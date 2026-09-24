@@ -1,0 +1,10 @@
+#SPELLINDEX^CASTERMETXT^CASTEROTHERTXT^CASTEDMETXT^CASTEDOTHERTXT^SPELLGONE^
+9^^^You feel much better.^ feels much better.^^
+32^^^You feel feverish.^ sweats and shivers, looking feverish.^Your fever has broken.^
+436^^^You have been poisoned.^ has been poisoned.^The poison has run its course.^
+4093^^^You stagger under a dark curse.^ staggers under a dark curse.^You are no longer cursed.^
+6906^^^You begin to snarl as your features become feline.^ growls with the spirit of the puma.^The spirit of the puma departs.^
+74067^^^You being to feel healed by the slug.^ is healed by the spirit of the slug.^You feel the slug spirit depart.^
+2334^^^^^^
+2335^^^^^^
+2368^^^^^^

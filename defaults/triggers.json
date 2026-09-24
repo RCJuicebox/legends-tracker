@@ -1,0 +1,149 @@
+[
+  {
+    "id": "1a2ada15-61e0-4c34-957b-de3f0478d7e9",
+    "name": "Incoming tell",
+    "folder": "Chat",
+    "enabled": true,
+    "comment": "Speaks who sent a tell and what it says.",
+    "phrases": [
+      {
+        "text": "^(?<S1>\\w+) tells you, '(?<S2>.+)'$",
+        "regex": true
+      }
+    ],
+    "cooldownSec": 0,
+    "actions": [
+      {
+        "type": "speak",
+        "text": "Tell from {S1}: {S2}",
+        "interrupt": false
+      }
+    ]
+  },
+  {
+    "id": "a1f0c9d2-4e3b-4a71-9c58-7d21b8e40001",
+    "name": "Haste faded - recast",
+    "folder": "Buffs",
+    "enabled": true,
+    "comment": "Speaks when a speed buff wears off. Covers both wordings the game uses.",
+    "phrases": [
+      {
+        "text": "Your speed returns to normal.",
+        "regex": false
+      },
+      {
+        "text": "Your speed returns.",
+        "regex": false
+      }
+    ],
+    "cooldownSec": 0,
+    "actions": [
+      {
+        "type": "speak",
+        "text": "Recast Haste",
+        "interrupt": false
+      }
+    ]
+  },
+  {
+    "id": "a1f0c9d2-4e3b-4a71-9c58-7d21b8e40002",
+    "name": "Spell interrupted",
+    "folder": "Spells",
+    "enabled": true,
+    "comment": "A bump sound whenever one of your casts is interrupted.",
+    "phrases": [
+      {
+        "text": "Your {S1} is interrupted.",
+        "regex": false
+      }
+    ],
+    "cooldownSec": 0,
+    "actions": [
+      {
+        "type": "sound",
+        "file": "thump.wav",
+        "volume": 0.5
+      }
+    ]
+  },
+  {
+    "id": "a1f0c9d2-4e3b-4a71-9c58-7d21b8e40003",
+    "name": "Invis dropping",
+    "folder": "Buffs",
+    "enabled": true,
+    "comment": "Warns just before invisibility ends.",
+    "phrases": [
+      {
+        "text": "You feel yourself starting to appear.",
+        "regex": false
+      }
+    ],
+    "cooldownSec": 0,
+    "actions": [
+      {
+        "type": "speak",
+        "text": "Invis dropping",
+        "interrupt": true
+      },
+      {
+        "type": "text",
+        "text": "INVIS DROPPING",
+        "color": "#ffaa33",
+        "durationSec": 6
+      }
+    ]
+  },
+  {
+    "id": "a1f0c9d2-4e3b-4a71-9c58-7d21b8e40004",
+    "name": "FD Fail",
+    "folder": "Combat",
+    "enabled": true,
+    "comment": "Your feign death failed and you fell to the ground ({C} is your character).",
+    "phrases": [
+      {
+        "text": "{C} has fallen to the ground.",
+        "regex": false
+      }
+    ],
+    "cooldownSec": 0,
+    "actions": [
+      {
+        "type": "speak",
+        "text": "FD Fail",
+        "interrupt": true
+      }
+    ]
+  },
+  {
+    "id": "a1f0c9d2-4e3b-4a71-9c58-7d21b8e40005",
+    "name": "FD broken",
+    "folder": "Combat",
+    "enabled": true,
+    "comment": "Feign death was broken and you are standing up.",
+    "phrases": [
+      {
+        "text": "You are no longer feigning death",
+        "regex": false
+      }
+    ],
+    "cooldownSec": 0,
+    "actions": [
+      {
+        "type": "speak",
+        "text": "F D broken",
+        "interrupt": true
+      },
+      {
+        "type": "sound",
+        "file": "alert.wav",
+        "volume": 1
+      },
+      {
+        "type": "text",
+        "text": "FD BROKEN - STANDING UP",
+        "color": "#ff4444",
+        "durationSec": 6
+      }
+    ]
+  }
+]
