@@ -28,15 +28,17 @@ updates and uninstalls.
 
 ### Releasing a new version
 
-1. Bump `version` in `package.json` (e.g. 1.0.0 → 1.1.0). The updater only offers a higher version.
-2. Build and publish:
+1. Bump `version` in `package.json` (e.g. 1.0.0 → 1.1.0) and commit. The updater only offers a higher
+   version.
+2. Run:
 
    ```bash
-   GH_TOKEN=$(gh auth token) npm run release
+   npm run release
    ```
 
-   This builds the installer and uploads it, with `latest.yml` and its blockmap, to a GitHub Release
-   for that version. Every installed copy picks it up on its next check.
+   It tags the version, creates the GitHub Release as a draft, builds and uploads the installer with
+   `latest.yml` and its blockmap, checks all three arrived, then publishes. Every installed copy picks it
+   up on its next check. It uses the GitHub CLI's login (`gh auth login`).
 
 `npm run dist` builds the installer into `dist\` without publishing anything.
 
