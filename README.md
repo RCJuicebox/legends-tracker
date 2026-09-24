@@ -36,9 +36,14 @@ updates and uninstalls.
    npm run release
    ```
 
-   It tags the version, creates the GitHub Release as a draft, builds and uploads the installer with
-   `latest.yml` and its blockmap, checks all three arrived, then publishes. Every installed copy picks it
-   up on its next check. It uses the GitHub CLI's login (`gh auth login`).
+   It pushes the commit and its version tag. GitHub Actions (`.github/workflows/release.yml`) then builds
+   the installer from that commit on a clean Windows machine, runs the tests, creates the release as a
+   draft, uploads the installer with `latest.yml` and its blockmap, checks all three arrived, and
+   publishes. Every installed copy picks it up on its next check. `gh run watch` follows the build.
+
+Running the Release workflow by hand (Actions → Release → Run workflow) is a dry run: it builds the
+installer and attaches it to the run, publishing nothing. Every push to `main` also runs the type-check
+and tests (`ci.yml`).
 
 `npm run dist` builds the installer into `dist\` without publishing anything.
 

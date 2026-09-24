@@ -3,13 +3,14 @@
 //   1. bump "version" in package.json and commit
 //   2. npm run release
 //
-// Order matters: GitHub only accepts a published release for a tag that already exists, and
-// electron-builder uploads the installer and latest.yml in parallel, so the release is created
-// first as a draft, filled, and published only once every file is up.
+// This pushes the commit and its version tag; GitHub Actions (.github/workflows/release.yml) then
+// builds the installer from that commit on a clean Windows machine and publishes it. Releases are
+// only ever built there, the same way every time, from the public source. `npm run dist` still builds
+// an installer locally for testing, without publishing anything.
 import { execSync } from 'node:child_process'
 import { readFileSync } from 'node:fs'
 
-const run = (cmd, opts = {}) => execSync(cmd, { stdio: 'inherit', ...opts })
+const run = (cmd) => execSync(cmd, { stdio: 'inherit' })
 const out = (cmd) => execSync(cmd, { encoding: 'utf8' }).trim()
 
 const { version } = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'))
@@ -21,15 +22,6 @@ if (out(`git ls-remote --tags origin ${tag}`)) throw new Error(`${tag} is alread
 run('git push origin HEAD')
 run(`git tag -a ${tag} -m "Legends Tracker ${version}"`)
 run(`git push origin ${tag}`)
-run(`gh release create ${tag} --draft --title "${version}" --notes "Legends Tracker ${version}. Download Legends-Tracker-Setup-${version}.exe below; installed copies update themselves."`)
-
-const token = out('gh auth token')
-run('npx electron-vite build')
-run('npx electron-builder --win --publish always', { env: { ...process.env, GH_TOKEN: token } })
-
-const assets = JSON.parse(out(`gh release view ${tag} --json assets`)).assets.map((a) => a.name)
-for (const need of ['latest.yml', `Legends-Tracker-Setup-${version}.exe`, `Legends-Tracker-Setup-${version}.exe.blockmap`]) {
-  if (!assets.includes(need)) throw new Error(`${need} did not upload; the release is still a draft. Fix and re-run electron-builder --publish always.`)
-}
-run(`gh release edit ${tag} --draft=false --latest`)
-console.log(`\nReleased ${tag}: https://github.com/RCJuicebox/legends-tracker/releases/tag/${tag}`)
+console.log(`\nPushed ${tag}. GitHub Actions is building and publishing it:`)
+console.log('  https://github.com/RCJuicebox/legends-tracker/actions/workflows/release.yml')
+console.log('Follow along with: gh run watch')
