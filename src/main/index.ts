@@ -10,7 +10,7 @@ import { GameWatcher, overlaysVisible } from './gameWatcher'
 import { Updater } from './updater'
 import { captureScreens, ocrImage } from './ocr'
 import { composeRows, countsFromComposite, findMoteRows, rows as ocrRows } from '../core/screenText'
-import { listLogs } from './game'
+import { checkGameFolder, findInstall, listLogs, logIsIn, resolveGameFolder } from './game'
 import { summarize } from '../core/spells'
 import { focusFromSpell, isDurationFocus } from '../core/focus'
 import { testTrigger } from '../core/triggers'
@@ -203,10 +203,20 @@ function saveSettings(next: AppSettings): AppSettings {
   refreshOverlayVisibility()
   toAudio({ kind: 'config' })
   engine.reconfigure()
-  if (next.installDir !== prev.installDir) void engine.loadSpells()
+  if (next.installDir !== prev.installDir) {
+    void engine.loadSpells()
+    // A log from the old folder no longer fits; follow the newest character log in the new one.
+    if (!logIsIn(next.logFile, next.installDir)) void followNewestLog(next.installDir)
+  }
   if (next.logFile !== prev.logFile && (engine.status.watching || next.autoStart)) void engine.startWatching()
   toMain('state:settings', next)
   return next
+}
+
+async function followNewestLog(dir: string): Promise<void> {
+  const newest = (await listLogs(dir))[0]?.path ?? ''
+  const s = store.settings.get()
+  if (s.installDir === dir && s.logFile !== newest && !logIsIn(s.logFile, dir)) saveSettings({ ...s, logFile: newest })
 }
 
 function registerIpc(): void {
@@ -313,6 +323,26 @@ function registerIpc(): void {
   handle('audio:sound', (file: string) => engine.playSound(file, 1))
   handle('audio:sounds', () => engine.listSounds())
   handle('audio:mute', () => toggleMute())
+
+  handle('game:check', (dir?: string) => checkGameFolder(dir ?? store.settings.get().installDir))
+  handle('game:find', async () => {
+    const dir = await findInstall()
+    if (dir) saveSettings({ ...store.settings.get(), installDir: dir })
+    return dir
+  })
+  // Takes the game folder, or a folder in or above it, and returns the game folder it settled on.
+  handle('game:choose', async () => {
+    const s = store.settings.get()
+    const r = await dialog.showOpenDialog(mainWindow!, {
+      title: 'Choose your EverQuest Legends folder',
+      defaultPath: s.installDir || undefined,
+      properties: ['openDirectory']
+    })
+    if (r.canceled) return { canceled: true, picked: '', dir: '' }
+    const dir = resolveGameFolder(r.filePaths[0])
+    if (dir) saveSettings({ ...store.settings.get(), installDir: dir })
+    return { canceled: false, picked: r.filePaths[0], dir }
+  })
 
   handle('dialog:folder', async () => {
     const r = await dialog.showOpenDialog(mainWindow!, { properties: ['openDirectory'] })

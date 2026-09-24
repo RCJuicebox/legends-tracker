@@ -3,6 +3,7 @@ import { useApp } from '../state'
 import { api, mb, ago } from '../api'
 import { useUpdate } from '../update'
 import { Field, NumberInput, Switch } from '../components/ui'
+import { GameFolderCard } from '../components/GameFolder'
 import type { LogFileInfo, TrackingSettings } from '../../../shared/types'
 
 export function Settings() {
@@ -10,7 +11,7 @@ export function Settings() {
   const s = state.settings
   const t = s.tracking
   const [logs, setLogs] = useState<LogFileInfo[]>([])
-  useEffect(() => void api.invoke<LogFileInfo[]>('logs:list').then(setLogs), [s.installDir])
+  useEffect(() => void api.invoke<LogFileInfo[]>('logs:list').then(setLogs), [s.installDir, s.logFile])
   const setT = (patch: Partial<TrackingSettings>) => patchSettings((x) => ({ ...x, tracking: { ...x.tracking, ...patch } }))
   const update = useUpdate()
   const u = update.status
@@ -55,15 +56,7 @@ export function Settings() {
 
         <div className="card stack" style={{ gap: 14 }}>
           <h2>Game</h2>
-          <Field label="EverQuest Legends folder" hint={state.status.spellsLoaded ? `${state.status.spellsLoaded.toLocaleString()} spells loaded from spells_us.txt` : state.status.spellError || 'Not found'}>
-            <div className="row">
-              <input className="grow" value={s.installDir} onChange={(e) => patchSettings((x) => ({ ...x, installDir: e.target.value }))} />
-              <button className="btn" onClick={async () => {
-                const dir = await api.invoke<string | null>('dialog:folder')
-                if (dir) void patchSettings((x) => ({ ...x, installDir: dir }))
-              }}>Browse…</button>
-            </div>
-          </Field>
+          <GameFolderCard />
           <Field label="Character log">
             <select value={s.logFile} onChange={(e) => patchSettings((x) => ({ ...x, logFile: e.target.value }))}>
               <option value="">Choose…</option>

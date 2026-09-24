@@ -1,7 +1,7 @@
 import { execFile } from 'node:child_process'
 import { existsSync, promises as fs } from 'node:fs'
-import { join } from 'node:path'
-import type { ArchiveInfo, LogFileInfo } from '../shared/types'
+import { dirname, join } from 'node:path'
+import type { ArchiveInfo, GameFolderCheck, LogFileInfo } from '../shared/types'
 
 const INSTALL_SUFFIXES = [
   '\\Daybreak Game Company\\Installed Games\\EverQuest Legends',
@@ -11,14 +11,88 @@ const INSTALL_SUFFIXES = [
   '\\EverQuest Legends'
 ]
 
-export function findInstall(): string {
+/** A game folder has the spell data the tracker reads; that is the one file it cannot work without. */
+export function isGameFolder(dir: string): boolean {
+  return !!dir && existsSync(join(dir, 'spells_us.txt'))
+}
+
+/**
+ * The game folder for a folder someone picked: the folder itself, the one above it when they picked
+ * Logs or another folder inside the game, or EverQuest Legends inside it when they picked the
+ * Daybreak "Installed Games" folder or one above that.
+ */
+export function resolveGameFolder(dir: string): string {
+  if (!dir) return ''
+  const inside = ['EverQuest Legends', join('Installed Games', 'EverQuest Legends'), join('Daybreak Game Company', 'Installed Games', 'EverQuest Legends')]
+  for (const d of [dir, ...inside.map((s) => join(dir, s))]) if (isGameFolder(d)) return d
+  let up = dir
+  for (let i = 0; i < 2; i++) {
+    const parent = dirname(up)
+    if (parent === up) break
+    up = parent
+    if (isGameFolder(up)) return up
+  }
+  return ''
+}
+
+/** The folder the game's own uninstaller is in, as Windows records it for Add or Remove Programs. */
+function fromUninstallEntry(): Promise<string> {
+  const entry = 'Microsoft\\Windows\\CurrentVersion\\Uninstall\\DGC-EverQuest Legends'
+  const keys = [`HKCU\\Software\\${entry}`, `HKLM\\Software\\${entry}`, `HKLM\\Software\\WOW6432Node\\${entry}`]
+  const query = (key: string) =>
+    new Promise<string>((resolve) => {
+      execFile('reg', ['query', key], { windowsHide: true }, (err, stdout) => {
+        if (err) return resolve('')
+        for (const name of ['InstallLocation', 'UninstallString', 'DisplayIcon']) {
+          const m = new RegExp(`^\\s*${name}\\s+REG_\\w+\\s+(.+?)\\s*$`, 'mi').exec(stdout)
+          const value = m?.[1].replace(/^"|"$/g, '').replace(/,\d+$/, '') ?? ''
+          if (!value) continue
+          const dir = name === 'InstallLocation' ? value : dirname(value)
+          if (isGameFolder(dir)) return resolve(dir)
+        }
+        resolve('')
+      })
+    })
+  return keys.reduce<Promise<string>>(async (found, key) => (await found) || query(key), Promise.resolve(''))
+}
+
+/** Looks for EverQuest Legends: Windows' record of the install first, then the usual folders on every drive. */
+export async function findInstall(): Promise<string> {
+  const registered = await fromUninstallEntry()
+  if (registered) return registered
   for (const drive of 'CDEFGHIJKLMNOPQRSTUVWXYZ') {
     for (const suffix of INSTALL_SUFFIXES) {
       const p = `${drive}:${suffix}`
-      if (existsSync(join(p, 'spells_us.txt'))) return p
+      if (isGameFolder(p)) return p
     }
   }
   return ''
+}
+
+/** What the tracker can use in a game folder: spell data, character logs, inventory and achievement exports. */
+export async function checkGameFolder(dir: string): Promise<GameFolderCheck> {
+  const empty: GameFolderCheck = { dir, exists: false, spells: false, logs: [], inventory: [], achievements: [] }
+  if (!dir) return empty
+  let names: string[]
+  try {
+    names = await fs.readdir(dir)
+  } catch {
+    return empty
+  }
+  const characters = (re: RegExp) => names.map((n) => re.exec(n)?.[1]).filter((c): c is string => !!c).sort()
+  return {
+    dir,
+    exists: true,
+    spells: names.some((n) => n.toLowerCase() === 'spells_us.txt'),
+    logs: (await listLogs(dir)).map((l) => l.character),
+    inventory: characters(/^(.+)-Inventory\.txt$/i),
+    achievements: characters(/^(.+)-Achievements\.txt$/i)
+  }
+}
+
+/** Whether a log file lives in this game folder's Logs. */
+export function logIsIn(logFile: string, dir: string): boolean {
+  return !!logFile && !!dir && dirname(logFile).toLowerCase() === join(dir, 'Logs').toLowerCase()
 }
 
 export async function listLogs(installDir: string): Promise<LogFileInfo[]> {

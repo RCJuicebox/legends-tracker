@@ -3,6 +3,7 @@ import { useApp } from '../state'
 import { api, ago, mb } from '../api'
 import { TimerBars, useNow } from '../components/TimerBars'
 import { Icon } from '../components/ui'
+import { GameFolderPrompt } from '../components/GameFolder'
 import type { PageId } from '../main'
 import { perHour, useMotes } from './Motes'
 import { localDay, sessionHours, totalMotes } from '../../../core/motes'
@@ -50,8 +51,8 @@ export function Dashboard({ go }: { go: (p: PageId) => void }) {
         </div>
       </div>
 
-      {status.spellError && <div className="notice bad" style={{ marginBottom: 16 }}>{status.spellError} — check the game folder under Settings.</div>}
-      {!settings.logFile && (
+      <GameFolderPrompt />
+      {settings.installDir && !status.spellError && !settings.logFile && (
         <div className="notice" style={{ marginBottom: 16 }}>
           No character log selected. <button className="btn small" onClick={() => go('settings')}>Choose one</button>
         </div>

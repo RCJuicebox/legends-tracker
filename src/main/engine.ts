@@ -16,7 +16,7 @@ import { readLines, scanMoteHistory } from './moteHistory'
 import { createReadStream } from 'node:fs'
 import type { LogLine } from '../core/logLine'
 import { characterKey, characterName, type Store } from './store'
-import { findInstall, isGameRunning, lastZone, listArchives, listLogs } from './game'
+import { findInstall, isGameFolder, isGameRunning, lastZone, listArchives, listLogs } from './game'
 import type { SpeechWorker } from './speech'
 import type {
   AppSettings, ArchiveStatus, CharacterSettings, FeedItem, KnownSpell, LogCheckRow, MoteStock, Notification, SpellRule, TimerView, WatchStatus
@@ -103,8 +103,8 @@ export class Engine {
 
   async init(): Promise<void> {
     const s = this.settings
-    if (!s.installDir || !existsSync(join(s.installDir, 'spells_us.txt'))) {
-      const found = findInstall()
+    if (!isGameFolder(s.installDir)) {
+      const found = await findInstall()
       if (found) this.store.settings.set({ ...s, installDir: found })
     }
     if (!this.settings.logFile && this.settings.installDir) {

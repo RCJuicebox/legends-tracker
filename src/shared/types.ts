@@ -162,6 +162,17 @@ export interface AppSettings {
 
 // ---- Mote stock (the upgrade planner's inventory) ----
 
+/** What a game folder holds that the tracker can use. Character names are as the files spell them, e.g. Name_server. */
+export interface GameFolderCheck {
+  dir: string
+  exists: boolean
+  /** spells_us.txt: needed for spell timers. */
+  spells: boolean
+  logs: string[]
+  inventory: string[]
+  achievements: string[]
+}
+
 export interface MoteStock {
   /** Motes on hand, by rank key ("major": 60). */
   counts: Partial<Record<string, number>>
