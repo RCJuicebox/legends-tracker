@@ -82,8 +82,17 @@ export function totalMotes(c: MoteCounts): number {
   return Object.values(c).reduce((n, v) => n + (v ?? 0), 0)
 }
 
-export function moteXp(c: MoteCounts): number {
-  return MOTE_RANKS.reduce((n, r) => n + (c[r.key] ?? 0) * r.xp, 0)
+/**
+ * What a rank is worth counted in Infinitesimal motes. Two motes of a rank combine into one of the
+ * next, so each rank is worth double the one below: Minor 2, Potential 8, Major 16, Superior 64.
+ */
+export function moteWorth(index: number): number {
+  return 2 ** index
+}
+
+/** The combine value of a haul, in Infinitesimal motes. Higher ranks count for what they took to make. */
+export function moteValue(c: MoteCounts): number {
+  return MOTE_RANKS.reduce((n, r, i) => n + (c[r.key] ?? 0) * moteWorth(i), 0)
 }
 
 export function moteName(rank: MoteKey): string {

@@ -3,7 +3,7 @@ import { api, clock } from '../api'
 import { useNow } from '../components/TimerBars'
 import { Icon } from '../components/ui'
 import { MotePlanner } from './MotePlanner'
-import { MOTE_RANKS, localDay, moteXp, pausedHours, sessionHours, totalMotes, type MoteCounts, type MoteSession, type MoteState } from '../../../core/motes'
+import { MOTE_RANKS, localDay, moteValue, moteWorth, pausedHours, sessionHours, totalMotes, type MoteCounts, type MoteSession, type MoteState } from '../../../core/motes'
 
 type View = MoteState & { scanning: string }
 
@@ -16,6 +16,9 @@ export function useMotes(): View | null {
   return view
 }
 
+const VALUE_HINT =
+  'Counted in Infinitesimal motes. Two of a rank combine into one of the next, so each rank is worth double the one below: Minor 2, Lesser 4, Potential 8, Major 16, Greater 32, Superior 64, Grand 128.'
+
 export function perHour(n: number, hours: number): string {
   return hours >= 1 / 60 ? (n / hours).toFixed(1) : '—'
 }
@@ -26,7 +29,7 @@ function RankChips({ counts }: { counts: MoteCounts }) {
   return (
     <span className="row tight">
       {ranks.map((r) => (
-        <span key={r.key} className="chip" title={`${r.xp} XP each`}>
+        <span key={r.key} className="chip" title={`Worth ${moteWorth(MOTE_RANKS.indexOf(r))} Infinitesimal each`}>
           {counts[r.key]} {r.name || 'Potential'}
         </span>
       ))}
@@ -119,7 +122,7 @@ function MoteTracking() {
   const crawls = view.sessions.filter((s) => s.kind === 'crawl' && s.outcome === 'completed')
   const crawlHours = crawls.reduce((n, s) => n + sessionHours(s, now), 0)
   const crawlMotes = crawls.reduce((n, s) => n + totalMotes(s.motes), 0)
-  const crawlXp = crawls.reduce((n, s) => n + moteXp(s.motes), 0)
+  const crawlValue = crawls.reduce((n, s) => n + moteValue(s.motes), 0)
   const allTime: MoteCounts = {}
   for (const day of Object.values(view.daily)) for (const r of MOTE_RANKS) if (day[r.key]) allTime[r.key] = (allTime[r.key] ?? 0) + day[r.key]!
 
@@ -174,12 +177,12 @@ function MoteTracking() {
                 <div className="stat">
                   <span className="label">Motes</span>
                   <span className="value">{totalMotes(a.motes)}</span>
-                  <span className="sub">{moteXp(a.motes)} XP</span>
+                  <span className="sub" title={VALUE_HINT}>{moteValue(a.motes)} value</span>
                 </div>
                 <div className="stat">
                   <span className="label">Per hour</span>
                   <span className="value">{perHour(totalMotes(a.motes), sessionHours(a, now))}</span>
-                  <span className="sub">{perHour(moteXp(a.motes), sessionHours(a, now))} XP/hour</span>
+                  <span className="sub" title={VALUE_HINT}>{perHour(moteValue(a.motes), sessionHours(a, now))} value/hour</span>
                 </div>
               </div>
               <RankChips counts={a.motes} />
@@ -196,7 +199,7 @@ function MoteTracking() {
             <div className="stat">
               <span className="label">Today</span>
               <span className="value">{totalMotes(today)}</span>
-              <span className="sub">{moteXp(today)} XP</span>
+              <span className="sub" title={VALUE_HINT}>{moteValue(today)} value</span>
             </div>
             <div className="stat">
               <span className="label">Completed crawls</span>
@@ -206,7 +209,7 @@ function MoteTracking() {
             <div className="stat">
               <span className="label">Crawl average</span>
               <span className="value">{perHour(crawlMotes, crawlHours)}/h</span>
-              <span className="sub">{perHour(crawlXp, crawlHours)} XP/hour</span>
+              <span className="sub" title={VALUE_HINT}>{perHour(crawlValue, crawlHours)} value/hour</span>
             </div>
           </div>
           <div className="small muted" style={{ marginBottom: 6 }}>Today</div>
@@ -232,7 +235,7 @@ function MoteTracking() {
                 <th>Time</th>
                 <th>Motes</th>
                 <th>Per hour</th>
-                <th>XP / hour</th>
+                <th title={VALUE_HINT}>Value / hour</th>
                 <th />
               </tr>
             </thead>
@@ -263,7 +266,7 @@ function MoteTracking() {
                     </td>
                     <td className="mono">{totalMotes(s.motes)}</td>
                     <td className="mono">{perHour(totalMotes(s.motes), h)}</td>
-                    <td className="mono">{perHour(moteXp(s.motes), h)}</td>
+                    <td className="mono">{perHour(moteValue(s.motes), h)}</td>
                     <td>
                       <button className="btn ghost small" title="Remove from the list" onClick={() => api.invoke('motes:forget', s.id)}>
                         ×

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { MoteTracker, moteXp, parseMoteLoot, sessionHours, totalMotes, type MoteSession } from '../src/core/motes'
+import { MoteTracker, moteValue, parseMoteLoot, sessionHours, totalMotes, type MoteSession } from '../src/core/motes'
 import { parseLogLine } from '../src/core/logLine'
 
 function tracker() {
@@ -64,7 +64,8 @@ describe('MoteTracker', () => {
     expect((done.endedAt! - done.startedAt) / 60_000).toBeCloseTo(49.32, 1)
     expect(done.motes).toEqual({ major: 11, superior: 1 })
     expect(totalMotes(done.motes)).toBe(12)
-    expect(moteXp(done.motes)).toBe(11 * 5 + 7)
+    // Major is worth 16 Infinitesimal, Superior 64.
+    expect(moteValue(done.motes)).toBe(11 * 16 + 64)
     // Every mote counts towards the day, crawl or not.
     expect(t.state.daily['2026-09-24']).toEqual({ major: 12, superior: 1 })
   })
