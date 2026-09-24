@@ -18,6 +18,100 @@ export function useStock(): [MoteStock | null, (s: MoteStock) => void] {
   return [stock, setStock]
 }
 
+interface ScreenRead {
+  counts: Record<string, number>
+  rows: string[]
+  nearMisses: string[]
+  screens: number
+}
+
+function ReadFromScreen({ stock, onApplied }: { stock: MoteStock; onApplied: (s: MoteStock) => void }) {
+  const [busy, setBusy] = useState(false)
+  const [read, setRead] = useState<ScreenRead | null>(null)
+  const [error, setError] = useState('')
+  const run = async () => {
+    setBusy(true)
+    setError('')
+    try {
+      setRead(await api.invoke<ScreenRead>('stock:readScreen'))
+    } catch (e) {
+      setError((e as Error).message)
+    } finally {
+      setBusy(false)
+    }
+  }
+  const found = read ? MOTE_RANKS.filter((r) => read.counts[r.key] !== undefined) : []
+  return (
+    <div className="stack" style={{ gap: 10, marginBottom: 14 }}>
+      <div className="row">
+        <button className="btn primary" disabled={busy} onClick={() => void run()}>
+          {busy ? 'Reading the screen…' : 'Read motes from screen'}
+        </button>
+        <span className="faint small">Open your currency window in game first. This window steps aside for a second while it looks.</span>
+      </div>
+      {error && <div className="notice bad">Could not read the screen: {error}</div>}
+      {read && found.length === 0 && (
+        <div className="notice">
+          No mote counts found on {read.screens} screen{read.screens === 1 ? '' : 's'}. Is the currency window open and not covered?
+          {read.nearMisses.length > 0 && (
+            <div className="small mono" style={{ marginTop: 6 }}>
+              Nearby text it did read: {read.nearMisses.join(' · ')}
+            </div>
+          )}
+        </div>
+      )}
+      {read && found.length > 0 && (
+        <div className="action-card">
+          <b>Read from the screen</b>
+          <table className="table">
+            <thead>
+              <tr>
+                <th>Mote</th>
+                <th>On screen</th>
+                <th>Your stock</th>
+                <th />
+              </tr>
+            </thead>
+            <tbody>
+              {found.map((r) => {
+                const now = stock.counts[r.key] ?? 0
+                const seen = read.counts[r.key]
+                return (
+                  <tr key={r.key}>
+                    <td>{r.name || 'Potential'}</td>
+                    <td className="mono">{seen}</td>
+                    <td className="mono">{now}</td>
+                    <td>{seen === now ? <span className="chip ok">same</span> : <span className="chip warn">{seen > now ? `+${seen - now}` : seen - now}</span>}</td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+          <div className="row">
+            <button
+              className="btn primary"
+              onClick={async () => {
+                onApplied(await api.invoke<MoteStock>('stock:counts', { ...stock.counts, ...read.counts }))
+                setRead(null)
+              }}
+            >
+              Apply these counts
+            </button>
+            <button className="btn ghost" onClick={() => setRead(null)}>
+              Discard
+            </button>
+            <span className="faint small">Ranks it did not see keep their current counts.</span>
+          </div>
+          <details className="small faint">
+            <summary>Rows it read</summary>
+            <div className="mono">{read.rows.map((r, i) => <div key={i}>{r}</div>)}</div>
+          </details>
+        </div>
+      )}
+    </div>
+  )
+}
+
 export function MotePlanner() {
   const [stock, setStock] = useStock()
   // Typed values are kept as text while editing, so a field can be cleared and retyped.
@@ -148,6 +242,7 @@ export function MotePlanner() {
             Add looted motes automatically
           </span>
         </h2>
+        <ReadFromScreen stock={stock} onApplied={setStock} />
         <table className="table">
           <thead>
             <tr>

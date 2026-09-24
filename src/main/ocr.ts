@@ -3,13 +3,13 @@ import { desktopCapturer, screen } from 'electron'
 import { promises as fs } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import type { OcrWord } from '../core/screenText'
+import type { Composite, OcrWord } from '../core/screenText'
 
 // Reads text off the screen with Windows' own OCR (Windows.Media.Ocr). It looks at pixels, the way a
 // player reads a window; it never touches the game's process or memory. The capture is enlarged 3×
 // and inverted to dark-on-light first: the game's small light-on-dark font reads far better that way.
 const SCRIPT = `
-param([string]$Path, [int]$Scale)
+param([string]$Path, [int]$Scale, [string]$Compose = '')
 $ErrorActionPreference = 'Stop'
 Add-Type -AssemblyName System.Runtime.WindowsRuntime
 Add-Type -AssemblyName System.Drawing
@@ -22,6 +22,17 @@ function Await($op, [Type]$t) { $task = $asTask.MakeGenericMethod($t).Invoke($nu
 # The OCR API wants a full path with backslashes.
 $Path = [System.IO.Path]::GetFullPath($Path)
 $src = [System.Drawing.Bitmap]::FromFile($Path)
+# Compose is 'width,height;sx,sy,w,h,dx,dy;...': pieces of the capture redrawn onto a fresh dark image.
+if ($Compose) {
+  $parts = $Compose.Split(';'); $size = $parts[0].Split(',')
+  $comp = New-Object System.Drawing.Bitmap ([int]$size[0]), ([int]$size[1])
+  $cg = [System.Drawing.Graphics]::FromImage($comp); $cg.Clear([System.Drawing.Color]::Black)
+  foreach ($piece in $parts[1..($parts.Count - 1)]) {
+    $n = $piece.Split(',') | ForEach-Object { [int]$_ }
+    $cg.DrawImage($src, (New-Object System.Drawing.Rectangle $n[4], $n[5], $n[2], $n[3]), $n[0], $n[1], $n[2], $n[3], [System.Drawing.GraphicsUnit]::Pixel)
+  }
+  $cg.Dispose(); $src.Dispose(); $src = $comp
+}
 $w = $src.Width * $Scale; $h = $src.Height * $Scale
 $bmp = New-Object System.Drawing.Bitmap $w, $h
 $g = [System.Drawing.Graphics]::FromImage($bmp)
@@ -44,11 +55,11 @@ $stream.Dispose(); Remove-Item $prepared -ErrorAction SilentlyContinue
 `
 
 /** OCR of an image file: every word with its box, in the image's own pixel coordinates. */
-export async function ocrImage(path: string, scale = 3): Promise<OcrWord[]> {
+export async function ocrImage(path: string, scale = 3, layout?: Composite): Promise<OcrWord[]> {
   const script = join(tmpdir(), 'legends-tracker-ocr.ps1')
   await fs.writeFile(script, SCRIPT, 'utf8')
   const out = await new Promise<string>((resolve, reject) => {
-    const p = spawn('powershell.exe', ['-NoLogo', '-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', script, '-Path', path, '-Scale', String(scale)], {
+    const p = spawn('powershell.exe', ['-NoLogo', '-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', script, '-Path', path, '-Scale', String(scale), ...(layout ? ['-Compose', composeArg(layout)] : [])], {
       windowsHide: true
     })
     let stdout = ''
@@ -63,6 +74,12 @@ export async function ocrImage(path: string, scale = 3): Promise<OcrWord[]> {
   const parsed = JSON.parse(out || '[]') as Raw[] | Raw
   const list = Array.isArray(parsed) ? parsed : [parsed]
   return list.map((w) => ({ text: w.t, x: w.x, y: w.y, w: w.w, h: w.h }))
+}
+
+/** The rebuilt image's layout as the OCR script takes it. Coordinates are whole pixels of the capture. */
+function composeArg(c: Composite): string {
+  const r = Math.round
+  return [`${r(c.width)},${r(c.height)}`, ...c.pieces.map((p) => [p.from.x, p.from.y, p.from.w, p.from.h, p.x, p.y].map(r).join(','))].join(';')
 }
 
 /** Captures every monitor at full resolution and returns the PNG paths. */

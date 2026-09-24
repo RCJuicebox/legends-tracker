@@ -8,6 +8,8 @@ import { IconSource } from './icons'
 import { OverlayManager } from './overlays'
 import { GameWatcher, overlaysVisible } from './gameWatcher'
 import { Updater } from './updater'
+import { captureScreens, ocrImage } from './ocr'
+import { composeRows, countsFromComposite, findMoteRows, rows as ocrRows } from '../core/screenText'
 import { listLogs } from './game'
 import { summarize } from '../core/spells'
 import { focusFromSpell, isDurationFocus } from '../core/focus'
@@ -294,6 +296,7 @@ function registerIpc(): void {
   handle('stock:item', (item: { name: string; lvl: number; xp: number; to: number }) => engine.setStockItem(item))
   handle('stock:autoAdd', (on: boolean) => engine.setStockAutoAdd(on))
   handle('stock:apply', () => engine.applyPlan())
+  handle('stock:readScreen', () => readMotesFromScreen())
   handle('motes:pause', (at?: number) => engine.motes.pause(at ?? Date.now(), Date.now()))
   handle('motes:resume', () => engine.motes.resume(Date.now()))
   handle('motes:forget', (id: string) => {
@@ -320,6 +323,47 @@ function registerIpc(): void {
     audioDevices = devices
     toMain('state:devices', devices)
   })
+}
+
+/**
+ * Reads mote counts off the screen: the game's currency window, open wherever it is. This window
+ * steps aside for a moment so it does not cover the game, then every monitor is captured and read
+ * with Windows' OCR. Nothing here touches the game's process.
+ *
+ * Two reads: the first finds the mote rows; the second reads a small image rebuilt from just those
+ * rows, each name set close beside its count, because OCR misses lone digits far out in a column.
+ */
+async function readMotesFromScreen() {
+  const wasVisible = !!mainWindow?.isVisible()
+  mainWindow?.hide()
+  try {
+    await new Promise((r) => setTimeout(r, 900))
+    const shots = await captureScreens()
+    const found: Record<string, number> = {}
+    const rowsRead: string[] = []
+    let sample: string[] = []
+    for (const path of shots) {
+      const words = await ocrImage(path, 2)
+      const moteRows = findMoteRows(words)
+      if (moteRows.length) {
+        const layout = composeRows(moteRows)
+        const second = countsFromComposite(await ocrImage(path, 3, layout), moteRows, layout)
+        moteRows.forEach((row, i) => {
+          const n = second[i] ?? row.count
+          if (n === null) return
+          found[row.rank] = n
+          rowsRead.push(`${row.text.replace(/\s*\d[\d,.]*$/, '')} → ${n}`)
+        })
+      }
+      if (!sample.length) sample = ocrRows(words).map((x) => x.text).filter((t) => /potential|mote/i.test(t)).slice(0, 20)
+    }
+    return { counts: found, rows: rowsRead, nearMisses: rowsRead.length ? [] : sample, screens: shots.length }
+  } finally {
+    if (wasVisible) {
+      mainWindow?.show()
+      mainWindow?.focus()
+    }
+  }
 }
 
 /** A first install gets its overlays laid out on the primary monitor, not wherever the defaults point. */
