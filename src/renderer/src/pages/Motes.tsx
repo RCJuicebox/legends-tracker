@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { api, clock } from '../api'
 import { useNow } from '../components/TimerBars'
 import { Icon } from '../components/ui'
+import { MotePlanner } from './MotePlanner'
 import { MOTE_RANKS, localDay, moteXp, pausedHours, sessionHours, totalMotes, type MoteCounts, type MoteSession, type MoteState } from '../../../core/motes'
 
 type View = MoteState & { scanning: string }
@@ -79,6 +80,37 @@ function PauseControl({ s, now }: { s: MoteSession; now: number }) {
 }
 
 export function Motes() {
+  const [tab, setTab] = useState<'tracking' | 'planner'>('tracking')
+  return (
+    <>
+      <div className="row" style={{ marginBottom: 14, gap: 6 }}>
+        <button className={`btn${tab === 'tracking' ? ' on' : ' ghost'}`} onClick={() => setTab('tracking')}>
+          Tracking
+        </button>
+        <button className={`btn${tab === 'planner' ? ' on' : ' ghost'}`} onClick={() => setTab('planner')}>
+          Upgrade planner
+        </button>
+      </div>
+      {tab === 'tracking' ? <MoteTracking /> : <MotePlannerPage />}
+    </>
+  )
+}
+
+function MotePlannerPage() {
+  return (
+    <>
+      <div className="page-head">
+        <div>
+          <h1>Upgrade planner</h1>
+          <p>Which motes an item needs to reach the level you want, and how to get them from your stock.</p>
+        </div>
+      </div>
+      <MotePlanner />
+    </>
+  )
+}
+
+function MoteTracking() {
   const view = useMotes()
   const now = useNow(1000)
   if (!view) return <div className="empty">Loading…</div>

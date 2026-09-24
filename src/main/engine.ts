@@ -10,7 +10,8 @@ import { SpellTracker } from '../core/spellTracker'
 import { TriggerEngine } from '../core/triggers'
 import { archiveLog, compressLoose, findStaging, finishStaged, stagingOriginalName, type ArchiveOutcome } from '../core/archiver'
 import { checkAgainstLog } from '../core/logCheck'
-import { MoteTracker, moteName, type MoteState } from '../core/motes'
+import { MoteTracker, moteName, parseMoteLoot, type MoteLoot, type MoteState } from '../core/motes'
+import { StockCursor, fixItem, levelFromName, plan } from '../core/moteCalc'
 import { readLines, scanMoteHistory } from './moteHistory'
 import { createReadStream } from 'node:fs'
 import type { LogLine } from '../core/logLine'
@@ -18,7 +19,7 @@ import { characterKey, characterName, type Store } from './store'
 import { findInstall, isGameRunning, lastZone, listArchives, listLogs } from './game'
 import type { SpeechWorker } from './speech'
 import type {
-  AppSettings, ArchiveStatus, CharacterSettings, FeedItem, KnownSpell, LogCheckRow, Notification, SpellRule, TimerView, WatchStatus
+  AppSettings, ArchiveStatus, CharacterSettings, FeedItem, KnownSpell, LogCheckRow, MoteStock, Notification, SpellRule, TimerView, WatchStatus
 } from '../shared/types'
 
 export interface EngineOutputs {
@@ -29,6 +30,7 @@ export interface EngineOutputs {
   feed: (item: FeedItem) => void
   archive: (status: ArchiveStatus) => void
   motes: (state: MoteState & { scanning: string }) => void
+  stock: (stock: MoteStock) => void
 }
 
 export type AudioCommand =
@@ -59,6 +61,9 @@ export class Engine {
   /** While history is being rebuilt, live lines wait here so none are lost or counted twice. */
   private moteBacklog: LogLine[] | null = null
   moteScan = ''
+  /** Pasted test lines must not add to the real mote stock. */
+  private simulating = false
+  private stockCursor: StockCursor | null = null
 
   constructor(
     private readonly store: Store,
@@ -79,8 +84,10 @@ export class Engine {
         this.store.motes.set(this.motes.state)
         this.motesDirty = true
       },
-      onLoot: (loot, session) =>
-        this.pushFeed('loot', `${loot.count > 1 ? `${loot.count} × ` : ''}${moteName(loot.rank)} from ${loot.source}${session ? '' : ' (no session running)'}`),
+      onLoot: (loot, session, time) => {
+        this.addToStock(loot, time)
+        this.pushFeed('loot', `${loot.count > 1 ? `${loot.count} × ` : ''}${moteName(loot.rank)} from ${loot.source}${session ? '' : ' (no session running)'}`)
+      },
       onSession: (s) =>
         this.pushFeed('loot', s.kind === 'crawl' ? `Dungeon crawl completed: ${s.name}` : `${s.kind === 'manual' ? 'Session' : 'Normal instance'} ended: ${s.name}`)
     })
@@ -233,6 +240,15 @@ export class Engine {
 
   /** Feeds pasted log lines through the live pipeline, with their times shifted to now. */
   simulate(text: string): void {
+    this.simulating = true
+    try {
+      this.simulateLines(text)
+    } finally {
+      this.simulating = false
+    }
+  }
+
+  private simulateLines(text: string): void {
     const parsed = text.split(/\r?\n/).map((l) => parseLogLine(l.trim())).filter((l) => l !== null)
     if (!parsed.length) return
     const shift = Date.now() - parsed[parsed.length - 1].time
@@ -502,6 +518,59 @@ export class Engine {
     this.pushFeed('info', 'The game is running.')
   }
 
+  // ---- mote stock and the upgrade planner ----
+
+  stockView(): MoteStock {
+    return this.store.stock.get()
+  }
+
+  private saveStock(next: MoteStock): MoteStock {
+    this.store.stock.set(next)
+    this.out.stock(next)
+    return next
+  }
+
+  private addToStock(loot: MoteLoot, time: number): void {
+    const s = this.store.stock.get()
+    if (this.simulating || !s.autoAdd) return
+    this.stockCursor ??= new StockCursor(s.seenUntil ?? 0, s.seenAtSecond ?? 0)
+    if (!this.stockCursor.accept(time)) return
+    this.saveStock({
+      ...s,
+      counts: { ...s.counts, [loot.rank]: (s.counts[loot.rank] ?? 0) + loot.count },
+      seenUntil: this.stockCursor.seenUntil,
+      seenAtSecond: this.stockCursor.seenAtSecond
+    })
+  }
+
+  setStockCounts(counts: MoteStock['counts']): MoteStock {
+    return this.saveStock({ ...this.store.stock.get(), counts })
+  }
+
+  setStockItem(item: MoteStock['item']): MoteStock {
+    return this.saveStock({ ...this.store.stock.get(), item: fixItem(item) })
+  }
+
+  setStockAutoAdd(on: boolean): MoteStock {
+    // Switching it back on counts from now, not from whenever it was switched off.
+    const s = this.store.stock.get()
+    if (on) this.stockCursor = new StockCursor(Date.now(), 0)
+    return this.saveStock({ ...s, autoAdd: on, ...(on ? { seenUntil: Date.now(), seenAtSecond: 0 } : {}) })
+  }
+
+  /** "Done": takes the planned motes off the stock and moves the item up to the level reached. */
+  applyPlan(): MoteStock {
+    const s = this.store.stock.get()
+    const p = plan(fixItem(s.item), s.counts)
+    if (!p.covered || !p.after) return s
+    const counts = { ...s.counts }
+    const keys = ['infinitesimal', 'minor', 'lesser', 'potential', 'major', 'greater', 'superior', 'grand', 'ascendant', 'infinite']
+    keys.forEach((k, i) => (counts[k] = p.after![i]))
+    const name = levelFromName(s.item.name) !== null ? s.item.name.replace(/\+\d+\s*$/, `+${p.reached}`) : s.item.name
+    this.pushFeed('loot', `Upgraded ${name || 'the item'} to +${p.reached}.`)
+    return this.saveStock({ ...s, counts, item: fixItem({ name, lvl: p.reached, xp: 0, to: Math.max(s.item.to, p.reached + 1) }) })
+  }
+
   moteView(): MoteState & { scanning: string } {
     return { ...this.motes.state, scanning: this.moteScan }
   }
@@ -512,15 +581,21 @@ export class Engine {
    */
   async catchUpMotes(): Promise<void> {
     const logFile = this.settings.logFile
-    const since = this.motes.state.seenUntil ?? 0
-    if (!logFile || this.moteBacklog || !since) return
+    const motesSince = this.motes.state.seenUntil ?? 0
+    const stockSince = this.store.stock.get().seenUntil ?? 0
+    const since = Math.min(motesSince || Infinity, stockSince || Infinity)
+    if (!logFile || this.moteBacklog || !Number.isFinite(since)) return
     this.moteBacklog = []
     let last = since
     try {
       await readLines(createReadStream(logFile), (line) => {
-        if (line.time > since) {
-          this.motes.handle(line)
-          last = line.time
+        if (line.time < since) return
+        last = line.time
+        if (line.time > motesSince) this.motes.handle(line)
+        else {
+          // Already tracked, but newer than the stock: count its motes into the stock only.
+          const loot = parseMoteLoot(line.text)
+          if (loot) this.addToStock(loot, line.time)
         }
       })
       for (const line of this.moteBacklog) if (line.time > last) this.motes.handle(line)

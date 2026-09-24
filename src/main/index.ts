@@ -112,7 +112,8 @@ const engine = new Engine(
     status: (s) => toMain('state:status', s),
     feed: (item) => toMain('state:feed', item),
     archive: (a) => toMain('state:archive', a),
-    motes: (m) => toMain('state:motes', m)
+    motes: (m) => toMain('state:motes', m),
+    stock: (s) => toMain('state:stock', s)
   },
   () => {
     const install = store.settings.get().installDir
@@ -288,6 +289,11 @@ function registerIpc(): void {
   handle('motes:start', () => engine.motes.startManual(Date.now()))
   handle('motes:stop', () => engine.motes.stop(Date.now()))
   handle('motes:rescan', () => engine.rebuildMoteHistory())
+  handle('stock:get', () => engine.stockView())
+  handle('stock:counts', (counts: Record<string, number>) => engine.setStockCounts(counts))
+  handle('stock:item', (item: { name: string; lvl: number; xp: number; to: number }) => engine.setStockItem(item))
+  handle('stock:autoAdd', (on: boolean) => engine.setStockAutoAdd(on))
+  handle('stock:apply', () => engine.applyPlan())
   handle('motes:pause', (at?: number) => engine.motes.pause(at ?? Date.now(), Date.now()))
   handle('motes:resume', () => engine.motes.resume(Date.now()))
   handle('motes:forget', (id: string) => {

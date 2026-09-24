@@ -8,6 +8,7 @@ import {
   type AppSettings,
   type CharacterSettings,
   type FocusSource,
+  type MoteStock,
   type OverlayConfig,
   type SpellRule,
   type Trigger
@@ -109,6 +110,7 @@ export class Store {
   readonly rules: JsonFile<Record<string, SpellRule>>
   readonly casts: JsonFile<Record<string, KnownCast>>
   readonly motes: JsonFile<MoteState>
+  readonly stock: JsonFile<MoteStock>
   /** True until mote history has been built from the logs once. */
   readonly motesFresh: boolean
   /** True on a first run, before any settings were saved. */
@@ -128,6 +130,13 @@ export class Store {
     const motes = readJson(p('motes.json')) as MoteState | undefined
     this.motesFresh = !motes
     this.motes = new JsonFile(p('motes.json'), motes ?? { active: null, sessions: [], daily: {} })
+    this.stock = new JsonFile(
+      p('mote-stock.json'),
+      mergeDefaults<MoteStock>(
+        { counts: {}, item: { name: '', lvl: 0, xp: 0, to: 1 }, autoAdd: true },
+        readJson(p('mote-stock.json'))
+      )
+    )
   }
 
   characterOf(logFile: string): CharacterSettings {
@@ -150,7 +159,7 @@ export class Store {
   }
 
   async flushAll(): Promise<void> {
-    await Promise.all([this.settings.flush(), this.triggers.flush(), this.rules.flush(), this.casts.flush(), this.motes.flush()])
+    await Promise.all([this.settings.flush(), this.triggers.flush(), this.rules.flush(), this.casts.flush(), this.motes.flush(), this.stock.flush()])
   }
 }
 

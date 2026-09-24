@@ -160,6 +160,21 @@ export interface AppSettings {
   overlaysOnlyWithGame: boolean
 }
 
+// ---- Mote stock (the upgrade planner's inventory) ----
+
+export interface MoteStock {
+  /** Motes on hand, by rank key ("major": 60). */
+  counts: Partial<Record<string, number>>
+  /** The item being planned. */
+  item: { name: string; lvl: number; xp: number; to: number }
+  /** Add motes to the stock as they are looted. */
+  autoAdd: boolean
+  /** The time of the last loot line counted into the stock, so a mote is never added twice … */
+  seenUntil?: number
+  /** … and how many loot lines in that second were counted (a reward chest logs several at once). */
+  seenAtSecond?: number
+}
+
 // ---- Triggers ----
 
 export interface Phrase {

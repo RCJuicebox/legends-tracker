@@ -93,7 +93,7 @@ export function moteName(rank: MoteKey): string {
 
 export interface MoteHooks {
   onChange: () => void
-  onLoot?: (loot: MoteLoot, session: MoteSession | null) => void
+  onLoot?: (loot: MoteLoot, session: MoteSession | null, time: number) => void
   onSession?: (session: MoteSession) => void
 }
 
@@ -196,7 +196,7 @@ export class MoteTracker {
     const recent = this.lastEnded && time - this.lastEnded.at <= CHEST_GRACE_MS ? this.lastEnded.session : null
     const target = this.state.active ?? recent
     if (target) target.motes[loot.rank] = (target.motes[loot.rank] ?? 0) + loot.count
-    this.hooks.onLoot?.(loot, target)
+    this.hooks.onLoot?.(loot, target, time)
     this.hooks.onChange()
   }
 
