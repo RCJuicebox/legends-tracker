@@ -1,7 +1,7 @@
 {
   "name": "legends-tracker",
   "productName": "Legends Tracker",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "private": true,
   "description": "Spell timers, recast cues, overlays, triggers, mote and crawl tracking, and log management for EverQuest Legends.",
   "main": "out/main/index.js",
@@ -63,7 +63,7 @@
       "out/**",
       "package.json",
       "!node_modules/koffi/build/koffi/!(win32_x64)/**",
-      "!node_modules/koffi/{src,vendor,doc}/**"
+      "!node_modules/koffi/{vendor,doc}/**"
     ],
     "extraResources": [
       {
