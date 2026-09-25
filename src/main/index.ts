@@ -8,6 +8,7 @@ import { IconSource } from './icons'
 import { OverlayManager } from './overlays'
 import { GameWatcher, overlaysVisible } from './gameWatcher'
 import { Updater } from './updater'
+import { AchievementFiles } from './achievements'
 import { captureScreens, ocrImage } from './ocr'
 import { composeRows, countsFromComposite, findMoteRows, rows as ocrRows } from '../core/screenText'
 import { checkGameFolder, findInstall, listLogs, logIsIn, resolveGameFolder } from './game'
@@ -16,6 +17,7 @@ import { focusFromSpell, isDurationFocus } from '../core/focus'
 import { testTrigger } from '../core/triggers'
 import { timerKey } from '../core/spellTracker'
 import type { AppSettings, CharacterSettings, SpellRule, Trigger } from '../shared/types'
+import type { AchMarks } from '../core/achievements'
 
 // Settings live in %APPDATA%\Legends Tracker. EQL_USER_DATA points a development or test run at a
 // separate profile, so a trial never touches real settings.
@@ -53,6 +55,10 @@ const updater = new Updater((s) => {
 })
 const speech = new SpeechWorker()
 const icons = new IconSource(() => store.settings.get().installDir)
+const achievementFiles = new AchievementFiles(
+  () => store.settings.get().installDir,
+  (view) => toMain('state:achievements', view)
+)
 
 function load(win: BrowserWindow, page: 'index' | 'overlay' | 'audio', query: Record<string, string> = {}): void {
   const dev = process.env['ELECTRON_RENDERER_URL']
@@ -369,6 +375,14 @@ function registerIpc(): void {
   handle('audio:sound', (file: string) => engine.playSound(file, 1))
   handle('audio:sounds', () => engine.listSounds())
   handle('audio:mute', () => toggleMute())
+
+  handle('achievements:characters', async () => ({
+    current: characterKey(store.settings.get().logFile),
+    available: (await checkGameFolder(store.settings.get().installDir)).achievements
+  }))
+  handle('achievements:load', (character: string) => achievementFiles.load(character))
+  handle('achievements:marks', (character: string, marks: AchMarks) => achievementFiles.saveMarks(character, marks))
+  handle('achievements:exportPath', (character: string) => achievementFiles.exportPath(character))
 
   handle('game:check', (dir?: string) => checkGameFolder(dir ?? store.settings.get().installDir))
   handle('game:find', async () => {

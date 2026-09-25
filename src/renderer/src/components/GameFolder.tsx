@@ -70,7 +70,7 @@ export function GameFolderCard() {
             {rows.map(([ok, label, detail]) => (
               <tr key={label}>
                 <td style={{ width: 24 }}>{ok ? <span className="chip ok">✓</span> : <span className="chip warn">–</span>}</td>
-                <td className="nowrap" style={{ fontWeight: 600 }}>
+                <td className="nowrap" style={{ fontWeight: 600, width: 170 }}>
                   {label}
                 </td>
                 <td className={ok ? '' : 'muted'}>{detail}</td>

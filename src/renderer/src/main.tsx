@@ -14,16 +14,18 @@ import { Overlays } from './pages/Overlays'
 import { Audio } from './pages/Audio'
 import { Logs } from './pages/Logs'
 import { Settings } from './pages/Settings'
+import { Achievements } from './pages/Achievements'
 
 const PAGES = [
-  { id: 'dashboard', label: 'Live', icon: 'dashboard', el: Dashboard },
-  { id: 'spells', label: 'Spell Timers', icon: 'spells', el: Spells },
-  { id: 'motes', label: 'Motes', icon: 'motes', el: Motes },
-  { id: 'triggers', label: 'Triggers', icon: 'triggers', el: Triggers },
-  { id: 'overlays', label: 'Overlays', icon: 'overlays', el: Overlays },
-  { id: 'audio', label: 'Audio', icon: 'audio', el: Audio },
-  { id: 'logs', label: 'Log Files', icon: 'logs', el: Logs },
-  { id: 'settings', label: 'Settings', icon: 'settings', el: Settings }
+  { id: 'dashboard', group: 'Play', label: 'Live', icon: 'dashboard', el: Dashboard },
+  { id: 'spells', group: 'Play', label: 'Spell Timers', icon: 'spells', el: Spells },
+  { id: 'motes', group: 'Play', label: 'Motes', icon: 'motes', el: Motes },
+  { id: 'achievements', group: 'Character', label: 'Achievements', icon: 'trophy', el: Achievements },
+  { id: 'triggers', group: 'Setup', label: 'Triggers', icon: 'triggers', el: Triggers },
+  { id: 'overlays', group: 'Setup', label: 'Overlays', icon: 'overlays', el: Overlays },
+  { id: 'audio', group: 'Setup', label: 'Audio', icon: 'audio', el: Audio },
+  { id: 'logs', group: 'Setup', label: 'Log Files', icon: 'logs', el: Logs },
+  { id: 'settings', group: 'Setup', label: 'Settings', icon: 'settings', el: Settings }
 ] as const
 
 export type PageId = (typeof PAGES)[number]['id']
@@ -51,13 +53,18 @@ function Shell() {
         )}
       </div>
       <nav className="sidebar">
-        {PAGES.map((p) => (
+        {PAGES.map((p, i) => [
+          p.group !== PAGES[i - 1]?.group && (
+            <div key={`g-${p.group}`} className="nav-group">
+              {p.group}
+            </div>
+          ),
           <button key={p.id} className={`nav-item${page === p.id ? ' active' : ''}`} onClick={() => setPage(p.id)}>
             <Icon name={p.icon} />
             {p.label}
             {p.id === 'dashboard' && state.timers.length > 0 && <span className="count">{state.timers.length}</span>}
           </button>
-        ))}
+        ])}
         <div className="sidebar-foot">
           <div className="row tight">
             <span className={`status-dot${s.watching ? ' live' : ''}`} />

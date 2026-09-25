@@ -162,6 +162,19 @@ export interface AppSettings {
 
 // ---- Mote stock (the upgrade planner's inventory) ----
 
+/** A character's achievements export as read from the game folder, with the player's own marks. */
+export interface AchievementsView {
+  /** Name_server, as the game names its files. */
+  character: string
+  file: string
+  /** When the game last wrote the export; 0 when there is none. */
+  modified: number
+  sections: import('../core/achievements').AchSection[]
+  marks: import('../core/achievements').AchMarks
+  /** 'missing' when there is no export yet; otherwise a read error, or ''. */
+  error: string
+}
+
 /** What a game folder holds that the tracker can use. Character names are as the files spell them, e.g. Name_server. */
 export interface GameFolderCheck {
   dir: string
