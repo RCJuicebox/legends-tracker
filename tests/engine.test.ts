@@ -78,7 +78,7 @@ function makeEngine(o: { logFile: string; motes?: MoteState; stock?: MoteStock }
   const engine = new Engine(
     store,
     { synthesize: async () => Buffer.alloc(0) },
-    { timers: noop, alert: noop, audio: noop, status: noop, feed: (i) => feed.push(i), archive: noop, motes: noop, moteScan: noop, stock: noop },
+    { timers: noop, alert: noop, audio: noop, status: noop, feed: (i) => feed.push(i), archive: noop, motes: noop, moteScan: noop, stock: noop, combat: noop },
     env
   )
   engines.push(engine)

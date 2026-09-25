@@ -1,5 +1,5 @@
 import { BrowserWindow, screen } from 'electron'
-import type { OverlayConfig, TimerView } from '../shared/types'
+import type { CombatSnapshot, OverlayConfig, TimerView } from '../shared/types'
 
 export interface OverlayHost {
   load: (win: BrowserWindow, page: 'overlay', query: Record<string, string>) => void
@@ -16,6 +16,8 @@ export interface OverlayHost {
  * - Topmost is re-asserted every two seconds: a borderless-windowed game re-asserts its own
  *   z-order and can end up above overlays that were topmost when created.
  * - Arrange mode lifts all of that so the windows can be dragged and resized.
+ * - A meter overlay still sees the mouse move over it (Windows forwards the moves while the window
+ *   ignores clicks), so its page can ask for the mouse back while the pointer is on its controls.
  */
 export class OverlayManager {
   private readonly windows = new Map<string, BrowserWindow>()
@@ -23,6 +25,7 @@ export class OverlayManager {
   private arranging = false
   private topmostTimer: NodeJS.Timeout | null = null
   private lastTimers: TimerView[] = []
+  private lastCombat: CombatSnapshot | null = null
   private shown = true
 
   constructor(private readonly host: OverlayHost) {}
@@ -69,7 +72,7 @@ export class OverlayManager {
       webPreferences: { preload: this.host.preload, backgroundThrottling: false, sandbox: true }
     })
     win.setAlwaysOnTop(true, 'screen-saver')
-    win.setIgnoreMouseEvents(true)
+    ignoreMouse(win, c.kind, true)
     win.setMenu(null)
     const report = () => {
       if (!win.isDestroyed()) this.host.onBoundsChanged(c.id, win.getBounds())
@@ -80,6 +83,7 @@ export class OverlayManager {
       const cfg = this.configs.find((x) => x.id === c.id) ?? c
       win.webContents.send('overlay:config', { config: cfg, arranging: this.arranging })
       win.webContents.send('overlay:timers', this.lastTimers)
+      if (cfg.kind === 'meter' && this.lastCombat) win.webContents.send('overlay:combat', this.lastCombat)
       if (this.shown) win.showInactive()
     })
     this.host.load(win, 'overlay', { id: c.id })
@@ -103,11 +107,27 @@ export class OverlayManager {
   setArranging(on: boolean): void {
     this.arranging = on
     for (const [id, win] of this.windows) {
-      win.setIgnoreMouseEvents(!on)
+      const cfg = this.configs.find((c) => c.id === id)
+      ignoreMouse(win, cfg?.kind ?? 'timers', !on)
       win.setFocusable(on)
       win.setResizable(on)
-      const cfg = this.configs.find((c) => c.id === id)
       if (cfg) win.webContents.send('overlay:config', { config: cfg, arranging: on })
+    }
+  }
+
+  /** A meter overlay's page asks for the mouse while the pointer is on its controls, and gives it back after. */
+  setMouse(id: string, interactive: boolean): void {
+    if (this.arranging) return
+    const win = this.windows.get(id)
+    const cfg = this.configs.find((c) => c.id === id)
+    if (win && !win.isDestroyed() && cfg?.kind === 'meter') ignoreMouse(win, 'meter', !interactive)
+  }
+
+  combat(snapshot: CombatSnapshot): void {
+    this.lastCombat = snapshot
+    for (const [id, w] of this.windows) {
+      const cfg = this.configs.find((c) => c.id === id)
+      if (cfg?.kind === 'meter' && !w.isDestroyed()) w.webContents.send('overlay:combat', snapshot)
     }
   }
 
@@ -128,6 +148,12 @@ export class OverlayManager {
     for (const w of this.windows.values()) w.destroy()
     this.windows.clear()
   }
+}
+
+/** Click-through, with mouse moves still forwarded to a meter so its page knows when the pointer is on it. */
+function ignoreMouse(win: BrowserWindow, kind: OverlayConfig['kind'], ignore: boolean): void {
+  if (ignore && kind === 'meter') win.setIgnoreMouseEvents(true, { forward: true })
+  else win.setIgnoreMouseEvents(ignore)
 }
 
 /** Saved positions can point at a monitor that is no longer attached; pull those back onto one that is. */

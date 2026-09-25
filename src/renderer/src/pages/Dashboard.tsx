@@ -6,6 +6,7 @@ import { OVERLAY_BUFFS } from '../constants'
 import { TimerBars, useNow } from '../components/TimerBars'
 import { Icon } from '../components/ui'
 import { GameFolderPrompt } from '../components/GameFolder'
+import { Meter } from '../components/Meter'
 import type { PageId } from '../main'
 import { perHour, useMotes } from './Motes'
 import { localDay, sessionHours, totalMotes } from '../../../core/motes'
@@ -33,7 +34,7 @@ export function Dashboard({ go }: { go: (p: PageId) => void }) {
       <div className="page-head">
         <div>
           <h1>Live</h1>
-          <p>Every timer the tracker is running, as the overlays show them, plus what has happened recently.</p>
+          <p>The damage meter, every timer the tracker is running as the overlays show them, and what has happened recently.</p>
         </div>
         <div className="actions">
           {status.watching ? (
@@ -94,6 +95,10 @@ export function Dashboard({ go }: { go: (p: PageId) => void }) {
             {settings.archive.autoEnabled ? `archives at ${settings.archive.thresholdMB} MB` : 'auto-archive off'}
           </span>
         </button>
+      </div>
+
+      <div className="mb-16">
+        <Meter />
       </div>
 
       <div className="grid two mb-16">

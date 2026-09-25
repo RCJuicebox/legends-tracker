@@ -12,6 +12,8 @@ import { TriggerEngine } from '../core/triggers'
 import type { ArchiveOutcome } from '../core/archiver'
 import { checkAgainstLog } from '../core/logCheck'
 import { MoteTracker, moteName, parseMoteLoot, type MoteState } from '../core/motes'
+import { CombatMeter, summarize as summarizeFight } from '../core/combatMeter'
+import { durationSec, fmtClock, fmtNum } from '../core/combatView'
 import { characterKey, characterName } from './storeCore'
 import { isGameFolder, lastZone, listLogs } from './game'
 import { ArchiveManager } from './archiveManager'
@@ -22,7 +24,7 @@ import { combineScans, mergeRebuilt, samePath } from './moteMerge'
 import { log } from './log'
 import type { SpeechWorker } from './speech'
 import type {
-  AppSettings, ArchiveStatus, CharacterSettings, FeedItem, KnownSpell, LogCheckRow, MoteStock, Notification, SpellRule, TimerView, Trigger, WatchStatus
+  AppSettings, ArchiveStatus, CharacterSettings, CombatSnapshot, FeedItem, KnownSpell, LogCheckRow, MoteStock, Notification, Segment, SpellRule, TimerView, Trigger, WatchStatus
 } from '../shared/types'
 
 export interface EngineOutputs {
@@ -36,6 +38,7 @@ export interface EngineOutputs {
   /** Progress of a mote history rebuild alone, without the history itself. */
   moteScan: (scan: { scanning: string; scanProgress: number }) => void
   stock: (stock: MoteStock) => void
+  combat: (snapshot: CombatSnapshot) => void
 }
 
 export type MoteView = MoteState & { scanning: string; scanProgress: number }
@@ -141,6 +144,12 @@ export class Engine {
   /** Pasted test lines must not add to the real mote history or stock. */
   private simulating = false
   private speechFailed = false
+  /** The damage meter. */
+  readonly meter: CombatMeter
+  private combatDirty = false
+  private combatSentAt = 0
+  /** While recent fights are being read from the log, live lines wait here so the meter sees them in order. */
+  private combatBacklog: LogLine[] | null = null
 
   constructor(
     private readonly store: EngineStore,
@@ -163,6 +172,15 @@ export class Engine {
       feed: (kind, text) => this.pushFeed(kind, text)
     })
     this.stock = new MoteStockKeeper(store.stock, (s) => out.stock(s), (kind, text) => this.pushFeed(kind, text))
+    this.meter = new CombatMeter(this.meterConfig(), {
+      onChange: () => (this.combatDirty = true),
+      onFightEnd: (f) => {
+        // Fights read from history are not news.
+        if (this.combatBacklog || !f.mine) return
+        const sum = summarizeFight(f)
+        this.pushFeed('fight', `${sum.name} · ${fmtClock(durationSec(f))} · ${fmtNum(sum.dps)} DPS (yours ${fmtNum(sum.yours / durationSec(f))})`)
+      }
+    })
     this.motes = new MoteTracker(store.motes.get(), {
       onChange: () => {
         this.store.motes.set(this.motes.state)
@@ -281,8 +299,14 @@ export class Engine {
     }
   }
 
+  private meterConfig() {
+    const c = this.settings.combat
+    return { fightGapSec: c.fightGapSec, newSessionOnZone: c.newSessionOnZone }
+  }
+
   reconfigure(): void {
     this.tracker?.configure(this.trackerConfig())
+    this.meter.configure(this.meterConfig())
     this.triggers.load(this.store.triggers.get(), characterName(this.settings.logFile))
     this.emitStatus()
   }
@@ -303,11 +327,13 @@ export class Engine {
       // Another character: nothing the last one had running applies any more.
       const n = this.board.list().length
       this.board.clear()
+      this.meter.reset()
       if (n) this.pushFeed('info', `Switched to ${basename(logFile)}; cleared ${n} timer${n === 1 ? '' : 's'}.`)
     }
     this.watchedLog = logFile
     this.status.logFile = logFile
     this.status.character = characterName(logFile)
+    this.meter.setSelf(this.status.character)
     this.triggers.load(this.store.triggers.get(), this.status.character)
     this.status.zone = zone
     this.tracker?.setZone(zone)
@@ -329,6 +355,62 @@ export class Engine {
     this.status.watching = true
     this.pushFeed('info', `Watching ${basename(logFile)}${zone ? ` in ${zone}` : ''}`)
     this.emitStatus()
+    void this.seedCombat()
+  }
+
+  /**
+   * Recent fights: the live tailer starts at the end of the log, so the last `minutes` of it are
+   * read here first, with live lines held back until the read is done, so the meter sees everything
+   * in its order. The meter's clock is held too, or an old fight would be cut off mid-read.
+   */
+  async seedCombat(minutes = this.settings.combat.historyMinutes): Promise<void> {
+    const t = this.tail
+    if (!t || minutes <= 0 || this.combatBacklog) return
+    const gen = this.watchGen
+    const logFile = t.logFile
+    this.combatBacklog = []
+    this.meter.reading = `Reading the last ${minutes} minutes of the log…`
+    this.combatDirty = true
+    try {
+      // The tailer reads on from where it attached; history is everything before that.
+      for (let i = 0; i < 200 && t.start < 0 && gen === this.watchGen; i++) await sleep(25)
+      const end = t.start
+      if (end > 0 && gen === this.watchGen) {
+        const from = await offsetBefore(logFile, Date.now() - minutes * 60_000)
+        if (end > from && gen === this.watchGen) {
+          await readLines(createReadStream(logFile, { start: from, end: end - 1 }), (line) => gen === this.watchGen && this.meter.handle(line), { flushLast: false })
+        }
+      }
+    } catch (e) {
+      if ((e as NodeJS.ErrnoException).code !== 'ENOENT') log.warn(`Reading recent fights from ${logFile} failed:`, e)
+    } finally {
+      const waiting = this.combatBacklog
+      this.combatBacklog = null
+      for (const line of waiting ?? []) this.meter.handle(line)
+      this.meter.reading = ''
+      this.combatDirty = true
+    }
+  }
+
+  /** Forgets every fight and reads the last `minutes` of the log again. */
+  async rebuildCombat(minutes: number): Promise<void> {
+    if (this.combatBacklog) return
+    this.meter.reset()
+    await this.seedCombat(minutes)
+  }
+
+  combatSnapshot(): CombatSnapshot {
+    return this.meter.snapshot()
+  }
+
+  combatSegment(id: string): Segment | null {
+    return this.meter.segment(id)
+  }
+
+  newCombatSession(): CombatSnapshot {
+    this.meter.newSession(Date.now())
+    this.pushFeed('fight', 'New session started.')
+    return this.meter.snapshot()
   }
 
   stopWatching(): void {
@@ -392,6 +474,8 @@ export class Engine {
       this.triggers.handle(line)
       if (this.moteBacklog) this.moteBacklog.push(line)
       else this.motes.handle(line)
+      if (this.combatBacklog) this.combatBacklog.push(line)
+      else this.meter.handle(line)
       this.status.lastLineAt = line.time
       this.statusDirty = true
     }
@@ -424,6 +508,12 @@ export class Engine {
     const now = Date.now()
     this.board.tick(now)
     this.motes.tick(now)
+    if (!this.combatBacklog) this.meter.tick(now)
+    if (this.combatDirty && now - this.combatSentAt > 500) {
+      this.combatDirty = false
+      this.combatSentAt = now
+      this.out.combat(this.meter.snapshot())
+    }
     if (this.motesDirty && now - this.motesSentAt > 1000) {
       this.motesDirty = false
       this.motesSentAt = now

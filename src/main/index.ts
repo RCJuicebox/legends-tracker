@@ -25,10 +25,12 @@ import { CastHistory } from './castHistory'
 import { focusFromSpell, isDurationFocus } from '../core/focus'
 import { testTrigger } from '../core/triggers'
 import { timerKey } from '../core/spellTracker'
+import { CombatMeter } from '../core/combatMeter'
+import { parseLogLine } from '../core/logLine'
 import type { AppSettings, CharacterSettings, CharacterSheet, SpellRule, Trigger } from '../shared/types'
 import type { AchMarks } from '../core/achievements'
 import { initLog, log, logDir } from './log'
-import { sanitizeCharacter, sanitizeSettings, sanitizeTrigger, sanitizeTriggers } from './validate'
+import { meterOptions, sanitizeCharacter, sanitizeSettings, sanitizeTrigger, sanitizeTriggers } from './validate'
 
 // Settings live in %APPDATA%\Legends Tracker. EQL_USER_DATA points a development or test run at a
 // separate profile, so a trial never touches real settings.
@@ -152,7 +154,11 @@ const engine = new Engine(
     archive: (a) => toMain('state:archive', a),
     motes: (m) => toMain('state:motes', m),
     moteScan: (s) => toMain('state:moteScan', s),
-    stock: (s) => toMain('state:stock', s)
+    stock: (s) => toMain('state:stock', s),
+    combat: (snap) => {
+      overlays.combat(snap)
+      toMain('state:combat', snap)
+    }
   },
   appEngineEnv({
     dataDir: app.getPath('userData'),
@@ -462,6 +468,30 @@ function registerIpc(): void {
 
   handle('overlays:arrange', (on: boolean) => setArranging(on))
   handle('overlays:demo', () => demoTimers())
+  ipcMain.on('overlay:mouse', (_e, id: string, interactive: boolean) => {
+    if (typeof id === 'string') overlays.setMouse(id, interactive === true)
+  })
+  // A meter overlay's own header changes what it shows; the choice is kept with the overlay.
+  ipcMain.on('overlay:meter', (_e, id: string, patch: unknown) => {
+    const s = store.settings.get()
+    const o = s.overlays.find((x) => x.id === id && x.kind === 'meter')
+    if (!o || !patch || typeof patch !== 'object') return
+    const meter = meterOptions({ ...o.meter, ...(patch as object) }, o.meter)
+    saveSettings({ ...s, overlays: s.overlays.map((x) => (x.id === id ? { ...x, meter } : x)) })
+  })
+
+  handle('combat:get', () => engine.combatSnapshot())
+  handle('combat:segment', (id: string) => (typeof id === 'string' ? engine.combatSegment(id) : null))
+  handle('combat:newSession', () => engine.newCombatSession())
+  handle('combat:addMember', (name: string) => {
+    if (typeof name === 'string') engine.meter.addMember(name.slice(0, 64))
+    return engine.combatSnapshot()
+  })
+  handle('combat:removeMember', (name: string) => {
+    if (typeof name === 'string') engine.meter.removeMember(name)
+    return engine.combatSnapshot()
+  })
+  handle('combat:rebuild', (minutes: number) => engine.rebuildCombat(Math.max(1, Math.min(1440, Number(minutes) || 60))))
 
   handle('motes:get', () => engine.moteView())
   handle('motes:start', () => engine.motes.startManual(Date.now()))
@@ -658,7 +688,8 @@ function placeOverlaysForNewInstall(): void {
   const place: Record<string, { x: number; y: number; width: number; height: number }> = {
     alerts: { x: a.x + Math.round(a.width / 2) - 400, y: a.y + Math.round(a.height * 0.18), width: 800, height: 180 },
     buffs: { x: a.x + a.width - 720, y: a.y + Math.round(a.height * 0.3), width: 340, height: 420 },
-    targets: { x: a.x + a.width - 370, y: a.y + Math.round(a.height * 0.3), width: 340, height: 420 }
+    targets: { x: a.x + a.width - 370, y: a.y + Math.round(a.height * 0.3), width: 340, height: 420 },
+    meter: { x: a.x + 40, y: a.y + a.height - 360, width: 380, height: 300 }
   }
   store.settings.set({ ...s, overlays: s.overlays.map((o) => (place[o.id] ? { ...o, ...place[o.id] } : o)) })
 }
@@ -696,6 +727,57 @@ function demoTimers(): void {
   add('Odium', 10, 'A ratman warrior', 12, 'targets')
   add('Plague', 7, 'Slizik the Mighty', 96, 'targets')
   overlays.alert({ text: 'Demo alert — overlays are here', color: '#ffd84d', durationSec: 6 })
+  demoCombat()
+}
+
+/**
+ * A made-up fight for the meter windows, run through a meter of its own so the real one keeps its
+ * fights. The next real snapshot replaces it.
+ */
+function demoCombat(): void {
+  const me = engine.status.character || 'Kelwyn'
+  const meter = new CombatMeter({ fightGapSec: 10, newSessionOnZone: true })
+  meter.setSelf(me)
+  const stamp = (t: number) => {
+    const d = new Date(t)
+    const day = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][d.getDay()]
+    const mon = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][d.getMonth()]
+    const two = (n: number) => String(n).padStart(2, '0')
+    return `${day} ${mon} ${String(d.getDate()).padStart(2, ' ')} ${two(d.getHours())}:${two(d.getMinutes())}:${two(d.getSeconds())} ${d.getFullYear()}`
+  }
+  const t0 = Date.now() - 42_000
+  const lines: [number, string][] = [
+    [0, 'You have entered The Plane of Fear 4 (Refined).'],
+    [1, "Jobarab told you, 'Attacking a fetid fiend Master.'"],
+    [1, 'Aldric has joined the group.'],
+    [1, 'You punch a fetid fiend for 142 points of damage.'],
+    [1, 'Jobarab slashes a fetid fiend for 61 points of damage.'],
+    [2, 'A fetid fiend hits YOU for 95 points of damage.'],
+    [2, 'You kick a fetid fiend for 611 points of damage. (Critical)'],
+    [3, 'Aldric hit a fetid fiend for 402 points of magic damage by Ice Spear.'],
+    [4, 'You try to punch a fetid fiend, but miss!'],
+    [4, 'A fetid fiend tries to hit YOU, but YOU dodge!'],
+    [5, 'A fetid fiend has taken 525 damage from your Envenomed Bolt X.'],
+    [6, 'Brenna slashes a fetid fiend for 88 points of damage.'],
+    [7, 'Aldric healed Kelwyn for 320 (410) hit points by Superior Healing.'],
+    [8, 'You strike a fetid fiend for 129 points of damage. (Critical)'],
+    [9, 'A fetid fiend is pierced by YOUR thorns for 3 points of non-melee damage.'],
+    [11, 'A fetid fiend has taken 534 damage from your Envenomed Bolt X.'],
+    [12, 'Jobarab hit a fetid fiend for 200 points of prismatic damage by Puma Maw V.'],
+    [14, 'You punch a fetid fiend for 156 points of damage.'],
+    [15, 'A fetid fiend hits YOU for 122 points of damage.'],
+    [17, 'A fetid fiend has taken 540 damage from your Envenomed Bolt X.'],
+    [18, 'Brenna hit a fetid fiend for 260 points of cold damage by Frost Spear.'],
+    [20, 'You bash a fetid fiend for 214 points of damage.'],
+    [21, 'You have slain a fetid fiend!']
+  ]
+  for (const [sec, text] of lines) {
+    const line = parseLogLine(`[${stamp(t0 + sec * 1000)}] ${text.replace(/Kelwyn/g, me)}`)
+    if (line) meter.handle(line)
+  }
+  const snap = meter.snapshot()
+  overlays.combat(snap)
+  toMain('state:combat', snap)
 }
 
 app.on('second-instance', () => showMain())

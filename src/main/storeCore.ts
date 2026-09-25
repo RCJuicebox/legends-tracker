@@ -1,15 +1,21 @@
 import { promises as fs, readFileSync, renameSync } from 'node:fs'
 import { basename, dirname, join } from 'node:path'
-import { DEFAULT_TIER_DURATION_PCT, type AppSettings, type OverlayConfig } from '../shared/types'
+import { DEFAULT_TIER_DURATION_PCT, type AppSettings, type MeterOverlayOptions, type OverlayConfig } from '../shared/types'
 import { log } from './log'
 
 // The pure half of the settings store: defaults, merging, and the JSON files themselves. No Electron
 // import, so it can be tested.
 
+export const DEFAULT_METER_OPTIONS: MeterOverlayOptions = { mode: 'damage', span: 'fight', scope: 'everyone', rows: 8, combinePet: true, header: true }
+
 export const DEFAULT_OVERLAYS: OverlayConfig[] = [
   { id: 'buffs', name: 'Buffs', kind: 'timers', x: 2040, y: 420, width: 340, height: 520, opacity: 1, fontSize: 15, visible: true, groupByTarget: true },
   { id: 'targets', name: 'DoTs & Timers', kind: 'timers', x: 2400, y: 420, width: 340, height: 520, opacity: 1, fontSize: 15, visible: true, groupByTarget: true },
-  { id: 'alerts', name: 'Alerts', kind: 'alerts', x: 1220, y: 300, width: 1000, height: 220, opacity: 1, fontSize: 30, visible: true, groupByTarget: false }
+  { id: 'alerts', name: 'Alerts', kind: 'alerts', x: 1220, y: 300, width: 1000, height: 220, opacity: 1, fontSize: 30, visible: true, groupByTarget: false },
+  {
+    id: 'meter', name: 'Damage meter', kind: 'meter', x: 40, y: 560, width: 380, height: 300, opacity: 1, fontSize: 13, visible: true, groupByTarget: false,
+    meter: { ...DEFAULT_METER_OPTIONS }
+  }
 ]
 
 /** The default overlays every install had before new ones were tracked; an install without a record has seen these. */
@@ -40,7 +46,8 @@ export function defaultSettings(): AppSettings {
     archive: { autoEnabled: false, thresholdMB: 150, archiveDir: '' },
     overlays: DEFAULT_OVERLAYS.map((o) => ({ ...o })),
     overlaysOnlyWithGame: true,
-    yieldToGame: true
+    yieldToGame: true,
+    combat: { fightGapSec: 10, historyMinutes: 60, newSessionOnZone: true, combinePet: true }
   }
 }
 

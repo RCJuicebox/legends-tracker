@@ -3,11 +3,13 @@ import {
   type AppSettings,
   type CharacterSettings,
   type FocusSource,
+  type MeterOverlayOptions,
   type OverlayConfig,
   type Phrase,
   type Trigger,
   type TriggerAction
 } from '../shared/types'
+import { DEFAULT_METER_OPTIONS } from './storeCore'
 
 // What the pages send the main process is checked here before it is stored. A page is our own code,
 // but a bug in one should not be able to write a setting that breaks the app on its next start.
@@ -109,15 +111,31 @@ export function sanitizeCharacter(v: unknown, fb: CharacterSettings): CharacterS
   return out
 }
 
+export function meterOptions(v: unknown, fb: MeterOverlayOptions | undefined): MeterOverlayOptions | undefined {
+  if (!isObj(v)) return fb
+  const base = fb ?? DEFAULT_METER_OPTIONS
+  return {
+    mode: oneOf(v.mode, ['damage', 'incoming', 'healing'] as const, base.mode),
+    span: oneOf(v.span, ['fight', 'session'] as const, base.span),
+    scope: oneOf(v.scope, ['everyone', 'group', 'you'] as const, base.scope),
+    rows: num(v.rows, base.rows, 1, 50),
+    combinePet: bool(v.combinePet, base.combinePet),
+    header: bool(v.header, base.header)
+  }
+}
+
 function overlay(v: unknown, fb: OverlayConfig | undefined): OverlayConfig | null {
   if (!isObj(v) || typeof v.id !== 'string' || !v.id) return null
   const base: OverlayConfig = fb ?? {
     id: v.id, name: v.id, kind: 'timers', x: 100, y: 100, width: 340, height: 420, opacity: 1, fontSize: 15, visible: true, groupByTarget: true
   }
+  const kind = oneOf(v.kind, ['timers', 'alerts', 'meter'] as const, base.kind)
+  const meter = kind === 'meter' ? (meterOptions(v.meter, base.meter) ?? { ...DEFAULT_METER_OPTIONS }) : undefined
   return shape(v, base, {
     id: v.id,
     name: str(v.name, base.name),
-    kind: oneOf(v.kind, ['timers', 'alerts'] as const, base.kind),
+    kind,
+    meter,
     x: num(v.x, base.x, -100_000, 100_000),
     y: num(v.y, base.y, -100_000, 100_000),
     width: num(v.width, base.width, 40, 20_000),
@@ -175,6 +193,14 @@ export function sanitizeSettings(v: unknown, fb: AppSettings): AppSettings | nul
     archiveDir: str(ar.archiveDir, fb.archive.archiveDir)
   })
 
+  const cb = isObj(v.combat) ? v.combat : {}
+  const combat = shape(cb, fb.combat, {
+    fightGapSec: num(cb.fightGapSec, fb.combat.fightGapSec, 2, 600),
+    historyMinutes: num(cb.historyMinutes, fb.combat.historyMinutes, 0, 1440),
+    newSessionOnZone: bool(cb.newSessionOnZone, fb.combat.newSessionOnZone),
+    combinePet: bool(cb.combinePet, fb.combat.combinePet)
+  })
+
   let overlays = fb.overlays
   if (Array.isArray(v.overlays)) {
     const seen = new Set<string>()
@@ -206,7 +232,8 @@ export function sanitizeSettings(v: unknown, fb: AppSettings): AppSettings | nul
     archive,
     overlays,
     overlaysOnlyWithGame: bool(v.overlaysOnlyWithGame, fb.overlaysOnlyWithGame),
-    yieldToGame: bool(v.yieldToGame, fb.yieldToGame)
+    yieldToGame: bool(v.yieldToGame, fb.yieldToGame),
+    combat
   })
 }
 

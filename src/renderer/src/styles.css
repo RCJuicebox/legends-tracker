@@ -663,6 +663,9 @@ table.table {
 .k-loot {
   color: #e8c46c;
 }
+.k-fight {
+  color: #f2a47f;
+}
 .k-warn {
   color: var(--red);
 }
@@ -2300,6 +2303,398 @@ button.tree-item {
 .lt-finder.stale {
   opacity: 0.6;
   transition: opacity 0.2s;
+}
+
+/* ---------- damage meter (Live page) ---------- */
+
+.dm-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.dm-head h2 {
+  margin: 0;
+}
+.dm-head .chip {
+  text-transform: none;
+  letter-spacing: normal;
+}
+.dm-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.dm-pick {
+  max-width: 360px;
+  padding: 4px 8px;
+  font-size: 12.5px;
+}
+.dm-roster {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin: -4px 0 12px;
+}
+.dm-roster .chip {
+  padding-right: 2px;
+}
+.dm-headline {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px 18px;
+  padding: 10px 14px;
+  margin-bottom: 12px;
+  border-radius: var(--radius-sm);
+  border: 1px solid rgba(232, 180, 76, 0.28);
+  background: radial-gradient(120% 120% at 0% 0%, rgba(232, 180, 76, 0.1), transparent 60%), var(--bg-2);
+}
+.dm-title {
+  font-size: 15px;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1 1 200px;
+}
+.dm-figures {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 16px;
+}
+.dm-big {
+  font-size: 24px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+}
+.dm-big small {
+  font-size: 11px;
+  font-weight: 650;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-3);
+  margin-left: 2px;
+}
+.dm-kv {
+  font-size: 12px;
+  color: var(--text-2);
+  white-space: nowrap;
+}
+.dm-kv b {
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+  font-size: 13px;
+}
+.dm-body {
+  display: grid;
+  grid-template-columns: minmax(0, 1.5fr) minmax(280px, 1fr);
+  gap: 16px;
+  align-items: start;
+}
+@media (max-width: 1150px) {
+  .dm-body {
+    grid-template-columns: 1fr;
+  }
+}
+.dm-main {
+  display: grid;
+  gap: 3px;
+  align-content: start;
+  min-width: 0;
+}
+.dm-side {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+}
+.dm-aux {
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--line);
+  background: var(--bg-2);
+  display: grid;
+  gap: 3px;
+  align-content: start;
+}
+.dm-aux-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 11px;
+  font-weight: 650;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-3);
+  margin-bottom: 4px;
+}
+.dm-sub {
+  font-size: 11px;
+  font-weight: 650;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-3);
+  margin: 8px 2px 2px;
+}
+.dm-crumb {
+  justify-self: start;
+  margin-bottom: 4px;
+}
+
+/* A bar: the fill behind, the text over it. */
+.dm-bar {
+  position: relative;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  min-height: 26px;
+  padding: 3px 8px 3px 6px;
+  border-radius: 5px;
+  border: none;
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+  text-align: left;
+  overflow: hidden;
+  width: 100%;
+}
+.dm-bar.clickable {
+  cursor: pointer;
+}
+.dm-bar.clickable:hover {
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--c) 60%, transparent);
+}
+.dm-bar.selected {
+  box-shadow: inset 0 0 0 1px var(--c);
+}
+.dm-bar .dm-fill {
+  position: absolute;
+  inset: 0;
+  width: var(--fill);
+  background: linear-gradient(90deg, color-mix(in srgb, var(--c) 42%, transparent), color-mix(in srgb, var(--c) 18%, transparent));
+  border-right: 2px solid color-mix(in srgb, var(--c) 80%, transparent);
+  pointer-events: none;
+}
+.dm-bar > :not(.dm-fill) {
+  position: relative;
+}
+.dm-rank {
+  width: 18px;
+  text-align: right;
+  font-size: 11px;
+  color: var(--text-3);
+  font-variant-numeric: tabular-nums;
+}
+.dm-bar:not(:has(.dm-rank)) {
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+.dm-name {
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+.dm-tag {
+  font-style: normal;
+  font-weight: 500;
+  font-size: 11px;
+  color: var(--text-2);
+  margin-left: 6px;
+}
+.dm-stat {
+  font-weight: 400;
+  font-size: 11.5px;
+  color: var(--text-2);
+  margin-left: 8px;
+}
+.dm-right {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  font-size: 12.5px;
+  color: var(--text-2);
+}
+.dm-right b {
+  color: var(--text);
+  font-size: 13px;
+}
+.dm-chart {
+  margin-top: 2px;
+}
+.dm-legend {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 6px;
+  border: none;
+  border-radius: 4px;
+  background: none;
+  color: var(--text-2);
+  cursor: pointer;
+  font-size: 12px;
+}
+.dm-legend i {
+  display: inline-block;
+  width: 12px;
+  height: 3px;
+  border-radius: 2px;
+}
+.dm-legend.off {
+  opacity: 0.5;
+  text-decoration: line-through;
+}
+.dm-legend:hover {
+  background: var(--panel-2);
+}
+
+/* ---------- damage meter (overlay) ---------- */
+
+.dm-ov {
+  --fs: 13px;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  font-size: var(--fs);
+  border-radius: 8px;
+  background: rgba(10, 12, 18, 0.72);
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.06) inset;
+  color: #fff;
+  overflow: hidden;
+}
+.dm-ov.unlocked {
+  box-shadow: 0 0 0 1px rgba(232, 180, 76, 0.7) inset;
+}
+.dm-ov-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 6px;
+  font-size: calc(var(--fs) * 0.85);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(232, 180, 76, 0.08);
+  -webkit-app-region: no-drag;
+  flex: none;
+}
+.overlay.arranging .dm-ov-head {
+  -webkit-app-region: drag;
+}
+.dm-ov-head .status-dot {
+  width: 7px;
+  height: 7px;
+}
+.dm-ov-title {
+  font-weight: 700;
+  color: var(--accent-2);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+  min-width: 0;
+  text-shadow: 0 1px 2px #000;
+}
+.dm-ov-total {
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+  color: rgba(255, 255, 255, 0.85);
+  text-shadow: 0 1px 2px #000;
+}
+.dm-ov-total b {
+  color: #fff;
+}
+.dm-ov-tools {
+  display: none;
+  gap: 3px;
+  -webkit-app-region: no-drag;
+}
+.dm-ov-head:hover .dm-ov-tools,
+.dm-ov.unlocked .dm-ov-tools {
+  display: inline-flex;
+}
+.dm-ov-btn,
+.dm-ov-pick {
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.45);
+  color: #fff;
+  font: inherit;
+  font-size: calc(var(--fs) * 0.8);
+  padding: 1px 6px;
+  cursor: pointer;
+  white-space: nowrap;
+  -webkit-app-region: no-drag;
+}
+.dm-ov-btn:hover,
+.dm-ov-pick:hover {
+  border-color: var(--accent);
+}
+.dm-ov-btn.on {
+  border-color: var(--accent);
+  color: var(--accent-2);
+}
+.dm-ov-pick {
+  max-width: 64px;
+  padding: 1px 2px;
+}
+.dm-ov-rows {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  padding: 4px 5px 2px;
+  display: grid;
+  gap: 2px;
+  align-content: start;
+}
+.dm-ov .dm-bar {
+  min-height: calc(var(--fs) * 1.7);
+  padding: 1px 6px 1px 4px;
+  font-size: var(--fs);
+  background: rgba(255, 255, 255, 0.05);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.9);
+  color: #fff;
+}
+.dm-ov .dm-fill {
+  background: linear-gradient(90deg, color-mix(in srgb, var(--c) 62%, transparent), color-mix(in srgb, var(--c) 30%, transparent));
+}
+.dm-ov .dm-rank {
+  color: rgba(255, 255, 255, 0.55);
+}
+.dm-ov .dm-tag,
+.dm-ov .dm-stat,
+.dm-ov .dm-right {
+  color: rgba(255, 255, 255, 0.72);
+}
+.dm-ov .dm-right b {
+  color: #fff;
+  font-size: var(--fs);
+}
+.dm-ov .dm-stat {
+  display: none;
+}
+.dm-ov-empty,
+.dm-ov-more {
+  padding: 4px 6px;
+  font-size: calc(var(--fs) * 0.85);
+  color: rgba(255, 255, 255, 0.6);
+  text-shadow: 0 1px 2px #000;
+}
+.dm-ov-foot {
+  flex: none;
+  padding: 0 8px 3px;
+  text-align: right;
+  font-size: 9px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.28);
+  pointer-events: none;
 }
 
 /* ---------- spacing utilities (after the blocks they adjust, so they win) ---------- */

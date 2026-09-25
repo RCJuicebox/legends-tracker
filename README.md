@@ -67,6 +67,47 @@ npm test
 (`settings.json`, `triggers.json`, `spell-rules.json`, `casts.json`, and a `sounds` folder).
 Setting `EQL_USER_DATA` to another folder runs against a separate profile.
 
+## Damage meter
+
+The Live page's first card, and a floating overlay of its own. Every combat line the game prints is
+read into it: your melee, spells, DoT ticks and damage shields, your pet's, your group's, strangers
+fighting near you, and everything hitting your side.
+
+- **Fights and sessions.** A fight opens on the first blow between your side and an enemy and
+  closes when the last enemy it engaged dies, or after ten seconds without a blow (Settings). It is
+  named after the mob that took the most ("a fetid fiend +2"). A session is everything since you
+  entered the zone, or pressed **New session**; the Overall figures read from it. Both are picked
+  from the same list, newest first, and the meter keeps showing the last fight until the next
+  begins.
+- **Damage, Incoming, Healing.** Damage lists who dealt what, with DPS over the fight, share, and
+  active DPS (damage over the time actually spent striking, gaps between hits capped at 3 s). Click a
+  row for its skills and spells: hits, crit rate, landed rate, resists, average and best hit, and
+  the pet's lane when pets are folded into their owners. Incoming lists who hit your side, with
+  **Your defence** (hit, miss, dodge, parry, block, riposte, absorb rates over the swings aimed at
+  you) and damage taken per person. Healing lists healers with overheal, a click down to their
+  spells and targets, runes and what enemies healed themselves for.
+- **Damage by mob** shows where the damage went; click a mob to see who did what to it. **DPS over
+  time** draws you, your pet, the rest of your side and incoming damage on a 6-second rolling
+  average, for fights.
+- **Everyone, Group, You.** Whose rows are listed. Group members are learned from the log's
+  join and leave lines and can be added by hand; a group-mate's pet joins them once it says
+  `/pet who leader`. A single capitalised name is a stranger or a named mob until it hits or heals
+  someone whose side is known, and is then remembered.
+- **Pets.** Your own pet is yours from the first `<pet> told you, 'Attacking … Master.'`, and what
+  it did before that line is re-attributed. A mob's pet is "<mob> pet".
+- **Copy** puts the list on the clipboard as text, for chat.
+- **On start**, the last hour of the log (Settings) is read into the meter before live lines, so the
+  fights before the app opened are there; **Read the log again** rebuilds from scratch.
+
+The meter overlay is a compact copy of the same list over the game, click-through like the others.
+Hover its header for the controls: fight or session, what it lists, whose rows, a flag that starts a
+new session, and a pin that unlocks the rows so a click opens their breakdown. The Overlays page
+sets what each meter window shows; there can be several, say one for the fight and one for the
+session.
+
+The line shapes, the fight rules and the sums are pinned in `tests/combat.test.ts` with lines
+copied from the log.
+
 ## Spell timers
 
 Every spell you cast is tracked automatically. No trigger needed.
@@ -162,7 +203,9 @@ one phrase at a time, and the backlog is capped so warnings about a finished fig
 Transparent windows that let clicks through, never take focus (EverQuest drops keyboard input the
 moment it loses focus), stay out of Alt-Tab, and re-assert always-on-top every two seconds. The game
 must be windowed or borderless. **Arrange** lifts all of that so they can be dragged and resized.
-Timer bars sort soonest-first and can group under each target's name.
+Timer bars sort soonest-first and can group under each target's name. A meter overlay is the damage
+meter's list; Windows keeps forwarding mouse moves to it while it ignores clicks, so hovering its
+header hands it the mouse for its controls and moving off hands it back.
 
 By default the overlays show only while the game (or this app's own window) has focus, and hide when
 you tab to anything else; audio cues play regardless. A resident PowerShell loop reads the foreground
@@ -208,7 +251,7 @@ No path loses a line. An archive interrupted by the app closing is finished on t
 
 | Path | What |
 |---|---|
-| `src/core` | Log parsing and tailing, spell book, duration model, spell tracker, triggers, archiver, log check. Plain TypeScript with no Electron dependency, so it is unit-tested directly |
+| `src/core` | Log parsing and tailing, spell book, duration model, spell tracker, triggers, archiver, log check, the damage meter (`combatLines` reads the lines, `combatMeter` keeps the fights, `combatView` sums them for display). Plain TypeScript with no Electron dependency, so it is unit-tested directly |
 | `src/main` | Electron main process: windows, tray, overlays, speech, icons, persistence, the engine that joins it all |
 | `src/preload` | The IPC bridge |
 | `src/renderer` | The React UI (`index.html`), overlay windows (`overlay.html`), hidden audio mixer (`audio.html`) |

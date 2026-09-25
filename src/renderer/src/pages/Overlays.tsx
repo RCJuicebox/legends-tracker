@@ -2,10 +2,56 @@ import { useApp } from '../state'
 import { act } from '../toast'
 import { BUILTIN_OVERLAYS } from '../constants'
 import { ConfirmButton, Field, Icon, NumberInput, Switch } from '../components/ui'
-import type { OverlayConfig } from '../../../shared/types'
+import type { MeterOverlayOptions, OverlayConfig } from '../../../shared/types'
 
 /** The opacity slider saves once it stops moving for this long; the overlay follows it at once. */
 const SLIDER_SAVE_MS = 150
+
+const METER_DEFAULTS: MeterOverlayOptions = { mode: 'damage', span: 'fight', scope: 'everyone', rows: 8, combinePet: true, header: true }
+
+function MeterOptions({ o, onChange }: { o: OverlayConfig; onChange: (m: Partial<MeterOverlayOptions>) => void }) {
+  const m = { ...METER_DEFAULTS, ...o.meter }
+  return (
+    <>
+      <div className="grid two">
+        <Field label="Shows">
+          <select value={m.mode} onChange={(e) => onChange({ mode: e.target.value as MeterOverlayOptions['mode'] })}>
+            <option value="damage">Damage</option>
+            <option value="incoming">Incoming</option>
+            <option value="healing">Healing</option>
+          </select>
+        </Field>
+        <Field label="Of">
+          <select value={m.span} onChange={(e) => onChange({ span: e.target.value as MeterOverlayOptions['span'] })}>
+            <option value="fight">The fight</option>
+            <option value="session">The session</option>
+          </select>
+        </Field>
+      </div>
+      <div className="grid two">
+        <Field label="Whose">
+          <select value={m.scope} onChange={(e) => onChange({ scope: e.target.value as MeterOverlayOptions['scope'] })}>
+            <option value="everyone">Everyone</option>
+            <option value="group">Group</option>
+            <option value="you">You</option>
+          </select>
+        </Field>
+        <Field label="Rows at most">
+          <NumberInput value={m.rows} min={1} max={50} onChange={(v) => onChange({ rows: v ?? 8 })} />
+        </Field>
+      </div>
+      <label className="check">
+        <input type="checkbox" checked={m.combinePet} onChange={(e) => onChange({ combinePet: e.target.checked })} />
+        Pets with their owners
+      </label>
+      <label className="check">
+        <input type="checkbox" checked={m.header} onChange={(e) => onChange({ header: e.target.checked })} />
+        Header with the fight name and controls
+      </label>
+      <p className="faint small m-0">Hover the header over the game for its controls: fight or session, what it lists, whose rows, a new session, and a pin to unlock the rows for clicking.</p>
+    </>
+  )
+}
 
 export function Overlays() {
   const { state, patchSettings } = useApp()
@@ -55,7 +101,7 @@ export function Overlays() {
         {overlays.map((o) => (
           <div className="card" key={o.id}>
             <h2>
-              {o.name} <span className="chip">{o.kind === 'timers' ? 'Timer bars' : 'Alert text'}</span>
+              {o.name} <span className="chip">{o.kind === 'timers' ? 'Timer bars' : o.kind === 'meter' ? 'Damage meter' : 'Alert text'}</span>
               <span className="spacer" />
               <Switch on={o.visible} onChange={(v) => update(o.id, { visible: v })} title="Show this overlay" label={`Show ${o.name}`} />
             </h2>
@@ -77,6 +123,7 @@ export function Overlays() {
                   Group bars under each target's name
                 </label>
               )}
+              {o.kind === 'meter' && <MeterOptions o={o} onChange={(m) => update(o.id, { meter: { ...METER_DEFAULTS, ...o.meter, ...m } })} />}
               <div className="faint small mono">
                 {o.width}×{o.height} at {o.x}, {o.y}
               </div>
@@ -88,6 +135,23 @@ export function Overlays() {
             </div>
           </div>
         ))}
+        <div className="card empty" style={{ display: 'grid', placeItems: 'center', gap: 10 }}>
+          <div>Another damage meter window: say, one for the fight and one for the whole session, or one for healing.</div>
+          <button
+            className="btn"
+            onClick={() =>
+              patchSettings((s) => ({
+                ...s,
+                overlays: [
+                  ...s.overlays,
+                  { id: `meter-${Date.now()}`, name: 'Meter', kind: 'meter', x: 440, y: 560, width: 380, height: 300, opacity: 1, fontSize: 13, visible: true, groupByTarget: false, meter: { ...METER_DEFAULTS } }
+                ]
+              }))
+            }
+          >
+            <Icon name="plus" /> Add meter overlay
+          </button>
+        </div>
         <div className="card empty" style={{ display: 'grid', placeItems: 'center', gap: 10 }}>
           <div>Another bar window, for spells or trigger timers you want kept apart — say, mez timers.</div>
           <button

@@ -106,6 +106,30 @@ export function Settings() {
         </div>
 
         <div className="card stack gap-14">
+          <h2>Damage meter</h2>
+          <div className="grid three">
+            <Field label="A fight ends after" hint="Seconds without a blow between your side and an enemy. A fight also ends when the last enemy it engaged dies.">
+              <NumberInput value={s.combat.fightGapSec} min={2} max={600} onChange={(v) => patchSettings((x) => ({ ...x, combat: { ...x.combat, fightGapSec: v ?? 10 } }))} />
+            </Field>
+            <Field label="Read back on start" hint="Minutes of the log read into the meter when watching starts, so the fights before the app opened are there. 0 reads nothing.">
+              <NumberInput value={s.combat.historyMinutes} min={0} max={1440} onChange={(v) => patchSettings((x) => ({ ...x, combat: { ...x.combat, historyMinutes: v ?? 0 } }))} />
+            </Field>
+            <Field label="Rebuild" hint="Forgets every fight and reads that much of the log again.">
+              <div>
+                <button className="btn" onClick={() => void act('combat:rebuild', s.combat.historyMinutes || 60)} disabled={!state.status.watching} title={state.status.watching ? 'Forget every fight and read the log again' : 'Start watching first'}>
+                  Read the log again
+                </button>
+              </div>
+            </Field>
+          </div>
+          <label className="row">
+            <Switch on={s.combat.newSessionOnZone} onChange={(v) => patchSettings((x) => ({ ...x, combat: { ...x.combat, newSessionOnZone: v } }))} />
+            Entering a zone starts a new session
+            <span className="faint small">the Overall figures then cover one zone or instance at a time; New session on the Live page splits by hand</span>
+          </label>
+        </div>
+
+        <div className="card stack gap-14">
           <h2>Spell tracking</h2>
           <div className="grid two">
             <label className="row">
