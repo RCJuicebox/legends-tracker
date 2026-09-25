@@ -2,6 +2,7 @@ import { app } from 'electron'
 import { promises as fs } from 'node:fs'
 import { join } from 'node:path'
 import { parseItemPage, type CatalogItem } from '../core/wikiItem'
+import { parseEraStatus } from '../core/upgrades'
 
 // Every piece of equipment on eqlwiki.com, for the upgrade finder. The wiki's Items category is read
 // fifty pages a request (about 225 requests for the whole of it), politely and one at a time; only
@@ -10,9 +11,15 @@ const API = 'https://eqlwiki.com/api.php'
 const AGENT = 'LegendsTracker (https://github.com/RCJuicebox/legends-tracker)'
 const FRESH_MS = 7 * 24 * 3600_000
 
+/** Bumped when what a download keeps changes, so an older file is fetched again. */
+const FORMAT = 2
+
 export interface CatalogFile {
   fetchedAt: number
   items: CatalogItem[]
+  /** The wiki's in/out era list (Template:PageEra), as it stood at the download. */
+  eraStatus?: Record<string, 'in' | 'out'>
+  format?: number
 }
 
 export interface CatalogProgress {
@@ -45,7 +52,7 @@ export class WikiCatalog {
   }
 
   isStale(file: CatalogFile | null): boolean {
-    return !file || Date.now() - file.fetchedAt > FRESH_MS
+    return !file || (file.format ?? 1) < FORMAT || Date.now() - file.fetchedAt > FRESH_MS
   }
 
   /** Downloads the catalog again. One download at a time; a second call waits for the first. */
@@ -100,7 +107,18 @@ export class WikiCatalog {
         // One request at a time, with a breath between: this is a volunteer-run wiki.
         await new Promise((r) => setTimeout(r, 150))
       }
-      const file: CatalogFile = { fetchedAt: Date.now(), items }
+      // The wiki's own list of which eras are live on EverQuest Legends.
+      let eraStatus: Record<string, 'in' | 'out'> | undefined
+      try {
+        const t = (await this.get(`${API}?action=query&format=json&formatversion=2&prop=revisions&rvprop=content&rvslots=main&titles=Template:PageEra`)) as {
+          query?: { pages?: { revisions?: { slots: { main: { content: string } } }[] }[] }
+        }
+        const parsed = parseEraStatus(t.query?.pages?.[0]?.revisions?.[0]?.slots.main.content ?? '')
+        if (Object.keys(parsed).length) eraStatus = parsed
+      } catch {
+        // The built-in list serves.
+      }
+      const file: CatalogFile = { fetchedAt: Date.now(), items, eraStatus, format: FORMAT }
       await fs.writeFile(this.path + '.tmp', JSON.stringify(file), 'utf8')
       await fs.rename(this.path + '.tmp', this.path)
       this.file = file

@@ -7,7 +7,7 @@ export interface CatalogItem {
   statsblock: string
   /** Icon number (lucy_img_ID), 500 and up; 0 when unknown. */
   icon: number
-  /** 'Classic', 'Kunark', 'Velious' … from the page's era template; '' when untagged. */
+  /** The page's era template name without " Era": 'Classic', 'Chardok Revamp' …; '' when untagged. */
   era: string
   /** Zones the page lists it dropping in. */
   zones: string[]
@@ -44,7 +44,7 @@ export function parseItemPage(title: string, content: string): CatalogItem | nul
     title,
     statsblock,
     icon: Number(field(content, 'lucy_img_ID')) || 0,
-    era: /\{\{\s*([A-Za-z]+)\s+Era\s*\}\}/.exec(content)?.[1] ?? '',
+    era: /\{\{\s*([A-Za-z][A-Za-z ]*?)\s+Era\s*\}\}/.exec(content)?.[1] ?? '',
     zones: [...new Set(zones)],
     mobs: [...new Set(mobs)],
     quest: /\S/.test(field(content, 'relatedquests')),

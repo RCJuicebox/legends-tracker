@@ -49,7 +49,7 @@ describe('finding upgrades', () => {
       wearer: { classes: ['shd'], race: 'IKS', level: 50 },
       weights: PRESETS.Tank,
       compare: 'drop',
-      hiddenEras: notLive ? [] : ['Kunark', 'Velious', 'Luclin'],
+      hiddenEras: notLive ? [] : ['Kunark', 'Velious', 'Luclin', 'Other OOE'],
       owned: new Set(['better ring'])
     }).find((s) => s.slot === 'Fingers')!
 
@@ -63,10 +63,16 @@ describe('finding upgrades', () => {
 })
 
 describe('eras', () => {
-  it('folds tags that are not eras into the one they belong to', async () => {
-    const { normalizeEra } = await import('../src/core/upgrades')
-    expect(['FearHateRevamp', 'Fear', 'Hate', 'Temple', 'Sky', 'Paineel', 'Classic'].map(normalizeEra)).toEqual(Array(7).fill('Classic'))
-    expect(['Epics', 'EpicQuests', 'Chardok', 'kunark'].map(normalizeEra)).toEqual(Array(4).fill('Kunark'))
-    expect(['Velious', 'Luclin', ''].map(normalizeEra)).toEqual(['Velious', 'Luclin', ''])
+  it("groups tags the way the wiki's in/out list says", async () => {
+    const { normalizeEra, parseEraStatus } = await import('../src/core/upgrades')
+    const one = (t: string) => normalizeEra(t)
+    expect(['Classic', 'Fear', 'Hate', 'Hole', 'Temple', 'Sky', 'Paineel', 'Warrens', 'Stonebrunt'].map(one)).toEqual(Array(9).fill('Classic'))
+    expect(['Epics', 'EpicQuests', 'Chardok', 'kunark'].map(one)).toEqual(Array(4).fill('Kunark'))
+    expect(['Velious', 'Chardok Revamp', 'Luclin', ''].map(one)).toEqual(['Velious', 'Velious', 'Luclin', ''])
+    expect(['FearHateRevamp', 'HoleVP', 'WarrensFearHateRevamp', 'Unknown', 'Something New'].map(one)).toEqual(Array(5).fill('Other OOE'))
+    // The live list wins: a tag the wiki moves in era counts as Classic.
+    const status = parseEraStatus('{{#ifeq:{{#switch:{{{1}}}\n| classic = in\n| kunark = in\n| #default = out\n}}|in|x|y}}')
+    expect(status).toEqual({ classic: 'in', kunark: 'in' })
+    expect(normalizeEra('Kunark', status)).toBe('Classic')
   })
 })

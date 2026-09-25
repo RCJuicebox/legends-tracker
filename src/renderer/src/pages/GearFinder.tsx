@@ -2,7 +2,9 @@ import { useEffect, useMemo, useState } from 'react'
 import { api, ago } from '../api'
 import { useRemembered } from '../remember'
 import { itemKey, slotLabel } from '../../../core/inventory'
-import { DEFAULT_HIDDEN_ERAS, eraOf, findUpgrades, PRESETS, UNKNOWN_ERA, WEIGHT_LABELS, zoneEras, type Weights, type WeightKey } from '../../../core/upgrades'
+import { DEFAULT_HIDDEN_ERAS, ERA_ORDER, eraOf, findUpgrades, OTHER_ERA, OTHER_OUT_ERA, zoneEras } from '../../../core/upgrades'
+import { conversions, rawWeights, ROLE_LABELS, ROLE_PRESETS, type ClassFactors, type RoleKey, type RoleWeights } from '../../../core/statValue'
+import { aaTotal } from '../../../core/aa'
 import type { CatalogItem } from '../../../core/wikiItem'
 import type { CharacterSheet, InventoryView } from '../../../shared/types'
 import { className } from '../../../core/acModel'
@@ -14,7 +16,7 @@ import { readSheet } from '../statsSheet'
 const AC_OVER_CAP = 0.25
 
 interface CatalogState {
-  file: { fetchedAt: number; items: CatalogItem[] } | null
+  file: { fetchedAt: number; items: CatalogItem[]; eraStatus?: Record<string, 'in' | 'out'>; format?: number } | null
   stale: boolean
   progress: { busy: boolean; pages: number; total: number; error: string }
 }
@@ -36,7 +38,19 @@ function useCatalog() {
     void api.invoke<CatalogState>('gear:catalog').then(setState)
     return api.on('state:catalog', (progress: CatalogState['progress']) => setState((s) => (s ? { ...s, progress } : s)))
   }, [])
-  const refresh = async () => setState(await api.invoke<CatalogState>('gear:catalogRefresh'))
+  const refresh = async () => {
+    await api.invoke<CatalogState>('gear:catalogRefresh')
+    // Read what is stored now, rather than trust a reply that another refresh may have overtaken.
+    setState(await api.invoke<CatalogState>('gear:catalog'))
+  }
+  // A catalog stored by an older build lacks what this one reads; fetch it again once, on its own.
+  const [autoRefreshed, setAutoRefreshed] = useState(false)
+  useEffect(() => {
+    if (state?.file && (state.file.format ?? 1) < 2 && !state.progress.busy && !autoRefreshed) {
+      setAutoRefreshed(true)
+      void refresh()
+    }
+  }, [state?.file, autoRefreshed])
   return { state, refresh }
 }
 
@@ -53,23 +67,50 @@ function source(item: CatalogItem): string {
 export function GearFinder({ view, sheet }: { view: InventoryView; sheet: CharacterSheet | null }) {
   const { state, refresh } = useCatalog()
   const [preset, setPreset] = useRemembered<string>('finder.preset', 'Balanced')
-  const [custom, setCustom] = useRemembered<Weights>('finder.weights', PRESETS.Balanced)
+  const [custom, setCustom] = useRemembered<RoleWeights>('finder.roleWeights', ROLE_PRESETS.Balanced)
+  const [twoHandMode, setTwoHandMode] = useRemembered<'auto' | 'one' | 'any'>('finder.twoHand', 'auto')
   const [compare, setCompare] = useRemembered<'drop' | 'level'>('finder.compare', 'drop')
-  const [hiddenEras, setHiddenEras] = useRemembered<string[]>('finder.hiddenEras.v2', DEFAULT_HIDDEN_ERAS)
+  const [hiddenEras, setHiddenEras] = useRemembered<string[]>('finder.hiddenEras.v3', DEFAULT_HIDDEN_ERAS)
   const [slot, setSlot] = useRemembered<string>('finder.slot', 'all')
   const [showWeights, setShowWeights] = useState(false)
   const [capMode, setCapMode] = useRemembered<'auto' | 'over' | 'under'>('finder.acCap', 'auto')
   const sheetStats = useMemo(() => readSheet(sheet?.stats), [sheet])
   const [acCaps, setAcCaps] = useState<Record<string, { cap: number; mult: number }> | null>(null)
+  const [factors, setFactors] = useState<Record<string, ClassFactors>>({})
   useEffect(() => {
     const trio = sheetStats.classes.filter(Boolean)
     if (!trio.length) return
-    void api.invoke<{ ac: Record<string, { cap: number; mult: number }> }>('stats:caps', trio, sheetStats.level).then((r) => setAcCaps(r.ac))
+    void api
+      .invoke<{ ac: Record<string, { cap: number; mult: number }>; factors: Record<string, ClassFactors> }>('stats:caps', trio, sheetStats.level)
+      .then((r) => {
+        setAcCaps(r.ac)
+        setFactors(r.factors ?? {})
+      })
   }, [sheetStats.classes.join(','), sheetStats.level])
 
   const stats = (sheet?.stats ?? {}) as { classes?: string[]; level?: number; race?: string }
   const classes = (stats.classes ?? []).filter(Boolean)
-  const baseWeights = preset === 'Custom' ? custom : (PRESETS[preset] ?? PRESETS.Balanced)
+  const role = preset === 'Custom' ? custom : (ROLE_PRESETS[preset] ?? ROLE_PRESETS.Balanced)
+  // What a point of each stat buys this character: its classes, its current stats (the Stats
+  // window's when read, else the sheet's), and its AAs.
+  const conv = useMemo(() => {
+    const w = sheetStats.window?.values ?? {}
+    const cur = (label: string, fallback: number) => w[label]?.[0] ?? fallback
+    return conversions({
+      classes: sheetStats.classes.filter(Boolean),
+      factors,
+      stats: {
+        STR: cur('Strength', sheetStats.strength || 150),
+        STA: cur('Stamina', 150),
+        AGI: cur('Agility', sheetStats.agility || 150),
+        DEX: cur('Dexterity', sheetStats.dexterity || 150),
+        WIS: cur('Wisdom', 150),
+        INT: cur('Intelligence', 150)
+      },
+      hpBonusPct: aaTotal(sheetStats.aa, 'base_hp_pct'),
+      evasionPct: sheetStats.overrides.evasion ?? aaTotal(sheetStats.aa, 'avoidance_pct')
+    })
+  }, [sheetStats, factors])
   // Over the soft cap or not: the game's own Stats window when it has been read (mitigation above
   // the soft cap means over), else the AC calculator.
   const acState = useMemo(() => {
@@ -80,21 +121,27 @@ export function GearFinder({ view, sheet }: { view: InventoryView; sheet: Charac
     return { over: r.over, mitigation: r.mitigation, cap: r.effCap, from: 'the AC calculator' }
   }, [sheetStats, acCaps, view, sheet])
   const overCap = capMode === 'auto' ? !!acState?.over : capMode === 'over'
-  const weights = useMemo(() => (overCap ? { ...baseWeights, ac: baseWeights.ac * AC_OVER_CAP } : baseWeights), [baseWeights, overCap])
+  const weights = useMemo(() => {
+    const w = rawWeights(role, conv)
+    return overCap ? { ...w, ac: w.ac * AC_OVER_CAP } : w
+  }, [role, conv, overCap])
+  // Two-handers only when the secondary hand is free, unless the player says otherwise.
+  const secondaryInUse = !!view.inventory?.worn.some((it) => it.location === 'Secondary')
+  const twoHanders = twoHandMode === 'any' || (twoHandMode === 'auto' && !secondaryInUse)
   const inv = view.inventory!
   const owned = useMemo(() => new Set([...inv.worn, ...inv.bags, ...inv.bank, ...inv.sharedBank].flatMap((i) => [itemKey(i.name), ...i.augs.map((a) => itemKey(a.name))])), [inv])
 
   // Every era in the catalog with how many pieces it holds, tagged or worked out from drop zones.
   const eraCounts = useMemo(() => {
     const items = state?.file?.items ?? []
-    const zones = zoneEras(items)
-    const counts = new Map<string, number>()
+    const status = state?.file?.eraStatus
+    const zones = zoneEras(items, status)
+    const counts = new Map<string, number>(ERA_ORDER.map((e) => [e, 0]))
     for (const it of items) {
-      const { era } = eraOf(it, zones)
+      const { era } = eraOf(it, zones, status)
       counts.set(era, (counts.get(era) ?? 0) + 1)
     }
-    const order = (e: string) => (e === 'Classic' ? 0 : e === 'Kunark' ? 2 : e === 'Velious' ? 3 : e === 'Luclin' ? 4 : e === UNKNOWN_ERA ? 5 : 1)
-    return [...counts].sort((a, b) => order(a[0]) - order(b[0]) || b[1] - a[1])
+    return [...counts]
   }, [state?.file])
 
   const results = useMemo(() => {
@@ -107,9 +154,11 @@ export function GearFinder({ view, sheet }: { view: InventoryView; sheet: Charac
       weights,
       compare,
       hiddenEras,
+      eraStatus: state.file.eraStatus,
+      twoHanders,
       owned
     })
-  }, [state?.file, classes.join(','), stats.level, stats.race, weights, compare, hiddenEras, inv, view.items, owned])
+  }, [state?.file, classes.join(','), stats.level, stats.race, weights, compare, hiddenEras, inv, view.items, owned, twoHanders])
 
   if (!state) return <div className="empty">Loading…</div>
   const p = state.progress
@@ -146,7 +195,7 @@ export function GearFinder({ view, sheet }: { view: InventoryView; sheet: Charac
         <div className="row" style={{ gap: 10, flexWrap: 'wrap' }}>
           <b>Weigh stats for</b>
           <span className="lt-seg">
-            {[...Object.keys(PRESETS), 'Custom'].map((name) => (
+            {[...Object.keys(ROLE_PRESETS), 'Custom'].map((name) => (
               <button key={name} className={preset === name ? 'on' : ''} onClick={() => setPreset(name)}>
                 {name}
               </button>
@@ -175,11 +224,13 @@ export function GearFinder({ view, sheet }: { view: InventoryView; sheet: Charac
                 key={era}
                 className={`lt-era${on ? ' on' : ''}`}
                 title={
-                  era === UNKNOWN_ERA
+                  era === OTHER_ERA
                     ? 'No era on the wiki page and no drop zone to tell by: quested, crafted and vendor items mostly'
-                    : DEFAULT_HIDDEN_ERAS.includes(era)
-                      ? `${era}: zones not in EverQuest Legends yet`
-                      : undefined
+                    : era === OTHER_OUT_ERA
+                      ? 'Out of era on the wiki, in no expansion named here: FearHateRevamp, HoleVP, WarrensFearHateRevamp and Unknown Era pages'
+                      : era === 'Classic'
+                        ? "Everything the wiki counts as in era for EverQuest Legends: Classic, and Legends' live zones (Fear, Hate, Hole, Sky, Temple, Warrens, Paineel, Stonebrunt)"
+                        : `${era}: out of era on EverQuest Legends`
                 }
                 onClick={() => setHiddenEras(on ? [...hiddenEras, era] : hiddenEras.filter((e) => e !== era))}
               >
@@ -213,19 +264,42 @@ export function GearFinder({ view, sheet }: { view: InventoryView; sheet: Charac
             {acState && capMode === 'auto' && ` Mitigation ${num(acState.mitigation)} against a soft cap of ${num(acState.cap)}, from ${acState.from}.`}
           </span>
         </div>
+        <div className="row small" style={{ gap: 10, flexWrap: 'wrap' }}>
+          <b>Primary</b>
+          <span className="lt-seg">
+            {(
+              [
+                ['auto', `Auto: ${secondaryInUse ? 'one-handed' : 'any'}`],
+                ['one', 'One-handed'],
+                ['any', 'Include two-handed']
+              ] as const
+            ).map(([m, label]) => (
+              <button key={m} className={twoHandMode === m ? 'on' : ''} onClick={() => setTwoHandMode(m)}>
+                {label}
+              </button>
+            ))}
+          </span>
+          <span className="muted">
+            {twoHanders ? 'Two-handed weapons are suggested for Primary.' : 'Two-handed weapons are left out: your secondary hand is in use.'}
+          </span>
+        </div>
+        <div className="small muted lt-worth">
+          <b>What a point is worth to you:</b> {conv.notes.join(' · ')}
+          {conv.offensePerStr ? ' · STR adds ⅔ Offense' : ''} · AGI adds {conv.avoidancePerAgi.toFixed(2)} avoidance · DEX only helps procs (it does not move crit on Legends)
+        </div>
         {showWeights && (
           <div className="lt-weights">
-            {(Object.keys(WEIGHT_LABELS) as WeightKey[]).map((k) => (
+            {(Object.keys(ROLE_LABELS) as RoleKey[]).map((k) => (
               <label key={k} className="lt-weight">
-                <span>{WEIGHT_LABELS[k]}</span>
+                <span>{ROLE_LABELS[k]}</span>
                 <input
                   type="number"
                   step={0.1}
                   min={0}
-                  value={baseWeights[k]}
-                  title={k === 'ac' && overCap ? `Counts as ${Math.round(baseWeights.ac * AC_OVER_CAP * 100) / 100} while over the soft cap` : undefined}
+                  value={role[k]}
+                  title={k === 'ac' && overCap ? `Counts as ${Math.round(role.ac * AC_OVER_CAP * 100) / 100} while over the soft cap` : undefined}
                   onChange={(e) => {
-                    setCustom({ ...baseWeights, [k]: Math.max(0, Number(e.target.value) || 0) })
+                    setCustom({ ...role, [k]: Math.max(0, Number(e.target.value) || 0) })
                     setPreset('Custom')
                   }}
                 />
@@ -320,9 +394,11 @@ export function GearFinder({ view, sheet }: { view: InventoryView; sheet: Charac
             </p>
           )}
           <p className="faint small">
-            Scores are your weights times each stat, so they only rank items against each other. The wiki holds base stats, so a candidate "as it drops" is at +0 while
+            Weights are on outcomes (HP, mana, AC, avoidance, Offense, haste…); a raw stat counts for what it buys you, worked out from your classes, level,
+            current stats and AAs, the same formulas the Stats page checks against the game. Scores only rank items against each other. The wiki holds base stats, so a candidate "as it drops" is at +0 while
             your gear counts at its merge level; switch to "At your merge level" to compare like with like. Weapon ratio (damage ÷ delay) only counts when you give it a
-            weight. An item with no era on its wiki page takes the era of the zones it drops in, learned from the tagged items there. Item data from eqlwiki.com.
+            weight. In era and out of era follow eqlwiki's own list; an item with no era on its page takes the era of the zones it drops in, learned from the tagged
+            items there. Item data from eqlwiki.com.
           </p>
         </>
       )}

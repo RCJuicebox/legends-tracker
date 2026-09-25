@@ -432,7 +432,8 @@ function registerIpc(): void {
 
   handle('stats:caps', async (classes: string[], level: number) => ({
     skills: await gameTables.skillCaps(classes, level),
-    ac: await gameTables.acCaps(classes, level)
+    ac: await gameTables.acCaps(classes, level),
+    factors: await gameTables.classFactors(classes, level)
   }))
   handle('stats:readAAs', () => readAasFromLog(store.settings.get().logFile))
   handle('stats:readScreen', () => readStatsFromScreen())

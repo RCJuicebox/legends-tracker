@@ -6,6 +6,7 @@ import { latestAas, type AaSummary } from '../core/aa'
 // The game's own tables, read from its Resources folder:
 //   skillcaps.txt     CLASS^SKILL^LEVEL^CAP^flag^      every class, skill and level
 //   ACMitigation.txt  CLASS^LVL^AC_CAP^SOFT_CAP_MULTIPLIER^
+//   basedata.txt      LEVEL^CLASS^hp^mana^end^?^?^hp_fac^mana_fac^end_fac^
 // Class numbers are classic EverQuest's (1 Warrior … 16 Berserker), skill numbers too.
 
 interface Tables {
@@ -14,6 +15,8 @@ interface Tables {
   skills: Map<number, Map<number, number[]>>
   /** class → [cap by level, multiplier by level]. */
   ac: Map<number, { caps: number[]; mult: number[] }>
+  /** class → level → what a point of STA, the casting stat and the endurance stats is worth. */
+  factors: Map<number, Map<number, { hp: number; mana: number; end: number }>>
 }
 
 export interface SkillCapRow {
@@ -31,9 +34,17 @@ export class GameTables {
   private async load(): Promise<Tables> {
     const dir = this.gameDir()
     if (this.tables?.dir === dir) return this.tables
-    const t: Tables = { dir, skills: new Map(), ac: new Map() }
+    const t: Tables = { dir, skills: new Map(), ac: new Map(), factors: new Map() }
     const read = (f: string) => fs.readFile(join(dir, 'Resources', f), 'utf8').catch(() => '')
-    const [skills, ac] = await Promise.all([read('skillcaps.txt'), read('ACMitigation.txt')])
+    const [skills, ac, base] = await Promise.all([read('skillcaps.txt'), read('ACMitigation.txt'), read('basedata.txt')])
+    for (const line of base.split('\n')) {
+      const p = line.split('^')
+      const [l, c] = [Number(p[0]), Number(p[1])]
+      if (!l || !c) continue
+      let byLevel = t.factors.get(c)
+      if (!byLevel) t.factors.set(c, (byLevel = new Map()))
+      byLevel.set(l, { hp: Number(p[7]) || 0, mana: Number(p[8]) || 0, end: Number(p[9]) || 0 })
+    }
     for (const line of skills.split('\n')) {
       const [c, s, l, cap] = line.split('^').map(Number)
       if (!c || Number.isNaN(s) || !l) continue
@@ -69,6 +80,17 @@ export class GameTables {
       }
     }
     return [...best.values()].sort((a, b) => b.cap - a.cap || a.id - b.id)
+  }
+
+  /** Per class, the HP, mana and endurance factors at this level (basedata.txt). */
+  async classFactors(classes: string[], level: number): Promise<Record<string, { hp: number; mana: number; end: number }>> {
+    const t = await this.load()
+    const out: Record<string, { hp: number; mana: number; end: number }> = {}
+    for (const cls of classes) {
+      const row = t.factors.get(CLASS_NUMBER[cls as ClassId])?.get(level)
+      if (row) out[cls] = row
+    }
+    return out
   }
 
   /** Soft cap and post-cap multiplier per class at this level. */

@@ -17,47 +17,68 @@ export const SLOT_WORDS: Record<string, string[]> = {
   Chest: ['CHEST'], Legs: ['LEGS'], Feet: ['FEET'], Waist: ['WAIST'], Ammo: ['AMMO'], 'Any Slot': ['CHARM']
 }
 
-/** Expansions whose zones are not in EverQuest Legends yet: hidden unless the player turns them on. */
-export const DEFAULT_HIDDEN_ERAS = ['Kunark', 'Velious', 'Luclin']
-export const UNKNOWN_ERA = 'Unknown'
+export const OTHER_ERA = 'Other'
+export const OTHER_OUT_ERA = 'Other OOE'
+/** Groups out of era on EverQuest Legends: hidden unless the player turns them on. */
+export const DEFAULT_HIDDEN_ERAS = ['Kunark', 'Velious', 'Luclin', OTHER_OUT_ERA]
+/** The order the era chips appear in. */
+export const ERA_ORDER = ['Classic', OTHER_ERA, 'Kunark', 'Velious', 'Luclin', OTHER_OUT_ERA]
 
 /**
- * Wiki tags that are not eras of their own, folded into the one they belong to: Legends' reworked
- * classic zones count as Classic; Chardok is a Kunark zone, and the epics are grouped with Kunark
- * for now.
+ * Which eras eqlwiki counts as in era for EverQuest Legends, as its Template:PageEra switch lists them
+ * (key: the tag lowercased, spaces out). The catalog download reads the live list; this copy is the
+ * fallback. Anything not listed is out, as on the wiki.
  */
-const ERA_OF_TAG: Record<string, string> = {
-  fearhaterevamp: 'Classic',
-  fear: 'Classic',
-  hate: 'Classic',
-  temple: 'Classic',
-  sky: 'Classic',
-  paineel: 'Classic',
+export const DEFAULT_ERA_STATUS: Record<string, 'in' | 'out'> = {
+  classic: 'in', fear: 'in', hate: 'in', hole: 'in', sky: 'in', stonebrunt: 'in', temple: 'in', warrens: 'in', paineel: 'in',
+  kunark: 'out', velious: 'out', luclin: 'out', chardok: 'out', chardokrevamp: 'out', holevp: 'out', warrensfearhaterevamp: 'out',
+  fearhaterevamp: 'out', epics: 'out', epicquests: 'out', unknown: 'out'
+}
+
+/** Reads the in/out list out of Template:PageEra's source ("| kunark = out"). */
+export function parseEraStatus(templateSource: string): Record<string, 'in' | 'out'> {
+  const out: Record<string, 'in' | 'out'> = {}
+  // Only the switch's own lines read "| name = in" or "| name = out"; its documentation uses "# name".
+  for (const m of templateSource.matchAll(/^\s*\|\s*([a-z0-9]+)\s*=\s*(in|out)\s*$/gim)) out[m[1].toLowerCase()] = m[2].toLowerCase() as 'in' | 'out'
+  return out
+}
+
+/** Out-of-era tags that belong to a named expansion. Chardok and the epics sit with Kunark for now. */
+const EXPANSION_OF_TAG: Record<string, string> = {
+  kunark: 'Kunark',
   chardok: 'Kunark',
   epics: 'Kunark',
-  epicquests: 'Kunark'
+  epicquests: 'Kunark',
+  velious: 'Velious',
+  chardokrevamp: 'Velious',
+  luclin: 'Luclin'
 }
 
-/** One name per era, whatever the tag's case or name. */
-export function normalizeEra(tag: string): string {
-  const t = tag.trim().toLowerCase()
-  if (!t) return ''
-  return ERA_OF_TAG[t] ?? t[0].toUpperCase() + t.slice(1)
+/**
+ * The era group a wiki tag falls in: every in-era tag (Legends' live classic content) is Classic, an
+ * out-of-era tag goes to its expansion, and an out-of-era tag with no expansion is Other OOE.
+ */
+export function normalizeEra(tag: string, status: Record<string, 'in' | 'out'> = DEFAULT_ERA_STATUS): string {
+  const key = tag.trim().toLowerCase().replace(/\s+/g, '')
+  if (!key) return ''
+  if ((status[key] ?? DEFAULT_ERA_STATUS[key]) === 'in') return 'Classic'
+  return EXPANSION_OF_TAG[key] ?? OTHER_OUT_ERA
 }
 
-/** Earliest first: Classic, then Legends' own tags, then the expansions in release order. */
+/** Earliest first, so an item from several zones counts in the one easiest to reach. */
 function eraRank(era: string): number {
-  return era === 'Classic' ? 0 : era === 'Kunark' ? 2 : era === 'Velious' ? 3 : era === 'Luclin' ? 4 : 1
+  const i = ERA_ORDER.indexOf(era)
+  return i < 0 ? ERA_ORDER.length : i
 }
 
 /**
  * Each zone's era, learned from the catalog itself: the era most of the tagged items dropping there
  * carry, when at least three in five agree.
  */
-export function zoneEras(catalog: CatalogItem[]): Map<string, string> {
+export function zoneEras(catalog: CatalogItem[], status?: Record<string, 'in' | 'out'>): Map<string, string> {
   const votes = new Map<string, Map<string, number>>()
   for (const item of catalog) {
-    const era = normalizeEra(item.era)
+    const era = normalizeEra(item.era, status)
     if (!era) continue
     for (const z of item.zones) {
       const m = votes.get(z) ?? new Map<string, number>()
@@ -75,19 +96,21 @@ export function zoneEras(catalog: CatalogItem[]): Map<string, string> {
 }
 
 /**
- * An item's era: its own tag, or, for an untagged item, the earliest era among the zones it drops in
- * (it can be had in the earliest of them). Unknown when neither says.
+ * An item's era group: its own tag, or, for an untagged item, the earliest group among the zones it
+ * drops in (it can be had in the earliest of them). Other when neither says.
  */
-export function eraOf(item: CatalogItem, zones: Map<string, string>): { era: string; inferred: boolean } {
-  const own = normalizeEra(item.era)
+export function eraOf(item: CatalogItem, zones: Map<string, string>, status?: Record<string, 'in' | 'out'>): { era: string; inferred: boolean } {
+  const own = normalizeEra(item.era, status)
   if (own) return { era: own, inferred: false }
   const eras = item.zones.map((z) => zones.get(z)).filter((e): e is string => !!e)
-  if (!eras.length) return { era: UNKNOWN_ERA, inferred: false }
+  if (!eras.length) return { era: OTHER_ERA, inferred: false }
   return { era: eras.sort((a, b) => eraRank(a) - eraRank(b))[0], inferred: true }
 }
 
 export interface Restrictions {
   slots: string[]
+  /** A weapon's skill as its stats block names it ("2H Slashing", "Hand to Hand"); '' for anything else. */
+  skill: string
   /** Class codes, or ['ALL']. */
   classes: string[]
   /** Race codes, or ['ALL']. */
@@ -105,6 +128,7 @@ export function restrictions(block: string): Restrictions {
       .filter(Boolean)
   return {
     slots: words('Slot'),
+    skill: /\bSkill:\s*([0-9A-Za-z ]+?)(?:\s{2,}|\s*Atk Delay|\s*$|\n)/m.exec(text)?.[1].trim() ?? '',
     classes: words('Class'),
     races: words('Race'),
     reqLevel: Number(/Required level of (\d+)/i.exec(text)?.[1] ?? 0)
@@ -126,6 +150,9 @@ export function canWear(r: Restrictions, who: Wearer, slot: string): boolean {
   if (who.race && r.races.length && !r.races.includes('ALL') && !r.races.includes(who.race)) return false
   return !(r.reqLevel && r.reqLevel > who.level)
 }
+
+/** Two-handed: it takes the secondary hand too. */
+export const isTwoHanded = (r: Restrictions) => /^2H\b/i.test(r.skill)
 
 /** Slots where a weapon's damage and delay count. */
 export const WEAPON_SLOTS = ['Primary', 'Secondary', 'Range']
@@ -209,8 +236,12 @@ export interface FinderOptions {
   weights: Weights
   /** 'drop': candidates as they drop (+0). 'level': at the merge level of what they replace. */
   compare: 'drop' | 'level'
-  /** Eras to leave out, by normalizeEra() name, 'Unknown' included. */
+  /** Era groups to leave out, as normalizeEra() names them. */
   hiddenEras: string[]
+  /** The wiki's in/out list; the built-in copy when absent. */
+  eraStatus?: Record<string, 'in' | 'out'>
+  /** Suggest two-handed weapons for Primary; off when the secondary hand is in use. */
+  twoHanders?: boolean
   /** itemKeys of everything the character owns anywhere. */
   owned: Set<string>
   perSlot?: number
@@ -219,9 +250,9 @@ export interface FinderOptions {
 /** Per worn slot, the best candidates that beat what is worn there, by the chosen weights. */
 export function findUpgrades(o: FinderOptions): SlotResult[] {
   const perSlot = o.perSlot ?? 6
-  const zones = zoneEras(o.catalog)
+  const zones = zoneEras(o.catalog, o.eraStatus)
   const hidden = new Set(o.hiddenEras)
-  const parsed = o.catalog.map((item) => ({ item, r: restrictions(item.statsblock), base: parseStatsBlock(item.statsblock), ...eraOf(item, zones) }))
+  const parsed = o.catalog.map((item) => ({ item, r: restrictions(item.statsblock), base: parseStatsBlock(item.statsblock), ...eraOf(item, zones, o.eraStatus) }))
   const slots = [...new Set(o.worn.map((w) => w.location))]
   for (const s of Object.keys(SLOT_WORDS)) if (!slots.includes(s)) slots.push(s)
   return slots.map((slot) => {
@@ -242,6 +273,7 @@ export function findUpgrades(o: FinderOptions): SlotResult[] {
       // Summoned items are conjured and vanish; they are not gear to chase.
       if (/^Summoned:/i.test(p.item.title)) continue
       if (!canWear(p.r, o.wearer, slot)) continue
+      if (slot === 'Primary' && !o.twoHanders && isTwoHanded(p.r)) continue
       if (wornKeys.has(itemKey(p.item.title))) continue
       const stats = o.compare === 'level' && level ? scaledStats(p.base, level) : p.base
       const sc = score(stats, weights)
