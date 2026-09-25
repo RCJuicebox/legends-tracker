@@ -118,7 +118,7 @@ export function Logs() {
                     <div className="faint small">{l.name}</div>
                   </td>
                   <td>
-                    <div className="row tight" style={{ marginBottom: 4 }}>
+                    <div className="row tight mb-4">
                       <b>{mb(l.size)}</b>
                       <span className="faint small">of {a.thresholdMB} MB</span>
                     </div>

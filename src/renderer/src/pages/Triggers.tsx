@@ -242,7 +242,7 @@ function TriggerEditor({ t, folders, onChange, onDelete, onDuplicate }: { t: Tri
             <Icon name="plus" /> Phrase
           </button>
         </h2>
-        <div className="stack" style={{ gap: 8 }}>
+        <div className="stack gap-8">
           {t.phrases.map((p, i) => (
             <div className="phrase-row" key={i}>
               <input className="mono" value={p.text} aria-label={`Phrase ${i + 1}`} onChange={(e) => setPhrase(i, { ...p, text: e.target.value })} placeholder={p.regex ? "^(?<S1>\\w+) tells you, '(?<S2>.+)'$" : 'You feel yourself starting to appear.'} />
@@ -271,7 +271,7 @@ function TriggerEditor({ t, folders, onChange, onDelete, onDuplicate }: { t: Tri
             <option value="timer">Start a timer</option>
           </select>
         </h2>
-        <div className="stack" style={{ gap: 10 }}>
+        <div className="stack gap-10">
           {t.actions.length === 0 && <div className="empty">No actions: this trigger does nothing.</div>}
           {t.actions.map((a, i) => (
             <ActionEditor key={i} a={a} onChange={(x) => setAction(i, x)} onRemove={() => set({ actions: t.actions.filter((_, j) => j !== i) })} />
@@ -411,7 +411,7 @@ function TestPanel({ t }: { t: Trigger }) {
           {result.error ? (
             <div className="notice bad">{result.error}</div>
           ) : result.matched ? (
-            <div className="stack" style={{ gap: 6 }}>
+            <div className="stack gap-6">
               <div className="row">
                 <span className="chip ok">Matches phrase {result.phraseIndex + 1}</span>
                 {Object.entries(result.captures).map(([k, v]) => (

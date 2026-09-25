@@ -235,7 +235,7 @@ export function Gear({ go }: { go?: (page: 'motes') => void }) {
       )}
       <GearTotals view={view} sheet={sheet} updateSheet={updateSheet} summary={summary} scaled={scaled} setScaled={setScaled} />
       <Carried view={view} />
-      <p className="faint small" style={{ marginTop: 14 }}>
+      <p className="faint small mt-14">
         Item stats and icon numbers come from <a href="https://eqlwiki.com" target="_blank" rel="noreferrer">eqlwiki.com</a>, the community wiki, scaled for each item's +N
         merge level the way the wiki's item level slider scales them; the icons themselves are the game's own. Exaltation augments add nothing on top: their effects are
         already part of the item's figures.
@@ -433,7 +433,7 @@ function GearTotals({
             </>
           )}
         </div>
-        <div className="faint small" style={{ marginTop: 10 }}>
+        <div className="faint small mt-10">
           {found} of {worn.length} worn items on the wiki · ammo left out of AC
         </div>
         <div className="small muted" style={{ marginTop: 8 }}>

@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { useApp } from '../state'
 import { api, clock, ago, errorMessage } from '../api'
 import { useInvoke } from '../hooks'
-import { showError, showUndo } from '../toast'
+import { act, showError, showUndo } from '../toast'
 import { who } from '../format'
 import { CategoryChip, ConfirmButton, Field, Info, LoadError, NumberInput, SpellIcon, Switch } from '../components/ui'
 import {
@@ -489,7 +489,7 @@ function RuleEditor({ k, onSaved }: { k: KnownSpell; onSaved: (list: KnownSpell[
           <button className="btn primary" onClick={() => void save(rule)}>
             Save
           </button>
-          <button className="btn" onClick={() => void api.invoke('audio:test', (rule.warnSpeech ?? (beneficial ? t.buffWarnSpeech : t.dotWarnSpeech)).replace(/\{spell\}/gi, rule.alias || k.name).replace(/\{target\}/gi, 'a gnoll'))}>
+          <button className="btn" onClick={() => void act('audio:test', (rule.warnSpeech ?? (beneficial ? t.buffWarnSpeech : t.dotWarnSpeech)).replace(/\{spell\}/gi, rule.alias || k.name).replace(/\{target\}/gi, 'a gnoll'))}>
             Hear warning
           </button>
           <span className="grow" />
@@ -570,7 +570,7 @@ function LogCheck() {
           {busy ? 'Reading…' : 'Run check'}
         </button>
       </h2>
-      <p className="muted small" style={{ marginTop: 0 }}>
+      <p className="muted small mt-0">
         A diagnostic, not a data source: replays recent history and compares each spell's real landing-to-fade time with
         the calculation. A mismatch usually means a focus effect missing from, or wrongly set in, the list above;
         the row shows the total focus that spell would need.
@@ -635,7 +635,7 @@ function TierTable() {
           Reset to guide values
         </button>
       </h2>
-      <p className="muted small" style={{ marginTop: 0 }}>
+      <p className="muted small mt-0">
         Duration bonus per rank, from the EQL spell upgrade guide: rank X is ten tiers, an unranked spell none. Confirmed
         in game for DoTs (Envenomed Bolt X 0:36 → 0:54) and buffs (Spirit of the Puma X). Heal over time is fitted
         rather than from the guide: 7% matches Slugs Healing V's Spell window and log, where the guide's 5% does not.

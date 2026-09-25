@@ -173,8 +173,8 @@ function AaLine({ aa, status, onRead }: { aa: AaSummary | null; status: string; 
   const [open, setOpen] = useState(false)
   const applied = (Object.keys(AA_USES) as AaEffect[]).filter((k) => aa?.totals[k])
   return (
-    <div className="stack" style={{ gap: 8 }}>
-      <div className="row small" style={{ gap: 10 }}>
+    <div className="stack gap-8">
+      <div className="row small gap-10">
         <b>Alternate Advancement</b>
         <span className="muted">
           {aa ? `${aa.count} abilities from your /alternateadv list of ${aa.when}.` : 'Type /alternateadv list in game; the tracker reads the result from your log.'}
@@ -339,7 +339,7 @@ function AcTab({ s, set, setOverride, auto, val, trio, primary, tableCap, skill,
 
   return (
     <div className="stats-grid">
-      <div className="stack" style={{ gap: 14 }}>
+      <div className="stack gap-14">
         <div className="card">
           <div className="grid three">
             <div className="stat">
@@ -359,7 +359,7 @@ function AcTab({ s, set, setOverride, auto, val, trio, primary, tableCap, skill,
             The Inventory window's three AC figures, in its order. With your unbuffed numbers these match the game exactly.
           </p>
         </div>
-        <div className="card stack" style={{ gap: 8 }}>
+        <div className="card stack gap-8">
           <b>
             {num(r.srv.total)} AC Sum against a {num(r.effCap)} soft cap
           </b>
@@ -388,8 +388,8 @@ function AcTab({ s, set, setOverride, auto, val, trio, primary, tableCap, skill,
         </div>
       </div>
 
-      <div className="stack" style={{ gap: 14 }}>
-        <div className="card stack" style={{ gap: 10 }}>
+      <div className="stack gap-14">
+        <div className="card stack gap-10">
           <h2>Worn gear</h2>
           <div className="stats-fields two">
             <NumField label="AC on equipped items" hint="every slot but ammo" value={s.overrides.itemAC} auto={auto.itemAC} autoFrom="inventory" onChange={(v) => setOverride('itemAC', v)} />
@@ -400,7 +400,7 @@ function AcTab({ s, set, setOverride, auto, val, trio, primary, tableCap, skill,
           </div>
           {!hasInventory && <p className="faint small">No inventory export yet, so type your worn AC. Type /outputfile inventory in game to fill it in.</p>}
         </div>
-        <div className="card stack" style={{ gap: 10 }}>
+        <div className="card stack gap-10">
           <h2>Character</h2>
           <div className="stats-fields two">
             <NumField label="Agility" hint="Inventory window" value={s.agility} onChange={(v) => set({ agility: v ?? 0 })} />
@@ -411,7 +411,7 @@ function AcTab({ s, set, setOverride, auto, val, trio, primary, tableCap, skill,
           </div>
           <p className="faint small">Defence skill ({num(skill(15))}) comes from your skills on the Combat tab.</p>
         </div>
-        <div className="card stack" style={{ gap: 10 }}>
+        <div className="card stack gap-10">
           <h2>Buffs and AAs</h2>
           <div className="stats-fields two">
             <NumField label="AC from buffs" hint="SPA 1 + 416" value={s.acBuffs} onChange={(v) => set({ acBuffs: v ?? 0 })} />
@@ -421,7 +421,7 @@ function AcTab({ s, set, setOverride, auto, val, trio, primary, tableCap, skill,
             <NumField label="Melee avoidance AAs" hint="SPA 172, %" value={s.overrides.evasion} auto={auto.evasion} autoFrom="AAs" onChange={(v) => setOverride('evasion', v)} />
           </div>
         </div>
-        <div className="card stack" style={{ gap: 10 }}>
+        <div className="card stack gap-10">
           <h2>Soft cap</h2>
           <div className="stats-fields two">
             <NumField label="Soft cap" value={s.overrides.softCap} auto={auto.softCap} autoFrom="game table" onChange={(v) => setOverride('softCap', v)} />
@@ -446,9 +446,9 @@ function CombatTab({ s, set, setOverride, auto, val, trio, primary, caps, skill 
   const { weaponName, offense, acc, dp, crit, swings, notes, rows } = combatReport(s, val, trio, caps, skill)
 
   return (
-    <div className="stack" style={{ gap: 14 }}>
+    <div className="stack gap-14">
       <div className="stats-grid">
-        <div className="stack" style={{ gap: 14 }}>
+        <div className="stack gap-14">
           <div className="card">
             <div className="grid four">
               <div className="stat">
@@ -473,15 +473,15 @@ function CombatTab({ s, set, setOverride, auto, val, trio, primary, caps, skill 
               </div>
             </div>
           </div>
-          <div className="card stack" style={{ gap: 8 }}>
+          <div className="card stack gap-8">
             <Notes notes={notes} />
             <Trace rows={rows} />
           </div>
           <StanceCard s={s} set={set} baseAcc={acc} weaponName={weaponName} />
         </div>
 
-        <div className="stack" style={{ gap: 14 }}>
-          <div className="card stack" style={{ gap: 10 }}>
+        <div className="stack gap-14">
+          <div className="card stack gap-10">
             <h2>Attack</h2>
             <div className="stats-fields two">
               <label className="field">
@@ -502,7 +502,7 @@ function CombatTab({ s, set, setOverride, auto, val, trio, primary, caps, skill 
               <NumField label="Double attack bonus" hint="%" value={s.doubleAttackBonus} onChange={(v) => set({ doubleAttackBonus: v ?? 0 })} />
             </div>
           </div>
-          <div className="card stack" style={{ gap: 10 }}>
+          <div className="card stack gap-10">
             <h2>Crit</h2>
             <div className="stats-fields two">
               <NumField label="Measured crit rate" hint="%, from a parse" step={0.1} max={100} value={s.measuredCrit} onChange={(v) => set({ measuredCrit: v ?? 0 })} />
@@ -525,7 +525,7 @@ function CombatTab({ s, set, setOverride, auto, val, trio, primary, caps, skill 
 
 function SkillsCard({ s, set, caps, trio }: { s: StatsSheet; set: SetSheet; caps: Caps; trio: string[] }) {
   return (
-    <div className="card stack" style={{ gap: 10 }}>
+    <div className="card stack gap-10">
       <h2>
         Your skills <span className="spacer" />
         <span className="row tight" style={{ textTransform: 'none', letterSpacing: 0, fontWeight: 500 }}>
@@ -591,7 +591,7 @@ function StanceCard({ s, set, baseAcc, weaponName }: { s: StatsSheet; set: SetSh
   const setStance = (i: number, patch: Partial<{ name: string; pct: number }>) => set({ stances: s.stances.map((st, j) => (j === i ? { ...st, ...patch } : st)) })
   const ladder = [0.75, 0.9, 0.95, 0.99].map((p) => `${p * 100}% needs ${num(Math.ceil(D / (2 * (1 - p))))}`).join(', ')
   return (
-    <div className="card stack" style={{ gap: 12 }}>
+    <div className="card stack gap-12">
       <h2>Stances and chance to hit</h2>
       <p className="faint small" style={{ margin: 0 }}>
         Your Accuracy ({num(baseAcc)} with {weaponName}) is multiplied by the stance's hit bonus, then rolled against the target's avoidance. Each stance is a point
@@ -815,8 +815,8 @@ function CharacterTab({
   )
 
   return (
-    <div className="stack" style={{ gap: 14 }}>
-      <div className="card row" style={{ gap: 12 }}>
+    <div className="stack gap-14">
+      <div className="card row gap-12">
         <button className="btn primary" disabled={busy} onClick={() => void read()}>
           {busy ? 'Reading the screen…' : 'Read from screen'}
         </button>
