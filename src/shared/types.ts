@@ -177,6 +177,11 @@ export interface CombatSettings {
   newSessionOnZone: boolean
   /** Fold each pet's damage into its owner's row on the Live page. */
   combinePet: boolean
+  /**
+   * Book a charmed mob's blows to its charmer as a pet. The log names a charm pet as the mob, so
+   * the guess can go wrong; off, charmed mobs are left out as before.
+   */
+  charmPets: boolean
 }
 
 export interface AppSettings {

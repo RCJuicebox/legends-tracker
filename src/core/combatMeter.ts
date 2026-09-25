@@ -33,6 +33,8 @@ const TIMELINE_MAX = 3600
 export interface MeterConfig {
   fightGapSec: number
   newSessionOnZone: boolean
+  /** Follow charmed mobs as their charmers' pets. Off by default here; the app's setting turns it on. */
+  charmPets?: boolean
 }
 
 export interface MeterHooks {
@@ -133,7 +135,7 @@ export class CombatMeter {
    * so its blows are told apart by where they land: on an enemy they are the pet's (mobs do not fight
    * each other), booked to `label`; on a friend they are an enemy's, and mean the charm has broken.
    */
-  private charmed = new Map<string, { label: string; owner: string; since: number }>()
+  private charmed = new Map<string, { label: string; owners: string[]; since: number }>()
   /** The last spell a friend began casting: whoever it was charmed what "has been charmed" next. */
   private lastFriendCast: { who: string; at: number } | null = null
   private seq = 0
@@ -147,6 +149,11 @@ export class CombatMeter {
 
   configure(config: MeterConfig): void {
     this.config = config
+    if (!config.charmPets) this.charmed.clear()
+  }
+
+  get charmPets(): boolean {
+    return !!this.config.charmPets
   }
 
   /** The character's name as the log spells it, so lines naming them ("Aldric healed Kelwyn") read as You. */
@@ -364,11 +371,18 @@ export class CombatMeter {
 
   /** "<mob> has been charmed.": the pet of the friend who began casting just before, if one did. */
   private onCharm(mob: string, at: number): void {
+    if (!this.config.charmPets) return
     const cast = this.lastFriendCast
     if (!cast || at - cast.at > CHARM_CAST_MS || at < cast.at) return
+    // One pet at a time: a new charm ends the charmer's last one.
+    for (const [k, c] of this.charmed) if (c.owners.includes(cast.who) && k !== nameKey(mob)) this.charmed.delete(k)
     const label = `${displayName(mob)} (charmed)`
-    this.charmed.set(nameKey(mob), { label, owner: cast.who, since: at })
-    this.pets.set(nameKey(label), cast.who)
+    // Two charmers of mobs with one name: the log cannot tell their pets apart, so the pet is theirs
+    // together, a row of its own rather than a share of either's.
+    const had = this.charmed.get(nameKey(mob))
+    const owners = had && !had.owners.includes(cast.who) ? [...had.owners, cast.who] : [cast.who]
+    this.charmed.set(nameKey(mob), { label, owners, since: at })
+    this.pets.set(nameKey(label), owners.join(' or '))
     this.refreshKind(nameKey(label))
     this.changed()
   }
@@ -429,6 +443,9 @@ export class CombatMeter {
       case 'resist':
         return this.onResist(ev, at)
       case 'pet': {
+        // "a gnoll told you, 'Attacking … Master.'" is a charmed mob: claiming its name would make
+        // every gnoll a pet. Charms are followed from "has been charmed" instead.
+        if (ARTICLE.test(ev.pet)) return
         const owner = this.norm(ev.owner)
         this.pets.set(nameKey(ev.pet), owner)
         this.sides.delete(nameKey(ev.pet))

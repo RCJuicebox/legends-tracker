@@ -200,7 +200,8 @@ export function sanitizeSettings(v: unknown, fb: AppSettings): AppSettings | nul
     fightGapSec: num(cb.fightGapSec, fb.combat.fightGapSec, 2, 600),
     historyMinutes: num(cb.historyMinutes, fb.combat.historyMinutes, 0, 1440),
     newSessionOnZone: bool(cb.newSessionOnZone, fb.combat.newSessionOnZone),
-    combinePet: bool(cb.combinePet, fb.combat.combinePet)
+    combinePet: bool(cb.combinePet, fb.combat.combinePet),
+    charmPets: bool(cb.charmPets, fb.combat.charmPets)
   })
 
   let overlays = fb.overlays

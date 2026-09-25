@@ -95,8 +95,8 @@ describe('combat lines', () => {
   })
 })
 
-function meter(opts: { fightGapSec?: number; newSessionOnZone?: boolean } = {}) {
-  const m = new CombatMeter({ fightGapSec: opts.fightGapSec ?? 10, newSessionOnZone: opts.newSessionOnZone ?? true })
+function meter(opts: { fightGapSec?: number; newSessionOnZone?: boolean; charmPets?: boolean } = {}) {
+  const m = new CombatMeter({ fightGapSec: opts.fightGapSec ?? 10, newSessionOnZone: opts.newSessionOnZone ?? true, charmPets: opts.charmPets })
   m.setSelf('Kelwyn')
   const feed = (text: string) => {
     for (const raw of text.trim().split('\n')) {
@@ -438,7 +438,7 @@ describe('charm pets', () => {
     [Sat Aug 08 20:39:54 2026] You punch a haunted chest for 100 points of damage.`
 
   it('books a charmed mob’s blows on enemies to a pet of its charmer, apart from mobs of its name', () => {
-    const { m, feed } = meter()
+    const { m, feed } = meter({ charmPets: true })
     feed(CHARM)
     const ents = m.snapshot().liveSession!.entities
     const pet = ents['an ire ghast (charmed)']
@@ -451,7 +451,7 @@ describe('charm pets', () => {
   })
 
   it('ends the charm when the pet turns on the group, and not before', () => {
-    const { m, feed } = meter()
+    const { m, feed } = meter({ charmPets: true })
     feed(`${CHARM}
       [Sat Aug 08 20:40:30 2026] An ire ghast hits Dorran for 50 points of damage.
       [Sat Aug 08 20:40:31 2026] An ire ghast hits a haunted chest for 70 points of damage.`)
@@ -462,11 +462,71 @@ describe('charm pets', () => {
   })
 
   it('claims no charm without a friend’s cast just before it', () => {
-    const { m, feed } = meter()
+    const { m, feed } = meter({ charmPets: true })
     feed(`
       [Sat Aug 08 20:37:00 2026] You have entered The Plane of Hate 4 (Refined).
       [Sat Aug 08 20:37:42 2026] an ire ghast has been charmed.
       [Sat Aug 08 20:39:50 2026] An ire ghast hits a haunted chest for 64 points of damage.`)
     expect(m.snapshot().liveSession?.entities['an ire ghast (charmed)']).toBeUndefined()
+  })
+})
+
+describe('charm pets, when they go wrong', () => {
+  const START = `
+    [Sat Aug 08 20:37:00 2026] You have entered The Plane of Hate 4 (Refined).
+    [Sat Aug 08 20:37:01 2026] Dorran has joined the group.
+    [Sat Aug 08 20:37:02 2026] Aldric has joined the group.`
+
+  it('leaves charmed mobs out when turned off', () => {
+    const { m, feed } = meter({ charmPets: false })
+    feed(`${START}
+      [Sat Aug 08 20:37:41 2026] Dorran begins casting Allure V.
+      [Sat Aug 08 20:37:42 2026] an ire ghast has been charmed.
+      [Sat Aug 08 20:39:50 2026] An ire ghast hits a haunted chest for 64 points of damage.`)
+    const ents = m.snapshot().liveSession?.entities ?? {}
+    expect(ents['an ire ghast (charmed)']).toBeUndefined()
+  })
+
+  it('ends a charmer’s last pet when they charm another', () => {
+    const { m, feed } = meter({ charmPets: true })
+    feed(`${START}
+      [Sat Aug 08 20:37:41 2026] Dorran begins casting Allure V.
+      [Sat Aug 08 20:37:42 2026] an ire ghast has been charmed.
+      [Sat Aug 08 20:38:00 2026] An ire ghast hits a haunted chest for 64 points of damage.
+      [Sat Aug 08 20:40:00 2026] Dorran begins casting Allure V.
+      [Sat Aug 08 20:40:01 2026] a gorgon has been charmed.
+      [Sat Aug 08 20:40:10 2026] An ire ghast hits a haunted chest for 70 points of damage.
+      [Sat Aug 08 20:40:11 2026] A gorgon hits a haunted chest for 90 points of damage.`)
+    const ents = m.snapshot().liveSession!.entities
+    // The ghast's second blow comes after the switch: nobody's pet, a mob hitting a mob, dropped.
+    expect(ents['an ire ghast (charmed)'].out.total).toBe(64)
+    expect(ents['a gorgon (charmed)']).toMatchObject({ kind: 'pet', owner: 'Dorran' })
+    expect(ents['a gorgon (charmed)'].out.total).toBe(90)
+  })
+
+  it('gives a pet two people charmed under one name to both of them, folded into neither', () => {
+    const { m, feed } = meter({ charmPets: true })
+    feed(`${START}
+      [Sat Aug 08 20:37:41 2026] Dorran begins casting Allure V.
+      [Sat Aug 08 20:37:42 2026] an ire ghast has been charmed.
+      [Sat Aug 08 20:37:50 2026] Aldric begins casting Allure V.
+      [Sat Aug 08 20:37:51 2026] an ire ghast has been charmed.
+      [Sat Aug 08 20:38:00 2026] An ire ghast hits a haunted chest for 64 points of damage.
+      [Sat Aug 08 20:38:01 2026] Dorran slashes a haunted chest for 10 points of damage.`)
+    const seg = m.snapshot().liveSession!
+    expect(seg.entities['an ire ghast (charmed)']).toMatchObject({ kind: 'pet', owner: 'Dorran or Aldric' })
+    const rows = damageRows(seg, 'everyone', true)
+    expect(rows.find((r) => r.name === 'Dorran')?.total).toBe(10)
+    expect(rows.find((r) => r.name === 'An ire ghast (charmed)')?.total).toBe(64)
+  })
+
+  it('never makes every mob of a name your pet from its "Attacking" tell', () => {
+    const { m, feed } = meter({ charmPets: false })
+    feed(`${START}
+      [Sat Aug 08 20:38:00 2026] an ire ghast told you, 'Attacking a haunted chest Master.'
+      [Sat Aug 08 20:38:01 2026] An ire ghast hits YOU for 50 points of damage.`)
+    const e = m.snapshot().liveSession!.entities['an ire ghast']
+    expect(e.kind).toBe('npc')
+    expect(e.out.total).toBe(50)
   })
 })

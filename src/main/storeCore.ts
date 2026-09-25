@@ -48,7 +48,7 @@ export function defaultSettings(): AppSettings {
     overlays: DEFAULT_OVERLAYS.map((o) => ({ ...o })),
     overlaysOnlyWithGame: true,
     yieldToGame: true,
-    combat: { fightGapSec: 10, historyMinutes: 60, newSessionOnZone: true, combinePet: true }
+    combat: { fightGapSec: 10, historyMinutes: 60, newSessionOnZone: true, combinePet: true, charmPets: true }
   }
 }
 

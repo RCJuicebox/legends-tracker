@@ -129,6 +129,13 @@ export function Meter({ standalone = false }: { standalone?: boolean }) {
           <input type="checkbox" checked={combinePet} onChange={(e) => patchSettings((s) => ({ ...s, combat: { ...s.combat, combinePet: e.target.checked } }))} />
           Pets with owners
         </label>
+        <label
+          className="check small"
+          title="Count a mob charmed by you or a groupmate as that player's pet. The log names a charm pet as the mob, so this is a guess: it goes wrong when two people charm mobs of one name (their pets then share a row), or when mobs of the pet's name fight other mobs. Turning it on or off reads the last hour again."
+        >
+          <input type="checkbox" checked={state.settings.combat.charmPets} onChange={(e) => patchSettings((s) => ({ ...s, combat: { ...s.combat, charmPets: e.target.checked } }))} />
+          Charm pets
+        </label>
         <label className="check small" title="Rate over the time actually spent hitting (gaps between hits capped at 3 s) instead of the whole fight">
           <input type="checkbox" checked={active} onChange={(e) => setActive(e.target.checked)} />
           Active DPS

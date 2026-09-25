@@ -364,12 +364,15 @@ export class Engine {
 
   private meterConfig() {
     const c = this.settings.combat
-    return { fightGapSec: c.fightGapSec, newSessionOnZone: c.newSessionOnZone }
+    return { fightGapSec: c.fightGapSec, newSessionOnZone: c.newSessionOnZone, charmPets: c.charmPets }
   }
 
   reconfigure(): void {
     this.tracker?.configure(this.trackerConfig())
+    const charmWas = this.meter.charmPets
     this.meter.configure(this.meterConfig())
+    // Charm pets on or off changes whose every past blow was: the fights on record are read again.
+    if (charmWas !== this.meter.charmPets && this.status.watching) void this.rebuildCombat(this.settings.combat.historyMinutes)
     this.triggers.load(this.store.triggers.get(), characterName(this.settings.logFile))
     this.emitStatus()
   }
