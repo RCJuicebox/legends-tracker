@@ -6,7 +6,9 @@ import { Store, characterKey } from './store'
 import { Engine, type AudioCommand } from './engine'
 import { appEngineEnv } from './engineEnv'
 import { SpeechWorker } from './speech'
+import { AzureSpeech, VoiceRouter } from './azureSpeech'
 import { IconSource } from './icons'
+import { appUserModelId, ensureSourceShortcut } from './appIdentity'
 import { OverlayManager } from './overlays'
 import { GameWatcher, overlaysVisible } from './gameWatcher'
 import { Updater } from './updater'
@@ -118,6 +120,8 @@ function announceUpdate(key: string, title: string, body: string, onClick: () =>
   }
 }
 const speech = new SpeechWorker()
+/** Microsoft's neural voices, with the player's own Azure key; the Windows voices otherwise. */
+const azure = new AzureSpeech()
 const icons = new IconSource(() => store.settings.get().installDir)
 const achievementFiles = new AchievementFiles(
   () => store.settings.get().installDir,
@@ -184,7 +188,7 @@ function toAudio(cmd: AudioCommand | { kind: 'config' }): void {
 
 const engine = new Engine(
   store,
-  speech,
+  new VoiceRouter(speech, azure),
   {
     timers: (views) => {
       overlays.timers(views)
@@ -635,6 +639,14 @@ function registerIpc(): void {
   handle('update:install', () => updater.install())
 
   handle('audio:test', (text: string) => engine.speak(text, true))
+  handle('audio:azure', async () => {
+    await azure.load()
+    return azure.status()
+  })
+  handle('audio:setAzure', (region: unknown, key: unknown) => {
+    if (typeof region !== 'string' || typeof key !== 'string' || key.length > 200 || region.length > 40) throw new Error('Not a region and key.')
+    return azure.configure(region, key)
+  })
   // engine.playSound reads any file it is given, absolute paths included; it only ever plays it.
   handle('audio:sound', (file: string) => engine.playSound(String(file), 1))
   handle('audio:sounds', () => engine.listSounds())
@@ -951,7 +963,8 @@ app.on('window-all-closed', () => {
 })
 
 void app.whenReady().then(async () => {
-  app.setAppUserModelId('legends.tracker')
+  app.setAppUserModelId(appUserModelId())
+  ensureSourceShortcut(appIcon)
   const ownPage = (url: string) => url.startsWith('file:') || url.startsWith(process.env['ELECTRON_RENDERER_URL'] ?? '\u0000')
   // Output-device names are only visible to pages granted 'media'; grant it to our own pages only.
   session.defaultSession.setPermissionCheckHandler((wc, permission) => permission === 'media' && !!wc && ownPage(wc.getURL()))
