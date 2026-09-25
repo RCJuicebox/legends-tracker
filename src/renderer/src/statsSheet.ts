@@ -39,6 +39,8 @@ export interface StatsSheet {
   parseAccuracy: number
   /** The newest /alternateadv list read from the log. */
   aa: AaSummary | null
+  /** The last read of the in-game Stats window: numbers by the window's own labels. */
+  window: { at: number; values: Record<string, number[]> } | null
 }
 
 export function defaultSheet(): StatsSheet {
@@ -72,7 +74,8 @@ export function defaultSheet(): StatsSheet {
     targetAvoidance: 467,
     parseHit: 0,
     parseAccuracy: 0,
-    aa: null
+    aa: null,
+    window: null
   }
 }
 

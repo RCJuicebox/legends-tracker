@@ -1728,3 +1728,55 @@ table.table {
 .gear-name {
   color: var(--green);
 }
+
+/* ---------- character (the in-game Stats window) ---------- */
+
+.char-window {
+  display: grid;
+  grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr);
+  gap: 14px;
+  align-items: start;
+}
+.char-col {
+  padding: 14px 18px;
+}
+.char-row {
+  display: grid;
+  grid-template-columns: 190px auto 1fr;
+  gap: 12px;
+  align-items: baseline;
+  font-size: 13.5px;
+  line-height: 1.75;
+}
+.char-row > span:first-child {
+  color: var(--text-2);
+}
+.char-row b {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.char-note {
+  font-size: 12px;
+  text-align: right;
+  white-space: nowrap;
+}
+.char-green {
+  color: var(--green);
+}
+.char-heroic {
+  color: var(--amber);
+  font-weight: 500;
+}
+.char-head {
+  margin: 12px 0 4px;
+  color: #8fa8ff;
+  font-weight: 600;
+  font-size: 13.5px;
+}
+.char-head.first {
+  margin-top: 0;
+}
+.warn-text {
+  color: var(--amber);
+}

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { api } from '../api'
+import { api, ago } from '../api'
 import { useRemembered } from '../remember'
 import { readSheet, type StatsSheet } from '../statsSheet'
 import { useExportCharacter, useInventory, wornSummary } from './Gear'
@@ -28,6 +28,7 @@ import {
 } from '../../../core/combatModel'
 import { AA_USES, aaTotal, type AaEffect, type AaSummary } from '../../../core/aa'
 import type { CharacterSheet } from '../../../shared/types'
+import type { WornTotals } from '../../../core/inventory'
 
 const num = (n: number) => Math.round(n).toLocaleString()
 const pct = (x: number) => `${(x * 100).toFixed(2)}%`
@@ -38,14 +39,14 @@ interface Caps {
   ac: Record<string, { cap: number; mult: number }>
 }
 
-type Tab = 'ac' | 'combat'
+type Tab = 'character' | 'ac' | 'combat'
 type Row = [label: string, value?: string | number, note?: string]
 type Note = [kind: '' | 'good' | 'warn' | 'tip', title: string, text: string]
 
 export function Stats() {
   const { exports, available, character, setCharacter } = useExportCharacter('inventory', 'stats.character')
   const { view, sheet: charSheet, saveSheet: saveCharSheet } = useInventory(character, !!exports)
-  const [tab, setTab] = useRemembered<Tab>('stats.tab', 'ac')
+  const [tab, setTab] = useRemembered<Tab>('stats.tab', 'character')
   const [caps, setCaps] = useState<Caps | null>(null)
   const [aaStatus, setAaStatus] = useState('')
 
@@ -160,6 +161,9 @@ export function Stats() {
       </div>
 
       <div className="row" style={{ marginBottom: 12, gap: 6 }}>
+        <button className={`btn${tab === 'character' ? ' on' : ' ghost'}`} onClick={() => setTab('character')}>
+          Character
+        </button>
         <button className={`btn${tab === 'ac' ? ' on' : ' ghost'}`} onClick={() => setTab('ac')}>
           AC
         </button>
@@ -168,7 +172,9 @@ export function Stats() {
         </button>
       </div>
 
-      {tab === 'ac' ? (
+      {tab === 'character' ? (
+        <CharacterTab s={s} set={set} val={val} trio={trio} primary={primary} skill={skill} gear={inv?.totals ?? null} />
+      ) : tab === 'ac' ? (
         <AcTab s={s} set={set} setOverride={setOverride} auto={auto} val={val} trio={trio} primary={primary} tableCap={tableCap} skill={skill} hasInventory={!!inv} />
       ) : (
         <CombatTab s={s} set={set} setOverride={setOverride} auto={auto} val={val} trio={trio} primary={primary} caps={caps} skill={skill} />
@@ -341,8 +347,9 @@ function Trace({ rows }: { rows: Row[] }) {
   )
 }
 
-function AcTab({ s, set, setOverride, auto, val, trio, primary, tableCap, skill, hasInventory }: TabProps & { tableCap?: { cap: number; mult: number }; hasInventory: boolean }) {
-  const i: AcInputs = {
+/** The AC calculator's inputs from the sheet, files and AAs. */
+function acInputs(s: StatsSheet, trio: string[], primary: string, val: TabProps['val'], skill: (id: number) => number): AcInputs {
+  return {
     trio,
     cls: primary,
     race: s.race,
@@ -366,6 +373,10 @@ function AcTab({ s, set, setOverride, auto, val, trio, primary, tableCap, skill,
     softCap: val('softCap'),
     multiplier: val('multiplier')
   }
+}
+
+function AcTab({ s, set, setOverride, auto, val, trio, primary, tableCap, skill, hasInventory }: TabProps & { tableCap?: { cap: number; mult: number }; hasInventory: boolean }) {
+  const i = acInputs(s, trio, primary, val, skill)
   const r = computeAc(i)
   const full = Math.min(r.srv.total, r.effCap)
   const sum = Math.max(1, r.srv.total)
@@ -877,4 +888,189 @@ function niceStep(span: number): number {
   const mag = 10 ** Math.floor(Math.log10(raw))
   const n = raw / mag
   return (n < 1.5 ? 1 : n < 3 ? 2 : n < 7 ? 5 : 10) * mag
+}
+
+const HEROIC = ['Accuracy', 'Avoidance', 'Combat Effects', 'Damage Shielding', 'Damage Shield Mitigation', 'DoT Shielding', 'Melee Shielding', 'Spell Shielding', 'Strike Through', 'Stun Resist']
+const SPELL_MODS = ['Heal Amount', 'Spell Damage', 'Clairvoyance', 'Luck']
+const SKILL_MODS = ['Bash', 'Backstab', 'Dragon Punch', 'Eagle Strike', 'Flying Kick', 'Frenzy', 'Kick', 'Round Kick', 'Tiger Claw']
+const STATS: [string, string][] = [['Strength', 'STR'], ['Stamina', 'STA'], ['Intelligence', 'INT'], ['Wisdom', 'WIS'], ['Agility', 'AGI'], ['Dexterity', 'DEX'], ['Charisma', 'CHA']]
+const RESISTS: [string, string][] = [['Magic', 'MAGIC'], ['Fire', 'FIRE'], ['Cold', 'COLD'], ['Disease', 'DISEASE'], ['Poison', 'POISON'], ['Void', 'VOID']]
+
+/**
+ * The in-game Inventory window's Stats tab, read off the screen, with what the tracker predicts
+ * beside it: the AC and attack calculators, and what worn gear contributes.
+ */
+function CharacterTab({
+  s,
+  set,
+  val,
+  trio,
+  primary,
+  skill,
+  gear
+}: {
+  s: StatsSheet
+  set: (p: Partial<StatsSheet>) => void
+  val: TabProps['val']
+  trio: string[]
+  primary: string
+  skill: (id: number) => number
+  gear: WornTotals | null
+}) {
+  const [busy, setBusy] = useState(false)
+  const [message, setMessage] = useState('')
+  const w = s.window?.values ?? {}
+  const has = !!s.window
+  const ac = computeAc(acInputs(s, trio, primary, val, skill))
+  const offense = windowOffense(skill(s.weapon), s.strength)
+  const accuracy = baseAccuracy(skill(OFFENSE), skill(s.weapon))
+
+  const read = async () => {
+    setBusy(true)
+    setMessage('')
+    try {
+      const r = await api.invoke<{ values: Record<string, number[]>; rows: string[]; screens: number }>('stats:readScreen')
+      const found = Object.keys(r.values).length
+      if (found < 5) {
+        setMessage(`Could not find the Stats window on ${r.screens} screen${r.screens === 1 ? '' : 's'}. Open your Inventory window on its Stats tab, uncovered, and try again.`)
+        return
+      }
+      const v = r.values
+      // The window's own stats feed the calculators, so they describe the character as it is now.
+      set({
+        window: { at: Date.now(), values: v },
+        ...(v.Agility ? { agility: v.Agility[0] } : {}),
+        ...(v.Strength ? { strength: v.Strength[0] } : {}),
+        ...(v.Dexterity ? { dexterity: v.Dexterity[0] } : {})
+      })
+      setMessage(`Read ${found} lines. Strength, Agility and Dexterity on the AC and Combat tabs now follow it.`)
+    } catch (e) {
+      setMessage(`Could not read the screen: ${(e as Error).message}`)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const n = (label: string, i = 0) => w[label]?.[i]
+  const show = (v: number | undefined) => (v === undefined ? '—' : num(v))
+  const pair = (label: string) => (w[label] ? `${num(w[label][0])} / ${num(w[label][1] ?? w[label][0])}` : '—')
+  const check = (actual: number | undefined, predicted: number) =>
+    actual === undefined ? (
+      <span className="faint">calc {num(predicted)}</span>
+    ) : actual === predicted ? (
+      <span className="ok-text" title="The calculator gives the same">
+        ✓
+      </span>
+    ) : (
+      <span className="warn-text" title="What the calculator gives with your current inputs">
+        calc {num(predicted)}
+      </span>
+    )
+  const gearNote = (g: number | undefined) => (gear && g ? <span className="faint">gear +{num(g)}</span> : null)
+  const row = (label: string, value: React.ReactNode, note?: React.ReactNode, color?: boolean) => (
+    <div className="char-row" key={label}>
+      <span>{label}</span>
+      <b className={color ? 'char-green' : ''}>{value}</b>
+      <span className="char-note">{note}</span>
+    </div>
+  )
+
+  return (
+    <div className="stack" style={{ gap: 14 }}>
+      <div className="card row" style={{ gap: 12 }}>
+        <button className="btn primary" disabled={busy} onClick={() => void read()}>
+          {busy ? 'Reading the screen…' : 'Read from screen'}
+        </button>
+        <span className="small muted grow">
+          {has
+            ? `Read ${ago(s.window!.at)}. Open your Inventory window on its Stats tab and read again whenever your gear or buffs change.`
+            : 'Open your Inventory window on its Stats tab in game, then read it. This window steps aside for a moment while it looks.'}
+        </span>
+        {message && <span className="small faint">{message}</span>}
+      </div>
+
+      {!has ? (
+        <div className="card empty">
+          Nothing read yet. The tracker reads the game&apos;s own Stats tab, so every figure here is exactly what the game shows, buffs included, with the calculators&apos;
+          predictions beside it.
+        </div>
+      ) : (
+        <div className="char-window">
+          <div className="card char-col">
+            {row('HP', pair('HP'), gearNote(gear?.pools.HP))}
+            {row('Mana', pair('Mana'), gearNote(gear?.pools.MANA))}
+            {row('Endurance', pair('Endurance'), gearNote(gear?.pools.END))}
+            {row(
+              'AC',
+              w.AC ? w.AC.map(num).join(' / ') : '—',
+              <>
+                {check(n('AC', 0), ac.mitigation)} {check(n('AC', 1), ac.effCap)} {check(n('AC', 2), ac.avoidance)}
+              </>
+            )}
+            {row(
+              'Attack',
+              pair('Attack'),
+              <>
+                {check(n('Attack', 0), offense)}
+                <span className="faint" title="Accuracy before any stance or buff">
+                  {' '}
+                  base accuracy {num(accuracy)}
+                </span>
+              </>
+            )}
+            {row('Attack Speed', w['Attack Speed'] ? `${w['Attack Speed'][0]}%` : '—', gear?.haste ? <span className="faint">gear haste {gear.haste}%</span> : null, true)}
+            {row('Velocity', show(n('Velocity')))}
+            <div className="char-head">Regen</div>
+            {row('Combat HP Regen', show(n('Combat HP Regen')), gearNote(gear?.hpRegen), true)}
+            {row('Combat Mana Regen', show(n('Combat Mana Regen')), gearNote(gear?.manaRegen), true)}
+            {row('Combat End Regen', show(n('Combat End Regen')), gearNote(gear?.endRegen), true)}
+            <div className="char-head">Stats</div>
+            {STATS.map(([label, key]) =>
+              row(
+                label,
+                w[label] ? (
+                  <>
+                    <span className="char-green">{num(w[label][0])}</span> / {num(w[label][1] ?? 510)} <span className="char-heroic">+{w[label][2] ?? 0}</span>
+                  </>
+                ) : (
+                  '—'
+                ),
+                gear && w[label] ? (
+                  <span className="faint">
+                    gear +{gear.stats[key] ?? 0} · rest {num(w[label][0] - (gear.stats[key] ?? 0))}
+                  </span>
+                ) : null
+              )
+            )}
+            <div className="char-head">Resists</div>
+            {RESISTS.map(([label, key]) =>
+              row(
+                label,
+                w[label] ? (
+                  <>
+                    <span className="char-green">{num(w[label][0])}</span> / {num(w[label][1] ?? 1000)}
+                  </>
+                ) : (
+                  '—'
+                ),
+                gearNote(gear?.saves[key])
+              )
+            )}
+          </div>
+          <div className="card char-col">
+            <div className="char-head first">Heroic Mods</div>
+            {HEROIC.map((label) => row(label, w[label] ? `${w[label][0]} / ${w[label][1]}` : '—'))}
+            <div className="char-head">Spell Mods</div>
+            {SPELL_MODS.map((label) => row(label, show(n(label))))}
+            <div className="char-head">Skill Damage Mod</div>
+            {SKILL_MODS.map((label) => row(label, w[label] ? `${w[label][0]} / ${w[label][1]}` : '—'))}
+          </div>
+        </div>
+      )}
+      <p className="faint small">
+        Read with Windows&apos; own text recognition from a picture of your screen; nothing touches the game. A dash is a line it could not read. The notes beside each figure
+        are what the AC and Combat tabs work out from your current inputs (a tick when they agree with the game) and what your worn gear adds.
+      </p>
+    </div>
+  )
 }

@@ -13,7 +13,7 @@ import { InventoryFiles } from './inventory'
 import { ItemCatalog } from './items'
 import { GameTables, readAasFromLog } from './stats'
 import { captureScreens, ocrImage } from './ocr'
-import { composeRows, countsFromComposite, findMoteRows, rows as ocrRows } from '../core/screenText'
+import { composeRows, countsFromComposite, findMoteRows, rows as ocrRows, statsWindowFromScreen } from '../core/screenText'
 import { checkGameFolder, findInstall, listLogs, logIsIn, resolveGameFolder } from './game'
 import { summarize } from '../core/spells'
 import { focusFromSpell, isDurationFocus } from '../core/focus'
@@ -408,6 +408,7 @@ function registerIpc(): void {
     ac: await gameTables.acCaps(classes, level)
   }))
   handle('stats:readAAs', () => readAasFromLog(store.settings.get().logFile))
+  handle('stats:readScreen', () => readStatsFromScreen())
 
   handle('game:check', (dir?: string) => checkGameFolder(dir ?? store.settings.get().installDir))
   handle('game:find', async () => {
@@ -448,12 +449,42 @@ function registerIpc(): void {
  * Two reads: the first finds the mote rows; the second reads a small image rebuilt from just those
  * rows, each name set close beside its count, because OCR misses lone digits far out in a column.
  */
-async function readMotesFromScreen() {
+/** Steps this window aside, captures every monitor, and hands the captures over. */
+async function withScreens<T>(read: (shots: string[]) => Promise<T>): Promise<T> {
   const wasVisible = !!mainWindow?.isVisible()
   mainWindow?.hide()
   try {
     await new Promise((r) => setTimeout(r, 900))
-    const shots = await captureScreens()
+    return await read(await captureScreens())
+  } finally {
+    if (wasVisible) {
+      mainWindow?.show()
+      mainWindow?.focus()
+    }
+  }
+}
+
+/**
+ * Reads the in-game Inventory window's Stats tab: a first read of each monitor finds the window, a
+ * second reads just that area at four times the size, where the small font's slashes survive better.
+ */
+function readStatsFromScreen() {
+  return withScreens(async (shots) => {
+    // Only the monitor the window is on counts: other windows can carry a stray "AC" or "Luck".
+    let best: { path: string; first: ReturnType<typeof statsWindowFromScreen> } | null = null
+    for (const path of shots) {
+      const first = statsWindowFromScreen(await ocrImage(path, 2))
+      if (first.area && Object.keys(first.values).length > Object.keys(best?.first.values ?? {}).length) best = { path, first }
+    }
+    if (!best) return { values: {}, rows: [], screens: shots.length }
+    const a = best.first.area!
+    const second = statsWindowFromScreen(await ocrImage(best.path, 4, { width: a.w, height: a.h, rowHeight: a.h, pieces: [{ from: a, x: 0, y: 0 }] }))
+    return { values: { ...best.first.values, ...second.values }, rows: second.rows.length ? second.rows : best.first.rows, screens: shots.length }
+  })
+}
+
+async function readMotesFromScreen() {
+  return withScreens(async (shots) => {
     const found: Record<string, number> = {}
     const rowsRead: string[] = []
     let sample: string[] = []
@@ -473,12 +504,7 @@ async function readMotesFromScreen() {
       if (!sample.length) sample = ocrRows(words).map((x) => x.text).filter((t) => /potential|mote/i.test(t)).slice(0, 20)
     }
     return { counts: found, rows: rowsRead, nearMisses: rowsRead.length ? [] : sample, screens: shots.length }
-  } finally {
-    if (wasVisible) {
-      mainWindow?.show()
-      mainWindow?.focus()
-    }
-  }
+  })
 }
 
 /** A first install gets its overlays laid out on the primary monitor, not wherever the defaults point. */
