@@ -110,7 +110,7 @@ export function itemKey(name: string): string {
 
 export const STAT_KEYS = ['STR', 'STA', 'AGI', 'DEX', 'WIS', 'INT', 'CHA'] as const
 export const POOL_KEYS = ['HP', 'MANA', 'END'] as const
-export const SAVE_KEYS = ['FIRE', 'COLD', 'MAGIC', 'POISON', 'DISEASE', 'CORRUPTION'] as const
+export const SAVE_KEYS = ['COLD', 'DISEASE', 'FIRE', 'MAGIC', 'POISON', 'CORRUPTION', 'VOID'] as const
 
 /** What an item's stats block says, at its base (unmerged) level. */
 export interface ItemStats {
@@ -119,6 +119,12 @@ export interface ItemStats {
   pools: Partial<Record<(typeof POOL_KEYS)[number], number>>
   saves: Partial<Record<(typeof SAVE_KEYS)[number], number>>
   haste: number
+  hpRegen: number
+  manaRegen: number
+  endRegen: number
+  attack: number
+  /** Required level to equip, 0 when none. */
+  reqLevel: number
   weight: number
   slots: string
   damage: number
@@ -143,6 +149,12 @@ export function parseStatsBlock(block: string): ItemStats {
     pools: {},
     saves: {},
     haste: num(/\bHaste:\s*\+?(\d+)%/i),
+    // "HP Regen: +10", or a bare "Regen: 2" beside Mana Regen and End Regen.
+    hpRegen: num(/(?:\bHP Regen|(?<!Mana |End )\bRegen):\s*\+?(\d+)/i),
+    manaRegen: num(/\bMana Regen:\s*\+?(\d+)/i),
+    endRegen: num(/\bEnd(?:urance)? Regen:\s*\+?(\d+)/i),
+    attack: num(/\b(?:Attack|ATK):\s*\+?(\d+)/i),
+    reqLevel: num(/Required level of (\d+)/i),
     weight: num(/\bWT:\s*([\d.]+)/),
     slots: /\bSlot:\s*([A-Z0-9 ]+)/.exec(text)?.[1].trim() ?? '',
     damage: num(/\bDMG:\s*(\d+)/),
@@ -153,12 +165,13 @@ export function parseStatsBlock(block: string): ItemStats {
     const v = num(new RegExp(`\\b${k}:\\s*([+-]?\\d+)`))
     if (v) out.stats[k] = v
   }
+  // Pages write "END:" and "End:" alike.
   for (const k of POOL_KEYS) {
-    const v = num(new RegExp(`\\b${k}:\\s*([+-]?\\d+)`))
+    const v = num(new RegExp(`\\b${k}:\\s*([+-]?\\d+)`, 'i'))
     if (v) out.pools[k] = v
   }
   for (const k of SAVE_KEYS) {
-    const v = num(new RegExp(`\\bSV ${k}:\\s*([+-]?\\d+)`))
+    const v = num(new RegExp(`\\bSV ${k}:\\s*([+-]?\\d+)`, 'i'))
     if (v) out.saves[k] = v
   }
   return out
@@ -209,6 +222,9 @@ export function scaledStats(s: ItemStats, n: number): ItemStats {
     pools: map(s.pools),
     saves: map(s.saves),
     haste: scaleFlat(s.haste, n),
+    hpRegen: scaleFlat(s.hpRegen, n),
+    manaRegen: scaleFlat(s.manaRegen, n),
+    endRegen: scaleFlat(s.endRegen, n),
     damage: scaleDamage(s.damage, n),
     weight: scaleWeight(s.weight, n)
   }
@@ -221,6 +237,12 @@ export interface WornTotals {
   saves: Record<string, number>
   /** Haste does not stack: the best worn haste counts. */
   haste: number
+  hpRegen: number
+  manaRegen: number
+  endRegen: number
+  attack: number
+  /** The highest required level among worn items. */
+  reqLevel: number
   weight: number
   /** Worn items with no stats found. */
   unknown: number
@@ -232,7 +254,7 @@ export interface WornTotals {
  * as the in-game AC check confirmed.
  */
 export function wornTotals(worn: InvItem[], statsOf: (item: InvItem) => ItemStats | null, acOverride: (item: InvItem) => number | undefined = () => undefined): WornTotals {
-  const t: WornTotals = { ac: 0, stats: {}, pools: {}, saves: {}, haste: 0, weight: 0, unknown: 0 }
+  const t: WornTotals = { ac: 0, stats: {}, pools: {}, saves: {}, haste: 0, hpRegen: 0, manaRegen: 0, endRegen: 0, attack: 0, reqLevel: 0, weight: 0, unknown: 0 }
   for (const it of worn) {
     const s = statsOf(it)
     const override = acOverride(it)
@@ -246,6 +268,11 @@ export function wornTotals(worn: InvItem[], statsOf: (item: InvItem) => ItemStat
     for (const [k, v] of Object.entries(s.pools)) t.pools[k] = (t.pools[k] ?? 0) + (v ?? 0)
     for (const [k, v] of Object.entries(s.saves)) t.saves[k] = (t.saves[k] ?? 0) + (v ?? 0)
     t.haste = Math.max(t.haste, s.haste)
+    t.hpRegen += s.hpRegen
+    t.manaRegen += s.manaRegen
+    t.endRegen += s.endRegen
+    t.attack += s.attack
+    t.reqLevel = Math.max(t.reqLevel, s.reqLevel)
     t.weight += s.weight
   }
   t.weight = Math.round(t.weight * 10) / 10

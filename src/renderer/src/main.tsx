@@ -15,7 +15,7 @@ import { Audio } from './pages/Audio'
 import { Logs } from './pages/Logs'
 import { Settings } from './pages/Settings'
 import { Achievements } from './pages/Achievements'
-import { Inventory } from './pages/Inventory'
+import { Gear } from './pages/Gear'
 import { Stats } from './pages/Stats'
 
 const PAGES = [
@@ -24,7 +24,7 @@ const PAGES = [
   { id: 'motes', group: 'Play', label: 'Motes', icon: 'motes', el: Motes },
   { id: 'achievements', group: 'Character', label: 'Achievements', icon: 'trophy', el: Achievements },
   { id: 'stats', group: 'Character', label: 'Stats', icon: 'stats', el: Stats },
-  { id: 'inventory', group: 'Character', label: 'Inventory', icon: 'bag', el: Inventory },
+  { id: 'gear', group: 'Character', label: 'Gear', icon: 'bag', el: Gear },
   { id: 'triggers', group: 'Setup', label: 'Triggers', icon: 'triggers', el: Triggers },
   { id: 'overlays', group: 'Setup', label: 'Overlays', icon: 'overlays', el: Overlays },
   { id: 'audio', group: 'Setup', label: 'Audio', icon: 'audio', el: Audio },
@@ -38,7 +38,9 @@ function Shell() {
   const { state } = useApp()
   // Opens where it was left, including across restarts.
   const [saved, setPage] = useRemembered<string>('page', 'dashboard')
-  const page = (PAGES.some((p) => p.id === saved) ? saved : 'dashboard') as PageId
+  // 'inventory' was Gear's first name.
+  const wanted = saved === 'inventory' ? 'gear' : saved
+  const page = (PAGES.some((p) => p.id === wanted) ? wanted : 'dashboard') as PageId
   const Page = PAGES.find((p) => p.id === page)!.el as ComponentType<{ go: (p: PageId) => void }>
   const s = state.status
   const update = useUpdate()

@@ -183,6 +183,8 @@ export interface ItemInfo {
   found: boolean
   /** The in-game stats block from the page, base (unmerged) values. */
   statsblock: string
+  /** The item's icon number (the page's lucy_img_ID), 500 and up; 0 when unknown. */
+  icon?: number
 }
 
 /** A character's inventory export, with what the wiki says about the items worn. */

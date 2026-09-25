@@ -47,7 +47,8 @@ export class ItemCatalog {
     const cache = await this.load()
     const wanted = new Map<string, string>()
     for (const n of names) if (n) wanted.set(itemKey(n), baseName(n))
-    const stale = [...wanted].filter(([k]) => force || !cache[k] || Date.now() - cache[k].fetchedAt > FRESH_MS)
+    // Entries cached before icons were kept have no icon field; fetch those again once.
+    const stale = [...wanted].filter(([k]) => force || !cache[k] || Date.now() - cache[k].fetchedAt > FRESH_MS || (cache[k].found && cache[k].icon === undefined))
     if (stale.length) {
       try {
         await this.fetchInto(cache, stale)
@@ -101,7 +102,8 @@ export class ItemCatalog {
       const content = p.revisions[0].slots.main.content
       const statsblock = /\|\s*statsblock\s*=([\s\S]*?)(?:\n\|\s*\w+\s*=|\n?\}\}\s*<\/onlyinclude>|\n\}\})/.exec(content)?.[1].trim() ?? ''
       if (!statsblock) continue
-      out.set(itemKey(p.title), { title: p.title, found: true, statsblock })
+      const icon = Number(/\|\s*lucy_img_ID\s*=\s*(\d+)/.exec(content)?.[1] ?? 0)
+      out.set(itemKey(p.title), { title: p.title, found: true, statsblock, icon })
     }
     // A redirect or normalised title answers for the name that was asked.
     for (const r of [...(body.query?.normalized ?? []), ...(body.query?.redirects ?? [])]) {
@@ -124,5 +126,5 @@ export class ItemCatalog {
 }
 
 function strip(c: Cached): ItemInfo {
-  return { title: c.title, found: c.found, statsblock: c.statsblock }
+  return { title: c.title, found: c.found, statsblock: c.statsblock, icon: c.icon }
 }

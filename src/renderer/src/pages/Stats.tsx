@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { api } from '../api'
 import { useRemembered } from '../remember'
 import { readSheet, type StatsSheet } from '../statsSheet'
-import { useExportCharacter, useInventory, wornSummary } from './Inventory'
+import { useExportCharacter, useInventory, wornSummary } from './Gear'
 import { CLASSES, className, computeAc, marginal, type AcInputs } from '../../../core/acModel'
 import {
   avoidanceFromHitRate,

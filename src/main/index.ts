@@ -549,8 +549,9 @@ void app.whenReady().then(async () => {
   session.defaultSession.setPermissionCheckHandler((wc, permission) => permission === 'media' && !!wc && ownPage(wc.getURL()))
   session.defaultSession.setPermissionRequestHandler((wc, permission, cb) => cb(permission === 'media' && ownPage(wc.getURL())))
   protocol.handle('eqicon', async (req) => {
-    const n = Number(new URL(req.url).pathname.replace(/\//g, ''))
-    const png = Number.isFinite(n) ? await icons.png(n) : null
+    const url = new URL(req.url)
+    const n = Number(url.pathname.replace(/\//g, ''))
+    const png = !Number.isFinite(n) ? null : url.hostname === 'item' ? await icons.itemPng(n) : await icons.png(n)
     return png ? new Response(new Uint8Array(png), { headers: { 'content-type': 'image/png', 'cache-control': 'max-age=86400' } }) : new Response(null, { status: 404 })
   })
   registerIpc()
