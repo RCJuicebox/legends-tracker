@@ -1,8 +1,10 @@
 import { app, BrowserWindow, dialog, ipcMain, Menu, nativeImage, protocol, screen, session, shell, Tray, type Rectangle } from 'electron'
 import { cpSync, existsSync, mkdirSync, readFileSync, writeFileSync, promises as fs } from 'node:fs'
-import { join } from 'node:path'
+import { release } from 'node:os'
+import { basename, join, relative, resolve, isAbsolute } from 'node:path'
 import { Store, characterKey } from './store'
 import { Engine, type AudioCommand } from './engine'
+import { appEngineEnv } from './engineEnv'
 import { SpeechWorker } from './speech'
 import { IconSource } from './icons'
 import { OverlayManager } from './overlays'
@@ -14,7 +16,7 @@ import { InventoryFiles } from './inventory'
 import { ItemCatalog } from './items'
 import { GameTables, readAasFromLog } from './stats'
 import { WikiCatalog } from './wikiCatalog'
-import { captureScreens, ocrImage } from './ocr'
+import { captureScreens, discardScreens, ocrImage } from './ocr'
 import { composeRows, countsFromComposite, findMoteRows, rows as ocrRows, statsWindowFromScreen } from '../core/screenText'
 import { checkGameFolder, findInstall, listLogs, logIsIn, resolveGameFolder } from './game'
 import { summarize } from '../core/spells'
@@ -25,25 +27,38 @@ import { testTrigger } from '../core/triggers'
 import { timerKey } from '../core/spellTracker'
 import type { AppSettings, CharacterSettings, CharacterSheet, SpellRule, Trigger } from '../shared/types'
 import type { AchMarks } from '../core/achievements'
+import { initLog, log, logDir } from './log'
+import { sanitizeCharacter, sanitizeSettings, sanitizeTrigger, sanitizeTriggers } from './validate'
 
 // Settings live in %APPDATA%\Legends Tracker. EQL_USER_DATA points a development or test run at a
 // separate profile, so a trial never touches real settings.
 app.setPath('userData', process.env['EQL_USER_DATA'] || join(app.getPath('appData'), 'Legends Tracker'))
+// Each profile keeps its own diagnostic log beside its settings.
+initLog(join(app.getPath('userData'), 'logs'))
+log.info(`Legends Tracker ${app.getVersion()}${app.isPackaged ? '' : ' (development)'} on Windows ${release()} ${process.arch}, Electron ${process.versions.electron}`)
+process.on('uncaughtException', (e) => log.error('Uncaught exception:', e))
+process.on('unhandledRejection', (e) => log.error('Unhandled rejection:', e))
 if (!process.env['EQL_USER_DATA']) carryOverSettings(join(app.getPath('appData'), 'EQL Audio Triggers'), app.getPath('userData'))
 
 /** The app was called EQL Audio Triggers until 2026-09-24; bring its settings across once. The old folder is left as it was. */
 function carryOverSettings(from: string, to: string): void {
   if (existsSync(join(to, 'settings.json')) || !existsSync(join(from, 'settings.json'))) return
-  mkdirSync(to, { recursive: true })
-  for (const f of ['settings.json', 'triggers.json', 'spell-rules.json', 'casts.json', 'motes.json']) {
-    if (existsSync(join(from, f))) cpSync(join(from, f), join(to, f))
+  try {
+    mkdirSync(to, { recursive: true })
+    for (const f of ['settings.json', 'triggers.json', 'spell-rules.json', 'casts.json', 'motes.json']) {
+      if (existsSync(join(from, f))) cpSync(join(from, f), join(to, f))
+    }
+    if (existsSync(join(from, 'sounds'))) cpSync(join(from, 'sounds'), join(to, 'sounds'), { recursive: true })
+    log.info(`Carried settings over from ${from}`)
+  } catch (e) {
+    log.warn(`Could not carry settings over from ${from}`, e)
   }
-  if (existsSync(join(from, 'sounds'))) cpSync(join(from, 'sounds'), join(to, 'sounds'), { recursive: true })
 }
 
 protocol.registerSchemesAsPrivileged([{ scheme: 'eqicon', privileges: { standard: true, secure: true, supportFetchAPI: true } }])
 
-if (!app.requestSingleInstanceLock()) app.quit()
+const primaryInstance = app.requestSingleInstanceLock()
+if (!primaryInstance) app.quit()
 
 const resources = app.isPackaged ? process.resourcesPath : join(__dirname, '../..')
 const preload = join(__dirname, '../preload/index.js')
@@ -136,12 +151,16 @@ const engine = new Engine(
     feed: (item) => toMain('state:feed', item),
     archive: (a) => toMain('state:archive', a),
     motes: (m) => toMain('state:motes', m),
+    moteScan: (s) => toMain('state:moteScan', s),
     stock: (s) => toMain('state:stock', s)
   },
-  () => {
-    const install = store.settings.get().installDir
-    return [join(app.getPath('userData'), 'sounds'), join(install, 'AudioTriggers', 'default'), join(install, 'AudioTriggers', 'shared')]
-  }
+  appEngineEnv({
+    dataDir: app.getPath('userData'),
+    soundDirs: () => {
+      const install = store.settings.get().installDir
+      return [join(app.getPath('userData'), 'sounds'), join(install, 'AudioTriggers', 'default'), join(install, 'AudioTriggers', 'shared')]
+    }
+  })
 )
 
 interface WindowPlace {
@@ -162,7 +181,8 @@ function savedWindowPlace(): WindowPlace | null {
       return b.x + b.width - 100 > a.x && b.x + 100 < a.x + a.width && b.y >= a.y - 10 && b.y + 30 < a.y + a.height
     })
     return visible ? place : null
-  } catch {
+  } catch (e) {
+    if ((e as NodeJS.ErrnoException).code !== 'ENOENT') log.warn('Could not read the saved window position', e)
     return null
   }
 }
@@ -175,8 +195,9 @@ function rememberWindowPlace(now = false): void {
     const place: WindowPlace = { bounds: mainWindow.getNormalBounds(), maximized: mainWindow.isMaximized() }
     try {
       writeFileSync(windowPlaceFile(), JSON.stringify(place))
-    } catch {
+    } catch (e) {
       // Not worth interrupting anything over; the window opens in the default spot next time.
+      log.warn('Could not save the window position', e)
     }
   }
   if (now) write()
@@ -300,9 +321,37 @@ async function followNewestLog(dir: string): Promise<void> {
   if (s.installDir === dir && s.logFile !== newest && !logIsIn(s.logFile, dir)) saveSettings({ ...s, logFile: newest })
 }
 
+/** Dialogs sit on the main window when there is one. */
+function openDialog(opts: Electron.OpenDialogOptions) {
+  return mainWindow && !mainWindow.isDestroyed() ? dialog.showOpenDialog(mainWindow, opts) : dialog.showOpenDialog(opts)
+}
+
+function saveDialog(opts: Electron.SaveDialogOptions) {
+  return mainWindow && !mainWindow.isDestroyed() ? dialog.showSaveDialog(mainWindow, opts) : dialog.showSaveDialog(opts)
+}
+
+function showError(message: string, detail: string): void {
+  const opts: Electron.MessageBoxOptions = { type: 'error', title: 'Legends Tracker', message, detail }
+  void (mainWindow && !mainWindow.isDestroyed() ? dialog.showMessageBox(mainWindow, opts) : dialog.showMessageBox(opts))
+}
+
+/** Whether `path` is `dir` or somewhere inside it. */
+function isInside(dir: string, path: string): boolean {
+  const r = relative(resolve(dir), resolve(path))
+  return r === '' || (!r.startsWith('..') && !isAbsolute(r))
+}
+
 function registerIpc(): void {
+  // A handler that fails is logged under its channel; the page still sees the rejection.
   const handle = <A extends unknown[], R>(channel: string, fn: (...args: A) => R) =>
-    ipcMain.handle(channel, (_e, ...args) => fn(...(args as A)))
+    ipcMain.handle(channel, async (_e, ...args) => {
+      try {
+        return await fn(...(args as A))
+      } catch (e) {
+        log.error(`${channel} failed:`, e)
+        throw e
+      }
+    })
 
   handle('app:state', () => ({
     settings: store.settings.get(),
@@ -318,11 +367,18 @@ function registerIpc(): void {
     devices: audioDevices,
     triggerErrors: engine.triggers.errors
   }))
-  handle('settings:save', (s: AppSettings) => saveSettings(s))
-  handle('character:save', (c: CharacterSettings) => {
+  handle('app:openLogs', () => shell.openPath(logDir()))
+  handle('settings:save', (s: AppSettings) => {
+    const clean = sanitizeSettings(s, store.settings.get())
+    if (!clean) throw new Error('Settings were not saved: they were not in the expected form.')
+    return saveSettings(clean)
+  })
+  handle('character:save', (input: CharacterSettings) => {
     const s = store.settings.get()
     const key = characterKey(s.logFile)
     if (!key) return
+    const c = sanitizeCharacter(input, store.characterOf(s.logFile))
+    if (!c) throw new Error('The character was not saved: it was not in the expected form.')
     store.settings.set({ ...s, characters: { ...s.characters, [key]: c } })
     engine.reconfigure()
     toMain('state:character', c)
@@ -332,21 +388,43 @@ function registerIpc(): void {
   handle('simulate', (text: string) => engine.simulate(text))
 
   handle('triggers:get', () => store.triggers.get())
-  handle('triggers:save', (list: Trigger[]) => {
+  handle('triggers:save', (input: Trigger[]) => {
+    const list = sanitizeTriggers(input)
+    if (!list) throw new Error('Triggers were not saved: they were not a list.')
     store.triggers.set(list)
     engine.reconfigure()
     return engine.triggers.errors
   })
-  handle('triggers:test', (t: Trigger, line: string) => testTrigger(t, line, engine.status.character || 'You'))
-  handle('triggers:import', async () => {
-    const r = await dialog.showOpenDialog(mainWindow!, { filters: [{ name: 'Trigger files', extensions: ['json'] }], properties: ['openFile'] })
-    if (r.canceled || !r.filePaths[0]) return null
-    const parsed = JSON.parse(await fs.readFile(r.filePaths[0], 'utf8'))
-    const list = Array.isArray(parsed) ? parsed : parsed.triggers
-    return Array.isArray(list) ? (list as Trigger[]) : null
+  handle('triggers:test', (input: Trigger, line: string) => {
+    const t = sanitizeTrigger(input)
+    if (!t) throw new Error('Not a trigger.')
+    return testTrigger(t, typeof line === 'string' ? line : '', engine.status.character || 'You')
   })
-  handle('triggers:export', async (list: Trigger[]) => {
-    const r = await dialog.showSaveDialog(mainWindow!, { defaultPath: 'eql-triggers.json', filters: [{ name: 'Trigger files', extensions: ['json'] }] })
+  // A file that is not a trigger list gets a message box and null, the same as cancelling.
+  handle('triggers:import', async () => {
+    const r = await openDialog({ filters: [{ name: 'Trigger files', extensions: ['json'] }], properties: ['openFile'] })
+    const file = r.filePaths[0]
+    if (r.canceled || !file) return null
+    let parsed: unknown
+    try {
+      parsed = JSON.parse(await fs.readFile(file, 'utf8'))
+    } catch (e) {
+      log.warn(`Trigger import: could not read ${file}`, e)
+      showError(`${basename(file)} could not be imported.`, e instanceof SyntaxError ? `It is not valid JSON: ${e.message}` : (e as Error).message)
+      return null
+    }
+    const inner = parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? (parsed as { triggers?: unknown }).triggers : parsed
+    const list = sanitizeTriggers(inner)
+    if (!list) {
+      showError(`${basename(file)} could not be imported.`, 'It holds no list of triggers: expected a JSON list, or an object with a "triggers" list.')
+      return null
+    }
+    return list
+  })
+  handle('triggers:export', async (input: Trigger[]) => {
+    const list = sanitizeTriggers(input)
+    if (!list) throw new Error('Nothing to export: not a list of triggers.')
+    const r = await saveDialog({ defaultPath: 'eql-triggers.json', filters: [{ name: 'Trigger files', extensions: ['json'] }] })
     if (r.canceled || !r.filePath) return false
     await fs.writeFile(r.filePath, JSON.stringify(list, null, 2), 'utf8')
     return true
@@ -373,7 +451,14 @@ function registerIpc(): void {
   handle('logs:overview', () => engine.logsOverview())
   handle('logs:archive', (path: string) => engine.archiveNow(path))
   handle('logs:compress', (path: string) => engine.compressLoose(path))
-  handle('logs:reveal', (path: string) => (existsSync(path) ? shell.showItemInFolder(path) : shell.openPath(engine.archiveDir())))
+  // Only a file in the game's Logs folder or the archive folder is shown; anything else opens the archive folder.
+  handle('logs:reveal', (path: string) => {
+    const installDir = store.settings.get().installDir
+    const archive = engine.archiveDir()
+    const allowed = typeof path === 'string' && !!path && ((!!installDir && isInside(join(installDir, 'Logs'), path)) || isInside(archive, path))
+    if (allowed && existsSync(path)) return shell.showItemInFolder(path)
+    return shell.openPath(archive)
+  })
 
   handle('overlays:arrange', (on: boolean) => setArranging(on))
   handle('overlays:demo', () => demoTimers())
@@ -401,7 +486,8 @@ function registerIpc(): void {
   handle('update:install', () => updater.install())
 
   handle('audio:test', (text: string) => engine.speak(text, true))
-  handle('audio:sound', (file: string) => engine.playSound(file, 1))
+  // engine.playSound reads any file it is given, absolute paths included; it only ever plays it.
+  handle('audio:sound', (file: string) => engine.playSound(String(file), 1))
   handle('audio:sounds', () => engine.listSounds())
   handle('audio:mute', () => toggleMute())
 
@@ -474,7 +560,7 @@ function registerIpc(): void {
   // Takes the game folder, or a folder in or above it, and returns the game folder it settled on.
   handle('game:choose', async () => {
     const s = store.settings.get()
-    const r = await dialog.showOpenDialog(mainWindow!, {
+    const r = await openDialog({
       title: 'Choose your EverQuest Legends folder',
       defaultPath: s.installDir || undefined,
       properties: ['openDirectory']
@@ -486,7 +572,7 @@ function registerIpc(): void {
   })
 
   handle('dialog:folder', async () => {
-    const r = await dialog.showOpenDialog(mainWindow!, { properties: ['openDirectory'] })
+    const r = await openDialog({ properties: ['openDirectory'] })
     return r.canceled ? null : r.filePaths[0]
   })
 
@@ -508,10 +594,13 @@ function registerIpc(): void {
 async function withScreens<T>(read: (shots: string[]) => Promise<T>): Promise<T> {
   const wasVisible = !!mainWindow?.isVisible()
   mainWindow?.hide()
+  let shots: string[] = []
   try {
     await new Promise((r) => setTimeout(r, 900))
-    return await read(await captureScreens())
+    shots = await captureScreens()
+    return await read(shots)
   } finally {
+    void discardScreens(shots)
     if (wasVisible) {
       mainWindow?.show()
       mainWindow?.focus()
@@ -610,14 +699,43 @@ function demoTimers(): void {
 }
 
 app.on('second-instance', () => showMain())
-app.on('before-quit', () => {
+app.on('render-process-gone', (_e, wc, d) => log.error(`A page stopped (${d.reason}, exit ${d.exitCode}): ${wc.getURL()}`))
+app.on('child-process-gone', (_e, d) => {
+  if (d.reason !== 'clean-exit') log.warn(`${d.type} process${d.name ? ` (${d.name})` : ''} stopped: ${d.reason}, exit ${d.exitCode}`)
+})
+
+// Quitting waits (up to a few seconds) for settings to reach disk: a change saved just before Quit is
+// still in its 400 ms wait. The first before-quit holds the quit, shuts down, writes, then quits again.
+// An update's quitAndInstall comes through here the same way.
+let shutDown = false
+let shuttingDown = false
+app.on('before-quit', (e) => {
   quitting = true
-  engine.shutdown()
-  updater.stop()
-  watcher.stop()
-  speech.stop()
-  overlays.destroy()
-  void store.flushAll()
+  // A second copy started by mistake quits at once and must not write over the first one's files.
+  if (shutDown || !primaryInstance) return
+  e.preventDefault()
+  if (shuttingDown) return
+  shuttingDown = true
+  log.info('Quitting')
+  for (const [name, stop] of [
+    ['engine', () => engine.shutdown()],
+    ['updater', () => updater.stop()],
+    ['game watcher', () => watcher.stop()],
+    ['speech', () => speech.stop()],
+    ['overlays', () => overlays.destroy()]
+  ] as const) {
+    try {
+      stop()
+    } catch (err) {
+      log.warn(`Stopping the ${name} failed`, err)
+    }
+  }
+  const limit = new Promise<'timeout'>((r) => setTimeout(() => r('timeout'), 3000))
+  void Promise.race([Promise.allSettled([store.flushAll()]), limit]).then((r) => {
+    if (r === 'timeout') log.warn('Saving settings took over 3s; quitting anyway')
+    shutDown = true
+    app.quit()
+  })
 })
 app.on('window-all-closed', () => {
   // Stay resident in the tray; Quit from the tray menu ends the app.
@@ -640,6 +758,10 @@ void app.whenReady().then(async () => {
   createMainWindow()
   void speech.start().then(() => toMain('state:voices', { voices: speech.voices, error: speech.failed }))
   await engine.init()
+  if (store.recovered.length) {
+    const names = store.recovered.map((f) => basename(f)).join(', ')
+    engine.pushFeed('warn', `Some saved settings could not be read and were set aside (${names}, in the app's data folder); defaults are in use for them.`)
+  }
   if (store.settingsFresh) placeOverlaysForNewInstall()
   overlays.apply(store.settings.get().overlays)
   watcher.start()

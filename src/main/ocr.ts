@@ -1,9 +1,10 @@
 import { spawn } from 'node:child_process'
 import { desktopCapturer, screen } from 'electron'
-import { promises as fs } from 'node:fs'
+import { existsSync, promises as fs } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import type { Composite, OcrWord } from '../core/screenText'
+import { log } from './log'
 import { yieldPriority } from './priority'
 
 // Reads text off the screen with Windows' own OCR (Windows.Media.Ocr). It looks at pixels, the way a
@@ -55,10 +56,20 @@ $stream.Dispose(); Remove-Item $prepared -ErrorAction SilentlyContinue
 [Console]::Out.Write((ConvertTo-Json -Compress -Depth 3 -InputObject @($words)))
 `
 
+let scriptWritten: Promise<string> | null = null
+
+/** The OCR script in the temp folder: written once a run, and again if something cleared it away. */
+function scriptFile(): Promise<string> {
+  const path = join(tmpdir(), 'legends-tracker-ocr.ps1')
+  if (scriptWritten && existsSync(path)) return scriptWritten
+  scriptWritten = fs.writeFile(path, SCRIPT, 'utf8').then(() => path)
+  scriptWritten.catch(() => (scriptWritten = null))
+  return scriptWritten
+}
+
 /** OCR of an image file: every word with its box, in the image's own pixel coordinates. */
 export async function ocrImage(path: string, scale = 3, layout?: Composite): Promise<OcrWord[]> {
-  const script = join(tmpdir(), 'legends-tracker-ocr.ps1')
-  await fs.writeFile(script, SCRIPT, 'utf8')
+  const script = await scriptFile()
   const out = await new Promise<string>((resolve, reject) => {
     const p = spawn('powershell.exe', ['-NoLogo', '-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', script, '-Path', path, '-Scale', String(scale), ...(layout ? ['-Compose', composeArg(layout)] : [])], {
       windowsHide: true
@@ -84,7 +95,7 @@ function composeArg(c: Composite): string {
   return [`${r(c.width)},${r(c.height)}`, ...c.pieces.map((p) => [p.from.x, p.from.y, p.from.w, p.from.h, p.x, p.y].map(r).join(','))].join(';')
 }
 
-/** Captures every monitor at full resolution and returns the PNG paths. */
+/** Captures every monitor at full resolution and returns the PNG paths. Pass them to discardScreens() when done. */
 export async function captureScreens(): Promise<string[]> {
   const largest = screen.getAllDisplays().reduce(
     (m, d) => ({ width: Math.max(m.width, Math.round(d.size.width * d.scaleFactor)), height: Math.max(m.height, Math.round(d.size.height * d.scaleFactor)) }),
@@ -92,10 +103,25 @@ export async function captureScreens(): Promise<string[]> {
   )
   const sources = await desktopCapturer.getSources({ types: ['screen'], thumbnailSize: largest })
   const paths: string[] = []
-  for (const [i, s] of sources.entries()) {
-    const p = join(tmpdir(), `legends-tracker-screen-${i}.png`)
-    await fs.writeFile(p, s.thumbnail.toPNG())
-    paths.push(p)
+  const stamp = Date.now().toString(36)
+  try {
+    for (const [i, s] of sources.entries()) {
+      const p = join(tmpdir(), `legends-tracker-screen-${stamp}-${i}.png`)
+      paths.push(p)
+      await fs.writeFile(p, s.thumbnail.toPNG())
+    }
+  } catch (e) {
+    await discardScreens(paths)
+    throw e
   }
   return paths
+}
+
+/** Deletes captures: they are pictures of the whole desktop, and have no business staying in %TEMP%. */
+export async function discardScreens(paths: string[]): Promise<void> {
+  await Promise.all(
+    paths.map((p) =>
+      fs.rm(p, { force: true }).catch((e) => log.warn(`Could not delete the screen capture ${p}`, e))
+    )
+  )
 }

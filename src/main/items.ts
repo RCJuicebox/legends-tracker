@@ -3,6 +3,7 @@ import { promises as fs } from 'node:fs'
 import { join } from 'node:path'
 import { baseName, itemKey } from '../core/inventory'
 import type { ItemInfo } from '../shared/types'
+import { log } from './log'
 
 // Item stats come from eqlwiki.com, the community wiki for EverQuest Legends: each item page carries
 // the in-game stats block. Only the items the player asks about are looked up, a batch at a time,
@@ -10,6 +11,8 @@ import type { ItemInfo } from '../shared/types'
 const API = 'https://eqlwiki.com/api.php'
 const AGENT = 'LegendsTracker (https://github.com/RCJuicebox/legends-tracker)'
 const FRESH_MS = 7 * 24 * 3600_000
+/** A stalled wiki must not hold the Gear page for ever. */
+const TIMEOUT_MS = 15_000
 
 interface Cached extends ItemInfo {
   fetchedAt: number
@@ -27,7 +30,8 @@ export class ItemCatalog {
     if (this.cache) return this.cache
     try {
       this.cache = JSON.parse(await fs.readFile(this.path, 'utf8')) as Record<string, Cached>
-    } catch {
+    } catch (e) {
+      if ((e as NodeJS.ErrnoException).code !== 'ENOENT') log.warn('The item cache could not be read; starting it afresh', e)
       this.cache = {}
     }
     return this.cache
@@ -46,15 +50,16 @@ export class ItemCatalog {
   async lookup(names: string[], force = false): Promise<Record<string, ItemInfo>> {
     const cache = await this.load()
     const wanted = new Map<string, string>()
-    for (const n of names) if (n) wanted.set(itemKey(n), baseName(n))
+    for (const n of Array.isArray(names) ? names : []) if (n && typeof n === 'string') wanted.set(itemKey(n), baseName(n))
     // Entries cached before icons were kept have no icon field; fetch those again once.
     const stale = [...wanted].filter(([k]) => force || !cache[k] || Date.now() - cache[k].fetchedAt > FRESH_MS || (cache[k].found && cache[k].icon === undefined))
     if (stale.length) {
       try {
         await this.fetchInto(cache, stale)
         await this.save()
-      } catch {
+      } catch (e) {
         // Offline or the wiki is down: what is cached still serves, however old.
+        log.warn(`Item lookup on eqlwiki failed for ${stale.length} item(s)`, e)
       }
     }
     const out: Record<string, ItemInfo> = {}
@@ -78,6 +83,8 @@ export class ItemCatalog {
     // "Shiverback-Hide Boots"): search, and take a result that is the same name once case and
     // punctuation are ignored.
     for (const [key, title] of misses.slice(0, 40)) {
+      // A slow wiki gets a minute of searching; the rest are tried at the next lookup.
+      if (Date.now() - now > 60_000) break
       const hit = await this.search(title, key)
       const page = hit ? (await this.pages([hit])).get(itemKey(hit)) : undefined
       cache[key] = page ? { ...page, fetchedAt: now } : { title, found: false, statsblock: '', fetchedAt: now }
@@ -87,7 +94,7 @@ export class ItemCatalog {
   /** Pages by title, keyed by itemKey() of both the asked title and the page's own. */
   private async pages(titles: string[]): Promise<Map<string, ItemInfo>> {
     const url = `${API}?action=query&format=json&formatversion=2&redirects=1&prop=revisions&rvprop=content&rvslots=main&titles=${encodeURIComponent(titles.join('|'))}`
-    const res = await fetch(url, { headers: { 'User-Agent': AGENT, 'Api-User-Agent': AGENT } })
+    const res = await fetch(url, { headers: { 'User-Agent': AGENT, 'Api-User-Agent': AGENT }, signal: AbortSignal.timeout(TIMEOUT_MS) })
     if (!res.ok) throw new Error(`eqlwiki answered ${res.status}`)
     const body = (await res.json()) as {
       query?: {
@@ -116,10 +123,11 @@ export class ItemCatalog {
   private async search(title: string, key: string): Promise<string | null> {
     const url = `${API}?action=query&format=json&formatversion=2&list=search&srlimit=10&srsearch=${encodeURIComponent(title)}`
     try {
-      const res = await fetch(url, { headers: { 'User-Agent': AGENT, 'Api-User-Agent': AGENT } })
+      const res = await fetch(url, { headers: { 'User-Agent': AGENT, 'Api-User-Agent': AGENT }, signal: AbortSignal.timeout(TIMEOUT_MS) })
       const body = (await res.json()) as { query?: { search?: { title: string }[] } }
       return body.query?.search?.find((s) => itemKey(s.title) === key)?.title ?? null
-    } catch {
+    } catch (e) {
+      log.warn(`eqlwiki search for ${title} failed`, e)
       return null
     }
   }

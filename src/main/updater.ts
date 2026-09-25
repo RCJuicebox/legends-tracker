@@ -1,5 +1,6 @@
 import { app } from 'electron'
 import electronUpdater from 'electron-updater'
+import { log } from './log'
 
 // electron-updater checks the GitHub Releases named in the build's `publish` settings, downloads a
 // newer installer in the background, and runs it when the app restarts. Settings live in
@@ -35,7 +36,10 @@ export class Updater {
       this.set({ state: 'downloading', version, percent: Math.round(p.percent) })
     })
     autoUpdater.on('update-downloaded', (info) => this.set({ state: 'ready', version: info.version }))
-    autoUpdater.on('error', (e) => this.set({ state: 'error', message: friendly(e) }))
+    autoUpdater.on('error', (e) => {
+      log.warn('Update failed:', e)
+      this.set({ state: 'error', message: friendly(e) })
+    })
     // Give the app a moment to settle before the first check.
     setTimeout(() => void this.check(), 15_000)
     this.timer = setInterval(() => void this.check(), CHECK_EVERY_MS)
@@ -46,13 +50,16 @@ export class Updater {
     try {
       await electronUpdater.autoUpdater.checkForUpdates()
     } catch (e) {
+      log.warn('Update check failed:', e)
       this.set({ state: 'error', message: friendly(e) })
     }
   }
 
   /** Restarts into the downloaded version. */
   install(): void {
-    if (this.status.state === 'ready') electronUpdater.autoUpdater.quitAndInstall(true, true)
+    if (this.status.state !== 'ready') return
+    log.info(`Restarting to install ${this.status.version}`)
+    electronUpdater.autoUpdater.quitAndInstall(true, true)
   }
 
   stop(): void {
@@ -60,6 +67,8 @@ export class Updater {
   }
 
   private set(s: UpdateState): void {
+    if (s.state === 'ready') log.info(`Update ${s.version} downloaded`)
+    else if (s.state === 'downloading' && this.status.state !== 'downloading') log.info(`Downloading update ${s.version}`)
     this.status = s
     this.onStatus(s)
   }

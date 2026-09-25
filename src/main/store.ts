@@ -1,102 +1,18 @@
 import { app } from 'electron'
 import type { MoteState } from '../core/motes'
-import { existsSync, promises as fs, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import {
   DEFAULT_CHARACTER,
-  DEFAULT_TIER_DURATION_PCT,
   type AppSettings,
   type CharacterSettings,
   type FocusSource,
   type MoteStock,
-  type OverlayConfig,
   type SpellRule,
   type Trigger
 } from '../shared/types'
+import { DEFAULT_OVERLAYS, JsonFile, LEGACY_OVERLAY_IDS, characterKey, defaultSettings, mergeDefaults, readJsonFile, type ReadResult } from './storeCore'
 
-export const DEFAULT_OVERLAYS: OverlayConfig[] = [
-  { id: 'buffs', name: 'Buffs', kind: 'timers', x: 2040, y: 420, width: 340, height: 520, opacity: 1, fontSize: 15, visible: true, groupByTarget: true },
-  { id: 'targets', name: 'DoTs & Timers', kind: 'timers', x: 2400, y: 420, width: 340, height: 520, opacity: 1, fontSize: 15, visible: true, groupByTarget: true },
-  { id: 'alerts', name: 'Alerts', kind: 'alerts', x: 1220, y: 300, width: 1000, height: 220, opacity: 1, fontSize: 30, visible: true, groupByTarget: false }
-]
-
-export function defaultSettings(): AppSettings {
-  return {
-    installDir: '',
-    logFile: '',
-    autoStart: true,
-    characters: {},
-    tracking: {
-      enabled: true,
-      selfBuffs: false,
-      otherBuffs: false,
-      dots: true,
-      debuffs: true,
-      buffWarnSec: 12,
-      dotWarnSec: 12,
-      buffWarnSpeech: 'Recast {spell}',
-      buffFadeSpeech: '{spell} down',
-      dotWarnSpeech: 'Recast {spell}',
-      dotFadeSpeech: '{spell} off',
-      announceOtherBuffFades: false,
-      tierDurationPct: { ...DEFAULT_TIER_DURATION_PCT }
-    },
-    audio: { deviceId: 'default', masterVolume: 1, speechVolume: 1, soundVolume: 0.8, voice: '', rate: 1, muted: false },
-    archive: { autoEnabled: false, thresholdMB: 150, archiveDir: '' },
-    overlays: DEFAULT_OVERLAYS.map((o) => ({ ...o })),
-    overlaysOnlyWithGame: true,
-    yieldToGame: true
-  }
-}
-
-/** Deep-merges saved settings over the defaults, so settings saved by an older build gain new fields. */
-function mergeDefaults<T>(base: T, saved: unknown): T {
-  if (Array.isArray(base)) return (Array.isArray(saved) ? saved : base) as T
-  if (base && typeof base === 'object') {
-    const out: Record<string, unknown> = { ...(base as Record<string, unknown>) }
-    if (saved && typeof saved === 'object') {
-      for (const [k, v] of Object.entries(saved as Record<string, unknown>)) {
-        out[k] = k in out ? mergeDefaults(out[k], v) : v
-      }
-    }
-    return out as T
-  }
-  return (saved === undefined ? base : saved) as T
-}
-
-class JsonFile<T> {
-  private timer: NodeJS.Timeout | null = null
-  constructor(
-    readonly path: string,
-    private value: T
-  ) {}
-
-  get(): T {
-    return this.value
-  }
-
-  set(value: T): void {
-    this.value = value
-    if (this.timer) clearTimeout(this.timer)
-    this.timer = setTimeout(() => void this.flush(), 400)
-  }
-
-  async flush(): Promise<void> {
-    if (this.timer) clearTimeout(this.timer)
-    this.timer = null
-    const tmp = this.path + '.tmp'
-    await fs.writeFile(tmp, JSON.stringify(this.value, null, 2), 'utf8')
-    await fs.rename(tmp, this.path)
-  }
-}
-
-function readJson(path: string): unknown {
-  try {
-    return JSON.parse(readFileSync(path, 'utf8'))
-  } catch {
-    return undefined
-  }
-}
+export { DEFAULT_OVERLAYS, characterKey, characterName, defaultSettings } from './storeCore'
 
 export interface KnownCast {
   rankedName: string
@@ -112,31 +28,57 @@ export class Store {
   readonly casts: JsonFile<Record<string, KnownCast>>
   readonly motes: JsonFile<MoteState>
   readonly stock: JsonFile<MoteStock>
-  /** True until mote history has been built from the logs once. */
+  /** The default overlays this install has been given, so one the player deleted is not brought back. */
+  private readonly seenDefaults: JsonFile<string[]>
+  /** True until mote history has been built from the logs once (or after its file was unreadable). */
   readonly motesFresh: boolean
-  /** True on a first run, before any settings were saved. */
+  /** True on a first run, before any settings were saved. An unreadable settings file is not a first run. */
   readonly settingsFresh: boolean
+  /** Files that would not parse and were moved aside this start, by the name they were moved to. */
+  readonly recovered: string[] = []
 
   constructor(defaultTriggersPath: string) {
     const p = (f: string) => join(this.dir, f)
-    const savedSettings = readJson(p('settings.json'))
-    this.settingsFresh = savedSettings === undefined
-    this.settings = new JsonFile(p('settings.json'), mergeDefaults(defaultSettings(), savedSettings))
-    const firstRun = !existsSync(p('triggers.json'))
-    const triggers = (readJson(firstRun ? defaultTriggersPath : p('triggers.json')) as Trigger[] | undefined) ?? []
-    this.triggers = new JsonFile(p('triggers.json'), triggers)
-    if (firstRun) this.triggers.set(triggers)
-    this.rules = new JsonFile(p('spell-rules.json'), (readJson(p('spell-rules.json')) as Record<string, SpellRule>) ?? {})
-    this.casts = new JsonFile(p('casts.json'), (readJson(p('casts.json')) as Record<string, KnownCast>) ?? {})
-    const motes = readJson(p('motes.json')) as MoteState | undefined
+    const read = (f: string): unknown => {
+      const r: ReadResult = readJsonFile(p(f))
+      if (r.state === 'corrupt') this.recovered.push(r.movedTo)
+      return r.state === 'ok' ? r.value : undefined
+    }
+
+    const settingsRead = readJsonFile(p('settings.json'))
+    if (settingsRead.state === 'corrupt') this.recovered.push(settingsRead.movedTo)
+    this.settingsFresh = settingsRead.state === 'missing'
+    const savedSettings = settingsRead.state === 'ok' ? settingsRead.value : undefined
+    const seenSaved = read('seen-defaults.json')
+    const seen = new Set<string>(Array.isArray(seenSaved) ? seenSaved.filter((x) => typeof x === 'string') : savedSettings ? LEGACY_OVERLAY_IDS : [])
+    this.settings = new JsonFile(p('settings.json'), mergeDefaults(defaultSettings(), savedSettings, (id) => !seen.has(id)))
+    const allDefaults = DEFAULT_OVERLAYS.map((o) => o.id)
+    this.seenDefaults = new JsonFile(p('seen-defaults.json'), [...new Set([...seen, ...allDefaults])])
+    // Written at the next save or at quit, not on a timer: a second copy of the app, started by
+    // mistake and quitting at once, must not write anything.
+    if (allDefaults.some((id) => !seen.has(id))) {
+      this.seenDefaults.markDirty()
+      // A default just added to the saved overlays must reach settings.json too.
+      if (savedSettings) this.settings.markDirty()
+    }
+
+    const triggersRead = readJsonFile(p('triggers.json'))
+    if (triggersRead.state === 'corrupt') this.recovered.push(triggersRead.movedTo)
+    const firstRun = triggersRead.state === 'missing'
+    const triggers = firstRun ? readJsonFile(defaultTriggersPath, { setAside: false }) : triggersRead
+    const list = triggers.state === 'ok' && Array.isArray(triggers.value) ? (triggers.value as Trigger[]) : []
+    this.triggers = new JsonFile(p('triggers.json'), list)
+    if (firstRun) this.triggers.markDirty()
+
+    this.rules = new JsonFile(p('spell-rules.json'), (read('spell-rules.json') as Record<string, SpellRule>) ?? {})
+    this.casts = new JsonFile(p('casts.json'), (read('casts.json') as Record<string, KnownCast>) ?? {})
+    // Mote history is rebuilt from the logs when its file is missing or unreadable.
+    const motes = read('motes.json') as MoteState | undefined
     this.motesFresh = !motes
     this.motes = new JsonFile(p('motes.json'), motes ?? { active: null, sessions: [], daily: {} })
     this.stock = new JsonFile(
       p('mote-stock.json'),
-      mergeDefaults<MoteStock>(
-        { counts: {}, item: { name: '', lvl: 0, xp: 0, to: 1 }, autoAdd: true },
-        readJson(p('mote-stock.json'))
-      )
+      mergeDefaults<MoteStock>({ counts: {}, item: { name: '', lvl: 0, xp: 0, to: 1 }, autoAdd: true }, read('mote-stock.json'))
     )
   }
 
@@ -159,18 +101,9 @@ export class Store {
     return c
   }
 
+  /** Writes whatever changed. Never rejects: a file that cannot be written is logged. */
   async flushAll(): Promise<void> {
-    await Promise.all([this.settings.flush(), this.triggers.flush(), this.rules.flush(), this.casts.flush(), this.motes.flush(), this.stock.flush()])
+    const files = [this.settings, this.triggers, this.rules, this.casts, this.motes, this.stock, this.seenDefaults]
+    await Promise.allSettled(files.map((f) => f.flush()))
   }
-}
-
-/** `...\Logs\eqlog_Kelwyn_neriak.txt` → `Kelwyn_neriak` */
-export function characterKey(logFile: string): string {
-  const m = /eqlog_(.+)\.txt$/i.exec(logFile)
-  return m ? m[1] : ''
-}
-
-/** `Kelwyn_neriak` → `Kelwyn` */
-export function characterName(logFile: string): string {
-  return characterKey(logFile).split('_')[0] ?? ''
 }

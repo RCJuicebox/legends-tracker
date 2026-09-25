@@ -1,4 +1,5 @@
 import koffi from 'koffi'
+import { log } from './log'
 
 // Direct calls into Windows, in place of launching command-line tools (reg.exe, tasklist, a
 // resident PowerShell loop). Asking the system itself is far quicker, costs nothing between calls,
@@ -50,7 +51,9 @@ function load(): Api | null {
       RegGetValueW: advapi32.func('int32 __stdcall RegGetValueW(intptr_t hkey, str16 subKey, str16 value, uint32 flags, void *type, _Out_ uint8_t *data, _Inout_ uint32 *size)'),
       entrySize: koffi.sizeof(ENTRY)
     }
-  } catch {
+  } catch (e) {
+    // Game detection then assumes the game is running; worth knowing why.
+    log.warn('Windows API unavailable (koffi):', e)
     api = null
   }
   return api

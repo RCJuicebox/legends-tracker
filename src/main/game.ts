@@ -2,6 +2,8 @@ import { HKEY_CURRENT_USER, HKEY_LOCAL_MACHINE, isProcessRunning, registryString
 import { existsSync, promises as fs } from 'node:fs'
 import { dirname, join } from 'node:path'
 import type { ArchiveInfo, GameFolderCheck, LogFileInfo } from '../shared/types'
+import { parseLogLine, zoneEntered } from '../core/logLine'
+import { log } from './log'
 
 const INSTALL_SUFFIXES = [
   '\\Daybreak Game Company\\Installed Games\\EverQuest Legends',
@@ -108,7 +110,9 @@ export async function listLogs(installDir: string): Promise<LogFileInfo[]> {
   for (const name of names) {
     const m = /^eqlog_(.+)\.txt$/i.exec(name)
     if (!m) continue
-    const st = await fs.stat(join(dir, name))
+    // A log archived or deleted since the folder was listed is simply left out.
+    const st = await fs.stat(join(dir, name)).catch(() => null)
+    if (!st) continue
     out.push({ path: join(dir, name), name, character: m[1], size: st.size, modified: st.mtimeMs })
   }
   return out.sort((a, b) => b.modified - a.modified)
@@ -126,7 +130,8 @@ export async function listArchives(archiveDir: string): Promise<ArchiveInfo[]> {
     if (name.startsWith('.staging-') || name.endsWith('.partial')) continue
     const lower = name.toLowerCase()
     if (!lower.endsWith('.zip') && !lower.endsWith('.txt')) continue
-    const st = await fs.stat(join(archiveDir, name))
+    const st = await fs.stat(join(archiveDir, name)).catch(() => null)
+    if (!st) continue
     out.push({ path: join(archiveDir, name), name, size: st.size, modified: st.mtimeMs, loose: lower.endsWith('.txt') })
   }
   return out.sort((a, b) => b.modified - a.modified)
@@ -138,28 +143,37 @@ export async function isGameRunning(): Promise<boolean> {
 
 /**
  * The client announces the zone once and never repeats it, so a tool attached mid-session reads
- * backwards from the end of the log to find it.
+ * backwards from the end of the log to find it, a chunk at a time, up to 64 chunks.
  */
-export async function lastZone(logPath: string): Promise<string> {
+export async function lastZone(logPath: string, step = 1 << 20): Promise<string> {
   let handle
   try {
     handle = await fs.open(logPath, 'r')
-  } catch {
+  } catch (e) {
+    if ((e as NodeJS.ErrnoException).code !== 'ENOENT') log.warn(`Could not open ${logPath} to find the zone:`, e)
     return ''
   }
   try {
     const size = (await handle.stat()).size
-    const step = 1 << 20
+    // The first piece of each chunk may be the end of a line begun in the chunk before it; it is
+    // carried back and joined to that chunk's last piece.
+    let carry = ''
     for (let end = size; end > 0 && size - end < 64 * step; end -= step) {
       const start = Math.max(0, end - step)
       const buf = Buffer.alloc(end - start)
       await handle.read(buf, 0, buf.length, start)
-      const lines = buf.toString('latin1').split('\n')
+      const lines = (buf.toString('latin1') + carry).split('\n')
+      carry = start > 0 ? (lines.shift() ?? '') : ''
       for (let i = lines.length - 1; i >= 0; i--) {
-        const m = /\] You have entered (.+)\.\r?$/.exec(lines[i])
-        if (m && !/^an? (?:area|Arena)/i.test(m[1])) return m[1]
+        if (!lines[i].includes('] You have entered ')) continue
+        const line = parseLogLine(lines[i].replace(/\r$/, ''))
+        const zone = line && zoneEntered(line.text)
+        if (zone) return zone
       }
     }
+    return ''
+  } catch (e) {
+    log.warn(`Could not read ${logPath} to find the zone:`, e)
     return ''
   } finally {
     await handle.close()

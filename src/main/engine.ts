@@ -1,6 +1,7 @@
-import { existsSync, promises as fs } from 'node:fs'
+import { createReadStream, existsSync, promises as fs, readFileSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { basename, isAbsolute, join } from 'node:path'
-import { parseLogLine } from '../core/logLine'
+import { Worker } from 'node:worker_threads'
+import { parseLogLine, type LogLine } from '../core/logLine'
 import { LogTailer } from '../core/tailer'
 import { SpellBook, summarize, type Spell } from '../core/spells'
 import { casterLevel, computeDuration } from '../core/durations'
@@ -8,21 +9,20 @@ import { focusFor } from '../core/focus'
 import { TimerBoard } from '../core/timers'
 import { SpellTracker } from '../core/spellTracker'
 import { TriggerEngine } from '../core/triggers'
-import { archiveLog, compressLoose, findStaging, finishStaged, stagingOriginalName, type ArchiveOutcome } from '../core/archiver'
+import type { ArchiveOutcome } from '../core/archiver'
 import { checkAgainstLog } from '../core/logCheck'
-import { MoteTracker, moteName, parseMoteLoot, type MoteLoot, type MoteState } from '../core/motes'
-import { StockCursor, fixItem, levelFromName, plan } from '../core/moteCalc'
-import { Worker } from 'node:worker_threads'
-import { readLines } from './moteHistory'
-import moteWorkerPath from './moteWorker?modulePath'
-import type { MoteState as ScannedMotes } from '../core/motes'
-import { createReadStream } from 'node:fs'
-import type { LogLine } from '../core/logLine'
-import { characterKey, characterName, type Store } from './store'
-import { findInstall, isGameFolder, isGameRunning, lastZone, listArchives, listLogs } from './game'
+import { MoteTracker, moteName, parseMoteLoot, type MoteState } from '../core/motes'
+import { characterKey, characterName } from './storeCore'
+import { isGameFolder, lastZone, listLogs } from './game'
+import { ArchiveManager } from './archiveManager'
+import { MoteStockKeeper, type Cell } from './moteStock'
+import { offsetBefore, readLines } from './logReading'
+import type { MoteScanJob, MoteScanResult } from './moteHistory'
+import { combineScans, mergeRebuilt, samePath } from './moteMerge'
+import { log } from './log'
 import type { SpeechWorker } from './speech'
 import type {
-  AppSettings, ArchiveStatus, CharacterSettings, FeedItem, KnownSpell, LogCheckRow, MoteStock, Notification, SpellRule, TimerView, WatchStatus
+  AppSettings, ArchiveStatus, CharacterSettings, FeedItem, KnownSpell, LogCheckRow, MoteStock, Notification, SpellRule, TimerView, Trigger, WatchStatus
 } from '../shared/types'
 
 export interface EngineOutputs {
@@ -32,21 +32,88 @@ export interface EngineOutputs {
   status: (status: WatchStatus) => void
   feed: (item: FeedItem) => void
   archive: (status: ArchiveStatus) => void
-  motes: (state: MoteState & { scanning: string; scanProgress: number }) => void
+  motes: (state: MoteView) => void
+  /** Progress of a mote history rebuild alone, without the history itself. */
+  moteScan: (scan: { scanning: string; scanProgress: number }) => void
   stock: (stock: MoteStock) => void
 }
+
+export type MoteView = MoteState & { scanning: string; scanProgress: number }
 
 export type AudioCommand =
   | { kind: 'speech'; wav: Uint8Array; interrupt: boolean }
   | { kind: 'speech-fallback'; text: string; interrupt: boolean }
   | { kind: 'sound'; data: Uint8Array; volume: number; name: string }
 
+/** Reads mote history somewhere (a worker thread in the app); `stop` abandons it. */
+export type MoteScanner = (
+  job: MoteScanJob,
+  progress: (message: string, fraction: number) => void
+) => { done: Promise<MoteScanResult>; stop: () => void }
+
+/** What the engine needs from the running app, passed in so the engine runs anywhere, tests included. */
+export interface EngineEnv {
+  /** The mote history worker's script (electron-vite's `./moteWorker?modulePath`). */
+  moteWorkerPath: string
+  isGameRunning: () => Promise<boolean>
+  findInstall: () => Promise<string>
+  soundDirs: () => string[]
+  /** Where the engine keeps its own files: catchup.json. */
+  dataDir: string
+  /** Reads mote history in place of the worker thread; for tests. */
+  scanMotes?: MoteScanner
+}
+
+/** The parts of the settings store the engine uses. */
+export interface EngineStore {
+  settings: Cell<AppSettings>
+  triggers: { get(): Trigger[] }
+  rules: { get(): Record<string, SpellRule> }
+  casts: Cell<Record<string, { rankedName: string; lastCast: number; count: number }>>
+  motes: Cell<MoteState>
+  stock: Cell<MoteStock>
+  readonly motesFresh: boolean
+  characterOf(logFile: string): CharacterSettings
+}
+
+export type Speaker = Pick<SpeechWorker, 'synthesize'>
+
+/**
+ * catchup.json: how far into which log mote tracking had read when the app last closed. Every line
+ * before `offset` was handled. It holds only while motes.json says the same `seenUntil`; otherwise
+ * catching up goes by the lines' times instead.
+ */
+interface CatchUpMark {
+  logFile: string
+  /** The file's identity (volume and file index), so an archived-and-replaced log is not mistaken for it. */
+  id: string
+  offset: number
+  seenUntil: number
+}
+
+interface Tail {
+  tailer: LogTailer
+  logFile: string
+  /** The size when the tailer attached: it reads on from there. -1 until its first look. */
+  start: number
+  /** Just past the last line it gave. -1 until it has given one. */
+  end: number
+}
+
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
+
 export class Engine {
   book: SpellBook | null = null
   readonly board: TimerBoard
   private tracker: SpellTracker | null = null
   readonly triggers: TriggerEngine
-  private tailer: LogTailer | null = null
+  private tail: Tail | null = null
+  /** Bumped by every start and stop, so a start overtaken while it waited gives up. */
+  private watchGen = 0
+  private starting = false
+  /** The log last watched, to tell a switch of character from a restart of the same log. */
+  private watchedLog = ''
+  private missing = false
   private tickTimer: NodeJS.Timeout | null = null
   private archiveTimer: NodeJS.Timeout | null = null
   private timersDirty = false
@@ -56,24 +123,30 @@ export class Engine {
   readonly status: WatchStatus = {
     watching: false, logFile: '', character: '', zone: '', spellsLoaded: 0, spellError: '', lastLineAt: 0, logSize: 0
   }
-  readonly archive: ArchiveStatus = { busy: false, message: '', pendingUntilGameExits: [], gameRunning: false, liveRotation: 'unknown' }
-  private archiveAbort = new AbortController()
+  readonly archives: ArchiveManager
+  readonly stock: MoteStockKeeper
   readonly motes: MoteTracker
   private motesDirty = false
   private motesSentAt = 0
-  /** While history is being rebuilt, live lines wait here so none are lost or counted twice. */
+  /** While history is being read, live lines wait here so none are lost or counted twice. */
   private moteBacklog: LogLine[] | null = null
+  /** Where in `backlogLog` the waiting lines begin: history reads up to there. -1 until known. */
+  private backlogFrom = -1
+  private backlogLog = ''
+  /** Every line of `logFile` before `offset` has been through mote tracking. */
+  private linePos: { logFile: string; offset: number } | null = null
+  private scan: { stop: () => void } | null = null
   moteScan = ''
   moteScanProgress = 0
-  /** Pasted test lines must not add to the real mote stock. */
+  /** Pasted test lines must not add to the real mote history or stock. */
   private simulating = false
-  private stockCursor: StockCursor | null = null
+  private speechFailed = false
 
   constructor(
-    private readonly store: Store,
-    private readonly speech: SpeechWorker,
+    private readonly store: EngineStore,
+    private readonly speech: Speaker,
     private readonly out: EngineOutputs,
-    private readonly soundDirs: () => string[]
+    private readonly env: EngineEnv
   ) {
     this.board = new TimerBoard({
       onChange: () => (this.timersDirty = true),
@@ -83,13 +156,20 @@ export class Engine {
       notify: (ns) => this.notify(ns),
       feed: (kind, text) => this.pushFeed(kind, text)
     })
+    this.archives = new ArchiveManager({
+      settings: () => this.settings,
+      isGameRunning: env.isGameRunning,
+      onStatus: (a) => out.archive(a),
+      feed: (kind, text) => this.pushFeed(kind, text)
+    })
+    this.stock = new MoteStockKeeper(store.stock, (s) => out.stock(s), (kind, text) => this.pushFeed(kind, text))
     this.motes = new MoteTracker(store.motes.get(), {
       onChange: () => {
         this.store.motes.set(this.motes.state)
         this.motesDirty = true
       },
       onLoot: (loot, session, time) => {
-        this.addToStock(loot, time)
+        if (!this.simulating) this.stock.add(loot, time)
         this.pushFeed('loot', `${loot.count > 1 ? `${loot.count} × ` : ''}${moteName(loot.rank)} from ${loot.source}${session ? '' : ' (no session running)'}`)
       },
       onSession: (s) =>
@@ -105,10 +185,21 @@ export class Engine {
     return this.feedItems
   }
 
+  get archive(): ArchiveStatus {
+    return this.archives.status
+  }
+
+  private get markFile(): string {
+    return join(this.env.dataDir, 'catchup.json')
+  }
+
   async init(): Promise<void> {
     const s = this.settings
     if (!isGameFolder(s.installDir)) {
-      const found = await findInstall()
+      const found = await this.env.findInstall().catch((e: unknown) => {
+        log.warn('Looking for the game folder failed:', e)
+        return ''
+      })
       if (found) this.store.settings.set({ ...s, installDir: found })
     }
     if (!this.settings.logFile && this.settings.installDir) {
@@ -118,9 +209,10 @@ export class Engine {
     await this.loadSpells()
     this.tickTimer = setInterval(() => this.tick(), 200)
     this.archiveTimer = setInterval(() => void this.archiveCheck(), 30_000)
-    void this.resumeStaging()
-    if (this.store.motesFresh) void this.rebuildMoteHistory()
-    else void this.catchUpMotes()
+    this.archives.resumeStaging().catch((e: unknown) => log.error('Finishing interrupted archives failed:', e))
+    // Reading history starts the backlog before the tailer can give a line, so nothing slips between.
+    const history = this.store.motesFresh ? this.rebuildMoteHistory() : this.catchUpMotes()
+    history.catch((e: unknown) => log.error('Reading mote history at startup failed:', e))
     if (this.settings.autoStart && this.settings.logFile) await this.startWatching()
     this.emitStatus()
   }
@@ -145,6 +237,7 @@ export class Engine {
         }
       })
     } catch (e) {
+      log.error(`Could not load spells from ${this.settings.installDir}:`, e)
       this.book = null
       this.tracker = null
       this.status.spellsLoaded = 0
@@ -197,39 +290,101 @@ export class Engine {
   // ---- watching ----
 
   async startWatching(): Promise<void> {
-    this.stopWatching()
+    const gen = ++this.watchGen
+    this.stopTail()
     const logFile = this.settings.logFile
     if (!logFile) return
+    this.starting = true
+    const zone = await lastZone(logFile)
+    // A later start or a stop came while the zone was being read; that one wins.
+    if (gen !== this.watchGen) return
+    this.starting = false
+    if (this.watchedLog && !samePath(this.watchedLog, logFile)) {
+      // Another character: nothing the last one had running applies any more.
+      const n = this.board.list().length
+      this.board.clear()
+      if (n) this.pushFeed('info', `Switched to ${basename(logFile)}; cleared ${n} timer${n === 1 ? '' : 's'}.`)
+    }
+    this.watchedLog = logFile
     this.status.logFile = logFile
     this.status.character = characterName(logFile)
     this.triggers.load(this.store.triggers.get(), this.status.character)
-    const zone = await lastZone(logFile)
     this.status.zone = zone
     this.tracker?.setZone(zone)
-    this.tailer = new LogTailer(logFile, {
-      startAtEnd: true,
-      onLines: (lines) => this.onLines(lines),
-      onReset: (reason) => this.pushFeed('info', reason === 'replaced' ? 'A new log file was started.' : 'The log was truncated; reading from the top.'),
-      onSize: (size) => {
-        if (size !== this.status.logSize) this.statusDirty = true
-        this.status.logSize = size
-      }
-    })
-    this.tailer.start()
+    this.missing = false
+    const tail: Tail = {
+      logFile,
+      start: -1,
+      end: -1,
+      tailer: new LogTailer(logFile, {
+        startAtEnd: true,
+        onLines: (lines, end) => this.tail === tail && this.onLines(tail, lines, end),
+        onReset: (reason) => this.tail === tail && this.onTailReset(tail, reason),
+        onMissing: () => this.tail === tail && this.onTailMissing(tail),
+        onSize: (size) => this.tail === tail && this.onTailSize(tail, size)
+      })
+    }
+    this.tail = tail
+    tail.tailer.start()
     this.status.watching = true
     this.pushFeed('info', `Watching ${basename(logFile)}${zone ? ` in ${zone}` : ''}`)
     this.emitStatus()
   }
 
   stopWatching(): void {
-    this.tailer?.stop()
-    this.tailer = null
+    this.watchGen++
+    this.stopTail()
+  }
+
+  private stopTail(): void {
+    this.starting = false
+    this.tail?.tailer.stop()
+    this.tail = null
     if (this.status.watching) this.pushFeed('info', 'Stopped watching')
     this.status.watching = false
     this.emitStatus()
   }
 
-  private onLines(lines: string[]): void {
+  private onTailSize(t: Tail, size: number): void {
+    if (t.start < 0) {
+      t.start = size
+      if (this.moteBacklog && this.backlogFrom < 0) {
+        this.backlogFrom = size
+        this.backlogLog = t.logFile
+      }
+    }
+    if (this.missing) {
+      this.missing = false
+      this.status.watching = true
+      this.pushFeed('info', `${basename(t.logFile)} is back; watching it again.`)
+      this.statusDirty = true
+    }
+    if (size !== this.status.logSize) this.statusDirty = true
+    this.status.logSize = size
+  }
+
+  private onTailReset(t: Tail, reason: 'truncated' | 'replaced'): void {
+    t.end = 0
+    if (this.moteBacklog && samePath(this.backlogLog, t.logFile)) {
+      // Where history reading was to stop is in the old file; the waiting lines are the new one's.
+      log.warn(`The log was ${reason} while mote history was being read; lines around the switch may be counted twice.`)
+      this.backlogFrom = -1
+      this.backlogLog = ''
+    }
+    this.pushFeed('info', reason === 'replaced' ? 'A new log file was started.' : 'The log was truncated; reading from the top.')
+  }
+
+  private onTailMissing(t: Tail): void {
+    this.missing = true
+    this.status.watching = false
+    const text = `${basename(t.logFile)} is gone (moved or deleted). Waiting for the game to write it again.`
+    // Archiving moves the log away on purpose; the game starts a new one at its next line.
+    this.pushFeed(this.archive.busy ? 'info' : 'warn', text)
+    this.emitStatus()
+  }
+
+  private onLines(t: Tail, lines: string[], end: number): void {
+    t.end = end
     for (const raw of lines) {
       const line = parseLogLine(raw)
       if (!line) continue
@@ -240,6 +395,7 @@ export class Engine {
       this.status.lastLineAt = line.time
       this.statusDirty = true
     }
+    if (!this.moteBacklog) this.linePos = { logFile: t.logFile, offset: end }
   }
 
   /** Feeds pasted log lines through the live pipeline, with their times shifted to now. */
@@ -260,7 +416,7 @@ export class Engine {
       const shifted = { ...line, time: line.time + shift }
       this.tracker?.handle(shifted)
       this.triggers.handle(shifted)
-      this.motes.handle(shifted)
+      // Mote history is a record of real play: a pasted loot line must not count towards it.
     }
   }
 
@@ -302,7 +458,10 @@ export class Engine {
     try {
       const wav = await this.speech.synthesize(text, a.voice, a.rate)
       this.out.audio({ kind: 'speech', wav: new Uint8Array(wav), interrupt })
-    } catch {
+    } catch (e) {
+      // The audio window speaks it itself instead. Said once, not for every line spoken.
+      if (!this.speechFailed) log.warn('Speech synthesis failed; falling back to the audio window’s own voice:', e)
+      this.speechFailed = true
       this.out.audio({ kind: 'speech-fallback', text, interrupt })
     }
   }
@@ -313,13 +472,17 @@ export class Engine {
       this.pushFeed('warn', `Sound not found: ${file}`)
       return
     }
-    const data = await fs.readFile(path)
-    this.out.audio({ kind: 'sound', data: new Uint8Array(data), volume, name: basename(path) })
+    try {
+      const data = await fs.readFile(path)
+      this.out.audio({ kind: 'sound', data: new Uint8Array(data), volume, name: basename(path) })
+    } catch (e) {
+      this.pushFeed('warn', `Could not play ${basename(path)}: ${(e as Error).message}`)
+    }
   }
 
   resolveSound(file: string): string | null {
     if (isAbsolute(file)) return existsSync(file) ? file : null
-    for (const dir of this.soundDirs()) {
+    for (const dir of this.env.soundDirs()) {
       const p = join(dir, file)
       if (existsSync(p)) return p
     }
@@ -328,17 +491,18 @@ export class Engine {
 
   async listSounds(): Promise<string[]> {
     const names = new Set<string>()
-    for (const dir of this.soundDirs()) {
+    for (const dir of this.env.soundDirs()) {
       try {
         for (const f of await fs.readdir(dir)) if (/\.(wav|mp3|ogg)$/i.test(f)) names.add(f)
-      } catch {
-        // folder absent
+      } catch (e) {
+        if ((e as NodeJS.ErrnoException).code !== 'ENOENT') log.warn(`Could not list sounds in ${dir}:`, e)
       }
     }
     return [...names].sort()
   }
 
   pushFeed(kind: FeedItem['kind'], text: string): void {
+    if (kind === 'warn') log.warn(text)
     const item = { at: Date.now(), kind, text }
     this.feedItems.push(item)
     if (this.feedItems.length > 300) this.feedItems.shift()
@@ -397,115 +561,31 @@ export class Engine {
     })
   }
 
-  // ---- log management ----
+  // ---- log management (ArchiveManager) ----
 
   archiveDir(): string {
-    const s = this.settings
-    return s.archive.archiveDir || join(s.installDir, 'Logs', 'archive')
+    return this.archives.archiveDir()
   }
 
-  private deps(progress = true) {
-    return {
-      isGameRunning,
-      signal: this.archiveAbort.signal,
-      progress: progress ? (m: string) => this.setArchive({ message: m }) : undefined
-    }
+  archiveNow(logPath: string): Promise<ArchiveOutcome> {
+    return this.archives.archiveNow(logPath)
   }
 
-  private setArchive(patch: Partial<ArchiveStatus>): void {
-    Object.assign(this.archive, patch)
-    this.out.archive({ ...this.archive })
+  compressLoose(path: string): Promise<ArchiveOutcome> {
+    return this.archives.compressLoose(path)
   }
 
-  async archiveNow(logPath: string): Promise<ArchiveOutcome> {
-    if (this.archive.busy) return { status: 'failed', message: 'An archive is already in progress.' }
-    this.setArchive({ busy: true, message: `Archiving ${basename(logPath)}…` })
-    try {
-      const outcome = await archiveLog(logPath, this.archiveDir(), this.deps())
-      this.report(logPath, outcome)
-      return outcome
-    } finally {
-      this.setArchive({ busy: false })
-    }
-  }
-
-  async compressLoose(path: string): Promise<ArchiveOutcome> {
-    if (this.archive.busy) return { status: 'failed', message: 'An archive is already in progress.' }
-    this.setArchive({ busy: true, message: `Compressing ${basename(path)}…` })
-    try {
-      const outcome = await compressLoose(path, this.deps())
-      this.report(path, outcome)
-      return outcome
-    } finally {
-      this.setArchive({ busy: false })
-    }
-  }
-
-  private report(logPath: string, o: ArchiveOutcome): void {
-    const name = basename(logPath)
-    const pending = this.archive.pendingUntilGameExits.filter((p) => p !== logPath)
-    if (o.status === 'archived') {
-      const ratio = o.originalBytes ? Math.round((1 - o.zipBytes / o.originalBytes) * 100) : 0
-      const msg = `Archived ${name}: ${mb(o.originalBytes)} → ${mb(o.zipBytes)} (${ratio}% smaller) as ${basename(o.zipPath)}`
-      this.setArchive({ message: msg, pendingUntilGameExits: pending, ...(o.liveHandoff ? { liveRotation: 'supported' as const } : {}) })
-      this.pushFeed('archive', msg)
-    } else if (o.status === 'deferred') {
-      this.setArchive({
-        message: o.message,
-        pendingUntilGameExits: [...pending, logPath],
-        ...(o.reason === 'held-open' ? { liveRotation: 'unsupported' as const } : {})
-      })
-      this.pushFeed('archive', o.message)
-    } else {
-      this.setArchive({ message: o.message, pendingUntilGameExits: pending })
-      this.pushFeed('warn', o.message)
-    }
-  }
-
-  /** Auto-archives any character log over the size threshold; retries deferred logs once the game has exited. */
+  /** Auto-archives any character log over the size threshold; never rejects. */
   async archiveCheck(): Promise<void> {
-    const s = this.settings
-    if (this.archive.busy || !s.installDir) return
-    const running = await isGameRunning()
-    if (running !== this.archive.gameRunning) this.setArchive({ gameRunning: running })
-    const waitForExit = running && this.archive.liveRotation === 'unsupported'
-    for (const path of this.archive.pendingUntilGameExits) {
-      if (!running && existsSync(path)) return void (await this.archiveNow(path))
-    }
-    if (!s.archive.autoEnabled) return
-    for (const log of await listLogs(s.installDir)) {
-      if (log.size < s.archive.thresholdMB * 1048576) continue
-      if (waitForExit || this.archive.pendingUntilGameExits.includes(log.path)) continue
-      this.pushFeed('archive', `${log.name} is ${mb(log.size)}, over the ${s.archive.thresholdMB} MB limit.`)
-      await this.archiveNow(log.path)
-      return
+    try {
+      await this.archives.check()
+    } catch (e) {
+      log.error('The automatic archive check failed:', e)
     }
   }
 
-  /** An archive interrupted by the app closing leaves its moved log behind; finish it. */
-  private async resumeStaging(): Promise<void> {
-    const dir = this.archiveDir()
-    for (const staging of await findStaging(dir)) {
-      const logPath = join(this.settings.installDir, 'Logs', stagingOriginalName(staging))
-      this.setArchive({ busy: true, message: `Finishing an interrupted archive of ${basename(logPath)}…` })
-      try {
-        this.report(logPath, await finishStaged(staging, logPath, dir, this.deps()))
-      } finally {
-        this.setArchive({ busy: false })
-      }
-    }
-  }
-
-  async logsOverview() {
-    const s = this.settings
-    const running = await isGameRunning()
-    if (running !== this.archive.gameRunning) this.setArchive({ gameRunning: running })
-    return {
-      logs: s.installDir ? await listLogs(s.installDir) : [],
-      archives: await listArchives(this.archiveDir()),
-      archiveDir: this.archiveDir(),
-      status: { ...this.archive }
-    }
+  logsOverview() {
+    return this.archives.overview()
   }
 
   /** The game has closed: nothing it was timing is still running. */
@@ -513,156 +593,206 @@ export class Engine {
     const n = this.board.list().length
     this.board.clear()
     this.motes.gameClosed(Date.now())
-    this.setArchive({ gameRunning: false })
+    this.archives.set({ gameRunning: false })
     this.pushFeed('info', n ? `The game closed; cleared ${n} timer${n === 1 ? '' : 's'}.` : 'The game closed.')
   }
 
   gameStarted(): void {
-    this.setArchive({ gameRunning: true })
+    this.archives.set({ gameRunning: true })
     this.pushFeed('info', 'The game is running.')
   }
 
-  // ---- mote stock and the upgrade planner ----
+  // ---- mote stock and the upgrade planner (MoteStockKeeper) ----
 
   stockView(): MoteStock {
-    return this.store.stock.get()
-  }
-
-  private saveStock(next: MoteStock): MoteStock {
-    this.store.stock.set(next)
-    this.out.stock(next)
-    return next
-  }
-
-  private addToStock(loot: MoteLoot, time: number): void {
-    const s = this.store.stock.get()
-    if (this.simulating || !s.autoAdd) return
-    this.stockCursor ??= new StockCursor(s.seenUntil ?? 0, s.seenAtSecond ?? 0)
-    if (!this.stockCursor.accept(time)) return
-    this.saveStock({
-      ...s,
-      counts: { ...s.counts, [loot.rank]: (s.counts[loot.rank] ?? 0) + loot.count },
-      seenUntil: this.stockCursor.seenUntil,
-      seenAtSecond: this.stockCursor.seenAtSecond
-    })
+    return this.stock.view()
   }
 
   setStockCounts(counts: MoteStock['counts']): MoteStock {
-    return this.saveStock({ ...this.store.stock.get(), counts })
+    return this.stock.setCounts(counts)
   }
 
   setStockItem(item: MoteStock['item']): MoteStock {
-    return this.saveStock({ ...this.store.stock.get(), item: fixItem(item) })
+    return this.stock.setItem(item)
   }
 
   setStockAutoAdd(on: boolean): MoteStock {
-    // Switching it back on counts from now, not from whenever it was switched off.
-    const s = this.store.stock.get()
-    if (on) this.stockCursor = new StockCursor(Date.now(), 0)
-    return this.saveStock({ ...s, autoAdd: on, ...(on ? { seenUntil: Date.now(), seenAtSecond: 0 } : {}) })
+    return this.stock.setAutoAdd(on)
   }
 
-  /** "Done": takes the planned motes off the stock and moves the item up to the level reached. */
   applyPlan(): MoteStock {
-    const s = this.store.stock.get()
-    const p = plan(fixItem(s.item), s.counts)
-    if (!p.covered || !p.after) return s
-    const counts = { ...s.counts }
-    const keys = ['infinitesimal', 'minor', 'lesser', 'potential', 'major', 'greater', 'superior', 'grand', 'ascendant', 'infinite']
-    keys.forEach((k, i) => (counts[k] = p.after![i]))
-    const name = levelFromName(s.item.name) !== null ? s.item.name.replace(/\+\d+\s*$/, `+${p.reached}`) : s.item.name
-    this.pushFeed('loot', `Upgraded ${name || 'the item'} to +${p.reached}.`)
-    return this.saveStock({ ...s, counts, item: fixItem({ name, lvl: p.reached, xp: 0, to: Math.max(s.item.to, p.reached + 1) }) })
+    return this.stock.applyPlan()
   }
 
-  moteView(): MoteState & { scanning: string; scanProgress: number } {
+  // ---- mote history ----
+
+  moteView(): MoteView {
     return { ...this.motes.state, scanning: this.moteScan, scanProgress: this.moteScanProgress }
+  }
+
+  private tailPos(): number {
+    const t = this.tail
+    return !t ? -1 : t.end >= 0 ? t.end : t.start
+  }
+
+  /** From here live lines wait, and the tailer's position says where reading history must stop. */
+  private beginBacklog(): void {
+    this.moteBacklog = []
+    this.backlogFrom = this.tailPos()
+    this.backlogLog = this.backlogFrom >= 0 ? this.tail!.logFile : ''
+  }
+
+  /** Where the waiting lines begin in `logFile`, waiting a moment for a tailer that is just starting; -1 if not known. */
+  private async backlogMark(logFile: string): Promise<number> {
+    for (let i = 0; i < 200 && this.backlogFrom < 0 && (this.starting || (this.tail && this.tail.start < 0)); i++) await sleep(25)
+    return this.backlogFrom >= 0 && samePath(this.backlogLog, logFile) ? this.backlogFrom : -1
+  }
+
+  /** History is read: the lines that waited are handled now, in order. */
+  private endBacklog(logFile: string, reached: number): void {
+    const waiting = this.moteBacklog ?? []
+    this.moteBacklog = null
+    this.backlogFrom = -1
+    this.backlogLog = ''
+    for (const line of waiting) this.motes.handle(line)
+    const pos = this.tailPos()
+    if (this.tail && pos >= 0) this.linePos = { logFile: this.tail.logFile, offset: pos }
+    else if (reached > 0) this.linePos = { logFile, offset: reached }
+    this.store.motes.set(this.motes.state)
+    this.motesDirty = true
+  }
+
+  private readMark(): CatchUpMark | null {
+    try {
+      const m = JSON.parse(readFileSync(this.markFile, 'utf8')) as CatchUpMark
+      return typeof m.logFile === 'string' && typeof m.offset === 'number' && typeof m.seenUntil === 'number' && typeof m.id === 'string' ? m : null
+    } catch (e) {
+      if ((e as NodeJS.ErrnoException).code !== 'ENOENT') log.warn(`Ignoring ${this.markFile}:`, e)
+      return null
+    }
+  }
+
+  /** Written on the way out, alongside motes.json: how far mote tracking read. */
+  private saveMark(): void {
+    const p = this.linePos
+    // Mid-read, what is on disk is not caught up; the next start goes by times instead.
+    if (!p || this.moteBacklog) return
+    try {
+      const st = statSync(p.logFile, { bigint: true })
+      const mark: CatchUpMark = { logFile: p.logFile, id: `${st.dev}:${st.ino}`, offset: p.offset, seenUntil: this.motes.state.seenUntil ?? 0 }
+      writeFileSync(this.markFile + '.tmp', JSON.stringify(mark), 'utf8')
+      renameSync(this.markFile + '.tmp', this.markFile)
+    } catch (e) {
+      log.warn('Could not save where mote tracking got to:', e)
+    }
   }
 
   /**
    * The live tailer starts at the end of the log, so anything logged while the app was closed (a run
-   * entered, motes looted) is read here first, from where mote tracking last left off.
+   * entered, motes looted) is read here first, from where mote tracking last left off: the offset in
+   * catchup.json when it still matches, else the first line older than the last one tracked.
    */
   async catchUpMotes(): Promise<void> {
     const logFile = this.settings.logFile
     const motesSince = this.motes.state.seenUntil ?? 0
-    const stockSince = this.store.stock.get().seenUntil ?? 0
-    const since = Math.min(motesSince || Infinity, stockSince || Infinity)
-    if (!logFile || this.moteBacklog || !Number.isFinite(since)) return
-    this.moteBacklog = []
-    let last = since
+    const stockSince = this.stock.view().seenUntil ?? 0
+    const since = motesSince || stockSince
+    if (!logFile || this.moteBacklog || !since) return
+    this.beginBacklog()
+    let reached = 0
     try {
-      await readLines(createReadStream(logFile), (line) => {
-        if (line.time < since) return
-        last = line.time
-        if (line.time > motesSince) this.motes.handle(line)
-        else {
+      const mark = this.readMark()
+      // Used once: a crash before the next clean exit must not replay from it again.
+      rmSync(this.markFile, { force: true })
+      const st = await fs.stat(logFile, { bigint: true })
+      const exact = !!mark && samePath(mark.logFile, logFile) && mark.id === `${st.dev}:${st.ino}` && mark.seenUntil === motesSince && mark.offset <= Number(st.size)
+      const from = exact ? mark!.offset : await offsetBefore(logFile, since)
+      const onLine = (line: LogLine) => {
+        if (exact || line.time > motesSince) this.motes.handle(line)
+        else if (line.time >= stockSince) {
           // Already tracked, but newer than the stock: count its motes into the stock only.
           const loot = parseMoteLoot(line.text)
-          if (loot) this.addToStock(loot, line.time)
+          if (loot) this.stock.add(loot, line.time)
         }
-      })
-      for (const line of this.moteBacklog) if (line.time > last) this.motes.handle(line)
-    } catch {
-      // A missing or rotated log: nothing to catch up on.
+      }
+      const until = await this.backlogMark(logFile)
+      const end = until >= 0 ? until : Number(st.size)
+      reached = from
+      if (end > from) reached += await readLines(createReadStream(logFile, { start: from, end: end - 1 }), onLine, { flushLast: false })
+      // The tailer attached while this read: read on to where it took over.
+      const later = until < 0 && samePath(this.backlogLog, logFile) ? this.backlogFrom : -1
+      if (later > reached) reached += await readLines(createReadStream(logFile, { start: reached, end: later - 1 }), onLine, { flushLast: false })
+    } catch (e) {
+      if ((e as NodeJS.ErrnoException).code === 'ENOENT') log.info(`No log to catch up on at ${logFile}.`)
+      else log.warn(`Catching up on motes from ${logFile} failed:`, e)
     } finally {
-      this.moteBacklog = null
-      this.store.motes.set(this.motes.state)
-      this.motesDirty = true
+      this.endBacklog(logFile, reached)
     }
   }
 
-  /** Rebuilds mote history from this character's logs and archives, then carries on live. */
+  /**
+   * Rebuilds mote history from every character's log in the Logs folder and their archives, merges
+   * it into the history kept, then carries on live. Only progress goes out while it reads.
+   */
   async rebuildMoteHistory(): Promise<void> {
-    const logFile = this.settings.logFile
-    if (!logFile || this.moteBacklog) return
-    this.moteBacklog = []
+    if (this.scan || this.moteBacklog) {
+      this.pushFeed('info', 'Already reading your logs.')
+      return
+    }
+    const watched = this.settings.logFile
+    const installDir = this.settings.installDir
+    this.beginBacklog()
     const setScan = (m: string, fraction = 0) => {
       this.moteScan = m
       this.moteScanProgress = fraction
-      this.out.motes(this.moteView())
+      this.out.moteScan({ scanning: m, scanProgress: fraction })
     }
+    let reached = 0
     try {
       setScan('Getting ready to read your logs…')
-      // Read in a worker thread at full speed, so nothing the rebuild does can be felt in the app,
-      // the overlays or the live tailer. Only progress and the finished history come back.
-      const { state, lastTime } = await new Promise<{ state: ScannedMotes; lastTime: number }>((resolve, reject) => {
-        const worker = new Worker(moteWorkerPath, {
-          workerData: { logPath: logFile, archiveDir: this.archiveDir(), stem: basename(logFile, '.txt') }
-        })
-        worker.on('message', (m: { kind: 'progress'; message: string; fraction: number } | { kind: 'done'; state: ScannedMotes; lastTime: number } | { kind: 'error'; message: string }) => {
-          if (m.kind === 'progress') setScan(m.message, m.fraction)
-          else if (m.kind === 'done') resolve(m)
-          else reject(new Error(m.message))
-        })
-        worker.on('error', reject)
-        worker.on('exit', (code) => code !== 0 && reject(new Error(`the reader stopped (${code})`)))
-      })
-      const live = this.motes.state
-      // A manual session is the player's own doing; keep it running over the rebuilt history.
-      if (live.active?.kind === 'manual') state.active = live.active
-      else if (!this.archive.gameRunning && state.active && state.active.kind !== 'manual') {
-        this.motes.state = state
-        this.motes.gameClosed(lastTime)
+      const paths = installDir ? (await listLogs(installDir)).map((l) => l.path) : []
+      if (watched && !paths.some((p) => samePath(p, watched)) && existsSync(watched)) paths.push(watched)
+      if (!paths.length) {
+        this.pushFeed('info', 'No character logs to read mote history from.')
+        return
       }
-      this.motes.state = state
-      for (const line of this.moteBacklog) if (line.time > lastTime) this.motes.handle(line)
-      const crawls = state.sessions.filter((s) => s.kind === 'crawl').length
-      this.pushFeed('loot', `Mote history rebuilt from your logs: ${crawls} crawl${crawls === 1 ? '' : 's'}.`)
+      const until = watched ? await this.backlogMark(watched) : -1
+      const job: MoteScanJob = {
+        archiveDir: this.archiveDir(),
+        logs: paths.map((p) => ({ logPath: p, stem: basename(p, '.txt'), ...(until >= 0 && samePath(p, watched) ? { end: until } : {}) }))
+      }
+      const run = (this.env.scanMotes ?? workerScanner(this.env.moteWorkerPath))(job, (m, f) => setScan(m, f))
+      this.scan = run
+      const scanned = await run.done
+      const merged = mergeRebuilt(this.motes.state, combineScans(scanned, watched, this.archive.gameRunning))
+      const w = scanned.characters.find((c) => samePath(c.logPath, watched))
+      if (merged.seenUntil === undefined && w?.lastTime) merged.seenUntil = w.lastTime
+      this.motes.state = merged
+      reached = w?.end ?? 0
+      // The tailer attached while the logs were read: read on to where it took over.
+      const later = w && until < 0 && samePath(this.backlogLog, watched) ? this.backlogFrom : -1
+      if (later > reached) reached += await readLines(createReadStream(watched, { start: reached, end: later - 1 }), (l) => this.motes.handle(l), { flushLast: false })
+      const crawls = merged.sessions.filter((s) => s.kind === 'crawl').length
+      const n = scanned.characters.length
+      this.pushFeed('loot', `Mote history rebuilt from ${n} character log${n === 1 ? '' : 's'}: ${crawls} crawl${crawls === 1 ? '' : 's'}.`)
     } catch (e) {
+      log.error('Rebuilding mote history failed:', e)
       this.pushFeed('warn', `Could not read mote history: ${(e as Error).message}`)
     } finally {
-      this.moteBacklog = null
-      this.store.motes.set(this.motes.state)
+      this.scan = null
+      this.endBacklog(watched, reached)
       setScan('')
+      this.out.motes(this.moteView())
     }
   }
 
   shutdown(): void {
-    this.archiveAbort.abort()
+    this.archives.shutdown()
+    this.scan?.stop()
     this.stopWatching()
     if (this.tickTimer) clearInterval(this.tickTimer)
     if (this.archiveTimer) clearInterval(this.archiveTimer)
+    this.saveMark()
   }
 
   characterKey(): string {
@@ -670,6 +800,26 @@ export class Engine {
   }
 }
 
-function mb(bytes: number): string {
-  return `${(bytes / 1048576).toFixed(bytes < 10 * 1048576 ? 1 : 0)} MB`
+/** Reads mote history on a worker thread, so nothing it does can be felt in the app, the overlays or the live tailer. */
+export function workerScanner(path: string): MoteScanner {
+  return (job, progress) => {
+    const worker = new Worker(path, { workerData: job })
+    let stopped = false
+    const done = new Promise<MoteScanResult>((resolve, reject) => {
+      worker.on('message', (m: { kind: 'progress'; message: string; fraction: number } | { kind: 'done'; result: MoteScanResult } | { kind: 'error'; message: string }) => {
+        if (m.kind === 'progress') progress(m.message, m.fraction)
+        else if (m.kind === 'done') resolve(m.result)
+        else reject(new Error(m.message))
+      })
+      worker.on('error', reject)
+      worker.on('exit', (code) => code !== 0 && reject(new Error(stopped ? 'stopped' : `the reader stopped (${code})`)))
+    })
+    return {
+      done,
+      stop: () => {
+        stopped = true
+        worker.terminate().catch((e: unknown) => log.warn('Stopping the mote history reader failed:', e))
+      }
+    }
+  }
 }

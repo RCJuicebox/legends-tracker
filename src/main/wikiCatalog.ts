@@ -3,6 +3,7 @@ import { promises as fs } from 'node:fs'
 import { join } from 'node:path'
 import { CATALOG_FORMAT, parseItemPage, type CatalogItem } from '../core/wikiItem'
 import { parseEraStatus } from '../core/upgrades'
+import { log } from './log'
 
 // Every piece of equipment on eqlwiki.com, for the upgrade finder. The wiki's Items category is read
 // fifty pages a request (about 225 requests for the whole of it), politely and one at a time; only
@@ -10,6 +11,7 @@ import { parseEraStatus } from '../core/upgrades'
 const API = 'https://eqlwiki.com/api.php'
 const AGENT = 'LegendsTracker (https://github.com/RCJuicebox/legends-tracker)'
 const FRESH_MS = 7 * 24 * 3600_000
+const TIMEOUT_MS = 15_000
 
 /** Bumped when what a download keeps changes, so an older file is fetched again. */
 const FORMAT = CATALOG_FORMAT
@@ -45,7 +47,8 @@ export class WikiCatalog {
     if (this.file) return this.file
     try {
       this.file = JSON.parse(await fs.readFile(this.path, 'utf8')) as CatalogFile
-    } catch {
+    } catch (e) {
+      if ((e as NodeJS.ErrnoException).code !== 'ENOENT') log.warn('The stored item catalog could not be read', e)
       this.file = null
     }
     return this.file
@@ -115,8 +118,9 @@ export class WikiCatalog {
         }
         const parsed = parseEraStatus(t.query?.pages?.[0]?.revisions?.[0]?.slots.main.content ?? '')
         if (Object.keys(parsed).length) eraStatus = parsed
-      } catch {
+      } catch (e) {
         // The built-in list serves.
+        log.warn('Could not read the era list from eqlwiki', e)
       }
       const file: CatalogFile = { fetchedAt: Date.now(), items, eraStatus, format: FORMAT }
       await fs.writeFile(this.path + '.tmp', JSON.stringify(file), 'utf8')
@@ -125,6 +129,7 @@ export class WikiCatalog {
       this.report({ busy: false })
       return file
     } catch (e) {
+      log.warn('Item catalog download failed', e)
       this.report({ busy: false, error: (e as Error).message })
       return this.file
     }
@@ -132,7 +137,7 @@ export class WikiCatalog {
 
   private async get(url: string): Promise<unknown> {
     for (let attempt = 0; ; attempt++) {
-      const res = await fetch(url, { headers: { 'User-Agent': AGENT, 'Api-User-Agent': AGENT } })
+      const res = await fetch(url, { headers: { 'User-Agent': AGENT, 'Api-User-Agent': AGENT }, signal: AbortSignal.timeout(TIMEOUT_MS) })
       if (res.ok) return res.json()
       // A busy wiki answers 429 or 503: wait and ask again, a few times.
       if (attempt < 3 && (res.status === 429 || res.status >= 500)) {

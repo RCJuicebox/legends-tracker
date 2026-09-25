@@ -1,6 +1,7 @@
 import { promises as fs } from 'node:fs'
 import { join } from 'node:path'
 import { crc32, deflateSync } from 'node:zlib'
+import { log } from './log'
 
 // Spell icons come straight from the client: uifiles\default\SpellsNN.tga, 256×256 sheets of
 // 40×40 icons, six by six, numbered by the spell file's icon field. Item icons sit the same way in
@@ -9,7 +10,7 @@ const ICON = 40
 const PER_ROW = 6
 const PER_SHEET = 36
 
-interface Sheet {
+export interface Sheet {
   width: number
   height: number
   bpp: number
@@ -63,7 +64,7 @@ export class IconSource {
       p = fs
         .readFile(join(this.installDir(), 'uifiles', 'default', `dragitem${sheetNo}.dds`))
         .then(decodeDds)
-        .catch(() => null)
+        .catch(sheetFailed)
       this.itemSheets.set(sheetNo, p)
     }
     const sheet = await p
@@ -82,7 +83,7 @@ export class IconSource {
   private sheet(n: number): Promise<Sheet | null> {
     let p = this.sheets.get(n)
     if (!p) {
-      p = this.loadSheet(n).catch(() => null)
+      p = this.loadSheet(n).catch(sheetFailed)
       this.sheets.set(n, p)
     }
     return p
@@ -92,6 +93,12 @@ export class IconSource {
     const file = join(this.installDir(), 'uifiles', 'default', `Spells${String(n).padStart(2, '0')}.tga`)
     return decodeTga(await fs.readFile(file))
   }
+}
+
+/** No game folder set, or no such sheet, is expected; anything else goes in the log. */
+function sheetFailed(e: unknown): null {
+  if ((e as NodeJS.ErrnoException).code !== 'ENOENT') log.warn('Could not read an icon sheet', e)
+  return null
 }
 
 /** A DXT5 (BC3) DDS, top-down RGBA. The game's item icon sheets are all this format. */
@@ -172,7 +179,8 @@ export function decodeTga(d: Buffer): Sheet | null {
   return { width, height, bpp, topDown, pixels }
 }
 
-function encodePng(w: number, h: number, rgba: Buffer): Buffer {
+/** An 8-bit RGBA PNG. */
+export function encodePng(w: number, h: number, rgba: Buffer): Buffer {
   const raw = Buffer.alloc((w * 4 + 1) * h)
   for (let y = 0; y < h; y++) rgba.copy(raw, y * (w * 4 + 1) + 1, y * w * 4, (y + 1) * w * 4)
   const chunk = (type: string, data: Buffer) => {

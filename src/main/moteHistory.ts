@@ -1,125 +1,111 @@
 import { createReadStream, promises as fs } from 'node:fs'
-import { join } from 'node:path'
+import { basename } from 'node:path'
 import type { Readable } from 'node:stream'
-import yauzl from 'yauzl'
-import { decodeCp1252, parseLogLine, type LogLine } from '../core/logLine'
 import { MoteTracker, type MoteState } from '../core/motes'
+import { localDay } from '../core/dates'
+import { characterArchivePaths, feedZip, readLines, zipTextSize } from './logReading'
+import { log } from './log'
+
+export { readLines }
+
+export interface MoteScanJob {
+  archiveDir: string
+  /**
+   * The character logs to read, each with its archives. `stem` is the log's name without .txt
+   * ("eqlog_Kelwyn_neriak"): only archives named for it are read. `end` stops the live log there,
+   * where the live tailer took over.
+   */
+  logs: { logPath: string; stem: string; end?: number }[]
+}
+
+export interface CharacterScan {
+  logPath: string
+  stem: string
+  /** This character's history on its own, as of its last line. */
+  state: MoteState
+  lastTime: number
+  /** How far into the live log was read, to the end of the last whole line. */
+  end: number
+}
+
+export interface MoteScanResult {
+  characters: CharacterScan[]
+  /** Every day any of the logs has a line on, "2026-09-24". */
+  days: string[]
+}
 
 /**
- * Rebuilds mote history by replaying a character's logs, oldest first: its zipped and loose archives,
- * then the live log. Returns the state as of the last line read, plus that line's time.
+ * Rebuilds mote history by replaying each character's logs, oldest first: its zipped and loose
+ * archives, then the live log. Each character gets a tracker of its own; merging is the caller's.
  */
-export async function scanMoteHistory(opts: {
-  logPath: string
-  archiveDir: string
-  /** e.g. "eqlog_Kelwyn_neriak": only this character's archives are read. */
-  stem: string
-  /** What is being read, and how far through all of it (0 to 1, by bytes). */
-  progress?: (message: string, fraction: number) => void
-}): Promise<{ state: MoteState; lastTime: number }> {
-  const tracker = new MoteTracker({ active: null, sessions: [], daily: {} }, { onChange: () => {} })
-  let lastTime = 0
+export async function scanMoteHistory(job: MoteScanJob, progress?: (message: string, fraction: number) => void): Promise<MoteScanResult> {
   let done = 0
-  let total = 1
   let message = ''
   let lastReport = 0
   const report = (force = false) => {
     const now = Date.now()
     if (!force && now - lastReport < 150) return
     lastReport = now
-    opts.progress?.(message, Math.min(1, done / total))
+    progress?.(message, Math.min(1, done / total))
   }
-  const feed = (stream: Readable) =>
-    readLines(
-      stream,
-      (line) => {
-        tracker.handle(line)
-        lastTime = line.time
-      },
-      (bytes) => {
-        done += bytes
-        report()
-      }
-    )
-
-  let archives: string[] = []
-  try {
-    archives = (await fs.readdir(opts.archiveDir))
-      .filter((f) => f.toLowerCase().startsWith(opts.stem.toLowerCase() + '_') && /\.(zip|txt)$/i.test(f))
-      .map((f) => join(opts.archiveDir, f))
-  } catch {
-    // no archive folder yet
+  const onBytes = (bytes: number) => {
+    done += bytes
+    report()
   }
-  // Archive names carry their dates; "thru-2026-08-07" sorts before "2026-08-07_to_…" on its own,
-  // so order by the first date in the name instead.
-  const firstDate = (p: string) => /(\d{4}-\d{2}-\d{2})/.exec(p)?.[1] ?? ''
-  archives.sort((a, b) => (/thru-/.test(a) ? '0' : firstDate(a)).localeCompare(/thru-/.test(b) ? '0' : firstDate(b)))
 
+  const plan = await Promise.all(job.logs.map(async (l) => ({ ...l, archives: await characterArchivePaths(job.archiveDir, l.stem) })))
   // The whole job in bytes, so progress is honest: a zip counts at its unpacked size.
-  const sizes = await Promise.all(
-    [...archives, opts.logPath].map((p) => (p.toLowerCase().endsWith('.zip') ? zipTextSize(p) : fs.stat(p).then((s) => s.size))).map((p) => p.catch(() => 0))
-  )
-  total = Math.max(1, sizes.reduce((a, b) => a + b, 0))
+  const sizeOf = (p: string) => (p.toLowerCase().endsWith('.zip') ? zipTextSize(p) : fs.stat(p).then((s) => s.size)).catch(() => 0)
+  const sizes = await Promise.all(plan.flatMap((l) => [...l.archives.map(sizeOf), l.end !== undefined ? Promise.resolve(l.end) : sizeOf(l.logPath)]))
+  const total = Math.max(1, sizes.reduce((a, b) => a + b, 0))
 
-  for (const path of archives) {
-    message = `Reading ${path.split(/[\\/]/).pop()}…`
-    report(true)
-    if (path.toLowerCase().endsWith('.zip')) await feedZip(path, feed)
-    else await feed(createReadStream(path))
+  const days = new Set<string>()
+  let dayFrom = 0
+  let dayTo = -1
+  const noteDay = (time: number) => {
+    if (time >= dayFrom && time < dayTo) return
+    // Days change rarely line to line; only work one out when the time leaves the last one.
+    const d = new Date(time)
+    dayFrom = new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime()
+    dayTo = new Date(d.getFullYear(), d.getMonth(), d.getDate() + 1).getTime()
+    days.add(localDay(time))
   }
-  message = 'Reading the current log…'
-  report(true)
-  await feed(createReadStream(opts.logPath))
-  return { state: tracker.state, lastTime }
-}
 
-/** The unpacked size of a zip's .txt entries, read from its directory without unpacking anything. */
-function zipTextSize(path: string): Promise<number> {
-  return new Promise((resolve, reject) => {
-    yauzl.open(path, { lazyEntries: true }, (err, zip) => {
-      if (err || !zip) return reject(err ?? new Error('could not open archive'))
-      let size = 0
-      zip.on('error', reject)
-      zip.on('entry', (entry: yauzl.Entry) => {
-        if (entry.fileName.toLowerCase().endsWith('.txt')) size += entry.uncompressedSize
-        zip.readEntry()
-      })
-      zip.on('end', () => resolve(size))
-      zip.readEntry()
-    })
-  })
-}
-
-/** Streams a log's lines, yielding to the event loop now and then so the live tailer and overlays keep running. */
-export async function readLines(stream: Readable, onLine: (line: LogLine) => void, onBytes?: (bytes: number) => void): Promise<void> {
-  let partial = ''
-  let n = 0
-  for await (const chunk of stream) {
-    onBytes?.((chunk as Buffer).length)
-    const lines = (partial + decodeCp1252(chunk as Buffer)).split('\n')
-    partial = lines.pop() ?? ''
-    for (const raw of lines) {
-      const line = parseLogLine(raw.replace(/\r$/, ''))
-      if (line) onLine(line)
+  const characters: CharacterScan[] = []
+  for (const l of plan) {
+    const tracker = new MoteTracker({ active: null, sessions: [], daily: {} }, { onChange: () => {} })
+    let lastTime = 0
+    const feed = (stream: Readable, flushLast = true) =>
+      readLines(
+        stream,
+        (line) => {
+          tracker.handle(line)
+          lastTime = line.time
+          noteDay(line.time)
+        },
+        { onBytes, flushLast }
+      )
+    for (const path of l.archives) {
+      message = `Reading ${basename(path)}…`
+      report(true)
+      try {
+        if (path.toLowerCase().endsWith('.zip')) await feedZip(path, feed)
+        else await feed(createReadStream(path))
+      } catch (e) {
+        log.warn(`Mote history: could not read ${path}; carrying on without it:`, e)
+      }
     }
-    if (++n % 8 === 0) await new Promise((r) => setImmediate(r))
+    message = `Reading ${basename(l.logPath)}…`
+    report(true)
+    let end = 0
+    if (l.end === undefined || l.end > 0) {
+      try {
+        end = await feed(createReadStream(l.logPath, l.end !== undefined ? { end: l.end - 1 } : {}), false)
+      } catch (e) {
+        log.warn(`Mote history: could not read ${l.logPath}:`, e)
+      }
+    }
+    characters.push({ logPath: l.logPath, stem: l.stem, state: tracker.state, lastTime, end })
   }
-}
-
-function feedZip(path: string, feed: (s: Readable) => Promise<void>): Promise<void> {
-  return new Promise((resolve, reject) => {
-    yauzl.open(path, { lazyEntries: true }, (err, zip) => {
-      if (err || !zip) return reject(err ?? new Error('could not open archive'))
-      zip.on('error', reject)
-      zip.on('end', () => resolve())
-      zip.on('entry', (entry: yauzl.Entry) => {
-        if (!entry.fileName.toLowerCase().endsWith('.txt')) return zip.readEntry()
-        zip.openReadStream(entry, (e2, stream) => {
-          if (e2 || !stream) return reject(e2 ?? new Error('could not read archive'))
-          feed(stream).then(() => zip.readEntry(), reject)
-        })
-      })
-      zip.readEntry()
-    })
-  })
+  return { characters, days: [...days].sort() }
 }

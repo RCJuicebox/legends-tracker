@@ -1,4 +1,5 @@
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process'
+import { log } from './log'
 import { yieldPriority } from './priority'
 
 // A resident PowerShell process driving Windows' System.Speech. Speech is rendered to WAV and
@@ -35,7 +36,11 @@ while ($null -ne ($line = [Console]::In.ReadLine())) {
 interface Waiter {
   resolve: (wav: Buffer) => void
   reject: (e: Error) => void
+  timer: NodeJS.Timeout
 }
+
+/** A phrase that takes longer than this to render means the engine has hung; it is restarted. */
+const REQUEST_TIMEOUT_MS = 10_000
 
 export class SpeechWorker {
   private proc: ChildProcessWithoutNullStreams | null = null
@@ -55,13 +60,16 @@ export class SpeechWorker {
         windowsHide: true
       })
       this.proc = proc
+      this.buffer = ''
       yieldPriority(proc.pid)
       const timeout = setTimeout(() => {
         this.failed = 'Speech engine did not start'
+        log.warn(this.failed)
         resolve()
       }, 15000)
       proc.stdout.setEncoding('utf8')
       proc.stdout.on('data', (chunk: string) => {
+        if (this.proc !== proc) return
         this.buffer += chunk
         let nl: number
         while ((nl = this.buffer.indexOf('\n')) >= 0) {
@@ -76,27 +84,53 @@ export class SpeechWorker {
           }
           if (msg.type === 'voices') {
             this.voices = Array.isArray(msg.voices) ? msg.voices : msg.voices ? [msg.voices] : []
+            this.failed = ''
             clearTimeout(timeout)
             resolve()
           } else if (msg.id !== undefined) {
             const w = this.waiting.get(msg.id)
+            if (!w) continue
             this.waiting.delete(msg.id)
-            if (msg.type === 'wav' && msg.data) w?.resolve(Buffer.from(msg.data, 'base64'))
-            else w?.reject(new Error(msg.message ?? 'speech failed'))
+            clearTimeout(w.timer)
+            if (msg.type === 'wav' && msg.data) w.resolve(Buffer.from(msg.data, 'base64'))
+            else {
+              log.warn('Speech failed:', msg.message ?? 'no reason given')
+              w.reject(new Error(msg.message ?? 'speech failed'))
+            }
           }
         }
       })
-      proc.on('exit', () => {
-        this.failed = this.failed || 'Speech engine exited'
-        for (const w of this.waiting.values()) w.reject(new Error(this.failed))
-        this.waiting.clear()
-        this.proc = null
-        this.ready = null
+      proc.stderr.setEncoding('utf8')
+      // Read so the pipe never fills; PowerShell's progress records (CLIXML) are noise.
+      proc.stderr.on('data', (d: string) => {
+        const text = d.trim()
+        if (text && !text.startsWith('#< CLIXML') && !text.startsWith('<Objs')) log.warn('Speech engine:', text.slice(0, 500))
+      })
+      // Writing to a process that has just died fails here rather than as an uncaught exception.
+      proc.stdin.on('error', (e) => {
+        log.warn('Speech engine input closed:', e)
+        if (this.proc === proc) this.failAll(e.message)
+        proc.kill()
+      })
+      proc.on('exit', (code) => {
         clearTimeout(timeout)
         resolve()
+        if (this.proc !== proc) return
+        this.failed = this.failed || 'Speech engine exited'
+        log.warn(`Speech engine exited (code ${code})`)
+        this.failAll(this.failed)
+        this.proc = null
+        this.ready = null
       })
       proc.on('error', (e) => {
         this.failed = e.message
+        log.error('Speech engine could not run:', e)
+        clearTimeout(timeout)
+        resolve()
+        if (this.proc !== proc) return
+        this.failAll(e.message)
+        this.proc = null
+        this.ready = null
       })
     })
     return this.ready
@@ -108,13 +142,21 @@ export class SpeechWorker {
     const hit = this.cache.get(key)
     if (hit) return hit
     await this.start()
-    if (!this.proc) throw new Error(this.failed || 'Speech engine unavailable')
+    const proc = this.proc
+    if (!proc) throw new Error(this.failed || 'Speech engine unavailable')
     const id = ++this.seq
     const wav = await new Promise<Buffer>((resolve, reject) => {
-      this.waiting.set(id, { resolve, reject })
+      const timer = setTimeout(() => {
+        if (!this.waiting.delete(id)) return
+        log.warn(`Speech took over ${REQUEST_TIMEOUT_MS / 1000}s; restarting the engine`)
+        reject(new Error('Speech engine did not answer'))
+        // The next request starts a fresh one.
+        this.restart(proc)
+      }, REQUEST_TIMEOUT_MS)
+      this.waiting.set(id, { resolve, reject, timer })
       // SAPI's rate runs -10..10; the UI's 0.5..2 maps onto it.
       const sapiRate = Math.max(-10, Math.min(10, Math.round((rate - 1) * 10)))
-      this.proc!.stdin.write(JSON.stringify({ id, text, voice, rate: sapiRate }) + '\n')
+      proc.stdin.write(JSON.stringify({ id, text, voice, rate: sapiRate }) + '\n')
     })
     if (this.cache.size > 300) this.cache.delete(this.cache.keys().next().value!)
     this.cache.set(key, wav)
@@ -122,7 +164,27 @@ export class SpeechWorker {
   }
 
   stop(): void {
-    this.proc?.kill()
+    const proc = this.proc
     this.proc = null
+    this.ready = null
+    this.failAll('Speech engine stopped')
+    proc?.kill()
+  }
+
+  /** Drops a hung process; the next request starts another. */
+  private restart(proc: ChildProcessWithoutNullStreams): void {
+    if (this.proc !== proc) return
+    this.proc = null
+    this.ready = null
+    this.failAll('Speech engine restarted')
+    proc.kill()
+  }
+
+  private failAll(reason: string): void {
+    for (const w of this.waiting.values()) {
+      clearTimeout(w.timer)
+      w.reject(new Error(reason))
+    }
+    this.waiting.clear()
   }
 }
