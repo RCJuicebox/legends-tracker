@@ -61,3 +61,12 @@ describe('finding upgrades', () => {
     expect(run(true).candidates.map((c) => c.item.title)).toEqual(['Velious Ring', 'Better Ring'])
   })
 })
+
+describe('eras', () => {
+  it('folds tags that are not eras into the one they belong to', async () => {
+    const { normalizeEra } = await import('../src/core/upgrades')
+    expect(['FearHateRevamp', 'Fear', 'Hate', 'Temple', 'Sky', 'Paineel', 'Classic'].map(normalizeEra)).toEqual(Array(7).fill('Classic'))
+    expect(['Epics', 'EpicQuests', 'Chardok', 'kunark'].map(normalizeEra)).toEqual(Array(4).fill('Kunark'))
+    expect(['Velious', 'Luclin', ''].map(normalizeEra)).toEqual(['Velious', 'Luclin', ''])
+  })
+})

@@ -55,7 +55,7 @@ export function GearFinder({ view, sheet }: { view: InventoryView; sheet: Charac
   const [preset, setPreset] = useRemembered<string>('finder.preset', 'Balanced')
   const [custom, setCustom] = useRemembered<Weights>('finder.weights', PRESETS.Balanced)
   const [compare, setCompare] = useRemembered<'drop' | 'level'>('finder.compare', 'drop')
-  const [hiddenEras, setHiddenEras] = useRemembered<string[]>('finder.hiddenEras', DEFAULT_HIDDEN_ERAS)
+  const [hiddenEras, setHiddenEras] = useRemembered<string[]>('finder.hiddenEras.v2', DEFAULT_HIDDEN_ERAS)
   const [slot, setSlot] = useRemembered<string>('finder.slot', 'all')
   const [showWeights, setShowWeights] = useState(false)
   const [capMode, setCapMode] = useRemembered<'auto' | 'over' | 'under'>('finder.acCap', 'auto')

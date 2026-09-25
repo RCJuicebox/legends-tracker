@@ -21,12 +21,28 @@ export const SLOT_WORDS: Record<string, string[]> = {
 export const DEFAULT_HIDDEN_ERAS = ['Kunark', 'Velious', 'Luclin']
 export const UNKNOWN_ERA = 'Unknown'
 
-/** One name per era: tags differ in case, and Chardok is a Kunark zone. */
+/**
+ * Wiki tags that are not eras of their own, folded into the one they belong to: Legends' reworked
+ * classic zones count as Classic; Chardok is a Kunark zone, and the epics are grouped with Kunark
+ * for now.
+ */
+const ERA_OF_TAG: Record<string, string> = {
+  fearhaterevamp: 'Classic',
+  fear: 'Classic',
+  hate: 'Classic',
+  temple: 'Classic',
+  sky: 'Classic',
+  paineel: 'Classic',
+  chardok: 'Kunark',
+  epics: 'Kunark',
+  epicquests: 'Kunark'
+}
+
+/** One name per era, whatever the tag's case or name. */
 export function normalizeEra(tag: string): string {
   const t = tag.trim().toLowerCase()
   if (!t) return ''
-  if (t === 'chardok') return 'Kunark'
-  return t[0].toUpperCase() + tag.trim().slice(1)
+  return ERA_OF_TAG[t] ?? t[0].toUpperCase() + t.slice(1)
 }
 
 /** Earliest first: Classic, then Legends' own tags, then the expansions in release order. */
@@ -111,6 +127,9 @@ export function canWear(r: Restrictions, who: Wearer, slot: string): boolean {
   return !(r.reqLevel && r.reqLevel > who.level)
 }
 
+/** Slots where a weapon's damage and delay count. */
+export const WEAPON_SLOTS = ['Primary', 'Secondary', 'Range']
+
 export type WeightKey =
   | 'ac' | 'hp' | 'mana' | 'end' | 'str' | 'sta' | 'agi' | 'dex' | 'wis' | 'int' | 'cha'
   | 'resists' | 'haste' | 'attack' | 'hpRegen' | 'manaRegen' | 'endRegen' | 'ratio'
@@ -126,7 +145,7 @@ export const WEIGHT_LABELS: Record<WeightKey, string> = {
 /** Starting points; every weight can be moved. Per point of the stat. */
 export const PRESETS: Record<string, Weights> = {
   Balanced: { ac: 2, hp: 0.25, mana: 0.2, end: 0.1, str: 0.6, sta: 0.8, agi: 0.6, dex: 0.5, wis: 0.5, int: 0.5, cha: 0.1, resists: 0.2, haste: 2, attack: 1, hpRegen: 2, manaRegen: 2, endRegen: 1, ratio: 0 },
-  Tank: { ac: 4, hp: 0.4, mana: 0, end: 0.1, str: 0.4, sta: 1.2, agi: 0.8, dex: 0.3, wis: 0.1, int: 0.1, cha: 0, resists: 0.4, haste: 1.5, attack: 0.5, hpRegen: 3, manaRegen: 0, endRegen: 1, ratio: 0 },
+  Tank: { ac: 4, hp: 0.4, mana: 0, end: 0.1, str: 0.4, sta: 1.2, agi: 0.8, dex: 0.3, wis: 0.1, int: 0.1, cha: 0, resists: 0.4, haste: 1.5, attack: 0.5, hpRegen: 3, manaRegen: 0, endRegen: 1, ratio: 40 },
   Melee: { ac: 1, hp: 0.2, mana: 0, end: 0.2, str: 1.2, sta: 0.5, agi: 0.6, dex: 1, wis: 0, int: 0, cha: 0, resists: 0.1, haste: 4, attack: 2, hpRegen: 1, manaRegen: 0, endRegen: 2, ratio: 40 },
   Caster: { ac: 0.8, hp: 0.25, mana: 0.5, end: 0, str: 0, sta: 0.6, agi: 0.3, dex: 0.1, wis: 1.2, int: 1.2, cha: 0.2, resists: 0.3, haste: 0, attack: 0, hpRegen: 1, manaRegen: 4, endRegen: 0, ratio: 0 }
 }
@@ -206,10 +225,12 @@ export function findUpgrades(o: FinderOptions): SlotResult[] {
   const slots = [...new Set(o.worn.map((w) => w.location))]
   for (const s of Object.keys(SLOT_WORDS)) if (!slots.includes(s)) slots.push(s)
   return slots.map((slot) => {
+    // A weapon's damage and delay only matter in the hands; anywhere else they are no reason to wear it.
+    const weights: Weights = WEAPON_SLOTS.includes(slot) ? o.weights : { ...o.weights, ratio: 0 }
     const worn = o.worn.filter((w) => w.location === slot)
     const scored = worn.map((item) => {
       const stats = o.statsOf(item)
-      return { item, stats, score: stats ? score(stats, o.weights) : 0 }
+      return { item, stats, score: stats ? score(stats, weights) : 0 }
     })
     const current = scored.sort((a, b) => a.score - b.score)[0] ?? null
     const level = current ? mergeLevel(current.item.name) : 0
@@ -223,14 +244,14 @@ export function findUpgrades(o: FinderOptions): SlotResult[] {
       if (!canWear(p.r, o.wearer, slot)) continue
       if (wornKeys.has(itemKey(p.item.title))) continue
       const stats = o.compare === 'level' && level ? scaledStats(p.base, level) : p.base
-      const sc = score(stats, o.weights)
+      const sc = score(stats, weights)
       const delta = sc - (current?.score ?? 0)
       if (delta <= 0) continue
       const values = statValues(stats)
       const diffs = (Object.keys(values) as WeightKey[])
         .map((k) => ({ key: k, label: WEIGHT_LABELS[k], delta: Math.round((values[k] - (currentValues?.[k] ?? 0)) * 100) / 100 }))
-        .filter((d) => d.delta !== 0 && o.weights[d.key] !== 0)
-        .sort((a, b) => Math.abs(b.delta * o.weights[b.key]) - Math.abs(a.delta * o.weights[a.key]))
+        .filter((d) => d.delta !== 0 && weights[d.key] !== 0)
+        .sort((a, b) => Math.abs(b.delta * weights[b.key]) - Math.abs(a.delta * weights[a.key]))
       candidates.push({ item: p.item, stats, score: sc, delta, diffs, owned: o.owned.has(itemKey(p.item.title)), era: p.era, eraInferred: p.inferred })
     }
     candidates.sort((a, b) => b.delta - a.delta)
