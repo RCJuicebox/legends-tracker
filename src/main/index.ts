@@ -9,6 +9,8 @@ import { OverlayManager } from './overlays'
 import { GameWatcher, overlaysVisible } from './gameWatcher'
 import { Updater } from './updater'
 import { AchievementFiles } from './achievements'
+import { InventoryFiles } from './inventory'
+import { ItemCatalog } from './items'
 import { captureScreens, ocrImage } from './ocr'
 import { composeRows, countsFromComposite, findMoteRows, rows as ocrRows } from '../core/screenText'
 import { checkGameFolder, findInstall, listLogs, logIsIn, resolveGameFolder } from './game'
@@ -16,7 +18,7 @@ import { summarize } from '../core/spells'
 import { focusFromSpell, isDurationFocus } from '../core/focus'
 import { testTrigger } from '../core/triggers'
 import { timerKey } from '../core/spellTracker'
-import type { AppSettings, CharacterSettings, SpellRule, Trigger } from '../shared/types'
+import type { AppSettings, CharacterSettings, CharacterSheet, SpellRule, Trigger } from '../shared/types'
 import type { AchMarks } from '../core/achievements'
 
 // Settings live in %APPDATA%\Legends Tracker. EQL_USER_DATA points a development or test run at a
@@ -58,6 +60,11 @@ const icons = new IconSource(() => store.settings.get().installDir)
 const achievementFiles = new AchievementFiles(
   () => store.settings.get().installDir,
   (view) => toMain('state:achievements', view)
+)
+const inventoryFiles = new InventoryFiles(
+  () => store.settings.get().installDir,
+  new ItemCatalog(),
+  (view) => toMain('state:inventory', view)
 )
 
 function load(win: BrowserWindow, page: 'index' | 'overlay' | 'audio', query: Record<string, string> = {}): void {
@@ -383,6 +390,16 @@ function registerIpc(): void {
   handle('achievements:load', (character: string) => achievementFiles.load(character))
   handle('achievements:marks', (character: string, marks: AchMarks) => achievementFiles.saveMarks(character, marks))
   handle('achievements:exportPath', (character: string) => achievementFiles.exportPath(character))
+
+  // Which characters have a given export, and which one is being played.
+  handle('character:exports', async () => {
+    const check = await checkGameFolder(store.settings.get().installDir)
+    return { current: characterKey(store.settings.get().logFile), achievements: check.achievements, inventory: check.inventory }
+  })
+  handle('inventory:load', (character: string, refresh?: boolean) => inventoryFiles.load(character, !!refresh))
+  handle('inventory:lookup', (names: string[]) => inventoryFiles.lookup(names))
+  handle('character:sheet', (character: string) => inventoryFiles.sheet(character))
+  handle('character:saveSheet', (character: string, sheet: CharacterSheet) => inventoryFiles.saveSheet(character, sheet))
 
   handle('game:check', (dir?: string) => checkGameFolder(dir ?? store.settings.get().installDir))
   handle('game:find', async () => {

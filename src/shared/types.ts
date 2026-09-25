@@ -175,6 +175,38 @@ export interface AchievementsView {
   error: string
 }
 
+/** An item's eqlwiki page, as far as the tracker uses it. */
+export interface ItemInfo {
+  /** The page title. */
+  title: string
+  /** False when the wiki has no page for it. */
+  found: boolean
+  /** The in-game stats block from the page, base (unmerged) values. */
+  statsblock: string
+}
+
+/** A character's inventory export, with what the wiki says about the items worn. */
+export interface InventoryView {
+  character: string
+  file: string
+  modified: number
+  inventory: import('../core/inventory').Inventory | null
+  /** By itemKey(). */
+  items: Record<string, ItemInfo>
+  /** 'missing' when there is no export yet; otherwise a read error, or ''. */
+  error: string
+}
+
+/** What the player has told the tracker about a character that no file records. */
+export interface CharacterSheet {
+  /** AC typed in for an item, by itemKey(); wins over the wiki. */
+  acOverrides: Record<string, number>
+  /** Whether the secondary item counts as a shield; null = go by its name. */
+  shield: boolean | null
+  /** The Stats page's inputs. */
+  stats: Record<string, unknown>
+}
+
 /** What a game folder holds that the tracker can use. Character names are as the files spell them, e.g. Name_server. */
 export interface GameFolderCheck {
   dir: string
