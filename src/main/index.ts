@@ -1,5 +1,5 @@
-import { app, BrowserWindow, dialog, ipcMain, Menu, nativeImage, protocol, screen, session, shell, Tray } from 'electron'
-import { cpSync, existsSync, mkdirSync, promises as fs } from 'node:fs'
+import { app, BrowserWindow, dialog, ipcMain, Menu, nativeImage, protocol, screen, session, shell, Tray, type Rectangle } from 'electron'
+import { cpSync, existsSync, mkdirSync, readFileSync, writeFileSync, promises as fs } from 'node:fs'
 import { join } from 'node:path'
 import { Store, characterKey } from './store'
 import { Engine, type AudioCommand } from './engine'
@@ -123,10 +123,51 @@ const engine = new Engine(
   }
 )
 
+interface WindowPlace {
+  bounds: Rectangle
+  maximized: boolean
+}
+
+const windowPlaceFile = () => join(app.getPath('userData'), 'window.json')
+
+/** Where the main window was last, if that spot is still on a connected monitor. */
+function savedWindowPlace(): WindowPlace | null {
+  try {
+    const place = JSON.parse(readFileSync(windowPlaceFile(), 'utf8')) as WindowPlace
+    const b = place.bounds
+    // Enough of the title bar must land on some display to grab it; otherwise use the default spot.
+    const visible = screen.getAllDisplays().some((d) => {
+      const a = d.workArea
+      return b.x + b.width - 100 > a.x && b.x + 100 < a.x + a.width && b.y >= a.y - 10 && b.y + 30 < a.y + a.height
+    })
+    return visible ? place : null
+  } catch {
+    return null
+  }
+}
+
+let placeTimer: NodeJS.Timeout | undefined
+function rememberWindowPlace(now = false): void {
+  clearTimeout(placeTimer)
+  const write = () => {
+    if (!mainWindow || mainWindow.isDestroyed() || mainWindow.isMinimized()) return
+    const place: WindowPlace = { bounds: mainWindow.getNormalBounds(), maximized: mainWindow.isMaximized() }
+    try {
+      writeFileSync(windowPlaceFile(), JSON.stringify(place))
+    } catch {
+      // Not worth interrupting anything over; the window opens in the default spot next time.
+    }
+  }
+  if (now) write()
+  else placeTimer = setTimeout(write, 500)
+}
+
 function createMainWindow(): void {
+  const place = savedWindowPlace()
   mainWindow = new BrowserWindow({
     width: 1320,
     height: 860,
+    ...(place?.bounds ?? {}),
     minWidth: 980,
     minHeight: 640,
     show: false,
@@ -137,8 +178,13 @@ function createMainWindow(): void {
     titleBarOverlay: { color: '#0f1117', symbolColor: '#9aa3b2', height: 38 },
     webPreferences: { preload, sandbox: true }
   })
-  mainWindow.on('ready-to-show', () => mainWindow?.show())
+  mainWindow.on('ready-to-show', () => {
+    if (place?.maximized) mainWindow?.maximize()
+    mainWindow?.show()
+  })
+  for (const event of ['move', 'resize', 'maximize', 'unmaximize'] as const) mainWindow.on(event as 'move', () => rememberWindowPlace())
   mainWindow.on('close', (e) => {
+    rememberWindowPlace(true)
     if (!quitting) {
       // Overlays and audio keep running from the tray.
       e.preventDefault()

@@ -1,10 +1,11 @@
-import { useState, type ComponentType } from 'react'
+import { type ComponentType } from 'react'
 import { createRoot } from 'react-dom/client'
 import './styles.css'
 import { StateProvider, useApp } from './state'
 import { Icon } from './components/ui'
 import { ago, api } from './api'
 import { useUpdate } from './update'
+import { useRemembered } from './remember'
 import { Dashboard } from './pages/Dashboard'
 import { Spells } from './pages/Spells'
 import { Motes } from './pages/Motes'
@@ -29,7 +30,9 @@ export type PageId = (typeof PAGES)[number]['id']
 
 function Shell() {
   const { state } = useApp()
-  const [page, setPage] = useState<PageId>('dashboard')
+  // Opens where it was left, including across restarts.
+  const [saved, setPage] = useRemembered<string>('page', 'dashboard')
+  const page = (PAGES.some((p) => p.id === saved) ? saved : 'dashboard') as PageId
   const Page = PAGES.find((p) => p.id === page)!.el as ComponentType<{ go: (p: PageId) => void }>
   const s = state.status
   const update = useUpdate()

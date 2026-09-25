@@ -3,6 +3,7 @@ import { api, clock } from '../api'
 import { useNow } from '../components/TimerBars'
 import { Icon } from '../components/ui'
 import { MotePlanner } from './MotePlanner'
+import { useRemembered } from '../remember'
 import { MOTE_RANKS, localDay, moteValue, moteWorth, pausedHours, sessionHours, totalMotes, type MoteCounts, type MoteSession, type MoteState } from '../../../core/motes'
 
 type View = MoteState & { scanning: string }
@@ -83,7 +84,7 @@ function PauseControl({ s, now }: { s: MoteSession; now: number }) {
 }
 
 export function Motes() {
-  const [tab, setTab] = useState<'tracking' | 'planner'>('tracking')
+  const [tab, setTab] = useRemembered<'tracking' | 'planner'>('motes.tab', 'tracking')
   return (
     <>
       <div className="row" style={{ marginBottom: 14, gap: 6 }}>
