@@ -3,14 +3,12 @@ import { slotLabel, type InvItem } from '../../../core/inventory'
 import type { PieceSource } from '../../../core/gearOptimizer'
 import type { CatalogItem } from '../../../core/wikiItem'
 
-// Small pieces the Gear tools share: icons, wiki links, where an item is.
+// Small pieces the Gear tools share: item icons, where an item is.
 
-export const num = (n: number) => Math.round(n).toLocaleString()
-export const pct = (n: number) => `${Math.round(n * 10) / 10}%`
 const itemIconUrl = (icon?: number) => (icon && icon >= 500 ? `eqicon://item/${icon}` : '')
-export const wikiUrl = (title: string) => `https://eqlwiki.com/index.php?title=${encodeURIComponent(title.replace(/ /g, '_'))}`
 
-export function Icon({ icon, size = 34 }: { icon?: number; size?: number }) {
+/** An item's icon from the game's own files, or an empty square when there is none. */
+export function ItemIcon({ icon, size = 34 }: { icon?: number; size?: number }) {
   const [ok, setOk] = useState(true)
   const src = itemIconUrl(icon)
   if (!src || !ok) return <span className="lt-icon blank" style={{ width: size, height: size }} />

@@ -1,79 +1,21 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { api, ago } from '../api'
-import { useRemembered } from '../remember'
-import {
-  itemKey,
-  mergeLevel,
-  parseStatsBlock,
-  scaledStats,
-  slotLabel,
-  wornTotals,
-  SAVE_KEYS,
-  SHIELD_NAME,
-  STAT_KEYS,
-  type InvItem,
-  type ItemStats
-} from '../../../core/inventory'
+import { remember, useRemembered } from '../remember'
+import { showError } from '../toast'
+import { Pending } from '../components/ui'
+import { numExact as num, who, wikiUrl } from '../format'
+import { itemKey, mergeLevel, parseStatsBlock, slotLabel, wornTotals, SAVE_KEYS, STAT_KEYS, type InvItem } from '../../../core/inventory'
 import type { CharacterSheet, InventoryView, ItemInfo } from '../../../shared/types'
 import { className } from '../../../core/acModel'
+import { MAX_LEVEL } from '../../../core/moteCalc'
+import { useExportCharacter, useInventory, wornSummary, statsFor, type WornSummary } from '../gear/model'
+import { ItemIcon } from './gearBits'
 import { GearFinder, type GearMode } from './GearFinder'
 
-const who = (key: string) => key.replace('_', ' · ')
-const num = (n: number) => n.toLocaleString()
+/** The highest merge an item takes: +10. */
+const MAX_MERGE = MAX_LEVEL
 
-interface Exports {
-  current: string
-  achievements: string[]
-  inventory: string[]
-}
-
-/** The character whose exports a page shows: the one being played, unless another was picked. */
-export function useExportCharacter(kind: 'inventory' | 'achievements', rememberKey: string) {
-  const [exports, setExports] = useState<Exports | null>(null)
-  const [picked, setPicked] = useRemembered<string>(rememberKey, '')
-  useEffect(() => void api.invoke<Exports>('character:exports').then(setExports), [])
-  const available = exports?.[kind] ?? []
-  const character = picked && available.includes(picked) ? picked : exports?.current || available[0] || ''
-  return { exports, available, character, setCharacter: setPicked }
-}
-
-export function useInventory(character: string, ready: boolean) {
-  const [view, setView] = useState<InventoryView | null>(null)
-  const [sheet, setSheet] = useState<CharacterSheet | null>(null)
-  useEffect(() => {
-    if (!ready) return
-    void api.invoke<InventoryView>('inventory:load', character).then(setView)
-    void api.invoke<CharacterSheet>('character:sheet', character).then(setSheet)
-    return api.on('state:inventory', (v: InventoryView) => v.character === character && setView(v))
-  }, [character, ready])
-  const saveSheet = (s: CharacterSheet) => {
-    setSheet(s)
-    void api.invoke('character:saveSheet', character, s)
-  }
-  return { view, setView, sheet, saveSheet }
-}
-
-/** An item's stats at its merge level, if the wiki has it. */
-export function statsFor(items: Record<string, ItemInfo>, name: string): ItemStats | null {
-  const info = items[itemKey(name)]
-  return info?.found ? scaledStats(parseStatsBlock(info.statsblock), mergeLevel(name)) : null
-}
-
-/** What the worn gear adds up to, with the player's typed-in AC where they gave one. */
-export function wornSummary(view: InventoryView, sheet: CharacterSheet | null) {
-  const worn = view.inventory?.worn ?? []
-  const totals = wornTotals(
-    worn,
-    (it) => statsFor(view.items, it.name),
-    (it) => sheet?.acOverrides[itemKey(it.name)]
-  )
-  const secondary = worn.find((it) => it.location === 'Secondary')
-  const shieldByName = !!secondary && SHIELD_NAME.test(secondary.name)
-  const shield = sheet?.shield ?? shieldByName
-  const shieldAC = shield && secondary ? (sheet?.acOverrides[itemKey(secondary.name)] ?? statsFor(view.items, secondary.name)?.ac ?? 0) : 0
-  return { totals, secondary, shield, shieldByName, shieldAC }
-}
-
+type UpdateSheet = (fn: (s: CharacterSheet) => CharacterSheet) => void
 
 // A character sheet: the body's slots down either side of a card for the character, weapons and
 // charms under the card. Slots that appear twice (ears, wrists, fingers, charms) take the export's
@@ -91,23 +33,14 @@ function bySlot(worn: InvItem[]): Map<string, InvItem[]> {
   return m
 }
 
-const itemIconUrl = (icon?: number) => (icon && icon >= 500 ? `eqicon://item/${icon}` : '')
-
-function ItemIcon({ icon, size = 36 }: { icon?: number; size?: number }) {
-  const [ok, setOk] = useState(true)
-  const src = itemIconUrl(icon)
-  if (!src || !ok) return <span className="lt-icon blank" style={{ width: size, height: size }} />
-  return <img className="lt-icon" src={src} width={size} height={size} alt="" onError={() => setOk(false)} />
-}
-
 const augName = (name: string) => name.replace(/\s*\(Exaltation\)$/i, '')
 const plainName = (name: string) => name.replace(/\s*\+\d+$/, '')
 
 /** Ten pips for the ten merge levels, filled up to this item's. */
 function MergePips({ level }: { level: number }) {
   return (
-    <span className="lt-pips" title={level ? `Merged to +${level} of 10` : 'Not merged yet'}>
-      {Array.from({ length: 10 }, (_, i) => (
+    <span className="lt-pips" title={level ? `Merged to +${level} of ${MAX_MERGE}` : 'Not merged yet'} role="img" aria-label={level ? `Merged to +${level} of ${MAX_MERGE}` : 'Not merged yet'}>
+      {Array.from({ length: MAX_MERGE }, (_, i) => (
         <i key={i} className={i < level ? 'on' : ''} />
       ))}
     </span>
@@ -116,15 +49,36 @@ function MergePips({ level }: { level: number }) {
 
 type Filter = 'all' | 'worn' | 'bags' | 'bank' | 'keyring'
 
+const MODES: ['sheet' | GearMode, string][] = [
+  ['sheet', 'Character sheet'],
+  ['finder', 'Upgrade finder'],
+  ['focus', 'Focus effects'],
+  ['optimize', 'Optimize what you own']
+]
+
 export function Gear({ go }: { go?: (page: 'motes') => void }) {
-  const { exports, available, character, setCharacter } = useExportCharacter('inventory', 'inv.character')
-  const { view, setView, sheet, saveSheet } = useInventory(character, !!exports)
+  const exp = useExportCharacter('inventory', 'inv.character')
+  const { exports, available, character, setCharacter } = exp
+  const inv = useInventory(character, !!exports, available.join(','))
+  const { view, setView, sheet, updateSheet } = inv
   const [selected, setSelected] = useState<string | null>(null)
   const [scaled, setScaled] = useRemembered<boolean>('gear.scaled', true)
   const [refreshing, setRefreshing] = useState(false)
   const [mode, setMode] = useRemembered<'sheet' | GearMode>('gear.view', 'sheet')
+  // Worked out once per inventory and sheet, for the card and the totals both.
+  const summary = useMemo(() => (view?.inventory ? wornSummary(view, sheet) : null), [view, sheet])
 
-  if (!exports || !view) return <div className="empty">Loading…</div>
+  if (!exports || !view)
+    return (
+      <Pending
+        what="your inventory"
+        error={exp.error || inv.error}
+        retry={() => {
+          exp.reload()
+          inv.reload()
+        }}
+      />
+    )
 
   const stats = (sheet?.stats ?? {}) as { classes?: string[]; level?: number }
   const classes = (stats.classes ?? []).filter(Boolean)
@@ -142,7 +96,7 @@ export function Gear({ go }: { go?: (page: 'motes') => void }) {
       </div>
       <div className="actions">
         {available.length > 1 && (
-          <select value={character} onChange={(e) => setCharacter(e.target.value)}>
+          <select aria-label="Character" value={character} onChange={(e) => setCharacter(e.target.value)}>
             {available.map((c) => (
               <option key={c} value={c}>
                 {who(c)}
@@ -157,8 +111,13 @@ export function Gear({ go }: { go?: (page: 'motes') => void }) {
             title="Fetch every worn item from eqlwiki.com again"
             onClick={async () => {
               setRefreshing(true)
-              setView(await api.invoke<InventoryView>('inventory:load', character, true))
-              setRefreshing(false)
+              try {
+                setView(await api.invoke<InventoryView>('inventory:load', character, true))
+              } catch (e) {
+                showError('Could not fetch the item stats', e)
+              } finally {
+                setRefreshing(false)
+              }
             }}
           >
             {refreshing ? 'Fetching…' : 'Refresh item stats'}
@@ -168,7 +127,7 @@ export function Gear({ go }: { go?: (page: 'motes') => void }) {
     </div>
   )
 
-  if (!view.inventory) {
+  if (!view.inventory || !summary) {
     return (
       <>
         {head}
@@ -219,20 +178,13 @@ export function Gear({ go }: { go?: (page: 'motes') => void }) {
   })
 
   const switcher = (
-    <div className="row" style={{ marginBottom: 12 }}>
-      <span className="lt-seg">
-        <button className={mode === 'sheet' ? 'on' : ''} onClick={() => setMode('sheet')}>
-          Character sheet
-        </button>
-        <button className={mode === 'finder' ? 'on' : ''} onClick={() => setMode('finder')}>
-          Upgrade finder
-        </button>
-        <button className={mode === 'focus' ? 'on' : ''} onClick={() => setMode('focus')}>
-          Focus effects
-        </button>
-        <button className={mode === 'optimize' ? 'on' : ''} onClick={() => setMode('optimize')}>
-          Optimize what you own
-        </button>
+    <div className="row mb-12">
+      <span className="lt-seg" role="group" aria-label="Gear view">
+        {MODES.map(([m, label]) => (
+          <button key={m} className={mode === m ? 'on' : ''} aria-pressed={mode === m} onClick={() => setMode(m)}>
+            {label}
+          </button>
+        ))}
       </span>
     </div>
   )
@@ -253,7 +205,7 @@ export function Gear({ go }: { go?: (page: 'motes') => void }) {
       <div className="lt-sheet">
         <div className="lt-side">{left}</div>
         <div className="lt-center">
-          <CharacterCard name={name} server={server} level={stats.level} classes={classes} view={view} sheet={sheet} />
+          <CharacterCard name={name} server={server} level={stats.level} classes={classes} view={view} summary={summary} />
           <div className="lt-subhead">Weapons</div>
           <div className="lt-grid2">{hands}</div>
           <div className="lt-subhead">Any slots</div>
@@ -266,21 +218,22 @@ export function Gear({ go }: { go?: (page: 'motes') => void }) {
           item={picked}
           view={view}
           sheet={sheet}
-          saveSheet={saveSheet}
+          updateSheet={updateSheet}
           onClose={() => setSelected(null)}
           onPlan={async () => {
             const lvl = mergeLevel(picked.name)
-            await api.invoke('stock:item', { name: picked.name, lvl, xp: 0, to: Math.min(11, lvl + 1) })
             try {
-              localStorage.setItem('lt:motes.tab', JSON.stringify('planner'))
-            } catch {
-              // The planner still opens; it just may land on the other tab.
+              await api.invoke('stock:item', { name: picked.name, lvl, xp: 0, to: Math.min(MAX_MERGE + 1, lvl + 1) })
+            } catch (e) {
+              showError('Could not set up the planner', e)
+              return
             }
+            remember('motes.tab', 'planner')
             go?.('motes')
           }}
         />
       )}
-      <GearTotals view={view} sheet={sheet} saveSheet={saveSheet} scaled={scaled} setScaled={setScaled} />
+      <GearTotals view={view} sheet={sheet} updateSheet={updateSheet} summary={summary} scaled={scaled} setScaled={setScaled} />
       <Carried view={view} />
       <p className="faint small" style={{ marginTop: 14 }}>
         Item stats and icon numbers come from <a href="https://eqlwiki.com" target="_blank" rel="noreferrer">eqlwiki.com</a>, the community wiki, scaled for each item's +N
@@ -306,7 +259,7 @@ function SlotTile({ slot, item, view, wide, selected, onSelect }: { slot: string
     )
   return (
     <button className={`lt-tile${wide ? ' wide' : ''}${selected ? ' selected' : ''}${info && !info.found ? ' unknown' : ''}`} onClick={onSelect} title={info && !info.found ? 'Not on the wiki' : 'Show this item'}>
-      <ItemIcon icon={info?.icon} />
+      <ItemIcon icon={info?.icon} size={36} />
       <div className="lt-tile-body">
         <span className="lt-slot">
           {slot}
@@ -334,13 +287,13 @@ function AugDot({ name, view }: { name: string; view: InventoryView }) {
 }
 
 /** The middle of the sheet: who it is, and what the gear adds up to. */
-function CharacterCard({ name, server, level, classes, view, sheet }: { name: string; server?: string; level?: number; classes: string[]; view: InventoryView; sheet: CharacterSheet | null }) {
-  const { totals } = wornSummary(view, sheet)
+function CharacterCard({ name, server, level, classes, view, summary }: { name: string; server?: string; level?: number; classes: string[]; view: InventoryView; summary: WornSummary }) {
+  const { totals } = summary
   const worn = view.inventory?.worn ?? []
   const levels = worn.map((it) => mergeLevel(it.name))
   const merged = levels.filter((l) => l > 0)
   const avg = merged.length ? merged.reduce((a, b) => a + b, 0) / merged.length : 0
-  const maxed = levels.filter((l) => l >= 10).length
+  const maxed = levels.filter((l) => l >= MAX_MERGE).length
   return (
     <div className="lt-card">
       <div className="lt-who">
@@ -378,11 +331,11 @@ function CharacterCard({ name, server, level, classes, view, sheet }: { name: st
           <span className="small muted">Merged</span>
           <span className="small">
             <b>{merged.length}</b> of {worn.length} items · average <b>+{avg.toFixed(1)}</b>
-            {maxed ? ` · ${maxed} at +10` : ''}
+            {maxed ? ` · ${maxed} at +${MAX_MERGE}` : ''}
           </span>
         </div>
         <div className="lt-mergebar">
-          <i style={{ width: `${(levels.reduce((a, b) => a + b, 0) / Math.max(1, worn.length * 10)) * 100}%` }} />
+          <i style={{ width: `${(levels.reduce((a, b) => a + b, 0) / Math.max(1, worn.length * MAX_MERGE)) * 100}%` }} />
         </div>
       </div>
     </div>
@@ -392,13 +345,15 @@ function CharacterCard({ name, server, level, classes, view, sheet }: { name: st
 function GearTotals({
   view,
   sheet,
-  saveSheet,
+  updateSheet,
+  summary,
   scaled,
   setScaled
 }: {
   view: InventoryView
   sheet: CharacterSheet | null
-  saveSheet: (s: CharacterSheet) => void
+  updateSheet: UpdateSheet
+  summary: WornSummary
   scaled: boolean
   setScaled: (v: boolean) => void
 }) {
@@ -407,8 +362,8 @@ function GearTotals({
     const info = view.items[itemKey(it.name)]
     return info?.found ? parseStatsBlock(info.statsblock) : null
   }
-  const t = scaled ? wornSummary(view, sheet).totals : wornTotals(worn, base, (it) => sheet?.acOverrides[itemKey(it.name)])
-  const { secondary, shield, shieldByName, shieldAC } = wornSummary(view, sheet)
+  const t = scaled ? summary.totals : wornTotals(worn, base, (it) => sheet?.acOverrides[itemKey(it.name)])
+  const { secondary, shield, shieldByName, shieldAC } = summary
   const found = worn.filter((it) => view.items[itemKey(it.name)]?.found).length
   const statName: Record<string, string> = { STR: 'Strength', STA: 'Stamina', AGI: 'Agility', DEX: 'Dexterity', WIS: 'Wisdom', INT: 'Intelligence', CHA: 'Charisma' }
   const bar = (label: string, v: number, most: number) => (
@@ -427,11 +382,11 @@ function GearTotals({
       <div className="card">
         <div className="lt-card-head">
           <b>Attributes from gear</b>
-          <span className="lt-seg">
-            <button className={scaled ? 'on' : ''} onClick={() => setScaled(true)}>
+          <span className="lt-seg" role="group" aria-label="Attributes shown">
+            <button className={scaled ? 'on' : ''} aria-pressed={scaled} onClick={() => setScaled(true)}>
               With merges
             </button>
-            <button className={scaled ? '' : 'on'} onClick={() => setScaled(false)}>
+            <button className={scaled ? '' : 'on'} aria-pressed={!scaled} onClick={() => setScaled(false)}>
               Base
             </button>
           </span>
@@ -487,7 +442,10 @@ function GearTotals({
               <input
                 type="checkbox"
                 checked={shield}
-                onChange={(e) => sheet && saveSheet({ ...sheet, shield: e.target.checked === shieldByName ? null : e.target.checked })}
+                onChange={(e) => {
+                  const on = e.target.checked
+                  updateSheet((sh) => ({ ...sh, shield: on === shieldByName ? null : on }))
+                }}
               />
               Secondary is a shield{shield ? `: its ${shieldAC} AC lifts your soft cap` : ''}
             </label>
@@ -498,10 +456,6 @@ function GearTotals({
       </div>
     </div>
   )
-}
-
-function wikiUrl(title: string) {
-  return `https://eqlwiki.com/index.php?title=${encodeURIComponent(title.replace(/ /g, '_'))}`
 }
 
 function statsText(info: ItemInfo): string {
@@ -517,14 +471,14 @@ function ItemPanel({
   item,
   view,
   sheet,
-  saveSheet,
+  updateSheet,
   onClose,
   onPlan
 }: {
   item: InvItem
   view: InventoryView
   sheet: CharacterSheet | null
-  saveSheet: (s: CharacterSheet) => void
+  updateSheet: UpdateSheet
   onClose: () => void
   onPlan: () => void
 }) {
@@ -535,13 +489,13 @@ function ItemPanel({
   const lvl = mergeLevel(item.name)
   return (
     <div className="card lt-panel">
-      <div className="row" style={{ gap: 12, alignItems: 'flex-start' }}>
+      <div className="row gap-12" style={{ alignItems: 'flex-start' }}>
         <ItemIcon icon={info?.icon} size={44} />
         <div className="grow">
           <div className="lt-panel-title">
             {plainName(item.name)} {lvl > 0 && <b className="lt-plus">+{lvl}</b>}
           </div>
-          <div className="row small muted" style={{ gap: 10 }}>
+          <div className="row small muted">
             <span>{slotLabel(item.location)}</span>
             <MergePips level={lvl} />
             {info?.found && (
@@ -551,12 +505,12 @@ function ItemPanel({
             )}
           </div>
         </div>
-        {lvl < 10 && (
+        {lvl < MAX_MERGE && (
           <button className="btn primary small" onClick={onPlan} title="Open the Motes upgrade planner with this item">
             Plan this upgrade
           </button>
         )}
-        <button className="btn ghost small" onClick={onClose}>
+        <button className="btn ghost small x-btn" aria-label="Close" onClick={onClose}>
           ×
         </button>
       </div>
@@ -564,7 +518,7 @@ function ItemPanel({
         <div>
           {info?.found ? (
             <>
-              <div className="small faint" style={{ marginBottom: 4 }}>
+              <div className="small faint mb-4">
                 The wiki's stats, base values{lvl ? `; at +${lvl}: AC ${s?.ac ?? 0}` : ''}
               </div>
               <pre className="inv-block">{statsText(info)}</pre>
@@ -572,7 +526,7 @@ function ItemPanel({
           ) : (
             <p className="small muted">eqlwiki has no page for this item, so it adds nothing to the totals unless you type its AC below.</p>
           )}
-          <label className="row small" style={{ marginTop: 10, gap: 8 }}>
+          <label className="row small gap-8 mt-10">
             AC
             <input
               className="inv-ac"
@@ -581,23 +535,25 @@ function ItemPanel({
               value={own ?? ''}
               placeholder={s ? String(s.ac) : '?'}
               onChange={(e) => {
-                if (!sheet) return
-                const next = { ...sheet.acOverrides }
-                if (e.target.value === '') delete next[key]
-                else next[key] = Math.max(0, Math.floor(Number(e.target.value) || 0))
-                saveSheet({ ...sheet, acOverrides: next })
+                const raw = e.target.value
+                updateSheet((sh) => {
+                  const next = { ...sh.acOverrides }
+                  if (raw === '') delete next[key]
+                  else next[key] = Math.max(0, Math.floor(Number(raw) || 0))
+                  return { ...sh, acOverrides: next }
+                })
               }}
             />
             <span className="faint">{own !== undefined ? 'your figure; clear it to use the wiki' : 'type to correct the wiki'}</span>
           </label>
         </div>
         {item.augs.length > 0 && (
-          <div className="stack" style={{ gap: 10 }}>
+          <div className="stack gap-10">
             {item.augs.map((a) => {
               const ai = view.items[itemKey(a.name)]
               return (
                 <div key={a.location}>
-                  <div className="row small" style={{ gap: 8 }}>
+                  <div className="row small gap-8">
                     <ItemIcon icon={ai?.icon} size={22} />
                     <b>{augName(a.name)}</b>
                     <span className="lt-chip">exaltation</span>
@@ -651,17 +607,17 @@ function Carried({ view }: { view: InventoryView }) {
   const label: Record<Filter, string> = { all: 'Everything', worn: 'Worn', bags: 'Bags', bank: 'Bank', keyring: 'Key ring' }
   return (
     <div className="card lt-carried">
-      <div className="row" style={{ gap: 10, flexWrap: 'wrap', marginBottom: 12 }}>
+      <div className="row mb-12">
         <h2 style={{ margin: 0 }}>Where everything is</h2>
         <span className="grow" />
-        <span className="lt-seg">
+        <span className="lt-seg" role="group" aria-label="Show">
           {(Object.keys(label) as Filter[]).map((f) => (
-            <button key={f} className={filter === f ? 'on' : ''} onClick={() => setFilter(f)}>
+            <button key={f} className={filter === f ? 'on' : ''} aria-pressed={filter === f} onClick={() => setFilter(f)}>
               {label[f]} <small>{counts[f]}</small>
             </button>
           ))}
         </span>
-        <input type="search" className="inv-search" placeholder="Find an item" value={q} onChange={(e) => setQ(e.target.value)} style={{ width: 200 }} />
+        <input type="search" className="inv-search" placeholder="Find an item" aria-label="Find an item" value={q} onChange={(e) => setQ(e.target.value)} style={{ width: 200 }} />
       </div>
       <div className="lt-list">
         {shown.map((r, i) => (

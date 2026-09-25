@@ -3,8 +3,19 @@ import type { SpellCategory } from '../../../shared/types'
 import { CATEGORY_LABELS } from '../../../shared/types'
 import { iconUrl } from '../api'
 
-export function Switch({ on, onChange, title }: { on: boolean; onChange: (v: boolean) => void; title?: string }) {
-  return <button type="button" title={title} className={`switch${on ? ' on' : ''}`} onClick={() => onChange(!on)} aria-pressed={on} />
+/** An on/off switch. Give it a `label` unless a wrapping <label> already names it. */
+export function Switch({ on, onChange, title, label }: { on: boolean; onChange: (v: boolean) => void; title?: string; label?: string }) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={on}
+      aria-label={label}
+      title={title}
+      className={`switch${on ? ' on' : ''}`}
+      onClick={() => onChange(!on)}
+    />
+  )
 }
 
 export function Field({ label, hint, children, style }: { label: string; hint?: ReactNode; children: ReactNode; style?: CSSProperties }) {
@@ -24,7 +35,8 @@ export function NumberInput({
   max,
   step,
   width,
-  placeholder
+  placeholder,
+  label
 }: {
   value: number | undefined
   onChange: (v: number | undefined) => void
@@ -33,6 +45,8 @@ export function NumberInput({
   step?: number
   width?: number
   placeholder?: string
+  /** The accessible name, when no <label> wraps it. */
+  label?: string
 }) {
   return (
     <input
@@ -42,6 +56,7 @@ export function NumberInput({
       max={max}
       step={step}
       placeholder={placeholder}
+      aria-label={label}
       style={width ? { width } : undefined}
       onChange={(e) => onChange(e.target.value === '' ? undefined : Number(e.target.value))}
     />
@@ -58,7 +73,7 @@ export function SpellIcon({ icon, large }: { icon?: number; large?: boolean }) {
   return <img className={`spell-icon${large ? ' lg' : ''}`} src={iconUrl(icon)} alt="" onError={() => setOk(false)} />
 }
 
-const paths: Record<string, ReactNode> = {
+const paths = {
   dashboard: <path d="M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z" />,
   spells: <path d="M7 2v11h3v9l7-12h-4l4-8z" />,
   triggers: <path d="M12 22a2.5 2.5 0 0 0 2.5-2.5h-5A2.5 2.5 0 0 0 12 22zm7-6V11c0-3.1-1.6-5.6-4.5-6.3V4a2.5 2.5 0 0 0-5 0v.7C6.6 5.4 5 7.9 5 11v5l-2 2v1h18v-1l-2-2z" />,
@@ -76,12 +91,97 @@ const paths: Record<string, ReactNode> = {
   stats: <path d="M4 20h4V10H4v10zm6 0h4V4h-4v16zm6 0h4v-7h-4v7z" />,
   bag: <path d="M18 7h-2a4 4 0 0 0-8 0H6a2 2 0 0 0-2 2v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2zm-6-2a2 2 0 0 1 2 2h-4a2 2 0 0 1 2-2zm6 15H6V9h2v2h2V9h4v2h2V9h2z" />,
   sparkle: <path d="M12 2l2.4 7.4H22l-6.2 4.5 2.4 7.4L12 16.8l-6.2 4.5 2.4-7.4L2 9.4h7.6z" />
-}
+} satisfies Record<string, ReactNode>
 
-export function Icon({ name }: { name: keyof typeof paths | string }) {
+export type IconName = keyof typeof paths
+
+export function Icon({ name }: { name: IconName }) {
   return (
     <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" width="16" height="16">
       {paths[name]}
     </svg>
+  )
+}
+
+/** What a page shows before its data arrives: "Loading…", or why it could not load, with a retry. */
+export function Pending({ error, retry, what = 'this' }: { error?: string; retry?: () => void; what?: string }) {
+  if (!error) return <div className="empty">Loading…</div>
+  return <LoadError error={error} retry={retry} what={what} />
+}
+
+/** A failed load, said plainly, with a retry. */
+export function LoadError({ error, retry, what = 'this' }: { error: string; retry?: () => void; what?: string }) {
+  return (
+    <div className="notice bad row mb-16" role="alert">
+      <span className="grow">
+        Could not load {what}: {error}
+      </span>
+      {retry && (
+        <button className="btn small" onClick={retry}>
+          Try again
+        </button>
+      )}
+    </div>
+  )
+}
+
+/**
+ * A button for something that cannot be taken back. The first click asks; Yes does it, No (or
+ * Escape) puts the button back.
+ */
+export function ConfirmButton({
+  children,
+  question = 'Are you sure?',
+  onConfirm,
+  className = 'btn small danger',
+  title,
+  label,
+  disabled
+}: {
+  children: ReactNode
+  question?: string
+  onConfirm: () => void
+  className?: string
+  title?: string
+  label?: string
+  disabled?: boolean
+}) {
+  const [asking, setAsking] = useState(false)
+  if (!asking) {
+    return (
+      <button className={className} title={title} aria-label={label} disabled={disabled} onClick={() => setAsking(true)}>
+        {children}
+      </button>
+    )
+  }
+  return (
+    <span className="confirm row tight" role="group" aria-label={question} onKeyDown={(e) => e.key === 'Escape' && setAsking(false)}>
+      <span className="small">{question}</span>
+      <button
+        className="btn small danger"
+        autoFocus
+        onClick={() => {
+          setAsking(false)
+          onConfirm()
+        }}
+      >
+        Yes
+      </button>
+      <button className="btn small ghost" onClick={() => setAsking(false)}>
+        No
+      </button>
+    </span>
+  )
+}
+
+/** An explanation behind a small "i": opens on click or Enter, so it reaches the keyboard as well as the mouse. */
+export function Info({ text, label = 'What this means' }: { text: ReactNode; label?: string }) {
+  return (
+    <details className="info">
+      <summary aria-label={label} title={typeof text === 'string' ? text : undefined}>
+        i
+      </summary>
+      <div className="info-pop">{text}</div>
+    </details>
   )
 }

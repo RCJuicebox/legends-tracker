@@ -3,8 +3,10 @@ import { baseName, slotLabel } from '../../../core/inventory'
 import { restrictions } from '../../../core/upgrades'
 import { focusValue, KIND_LABELS, KIND_ORDER, KIND_WORTH, type FocusInfo, type FocusLine } from '../../../core/itemFocus'
 import { optimizeGear, type Piece } from '../../../core/gearOptimizer'
-import type { FocusCandidate, GearModel, OwnedFocus } from './GearFinder'
-import { Icon, num, pct, source, whereText, wikiUrl } from './gearBits'
+import type { FocusCandidate, GearModel, OwnedFocus } from '../gear/useGearModel'
+import { Info } from '../components/ui'
+import { num, roundPct as pct, wikiUrl } from '../format'
+import { ItemIcon, source, whereText } from './gearBits'
 
 // The Gear page's focus effects tab and its optimizer for what the character already owns.
 
@@ -56,9 +58,9 @@ export function FocusTab({ m }: { m: GearModel }) {
   const r = m.report
   const top = r.uses.slice(0, 6).map((u) => `${u.name} ${u.casts}`)
   return (
-    <div className="stack" style={{ gap: 12 }}>
-      <div className="card stack" style={{ gap: 8 }}>
-        <div className="row" style={{ gap: 10, flexWrap: 'wrap' }}>
+    <div className="stack gap-12">
+      <div className="card stack gap-8">
+        <div className="row">
           <h2 style={{ margin: 0 }}>Focus effects for your spells</h2>
           <span className="grow" />
           <button className="btn ghost small" onClick={() => m.setWanted(m.lines.map((l) => l.key), true)}>
@@ -71,9 +73,9 @@ export function FocusTab({ m }: { m: GearModel }) {
             Defaults
           </button>
         </div>
-        <div className="row small" style={{ gap: 10, flexWrap: 'wrap' }}>
+        <div className="row small">
           <b>Judged on what you cast</b>
-          <span className="lt-seg">
+          <span className="lt-seg" role="group" aria-label="Judged on what you cast">
             {(
               [
                 [7, '7 days'],
@@ -82,7 +84,7 @@ export function FocusTab({ m }: { m: GearModel }) {
                 [0, 'All logs']
               ] as const
             ).map(([d, label]) => (
-              <button key={d} className={m.days === d ? 'on' : ''} onClick={() => m.setDays(d)}>
+              <button key={d} className={m.days === d ? 'on' : ''} aria-pressed={m.days === d} onClick={() => m.setDays(d)}>
                 {label}
               </button>
             ))}
@@ -96,7 +98,7 @@ export function FocusTab({ m }: { m: GearModel }) {
         <p className="small muted" style={{ margin: 0 }}>
           A focus is worth what it does to the spells you actually cast, spell by spell: its strength on each (less on a spell above its level cap), times how often you
           cast that spell. Only the best focus of a kind works on a spell, as in game. Making every spell you cast 10% better counts as{' '}
-          <input type="number" min={0} step={25} value={m.points} style={{ width: 64 }} onChange={(e) => m.setPoints(Math.max(0, Number(e.target.value) || 0))} /> points in
+          <input type="number" min={0} step={25} value={m.points} style={{ width: 64 }} aria-label="Points for making every spell 10% better" onChange={(e) => m.setPoints(Math.max(0, Number(e.target.value) || 0))} /> points in
           the upgrade finder and the optimizer; spell range and reagents count a quarter as much. Tick the ones you want: {wantedCount} of {m.lines.length} are.
         </p>
       </div>
@@ -139,7 +141,7 @@ function FocusRow({ m, l }: { m: GearModel; l: FocusLine }) {
   return (
     <div className={`lt-focus-row${on ? '' : ' off'}`}>
       <label className="lt-focus-toggle" title={on ? 'Wanted: counts in the finder and the optimizer' : 'Not wanted'}>
-        <input type="checkbox" checked={on} onChange={() => m.setWanted([l.key], !on)} />
+        <input type="checkbox" checked={on} aria-label={`Want ${l.label}`} onChange={() => m.setWanted([l.key], !on)} />
       </label>
       <div className="lt-focus-line">
         <b>{l.label}</b>
@@ -155,7 +157,7 @@ function FocusRow({ m, l }: { m: GearModel; l: FocusLine }) {
         {best ? (
           <>
             <div title={strengthNote(info(best.focus))}>
-              <b>{best.focus}</b> <span className="muted">{pct(best.eff)}</span>{' '}
+              <b>{best.focus}</b> <span className="muted">{pct(best.eff)}</span> <Info label={`What ${best.focus} does`} text={strengthNote(info(best.focus))} />{' '}
               <span className="faint small" title="What it is worth to you, in the finder's points, worn on its own">
                 · worth {num(worth(best.focus))}
                 {KIND_WORTH[l.kind] < 1 ? ' (counts a quarter)' : ''}
@@ -163,7 +165,7 @@ function FocusRow({ m, l }: { m: GearModel; l: FocusLine }) {
             </div>
             {topItems.slice(0, 3).map((c) => (
               <div key={c.item.title} className="lt-focus-item" title={source(c.item)}>
-                <Icon icon={c.item.icon} size={20} />
+                <ItemIcon icon={c.item.icon} size={20} />
                 <a href={wikiUrl(c.item.title)} target="_blank" rel="noreferrer">
                   {c.item.title}
                 </a>
@@ -189,7 +191,7 @@ function FocusRow({ m, l }: { m: GearModel; l: FocusLine }) {
         {have.length ? (
           <>
             <div title={strengthNote(info(have[0].focus))}>
-              <b>{have[0].focus}</b> <span className="muted">{pct(have[0].eff)}</span> <span className="faint small">· worth {num(worth(have[0].focus))}</span>
+              <b>{have[0].focus}</b> <span className="muted">{pct(have[0].eff)}</span> <Info label={`What ${have[0].focus} does`} text={strengthNote(info(have[0].focus))} /> <span className="faint small">· worth {num(worth(have[0].focus))}</span>
             </div>
             <div className="small muted">{ownedText(have[0])}</div>
             {have[0].from !== 'worn' && have.some((h) => h.from === 'worn') && (
@@ -224,8 +226,8 @@ export function OptimizeTab({ m }: { m: GearModel }) {
   const wantedLines = m.lines.filter((l) => m.wanted.has(l.key))
 
   return (
-    <div className="stack" style={{ gap: 12 }}>
-      <div className="card stack" style={{ gap: 6 }}>
+    <div className="stack gap-12">
+      <div className="card stack gap-6">
         <h2 style={{ margin: 0 }}>Best use of what you own</h2>
         <p className="small muted" style={{ margin: 0 }}>
           Every piece you wear, carry and bank ({m.pieces.length} of them), tried in every slot it fits, both Any slots included, scored with these weights plus the focus
@@ -262,7 +264,7 @@ export function OptimizeTab({ m }: { m: GearModel }) {
               <div key={c.i} className="lt-opt-row">
                 <span className="lt-slot">{slotLabel(c.slot)}</span>
                 <div className="lt-cand-body">
-                  <div className="row tight" style={{ gap: 8, flexWrap: 'wrap' }}>
+                  <div className="row gap-8">
                     {c.after ? (
                       <>
                         <b>{c.after.item.name}</b>

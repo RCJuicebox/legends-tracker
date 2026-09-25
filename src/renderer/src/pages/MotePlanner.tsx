@@ -1,21 +1,30 @@
 import { useEffect, useMemo, useState } from 'react'
-import { api } from '../api'
-import { Switch } from '../components/ui'
+import { api, errorMessage } from '../api'
+import { useInvoke } from '../hooks'
+import { showError } from '../toast'
+import { ConfirmButton, Pending, Switch } from '../components/ui'
+import { numExact as num } from '../format'
 import { MOTE_RANKS } from '../../../core/motes'
-import { countsToArray, fixItem, levelFromName, makeable, plan } from '../../../core/moteCalc'
+import { countsToArray, fixItem, levelFromName, makeable, plan, MAX_LEVEL } from '../../../core/moteCalc'
 import type { MoteStock } from '../../../shared/types'
 
 const short = (i: number) => MOTE_RANKS[i].name || 'Potential'
 const long = (i: number, n: number) => `${n === 1 ? 'Mote' : 'Motes'} of ${MOTE_RANKS[i].name ? MOTE_RANKS[i].name + ' ' : ''}Potential`
-const num = (n: number) => n.toLocaleString()
 
-export function useStock(): [MoteStock | null, (s: MoteStock) => void] {
-  const [stock, setStock] = useState<MoteStock | null>(null)
-  useEffect(() => {
-    void api.invoke<MoteStock>('stock:get').then(setStock)
-    return api.on('state:stock', (s: MoteStock) => setStock(s))
-  }, [])
-  return [stock, setStock]
+export function useStock() {
+  const q = useInvoke<MoteStock>('stock:get')
+  const setData = q.setData
+  useEffect(() => api.on('state:stock', (s: MoteStock) => setData(s)), [setData])
+  return q
+}
+
+/** A stock write; the reply is the stock as stored. A failure is shown and changes nothing. */
+async function writeStock(set: (s: MoteStock) => void, channel: string, ...args: unknown[]): Promise<void> {
+  try {
+    set(await api.invoke<MoteStock>(channel, ...args))
+  } catch (e) {
+    showError('Could not update your motes', e)
+  }
 }
 
 interface ScreenRead {
@@ -35,14 +44,14 @@ function ReadFromScreen({ stock, onApplied }: { stock: MoteStock; onApplied: (s:
     try {
       setRead(await api.invoke<ScreenRead>('stock:readScreen'))
     } catch (e) {
-      setError((e as Error).message)
+      setError(errorMessage(e))
     } finally {
       setBusy(false)
     }
   }
   const found = read ? MOTE_RANKS.filter((r) => read.counts[r.key] !== undefined) : []
   return (
-    <div className="stack" style={{ gap: 10, marginBottom: 14 }}>
+    <div className="stack gap-10 mb-14">
       <div className="row">
         <button className="btn primary" disabled={busy} onClick={() => void run()}>
           {busy ? 'Reading the screen…' : 'Read motes from screen'}
@@ -91,8 +100,12 @@ function ReadFromScreen({ stock, onApplied }: { stock: MoteStock; onApplied: (s:
             <button
               className="btn primary"
               onClick={async () => {
-                onApplied(await api.invoke<MoteStock>('stock:counts', { ...stock.counts, ...read.counts }))
-                setRead(null)
+                try {
+                  onApplied(await api.invoke<MoteStock>('stock:counts', { ...stock.counts, ...read.counts }))
+                  setRead(null)
+                } catch (e) {
+                  setError(errorMessage(e))
+                }
               }}
             >
               Apply these counts
@@ -113,12 +126,14 @@ function ReadFromScreen({ stock, onApplied }: { stock: MoteStock; onApplied: (s:
 }
 
 export function MotePlanner() {
-  const [stock, setStock] = useStock()
+  const q = useStock()
+  const stock = q.data
+  const setStock = q.setData
   // Typed values are kept as text while editing, so a field can be cleared and retyped.
   const [draft, setDraft] = useState<Record<string, string>>({})
   const item = useMemo(() => fixItem(stock?.item ?? {}), [stock?.item])
   const result = useMemo(() => (stock ? plan(item, stock.counts) : null), [item, stock])
-  if (!stock || !result) return <div className="empty">Loading…</div>
+  if (!stock || !result) return <Pending what="your mote stock" error={q.error} retry={q.reload} />
 
   const inv = countsToArray(stock.counts)
   const setItem = async (patch: Partial<MoteStock['item']>, field: string) => {
@@ -128,12 +143,12 @@ export function MotePlanner() {
       if (lvl !== null) Object.assign(d, { lvl, xp: 0, to: lvl + 1 })
     }
     if (field === 'lvl') d.to = Math.max(Number(d.to) || 0, (Number(d.lvl) || 0) + 1)
-    setStock(await api.invoke<MoteStock>('stock:item', d))
+    await writeStock(setStock, 'stock:item', d)
   }
   const setCount = async (key: string, value: string) => {
     setDraft((x) => ({ ...x, [key]: value }))
     const v = Math.max(0, Math.floor(Number(value) || 0))
-    setStock(await api.invoke<MoteStock>('stock:counts', { ...stock.counts, [key]: v }))
+    await writeStock(setStock, 'stock:counts', { ...stock.counts, [key]: v })
   }
   const spent = result.after
     ? MOTE_RANKS.map((r, i) => ({ i, d: (stock.counts[r.key] ?? 0) - result.after![i] })).filter((x) => x.d > 0)
@@ -141,7 +156,7 @@ export function MotePlanner() {
 
   return (
     <div className="grid two" style={{ alignItems: 'start' }}>
-      <div className="card stack" style={{ gap: 14 }}>
+      <div className="card stack gap-14">
         <h2>Item</h2>
         <p className="muted small" style={{ margin: 0 }}>
           Put in the item's level and the xp in its bar. It works out which motes you need, how many, and what to combine
@@ -154,7 +169,7 @@ export function MotePlanner() {
         <div className="grid three">
           <label className="field">
             <span>Level now</span>
-            <input type="number" min={0} max={10} value={item.lvl} onChange={(e) => void setItem({ lvl: Number(e.target.value) }, 'lvl')} />
+            <input type="number" min={0} max={MAX_LEVEL} value={item.lvl} onChange={(e) => void setItem({ lvl: Number(e.target.value) }, 'lvl')} />
           </label>
           <label className="field">
             <span>XP in bar (of {num(2 ** item.lvl)})</span>
@@ -162,11 +177,11 @@ export function MotePlanner() {
           </label>
           <label className="field">
             <span>Upgrade to</span>
-            <input type="number" min={1} max={11} value={item.to} onChange={(e) => void setItem({ to: Number(e.target.value) }, 'to')} />
+            <input type="number" min={1} max={MAX_LEVEL + 1} value={item.to} onChange={(e) => void setItem({ to: Number(e.target.value) }, 'to')} />
           </label>
         </div>
 
-        <div className="stack" style={{ gap: 10 }}>
+        <div className="stack gap-10">
           {result.steps.map((st) => {
             const state = st.noMote || st.short ? 'bad' : st.unsourced ? '' : 'ok'
             const pill = st.noMote ? 'No mote' : st.short ? `Short ${num(st.short)}` : st.unsourced ? 'Needs the step above' : 'Covered'
@@ -220,11 +235,11 @@ export function MotePlanner() {
         </div>
 
         {result.covered > 0 && (
-          <div className="stack" style={{ gap: 8 }}>
+          <div className="stack gap-8">
             <div className="muted small">From your stock this uses {spent.map((x) => `${num(x.d)} ${short(x.i)}`).join(', ')}.</div>
-            <button className="btn primary" onClick={async () => setStock(await api.invoke<MoteStock>('stock:apply'))}>
+            <ConfirmButton className="btn primary" question="Take them off your stock?" onConfirm={() => void writeStock(setStock, 'stock:apply')}>
               Done: take them off my stock and set the item to +{result.reached}
-            </button>
+            </ConfirmButton>
           </div>
         )}
         <p className="faint small" style={{ margin: 0 }}>
@@ -238,7 +253,7 @@ export function MotePlanner() {
         <h2>
           Your motes <span className="spacer" />
           <span className="row tight" style={{ textTransform: 'none', letterSpacing: 0, fontWeight: 500 }}>
-            <Switch on={stock.autoAdd} onChange={async (v) => setStock(await api.invoke<MoteStock>('stock:autoAdd', v))} />
+            <Switch on={stock.autoAdd} label="Add looted motes automatically" onChange={(v) => void writeStock(setStock, 'stock:autoAdd', v)} />
             Add looted motes automatically
           </span>
         </h2>
@@ -264,6 +279,7 @@ export function MotePlanner() {
                     type="number"
                     min={0}
                     style={{ width: 80 }}
+                    aria-label={`${long(i, 2)} you have`}
                     value={draft[r.key] ?? String(stock.counts[r.key] ?? 0)}
                     onChange={(e) => void setCount(r.key, e.target.value)}
                     onBlur={() => setDraft((x) => ({ ...x, [r.key]: undefined as unknown as string }))}

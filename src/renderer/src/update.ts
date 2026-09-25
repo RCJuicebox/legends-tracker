@@ -8,11 +8,21 @@ export function useUpdate(): { status: UpdateState | null; version: string } {
   const [status, setStatus] = useState<UpdateState | null>(null)
   const [version, setVersion] = useState('')
   useEffect(() => {
-    void api.invoke<{ status: UpdateState; version: string }>('update:status').then((r) => {
-      setStatus(r.status)
-      setVersion(r.version)
-    })
-    return api.on('state:update', (s: UpdateState) => setStatus(s))
+    let live = true
+    api.invoke<{ status: UpdateState; version: string }>('update:status').then(
+      (r) => {
+        if (!live) return
+        setStatus(r.status)
+        setVersion(r.version)
+      },
+      // No status: the page says it cannot check, and a later push fills it in.
+      () => {}
+    )
+    const off = api.on('state:update', (s: UpdateState) => setStatus(s))
+    return () => {
+      live = false
+      off()
+    }
   }, [])
   return { status, version }
 }

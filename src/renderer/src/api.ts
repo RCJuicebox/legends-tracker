@@ -16,11 +16,20 @@ declare global {
 
 export const api = window.eql
 
+/** What went wrong in a call to the main process, without Electron's "Error invoking remote method" wrapping. */
+export function errorMessage(e: unknown): string {
+  const text = e instanceof Error ? e.message : String(e)
+  return text.replace(/^Error invoking remote method '[^']*':\s*/, '').replace(/^(?:[A-Z]\w*)?Error:\s*/, '') || 'unknown error'
+}
+
+/** An activity line, numbered as it arrives so the list can keep each row. */
+export type FeedEntry = FeedItem & { id: number }
+
 export interface AppState {
   settings: AppSettings
   status: WatchStatus
   timers: TimerView[]
-  feed: FeedItem[]
+  feed: FeedEntry[]
   archive: ArchiveStatus
   character: CharacterSettings
   characterKey: string

@@ -3,7 +3,8 @@ import { createRoot } from 'react-dom/client'
 import './styles.css'
 import { StateProvider, useApp } from './state'
 import { Icon } from './components/ui'
-import { ago, api } from './api'
+import { ago } from './api'
+import { act, Toasts } from './toast'
 import { useUpdate } from './update'
 import { useRemembered } from './remember'
 import { Dashboard } from './pages/Dashboard'
@@ -53,19 +54,19 @@ function Shell() {
         {state.settings.audio.muted && <span className="chip warn">Muted</span>}
         {state.arranging && <span className="chip warn">Arranging overlays</span>}
         {update.status?.state === 'ready' && (
-          <button className="btn small primary" style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties} onClick={() => api.invoke('update:install')}>
+          <button className="btn small primary" style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties} onClick={() => void act('update:install')}>
             Update ready ({update.status.version}): restart
           </button>
         )}
       </div>
-      <nav className="sidebar">
+      <nav className="sidebar" aria-label="Pages">
         {PAGES.map((p, i) => [
           p.group !== PAGES[i - 1]?.group && (
             <div key={`g-${p.group}`} className="nav-group">
               {p.group}
             </div>
           ),
-          <button key={p.id} className={`nav-item${page === p.id ? ' active' : ''}`} onClick={() => setPage(p.id)}>
+          <button key={p.id} className={`nav-item${page === p.id ? ' active' : ''}`} aria-current={page === p.id ? 'page' : undefined} onClick={() => setPage(p.id)}>
             <Icon name={p.icon} />
             {p.label}
             {p.id === 'dashboard' && state.timers.length > 0 && <span className="count">{state.timers.length}</span>}
@@ -83,6 +84,7 @@ function Shell() {
       <main className="main">
         <Page go={setPage} />
       </main>
+      <Toasts />
     </div>
   )
 }

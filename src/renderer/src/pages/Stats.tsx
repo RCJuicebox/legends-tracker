@@ -1,107 +1,97 @@
-import { useEffect, useMemo, useState } from 'react'
-import { api, ago } from '../api'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import { api, ago, errorMessage } from '../api'
 import { useRemembered } from '../remember'
+import { useInvoke } from '../hooks'
+import { showUndo } from '../toast'
+import { Pending } from '../components/ui'
+import { fractionPct as pct, num, who } from '../format'
 import { readSheet, type StatsSheet } from '../statsSheet'
-import { useExportCharacter, useInventory, wornSummary } from './Gear'
-import { CLASSES, className, computeAc, marginal, type AcInputs } from '../../../core/acModel'
-import {
-  avoidanceFromHitRate,
-  baseAccuracy,
-  classicCritChance,
-  damageBonusPct,
-  DOUBLE_ATTACK,
-  doubleAttackChance,
-  DUAL_WIELD,
-  dualWieldChance,
-  hitChance,
-  MELEE_CLASSES,
-  OFFENSE,
-  skillName,
-  stanceAccuracy,
-  strengthOffense,
-  swingsPerRound,
-  TRIPLE_ATTACK,
-  TRIPLE_CLASSES,
-  tripleAttackChance,
-  WEAPON_SKILLS,
-  windowOffense
-} from '../../../core/combatModel'
-import { AA_USES, aaTotal, type AaEffect, type AaSummary } from '../../../core/aa'
+import { useExportCharacter, useInventory, wornSummary } from '../gear/model'
+import { acInputs, acReport, autoValues, classTrio, combatReport, primaryClass, valOf, type Auto, type Caps, type Note, type Row, type Val } from '../stats/model'
+import { CLASSES, className, computeAc } from '../../../core/acModel'
+import { avoidanceFromHitRate, baseAccuracy, hitChance, OFFENSE, skillName, stanceAccuracy, WEAPON_SKILLS, windowOffense } from '../../../core/combatModel'
+import { AA_USES, type AaEffect, type AaSummary } from '../../../core/aa'
 import type { CharacterSheet } from '../../../shared/types'
 import type { WornTotals } from '../../../core/inventory'
 
-const num = (n: number) => Math.round(n).toLocaleString()
-const pct = (x: number) => `${(x * 100).toFixed(2)}%`
-const who = (key: string) => key.replace('_', ' · ')
-
-interface Caps {
-  skills: { id: number; cap: number; from: string }[]
-  ac: Record<string, { cap: number; mult: number }>
-}
-
 type Tab = 'character' | 'ac' | 'combat'
-type Row = [label: string, value?: string | number, note?: string]
-type Note = [kind: '' | 'good' | 'warn' | 'tip', title: string, text: string]
+const TABS: [Tab, string][] = [
+  ['character', 'Character'],
+  ['ac', 'AC'],
+  ['combat', 'Combat']
+]
+
+/** A change to the sheet: fields, or a function of the latest sheet giving them. */
+type SetSheet = (patch: Partial<StatsSheet> | ((s: StatsSheet) => Partial<StatsSheet>)) => void
 
 export function Stats() {
-  const { exports, available, character, setCharacter } = useExportCharacter('inventory', 'stats.character')
-  const { view, sheet: charSheet, saveSheet: saveCharSheet } = useInventory(character, !!exports)
+  const exp = useExportCharacter('inventory', 'stats.character')
+  const { exports, available, character, setCharacter } = exp
+  const inv = useInventory(character, !!exports, available.join(','))
+  const { view, sheet: charSheet, updateSheet } = inv
   const [tab, setTab] = useRemembered<Tab>('stats.tab', 'character')
-  const [caps, setCaps] = useState<Caps | null>(null)
   const [aaStatus, setAaStatus] = useState('')
 
   const s = useMemo(() => readSheet(charSheet?.stats), [charSheet])
-  const trio = useMemo(() => [...new Set(s.classes.filter(Boolean))].length ? [...new Set(s.classes.filter(Boolean))] : ['war'], [s.classes])
+  const trio = useMemo(() => classTrio(s), [s.classes])
+  const capsQ = useInvoke<Caps>('stats:caps', [trio, s.level])
+  const caps = capsQ.data
 
-  useEffect(() => {
-    void api.invoke<Caps>('stats:caps', trio, s.level).then(setCaps)
-  }, [trio.join(','), s.level])
-
-  const set = (patch: Partial<StatsSheet>) => {
-    if (!charSheet) return
-    saveCharSheet({ ...charSheet, stats: { ...s, ...patch } as unknown as CharacterSheet['stats'] })
-  }
-  const setOverride = (key: keyof StatsSheet['overrides'], v: number | undefined) => {
-    const o = { ...s.overrides }
-    if (v === undefined) delete o[key]
-    else o[key] = v
-    set({ overrides: o })
-  }
+  // Builds on the latest sheet, so a change that lands after an await (the AAs, a screen read) never
+  // undoes what was typed meanwhile.
+  const set = useCallback<SetSheet>(
+    (patch) =>
+      updateSheet((cs) => {
+        const cur = readSheet(cs.stats)
+        const p = typeof patch === 'function' ? patch(cur) : patch
+        return { ...cs, stats: { ...cur, ...p } as unknown as CharacterSheet['stats'] }
+      }),
+    [updateSheet]
+  )
+  const setOverride = (key: keyof StatsSheet['overrides'], v: number | undefined) =>
+    set((cur) => {
+      const o = { ...cur.overrides }
+      if (v === undefined) delete o[key]
+      else o[key] = v
+      return { overrides: o }
+    })
 
   const readAas = async (quiet: boolean) => {
     setAaStatus('Reading your log…')
-    const aa = await api.invoke<AaSummary | null>('stats:readAAs')
-    if (aa) {
-      set({ aa })
-      setAaStatus('')
-    } else setAaStatus(quiet ? '' : 'No /alternateadv list in your current log yet.')
+    try {
+      const aa = await api.invoke<AaSummary | null>('stats:readAAs')
+      if (aa) {
+        set({ aa })
+        setAaStatus('')
+      } else setAaStatus(quiet ? '' : 'No /alternateadv list in your current log yet.')
+    } catch (e) {
+      setAaStatus(quiet ? '' : `Could not read your log: ${errorMessage(e)}`)
+    }
   }
   // First visit for a character: look for AAs without being asked.
   useEffect(() => {
     if (charSheet && !s.aa) void readAas(true)
   }, [character, !!charSheet])
 
-  if (!exports || !view || !charSheet || !caps) return <div className="empty">Loading…</div>
+  if (!exports || !view || !charSheet || !caps)
+    return (
+      <Pending
+        what="the Stats page"
+        error={exp.error || inv.error || capsQ.error}
+        retry={() => {
+          exp.reload()
+          inv.reload()
+          capsQ.reload()
+        }}
+      />
+    )
 
-  // The sturdiest class sets the soft cap; the cap and its multiplier rise together through the
-  // whole table, so the highest cap never brings a worse multiplier.
-  const primary = trio.reduce((best, c) => ((caps.ac[c]?.cap ?? 0) > (caps.ac[best]?.cap ?? 0) ? c : best), trio[0])
+  const primary = primaryClass(trio, caps.ac)
   const tableCap = caps.ac[primary]
-  const inv = view.inventory ? wornSummary(view, charSheet) : null
+  const gear = view.inventory ? wornSummary(view, charSheet) : null
   const skill = (id: number) => s.skills[id] ?? 0
-
-  const auto = {
-    itemAC: inv ? inv.totals.ac : undefined,
-    shieldAC: inv ? (inv.shield ? inv.shieldAC : 0) : undefined,
-    softCap: tableCap?.cap,
-    multiplier: tableCap?.mult,
-    combatStability: s.aa ? aaTotal(s.aa, 'softcap_pct') : undefined,
-    evasion: s.aa ? aaTotal(s.aa, 'avoidance_pct') : undefined,
-    spa169: s.aa ? aaTotal(s.aa, 'melee_crit_pct') : undefined,
-    attackAA: s.aa ? aaTotal(s.aa, 'attack') : undefined,
-    ambidexterity: s.aa ? aaTotal(s.aa, 'dual_wield_pct') : undefined
-  }
-  const val = (k: keyof typeof auto) => s.overrides[k] ?? auto[k] ?? 0
+  const auto = autoValues(s, caps.ac, primary, gear)
+  const val = valOf(s, auto)
 
   return (
     <>
@@ -115,7 +105,7 @@ export function Stats() {
         </div>
         {available.length > 1 && (
           <div className="actions">
-            <select value={character} onChange={(e) => setCharacter(e.target.value)}>
+            <select aria-label="Character" value={character} onChange={(e) => setCharacter(e.target.value)}>
               {available.map((c) => (
                 <option key={c} value={c}>
                   {who(c)}
@@ -126,7 +116,7 @@ export function Stats() {
         )}
       </div>
 
-      <div className="card stack" style={{ gap: 12, marginBottom: 14 }}>
+      <div className="card stack gap-12 mb-14">
         <div className="stats-fields">
           {[0, 1, 2].map((i) => (
             <label key={i} className="field">
@@ -160,22 +150,18 @@ export function Stats() {
         <AaLine aa={s.aa} status={aaStatus} onRead={() => void readAas(false)} />
       </div>
 
-      <div className="row" style={{ marginBottom: 12, gap: 6 }}>
-        <button className={`btn${tab === 'character' ? ' on' : ' ghost'}`} onClick={() => setTab('character')}>
-          Character
-        </button>
-        <button className={`btn${tab === 'ac' ? ' on' : ' ghost'}`} onClick={() => setTab('ac')}>
-          AC
-        </button>
-        <button className={`btn${tab === 'combat' ? ' on' : ' ghost'}`} onClick={() => setTab('combat')}>
-          Combat
-        </button>
+      <div className="row gap-6 mb-12" role="group" aria-label="Stats view">
+        {TABS.map(([id, label]) => (
+          <button key={id} className={`btn${tab === id ? ' on' : ' ghost'}`} aria-pressed={tab === id} onClick={() => setTab(id)}>
+            {label}
+          </button>
+        ))}
       </div>
 
       {tab === 'character' ? (
-        <CharacterTab s={s} set={set} val={val} trio={trio} primary={primary} skill={skill} gear={inv?.totals ?? null} />
+        <CharacterTab s={s} set={set} val={val} trio={trio} primary={primary} skill={skill} gear={gear?.totals ?? null} />
       ) : tab === 'ac' ? (
-        <AcTab s={s} set={set} setOverride={setOverride} auto={auto} val={val} trio={trio} primary={primary} tableCap={tableCap} skill={skill} hasInventory={!!inv} />
+        <AcTab s={s} set={set} setOverride={setOverride} auto={auto} val={val} trio={trio} primary={primary} tableCap={tableCap} skill={skill} hasInventory={!!gear} />
       ) : (
         <CombatTab s={s} set={set} setOverride={setOverride} auto={auto} val={val} trio={trio} primary={primary} caps={caps} skill={skill} />
       )}
@@ -297,10 +283,10 @@ function NumField({
 
 interface TabProps {
   s: StatsSheet
-  set: (p: Partial<StatsSheet>) => void
+  set: SetSheet
   setOverride: (k: keyof StatsSheet['overrides'], v: number | undefined) => void
-  auto: Record<string, number | undefined>
-  val: (k: 'itemAC' | 'shieldAC' | 'softCap' | 'multiplier' | 'combatStability' | 'evasion' | 'spa169' | 'attackAA' | 'ambidexterity') => number
+  auto: Auto
+  val: Val
   trio: string[]
   primary: string
   skill: (id: number) => number
@@ -347,123 +333,9 @@ function Trace({ rows }: { rows: Row[] }) {
   )
 }
 
-/** The AC calculator's inputs from the sheet, files and AAs. */
-/**
- * The AC calculator's result for a character from what the tracker knows: the sheet, worn gear, the
- * game's soft cap table for its classes, and its AAs. For pages other than this one.
- */
-export function characterAc(
-  s: StatsSheet,
-  acCaps: Record<string, { cap: number; mult: number }>,
-  gear: { totals: { ac: number }; shield: boolean; shieldAC: number } | null
-) {
-  const trio = [...new Set(s.classes.filter(Boolean))].length ? [...new Set(s.classes.filter(Boolean))] : ['war']
-  const primary = trio.reduce((best, c) => ((acCaps[c]?.cap ?? 0) > (acCaps[best]?.cap ?? 0) ? c : best), trio[0])
-  const auto: Record<string, number | undefined> = {
-    itemAC: gear ? gear.totals.ac : undefined,
-    shieldAC: gear ? (gear.shield ? gear.shieldAC : 0) : undefined,
-    softCap: acCaps[primary]?.cap,
-    multiplier: acCaps[primary]?.mult,
-    combatStability: s.aa ? aaTotal(s.aa, 'softcap_pct') : undefined,
-    evasion: s.aa ? aaTotal(s.aa, 'avoidance_pct') : undefined
-  }
-  const val: TabProps['val'] = (k) => s.overrides[k] ?? auto[k] ?? 0
-  return computeAc(acInputs(s, trio, primary, val, (id) => s.skills[id] ?? 0))
-}
-
-function acInputs(s: StatsSheet, trio: string[], primary: string, val: TabProps['val'], skill: (id: number) => number): AcInputs {
-  return {
-    trio,
-    cls: primary,
-    race: s.race,
-    level: s.level,
-    defense: skill(15),
-    agility: s.agility,
-    heroicAgility: s.heroicAgility,
-    heroicStrength: s.heroicStrength,
-    weight: s.weight,
-    drunk: s.drunk,
-    itemAC: val('itemAC'),
-    shieldAC: val('shieldAC'),
-    itemAvoidance: s.itemAvoidance,
-    foodDrinkAC: s.foodDrinkAC,
-    tributeAC: s.tributeAC,
-    acBuffs: s.acBuffs,
-    armorOfWisdom: s.armorOfWisdom,
-    herosFortitude: s.herosFortitude,
-    combatStability: val('combatStability'),
-    evasion: val('evasion'),
-    softCap: val('softCap'),
-    multiplier: val('multiplier')
-  }
-}
-
 function AcTab({ s, set, setOverride, auto, val, trio, primary, tableCap, skill, hasInventory }: TabProps & { tableCap?: { cap: number; mult: number }; hasInventory: boolean }) {
   const i = acInputs(s, trio, primary, val, skill)
-  const r = computeAc(i)
-  const full = Math.min(r.srv.total, r.effCap)
-  const sum = Math.max(1, r.srv.total)
-  const notes: Note[] = []
-  if (r.srv.twinkCapped)
-    notes.push(['warn', 'The anti-twink cap is biting.', `Below level 50 the server holds worn AC at 25 + 6 × level = ${num(r.srv.twink)}, cutting ${num(r.disp.eqmath - r.srv.twink)}. Your Inventory window never shows that cut.`])
-  if (r.shield) notes.push(['good', `Your shield carries ${num(r.shield)} AC.`, 'It lifts the soft cap point for point, so every one of those counts in full.'])
-  else notes.push(['tip', 'No shield.', 'A shield raises the soft cap by its own AC, which makes shield AC the best AC in the game.'])
-  if (r.over) {
-    const g = marginal(i, ['itemAC'])
-    const sh = r.shield ? marginal(i, ['shieldAC', 'itemAC']) : 0
-    notes.push([
-      '',
-      `One more AC on gear is worth ${g.toFixed(2)} mitigation AC;`,
-      r.shield ? `one more on your shield is worth ${sh.toFixed(2)}, about ${g > 0 ? (sh / g).toFixed(1) : '—'}× as much.` : 'a shield would be worth far more, because its AC lifts the cap as well.'
-    ])
-    const buff = marginal(i, ['acBuffs'])
-    notes.push(['', `An AC buff point is worth ${buff.toFixed(2)}.`, `Buff AC counts a ${r.srv.silk ? 'third' : 'quarter'} before the cap, where gear counts 4/3.`])
-  } else notes.push(['good', 'You are under the soft cap.', `${num(r.effCap - r.srv.total)} to go, and every point counts in full until then.`])
-  if (r.srv.rc.caps) {
-    const c = r.srv.rc.caps
-    if (r.srv.rc.monkPenalty) notes.push(['warn', 'Over the monk weight hard cap.', `Carrying ${num(i.weight)} against a hard cap of ${c.hard} costs you ${num(-r.srv.rc.monk)} AC.`])
-    else notes.push([r.srv.rc.monk > 0 ? 'good' : '', `Monk weight bonus: ${num(r.srv.rc.monk)} AC.`, `Soft cap ${c.soft}, hard cap ${c.hard}, carrying ${num(i.weight)}.`])
-  }
-  if (r.srv.rc.cls) notes.push(['good', `Agility bonus: ${num(r.srv.rc.cls)} AC.`, `From level ${i.level} at ${num(i.agility)} agility.`])
-  if (r.srv.rc.iksar) notes.push(['good', `Iksar racial: ${num(r.srv.rc.iksar)} AC.`, 'Your level, held between 10 and 35.'])
-  if (r.d.red < 1) notes.push(['warn', 'Drunk enough to lose avoidance.', `Your Computed Defence is cut to ${Math.round(r.d.red * 100)}% of ${num(r.d.raw)}.`])
-
-  const rows: Row[] = [
-    ['#Avoidance: Computed Defence, then EQEmu'],
-    [`defence ${num(i.defense)} × 400 / 225`, r.d.skill, 'Defense skill, from the Combat tab'],
-    [`8000 × (${num(i.agility)} agility − 40) / 36000`, r.d.agi],
-    [`heroic agility ${num(i.heroicAgility)} / 10`, r.d.hagi],
-    ['item avoidance, up to 100', r.d.avoid],
-    ["Dzarn's Computed Defence", r.d.total],
-    [`+ 10, × (100 + ${num(i.evasion)}% avoidance AAs) / 100`, r.avoidance, 'EQEmu GetTotalDefense, SPA 172'],
-    ['#AC Sum'],
-    ['AC on every equipped item but ammo', i.itemAC],
-    ...(i.foodDrinkAC ? [['food and drink', i.foodDrinkAC] as [string, number]] : []),
-    ...(i.tributeAC ? [['tribute and trophies', i.tributeAC] as [string, number]] : []),
-    ['× 4 / 3', r.disp.eqmath],
-    ...(r.srv.twinkCapped ? [[`server only: held at 25 + 6 × ${i.level}`, r.srv.twink, 'anti-twink'] as [string, number, string]] : []),
-    ...(r.srv.rc.total ? [['race and class bonus', r.srv.rc.total] as [string, number]] : []),
-    [`defence skill / ${r.srv.silk ? 2 : 3}`, r.srv.def],
-    ...(i.acBuffs ? [[`AC buffs / ${r.srv.silk ? 3 : 4}`, r.srv.buffs] as [string, number]] : []),
-    ...(i.armorOfWisdom ? [['Armor of Wisdom', r.srv.aow] as [string, number]] : []),
-    ...(i.herosFortitude ? [["Hero's Fortitude", r.srv.hf] as [string, number]] : []),
-    ...(r.srv.agi ? [[`agility over 70: ${num(i.agility)} / 20`, r.srv.agi] as [string, number]] : []),
-    ['AC Sum, as the server has it', r.srv.total],
-    ['#Mitigation AC'],
-    [`${className(primary)} soft cap`, i.softCap, 'Resources/ACMitigation.txt'],
-    [`+ Combat Stability ${num(i.combatStability)}%`, r.capWithAA, 'SPA 259'],
-    ...(r.shield ? [[`+ shield ${num(i.shieldAC)} and heroic strength / 10`, r.effCap] as [string, number]] : []),
-    ['effective soft cap', r.effCap],
-    ...(r.over
-      ? ([
-          [`${num(r.srv.total)} − ${num(r.effCap)}, the part over the cap`, r.srv.total - r.effCap],
-          [`× ${i.multiplier} post-cap multiplier`, r.kept],
-          ['Mitigation AC', r.mitigation]
-        ] as [string, number][])
-      : ([['under the cap, so nothing is lost', r.mitigation]] as [string, number][])),
-    ['#For reference'],
-    ["Dzarn's displayed AC", r.displayed, 'EverQuest Legends does not show this one']
-  ]
+  const { r, full, sum, notes, rows } = acReport(i, primary)
 
   return (
     <div className="stats-grid">
@@ -571,71 +443,7 @@ function AcTab({ s, set, setOverride, auto, val, trio, primary, tableCap, skill,
 }
 
 function CombatTab({ s, set, setOverride, auto, val, trio, primary, caps, skill }: TabProps & { caps: Caps }) {
-  const lvl = s.level
-  const capOf = (id: number) => caps.skills.find((x) => x.id === id)?.cap ?? 0
-  const weaponName = WEAPON_SKILLS.find(([id]) => id === s.weapon)?.[1] ?? 'Hand to Hand'
-  const wsk = skill(s.weapon)
-  const offense = windowOffense(wsk, s.strength)
-  const acc = baseAccuracy(skill(OFFENSE), wsk)
-  const da = skill(DOUBLE_ATTACK)
-  const dw = skill(DUAL_WIELD)
-  const dp = doubleAttackChance(da, lvl, s.doubleAttackBonus)
-  const canTriple = trio.some((c) => TRIPLE_CLASSES.includes(c))
-  const taRoll = canTriple ? tripleAttackChance(skill(TRIPLE_ATTACK)) : 0
-  const wp = capOf(DUAL_WIELD) ? dualWieldChance(dw, lvl, val('ambidexterity')) : 0
-  const swings = swingsPerRound({ double: dp, triple: taRoll, dual: wp, doubleSkill: da })
-  const innate = trio.some((c) => c === 'war' || c === 'ber') && lvl >= 12
-  const classic = classicCritChance({ innate, dex: s.dexterity, heroicDex: s.heroicDex, dexCap: s.dexCap, spa169: val('spa169'), difficulty: s.critDifficulty })
-  const crit = s.measuredCrit > 0 ? s.measuredCrit / 100 : classic.p
-  const monk = trio.includes('mnk')
-  const melee = trio.some((c) => MELEE_CLASSES.includes(c))
-
-  const notes: Note[] = [
-    ['good', `Attack line: ${num(offense)} / ${num(acc)}.`, `Offense is your ${weaponName} skill (${num(wsk)}) plus ${num(strengthOffense(s.strength))} from strength. Accuracy is Offense skill + weapon skill + 17, times 1.21. Both are EQEmu's formulas and match the stats window exactly.`],
-    ['good', `${swings.toFixed(3)} swings a round.`, "EQEmu's attack rounds: double attack over 500, triple attack as skill ÷ (skill + 800) after a double, dual wield over 375. Hour-long parses on the test dummies matched it to within 0.01."]
-  ]
-  if (val('attackAA') || s.itemATK)
-    notes.push(['', 'ATK does not show in the window.', `Your ${num(val('attackAA') + s.itemATK)} ATK from AAs and gear is left out of Offense, as the window leaves it out.`])
-  if (s.measuredCrit > 0) notes.push(['good', 'Using your measured crit rate.', `The classic model gives ${pct(classic.p)} for this character, which parses contradict. The measurement wins.`])
-  notes.push([
-    'warn',
-    "The classic crit model does not hold on EverQuest Legends.",
-    'Parses give 11-12% for classes the classic model says cannot crit, unmoved by stance or a 50-point dexterity buff. Enter a measured rate.'
-  ])
-  if (val('spa169') > 40) notes.push(['warn', 'That crit bonus looks like an EQ Live number.', 'Combat Fury tops out at 5% on EverQuest Legends; Live values run to 230%.'])
-  if (capOf(DUAL_WIELD) && da && da < 150) notes.push(['', 'Your offhand cannot double attack yet.', `That needs a double attack skill of 150; yours is ${num(da)}.`])
-  if (melee)
-    notes.push(
-      offense < 115
-        ? ['warn', 'Under 115 Offense you get no damage bonus.', `EQEmu gates the melee damage table at 115 and you are at ${num(offense)}.`]
-        : ['', `Your damage table averages ${damageBonusPct(monk, offense).toFixed(1)}% of base.`, `${monk ? 'Monks have their own row' : 'The standard row'} in EQEmu's table.`]
-    )
-
-  const rows: Row[] = [
-    ['#Attack line'],
-    [`${weaponName} skill`, wsk],
-    [`strength ${num(s.strength)}: (2 × str − 150) ÷ 3`, `+${num(strengthOffense(s.strength))}`, 'Mob::offense'],
-    ['Offense', offense, 'first number'],
-    [`Offense skill (cap ${num(capOf(OFFENSE))})`, skill(OFFENSE)],
-    [`(Offense + ${weaponName} + 17) × 121 ÷ 100`, acc, 'compute_tohit'],
-    ['in Offensive (+25%)', stanceAccuracy(acc, 25)],
-    ['#Swings'],
-    [`double attack (${num(da)} + level ${lvl}) / 500${s.doubleAttackBonus ? ` × ${100 + s.doubleAttackBonus}%` : ''}`, pct(dp), 'CheckDoubleAttack'],
-    ...(canTriple
-      ? ([
-          [`triple attack skill ${num(skill(TRIPLE_ATTACK))}: c × 100 / (c + 800)`, pct(taRoll), 'CheckTripleAttack'],
-          ['per round, after a double', pct(dp * taRoll)]
-        ] as [string, string, string?][])
-      : []),
-    ...(capOf(DUAL_WIELD)
-      ? ([[`dual wield (${num(dw)} + level ${lvl}${val('ambidexterity') ? ` + ${val('ambidexterity')}` : ''}) / 375`, pct(wp), 'CheckDualWield']] as [string, string, string][])
-      : []),
-    ['average swings a round', swings.toFixed(3)],
-    ['#Crit'],
-    ...(s.measuredCrit > 0 ? ([['your measured rate', pct(s.measuredCrit / 100), 'from a parse']] as [string, string, string][]) : []),
-    ['innate melee crit (classic model)', innate ? 'yes' : 'no', innate ? 'Warrior or Berserker' : ''],
-    ['classic model', pct(classic.p), `term ${classic.term.toFixed(1)} against ${num(s.critDifficulty)}`]
-  ]
+  const { weaponName, offense, acc, dp, crit, swings, notes, rows } = combatReport(s, val, trio, caps, skill)
 
   return (
     <div className="stack" style={{ gap: 14 }}>
@@ -715,7 +523,7 @@ function CombatTab({ s, set, setOverride, auto, val, trio, primary, caps, skill 
   )
 }
 
-function SkillsCard({ s, set, caps, trio }: { s: StatsSheet; set: (p: Partial<StatsSheet>) => void; caps: Caps; trio: string[] }) {
+function SkillsCard({ s, set, caps, trio }: { s: StatsSheet; set: SetSheet; caps: Caps; trio: string[] }) {
   return (
     <div className="card stack" style={{ gap: 10 }}>
       <h2>
@@ -724,7 +532,14 @@ function SkillsCard({ s, set, caps, trio }: { s: StatsSheet; set: (p: Partial<St
           <button className="btn ghost small" onClick={() => set({ skills: Object.fromEntries(caps.skills.map((x) => [x.id, x.cap])) })}>
             All capped
           </button>
-          <button className="btn ghost small" onClick={() => set({ skills: {} })}>
+          <button
+            className="btn ghost small"
+            onClick={() => {
+              const before = s.skills
+              set({ skills: {} })
+              showUndo('Skills cleared.', () => set({ skills: before }))
+            }}
+          >
             Clear
           </button>
         </span>
@@ -753,6 +568,7 @@ function SkillsCard({ s, set, caps, trio }: { s: StatsSheet; set: (p: Partial<St
                 max={x.cap}
                 value={s.skills[x.id] ?? ''}
                 placeholder="0"
+                aria-label={`${skillName(x.id)} skill`}
                 onChange={(e) => {
                   const next = { ...s.skills }
                   if (e.target.value === '') delete next[x.id]
@@ -768,7 +584,7 @@ function SkillsCard({ s, set, caps, trio }: { s: StatsSheet; set: (p: Partial<St
   )
 }
 
-function StanceCard({ s, set, baseAcc, weaponName }: { s: StatsSheet; set: (p: Partial<StatsSheet>) => void; baseAcc: number; weaponName: string }) {
+function StanceCard({ s, set, baseAcc, weaponName }: { s: StatsSheet; set: SetSheet; baseAcc: number; weaponName: string }) {
   const D = Math.max(1, Math.floor(s.targetAvoidance || 1))
   const [solveNote, setSolveNote] = useState('')
   const stances = s.stances.map((st) => ({ ...st, acc: stanceAccuracy(baseAcc, st.pct) }))
@@ -796,15 +612,15 @@ function StanceCard({ s, set, baseAcc, weaponName }: { s: StatsSheet; set: (p: P
           {stances.map((st, i) => (
             <tr key={i}>
               <td>
-                <input value={st.name} maxLength={40} onChange={(e) => setStance(i, { name: e.target.value })} />
+                <input value={st.name} maxLength={40} aria-label={`Stance ${i + 1} name`} onChange={(e) => setStance(i, { name: e.target.value })} />
               </td>
               <td>
-                <input type="number" min={0} max={200} style={{ width: 70 }} value={st.pct} onChange={(e) => setStance(i, { pct: Math.max(0, Math.min(200, Math.floor(Number(e.target.value) || 0))) })} />
+                <input type="number" min={0} max={200} style={{ width: 70 }} aria-label={`${st.name} hit bonus %`} value={st.pct} onChange={(e) => setStance(i, { pct: Math.max(0, Math.min(200, Math.floor(Number(e.target.value) || 0))) })} />
               </td>
               <td className="mono">{num(st.acc)}</td>
               <td className="mono">{pct(hitChance(st.acc, D))}</td>
               <td>
-                <button className="btn ghost small" disabled={s.stances.length < 2} onClick={() => set({ stances: s.stances.filter((_, j) => j !== i) })}>
+                <button className="btn ghost small x-btn" aria-label={`Remove ${st.name}`} disabled={s.stances.length < 2} onClick={() => set({ stances: s.stances.filter((_, j) => j !== i) })}>
                   ×
                 </button>
               </td>
@@ -933,8 +749,8 @@ function CharacterTab({
   gear
 }: {
   s: StatsSheet
-  set: (p: Partial<StatsSheet>) => void
-  val: TabProps['val']
+  set: SetSheet
+  val: Val
   trio: string[]
   primary: string
   skill: (id: number) => number

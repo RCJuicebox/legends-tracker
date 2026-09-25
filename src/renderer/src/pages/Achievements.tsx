@@ -1,6 +1,10 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { api, ago } from '../api'
 import { useRemembered } from '../remember'
+import { useInvoke } from '../hooks'
+import { showError } from '../toast'
+import { Pending } from '../components/ui'
+import { numExact as num, who } from '../format'
 import {
   AchievementBook,
   compareNames,
@@ -16,33 +20,41 @@ import {
 import { HUNT } from '../../../core/achievementHunt'
 import type { AchievementsView } from '../../../shared/types'
 
-const num = (n: number) => n.toLocaleString()
-const who = (key: string) => key.replace('_', ' · ')
 const isKill = (sectionName: string) => /hunter|raids/i.test(sectionName)
 
 interface Toast {
   id: number
-  html: string
+  body: ReactNode
 }
 
+/** Open and closed blocks are remembered by name; at most this many, the newest kept. */
+const OPEN_KEEP = 1000
+
 function useAchievements() {
-  const [chars, setChars] = useState<{ current: string; available: string[] } | null>(null)
+  const charsQ = useInvoke<{ current: string; available: string[] }>('achievements:characters')
+  const chars = charsQ.data
+  const reloadChars = charsQ.reload
   const [picked, setPicked] = useRemembered<string>('ach.character', '')
-  const [view, setView] = useState<AchievementsView | null>(null)
-  useEffect(() => {
-    void api.invoke<{ current: string; available: string[] }>('achievements:characters').then(setChars)
-  }, [])
   const character = picked && chars?.available.includes(picked) ? picked : chars?.current || chars?.available[0] || ''
+  const viewQ = useInvoke<AchievementsView>(chars ? 'achievements:load' : null, [character])
+  const setView = viewQ.setData
   useEffect(() => {
     if (!chars) return
-    void api.invoke<AchievementsView>('achievements:load', character).then(setView)
-    return api.on('state:achievements', (v: AchievementsView) => v.character === character && setView(v))
-  }, [character, chars])
-  return { chars, character, setCharacter: setPicked, view, setView }
+    return api.on('state:achievements', (v: AchievementsView) => {
+      if (v.character === character) setView(v)
+      // A character's first export: it joins the list.
+      if (!chars.available.includes(v.character)) reloadChars()
+    })
+  }, [character, chars, setView, reloadChars])
+  const retry = () => {
+    reloadChars()
+    viewQ.reload()
+  }
+  return { chars, character, setCharacter: setPicked, view: viewQ.data, setView, error: charsQ.error || viewQ.error, retry }
 }
 
 export function Achievements() {
-  const { chars, character, setCharacter, view, setView } = useAchievements()
+  const { chars, character, setCharacter, view, setView, error, retry } = useAchievements()
   const [cat, setCat] = useRemembered<string>('ach.cat', '')
   const [sec, setSec] = useRemembered<string>('ach.sec', '')
   const [remaining, setRemaining] = useRemembered<boolean>('ach.remaining', true)
@@ -63,6 +75,15 @@ export function Achievements() {
   const catSections = book ? book.sections.map((s, si) => ({ s, si })).filter((x) => x.s.cat === curCat) : []
   const cur = catSections.find((x) => secKey(x.s) === sec) ?? catSections[0]
 
+  // Forget blocks no longer in the book, and keep the list from growing without end.
+  useEffect(() => {
+    if (!book) return
+    const known = new Set(book.sections.flatMap((s) => s.ach.map((a) => `${secKey(s)} > ${a.n}`)))
+    const kept = Object.entries(open).filter(([k]) => known.has(k))
+    const trimmed = kept.slice(-OPEN_KEEP)
+    if (trimmed.length !== Object.keys(open).length) setOpen(Object.fromEntries(trimmed))
+  }, [book])
+
   useEffect(() => {
     if (!flash) return
     document.getElementById(flash)?.scrollIntoView({ block: 'center' })
@@ -70,11 +91,11 @@ export function Achievements() {
     return () => clearTimeout(t)
   }, [flash])
 
-  if (!chars || !view) return <div className="empty">Loading…</div>
+  if (!chars || !view) return <Pending what="your achievements" error={error} retry={retry} />
 
-  const toast = (html: string) => {
+  const toast = (body: ReactNode) => {
     const id = ++toastId.current
-    setToasts((t) => [...t.slice(-3), { id, html }])
+    setToasts((t) => [...t.slice(-3), { id, body }])
     setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), 4200)
   }
 
@@ -84,16 +105,26 @@ export function Achievements() {
     const after = new AchievementBook(view.sections, marks)
     const newlyDone: string[] = []
     after.sections.forEach((s, si) => s.ach.forEach((a, ai) => after.achDone([si, ai]) && !before.achDone([si, ai]) && newlyDone.push(a.n)))
-    for (const n of [...new Set(newlyDone)]) toast(`You have completed the achievement: <b>${escapeHtml(n)}</b>`)
+    for (const n of [...new Set(newlyDone)])
+      toast(
+        <>
+          You have completed the achievement: <b>{n}</b>
+        </>
+      )
     setView({ ...view, marks })
-    void api.invoke('achievements:marks', view.character, marks)
+    api.invoke('achievements:marks', view.character, marks).catch((e) => showError('Could not save your ticks', e))
   }
 
   const tick = (r: ObjRef, on: boolean) => {
     const targets = book!.tickTargets(r)
     setTouched((t) => new Set([...t, ...targets.map(([si, ai, ci]) => `${si}:${ai}:${ci}`), ...targets.map(([si, ai]) => `a:${si}:${ai}`)]))
     const c = book!.sections[r[0]].ach[r[1]].c[r[2]]
-    if (on && isKill(book!.sections[r[0]].name)) toast(`You have slain <b>${escapeHtml(c.t)}</b>!`)
+    if (on && isKill(book!.sections[r[0]].name))
+      toast(
+        <>
+          You have slain <b>{c.t}</b>!
+        </>
+      )
     saveMarks(book!.withTick(r, on, view.marks))
   }
 
@@ -127,7 +158,7 @@ export function Achievements() {
       </div>
       {chars.available.length > 1 && (
         <div className="actions">
-          <select value={character} onChange={(e) => setCharacter(e.target.value)}>
+          <select aria-label="Character" value={character} onChange={(e) => setCharacter(e.target.value)}>
             {chars.available.map((c) => (
               <option key={c} value={c}>
                 {who(c)}
@@ -196,13 +227,14 @@ export function Achievements() {
         </div>
       </div>
 
-      <div className="ach-tabs">
+      <div className="ach-tabs" role="group" aria-label="Category">
         {cats.map((c) => {
           const s = book.categoryStats(c)
           return (
             <button
               key={c}
               className={`ach-tab${c === curCat && !query ? ' on' : ''}${s.trackable && s.done === s.trackable ? ' complete' : ''}`}
+              aria-pressed={c === curCat && !query}
               onClick={() => {
                 const first = book.sections.find((x) => x.cat === c)
                 chooseSection(first ? secKey(first) : '', c)
@@ -217,13 +249,14 @@ export function Achievements() {
         })}
       </div>
 
-      <div className="ach-chips">
+      <div className="ach-chips" role="group" aria-label="Section">
         {catSections.map(({ s, si }) => {
           const st = book.sectionStats(si)
           return (
             <button
               key={si}
               className={`ach-chip${cur?.si === si && !query ? ' on' : ''}${st.trackable && st.done === st.trackable ? ' complete' : ''}`}
+              aria-pressed={cur?.si === si && !query}
               onClick={() => chooseSection(secKey(s))}
             >
               {s.name}
@@ -236,8 +269,8 @@ export function Achievements() {
       </div>
 
       <div className="row ach-controls">
-        <input className="grow" type="search" placeholder="Find an achievement or objective in any section" value={q} onChange={(e) => setQ(e.target.value)} />
-        <button className={`btn${remaining ? ' on' : ' ghost'}`} onClick={() => setRemaining(!remaining)}>
+        <input className="grow" type="search" placeholder="Find an achievement or objective in any section" aria-label="Find an achievement or objective" value={q} onChange={(e) => setQ(e.target.value)} />
+        <button className={`btn${remaining ? ' on' : ' ghost'}`} aria-pressed={remaining} onClick={() => setRemaining(!remaining)}>
           Remaining only
         </button>
         <button
@@ -262,14 +295,16 @@ export function Achievements() {
         <div className="empty">No sections in this export.</div>
       )}
 
-      <p className="faint small" style={{ marginTop: 18 }}>
+      <p className="faint small mt-18">
         Optional objectives never count toward completion, the same way the game scores them. An objective that names another
         achievement follows that achievement; click it to jump there. Your ticks are kept when the game writes a new export.
       </p>
 
       <div className="ach-toasts" aria-live="polite">
         {toasts.map((x) => (
-          <div key={x.id} className="ach-toast" dangerouslySetInnerHTML={{ __html: x.html }} />
+          <div key={x.id} className="ach-toast">
+            {x.body}
+          </div>
         ))}
       </div>
     </div>
@@ -372,6 +407,7 @@ function SectionView({
     return (
       <button
         className={`btn small${d ? ' on' : ' ghost'}`}
+        aria-pressed={!!d}
         title={`Sort by ${label}, then reverse, then back to the game's own order`}
         onClick={() => setSort({ ...ctx.sort, [k]: { ...sort, [which]: d === 1 ? -1 : d === -1 ? 0 : 1 } })}
       >
@@ -397,6 +433,7 @@ function SectionView({
         {sortBtn('blk', zoned ? 'Zone' : 'Achievement')}
         <button
           className={`btn small${ctx.hideOpt[k] ? ' on' : ' ghost'}`}
+          aria-pressed={!!ctx.hideOpt[k]}
           disabled={!st.opt}
           title={st.opt ? '' : 'No optional objectives in this section'}
           onClick={() => setHideOpt({ ...ctx.hideOpt, [k]: !ctx.hideOpt[k] })}
@@ -499,7 +536,7 @@ function Block({ book, r, rows, query, ctx }: { book: AchievementBook; r: AchRef
           {rows.length ? (
             rows.map(({ c, ci }) => <ObjectiveRow key={ci} book={book} r={[si, ai, ci]} c={c} label={c.t} ctx={ctx} />)
           ) : (
-            <div className="faint small" style={{ padding: 8 }}>
+            <div className="faint small p-8">
               {ctx.remaining && !query ? 'Nothing left here.' : 'No matches.'}
             </div>
           )}
@@ -607,8 +644,4 @@ function ObjectiveRow({ book, r, c, label, sub, ctx, single }: { book: Achieveme
       {zone}
     </label>
   )
-}
-
-function escapeHtml(s: string): string {
-  return s.replace(/[&<>"']/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[ch]!)
 }

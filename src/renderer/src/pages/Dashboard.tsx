@@ -1,6 +1,8 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useApp } from '../state'
-import { api, ago, mb } from '../api'
+import { ago, mb } from '../api'
+import { act } from '../toast'
+import { OVERLAY_BUFFS } from '../constants'
 import { TimerBars, useNow } from '../components/TimerBars'
 import { Icon } from '../components/ui'
 import { GameFolderPrompt } from '../components/GameFolder'
@@ -22,8 +24,9 @@ export function Dashboard({ go }: { go: (p: PageId) => void }) {
   const motes = useMotes()
   const crawl = motes?.active
   const now = Date.now()
-  const buffs = timers.filter((t) => t.overlay === 'buffs')
-  const others = timers.filter((t) => t.overlay !== 'buffs')
+  const buffs = useMemo(() => timers.filter((t) => t.overlay === OVERLAY_BUFFS), [timers])
+  const others = useMemo(() => timers.filter((t) => t.overlay !== OVERLAY_BUFFS), [timers])
+  const recent = useMemo(() => [...feed].reverse(), [feed])
 
   return (
     <>
@@ -34,18 +37,23 @@ export function Dashboard({ go }: { go: (p: PageId) => void }) {
         </div>
         <div className="actions">
           {status.watching ? (
-            <button className="btn" onClick={() => api.invoke('watch:stop')}>
+            <button className="btn" onClick={() => void act('watch:stop')}>
               <Icon name="stop" /> Stop watching
             </button>
           ) : (
-            <button className="btn primary" onClick={() => api.invoke('watch:start')} disabled={!settings.logFile}>
+            <button
+              className="btn primary"
+              onClick={() => void act('watch:start')}
+              disabled={!settings.logFile}
+              title={settings.logFile ? undefined : 'Choose a character log in Settings first'}
+            >
               <Icon name="play" /> Start watching
             </button>
           )}
-          <button className={`btn${state.arranging ? ' on' : ''}`} onClick={() => api.invoke('overlays:arrange', !state.arranging)}>
+          <button className={`btn${state.arranging ? ' on' : ''}`} aria-pressed={state.arranging} onClick={() => void act('overlays:arrange', !state.arranging)}>
             <Icon name="move" /> {state.arranging ? 'Lock overlays' : 'Arrange overlays'}
           </button>
-          <button className={`btn${settings.audio.muted ? ' on' : ''}`} onClick={() => patchSettings((s) => ({ ...s, audio: { ...s.audio, muted: !s.audio.muted } }))}>
+          <button className={`btn${settings.audio.muted ? ' on' : ''}`} aria-pressed={settings.audio.muted} onClick={() => patchSettings((s) => ({ ...s, audio: { ...s.audio, muted: !s.audio.muted } }))}>
             <Icon name="mute" /> {settings.audio.muted ? 'Unmute' : 'Mute'}
           </button>
         </div>
@@ -53,12 +61,12 @@ export function Dashboard({ go }: { go: (p: PageId) => void }) {
 
       <GameFolderPrompt />
       {settings.installDir && !status.spellError && !settings.logFile && (
-        <div className="notice" style={{ marginBottom: 16 }}>
+        <div className="notice mb-16">
           No character log selected. <button className="btn small" onClick={() => go('settings')}>Choose one</button>
         </div>
       )}
 
-      <div className="grid four" style={{ marginBottom: 16 }}>
+      <div className="grid four mb-16">
         <div className="card stat">
           <span className="label">Status</span>
           <span className="value row tight">
@@ -72,23 +80,23 @@ export function Dashboard({ go }: { go: (p: PageId) => void }) {
           <span className="value">{status.character || '—'}</span>
           <span className="sub">{status.zone || 'zone unknown'}</span>
         </div>
-        <div className="card stat" style={{ cursor: 'pointer' }} onClick={() => go('motes')}>
+        <button className="card stat card-button" onClick={() => go('motes')}>
           <span className="label">{crawl ? (crawl.kind === 'manual' ? 'Session motes' : 'Instance run motes') : 'Motes today'}</span>
           <span className="value">
             {crawl ? `${totalMotes(crawl.motes)} · ${perHour(totalMotes(crawl.motes), sessionHours(crawl, now))}/h` : totalMotes(motes?.daily[localDay(now)] ?? {})}
           </span>
           <span className="sub">{crawl ? `${crawl.pausedSince ? 'Paused · ' : ''}${crawl.name}` : 'no run in progress'}</span>
-        </div>
-        <div className="card stat" style={{ cursor: 'pointer' }} onClick={() => go('logs')}>
+        </button>
+        <button className="card stat card-button" onClick={() => go('logs')}>
           <span className="label">Log size</span>
           <span className="value">{status.logSize ? mb(status.logSize) : '—'}</span>
           <span className="sub">
             {settings.archive.autoEnabled ? `archives at ${settings.archive.thresholdMB} MB` : 'auto-archive off'}
           </span>
-        </div>
+        </button>
       </div>
 
-      <div className="grid two" style={{ marginBottom: 16 }}>
+      <div className="grid two mb-16">
         <div className="card">
           <h2>
             Buffs <span className="chip">{buffs.length}</span>
@@ -110,8 +118,8 @@ export function Dashboard({ go }: { go: (p: PageId) => void }) {
           </h2>
           <div className="feed">
             {feed.length === 0 && <div className="empty">Nothing yet.</div>}
-            {[...feed].reverse().map((f, i) => (
-              <div className="feed-item" key={`${f.at}-${i}`}>
+            {recent.map((f) => (
+              <div className="feed-item" key={f.id}>
                 <span className="t">{new Date(f.at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</span>
                 <span className={`k k-${f.kind}`}>{f.kind}</span>
                 <span>{f.text}</span>
@@ -122,19 +130,19 @@ export function Dashboard({ go }: { go: (p: PageId) => void }) {
         <div className="card">
           <h2>
             Try it <span className="spacer" />
-            <button className="btn small" onClick={() => api.invoke('overlays:demo')}>
+            <button className="btn small" onClick={() => void act('overlays:demo')}>
               <Icon name="sparkle" /> Show demo timers
             </button>
           </h2>
-          <p className="muted small" style={{ marginTop: 0 }}>
+          <p className="muted small mt-0">
             Paste log lines to run them through the live tracker and triggers, with their times moved to now. Useful for
             checking a trigger before relying on it.
           </p>
           {simOpen ? (
-            <div className="stack" style={{ gap: 8 }}>
-              <textarea className="mono" rows={7} value={sim} onChange={(e) => setSim(e.target.value)} placeholder={SAMPLE} />
+            <div className="stack gap-8">
+              <textarea className="mono" rows={7} value={sim} aria-label="Log lines to run" onChange={(e) => setSim(e.target.value)} placeholder={SAMPLE} />
               <div className="row">
-                <button className="btn primary" onClick={() => api.invoke('simulate', sim || SAMPLE)}>
+                <button className="btn primary" onClick={() => void act('simulate', sim || SAMPLE)}>
                   Run lines
                 </button>
                 <button className="btn ghost" onClick={() => setSim(SAMPLE)}>
