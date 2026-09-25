@@ -36,6 +36,8 @@ interface Draft {
 let kept: Draft | null = null
 
 const same = (a: Trigger[], b: Trigger[]) => a === b || JSON.stringify(a) === JSON.stringify(b)
+// One empty list while nothing is loaded, so the memos below don't see a new one every render.
+const NO_TRIGGERS: Trigger[] = []
 
 export function Triggers() {
   const { state } = useApp()
@@ -63,8 +65,8 @@ export function Triggers() {
     }
   }, [attempt])
 
-  const list = draft?.list ?? []
-  const saved = draft?.saved ?? []
+  const list = draft?.list ?? NO_TRIGGERS
+  const saved = draft?.saved ?? NO_TRIGGERS
   const selected = draft?.selected ?? null
   const setList = (fn: (l: Trigger[]) => Trigger[]) => setDraft((d) => (d ? { ...d, list: fn(d.list) } : d))
   const setSelected = (id: string | null) => setDraft((d) => (d ? { ...d, selected: id } : d))

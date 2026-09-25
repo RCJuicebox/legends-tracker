@@ -33,7 +33,7 @@ export function Stats() {
   const [aaStatus, setAaStatus] = useState('')
 
   const s = useMemo(() => readSheet(charSheet?.stats), [charSheet])
-  const trio = useMemo(() => classTrio(s), [s.classes])
+  const trio = useMemo(() => classTrio(s), [s])
   const capsQ = useInvoke<Caps>('stats:caps', [trio, s.level])
   const caps = capsQ.data
 
@@ -69,9 +69,13 @@ export function Stats() {
     }
   }
   // First visit for a character: look for AAs without being asked.
+  // Once per character and sheet arrival, not on every edit: readAas writes through updateSheet,
+  // which always works on the latest sheet, so nothing it reads can be stale.
+  const hasSheet = !!charSheet
   useEffect(() => {
-    if (charSheet && !s.aa) void readAas(true)
-  }, [character, !!charSheet])
+    if (hasSheet && !s.aa) void readAas(true)
+    // oxlint-disable-next-line react-hooks/exhaustive-deps -- deliberately keyed on character and sheet arrival
+  }, [character, hasSheet])
 
   if (!exports || !view || !charSheet || !caps)
     return (

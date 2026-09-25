@@ -1,0 +1,20 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "plugins": ["typescript", "react", "import"],
+  "categories": { "correctness": "error" },
+  "rules": {
+    "react-hooks/rules-of-hooks": "error",
+    "react-hooks/exhaustive-deps": "error",
+    "import/no-cycle": "error",
+
+    // The five below are React Compiler rules:
+    // they flag what the compiler could not auto-memoize.
+    // This app does not use the compiler, and its useNow clock and latest-value refs are deliberate.
+    "react/refs": "off",
+    "react/purity": "off",
+    "react/set-state-in-effect": "off",
+    "react/preserve-manual-memoization": "off",
+    "react/use-memo": "off"
+  },
+  "ignorePatterns": ["out/**", "dist/**", "node_modules/**", "tests/fixtures/**"]
+}

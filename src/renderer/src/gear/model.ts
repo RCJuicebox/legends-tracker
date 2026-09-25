@@ -98,10 +98,12 @@ export function useInventory(character: string, ready: boolean, exportsKey = '')
     },
     [call]
   )
+  const { reload: reloadInv } = inv
+  const { reload: reloadSheet } = sheetQ
   const reload = useCallback(() => {
-    inv.reload()
-    sheetQ.reload()
-  }, [inv.reload, sheetQ.reload])
+    reloadInv()
+    reloadSheet()
+  }, [reloadInv, reloadSheet])
 
   return { view: inv.data, setView, sheet, updateSheet, error: inv.error || sheetQ.error, reload }
 }

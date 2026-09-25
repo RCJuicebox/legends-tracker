@@ -37,6 +37,7 @@ export function useInvoke<T>(channel: string | null, args: unknown[] = [], deps:
     return () => {
       live = false
     }
+    // oxlint-disable-next-line react-hooks/exhaustive-deps -- `deps` is this hook's own dependency list, passed through like useEffect's
   }, [channel, key, tick, ...deps])
   const reload = useCallback(() => setTick((t) => t + 1), [])
   const setData = useCallback((next: T | null | ((prev: T | null) => T | null)) => {

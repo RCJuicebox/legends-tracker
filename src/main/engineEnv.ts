@@ -1,3 +1,4 @@
+// oxlint-disable-next-line import/default -- electron-vite's ?modulePath import: the build supplies the default export
 import moteWorkerPath from './moteWorker?modulePath'
 import { findInstall, isGameRunning } from './game'
 import type { EngineEnv } from './engine'

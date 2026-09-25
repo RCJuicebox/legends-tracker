@@ -128,7 +128,7 @@ function useCatalog() {
       setAutoRefreshed(true)
       void refresh()
     }
-  }, [state?.file, autoRefreshed])
+  }, [state?.file, state?.progress.busy, autoRefreshed, refresh])
   return { state, refresh, error: q.error, reload }
 }
 
@@ -155,7 +155,9 @@ export function useGearModel(view: InventoryView, sheet: CharacterSheet | null, 
   const factors = useMemo(() => capsQ.data?.factors ?? {}, [capsQ.data])
 
   const stats = (sheet?.stats ?? {}) as { classes?: string[]; level?: number; race?: string }
-  const classes = (stats.classes ?? []).filter(Boolean)
+  // The same array for as long as the classes are the same, so memos and effects can depend on it.
+  const classKey = (stats.classes ?? []).filter(Boolean).join(',')
+  const classes = useMemo(() => (classKey ? classKey.split(',') : []), [classKey])
   const level = stats.level ?? 50
   const role = preset === 'Custom' ? custom : (ROLE_PRESETS[preset] ?? ROLE_PRESETS.Balanced)
   // What a point of each stat buys this character: its classes, its current stats (the Stats
@@ -197,7 +199,7 @@ export function useGearModel(view: InventoryView, sheet: CharacterSheet | null, 
   const twoHanders = twoHandMode === 'any' || (twoHandMode === 'auto' && !secondaryInUse)
   const inv = view.inventory!
   const owned = useMemo(() => new Set([...inv.worn, ...inv.bags, ...inv.bank, ...inv.sharedBank].flatMap((i) => [itemKey(i.name), ...i.augs.map((a) => itemKey(a.name))])), [inv])
-  const wearer = useMemo<Wearer>(() => ({ classes, race: stats.race === 'iksar' ? 'IKS' : '', level }), [classes.join(','), stats.race, level])
+  const wearer = useMemo<Wearer>(() => ({ classes, race: stats.race === 'iksar' ? 'IKS' : '', level }), [classes, stats.race, level])
 
   const items = state?.file?.items
   const eraStatus = state?.file?.eraStatus
@@ -239,7 +241,7 @@ export function useGearModel(view: InventoryView, sheet: CharacterSheet | null, 
     return () => {
       live = false
     }
-  }, [items, classes.join(','), level, view.character, days])
+  }, [items, classes, level, view.character, days])
   // Only lines that touch a spell the character casts are worth anything.
   const lines = useMemo(() => (report?.lines ?? []).filter((l) => l.share > 0), [report])
   const idleLines = useMemo(() => (report?.lines ?? []).filter((l) => l.share === 0), [report])

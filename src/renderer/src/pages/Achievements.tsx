@@ -76,14 +76,18 @@ export function Achievements() {
   const cur = catSections.find((x) => secKey(x.s) === sec) ?? catSections[0]
 
   // Forget blocks no longer in the book, and keep the list from growing without end.
+  // An export that failed to read has no sections; that is no reason to forget anything.
+  const readFailed = !!view?.error
+  const known = useMemo(
+    () => (book && book.sections.length ? new Set(book.sections.flatMap((s) => s.ach.map((a) => `${secKey(s)} > ${a.n}`))) : null),
+    [book]
+  )
   useEffect(() => {
-    // An export that failed to read has no sections; that is no reason to forget anything.
-    if (!book || !book.sections.length || view?.error) return
-    const known = new Set(book.sections.flatMap((s) => s.ach.map((a) => `${secKey(s)} > ${a.n}`)))
+    if (!known || readFailed) return
     const kept = Object.entries(open).filter(([k]) => known.has(k))
     const trimmed = kept.slice(-OPEN_KEEP)
     if (trimmed.length !== Object.keys(open).length) setOpen(Object.fromEntries(trimmed))
-  }, [book])
+  }, [known, readFailed, open, setOpen])
 
   useEffect(() => {
     if (!flash) return
