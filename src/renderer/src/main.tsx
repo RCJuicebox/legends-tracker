@@ -19,9 +19,11 @@ import { Achievements } from './pages/Achievements'
 import { Gear } from './pages/Gear'
 import { Stats } from './pages/Stats'
 import { Loot } from './pages/Loot'
+import { DamageMeter } from './pages/DamageMeter'
 
 const PAGES = [
   { id: 'dashboard', group: 'Play', label: 'Live', icon: 'dashboard', el: Dashboard },
+  { id: 'meter', group: 'Play', label: 'Damage Meter', icon: 'meter', el: DamageMeter },
   { id: 'spells', group: 'Play', label: 'Spell Timers', icon: 'spells', el: Spells },
   { id: 'motes', group: 'Play', label: 'Motes', icon: 'motes', el: Motes },
   { id: 'loot', group: 'Play', label: 'Loot', icon: 'loot', el: Loot },

@@ -74,7 +74,7 @@ Setting `EQL_USER_DATA` to another folder runs against a separate profile.
 
 ## Damage meter
 
-The Live page's first card, and a floating overlay of its own. Every combat line the game prints is
+Its own page under Play, and a floating overlay of its own. Every combat line the game prints is
 read into it: your melee, spells, DoT ticks and damage shields, your pet's, your group's, strangers
 fighting near you, and everything hitting your side.
 

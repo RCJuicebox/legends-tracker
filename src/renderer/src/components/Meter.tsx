@@ -59,7 +59,7 @@ function SegmentPicker({ list, span, selection, onChange, live }: { list: Segmen
   )
 }
 
-export function Meter() {
+export function Meter({ standalone = false }: { standalone?: boolean }) {
   const { state, patchSettings } = useApp()
   const snap = useCombat()
   const [span, setSpan] = useRemembered<MeterSpan>('meter.span', 'fight')
@@ -99,11 +99,18 @@ export function Meter() {
   return (
     <div className="card dm">
       <div className="dm-head">
-        <h2 className="m-0">
-          Damage meter
-          {snap?.reading && <span className="chip warn">{snap.reading}</span>}
-          {live?.open && span === 'fight' && <span className="chip ok">in combat</span>}
-        </h2>
+        {standalone ? (
+          <span className="row tight">
+            {snap?.reading && <span className="chip warn">{snap.reading}</span>}
+            {live?.open && span === 'fight' && <span className="chip ok">in combat</span>}
+          </span>
+        ) : (
+          <h2 className="m-0">
+            Damage meter
+            {snap?.reading && <span className="chip warn">{snap.reading}</span>}
+            {live?.open && span === 'fight' && <span className="chip ok">in combat</span>}
+          </h2>
+        )}
         <span className="spacer" />
         <button className="btn small" onClick={() => void act('combat:newSession')} title="Close the current session and start a new one counting from now">
           <Icon name="flag" /> New session
