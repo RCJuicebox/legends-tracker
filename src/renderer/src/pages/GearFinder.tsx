@@ -32,8 +32,11 @@ import { FocusTab, OptimizeTab } from './GearFocus'
 
 /** AC past the soft cap is worth a quarter of AC under it, in every weighting. */
 const AC_OVER_CAP = 0.25
-/** What a wanted focus effect is worth at the best rank there is, in score points, to start with. */
+/** Points, to start with, for a focus that made every spell cast 10% better. */
 const DEFAULT_FOCUS_POINTS = 300
+
+/** The focus report, with the window of casts it was judged on. */
+export type FocusData = FocusReport & { window: { total: number; from: string; to: string } | null }
 
 interface CatalogState {
   file: { fetchedAt: number; items: CatalogItem[]; eraStatus?: Record<string, 'in' | 'out'>; format?: number } | null
@@ -99,7 +102,10 @@ export interface GearModel {
   catalog: CatalogItem[]
   /** Focus names an item carries: its own and its exaltations'. */
   fociOf: (item: InvItem) => { name: string; via: string }[]
-  report: FocusReport | null
+  report: FocusData | null
+  /** Days of casting the foci are judged on; 0 for all of it. */
+  days: number
+  setDays: (n: number) => void
   /** Lines that improve at least one of the character's spells. */
   lines: FocusLine[]
   /** Lines that improve none of them. */
@@ -128,7 +134,8 @@ export function GearFinder({ view, sheet, mode }: { view: InventoryView; sheet: 
   const [slot, setSlot] = useRemembered<string>('finder.slot', 'all')
   const [showWeights, setShowWeights] = useState(false)
   const [capMode, setCapMode] = useRemembered<'auto' | 'over' | 'under'>('finder.acCap', 'auto')
-  const [points, setPoints] = useRemembered<number>('finder.focusPoints', DEFAULT_FOCUS_POINTS)
+  const [points, setPoints] = useRemembered<number>('finder.focusPoints.v2', DEFAULT_FOCUS_POINTS)
+  const [days, setDays] = useRemembered<number>('focus.days', 14)
   const [focusOff, setFocusOff] = useRemembered<string[] | null>(`focus.off.${view.character}`, null)
   const sheetStats = useMemo(() => readSheet(sheet?.stats), [sheet])
   const [acCaps, setAcCaps] = useState<Record<string, { cap: number; mult: number }> | null>(null)
@@ -217,14 +224,15 @@ export function GearFinder({ view, sheet, mode }: { view: InventoryView; sheet: 
     },
     [byKey]
   )
-  const [report, setReport] = useState<FocusReport | null>(null)
+  const [report, setReport] = useState<FocusData | null>(null)
   useEffect(() => {
     if (!items || !classes.length) return
     const names = [...new Set(items.map((it) => it.focus).filter(Boolean))]
-    void api.invoke<FocusReport | null>('gear:foci', names, classes, level).then(setReport)
-  }, [items, classes.join(','), level])
-  const lines = useMemo(() => (report?.lines ?? []).filter((l) => l.spells > 0), [report])
-  const idleLines = useMemo(() => (report?.lines ?? []).filter((l) => l.spells === 0), [report])
+    void api.invoke<FocusData | null>('gear:foci', names, classes, level, view.character, days).then(setReport)
+  }, [items, classes.join(','), level, view.character, days])
+  // Only lines that touch a spell the character casts are worth anything.
+  const lines = useMemo(() => (report?.lines ?? []).filter((l) => l.share > 0), [report])
+  const idleLines = useMemo(() => (report?.lines ?? []).filter((l) => l.share === 0), [report])
   // Wanted unless turned off. Out of the box that is every line but reagents: Legends' spell file
   // lists no reagents, so there is no telling which spells use one.
   const off = useMemo(() => focusOff ?? lines.filter((l) => l.kind === 'reagent').map((l) => l.key), [focusOff, lines])
@@ -272,12 +280,10 @@ export function GearFinder({ view, sheet, mode }: { view: InventoryView; sheet: 
     for (const list of out.values()) list.sort((a, b) => b.eff - a.eff || Number(b.from === 'worn') - Number(a.from === 'worn'))
     return out
   }, [pieces, report, fociOf, wearer])
-  const worth = useMemo<FocusWorth | null>(() => {
-    if (!report) return null
-    const best = new Map<string, number>()
-    for (const l of lines) best.set(l.key, Math.max(available.get(l.key)?.[0]?.eff ?? 0, ownedFoci.get(l.key)?.[0]?.eff ?? 0))
-    return { points, wanted, best, foci: report.foci }
-  }, [report, lines, available, ownedFoci, points, wanted])
+  const worth = useMemo<FocusWorth | null>(
+    () => (report ? { points, wanted, foci: report.foci, shares: Object.fromEntries(report.uses.map((u) => [u.name, u.share])) } : null),
+    [report, points, wanted]
+  )
   const valueOf = useMemo(() => (names: string[]) => (worth ? focusValue(worth, names) : 0), [worth])
 
   const results = useMemo(() => {
@@ -332,6 +338,8 @@ export function GearFinder({ view, sheet, mode }: { view: InventoryView; sheet: 
     catalog: state.file.items,
     fociOf,
     report,
+    days,
+    setDays,
     lines,
     idleLines,
     wanted,
@@ -605,13 +613,10 @@ function FocusPoints({ points, setPoints, wanted, lines }: { points: number; set
   return (
     <div className="row small" style={{ gap: 10, flexWrap: 'wrap' }}>
       <b>Focus effects</b>
-      <label className="row tight" style={{ gap: 6 }}>
-        each worth
-        <input type="number" min={0} step={25} value={points} style={{ width: 72 }} onChange={(e) => setPoints(Math.max(0, Number(e.target.value) || 0))} />
-        points
-      </label>
+      <span className="muted">making every spell you cast 10% better is worth</span>
+      <input type="number" min={0} step={25} value={points} style={{ width: 72 }} onChange={(e) => setPoints(Math.max(0, Number(e.target.value) || 0))} />
       <span className="muted">
-        at the best rank there is; less for a lower rank. {wanted} of the {lines} that help your spells are wanted (Focus effects tab).
+        points; a focus counts for the spells it touches, by how often you cast them. {wanted} of the {lines} that touch your spells are wanted (Focus effects tab).
       </span>
     </div>
   )

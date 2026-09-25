@@ -1,7 +1,7 @@
 import { useMemo } from 'react'
 import { baseName, slotLabel } from '../../../core/inventory'
 import { restrictions } from '../../../core/upgrades'
-import { KIND_LABELS, KIND_ORDER, type FocusLine } from '../../../core/itemFocus'
+import { focusValue, KIND_LABELS, KIND_ORDER, KIND_WORTH, type FocusInfo, type FocusLine } from '../../../core/itemFocus'
 import { optimizeGear, type Piece } from '../../../core/gearOptimizer'
 import type { FocusCandidate, GearModel, OwnedFocus } from './GearFinder'
 import { Icon, num, pct, source, whereText, wikiUrl } from './gearBits'
@@ -14,11 +14,15 @@ const slotWords = (statsblock: string) =>
     .slots.map((s) => s.toLowerCase())
     .join(' ')
 
-function strengthNote(info: { pct: number; maxLevel: number; decayPct: number; eff: number }, topLevel: number): string {
-  if (!info.maxLevel) return `${pct(info.pct)}, with no level cap`
-  if (info.eff >= info.pct) return `${pct(info.pct)} on spells up to level ${info.maxLevel}: full strength on your level-${topLevel} spells`
-  if (!info.eff) return `${pct(info.pct)} on spells up to level ${info.maxLevel}, and nothing past it: no use on your level-${topLevel} spells`
-  return `${pct(info.pct)} on spells up to level ${info.maxLevel}, ${info.decayPct}% less for each level past it: ${pct(info.eff)} on your level-${topLevel} spells`
+/** What a focus does on paper, then spell by spell on what the character casts. */
+function strengthNote(info: FocusInfo): string {
+  const cap = !info.maxLevel
+    ? `${pct(info.pct)}, with no level cap`
+    : info.decayPct
+      ? `${pct(info.pct)} on spells up to level ${info.maxLevel}, ${info.decayPct}% less for each level past it`
+      : `${pct(info.pct)} on spells up to level ${info.maxLevel}, and nothing past it`
+  const on = Object.entries(info.on).map(([spell, eff]) => `${spell}: ${pct(eff)}`)
+  return [cap, on.length ? 'On the spells you cast:' : 'No use on the spells you cast.', ...on].join('\n')
 }
 
 type Status = { label: string; tone: 'good' | 'warn' | 'bad' | '' }
@@ -49,6 +53,8 @@ export function FocusTab({ m }: { m: GearModel }) {
   }
   const byKind = KIND_ORDER.map((k) => ({ kind: k, lines: m.lines.filter((l) => l.kind === k) })).filter((g) => g.lines.length)
   const wantedCount = m.lines.filter((l) => m.wanted.has(l.key)).length
+  const r = m.report
+  const top = r.uses.slice(0, 6).map((u) => `${u.name} ${u.casts}`)
   return (
     <div className="stack" style={{ gap: 12 }}>
       <div className="card stack" style={{ gap: 8 }}>
@@ -65,14 +71,33 @@ export function FocusTab({ m }: { m: GearModel }) {
             Defaults
           </button>
         </div>
+        <div className="row small" style={{ gap: 10, flexWrap: 'wrap' }}>
+          <b>Judged on what you cast</b>
+          <span className="lt-seg">
+            {(
+              [
+                [7, '7 days'],
+                [14, '14 days'],
+                [30, '30 days'],
+                [0, 'All logs']
+              ] as const
+            ).map(([d, label]) => (
+              <button key={d} className={m.days === d ? 'on' : ''} onClick={() => m.setDays(d)}>
+                {label}
+              </button>
+            ))}
+          </span>
+          <span className="muted">
+            {r.basis === 'casts' && r.window
+              ? `${num(r.window.total)} casts from ${r.window.from} to ${r.window.to}: ${top.join(' · ')}${r.uses.length > 6 ? '…' : ''}`
+              : 'No casts in your log for this window, so every spell your classes get counts alike.'}
+          </span>
+        </div>
         <p className="small muted" style={{ margin: 0 }}>
-          Every focus effect on gear that improves at least one spell your classes cast, with the best there is in the eras shown and the best you own, worn or not
-          (exaltations included). Tick the ones you want: {wantedCount} of {m.lines.length} are. Each wanted focus counts for{' '}
-          <label className="row tight" style={{ display: 'inline-flex', gap: 4 }}>
-            <input type="number" min={0} step={25} value={m.points} style={{ width: 64 }} onChange={(e) => m.setPoints(Math.max(0, Number(e.target.value) || 0))} />
-          </label>{' '}
-          points at the best rank there is in the upgrade finder and the optimizer, a lower rank for less. Only the best focus of a kind works on a spell, so what counts is
-          the best rank you wear in each line.
+          A focus is worth what it does to the spells you actually cast, spell by spell: its strength on each (less on a spell above its level cap), times how often you
+          cast that spell. Only the best focus of a kind works on a spell, as in game. Making every spell you cast 10% better counts as{' '}
+          <input type="number" min={0} step={25} value={m.points} style={{ width: 64 }} onChange={(e) => m.setPoints(Math.max(0, Number(e.target.value) || 0))} /> points in
+          the upgrade finder and the optimizer; spell range and reagents count a quarter as much. Tick the ones you want: {wantedCount} of {m.lines.length} are.
         </p>
       </div>
 
@@ -87,13 +112,14 @@ export function FocusTab({ m }: { m: GearModel }) {
 
       {m.idleLines.length > 0 && (
         <p className="small muted">
-          No help to your spells: {m.idleLines.map((l) => `${l.label} (${l.families.join(', ')})`).join(' · ')}.
+          Touch none of the spells you cast, so worth nothing to you now: {m.idleLines.map((l) => `${l.label} (${l.families.join(', ')})`).join(' · ')}.
         </p>
       )}
       <p className="faint small">
         What each focus does comes from the game's own spell file: its strength, its level cap and how fast it fades past it, and which spells it touches (beneficial or
         detrimental, instant or over time, pets, lifetaps, instruments). Foci that differ only in strength and level cap are ranks of one line; Extended Enhancement III and
-        Tavee's Greater Diuturnity are the same focus. A rank is judged on your highest-level spell in its line. Which item carries which focus comes from eqlwiki.com.
+        Tavee's Greater Diuturnity are the same focus. Casts come from your log and its archives ("You begin casting"); the percentages shown are a focus's strength
+        averaged over the casts it touches (hover one for each spell). Which item carries which focus comes from eqlwiki.com.
       </p>
     </div>
   )
@@ -107,6 +133,9 @@ function FocusRow({ m, l }: { m: GearModel; l: FocusLine }) {
   const topItems = best ? avail.filter((c) => c.eff >= best.eff) : []
   const st = status(have, best)
   const info = (name: string) => m.report!.foci[name]
+  // Worth on its own, wanted or not: what ticking it would bring.
+  const worth = (name: string) => (m.worth ? focusValue({ ...m.worth, wanted: new Set([l.key]) }, [name]) : 0)
+  const castWord = m.report!.basis === 'casts'
   return (
     <div className={`lt-focus-row${on ? '' : ' off'}`}>
       <label className="lt-focus-toggle" title={on ? 'Wanted: counts in the finder and the optimizer' : 'Not wanted'}>
@@ -116,16 +145,21 @@ function FocusRow({ m, l }: { m: GearModel; l: FocusLine }) {
         <b>{l.label}</b>
         <div className="small muted">{l.families.join(' · ')}</div>
         <div className="faint small" title={l.examples.join('\n')}>
-          Helps {l.spells} of your spells: {l.examples.slice(0, 3).join(', ')}
+          {castWord ? `${pct(l.share * 100)} of your casts` : `${l.spells} of your spells`}: {l.examples.slice(0, 3).join(', ')}
           {l.spells > 3 ? '…' : ''}
         </div>
+        {l.kind === 'reagent' && <div className="faint small">Legends' spell file lists no reagents, so this counts every spell as using one.</div>}
       </div>
       <div className="lt-focus-col">
         <div className="lt-focus-cap">Best there is</div>
         {best ? (
           <>
-            <div title={strengthNote(info(best.focus), l.topLevel)}>
-              <b>{best.focus}</b> <span className="muted">{pct(best.eff)}</span>
+            <div title={strengthNote(info(best.focus))}>
+              <b>{best.focus}</b> <span className="muted">{pct(best.eff)}</span>{' '}
+              <span className="faint small" title="What it is worth to you, in the finder's points, worn on its own">
+                · worth {num(worth(best.focus))}
+                {KIND_WORTH[l.kind] < 1 ? ' (counts a quarter)' : ''}
+              </span>
             </div>
             {topItems.slice(0, 3).map((c) => (
               <div key={c.item.title} className="lt-focus-item" title={source(c.item)}>
@@ -154,8 +188,8 @@ function FocusRow({ m, l }: { m: GearModel; l: FocusLine }) {
         </div>
         {have.length ? (
           <>
-            <div title={strengthNote(info(have[0].focus), l.topLevel)}>
-              <b>{have[0].focus}</b> <span className="muted">{pct(have[0].eff)}</span>
+            <div title={strengthNote(info(have[0].focus))}>
+              <b>{have[0].focus}</b> <span className="muted">{pct(have[0].eff)}</span> <span className="faint small">· worth {num(worth(have[0].focus))}</span>
             </div>
             <div className="small muted">{ownedText(have[0])}</div>
             {have[0].from !== 'worn' && have.some((h) => h.from === 'worn') && (

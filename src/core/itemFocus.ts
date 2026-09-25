@@ -149,6 +149,16 @@ export function effectivePct(f: FocusSpec, spellLevel: number): number {
   return f.decayPct > 0 ? (f.pct * Math.max(0, 100 - f.decayPct * over)) / 100 : 0
 }
 
+/** A spell the character casts, and its share of their casting. */
+export interface SpellUse {
+  name: string
+  /** The level it counts as for a focus's level cap. */
+  level: number
+  casts: number
+  /** Its casts over all their casts: 0 to 1. */
+  share: number
+}
+
 export interface FocusLine {
   key: string
   kind: FocusKind
@@ -156,12 +166,12 @@ export interface FocusLine {
   label: string
   /** The names its ranks go by, without the rank: "Extended Enhancement", "Tavee's Diuturnity". */
   families: string[]
-  /** How many of the character's spells it improves. */
+  /** How many of the spells the character casts it touches. */
   spells: number
-  /** A few of them, highest level first. */
+  /** Their share of the character's casting: 0 to 1. */
+  share: number
+  /** Those spells, most cast first: "Envenomed Bolt (151)". */
   examples: string[]
-  /** The highest level among them, where ranks are compared. */
-  topLevel: number
 }
 
 export interface FocusInfo {
@@ -171,13 +181,18 @@ export interface FocusInfo {
   pct: number
   maxLevel: number
   decayPct: number
-  /** Its strength on the character's highest-level spell in its line. */
+  /** Its strength on the spells it touches, averaged by how often each is cast. */
   eff: number
+  /** Its strength on each spell cast that it touches, past its level cap's fade. */
+  on: Record<string, number>
 }
 
 export interface FocusReport {
   lines: FocusLine[]
   foci: Record<string, FocusInfo>
+  uses: SpellUse[]
+  /** 'casts': judged on the spells the log shows being cast; 'spellbook': on every class spell alike, for want of casts. */
+  basis: 'casts' | 'spellbook'
 }
 
 /** "Tavee's Charm of Diuturnity" → "Tavee's Diuturnity"; "Improved Damage III" → "Improved Damage". */
@@ -206,58 +221,89 @@ function lineLabel(f: FocusSpec): string {
 }
 
 /**
- * Each focus's line and strength for this character, and each line's reach among their spells.
- * `specs` are the foci worth reporting (those on items); a line that touches none of the
- * character's spells still comes back, with `spells: 0`.
+ * Each focus's line and strength for this character, judged on the spells they cast. `uses` are
+ * those spells with their share of the casting; without any, every class spell counts alike.
+ * `specs` are the foci worth reporting (those on items); a line that touches none of the spells
+ * cast still comes back, with `share: 0`.
  */
-export function focusReport(specs: FocusSpec[], spells: CastSpell[], classes: string[], level: number): FocusReport {
+export function focusReport(specs: FocusSpec[], classSpells: CastSpell[], classes: string[], level: number, casts: Record<string, number> = {}): FocusReport {
   const bits = classBits(classes)
+  const byName = new Map(classSpells.map((c) => [c.spell.name, c]))
+  let used = Object.entries(casts)
+    .filter(([name, n]) => n > 0 && byName.has(name))
+    .map(([name, n]) => ({ cast: byName.get(name)!, casts: n }))
+  const basis: FocusReport['basis'] = used.length ? 'casts' : 'spellbook'
+  if (!used.length) used = classSpells.map((cast) => ({ cast, casts: 1 }))
+  const total = used.reduce((a, u) => a + u.casts, 0) || 1
+  used.sort((a, b) => b.casts - a.casts || a.cast.spell.name.localeCompare(b.cast.spell.name))
+  const uses: SpellUse[] = used.map((u) => ({ name: u.cast.spell.name, level: u.cast.level, casts: u.casts, share: u.casts / total }))
+
   const byLine = new Map<string, FocusSpec[]>()
   for (const f of specs) byLine.set(f.line, [...(byLine.get(f.line) ?? []), f])
   const lines: FocusLine[] = []
   const foci: Record<string, FocusInfo> = {}
   for (const [key, members] of byLine) {
-    const touched = spells.filter((c) => members.some((f) => focusApplies(f, c, Math.max(level, c.level), bits)))
-    touched.sort((a, b) => b.level - a.level || a.spell.name.localeCompare(b.spell.name))
-    const topLevel = touched[0]?.level ?? level
+    const reach = new Map(members.map((f) => [f, used.filter((u) => focusApplies(f, u.cast, Math.max(level, u.cast.level), bits))]))
+    const touched = used.filter((u) => members.some((f) => reach.get(f)!.includes(u)))
     lines.push({
       key,
       kind: members[0].kind,
       label: lineLabel(members[0]),
       families: [...new Set(members.map((f) => familyName(f.name)))].sort(),
       spells: touched.length,
-      examples: touched.slice(0, 6).map((c) => `${c.spell.name} (${c.level})`),
-      topLevel
+      share: touched.reduce((a, u) => a + u.casts, 0) / total,
+      examples: touched.map((u) => (basis === 'casts' ? `${u.cast.spell.name} (${u.casts})` : `${u.cast.spell.name} (level ${u.cast.level})`))
     })
     for (const f of members) {
-      foci[f.name] = { name: f.name, line: key, kind: f.kind, pct: f.pct, maxLevel: f.maxLevel, decayPct: f.decayPct, eff: Math.round(effectivePct(f, topLevel) * 100) / 100 }
+      const on: Record<string, number> = {}
+      let weighted = 0
+      let casts = 0
+      for (const u of reach.get(f)!) {
+        const eff = Math.round(effectivePct(f, u.cast.level) * 100) / 100
+        if (eff > 0) on[u.cast.spell.name] = eff
+        weighted += eff * u.casts
+        casts += u.casts
+      }
+      foci[f.name] = { name: f.name, line: key, kind: f.kind, pct: f.pct, maxLevel: f.maxLevel, decayPct: f.decayPct, eff: casts ? Math.round((weighted / casts) * 100) / 100 : 0, on }
     }
   }
-  lines.sort((a, b) => KIND_ORDER.indexOf(a.kind) - KIND_ORDER.indexOf(b.kind) || b.spells - a.spells || a.label.localeCompare(b.label))
-  return { lines, foci }
+  lines.sort((a, b) => KIND_ORDER.indexOf(a.kind) - KIND_ORDER.indexOf(b.kind) || b.share - a.share || a.label.localeCompare(b.label))
+  return { lines, foci, uses, basis }
 }
 
-/** What wearing a set of foci is worth: points for each wanted line, in proportion to its best rank. */
+/**
+ * How much each kind of focus counts, a percent of it against a percent of casting speed. A longer
+ * reach or fewer reagents rarely decides anything, so they count for a quarter.
+ */
+export const KIND_WORTH: Record<FocusKind, number> = {
+  damage: 1, healing: 1, haste: 1, duration: 1, mana: 1, pet: 1, instrument: 1, range: 0.25, reagent: 0.25
+}
+
+/** What wearing a set of foci is worth to one character. */
 export interface FocusWorth {
-  /** Points a wanted line is worth at the best rank there is. */
+  /** Points for a focus that made every spell they cast 10% better. */
   points: number
   wanted: Set<string>
-  /** Per line, the best strength there is to have. */
-  best: Map<string, number>
   foci: Record<string, FocusInfo>
+  /** Each spell's share of their casting. */
+  shares: Record<string, number>
 }
 
+/**
+ * Spell by spell, the best focus of each kind among those worn (the game applies only the best of a
+ * kind), weighted by how often the spell is cast.
+ */
 export function focusValue(w: FocusWorth, names: Iterable<string>): number {
-  const top = new Map<string, number>()
+  const best = new Map<string, { kind: FocusKind; spell: string; eff: number }>()
   for (const n of names) {
     const f = w.foci[n]
     if (!f || !w.wanted.has(f.line)) continue
-    top.set(f.line, Math.max(top.get(f.line) ?? 0, f.eff))
+    for (const [spell, eff] of Object.entries(f.on)) {
+      const k = `${f.kind}|${spell}`
+      if (eff > (best.get(k)?.eff ?? 0)) best.set(k, { kind: f.kind, spell, eff })
+    }
   }
   let v = 0
-  for (const [line, eff] of top) {
-    const best = w.best.get(line) || eff
-    if (best > 0) v += w.points * Math.min(1, eff / best)
-  }
-  return v
+  for (const b of best.values()) v += (w.shares[b.spell] ?? 0) * (b.eff / 10) * KIND_WORTH[b.kind]
+  return v * w.points
 }

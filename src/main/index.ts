@@ -19,6 +19,7 @@ import { composeRows, countsFromComposite, findMoteRows, rows as ocrRows, statsW
 import { checkGameFolder, findInstall, listLogs, logIsIn, resolveGameFolder } from './game'
 import { summarize } from '../core/spells'
 import { castableSpells, focusReport, focusSpec } from '../core/itemFocus'
+import { CastHistory } from './castHistory'
 import { focusFromSpell, isDurationFocus } from '../core/focus'
 import { testTrigger } from '../core/triggers'
 import { timerKey } from '../core/spellTracker'
@@ -67,6 +68,7 @@ const achievementFiles = new AchievementFiles(
 )
 const gameTables = new GameTables(() => store.settings.get().installDir)
 const wikiCatalog = new WikiCatalog((p) => toMain('state:catalog', p))
+const castHistory = new CastHistory(join(app.getPath('userData'), 'cast-history.json'))
 const inventoryFiles = new InventoryFiles(
   () => store.settings.get().installDir,
   new ItemCatalog(),
@@ -433,11 +435,26 @@ function registerIpc(): void {
 
   // Focus effects on gear, read from the game's spell file: each one's line and strength for these
   // classes at this level, and which of their spells each line improves.
-  handle('gear:foci', (names: string[], classes: string[], level: number) => {
+  // Judged on what the character casts: their casts over the last `days` days of play, from the log
+  // and its archives.
+  handle('gear:foci', async (names: string[], classes: string[], level: number, character: string, days: number) => {
     const book = engine.book
     if (!book) return null
     const specs = [...new Set(names)].map((n) => book.named(n)).flatMap((s) => (s ? [focusSpec(s)] : [])).filter((f) => f !== null)
-    return focusReport(specs, castableSpells(book.all(), classes, level), classes, level)
+    const installDir = store.settings.get().installDir
+    const recent = character
+      ? await castHistory
+          .recent({ logPath: join(installDir, 'Logs', `eqlog_${character}.txt`), archiveDir: engine.archiveDir(), stem: `eqlog_${character}`, days })
+          .catch(() => null)
+      : null
+    // "Envenomed Bolt X" is Envenomed Bolt at rank X: one spell, whatever the rank.
+    const casts: Record<string, number> = {}
+    for (const [name, n] of Object.entries(recent?.counts ?? {})) {
+      const spell = book.resolve(name)?.spell.name
+      if (spell) casts[spell] = (casts[spell] ?? 0) + n
+    }
+    const report = focusReport(specs, castableSpells(book.all(), classes, level), classes, level, casts)
+    return { ...report, window: recent ? { total: recent.total, from: recent.from, to: recent.to } : null }
   })
 
   handle('stats:caps', async (classes: string[], level: number) => ({

@@ -59,28 +59,45 @@ describe('reading focus spells', () => {
     expect(focusApplies(dmg2, cast(puma, 50), 50, bits)).toBe(false)
   })
 
-  it('reports each line for the classes the character plays', () => {
+  it('judges each line on the spells the character casts, by how often', () => {
     const spells = castableSpells([puma, spear, quick, wizOnly], ['shd', 'mnk', 'shm'], 50)
     expect(spells.map((s) => s.spell.name).sort()).toEqual(['Short Buff', 'Spear of Pain', 'Spirit of the Puma'])
-    const r = focusReport([ee2, ee3, tavee, dmg2], spells, ['shd', 'mnk', 'shm'], 50)
+    const r = focusReport([ee2, ee3, tavee, dmg2], spells, ['shd', 'mnk', 'shm'], 50, { 'Spirit of the Puma': 30, 'Spear of Pain': 70, 'Wizard Nuke': 5 })
+    expect(r.basis).toBe('casts')
+    expect(r.uses.map((u) => [u.name, u.share])).toEqual([['Spear of Pain', 0.7], ['Spirit of the Puma', 0.3]])
     const duration = r.lines.find((l) => l.kind === 'duration')!
-    expect(duration).toMatchObject({ spells: 1, topLevel: 50, families: ['Extended Enhancement', "Tavee's Diuturnity"] })
-    expect(r.foci['Extended Enhancement II'].eff).toBeCloseTo(10.5)
-    expect(r.lines.find((l) => l.kind === 'damage')).toMatchObject({ spells: 1, topLevel: 49 })
+    expect(duration).toMatchObject({ spells: 1, share: 0.3, families: ['Extended Enhancement', "Tavee's Diuturnity"] })
+    expect(r.foci['Extended Enhancement II']).toMatchObject({ eff: 10.5, on: { 'Spirit of the Puma': 10.5 } })
+    expect(r.lines.find((l) => l.kind === 'damage')).toMatchObject({ spells: 1, share: 0.7 })
+  })
+
+  it('counts every class spell alike when the log shows no casts', () => {
+    const r = focusReport([ee3], castableSpells([puma, spear, quick], ['shd', 'shm'], 50), ['shd', 'shm'], 50)
+    expect(r.basis).toBe('spellbook')
+    expect(r.lines[0].share).toBeCloseTo(1 / 3)
+  })
+
+  it('is worth nothing on spells not cast', () => {
+    const r = focusReport([ee3, dmg2], castableSpells([puma, spear], ['shd', 'shm'], 50), ['shd', 'shm'], 50, { 'Spear of Pain': 10 })
+    expect(r.lines.find((l) => l.kind === 'duration')!.share).toBe(0)
   })
 })
 
 describe('what worn foci are worth', () => {
   const spells = castableSpells([puma, spear], ['shd', 'shm'], 50)
-  const r = focusReport([ee2, ee3, dmg2], spells, ['shd', 'shm'], 50)
+  const r = focusReport([ee2, ee3, dmg2], spells, ['shd', 'shm'], 50, { 'Spirit of the Puma': 30, 'Spear of Pain': 70 })
   const line = (f: FocusSpec) => r.foci[f.name].line
-  const worth = { points: 300, wanted: new Set([line(ee3), line(dmg2)]), best: new Map([[line(ee3), 15], [line(dmg2), 20]]), foci: r.foci }
+  const shares = Object.fromEntries(r.uses.map((u) => [u.name, u.share]))
+  const worth = { points: 300, wanted: new Set([line(ee3), line(dmg2)]), foci: r.foci, shares }
 
-  it('counts the best rank worn in each wanted line, in proportion to the best there is', () => {
-    expect(focusValue(worth, ['Extended Enhancement III'])).toBe(300)
-    expect(focusValue(worth, ['Extended Enhancement II'])).toBeCloseTo(210)
-    expect(focusValue(worth, ['Extended Enhancement II', 'Extended Enhancement III'])).toBe(300)
-    expect(focusValue(worth, ['Extended Enhancement III', 'Improved Damage II'])).toBe(300 + 225)
+  it('counts each focus spell by spell, the best of a kind on each, by how often the spell is cast', () => {
+    // 300 points for 10% on everything cast; Puma is 30% of the casting.
+    expect(focusValue(worth, ['Extended Enhancement III'])).toBeCloseTo(0.3 * 1.5 * 300)
+    // Capped at 44, it fades 5% a level: 10.5% on the level-50 Puma.
+    expect(focusValue(worth, ['Extended Enhancement II'])).toBeCloseTo(0.3 * 1.05 * 300)
+    expect(focusValue(worth, ['Extended Enhancement II', 'Extended Enhancement III'])).toBeCloseTo(0.3 * 1.5 * 300)
+    // Improved Damage II on the level-49 Spear of Pain: 20% faded to 15%.
+    expect(focusValue(worth, ['Extended Enhancement III', 'Improved Damage II'])).toBeCloseTo(0.3 * 1.5 * 300 + 0.7 * 1.5 * 300)
     expect(focusValue({ ...worth, wanted: new Set([line(dmg2)]) }, ['Extended Enhancement III'])).toBe(0)
   })
 })
@@ -101,8 +118,9 @@ describe('Any slots and focus effects in the finder and the optimizer', () => {
   })
 
   const acOnly: Weights = { ...PRESETS.Tank, ac: 1, hp: 0, sta: 0 }
-  const foci = focusReport([ee3], castableSpells([puma], ['shm'], 50), ['shm'], 50).foci
-  const worth = { points: 300, wanted: new Set([foci['Extended Enhancement III'].line]), best: new Map([[foci['Extended Enhancement III'].line, 15]]), foci }
+  const foci = focusReport([ee3], castableSpells([puma], ['shm'], 50), ['shm'], 50, { 'Spirit of the Puma': 1 }).foci
+  // All the casting is Puma, so Extended Enhancement III is 15% on everything cast: 450 points.
+  const worth = { points: 300, wanted: new Set([foci['Extended Enhancement III'].line]), foci, shares: { 'Spirit of the Puma': 1 } }
   const byTitle = new Map(catalog.map((c) => [c.title.toLowerCase(), c]))
   const fociOf = (name: string) => byTitle.get(name.toLowerCase())?.focus || ''
 
@@ -121,7 +139,8 @@ describe('Any slots and focus effects in the finder and the optimizer', () => {
     }).find((s) => s.slot === 'Any Slot')!
     const titles = any.candidates.map((c) => c.item.title)
     expect(titles[0]).toBe('Drakescale Belt')
-    expect(any.candidates[0]).toMatchObject({ delta: 4 + 300, focus: { name: 'Extended Enhancement III', gain: 300 } })
+    expect(any.candidates[0].delta).toBeCloseTo(4 + 450)
+    expect(any.candidates[0].focus).toMatchObject({ name: 'Extended Enhancement III' })
     expect(titles).toContain('Big Shield')
     // A lore belt already worn at the waist cannot go on twice.
     expect(titles).not.toContain('Plain Belt')
@@ -140,7 +159,7 @@ describe('Any slots and focus effects in the finder and the optimizer', () => {
     // The shield takes the empty Secondary; both belts and the charm share the waist and the Any slots.
     expect(worn('Secondary')).toEqual(['Big Shield'])
     expect([...worn('Waist'), ...worn('Any Slot')].sort()).toEqual(['Drakescale Belt', 'Plain Belt', 'Tiny Charm'])
-    expect(plan.focusAfter - plan.focusBefore).toBe(300)
+    expect(plan.focusAfter - plan.focusBefore).toBeCloseTo(450)
     expect(plan.slotScoreAfter.reduce((a, b) => a + b, 0)).toBe(25 + 10 + 5 + 1)
   })
 })
