@@ -11,6 +11,7 @@ import { Updater } from './updater'
 import { AchievementFiles } from './achievements'
 import { InventoryFiles } from './inventory'
 import { ItemCatalog } from './items'
+import { GameTables, readAasFromLog } from './stats'
 import { captureScreens, ocrImage } from './ocr'
 import { composeRows, countsFromComposite, findMoteRows, rows as ocrRows } from '../core/screenText'
 import { checkGameFolder, findInstall, listLogs, logIsIn, resolveGameFolder } from './game'
@@ -61,6 +62,7 @@ const achievementFiles = new AchievementFiles(
   () => store.settings.get().installDir,
   (view) => toMain('state:achievements', view)
 )
+const gameTables = new GameTables(() => store.settings.get().installDir)
 const inventoryFiles = new InventoryFiles(
   () => store.settings.get().installDir,
   new ItemCatalog(),
@@ -400,6 +402,12 @@ function registerIpc(): void {
   handle('inventory:lookup', (names: string[]) => inventoryFiles.lookup(names))
   handle('character:sheet', (character: string) => inventoryFiles.sheet(character))
   handle('character:saveSheet', (character: string, sheet: CharacterSheet) => inventoryFiles.saveSheet(character, sheet))
+
+  handle('stats:caps', async (classes: string[], level: number) => ({
+    skills: await gameTables.skillCaps(classes, level),
+    ac: await gameTables.acCaps(classes, level)
+  }))
+  handle('stats:readAAs', () => readAasFromLog(store.settings.get().logFile))
 
   handle('game:check', (dir?: string) => checkGameFolder(dir ?? store.settings.get().installDir))
   handle('game:find', async () => {

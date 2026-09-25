@@ -16,12 +16,14 @@ import { Logs } from './pages/Logs'
 import { Settings } from './pages/Settings'
 import { Achievements } from './pages/Achievements'
 import { Inventory } from './pages/Inventory'
+import { Stats } from './pages/Stats'
 
 const PAGES = [
   { id: 'dashboard', group: 'Play', label: 'Live', icon: 'dashboard', el: Dashboard },
   { id: 'spells', group: 'Play', label: 'Spell Timers', icon: 'spells', el: Spells },
   { id: 'motes', group: 'Play', label: 'Motes', icon: 'motes', el: Motes },
   { id: 'achievements', group: 'Character', label: 'Achievements', icon: 'trophy', el: Achievements },
+  { id: 'stats', group: 'Character', label: 'Stats', icon: 'stats', el: Stats },
   { id: 'inventory', group: 'Character', label: 'Inventory', icon: 'bag', el: Inventory },
   { id: 'triggers', group: 'Setup', label: 'Triggers', icon: 'triggers', el: Triggers },
   { id: 'overlays', group: 'Setup', label: 'Overlays', icon: 'overlays', el: Overlays },

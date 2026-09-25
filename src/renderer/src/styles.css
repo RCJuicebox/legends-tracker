@@ -1339,3 +1339,191 @@ table.table {
   column-gap: 16px;
   line-height: 1.6;
 }
+
+/* ---------- stats ---------- */
+
+.stats-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr);
+  gap: 14px;
+  align-items: start;
+}
+@media (max-width: 1150px) {
+  .stats-grid {
+    grid-template-columns: 1fr;
+  }
+}
+.stats-fields {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 10px 12px;
+}
+.stats-fields.two {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.stats-fields.three {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+.stats-fields .field em {
+  font-style: normal;
+  font-weight: 400;
+}
+.stats-fields .chip {
+  border: none;
+  cursor: default;
+}
+.stats-fields button.chip {
+  cursor: pointer;
+}
+.stats-big {
+  font-size: 26px !important;
+}
+.stats-bar {
+  display: flex;
+  height: 12px;
+  border-radius: 6px;
+  overflow: hidden;
+  background: var(--line);
+}
+.stats-bar i,
+.stats-key {
+  display: inline-block;
+  height: 100%;
+}
+.stats-key {
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+  vertical-align: -1px;
+  margin-right: 4px;
+}
+.stats-bar .full,
+.stats-key.full {
+  background: var(--green);
+}
+.stats-bar .over,
+.stats-key.over {
+  background: var(--amber);
+}
+.stats-bar .lost,
+.stats-key.lost {
+  background: var(--red);
+  opacity: 0.7;
+}
+.stats-notes {
+  list-style: none;
+  margin: 4px 0 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+.stats-notes li {
+  padding: 8px 12px;
+  border-radius: var(--radius-sm);
+  background: var(--bg-2);
+  border-left: 3px solid var(--line-2);
+  line-height: 1.45;
+  font-size: 13px;
+  color: var(--text-2);
+}
+.stats-notes li b {
+  color: var(--text);
+}
+.stats-notes li.good {
+  border-left-color: var(--green);
+}
+.stats-notes li.warn {
+  border-left-color: var(--amber);
+}
+.stats-notes li.tip {
+  border-left-color: var(--teal);
+}
+.stats-trace summary {
+  cursor: pointer;
+  color: var(--text-2);
+  font-size: 13px;
+  padding: 4px 0;
+}
+.stats-trace td {
+  padding: 4px 8px;
+}
+.stats-trace-head {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--accent) !important;
+  padding-top: 12px !important;
+}
+.stats-aalist {
+  columns: 2;
+  column-gap: 20px;
+  line-height: 1.6;
+  max-height: 260px;
+  overflow: auto;
+}
+.stats-skills {
+  display: grid;
+  gap: 2px;
+}
+.stats-skill {
+  display: grid;
+  grid-template-columns: 1fr 90px 80px 72px;
+  align-items: center;
+  gap: 10px;
+  padding: 2px 0;
+}
+.stats-skill input {
+  padding: 3px 6px;
+}
+.stats-skillbar {
+  height: 5px;
+  border-radius: 3px;
+  background: var(--line);
+  overflow: hidden;
+}
+.stats-skillbar i {
+  display: block;
+  height: 100%;
+  background: var(--teal);
+}
+.ok-text {
+  color: var(--green);
+}
+.stats-chart {
+  width: 100%;
+  height: auto;
+}
+.stats-chart text {
+  fill: var(--text-3);
+  font-size: 11px;
+}
+.stats-chart .axis {
+  fill: var(--text-2);
+}
+.stats-chart .label {
+  fill: var(--text);
+  font-size: 11.5px;
+  font-weight: 600;
+}
+.stats-chart .grid {
+  stroke: var(--line);
+}
+.stats-chart .curve {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 2;
+}
+.stats-chart .avoid {
+  stroke: var(--text-3);
+  stroke-dasharray: 4 4;
+}
+.stats-chart .dot {
+  fill: var(--teal);
+  stroke: var(--bg);
+  stroke-width: 2;
+}
+.stats-chart .leader {
+  stroke: var(--text-3);
+  stroke-width: 1;
+  opacity: 0.6;
+}
