@@ -61,6 +61,8 @@ protocol.registerSchemesAsPrivileged([{ scheme: 'eqicon', privileges: { standard
 
 const primaryInstance = app.requestSingleInstanceLock()
 if (!primaryInstance) app.quit()
+// --quit with nothing running to quit: there is nothing to do, and a restart script must not wait on this copy.
+else if (process.argv.includes('--quit')) app.exit(0)
 
 const resources = app.isPackaged ? process.resourcesPath : join(__dirname, '../..')
 const preload = join(__dirname, '../preload/index.js')
@@ -810,7 +812,15 @@ function demoCombat(): void {
   toMain('state:combat', snap)
 }
 
-app.on('second-instance', () => showMain())
+// A second copy started with --quit is a request to shut this one down properly (settings written,
+// overlays closed), from a script or a launcher about to start a fresh one; any other second copy
+// just brings this one to the front.
+app.on('second-instance', (_e, argv) => {
+  if (argv.includes('--quit')) {
+    log.info('Quitting: another copy asked with --quit')
+    app.quit()
+  } else showMain()
+})
 app.on('render-process-gone', (_e, wc, d) => log.error(`A page stopped (${d.reason}, exit ${d.exitCode}): ${wc.getURL()}`))
 app.on('child-process-gone', (_e, d) => {
   if (d.reason !== 'clean-exit') log.warn(`${d.type} process${d.name ? ` (${d.name})` : ''} stopped: ${d.reason}, exit ${d.exitCode}`)
