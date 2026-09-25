@@ -6,7 +6,12 @@ import { DEFAULT_HIDDEN_ERAS, eraOf, findUpgrades, PRESETS, UNKNOWN_ERA, WEIGHT_
 import type { CatalogItem } from '../../../core/wikiItem'
 import type { CharacterSheet, InventoryView } from '../../../shared/types'
 import { className } from '../../../core/acModel'
-import { statsFor } from './Gear'
+import { statsFor, wornSummary } from './Gear'
+import { characterAc } from './Stats'
+import { readSheet } from '../statsSheet'
+
+/** AC past the soft cap is worth a quarter of AC under it, in every weighting. */
+const AC_OVER_CAP = 0.25
 
 interface CatalogState {
   file: { fetchedAt: number; items: CatalogItem[] } | null
@@ -53,10 +58,29 @@ export function GearFinder({ view, sheet }: { view: InventoryView; sheet: Charac
   const [hiddenEras, setHiddenEras] = useRemembered<string[]>('finder.hiddenEras', DEFAULT_HIDDEN_ERAS)
   const [slot, setSlot] = useRemembered<string>('finder.slot', 'all')
   const [showWeights, setShowWeights] = useState(false)
+  const [capMode, setCapMode] = useRemembered<'auto' | 'over' | 'under'>('finder.acCap', 'auto')
+  const sheetStats = useMemo(() => readSheet(sheet?.stats), [sheet])
+  const [acCaps, setAcCaps] = useState<Record<string, { cap: number; mult: number }> | null>(null)
+  useEffect(() => {
+    const trio = sheetStats.classes.filter(Boolean)
+    if (!trio.length) return
+    void api.invoke<{ ac: Record<string, { cap: number; mult: number }> }>('stats:caps', trio, sheetStats.level).then((r) => setAcCaps(r.ac))
+  }, [sheetStats.classes.join(','), sheetStats.level])
 
   const stats = (sheet?.stats ?? {}) as { classes?: string[]; level?: number; race?: string }
   const classes = (stats.classes ?? []).filter(Boolean)
-  const weights = preset === 'Custom' ? custom : (PRESETS[preset] ?? PRESETS.Balanced)
+  const baseWeights = preset === 'Custom' ? custom : (PRESETS[preset] ?? PRESETS.Balanced)
+  // Over the soft cap or not: the game's own Stats window when it has been read (mitigation above
+  // the soft cap means over), else the AC calculator.
+  const acState = useMemo(() => {
+    const w = sheetStats.window?.values.AC
+    if (w && w.length >= 2) return { over: w[0] > w[1], mitigation: w[0], cap: w[1], from: 'your last Stats window read' }
+    if (!acCaps) return null
+    const r = characterAc(sheetStats, acCaps, view.inventory ? wornSummary(view, sheet) : null)
+    return { over: r.over, mitigation: r.mitigation, cap: r.effCap, from: 'the AC calculator' }
+  }, [sheetStats, acCaps, view, sheet])
+  const overCap = capMode === 'auto' ? !!acState?.over : capMode === 'over'
+  const weights = useMemo(() => (overCap ? { ...baseWeights, ac: baseWeights.ac * AC_OVER_CAP } : baseWeights), [baseWeights, overCap])
   const inv = view.inventory!
   const owned = useMemo(() => new Set([...inv.worn, ...inv.bags, ...inv.bank, ...inv.sharedBank].flatMap((i) => [itemKey(i.name), ...i.augs.map((a) => itemKey(a.name))])), [inv])
 
@@ -167,6 +191,28 @@ export function GearFinder({ view, sheet }: { view: InventoryView; sheet: Charac
             Live eras only
           </button>
         </div>
+        <div className="row small" style={{ gap: 10, flexWrap: 'wrap' }}>
+          <b>AC soft cap</b>
+          <span className="lt-seg">
+            {(
+              [
+                ['auto', acState ? `Auto: ${acState.over ? 'over' : 'under'}` : 'Auto'],
+                ['over', 'Over'],
+                ['under', 'Under']
+              ] as const
+            ).map(([m, label]) => (
+              <button key={m} className={capMode === m ? 'on' : ''} onClick={() => setCapMode(m)}>
+                {label}
+              </button>
+            ))}
+          </span>
+          <span className="muted">
+            {overCap
+              ? `AC counts at ${AC_OVER_CAP * 100}% of its weight: past the soft cap most of it is lost.`
+              : 'AC counts in full: you are under the soft cap.'}
+            {acState && capMode === 'auto' && ` Mitigation ${num(acState.mitigation)} against a soft cap of ${num(acState.cap)}, from ${acState.from}.`}
+          </span>
+        </div>
         {showWeights && (
           <div className="lt-weights">
             {(Object.keys(WEIGHT_LABELS) as WeightKey[]).map((k) => (
@@ -176,9 +222,10 @@ export function GearFinder({ view, sheet }: { view: InventoryView; sheet: Charac
                   type="number"
                   step={0.1}
                   min={0}
-                  value={weights[k]}
+                  value={baseWeights[k]}
+                  title={k === 'ac' && overCap ? `Counts as ${Math.round(baseWeights.ac * AC_OVER_CAP * 100) / 100} while over the soft cap` : undefined}
                   onChange={(e) => {
-                    setCustom({ ...weights, [k]: Math.max(0, Number(e.target.value) || 0) })
+                    setCustom({ ...baseWeights, [k]: Math.max(0, Number(e.target.value) || 0) })
                     setPreset('Custom')
                   }}
                 />

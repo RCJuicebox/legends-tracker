@@ -348,6 +348,29 @@ function Trace({ rows }: { rows: Row[] }) {
 }
 
 /** The AC calculator's inputs from the sheet, files and AAs. */
+/**
+ * The AC calculator's result for a character from what the tracker knows: the sheet, worn gear, the
+ * game's soft cap table for its classes, and its AAs. For pages other than this one.
+ */
+export function characterAc(
+  s: StatsSheet,
+  acCaps: Record<string, { cap: number; mult: number }>,
+  gear: { totals: { ac: number }; shield: boolean; shieldAC: number } | null
+) {
+  const trio = [...new Set(s.classes.filter(Boolean))].length ? [...new Set(s.classes.filter(Boolean))] : ['war']
+  const primary = trio.reduce((best, c) => ((acCaps[c]?.cap ?? 0) > (acCaps[best]?.cap ?? 0) ? c : best), trio[0])
+  const auto: Record<string, number | undefined> = {
+    itemAC: gear ? gear.totals.ac : undefined,
+    shieldAC: gear ? (gear.shield ? gear.shieldAC : 0) : undefined,
+    softCap: acCaps[primary]?.cap,
+    multiplier: acCaps[primary]?.mult,
+    combatStability: s.aa ? aaTotal(s.aa, 'softcap_pct') : undefined,
+    evasion: s.aa ? aaTotal(s.aa, 'avoidance_pct') : undefined
+  }
+  const val: TabProps['val'] = (k) => s.overrides[k] ?? auto[k] ?? 0
+  return computeAc(acInputs(s, trio, primary, val, (id) => s.skills[id] ?? 0))
+}
+
 function acInputs(s: StatsSheet, trio: string[], primary: string, val: TabProps['val'], skill: (id: number) => number): AcInputs {
   return {
     trio,
