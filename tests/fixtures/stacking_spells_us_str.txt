@@ -1,0 +1,70 @@
+#SPELLINDEX^CASTERMETXT^CASTEROTHERTXT^CASTEDMETXT^CASTEDOTHERTXT^SPELLGONE^
+6^^^Your blood ignites.^'s blood ignites.^Your blood cools.^
+19^^^You feel the favor of the gods upon you.^ feels the favor of the gods upon them.^You no longer feel blessed.^
+20^^^You feel the favor of the gods upon you.^ feels the favor of the gods upon them.^You no longer feel blessed.^
+39^^^You feel much faster.^ feels much faster.^Your speed returns to normal.^
+64^^^You feel resistant to magic.^ is resistant to magic.^Your magic resistance fades.^
+72^^^You feel protected from magic.^ is resistant to magic.^Your protection fades.^
+144^^^You begin to regenerate.^ begins to regenerate.^You have stopped regenerating.^
+145^^^You begin to regenerate.^ begins to regenerate.^You have stopped regenerating.^
+146^^^You feel the spirit of monkey enter you.^ is surrounded by a brief simian aura.^The spirit of monkey leaves.^
+147^^^You feel stronger.^ looks stronger.^Your strength fades.^
+148^^^You feel the spirit of cat enter you.^ is surrounded by a brief feline aura.^The spirit of cat leaves you.^
+149^^^You feel the spirit of ox enter you.^ is surrounded by a brief bovine aura.^The spirit of ox leaves you.^
+151^^^You feel stronger.^ looks stronger.^Your strength fades.^
+152^^^You feel dexterous.^ looks dexterous.^Your dexterity fades.^
+153^^^You feel stronger.^ looks stronger.^Your strength fades.^
+154^^^You feel agile.^ looks agile.^Your agility fades.^
+157^^^You feel dexterous.^ looks dexterous.^Your dexterity fades.^
+158^^^You feel robust.^ looks robust.^Your stamina fades.^
+159^^^You feel strong.^ looks strong.^Your strength fades.^
+161^^^You feel healthy.^ looks healthy.^Your health fades.^
+168^^^You feel tough.^ looks tougher.^Your hit points fade.^
+170^^^You feel much faster.^ feels much faster.^Your speed returns to normal.^
+171^^^You feel much faster.^ feels much faster.^Your speed returns to normal.^
+172^^^You feel much faster.^ feels much faster.^Your speed returns to normal.^
+174^^^A cool breeze slips through your mind.^ looks tranquil.^The cool breeze fades.^
+219^^^You feel magnanimous of spirit.^ is surrounded by a divine aura.^Your sense of center fades.^
+261^^^Your feet leave the ground.^ floats into the air.^You can no longer levitate.^
+267^^^You feel your body pulse with energy.^'s body pulses with energy.^The inner fire fades.^
+269^^^You feel more agile.^ looks more agile.^Your agility fades.^
+278^^^You feel the spirit of wolf enter you.^ is surrounded by a brief lupine aura.^The spirit of wolf leaves you.^
+279^^^You feel the spirit of bear enter you.^ is surrounded by a brief ursine aura.^The spirit of bear leaves you.^
+349^^^You feel dexterous.^ looks dexterous.^Your dexterity fades.^
+389^^^The protective presence of a guardian spirit reassures you.^ is surrounded by a spirit aura.^You are no longer guarded.^
+421^^^Your skin turns hard as steel.^'s skin turns hard as steel.^Your skin returns to normal.^
+425^^^You are now a wolf.^ turns into a wolf.^You are no longer a wolf.^
+426^^^You are now a wolf.^ turns into a wolf.^You are no longer a wolf.^
+452^^^You are engulfed by darkness.^ is engulfed by darkness.^The darkness fades.^
+457^^^You become like the dead.^ looks dead.^You return to life.^
+481^^^A light shimmer of runes surrounds you.^ is surrounded by a shimmer of runes.^The shimmer of runes fades.^
+482^^^A shimmer of runes surrounds you.^ is surrounded by a shimmer of runes.^The shimmer of runes fades.^
+483^^^A dark shimmer of runes surrounds you.^ is surrounded by a shimmer of runes.^The shimmer of runes fades.^
+484^^^A coat of shimmering runes surrounds you.^ is surrounded by a shimmer of runes.^The shimmer of runes fades.^
+487^^^The symbol of Pinzarn flashes before your eyes.^ is cloaked in a shimmer of glowing symbols.^The mystic symbol fades.^
+488^^^The symbol of Naltron flashes before your eyes.^ is cloaked in a shimmer of glowing symbols.^The mystic symbol fades.^
+649^^^A protective aura settles over you.^ is covered in a protective aura.^Your protection fades.^
+677^^^You hear the barking of the Tashani.^ glances nervously about.^The barking fades.^
+678^^^You hear the barking of Tashania.^ glances nervously about.^The barking fades.^
+998^^^You feel your heart begin to race.^ begins to move faster.^Your speed returns to normal.^
+1694^^^A cool breeze slips through your mind.^ looks tranquil.^The cool breeze fades.^
+2505^^^You feel protected.^ looks protected.^Your protection fades.^
+2512^^^Your skin turns hard as stone.^'s skin turns hard as stone.^Your skin returns to normal.^
+2513^^^Your skin turns hard as steel.^'s skin turns hard as steel.^Your skin returns to normal.^
+2524^^^You feel the spirit of Bih`Li enter you.^ is surrounded by a brief lupine aura.^The spirit of Bih`Li leaves you.^
+2525^^^You feel tough.^ looks tougher.^Your hit points fade.^
+3454^^^You are infused with power.^ looks powerful.^Your power fades.^
+3692^^^A feeling of temperance washes over you.^ is surrounded in an aura of temperance.^The temperance fades.^
+4053^^^A feeling of temperance washes over you.^ is surrounded in an aura of temperance.^The temperance fades.^
+4088^^^A faint white aura surrounds you.^ has been surrounded in a faint white aura.^The white aura fades.^
+4089^^^A dull white aura surrounds you.^ has been surrounded in a dull white aura.^The white aura fades.^
+40593^^^^^^
+74010^^^Your hands glow a pale gold.^'s hands gain a pale gold glow.^The golden glow fades.^
+352^^^Your vision shifts.^'s eyes glow red.^Your vision returns to normal.^
+359^^^Your hand begins to glow.^'s hands begin to glow.^^
+478^^^You feel your heart stop beating.^ stops breathing.^You resume breathing.^
+693^^^Your hand begins to glow with divine might.^'s hands begin to glow with divine might.^Your hands stop glowing.^
+821^^^You feel your life force drain away.^ staggers.^^
+823^^^You have been struck by a surge of Divine Might.^ is struck by a surge of Divine Might.^^
+1461^^^The Call of Sky fills your weapons with power.^'s weapons gleam.^The Call of Sky leaves.^
+3129^^^A concussion of air knocks you backwards.^ is knocked backwards by a concussion of air.^^

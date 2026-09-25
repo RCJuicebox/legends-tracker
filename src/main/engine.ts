@@ -16,7 +16,7 @@ import { CombatMeter, summarize as summarizeFight } from '../core/combatMeter'
 import { LootLedger, type LootSnapshot } from '../core/loot'
 import { RespawnLog, respawnView, type RespawnRecords, type RespawnView } from '../core/respawns'
 import { PetGearReader, petSummonName, type PetGearReading } from '../core/pets'
-import { askText, BuffWatch, buffOffers, buffPlan, defaultWanted, type ActiveBuff, type BuffOffer, type BuffsFile, type BuffView, type Person } from '../core/buffs'
+import { askText, BuffWatch, buffOffers, buffPlan, defaultWanted, YOU, type ActiveBuff, type BuffOffer, type BuffsFile, type BuffView, type Person } from '../core/buffs'
 import { CATEGORY_COLORS } from '../core/spellTracker'
 import { durationSec, fmtClock, fmtNum } from '../core/combatView'
 import { characterKey, characterName } from './storeCore'
@@ -28,9 +28,12 @@ import type { MoteScanJob, MoteScanResult } from './moteHistory'
 import { combineScans, mergeRebuilt, samePath } from './moteMerge'
 import { log } from './log'
 import type { SpeechWorker } from './speech'
-import type {
-  AppSettings, ArchiveStatus, CharacterSettings, CombatSnapshot, FeedItem, KnownSpell, LogCheckRow, MoteStock, Notification, Segment, SpellRule, TimerView, Trigger, WatchStatus
+import {
+  CLASS_NAMES,
+  type AppSettings, type ArchiveStatus, type CharacterSettings, type CombatSnapshot, type FeedItem, type KnownSpell, type LogCheckRow, type MoteStock, type Notification,
+  type Segment, type SpellRule, type TimerView, type Trigger, type WatchStatus
 } from '../shared/types'
+import { CLASS_NUMBER, type ClassId } from '../core/acModel'
 
 export interface EngineOutputs {
   timers: (views: TimerView[]) => void
@@ -186,6 +189,8 @@ export class Engine {
   private lastAsk = { text: '', at: 0 }
   /** Groupmates the player has been told to /who, once each. */
   private readonly whoHinted = new Set<string>()
+  /** Permanent self-only buffs already asked for this run. */
+  private readonly selfSaid = new Set<string>()
 
   constructor(
     private readonly store: EngineStore,
@@ -491,20 +496,35 @@ export class Engine {
     return this.meter.groupMembers.map((name) => ({ name, person: people[name.toLowerCase()] ?? null }))
   }
 
+  /** You: what /who last said, or failing that the classes and levels on the character sheet. */
+  private me(): Person | null {
+    const name = characterName(this.settings.logFile)
+    if (!name) return null
+    const seen = this.store.buffs.get().people[name.toLowerCase()]
+    if (seen) return seen
+    const c = this.character()
+    // The sheet names classes the game's way (CLASS_NAMES, in class-number order); the tracker by id.
+    const levels = (Object.entries(CLASS_NUMBER) as [ClassId, number][]).map(([id, n]) => [id, c.classLevels[CLASS_NAMES[n - 1]] ?? 0] as const).filter(([, l]) => l > 0)
+    if (!levels.length) return null
+    return { name, classes: levels.map(([id]) => id), level: Math.max(...levels.map(([, l]) => l)), race: '', at: 0 }
+  }
+
   buffView(): BuffView {
     const group = this.groupPeople()
     const active = this.buffWatch.active
     const wanted = this.wantedBuffs
-    const plan = buffPlan({ offers: this.buffOfferList, wanted, group: group.flatMap((g) => (g.person ? [g.person] : [])), active })
+    const me = this.me()
+    const plan = buffPlan({ offers: this.buffOfferList, wanted, group: group.flatMap((g) => (g.person ? [g.person] : [])), active, me })
     return {
       offers: this.buffOfferList,
       wanted,
       defaults: !this.store.buffs.get().wanted[this.characterKey()],
       group,
+      me,
       active,
       needs: plan.needs,
       plan,
-      planAnyone: buffPlan({ offers: this.buffOfferList, wanted, group: 'anyone', active }),
+      planAnyone: buffPlan({ offers: this.buffOfferList, wanted, group: 'anyone', active, me }),
       spellsLoaded: !!this.book
     }
   }
@@ -584,7 +604,10 @@ export class Engine {
       this.whoHinted.add(g.name.toLowerCase())
       this.pushFeed('info', `Type /who ${g.name} so the buff tracker knows the classes ${g.name} plays.`)
     }
-    const needs = this.buffView().needs
+    // A permanent self-only buff (Rage, Shielding) is said once a run: it may well be on from before the
+    // tracker was watching, and then it never shows as on. The plan still lists it.
+    const permanent = (spell: string) => this.buffOfferList.find((o) => o.spell === spell)?.seconds === Infinity
+    const needs = this.buffView().needs.filter((n) => !(n.from === YOU && permanent(n.spell) && this.selfSaid.has(n.spell)))
     const text = needs.length ? askText(needs) : ''
     if (!text) {
       this.lastAsk = { text: '', at: 0 }
@@ -593,6 +616,7 @@ export class Engine {
     if (this.meter.fighting) return
     if (text === this.lastAsk.text && now - this.lastAsk.at < BUFF_REMIND_MS) return
     this.lastAsk = { text, at: now }
+    for (const n of needs) if (n.from === YOU && permanent(n.spell)) this.selfSaid.add(n.spell)
     this.pushFeed('info', `Buffs: ${text}.`)
     this.notify([
       { kind: 'speak', text, interrupt: false },

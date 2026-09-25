@@ -7,12 +7,12 @@ import { useNow } from '../components/TimerBars'
 import { Info, Pending } from '../components/ui'
 import { wikiUrl } from '../format'
 import { CLASSES } from '../../../core/acModel'
-import { askText, LINE_LABELS, MIN_ASK_VALUE, MIN_BUFF_SEC, offersFor, type BuffLine, type BuffOffer, type BuffPlan, type BuffView } from '../../../core/buffs'
+import { askText, canCast, LINE_LABELS, MIN_ASK_VALUE, MIN_BUFF_SEC, offersFor, YOU, type BuffLine, type BuffOffer, type BuffPlan, type BuffView } from '../../../core/buffs'
 
 // What the group can buff you with: who is in it (and their classes, from /who), what is on you
 // now, what to ask for, and the list of every class's buffs to pick the wanted ones from.
 
-const LINE_ORDER: BuffLine[] = ['hpac', 'haste', 'spellHaste', 'manaRegen', 'hpRegen', 'ds', 'rune', 'attack', 'stats', 'mana', 'resist', 'move']
+const LINE_ORDER: BuffLine[] = ['hpac', 'haste', 'spellHaste', 'manaRegen', 'hpRegen', 'ds', 'rune', 'attack', 'proc', 'stats', 'mana', 'resist', 'move', 'other']
 
 function useBuffs() {
   const q = useInvoke<BuffView>('buffs:get')
@@ -33,13 +33,16 @@ const casters = (o: BuffOffer) =>
     .join(', ')
 
 const HOW =
-  'Classes come from /who: type /who <name> for anyone in the group the tracker does not know yet. A buff counts as on you from its ' +
+  'Classes come from /who: type /who <name> for anyone in the group the tracker does not know yet, and /who <your name> for your own. Self-only ' +
+  'buffs are listed too (marked self), as are permanent procs and utility buffs (combat innates, poisons, Breath of the Dead; not vision): whatever ' +
+  'your own classes can cast is yours to keep up, group or no group, and the reminder says "Cast …" for it. A buff counts as on you from its ' +
   `"you feel…" line, matched to the cast just before it, until its fade line (or death). Songs and buffs under ${MIN_BUFF_SEC / 60} minutes are left ` +
-  'out. What to ask for is the best combination that stacks, by the spell file’s own stacking rules (two buffs with the same effect in the same ' +
-  'slot do not stack; some block others outright): of the buffs you pick that your group can cast, and what is on you already, the set worth ' +
-  `the most. A buff is worth its HP plus 2 a point of AC, 1.5 of STA, 1 of other stats, nothing for CHA; buffs worth under ${MIN_ASK_VALUE} are ` +
-  'not asked for. Durations of other people’s buffs are ' +
-  'worked out at their /who level without their focus, so the real end can come later; the fade line is what counts.'
+  'out. What to ask for is the best combination that stacks, by the game’s own stacking rules: two buffs with the same effect in the same ' +
+  'slot do not stack and the stronger holds; some block or overwrite others below a set strength, worked out at the caster’s level, so the order ' +
+  'they land in can matter (a level-50 Strength stays on under Harnessing of Spirit, but not the other way round), and the combination says ' +
+  'when it does. Of the buffs you pick that your group can cast, and what is on you already, it is the set worth the most. A buff is worth its ' +
+  `HP plus 2 a point of AC, 1.5 of STA, 1 of other stats, nothing for CHA; buffs worth under ${MIN_ASK_VALUE} are not asked for. Durations of ` +
+  'other people’s buffs are worked out at their /who level without their focus, so the real end can come later; the fade line is what counts.'
 
 export function Buffs() {
   const q = useBuffs()
@@ -85,9 +88,32 @@ export function Buffs() {
       <div className="grid two mb-16" style={{ alignItems: 'start' }}>
         <div className="card stack gap-8">
           <h2 style={{ margin: 0 }}>Your group</h2>
+          <div className="stack" style={{ gap: 2 }}>
+            <div className="row gap-8">
+              <b>You</b>
+              {v.me ? (
+                <span className="small muted">
+                  {v.me.classes.map(code).join('/')} {v.me.level}
+                </span>
+              ) : (
+                <span className="small lt-chip warn">
+                  type <span className="mono">/who</span> in game so the tracker knows your classes
+                </span>
+              )}
+            </div>
+            {v.me && (
+              <div className="small">
+                {(() => {
+                  const me = v.me
+                  const own = v.offers.filter((o) => wanted.has(o.spell) && canCast(o, me))
+                  return own.length ? own.map((o) => o.spell).join(', ') : <span className="faint">none of the buffs you want</span>
+                })()}
+              </div>
+            )}
+          </div>
           {!v.group.length ? (
             <p className="muted" style={{ margin: 0 }}>
-              Not in a group. Join one and each member shows here with what they could buff you with.
+              Not in a group: the combination below is what you can cast yourself. Join one and each member shows here with what they could buff you with.
             </p>
           ) : (
             v.group.map((g) => {
@@ -119,10 +145,15 @@ export function Buffs() {
             {v.needs.length ? (
               <>
                 <b>To ask for:</b> {askText(v.needs)}.
-                {v.needs.some((n) => n.replaces) && (
+                {v.needs.some((n) => n.replaces || n.clickOff.length) && (
                   <span className="muted">
                     {' '}
-                    ({v.needs.filter((n) => n.replaces).map((n) => `${n.spell} would replace ${n.replaces}`).join('; ')})
+                    (
+                    {v.needs
+                      .filter((n) => n.replaces || n.clickOff.length)
+                      .map((n) => [n.replaces && `${n.spell} would replace ${n.replaces}`, n.clickOff.length && `${n.spell} needs ${n.clickOff.join(', ')} clicked off first`].filter(Boolean).join('; '))
+                      .join('; ')}
+                    )
                   </span>
                 )}
               </>
@@ -212,6 +243,11 @@ export function Buffs() {
                             {o.spell}
                           </a>
                           {o.group && <span className="lt-chip" style={{ marginLeft: 6 }}>group</span>}
+                          {o.self && (
+                            <span className="lt-chip" style={{ marginLeft: 6 }} title="Only the caster can have it: yours to cast when your classes can">
+                              self
+                            </span>
+                          )}
                         </td>
                         <td className="small muted nowrap">{LINE_LABELS[o.line]}</td>
                         <td className="small">{effectText(o)}</td>
@@ -233,6 +269,7 @@ export function Buffs() {
 /** The best set of buffs that stacks, with this group or with anyone; and what was left out, and why. */
 function BestCombination({ view, unpick }: { view: BuffView; unpick: (spell: string) => void }) {
   const [scope, setScope] = useRemembered<'group' | 'anyone'>('buffs.planScope', 'group')
+  const [leftOpen, setLeftOpen] = useRemembered<boolean>('buffs.leftOutOpen', false)
   const plan: BuffPlan = scope === 'group' ? view.plan : view.planAnyone
   const total = plan.chosen.reduce((t, c) => t + c.value, 0)
   const byName = new Map(view.offers.map((o) => [o.spell, o]))
@@ -250,7 +287,7 @@ function BestCombination({ view, unpick }: { view: BuffView; unpick: (spell: str
           </button>
         </span>
         <span className="small muted">
-          {scope === 'group' ? 'From what your group can cast and what is on you.' : 'From every class at level 50, to plan with.'} Worth {total.toLocaleString()} in all.
+          {scope === 'group' ? 'From what your group and you can cast, and what is on you.' : 'From every class at level 50, and your own self-only buffs, to plan with.'} Worth {total.toLocaleString()} in all.
         </span>
       </div>
       {!plan.chosen.length ? (
@@ -274,7 +311,12 @@ function BestCombination({ view, unpick }: { view: BuffView; unpick: (spell: str
                     <span className="muted" style={{ minWidth: 200 }}>
                       {o ? effectText(o) : ''}
                     </span>
-                    {c.on ? <span className="lt-chip good">on you</span> : <span className="lt-chip warn">ask {c.from}</span>}
+                    {c.on ? <span className="lt-chip good">on you</span> : c.from === YOU ? <span className="lt-chip warn">cast it yourself</span> : <span className="lt-chip warn">ask {c.from}</span>}
+                    {c.after.length > 0 && (
+                      <span className="faint" title="By the stacking rules it holds only when it lands after these">
+                        after {c.after.join(', ')}
+                      </span>
+                    )}
                     <span className="spacer" />
                     <span className="faint mono">{c.value.toLocaleString()}</span>
                   </div>
@@ -286,8 +328,13 @@ function BestCombination({ view, unpick }: { view: BuffView; unpick: (spell: str
       )}
       {stacked.length > 0 && (
         <div className="stack" style={{ gap: 2 }}>
-          <b className="small">Left out: they do not stack with the combination</b>
-          {stacked.map((l) => (
+          <div className="row gap-8">
+            <button className="btn small ghost" aria-expanded={leftOpen} aria-label={leftOpen ? 'Collapse left out' : 'Expand left out'} onClick={() => setLeftOpen(!leftOpen)} style={{ width: 28 }}>
+              {leftOpen ? '▾' : '▸'}
+            </button>
+            <b className="small">Left out: {stacked.length} that do not stack with the combination</b>
+          </div>
+          {leftOpen && stacked.map((l) => (
             <div key={l.spell} className="row gap-8 small">
               <span style={{ minWidth: 200 }} className="muted">
                 {l.spell}
