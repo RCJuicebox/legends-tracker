@@ -248,6 +248,23 @@ export interface Defense {
   absorb: number
 }
 
+/**
+ * Where a proc row came from. `spell`: a spell effect that landed with no cast line behind it, so
+ * something fired it (a weapon, a buff). `ability`: the same, for an ability the game lists as one
+ * you press. `aa`: a swing the game annotated "(Finishing Blow)".
+ */
+export type ProcOrigin = 'spell' | 'ability' | 'aa'
+
+export interface ProcStat {
+  name: string
+  origin: ProcOrigin
+  count: number
+  /** Damage the firings did; for Finishing Blow, the damage of the swings that procced. */
+  damage: number
+  /** Hit points the firings healed: a lifetap proc prints a damage line and a heal line for one firing. */
+  healed: number
+}
+
 export interface Entity {
   name: string
   kind: EntityKind
@@ -263,6 +280,8 @@ export interface Entity {
   attackers: Record<string, Tally>
   /** Damage taken, by skill or spell. */
   takenBy: Record<string, SkillStat>
+  /** Effects that fired without being cast, by name. */
+  procs: Record<string, ProcStat>
   defense: Defense
   healOut: HealTally
   healIn: HealTally

@@ -1,7 +1,7 @@
 import { parseCombatLine, looksLikeCombat, SELF, type CombatEvent } from './combatLines'
 import { zoneEntered, type LogLine } from './logLine'
 import type {
-  CombatSnapshot, DamageHow, Defense, Entity, EntityKind, HealTally, RosterMember, Segment, SegmentSummary, SkillStat, Tally
+  CombatSnapshot, DamageHow, Defense, Entity, EntityKind, HealTally, ProcOrigin, RosterMember, Segment, SegmentSummary, SkillStat, Tally
 } from '../shared/types'
 
 // The damage meter: every combat line sorted into fights and sessions, per entity.
@@ -18,6 +18,13 @@ import type {
 
 /** A gap between an entity's hits counts as combat time up to this long. */
 export const ACTIVE_GAP_MS = 3000
+/**
+ * A spell effect landing this long after its cast line is the cast; later, or with no cast line at
+ * all, it was fired by something else: a weapon, a buff, an ability. Long casts run to ten seconds.
+ */
+export const CAST_WINDOW_MS = 20_000
+/** Abilities the game lists as ones you press, whose effect prints like a proc. */
+const ACTIVATED = new Set(['reaving strike', 'harm touch', 'leech touch'])
 const FIGHTS_KEPT = 300
 const SESSIONS_KEPT = 60
 /** A fight's per-second timeline stops growing past an hour. */
@@ -51,10 +58,15 @@ const healTally = (): HealTally => ({ total: 0, raw: 0, count: 0, crits: 0, max:
 const skillStat = (name: string, how: DamageHow): SkillStat => ({ ...tally(), name, how, misses: 0, resists: 0, mods: {} })
 const defense = (): Defense => ({ swings: 0, hit: 0, miss: 0, dodge: 0, parry: 0, block: 0, riposte: 0, absorb: 0 })
 
+/** "Envenomed Bolt X" and "Envenomed Bolt" are one spell for matching a landing to its cast. */
+export function spellBase(name: string): string {
+  return name.replace(/ (?:[IVXL]+|\d+)$/, '').toLowerCase()
+}
+
 function newEntity(name: string, kind: EntityKind, owner: string | undefined, at: number): Entity {
   return {
     name, kind, ...(owner ? { owner } : {}),
-    out: tally(), in: tally(), skills: {}, targets: {}, attackers: {}, takenBy: {}, defense: defense(),
+    out: tally(), in: tally(), skills: {}, targets: {}, attackers: {}, takenBy: {}, procs: {}, defense: defense(),
     healOut: healTally(), healIn: healTally(), healSpells: {}, healTargets: {}, healers: {},
     runes: 0, casts: 0, resisted: 0, kills: 0, deaths: 0, firstAt: at, lastAt: at, activeMs: 0, lastHitAt: 0
   }
@@ -108,6 +120,10 @@ export class CombatMeter {
   private roster = new Map<string, RosterMember>()
   /** Which side a single-word name turned out to be on. */
   private sides = new Map<string, Side>()
+  /** When each entity last began casting each spell: "kelwyn|envenomed bolt" → time. */
+  private lastCast = new Map<string, number>()
+  /** When each entity's proc last did damage, by name, so its heal line a moment later is the same firing. */
+  private lastProc = new Map<string, number>()
   private seq = 0
   /** A note shown while the log's history is being read. */
   reading = ''
@@ -140,6 +156,8 @@ export class CombatMeter {
     this.pets.clear()
     this.roster.clear()
     this.sides.clear()
+    this.lastCast.clear()
+    this.lastProc.clear()
     this.zone = ''
     this.changed()
   }
@@ -329,11 +347,28 @@ export class CombatMeter {
         return this.onGroup(ev)
       case 'cast': {
         const source = this.norm(ev.source)
+        this.lastCast.set(`${nameKey(source)}|${spellBase(ev.spell)}`, at)
+        if (this.lastCast.size > 4000) this.lastCast.delete(this.lastCast.keys().next().value!)
         if (this.sideOf(source) !== 'friend') return
         for (const seg of this.liveSegments(at, false)) this.ent(seg, source, at).casts++
         return
       }
     }
+  }
+
+  /** A spell effect of a friend's with no cast line of theirs within the window was fired by something. */
+  private procOrigin(source: string, spell: string, at: number): ProcOrigin | null {
+    const base = spellBase(spell)
+    const cast = this.lastCast.get(`${nameKey(source)}|${base}`)
+    if (cast !== undefined && at - cast <= CAST_WINDOW_MS && at >= cast) return null
+    return ACTIVATED.has(base) ? 'ability' : 'spell'
+  }
+
+  private static proc(e: Entity, name: string, origin: ProcOrigin, damage: number, healed: number, firing: boolean): void {
+    const p = (e.procs[name] ??= { name, origin, count: 0, damage: 0, healed: 0 })
+    if (firing) p.count++
+    p.damage += damage
+    p.healed += healed
   }
 
   /** The segments an event lands in: the session, and the fight (opened if `combat` says the event is one). */
@@ -351,10 +386,15 @@ export class CombatMeter {
     const [ss, ts] = this.place(source, target, true)
     if (ss === 'unknown' || ts === 'unknown' || ss === ts) return
     const crit = ev.mods.includes('critical')
+    const proc = ss === 'friend' && ev.how === 'spell' ? this.procOrigin(source, ev.skill, at) : null
+    if (proc) this.lastProc.set(`${nameKey(source)}|${ev.skill}`, at)
+    const finishing = ev.how === 'melee' && ev.mods.includes('finishing blow')
     for (const seg of this.liveSegments(at, true)) {
       const src = this.ent(seg, source, at)
       const tgt = this.ent(seg, target, at)
       add(src.out, ev.amount, crit)
+      if (proc) CombatMeter.proc(src, ev.skill, proc, ev.amount, 0, true)
+      if (finishing) CombatMeter.proc(src, 'Finishing Blow', 'aa', ev.amount, 0, true)
       const skill = (src.skills[ev.skill] ??= skillStat(ev.skill, ev.how))
       add(skill, ev.amount, crit)
       for (const m of ev.mods) skill.mods[m] = (skill.mods[m] ?? 0) + 1
@@ -414,6 +454,10 @@ export class CombatMeter {
     const [ss, ts] = this.place(source, target, false)
     if (ss === 'unknown' || ts === 'unknown' || ss !== ts) return
     const crit = ev.mods.includes('critical')
+    // A heal over time ticks long after its cast; only a direct heal can be a proc. A lifetap's heal
+    // line follows its damage line: the same firing, not another.
+    const proc = ss === 'friend' && !ev.hot ? this.procOrigin(source, ev.spell, at) : null
+    const firing = !!proc && Math.abs(at - (this.lastProc.get(`${nameKey(source)}|${ev.spell}`) ?? -Infinity)) > 1000
     for (const seg of this.liveSegments(at, false)) {
       if (ss === 'enemy') {
         // Only a fight cares what the enemy healed: it is damage undone.
@@ -422,6 +466,7 @@ export class CombatMeter {
       }
       const src = this.ent(seg, source, at)
       const tgt = this.ent(seg, target, at)
+      if (proc) CombatMeter.proc(src, ev.spell, proc, 0, ev.amount, firing)
       addHeal(src.healOut, ev.amount, ev.raw, crit)
       addHeal((src.healSpells[ev.spell] ??= healTally()), ev.amount, ev.raw, crit)
       addHeal((src.healTargets[target] ??= healTally()), ev.amount, ev.raw, crit)

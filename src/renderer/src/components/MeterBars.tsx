@@ -1,6 +1,6 @@
 import type { CSSProperties, ReactNode } from 'react'
 import { fmtNum, fmtPct, fmtRate, type HealRow, type Row, type SkillRow } from '../../../core/combatView'
-import type { EntityKind } from '../../../shared/types'
+import type { EntityKind, ProcOrigin } from '../../../shared/types'
 
 // The bars a damage meter is made of, in the Live page and in the overlay alike: a name, a fill
 // showing its share of the top row, and the figures on the right. The overlay gives them a
@@ -25,6 +25,16 @@ export const HOW_COLOR: Record<SkillRow['how'], string> = {
 }
 
 export const HEAL_COLOR = 'var(--green)'
+
+export const PROC_COLOR: Record<ProcOrigin, string> = { spell: '#c46fd2', ability: '#6fb3d2', aa: 'var(--accent)' }
+
+export const PROC_HINT: Record<ProcOrigin, string> = {
+  spell: 'Landed with no cast line behind it, so something fired it: a weapon, a buff, an item. The log never says which.',
+  ability: 'An ability you press; its effect prints like a proc, with no cast line.',
+  aa: 'Swings the game marked (Finishing Blow). Their damage stays in the melee lane; this is the damage of the swings that procced.'
+}
+
+export const PROC_WORD: Record<ProcOrigin, string> = { spell: 'proc', ability: 'ability', aa: 'AA' }
 
 /** "pet", "group" after a name; nothing for you, players and mobs. */
 export function kindTag(kind: EntityKind, owner?: string): string {
@@ -120,12 +130,25 @@ export function SkillBar({ s, rank, onClick, per }: { s: SkillRow; rank?: number
     .filter(([m]) => m !== 'critical')
     .map(([m, n]) => `${n} ${m}`)
     .join(', ')
+  const proc = s.proc
   return (
     <Bar
       color={HOW_COLOR[s.how]}
       fill={s.fill}
       rank={rank}
-      name={s.name}
+      name={
+        proc ? (
+          <>
+            {s.name}
+            <em className="dm-proc" style={{ color: PROC_COLOR[proc.origin] }} title={PROC_HINT[proc.origin]}>
+              {PROC_WORD[proc.origin]}
+              {proc.ppm !== null ? ` · ${proc.ppm.toFixed(1)}/min` : ''}
+            </em>
+          </>
+        ) : (
+          s.name
+        )
+      }
       tag={s.how === 'pet' ? 'pet' : s.how === 'dot' ? 'DoT' : s.how === 'ds' ? 'shield' : s.how === 'spell' ? 'spell' : ''}
       stat={bits.join(' · ')}
       right={

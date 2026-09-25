@@ -4,10 +4,10 @@ import { act, showToast } from '../toast'
 import { useRemembered } from '../remember'
 import { LIVE, useCombat, useSegment } from '../combat'
 import { Icon, Info } from './ui'
-import { EntityBar, HealBar, HEAL_COLOR, KIND_COLOR, SkillBar, kindTag } from './MeterBars'
+import { EntityBar, HealBar, HEAL_COLOR, KIND_COLOR, PROC_COLOR, PROC_HINT, PROC_WORD, SkillBar, kindTag } from './MeterBars'
 import {
   attackerRows, attackerSkillRows, copyText, damageRows, defenseOf, durationSec, fmtClock, fmtNum, fmtPct, fmtRate,
-  healSpellRows, healTargetRows, healTotals, healedRows, healerRows, rolling, skillRows, sourcesFor, takenRows, targetRows, totalsOf,
+  healSpellRows, healTargetRows, healTotals, healedRows, healerRows, MIN_PROC_ACTIVE_SEC, procAmount, procRows, procSummary, procText, rolling, skillRows, sourcesFor, takenRows, targetRows, totalsOf,
   type HealRow, type Row
 } from '../../../core/combatView'
 import type { CombatSnapshot, Defense, MeterMode, MeterScope, MeterSpan, Segment, SegmentSummary } from '../../../shared/types'
@@ -142,6 +142,7 @@ export function Meter() {
             </div>
             <div className="dm-side">
               {mode === 'damage' && <TargetsCard seg={seg} scope={scope} drill={drill} setDrill={setDrill} />}
+              {mode !== 'incoming' && <ProcsCard seg={seg} scope={scope} name={name} />}
               {mode === 'incoming' && <DefenseCard d={defenseOf(seg, scope)} scope={scope} />}
               {mode === 'incoming' && <TakenCard seg={seg} scope={scope} />}
               {mode === 'healing' && <HealedCard seg={seg} scope={scope} />}
@@ -301,6 +302,59 @@ function TargetsCard({ seg, scope, drill, setDrill }: { seg: Segment; scope: Met
         <EntityBar key={t.key} r={t} rank={i + 1} selected={drill?.kind === 'target' && drill.name === t.name} onClick={() => setDrill(drill?.kind === 'target' && drill.name === t.name ? null : { kind: 'target', name: t.name })} />
       ))}
       {targets.length > 12 && <div className="faint small">+{targets.length - 12} more</div>}
+    </div>
+  )
+}
+
+function ProcsCard({ seg, scope, name }: { seg: Segment; scope: MeterScope; name: string }) {
+  const rows = useMemo(() => procRows(seg, scope), [seg, scope])
+  const sum = useMemo(() => procSummary(seg, scope, rows), [seg, scope, rows])
+  const copy = () =>
+    navigator.clipboard.writeText(procText(seg, scope, name)).then(
+      () => showToast('Copied to the clipboard'),
+      () => showToast('Could not copy', { tone: 'bad' })
+    )
+  return (
+    <div className="dm-aux">
+      <div className="dm-aux-head">
+        <span>
+          Procs{' '}
+          <Info
+            label="About procs"
+            text={`An effect that landed with no cast line behind it: a weapon proc, a buff's proc, an item. Rated per minute of the source's active combat time (gaps between hits capped at 3 s), withheld under ${MIN_PROC_ACTIVE_SEC} s of it. Abilities you press print the same way and are marked. (Finishing Blow) swings count as the AA.`}
+          />
+        </span>
+        <span className="row tight">
+          {rows.length > 0 && (
+            <span className="faint small">
+              {sum.count} firing{sum.count === 1 ? '' : 's'}
+              {sum.ppm !== null ? ` · ${sum.ppm.toFixed(1)}/min` : ''}
+            </span>
+          )}
+          {rows.length > 0 && (
+            <button className="btn ghost small x-btn" onClick={copy} title="Copy this list as text" aria-label="Copy the proc list">
+              <Icon name="copy" />
+            </button>
+          )}
+        </span>
+      </div>
+      {!rows.length && <div className="faint small">Nothing has fired on its own yet.</div>}
+      {rows.slice(0, 12).map((r) => (
+        <div key={r.key} className="dm-procrow" title={`${PROC_HINT[r.origin]}${r.ppm === null ? ` No rate yet: that needs ${MIN_PROC_ACTIVE_SEC} s of active combat.` : ''}`}>
+          <i className="dm-dot" style={{ background: PROC_COLOR[r.origin] }} />
+          <span className="dm-name">
+            {r.name}
+            {r.sourceKind !== 'you' && <em className="dm-tag">{r.source}</em>}
+            <em className="dm-tag" style={{ color: PROC_COLOR[r.origin] }}>
+              {PROC_WORD[r.origin]}
+            </em>
+          </span>
+          <span className="dm-right">
+            {r.ppm === null ? '–' : `${r.ppm.toFixed(1)}/min`} · <b>×{r.count}</b> · {procAmount(r)}
+          </span>
+        </div>
+      ))}
+      {rows.length > 12 && <div className="faint small">+{rows.length - 12} more</div>}
     </div>
   )
 }

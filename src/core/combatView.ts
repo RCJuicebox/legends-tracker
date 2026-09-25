@@ -1,6 +1,6 @@
 import { SELF } from './combatLines'
 import { durationMs, isFriend, nameKey } from './combatMeter'
-import type { Defense, Entity, EntityKind, HealTally, MeterMode, MeterScope, Segment, SkillStat } from '../shared/types'
+import type { Defense, Entity, EntityKind, HealTally, MeterMode, MeterScope, ProcOrigin, Segment, SkillStat } from '../shared/types'
 
 // What the damage meter shows, worked out from a segment: the same sums for the Live page and the
 // overlay. Pure functions of the data, so they run in any window.
@@ -27,10 +27,19 @@ export interface Row {
   pets?: Row[]
 }
 
+/** A skill row's proc note: this effect fired without being cast. */
+export interface ProcTag {
+  origin: ProcOrigin
+  count: number
+  /** Firings per minute of the entity's active combat time; null under MIN_PROC_ACTIVE_SEC of it. */
+  ppm: number | null
+}
+
 export interface SkillRow {
   key: string
   name: string
   how: SkillStat['how'] | 'pet'
+  proc?: ProcTag
   total: number
   dps: number
   fill: number
@@ -129,14 +138,25 @@ export function damageRows(seg: Segment, scope: MeterScope, combinePet: boolean)
   return finish([...rows.values(), ...orphans])
 }
 
+/** A rate needs this much active combat time before it means anything. */
+export const MIN_PROC_ACTIVE_SEC = 10
+
+const perMinute = (count: number, activeMs: number): number | null => (activeMs >= MIN_PROC_ACTIVE_SEC * 1000 ? count / (activeMs / 60_000) : null)
+
+function procTag(e: Entity | undefined, skill: string): ProcTag | undefined {
+  const p = e?.procs[skill]
+  return p ? { origin: p.origin, count: p.count, ppm: perMinute(p.count, e!.activeMs) } : undefined
+}
+
 /** The skills and spells behind one row, plus a lane per pet folded into it. */
 export function skillRows(seg: Segment, row: Row): SkillRow[] {
   const ms = durationMs(seg)
   const e = seg.entities[row.key]
   const out: SkillRow[] = []
   for (const s of Object.values(e?.skills ?? {})) {
+    const proc = procTag(e, s.name)
     out.push({
-      key: `s:${s.name}`, name: s.name, how: s.how, total: s.total, dps: rate(s.total, ms), fill: 0, share: 0,
+      key: `s:${s.name}`, name: s.name, how: s.how, ...(proc ? { proc } : {}), total: s.total, dps: rate(s.total, ms), fill: 0, share: 0,
       hits: s.hits, crits: s.crits, misses: s.misses, resists: s.resists, max: s.max, min: s.min, avg: s.hits ? s.total / s.hits : 0, mods: s.mods
     })
   }
@@ -279,6 +299,71 @@ export function healedRows(seg: Segment, scope: MeterScope): HealRow[] {
     }
   }
   return finish([...sums].map(([k, h]) => healRow(k, seg.entities[k]?.name ?? k, seg.entities[k]?.kind ?? 'player', h, ms)))
+}
+
+export interface ProcRow {
+  key: string
+  name: string
+  origin: ProcOrigin
+  /** Who it fired for. */
+  source: string
+  sourceKind: EntityKind
+  count: number
+  damage: number
+  healed: number
+  ppm: number | null
+  /** Of the most frequent row. */
+  fill: number
+}
+
+export interface ProcSummary {
+  count: number
+  /** Over the active time of every source listed; null with too little of it. */
+  ppm: number | null
+  activeSec: number
+}
+
+/** Every effect that fired without being cast, for the rows in scope, most frequent first. */
+export function procRows(seg: Segment, scope: MeterScope): ProcRow[] {
+  const rows: ProcRow[] = []
+  for (const e of scoped(seg, scope)) {
+    for (const p of Object.values(e.procs)) {
+      rows.push({
+        key: `${nameKey(e.name)}|${p.name}`, name: p.name, origin: p.origin, source: e.name, sourceKind: e.kind,
+        count: p.count, damage: p.damage, healed: p.healed, ppm: perMinute(p.count, e.activeMs), fill: 0
+      })
+    }
+  }
+  rows.sort((a, b) => b.count - a.count || a.name.localeCompare(b.name))
+  const top = rows[0]?.count ?? 0
+  for (const r of rows) r.fill = top ? r.count / top : 0
+  return rows
+}
+
+export function procSummary(seg: Segment, scope: MeterScope, rows: ProcRow[]): ProcSummary {
+  const sources = new Set(rows.map((r) => nameKey(r.source)))
+  const activeMs = scoped(seg, scope).filter((e) => sources.has(nameKey(e.name))).reduce((s, e) => s + e.activeMs, 0)
+  const count = rows.reduce((s, r) => s + r.count, 0)
+  return { count, ppm: perMinute(count, activeMs), activeSec: activeMs / 1000 }
+}
+
+export const PROC_ORIGIN_LABEL: Record<ProcOrigin, string> = { spell: 'proc', ability: 'ability', aa: 'AA' }
+
+/** "400", "42 + 42 healed", "300 healed". */
+export function procAmount(r: { damage: number; healed: number }): string {
+  return [r.damage > 0 ? fmtNum(r.damage) : null, r.healed > 0 ? `${fmtNum(r.healed)} healed` : null].filter(Boolean).join(' + ') || '0'
+}
+
+export function procText(seg: Segment, scope: MeterScope, name: string): string {
+  const rows = procRows(seg, scope)
+  const sum = procSummary(seg, scope, rows)
+  const lines = [`${name} · Procs · ${sum.count} firing${sum.count === 1 ? '' : 's'}${sum.ppm === null ? '' : ` · ${sum.ppm.toFixed(1)}/min`} · ${scope}`]
+  for (const r of rows) {
+    const who = r.sourceKind === 'you' ? '' : ` (${r.source})`
+    lines.push(`${r.name}${who}  ×${r.count}  ${r.ppm === null ? '-' : `${r.ppm.toFixed(1)}/min`}  ${procAmount(r)}  ${PROC_ORIGIN_LABEL[r.origin]}`)
+  }
+  if (rows.length === 0) lines.push('Nothing fired on its own.')
+  return lines.join('\n')
 }
 
 export interface Totals {

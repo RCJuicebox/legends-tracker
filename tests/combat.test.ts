@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { parseCombatLine, parseMods, SELF } from '../src/core/combatLines'
-import { CombatMeter, durationMs, fightName, summarize } from '../src/core/combatMeter'
-import { attackerRows, copyText, damageRows, defenseOf, healerRows, rolling, skillRows, targetRows, totalsOf } from '../src/core/combatView'
+import { CombatMeter, durationMs, fightName, spellBase, summarize } from '../src/core/combatMeter'
+import { attackerRows, copyText, damageRows, defenseOf, healerRows, procRows, procSummary, procText, rolling, skillRows, targetRows, totalsOf } from '../src/core/combatView'
 import { parseLogLine } from '../src/core/logLine'
 import { at } from './helpers'
 
@@ -345,6 +345,74 @@ describe('CombatMeter', () => {
     expect(tl.inc[1]).toBe(50)
     expect(tl.you[6]).toBe(303)
     expect(m.sessions[0].timeline).toBeUndefined()
+  })
+
+  it('an effect with no cast line behind it is a proc; a cast one is not; a HoT tick is neither', () => {
+    const { m, feed } = meter()
+    feed(`
+      [Thu Sep 24 20:00:00 2026] You begin casting Envenomed Bolt X.
+      [Thu Sep 24 20:00:02 2026] You hit a fetid fiend for 58 points of poison damage by Envenomed Bolt X.
+      [Thu Sep 24 20:00:03 2026] You punch a fetid fiend for 100 points of damage.
+      [Thu Sep 24 20:00:04 2026] You hit a fetid fiend for 200 points of prismatic damage by Puma Maw V.
+      [Thu Sep 24 20:00:05 2026] You hit a fetid fiend for 42 points of magic damage by Lifebite.
+      [Thu Sep 24 20:00:05 2026] You healed Kelwyn for 42 hit points by Lifebite.
+      [Thu Sep 24 20:00:06 2026] You hit a fetid fiend for 404 points of magic damage by Reaving Strike.
+      [Thu Sep 24 20:00:07 2026] You punch a fetid fiend for 221 points of damage. (Finishing Blow)
+      [Thu Sep 24 20:00:08 2026] You healed Kelwyn over time for 235 hit points by Slugs Healing.
+      [Thu Sep 24 20:00:09 2026] You hit a fetid fiend for 200 points of prismatic damage by Puma Maw V.
+      [Thu Sep 24 20:00:09 2026] Jobarab told you, 'Attacking a fetid fiend Master.'
+      [Thu Sep 24 20:00:10 2026] Jobarab begins casting Malaria.
+      [Thu Sep 24 20:00:12 2026] Jobarab hit a fetid fiend for 200 points of prismatic damage by Puma Maw V.
+      [Thu Sep 24 20:00:13 2026] A fetid fiend has taken 69 damage from Malaria by Jobarab.
+      [Thu Sep 24 20:00:14 2026] You punch a fetid fiend for 100 points of damage.
+      [Thu Sep 24 20:00:16 2026] You punch a fetid fiend for 100 points of damage.`)
+    const f = m.liveFight!
+    const you = f.entities['you']
+    expect(Object.keys(you.procs).sort()).toEqual(['Finishing Blow', 'Lifebite', 'Puma Maw V', 'Reaving Strike'])
+    expect(you.procs['Puma Maw V']).toEqual({ name: 'Puma Maw V', origin: 'spell', count: 2, damage: 400, healed: 0 })
+    // Lifebite's damage line and heal line are one firing.
+    expect(you.procs['Lifebite']).toEqual({ name: 'Lifebite', origin: 'spell', count: 1, damage: 42, healed: 42 })
+    expect(you.procs['Reaving Strike']).toMatchObject({ origin: 'ability', count: 1 })
+    expect(you.procs['Finishing Blow']).toEqual({ name: 'Finishing Blow', origin: 'aa', count: 1, damage: 221, healed: 0 })
+    expect(f.entities['jobarab'].procs).toEqual({ 'Puma Maw V': { name: 'Puma Maw V', origin: 'spell', count: 1, damage: 200, healed: 0 } })
+    expect(spellBase('Envenomed Bolt X')).toBe('envenomed bolt')
+    // Rows: yours and the pet's, most frequent first, rated over each source's active time.
+    const rows = procRows(f, 'everyone')
+    expect(rows.map((r) => [r.name, r.source, r.count])).toEqual([
+      ['Puma Maw V', 'You', 2],
+      ['Finishing Blow', 'You', 1],
+      ['Lifebite', 'You', 1],
+      ['Puma Maw V', 'Jobarab', 1],
+      ['Reaving Strike', 'You', 1]
+    ])
+    // Your hits came at 02, 03, 04, 05, 06, 07, 09, 14 and 16: the first counts one second, then each
+    // gap capped at three: 1+1+1+1+1+1+2+3+2 = 13 s. Two Puma Maws in 13 s is 9.2 a minute.
+    expect(you.activeMs).toBe(13_000)
+    expect(rows[0].ppm).toBeCloseTo(2 / (13 / 60), 5)
+    // The pet struck twice a second apart: 2 s of active time is too little for a rate.
+    expect(rows[3].ppm).toBeNull()
+    const sum = procSummary(f, 'everyone', rows)
+    expect(sum.count).toBe(6)
+    expect(sum.activeSec).toBe(15)
+    expect(sum.ppm).toBeCloseTo(6 / (15 / 60), 5)
+    expect(procRows(f, 'you').map((r) => r.source)).toEqual(['You', 'You', 'You', 'Jobarab', 'You'])
+    // The skill lane says which of the row's spells fired on their own.
+    const skills = skillRows(f, damageRows(f, 'you', false)[0])
+    expect(skills.find((s) => s.name === 'Puma Maw V')?.proc).toMatchObject({ origin: 'spell', count: 2 })
+    expect(skills.find((s) => s.name === 'Puma Maw V')?.proc?.ppm).toBeCloseTo(2 / (13 / 60), 5)
+    expect(skills.find((s) => s.name === 'Envenomed Bolt X')?.proc).toBeUndefined()
+    const text = procText(f, 'you', 'A fetid fiend').split('\n')
+    expect(text[0]).toBe('A fetid fiend · Procs · 6 firings · 24.0/min · you')
+    expect(text[1]).toBe('Puma Maw V  ×2  9.2/min  400  proc')
+    expect(text[3]).toBe('Lifebite  ×1  4.6/min  42 + 42 healed  proc')
+  })
+
+  it('a cast well before its landing no longer explains it', () => {
+    const { m, feed } = meter()
+    feed(`
+      [Thu Sep 24 20:00:00 2026] You begin casting Drain Spirit.
+      [Thu Sep 24 20:00:30 2026] You hit a fetid fiend for 444 points of magic damage by Drain Spirit.`)
+    expect(m.liveFight!.entities['you'].procs['Drain Spirit']).toMatchObject({ count: 1 })
   })
 
   it('reset forgets everything for a new character', () => {

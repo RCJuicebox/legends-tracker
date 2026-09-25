@@ -89,6 +89,13 @@ fighting near you, and everything hitting your side.
 - **Damage by mob** shows where the damage went; click a mob to see who did what to it. **DPS over
   time** draws you, your pet, the rest of your side and incoming damage on a 6-second rolling
   average, for fights.
+- **Procs** lists every effect that fired without being cast: a spell damage or direct heal line of
+  yours (or your pet's, or a group-mate's) with no `You begin casting` line of theirs in the twenty
+  seconds before it. Each row has its firings, their damage and healing (a lifetap's damage line and
+  heal line are one firing), and firings per minute of that source's active combat time, withheld
+  under ten seconds of it. Abilities you press print the same way (Reaving Strike, Harm Touch) and
+  are marked as such; swings the game annotates `(Finishing Blow)` count as the AA, with the damage
+  of the swings that procced. The same note sits on the skill rows in a drilldown.
 - **Everyone, Group, You.** Whose rows are listed. Group members are learned from the log's
   join and leave lines and can be added by hand; a group-mate's pet joins them once it says
   `/pet who leader`. A single capitalised name is a stranger or a named mob until it hits or heals

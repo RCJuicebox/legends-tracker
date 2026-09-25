@@ -2529,6 +2529,30 @@ button.tree-item {
 .dm-chart {
   margin-top: 2px;
 }
+.dm-proc {
+  font-style: normal;
+  font-weight: 600;
+  font-size: 10.5px;
+  margin-left: 6px;
+  letter-spacing: 0.02em;
+}
+.dm-procrow {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  padding: 3px 4px;
+  font-size: 12.5px;
+  border-bottom: 1px solid var(--line);
+}
+.dm-procrow:last-child {
+  border-bottom: none;
+}
+.dm-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 2px;
+}
 .dm-legend {
   display: inline-flex;
   align-items: center;
