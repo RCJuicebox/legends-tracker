@@ -13,6 +13,7 @@ import type { ArchiveOutcome } from '../core/archiver'
 import { checkAgainstLog } from '../core/logCheck'
 import { MoteTracker, moteName, parseMoteLoot, type MoteState } from '../core/motes'
 import { CombatMeter, summarize as summarizeFight } from '../core/combatMeter'
+import { LootLedger, type LootSnapshot } from '../core/loot'
 import { durationSec, fmtClock, fmtNum } from '../core/combatView'
 import { characterKey, characterName } from './storeCore'
 import { isGameFolder, lastZone, listLogs } from './game'
@@ -39,7 +40,11 @@ export interface EngineOutputs {
   moteScan: (scan: { scanning: string; scanProgress: number }) => void
   stock: (stock: MoteStock) => void
   combat: (snapshot: CombatSnapshot) => void
+  loot: (snapshot: LootView) => void
 }
+
+/** The loot ledger with the meter's sessions, which its entries are filed under. */
+export type LootView = LootSnapshot & { sessions: import('../shared/types').SegmentSummary[] }
 
 export type MoteView = MoteState & { scanning: string; scanProgress: number }
 
@@ -150,6 +155,9 @@ export class Engine {
   private combatSentAt = 0
   /** While recent fights are being read from the log, live lines wait here so the meter sees them in order. */
   private combatBacklog: LogLine[] | null = null
+  readonly loot: LootLedger
+  private lootDirty = false
+  private lootSentAt = 0
 
   constructor(
     private readonly store: EngineStore,
@@ -172,6 +180,15 @@ export class Engine {
       feed: (kind, text) => this.pushFeed(kind, text)
     })
     this.stock = new MoteStockKeeper(store.stock, (s) => out.stock(s), (kind, text) => this.pushFeed(kind, text))
+    this.loot = new LootLedger({
+      onChange: () => (this.lootDirty = true),
+      onLoot: (e) => {
+        // What was kept or merged is news; what auto-loot sold or stored is not, and history is not.
+        if (this.combatBacklog || (e.outcome !== 'kept' && e.outcome !== 'merged')) return
+        const who = e.looter === 'You' ? 'Looted' : `${e.looter} looted`
+        this.pushFeed('loot', `${who} ${e.count > 1 ? `${e.count} × ` : ''}${e.item} from ${e.source}${e.into ? ` → ${e.into}` : ''}`)
+      }
+    })
     this.meter = new CombatMeter(this.meterConfig(), {
       onChange: () => (this.combatDirty = true),
       onFightEnd: (f) => {
@@ -328,6 +345,7 @@ export class Engine {
       const n = this.board.list().length
       this.board.clear()
       this.meter.reset()
+      this.loot.reset()
       if (n) this.pushFeed('info', `Switched to ${basename(logFile)}; cleared ${n} timer${n === 1 ? '' : 's'}.`)
     }
     this.watchedLog = logFile
@@ -370,7 +388,9 @@ export class Engine {
     const logFile = t.logFile
     this.combatBacklog = []
     this.meter.reading = `Reading the last ${minutes} minutes of the log…`
+    this.loot.reading = this.meter.reading
     this.combatDirty = true
+    this.lootDirty = true
     try {
       // The tailer reads on from where it attached; history is everything before that.
       for (let i = 0; i < 200 && t.start < 0 && gen === this.watchGen; i++) await sleep(25)
@@ -378,7 +398,7 @@ export class Engine {
       if (end > 0 && gen === this.watchGen) {
         const from = await offsetBefore(logFile, Date.now() - minutes * 60_000)
         if (end > from && gen === this.watchGen) {
-          await readLines(createReadStream(logFile, { start: from, end: end - 1 }), (line) => gen === this.watchGen && this.meter.handle(line), { flushLast: false })
+          await readLines(createReadStream(logFile, { start: from, end: end - 1 }), (line) => gen === this.watchGen && this.combatLine(line), { flushLast: false })
         }
       }
     } catch (e) {
@@ -386,16 +406,30 @@ export class Engine {
     } finally {
       const waiting = this.combatBacklog
       this.combatBacklog = null
-      for (const line of waiting ?? []) this.meter.handle(line)
+      for (const line of waiting ?? []) this.combatLine(line)
       this.meter.reading = ''
+      this.loot.reading = ''
       this.combatDirty = true
+      this.lootDirty = true
     }
+  }
+
+  /** A line through the damage meter, then the loot ledger, which files loot under the meter's session. */
+  private combatLine(line: LogLine): void {
+    this.meter.handle(line)
+    const c = line.text.charCodeAt(0)
+    if (c === 89 || c === 45) this.loot.handle(line, this.meter.currentZone, this.meter.sessionAt(line.time).id)
+  }
+
+  lootView(): LootView {
+    return { ...this.loot.snapshot(), sessions: [...this.meter.sessions].reverse().map(summarizeFight) }
   }
 
   /** Forgets every fight and reads the last `minutes` of the log again. */
   async rebuildCombat(minutes: number): Promise<void> {
     if (this.combatBacklog) return
     this.meter.reset()
+    this.loot.reset()
     await this.seedCombat(minutes)
   }
 
@@ -475,7 +509,7 @@ export class Engine {
       if (this.moteBacklog) this.moteBacklog.push(line)
       else this.motes.handle(line)
       if (this.combatBacklog) this.combatBacklog.push(line)
-      else this.meter.handle(line)
+      else this.combatLine(line)
       this.status.lastLineAt = line.time
       this.statusDirty = true
     }
@@ -513,6 +547,11 @@ export class Engine {
       this.combatDirty = false
       this.combatSentAt = now
       this.out.combat(this.meter.snapshot())
+    }
+    if (this.lootDirty && now - this.lootSentAt > 500) {
+      this.lootDirty = false
+      this.lootSentAt = now
+      this.out.loot(this.lootView())
     }
     if (this.motesDirty && now - this.motesSentAt > 1000) {
       this.motesDirty = false

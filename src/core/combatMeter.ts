@@ -297,6 +297,11 @@ export class CombatMeter {
     return s
   }
 
+  /** The session a moment falls in, opened if there is none: what loot at that moment is filed under. */
+  sessionAt(at: number): Segment {
+    return this.ensureSession(at)
+  }
+
   /** The fight ends when nobody has struck for the gap; called on a clock, since the log goes quiet too. */
   tick(now: number): void {
     if (this.live && now - this.live.endedAt > this.config.fightGapSec * 1000) this.closeFight()

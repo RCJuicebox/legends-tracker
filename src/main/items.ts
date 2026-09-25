@@ -2,6 +2,7 @@ import { app } from 'electron'
 import { promises as fs } from 'node:fs'
 import { join } from 'node:path'
 import { baseName, itemKey } from '../core/inventory'
+import { parseItemUse } from '../core/wikiItem'
 import type { ItemInfo } from '../shared/types'
 import { log } from './log'
 
@@ -51,8 +52,8 @@ export class ItemCatalog {
     const cache = await this.load()
     const wanted = new Map<string, string>()
     for (const n of Array.isArray(names) ? names : []) if (n && typeof n === 'string') wanted.set(itemKey(n), baseName(n))
-    // Entries cached before icons were kept have no icon field; fetch those again once.
-    const stale = [...wanted].filter(([k]) => force || !cache[k] || Date.now() - cache[k].fetchedAt > FRESH_MS || (cache[k].found && cache[k].icon === undefined))
+    // Entries cached before icons, or before what an item is for, were kept have no such field; fetch those again once.
+    const stale = [...wanted].filter(([k]) => force || !cache[k] || Date.now() - cache[k].fetchedAt > FRESH_MS || (cache[k].found && (cache[k].icon === undefined || cache[k].use === undefined)))
     if (stale.length) {
       try {
         await this.fetchInto(cache, stale)
@@ -108,9 +109,11 @@ export class ItemCatalog {
       if (p.missing || !p.revisions?.length) continue
       const content = p.revisions[0].slots.main.content
       const statsblock = /\|\s*statsblock\s*=([\s\S]*?)(?:\n\|\s*\w+\s*=|\n?\}\}\s*<\/onlyinclude>|\n\}\})/.exec(content)?.[1].trim() ?? ''
-      if (!statsblock) continue
+      const use = parseItemUse(content)
+      // A page with no stats block is still the item's page when it says what the item is for.
+      if (!statsblock && !use.notes && !use.quests.length && !use.recipes.length) continue
       const icon = Number(/\|\s*lucy_img_ID\s*=\s*(\d+)/.exec(content)?.[1] ?? 0)
-      out.set(itemKey(p.title), { title: p.title, found: true, statsblock, icon })
+      out.set(itemKey(p.title), { title: p.title, found: true, statsblock, icon, use })
     }
     // A redirect or normalised title answers for the name that was asked.
     for (const r of [...(body.query?.normalized ?? []), ...(body.query?.redirects ?? [])]) {
@@ -134,5 +137,5 @@ export class ItemCatalog {
 }
 
 function strip(c: Cached): ItemInfo {
-  return { title: c.title, found: c.found, statsblock: c.statsblock, icon: c.icon }
+  return { title: c.title, found: c.found, statsblock: c.statsblock, icon: c.icon, ...(c.use ? { use: c.use } : {}) }
 }

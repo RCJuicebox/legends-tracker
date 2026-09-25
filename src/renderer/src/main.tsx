@@ -18,11 +18,13 @@ import { Settings } from './pages/Settings'
 import { Achievements } from './pages/Achievements'
 import { Gear } from './pages/Gear'
 import { Stats } from './pages/Stats'
+import { Loot } from './pages/Loot'
 
 const PAGES = [
   { id: 'dashboard', group: 'Play', label: 'Live', icon: 'dashboard', el: Dashboard },
   { id: 'spells', group: 'Play', label: 'Spell Timers', icon: 'spells', el: Spells },
   { id: 'motes', group: 'Play', label: 'Motes', icon: 'motes', el: Motes },
+  { id: 'loot', group: 'Play', label: 'Loot', icon: 'loot', el: Loot },
   { id: 'achievements', group: 'Character', label: 'Achievements', icon: 'trophy', el: Achievements },
   { id: 'stats', group: 'Character', label: 'Stats', icon: 'stats', el: Stats },
   { id: 'gear', group: 'Character', label: 'Gear', icon: 'bag', el: Gear },

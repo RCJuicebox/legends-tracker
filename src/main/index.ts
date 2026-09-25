@@ -158,7 +158,8 @@ const engine = new Engine(
     combat: (snap) => {
       overlays.combat(snap)
       toMain('state:combat', snap)
-    }
+    },
+    loot: (view) => toMain('state:loot', view)
   },
   appEngineEnv({
     dataDir: app.getPath('userData'),
@@ -492,6 +493,7 @@ function registerIpc(): void {
     return engine.combatSnapshot()
   })
   handle('combat:rebuild', (minutes: number) => engine.rebuildCombat(Math.max(1, Math.min(1440, Number(minutes) || 60))))
+  handle('loot:get', () => engine.lootView())
 
   handle('motes:get', () => engine.moteView())
   handle('motes:start', () => engine.motes.startManual(Date.now()))

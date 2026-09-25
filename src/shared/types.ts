@@ -396,6 +396,18 @@ export interface AchievementsView {
   error: string
 }
 
+/** What an item is for, from its eqlwiki page: the notes, the quests and recipes it is used in. */
+export interface ItemUse {
+  /** The page's notes, markup stripped and cut short; '' for none. */
+  notes: string
+  /** Quests the page relates it to. */
+  quests: string[]
+  /** "Jewelcrafting: Silver Blue Diamond Ring (75)". */
+  recipes: string[]
+  /** What merchants pay, as the page words it; '' when unsaid. */
+  value: string
+}
+
 /** An item's eqlwiki page, as far as the tracker uses it. */
 export interface ItemInfo {
   /** The page title. */
@@ -406,6 +418,8 @@ export interface ItemInfo {
   statsblock: string
   /** The item's icon number (the page's lucy_img_ID), 500 and up; 0 when unknown. */
   icon?: number
+  /** Absent on entries cached before it was kept. */
+  use?: ItemUse
 }
 
 /** A character's inventory export, with what the wiki says about the items worn. */

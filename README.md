@@ -115,6 +115,20 @@ session.
 The line shapes, the fight rules and the sums are pinned in `tests/combat.test.ts` with lines
 copied from the log.
 
+## Loot
+
+Everything looted, newest first, grouped by the damage meter's sessions (a zone, or a New session
+press), with the coin picked up from corpses and taken in sales per session. Auto-loot says what
+became of each item and the page shows it: kept, merged into an item you own, sold (and for what),
+stored in the tradeskill depot, or stored as currency (motes; hidden by default, the Motes page
+counts them). A group-mate's loot line (`--Aldric has looted …--`) is listed under their name.
+
+Each row says what the item is, from its eqlwiki page: equipment gets its slot, first stats and
+classes; anything else gets the page's notes, the quests and recipes it is used in, and what
+merchants pay. The name links to eqlwiki, and a second link searches Allakhazam. The lookup is the
+Gear page's (cached a week, fetched only for items on screen); a page found under a different
+spelling is missed and says so.
+
 ## Spell timers
 
 Every spell you cast is tracked automatically. No trigger needed.
@@ -258,7 +272,7 @@ No path loses a line. An archive interrupted by the app closing is finished on t
 
 | Path | What |
 |---|---|
-| `src/core` | Log parsing and tailing, spell book, duration model, spell tracker, triggers, archiver, log check, the damage meter (`combatLines` reads the lines, `combatMeter` keeps the fights, `combatView` sums them for display). Plain TypeScript with no Electron dependency, so it is unit-tested directly |
+| `src/core` | Log parsing and tailing, spell book, duration model, spell tracker, triggers, archiver, log check, the damage meter (`combatLines` reads the lines, `combatMeter` keeps the fights, `combatView` sums them for display), the loot ledger (`loot`). Plain TypeScript with no Electron dependency, so it is unit-tested directly |
 | `src/main` | Electron main process: windows, tray, overlays, speech, icons, persistence, the engine that joins it all |
 | `src/preload` | The IPC bridge |
 | `src/renderer` | The React UI (`index.html`), overlay windows (`overlay.html`), hidden audio mixer (`audio.html`) |

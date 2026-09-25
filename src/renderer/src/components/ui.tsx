@@ -94,7 +94,9 @@ const paths = {
   meter: <path d="M3 4h18v3H3zm0 6.5h12v3H3zm0 6.5h7v3H3z" />,
   flag: <path d="M5 2h2v20H5zm4 1h10l-2.5 4L19 11H9z" />,
   copy: <path d="M8 2h10a2 2 0 0 1 2 2v12h-2V4H8zm-4 4h10a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2zm0 2v12h10V8z" />,
-  back: <path d="M20 11H7.8l5.6-5.6L12 4l-8 8 8 8 1.4-1.4L7.8 13H20z" />
+  back: <path d="M20 11H7.8l5.6-5.6L12 4l-8 8 8 8 1.4-1.4L7.8 13H20z" />,
+  loot: <path d="M4 7a3 3 0 0 1 3-3h10a3 3 0 0 1 3 3v3H4zm0 5h6v2h4v-2h6v7a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1zm7-1h2v3h-2z" />,
+  link: <path d="M10 13a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-1.5 1.5 1.4 1.4L14.4 4.5a3 3 0 0 1 4.2 4.2l-3 3a3 3 0 0 1-4.2 0zm4-2a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l1.5-1.5-1.4-1.4L9.6 19.5a3 3 0 0 1-4.2-4.2l3-3a3 3 0 0 1 4.2 0z" />
 } satisfies Record<string, ReactNode>
 
 export type IconName = keyof typeof paths
