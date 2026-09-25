@@ -157,3 +157,48 @@ describe('self buff tracking', () => {
     expect(h.board.list()).toHaveLength(0)
   })
 })
+
+describe('more tracking rules', () => {
+  it('starts a timer on every group member a buff lands on within the group window, and no later', () => {
+    const h = harness()
+    h.feed(`
+      [Wed Sep 23 13:29:05 2026] You begin casting Slugs Healing V.
+      [Wed Sep 23 13:29:06 2026] Aldric is healed by the spirit of the slug.
+      [Wed Sep 23 13:29:06 2026] Brenna is healed by the spirit of the slug.
+      [Wed Sep 23 13:29:08 2026] Corvin is healed by the spirit of the slug.`)
+    expect(h.board.list().map((t) => t.target).sort()).toEqual(['Aldric', 'Brenna'])
+  })
+
+  it("ends the newest matching buff on another when a pet's buff wears off", () => {
+    const h = harness()
+    h.feed(`
+      [Wed Sep 23 13:29:05 2026] You begin casting Slugs Healing V.
+      [Wed Sep 23 13:29:06 2026] Aldric is healed by the spirit of the slug.
+      [Wed Sep 23 13:29:15 2026] You begin casting Slugs Healing V.
+      [Wed Sep 23 13:29:16 2026] Brenna is healed by the spirit of the slug.
+      [Wed Sep 23 13:29:30 2026] Your pet's Slugs Healing spell has worn off.`)
+    expect(h.board.list().map((t) => t.target)).toEqual(['Aldric'])
+  })
+
+  it('ends your own buffs when you die, and leaves those on others', () => {
+    const h = harness()
+    h.feed(`
+      [Wed Sep 23 13:29:05 2026] You begin casting Spirit of the Puma X.
+      [Wed Sep 23 13:29:06 2026] You begin to snarl as your features become feline.
+      [Wed Sep 23 13:29:10 2026] You begin casting Slugs Healing V.
+      [Wed Sep 23 13:29:11 2026] Aldric is healed by the spirit of the slug.
+      [Wed Sep 23 13:29:40 2026] You died.`)
+    expect(h.board.list().map((t) => t.target)).toEqual(['Aldric'])
+  })
+
+  it('keeps at most six casts waiting to land, dropping the oldest', () => {
+    const casts = (bolts: number) =>
+      ['[Sat Sep 12 23:11:04 2026] You begin casting Odium X.', ...Array(bolts).fill('[Sat Sep 12 23:11:04 2026] You begin casting Envenomed Bolt X.'), '[Sat Sep 12 23:11:05 2026] A ratman warrior staggers under a dark curse.'].join('\n')
+    const kept = harness()
+    kept.feed(casts(5))
+    expect(kept.board.list().map((t) => t.spell)).toEqual(['Odium'])
+    const dropped = harness()
+    dropped.feed(casts(6))
+    expect(dropped.board.list()).toEqual([])
+  })
+})

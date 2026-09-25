@@ -16,6 +16,11 @@ function escapeRegex(s: string): string {
  * must capture the same text both times.
  */
 export function compilePhrase(p: Phrase, character: string): RegExp {
+  return compileWith(p, character, {})
+}
+
+/** As compilePhrase, but snippets named in `bound` match only that exact text instead of capturing. */
+function compileWith(p: Phrase, character: string, bound: Record<string, string>): RegExp {
   const used = new Set<string>()
   let out = ''
   let last = 0
@@ -34,6 +39,7 @@ export function compilePhrase(p: Phrase, character: string): RegExp {
   return new RegExp(out, 'i')
 
   function group(name: string, body: string): string {
+    if (bound[name] !== undefined) return escapeRegex(bound[name])
     if (used.has(name)) return `\\k<${name}>`
     used.add(name)
     return `(?<${name}>${body})`
@@ -147,19 +153,19 @@ export class TriggerEngine {
   }
 
   private checkEndEarly(text: string): void {
-    for (const t of this.board.list()) {
+    for (const t of this.board.values()) {
       const phrases = t.meta?.endEarly as RegExp[] | undefined
       if (phrases?.some((re) => re.test(text))) this.board.end(t.key, 'cleared')
     }
   }
 }
 
-/** End-early phrases are fixed to the values the starting line captured, so they only end their own timer. */
+/**
+ * End-early phrases are fixed to the values the starting line captured ({S1}, {N1} and ${Name}
+ * alike), so they only end their own timer. A snippet the start did not capture still matches anything.
+ */
 function compileEndEarly(p: Phrase, captures: Record<string, string>, character: string): RegExp {
-  const text = p.text.replace(/\$\{(\w+)\}/g, (whole, name: string) =>
-    captures[name] !== undefined ? (p.regex ? escapeRegex(captures[name]) : captures[name]) : whole
-  )
-  return compilePhrase({ text, regex: p.regex }, character)
+  return compileWith(p, character, captures)
 }
 
 export function testTrigger(trigger: Trigger, line: string, character: string): TriggerTestResult {

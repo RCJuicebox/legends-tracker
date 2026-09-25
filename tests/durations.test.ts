@@ -101,3 +101,13 @@ describe('computeDuration against the log', () => {
     expect(d.seconds).toBe(42)
   })
 })
+
+describe('whole ticks', () => {
+  it('reports the whole ticks the Spell window shows beside the ticks counting the partial one', () => {
+    // Envenomed Bolt X: the Spell window reads 0:36 (0:54), nine whole ticks.
+    const d = dur('Envenomed Bolt X')
+    expect(d.wholeTicks).toBe(9)
+    expect(d.ticks).toBe(d.wholeTicks + 1)
+    expect(d.spellWindowSec).toBe(d.wholeTicks * 6)
+  })
+})

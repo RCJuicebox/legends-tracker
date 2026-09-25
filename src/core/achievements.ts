@@ -143,6 +143,9 @@ export type ObjRef = [number, number, number]
 
 export type AchState = 'done' | 'broken' | 'blocked' | 'open'
 
+/** What a reference into an older export resolves to: no objectives, never done. */
+const MISSING: Achievement = Object.freeze({ n: '', c: Object.freeze([]) as unknown as AchObjective[] })
+
 export interface AchCounts {
   req: number
   done: number
@@ -192,11 +195,28 @@ export class AchievementBook {
     this.index()
   }
 
+  /**
+   * The achievement at a reference. Refs can outlive the export they were made from (a click that
+   * races a new export), so one that points nowhere reads as an empty achievement rather than throwing.
+   */
   ach([si, ai]: AchRef): Achievement {
-    return this.sections[si].ach[ai]
+    return this.sections[si]?.ach[ai] ?? MISSING
+  }
+
+  /** Whether a reference points at something in this export. */
+  has([si, ai, ci]: AchRef | ObjRef): boolean {
+    const a = this.sections[si]?.ach[ai]
+    return !!a && (ci === undefined || !!a.c[ci])
   }
 
   private index(): void {
+    const names = this.indexNames()
+    this.indexLinks(names)
+    this.indexPlaces()
+  }
+
+  /** Achievements by name, per section and across all, and twins: the same achievement listed twice. */
+  private indexNames(): { byName: Map<string, number>[]; global: Map<string, AchRef> } {
     const byName: Map<string, number>[] = []
     const global = new Map<string, AchRef>()
     const groups = new Map<string, AchRef[]>()
@@ -208,11 +228,17 @@ export class AchievementBook {
         if (!map.has(k)) map.set(k, ai)
         if (!global.has(k)) global.set(k, [si, ai])
         const gk = k + '|' + a.c.map((c) => (c.o ? '*' : '') + norm(c.t)).join('|')
-        groups.set(gk, [...(groups.get(gk) ?? []), [si, ai]])
+        const group = groups.get(gk)
+        if (group) group.push([si, ai])
+        else groups.set(gk, [[si, ai]])
       })
     })
     for (const refs of groups.values()) if (refs.length > 1) for (const r of refs) this.twins.set(r.join(':'), refs)
+    return { byName, global }
+  }
 
+  /** Objectives that name another achievement: the same section's first, else any section's. */
+  private indexLinks({ byName, global }: { byName: Map<string, number>[]; global: Map<string, AchRef> }): void {
     this.sections.forEach((sec, si) =>
       sec.ach.forEach((a, ai) =>
         a.c.forEach((c, ci) => {
@@ -226,9 +252,14 @@ export class AchievementBook {
         })
       )
     )
+  }
 
-    // Which zones each named appears in. Only place-named achievements count, and only their real
-    // objectives: one that links to another achievement is a zone, not a named.
+  /**
+   * Which zones each named appears in. Only place-named achievements count, and only their real
+   * objectives: one that links to another achievement is a zone, not a named. Then the named of
+   * zones that share kills are paired up.
+   */
+  private indexPlaces(): void {
     const placeAt = new Map<string, AchRef>()
     this.sections.forEach((sec, si) =>
       sec.ach.forEach((a, ai) => {
@@ -284,17 +315,19 @@ export class AchievementBook {
 
   /** Recorded by the game itself, so a tick cannot take it back. */
   fromGame([si, ai, ci]: ObjRef): boolean {
-    return !!this.sections[si].ach[ai].c[ci].d
+    return !!this.sections[si]?.ach[ai]?.c[ci]?.d
   }
 
   ticks([si, ai, ci]: ObjRef): boolean {
     const sec = this.sections[si]
-    const a = sec.ach[ai]
-    return this.ticked.has(objKey(sec, a, a.c[ci]))
+    const a = sec?.ach[ai]
+    const c = a?.c[ci]
+    return !!c && this.ticked.has(objKey(sec, a, c))
   }
 
   isBroken(r: AchRef): boolean {
-    return this.brokenSet.has(achKey(this.sections[r[0]], this.ach(r)))
+    const sec = this.sections[r[0]]
+    return !!sec && this.has(r) && this.brokenSet.has(achKey(sec, this.ach(r)))
   }
 
   /** An objective counts as done when the game says so, it is ticked, or the achievement it names is done. */
@@ -441,8 +474,8 @@ export class AchievementBook {
     const ticks = new Set(marks.ticks)
     for (const [si, ai, ci] of this.tickTargets(r)) {
       const sec = this.sections[si]
-      const a = sec.ach[ai]
-      const c = a.c[ci]
+      const a = sec?.ach[ai]
+      const c = a?.c[ci]
       if (!c) continue
       if (on && !c.d) ticks.add(objKey(sec, a, c))
       else ticks.delete(objKey(sec, a, c))
@@ -454,6 +487,7 @@ export class AchievementBook {
   withBroken(r: AchRef, on: boolean, marks: AchMarks): AchMarks {
     const broken = new Set(marks.broken)
     for (const t of this.twinsOf(r) ?? [r]) {
+      if (!this.has(t)) continue
       const k = achKey(this.sections[t[0]], this.ach(t))
       if (on) broken.add(k)
       else broken.delete(k)

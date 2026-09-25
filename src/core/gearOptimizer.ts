@@ -88,7 +88,16 @@ export function optimizeGear(o: OptimizeOptions): Plan {
     const main = a[primary]
     return !(main?.r && isTwoHanded(main.r) && a[secondary])
   }
-  const focusOf = (a: (Piece | null)[]) => o.focusValue(a.flatMap((p) => p?.foci ?? []))
+  // Most moves leave the foci worn unchanged, and their worth does not depend on the order they are
+  // worn in, so it is worked out once per set.
+  const focusCache = new Map<string, number>()
+  const focusOf = (a: (Piece | null)[]) => {
+    const names = a.flatMap((p) => p?.foci ?? [])
+    const key = names.slice().sort().join('\u0001')
+    let v = focusCache.get(key)
+    if (v === undefined) focusCache.set(key, (v = o.focusValue(names)))
+    return v
+  }
   const total = (a: (Piece | null)[]): number => {
     if (!valid(a)) return -Infinity
     let t = focusOf(a) + hasteOf(a)

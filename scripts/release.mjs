@@ -17,6 +17,11 @@ const { version } = JSON.parse(readFileSync(new URL('../package.json', import.me
 const tag = `v${version}`
 
 if (out('git status --porcelain')) throw new Error('Commit your changes first: the release is built from what is committed.')
+// Releases come from main only, so every installed copy updates to something CI has already checked there.
+const branch = out('git branch --show-current')
+if (branch !== 'main') throw new Error(`Releases are cut from main; this is ${branch || 'a detached HEAD'}. Merge first.`)
+run('git fetch origin main')
+if (out('git rev-list --count HEAD..origin/main') !== '0') throw new Error('origin/main has commits this checkout lacks. Pull first.')
 if (out(`git ls-remote --tags origin ${tag}`)) throw new Error(`${tag} is already released. Bump "version" in package.json first.`)
 
 run('git push origin HEAD')

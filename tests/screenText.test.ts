@@ -110,3 +110,9 @@ describe('reading the Stats window', () => {
     expect(area!.w).toBeLessThan(520)
   })
 })
+
+describe('composeRows with nothing found', () => {
+  it('lays out an empty image rather than NaN', () => {
+    expect(composeRows([])).toEqual({ width: 0, height: 0, rowHeight: 0, pieces: [] })
+  })
+})

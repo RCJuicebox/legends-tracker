@@ -136,3 +136,17 @@ describe('MoteTracker', () => {
     expect(t.state.sessions[0]).toMatchObject({ kind: 'manual', outcome: 'stopped', motes: { minor: 1, major: 1 } })
   })
 })
+
+describe('time outside a run', () => {
+  it('is measured on the log clock alone, whatever the computer clock says', () => {
+    // A log from the future: mixing in Date.now() would clamp the time outside to nothing.
+    const { t, feed } = tracker()
+    feed(`
+      [Thu Sep 24 11:06:56 2099] You have entered The Plane of Fear 4 (Refined).
+      [Thu Sep 24 11:08:17 2099] You looted a Mote of Major Potential from Amygdalan warrior's corpse and stored it in your currency
+      [Thu Sep 24 11:09:54 2099] You have entered New Sebilis Expedition.`)
+    const left = parseLogLine('[Thu Sep 24 11:09:54 2099] x')!.time
+    t.stop(left + 5 * 60_000)
+    expect(t.state.sessions[0].outsideMs).toBe(5 * 60_000)
+  })
+})

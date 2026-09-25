@@ -57,15 +57,24 @@ export interface Plan {
 
 export const MAX_LEVEL = 10
 
+/** A loot line this much earlier than the one before it in the same pass is a clock change, not a replay. */
+const CLOCK_STEP_MS = 5000
+
 /**
  * Decides whether a loot line is new to the stock. Log times have one-second resolution and a reward
  * chest logs several loot lines in the same second, so "newer than the last counted line" is not
  * enough: the cursor also remembers how many loot lines in that second it has already counted, and
  * a replay (catching up after a restart) skips exactly those.
+ *
+ * Log times are local, so when the clocks go back (01:59:59 is followed by 01:00:00) the log steps
+ * backwards. A line well behind the previous one in the same pass is taken as that, and the cursor
+ * restarts from it rather than dropping the whole repeated hour.
  */
 export class StockCursor {
   /** Loot lines seen in this pass at the cursor's second. */
   private sameSecond = 0
+  /** The previous line's time in this pass, accepted or not. */
+  private previous: number | null = null
 
   constructor(
     public seenUntil = 0,
@@ -73,6 +82,14 @@ export class StockCursor {
   ) {}
 
   accept(time: number): boolean {
+    const previous = this.previous
+    this.previous = time
+    if (previous !== null && time < previous - CLOCK_STEP_MS) {
+      this.seenUntil = time
+      this.seenAtSecond = 1
+      this.sameSecond = 1
+      return true
+    }
     if (time < this.seenUntil) return false
     if (time === this.seenUntil) {
       this.sameSecond++

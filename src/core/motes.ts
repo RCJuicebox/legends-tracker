@@ -1,4 +1,7 @@
-import type { LogLine } from './logLine'
+import { zoneEntered, type LogLine } from './logLine'
+import { localDay } from './dates'
+
+export { localDay }
 
 /** Mote ranks in upgrade order, with the item XP each is worth (from the EQL mote guide). */
 export const MOTE_RANKS = [
@@ -55,8 +58,6 @@ export interface MoteLoot {
 const RE_LOOT = /^(?:--)?You (?:have )?looted (a|an|\d+) Motes? of (?:(\w+) )?Potential from (.+?)(?: and stored it in your currency|\.--|\.)?$/
 // "You have entered The Plane of Fear 4 (Refined)." / "… Nagafen's Lair - Solo 4 (Refined)."
 const RE_INSTANCE = /^(.+?)(?: - (?:Solo|Group))? (\d+) \((\w+)\)$/
-const RE_ZONE = /^You have entered (.+)\.$/
-const RE_NOT_ZONE = /^(?:an? (?:area|Arena)|the Drunken)/i
 const RE_CREATING = /^Player .+ creating instance .+ \d+\.$/
 const RE_COMPLETED = /^You have completed the Dungeon Crawl/
 
@@ -171,8 +172,8 @@ export class MoteTracker {
       }
       return
     }
-    const z = RE_ZONE.exec(text)
-    if (z && !RE_NOT_ZONE.test(z[1])) this.onZone(z[1], time)
+    const zone = zoneEntered(text)
+    if (zone) this.onZone(zone, time)
   }
 
   private onZone(zone: string, time: number): void {
@@ -232,7 +233,7 @@ export class MoteTracker {
     const s = this.state.active
     if (!s) return
     if (s.outsideSince !== null) {
-      s.outsideMs += Math.max(0, Math.min(time, Date.now()) - s.outsideSince)
+      s.outsideMs += Math.max(0, time - s.outsideSince)
       s.outsideSince = null
     }
     if (s.pausedSince) {
@@ -305,9 +306,4 @@ export function sessionHours(s: MoteSession, now: number): number {
 export function pausedHours(s: MoteSession, now: number): number {
   const end = s.endedAt ?? now
   return ((s.pausedMs ?? 0) + (s.pausedSince ? Math.max(0, end - s.pausedSince) : 0)) / 3_600_000
-}
-
-export function localDay(t: number): string {
-  const d = new Date(t)
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 }

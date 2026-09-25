@@ -1,5 +1,5 @@
 import type { Spell } from './spells'
-import { formulaTicks } from './durations'
+import { formulaTicks, round2 } from './durations'
 import { CLASS_NAMES, type CharacterSettings, type FocusSource } from '../shared/types'
 
 // Effect ids (SPA) a duration focus spell is built from, e.g. Extended Enhancement II:
@@ -34,6 +34,16 @@ export function focusFromSpell(spell: Spell, kind: FocusSource['kind'], from: st
     excludeSpas: spell.effects.filter((e) => e.spa === SPA_LIMIT_EFFECT && e.base < 0).map((e) => -e.base),
     enabled: true
   }
+}
+
+/**
+ * A focus's effect limits (SPA 137): a spell must carry at least one of the included effects, when
+ * there are any, and none of the excluded ones. EQEmu reads positive 137s as any-of, not all-of.
+ */
+export function effectLimitsAllow(spell: Spell, include: readonly number[], exclude: readonly number[]): boolean {
+  const has = (spa: number) => spell.effects.some((e) => e.spa === spa)
+  if (exclude.some(has)) return false
+  return !include.length || include.some(has)
 }
 
 /**
@@ -74,7 +84,7 @@ export function focusFor(spell: Spell, character: CharacterSettings, casterLevel
       steps.push(`${f.name}: not applied, the spell is under ${f.minTicks} ticks`)
       continue
     }
-    if (f.excludeSpas.some((spa) => spell.effects.some((e) => e.spa === spa)) || f.requireSpas.some((spa) => !spell.effects.some((e) => e.spa === spa))) {
+    if (!effectLimitsAllow(spell, f.requireSpas, f.excludeSpas)) {
       steps.push(`${f.name}: does not apply to this kind of spell`)
       continue
     }
@@ -96,8 +106,4 @@ export function focusFor(spell: Spell, character: CharacterSettings, casterLevel
   const aa = applied.filter((a) => a.source.kind === 'aa').reduce((n, a) => n + a.pct, 0)
   const pct = round2((bestItem?.pct ?? 0) + aa)
   return { pct, steps }
-}
-
-function round2(n: number): number {
-  return Math.round(n * 100) / 100
 }

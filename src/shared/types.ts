@@ -353,7 +353,13 @@ export interface SpellSummary {
 }
 
 export interface DurationBreakdown {
+  /**
+   * Ticks the effect is seen on its target, counting the partial tick it lands in: wholeTicks + 1.
+   * A timer joined at a tick ends (ticks − 1) ticks after it. 0 for an instant spell, -1 permanent.
+   */
   ticks: number
+  /** Whole ticks after rounding, the Spell window's bracketed figure: spellWindowSec = wholeTicks × 6. */
+  wholeTicks: number
   permanent: boolean
   /** How long a timer runs: the earliest the effect can wear off. */
   seconds: number

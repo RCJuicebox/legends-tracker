@@ -11,6 +11,7 @@
 
 import type { Spell } from './spells'
 import { formulaTicks } from './durations'
+import { effectLimitsAllow } from './focus'
 import { CLASS_NUMBER, type ClassId } from './acModel'
 
 export type FocusKind = 'damage' | 'healing' | 'haste' | 'duration' | 'range' | 'reagent' | 'mana' | 'pet' | 'instrument'
@@ -93,12 +94,12 @@ export function focusApplies(f: FocusSpec, cast: CastSpell, casterLevel: number,
   const s = cast.spell
   const has = (spa: number) => s.effects.some((e) => e.spa === spa)
   const include = { effect: [] as number[], target: [] as number[], spell: [] as number[] }
+  const excludeEffect: number[] = []
   for (const [spa, base] of f.limits) {
     switch (spa) {
       case 137:
-        if (base < 0) {
-          if (has(-base)) return false
-        } else include.effect.push(base)
+        if (base < 0) excludeEffect.push(-base)
+        else include.effect.push(base)
         break
       case 136:
         if (base < 0) {
@@ -135,7 +136,7 @@ export function focusApplies(f: FocusSpec, cast: CastSpell, casterLevel: number,
         break
     }
   }
-  if (include.effect.length && !include.effect.some(has)) return false
+  if (!effectLimitsAllow(s, include.effect, excludeEffect)) return false
   if (include.target.length && !include.target.includes(s.targetType)) return false
   if (include.spell.length && !include.spell.includes(s.id)) return false
   if (f.kind === 'pet' && !PET_SPAS.some(has)) return false
@@ -244,7 +245,9 @@ export function focusReport(specs: FocusSpec[], classSpells: CastSpell[], classe
   const foci: Record<string, FocusInfo> = {}
   for (const [key, members] of byLine) {
     const reach = new Map(members.map((f) => [f, used.filter((u) => focusApplies(f, u.cast, Math.max(level, u.cast.level), bits))]))
-    const touched = used.filter((u) => members.some((f) => reach.get(f)!.includes(u)))
+    const reached = new Set<(typeof used)[number]>()
+    for (const r of reach.values()) for (const u of r) reached.add(u)
+    const touched = used.filter((u) => reached.has(u))
     lines.push({
       key,
       kind: members[0].kind,

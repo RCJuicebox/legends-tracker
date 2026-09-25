@@ -55,6 +55,7 @@ export async function checkAgainstLog(opts: {
     let pos = Math.max(0, size - opts.megabytes * 1048576)
     let partial = ''
     let first = pos > 0
+    let ticked = -1
     const chunk = Buffer.alloc(4 << 20)
     while (pos < size) {
       const { bytesRead } = await handle.read(chunk, 0, Math.min(chunk.length, size - pos), pos)
@@ -71,7 +72,10 @@ export async function checkAgainstLog(opts: {
         if (!line) continue
         now = line.time
         tracker.handle(line)
-        board.tick(now)
+        // The board is ticked once per second of log, after that second's first line: nothing a
+        // later line in the same second starts or moves can expire within it, so ticking again
+        // would change nothing.
+        if (now !== ticked) board.tick((ticked = now))
       }
       await new Promise((r) => setImmediate(r))
     }
@@ -88,7 +92,7 @@ export async function checkAgainstLog(opts: {
     const calc = computeDuration({
       spell: r.spell, rank: r.rank, level: opts.level(r.spell.name), tierPct: opts.tierPct, focusPct: opts.focusPct(r.spell)
     })
-    if (calc.ticks <= 0) continue
+    if (calc.permanent || calc.wholeTicks <= 0) continue
     const fits = median >= calc.earliestSec - 1 && median <= calc.latestSec + 1
     const range = fits ? null : focusForObserved(tieredTicks(r.spell, r.rank, opts.level(r.spell.name), opts.tierPct), median)
     rows.push({

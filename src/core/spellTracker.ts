@@ -1,6 +1,6 @@
-import type { LogLine } from './logLine'
+import { zoneEntered, type LogLine } from './logLine'
 import type { RankedSpell, Spell, SpellBook } from './spells'
-import { TICK_MS } from './durations'
+import { isBeneficialCategory, TICK_MS } from './durations'
 import type { BoardTimer, TimerBoard } from './timers'
 import type { DurationBreakdown, FeedItem, Notification, SpellCategory, SpellRule, TrackingSettings } from '../shared/types'
 
@@ -46,6 +46,10 @@ const SELF = 'You'
 const GRACE_MS = 14000
 /** How long after a beneficial spell first lands other targets may still report it: group buffs land in the same second. */
 const GROUP_LAND_MS = 1500
+/** A cast stays open this long past its cast time for its landing line: lag, and the tick it lands in. */
+const CAST_SLACK_MS = 6000
+/** Casts still waiting to land, at most; the oldest is dropped past this. */
+const MAX_PENDING = 6
 
 const RE_CAST = /^You begin (?:casting|singing) (.+)\.$/
 const RE_FAIL_NAMED = /^Your (.+?) spell (?:is interrupted|fizzles)[.!]$/
@@ -69,8 +73,6 @@ const RE_SLAIN_BY = /^(.+) has been slain by .+!$/
 const RE_YOU_SLEW = /^You have slain (.+)!$/
 const RE_DIED = /^(.+) died\.$/
 const RE_YOU_DIED = /^(?:You died\.|You have been slain by .+!)$/
-const RE_ZONE = /^You have entered (.+)\.$/
-const RE_NOT_ZONE = /^(?:an? (?:area|Arena)|the Drunken)/i
 
 export function targetKey(target: string): string {
   return target.toLowerCase()
@@ -115,7 +117,7 @@ export class SpellTracker {
 
   handle(line: LogLine): void {
     const { text, time: now } = line
-    this.pending = this.pending.filter((p) => p.expires >= now)
+    if (this.pending.length) this.pending = this.pending.filter((p) => p.expires >= now)
 
     let m = RE_CAST.exec(text)
     if (m) return this.onCast(m[1], now)
@@ -135,21 +137,23 @@ export class SpellTracker {
     if ((m = RE_WORN_OFF.exec(text))) return this.onWornOff(m[1], m[2])
     if ((m = RE_PET_WORN_OFF.exec(text))) return this.onPetWornOff(m[1])
 
+    // Your own death first: "You died." would otherwise be read as a target called "You" dying.
+    if (RE_YOU_DIED.test(text)) {
+      this.board.endWhere((t) => t.source === 'spell' && t.target === SELF, 'died')
+      return
+    }
     if ((m = RE_SLAIN_BY.exec(text)) || (m = RE_YOU_SLEW.exec(text)) || (m = RE_DIED.exec(text))) {
       const k = targetKey(m[1])
       this.board.endWhere((t) => t.source === 'spell' && targetKey(t.target) === k, 'died')
       return
     }
-    if (RE_YOU_DIED.test(text)) {
-      this.board.endWhere((t) => t.source === 'spell' && t.target === SELF, 'died')
-      return
-    }
-    if ((m = RE_ZONE.exec(text)) && !RE_NOT_ZONE.test(m[1])) {
-      this.zone = m[1]
+    const zone = zoneEntered(text)
+    if (zone) {
+      this.zone = zone
       this.pending = []
       // Mobs do not follow you; buffs do.
       this.board.endWhere((t) => t.source === 'spell' && !isBeneficialTimer(t), 'zoned')
-      this.hooks.onZone?.(m[1])
+      this.hooks.onZone?.(zone)
       return
     }
     this.onSelfFade(text)
@@ -165,8 +169,8 @@ export class SpellTracker {
     this.hooks.onCast?.(r, now)
     const d = this.config.durationFor(r.spell, r.rank)
     if (d.ticks === 0 || d.permanent) return
-    this.pending.push({ r, at: now, expires: now + r.spell.castMs + 6000, targets: new Set() })
-    if (this.pending.length > 6) this.pending.shift()
+    this.pending.push({ r, at: now, expires: now + r.spell.castMs + CAST_SLACK_MS, targets: new Set() })
+    if (this.pending.length > MAX_PENDING) this.pending.shift()
   }
 
   private dropPending(name: string): void {
@@ -282,7 +286,8 @@ export class SpellTracker {
   }
 
   private onSelfFade(text: string): void {
-    for (const t of this.board.list()) {
+    // Most lines reach here, so the board is walked without copying it.
+    for (const t of this.board.values()) {
       if (t.source !== 'spell' || t.target !== SELF || !t.spell) continue
       const s = this.book.named(t.spell)
       if (s?.fade && s.fade === text) {
@@ -310,5 +315,5 @@ export class SpellTracker {
 }
 
 function isBeneficialTimer(t: BoardTimer): boolean {
-  return t.category === 'buff' || t.category === 'hot' || t.category === 'heal'
+  return t.category !== undefined && isBeneficialCategory(t.category)
 }

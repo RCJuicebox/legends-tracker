@@ -36,9 +36,12 @@ export function rows(words: OcrWord[]): OcrRow[] {
   return out
 }
 
-/** A count as OCR tends to misread it: O for 0, l or I for 1, a stray comma or period for thousands. */
+/** Digits as OCR tends to misread them: O for 0, l, I or | for 1, a stray comma or period for thousands. */
+const ocrDigits = (t: string) => t.replace(/[Oo]/g, '0').replace(/[lI|]/g, '1').replace(/[,.]/g, '')
+
+/** A count as OCR tends to misread it, an apostrophe for a thousands separator included. */
 export function readCount(text: string): number | null {
-  const t = text.replace(/[Oo]/g, '0').replace(/[lI|]/g, '1').replace(/[,.'’]/g, '')
+  const t = ocrDigits(text).replace(/['’]/g, '')
   return /^\d{1,7}$/.test(t) ? Number(t) : null
 }
 
@@ -65,6 +68,20 @@ export interface MoteRow {
 
 const plain = (w: OcrWord) => w.text.toLowerCase().replace(/[^a-z-]/g, '')
 
+// Distances in a mote row, in multiples of the text height of "Potential" unless said otherwise.
+/** A mote's name is at most this far left of "Potential"… */
+const NAME_REACH = 4
+/** …with gaps between its words no wider than this. */
+const NAME_WORD_GAP = 1.5
+/** A Quantity header this many pixels above a row or less can head its column. */
+const HEADER_REACH_PX = 800
+/** The count cell under a header: it starts this far left of the header's right edge… */
+const CELL_LEFT = 4
+/** …and is this wide. */
+const CELL_WIDTH = 5
+/** With no header, the cell is this many widths of "Potential". */
+const CELL_WIDTH_NO_HEADER = 7
+
 /**
  * Finds "Mote(s) of <Rank> Potential" rows. The plain rank reads "Motes of Potential";
  * Void-Touched Potential is a different item and is skipped. The name is traced left from
@@ -85,7 +102,7 @@ export function findMoteRows(words: OcrWord[]): MoteRow[] {
     if (!rank) continue
     const p = ws[pi]
     let first = pi
-    while (first > 0 && pi - first < 3 && p.x - (ws[first - 1].x + ws[first - 1].w) < p.h * 4 && ws[first].x - (ws[first - 1].x + ws[first - 1].w) < p.h * 1.5) first--
+    while (first > 0 && pi - first < 3 && p.x - (ws[first - 1].x + ws[first - 1].w) < p.h * NAME_REACH && ws[first].x - (ws[first - 1].x + ws[first - 1].w) < p.h * NAME_WORD_GAP) first--
     const left = ws[first].x
     const right = p.x + p.w
     const top = Math.min(...ws.slice(first, pi + 1).map((w) => w.y))
@@ -95,11 +112,11 @@ export function findMoteRows(words: OcrWord[]): MoteRow[] {
     // The nearest Quantity header above the row and to its right. Counts are right-aligned under it,
     // so the cell hugs its right edge, wide enough for six digits.
     const header = headers
-      .filter((h) => h.x > right && h.y < p.y && p.y - h.y < 800)
+      .filter((h) => h.x > right && h.y < p.y && p.y - h.y < HEADER_REACH_PX)
       .sort((a, b) => a.x - right - (b.x - right) || b.y - a.y)[0]
     const cell: Box = header
-      ? { x: header.x + header.w - p.h * 4, y: name.y, w: p.h * 5, h: name.h }
-      : { x: right + p.h, y: name.y, w: p.w * 7, h: name.h }
+      ? { x: header.x + header.w - p.h * CELL_LEFT, y: name.y, w: p.h * CELL_WIDTH, h: name.h }
+      : { x: right + p.h, y: name.y, w: p.w * CELL_WIDTH_NO_HEADER, h: name.h }
     const numbers = ws.filter((w) => w.x >= cell.x && w.x + w.w <= cell.x + cell.w + p.h).map((w) => readCount(w.text)).filter((n): n is number => n !== null)
     // No padding on its left: that would pick up the end of the rank word before it.
     const word: Box = { x: p.x, y: name.y, w: p.w + pad, h: name.h }
@@ -117,13 +134,17 @@ export interface Composite {
   pieces: { from: Box; x: number; y: number }[]
 }
 
+/** The rebuilt image's border, which composeRows lays out and countsFromComposite reads back. */
+const COMPOSITE_MARGIN = 12
+
 /**
  * Lays the rows out tight: name, a small gap, the count cell, then the word "Potential" again, one row
  * under the next. OCR drops a lone digit far off to the right of a list, and a lone 0 even beside its
  * label; with words on both sides it reads it as part of the line.
  */
 export function composeRows(found: MoteRow[]): Composite {
-  const margin = 12
+  if (!found.length) return { width: 0, height: 0, rowHeight: 0, pieces: [] }
+  const margin = COMPOSITE_MARGIN
   const gap = 10
   const rowHeight = Math.max(...found.map((r) => Math.max(r.name.h, r.cell.h))) + 12
   let width = 0
@@ -140,7 +161,7 @@ export function composeRows(found: MoteRow[]): Composite {
 
 /** Reads the counts off the rebuilt image: each row band holds one mote's name and its count. */
 export function countsFromComposite(words: OcrWord[], found: MoteRow[], layout: Composite): (number | null)[] {
-  const margin = 12
+  const margin = COMPOSITE_MARGIN
   return found.map((_, i) => {
     const top = margin + i * layout.rowHeight
     const [, cell, end] = layout.pieces.slice(i * 3, i * 3 + 3)
@@ -195,7 +216,7 @@ const WINDOW_CAPS: Record<string, number> = {
 /** Lines that print "current / most" with no fixed most. */
 const PAIRS = new Set(['HP', 'Mana', 'Endurance', 'Attack'])
 
-const clean = (t: string) => t.replace(/[Oo]/g, '0').replace(/[lI|]/g, '1').replace(/[,.]/g, '')
+const clean = ocrDigits
 
 /**
  * "value/most" as OCR returned it. The window's thin slash after a coloured number often reads as
@@ -258,7 +279,45 @@ export function statsWindowFromScreen(words: OcrWord[]): { values: Record<string
   const values: Record<string, number[]> = {}
   const seen: string[] = []
   const used: OcrWord[] = []
-  const segments: { label: string; label0: number; words: OcrWord[]; all: OcrWord[]; row: string }[] = []
+  const segments = labelSegments(words)
+  // Lines with a known most ("68/1000") read reliably, and their numbers end at the window's right
+  // edge. Anything further right belongs to another window.
+  let edge = Infinity
+  const capped = segments.filter((g) => WINDOW_CAPS[g.label] !== undefined && valuesFor(g.label, g.words.map((w) => w.text)).length)
+  if (capped.length >= 3) {
+    const ends = capped.map((g) => g.words.find((w) => /\d/.test(w.text))!).map((w) => w.x + w.w)
+    edge = Math.max(...ends) + 12
+  }
+  for (const g of segments) {
+    const inside = g.words.filter((w) => w.x <= edge)
+    const v = valuesFor(g.label, inside.map((w) => w.text))
+    if (!v.length || values[g.label]) continue
+    values[g.label] = v
+    used.push(...g.all.filter((w) => w.x <= edge))
+    if (!seen.includes(g.row)) seen.push(g.row)
+  }
+  if (used.length < 6) return { values, rows: seen, area: null }
+  const x0 = Math.min(...used.map((w) => w.x))
+  const y0 = Math.min(...used.map((w) => w.y))
+  const x1 = Math.max(...used.map((w) => w.x + w.w))
+  const y1 = Math.max(...used.map((w) => w.y + w.h))
+  const pad = 24
+  return { values, rows: seen, area: { x: Math.max(0, x0 - pad), y: Math.max(0, y0 - pad), w: x1 - x0 + pad * 2, h: y1 - y0 + pad * 2 } }
+}
+
+interface LabelSegment {
+  label: string
+  label0: number
+  /** The words after the label, up to the next label on the line. */
+  words: OcrWord[]
+  /** The label's words and those after it. */
+  all: OcrWord[]
+  row: string
+}
+
+/** Every label found on each line, with the words that follow it. */
+function labelSegments(words: OcrWord[]): LabelSegment[] {
+  const segments: LabelSegment[] = []
   for (const row of rows(words)) {
     const ws = row.words
     const plainWords = ws.map((w) => w.text.toLowerCase().replace(/[^a-z]/g, ''))
@@ -284,27 +343,5 @@ export function statsWindowFromScreen(words: OcrWord[]): { values: Record<string
       segments.push({ label: h.label, label0: Math.max(0, h.at), words: ws.slice(h.end, stop), all: ws.slice(Math.max(0, h.at), stop), row: row.text })
     })
   }
-  // Lines with a known most ("68/1000") read reliably, and their numbers end at the window's right
-  // edge. Anything further right belongs to another window.
-  let edge = Infinity
-  const capped = segments.filter((g) => WINDOW_CAPS[g.label] !== undefined && valuesFor(g.label, g.words.map((w) => w.text)).length)
-  if (capped.length >= 3) {
-    const ends = capped.map((g) => g.words.find((w) => /\d/.test(w.text))!).map((w) => w.x + w.w)
-    edge = Math.max(...ends) + 12
-  }
-  for (const g of segments) {
-    const inside = g.words.filter((w) => w.x <= edge)
-    const v = valuesFor(g.label, inside.map((w) => w.text))
-    if (!v.length || values[g.label]) continue
-    values[g.label] = v
-    used.push(...g.all.filter((w) => w.x <= edge))
-    if (!seen.includes(g.row)) seen.push(g.row)
-  }
-  if (used.length < 6) return { values, rows: seen, area: null }
-  const x0 = Math.min(...used.map((w) => w.x))
-  const y0 = Math.min(...used.map((w) => w.y))
-  const x1 = Math.max(...used.map((w) => w.x + w.w))
-  const y1 = Math.max(...used.map((w) => w.y + w.h))
-  const pad = 24
-  return { values, rows: seen, area: { x: Math.max(0, x0 - pad), y: Math.max(0, y0 - pad), w: x1 - x0 + pad * 2, h: y1 - y0 + pad * 2 } }
+  return segments
 }

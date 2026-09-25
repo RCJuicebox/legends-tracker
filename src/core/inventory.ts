@@ -132,6 +132,12 @@ export interface ItemStats {
   skill: string
 }
 
+// Built once: the upgrade finder parses every catalog item's block. None is global, so none carries lastIndex.
+const RE_STAT = Object.fromEntries(STAT_KEYS.map((k) => [k, new RegExp(`\\b${k}:\\s*([+-]?\\d+)`)])) as Record<(typeof STAT_KEYS)[number], RegExp>
+// Pages write "END:" and "End:" alike.
+const RE_POOL = Object.fromEntries(POOL_KEYS.map((k) => [k, new RegExp(`\\b${k}:\\s*([+-]?\\d+)`, 'i')])) as Record<(typeof POOL_KEYS)[number], RegExp>
+const RE_SAVE = Object.fromEntries(SAVE_KEYS.map((k) => [k, new RegExp(`\\bSV ${k}:\\s*([+-]?\\d+)`, 'i')])) as Record<(typeof SAVE_KEYS)[number], RegExp>
+
 /** Reads the in-game stats block, as the wiki page holds it ("AC: 20<br>STR: +5  DEX: +5 …"). */
 export function parseStatsBlock(block: string): ItemStats {
   const text = String(block)
@@ -162,16 +168,15 @@ export function parseStatsBlock(block: string): ItemStats {
     skill: /\bSkill:\s*([A-Za-z0-9 ]+?)\s{2,}|\bSkill:\s*([A-Za-z0-9 ]+?)\s*(?:\n|$)/.exec(text)?.slice(1).find(Boolean)?.trim() ?? ''
   }
   for (const k of STAT_KEYS) {
-    const v = num(new RegExp(`\\b${k}:\\s*([+-]?\\d+)`))
+    const v = num(RE_STAT[k])
     if (v) out.stats[k] = v
   }
-  // Pages write "END:" and "End:" alike.
   for (const k of POOL_KEYS) {
-    const v = num(new RegExp(`\\b${k}:\\s*([+-]?\\d+)`, 'i'))
+    const v = num(RE_POOL[k])
     if (v) out.pools[k] = v
   }
   for (const k of SAVE_KEYS) {
-    const v = num(new RegExp(`\\bSV ${k}:\\s*([+-]?\\d+)`, 'i'))
+    const v = num(RE_SAVE[k])
     if (v) out.saves[k] = v
   }
   return out
@@ -204,10 +209,13 @@ export function scaleFlat(base: number, n: number): number {
   return base ? base + n : 0
 }
 
-/** Weight falls 9% per doubling of merges, rounded up to a tenth. Very light items do not change. */
+/**
+ * Weight falls by 9% of its base per merge level (each level doubles the merges: 2^n items make +n),
+ * rounded up to a tenth. Very light items do not change.
+ */
 export function scaleWeight(base: number, n: number): number {
   if (base <= 0.1 || !n) return base
-  const w = base * (1 - 0.09 * Math.log2(2 ** n))
+  const w = base * (1 - 0.09 * n)
   return Math.max(0, Math.ceil(w * 10 - 1e-9) / 10)
 }
 

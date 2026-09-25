@@ -110,8 +110,9 @@ export class SpellBook {
       const spell: Spell = {
         id,
         name: f[F.name],
-        castMs: +f[F.cast],
-        recastMs: +f[F.recast],
+        // A blank or odd field reads as 0, not NaN: a NaN cast time would drop every pending cast.
+        castMs: +f[F.cast] || 0,
+        recastMs: +f[F.recast] || 0,
         formula,
         cap,
         beneficial,
@@ -164,18 +165,19 @@ export class SpellBook {
     return this.byName.values()
   }
 
-  /** Spells whose name contains `query`. Focus spells belong to items, not classes, so `anyone` includes them. */
+  /**
+   * The first `limit` spells, alphabetically, whose name contains `query`. Focus spells belong to
+   * items, not classes, so `anyone` includes them.
+   */
   search(query: string, limit = 50, anyone = false): Spell[] {
     const q = query.trim().toLowerCase()
     if (!q) return []
     const out: Spell[] = []
     for (const s of this.byName.values()) {
-      if (s.name.toLowerCase().includes(q) && (anyone || castable(s))) {
-        out.push(s)
-        if (out.length >= limit) break
-      }
+      if (s.name.toLowerCase().includes(q) && (anyone || castable(s))) out.push(s)
     }
-    return out.sort((a, b) => a.name.localeCompare(b.name))
+    // Sorted before cutting, so an early match in file order cannot push out one earlier in the alphabet.
+    return out.sort((a, b) => a.name.localeCompare(b.name)).slice(0, limit)
   }
 }
 

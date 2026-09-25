@@ -2,7 +2,8 @@
 // chat: "Ability #<id>: <Name>", "Description: <text>", "Cost per Level: <n>". Each description
 // states the effect at the rank held, so the numbers come straight out of the prose.
 
-const STAMP = /^\[(\w\w\w \w\w\w \d\d \d\d:\d\d:\d\d \d{4})\] ?(.*)$/
+import { parseLogLine } from './logLine'
+
 const ABILITY = /^Ability #(\d+): (.+?)\s*$/
 const DESCRIPTION = /^Description: ?(.*)$/
 const COST = /^Cost per Level: ?(\d+)/
@@ -72,10 +73,8 @@ export interface AaSummary {
   totals: Partial<Record<AaEffect, { sum: number; from: [string, number][] }>>
 }
 
-const secondsOf = (ts: string) => {
-  const [h, m, s] = ts.split(' ')[3].split(':').map(Number)
-  return h * 3600 + m * 60 + s
-}
+/** Ability entries further apart than this belong to different dumps. */
+const DUMP_GAP_MS = 5000
 
 interface RawEntry {
   id: number
@@ -91,29 +90,31 @@ export function findAaDumps(lines: string[]): RawEntry[][] {
   const dumps: RawEntry[][] = []
   let cur: RawEntry[] = []
   let entry: RawEntry | null = null
-  let lastTs: string | null = null
+  let lastTime: number | null = null
   const close = () => {
     if (entry) cur.push(entry)
     entry = null
   }
   for (const line of lines) {
     const raw = line.replace(/\r$/, '')
-    const m = STAMP.exec(raw)
-    if (!m) {
+    const l = parseLogLine(raw)
+    if (!l) {
       // Descriptions wrap onto untimestamped lines.
       if (entry?.inDescription && raw.trim()) entry.description += '\n' + raw.trim()
       continue
     }
-    const [, ts, body] = m
+    const body = l.text
     const a = ABILITY.exec(body)
     if (a) {
       close()
-      if (lastTs && ts !== lastTs && cur.length && Math.abs(secondsOf(lastTs) - secondsOf(ts)) > 5) {
+      if (lastTime !== null && cur.length && Math.abs(l.time - lastTime) > DUMP_GAP_MS) {
         dumps.push(cur)
         cur = []
       }
-      entry = { id: Number(a[1]), name: a[2].trim(), description: '', cost: null, when: ts, inDescription: false }
-      lastTs = ts
+      // The stamp exactly as written (padded day and all), so callers can find the line again.
+      const when = raw.slice(1, raw.indexOf(']'))
+      entry = { id: Number(a[1]), name: a[2].trim(), description: '', cost: null, when, inDescription: false }
+      lastTime = l.time
       continue
     }
     if (!entry) continue
@@ -132,7 +133,7 @@ export function findAaDumps(lines: string[]): RawEntry[][] {
     close()
     if (cur.length) dumps.push(cur)
     cur = []
-    lastTs = null
+    lastTime = null
   }
   close()
   if (cur.length) dumps.push(cur)

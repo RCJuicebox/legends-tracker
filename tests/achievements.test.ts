@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { AchievementBook, parseAchievements, sourceFromName, type AchMarks } from '../src/core/achievements'
+import { HUNT } from '../src/core/achievementHunt'
 
 const EXPORT = [
   'EverQuest: Hunter',
@@ -93,5 +94,41 @@ describe('the rules across achievements', () => {
     expect(book.fromGame([0, 0, 0])).toBe(true)
     const stale: AchMarks = { ticks: ['EverQuest: Hunter > hunter of the lair of the splitpaw > an ancient mob', 'x > y > z'], broken: [] }
     expect(book.prune(stale).ticks).toEqual(['x > y > z'])
+  })
+})
+
+describe('references from an older export', () => {
+  const { sections } = parseAchievements(EXPORT)
+
+  it('read as nothing instead of throwing', () => {
+    const book = new AchievementBook(sections, none)
+    expect(book.has([0, 0])).toBe(true)
+    expect(book.has([0, 0, 9])).toBe(false)
+    expect(book.has([9, 0])).toBe(false)
+    expect(book.ach([9, 9]).c).toEqual([])
+    expect(book.fromGame([0, 9, 0])).toBe(false)
+    expect(book.ticks([9, 0, 0])).toBe(false)
+    expect(book.objDone([0, 0, 9])).toBe(false)
+    expect(book.isBroken([9, 0])).toBe(false)
+    expect(book.achDone([9, 0])).toBe(false)
+    expect(book.state([9, 0])).toBe('open')
+    expect(book.counts([9, 0])).toEqual({ req: 0, done: 0, opt: 0, optDone: 0, ign: 0 })
+    expect(book.withTick([9, 0, 0], true, none)).toEqual(none)
+    expect(book.withBroken([9, 0], true, none)).toEqual(none)
+  })
+})
+
+describe('Slayer hunting grounds', () => {
+  it('lists zones with a count and, where known, a level range that runs low to high', () => {
+    for (const [key, zones] of Object.entries(HUNT)) {
+      expect(key).toBe(key.toLowerCase())
+      for (const [zone, n, lo, hi] of zones) {
+        expect(zone.length).toBeGreaterThan(0)
+        expect(n).toBeGreaterThan(0)
+        if (lo !== undefined && hi !== undefined) expect(lo).toBeLessThanOrEqual(hi)
+      }
+      // Most NPCs of the race first.
+      expect(zones.map((z) => z[1])).toEqual([...zones.map((z) => z[1])].sort((a, b) => b - a))
+    }
   })
 })

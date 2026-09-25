@@ -76,3 +76,76 @@ describe('testTrigger', () => {
     expect(r.outputs).toEqual(['Speak: "Envenomed Bolt interrupted"'])
   })
 })
+
+describe('TriggerEngine end-early with snippets', () => {
+  it('fixes {S1} in an end-early phrase to what the start captured, so one awakening ends one timer', () => {
+    const board = new TimerBoard({ onChange: () => {}, onNotify: () => {} })
+    const engine = new TriggerEngine(board, { notify: () => {}, feed: () => {} })
+    engine.load(
+      [
+        trig({
+          id: 'mez',
+          phrases: [{ text: '{S1} has been mesmerized.', regex: false }],
+          actions: [{
+            type: 'timer', name: 'Mez {S1}', durationSec: 24, color: '#fff', overlay: 'targets', warnSec: 0,
+            warnSpeech: '', endSpeech: '', restart: 'restart',
+            endEarly: [{ text: '{S1} has been awakened', regex: false }]
+          }]
+        })
+      ],
+      'Kelwyn'
+    )
+    const feed = (raw: string) => engine.handle(parseLogLine(raw)!)
+    feed('[Wed Sep 23 13:00:10 2026] A gnoll pup has been mesmerized.')
+    feed('[Wed Sep 23 13:00:11 2026] A gnoll scout has been mesmerized.')
+    feed('[Wed Sep 23 13:00:12 2026] A gnoll pup has been awakened by Aldric.')
+    expect(board.list().map((t) => t.label)).toEqual(['Mez A gnoll scout'])
+  })
+
+  it('fixes {N1} too, and escapes the bound text in regex end-early phrases', () => {
+    const board = new TimerBoard({ onChange: () => {}, onNotify: () => {} })
+    const engine = new TriggerEngine(board, { notify: () => {}, feed: () => {} })
+    engine.load(
+      [
+        trig({
+          id: 'n',
+          phrases: [{ text: 'Countdown {N1} for {S1}', regex: false }],
+          actions: [{
+            type: 'timer', name: '{S1} {N1}', durationSec: 60, color: '#fff', overlay: 'targets', warnSec: 0,
+            warnSpeech: '', endSpeech: '', restart: 'restart',
+            endEarly: [{ text: '^Stop {N1} for {S1}$', regex: true }]
+          }]
+        })
+      ],
+      'Kelwyn'
+    )
+    const feed = (raw: string) => engine.handle(parseLogLine(raw)!)
+    feed('[Wed Sep 23 13:00:10 2026] Countdown 1 for a.b')
+    feed('[Wed Sep 23 13:00:11 2026] Countdown 2 for a.b')
+    feed('[Wed Sep 23 13:00:12 2026] Stop 1 for axb')
+    expect(board.list().length).toBe(2)
+    feed('[Wed Sep 23 13:00:13 2026] Stop 1 for a.b')
+    expect(board.list().map((t) => t.label)).toEqual(['a.b 2'])
+  })
+})
+
+describe('compilePhrase edge cases', () => {
+  it('makes a repeated snippet a backreference', () => {
+    const re = compilePhrase({ text: '{S1} hits {S1}', regex: false }, 'Kelwyn')
+    expect(re.test('a rat hits a rat')).toBe(true)
+    expect(re.test('a rat hits a bat')).toBe(false)
+  })
+
+  it('lets {N1} match negative numbers', () => {
+    const re = compilePhrase({ text: 'Your faction standing changed by {N1}.', regex: false }, 'Kelwyn')
+    expect(re.exec('Your faction standing changed by -5.')!.groups).toEqual({ N1: '-5' })
+  })
+
+  it('reports a bad regex in errors instead of throwing', () => {
+    const board = new TimerBoard({ onChange: () => {}, onNotify: () => {} })
+    const engine = new TriggerEngine(board, { notify: () => {}, feed: () => {} })
+    engine.load([trig({ name: 'Broken', phrases: [{ text: '(unclosed', regex: true }] }), trig({ id: 'ok', phrases: [{ text: 'fine', regex: false }] })], 'Kelwyn')
+    expect(engine.errors.map((e) => e.trigger)).toEqual(['Broken'])
+    expect(testTrigger(trig({ phrases: [{ text: '(unclosed', regex: true }] }), 'x', 'Kelwyn').error).not.toBe('')
+  })
+})

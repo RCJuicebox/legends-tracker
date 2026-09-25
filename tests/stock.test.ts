@@ -20,3 +20,20 @@ describe('StockCursor', () => {
     expect(c.accept(t('15:47:00'))).toBe(true)
   })
 })
+
+describe('StockCursor across a clock change', () => {
+  it('keeps counting when the clocks go back and the log repeats an hour', () => {
+    const c = new StockCursor(t('01:59:00'), 1)
+    expect(c.accept(t('01:59:59'))).toBe(true)
+    // Fall-back: the next line is an hour earlier by the log's clock.
+    expect(c.accept(t('01:00:00'))).toBe(true)
+    expect(c.accept(t('01:00:00'))).toBe(true)
+    expect(c.accept(t('01:20:00'))).toBe(true)
+    expect(c.seenUntil).toBe(t('01:20:00'))
+  })
+
+  it('still skips a replay that starts behind the cursor', () => {
+    const c = new StockCursor(t('15:45:00'), 1)
+    expect([c.accept(t('15:40:00')), c.accept(t('15:44:00')), c.accept(t('15:45:00')), c.accept(t('15:45:00'))]).toEqual([false, false, false, true])
+  })
+})

@@ -87,3 +87,29 @@ describe('AAs from the log', () => {
     expect(latestAas('[Sat Sep 12 16:23:15 2026] nothing here')).toBeNull()
   })
 })
+
+describe('AAs from the log, on single-digit days', () => {
+  it('reads a dump whose day is space-padded, and keeps the stamp exactly as written', () => {
+    const log = [
+      '[Wed Sep  9 16:23:16 2026] Ability #33: Combat Stability',
+      '[Wed Sep  9 16:23:16 2026] Description: Increases the armor class soft cap of your class by 10%.',
+      '[Wed Sep  9 16:23:16 2026] Cost per Level: 3'
+    ].join('\n')
+    const aa = latestAas(log)!
+    expect(aa.count).toBe(1)
+    expect(aa.when).toBe('Wed Sep  9 16:23:16 2026')
+    expect(log.indexOf(`[${aa.when}] Ability #`)).toBe(0)
+  })
+
+  it('keeps a dump that runs across midnight together, and splits dumps minutes apart', () => {
+    const entry = (stamp: string, id: number, name: string) => [
+      `[${stamp}] Ability #${id}: ${name}`,
+      `[${stamp}] Description: Increases the armor class soft cap of your class by 10%.`,
+      `[${stamp}] Cost per Level: 3`
+    ]
+    const across = [...entry('Wed Sep  9 23:59:59 2026', 33, 'Combat Stability'), ...entry('Thu Sep 10 00:00:00 2026', 34, 'Other')].join('\n')
+    expect(latestAas(across)!.count).toBe(2)
+    const apart = [...entry('Thu Sep 10 00:00:00 2026', 33, 'Combat Stability'), ...entry('Thu Sep 10 00:05:00 2026', 34, 'Other')].join('\n')
+    expect(latestAas(apart)!.count).toBe(1)
+  })
+})

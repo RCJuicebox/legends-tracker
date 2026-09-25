@@ -74,8 +74,10 @@ export interface DurationInput {
 export function computeDuration(input: DurationInput): DurationBreakdown {
   const { spell, rank, level, tierPct, focusPct, focusSteps, overrideSec } = input
   if (overrideSec && overrideSec > 0) {
+    const ticks = Math.ceil(overrideSec / 6)
     return {
-      ticks: Math.ceil(overrideSec / 6),
+      ticks,
+      wholeTicks: Math.max(0, ticks - 1),
       permanent: false,
       seconds: overrideSec,
       earliestSec: overrideSec,
@@ -88,10 +90,10 @@ export function computeDuration(input: DurationInput): DurationBreakdown {
   const base = formulaTicks(level, spell.formula, spell.cap)
   const steps: string[] = []
   if (base < 0) {
-    return { ticks: -1, permanent: true, seconds: Infinity, earliestSec: Infinity, latestSec: Infinity, spellWindowSec: Infinity, baseSec: Infinity, steps: ['Permanent until removed'] }
+    return { ticks: -1, wholeTicks: -1, permanent: true, seconds: Infinity, earliestSec: Infinity, latestSec: Infinity, spellWindowSec: Infinity, baseSec: Infinity, steps: ['Permanent until removed'] }
   }
   if (base === 0) {
-    return { ticks: 0, permanent: false, seconds: 0, earliestSec: 0, latestSec: 0, spellWindowSec: 0, baseSec: 0, steps: ['Instant: no duration'] }
+    return { ticks: 0, wholeTicks: 0, permanent: false, seconds: 0, earliestSec: 0, latestSec: 0, spellWindowSec: 0, baseSec: 0, steps: ['Instant: no duration'] }
   }
   steps.push(`Formula ${spell.formula} at level ${level}${spell.cap ? `, capped at ${spell.cap}` : ''}: ${base} ticks (${clock(base * 6)})`)
   let ticks = base
@@ -113,7 +115,7 @@ export function computeDuration(input: DurationInput): DurationBreakdown {
   const earliest = whole * 6
   const latest = total * 6
   steps.push(`Plus the partial tick it lands in: wears off ${earliest}–${latest}s after landing`)
-  return { ticks: total, permanent: false, seconds: earliest, earliestSec: earliest, latestSec: latest, spellWindowSec: whole * 6, baseSec: base * 6, steps }
+  return { ticks: total, wholeTicks: whole, permanent: false, seconds: earliest, earliestSec: earliest, latestSec: latest, spellWindowSec: whole * 6, baseSec: base * 6, steps }
 }
 
 /** Ticks after the formula and rank bonus, before focus and rounding. */
@@ -142,7 +144,8 @@ export function clock(sec: number): string {
   return h ? `${h}:${String(m % 60).padStart(2, '0')}:${ss}` : `${m}:${ss}`
 }
 
-function round2(n: number): number {
+/** Rounded to two decimal places, for the breakdown's figures. */
+export function round2(n: number): number {
   return Math.round(n * 100) / 100
 }
 

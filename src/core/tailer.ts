@@ -8,7 +8,8 @@ export interface TailerOptions {
   /** Skip what the file already holds when the tailer first attaches. A file that appears later is read whole. */
   startAtEnd: boolean
   pollMs?: number
-  onLines: (lines: string[]) => void
+  /** `end`: the byte offset just past the last line given, so a reader elsewhere can pick up exactly there. */
+  onLines: (lines: string[], end: number) => void
   onReset?: (reason: ResetReason) => void
   onMissing?: () => void
   onSize?: (size: number) => void
@@ -36,6 +37,11 @@ export class LogTailer {
   private running = false
   private missing = false
   private handle: FileHandle | null = null
+  /**
+   * Bumped by start and stop. A poll or read begun under an older generation was overtaken (stopped,
+   * perhaps restarted) and must neither read on nor schedule another poll, or two loops would run.
+   */
+  private generation = 0
 
   constructor(
     readonly path: string,
@@ -45,11 +51,12 @@ export class LogTailer {
   start(): void {
     if (this.running) return
     this.running = true
-    void this.poll()
+    void this.poll(++this.generation)
   }
 
   stop(): void {
     this.running = false
+    this.generation++
     if (this.timer) clearTimeout(this.timer)
     this.timer = null
     void this.release()
@@ -62,21 +69,23 @@ export class LogTailer {
     await h?.close().catch(() => undefined)
   }
 
-  private schedule(): void {
-    if (this.running) this.timer = setTimeout(() => void this.poll(), this.opts.pollMs ?? 100)
+  private schedule(gen: number): void {
+    if (this.running && gen === this.generation) this.timer = setTimeout(() => void this.poll(gen), this.opts.pollMs ?? 100)
   }
 
-  private async poll(): Promise<void> {
+  private async poll(gen: number): Promise<void> {
     try {
       await this.readOnce()
     } catch {
       // A transient sharing violation while the game writes; try again next poll.
     }
-    this.schedule()
+    this.schedule(gen)
   }
 
   /** One polling step. Public so tests can drive it without timers. */
   async readOnce(): Promise<void> {
+    const gen = this.generation
+    const overtaken = () => gen !== this.generation
     let stat
     try {
       stat = await fs.stat(this.path, { bigint: true })
@@ -111,28 +120,34 @@ export class LogTailer {
     this.opts.onSize?.(size)
     if (size === this.pos) return
 
+    if (overtaken()) return
     if (!this.handle) {
       const h = await fs.open(this.path, 'r')
-      // The file could be swapped between the stat and the open; only keep a handle to the one stat saw.
+      // The file could be swapped between the stat and the open; only keep a handle to the one stat
+      // saw, and none at all if the tailer was stopped meanwhile.
       const hs = await h.stat({ bigint: true })
-      if (`${hs.dev}:${hs.ino}` !== this.identity) {
+      if (`${hs.dev}:${hs.ino}` !== this.identity || overtaken() || this.handle) {
         await h.close()
         return
       }
       this.handle = h
     }
+    // Read through this handle even if release() drops this.handle meanwhile; a closed one just throws.
+    const h = this.handle
     const buf = Buffer.allocUnsafe(SLICE)
     try {
       while (this.pos < size) {
         const want = Math.min(SLICE, size - this.pos)
-        const { bytesRead } = await this.handle.read(buf, 0, want, this.pos)
-        if (bytesRead <= 0) break
+        const { bytesRead } = await h.read(buf, 0, want, this.pos)
+        // Stopped mid-read: a newer read owns the position now.
+        if (overtaken() || bytesRead <= 0) break
         this.pos += bytesRead
         this.emit(decodeCp1252(buf.subarray(0, bytesRead)))
       }
     } catch (e) {
+      if (overtaken()) return
       // A handle that went bad (the file swapped under it) is dropped; the next poll reopens.
-      await this.release()
+      if (this.handle === h) await this.release()
       throw e
     }
   }
@@ -142,6 +157,7 @@ export class LogTailer {
     // The last piece has no newline yet: hold it until the rest of the line arrives.
     this.partial = parts.pop() ?? ''
     const lines = parts.map((l) => (l.endsWith('\r') ? l.slice(0, -1) : l)).filter((l) => l.length > 0)
-    if (lines.length) this.opts.onLines(lines)
+    // Windows-1252 decodes one byte to one character, so the held piece's length is its size in bytes.
+    if (lines.length) this.opts.onLines(lines, this.pos - this.partial.length)
   }
 }

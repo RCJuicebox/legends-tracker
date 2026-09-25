@@ -23,22 +23,21 @@ export function parseLogLine(raw: string): LogLine | null {
 }
 
 // Windows-1252, not UTF-8: a UTF-8 decode corrupts extended characters in zone and mob names.
-const CP1252_HIGH = [
-  0x20ac, 0x81, 0x201a, 0x0192, 0x201e, 0x2026, 0x2020, 0x2021, 0x02c6, 0x2030, 0x0160, 0x2039,
-  0x0152, 0x8d, 0x017d, 0x8f, 0x90, 0x2018, 0x2019, 0x201c, 0x201d, 0x2022, 0x2013, 0x2014,
-  0x02dc, 0x2122, 0x0161, 0x203a, 0x0153, 0x9d, 0x017e, 0x0178
-]
+// Node's decoder passes the five bytes 1252 leaves undefined (0x81, 0x8D, 0x8F, 0x90, 0x9D) through
+// as the same code points, as the hand-written table this replaced did.
+const CP1252 = new TextDecoder('windows-1252')
 
 export function decodeCp1252(bytes: Uint8Array): string {
-  let out = ''
-  const chunk: number[] = []
-  for (let i = 0; i < bytes.length; i++) {
-    const b = bytes[i]
-    chunk.push(b >= 0x80 && b <= 0x9f ? CP1252_HIGH[b - 0x80] : b)
-    if (chunk.length === 8192) {
-      out += String.fromCharCode(...chunk)
-      chunk.length = 0
-    }
-  }
-  return out + String.fromCharCode(...chunk)
+  return CP1252.decode(bytes)
+}
+
+// "You have entered The Plane of Fear 4 (Refined)." Arenas and the Drunken Monkey's areas print the
+// same words without being zones.
+export const RE_ZONE = /^You have entered (.+)\.$/
+export const RE_NOT_ZONE = /^(?:an? (?:area|Arena)|the Drunken)/i
+
+/** The zone a line says you entered, or null when it is not a zone change. */
+export function zoneEntered(text: string): string | null {
+  const m = RE_ZONE.exec(text)
+  return m && !RE_NOT_ZONE.test(m[1]) ? m[1] : null
 }

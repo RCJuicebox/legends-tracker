@@ -125,10 +125,16 @@ export interface Restrictions {
   reqLevel: number
 }
 
+const RE_WORDS = {
+  Slot: /\bSlot:\s*([A-Z0-9 ]+)/i,
+  Class: /\bClass:\s*([A-Z0-9 ]+)/i,
+  Race: /\bRace:\s*([A-Z0-9 ]+)/i
+}
+
 export function restrictions(block: string): Restrictions {
   const text = block.replace(/<br\s*\/?>/gi, '\n').replace(/<[^>]+>/g, '')
-  const words = (label: string) =>
-    (new RegExp(`\\b${label}:\\s*([A-Z0-9 ]+)`, 'i').exec(text)?.[1] ?? '')
+  const words = (label: keyof typeof RE_WORDS) =>
+    (RE_WORDS[label].exec(text)?.[1] ?? '')
       .trim()
       .toUpperCase()
       .split(/\s+/)
@@ -263,12 +269,37 @@ export interface FinderOptions {
   perSlot?: number
 }
 
+interface ParsedItem {
+  item: CatalogItem
+  r: Restrictions
+  base: ItemStats
+  era: string
+  inferred: boolean
+}
+
+/** Parsed catalogs, by the catalog array itself: the finder runs again on every slider move. */
+const parsedCatalogs = new WeakMap<CatalogItem[], { status: FinderOptions['eraStatus']; items: ParsedItem[] }>()
+
+/**
+ * Every catalog item's restrictions, base stats and era, parsed once per catalog (eras again when the
+ * era list changes). Candidates at +0 share these stats objects, so they are read-only.
+ */
+function parseCatalog(catalog: CatalogItem[], eraStatus: FinderOptions['eraStatus']): ParsedItem[] {
+  const hit = parsedCatalogs.get(catalog)
+  if (hit && hit.status === eraStatus) return hit.items
+  const zones = zoneEras(catalog, eraStatus)
+  const items = hit
+    ? hit.items.map((p) => ({ ...p, ...eraOf(p.item, zones, eraStatus) }))
+    : catalog.map((item) => ({ item, r: restrictions(item.statsblock), base: parseStatsBlock(item.statsblock), ...eraOf(item, zones, eraStatus) }))
+  parsedCatalogs.set(catalog, { status: eraStatus, items })
+  return items
+}
+
 /** Per worn slot, the best candidates that beat what is worn there, by the chosen weights. */
 export function findUpgrades(o: FinderOptions): SlotResult[] {
   const perSlot = o.perSlot ?? 6
-  const zones = zoneEras(o.catalog, o.eraStatus)
   const hidden = new Set(o.hiddenEras)
-  const parsed = o.catalog.map((item) => ({ item, r: restrictions(item.statsblock), base: parseStatsBlock(item.statsblock), ...eraOf(item, zones, o.eraStatus) }))
+  const parsed = parseCatalog(o.catalog, o.eraStatus)
   const slots = [...new Set(o.worn.map((w) => w.location))]
   for (const s of Object.keys(SLOT_WORDS)) if (!slots.includes(s)) slots.push(s)
   const wornAnywhere = new Set(o.worn.map((w) => itemKey(w.name)))

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { focusFor, focusFromSpell, isDurationFocus, spellLevel } from '../src/core/focus'
+import { effectLimitsAllow, focusFor, focusFromSpell, isDurationFocus, spellLevel } from '../src/core/focus'
 import { casterLevel, computeDuration } from '../src/core/durations'
 import { fixtureBook, exampleShaman, SPELL_CASTING_REINFORCEMENT } from './helpers'
 import { DEFAULT_TIER_DURATION_PCT, type CharacterSettings } from '../src/shared/types'
@@ -57,5 +57,19 @@ describe('focusFor', () => {
     expect(focusFor(spell('Spirit of the Puma'), both, 50).pct).toBe(15)
     const noDecay: CharacterSettings = { level: 50, classLevels: {}, focusSources: [{ ...ee2, decayPct: 0 }, SPELL_CASTING_REINFORCEMENT] }
     expect(focusFor(spell('Spirit of the Puma'), noDecay, 50).pct).toBe(50)
+  })
+})
+
+describe('effect limits (SPA 137)', () => {
+  it('needs any one of several included effects, as the gear focus report does', () => {
+    const puma = spell('Spirit of the Puma')
+    const carried = puma.effects[0].spa
+    const ee2 = focusFromSpell(spell('Extended Enhancement II'), 'item', 'ring')
+    const anyOf: CharacterSettings = { level: 50, classLevels: {}, focusSources: [{ ...ee2, maxLevel: 0, minTicks: 0, excludeSpas: [], requireSpas: [9999, carried] }] }
+    expect(focusFor(puma, anyOf, 50).pct).toBe(15)
+    expect(effectLimitsAllow(puma, [9999, carried], [])).toBe(true)
+    expect(effectLimitsAllow(puma, [9999], [])).toBe(false)
+    expect(effectLimitsAllow(puma, [], [carried])).toBe(false)
+    expect(effectLimitsAllow(puma, [], [])).toBe(true)
   })
 })

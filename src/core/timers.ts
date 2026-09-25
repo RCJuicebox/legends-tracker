@@ -13,6 +13,11 @@ export interface BoardTimer extends TimerView {
   meta?: Record<string, unknown>
 }
 
+/** A reschedule this much later than the old end counts as a refresh and re-arms the warning. */
+const REARM_MS = 500
+/** The most grace an exact end (a DoT pinned by its ticks) gets. */
+const EXACT_GRACE_MS = 3000
+
 export type EndReason = 'faded' | 'expired' | 'died' | 'zoned' | 'cleared' | 'replaced'
 
 export interface BoardEvents {
@@ -43,6 +48,11 @@ export class TimerBoard {
     return [...this.timers.values()]
   }
 
+  /** The running timers without copying them. Ending timers while walking this is safe. */
+  values(): IterableIterator<BoardTimer> {
+    return this.timers.values()
+  }
+
   views(): TimerView[] {
     return this.list()
       .sort((a, b) => a.endsAt - b.endsAt)
@@ -62,7 +72,7 @@ export class TimerBoard {
   reschedule(key: string, endsAt: number, exact: boolean): void {
     const t = this.timers.get(key)
     if (!t) return
-    if (endsAt > t.endsAt + 500) t.warned = false
+    if (endsAt > t.endsAt + REARM_MS) t.warned = false
     t.endsAt = endsAt
     t.exact = exact
     this.events.onChange()
@@ -89,14 +99,15 @@ export class TimerBoard {
 
   tick(now: number): void {
     let changed = false
-    for (const t of this.list()) {
-      if (!t.warned && t.warnSec > 0 && now >= t.endsAt - t.warnSec * 1000 && now < t.endsAt + (t.exact ? Math.min(t.graceMs, 3000) : t.graceMs)) {
+    // Deleting from a Map while walking it is safe, so no copy is made per tick.
+    for (const t of this.timers.values()) {
+      // An exact end (a DoT pinned by its ticks) needs little grace: some, like Harm Touch, print no
+      // "worn off" line at all, and should not sit on "fading…" for long.
+      const grace = t.exact ? Math.min(t.graceMs, EXACT_GRACE_MS) : t.graceMs
+      if (!t.warned && t.warnSec > 0 && now >= t.endsAt - t.warnSec * 1000 && now < t.endsAt + grace) {
         t.warned = true
         if (t.onWarn.length) this.events.onNotify(t.onWarn, t)
       }
-      // An exact end (a DoT pinned by its ticks) needs little grace: some, like Harm Touch, print no
-      // "worn off" line at all, and should not sit on "fading…" for long.
-      const grace = t.exact ? Math.min(t.graceMs, 3000) : t.graceMs
       if (now >= t.endsAt + grace) {
         this.timers.delete(t.key)
         if (t.onExpire.length) this.events.onNotify(t.onExpire, t)

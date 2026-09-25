@@ -5,6 +5,7 @@ import { crc32 } from 'node:zlib'
 import yazl from 'yazl'
 import yauzl from 'yauzl'
 import { parseLogLine } from './logLine'
+import { localDay } from './dates'
 
 export type ArchiveOutcome =
   | { status: 'archived'; zipPath: string; originalBytes: number; zipBytes: number; liveHandoff: boolean }
@@ -16,9 +17,21 @@ export interface ArchiverDeps {
   pollMs?: number
   progress?: (message: string) => void
   signal?: AbortSignal
+  /** Stand-ins for tests: moving a file, and waiting between checks. */
+  rename?: (from: string, to: string) => Promise<void>
+  sleep?: (ms: number) => Promise<void>
 }
 
 const STAGING_PREFIX = '.staging-'
+/** How much of the log's start and end is read for its first and last timestamps. */
+const HEAD_BYTES = 4096
+const TAIL_BYTES = 8192
+/** After a handoff, the moved log counts as finished once its size holds still between two checks… */
+const STABLE_MIN_WAIT_MS = 500
+/** …or after this many checks. */
+const STABLE_MAX_CHECKS = 20
+/** While waiting on a handoff, whether the game is still running is asked every this many polls. */
+const GAME_CHECK_EVERY = 10
 
 /**
  * Archives a character log: moves it aside, zips it, verifies the zip, and only then deletes the
@@ -39,19 +52,43 @@ export async function archiveLog(logPath: string, archiveDir: string, deps: Arch
   await fs.mkdir(archiveDir, { recursive: true })
   const staging = join(archiveDir, `${STAGING_PREFIX}${basename(logPath, '.txt')}-${Date.now()}.txt`)
   try {
-    await fs.rename(logPath, staging)
+    await (deps.rename ?? fs.rename)(logPath, staging)
   } catch (e) {
     const code = (e as NodeJS.ErrnoException).code
     if (code === 'EBUSY' || code === 'EPERM' || code === 'EACCES') {
       return { status: 'deferred', reason: 'locked', message: 'The game has the log locked. It will be archived once the game closes.' }
     }
+    if (code === 'EXDEV') return moveAcrossDrives(logPath, staging, archiveDir, deps)
     return { status: 'failed', message: (e as Error).message }
   }
   return finishStaged(staging, logPath, archiveDir, deps)
 }
 
+/**
+ * The archive folder is on another drive, so the log cannot simply be renamed there: it is copied,
+ * the copy's size checked, and only then is the original removed. Watching for the handoff depends
+ * on a rename, so this waits until the game is closed.
+ */
+async function moveAcrossDrives(logPath: string, staging: string, archiveDir: string, deps: ArchiverDeps): Promise<ArchiveOutcome> {
+  if (await deps.isGameRunning()) {
+    return { status: 'deferred', reason: 'locked', message: 'The archive folder is on another drive, so the log can only be moved there while the game is closed. It will be archived then.' }
+  }
+  try {
+    await fs.copyFile(logPath, staging)
+    const from = await sizeOf(logPath)
+    const to = await sizeOf(staging)
+    if (from !== to) throw new Error(`the copy is ${to} bytes, the log ${from}`)
+    await fs.unlink(logPath)
+  } catch (e) {
+    await fs.rm(staging, { force: true }).catch(() => {})
+    return { status: 'failed', message: `Moving the log to the archive folder on another drive failed (${(e as Error).message}). The log is untouched at ${logPath}.` }
+  }
+  return zipAndVerify(staging, logPath, archiveDir, false, deps)
+}
+
 /** Completes an archive whose log has already been moved to `staging`, including one left by an earlier run. */
 export async function finishStaged(staging: string, logPath: string, archiveDir: string, deps: ArchiverDeps): Promise<ArchiveOutcome> {
+  const sleep = deps.sleep ?? delay
   let liveHandoff = false
   if (await deps.isGameRunning()) {
     deps.progress?.('Log moved aside. Waiting for the game to write its next line, to confirm it starts a new file.')
@@ -62,7 +99,7 @@ export async function finishStaged(staging: string, logPath: string, archiveDir:
       if (deps.signal?.aborted) return { status: 'deferred', reason: 'held-open', message: 'Stopped before the handoff was confirmed; it resumes next start.' }
       await sleep(pollMs)
       if (await exists(logPath)) {
-        await waitStable(staging, pollMs)
+        await waitStable(staging, pollMs, sleep)
         liveHandoff = true
         break
       }
@@ -70,14 +107,14 @@ export async function finishStaged(staging: string, logPath: string, archiveDir:
       if (now > last) {
         // Still being written through the old handle: put it back where the game expects it.
         try {
-          await fs.rename(staging, logPath)
+          await (deps.rename ?? fs.rename)(staging, logPath)
         } catch (e) {
           return { status: 'failed', message: `The game kept writing to the moved log and it could not be moved back: ${(e as Error).message}. It is at ${staging}.` }
         }
         return { status: 'deferred', reason: 'held-open', message: 'The game keeps its log open while running, so the log was put back. It will be archived once the game closes.' }
       }
       last = now
-      if (++gameCheck % 10 === 0 && !(await deps.isGameRunning())) break
+      if (++gameCheck % GAME_CHECK_EVERY === 0 && !(await deps.isGameRunning())) break
     }
   }
   return zipAndVerify(staging, logPath, archiveDir, liveHandoff, deps)
@@ -96,7 +133,7 @@ async function zipAndVerify(staging: string, logPath: string, archiveDir: string
       throw new Error('the archive did not read back identically')
     }
   } catch (e) {
-    await fs.rm(zipPath, { force: true })
+    await removeZip(zipPath)
     return { status: 'failed', message: `Archiving failed (${(e as Error).message}). The log is untouched at ${staging}.` }
   }
   await fs.unlink(staging)
@@ -113,9 +150,11 @@ export async function compressLoose(txtPath: string, deps: ArchiverDeps): Promis
   try {
     const written = await zipFile(txtPath, zipPath, `${stem}.txt`)
     const read = await readZipEntryCrc(zipPath)
-    if (read.crc !== written.crc || read.size !== originalBytes) throw new Error('the archive did not read back identically')
+    if (read.crc !== written.crc || read.size !== written.size || written.size !== originalBytes) {
+      throw new Error('the archive did not read back identically')
+    }
   } catch (e) {
-    await fs.rm(zipPath, { force: true })
+    await removeZip(zipPath)
     return { status: 'failed', message: `Compressing ${basename(txtPath)} failed: ${(e as Error).message}` }
   }
   await fs.unlink(txtPath)
@@ -135,28 +174,49 @@ export function stagingOriginalName(stagingPath: string): string {
   return basename(stagingPath).slice(STAGING_PREFIX.length).replace(/-\d+\.txt$/, '.txt')
 }
 
+const PARTIAL = '.partial'
+
+/** A zip that failed part way, and the half-written file it was being written through. */
+async function removeZip(zipPath: string): Promise<void> {
+  await fs.rm(zipPath, { force: true }).catch(() => {})
+  await fs.rm(zipPath + PARTIAL, { force: true }).catch(() => {})
+}
+
 function zipFile(src: string, zipPath: string, entryName: string): Promise<{ crc: number; size: number }> {
   return new Promise((resolve, reject) => {
     const zip = new yazl.ZipFile()
     const input = createReadStream(src)
     const pass = new PassThrough()
+    const tmp = zipPath + PARTIAL
+    const out = createWriteStream(tmp)
     let crc = 0
     let size = 0
+    // Any stream failing stops them all. The promise settles once the output file is closed, so the
+    // caller can then remove it.
+    let failure: Error | null = null
+    const fail = (e: Error) => {
+      if (failure) return
+      failure = e
+      input.destroy()
+      pass.destroy()
+      out.destroy()
+    }
     input.on('data', (chunk) => {
       const b = chunk as Buffer
       crc = crc32(b, crc)
       size += b.length
     })
-    input.on('error', reject)
+    input.on('error', fail)
+    pass.on('error', fail)
+    zip.outputStream.on('error', fail)
+    out.on('error', fail)
+    out.on('close', () => {
+      if (failure) return reject(failure)
+      fs.rename(tmp, zipPath).then(() => resolve({ crc, size }), reject)
+    })
     input.pipe(pass)
     zip.addReadStream(pass, entryName, { compress: true, compressionLevel: 6 })
     zip.end()
-    const tmp = zipPath + '.partial'
-    const out = createWriteStream(tmp)
-    out.on('error', reject)
-    out.on('close', () => {
-      fs.rename(tmp, zipPath).then(() => resolve({ crc, size }), reject)
-    })
     zip.outputStream.pipe(out)
   })
 }
@@ -166,6 +226,11 @@ function readZipEntryCrc(zipPath: string): Promise<{ crc: number; size: number }
     yauzl.open(zipPath, { lazyEntries: true, validateEntrySizes: true }, (err, zip) => {
       if (err || !zip) return reject(err ?? new Error('could not open archive'))
       zip.on('error', reject)
+      // Only reached when there is no entry at all: the first one settles the promise and closes the zip.
+      zip.on('end', () => {
+        zip.close()
+        reject(new Error('the archive is empty'))
+      })
       zip.on('entry', (entry: yauzl.Entry) => {
         zip.openReadStream(entry, (e2, stream) => {
           if (e2 || !stream) return reject(e2 ?? new Error('could not read archive entry'))
@@ -192,22 +257,17 @@ async function archiveStem(path: string, fallback: string): Promise<string> {
   const handle = await fs.open(path, 'r')
   try {
     const size = (await handle.stat()).size
-    const head = Buffer.alloc(Math.min(4096, size))
+    const head = Buffer.alloc(Math.min(HEAD_BYTES, size))
     await handle.read(head, 0, head.length, 0)
-    const tail = Buffer.alloc(Math.min(8192, size))
+    const tail = Buffer.alloc(Math.min(TAIL_BYTES, size))
     await handle.read(tail, 0, tail.length, Math.max(0, size - tail.length))
     const first = head.toString('latin1').split('\n').map((l) => parseLogLine(l.trim())).find(Boolean)
     const last = tail.toString('latin1').split('\n').reverse().map((l) => parseLogLine(l.trim())).find(Boolean)
-    if (!first || !last) return `${fallback}_${ymd(Date.now())}`
-    return `${fallback}_${ymd(first.time)}_to_${ymd(last.time)}`
+    if (!first || !last) return `${fallback}_${localDay(Date.now())}`
+    return `${fallback}_${localDay(first.time)}_to_${localDay(last.time)}`
   } finally {
     await handle.close()
   }
-}
-
-function ymd(t: number): string {
-  const d = new Date(t)
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 }
 
 async function uniquePath(dir: string, stem: string, ext: string): Promise<string> {
@@ -217,13 +277,13 @@ async function uniquePath(dir: string, stem: string, ext: string): Promise<strin
   }
 }
 
-async function waitStable(path: string, pollMs: number): Promise<void> {
+async function waitStable(path: string, pollMs: number, sleep: (ms: number) => Promise<void>): Promise<void> {
   let prev = -1
-  for (let i = 0; i < 20; i++) {
+  for (let i = 0; i < STABLE_MAX_CHECKS; i++) {
     const s = await sizeOf(path)
     if (s === prev) return
     prev = s
-    await sleep(Math.max(pollMs, 500))
+    await sleep(Math.max(pollMs, STABLE_MIN_WAIT_MS))
   }
 }
 
@@ -244,6 +304,6 @@ async function sizeOf(p: string): Promise<number> {
   }
 }
 
-function sleep(ms: number): Promise<void> {
+function delay(ms: number): Promise<void> {
   return new Promise((r) => setTimeout(r, ms))
 }

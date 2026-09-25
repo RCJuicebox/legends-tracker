@@ -22,10 +22,18 @@ export interface CatalogItem {
   crafted: boolean
 }
 
+const FIELD_RE = new Map<string, RegExp>()
+
 /** A template parameter's text: "|dropsfrom = …" up to the next parameter or the template's end. */
 function field(content: string, name: string): string {
-  const re = new RegExp(`\\|\\s*${name}\\s*=([\\s\\S]*?)(?=\\n\\s*\\|\\s*\\w+\\s*=|\\n?\\}\\}\\s*</onlyinclude>|\\n\\}\\}\\s*(?:\\n|$))`)
+  // Cached per name. Not global, so a cached pattern keeps no lastIndex between pages.
+  let re = FIELD_RE.get(name)
+  if (!re) FIELD_RE.set(name, (re = fieldPattern(name)))
   return re.exec(content)?.[1].trim() ?? ''
+}
+
+function fieldPattern(name: string): RegExp {
+  return new RegExp(`\\|\\s*${name}\\s*=([\\s\\S]*?)(?=\\n\\s*\\|\\s*\\w+\\s*=|\\n?\\}\\}\\s*</onlyinclude>|\\n\\}\\}\\s*(?:\\n|$))`)
 }
 
 /** "[[Innoruuk_(God)|Innoruuk]]" → "Innoruuk"; "[[Plane of Hate]]" → "Plane of Hate". */
