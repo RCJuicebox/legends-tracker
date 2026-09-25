@@ -68,7 +68,7 @@ export function Audio() {
 
         <div className="card stack gap-14">
           <h2>Voice</h2>
-          <Field label="Voice">
+          <Field label="Voice" hint="Add more in Windows Settings → Time & language → Speech → Manage voices, then restart Legends Tracker.">
             <select value={a.voice} onChange={(e) => set({ voice: e.target.value })}>
               <option value="">Windows default</option>
               {state.voices.map((v) => (

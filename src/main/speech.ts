@@ -2,16 +2,39 @@ import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process'
 import { log } from './log'
 import { yieldPriority } from './priority'
 
-// A resident PowerShell process driving Windows' System.Speech. Speech is rendered to WAV and
-// handed to the audio window, which mixes it with alert sounds on the chosen output device.
-// (Chromium's built-in speechSynthesis always plays on the system default device.)
+// A resident PowerShell process driving Windows speech. Speech is rendered to WAV and handed to
+// the audio window, which mixes it with alert sounds on the chosen output device. (Chromium's
+// built-in speechSynthesis always plays on the system default device.)
+//
+// Two engines: WinRT (Windows.Media.SpeechSynthesis) speaks the OneCore voices, which are the ones
+// Settings → Speech → Manage voices installs; System.Speech (SAPI 5) speaks the older desktop
+// voices and anything registered only there, such as third-party SAPI voices. A voice name picks
+// its engine; the default (and any unknown name) is WinRT's, i.e. the one chosen in Windows
+// Settings. If WinRT cannot load, SAPI does everything.
 const SCRIPT = `
 $ErrorActionPreference = 'Stop'
 Add-Type -AssemblyName System.Speech
 [Console]::InputEncoding = [Text.Encoding]::UTF8
 [Console]::OutputEncoding = [Text.Encoding]::UTF8
+$rt = $null
+$rtVoices = @{}
+$rtNames = @()
+try {
+  Add-Type -AssemblyName System.Runtime.WindowsRuntime
+  $null = [Windows.Media.SpeechSynthesis.SpeechSynthesizer, Windows.Media.SpeechSynthesis, ContentType = WindowsRuntime]
+  $asTask = [System.WindowsRuntimeSystemExtensions].GetMethods() | Where-Object { $_.Name -eq 'AsTask' -and $_.GetParameters().Count -eq 1 -and $_.GetParameters()[0].ParameterType.Name -eq 'IAsyncOperation\`1' } | Select-Object -First 1
+  $asTask = $asTask.MakeGenericMethod([Windows.Media.SpeechSynthesis.SpeechSynthesisStream])
+  foreach ($v in [Windows.Media.SpeechSynthesis.SpeechSynthesizer]::AllVoices) { $rtVoices[$v.DisplayName] = $v; $rtNames += $v.DisplayName }
+  $rt = New-Object Windows.Media.SpeechSynthesis.SpeechSynthesizer
+  $rtDefault = [Windows.Media.SpeechSynthesis.SpeechSynthesizer]::DefaultVoice
+} catch {
+  $rt = $null
+  $rtVoices = @{}
+  $rtNames = @()
+}
 $s = New-Object System.Speech.Synthesis.SpeechSynthesizer
-$names = @($s.GetInstalledVoices() | Where-Object { $_.Enabled } | ForEach-Object { $_.VoiceInfo.Name })
+$sapiNames = @($s.GetInstalledVoices() | Where-Object { $_.Enabled } | ForEach-Object { $_.VoiceInfo.Name } | Where-Object { -not $rtVoices.ContainsKey($_) })
+$names = @($rtNames) + @($sapiNames)
 [Console]::Out.WriteLine((ConvertTo-Json -Compress -InputObject @{ type = 'voices'; voices = $names }))
 [Console]::Out.Flush()
 while ($null -ne ($line = [Console]::In.ReadLine())) {
@@ -19,12 +42,26 @@ while ($null -ne ($line = [Console]::In.ReadLine())) {
   try {
     $req = ConvertFrom-Json $line
     $id = [int]$req.id
-    if ($req.voice) { try { $s.SelectVoice([string]$req.voice) } catch {} }
-    $s.Rate = [int]$req.rate
-    $ms = New-Object System.IO.MemoryStream
-    $s.SetOutputToWaveStream($ms)
-    $s.Speak([string]$req.text)
-    $s.SetOutputToNull()
+    $voice = [string]$req.voice
+    if ($rt -and -not ($sapiNames -contains $voice)) {
+      # An unknown name (a voice since uninstalled) gets the default too.
+      if ($rtVoices.ContainsKey($voice)) { $rt.Voice = $rtVoices[$voice] } else { $rt.Voice = $rtDefault }
+      $rt.Options.SpeakingRate = [double]$req.rate
+      $stream = $asTask.Invoke($null, @($rt.SynthesizeTextToStreamAsync([string]$req.text))).GetAwaiter().GetResult()
+      $in = [System.IO.WindowsRuntimeStreamExtensions]::AsStreamForRead($stream)
+      $ms = New-Object System.IO.MemoryStream
+      $in.CopyTo($ms)
+      $in.Dispose()
+      $stream.Dispose()
+    } else {
+      if ($voice) { try { $s.SelectVoice($voice) } catch {} }
+      # SAPI's rate runs -10..10; the UI's 0.5..2 maps onto it.
+      $s.Rate = [Math]::Max(-10, [Math]::Min(10, [int][Math]::Round(([double]$req.rate - 1) * 10)))
+      $ms = New-Object System.IO.MemoryStream
+      $s.SetOutputToWaveStream($ms)
+      $s.Speak([string]$req.text)
+      $s.SetOutputToNull()
+    }
     [Console]::Out.WriteLine('{"type":"wav","id":' + $id + ',"data":"' + [Convert]::ToBase64String($ms.ToArray()) + '"}')
   } catch {
     [Console]::Out.WriteLine((ConvertTo-Json -Compress -InputObject @{ type = 'error'; id = $id; message = $_.Exception.Message }))
@@ -154,9 +191,7 @@ export class SpeechWorker {
         this.restart(proc)
       }, REQUEST_TIMEOUT_MS)
       this.waiting.set(id, { resolve, reject, timer })
-      // SAPI's rate runs -10..10; the UI's 0.5..2 maps onto it.
-      const sapiRate = Math.max(-10, Math.min(10, Math.round((rate - 1) * 10)))
-      proc.stdin.write(JSON.stringify({ id, text, voice, rate: sapiRate }) + '\n')
+      proc.stdin.write(JSON.stringify({ id, text, voice, rate }) + '\n')
     })
     if (this.cache.size > 300) this.cache.delete(this.cache.keys().next().value!)
     this.cache.set(key, wav)
