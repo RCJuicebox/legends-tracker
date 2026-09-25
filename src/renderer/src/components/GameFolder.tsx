@@ -1,9 +1,8 @@
 import { useEffect, useState } from 'react'
-import { api } from '../api'
+import { api, errorMessage } from '../api'
 import { useApp } from '../state'
+import { whoList as who } from '../format'
 import type { GameFolderCheck } from '../../../shared/types'
-
-const who = (names: string[]) => names.map((n) => n.replace('_', ' · ')).join(', ')
 
 /** Finds the game folder again, or lets the player point at it. Reports what happened in a line under the buttons. */
 function useFolderActions() {
@@ -12,14 +11,23 @@ function useFolderActions() {
   const find = async () => {
     setBusy(true)
     setMessage('')
-    const dir = await api.invoke<string>('game:find')
-    setBusy(false)
-    setMessage(dir ? '' : 'Could not find it on any drive. Choose the folder yourself.')
+    try {
+      const dir = await api.invoke<string>('game:find')
+      setMessage(dir ? '' : 'Could not find it on any drive. Choose the folder yourself.')
+    } catch (e) {
+      setMessage(`Could not look for it: ${errorMessage(e)}`)
+    } finally {
+      setBusy(false)
+    }
   }
   const choose = async () => {
     setMessage('')
-    const r = await api.invoke<{ canceled: boolean; picked: string; dir: string }>('game:choose')
-    if (!r.canceled && !r.dir) setMessage(`${r.picked} is not an EverQuest Legends folder: it has no spells_us.txt. Pick the folder the game is installed in.`)
+    try {
+      const r = await api.invoke<{ canceled: boolean; picked: string; dir: string }>('game:choose')
+      if (!r.canceled && !r.dir) setMessage(`${r.picked} is not an EverQuest Legends folder: it has no spells_us.txt. Pick the folder the game is installed in.`)
+    } catch (e) {
+      setMessage(`Could not use that folder: ${errorMessage(e)}`)
+    }
   }
   return { busy, message, find, choose }
 }
@@ -32,7 +40,15 @@ export function GameFolderCard() {
   const { busy, message, find, choose } = useFolderActions()
   useEffect(() => {
     let live = true
-    const t = setTimeout(() => void api.invoke<GameFolderCheck>('game:check').then((c) => live && setCheck(c)), 300)
+    const t = setTimeout(
+      () =>
+        api.invoke<GameFolderCheck>('game:check').then(
+          (c) => live && setCheck(c),
+          // No check: the card just shows no table until the next change.
+          () => {}
+        ),
+      300
+    )
     return () => {
       live = false
       clearTimeout(t)
@@ -49,7 +65,7 @@ export function GameFolderCard() {
     : []
 
   return (
-    <div className="stack" style={{ gap: 10 }}>
+    <div className="stack gap-10">
       <label className="field">
         <span>EverQuest Legends folder</span>
         <div className="row">
@@ -62,7 +78,11 @@ export function GameFolderCard() {
           </button>
         </div>
       </label>
-      {message && <div className="notice bad small">{message}</div>}
+      {message && (
+        <div className="notice bad small" role="status">
+          {message}
+        </div>
+      )}
       {check && dir && !check.exists && <div className="notice bad small">That folder does not exist.</div>}
       {check?.exists && (
         <table className="table small">
@@ -90,7 +110,7 @@ export function GameFolderPrompt() {
   const s = state.settings
   if (s.installDir && !state.status.spellError) return null
   return (
-    <div className="notice bad stack" style={{ marginBottom: 16, gap: 8 }}>
+    <div className="notice bad stack gap-8 mb-16">
       <div>
         <b>{s.installDir ? `No EverQuest Legends game files in ${s.installDir}.` : 'Could not find your EverQuest Legends folder.'}</b> The tracker reads
         your logs, spell data, inventory and achievement files from it. Point it at the folder the game is installed in, usually
@@ -104,7 +124,11 @@ export function GameFolderPrompt() {
           {busy ? 'Looking…' : 'Find it again'}
         </button>
       </div>
-      {message && <div className="small">{message}</div>}
+      {message && (
+        <div className="small" role="status">
+          {message}
+        </div>
+      )}
     </div>
   )
 }

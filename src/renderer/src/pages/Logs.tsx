@@ -1,7 +1,10 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { useApp } from '../state'
-import { api, mb, ago } from '../api'
-import { Field, NumberInput, Switch } from '../components/ui'
+import { api, mb, ago, errorMessage } from '../api'
+import { useInvoke } from '../hooks'
+import { act, showError } from '../toast'
+import { who } from '../format'
+import { Field, LoadError, NumberInput, Switch } from '../components/ui'
 import type { ArchiveInfo, ArchiveStatus, LogFileInfo } from '../../../shared/types'
 
 interface Overview {
@@ -13,9 +16,11 @@ interface Overview {
 
 export function Logs() {
   const { state, patchSettings } = useApp()
-  const [view, setView] = useState<Overview | null>(null)
-  const refresh = () => void api.invoke<Overview>('logs:overview').then(setView)
-  useEffect(refresh, [state.archive.busy, state.settings.archive.archiveDir])
+  const q = useInvoke<Overview>('logs:overview', [], [state.archive.busy, state.settings.archive.archiveDir])
+  const view = q.data
+  const refresh = q.reload
+  const [zipping, setZipping] = useState(false)
+  const [zipErrors, setZipErrors] = useState<string[]>([])
   const a = state.settings.archive
   const status = state.archive
   const threshold = a.thresholdMB * 1048576
@@ -35,24 +40,27 @@ export function Logs() {
         </div>
         <div className="actions">
           <button className="btn" onClick={refresh}>Refresh</button>
-          <button className="btn" onClick={() => api.invoke('logs:reveal', view?.archiveDir ?? '')}>Open archive folder</button>
+          <button className="btn" onClick={() => void act('logs:reveal', view?.archiveDir ?? '')}>Open archive folder</button>
         </div>
       </div>
 
-      {(status.busy || status.message) && (
-        <div className={`notice${status.busy ? '' : ' info'}`} style={{ marginBottom: 16 }}>
-          {status.busy && <b>Working: </b>}
-          {status.message}
-        </div>
-      )}
+      {q.error && <LoadError what="your log files" error={q.error} retry={refresh} />}
+      <div role="status">
+        {(status.busy || status.message) && (
+          <div className={`notice${status.busy ? '' : ' info'} mb-16`}>
+            {status.busy && <b>Working: </b>}
+            {status.message}
+          </div>
+        )}
+      </div>
 
-      <div className="grid two" style={{ alignItems: 'start', marginBottom: 16 }}>
-        <div className="card stack" style={{ gap: 14 }}>
+      <div className="grid two mb-16" style={{ alignItems: 'start' }}>
+        <div className="card stack gap-14">
           <h2>Automatic archiving</h2>
           <div className="row">
-            <Switch on={a.autoEnabled} onChange={(v) => setA({ autoEnabled: v })} />
+            <Switch on={a.autoEnabled} label="Archive logs automatically" onChange={(v) => setA({ autoEnabled: v })} />
             <span>Archive a character log once it passes</span>
-            <NumberInput value={a.thresholdMB} min={10} max={10000} step={10} width={90} onChange={(v) => setA({ thresholdMB: v ?? 150 })} />
+            <NumberInput value={a.thresholdMB} min={10} max={10000} step={10} width={90} label="Archive threshold in MB" onChange={(v) => setA({ thresholdMB: v ?? 150 })} />
             <span>MB</span>
           </div>
           <Field
@@ -62,13 +70,13 @@ export function Logs() {
             <div className="row">
               <input className="grow" value={a.archiveDir} placeholder="Logs\archive (default)" onChange={(e) => setA({ archiveDir: e.target.value })} />
               <button className="btn" onClick={async () => {
-                const dir = await api.invoke<string | null>('dialog:folder')
+                const dir = await act<string | null>('dialog:folder')
                 if (dir) void setA({ archiveDir: dir })
               }}>Browse…</button>
             </div>
           </Field>
         </div>
-        <div className="card stack" style={{ gap: 10 }}>
+        <div className="card stack gap-10">
           <h2>While the game is running</h2>
           <div className="row">
             <span className={`status-dot${status.gameRunning ? ' live' : ''}`} />
@@ -86,7 +94,7 @@ export function Logs() {
         </div>
       </div>
 
-      <div className="card" style={{ marginBottom: 16 }}>
+      <div className="card mb-16">
         <h2>Character logs</h2>
         {!view ? (
           <div className="empty">Reading…</div>
@@ -106,7 +114,7 @@ export function Logs() {
               {view.logs.map((l) => (
                 <tr key={l.path}>
                   <td>
-                    <div style={{ fontWeight: 600 }}>{l.character.replace('_', ' · ')}</div>
+                    <div style={{ fontWeight: 600 }}>{who(l.character)}</div>
                     <div className="faint small">{l.name}</div>
                   </td>
                   <td>
@@ -120,7 +128,17 @@ export function Logs() {
                   </td>
                   <td className="muted small">{ago(l.modified)}</td>
                   <td style={{ textAlign: 'right' }}>
-                    <button className="btn small" disabled={status.busy || l.size === 0} onClick={() => api.invoke('logs:archive', l.path).then(refresh)}>
+                    <button
+                      className="btn small"
+                      disabled={status.busy || l.size === 0}
+                      title={status.busy ? 'Waiting for the current job to finish' : l.size === 0 ? 'Nothing in it yet' : undefined}
+                      onClick={() =>
+                        api
+                          .invoke('logs:archive', l.path)
+                          .catch((e) => showError(`Could not archive ${l.name}`, e))
+                          .finally(refresh)
+                      }
+                    >
                       Archive now
                     </button>
                   </td>
@@ -138,16 +156,41 @@ export function Logs() {
           <span className="faint small" style={{ textTransform: 'none', letterSpacing: 0 }}>{mb(totalZip)} zipped</span>
         </h2>
         {loose.length > 0 && (
-          <div className="notice row" style={{ marginBottom: 10 }}>
+          <div className="notice row mb-10">
             <span className="grow">
               {loose.length} uncompressed log{loose.length === 1 ? '' : 's'} in the archive folder ({mb(loose.reduce((n, x) => n + x.size, 0))}).
             </span>
-            <button className="btn small" disabled={status.busy} onClick={async () => {
-              for (const l of loose) await api.invoke('logs:compress', l.path)
-              refresh()
-            }}>
-              Zip {loose.length === 1 ? 'it' : 'them'}
+            <button
+              className="btn small"
+              disabled={status.busy || zipping}
+              onClick={async () => {
+                // One that fails is reported; the rest are still zipped.
+                setZipping(true)
+                const failed: string[] = []
+                for (const l of loose) {
+                  try {
+                    await api.invoke('logs:compress', l.path)
+                  } catch (e) {
+                    failed.push(`${l.name}: ${errorMessage(e)}`)
+                  }
+                }
+                setZipErrors(failed)
+                setZipping(false)
+                refresh()
+              }}
+            >
+              {zipping ? 'Zipping…' : `Zip ${loose.length === 1 ? 'it' : 'them'}`}
             </button>
+          </div>
+        )}
+        {zipErrors.length > 0 && (
+          <div className="notice bad mb-10" role="alert">
+            Could not zip {zipErrors.length === 1 ? 'one log' : `${zipErrors.length} logs`}:
+            {zipErrors.map((x) => (
+              <div key={x} className="small">
+                {x}
+              </div>
+            ))}
           </div>
         )}
         {view && view.archives.length === 0 ? (
@@ -163,7 +206,7 @@ export function Logs() {
                   <td className="muted nowrap">{mb(x.size)}</td>
                   <td className="faint small nowrap">{new Date(x.modified).toLocaleDateString()}</td>
                   <td style={{ textAlign: 'right' }}>
-                    <button className="btn ghost small" onClick={() => api.invoke('logs:reveal', x.path)}>Show</button>
+                    <button className="btn ghost small" onClick={() => void act('logs:reveal', x.path)}>Show</button>
                   </td>
                 </tr>
               ))}

@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useState } from 'react'
-import { api } from '../api'
+import { api, errorMessage } from '../api'
 import { useApp } from '../state'
-import { Field, Icon, NumberInput, Switch } from '../components/ui'
+import { act, showError } from '../toast'
+import { OVERLAY_TARGETS } from '../constants'
+import { Field, Icon, LoadError, NumberInput, Pending, Switch } from '../components/ui'
 import type { Phrase, Trigger, TriggerAction, TriggerTestResult } from '../../../shared/types'
 
 const newId = () => (crypto.randomUUID ? crypto.randomUUID() : String(Math.random()).slice(2))
@@ -15,33 +17,83 @@ function blankAction(type: TriggerAction['type']): TriggerAction {
     case 'speak': return { type, text: '', interrupt: false }
     case 'sound': return { type, file: '', volume: 1 }
     case 'text': return { type, text: '', color: '#ffd84d', durationSec: 5 }
-    case 'timer': return { type, name: '', durationSec: 30, color: '#e8b44c', overlay: 'targets', warnSec: 5, warnSpeech: '', endSpeech: '', restart: 'restart', endEarly: [] }
+    case 'timer': return { type, name: '', durationSec: 30, color: '#e8b44c', overlay: OVERLAY_TARGETS, warnSec: 5, warnSpeech: '', endSpeech: '', restart: 'restart', endEarly: [] }
   }
 }
 
+type TriggerError = { trigger: string; error: string }
+
+interface Draft {
+  /** What is being edited. */
+  list: Trigger[]
+  /** What is saved. */
+  saved: Trigger[]
+  selected: string | null
+}
+
+// Unsaved edits live here rather than in the page, so leaving the page and coming back finds them
+// as they were. They last until the app closes.
+let kept: Draft | null = null
+
+const same = (a: Trigger[], b: Trigger[]) => a === b || JSON.stringify(a) === JSON.stringify(b)
+
 export function Triggers() {
   const { state } = useApp()
-  const [list, setList] = useState<Trigger[]>([])
-  const [saved, setSaved] = useState<Trigger[]>([])
-  const [selected, setSelected] = useState<string | null>(null)
+  const [draft, setDraft] = useState<Draft | null>(kept)
+  const [loadError, setLoadError] = useState('')
+  const [attempt, setAttempt] = useState(0)
   const [query, setQuery] = useState('')
-  const [errors, setErrors] = useState(state.triggerErrors)
+  const [errors, setErrors] = useState<TriggerError[]>(state.triggerErrors)
 
   useEffect(() => {
-    void api.invoke<Trigger[]>('triggers:get').then((t) => {
-      setList(t)
-      setSaved(t)
-      setSelected(t[0]?.id ?? null)
-    })
-  }, [])
+    kept = draft
+  }, [draft])
 
-  const dirty = JSON.stringify(list) !== JSON.stringify(saved)
-  const save = async (next = list) => {
-    setErrors(await api.invoke('triggers:save', next))
-    setSaved(next)
+  useEffect(() => {
+    // Edits left from an earlier visit win over a fresh read.
+    if (kept && !same(kept.list, kept.saved)) return
+    let live = true
+    setLoadError('')
+    api.invoke<Trigger[]>('triggers:get').then(
+      (t) => live && setDraft((d) => ({ list: t, saved: t, selected: d?.selected && t.some((x) => x.id === d.selected) ? d.selected : (t[0]?.id ?? null) })),
+      (e) => live && setLoadError(errorMessage(e))
+    )
+    return () => {
+      live = false
+    }
+  }, [attempt])
+
+  const list = draft?.list ?? []
+  const saved = draft?.saved ?? []
+  const selected = draft?.selected ?? null
+  const setList = (fn: (l: Trigger[]) => Trigger[]) => setDraft((d) => (d ? { ...d, list: fn(d.list) } : d))
+  const setSelected = (id: string | null) => setDraft((d) => (d ? { ...d, selected: id } : d))
+  const dirty = useMemo(() => !same(list, saved), [list, saved])
+
+  const write = async (next: Trigger[]): Promise<boolean> => {
+    try {
+      setErrors(await api.invoke<TriggerError[]>('triggers:save', next))
+      return true
+    } catch (e) {
+      showError('Could not save the triggers', e)
+      return false
+    }
+  }
+  const save = async () => {
+    const next = list
+    if (await write(next)) setDraft((d) => (d ? { ...d, saved: next } : d))
+  }
+  // Enabling or disabling takes effect at once: it saves that one flag onto what is saved, leaving
+  // any other unsaved edits as they are.
+  const setEnabled = async (id: string, on: boolean) => {
+    setList((l) => l.map((x) => (x.id === id ? { ...x, enabled: on } : x)))
+    if (!saved.some((x) => x.id === id)) return
+    const next = saved.map((x) => (x.id === id ? { ...x, enabled: on } : x))
+    if (await write(next)) setDraft((d) => (d ? { ...d, saved: next } : d))
   }
   const update = (t: Trigger) => setList((l) => l.map((x) => (x.id === t.id ? t : x)))
   const current = list.find((t) => t.id === selected) ?? null
+  const folderNames = useMemo(() => [...new Set(list.map((t) => t.folder).filter(Boolean))], [list])
 
   const folders = useMemo(() => {
     const q = query.toLowerCase()
@@ -52,6 +104,8 @@ export function Triggers() {
     }
     return [...map.entries()].sort(([a], [b]) => a.localeCompare(b))
   }, [list, query])
+
+  if (!draft) return loadError ? <LoadError what="your triggers" error={loadError} retry={() => setAttempt((n) => n + 1)} /> : <Pending />
 
   return (
     <>
@@ -65,12 +119,16 @@ export function Triggers() {
         </div>
         <div className="actions">
           <button className="btn" onClick={async () => {
-            const imported = await api.invoke<Trigger[] | null>('triggers:import')
-            if (imported) setList((l) => [...l, ...imported.map((t) => ({ ...blankTrigger(''), ...t, id: newId() }))])
+            try {
+              const imported = await api.invoke<Trigger[] | null>('triggers:import')
+              if (imported) setList((l) => [...l, ...imported.map((t) => ({ ...blankTrigger(''), ...t, id: newId() }))])
+            } catch (e) {
+              showError('Could not import that file', e)
+            }
           }}>
             Import…
           </button>
-          <button className="btn" onClick={() => api.invoke('triggers:export', list)}>
+          <button className="btn" onClick={() => void act('triggers:export', list)}>
             Export…
           </button>
           <button className="btn" onClick={() => {
@@ -83,11 +141,14 @@ export function Triggers() {
           <button className="btn primary" disabled={!dirty} onClick={() => void save()}>
             {dirty ? 'Save changes' : 'Saved'}
           </button>
+          <span className="sr-only" role="status">
+            {dirty ? 'Unsaved changes' : 'All changes saved'}
+          </span>
         </div>
       </div>
 
       {errors.length > 0 && (
-        <div className="notice bad" style={{ marginBottom: 16 }}>
+        <div className="notice bad mb-16">
           {errors.map((e) => (
             <div key={e.trigger}>
               <b>{e.trigger}</b>: {e.error}
@@ -98,7 +159,7 @@ export function Triggers() {
 
       <div className="split">
         <div className="card" style={{ padding: 10 }}>
-          <input placeholder="Search triggers…" value={query} onChange={(e) => setQuery(e.target.value)} style={{ width: '100%', marginBottom: 6 }} />
+          <input placeholder="Search triggers…" aria-label="Search triggers" value={query} onChange={(e) => setQuery(e.target.value)} style={{ width: '100%', marginBottom: 6 }} />
           <div className="tree">
             {folders.length === 0 && <div className="empty">No triggers.</div>}
             {folders.map(([folder, items]) => (
@@ -106,17 +167,10 @@ export function Triggers() {
                 <div className="tree-folder">{folder}</div>
                 {items.map((t) => (
                   <div key={t.id} className={`tree-item${t.id === selected ? ' active' : ''}${t.enabled ? '' : ' disabled'}`} onClick={() => setSelected(t.id)}>
-                    <span className="name">{t.name}</span>
-                    <Switch
-                      on={t.enabled}
-                      title={t.enabled ? 'Enabled' : 'Disabled'}
-                      onChange={(v) => {
-                        // Enabling or disabling takes effect at once; no save needed.
-                        const next = list.map((x) => (x.id === t.id ? { ...x, enabled: v } : x))
-                        setList(next)
-                        void save(next)
-                      }}
-                    />
+                    <button className="name" aria-current={t.id === selected ? 'true' : undefined} onClick={() => setSelected(t.id)}>
+                      {t.name}
+                    </button>
+                    <Switch on={t.enabled} title={t.enabled ? 'Enabled' : 'Disabled'} label={`${t.name} enabled`} onChange={(v) => void setEnabled(t.id, v)} />
                   </div>
                 ))}
               </div>
@@ -128,7 +182,7 @@ export function Triggers() {
           <TriggerEditor
             key={current.id}
             t={current}
-            folders={[...new Set(list.map((t) => t.folder).filter(Boolean))]}
+            folders={folderNames}
             onChange={update}
             onDelete={() => {
               setList((l) => l.filter((x) => x.id !== current.id))
@@ -191,11 +245,11 @@ function TriggerEditor({ t, folders, onChange, onDelete, onDuplicate }: { t: Tri
         <div className="stack" style={{ gap: 8 }}>
           {t.phrases.map((p, i) => (
             <div className="phrase-row" key={i}>
-              <input className="mono" value={p.text} onChange={(e) => setPhrase(i, { ...p, text: e.target.value })} placeholder={p.regex ? "^(?<S1>\\w+) tells you, '(?<S2>.+)'$" : 'You feel yourself starting to appear.'} />
+              <input className="mono" value={p.text} aria-label={`Phrase ${i + 1}`} onChange={(e) => setPhrase(i, { ...p, text: e.target.value })} placeholder={p.regex ? "^(?<S1>\\w+) tells you, '(?<S2>.+)'$" : 'You feel yourself starting to appear.'} />
               <label className="check small">
                 <input type="checkbox" checked={p.regex} onChange={(e) => setPhrase(i, { ...p, regex: e.target.checked })} /> Regex
               </label>
-              <button className="btn ghost small" onClick={() => set({ phrases: t.phrases.filter((_, j) => j !== i) })}>×</button>
+              <button className="btn ghost small x-btn" aria-label={`Remove phrase ${i + 1}`} onClick={() => set({ phrases: t.phrases.filter((_, j) => j !== i) })}>×</button>
             </div>
           ))}
         </div>
@@ -209,7 +263,7 @@ function TriggerEditor({ t, folders, onChange, onDelete, onDuplicate }: { t: Tri
       <div className="card">
         <h2>
           Then <span className="spacer" />
-          <select value="" onChange={(e) => e.target.value && set({ actions: [...t.actions, blankAction(e.target.value as TriggerAction['type'])] })} style={{ textTransform: 'none', letterSpacing: 0 }}>
+          <select value="" aria-label="Add an action" onChange={(e) => e.target.value && set({ actions: [...t.actions, blankAction(e.target.value as TriggerAction['type'])] })} style={{ textTransform: 'none', letterSpacing: 0 }}>
             <option value="">Add an action…</option>
             <option value="speak">Speak</option>
             <option value="sound">Play a sound</option>
@@ -234,7 +288,15 @@ function ActionEditor({ a, onChange, onRemove }: { a: TriggerAction; onChange: (
   const { state } = useApp()
   const [sounds, setSounds] = useState<string[]>([])
   useEffect(() => {
-    if (a.type === 'sound') void api.invoke<string[]>('audio:sounds').then(setSounds)
+    if (a.type !== 'sound') return
+    let live = true
+    api.invoke<string[]>('audio:sounds').then(
+      (s) => live && setSounds(s),
+      () => {}
+    )
+    return () => {
+      live = false
+    }
   }, [a.type])
   const head = { speak: 'Speak', sound: 'Play a sound', text: 'Show text', timer: 'Start a timer' }[a.type]
   return (
@@ -246,31 +308,31 @@ function ActionEditor({ a, onChange, onRemove }: { a: TriggerAction; onChange: (
       </div>
       {a.type === 'speak' && (
         <div className="row">
-          <input className="grow" value={a.text} onChange={(e) => onChange({ ...a, text: e.target.value })} placeholder="Tell from {S1}: {S2}" />
+          <input className="grow" value={a.text} aria-label="Words to speak" onChange={(e) => onChange({ ...a, text: e.target.value })} placeholder="Tell from {S1}: {S2}" />
           <label className="check small">
             <input type="checkbox" checked={a.interrupt} onChange={(e) => onChange({ ...a, interrupt: e.target.checked })} /> Interrupt other speech
           </label>
-          <button className="btn small" onClick={() => api.invoke('audio:test', a.text.replace(/\{\w+\}|\$\{\w+\}/g, 'something'))}>Hear</button>
+          <button className="btn small" onClick={() => void act('audio:test', a.text.replace(/\{\w+\}|\$\{\w+\}/g, 'something'))}>Hear</button>
         </div>
       )}
       {a.type === 'sound' && (
         <div className="row">
-          <select className="grow" value={a.file} onChange={(e) => onChange({ ...a, file: e.target.value })}>
+          <select className="grow" value={a.file} aria-label="Sound" onChange={(e) => onChange({ ...a, file: e.target.value })}>
             <option value="">Choose a sound…</option>
             {[...new Set([a.file, ...sounds])].filter(Boolean).map((s) => (
               <option key={s}>{s}</option>
             ))}
           </select>
           <span className="muted small">Volume</span>
-          <input type="range" min={0} max={1} step={0.05} value={a.volume} onChange={(e) => onChange({ ...a, volume: Number(e.target.value) })} />
-          <button className="btn small" disabled={!a.file} onClick={() => api.invoke('audio:sound', a.file)}>Play</button>
+          <input type="range" min={0} max={1} step={0.05} value={a.volume} aria-label="Volume" onChange={(e) => onChange({ ...a, volume: Number(e.target.value) })} />
+          <button className="btn small" disabled={!a.file} title={a.file ? undefined : 'Choose a sound first'} onClick={() => void act('audio:sound', a.file)}>Play</button>
         </div>
       )}
       {a.type === 'text' && (
         <div className="row">
-          <input className="grow" value={a.text} onChange={(e) => onChange({ ...a, text: e.target.value })} placeholder="INVIS DROPPING" />
-          <input type="color" value={a.color} onChange={(e) => onChange({ ...a, color: e.target.value })} style={{ width: 44, height: 32, padding: 2 }} />
-          <NumberInput value={a.durationSec} min={1} width={64} onChange={(v) => onChange({ ...a, durationSec: v ?? 5 })} />
+          <input className="grow" value={a.text} aria-label="Text to show" onChange={(e) => onChange({ ...a, text: e.target.value })} placeholder="INVIS DROPPING" />
+          <input type="color" value={a.color} aria-label="Text colour" onChange={(e) => onChange({ ...a, color: e.target.value })} style={{ width: 44, height: 32, padding: 2 }} />
+          <NumberInput value={a.durationSec} min={1} width={64} label="Seconds to show it" onChange={(v) => onChange({ ...a, durationSec: v ?? 5 })} />
           <span className="muted small">seconds</span>
         </div>
       )}
@@ -326,13 +388,24 @@ function TestPanel({ t }: { t: Trigger }) {
   const [result, setResult] = useState<TriggerTestResult | null>(null)
   useEffect(() => {
     if (!line.trim()) return setResult(null)
-    const id = setTimeout(() => void api.invoke<TriggerTestResult>('triggers:test', t, line).then(setResult), 150)
-    return () => clearTimeout(id)
+    let live = true
+    const id = setTimeout(
+      () =>
+        api.invoke<TriggerTestResult>('triggers:test', t, line).then(
+          (r) => live && setResult(r),
+          (e) => live && setResult({ matched: false, phraseIndex: -1, captures: {}, outputs: [], error: errorMessage(e) })
+        ),
+      150
+    )
+    return () => {
+      live = false
+      clearTimeout(id)
+    }
   }, [line, t])
   return (
     <div className="card">
       <h2>Test</h2>
-      <input className="mono" style={{ width: '100%' }} value={line} onChange={(e) => setLine(e.target.value)} placeholder="Paste a log line, e.g. [Wed Sep 23 13:29:05 2026] Aldric tells you, 'inc'" />
+      <input className="mono" style={{ width: '100%' }} value={line} aria-label="A log line to test" onChange={(e) => setLine(e.target.value)} placeholder="Paste a log line, e.g. [Wed Sep 23 13:29:05 2026] Aldric tells you, 'inc'" />
       {result && (
         <div style={{ marginTop: 10 }}>
           {result.error ? (

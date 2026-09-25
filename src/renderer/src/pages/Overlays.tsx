@@ -1,13 +1,17 @@
 import { useApp } from '../state'
-import { api } from '../api'
-import { Field, Icon, NumberInput, Switch } from '../components/ui'
+import { act } from '../toast'
+import { BUILTIN_OVERLAYS } from '../constants'
+import { ConfirmButton, Field, Icon, NumberInput, Switch } from '../components/ui'
 import type { OverlayConfig } from '../../../shared/types'
+
+/** The opacity slider saves once it stops moving for this long; the overlay follows it at once. */
+const SLIDER_SAVE_MS = 150
 
 export function Overlays() {
   const { state, patchSettings } = useApp()
   const overlays = state.settings.overlays
-  const update = (id: string, patch: Partial<OverlayConfig>) =>
-    patchSettings((s) => ({ ...s, overlays: s.overlays.map((o) => (o.id === id ? { ...o, ...patch } : o)) }))
+  const update = (id: string, patch: Partial<OverlayConfig>, debounceMs?: number) =>
+    patchSettings((s) => ({ ...s, overlays: s.overlays.map((o) => (o.id === id ? { ...o, ...patch } : o)) }), { debounceMs })
 
   return (
     <>
@@ -20,17 +24,17 @@ export function Overlays() {
           </p>
         </div>
         <div className="actions">
-          <button className="btn" onClick={() => api.invoke('overlays:demo')}>
+          <button className="btn" onClick={() => void act('overlays:demo')}>
             <Icon name="sparkle" /> Show demo timers
           </button>
-          <button className={`btn ${state.arranging ? 'on' : 'primary'}`} onClick={() => api.invoke('overlays:arrange', !state.arranging)}>
+          <button className={`btn ${state.arranging ? 'on' : 'primary'}`} aria-pressed={state.arranging} onClick={() => void act('overlays:arrange', !state.arranging)}>
             <Icon name="move" /> {state.arranging ? 'Done arranging' : 'Arrange on screen'}
           </button>
         </div>
       </div>
 
-      <div className="card row" style={{ marginBottom: 16 }}>
-        <Switch on={state.settings.overlaysOnlyWithGame} onChange={(v) => patchSettings((s) => ({ ...s, overlaysOnlyWithGame: v }))} />
+      <div className="card row mb-16">
+        <Switch on={state.settings.overlaysOnlyWithGame} label="Only show overlays while the game has focus" onChange={(v) => patchSettings((s) => ({ ...s, overlaysOnlyWithGame: v }))} />
         <div className="grow">
           <div style={{ fontWeight: 600 }}>Only show overlays while the game has focus</div>
           <div className="muted small">
@@ -41,7 +45,7 @@ export function Overlays() {
       </div>
 
       {state.arranging && (
-        <div className="notice" style={{ marginBottom: 16 }}>
+        <div className="notice mb-16">
           Drag each outlined window where you want it and drag its edges to resize. Positions save as you go. Click
           <b> Done arranging</b> to make them click-through again.
         </div>
@@ -53,9 +57,9 @@ export function Overlays() {
             <h2>
               {o.name} <span className="chip">{o.kind === 'timers' ? 'Timer bars' : 'Alert text'}</span>
               <span className="spacer" />
-              <Switch on={o.visible} onChange={(v) => update(o.id, { visible: v })} title="Show this overlay" />
+              <Switch on={o.visible} onChange={(v) => update(o.id, { visible: v })} title="Show this overlay" label={`Show ${o.name}`} />
             </h2>
-            <div className="stack" style={{ gap: 12 }}>
+            <div className="stack gap-12">
               <Field label="Name">
                 <input value={o.name} onChange={(e) => update(o.id, { name: e.target.value })} />
               </Field>
@@ -64,7 +68,7 @@ export function Overlays() {
                   <NumberInput value={o.fontSize} min={9} max={72} onChange={(v) => update(o.id, { fontSize: v ?? 15 })} />
                 </Field>
                 <Field label={`Opacity ${Math.round(o.opacity * 100)}%`}>
-                  <input type="range" min={0.2} max={1} step={0.05} value={o.opacity} onChange={(e) => update(o.id, { opacity: Number(e.target.value) })} />
+                  <input type="range" min={0.2} max={1} step={0.05} value={o.opacity} onChange={(e) => update(o.id, { opacity: Number(e.target.value) }, SLIDER_SAVE_MS)} />
                 </Field>
               </div>
               {o.kind === 'timers' && (
@@ -76,10 +80,10 @@ export function Overlays() {
               <div className="faint small mono">
                 {o.width}×{o.height} at {o.x}, {o.y}
               </div>
-              {!['buffs', 'targets', 'alerts'].includes(o.id) && (
-                <button className="btn small danger" onClick={() => patchSettings((s) => ({ ...s, overlays: s.overlays.filter((x) => x.id !== o.id) }))}>
+              {!BUILTIN_OVERLAYS.includes(o.id) && (
+                <ConfirmButton question={`Remove ${o.name}?`} onConfirm={() => void patchSettings((s) => ({ ...s, overlays: s.overlays.filter((x) => x.id !== o.id) }))}>
                   Remove overlay
-                </button>
+                </ConfirmButton>
               )}
             </div>
           </div>

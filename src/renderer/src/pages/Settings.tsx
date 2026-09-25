@@ -1,20 +1,50 @@
-import { useEffect, useState } from 'react'
 import { useApp } from '../state'
-import { api, mb, ago } from '../api'
-import { useUpdate } from '../update'
-import { Field, NumberInput, Switch } from '../components/ui'
+import { mb, ago } from '../api'
+import { useInvoke } from '../hooks'
+import { act } from '../toast'
+import { who } from '../format'
+import { useUpdate, type UpdateState } from '../update'
+import { Field, LoadError, NumberInput, Switch } from '../components/ui'
 import { GameFolderCard } from '../components/GameFolder'
 import type { LogFileInfo, TrackingSettings } from '../../../shared/types'
+
+/** One line on where updates stand. */
+function updateText(u: UpdateState | null): string {
+  if (!u) return 'Running from source: updates apply to the installed app only.'
+  switch (u.state) {
+    case 'dev':
+      return 'Running from source: updates apply to the installed app only.'
+    case 'checking':
+      return 'Checking for updates…'
+    case 'downloading':
+      return `Downloading ${u.version}… ${u.percent}%`
+    case 'ready':
+      return `Version ${u.version} is downloaded and installs when you restart.`
+    case 'error':
+      return `Could not check for updates: ${u.message}`
+    default:
+      return `Up to date${u.checkedAt ? `, checked ${ago(u.checkedAt)}` : ''}. Checks automatically every few hours.`
+  }
+}
+
+/** Why "Check for updates" is greyed out, when it is. */
+function noCheckReason(u: UpdateState | null): string | undefined {
+  if (!u || u.state === 'dev') return 'This copy runs from source; only the installed app updates'
+  if (u.state === 'checking') return 'Already checking'
+  if (u.state === 'downloading') return 'An update is downloading'
+  return undefined
+}
 
 export function Settings() {
   const { state, patchSettings } = useApp()
   const s = state.settings
   const t = s.tracking
-  const [logs, setLogs] = useState<LogFileInfo[]>([])
-  useEffect(() => void api.invoke<LogFileInfo[]>('logs:list').then(setLogs), [s.installDir, s.logFile])
+  const logsQ = useInvoke<LogFileInfo[]>('logs:list', [], [s.installDir, s.logFile])
+  const logs = logsQ.data ?? []
   const setT = (patch: Partial<TrackingSettings>) => patchSettings((x) => ({ ...x, tracking: { ...x.tracking, ...patch } }))
   const update = useUpdate()
   const u = update.status
+  const noCheck = noCheckReason(u)
 
   return (
     <>
@@ -26,43 +56,40 @@ export function Settings() {
       </div>
 
       <div className="stack">
-        <div className="card row">
-          <div className="grow">
-            <div style={{ fontWeight: 650 }}>Legends Tracker {update.version}</div>
-            <div className="muted small">
-              {!u || u.state === 'dev'
-                ? 'Running from source: updates apply to the installed app only.'
-                : u.state === 'checking'
-                  ? 'Checking for updates…'
-                  : u.state === 'downloading'
-                    ? `Downloading ${u.version}… ${u.percent}%`
-                    : u.state === 'ready'
-                      ? `Version ${u.version} is downloaded and installs when you restart.`
-                      : u.state === 'error'
-                        ? `Could not check for updates: ${u.message}`
-                        : `Up to date${u.checkedAt ? `, checked ${ago(u.checkedAt)}` : ''}. Checks automatically every few hours.`}
+        <div className="card stack gap-12">
+          <div className="row">
+            <div className="grow">
+              <div style={{ fontWeight: 650 }}>Legends Tracker {update.version}</div>
+              <div className="muted small">{updateText(u)}</div>
             </div>
+            {u?.state === 'ready' ? (
+              <button className="btn primary" onClick={() => void act('update:install')}>
+                Restart and update
+              </button>
+            ) : (
+              <button className="btn" disabled={!!noCheck} title={noCheck} onClick={() => void act('update:check')}>
+                Check for updates
+              </button>
+            )}
           </div>
-          {u?.state === 'ready' ? (
-            <button className="btn primary" onClick={() => api.invoke('update:install')}>
-              Restart and update
+          <div className="row">
+            <button className="btn" onClick={() => void act('app:openLogs')}>
+              Open log folder
             </button>
-          ) : (
-            <button className="btn" disabled={!u || u.state === 'dev' || u.state === 'checking' || u.state === 'downloading'} onClick={() => api.invoke('update:check')}>
-              Check for updates
-            </button>
-          )}
+            <span className="faint small">What the app wrote while it ran. Attach the newest file to a bug report.</span>
+          </div>
         </div>
 
-        <div className="card stack" style={{ gap: 14 }}>
+        <div className="card stack gap-14">
           <h2>Game</h2>
           <GameFolderCard />
+          {logsQ.error && <LoadError what="the character logs" error={logsQ.error} retry={logsQ.reload} />}
           <Field label="Character log">
             <select value={s.logFile} onChange={(e) => patchSettings((x) => ({ ...x, logFile: e.target.value }))}>
               <option value="">Choose…</option>
               {logs.map((l) => (
                 <option key={l.path} value={l.path}>
-                  {l.character.replace('_', ' · ')} — {mb(l.size)}, written {ago(l.modified)}
+                  {who(l.character)} — {mb(l.size)}, written {ago(l.modified)}
                 </option>
               ))}
             </select>
@@ -78,7 +105,7 @@ export function Settings() {
           </label>
         </div>
 
-        <div className="card stack" style={{ gap: 14 }}>
+        <div className="card stack gap-14">
           <h2>Spell tracking</h2>
           <div className="grid two">
             <label className="row">
@@ -98,11 +125,11 @@ export function Settings() {
               <Switch on={t.debuffs} onChange={(v) => setT({ debuffs: v })} /> Debuffs, mez and charm
             </label>
           </div>
-          <p className="muted small" style={{ margin: 0 }}>These are the defaults. Any spell can override them on the Spell Timers page: with buffs off, set a buff you want to "Always track".</p>
+          <p className="muted small m-0">These are the defaults. Any spell can override them on the Spell Timers page: with buffs off, set a buff you want to "Always track".</p>
         </div>
 
         <div className="grid two">
-          <div className="card stack" style={{ gap: 12 }}>
+          <div className="card stack gap-12">
             <h2>Buff announcements</h2>
             <Field label="Warn before a buff on me ends" hint="Seconds; 0 turns it off. Buff ends are known to within one 6-second tick, so this counts from the earliest they could end.">
               <NumberInput value={t.buffWarnSec} min={0} onChange={(v) => setT({ buffWarnSec: v ?? 0 })} />
@@ -118,7 +145,7 @@ export function Settings() {
               Also announce buffs fading from other players
             </label>
           </div>
-          <div className="card stack" style={{ gap: 12 }}>
+          <div className="card stack gap-12">
             <h2>DoT announcements</h2>
             <Field label="Warn before a DoT ends" hint="Seconds; 0 turns it off. Exact to the second once the DoT has ticked.">
               <NumberInput value={t.dotWarnSec} min={0} onChange={(v) => setT({ dotWarnSec: v ?? 0 })} />
