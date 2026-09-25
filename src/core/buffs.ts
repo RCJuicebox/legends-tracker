@@ -5,12 +5,17 @@
 // cast comes from the spell file. What lands on you is the spell's "you" text ("You feel armored."),
 // matched to a cast seen just before it ("Kelwyn begins casting Temperance."); its fade text ends it.
 //
-// Buffs are grouped into lines by what they do (HP & AC, haste, spell haste, mana regen…): one of a
-// line on you covers the line, as the game will not stack two of them anyway.
+// What to ask for is the best combination that stacks: of the buffs the player picked that the
+// group can cast, and what is on them already, the set worth the most that can all be on at once
+// (stacking.ts). Harnessing of Spirit is the shaman's biggest single buff, but it will not stack with
+// Infusion of Spirit or with Strength and Dexterity, which together are worth more. Buffs are shown
+// grouped into lines by what they do (HP & AC, haste, spell haste, mana regen, stats…).
 
 import { CLASS_NUMBER, type ClassId } from './acModel'
 import { computeDuration } from './durations'
 import type { Spell, SpellBook } from './spells'
+import { effectValue } from './effectValue'
+import { bestStack, stacks, type StackEffect } from './stacking'
 import type { SpellCategory } from '../shared/types'
 
 // ---- who is who ----
@@ -55,8 +60,8 @@ export const LINE_LABELS: Record<BuffLine, string> = {
   move: 'Movement'
 }
 
-/** The lines the tracker wants out of the box, one best buff each per class. */
-export const DEFAULT_LINES: BuffLine[] = ['hpac', 'haste', 'spellHaste', 'manaRegen']
+/** The lines the tracker picks from out of the box: every buff of them worth something. */
+export const DEFAULT_LINES: BuffLine[] = ['hpac', 'haste', 'spellHaste', 'manaRegen', 'stats']
 
 export interface BuffEffect {
   line: BuffLine
@@ -103,6 +108,33 @@ export interface BuffOffer {
   seconds: number
   group: boolean
   category: SpellCategory
+  /** What it is worth at the level cap, in HP (see VALUE_PER_POINT): what the best combination adds up. */
+  value: number
+  /** Its effects slot by slot, for telling what it stacks with. */
+  stack: StackEffect[]
+}
+
+/**
+ * What a point of each effect is worth, in HP, for weighing one buff against another. AC counts
+ * twice (so a paladin's Symbol of Pinzarn, +307 HP, comes before Armor of Faith, +85 AC), STA 1.5
+ * for the HP it brings, charisma nothing. Haste and spell haste are per percent, regen per point a tick.
+ */
+export const VALUE_PER_POINT: Record<number, number> = {
+  69: 1, 1: 2, 4: 1, 5: 1, 6: 1, 7: 1.5, 8: 1, 9: 1, 10: 0, 2: 1,
+  11: 20, 98: 20, 119: 20, 127: 30, 15: 30, 0: 10, 59: 5, 55: 0.5, 97: 1,
+  46: 0.5, 47: 0.5, 48: 0.5, 49: 0.5, 50: 0.5, 3: 1
+}
+
+/** A buff's worth from its effects at the level cap. Haste is counted above 100%; a damage shield by its size. */
+function valueOf(effects: { spa: number; base: number }[]): number {
+  let v = 0
+  for (const e of effects) {
+    const w = VALUE_PER_POINT[e.spa]
+    if (!w) continue
+    const n = e.spa === 11 ? e.base - 100 : e.spa === 98 || e.spa === 119 ? (e.base > 100 ? e.base - 100 : e.base) : e.spa === 59 ? -e.base : e.base
+    if (n > 0) v += n * w
+  }
+  return Math.round(v)
 }
 
 /** Casting skills of songs: brass, singing, stringed, wind, percussion. */
@@ -125,7 +157,9 @@ export function buffOffers(book: SpellBook, tierPct: Record<SpellCategory, numbe
   const out = new Map<string, BuffOffer>()
   for (const s of book.all()) {
     if (!s.beneficial || NOT_ON_OTHERS.includes(s.targetType) || SONG_SKILLS.includes(s.skill) || /^Item Benefit/i.test(s.name)) continue
-    const effects = s.effects.map((e) => effectOf(e.spa, e.base)).filter((e): e is BuffEffect => !!e)
+    // Values at the level cap, as a caster at the top would give them.
+    const valued = s.effects.map((e) => ({ spa: e.spa, base: effectValue(e, maxLevel) }))
+    const effects = valued.map((e) => effectOf(e.spa, e.base)).filter((e): e is BuffEffect => !!e)
     if (!effects.length) continue
     const classes: Record<string, number> = {}
     for (const [id, n] of Object.entries(CLASS_NUMBER) as [ClassId, number][]) {
@@ -143,7 +177,17 @@ export function buffOffers(book: SpellBook, tierPct: Record<SpellCategory, numbe
       for (const [c, l] of Object.entries(classes)) had.classes[c] = Math.min(had.classes[c] ?? l, l)
       continue
     }
-    out.set(name, { spell: name, line, effects, classes, seconds: d.permanent ? Infinity : d.seconds, group: GROUP_TARGETS.includes(s.targetType), category: s.category })
+    out.set(name, {
+      spell: name,
+      line,
+      effects,
+      classes,
+      seconds: d.permanent ? Infinity : d.seconds,
+      group: GROUP_TARGETS.includes(s.targetType),
+      category: s.category,
+      value: valueOf(valued),
+      stack: s.effects.map((e) => ({ slot: e.slot, spa: e.spa, base: e.base, base2: e.base2 }))
+    })
   }
   return [...out.values()].sort((a, b) => a.spell.localeCompare(b.spell))
 }
@@ -153,19 +197,17 @@ export function offersFor(offers: BuffOffer[], classes: string[], level: number)
   return offers.filter((o) => classes.some((c) => o.classes[c] !== undefined && o.classes[c] <= level))
 }
 
-/** Out of the box: each class's best (highest level) buff in each of the default lines. */
+/** Worth most first; the higher-level spell first between two alike. */
+export function byValue(a: BuffOffer, b: BuffOffer): number {
+  return b.value - a.value || Math.max(...Object.values(b.classes)) - Math.max(...Object.values(a.classes)) || a.spell.localeCompare(b.spell)
+}
+
+/**
+ * Out of the box: every buff of the default lines worth something (charisma alone is worth nothing).
+ * Which of them to ask for is the best combination's call, so the pool can be wide.
+ */
 export function defaultWanted(offers: BuffOffer[]): string[] {
-  const best = new Map<string, BuffOffer>()
-  for (const o of offers) {
-    if (!DEFAULT_LINES.includes(o.line)) continue
-    for (const [c, l] of Object.entries(o.classes)) {
-      if (l > LEVEL_CAP) continue
-      const k = `${c}|${o.line}`
-      const had = best.get(k)
-      if (!had || l > (had.classes[c] ?? 0)) best.set(k, o)
-    }
-  }
-  return [...new Set([...best.values()].map((o) => o.spell))].sort()
+  return offers.filter((o) => DEFAULT_LINES.includes(o.line) && o.value > 0).sort(byValue).map((o) => o.spell)
 }
 
 // ---- what is on you ----
@@ -302,26 +344,94 @@ export interface BuffNeed {
   /** The best wanted buff of this line a groupmate can cast, and who. */
   spell: string
   from: string
+  /** What of this line is on you now and would give way to it; '' when nothing is. */
+  replaces: string
+}
+
+/** A groupmate who can cast this buff at their level, or undefined. */
+export function casterOf(offer: BuffOffer, group: Person[]): Person | undefined {
+  return group.find((p) => p.classes.some((c) => offer.classes[c] !== undefined && offer.classes[c] <= p.level))
+}
+
+/** Asking is not worth it for less than this (a +5 DEX buff): the combination leaves such buffs out. */
+export const MIN_ASK_VALUE = 20
+
+export interface PlanItem {
+  spell: string
+  line: BuffLine
+  value: number
+  /** Who to ask: a groupmate's name, or with "anyone", the class and level ("Shaman 49"); '' when on you already. */
+  from: string
+  on: boolean
+}
+
+export interface BuffPlan {
+  /** The best combination: what is on you and stays, and what to ask for. */
+  chosen: PlanItem[]
+  /** Picked but not in it: nobody here casts it, or it does not stack with what is (named). */
+  leftOut: { spell: string; line: BuffLine; value: number; reason: 'nobody' | 'stack' | 'small'; blockedBy: string[] }[]
+  needs: BuffNeed[]
 }
 
 /**
- * For each line of the buffs wanted: covered when one of that line is on you; otherwise the best
- * wanted buff of it a groupmate can cast (the highest level), if any.
+ * The best combination of buffs to have: of the ones picked that the group can cast (or, with
+ * 'anyone', any class can by the level cap) and the ones on you now, the set worth the most that all
+ * stack. What is in it and not on you is what to ask for, each replacing what of yours it does not
+ * stack with. A tie goes to what is on you already, so a buff's twin (Temperance, Blessing of
+ * Temperance) is never asked for over it.
  */
-export function buffNeeds(o: { offers: BuffOffer[]; wanted: string[]; group: Person[]; active: ActiveBuff[] }): BuffNeed[] {
-  const wanted = new Set(o.wanted)
-  const covered = new Set(o.active.map((b) => b.line))
-  const out = new Map<BuffLine, { need: BuffNeed; level: number }>()
-  for (const offer of o.offers) {
-    if (!wanted.has(offer.spell) || covered.has(offer.line)) continue
-    for (const p of o.group) {
-      const level = Math.max(-1, ...p.classes.map((c) => (offer.classes[c] !== undefined && offer.classes[c] <= p.level ? offer.classes[c] : -1)))
-      if (level < 0) continue
-      const had = out.get(offer.line)
-      if (!had || level > had.level) out.set(offer.line, { need: { line: offer.line, spell: offer.spell, from: p.name }, level })
+export function buffPlan(o: { offers: BuffOffer[]; wanted: string[]; group: Person[] | 'anyone'; active: ActiveBuff[] }): BuffPlan {
+  const byName = new Map(o.offers.map((x) => [x.spell, x]))
+  const onYou = new Set(o.active.map((b) => b.spell))
+  const who = (offer: BuffOffer): string => {
+    if (o.group === 'anyone') {
+      const [c, l] = Object.entries(offer.classes).sort((a, b) => a[1] - b[1])[0] ?? []
+      return c ? `${c.toUpperCase()} ${l}` : ''
     }
+    return casterOf(offer, o.group)?.name ?? ''
   }
-  return LINE_ORDER.flatMap((l) => (out.has(l) ? [out.get(l)!.need] : []))
+  const items: { key: string; value: number; effects: StackEffect[]; keep: boolean }[] = []
+  const leftOut: BuffPlan['leftOut'] = []
+  for (const spell of new Set([...o.wanted, ...onYou])) {
+    const offer = byName.get(spell)
+    if (!offer) continue
+    const on = onYou.has(spell)
+    if (!on && !who(offer)) {
+      leftOut.push({ spell, line: offer.line, value: offer.value, reason: 'nobody', blockedBy: [] })
+      continue
+    }
+    if (!on && offer.value < MIN_ASK_VALUE) {
+      leftOut.push({ spell, line: offer.line, value: offer.value, reason: 'small', blockedBy: [] })
+      continue
+    }
+    items.push({ key: spell, value: offer.value, effects: offer.stack, keep: on })
+  }
+  const best = bestStack(items)
+  const chosen = items
+    .filter((i) => best.has(i.key))
+    .map((i): PlanItem => {
+      const offer = byName.get(i.key)!
+      return { spell: i.key, line: offer.line, value: offer.value, from: i.keep ? '' : who(offer), on: i.keep }
+    })
+    .sort((a, b) => LINE_ORDER.indexOf(a.line) - LINE_ORDER.indexOf(b.line) || b.value - a.value)
+  for (const i of items) {
+    if (best.has(i.key) || i.keep) continue
+    const offer = byName.get(i.key)!
+    leftOut.push({ spell: i.key, line: offer.line, value: offer.value, reason: 'stack', blockedBy: chosen.filter((c) => !stacks(i.effects, byName.get(c.spell)!.stack)).map((c) => c.spell) })
+  }
+  const needs = chosen
+    .filter((c) => !c.on)
+    .map((c): BuffNeed => {
+      const stackOf = byName.get(c.spell)!.stack
+      const replaced = o.active.filter((b) => !best.has(b.spell) && byName.get(b.spell) && !stacks(stackOf, byName.get(b.spell)!.stack)).map((b) => b.spell)
+      return { line: c.line, spell: c.spell, from: c.from, replaces: replaced.join(', ') }
+    })
+  return { chosen, leftOut: leftOut.sort((a, b) => b.value - a.value), needs }
+}
+
+/** What to ask the group for: the best combination's buffs that are not on you. */
+export function buffNeeds(o: { offers: BuffOffer[]; wanted: string[]; group: Person[]; active: ActiveBuff[] }): BuffNeed[] {
+  return buffPlan(o).needs
 }
 
 /** "Ask Kelwyn for Temperance and Clarity; ask Aldric for Swift Like the Wind." */
@@ -353,6 +463,9 @@ export interface BuffView {
   group: { name: string; person: Person | null }[]
   active: ActiveBuff[]
   needs: BuffNeed[]
+  /** The best combination with this group, and with anyone at all, to plan by. */
+  plan: BuffPlan
+  planAnyone: BuffPlan
   /** False until the spell file is read. */
   spellsLoaded: boolean
 }

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import { askText, BuffWatch, buffNeeds, defaultWanted, parseWho, type ActiveBuff, type BuffOffer, type Person } from '../src/core/buffs'
+import { askText, BuffWatch, buffNeeds, buffPlan, defaultWanted, parseWho, type ActiveBuff, type BuffOffer, type Person } from '../src/core/buffs'
 import type { Spell, SpellBook } from '../src/core/spells'
+import { effectValue } from '../src/core/effectValue'
 
 // /who lines are the game's own shape (names swapped); the spells are made up, with the fields the
 // watcher reads.
@@ -25,7 +26,11 @@ const temperance = spell('Temperance', { landSelf: 'You feel the power of temper
 const aegis = spell('Holy Aegis', { landSelf: 'You feel the power of temperance.', fade: 'Your temperance fades.' })
 const clarity = spell('Clarity', { landSelf: 'A soft breeze passes over you.', fade: 'The breeze fades.' })
 const book = { all: () => [temperance, aegis, clarity].values() } as unknown as SpellBook
-const offer = (name: string, line: BuffOffer['line'], classes: Record<string, number>): BuffOffer => ({ spell: name, line, effects: [], classes, seconds: 3600, group: false, category: 'buff' })
+/** An offer with its effects slot by slot: [slot, spa, value] (stacking commands: [slot, 148/149, spa, slot]). */
+const offer = (name: string, line: BuffOffer['line'], classes: Record<string, number>, value = 100, stack: number[][] = [[1, 100 + name.length, 1]]): BuffOffer => ({
+  spell: name, line, effects: [], classes, seconds: 3600, group: false, category: 'buff', value,
+  stack: stack.map(([slot, spa, base, base2 = 0]) => ({ slot, spa, base, base2 }))
+})
 const OFFERS = [offer('Temperance', 'hpac', { clr: 40 }), offer('Holy Aegis', 'hpac', { pal: 45 }), offer('Clarity', 'manaRegen', { enc: 26 })]
 
 function watch(active: ActiveBuff[] = []) {
@@ -80,36 +85,104 @@ describe('buffs on you', () => {
 
 describe('what to ask for', () => {
   const cleric: Person = { name: 'Brenna', classes: ['clr', 'mnk', 'war'], level: 50, race: 'Human', at: 0 }
+  const paladin: Person = { name: 'Aldric', classes: ['pal', 'war', 'rog'], level: 50, race: 'Human', at: 0 }
+  const shaman: Person = { name: 'Dorran', classes: ['shm', 'war', 'rog'], level: 50, race: 'Troll', at: 0 }
   const enc: Person = { name: 'Corvin', classes: ['enc'], level: 20, race: 'Gnome', at: 0 }
+  const on = (spell: string, line: BuffOffer['line'] = 'hpac'): ActiveBuff => ({ spell, ranked: spell, line, caster: 'someone', landedAt: 0, endsAt: null })
 
-  it('asks the groupmate who can cast the best wanted buff of each line not covered', () => {
-    const needs = buffNeeds({ offers: OFFERS, wanted: ['Temperance', 'Holy Aegis', 'Clarity'], group: [cleric, enc], active: [] })
-    // Corvin is level 20, too low for Clarity (26); nobody here is a paladin.
-    expect(needs).toEqual([{ line: 'hpac', spell: 'Temperance', from: 'Brenna' }])
-    expect(askText(needs)).toBe('Ask Brenna for Temperance')
+  // The slot layouts of the spell file (spa 69 HP, 1 AC, 4 STR, 5 DEX, 6 AGI, 7 STA; 148 blocks).
+  const temperance = offer('Temperance', 'hpac', { clr: 40 }, 1120, [[1, 148, 69, 3], [2, 69, 800], [4, 1, 160]])
+  const blessing = offer('Blessing of Temperance', 'hpac', { clr: 45 }, 1120, [[1, 148, 69, 3], [2, 69, 800], [4, 1, 160]])
+  const symbol = offer('Symbol of Pinzarn', 'hpac', { pal: 46, clr: 31 }, 307, [[3, 69, 307]])
+  const HP = [temperance, blessing, symbol]
+
+  it('asks the cleric when a cleric and a paladin are both in the group', () => {
+    expect(buffNeeds({ offers: HP, wanted: ['Temperance', 'Symbol of Pinzarn'], group: [paladin, cleric], active: [] })).toEqual([
+      { line: 'hpac', spell: 'Temperance', from: 'Brenna', replaces: '' }
+    ])
   })
 
-  it('counts a line as covered by any buff of it', () => {
-    const active: ActiveBuff[] = [{ spell: 'Holy Aegis', ranked: 'Holy Aegis', line: 'hpac', caster: 'Aldric', landedAt: 0, endsAt: null }]
-    expect(buffNeeds({ offers: OFFERS, wanted: ['Temperance'], group: [cleric], active })).toEqual([])
+  it('asks the paladin for the symbol when the paladin is the only one who can', () => {
+    expect(buffNeeds({ offers: HP, wanted: ['Temperance', 'Symbol of Pinzarn'], group: [paladin], active: [] })).toEqual([
+      { line: 'hpac', spell: 'Symbol of Pinzarn', from: 'Aldric', replaces: '' }
+    ])
   })
 
-  it('asks for nothing that is not wanted', () => {
-    expect(buffNeeds({ offers: OFFERS, wanted: [], group: [cleric], active: [] })).toEqual([])
+  it('asks for the better buff over one on you it blocks, and nothing once the best there is is on', () => {
+    expect(buffNeeds({ offers: HP, wanted: ['Temperance', 'Symbol of Pinzarn'], group: [paladin, cleric], active: [on('Symbol of Pinzarn')] })).toEqual([
+      { line: 'hpac', spell: 'Temperance', from: 'Brenna', replaces: 'Symbol of Pinzarn' }
+    ])
+    expect(buffNeeds({ offers: HP, wanted: ['Temperance', 'Symbol of Pinzarn'], group: [paladin, cleric], active: [on('Temperance')] })).toEqual([])
+    expect(buffNeeds({ offers: HP, wanted: ['Temperance', 'Symbol of Pinzarn'], group: [paladin], active: [on('Symbol of Pinzarn')] })).toEqual([])
+  })
+
+  it('never asks for a buff’s twin over it: Temperance on, Blessing of Temperance wanted', () => {
+    expect(buffNeeds({ offers: HP, wanted: ['Blessing of Temperance'], group: [cleric], active: [on('Temperance')] })).toEqual([])
+  })
+
+  it('picks the combination that stacks for the most over the single biggest buff', () => {
+    // Harnessing: HP and STR/DEX in slots 1, 4, 5, and it blocks slot-1 STR and DEX (Strength, Dexterity).
+    const harnessing = offer('Harnessing of Spirit', 'hpac', { shm: 46 }, 368, [[1, 69, 251], [4, 4, 67], [5, 5, 50], [8, 148, 4, 1], [9, 148, 5, 1]])
+    const infusion = offer('Infusion of Spirit', 'stats', { shm: 49 }, 173, [[4, 4, 50], [5, 5, 55], [6, 7, 45]])
+    const strength = offer('Strength', 'stats', { shm: 44 }, 67, [[1, 4, 67]])
+    const dexterity = offer('Dexterity', 'stats', { shm: 48 }, 50, [[1, 5, 50]])
+    const stamina = offer('Stamina', 'stats', { shm: 44 }, 60, [[1, 7, 40]])
+    const agility = offer('Agility', 'stats', { shm: 41 }, 45, [[1, 6, 45]])
+    const altuna = offer('Talisman of Altuna', 'hpac', { shm: 40 }, 250, [[1, 69, 250]])
+    const offers = [harnessing, infusion, strength, dexterity, stamina, agility, altuna]
+    const plan = buffPlan({ offers, wanted: offers.map((o) => o.spell), group: [shaman], active: [] })
+    expect(plan.chosen.map((c) => c.spell).sort()).toEqual(['Agility', 'Dexterity', 'Infusion of Spirit', 'Stamina', 'Strength', 'Talisman of Altuna'])
+    expect(plan.leftOut).toEqual([
+      { spell: 'Harnessing of Spirit', line: 'hpac', value: 368, reason: 'stack', blockedBy: ['Talisman of Altuna', 'Infusion of Spirit', 'Strength', 'Dexterity'] }
+    ])
+    // With Harnessing on you, the combination replaces it.
+    const needs = buffNeeds({ offers, wanted: offers.map((o) => o.spell), group: [shaman], active: [on('Harnessing of Spirit')] })
+    expect(needs.find((n) => n.spell === 'Infusion of Spirit')?.replaces).toBe('Harnessing of Spirit')
+  })
+
+  it('leaves out what nobody here can cast or is too small to ask for', () => {
+    const clarity = offer('Clarity', 'manaRegen', { enc: 26 }, 270)
+    const tiny = offer('Rising Dexterity', 'stats', { shm: 25 }, 5)
+    const plan = buffPlan({ offers: [clarity, tiny], wanted: ['Clarity', 'Rising Dexterity'], group: [enc, shaman], active: [] })
+    // Corvin is level 20, too low for Clarity (26).
+    expect(plan.chosen).toEqual([])
+    expect(plan.leftOut.map((l) => [l.spell, l.reason])).toEqual([
+      ['Clarity', 'nobody'],
+      ['Rising Dexterity', 'small']
+    ])
+  })
+
+  it('plans with anyone, naming the class and level to look for', () => {
+    const plan = buffPlan({ offers: HP, wanted: ['Symbol of Pinzarn'], group: 'anyone', active: [] })
+    expect(plan.chosen).toEqual([{ spell: 'Symbol of Pinzarn', line: 'hpac', value: 307, from: 'CLR 31', on: false }])
   })
 
   it('reads well with several people', () => {
     expect(
       askText([
-        { line: 'hpac', spell: 'Temperance', from: 'Brenna' },
-        { line: 'spellHaste', spell: 'Blessing of Faith', from: 'Brenna' },
-        { line: 'manaRegen', spell: 'Clarity', from: 'Corvin' }
+        { line: 'hpac', spell: 'Temperance', from: 'Brenna', replaces: '' },
+        { line: 'spellHaste', spell: 'Blessing of Faith', from: 'Brenna', replaces: '' },
+        { line: 'manaRegen', spell: 'Clarity', from: 'Corvin', replaces: '' }
       ])
     ).toBe('Ask Brenna for Temperance and Blessing of Faith; ask Corvin for Clarity')
   })
 
-  it('wants each class’s best of the main lines out of the box', () => {
-    const offers = [offer('Courage', 'hpac', { clr: 1 }), offer('Temperance', 'hpac', { clr: 40 }), offer('Charisma', 'stats', { shm: 30 }), offer('Clarity', 'manaRegen', { enc: 26 })]
-    expect(defaultWanted(offers)).toEqual(['Clarity', 'Temperance'])
+  it('wants every buff of the main lines worth something out of the box, worth most first', () => {
+    const offers = [offer('Courage', 'hpac', { clr: 1 }, 30), offer('Temperance', 'hpac', { clr: 40 }, 1120), offer('Charisma', 'stats', { shm: 30 }, 0), offer('Clarity', 'manaRegen', { enc: 26 }, 270)]
+    expect(defaultWanted(offers)).toEqual(['Temperance', 'Clarity', 'Courage'])
+  })
+})
+
+describe('effect values', () => {
+  it('follow the spell file’s level formulas and caps', () => {
+    // From spells_us.txt: slot|spa|base|base2|formula|max.
+    expect(effectValue({ base: 150, formula: 103, max: 250 }, 50)).toBe(250) // Protection of Nature, HP
+    expect(effectValue({ base: 150, formula: 103, max: 250 }, 20)).toBe(190)
+    expect(effectValue({ base: 5, formula: 102, max: 55 }, 50)).toBe(55) // Protection of Nature, AC
+    expect(effectValue({ base: 224, formula: 117, max: 307 }, 50)).toBe(307) // Symbol of Pinzarn
+    expect(effectValue({ base: 1, formula: 109, max: 9 }, 50)).toBe(9) // Clarity
+    expect(effectValue({ base: 1, formula: 119, max: 9 }, 50)).toBe(7) // Boon of the Clear Mind
+    expect(effectValue({ base: 160, formula: 100, max: 160 }, 50)).toBe(160) // Swift Like the Wind
+    expect(effectValue({ base: -20, formula: 102, max: 0 }, 10)).toBe(-30)
   })
 })

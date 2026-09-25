@@ -16,7 +16,7 @@ import { CombatMeter, summarize as summarizeFight } from '../core/combatMeter'
 import { LootLedger, type LootSnapshot } from '../core/loot'
 import { RespawnLog, respawnView, type RespawnRecords, type RespawnView } from '../core/respawns'
 import { PetGearReader, petSummonName, type PetGearReading } from '../core/pets'
-import { askText, BuffWatch, buffNeeds, buffOffers, defaultWanted, type ActiveBuff, type BuffOffer, type BuffsFile, type BuffView, type Person } from '../core/buffs'
+import { askText, BuffWatch, buffOffers, buffPlan, defaultWanted, type ActiveBuff, type BuffOffer, type BuffsFile, type BuffView, type Person } from '../core/buffs'
 import { CATEGORY_COLORS } from '../core/spellTracker'
 import { durationSec, fmtClock, fmtNum } from '../core/combatView'
 import { characterKey, characterName } from './storeCore'
@@ -495,13 +495,16 @@ export class Engine {
     const group = this.groupPeople()
     const active = this.buffWatch.active
     const wanted = this.wantedBuffs
+    const plan = buffPlan({ offers: this.buffOfferList, wanted, group: group.flatMap((g) => (g.person ? [g.person] : [])), active })
     return {
       offers: this.buffOfferList,
       wanted,
       defaults: !this.store.buffs.get().wanted[this.characterKey()],
       group,
       active,
-      needs: buffNeeds({ offers: this.buffOfferList, wanted, group: group.flatMap((g) => (g.person ? [g.person] : [])), active }),
+      needs: plan.needs,
+      plan,
+      planAnyone: buffPlan({ offers: this.buffOfferList, wanted, group: 'anyone', active }),
       spellsLoaded: !!this.book
     }
   }
@@ -511,7 +514,8 @@ export class Engine {
     const f = this.store.buffs.get()
     const key = this.characterKey()
     const wanted = { ...f.wanted }
-    if (list) wanted[key] = [...new Set(list)].sort()
+    // The order is the priority: kept as given.
+    if (list) wanted[key] = [...new Set(list)]
     else delete wanted[key]
     this.store.buffs.set({ ...f, wanted })
     this.lastAsk = { text: '', at: 0 }

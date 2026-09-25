@@ -33,10 +33,17 @@ export interface Spell {
 }
 
 export interface SpellEffect {
+  /** The effect's slot, 1–12: two buffs with the same effect in the same slot do not stack. */
+  slot?: number
   spa: number
   base: number
   base2: number
+  /** How the value grows with the caster's level (100 = flat; see effectValue). */
+  formula?: number
+  /** The value's cap; 0 for none. */
+  max?: number
 }
+
 
 export interface RankedSpell {
   spell: Spell
@@ -105,7 +112,7 @@ export class SpellBook {
         .split('$')
         .map((e) => e.split('|'))
         .filter((e) => e.length > 2)
-        .map((e) => ({ spa: +e[1], base: +e[2], base2: +(e[3] ?? 0) }))
+        .map((e) => ({ slot: +e[0] || 0, spa: +e[1], base: +e[2], base2: +(e[3] ?? 0), formula: +(e[4] ?? 100) || 100, max: +(e[5] ?? 0) || 0 }))
       const msg = messages.get(id) ?? []
       const spell: Spell = {
         id,
