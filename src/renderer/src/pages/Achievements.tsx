@@ -57,7 +57,7 @@ export function Achievements() {
   const [toasts, setToasts] = useState<Toast[]>([])
   const toastId = useRef(0)
 
-  const book = useMemo(() => (view ? new AchievementBook(view.sections, view.marks) : null), [view])
+  const book = useMemo(() => (view ? new AchievementBook(view.sections, { ticks: view.marks.ticks, broken: [] }) : null), [view])
   const cats = useMemo(() => book?.categories() ?? [], [book])
   const curCat = cats.includes(cat) ? cat : (cats[0] ?? '')
   const catSections = book ? book.sections.map((s, si) => ({ s, si })).filter((x) => x.s.cat === curCat) : []
@@ -78,7 +78,8 @@ export function Achievements() {
     setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), 4200)
   }
 
-  const saveMarks = (marks: AchMarks) => {
+  const saveMarks = (next: AchMarks) => {
+    const marks: AchMarks = { ticks: next.ticks, broken: [] }
     const before = book!
     const after = new AchievementBook(view.sections, marks)
     const newlyDone: string[] = []
@@ -96,12 +97,6 @@ export function Achievements() {
     saveMarks(book!.withTick(r, on, view.marks))
   }
 
-  const markBroken = (r: AchRef, on: boolean) => {
-    setTouched((t) => new Set([...t, `a:${r[0]}:${r[1]}`]))
-    const a = book!.ach(r)
-    toast(on ? `<b>${escapeHtml(a.n)}</b> marked as broken. It no longer counts.` : `<b>${escapeHtml(a.n)}</b> is no longer marked as broken.`)
-    saveMarks(book!.withBroken(r, on, view.marks))
-  }
 
   const goTo = ([si, ai]: AchRef) => {
     const s = book!.sections[si]
@@ -197,8 +192,6 @@ export function Achievements() {
         </div>
         <div className="small muted">
           <b>{num(t.open)}</b> still open
-          {t.ign > 0 && ` · ${num(t.ign)} broken`}
-          {t.blocked > 0 && ` · ${num(t.blocked)} blocked by broken`}
           {t.opt > 0 && ` · ${num(t.optDone)} of ${num(t.opt)} optional objectives taken`}
         </div>
       </div>
@@ -262,18 +255,16 @@ export function Achievements() {
       </div>
 
       {query.length >= 2 ? (
-        <SearchResults book={book} query={query} ctx={{ remaining, hideOpt, sort, open, setOpen, touched, flash, tick, markBroken, goTo }} />
+        <SearchResults book={book} query={query} ctx={{ remaining, hideOpt, sort, open, setOpen, touched, flash, tick, goTo }} />
       ) : cur ? (
-        <SectionView si={cur.si} book={book} ctx={{ remaining, hideOpt, sort, open, setOpen, touched, flash, tick, markBroken, goTo }} setHideOpt={setHideOpt} setSort={setSort} />
+        <SectionView si={cur.si} book={book} ctx={{ remaining, hideOpt, sort, open, setOpen, touched, flash, tick, goTo }} setHideOpt={setHideOpt} setSort={setSort} />
       ) : (
         <div className="empty">No sections in this export.</div>
       )}
 
       <p className="faint small" style={{ marginTop: 18 }}>
         Optional objectives never count toward completion, the same way the game scores them. An objective that names another
-        achievement follows that achievement; click it to jump there. Tick <b>Broken</b> on an achievement the game can't
-        complete: it stops counting, and anything that needs it shows as <b>Blocked</b>. Your ticks and Broken marks are kept
-        when the game writes a new export.
+        achievement follows that achievement; click it to jump there. Your ticks are kept when the game writes a new export.
       </p>
 
       <div className="ach-toasts" aria-live="polite">
@@ -294,7 +285,6 @@ interface Ctx {
   touched: Set<string>
   flash: string
   tick: (r: ObjRef, on: boolean) => void
-  markBroken: (r: AchRef, on: boolean) => void
   goTo: (r: AchRef) => void
 }
 
@@ -397,8 +387,7 @@ function SectionView({
           <h2>{s.name}</h2>
         </div>
         <div className="small muted">
-          {st.done} / {st.trackable} achievements{st.ign ? ` · ${st.ign} broken` : ''}
-          {st.blocked ? ` · ${st.blocked} blocked` : ''}
+          {st.done} / {st.trackable} achievements
           <br />
           {num(st.reqDone)} / {num(st.req)} objectives{st.opt ? ` · ${st.optDone} / ${st.opt} optional` : ''}
         </div>
@@ -421,8 +410,6 @@ function SectionView({
         <div className="empty">{ctx.remaining ? 'Nothing open here.' : 'Nothing to show.'}</div>
       )}
       <NamesLine label="Complete" names={body.done} />
-      <NamesLine label="Blocked by a broken achievement" names={body.blocked} />
-      <NamesLine label="Broken" names={body.broken} />
     </section>
   )
 }
@@ -459,19 +446,6 @@ function NamesLine({ label, names }: { label: string; names: string[] }) {
         </span>
       ))}
     </p>
-  )
-}
-
-function BrokenControl({ book, r, ctx, compact }: { book: AchievementBook; r: AchRef; ctx: Ctx; compact?: boolean }) {
-  const a = book.ach(r)
-  const broken = book.isBroken(r)
-  if (book.achDone(r) && !broken) return null
-  return (
-    <label className={`ach-broken${compact ? ' compact' : ''}${broken ? ' on' : ''}`} title="Mark this achievement as broken. It stops counting, and anything that needs it shows as Blocked instead of open.">
-      <input type="checkbox" checked={broken} onChange={(e) => ctx.markBroken(r, e.target.checked)} />
-      Broken
-      <span className="sr-only">{a.n}</span>
-    </label>
   )
 }
 
@@ -516,7 +490,6 @@ function Block({ book, r, rows, query, ctx }: { book: AchievementBook; r: AchRef
           )}
         </button>
         <span className="ach-count">{count}</span>
-        <BrokenControl book={book} r={r} ctx={ctx} />
         <span className="ach-bar">
           <i style={{ width: `${pct}%` }} />
         </span>
@@ -546,7 +519,6 @@ function SingleRow({ book, r, ctx }: { book: AchievementBook; r: AchRef; ctx: Ct
   return (
     <div id={`ach-${r[0]}-${r[1]}`} className={`ach-single ${state}${ctx.flash === `ach-${r[0]}-${r[1]}` ? ' flash' : ''}`}>
       <ObjectiveRow book={book} r={[...r, 0]} c={c} label={a.n} sub={sub} ctx={ctx} single />
-      <BrokenControl book={book} r={r} ctx={ctx} compact />
       {!done && hunt && (
         <div className="ach-hunt">
           <span>Try</span>{' '}

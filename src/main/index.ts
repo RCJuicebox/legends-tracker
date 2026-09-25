@@ -13,6 +13,7 @@ import { AchievementFiles } from './achievements'
 import { InventoryFiles } from './inventory'
 import { ItemCatalog } from './items'
 import { GameTables, readAasFromLog } from './stats'
+import { WikiCatalog } from './wikiCatalog'
 import { captureScreens, ocrImage } from './ocr'
 import { composeRows, countsFromComposite, findMoteRows, rows as ocrRows, statsWindowFromScreen } from '../core/screenText'
 import { checkGameFolder, findInstall, listLogs, logIsIn, resolveGameFolder } from './game'
@@ -64,6 +65,7 @@ const achievementFiles = new AchievementFiles(
   (view) => toMain('state:achievements', view)
 )
 const gameTables = new GameTables(() => store.settings.get().installDir)
+const wikiCatalog = new WikiCatalog((p) => toMain('state:catalog', p))
 const inventoryFiles = new InventoryFiles(
   () => store.settings.get().installDir,
   new ItemCatalog(),
@@ -417,6 +419,16 @@ function registerIpc(): void {
   handle('inventory:lookup', (names: string[]) => inventoryFiles.lookup(names))
   handle('character:sheet', (character: string) => inventoryFiles.sheet(character))
   handle('character:saveSheet', (character: string, sheet: CharacterSheet) => inventoryFiles.saveSheet(character, sheet))
+
+  // The upgrade finder's catalog: what is stored, and a download when asked (or when none is stored).
+  handle('gear:catalog', async () => {
+    const file = await wikiCatalog.stored()
+    return { file, stale: wikiCatalog.isStale(file), progress: wikiCatalog.progress }
+  })
+  handle('gear:catalogRefresh', async () => {
+    const file = await wikiCatalog.refresh()
+    return { file, stale: wikiCatalog.isStale(file), progress: wikiCatalog.progress }
+  })
 
   handle('stats:caps', async (classes: string[], level: number) => ({
     skills: await gameTables.skillCaps(classes, level),

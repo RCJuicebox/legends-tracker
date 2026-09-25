@@ -16,6 +16,7 @@ import {
 } from '../../../core/inventory'
 import type { CharacterSheet, InventoryView, ItemInfo } from '../../../shared/types'
 import { className } from '../../../core/acModel'
+import { GearFinder } from './GearFinder'
 
 const who = (key: string) => key.replace('_', ' · ')
 const num = (n: number) => n.toLocaleString()
@@ -121,6 +122,7 @@ export function Gear({ go }: { go?: (page: 'motes') => void }) {
   const [selected, setSelected] = useState<string | null>(null)
   const [scaled, setScaled] = useRemembered<boolean>('gear.scaled', true)
   const [refreshing, setRefreshing] = useState(false)
+  const [mode, setMode] = useRemembered<'sheet' | 'finder'>('gear.view', 'sheet')
 
   if (!exports || !view) return <div className="empty">Loading…</div>
 
@@ -216,9 +218,32 @@ export function Gear({ go }: { go?: (page: 'motes') => void }) {
     return it.location + '#' + i === selected
   })
 
+  const switcher = (
+    <div className="row" style={{ marginBottom: 12 }}>
+      <span className="lt-seg">
+        <button className={mode === 'sheet' ? 'on' : ''} onClick={() => setMode('sheet')}>
+          Character sheet
+        </button>
+        <button className={mode === 'finder' ? 'on' : ''} onClick={() => setMode('finder')}>
+          Upgrade finder
+        </button>
+      </span>
+    </div>
+  )
+
+  if (mode === 'finder')
+    return (
+      <>
+        {head}
+        {switcher}
+        <GearFinder view={view} sheet={sheet} />
+      </>
+    )
+
   return (
     <>
       {head}
+      {switcher}
       <div className="lt-sheet">
         <div className="lt-side">{left}</div>
         <div className="lt-center">

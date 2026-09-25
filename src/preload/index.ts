@@ -1,7 +1,7 @@
 import { contextBridge, ipcRenderer, type IpcRendererEvent } from 'electron'
 
 // Pages reach the main process only through these channel families.
-const ALLOWED = /^(app|settings|character|watch|simulate|triggers|spells|focus|motes|stock|update|logs|overlays|overlay|audio|dialog|game|achievements|inventory|stats|state):?/
+const ALLOWED = /^(app|settings|character|watch|simulate|triggers|spells|focus|motes|stock|update|logs|overlays|overlay|audio|dialog|game|achievements|inventory|stats|gear|state):?/
 
 function check(channel: string): void {
   if (!ALLOWED.test(channel)) throw new Error(`Channel not allowed: ${channel}`)
