@@ -77,7 +77,8 @@ export function Achievements() {
 
   // Forget blocks no longer in the book, and keep the list from growing without end.
   useEffect(() => {
-    if (!book) return
+    // An export that failed to read has no sections; that is no reason to forget anything.
+    if (!book || !book.sections.length || view?.error) return
     const known = new Set(book.sections.flatMap((s) => s.ach.map((a) => `${secKey(s)} > ${a.n}`)))
     const kept = Object.entries(open).filter(([k]) => known.has(k))
     const trimmed = kept.slice(-OPEN_KEEP)
