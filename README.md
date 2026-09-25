@@ -21,10 +21,12 @@ time: **More info → Run anyway**.
 
 ### Updates
 
-The installed app checks GitHub Releases shortly after it starts and every four hours, downloads a newer
-version in the background, and offers **Restart and update** in the title bar, the tray menu and
-Settings. Settings live in `%APPDATA%\Legends Tracker`, outside the install folder, so they survive
-updates and uninstalls.
+The installed app checks GitHub Releases shortly after it starts and every hour after that (and
+whenever **Check for updates** is pressed in Settings), downloads a newer version in the background,
+and offers **Restart and update** in the title bar, the tray menu and Settings. A Windows notification
+says when a new version has been found and again, to click on, when it is ready to install; each is
+said once per version. Settings live in `%APPDATA%\Legends Tracker`, outside the install folder, so
+they survive updates and uninstalls.
 
 ### Releasing a new version
 

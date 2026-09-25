@@ -23,7 +23,7 @@ function updateText(u: UpdateState | null): string {
     case 'error':
       return `Could not check for updates: ${u.message}`
     default:
-      return `Up to date${u.checkedAt ? `, checked ${ago(u.checkedAt)}` : ''}. Checks automatically every few hours.`
+      return `Up to date${u.checkedAt ? `, checked ${ago(u.checkedAt)}` : ''}. Checks again every hour, and a new version is announced with a notification.`
   }
 }
 

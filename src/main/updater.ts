@@ -4,7 +4,9 @@ import { log } from './log'
 
 // electron-updater checks the GitHub Releases named in the build's `publish` settings, downloads a
 // newer installer in the background, and runs it when the app restarts. Settings live in
-// %APPDATA%\Legends Tracker, outside the install folder, so they survive every update.
+// %APPDATA%\Legends Tracker, outside the install folder, so they survive every update. The check
+// runs shortly after start and then every hour; a new version is announced with a Windows
+// notification when it is found and again, to click on, when it has downloaded.
 
 export type UpdateState =
   | { state: 'dev' }
@@ -14,7 +16,8 @@ export type UpdateState =
   | { state: 'ready'; version: string }
   | { state: 'error'; message: string }
 
-const CHECK_EVERY_MS = 4 * 60 * 60 * 1000
+/** Between automatic checks; Check for updates in Settings asks at any time. */
+const CHECK_EVERY_MS = 60 * 60 * 1000
 
 export class Updater {
   status: UpdateState = app.isPackaged ? { state: 'idle', checkedAt: 0 } : { state: 'dev' }

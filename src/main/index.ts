@@ -1,4 +1,4 @@
-import { app, BrowserWindow, dialog, ipcMain, Menu, nativeImage, protocol, screen, session, shell, Tray, type Rectangle } from 'electron'
+import { app, BrowserWindow, dialog, ipcMain, Menu, nativeImage, Notification, protocol, screen, session, shell, Tray, type Rectangle } from 'electron'
 import { cpSync, existsSync, mkdirSync, readFileSync, writeFileSync, promises as fs } from 'node:fs'
 import { release } from 'node:os'
 import { basename, join, relative, resolve, isAbsolute } from 'node:path'
@@ -75,8 +75,36 @@ const store = new Store(join(resources, 'defaults', 'triggers.json'))
 const appIcon = app.isPackaged ? join(process.resourcesPath, 'icon.png') : join(resources, 'build', 'icon.png')
 const updater = new Updater((s) => {
   toMain('state:update', s)
-  if (s.state === 'ready') engine.pushFeed('info', `Version ${s.version} is ready: restart to update.`)
+  if (s.state === 'downloading') {
+    announceUpdate(`found:${s.version}`, `Legends Tracker ${s.version} is available`, 'Downloading it now. You can restart into it once it has arrived.', () => showMain())
+  } else if (s.state === 'ready') {
+    engine.pushFeed('info', `Version ${s.version} is ready: restart to update.`)
+    announceUpdate(`ready:${s.version}`, `Legends Tracker ${s.version} is ready`, 'Click to restart and update. Your settings and overlays stay as they are.', () => updater.install())
+  }
 })
+
+/** Each step of one version is announced once: an hourly check must not nag. */
+const announced = new Set<string>()
+
+/** A Windows notification about an update, said once per key. Clicking it runs `onClick`. */
+function announceUpdate(key: string, title: string, body: string, onClick: () => void): void {
+  if (announced.has(key)) return
+  announced.add(key)
+  if (!Notification.isSupported()) return
+  try {
+    const n = new Notification({ title, body, icon: appIcon })
+    n.on('click', () => {
+      try {
+        onClick()
+      } catch (e) {
+        log.warn('The update notification\'s action failed:', e)
+      }
+    })
+    n.show()
+  } catch (e) {
+    log.warn('Could not show the update notification:', e)
+  }
+}
 const speech = new SpeechWorker()
 const icons = new IconSource(() => store.settings.get().installDir)
 const achievementFiles = new AchievementFiles(
