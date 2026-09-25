@@ -1,4 +1,4 @@
-import { execFile } from 'node:child_process'
+import { HKEY_CURRENT_USER, HKEY_LOCAL_MACHINE, isProcessRunning, registryString } from './win32'
 import { existsSync, promises as fs } from 'node:fs'
 import { dirname, join } from 'node:path'
 import type { ArchiveInfo, GameFolderCheck, LogFileInfo } from '../shared/types'
@@ -35,30 +35,31 @@ export function resolveGameFolder(dir: string): string {
   return ''
 }
 
-/** The folder the game's own uninstaller is in, as Windows records it for Add or Remove Programs. */
-function fromUninstallEntry(): Promise<string> {
-  const entry = 'Microsoft\\Windows\\CurrentVersion\\Uninstall\\DGC-EverQuest Legends'
-  const keys = [`HKCU\\Software\\${entry}`, `HKLM\\Software\\${entry}`, `HKLM\\Software\\WOW6432Node\\${entry}`]
-  const query = (key: string) =>
-    new Promise<string>((resolve) => {
-      execFile('reg', ['query', key], { windowsHide: true }, (err, stdout) => {
-        if (err) return resolve('')
-        for (const name of ['InstallLocation', 'UninstallString', 'DisplayIcon']) {
-          const m = new RegExp(`^\\s*${name}\\s+REG_\\w+\\s+(.+?)\\s*$`, 'mi').exec(stdout)
-          const value = m?.[1].replace(/^"|"$/g, '').replace(/,\d+$/, '') ?? ''
-          if (!value) continue
-          const dir = name === 'InstallLocation' ? value : dirname(value)
-          if (isGameFolder(dir)) return resolve(dir)
-        }
-        resolve('')
-      })
-    })
-  return keys.reduce<Promise<string>>(async (found, key) => (await found) || query(key), Promise.resolve(''))
+/**
+ * The folder the game's own uninstaller is in, as Windows records it for Add or Remove Programs,
+ * read from the registry directly.
+ */
+function fromUninstallEntry(): string {
+  const entry = String.raw`Microsoft\Windows\CurrentVersion\Uninstall\DGC-EverQuest Legends`
+  const keys: [number, string][] = [
+    [HKEY_CURRENT_USER, 'Software\\' + entry],
+    [HKEY_LOCAL_MACHINE, 'Software\\' + entry],
+    [HKEY_LOCAL_MACHINE, 'Software\\WOW6432Node\\' + entry]
+  ]
+  for (const [hkey, key] of keys) {
+    for (const name of ['InstallLocation', 'UninstallString', 'DisplayIcon']) {
+      const value = registryString(hkey, key, name).replace(/^"|"$/g, '').replace(/,\d+$/, '')
+      if (!value) continue
+      const dir = name === 'InstallLocation' ? value : dirname(value)
+      if (isGameFolder(dir)) return dir
+    }
+  }
+  return ''
 }
 
 /** Looks for EverQuest Legends: Windows' record of the install first, then the usual folders on every drive. */
 export async function findInstall(): Promise<string> {
-  const registered = await fromUninstallEntry()
+  const registered = fromUninstallEntry()
   if (registered) return registered
   for (const drive of 'CDEFGHIJKLMNOPQRSTUVWXYZ') {
     for (const suffix of INSTALL_SUFFIXES) {
@@ -131,12 +132,8 @@ export async function listArchives(archiveDir: string): Promise<ArchiveInfo[]> {
   return out.sort((a, b) => b.modified - a.modified)
 }
 
-export function isGameRunning(): Promise<boolean> {
-  return new Promise((resolve) => {
-    execFile('tasklist', ['/FI', 'IMAGENAME eq eqgame.exe', '/NH', '/FO', 'CSV'], { windowsHide: true }, (err, stdout) => {
-      resolve(!err && stdout.toLowerCase().includes('eqgame.exe'))
-    })
-  })
+export async function isGameRunning(): Promise<boolean> {
+  return isProcessRunning('eqgame.exe')
 }
 
 /**

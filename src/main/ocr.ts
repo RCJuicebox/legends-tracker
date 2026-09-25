@@ -4,6 +4,7 @@ import { promises as fs } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import type { Composite, OcrWord } from '../core/screenText'
+import { yieldPriority } from './priority'
 
 // Reads text off the screen with Windows' own OCR (Windows.Media.Ocr). It looks at pixels, the way a
 // player reads a window; it never touches the game's process or memory. The capture is enlarged 3×
@@ -62,6 +63,7 @@ export async function ocrImage(path: string, scale = 3, layout?: Composite): Pro
     const p = spawn('powershell.exe', ['-NoLogo', '-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', script, '-Path', path, '-Scale', String(scale), ...(layout ? ['-Compose', composeArg(layout)] : [])], {
       windowsHide: true
     })
+    yieldPriority(p.pid)
     let stdout = ''
     let stderr = ''
     p.stdout.setEncoding('utf8').on('data', (d: string) => (stdout += d))

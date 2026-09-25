@@ -6,7 +6,7 @@ import { MotePlanner } from './MotePlanner'
 import { useRemembered } from '../remember'
 import { MOTE_RANKS, localDay, moteValue, moteWorth, pausedHours, sessionHours, totalMotes, type MoteCounts, type MoteSession, type MoteState } from '../../../core/motes'
 
-type View = MoteState & { scanning: string }
+type View = MoteState & { scanning: string; scanProgress: number }
 
 export function useMotes(): View | null {
   const [view, setView] = useState<View | null>(null)
@@ -154,7 +154,17 @@ function MoteTracking() {
         </div>
       </div>
 
-      {view.scanning && <div className="notice" style={{ marginBottom: 16 }}>{view.scanning}</div>}
+      {view.scanning && (
+        <div className="notice stack" style={{ marginBottom: 16, gap: 8 }}>
+          <div className="row">
+            <span className="grow">{view.scanning}</span>
+            <b>{Math.round((view.scanProgress ?? 0) * 100)}%</b>
+          </div>
+          <div className="bar-meter">
+            <div style={{ width: `${Math.round((view.scanProgress ?? 0) * 100)}%` }} />
+          </div>
+        </div>
+      )}
 
       <div className="grid two" style={{ marginBottom: 16, alignItems: 'start' }}>
         <div className="card">

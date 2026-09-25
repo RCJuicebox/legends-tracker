@@ -71,6 +71,11 @@ export function Settings() {
             <Switch on={s.autoStart} onChange={(v) => patchSettings((x) => ({ ...x, autoStart: v }))} />
             Start watching as soon as the app opens
           </label>
+          <label className="row">
+            <Switch on={s.yieldToGame} onChange={(v) => patchSettings((x) => ({ ...x, yieldToGame: v }))} />
+            Yield CPU to EverQuest
+            <span className="faint small">runs this app below normal priority, so the game wins every tie for a frame; sound stays normal</span>
+          </label>
         </div>
 
         <div className="card stack" style={{ gap: 14 }}>

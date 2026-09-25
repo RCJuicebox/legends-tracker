@@ -1,4 +1,5 @@
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process'
+import { yieldPriority } from './priority'
 
 // A resident PowerShell process driving Windows' System.Speech. Speech is rendered to WAV and
 // handed to the audio window, which mixes it with alert sounds on the chosen output device.
@@ -54,6 +55,7 @@ export class SpeechWorker {
         windowsHide: true
       })
       this.proc = proc
+      yieldPriority(proc.pid)
       const timeout = setTimeout(() => {
         this.failed = 'Speech engine did not start'
         resolve()

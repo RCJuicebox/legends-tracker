@@ -17,6 +17,7 @@
   },
   "dependencies": {
     "electron-updater": "^6.8.9",
+    "koffi": "^2.16.3",
     "yauzl": "^3.4.0",
     "yazl": "^3.3.1"
   },
@@ -40,7 +41,8 @@
     "electron@44.4.5": true,
     "esbuild@0.25.12": true,
     "esbuild@0.28.2": true,
-    "electron-winstaller": false
+    "electron-winstaller": false,
+    "koffi@2.16.3": true
   },
   "author": "RCJuicebox",
   "homepage": "https://github.com/RCJuicebox/legends-tracker",
@@ -54,7 +56,9 @@
     },
     "files": [
       "out/**",
-      "package.json"
+      "package.json",
+      "!node_modules/koffi/build/koffi/!(win32_x64)/**",
+      "!node_modules/koffi/{src,vendor,doc}/**"
     ],
     "extraResources": [
       {

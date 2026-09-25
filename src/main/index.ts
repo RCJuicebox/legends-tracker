@@ -8,6 +8,7 @@ import { IconSource } from './icons'
 import { OverlayManager } from './overlays'
 import { GameWatcher, overlaysVisible } from './gameWatcher'
 import { Updater } from './updater'
+import { yieldPriority } from './priority'
 import { AchievementFiles } from './achievements'
 import { InventoryFiles } from './inventory'
 import { ItemCatalog } from './items'
@@ -257,9 +258,23 @@ function toggleMute(): void {
   saveSettings({ ...s, audio: { ...s.audio, muted: !s.audio.muted } })
 }
 
+/**
+ * Every process of this app at below-normal priority while the setting is on, apart from audio:
+ * the audio window and Chromium's audio service stay normal so alerts never stutter.
+ */
+function applyPriority(): void {
+  const on = store.settings.get().yieldToGame
+  const keep = new Set([audioWindow?.webContents.getOSProcessId()])
+  for (const m of app.getAppMetrics()) {
+    if (keep.has(m.pid) || /audio/i.test(m.serviceName ?? '')) continue
+    yieldPriority(m.pid, on)
+  }
+}
+
 function saveSettings(next: AppSettings): AppSettings {
   const prev = store.settings.get()
   store.settings.set(next)
+  if (next.yieldToGame !== prev.yieldToGame) applyPriority()
   overlays.apply(next.overlays)
   refreshOverlayVisibility()
   toAudio({ kind: 'config' })
@@ -589,5 +604,11 @@ void app.whenReady().then(async () => {
   overlays.apply(store.settings.get().overlays)
   watcher.start()
   updater.start()
+  // New windows (overlays, the main window reopened) start at normal priority; catch them up.
+  applyPriority()
+  // Renderers start a moment after their windows; look again once they have.
+  for (const ms of [3000, 10_000]) setTimeout(applyPriority, ms).unref()
+  app.on('browser-window-created', () => setTimeout(applyPriority, 1500))
+  setInterval(applyPriority, 60_000).unref()
   await createTray()
 })

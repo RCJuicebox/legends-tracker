@@ -158,6 +158,8 @@ export interface AppSettings {
   overlays: OverlayConfig[]
   /** Hide the overlays unless the game (or this app) has focus. */
   overlaysOnlyWithGame: boolean
+  /** Run this app's processes at below-normal priority, so the game wins every tie for the CPU. */
+  yieldToGame: boolean
 }
 
 // ---- Mote stock (the upgrade planner's inventory) ----

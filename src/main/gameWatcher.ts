@@ -1,39 +1,8 @@
-import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process'
+import { foregroundPid, isProcessRunning, processName, win32Available } from './win32'
 
-// A resident PowerShell loop that reports which process owns the foreground window (checked four
-// times a second, reported only when it changes) and whether eqgame.exe is running (every 3s).
-// $procId, not $pid: $PID is PowerShell's own read-only automatic variable.
-const SCRIPT = `
-Add-Type @"
-using System;
-using System.Runtime.InteropServices;
-public static class Fg {
-  [DllImport("user32.dll")] public static extern IntPtr GetForegroundWindow();
-  [DllImport("user32.dll")] public static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint processId);
-}
-"@
-[Console]::OutputEncoding = [Text.Encoding]::UTF8
-$lastPid = -1; $lastName = ''; $lastRunning = $null; $n = 0
-while ($true) {
-  $procId = [uint32]0
-  [void][Fg]::GetWindowThreadProcessId([Fg]::GetForegroundWindow(), [ref]$procId)
-  if ($procId -ne $lastPid) {
-    $lastPid = $procId
-    $lastName = try { [System.Diagnostics.Process]::GetProcessById([int]$procId).ProcessName } catch { '' }
-    $changed = $true
-  } else { $changed = $false }
-  if ($n % 12 -eq 0) {
-    $running = [System.Diagnostics.Process]::GetProcessesByName('eqgame').Length -gt 0
-    if ($running -ne $lastRunning) { $lastRunning = $running; $changed = $true }
-  }
-  if ($changed) {
-    [Console]::Out.WriteLine('{"pid":' + $lastPid + ',"name":' + (ConvertTo-Json ([string]$lastName)) + ',"running":' + $lastRunning.ToString().ToLower() + '}')
-    [Console]::Out.Flush()
-  }
-  $n++
-  Start-Sleep -Milliseconds 250
-}
-`
+// Which process owns the foreground window (checked four times a second, reported only when it
+// changes) and whether eqgame.exe is running (every 3s), asked of Windows directly. It used to be a
+// resident PowerShell loop; a direct call costs well under a millisecond and launches nothing.
 
 export interface GameState {
   /** Process id owning the foreground window. */
@@ -43,48 +12,40 @@ export interface GameState {
 }
 
 export class GameWatcher {
-  private proc: ChildProcessWithoutNullStreams | null = null
-  private stopped = false
-  private buffer = ''
+  private timer: NodeJS.Timeout | null = null
+  private ticks = 0
   state: GameState = { foregroundPid: 0, foregroundName: '', gameRunning: false }
 
   constructor(private readonly onChange: (state: GameState, previous: GameState) => void) {}
 
   start(): void {
-    this.stopped = false
-    const encoded = Buffer.from(SCRIPT, 'utf16le').toString('base64')
-    const proc = spawn('powershell.exe', ['-NoLogo', '-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-EncodedCommand', encoded], {
-      windowsHide: true
-    })
-    this.proc = proc
-    proc.stdout.setEncoding('utf8')
-    proc.stdout.on('data', (chunk: string) => {
-      this.buffer += chunk
-      let nl: number
-      while ((nl = this.buffer.indexOf('\n')) >= 0) {
-        const line = this.buffer.slice(0, nl).trim()
-        this.buffer = this.buffer.slice(nl + 1)
-        try {
-          const m = JSON.parse(line) as { pid: number; name: string; running: boolean }
-          const previous = this.state
-          this.state = { foregroundPid: m.pid, foregroundName: m.name.toLowerCase(), gameRunning: m.running }
-          this.onChange(this.state, previous)
-        } catch {
-          // a partial or non-JSON line; ignore
-        }
-      }
-    })
-    proc.on('exit', () => {
-      this.proc = null
-      // Keep watching: restart after a pause unless the app is shutting down.
-      if (!this.stopped) setTimeout(() => this.start(), 3000)
-    })
+    if (this.timer) return
+    if (!win32Available()) {
+      // Nothing can be asked, so assume the game is up and in front: overlays stay visible rather
+      // than hidden for good, and timers are not stopped for a game that may well be running.
+      const previous = this.state
+      this.state = { foregroundPid: 0, foregroundName: 'eqgame', gameRunning: true }
+      this.onChange(this.state, previous)
+      return
+    }
+    this.check()
+    this.timer = setInterval(() => this.check(), 250)
+  }
+
+  private check(): void {
+    const pid = foregroundPid()
+    const running = this.ticks++ % 12 === 0 ? isProcessRunning('eqgame.exe') : this.state.gameRunning
+    const previous = this.state
+    if (pid === previous.foregroundPid && running === previous.gameRunning) return
+    // The name is only looked up when the foreground process changes.
+    const name = pid === previous.foregroundPid ? previous.foregroundName : processName(pid)
+    this.state = { foregroundPid: pid, foregroundName: name, gameRunning: running }
+    this.onChange(this.state, previous)
   }
 
   stop(): void {
-    this.stopped = true
-    this.proc?.kill()
-    this.proc = null
+    if (this.timer) clearInterval(this.timer)
+    this.timer = null
   }
 }
 

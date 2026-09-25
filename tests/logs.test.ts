@@ -28,6 +28,26 @@ describe('parseLogLine', () => {
 })
 
 describe('LogTailer', () => {
+  it('keeps one handle across reads, lets the archiver rename the log away, and follows the new file', async () => {
+    const path = join(dir, 'eqlog_Kelwyn_neriak.txt')
+    await fs.writeFile(path, '')
+    const got: string[] = []
+    const resets: string[] = []
+    const t = new LogTailer(path, { startAtEnd: false, onLines: (l) => got.push(...l), onReset: (r) => resets.push(r) })
+    await fs.appendFile(path, 'one\r\n')
+    await t.readOnce()
+    await fs.appendFile(path, 'two\r\n')
+    await t.readOnce()
+    // The handle is still open here, and the rename must succeed anyway.
+    await fs.rename(path, join(dir, 'archived.txt'))
+    await fs.writeFile(path, 'three\r\n')
+    await t.readOnce()
+    await t.readOnce()
+    await t.release()
+    expect(got).toEqual(['one', 'two', 'three'])
+    expect(resets).toEqual(['replaced'])
+  })
+
   it('holds partial lines, skips existing content at start, and survives truncation and replacement', async () => {
     const path = join(dir, 'eqlog_Test_x.txt')
     await fs.writeFile(path, 'old line\r\n')

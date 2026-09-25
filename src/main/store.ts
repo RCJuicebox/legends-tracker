@@ -44,7 +44,8 @@ export function defaultSettings(): AppSettings {
     audio: { deviceId: 'default', masterVolume: 1, speechVolume: 1, soundVolume: 0.8, voice: '', rate: 1, muted: false },
     archive: { autoEnabled: false, thresholdMB: 150, archiveDir: '' },
     overlays: DEFAULT_OVERLAYS.map((o) => ({ ...o })),
-    overlaysOnlyWithGame: true
+    overlaysOnlyWithGame: true,
+    yieldToGame: true
   }
 }
 

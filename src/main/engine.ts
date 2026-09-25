@@ -12,7 +12,10 @@ import { archiveLog, compressLoose, findStaging, finishStaged, stagingOriginalNa
 import { checkAgainstLog } from '../core/logCheck'
 import { MoteTracker, moteName, parseMoteLoot, type MoteLoot, type MoteState } from '../core/motes'
 import { StockCursor, fixItem, levelFromName, plan } from '../core/moteCalc'
-import { readLines, scanMoteHistory } from './moteHistory'
+import { Worker } from 'node:worker_threads'
+import { readLines } from './moteHistory'
+import moteWorkerPath from './moteWorker?modulePath'
+import type { MoteState as ScannedMotes } from '../core/motes'
 import { createReadStream } from 'node:fs'
 import type { LogLine } from '../core/logLine'
 import { characterKey, characterName, type Store } from './store'
@@ -29,7 +32,7 @@ export interface EngineOutputs {
   status: (status: WatchStatus) => void
   feed: (item: FeedItem) => void
   archive: (status: ArchiveStatus) => void
-  motes: (state: MoteState & { scanning: string }) => void
+  motes: (state: MoteState & { scanning: string; scanProgress: number }) => void
   stock: (stock: MoteStock) => void
 }
 
@@ -61,6 +64,7 @@ export class Engine {
   /** While history is being rebuilt, live lines wait here so none are lost or counted twice. */
   private moteBacklog: LogLine[] | null = null
   moteScan = ''
+  moteScanProgress = 0
   /** Pasted test lines must not add to the real mote stock. */
   private simulating = false
   private stockCursor: StockCursor | null = null
@@ -571,8 +575,8 @@ export class Engine {
     return this.saveStock({ ...s, counts, item: fixItem({ name, lvl: p.reached, xp: 0, to: Math.max(s.item.to, p.reached + 1) }) })
   }
 
-  moteView(): MoteState & { scanning: string } {
-    return { ...this.motes.state, scanning: this.moteScan }
+  moteView(): MoteState & { scanning: string; scanProgress: number } {
+    return { ...this.motes.state, scanning: this.moteScan, scanProgress: this.moteScanProgress }
   }
 
   /**
@@ -613,16 +617,26 @@ export class Engine {
     const logFile = this.settings.logFile
     if (!logFile || this.moteBacklog) return
     this.moteBacklog = []
-    const setScan = (m: string) => {
+    const setScan = (m: string, fraction = 0) => {
       this.moteScan = m
+      this.moteScanProgress = fraction
       this.out.motes(this.moteView())
     }
     try {
-      const { state, lastTime } = await scanMoteHistory({
-        logPath: logFile,
-        archiveDir: this.archiveDir(),
-        stem: basename(logFile, '.txt'),
-        progress: setScan
+      setScan('Getting ready to read your logs…')
+      // Read in a worker thread at full speed, so nothing the rebuild does can be felt in the app,
+      // the overlays or the live tailer. Only progress and the finished history come back.
+      const { state, lastTime } = await new Promise<{ state: ScannedMotes; lastTime: number }>((resolve, reject) => {
+        const worker = new Worker(moteWorkerPath, {
+          workerData: { logPath: logFile, archiveDir: this.archiveDir(), stem: basename(logFile, '.txt') }
+        })
+        worker.on('message', (m: { kind: 'progress'; message: string; fraction: number } | { kind: 'done'; state: ScannedMotes; lastTime: number } | { kind: 'error'; message: string }) => {
+          if (m.kind === 'progress') setScan(m.message, m.fraction)
+          else if (m.kind === 'done') resolve(m)
+          else reject(new Error(m.message))
+        })
+        worker.on('error', reject)
+        worker.on('exit', (code) => code !== 0 && reject(new Error(`the reader stopped (${code})`)))
       })
       const live = this.motes.state
       // A manual session is the player's own doing; keep it running over the rebuilt history.
