@@ -703,10 +703,15 @@ export class Engine {
     try {
       const mark = this.readMark()
       // Used once: a crash before the next clean exit must not replay from it again.
-      rmSync(this.markFile, { force: true })
+      try {
+        rmSync(this.markFile, { force: true })
+      } catch (e) {
+        log.warn(`Could not remove ${this.markFile}:`, e)
+      }
       const st = await fs.stat(logFile, { bigint: true })
       const exact = !!mark && samePath(mark.logFile, logFile) && mark.id === `${st.dev}:${st.ino}` && mark.seenUntil === motesSince && mark.offset <= Number(st.size)
       const from = exact ? mark!.offset : await offsetBefore(logFile, since)
+      if (exact) this.stock.resume()
       const onLine = (line: LogLine) => {
         if (exact || line.time > motesSince) this.motes.handle(line)
         else if (line.time >= stockSince) {

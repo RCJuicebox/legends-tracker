@@ -41,6 +41,18 @@ export class MoteStockKeeper {
     })
   }
 
+  /**
+   * Carries on counting exactly where the saved stock left off, for a read that picks up right after
+   * the last line counted: the loot already counted in that last second is gone over again first, so
+   * more loot logged in the same second still counts.
+   */
+  resume(): void {
+    const s = this.cell.get()
+    const c = new StockCursor(s.seenUntil ?? 0, s.seenAtSecond ?? 0)
+    for (let i = 0; i < (s.seenAtSecond ?? 0); i++) c.accept(s.seenUntil ?? 0)
+    this.cursor = c
+  }
+
   setCounts(counts: MoteStock['counts']): MoteStock {
     return this.save({ ...this.cell.get(), counts })
   }

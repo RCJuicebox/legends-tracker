@@ -79,7 +79,8 @@ export async function checkGameFolder(dir: string): Promise<GameFolderCheck> {
   let names: string[]
   try {
     names = await fs.readdir(dir)
-  } catch {
+  } catch (e) {
+    quietIfMissing(e, `Could not list the game folder ${dir}:`)
     return empty
   }
   const characters = (re: RegExp) => names.map((n) => re.exec(n)?.[1]).filter((c): c is string => !!c).sort()
@@ -103,7 +104,8 @@ export async function listLogs(installDir: string): Promise<LogFileInfo[]> {
   let names: string[]
   try {
     names = await fs.readdir(dir)
-  } catch {
+  } catch (e) {
+    quietIfMissing(e, `Could not list the logs in ${dir}:`)
     return []
   }
   const out: LogFileInfo[] = []
@@ -122,7 +124,8 @@ export async function listArchives(archiveDir: string): Promise<ArchiveInfo[]> {
   let names: string[]
   try {
     names = await fs.readdir(archiveDir)
-  } catch {
+  } catch (e) {
+    quietIfMissing(e, `Could not list the archives in ${archiveDir}:`)
     return []
   }
   const out: ArchiveInfo[] = []
@@ -135,6 +138,11 @@ export async function listArchives(archiveDir: string): Promise<ArchiveInfo[]> {
     out.push({ path: join(archiveDir, name), name, size: st.size, modified: st.mtimeMs, loose: lower.endsWith('.txt') })
   }
   return out.sort((a, b) => b.modified - a.modified)
+}
+
+/** A folder that is not there yet is normal; anything else is worth a line in the diagnostic log. */
+function quietIfMissing(e: unknown, what: string): void {
+  if ((e as NodeJS.ErrnoException).code !== 'ENOENT') log.warn(what, e)
 }
 
 export async function isGameRunning(): Promise<boolean> {

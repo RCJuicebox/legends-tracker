@@ -100,7 +100,8 @@ export async function scanMoteHistory(job: MoteScanJob, progress?: (message: str
     let end = 0
     if (l.end === undefined || l.end > 0) {
       try {
-        end = await feed(createReadStream(l.logPath, l.end !== undefined ? { end: l.end - 1 } : {}), false)
+        // Read to the end, a last line with no newline counts too; read to where the tailer took over, that is a line's end.
+        end = await feed(createReadStream(l.logPath, l.end !== undefined ? { end: l.end - 1 } : {}), l.end === undefined)
       } catch (e) {
         log.warn(`Mote history: could not read ${l.logPath}:`, e)
       }
