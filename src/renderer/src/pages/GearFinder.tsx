@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { api, ago } from '../api'
 import { useRemembered } from '../remember'
 import { itemKey, slotLabel } from '../../../core/inventory'
-import { findUpgrades, NOT_LIVE_ERAS, PRESETS, WEIGHT_LABELS, type Weights, type WeightKey } from '../../../core/upgrades'
+import { DEFAULT_HIDDEN_ERAS, eraOf, findUpgrades, PRESETS, UNKNOWN_ERA, WEIGHT_LABELS, zoneEras, type Weights, type WeightKey } from '../../../core/upgrades'
 import type { CatalogItem } from '../../../core/wikiItem'
 import type { CharacterSheet, InventoryView } from '../../../shared/types'
 import { className } from '../../../core/acModel'
@@ -50,8 +50,7 @@ export function GearFinder({ view, sheet }: { view: InventoryView; sheet: Charac
   const [preset, setPreset] = useRemembered<string>('finder.preset', 'Balanced')
   const [custom, setCustom] = useRemembered<Weights>('finder.weights', PRESETS.Balanced)
   const [compare, setCompare] = useRemembered<'drop' | 'level'>('finder.compare', 'drop')
-  const [notLive, setNotLive] = useRemembered<boolean>('finder.notLive', false)
-  const [untagged, setUntagged] = useRemembered<boolean>('finder.untagged', true)
+  const [hiddenEras, setHiddenEras] = useRemembered<string[]>('finder.hiddenEras', DEFAULT_HIDDEN_ERAS)
   const [slot, setSlot] = useRemembered<string>('finder.slot', 'all')
   const [showWeights, setShowWeights] = useState(false)
 
@@ -60,6 +59,19 @@ export function GearFinder({ view, sheet }: { view: InventoryView; sheet: Charac
   const weights = preset === 'Custom' ? custom : (PRESETS[preset] ?? PRESETS.Balanced)
   const inv = view.inventory!
   const owned = useMemo(() => new Set([...inv.worn, ...inv.bags, ...inv.bank, ...inv.sharedBank].flatMap((i) => [itemKey(i.name), ...i.augs.map((a) => itemKey(a.name))])), [inv])
+
+  // Every era in the catalog with how many pieces it holds, tagged or worked out from drop zones.
+  const eraCounts = useMemo(() => {
+    const items = state?.file?.items ?? []
+    const zones = zoneEras(items)
+    const counts = new Map<string, number>()
+    for (const it of items) {
+      const { era } = eraOf(it, zones)
+      counts.set(era, (counts.get(era) ?? 0) + 1)
+    }
+    const order = (e: string) => (e === 'Classic' ? 0 : e === 'Kunark' ? 2 : e === 'Velious' ? 3 : e === 'Luclin' ? 4 : e === UNKNOWN_ERA ? 5 : 1)
+    return [...counts].sort((a, b) => order(a[0]) - order(b[0]) || b[1] - a[1])
+  }, [state?.file])
 
   const results = useMemo(() => {
     if (!state?.file || !classes.length) return null
@@ -70,10 +82,10 @@ export function GearFinder({ view, sheet }: { view: InventoryView; sheet: Charac
       wearer: { classes, race: stats.race === 'iksar' ? 'IKS' : '', level: stats.level ?? 50 },
       weights,
       compare,
-      eras: { notLive, untagged },
+      hiddenEras,
       owned
     })
-  }, [state?.file, classes.join(','), stats.level, stats.race, weights, compare, notLive, untagged, inv, view.items, owned])
+  }, [state?.file, classes.join(','), stats.level, stats.race, weights, compare, hiddenEras, inv, view.items, owned])
 
   if (!state) return <div className="empty">Loading…</div>
   const p = state.progress
@@ -130,6 +142,31 @@ export function GearFinder({ view, sheet }: { view: InventoryView; sheet: Charac
             </button>
           </span>
         </div>
+        <div className="row" style={{ gap: 8, flexWrap: 'wrap' }}>
+          <b>Eras</b>
+          {eraCounts.map(([era, n]) => {
+            const on = !hiddenEras.includes(era)
+            return (
+              <button
+                key={era}
+                className={`lt-era${on ? ' on' : ''}`}
+                title={
+                  era === UNKNOWN_ERA
+                    ? 'No era on the wiki page and no drop zone to tell by: quested, crafted and vendor items mostly'
+                    : DEFAULT_HIDDEN_ERAS.includes(era)
+                      ? `${era}: zones not in EverQuest Legends yet`
+                      : undefined
+                }
+                onClick={() => setHiddenEras(on ? [...hiddenEras, era] : hiddenEras.filter((e) => e !== era))}
+              >
+                {era} <small>{num(n)}</small>
+              </button>
+            )
+          })}
+          <button className="btn ghost small" onClick={() => setHiddenEras(DEFAULT_HIDDEN_ERAS)}>
+            Live eras only
+          </button>
+        </div>
         {showWeights && (
           <div className="lt-weights">
             {(Object.keys(WEIGHT_LABELS) as WeightKey[]).map((k) => (
@@ -166,12 +203,6 @@ export function GearFinder({ view, sheet }: { view: InventoryView; sheet: Charac
               </option>
             ))}
           </select>
-          <label className="row tight">
-            <input type="checkbox" checked={untagged} onChange={(e) => setUntagged(e.target.checked)} /> Items with no era on the wiki
-          </label>
-          <label className="row tight" title={`Tagged ${NOT_LIVE_ERAS.join(', ')}: zones not in EverQuest Legends yet`}>
-            <input type="checkbox" checked={notLive} onChange={(e) => setNotLive(e.target.checked)} /> Eras not live yet
-          </label>
           <span className="grow" />
           <span className="faint">
             {num(state.file.items.length)} pieces from eqlwiki, fetched {ago(state.file.fetchedAt)}
@@ -212,7 +243,10 @@ export function GearFinder({ view, sheet }: { view: InventoryView; sheet: Charac
                           {c.item.title}
                         </a>
                         {c.owned && <span className="lt-chip gold">you have one</span>}
-                        {c.item.era && <span className="lt-chip">{c.item.era}</span>}
+                        <span className="lt-chip" title={c.eraInferred ? 'Worked out from the zones it drops in; the wiki page has no era' : undefined}>
+                          {c.era}
+                          {c.eraInferred ? ' · by zone' : ''}
+                        </span>
                       </div>
                       <div className="lt-diffs">
                         {c.diffs.slice(0, 7).map((d) => (
@@ -241,7 +275,7 @@ export function GearFinder({ view, sheet }: { view: InventoryView; sheet: Charac
           <p className="faint small">
             Scores are your weights times each stat, so they only rank items against each other. The wiki holds base stats, so a candidate "as it drops" is at +0 while
             your gear counts at its merge level; switch to "At your merge level" to compare like with like. Weapon ratio (damage ÷ delay) only counts when you give it a
-            weight. Item data from eqlwiki.com.
+            weight. An item with no era on its wiki page takes the era of the zones it drops in, learned from the tagged items there. Item data from eqlwiki.com.
           </p>
         </>
       )}

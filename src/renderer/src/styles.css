@@ -2215,3 +2215,25 @@ table.table {
 .lt-finder-intro {
   max-width: 760px;
 }
+
+.lt-era {
+  font-size: 12px;
+  padding: 3px 10px;
+  border-radius: 14px;
+  border: 1px dashed var(--line-2);
+  background: none;
+  color: var(--text-3);
+  cursor: pointer;
+  text-decoration: line-through;
+  text-decoration-color: rgba(255, 255, 255, 0.25);
+}
+.lt-era small {
+  color: var(--text-3);
+  margin-left: 3px;
+}
+.lt-era.on {
+  border: 1px solid rgba(232, 180, 76, 0.55);
+  background: rgba(232, 180, 76, 0.1);
+  color: var(--accent-2);
+  text-decoration: none;
+}

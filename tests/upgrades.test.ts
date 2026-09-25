@@ -49,7 +49,7 @@ describe('finding upgrades', () => {
       wearer: { classes: ['shd'], race: 'IKS', level: 50 },
       weights: PRESETS.Tank,
       compare: 'drop',
-      eras: { notLive, untagged: true },
+      hiddenEras: notLive ? [] : ['Kunark', 'Velious', 'Luclin'],
       owned: new Set(['better ring'])
     }).find((s) => s.slot === 'Fingers')!
 

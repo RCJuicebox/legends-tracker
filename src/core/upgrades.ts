@@ -17,8 +17,58 @@ export const SLOT_WORDS: Record<string, string[]> = {
   Chest: ['CHEST'], Legs: ['LEGS'], Feet: ['FEET'], Waist: ['WAIST'], Ammo: ['AMMO'], 'Any Slot': ['CHARM']
 }
 
-/** Eras whose zones are not in EverQuest Legends yet. The rest (Classic and Legends' own tags) are. */
-export const NOT_LIVE_ERAS = ['kunark', 'velious', 'luclin', 'chardok']
+/** Expansions whose zones are not in EverQuest Legends yet: hidden unless the player turns them on. */
+export const DEFAULT_HIDDEN_ERAS = ['Kunark', 'Velious', 'Luclin']
+export const UNKNOWN_ERA = 'Unknown'
+
+/** One name per era: tags differ in case, and Chardok is a Kunark zone. */
+export function normalizeEra(tag: string): string {
+  const t = tag.trim().toLowerCase()
+  if (!t) return ''
+  if (t === 'chardok') return 'Kunark'
+  return t[0].toUpperCase() + tag.trim().slice(1)
+}
+
+/** Earliest first: Classic, then Legends' own tags, then the expansions in release order. */
+function eraRank(era: string): number {
+  return era === 'Classic' ? 0 : era === 'Kunark' ? 2 : era === 'Velious' ? 3 : era === 'Luclin' ? 4 : 1
+}
+
+/**
+ * Each zone's era, learned from the catalog itself: the era most of the tagged items dropping there
+ * carry, when at least three in five agree.
+ */
+export function zoneEras(catalog: CatalogItem[]): Map<string, string> {
+  const votes = new Map<string, Map<string, number>>()
+  for (const item of catalog) {
+    const era = normalizeEra(item.era)
+    if (!era) continue
+    for (const z of item.zones) {
+      const m = votes.get(z) ?? new Map<string, number>()
+      m.set(era, (m.get(era) ?? 0) + 1)
+      votes.set(z, m)
+    }
+  }
+  const out = new Map<string, string>()
+  for (const [zone, m] of votes) {
+    const total = [...m.values()].reduce((a, b) => a + b, 0)
+    const [era, n] = [...m].sort((a, b) => b[1] - a[1])[0]
+    if (n / total >= 0.6) out.set(zone, era)
+  }
+  return out
+}
+
+/**
+ * An item's era: its own tag, or, for an untagged item, the earliest era among the zones it drops in
+ * (it can be had in the earliest of them). Unknown when neither says.
+ */
+export function eraOf(item: CatalogItem, zones: Map<string, string>): { era: string; inferred: boolean } {
+  const own = normalizeEra(item.era)
+  if (own) return { era: own, inferred: false }
+  const eras = item.zones.map((z) => zones.get(z)).filter((e): e is string => !!e)
+  if (!eras.length) return { era: UNKNOWN_ERA, inferred: false }
+  return { era: eras.sort((a, b) => eraRank(a) - eraRank(b))[0], inferred: true }
+}
 
 export interface Restrictions {
   slots: string[]
@@ -119,6 +169,9 @@ export interface Candidate {
   /** Stat changes against the item it would replace, biggest first. */
   diffs: { key: WeightKey; label: string; delta: number }[]
   owned: boolean
+  era: string
+  /** The era came from the zones it drops in, not a tag on its page. */
+  eraInferred: boolean
 }
 
 export interface SlotResult {
@@ -137,7 +190,8 @@ export interface FinderOptions {
   weights: Weights
   /** 'drop': candidates as they drop (+0). 'level': at the merge level of what they replace. */
   compare: 'drop' | 'level'
-  eras: { notLive: boolean; untagged: boolean }
+  /** Eras to leave out, by normalizeEra() name, 'Unknown' included. */
+  hiddenEras: string[]
   /** itemKeys of everything the character owns anywhere. */
   owned: Set<string>
   perSlot?: number
@@ -146,7 +200,9 @@ export interface FinderOptions {
 /** Per worn slot, the best candidates that beat what is worn there, by the chosen weights. */
 export function findUpgrades(o: FinderOptions): SlotResult[] {
   const perSlot = o.perSlot ?? 6
-  const parsed = o.catalog.map((item) => ({ item, r: restrictions(item.statsblock), base: parseStatsBlock(item.statsblock) }))
+  const zones = zoneEras(o.catalog)
+  const hidden = new Set(o.hiddenEras)
+  const parsed = o.catalog.map((item) => ({ item, r: restrictions(item.statsblock), base: parseStatsBlock(item.statsblock), ...eraOf(item, zones) }))
   const slots = [...new Set(o.worn.map((w) => w.location))]
   for (const s of Object.keys(SLOT_WORDS)) if (!slots.includes(s)) slots.push(s)
   return slots.map((slot) => {
@@ -161,9 +217,7 @@ export function findUpgrades(o: FinderOptions): SlotResult[] {
     const currentValues = current?.stats ? statValues(current.stats) : null
     const candidates: Candidate[] = []
     for (const p of parsed) {
-      const era = p.item.era.toLowerCase()
-      if (!o.eras.notLive && NOT_LIVE_ERAS.includes(era)) continue
-      if (!o.eras.untagged && !era) continue
+      if (hidden.has(p.era)) continue
       // Summoned items are conjured and vanish; they are not gear to chase.
       if (/^Summoned:/i.test(p.item.title)) continue
       if (!canWear(p.r, o.wearer, slot)) continue
@@ -177,7 +231,7 @@ export function findUpgrades(o: FinderOptions): SlotResult[] {
         .map((k) => ({ key: k, label: WEIGHT_LABELS[k], delta: Math.round((values[k] - (currentValues?.[k] ?? 0)) * 100) / 100 }))
         .filter((d) => d.delta !== 0 && o.weights[d.key] !== 0)
         .sort((a, b) => Math.abs(b.delta * o.weights[b.key]) - Math.abs(a.delta * o.weights[a.key]))
-      candidates.push({ item: p.item, stats, score: sc, delta, diffs, owned: o.owned.has(itemKey(p.item.title)) })
+      candidates.push({ item: p.item, stats, score: sc, delta, diffs, owned: o.owned.has(itemKey(p.item.title)), era: p.era, eraInferred: p.inferred })
     }
     candidates.sort((a, b) => b.delta - a.delta)
     return { slot, current: current ? { item: current.item, score: current.score, stats: current.stats } : null, candidates: candidates.slice(0, perSlot) }
