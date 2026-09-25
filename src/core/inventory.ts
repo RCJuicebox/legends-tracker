@@ -20,6 +20,8 @@ export interface Inventory {
   bags: InvItem[]
   bank: InvItem[]
   sharedBank: InvItem[]
+  /** The tradeskill depot (Personal-Depot1…), where auto-loot stores tradeskill items; absent from older exports. */
+  depot: InvItem[]
   /** The key ring: collections by kind (Equipment, Augmentation, Activated, …). */
   keyRing: { kind: string; name: string; id: number }[]
 }
@@ -33,7 +35,7 @@ export const WORN_SLOTS = [
 const EMPTY = (name: string) => !name || name === 'Empty'
 
 export function parseInventory(text: string): Inventory {
-  const inv: Inventory = { worn: [], bags: [], bank: [], sharedBank: [], keyRing: [] }
+  const inv: Inventory = { worn: [], bags: [], bank: [], sharedBank: [], depot: [], keyRing: [] }
   const lines = String(text).replace(/^﻿/, '').replace(/\r/g, '').split('\n')
   let inKeyRing = false
   // The item each nesting level last added, so "General 1-Slot3-Slot7" lands in the item at General 1-Slot3.
@@ -52,6 +54,10 @@ export function parseInventory(text: string): Inventory {
     }
     if (EMPTY(name)) continue
     const item: InvItem = { location: loc, name, id: Number(id) || 0, count: Number(count) || 1, augs: [] }
+    if (/^Personal-Depot\d+$/.test(loc)) {
+      inv.depot.push(item)
+      continue
+    }
     const cut = loc.lastIndexOf('-')
     const parent = cut > 0 ? byLocation.get(loc.slice(0, cut)) : undefined
     const top = loc.split('-')[0]

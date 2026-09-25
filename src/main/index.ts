@@ -1,7 +1,7 @@
 import { app, BrowserWindow, dialog, ipcMain, Menu, nativeImage, Notification, protocol, screen, session, shell, Tray, type Rectangle } from 'electron'
 import { cpSync, existsSync, mkdirSync, readFileSync, writeFileSync, promises as fs } from 'node:fs'
 import { release } from 'node:os'
-import { basename, join, relative, resolve, isAbsolute } from 'node:path'
+import { basename, dirname, join, relative, resolve, isAbsolute } from 'node:path'
 import { Store, characterKey } from './store'
 import { Engine, type AudioCommand } from './engine'
 import { appEngineEnv } from './engineEnv'
@@ -22,15 +22,21 @@ import { checkGameFolder, findInstall, listLogs, logIsIn, resolveGameFolder } fr
 import { summarize } from '../core/spells'
 import { castableSpells, focusReport, focusSpec } from '../core/itemFocus'
 import { CastHistory } from './castHistory'
+import { RecipeBook } from './recipes'
+import { PurchaseHistory } from './purchases'
+import { TradeFavorites } from './tradeFavorites'
 import { focusFromSpell, isDurationFocus } from '../core/focus'
 import { testTrigger } from '../core/triggers'
+import { respawnTrigger, respawnTriggerId } from '../core/respawns'
+import { petSpells, petSummonName } from '../core/pets'
+import { PetStore, PetWiki, scanPetLog } from './pets'
 import { timerKey } from '../core/spellTracker'
 import { CombatMeter } from '../core/combatMeter'
 import { parseLogLine } from '../core/logLine'
 import type { AppSettings, CharacterSettings, CharacterSheet, SpellRule, Trigger } from '../shared/types'
 import type { AchMarks } from '../core/achievements'
 import { initLog, log, logDir } from './log'
-import { meterOptions, sanitizeCharacter, sanitizeSettings, sanitizeTrigger, sanitizeTriggers } from './validate'
+import { isCharacterKey, meterOptions, sanitizeCharacter, sanitizeRespawnTimer, sanitizeSettings, sanitizeTrigger, sanitizeTriggers } from './validate'
 
 // Settings live in %APPDATA%\Legends Tracker. EQL_USER_DATA points a development or test run at a
 // separate profile, so a trial never touches real settings.
@@ -74,6 +80,10 @@ let quitting = false
 let audioDevices: { deviceId: string; label: string }[] = []
 
 const store = new Store(join(resources, 'defaults', 'triggers.json'))
+const petStore = new PetStore()
+const petWiki = new PetWiki()
+/** Characters whose log has been read back for the pet this session; after that the live log keeps it. */
+const petScanned = new Set<string>()
 const appIcon = app.isPackaged ? join(process.resourcesPath, 'icon.png') : join(resources, 'build', 'icon.png')
 const updater = new Updater((s) => {
   toMain('state:update', s)
@@ -116,6 +126,9 @@ const achievementFiles = new AchievementFiles(
 const gameTables = new GameTables(() => store.settings.get().installDir)
 const wikiCatalog = new WikiCatalog((p) => toMain('state:catalog', p))
 const castHistory = new CastHistory(join(app.getPath('userData'), 'cast-history.json'))
+const recipeBook = new RecipeBook((p) => toMain('state:recipes', p))
+const purchases = new PurchaseHistory(join(app.getPath('userData'), 'purchases.json'))
+const tradeFavorites = new TradeFavorites(join(app.getPath('userData'), 'tradeskills.json'))
 const inventoryFiles = new InventoryFiles(
   () => store.settings.get().installDir,
   new ItemCatalog(),
@@ -189,7 +202,14 @@ const engine = new Engine(
       overlays.combat(snap)
       toMain('state:combat', snap)
     },
-    loot: (view) => toMain('state:loot', view)
+    loot: (view) => toMain('state:loot', view),
+    respawns: (view) => toMain('state:respawns', view),
+    pet: (update) => {
+      const character = characterKey(store.settings.get().logFile)
+      if (!character) return
+      void petStore.merge(character, update).then(async (changed) => changed && toMain('state:pet', { character, ...(await petStore.get(character)) }))
+    },
+    buffs: (view) => toMain('state:buffs', view)
   },
   appEngineEnv({
     dataDir: app.getPath('userData'),
@@ -430,6 +450,7 @@ function registerIpc(): void {
     if (!list) throw new Error('Triggers were not saved: they were not a list.')
     store.triggers.set(list)
     engine.reconfigure()
+    engine.triggersChanged()
     return engine.triggers.errors
   })
   handle('triggers:test', (input: Trigger, line: string) => {
@@ -524,6 +545,72 @@ function registerIpc(): void {
   })
   handle('combat:rebuild', (minutes: number) => engine.rebuildCombat(Math.max(1, Math.min(1440, Number(minutes) || 60))))
   handle('loot:get', () => engine.lootView())
+  handle('respawns:get', () => engine.respawnView())
+  handle('buffs:get', () => engine.buffView())
+  handle('buffs:setWanted', (list: unknown) =>
+    engine.setWantedBuffs(Array.isArray(list) ? list.filter((x): x is string => typeof x === 'string').slice(0, 2000) : null)
+  )
+  // Tradeskills: the wiki's recipes, what the character paid for things, and the favourites.
+  handle('trade:recipes', async () => {
+    const file = await recipeBook.stored()
+    return { file, stale: recipeBook.isStale(file), progress: recipeBook.progress }
+  })
+  handle('trade:refresh', async () => {
+    const file = await recipeBook.refresh()
+    return { file, stale: recipeBook.isStale(file), progress: recipeBook.progress }
+  })
+  handle('trade:purchases', async (character: unknown) => {
+    if (!isCharacterKey(character)) throw new Error('Not a character.')
+    const installDir = store.settings.get().installDir
+    if (!installDir) return {}
+    return purchases.latest({ logPath: join(installDir, 'Logs', `eqlog_${character}.txt`), archiveDir: engine.archiveDir(), stem: `eqlog_${character}` })
+  })
+  handle('trade:favorites', () => tradeFavorites.get())
+  handle('trade:saveFavorites', (input: unknown) => tradeFavorites.set(input))
+  // The pet: what it wears and which one it is, from the log (read back once a session per
+  // character, then followed live), and every pet the character's classes can summon.
+  handle('pet:state', async (character: unknown, classes: unknown, level: unknown) => {
+    if (!isCharacterKey(character)) throw new Error('Not a character.')
+    const ids = Array.isArray(classes) ? classes.filter((c): c is string => typeof c === 'string') : []
+    const lvl = typeof level === 'number' ? level : 50
+    const book = engine.book
+    if (!petScanned.has(character) && book) {
+      petScanned.add(character)
+      const logFile = store.settings.get().logFile
+      const path = characterKey(logFile) === character ? logFile : join(dirname(logFile), `eqlog_${character}.txt`)
+      if (logFile) await petStore.merge(character, await scanPetLog(path, (name) => petSummonName(book, name)))
+    }
+    return { character, ...(await petStore.get(character)), spells: book ? petSpells(book, ids, lvl) : [], spellsLoaded: !!book }
+  })
+  handle('pet:profile', (spell: unknown, force: unknown) => {
+    if (typeof spell !== 'string' || !spell.trim()) throw new Error('Not a spell.')
+    return petWiki.profile(spell.trim(), force === true).then((profile) => ({ spell: spell.trim(), profile }))
+  })
+  // A respawn timer is an ordinary trigger, made or remade here and editable on the Triggers page.
+  handle('respawns:setTimer', (input: unknown) => {
+    const spec = sanitizeRespawnTimer(input)
+    if (!spec) throw new Error('The timer was not saved: it needs a name and a length.')
+    const list = store.triggers.get()
+    const id = respawnTriggerId(spec.name)
+    const existing = list.find((t) => t.id === id)
+    const trigger = respawnTrigger(spec, existing)
+    store.triggers.set(existing ? list.map((t) => (t.id === id ? trigger : t)) : [...list, trigger])
+    engine.reconfigure()
+    engine.triggersChanged()
+    return engine.respawnView()
+  })
+  handle('respawns:removeTimer', (name: unknown) => {
+    if (typeof name !== 'string') throw new Error('Not a name.')
+    const id = respawnTriggerId(name)
+    store.triggers.set(store.triggers.get().filter((t) => t.id !== id))
+    engine.reconfigure()
+    engine.triggersChanged()
+    return engine.respawnView()
+  })
+  handle('respawns:forget', (key: unknown) => {
+    if (typeof key === 'string') engine.respawns.forget(key)
+    return engine.respawnView()
+  })
 
   handle('motes:get', () => engine.moteView())
   handle('motes:start', () => engine.motes.startManual(Date.now()))

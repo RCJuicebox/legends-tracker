@@ -406,6 +406,17 @@ export interface ItemUse {
   recipes: string[]
   /** What merchants pay, as the page words it; '' when unsaid. */
   value: string
+  /** The merchants the page lists selling it. Absent on entries cached before it was kept. */
+  vendors?: { zone: string; npc: string; note: string }[]
+  /** Where else it comes from, when no vendor sells it. Absent on entries cached before it was kept. */
+  sources?: ItemSources
+}
+
+/** An item's other sources, from its page: what drops it and where, where it is foraged, whether it is crafted. */
+export interface ItemSources {
+  drops: { zone: string; mobs: string[] }[]
+  foraged: string[]
+  crafted: boolean
 }
 
 /** An item's eqlwiki page, as far as the tracker uses it. */

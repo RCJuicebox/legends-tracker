@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { api } from '../api'
 import { useInvoke } from '../hooks'
 import { useRemembered } from '../remember'
@@ -28,6 +28,8 @@ const day = (t: number) => new Date(t).toLocaleDateString([], { weekday: 'short'
 
 /** Items shown at most; older loot stays in the ledger. */
 const SHOWN = 400
+/** Opened sessions remembered at most; older ones fold again. */
+const OPEN_KEPT = 50
 
 function useLoot() {
   const q = useInvoke<View>('loot:get')
@@ -71,6 +73,11 @@ export function Loot() {
   const [hidden, setHidden] = useRemembered<LootOutcome[]>('loot.hidden', ['currency'])
   const [info, setInfo] = useState<Record<string, ItemInfo>>({})
   const [asked] = useState(() => new Set<string>())
+  // Sessions start folded; these are the ones opened. A filter opens every session it matches.
+  const [opened, setOpened] = useRemembered<string[]>('loot.open', [])
+  const filtering = filter.trim().length > 0
+  const isOpen = (id: string) => filtering || opened.includes(id)
+  const toggleOpen = (id: string) => setOpened(opened.includes(id) ? opened.filter((x) => x !== id) : [id, ...opened].slice(0, OPEN_KEPT))
 
   const entries = useMemo(() => {
     const f = filter.trim().toLowerCase()
@@ -79,24 +86,6 @@ export function Loot() {
       .filter((e) => !f || e.item.toLowerCase().includes(f) || e.source.toLowerCase().includes(f) || e.looter.toLowerCase().includes(f))
       .slice(0, SHOWN)
   }, [view, hidden, filter])
-
-  // The wiki, for whatever is on screen and not yet known; asked once per name.
-  useEffect(() => {
-    const names = [...new Set(entries.map((e) => e.base))].filter((n) => !asked.has(itemKey(n)))
-    if (!names.length) return
-    for (const n of names) asked.add(itemKey(n))
-    let on = true
-    api.invoke<Record<string, ItemInfo>>('inventory:lookup', names).then(
-      (r) => on && setInfo((prev) => ({ ...prev, ...r })),
-      () => {
-        // Offline: the names can be asked again later.
-        for (const n of names) asked.delete(itemKey(n))
-      }
-    )
-    return () => {
-      on = false
-    }
-  }, [entries, asked])
 
   const groups = useMemo(() => {
     const out: { id: string; entries: LootEntry[] }[] = []
@@ -107,6 +96,32 @@ export function Loot() {
     }
     return out
   }, [entries])
+
+  // The wiki, for what the open sessions show and is not yet known; asked once per name. An answer
+  // is kept whenever it comes (it is keyed by name), so opening another session meanwhile loses none.
+  const mounted = useRef(true)
+  useEffect(() => {
+    mounted.current = true
+    return () => {
+      mounted.current = false
+    }
+  }, [])
+  const shownNames = useMemo(
+    () => [...new Set(groups.filter((g) => filtering || opened.includes(g.id)).flatMap((g) => g.entries.map((e) => e.base)))],
+    [groups, filtering, opened]
+  )
+  useEffect(() => {
+    const names = shownNames.filter((n) => !asked.has(itemKey(n)))
+    if (!names.length) return
+    for (const n of names) asked.add(itemKey(n))
+    api.invoke<Record<string, ItemInfo>>('inventory:lookup', names).then(
+      (r) => mounted.current && setInfo((prev) => ({ ...prev, ...r })),
+      () => {
+        // Offline: the names can be asked again later.
+        for (const n of names) asked.delete(itemKey(n))
+      }
+    )
+  }, [shownNames, asked])
   const sessions = useMemo(() => new Map((view?.sessions ?? []).map((s) => [s.id, s])), [view])
 
   const toggle = (k: LootOutcome) => setHidden(hidden.includes(k) ? hidden.filter((x) => x !== k) : [...hidden, k])
@@ -149,10 +164,23 @@ export function Loot() {
           const coin = view.coin[g.id]
           const first = g.entries[g.entries.length - 1]
           const last = g.entries[0]
+          const open = isOpen(g.id)
+          const name = s?.name || first.zone || 'Session'
           return (
-            <div className="card loot-session" key={`${g.id}-${last.id}`}>
+            <div className={`card loot-session${open ? '' : ' folded'}`} key={`${g.id}-${last.id}`}>
               <div className="loot-session-head">
-                <h2>{s?.name || first.zone || 'Session'}</h2>
+                <button
+                  className="btn small ghost"
+                  aria-expanded={open}
+                  aria-label={open ? `Collapse ${name}` : `Expand ${name}`}
+                  title={filtering ? 'Open while filtering' : open ? 'Collapse' : 'Expand'}
+                  disabled={filtering}
+                  onClick={() => toggleOpen(g.id)}
+                  style={{ width: 28 }}
+                >
+                  {open ? '▾' : '▸'}
+                </button>
+                <h2>{name}</h2>
                 <span className="faint small">
                   {day(first.at)} · {when(first.at)}
                   {last.at - first.at > 60_000 ? ` – ${when(last.at)}` : ''}
@@ -163,9 +191,7 @@ export function Loot() {
                 {coin && coin.corpse > 0 && <span className="chip" title="Coin picked up from corpses">{fmtCoin(coin.corpse)} looted</span>}
                 {coin && coin.sales > 0 && <span className="chip" title="Coin from items sold, by auto-loot or at a merchant">{fmtCoin(coin.sales)} sold</span>}
               </div>
-              {g.entries.map((e) => (
-                <Row key={e.id} e={e} info={info[itemKey(e.base)]} />
-              ))}
+              {open && g.entries.map((e) => <Row key={e.id} e={e} info={info[itemKey(e.base)]} />)}
             </div>
           )
         })

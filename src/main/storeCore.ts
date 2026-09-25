@@ -15,7 +15,8 @@ export const DEFAULT_OVERLAYS: OverlayConfig[] = [
   {
     id: 'meter', name: 'Damage meter', kind: 'meter', x: 40, y: 560, width: 380, height: 300, opacity: 1, fontSize: 13, visible: true, groupByTarget: false,
     meter: { ...DEFAULT_METER_OPTIONS }
-  }
+  },
+  { id: 'respawns', name: 'Respawns', kind: 'timers', x: 2040, y: 960, width: 340, height: 260, opacity: 1, fontSize: 15, visible: true, groupByTarget: false }
 ]
 
 /** The default overlays every install had before new ones were tracked; an install without a record has seen these. */

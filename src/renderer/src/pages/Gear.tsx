@@ -53,7 +53,8 @@ const MODES: ['sheet' | GearMode, string][] = [
   ['sheet', 'Character sheet'],
   ['finder', 'Upgrade finder'],
   ['focus', 'Focus effects'],
-  ['optimize', 'Optimize what you own']
+  ['optimize', 'Optimize what you own'],
+  ['pet', 'Pet']
 ]
 
 export function Gear({ go }: { go?: (page: 'motes') => void }) {

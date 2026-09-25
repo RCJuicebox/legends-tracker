@@ -101,9 +101,18 @@ WT: 1.0  Size: SMALL<br>
       notes: 'This key unlocks the portal to the island of the Overseer of Air. Once activated this key is saved.',
       quests: ['Plane of Sky Keys', 'Islands'],
       recipes: ['Jewelcrafting: Silver Blue Diamond Ring (75)', 'Jewelcrafting: Blue Diamond Electrum Earring (148)', 'Spell Research: Practice Rune (Azia) (21)'],
-      value: '238p 9s 5c'
+      value: '238p 9s 5c',
+      vendors: [],
+      sources: { drops: [{ zone: 'Plane of Sky', mobs: ['Gorgalosk'] }], foraged: [], crafted: false }
     })
-    expect(parseItemUse('{{Itempage\n|notes = \n|statsblock = \nSlot: HEAD<br>\n}}')).toEqual({ notes: '', quests: [], recipes: [], value: '' })
+    expect(parseItemUse('{{Itempage\n|notes = \n|statsblock = \nSlot: HEAD<br>\n}}')).toEqual({
+      notes: '',
+      quests: [],
+      recipes: [],
+      value: '',
+      vendors: [],
+      sources: { drops: [], foraged: [], crafted: false }
+    })
     expect(plainText("'''Bold''' and [[a link|words]]<br>next")).toBe('Bold and words next')
   })
 })

@@ -10,6 +10,8 @@ import {
   type TriggerAction
 } from '../shared/types'
 import { DEFAULT_METER_OPTIONS } from './storeCore'
+import type { RespawnRecords, RespawnTimerSpec } from '../core/respawns'
+import type { ActiveBuff, BuffsFile, Person } from '../core/buffs'
 
 // What the pages send the main process is checked here before it is stored. A page is our own code,
 // but a bug in one should not be able to write a setting that breaks the app on its next start.
@@ -304,4 +306,79 @@ export function sanitizeTriggers(v: unknown): Trigger[] | null {
 /** One trigger, as the trigger tester takes it. */
 export function sanitizeTrigger(v: unknown): Trigger | null {
   return sanitizeTriggers([v])?.[0] ?? null
+}
+
+/** respawns.json as read back: records with a name and a zone, every field in range. */
+export function sanitizeRespawns(v: unknown): RespawnRecords {
+  const out: RespawnRecords = {}
+  if (!isObj(v)) return out
+  for (const [key, r] of Object.entries(v)) {
+    if (!isObj(r) || typeof r.name !== 'string' || !r.name || typeof r.zone !== 'string') continue
+    out[key] = {
+      zone: r.zone,
+      name: r.name,
+      kills: num(r.kills, 0, 0, 1e9),
+      lastDeath: num(r.lastDeath, 0, 0, 1e15),
+      pendingSince: num(r.pendingSince, 0, 0, 1e15),
+      gaps: numbers(r.gaps).filter((g) => g >= 0),
+      shared: bool(r.shared, false)
+    }
+  }
+  return out
+}
+
+/** A respawn timer as the Respawns page asks for it; null without a name or a length. */
+export function sanitizeRespawnTimer(v: unknown): RespawnTimerSpec | null {
+  if (!isObj(v) || typeof v.name !== 'string' || !v.name.trim() || typeof v.seconds !== 'number') return null
+  return {
+    name: v.name.trim().slice(0, 100),
+    seconds: Math.round(num(v.seconds, 0, 1, DAY)),
+    overlay: str(v.overlay, 'respawns'),
+    warnSec: Math.round(num(v.warnSec, 0, 0, 3600)),
+    announce: bool(v.announce, true)
+  }
+}
+
+/** buffs.json as read back: people with a name and classes, wanted lists of names, active buffs with times. */
+export function sanitizeBuffs(v: unknown): BuffsFile {
+  const out: BuffsFile = { people: {}, wanted: {}, active: {} }
+  if (!isObj(v)) return out
+  if (isObj(v.people)) {
+    for (const [k, p] of Object.entries(v.people)) {
+      if (!isObj(p) || typeof p.name !== 'string' || !Array.isArray(p.classes)) continue
+      const person: Person = {
+        name: p.name,
+        classes: p.classes.filter((c): c is string => typeof c === 'string'),
+        level: num(p.level, 1, 1, 100),
+        race: str(p.race, ''),
+        at: num(p.at, 0, 0, 1e15)
+      }
+      out.people[k.toLowerCase()] = person
+    }
+  }
+  if (isObj(v.wanted)) {
+    for (const [k, list] of Object.entries(v.wanted)) {
+      if (isCharacterKey(k) && Array.isArray(list)) out.wanted[k] = list.filter((x): x is string => typeof x === 'string')
+    }
+  }
+  if (isObj(v.active)) {
+    for (const [k, list] of Object.entries(v.active)) {
+      if (!isCharacterKey(k) || !Array.isArray(list)) continue
+      out.active[k] = list.flatMap((b): ActiveBuff[] =>
+        isObj(b) && typeof b.spell === 'string' && typeof b.line === 'string'
+          ? [
+              {
+                spell: b.spell,
+                ranked: str(b.ranked, b.spell),
+                line: b.line as ActiveBuff['line'],
+                caster: str(b.caster, ''),
+                landedAt: num(b.landedAt, 0, 0, 1e15),
+                endsAt: b.endsAt === null ? null : num(b.endsAt, 0, 0, 1e15)
+              }
+            ]
+          : []
+      )
+    }
+  }
+  return out
 }

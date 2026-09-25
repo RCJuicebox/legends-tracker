@@ -53,7 +53,7 @@ export class ItemCatalog {
     const wanted = new Map<string, string>()
     for (const n of Array.isArray(names) ? names : []) if (n && typeof n === 'string') wanted.set(itemKey(n), baseName(n))
     // Entries cached before icons, or before what an item is for, were kept have no such field; fetch those again once.
-    const stale = [...wanted].filter(([k]) => force || !cache[k] || Date.now() - cache[k].fetchedAt > FRESH_MS || (cache[k].found && (cache[k].icon === undefined || cache[k].use === undefined)))
+    const stale = [...wanted].filter(([k]) => force || !cache[k] || Date.now() - cache[k].fetchedAt > FRESH_MS || (cache[k].found && (cache[k].icon === undefined || cache[k].use === undefined || cache[k].use.vendors === undefined || cache[k].use.sources === undefined)))
     if (stale.length) {
       try {
         await this.fetchInto(cache, stale)

@@ -1,5 +1,7 @@
 import { app } from 'electron'
 import type { MoteState } from '../core/motes'
+import type { RespawnRecords } from '../core/respawns'
+import type { BuffsFile } from '../core/buffs'
 import { join } from 'node:path'
 import {
   DEFAULT_CHARACTER,
@@ -10,6 +12,7 @@ import {
   type SpellRule,
   type Trigger
 } from '../shared/types'
+import { sanitizeBuffs, sanitizeRespawns } from './validate'
 import { DEFAULT_OVERLAYS, JsonFile, LEGACY_OVERLAY_IDS, characterKey, defaultSettings, mergeDefaults, readJsonFile, type ReadResult } from './storeCore'
 
 export { DEFAULT_OVERLAYS, characterKey, characterName, defaultSettings } from './storeCore'
@@ -28,6 +31,8 @@ export class Store {
   readonly casts: JsonFile<Record<string, KnownCast>>
   readonly motes: JsonFile<MoteState>
   readonly stock: JsonFile<MoteStock>
+  readonly respawns: JsonFile<RespawnRecords>
+  readonly buffs: JsonFile<BuffsFile>
   /** The default overlays this install has been given, so one the player deleted is not brought back. */
   private readonly seenDefaults: JsonFile<string[]>
   /** True until mote history has been built from the logs once (or after its file was unreadable). */
@@ -80,6 +85,8 @@ export class Store {
       p('mote-stock.json'),
       mergeDefaults<MoteStock>({ counts: {}, item: { name: '', lvl: 0, xp: 0, to: 1 }, autoAdd: true }, read('mote-stock.json'))
     )
+    this.respawns = new JsonFile(p('respawns.json'), sanitizeRespawns(read('respawns.json')))
+    this.buffs = new JsonFile(p('buffs.json'), sanitizeBuffs(read('buffs.json')))
   }
 
   characterOf(logFile: string): CharacterSettings {
@@ -103,7 +110,7 @@ export class Store {
 
   /** Writes whatever changed. Never rejects: a file that cannot be written is logged. */
   async flushAll(): Promise<void> {
-    const files = [this.settings, this.triggers, this.rules, this.casts, this.motes, this.stock, this.seenDefaults]
+    const files = [this.settings, this.triggers, this.rules, this.casts, this.motes, this.stock, this.respawns, this.buffs, this.seenDefaults]
     await Promise.allSettled(files.map((f) => f.flush()))
   }
 }

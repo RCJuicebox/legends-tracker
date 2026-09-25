@@ -52,6 +52,10 @@ export function displayName(name: string): string {
 
 const ARTICLE = /^(?:a|an|the) /i
 const SINGLE_WORD = /^[A-Z][A-Za-z`']*$/
+/** "an ire ghast has been charmed." */
+const RE_CHARMED = /^(.+) has been charmed\.$/
+/** A charm lands within its cast time (Allure's is a few seconds) of the cast beginning. */
+const CHARM_CAST_MS = 15_000
 
 const tally = (): Tally => ({ total: 0, hits: 0, crits: 0, critTotal: 0, max: 0, min: 0 })
 const healTally = (): HealTally => ({ total: 0, raw: 0, count: 0, crits: 0, max: 0 })
@@ -124,6 +128,14 @@ export class CombatMeter {
   private lastCast = new Map<string, number>()
   /** When each entity's proc last did damage, by name, so its heal line a moment later is the same firing. */
   private lastProc = new Map<string, number>()
+  /**
+   * Charmed mobs, by the mob's name key. A charm pet has the mob's name, and other mobs may share it,
+   * so its blows are told apart by where they land: on an enemy they are the pet's (mobs do not fight
+   * each other), booked to `label`; on a friend they are an enemy's, and mean the charm has broken.
+   */
+  private charmed = new Map<string, { label: string; owner: string; since: number }>()
+  /** The last spell a friend began casting: whoever it was charmed what "has been charmed" next. */
+  private lastFriendCast: { who: string; at: number } | null = null
   private seq = 0
   /** A note shown while the log's history is being read. */
   reading = ''
@@ -147,6 +159,16 @@ export class CombatMeter {
     return this.zone
   }
 
+  /** The group's other members, as the log and the player have given them. */
+  get groupMembers(): string[] {
+    return [...this.roster.values()].map((m) => m.name)
+  }
+
+  /** A fight is on. */
+  get fighting(): boolean {
+    return this.live !== null
+  }
+
   /** Everything forgotten: another character's log is being watched. */
   reset(): void {
     this.fights = []
@@ -158,6 +180,8 @@ export class CombatMeter {
     this.sides.clear()
     this.lastCast.clear()
     this.lastProc.clear()
+    this.charmed.clear()
+    this.lastFriendCast = null
     this.zone = ''
     this.changed()
   }
@@ -309,22 +333,85 @@ export class CombatMeter {
 
   onZone(zone: string, at: number): void {
     if (this.live) this.closeFight()
+    // Charm does not survive a zone line.
+    this.charmed.clear()
     this.zone = zone
     if (this.config.newSessionOnZone || !this.session) this.newSession(at, zone)
   }
 
   // ---- lines ----
 
-  handle(line: LogLine): void {
+  /** Reads one line; returns the combat event in it, if any, for others that follow the same lines. */
+  handle(line: LogLine): CombatEvent | null {
     const { text, time } = line
     const zone = zoneEntered(text)
-    if (zone) return this.onZone(zone, time)
-    if (!looksLikeCombat(text)) return
+    if (zone) {
+      this.onZone(zone, time)
+      return null
+    }
+    const charm = RE_CHARMED.exec(text)
+    if (charm) {
+      this.onCharm(charm[1], time)
+      return null
+    }
+    if (!looksLikeCombat(text)) return null
     const ev = parseCombatLine(text)
     if (ev) this.event(ev, time)
+    return ev
   }
 
-  event(ev: CombatEvent, at: number): void {
+  // ---- charm pets ----
+
+  /** "<mob> has been charmed.": the pet of the friend who began casting just before, if one did. */
+  private onCharm(mob: string, at: number): void {
+    const cast = this.lastFriendCast
+    if (!cast || at - cast.at > CHARM_CAST_MS || at < cast.at) return
+    const label = `${displayName(mob)} (charmed)`
+    this.charmed.set(nameKey(mob), { label, owner: cast.who, since: at })
+    this.pets.set(nameKey(label), cast.who)
+    this.refreshKind(nameKey(label))
+    this.changed()
+  }
+
+  /**
+   * A blow, miss or heal involving a charmed mob's name, rewritten to its pet label where the pet is
+   * the one meant: its blows on enemies, enemies' blows on it, friends' heals on it. Its blows on a
+   * friend stay an enemy's, and end the charm: the pet has turned.
+   */
+  private charmEvent(ev: CombatEvent): CombatEvent {
+    if (!this.charmed.size || (ev.kind !== 'damage' && ev.kind !== 'miss' && ev.kind !== 'heal')) return ev
+    const src = ev.source ? this.charmed.get(nameKey(ev.source)) : undefined
+    const tgt = this.charmed.get(nameKey(ev.target))
+    if (!src && !tgt) return ev
+    let out = ev
+    if (src && ev.kind !== 'heal') {
+      const side = nameKey(ev.source) === nameKey(ev.target) ? 'enemy' : this.sideOf(this.norm(ev.target))
+      if (side === 'friend') {
+        this.charmed.delete(nameKey(ev.source))
+        return ev
+      }
+      if (side === 'enemy') out = { ...out, source: src.label }
+    }
+    if (tgt && out.source !== tgt.label) {
+      const side = out.source ? this.sideOf(this.norm(out.source)) : 'unknown'
+      const same = nameKey(out.source) === nameKey(ev.target)
+      if (!same && (ev.kind === 'heal' ? side === 'friend' : side === 'enemy')) out = { ...out, target: tgt.label }
+    }
+    return out
+  }
+
+  /** A charmed mob dead at an enemy's hand, or of its own accord, was the pet. */
+  private charmDeath(ev: Extract<CombatEvent, { kind: 'kill' }>): Extract<CombatEvent, { kind: 'kill' }> {
+    const c = this.charmed.get(nameKey(ev.target))
+    if (!c) return ev
+    const killer = ev.killer ? this.sideOf(this.norm(ev.killer)) : 'enemy'
+    if (killer === 'friend') return ev
+    this.charmed.delete(nameKey(ev.target))
+    return { ...ev, target: c.label }
+  }
+
+  event(input: CombatEvent, at: number): void {
+    const ev = input.kind === 'kill' ? this.charmDeath(input) : this.charmEvent(input)
     switch (ev.kind) {
       case 'damage':
         return this.onDamage(ev, at)
@@ -354,6 +441,8 @@ export class CombatMeter {
         const source = this.norm(ev.source)
         this.lastCast.set(`${nameKey(source)}|${spellBase(ev.spell)}`, at)
         if (this.lastCast.size > 4000) this.lastCast.delete(this.lastCast.keys().next().value!)
+        // Anyone not an enemy may be the one a charm that lands next belongs to.
+        if (this.sideOf(source) !== 'enemy') this.lastFriendCast = { who: source, at }
         if (this.sideOf(source) !== 'friend') return
         for (const seg of this.liveSegments(at, false)) this.ent(seg, source, at).casts++
         return

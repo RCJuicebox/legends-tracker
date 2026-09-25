@@ -2594,6 +2594,9 @@ button.tree-item {
 .loot-session-head h2 {
   margin: 0;
 }
+.loot-session.folded .loot-session-head {
+  margin-bottom: 0;
+}
 .loot-row {
   display: grid;
   grid-template-columns: 28px minmax(0, 1fr) auto;

@@ -1,7 +1,7 @@
 // An eqlwiki item page, as far as the upgrade finder needs it: the in-game stats block, the icon,
 // its focus effect, which era the item belongs to, and where it comes from.
 
-import type { ItemUse } from '../shared/types'
+import type { ItemSources, ItemUse } from '../shared/types'
 
 /** Bumped when a catalog entry gains something, so a stored catalog from an older build is fetched again. */
 export const CATALOG_FORMAT = 3
@@ -74,7 +74,43 @@ export function parseItemUse(content: string): ItemUse {
       recipes.push(`${skill ? `${skill}: ` : ''}${names[0]}${trivial ? ` (${trivial})` : ''}`)
     } else skill = names[0]
   }
-  return { notes, quests: linkTexts(field(content, 'relatedquests')), recipes, value: plainText(field(content, 'merchant_value')) }
+  return { notes, quests: linkTexts(field(content, 'relatedquests')), recipes, value: plainText(field(content, 'merchant_value')), vendors: parseVendors(content), sources: parseSources(content) }
+}
+
+/**
+ * Drops, forage and crafting. "dropsfrom" lists a zone link on its own line, then its creatures as
+ * bullets under it; a creature before any zone goes under ''.
+ */
+export function parseSources(content: string): ItemSources {
+  const drops: { zone: string; mobs: string[] }[] = []
+  for (const line of field(content, 'dropsfrom').split('\n')) {
+    const names = linkTexts(line)
+    if (!names.length) continue
+    if (line.trim().startsWith('*')) {
+      if (!drops.length) drops.push({ zone: '', mobs: [] })
+      drops[drops.length - 1].mobs.push(...names)
+    } else for (const zone of names) drops.push({ zone, mobs: [] })
+  }
+  return { drops, foraged: [...new Set(linkTexts(field(content, 'foraged')))], crafted: /\S/.test(field(content, 'playercrafted')) }
+}
+
+export interface Vendor {
+  zone: string
+  npc: string
+  /** Where in the zone, as the wiki says it; '' when it does not. */
+  note: string
+}
+
+/** The soldby field's rows: {{ItemWhereRow | [[Rivervale]] | [[Kizzie Mintopp]] | note | (loc) }}. */
+export function parseVendors(content: string): Vendor[] {
+  const out: Vendor[] = []
+  for (const m of field(content, 'soldby').matchAll(/\{\{ItemWhereRow\w*\s*\|([^\n]*?)\}\}/g)) {
+    const cells = m[1].split(/\|(?![^[]*\]\])/).map((c) => c.trim())
+    const zone = linkTexts(cells[0] ?? '')[0] ?? (cells[0] ?? '')
+    const npc = linkTexts(cells[1] ?? '')[0] ?? (cells[1] ?? '')
+    if (npc) out.push({ zone, npc, note: plainText(cells[2] ?? '') })
+  }
+  return out
 }
 
 /** An item page's parts, or null for a page that is not a piece of equipment (no Slot line). */

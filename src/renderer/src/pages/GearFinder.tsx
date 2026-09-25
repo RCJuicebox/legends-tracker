@@ -10,6 +10,7 @@ import { num, wikiUrl } from '../format'
 import { AC_OVER_CAP, useGearModel, type CatalogState, type GearMode } from '../gear/useGearModel'
 import { ItemIcon, source } from './gearBits'
 import { FocusTab, OptimizeTab } from './GearFocus'
+import { PetTab } from './GearPet'
 
 export type { GearMode }
 
@@ -60,6 +61,9 @@ export function GearFinder({ view, sheet, mode }: { view: InventoryView; sheet: 
       </div>
     )
   }
+
+  if (mode === 'pet')
+    return classes.length ? <PetTab m={model} /> : <div className="card empty">Set your classes and level on the Stats page, and the pet tools will know what your pet can wear.</div>
 
   const shown = (results ?? []).filter((r) => slot === 'all' || r.slot === slot)
   const withUpgrades = shown.filter((r) => r.candidates.length)

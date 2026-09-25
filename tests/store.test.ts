@@ -33,7 +33,7 @@ describe('merging saved settings over the defaults', () => {
   })
 
   it('does not bring back a default the player deleted', () => {
-    const merged = mergeDefaults(defaultSettings(), { overlays: [{ ...DEFAULT_OVERLAYS[0], x: 5 }] }, (id) => !['buffs', 'targets', 'alerts', 'meter'].includes(id))
+    const merged = mergeDefaults(defaultSettings(), { overlays: [{ ...DEFAULT_OVERLAYS[0], x: 5 }] }, (id) => !['buffs', 'targets', 'alerts', 'meter', 'respawns'].includes(id))
     expect(merged.overlays.map((o) => o.id)).toEqual(['buffs'])
     expect(merged.overlays[0].x).toBe(5)
   })

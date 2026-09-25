@@ -14,6 +14,10 @@ import { checkAgainstLog } from '../core/logCheck'
 import { MoteTracker, moteName, parseMoteLoot, type MoteState } from '../core/motes'
 import { CombatMeter, summarize as summarizeFight } from '../core/combatMeter'
 import { LootLedger, type LootSnapshot } from '../core/loot'
+import { RespawnLog, respawnView, type RespawnRecords, type RespawnView } from '../core/respawns'
+import { PetGearReader, petSummonName, type PetGearReading } from '../core/pets'
+import { askText, BuffWatch, buffNeeds, buffOffers, defaultWanted, type ActiveBuff, type BuffOffer, type BuffsFile, type BuffView, type Person } from '../core/buffs'
+import { CATEGORY_COLORS } from '../core/spellTracker'
 import { durationSec, fmtClock, fmtNum } from '../core/combatView'
 import { characterKey, characterName } from './storeCore'
 import { isGameFolder, lastZone, listLogs } from './game'
@@ -41,6 +45,10 @@ export interface EngineOutputs {
   stock: (stock: MoteStock) => void
   combat: (snapshot: CombatSnapshot) => void
   loot: (snapshot: LootView) => void
+  respawns: (view: RespawnView) => void
+  /** A `/pet inventory check` list, or a pet summoned, as the log reports it. */
+  pet: (update: { gear?: PetGearReading; summon?: { spell: string; at: number } }) => void
+  buffs: (view: BuffView) => void
 }
 
 /** The loot ledger with the meter's sessions, which its entries are filed under. */
@@ -80,6 +88,8 @@ export interface EngineStore {
   casts: Cell<Record<string, { rankedName: string; lastCast: number; count: number }>>
   motes: Cell<MoteState>
   stock: Cell<MoteStock>
+  respawns: Cell<RespawnRecords>
+  buffs: Cell<BuffsFile>
   readonly motesFresh: boolean
   characterOf(logFile: string): CharacterSettings
 }
@@ -109,6 +119,10 @@ interface Tail {
 }
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
+/** Warned this long before someone else's buff on you is due to fade: time to ask for it again. */
+const BUFF_WARN_SEC = 60
+/** An unchanged "ask for" is said again after this long, while it still holds. */
+const BUFF_REMIND_MS = 10 * 60_000
 
 export class Engine {
   book: SpellBook | null = null
@@ -158,6 +172,20 @@ export class Engine {
   readonly loot: LootLedger
   private lootDirty = false
   private lootSentAt = 0
+  /** How long mobs take to respawn, from kills and sightings. */
+  readonly respawns: RespawnLog
+  private respawnsDirty = false
+  private respawnsSentAt = 0
+  private readonly petReader: PetGearReader
+  /** Buffs on the character from others, who is who, and what to ask the group for. */
+  private readonly buffWatch: BuffWatch
+  private buffOfferList: BuffOffer[] = []
+  private buffsDirty = false
+  private buffsSentAt = 0
+  /** The last "ask for" told, and when, so it is not said again every few seconds. */
+  private lastAsk = { text: '', at: 0 }
+  /** Groupmates the player has been told to /who, once each. */
+  private readonly whoHinted = new Set<string>()
 
   constructor(
     private readonly store: EngineStore,
@@ -197,6 +225,21 @@ export class Engine {
         const sum = summarizeFight(f)
         this.pushFeed('fight', `${sum.name} · ${fmtClock(durationSec(f))} · ${fmtNum(sum.dps)} DPS (yours ${fmtNum(sum.yours / durationSec(f))})`)
       }
+    })
+    this.petReader = new PetGearReader((gear) => out.pet({ gear }))
+    this.buffWatch = new BuffWatch([], {
+      seconds: (spell, rank, caster) => this.buffSeconds(spell, rank, caster),
+      onChange: () => this.buffsChanged(),
+      onLand: (b) => this.buffLanded(b),
+      onFade: (b) => this.board.end(`buff:${b.spell}`, 'faded'),
+      onWho: (p) => this.learnPerson(p)
+    })
+    this.respawns = new RespawnLog(store.respawns.get(), {
+      onChange: () => {
+        this.store.respawns.set(this.respawns.records)
+        this.respawnsDirty = true
+      },
+      kindOf: (name) => this.meter.kindOf(name).kind
     })
     this.motes = new MoteTracker(store.motes.get(), {
       onChange: () => {
@@ -256,6 +299,9 @@ export class Engine {
     try {
       this.book = await SpellBook.load(this.settings.installDir)
       this.status.spellsLoaded = this.book.size
+      this.buffOfferList = buffOffers(this.book, this.settings.tracking.tierDurationPct)
+      this.buffWatch.setBook(this.book, this.buffOfferList)
+      this.buffsDirty = true
       this.status.spellError = ''
       this.tracker = new SpellTracker(this.book, this.board, this.trackerConfig(), {
         notify: (ns) => this.notify(ns),
@@ -349,6 +395,10 @@ export class Engine {
       if (n) this.pushFeed('info', `Switched to ${basename(logFile)}; cleared ${n} timer${n === 1 ? '' : 's'}.`)
     }
     this.watchedLog = logFile
+    // Each character's own buffs: the ones the last run saw on them, still running.
+    this.buffWatch.active = this.store.buffs.get().active[characterKey(logFile)] ?? []
+    this.buffWatch.prune(Date.now())
+    this.buffsDirty = true
     this.status.logFile = logFile
     this.status.character = characterName(logFile)
     this.meter.setSelf(this.status.character)
@@ -414,11 +464,142 @@ export class Engine {
     }
   }
 
-  /** A line through the damage meter, then the loot ledger, which files loot under the meter's session. */
+  /**
+   * A line through the damage meter, then the loot ledger, which files loot under the meter's
+   * session, and the respawn log, which goes by the meter's idea of who is a mob.
+   */
   private combatLine(line: LogLine): void {
-    this.meter.handle(line)
+    const ev = this.meter.handle(line)
+    this.buffWatch.handle(line.text, line.time, (name) => this.book?.resolve(name))
+    this.respawns.handle(line, this.meter.currentZone || this.status.zone, ev)
     const c = line.text.charCodeAt(0)
     if (c === 89 || c === 45) this.loot.handle(line, this.meter.currentZone, this.meter.sessionAt(line.time).id)
+  }
+
+  // ---- buffs ----
+
+  private get wantedBuffs(): string[] {
+    return this.store.buffs.get().wanted[this.characterKey()] ?? defaultWanted(this.buffOfferList)
+  }
+
+  /** The group as /who last described each member. */
+  private groupPeople(): { name: string; person: Person | null }[] {
+    const people = this.store.buffs.get().people
+    return this.meter.groupMembers.map((name) => ({ name, person: people[name.toLowerCase()] ?? null }))
+  }
+
+  buffView(): BuffView {
+    const group = this.groupPeople()
+    const active = this.buffWatch.active
+    const wanted = this.wantedBuffs
+    return {
+      offers: this.buffOfferList,
+      wanted,
+      defaults: !this.store.buffs.get().wanted[this.characterKey()],
+      group,
+      active,
+      needs: buffNeeds({ offers: this.buffOfferList, wanted, group: group.flatMap((g) => (g.person ? [g.person] : [])), active }),
+      spellsLoaded: !!this.book
+    }
+  }
+
+  /** The buffs the character wants; null goes back to the defaults. */
+  setWantedBuffs(list: string[] | null): BuffView {
+    const f = this.store.buffs.get()
+    const key = this.characterKey()
+    const wanted = { ...f.wanted }
+    if (list) wanted[key] = [...new Set(list)].sort()
+    else delete wanted[key]
+    this.store.buffs.set({ ...f, wanted })
+    this.lastAsk = { text: '', at: 0 }
+    this.buffsDirty = true
+    return this.buffView()
+  }
+
+  /** How long a buff lasts from this caster: yours with your focus, anyone else's at their /who level, unfocused. */
+  private buffSeconds(spell: Spell, rank: number, caster: string): number | null {
+    if (caster === 'You') {
+      const d = this.durationFor(spell, rank)
+      return d.permanent ? null : d.seconds
+    }
+    const level = this.store.buffs.get().people[caster.toLowerCase()]?.level ?? 50
+    const d = computeDuration({ spell, rank, level, tierPct: this.settings.tracking.tierDurationPct, focusPct: 0 })
+    return d.permanent ? null : d.seconds
+  }
+
+  private buffsChanged(): void {
+    const f = this.store.buffs.get()
+    const key = this.characterKey()
+    if (key) this.store.buffs.set({ ...f, active: { ...f.active, [key]: this.buffWatch.active } })
+    this.buffsDirty = true
+  }
+
+  private learnPerson(p: Person): void {
+    const f = this.store.buffs.get()
+    const k = p.name.toLowerCase()
+    if (f.people[k] && f.people[k].at >= p.at) return
+    this.store.buffs.set({ ...f, people: { ...f.people, [k]: p } })
+    this.buffsDirty = true
+  }
+
+  /** Someone else's buff on you: a timer on the buffs overlay, with a word before it fades. */
+  private buffLanded(b: ActiveBuff): void {
+    if (b.caster === 'You' || b.endsAt === null) return
+    const inGroup = this.meter.groupMembers.some((n) => n.toLowerCase() === b.caster.toLowerCase())
+    this.board.upsert({
+      key: `buff:${b.spell}`,
+      id: this.board.get(`buff:${b.spell}`)?.id ?? this.board.nextId(),
+      spell: b.spell,
+      label: b.ranked,
+      target: 'You',
+      source: 'spell',
+      category: 'buff',
+      icon: this.book?.named(b.ranked)?.icon,
+      color: CATEGORY_COLORS.buff,
+      overlay: 'buffs',
+      startedAt: b.landedAt,
+      endsAt: b.endsAt,
+      exact: false,
+      warnSec: BUFF_WARN_SEC,
+      onWarn: this.combatBacklog ? [] : [{ kind: 'speak', text: `${b.spell} is fading${inGroup ? `, ask ${b.caster}` : ''}`, interrupt: false }],
+      onExpire: [],
+      warned: false,
+      graceMs: 12_000
+    })
+  }
+
+  /** Says what to ask the group for, when it changes and again every so often, but never mid-fight. */
+  private remindBuffs(now: number): void {
+    if (this.combatBacklog || this.simulating || !this.status.watching) return
+    const group = this.groupPeople()
+    for (const g of group) {
+      if (g.person || this.whoHinted.has(g.name.toLowerCase())) continue
+      this.whoHinted.add(g.name.toLowerCase())
+      this.pushFeed('info', `Type /who ${g.name} so the buff tracker knows the classes ${g.name} plays.`)
+    }
+    const needs = this.buffView().needs
+    const text = needs.length ? askText(needs) : ''
+    if (!text) {
+      this.lastAsk = { text: '', at: 0 }
+      return
+    }
+    if (this.meter.fighting) return
+    if (text === this.lastAsk.text && now - this.lastAsk.at < BUFF_REMIND_MS) return
+    this.lastAsk = { text, at: now }
+    this.pushFeed('info', `Buffs: ${text}.`)
+    this.notify([
+      { kind: 'speak', text, interrupt: false },
+      { kind: 'text', text, color: CATEGORY_COLORS.buff, durationSec: 6 }
+    ])
+  }
+
+  respawnView(): RespawnView {
+    return respawnView(this.respawns.records, this.store.triggers.get(), this.status.zone)
+  }
+
+  /** The page shows which mobs have timers, so it hears when the triggers change. */
+  triggersChanged(): void {
+    this.respawnsDirty = true
   }
 
   lootView(): LootView {
@@ -506,6 +687,7 @@ export class Engine {
       if (!line) continue
       this.tracker?.handle(line)
       this.triggers.handle(line)
+      this.petLine(line)
       if (this.moteBacklog) this.moteBacklog.push(line)
       else this.motes.handle(line)
       if (this.combatBacklog) this.combatBacklog.push(line)
@@ -514,6 +696,15 @@ export class Engine {
       this.statusDirty = true
     }
     if (!this.moteBacklog) this.linePos = { logFile: t.logFile, offset: end }
+  }
+
+  /** What the pet wears and which pet it is, as the log tells it. */
+  private petLine(line: LogLine): void {
+    this.petReader.handle(line.text, line.time)
+    if (this.book && line.text.startsWith('You begin casting ')) {
+      const spell = petSummonName(this.book, line.text.slice(18, -1))
+      if (spell) this.out.pet({ summon: { spell, at: line.time } })
+    }
   }
 
   /** Feeds pasted log lines through the live pipeline, with their times shifted to now. */
@@ -541,6 +732,7 @@ export class Engine {
   private tick(): void {
     const now = Date.now()
     this.board.tick(now)
+    this.petReader.tick(now)
     this.motes.tick(now)
     if (!this.combatBacklog) this.meter.tick(now)
     if (this.combatDirty && now - this.combatSentAt > 500) {
@@ -552,6 +744,20 @@ export class Engine {
       this.lootDirty = false
       this.lootSentAt = now
       this.out.loot(this.lootView())
+    }
+    if (now - this.buffsSentAt > 5000 || (this.buffsDirty && now - this.buffsSentAt > 1000)) {
+      this.buffsSentAt = now
+      this.buffWatch.prune(now)
+      this.remindBuffs(now)
+      if (this.buffsDirty) {
+        this.buffsDirty = false
+        this.out.buffs(this.buffView())
+      }
+    }
+    if (this.respawnsDirty && now - this.respawnsSentAt > 1000) {
+      this.respawnsDirty = false
+      this.respawnsSentAt = now
+      this.out.respawns(this.respawnView())
     }
     if (this.motesDirty && now - this.motesSentAt > 1000) {
       this.motesDirty = false

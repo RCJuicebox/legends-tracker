@@ -422,3 +422,51 @@ describe('CombatMeter', () => {
     expect(m.snapshot()).toMatchObject({ fights: [], sessions: [], liveFight: null, liveSession: null, pets: [] })
   })
 })
+
+describe('charm pets', () => {
+  // Real lines (a groupmate's Allure V on an ire ghast, 2026-08-08), names swapped.
+  const CHARM = `
+    [Sat Aug 08 20:37:00 2026] You have entered The Plane of Hate 4 (Refined).
+    [Sat Aug 08 20:37:01 2026] Dorran has joined the group.
+    [Sat Aug 08 20:37:41 2026] Dorran begins casting Allure V.
+    [Sat Aug 08 20:37:41 2026] An ire ghast hits Dorran for 43 points of damage.
+    [Sat Aug 08 20:37:42 2026] an ire ghast has been charmed.
+    [Sat Aug 08 20:39:50 2026] An ire ghast hits a haunted chest for 64 points of damage.
+    [Sat Aug 08 20:39:51 2026] An ire ghast crushes a haunted chest for 84 points of damage.
+    [Sat Aug 08 20:39:52 2026] An ire ghast tries to hit a haunted chest, but a haunted chest parries!
+    [Sat Aug 08 20:39:53 2026] A haunted chest hits an ire ghast for 30 points of damage.
+    [Sat Aug 08 20:39:54 2026] You punch a haunted chest for 100 points of damage.`
+
+  it('books a charmed mob’s blows on enemies to a pet of its charmer, apart from mobs of its name', () => {
+    const { m, feed } = meter()
+    feed(CHARM)
+    const ents = m.snapshot().liveSession!.entities
+    const pet = ents['an ire ghast (charmed)']
+    expect(pet).toMatchObject({ name: 'An ire ghast (charmed)', kind: 'pet', owner: 'Dorran' })
+    expect(pet.out.total).toBe(64 + 84)
+    expect(pet.in.total).toBe(30)
+    // Before the charm, the ghast was an enemy hitting Dorran; that stays the enemy's.
+    expect(ents['an ire ghast'].out.total).toBe(43)
+    expect(ents['a haunted chest'].in.total).toBe(64 + 84 + 100)
+  })
+
+  it('ends the charm when the pet turns on the group, and not before', () => {
+    const { m, feed } = meter()
+    feed(`${CHARM}
+      [Sat Aug 08 20:40:30 2026] An ire ghast hits Dorran for 50 points of damage.
+      [Sat Aug 08 20:40:31 2026] An ire ghast hits a haunted chest for 70 points of damage.`)
+    const ents = m.snapshot().liveSession!.entities
+    expect(ents['an ire ghast'].out.total).toBe(43 + 50)
+    // Charm over: a mob hitting a mob is nobody's, and is dropped.
+    expect(ents['an ire ghast (charmed)'].out.total).toBe(64 + 84)
+  })
+
+  it('claims no charm without a friend’s cast just before it', () => {
+    const { m, feed } = meter()
+    feed(`
+      [Sat Aug 08 20:37:00 2026] You have entered The Plane of Hate 4 (Refined).
+      [Sat Aug 08 20:37:42 2026] an ire ghast has been charmed.
+      [Sat Aug 08 20:39:50 2026] An ire ghast hits a haunted chest for 64 points of damage.`)
+    expect(m.snapshot().liveSession?.entities['an ire ghast (charmed)']).toBeUndefined()
+  })
+})

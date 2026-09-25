@@ -44,7 +44,7 @@ export interface CatalogState {
   progress: { busy: boolean; pages: number; total: number; error: string }
 }
 
-export type GearMode = 'finder' | 'focus' | 'optimize'
+export type GearMode = 'finder' | 'focus' | 'optimize' | 'pet'
 
 /** A focus effect on something the character owns, and how they have it. */
 export interface OwnedFocus {

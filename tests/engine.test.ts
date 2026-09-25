@@ -62,6 +62,8 @@ function makeEngine(o: { logFile: string; motes?: MoteState; stock?: MoteStock }
     casts: cell({}),
     motes: cell<MoteState>(o.motes ?? { active: null, sessions: [], daily: {} }),
     stock: cell<MoteStock>(o.stock ?? { counts: {}, item: { name: '', lvl: 0, xp: 0, to: 1 }, autoAdd: true }),
+    respawns: cell({}),
+    buffs: cell({ people: {}, wanted: {}, active: {} }),
     motesFresh: false,
     characterOf: () => ({ level: 50, classLevels: {}, focusSources: [] })
   } satisfies EngineStore
@@ -78,7 +80,7 @@ function makeEngine(o: { logFile: string; motes?: MoteState; stock?: MoteStock }
   const engine = new Engine(
     store,
     { synthesize: async () => Buffer.alloc(0) },
-    { timers: noop, alert: noop, audio: noop, status: noop, feed: (i) => feed.push(i), archive: noop, motes: noop, moteScan: noop, stock: noop, combat: noop, loot: noop },
+    { timers: noop, alert: noop, audio: noop, status: noop, feed: (i) => feed.push(i), archive: noop, motes: noop, moteScan: noop, stock: noop, combat: noop, loot: noop, respawns: noop, pet: noop, buffs: noop },
     env
   )
   engines.push(engine)
