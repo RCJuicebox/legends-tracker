@@ -87,15 +87,11 @@ export function StateProvider({ children }: { children: ReactNode }) {
       const fresh = await api.invoke<AppState>('app:state')
       setState((s) => (s ? { ...s, character: fresh.character, characterKey: fresh.characterKey } : s))
     } catch (e) {
+      // What was typed stays on screen rather than snapping back mid-edit (typing 200 passes
+      // through 2); the next change that is accepted saves it all.
       showError('Could not save settings', e)
-      // Show what is really stored, not the change that was refused.
-      try {
-        takeSettings((await api.invoke<AppState>('app:state')).settings)
-      } catch {
-        // The next push from the main process corrects it.
-      }
     }
-  }, [takeSettings])
+  }, [])
 
   const patchSettings = useCallback(
     async (fn: Patch, opts?: { debounceMs?: number }) => {
