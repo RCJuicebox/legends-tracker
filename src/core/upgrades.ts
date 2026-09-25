@@ -17,6 +17,13 @@ export const SLOT_WORDS: Record<string, string[]> = {
   Chest: ['CHEST'], Legs: ['LEGS'], Feet: ['FEET'], Waist: ['WAIST'], Ammo: ['AMMO'], 'Any Slot': ['CHARM']
 }
 
+/** Legends' two Any slots take any piece of gear: a shield, a necklace, a charm. */
+export const ANY_SLOT = 'Any Slot'
+const EVERY_SLOT_WORD = [...new Set(Object.values(SLOT_WORDS).flat())]
+
+/** Lore: one to a character, so one already worn cannot be worn again elsewhere. */
+export const isLore = (statsblock: string) => /\bLORE\b/i.test(statsblock)
+
 export const OTHER_ERA = 'Other'
 export const OTHER_OUT_ERA = 'Other OOE'
 /** Groups out of era on EverQuest Legends: hidden unless the player turns them on. */
@@ -144,7 +151,7 @@ export interface Wearer {
 }
 
 export function canWear(r: Restrictions, who: Wearer, slot: string): boolean {
-  const words = SLOT_WORDS[slot] ?? []
+  const words = slot === ANY_SLOT ? EVERY_SLOT_WORD : (SLOT_WORDS[slot] ?? [])
   if (!r.slots.some((s) => words.includes(s))) return false
   if (!r.classes.includes('ALL') && !who.classes.some((c) => r.classes.includes(CLASS_CODE[c] ?? ''))) return false
   if (who.race && r.races.length && !r.races.includes('ALL') && !r.races.includes(who.race)) return false
@@ -218,13 +225,21 @@ export interface Candidate {
   era: string
   /** The era came from the zones it drops in, not a tag on its page. */
   eraInferred: boolean
+  /** Its focus effect, and what swapping it in does to the worth of the foci worn (in score points). */
+  focus: { name: string; gain: number } | null
 }
 
 export interface SlotResult {
   slot: string
   /** The worn item this would replace: the weaker one where the slot comes in pairs. */
-  current: { item: InvItem; score: number; stats: ItemStats | null } | null
+  current: { item: InvItem; score: number; stats: ItemStats | null; focusLoss: number } | null
   candidates: Candidate[]
+}
+
+/** Focus effects in the finder: what a worn item carries (with its exaltations) and what a set of foci is worth. */
+export interface FinderFocus {
+  worn: (item: InvItem) => string[]
+  value: (names: string[]) => number
 }
 
 export interface FinderOptions {
@@ -244,6 +259,7 @@ export interface FinderOptions {
   twoHanders?: boolean
   /** itemKeys of everything the character owns anywhere. */
   owned: Set<string>
+  focus?: FinderFocus
   perSlot?: number
 }
 
@@ -255,18 +271,34 @@ export function findUpgrades(o: FinderOptions): SlotResult[] {
   const parsed = o.catalog.map((item) => ({ item, r: restrictions(item.statsblock), base: parseStatsBlock(item.statsblock), ...eraOf(item, zones, o.eraStatus) }))
   const slots = [...new Set(o.worn.map((w) => w.location))]
   for (const s of Object.keys(SLOT_WORDS)) if (!slots.includes(s)) slots.push(s)
+  const wornAnywhere = new Set(o.worn.map((w) => itemKey(w.name)))
+  // The foci worn now, item by item, and what they are worth together.
+  const wornFoci = o.worn.map((w) => o.focus?.worn(w) ?? [])
+  const focusNow = o.focus ? o.focus.value(wornFoci.flat()) : 0
+  const focusWithout = (item: InvItem | undefined, add: string[] = []) =>
+    o.focus ? o.focus.value([...wornFoci.filter((_, i) => o.worn[i] !== item).flat(), ...add]) : 0
+  // Haste does not add up: only the best worn counts. Items are scored without it, and haste is
+  // counted as what the best worn one gives, so a second haste item is worth only what it adds.
+  const wornHaste = o.worn.map((w) => o.statsOf(w)?.haste ?? 0)
+  const hasteNow = Math.max(0, ...wornHaste)
+  const hasteWithout = (item?: InvItem) => Math.max(0, ...wornHaste.filter((_, i) => o.worn[i] !== item))
   return slots.map((slot) => {
     // A weapon's damage and delay only matter in the hands; anywhere else they are no reason to wear it.
-    const weights: Weights = WEAPON_SLOTS.includes(slot) ? o.weights : { ...o.weights, ratio: 0 }
+    const shown: Weights = WEAPON_SLOTS.includes(slot) ? o.weights : { ...o.weights, ratio: 0 }
+    const weights: Weights = { ...shown, haste: 0 }
     const worn = o.worn.filter((w) => w.location === slot)
     const scored = worn.map((item) => {
       const stats = o.statsOf(item)
-      return { item, stats, score: stats ? score(stats, weights) : 0 }
+      const hasteLoss = (hasteNow - hasteWithout(item)) * o.weights.haste
+      return { item, stats, score: (stats ? score(stats, weights) : 0) + hasteLoss, focusLoss: focusNow - focusWithout(item) }
     })
-    const current = scored.sort((a, b) => a.score - b.score)[0] ?? null
+    // The one to replace is the one worth least, its focus effects counted.
+    const current = scored.sort((a, b) => a.score + a.focusLoss - (b.score + b.focusLoss))[0] ?? null
     const level = current ? mergeLevel(current.item.name) : 0
     const wornKeys = new Set(worn.map((w) => itemKey(w.name)))
     const currentValues = current?.stats ? statValues(current.stats) : null
+    const withoutCurrent = focusWithout(current?.item)
+    const hasteLeft = hasteWithout(current?.item)
     const candidates: Candidate[] = []
     for (const p of parsed) {
       if (hidden.has(p.era)) continue
@@ -274,19 +306,36 @@ export function findUpgrades(o: FinderOptions): SlotResult[] {
       if (/^Summoned:/i.test(p.item.title)) continue
       if (!canWear(p.r, o.wearer, slot)) continue
       if (slot === 'Primary' && !o.twoHanders && isTwoHanded(p.r)) continue
-      if (wornKeys.has(itemKey(p.item.title))) continue
+      const key = itemKey(p.item.title)
+      if (wornKeys.has(key) || (wornAnywhere.has(key) && isLore(p.item.statsblock))) continue
       const stats = o.compare === 'level' && level ? scaledStats(p.base, level) : p.base
-      const sc = score(stats, weights)
-      const delta = sc - (current?.score ?? 0)
+      const hasteChange = Math.max(hasteLeft, stats.haste) - hasteNow
+      const sc = score(stats, weights) + (Math.max(hasteLeft, stats.haste) - hasteLeft) * o.weights.haste
+      const focusGain = !o.focus ? 0 : (p.item.focus ? focusWithout(current?.item, [p.item.focus]) : withoutCurrent) - focusNow
+      const delta = sc - (current?.score ?? 0) + focusGain
       if (delta <= 0) continue
       const values = statValues(stats)
       const diffs = (Object.keys(values) as WeightKey[])
-        .map((k) => ({ key: k, label: WEIGHT_LABELS[k], delta: Math.round((values[k] - (currentValues?.[k] ?? 0)) * 100) / 100 }))
-        .filter((d) => d.delta !== 0 && weights[d.key] !== 0)
-        .sort((a, b) => Math.abs(b.delta * weights[b.key]) - Math.abs(a.delta * weights[a.key]))
-      candidates.push({ item: p.item, stats, score: sc, delta, diffs, owned: o.owned.has(itemKey(p.item.title)), era: p.era, eraInferred: p.inferred })
+        .map((k) => ({ key: k, label: WEIGHT_LABELS[k], delta: Math.round((k === 'haste' ? hasteChange : values[k] - (currentValues?.[k] ?? 0)) * 100) / 100 }))
+        .filter((d) => d.delta !== 0 && shown[d.key] !== 0)
+        .sort((a, b) => Math.abs(b.delta * shown[b.key]) - Math.abs(a.delta * shown[a.key]))
+      candidates.push({
+        item: p.item,
+        stats,
+        score: sc,
+        delta,
+        diffs,
+        owned: o.owned.has(key),
+        era: p.era,
+        eraInferred: p.inferred,
+        focus: p.item.focus ? { name: p.item.focus, gain: focusGain } : null
+      })
     }
     candidates.sort((a, b) => b.delta - a.delta)
-    return { slot, current: current ? { item: current.item, score: current.score, stats: current.stats } : null, candidates: candidates.slice(0, perSlot) }
+    return {
+      slot,
+      current: current ? { item: current.item, score: current.score, stats: current.stats, focusLoss: current.focusLoss } : null,
+      candidates: candidates.slice(0, perSlot)
+    }
   })
 }

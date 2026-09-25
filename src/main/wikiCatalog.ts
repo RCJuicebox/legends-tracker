@@ -1,7 +1,7 @@
 import { app } from 'electron'
 import { promises as fs } from 'node:fs'
 import { join } from 'node:path'
-import { parseItemPage, type CatalogItem } from '../core/wikiItem'
+import { CATALOG_FORMAT, parseItemPage, type CatalogItem } from '../core/wikiItem'
 import { parseEraStatus } from '../core/upgrades'
 
 // Every piece of equipment on eqlwiki.com, for the upgrade finder. The wiki's Items category is read
@@ -12,7 +12,7 @@ const AGENT = 'LegendsTracker (https://github.com/RCJuicebox/legends-tracker)'
 const FRESH_MS = 7 * 24 * 3600_000
 
 /** Bumped when what a download keeps changes, so an older file is fetched again. */
-const FORMAT = 2
+const FORMAT = CATALOG_FORMAT
 
 export interface CatalogFile {
   fetchedAt: number

@@ -16,7 +16,7 @@ import {
 } from '../../../core/inventory'
 import type { CharacterSheet, InventoryView, ItemInfo } from '../../../shared/types'
 import { className } from '../../../core/acModel'
-import { GearFinder } from './GearFinder'
+import { GearFinder, type GearMode } from './GearFinder'
 
 const who = (key: string) => key.replace('_', ' · ')
 const num = (n: number) => n.toLocaleString()
@@ -82,7 +82,7 @@ const LEFT = ['Head', 'Face', 'Ear', 'Ear', 'Neck', 'Shoulders', 'Back', 'Arms']
 const RIGHT = ['Chest', 'Wrist', 'Wrist', 'Hands', 'Fingers', 'Fingers', 'Waist', 'Legs', 'Feet']
 const HANDS = ['Primary', 'Secondary', 'Range', 'Ammo']
 const CHARMS = ['Any Slot', 'Any Slot']
-const SLOT_NAMES: Record<string, string> = { 'Any Slot': 'Charm' }
+const SLOT_NAMES: Record<string, string> = { 'Any Slot': 'Any slot' }
 
 /** Worn items by slot, each slot's items in the export's order. */
 function bySlot(worn: InvItem[]): Map<string, InvItem[]> {
@@ -122,7 +122,7 @@ export function Gear({ go }: { go?: (page: 'motes') => void }) {
   const [selected, setSelected] = useState<string | null>(null)
   const [scaled, setScaled] = useRemembered<boolean>('gear.scaled', true)
   const [refreshing, setRefreshing] = useState(false)
-  const [mode, setMode] = useRemembered<'sheet' | 'finder'>('gear.view', 'sheet')
+  const [mode, setMode] = useRemembered<'sheet' | GearMode>('gear.view', 'sheet')
 
   if (!exports || !view) return <div className="empty">Loading…</div>
 
@@ -227,16 +227,22 @@ export function Gear({ go }: { go?: (page: 'motes') => void }) {
         <button className={mode === 'finder' ? 'on' : ''} onClick={() => setMode('finder')}>
           Upgrade finder
         </button>
+        <button className={mode === 'focus' ? 'on' : ''} onClick={() => setMode('focus')}>
+          Focus effects
+        </button>
+        <button className={mode === 'optimize' ? 'on' : ''} onClick={() => setMode('optimize')}>
+          Optimize what you own
+        </button>
       </span>
     </div>
   )
 
-  if (mode === 'finder')
+  if (mode !== 'sheet')
     return (
       <>
         {head}
         {switcher}
-        <GearFinder view={view} sheet={sheet} />
+        <GearFinder view={view} sheet={sheet} mode={mode} />
       </>
     )
 
@@ -250,7 +256,7 @@ export function Gear({ go }: { go?: (page: 'motes') => void }) {
           <CharacterCard name={name} server={server} level={stats.level} classes={classes} view={view} sheet={sheet} />
           <div className="lt-subhead">Weapons</div>
           <div className="lt-grid2">{hands}</div>
-          <div className="lt-subhead">Charms</div>
+          <div className="lt-subhead">Any slots</div>
           <div className="lt-grid2">{charms}</div>
         </div>
         <div className="lt-side">{right}</div>

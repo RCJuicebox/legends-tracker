@@ -8,7 +8,8 @@ import { CLASS_NAMES, type SpellCategory, type SpellSummary } from '../shared/ty
  *
  * Field positions were established against the EQL client (2026-09): 8 cast time (ms), 10 recast,
  * 11 duration formula, 12 duration cap in ticks, 28 beneficial flag, 36–51 class levels (255 = cannot
- * cast), 75 icon index, 172 effect slots as `slot|spa|base|base2|formula|max` joined by `$`.
+ * cast), 30 target type (13 lifetap), 32 casting skill (70 percussion…), 75 icon index, 172 effect
+ * slots as `slot|spa|base|base2|formula|max` joined by `$`.
  */
 export interface Spell {
   id: number
@@ -19,6 +20,10 @@ export interface Spell {
   cap: number
   beneficial: boolean
   classLevels: number[]
+  /** The spell file's target type: 5 single, 6 self, 13 lifetap… */
+  targetType: number
+  /** The casting skill: 24 evocation, 49 stringed, 54 wind, 70 percussion… */
+  skill: number
   icon: number
   effects: SpellEffect[]
   category: SpellCategory
@@ -40,7 +45,7 @@ export interface RankedSpell {
   rankedName: string
 }
 
-const F = { id: 0, name: 1, cast: 8, recast: 10, formula: 11, cap: 12, good: 28, cls: 36, icon: 75, effects: 172 }
+const F = { id: 0, name: 1, cast: 8, recast: 10, formula: 11, cap: 12, good: 28, target: 30, skill: 32, cls: 36, icon: 75, effects: 172 }
 
 const ROMAN: Record<string, number> = {
   I: 1, II: 2, III: 3, IV: 4, V: 5, VI: 6, VII: 7, VIII: 8, IX: 9, X: 10,
@@ -111,6 +116,8 @@ export class SpellBook {
         cap,
         beneficial,
         classLevels: f.slice(F.cls, F.cls + 16).map(Number),
+        targetType: +f[F.target] || 0,
+        skill: +f[F.skill] || 0,
         icon: +f[F.icon],
         effects,
         category: categorize(beneficial, formula !== 0 || cap !== 0, effects),
@@ -150,6 +157,11 @@ export class SpellBook {
     if (!m) return undefined
     const base = this.byName.get(m[1])
     return base ? { spell: base, rank: ROMAN[m[2]], rankedName } : undefined
+  }
+
+  /** Every spell, one per name. */
+  all(): IterableIterator<Spell> {
+    return this.byName.values()
   }
 
   /** Spells whose name contains `query`. Focus spells belong to items, not classes, so `anyone` includes them. */

@@ -2241,3 +2241,126 @@ table.table {
 .lt-worth {
   line-height: 1.6;
 }
+
+/* ---------- gear: focus effects and the optimizer ---------- */
+
+.lt-chip.focus,
+.lt-chip.good {
+  background: rgba(92, 194, 122, 0.16);
+  color: var(--green);
+}
+.lt-chip.warn {
+  background: rgba(232, 180, 76, 0.16);
+  color: var(--accent-2);
+}
+.lt-chip.bad {
+  background: rgba(226, 90, 90, 0.16);
+  color: var(--red);
+}
+.lt-focus {
+  display: grid;
+  gap: 2px;
+  padding: 12px 14px;
+}
+.lt-focus-row {
+  display: grid;
+  grid-template-columns: 26px minmax(200px, 1.1fr) minmax(220px, 1.2fr) minmax(220px, 1.2fr);
+  gap: 14px;
+  align-items: start;
+  padding: 10px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+}
+.lt-focus-row:last-child {
+  border-bottom: none;
+}
+.lt-focus-row.off > :not(.lt-focus-toggle) {
+  opacity: 0.45;
+}
+.lt-focus-toggle input {
+  margin-top: 3px;
+  width: 16px;
+  height: 16px;
+  accent-color: var(--accent);
+}
+.lt-focus-line,
+.lt-focus-col {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+.lt-focus-cap {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-3);
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.lt-focus-cap .lt-chip {
+  text-transform: none;
+  letter-spacing: 0;
+}
+.lt-focus-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12.5px;
+  min-width: 0;
+}
+.lt-focus-item a {
+  color: var(--text);
+  text-decoration: none;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.lt-focus-item a:hover {
+  color: var(--accent-2);
+  text-decoration: underline;
+}
+.lt-focus-item .faint {
+  white-space: nowrap;
+}
+.lt-opt {
+  display: grid;
+  padding: 6px 14px;
+}
+.lt-opt-row {
+  display: grid;
+  grid-template-columns: 90px 1fr auto;
+  gap: 12px;
+  align-items: start;
+  padding: 9px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+}
+.lt-opt-row:last-child {
+  border-bottom: none;
+}
+.lt-opt-table {
+  display: grid;
+  grid-template-columns: minmax(200px, 1.3fr) 0.6fr 0.9fr 1.4fr;
+  gap: 6px 14px;
+  align-items: start;
+}
+.lt-opt-line {
+  display: contents;
+}
+.lt-opt-line > span {
+  padding: 6px 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.04);
+}
+.lt-up {
+  color: var(--green);
+}
+.lt-down {
+  color: var(--red);
+}
+@media (max-width: 900px) {
+  .lt-focus-row {
+    grid-template-columns: 26px 1fr;
+  }
+  .lt-focus-row .lt-focus-col {
+    grid-column: 2;
+  }
+}

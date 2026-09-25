@@ -1,5 +1,8 @@
 // An eqlwiki item page, as far as the upgrade finder needs it: the in-game stats block, the icon,
-// which era the item belongs to, and where it comes from.
+// its focus effect, which era the item belongs to, and where it comes from.
+
+/** Bumped when a catalog entry gains something, so a stored catalog from an older build is fetched again. */
+export const CATALOG_FORMAT = 3
 
 export interface CatalogItem {
   title: string
@@ -7,6 +10,8 @@ export interface CatalogItem {
   statsblock: string
   /** Icon number (lucy_img_ID), 500 and up; 0 when unknown. */
   icon: number
+  /** The focus effect it carries ("Extended Enhancement II"); '' for none. */
+  focus: string
   /** The page's era template name without " Era": 'Classic', 'Chardok Revamp' …; '' when untagged. */
   era: string
   /** Zones the page lists it dropping in. */
@@ -44,6 +49,7 @@ export function parseItemPage(title: string, content: string): CatalogItem | nul
     title,
     statsblock,
     icon: Number(field(content, 'lucy_img_ID')) || 0,
+    focus: field(content, 'focus_effect').replace(/\[\[(?:[^\]|]*\|)?([^\]]*)\]\]/g, '$1').replace(/_/g, ' ').trim(),
     era: /\{\{\s*([A-Za-z][A-Za-z ]*?)\s+Era\s*\}\}/.exec(content)?.[1] ?? '',
     zones: [...new Set(zones)],
     mobs: [...new Set(mobs)],

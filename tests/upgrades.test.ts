@@ -76,3 +76,30 @@ describe('eras', () => {
     expect(normalizeEra('Kunark', status)).toBe('Classic')
   })
 })
+
+describe('haste in the finder', () => {
+  const page = (name: string, block: string) => `{{Classic Era}}\n<onlyinclude>{{Itempage\n|itemname    = ${name}\n|statsblock  = \n${block}\n|dropsfrom = \n\n}}</onlyinclude>`
+  const blocks: Record<string, string> = {
+    'Haste Cloak': 'Slot: BACK<br>\nHaste: +41%<br>\nClass: ALL<br>\nRace: ALL<br>',
+    'Plain Belt': 'Slot: WAIST<br>\nAC: 2<br>\nClass: ALL<br>\nRace: ALL<br>',
+    'Haste Belt': 'Slot: WAIST<br>\nHaste: +46%<br>\nClass: ALL<br>\nRace: ALL<br>'
+  }
+  it('counts only what a second haste item adds over the best worn', () => {
+    expect(parseStatsBlock(blocks['Haste Belt']).haste).toBe(46)
+    const inv = parseInventory(['Location\tName\tID\tCount\tSlots', 'Back\tHaste Cloak\t1\t1\t10', 'Waist\tPlain Belt\t2\t1\t10'].join('\n'))
+    const weights = { ...PRESETS.Tank, ac: 1, haste: 10 }
+    const waist = findUpgrades({
+      worn: inv.worn,
+      statsOf: (it) => parseStatsBlock(blocks[it.name]),
+      catalog: [parseItemPage('Haste Belt', page('Haste Belt', blocks['Haste Belt']))!],
+      wearer: { classes: ['shd'], race: '', level: 50 },
+      weights,
+      compare: 'drop',
+      hiddenEras: [],
+      owned: new Set()
+    }).find((s) => s.slot === 'Waist')!
+    // 5 more haste than the cloak's, at 10 a point, less the plain belt's 2 AC.
+    expect(waist.candidates[0].delta).toBe(5 * 10 - 2)
+    expect(waist.candidates[0].diffs.find((d) => d.key === 'haste')?.delta).toBe(5)
+  })
+})

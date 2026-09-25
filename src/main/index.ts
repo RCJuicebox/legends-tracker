@@ -18,6 +18,7 @@ import { captureScreens, ocrImage } from './ocr'
 import { composeRows, countsFromComposite, findMoteRows, rows as ocrRows, statsWindowFromScreen } from '../core/screenText'
 import { checkGameFolder, findInstall, listLogs, logIsIn, resolveGameFolder } from './game'
 import { summarize } from '../core/spells'
+import { castableSpells, focusReport, focusSpec } from '../core/itemFocus'
 import { focusFromSpell, isDurationFocus } from '../core/focus'
 import { testTrigger } from '../core/triggers'
 import { timerKey } from '../core/spellTracker'
@@ -428,6 +429,15 @@ function registerIpc(): void {
   handle('gear:catalogRefresh', async () => {
     const file = await wikiCatalog.refresh()
     return { file, stale: wikiCatalog.isStale(file), progress: wikiCatalog.progress }
+  })
+
+  // Focus effects on gear, read from the game's spell file: each one's line and strength for these
+  // classes at this level, and which of their spells each line improves.
+  handle('gear:foci', (names: string[], classes: string[], level: number) => {
+    const book = engine.book
+    if (!book) return null
+    const specs = [...new Set(names)].map((n) => book.named(n)).flatMap((s) => (s ? [focusSpec(s)] : [])).filter((f) => f !== null)
+    return focusReport(specs, castableSpells(book.all(), classes, level), classes, level)
   })
 
   handle('stats:caps', async (classes: string[], level: number) => ({

@@ -77,10 +77,10 @@ function list(inv: Inventory, top: string): InvItem[] | undefined {
   return undefined
 }
 
-/** The worn slot an item sits in, as the game names it: "Any Slot" reads better as Charm. */
+/** The worn slot an item sits in, as the game names it. The two Any slots take any piece of gear. */
 export function slotLabel(location: string): string {
   const top = location.split('-')[0]
-  return top === 'Any Slot' ? 'Charm' : top
+  return top === 'Any Slot' ? 'Any slot' : top
 }
 
 /** "Earring of Bashing +7" → 7. Merge levels run 0-10. */
