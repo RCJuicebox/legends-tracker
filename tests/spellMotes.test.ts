@@ -78,10 +78,29 @@ describe('what a rank gives', () => {
     expect(isAbility({ classLevels: levels([4, 49], [10, 39]) })).toBe(false)
   })
 
-  it('files pet summons under their own section', () => {
+  it('files pet summons, transport and heals that heal nothing under their own sections', () => {
     expect(sectionOf('heal', true)).toBe('pet')
     expect(sectionOf('mez', false)).toBe('cc')
     expect(sectionOf('nuke', false)).toBe('nuke')
+    // Gate (SPA 26) and Bind Affinity (SPA 25) are beneficial instants in the file: heals, until their effects are read.
+    expect(sectionOf('heal', false, [{ spa: 26, base: 1 }])).toBe('transport')
+    expect(sectionOf('nuke', false, [{ spa: 25, base: 1 }])).toBe('transport')
+    // Cure Disease (SPA 35, negative counters) heals nothing; Superior Healing (SPA 0, positive) does.
+    expect(sectionOf('heal', false, [{ spa: 35, base: -2 }])).toBe('utility')
+    expect(sectionOf('heal', false, [{ spa: 0, base: 583 }])).toBe('heal')
+    const { rows } = castRows(book, { 'Superior Healing': 1 }, character)
+    expect(rows[0]).toMatchObject({ section: 'heal', classNames: ['Cleric', 'Paladin', 'Druid', 'Shaman'] })
+  })
+
+  it('gives transport and utility spells only the cast and mana cuts', () => {
+    const gate = { ...castRows(book, { 'Superior Healing': 10 }, character).rows[0], name: 'Gate', section: 'transport' as const }
+    const [o] = spellUpgradeOptions({ rows: [gate], tierPct: DEFAULT_TIER_DURATION_PCT })
+    expect(o.parts.map((p) => [p.key, p.pct])).toEqual([
+      ['mana', 2],
+      ['cast', 4],
+      ['reuse', 4]
+    ])
+    expect(o.section).toBe('transport')
   })
 })
 

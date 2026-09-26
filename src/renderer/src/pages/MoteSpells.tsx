@@ -6,12 +6,15 @@ import { useRemembered } from '../remember'
 import { CategoryChip, Info, NumberInput, Pending, SpellIcon } from '../components/ui'
 import { num, roundPct } from '../format'
 import { useStock } from './MotePlanner'
+import { CLASS_NUMBER } from '../../../core/acModel'
 import { MOTE_RANKS } from '../../../core/motes'
+import { CLASS_NAMES } from '../../../shared/types'
 import {
   DEFAULT_SPELL_WEIGHTS,
   RANK_BONUS,
   SECTIONS,
   UNIVERSAL,
+  UTILITY_BONUS,
   WEIGHT_LABELS,
   spellUpgradeOptions,
   stockXp,
@@ -27,9 +30,16 @@ interface Casts {
   rows: SpellCastRow[]
   unknown: { name: string; casts: number }[]
   window: { total: number; from: string; to: string } | null
+  /** Your classes as the game names them, from /who or the character sheet. */
+  mine: string[]
 }
 
 const short = (i: number) => MOTE_RANKS[i].name || 'Potential'
+/** "Shadow Knight" → "SHD", the way /who abbreviates classes. */
+const classId = (name: string) =>
+  Object.entries(CLASS_NUMBER)
+    .find(([, n]) => CLASS_NAMES[n - 1] === name)?.[0]
+    .toUpperCase() ?? name.slice(0, 3)
 const fmt = (v: number) => (Number.isInteger(v) ? String(v) : v.toFixed(1))
 
 const HOW =
@@ -42,6 +52,8 @@ const HOW =
 /** The guide's per-rank line for a section. */
 function sectionNote(key: SectionKey, tierPct: Record<string, number>): string {
   if (key === 'pet') return `Each rank adds a pet level (up to your level less one), with the cast and mana reductions of the spell's own category.`
+  if (key === 'transport' || key === 'utility')
+    return `Each rank: −${UTILITY_BONUS.cast}% cast time, −${UTILITY_BONUS.mana}% mana (${UTILITY_BONUS.caveat}). ${key === 'transport' ? 'Gates, ports, rings, circles, succors and binds.' : 'Cures, summoned items, resurrections and the like: beneficial spells with nothing to heal or lengthen.'}`
   const cat = key === 'cc' ? 'charm' : key
   const b = RANK_BONUS[cat as keyof typeof RANK_BONUS]
   const parts = [`−${b.cast}% cast time`, `−${b.mana}% mana`]
@@ -88,18 +100,23 @@ export function MoteSpells() {
   const [sortBy, setSortBy] = useRemembered<'rate' | 'worth' | 'casts'>('spellmotes.sort', 'rate')
   const [onlyAffordable, setOnlyAffordable] = useRemembered<boolean>('spellmotes.affordable', false)
   const [showMaxed, setShowMaxed] = useRemembered<boolean>('spellmotes.maxed', false)
+  const [whose, setWhose] = useRemembered<'mine' | 'all'>('spellmotes.whose', 'mine')
   const [weights, setWeights] = useRemembered<SpellWeights>('spellmotes.weights', DEFAULT_SPELL_WEIGHTS)
   const tierPct = state.settings.tracking.tierDurationPct
   const q = useInvoke<Casts | null>('motes:spellCasts', [state.characterKey, days], [state.characterKey, days, state.status.spellsLoaded])
   const stockQ = useStock()
   const stock = stockQ.data?.counts
 
+  const data = q.data
+  const mine = useMemo(() => data?.mine ?? [], [data])
   const options = useMemo(() => {
-    const all = spellUpgradeOptions({ rows: q.data?.rows ?? [], tierPct, weights, stock })
+    // Legends characters change classes: "your classes" is what /who last said, so a spell from a class you left is left out.
+    const rows = whose === 'mine' && mine.length ? (data?.rows ?? []).filter((r) => r.classNames.some((c) => mine.includes(c))) : (data?.rows ?? [])
+    const all = spellUpgradeOptions({ rows, tierPct, weights, stock })
     if (sortBy === 'worth') return [...all].sort((a, b) => Number(a.maxed) - Number(b.maxed) || b.worth - a.worth || a.need - b.need)
     if (sortBy === 'casts') return [...all].sort((a, b) => Number(a.maxed) - Number(b.maxed) || b.row.casts - a.row.casts)
     return all
-  }, [q.data, tierPct, weights, stock, sortBy])
+  }, [data, tierPct, weights, stock, sortBy, whose, mine])
 
   if (!q.data) return q.error ? <Pending what="your casts" error={q.error} retry={q.reload} /> : <Pending what="your casts" />
   if (q.data === null) return <div className="card empty">The spell file is not loaded yet: check the game folder in Settings.</div>
@@ -200,6 +217,23 @@ export function MoteSpells() {
               .join(', ')}${unknown.length > 5 ? '…' : ''}.`}
         </p>
         <div className="row">
+          <span
+            className="lt-seg"
+            role="group"
+            aria-label="Whose spells"
+            title={
+              mine.length
+                ? `Your classes: ${mine.join(', ')}`
+                : 'Your classes are not known yet: type /who in game, or set class levels on the Spell Timers page'
+            }
+          >
+            <button className={whose === 'mine' ? 'on' : ''} aria-pressed={whose === 'mine'} onClick={() => setWhose('mine')} disabled={!mine.length}>
+              Your classes{mine.length > 0 && <small>{mine.map(classId).join('/')}</small>}
+            </button>
+            <button className={whose === 'all' ? 'on' : ''} aria-pressed={whose === 'all'} onClick={() => setWhose('all')}>
+              All spells cast
+            </button>
+          </span>
           <span className="lt-seg" role="group" aria-label="Section">
             <button className={section === 'all' ? 'on' : ''} aria-pressed={section === 'all'} onClick={() => setSection('all')}>
               All <small>{kept.length}</small>

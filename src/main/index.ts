@@ -723,9 +723,9 @@ function registerIpc(): void {
     if (!book) return null
     const s = store.settings.get()
     const key = character || characterKey(s.logFile)
-    if (!key) return { rows: [], unknown: [], window: null }
+    if (!key) return { rows: [], unknown: [], window: null, mine: [] }
     const recent = await castHistory.recent({ logPath: join(s.installDir, 'Logs', `eqlog_${key}.txt`), archiveDir: engine.archiveDir(), stem: `eqlog_${key}`, days })
-    return { ...castRows(book, recent.counts, engine.character()), window: { total: recent.total, from: recent.from, to: recent.to } }
+    return { ...castRows(book, recent.counts, engine.character()), window: { total: recent.total, from: recent.from, to: recent.to }, mine: engine.myClasses() }
   })
 
   handle('stats:caps', async (classes: string[], level: number) => ({

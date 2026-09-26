@@ -56,6 +56,23 @@ export const RANK_BONUS: Record<SpellCategory, RankBonus> = {
 /** The same for every category, per rank. */
 export const UNIVERSAL = { recovery: 2, reuse: 2, resist: 15 }
 
+/**
+ * Transport and utility spells are not in the guide's table. They get the cast and mana cuts every
+ * non-nuke category shares and nothing else: there is no damage, healing or duration to grow.
+ */
+export const UTILITY_BONUS: RankBonus = {
+  cast: 4,
+  mana: 2,
+  power: 0,
+  powerNote: '',
+  caveat: 'not in the guide; the cast and mana cuts of other spells assumed'
+}
+
+/** Bind affinity, gate, teleport, succor, translocate, teleport (v2): a spell that moves you. */
+export const TRANSPORT_SPAS = [25, 26, 83, 88, 104, 145]
+/** Effects that heal: hit points now, or over time. */
+const HEAL_SPAS = [0, 79, 100]
+
 /** Percent a pet gains per rank: +1 pet level. */
 export const PET_LEVELS_PER_RANK = 1
 
@@ -89,14 +106,28 @@ export const SECTIONS = [
   { key: 'debuff', label: 'Debuff', cats: ['debuff'] },
   { key: 'cc', label: 'Charm / Mez', cats: ['charm', 'mez'] },
   { key: 'buff', label: 'Buff', cats: ['buff'] },
-  { key: 'pet', label: 'Pet summons', cats: [] }
+  { key: 'pet', label: 'Pet summons', cats: [] },
+  { key: 'transport', label: 'Transport & bind', cats: [] },
+  { key: 'utility', label: 'Cures, summons & other', cats: [] }
 ] as const
 
 export type SectionKey = (typeof SECTIONS)[number]['key']
 
-export function sectionOf(category: SpellCategory, pet: boolean): SectionKey {
+/**
+ * The guide's section a spell belongs in. The spell file marks a gate or a cure beneficial with no
+ * duration, the same as a heal, so those are told apart by their effects: anything that moves you is
+ * transport, and a "heal" that heals nothing (cures, summoned items, resurrection) is utility.
+ */
+export function sectionOf(category: SpellCategory, pet: boolean, effects: { spa: number; base: number }[] = []): SectionKey {
+  if (effects.some((e) => TRANSPORT_SPAS.includes(e.spa))) return 'transport'
   if (pet) return 'pet'
+  if (category === 'heal' && !effects.some((e) => HEAL_SPAS.includes(e.spa) && e.base > 0)) return 'utility'
   return SECTIONS.find((s) => (s.cats as readonly string[]).includes(category))?.key ?? 'buff'
+}
+
+/** The per-rank table for a spell: its category's row, unless its section has none in the guide. */
+export function bonusFor(category: SpellCategory, section: SectionKey): RankBonus {
+  return section === 'transport' || section === 'utility' ? UTILITY_BONUS : RANK_BONUS[category]
 }
 
 /** One spell you cast, as the log and the spell file describe it. */
@@ -108,6 +139,7 @@ export interface SpellCastRow {
   /** Casts in the window, every rank counted. */
   casts: number
   category: SpellCategory
+  section: SectionKey
   icon: number
   castMs: number
   recastMs: number
@@ -121,6 +153,8 @@ export interface SpellCastRow {
   resistable: boolean
   /** The classes that cast it, for showing. */
   classes: string
+  /** The same as names, for the class filter. */
+  classNames: string[]
 }
 
 /** An ability granted outside the spell book (Harm Touch X, Life Burn I): no class has a level under 254 for it. */
@@ -155,23 +189,26 @@ export function castRows(
       had.rank = Math.max(had.rank, r.rank)
       continue
     }
+    const pet = summonsPet(s)
     rows.set(s.name, {
       name: s.name,
       rank: r.rank,
       casts,
       category: s.category,
+      section: sectionOf(s.category, pet, s.effects),
       icon: s.icon,
       castMs: s.castMs,
       recastMs: s.recastMs,
       mana: s.mana,
       ticks: formulaTicks(casterLevel(s, character), s.formula, s.cap),
       song: isSong(s),
-      pet: summonsPet(s),
+      pet,
       resistable: !s.beneficial,
       classes: s.classLevels
         .map((l, i) => (l > 0 && l < 255 ? `${CLASS_NAMES[i]} ${l === 254 ? '(ability)' : l}` : ''))
         .filter(Boolean)
-        .join(', ')
+        .join(', '),
+      classNames: s.classLevels.map((l, i) => (l > 0 && l < 254 ? CLASS_NAMES[i] : '')).filter(Boolean)
     })
   }
   return { rows: [...rows.values()], unknown: unknown.sort((a, b) => b.casts - a.casts) }
@@ -266,7 +303,7 @@ const round = (v: number, places: number) => Math.round(v * 10 ** places) / 10 *
 
 /** What one more rank gives one cast of the spell, in weighed points, part by part. */
 export function rankGain(row: SpellCastRow, tierPct: Record<SpellCategory, number>, w: SpellWeights): GainPart[] {
-  const b = RANK_BONUS[row.category]
+  const b = bonusFor(row.category, row.section)
   const parts: GainPart[] = []
   const add = (key: keyof SpellWeights, pct: number, label: string) => {
     if (pct > 0) parts.push({ key, pct, points: round(pct * w[key], 3), label })
@@ -305,7 +342,7 @@ export function spellUpgradeOptions(o: SpellUpgradeInput): SpellUpgradeOption[] 
     const spend = maxed ? { motes: [], xp: 0, over: 0, worth: 0, short: 0 } : spendOnSpell(need, stock)
     out.push({
       row,
-      section: sectionOf(row.category, row.pet),
+      section: row.section,
       rank,
       next: maxed ? rank : rank + 1,
       benefit,

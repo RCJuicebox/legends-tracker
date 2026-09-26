@@ -512,6 +512,12 @@ export class Engine {
     return { name, classes: levels.map(([id]) => id), level: Math.max(...levels.map(([, l]) => l)), race: '', at: 0 }
   }
 
+  /** The character's classes as the game names them: what /who last said, else the character sheet. */
+  myClasses(): string[] {
+    const me = this.me()
+    return me ? me.classes.map((id) => CLASS_NAMES[(CLASS_NUMBER[id as ClassId] ?? 0) - 1]).filter(Boolean) : []
+  }
+
   buffView(): BuffView {
     const group = this.groupPeople()
     const active = this.buffWatch.active

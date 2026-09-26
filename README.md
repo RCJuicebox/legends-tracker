@@ -276,6 +276,13 @@ play, or all your logs, and scores the next rank of each spell with the communit
   gets −2% recovery, −2% reuse and −15 resist modifier per rank; pet summons +1 pet level. Duration
   bonuses use the spell timers' per-rank table, so heals over time get the fitted 7%. Instant and
   permanent spells get no duration bonus; zero-mana spells nothing on mana.
+- The spell file marks a gate or a cure beneficial with no duration, the same as a heal, so the
+  sections go by effects too: anything that moves you (bind, gate, teleport, succor, translocate) is
+  **Transport & bind**, a "heal" that heals nothing (cures, summoned items, resurrection) is
+  **Cures, summons & other**, and a pet summon is **Pet summons**. Neither of the first two is in
+  the guide's table; they get the −4% cast and −2% mana cuts other spells get and nothing else.
+- **Your classes** (what `/who` last said, else the character sheet) hides spells of classes you have
+  left; **All spells cast** shows everything in the window.
 - A point is one cast made one percent better, with weights you can change (damage and healing 1,
   duration 1, mana ½, cast time ½, recovery and reuse ¼, a level 5). A rank's worth is casts × points
   per cast; worth per xp is the default order. Spells at rank X are listed last, with nothing to plan.
