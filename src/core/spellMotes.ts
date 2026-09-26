@@ -68,8 +68,10 @@ export const UTILITY_BONUS: RankBonus = {
   caveat: 'not in the guide; the cast and mana cuts of other spells assumed'
 }
 
-/** Bind affinity, gate, teleport, succor, translocate, teleport (v2): a spell that moves you. */
-export const TRANSPORT_SPAS = [25, 26, 83, 88, 104, 145]
+/** Gate, teleport, succor, translocate, teleport (v2): a spell that moves you. */
+export const TRANSPORT_SPAS = [26, 83, 88, 104, 145]
+/** Bind affinity: misc, with the cures and summons. */
+const SPA_BIND = 25
 /** Effects that heal: hit points now, or over time. */
 const HEAL_SPAS = [0, 79, 100]
 
@@ -107,8 +109,8 @@ export const SECTIONS = [
   { key: 'cc', label: 'Charm / Mez', cats: ['charm', 'mez'] },
   { key: 'buff', label: 'Buff', cats: ['buff'] },
   { key: 'pet', label: 'Pet summons', cats: [] },
-  { key: 'transport', label: 'Transport & bind', cats: [] },
-  { key: 'utility', label: 'Cures, summons & other', cats: [] }
+  { key: 'transport', label: 'Transport', cats: [] },
+  { key: 'utility', label: 'Misc', cats: [] }
 ] as const
 
 export type SectionKey = (typeof SECTIONS)[number]['key']
@@ -116,10 +118,12 @@ export type SectionKey = (typeof SECTIONS)[number]['key']
 /**
  * The guide's section a spell belongs in. The spell file marks a gate or a cure beneficial with no
  * duration, the same as a heal, so those are told apart by their effects: anything that moves you is
- * transport, and a "heal" that heals nothing (cures, summoned items, resurrection) is utility.
+ * transport; bind affinity and a "heal" that heals nothing (cures, summoned items, resurrection) are
+ * misc (`utility`).
  */
 export function sectionOf(category: SpellCategory, pet: boolean, effects: { spa: number; base: number }[] = []): SectionKey {
   if (effects.some((e) => TRANSPORT_SPAS.includes(e.spa))) return 'transport'
+  if (effects.some((e) => e.spa === SPA_BIND)) return 'utility'
   if (pet) return 'pet'
   if (category === 'heal' && !effects.some((e) => HEAL_SPAS.includes(e.spa) && e.base > 0)) return 'utility'
   return SECTIONS.find((s) => (s.cats as readonly string[]).includes(category))?.key ?? 'buff'

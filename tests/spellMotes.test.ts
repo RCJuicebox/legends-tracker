@@ -92,9 +92,9 @@ describe('what a rank gives', () => {
     expect(sectionOf('heal', true)).toBe('pet')
     expect(sectionOf('mez', false)).toBe('cc')
     expect(sectionOf('nuke', false)).toBe('nuke')
-    // Gate (SPA 26) and Bind Affinity (SPA 25) are beneficial instants in the file: heals, until their effects are read.
+    // Gate (SPA 26) is a beneficial instant in the file: a heal, until its effects are read. Bind Affinity (SPA 25) is misc.
     expect(sectionOf('heal', false, [{ spa: 26, base: 1 }])).toBe('transport')
-    expect(sectionOf('nuke', false, [{ spa: 25, base: 1 }])).toBe('transport')
+    expect(sectionOf('nuke', false, [{ spa: 25, base: 1 }])).toBe('utility')
     // Cure Disease (SPA 35, negative counters) heals nothing; Superior Healing (SPA 0, positive) does.
     expect(sectionOf('heal', false, [{ spa: 35, base: -2 }])).toBe('utility')
     expect(sectionOf('heal', false, [{ spa: 0, base: 583 }])).toBe('heal')

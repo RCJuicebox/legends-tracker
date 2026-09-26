@@ -277,10 +277,12 @@ play, or all your logs, and scores the next rank of each spell with the communit
   bonuses use the spell timers' per-rank table, so heals over time get the fitted 7%. Instant and
   permanent spells get no duration bonus; zero-mana spells nothing on mana.
 - The spell file marks a gate or a cure beneficial with no duration, the same as a heal, so the
-  sections go by effects too: anything that moves you (bind, gate, teleport, succor, translocate) is
-  **Transport & bind**, a "heal" that heals nothing (cures, summoned items, resurrection) is
-  **Cures, summons & other**, and a pet summon is **Pet summons**. Neither of the first two is in
-  the guide's table; they get the −4% cast and −2% mana cuts other spells get and nothing else.
+  sections go by effects too: anything that moves you (gate, teleport, succor, translocate) is
+  **Transport**; bind affinity and a "heal" that heals nothing (cures, summoned items, resurrection)
+  are **Misc**; a pet summon is **Pet summons**. Neither of the first two is in the guide's table;
+  they get the −4% cast and −2% mana cuts other spells get and nothing else.
+- **Ignore** on a row hides a spell you will never put motes into; "Show ignored" lists them faint
+  with a Restore button. The list is kept per character on this machine.
 - **Your trio** keeps only spells one of your current classes (what `/who` last said, else the
   character sheet) has at its level now, never over the level cap of 50: a spell a Necromancer gets at
   39 is not the Shadow Knight's until 49. **Every class you have cast as** shows everything in the

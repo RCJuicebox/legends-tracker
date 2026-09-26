@@ -55,7 +55,7 @@ const HOW =
 function sectionNote(key: SectionKey, tierPct: Record<string, number>): string {
   if (key === 'pet') return `Each rank adds a pet level (up to your level less one), with the cast and mana reductions of the spell's own category.`
   if (key === 'transport' || key === 'utility')
-    return `Each rank: −${UTILITY_BONUS.cast}% cast time, −${UTILITY_BONUS.mana}% mana (${UTILITY_BONUS.caveat}). ${key === 'transport' ? 'Gates, ports, rings, circles, succors and binds.' : 'Cures, summoned items, resurrections and the like: beneficial spells with nothing to heal or lengthen.'}`
+    return `Each rank: −${UTILITY_BONUS.cast}% cast time, −${UTILITY_BONUS.mana}% mana (${UTILITY_BONUS.caveat}). ${key === 'transport' ? 'Gates, ports, rings, circles and succors.' : 'Binds, cures, summoned items, resurrections and the like: spells with nothing to heal, hurt or lengthen.'}`
   const cat = key === 'cc' ? 'charm' : key
   const b = RANK_BONUS[cat as keyof typeof RANK_BONUS]
   const parts = [`−${b.cast}% cast time`, `−${b.mana}% mana`]
@@ -102,6 +102,10 @@ export function MoteSpells() {
   const [sortBy, setSortBy] = useRemembered<'rate' | 'worth' | 'casts'>('spellmotes.sort', 'rate')
   const [onlyAffordable, setOnlyAffordable] = useRemembered<boolean>('spellmotes.affordable', false)
   const [showMaxed, setShowMaxed] = useRemembered<boolean>('spellmotes.maxed', false)
+  const [showIgnored, setShowIgnored] = useRemembered<boolean>('spellmotes.showIgnored', false)
+  // Spells the player will never put motes into, by name, kept per character.
+  const [ignored, setIgnored] = useRemembered<string[]>(`spellmotes.ignored.${state.characterKey || 'none'}`, [])
+  const ignore = (name: string, on: boolean) => setIgnored(on ? [...new Set([...ignored, name])] : ignored.filter((n) => n !== name))
   const [whose, setWhose] = useRemembered<'mine' | 'all'>('spellmotes.whose', 'mine')
   const [weights, setWeights] = useRemembered<SpellWeights>('spellmotes.weights', DEFAULT_SPELL_WEIGHTS)
   const tierPct = state.settings.tracking.tierDurationPct
@@ -124,12 +128,14 @@ export function MoteSpells() {
   if (q.data === null) return <div className="card empty">The spell file is not loaded yet: check the game folder in Settings.</div>
 
   // The section chips count what the checkboxes leave, so a chip's number is its table's.
-  const kept = options.filter((o) => (showMaxed || !o.maxed) && (!onlyAffordable || o.affordable))
+  const isIgnored = (o: SpellUpgradeOption) => ignored.includes(o.row.name)
+  const kept = options.filter((o) => (showMaxed || !o.maxed) && (!onlyAffordable || o.affordable) && (showIgnored || !isIgnored(o)))
   const counts = new Map<SectionKey, number>()
   for (const o of kept) counts.set(o.section, (counts.get(o.section) ?? 0) + 1)
   const sections = SECTIONS.filter((s) => counts.get(s.key))
   const shown = kept.filter((o) => section === 'all' || o.section === section)
   const maxed = options.filter((o) => o.maxed).length
+  const ignoredCount = options.filter(isIgnored).length
   const xp = stock ? stockXp(stock) : 0
   const w = q.data.window
   const unknown = q.data.unknown
@@ -207,7 +213,7 @@ export function MoteSpells() {
         </div>
         <p className="muted small m-0">
           {w && w.total > 0
-            ? `${num(w.total)} casts from ${w.from} to ${w.to}, ${options.length} spell${options.length === 1 ? '' : 's'}${maxed ? `, ${maxed} at rank X already` : ''}.`
+            ? `${num(w.total)} casts from ${w.from} to ${w.to}, ${options.length} spell${options.length === 1 ? '' : 's'}${maxed ? `, ${maxed} at rank X already` : ''}${ignoredCount ? `, ${ignoredCount} ignored` : ''}.`
             : 'No casts in your log for this window.'}{' '}
           {stock ? `Your motes are worth ${num(xp)} xp on spells.` : 'Motes on hand are not loaded yet, so nothing is marked affordable.'} Spend the low ranks
           here: on an item a mote only works at its own tier, but on a spell it always counts its xp. Every rank also takes −{UNIVERSAL.recovery}% recovery, −
@@ -263,6 +269,12 @@ export function MoteSpells() {
             <input type="checkbox" checked={showMaxed} onChange={(e) => setShowMaxed(e.target.checked)} />
             Show rank X spells
           </label>
+          {ignoredCount > 0 && (
+            <label className="row tight">
+              <input type="checkbox" checked={showIgnored} onChange={(e) => setShowIgnored(e.target.checked)} />
+              Show ignored ({ignoredCount})
+            </label>
+          )}
         </div>
       </div>
 
@@ -295,13 +307,14 @@ export function MoteSpells() {
                     Per xp
                   </th>
                   <th title="The cheapest motes in your stock for it, lowest rank first">Pay with</th>
+                  <th />
                 </tr>
               </thead>
               <tbody>
                 {shown
                   .filter((o) => o.section === s.key)
                   .map((o) => (
-                    <tr key={o.row.name} className={o.maxed || (!o.affordable && stock) ? 'faint' : ''}>
+                    <tr key={o.row.name} className={o.maxed || isIgnored(o) || (!o.affordable && stock) ? 'faint' : ''}>
                       <td>
                         <SpellIcon icon={o.row.icon} />
                       </td>
@@ -331,6 +344,21 @@ export function MoteSpells() {
                       <td className="mono num">{o.maxed ? '—' : fmt(o.rate)}</td>
                       <td className="small">
                         <PayWith o={o} />
+                      </td>
+                      <td>
+                        {isIgnored(o) ? (
+                          <button className="btn ghost small" onClick={() => ignore(o.row.name, false)} title="Put it back in the list">
+                            Restore
+                          </button>
+                        ) : (
+                          <button
+                            className="btn ghost small"
+                            onClick={() => ignore(o.row.name, true)}
+                            title="Leave this spell out: you will not put motes into it"
+                          >
+                            Ignore
+                          </button>
+                        )}
                       </td>
                     </tr>
                   ))}
