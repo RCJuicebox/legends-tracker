@@ -1,5 +1,15 @@
 import { describe, expect, it } from 'vitest'
-import { castRows, DEFAULT_SPELL_WEIGHTS, isAbility, rankGain, sectionOf, spellUpgradeOptions, spendOnSpell, stockXp } from '../src/core/spellMotes'
+import {
+  castableByMine,
+  castRows,
+  DEFAULT_SPELL_WEIGHTS,
+  isAbility,
+  rankGain,
+  sectionOf,
+  spellUpgradeOptions,
+  spendOnSpell,
+  stockXp
+} from '../src/core/spellMotes'
 import { DEFAULT_TIER_DURATION_PCT } from '../src/shared/types'
 import { fixtureBook } from './helpers'
 
@@ -89,7 +99,22 @@ describe('what a rank gives', () => {
     expect(sectionOf('heal', false, [{ spa: 35, base: -2 }])).toBe('utility')
     expect(sectionOf('heal', false, [{ spa: 0, base: 583 }])).toBe('heal')
     const { rows } = castRows(book, { 'Superior Healing': 1 }, character)
-    expect(rows[0]).toMatchObject({ section: 'heal', classNames: ['Cleric', 'Paladin', 'Druid', 'Shaman'] })
+    expect(rows[0]).toMatchObject({ section: 'heal', classLevels: { Cleric: 30, Paladin: 46, Druid: 44, Shaman: 45 } })
+  })
+
+  it('counts a spell as yours only when one of your classes has it at their level', () => {
+    // Envenomed Bolt: Shaman 49, Necromancer 50 in the fixture (Drain Spirit is Necromancer 39, Shadow Knight 49 in the real file).
+    const { rows } = castRows(book, { 'Envenomed Bolt X': 1 }, character)
+    expect(rows[0].classLevels).toEqual({ Shaman: 49, Necromancer: 50 })
+    expect(castableByMine(rows[0], [{ name: 'Shaman', level: 50 }])).toBe(true)
+    expect(castableByMine(rows[0], [{ name: 'Shaman', level: 48 }])).toBe(false)
+    expect(
+      castableByMine(rows[0], [
+        { name: 'Shadow Knight', level: 50 },
+        { name: 'Monk', level: 50 }
+      ])
+    ).toBe(false)
+    expect(castableByMine(rows[0], [])).toBe(false)
   })
 
   it('gives transport and utility spells only the cast and mana cuts', () => {

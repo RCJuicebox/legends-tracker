@@ -16,8 +16,10 @@ import {
   UNIVERSAL,
   UTILITY_BONUS,
   WEIGHT_LABELS,
+  castableByMine,
   spellUpgradeOptions,
   stockXp,
+  type MyClass,
   type SectionKey,
   type SpellCastRow,
   type SpellUpgradeOption,
@@ -30,8 +32,8 @@ interface Casts {
   rows: SpellCastRow[]
   unknown: { name: string; casts: number }[]
   window: { total: number; from: string; to: string } | null
-  /** Your classes as the game names them, from /who or the character sheet. */
-  mine: string[]
+  /** Your classes as the game names them, each with its level, from /who or the character sheet. */
+  mine: MyClass[]
 }
 
 const short = (i: number) => MOTE_RANKS[i].name || 'Potential'
@@ -111,7 +113,7 @@ export function MoteSpells() {
   const mine = useMemo(() => data?.mine ?? [], [data])
   const options = useMemo(() => {
     // Legends characters change classes: "your classes" is what /who last said, so a spell from a class you left is left out.
-    const rows = whose === 'mine' && mine.length ? (data?.rows ?? []).filter((r) => r.classNames.some((c) => mine.includes(c))) : (data?.rows ?? [])
+    const rows = whose === 'mine' && mine.length ? (data?.rows ?? []).filter((r) => castableByMine(r, mine)) : (data?.rows ?? [])
     const all = spellUpgradeOptions({ rows, tierPct, weights, stock })
     if (sortBy === 'worth') return [...all].sort((a, b) => Number(a.maxed) - Number(b.maxed) || b.worth - a.worth || a.need - b.need)
     if (sortBy === 'casts') return [...all].sort((a, b) => Number(a.maxed) - Number(b.maxed) || b.row.casts - a.row.casts)
@@ -217,23 +219,31 @@ export function MoteSpells() {
               .join(', ')}${unknown.length > 5 ? '…' : ''}.`}
         </p>
         <div className="row">
+          <b>Spells of</b>
           <span
             className="lt-seg"
             role="group"
-            aria-label="Whose spells"
+            aria-label="Spells of"
             title={
               mine.length
-                ? `Your classes: ${mine.join(', ')}`
+                ? `Your trio: ${mine.map((m) => `${m.name} ${m.level}`).join(', ')}. A spell counts when one of them has it at their level.`
                 : 'Your classes are not known yet: type /who in game, or set class levels on the Spell Timers page'
             }
           >
             <button className={whose === 'mine' ? 'on' : ''} aria-pressed={whose === 'mine'} onClick={() => setWhose('mine')} disabled={!mine.length}>
-              Your classes{mine.length > 0 && <small>{mine.map(classId).join('/')}</small>}
+              Your trio{mine.length > 0 && <small>{mine.map((m) => classId(m.name)).join('/')}</small>}
             </button>
             <button className={whose === 'all' ? 'on' : ''} aria-pressed={whose === 'all'} onClick={() => setWhose('all')}>
-              All spells cast
+              Every class you have cast as
             </button>
           </span>
+          <span className="muted small">
+            {whose === 'mine' && mine.length
+              ? 'Only spells one of your classes has at its level now: a spell a Necromancer gets at 39 is not the Shadow Knight’s until 49.'
+              : 'Everything cast in the window, whatever class you were.'}
+          </span>
+        </div>
+        <div className="row">
           <span className="lt-seg" role="group" aria-label="Section">
             <button className={section === 'all' ? 'on' : ''} aria-pressed={section === 'all'} onClick={() => setSection('all')}>
               All <small>{kept.length}</small>

@@ -16,7 +16,7 @@ import { CombatMeter, summarize as summarizeFight } from '../core/combatMeter'
 import { LootLedger, type LootSnapshot } from '../core/loot'
 import { RespawnLog, respawnView, type RespawnRecords, type RespawnView } from '../core/respawns'
 import { PetGearReader, petSummonName, type PetGearReading } from '../core/pets'
-import { askText, BuffWatch, buffOffers, buffPlan, defaultWanted, YOU, type ActiveBuff, type BuffOffer, type BuffsFile, type BuffView, type Person } from '../core/buffs'
+import { askText, BuffWatch, buffOffers, buffPlan, defaultWanted, LEVEL_CAP, YOU, type ActiveBuff, type BuffOffer, type BuffsFile, type BuffView, type Person } from '../core/buffs'
 import { CATEGORY_COLORS } from '../core/spellTracker'
 import { durationSec, fmtClock, fmtNum } from '../core/combatView'
 import { characterKey, characterName } from './storeCore'
@@ -34,6 +34,7 @@ import {
   type Segment, type SpellRule, type TimerView, type Trigger, type WatchStatus
 } from '../shared/types'
 import { CLASS_NUMBER, type ClassId } from '../core/acModel'
+import type { MyClass } from '../core/spellMotes'
 
 export interface EngineOutputs {
   timers: (views: TimerView[]) => void
@@ -512,10 +513,19 @@ export class Engine {
     return { name, classes: levels.map(([id]) => id), level: Math.max(...levels.map(([, l]) => l)), race: '', at: 0 }
   }
 
-  /** The character's classes as the game names them: what /who last said, else the character sheet. */
-  myClasses(): string[] {
+  /**
+   * The character's classes as the game names them, with the level each is at: the classes are what
+   * /who last said (else the character sheet's), the level the sheet's for that class, else /who's,
+   * never over the level cap.
+   */
+  myClasses(): MyClass[] {
     const me = this.me()
-    return me ? me.classes.map((id) => CLASS_NAMES[(CLASS_NUMBER[id as ClassId] ?? 0) - 1]).filter(Boolean) : []
+    if (!me) return []
+    const sheet = this.character().classLevels
+    return me.classes.flatMap((id) => {
+      const name = CLASS_NAMES[(CLASS_NUMBER[id as ClassId] ?? 0) - 1]
+      return name ? [{ name, level: Math.min(LEVEL_CAP, sheet[name] || me.level || LEVEL_CAP) }] : []
+    })
   }
 
   buffView(): BuffView {

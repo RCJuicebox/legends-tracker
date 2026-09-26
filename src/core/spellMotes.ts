@@ -153,8 +153,25 @@ export interface SpellCastRow {
   resistable: boolean
   /** The classes that cast it, for showing. */
   classes: string
-  /** The same as names, for the class filter. */
-  classNames: string[]
+  /** The level each class gets it at, by class name, for the class filter (abilities' 254 left out). */
+  classLevels: Record<string, number>
+}
+
+/** One of the character's classes and the level it is at, for the class filter. */
+export interface MyClass {
+  name: string
+  level: number
+}
+
+/**
+ * Whether one of your classes can cast the spell at its level: a spell a Necromancer gets at 39 is
+ * not the Shadow Knight's until 49, so under the level cap it is theirs alone.
+ */
+export function castableByMine(row: Pick<SpellCastRow, 'classLevels'>, mine: MyClass[]): boolean {
+  return mine.some((m) => {
+    const l = row.classLevels[m.name]
+    return l !== undefined && l <= m.level
+  })
 }
 
 /** An ability granted outside the spell book (Harm Touch X, Life Burn I): no class has a level under 254 for it. */
@@ -208,7 +225,7 @@ export function castRows(
         .map((l, i) => (l > 0 && l < 255 ? `${CLASS_NAMES[i]} ${l === 254 ? '(ability)' : l}` : ''))
         .filter(Boolean)
         .join(', '),
-      classNames: s.classLevels.map((l, i) => (l > 0 && l < 254 ? CLASS_NAMES[i] : '')).filter(Boolean)
+      classLevels: Object.fromEntries(s.classLevels.flatMap((l, i) => (l > 0 && l < 254 ? [[CLASS_NAMES[i], l]] : [])))
     })
   }
   return { rows: [...rows.values()], unknown: unknown.sort((a, b) => b.casts - a.casts) }
