@@ -11,6 +11,7 @@ import { AC_OVER_CAP, useGearModel, type CatalogState, type GearMode } from '../
 import { ItemIcon, source } from './gearBits'
 import { FocusTab, OptimizeTab } from './GearFocus'
 import { PetTab } from './GearPet'
+import { MergeTab } from './GearMerge'
 
 export type { GearMode }
 
@@ -25,13 +26,16 @@ function eraTip(era: string): string {
         : `${era}: out of era on EverQuest Legends`
 }
 
-export function GearFinder({ view, sheet, mode }: { view: InventoryView; sheet: CharacterSheet | null; mode: GearMode }) {
+export function GearFinder({ view, sheet, mode, go }: { view: InventoryView; sheet: CharacterSheet | null; mode: GearMode; go?: (page: 'motes') => void }) {
   const g = useGearModel(view, sheet, mode)
   const { catalog, model, results, stats, classes, level, role, conv, acState, overCap, secondaryInUse, twoHanders, eraCounts, fociOf, lines, wanted, points, setPoints } = g
-  const { preset, setPreset, setCustom, twoHandMode, setTwoHandMode, compare, setCompare, hiddenEras, setHiddenEras, slot, setSlot, capMode, setCapMode } = g.controls
+  const { preset, setPreset, setCustom, twoHandMode, setTwoHandMode, compare, setCompare, hiddenEras, setHiddenEras, slot, setSlot, capMode, setCapMode, judge, setJudge } = g.controls
   const [showWeights, setShowWeights] = useState(false)
   const state = catalog.state
   const refresh = catalog.refresh
+
+  // The best merge reads only what is worn and the wiki's stats for it: no catalog needed.
+  if (mode === 'merge') return <MergeTab view={view} weights={g.weights} preset={preset} setPreset={setPreset} go={go} />
 
   if (!state) return <Pending what="the item catalog" error={catalog.error} retry={catalog.reload} />
   const p = state.progress
@@ -101,6 +105,19 @@ export function GearFinder({ view, sheet, mode }: { view: InventoryView; sheet: 
                 <Info
                   label="About Compare"
                   text="As they drop: candidates at +0, against your gear at its merge level. At your merge level: candidates merged to the same level as the item they would replace."
+                />
+                <b>Judge</b>
+                <span className="lt-seg" role="group" aria-label="Judge">
+                  <button className={judge === 'round' ? 'on' : ''} aria-pressed={judge === 'round'} onClick={() => setJudge('round')} title="Everything you own rearranged around the candidate: the item it pushes out may go to an Any slot and keep its focus">
+                    In the round
+                  </button>
+                  <button className={judge === 'slot' ? 'on' : ''} aria-pressed={judge === 'slot'} onClick={() => setJudge('slot')} title="One slot, one item out: quicker, and blind to where the displaced item could go">
+                    This slot only
+                  </button>
+                </span>
+                <Info
+                  label="About Judge"
+                  text="In the round: each candidate is added to everything you own and the optimizer wears the lot as well as it can; the gain is what the whole set gains, so an item that pushes a focus belt into a free Any slot loses no focus, and a lore twin or a two-hander is caught. This slot only: the candidate against the one item it replaces, focus lost and all."
                 />
               </>
             )}
@@ -304,9 +321,25 @@ export function GearFinder({ view, sheet, mode }: { view: InventoryView; sheet: 
                         ))}
                       </div>
                       <div className="faint small">{source(c.item)}</div>
+                      {c.round && (c.round.placed !== r.slot || c.round.moves.length > 1) && (
+                        <div className="small muted">
+                          {c.round.placed && c.round.placed !== r.slot ? `Goes in ${slotLabel(c.round.placed)}. ` : ''}
+                          {c.round.moves
+                            .filter((m) => m.in !== c.item.title)
+                            .map((m) => (m.in ? `${m.in} → ${slotLabel(m.slot)}` : `${m.out} → carried`))
+                            .join(' · ')}
+                        </div>
+                      )}
                     </div>
-                    <span className="lt-gain" title="How much higher it scores than what you wear, by your weights, focus effects included">
-                      +{num(c.delta)}
+                    <span
+                      className="lt-gain"
+                      title={
+                        c.round
+                          ? `What the whole set gains with it, everything rearranged (this slot alone: ${c.delta > 0 ? '+' : ''}${num(c.delta)})`
+                          : 'How much higher it scores than what you wear, by your weights, focus effects included'
+                      }
+                    >
+                      +{num(c.round ? c.round.delta : c.delta)}
                     </span>
                   </div>
                 ))}

@@ -100,6 +100,16 @@ describe('what worn foci are worth', () => {
     expect(focusValue(worth, ['Extended Enhancement III', 'Improved Damage II'])).toBeCloseTo(0.3 * 1.5 * 300 + 0.7 * 1.5 * 300)
     expect(focusValue({ ...worth, wanted: new Set([line(dmg2)]) }, ['Extended Enhancement III'])).toBe(0)
   })
+
+  it('counts a stronger rank for no more than the one called enough', () => {
+    const eeLine = worth.foci['Extended Enhancement III'].line
+    const enough = { ...worth, enough: { [eeLine]: 'Extended Enhancement II' } }
+    // Rank III is worth what rank II is: 10.5% on Puma, not 15%.
+    expect(focusValue(enough, ['Extended Enhancement III'])).toBeCloseTo(0.3 * 1.05 * 300)
+    expect(focusValue(enough, ['Extended Enhancement II'])).toBeCloseTo(0.3 * 1.05 * 300)
+    // Another line's cap changes nothing here.
+    expect(focusValue({ ...worth, enough: { [line(dmg2)]: 'Improved Damage II' } }, ['Extended Enhancement III'])).toBeCloseTo(0.3 * 1.5 * 300)
+  })
 })
 
 describe('Any slots and focus effects in the finder and the optimizer', () => {

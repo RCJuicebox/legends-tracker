@@ -167,6 +167,7 @@ export function sanitizeSettings(v: unknown, fb: AppSettings): AppSettings | nul
     enabled: bool(t.enabled, fb.tracking.enabled),
     selfBuffs: bool(t.selfBuffs, fb.tracking.selfBuffs),
     otherBuffs: bool(t.otherBuffs, fb.tracking.otherBuffs),
+    groupBuffs: bool(t.groupBuffs, fb.tracking.groupBuffs),
     dots: bool(t.dots, fb.tracking.dots),
     debuffs: bool(t.debuffs, fb.tracking.debuffs),
     buffWarnSec: num(t.buffWarnSec, fb.tracking.buffWarnSec, 0, 3600),

@@ -233,6 +233,11 @@ export interface Candidate {
   eraInferred: boolean
   /** Its focus effect, and what swapping it in does to the worth of the foci worn (in score points). */
   focus: { name: string; gain: number } | null
+  /**
+   * Judged in the round (see finderRound.ts): what the whole set gains with it, where it lands, and
+   * what else moves. Filled in by the finder page, not here.
+   */
+  round?: { delta: number; placed: string | null; moves: { slot: string; out: string | null; in: string | null }[] }
 }
 
 export interface SlotResult {
@@ -267,6 +272,11 @@ export interface FinderOptions {
   owned: Set<string>
   focus?: FinderFocus
   perSlot?: number
+  /**
+   * Keep candidates whose stats beat the worn item even when the focus lost with it makes the swap
+   * a loss slot by slot: judged in the round, the displaced item may keep its focus in another slot.
+   */
+  keepStatWinners?: boolean
 }
 
 interface ParsedItem {
@@ -343,8 +353,9 @@ export function findUpgrades(o: FinderOptions): SlotResult[] {
       const hasteChange = Math.max(hasteLeft, stats.haste) - hasteNow
       const sc = score(stats, weights) + (Math.max(hasteLeft, stats.haste) - hasteLeft) * o.weights.haste
       const focusGain = !o.focus ? 0 : (p.item.focus ? focusWithout(current?.item, [p.item.focus]) : withoutCurrent) - focusNow
-      const delta = sc - (current?.score ?? 0) + focusGain
-      if (delta <= 0) continue
+      const statDelta = sc - (current?.score ?? 0)
+      const delta = statDelta + focusGain
+      if (delta <= 0 && !(o.keepStatWinners && statDelta > 0)) continue
       const values = statValues(stats)
       const diffs = (Object.keys(values) as WeightKey[])
         .map((k) => ({ key: k, label: WEIGHT_LABELS[k], delta: Math.round((k === 'haste' ? hasteChange : values[k] - (currentValues?.[k] ?? 0)) * 100) / 100 }))

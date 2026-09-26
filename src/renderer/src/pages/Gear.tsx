@@ -54,6 +54,7 @@ const MODES: ['sheet' | GearMode, string][] = [
   ['finder', 'Upgrade finder'],
   ['focus', 'Focus effects'],
   ['optimize', 'Optimize what you own'],
+  ['merge', 'Best merge'],
   ['pet', 'Pet']
 ]
 
@@ -195,7 +196,7 @@ export function Gear({ go }: { go?: (page: 'motes') => void }) {
       <>
         {head}
         {switcher}
-        <GearFinder view={view} sheet={sheet} mode={mode} />
+        <GearFinder view={view} sheet={sheet} mode={mode} go={go} />
       </>
     )
 

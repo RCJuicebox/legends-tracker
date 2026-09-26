@@ -290,6 +290,11 @@ export interface FocusWorth {
   foci: Record<string, FocusInfo>
   /** Each spell's share of their casting. */
   shares: Record<string, number>
+  /**
+   * Per line, a focus the player calls enough: a stronger rank counts for no more than it does,
+   * spell by spell, so the finder stops chasing the best when a lower rank will do.
+   */
+  enough?: Record<string, string>
 }
 
 /**
@@ -301,7 +306,10 @@ export function focusValue(w: FocusWorth, names: Iterable<string>): number {
   for (const n of names) {
     const f = w.foci[n]
     if (!f || !w.wanted.has(f.line)) continue
-    for (const [spell, eff] of Object.entries(f.on)) {
+    const enough = w.enough?.[f.line]
+    const cap = enough ? w.foci[enough] : undefined
+    for (const [spell, raw] of Object.entries(f.on)) {
+      const eff = cap ? Math.min(raw, cap.on[spell] ?? 0) : raw
       const k = `${f.kind}|${spell}`
       if (eff > (best.get(k)?.eff ?? 0)) best.set(k, { kind: f.kind, spell, eff })
     }

@@ -155,7 +155,8 @@ function MoteTracking() {
           <p>
             Every mote you loot, counted from the log. Every instance run is timed from when you enter; the log cannot tell
             a Dungeon Crawl from a normal instance, so a run becomes a crawl when the game says it is complete (reward chest
-            included). Use a manual session for anything else.
+            included). Only the instance owner gets that line, so click a run's type to mark it a crawl yourself. Use a manual
+            session for anything else.
           </p>
         </div>
         <div className="actions">
@@ -302,9 +303,22 @@ function SessionTable({ sessions, now }: { sessions: MoteSession[]; now: number 
                     </div>
                   </td>
                   <td>
-                    <span className={`chip ${s.kind === 'crawl' ? 'ok' : ''}`}>
-                      {s.kind === 'crawl' ? 'dungeon crawl' : s.kind === 'manual' ? 'manual' : 'normal'}
-                    </span>
+                    {s.kind === 'manual' ? (
+                      <span className="chip">manual</span>
+                    ) : (
+                      <button
+                        className={`chip chip-btn ${s.kind === 'crawl' ? 'ok' : ''}`}
+                        onClick={() => void act('motes:setKind', s.id, s.kind === 'crawl' ? 'instance' : 'crawl')}
+                        title={
+                          s.kind === 'crawl'
+                            ? `${s.byHand ? 'Marked a crawl by you' : 'The game said this crawl was completed'}. Click to make it a normal instance.`
+                            : 'Click to mark this run as a dungeon crawl: the game only tells the instance owner when one is completed.'
+                        }
+                      >
+                        {s.kind === 'crawl' ? 'dungeon crawl' : 'normal'}
+                        {s.byHand && <span className="faint"> ✎</span>}
+                      </button>
+                    )}
                   </td>
                   <td
                     className="mono nowrap"

@@ -58,6 +58,8 @@ const SINGLE_WORD = /^[A-Z][A-Za-z`']*$/
 const RE_CHARMED = /^(.+) has been charmed\.$/
 /** A charm lands within its cast time (Allure's is a few seconds) of the cast beginning. */
 const CHARM_CAST_MS = 15_000
+/** An invite older than this is not the one a "You have joined the group." answers. */
+const INVITE_MS = 60_000
 
 const tally = (): Tally => ({ total: 0, hits: 0, crits: 0, critTotal: 0, max: 0, min: 0 })
 const healTally = (): HealTally => ({ total: 0, raw: 0, count: 0, crits: 0, max: 0 })
@@ -124,6 +126,8 @@ export class CombatMeter {
   /** Pet name key → owner's name (SELF for yours). */
   private pets = new Map<string, string>()
   private roster = new Map<string, RosterMember>()
+  /** Who last invited you to a group, until you join one or the invite goes stale. */
+  private invite: { who: string; at: number } | null = null
   /** Which side a single-word name turned out to be on. */
   private sides = new Map<string, Side>()
   /** When each entity last began casting each spell: "kelwyn|envenomed bolt" → time. */
@@ -453,7 +457,7 @@ export class CombatMeter {
         return this.changed()
       }
       case 'group':
-        return this.onGroup(ev)
+        return this.onGroup(ev, at)
       case 'cast': {
         const source = this.norm(ev.source)
         this.lastCast.set(`${nameKey(source)}|${spellBase(ev.spell)}`, at)
@@ -628,18 +632,31 @@ export class CombatMeter {
     this.changed()
   }
 
-  private onGroup(ev: Extract<CombatEvent, { kind: 'group' }>): void {
+  private onGroup(ev: Extract<CombatEvent, { kind: 'group' }>, at: number): void {
     const k = nameKey(ev.who)
     if (ev.action === 'joined') {
       this.roster.set(k, { name: ev.who, from: 'log' })
       this.sides.delete(k)
       this.refreshKind(k)
+    } else if (ev.action === 'invited') {
+      this.invite = { who: ev.who, at }
+    } else if (ev.action === 'youJoined') {
+      // Joining within a minute of an invite is accepting it: the inviter is in the group with you.
+      // Forming your own group prints the same line, with no invite before it.
+      if (this.invite && at - this.invite.at <= INVITE_MS) {
+        const ik = nameKey(this.invite.who)
+        this.roster.set(ik, { name: this.invite.who, from: 'log' })
+        this.sides.delete(ik)
+        this.refreshKind(ik)
+      }
+      this.invite = null
     } else if (ev.action === 'left') {
       // Out of the group, but still a person.
       if (this.roster.get(k)?.from === 'log') this.roster.delete(k)
       if (!this.roster.has(k)) this.sides.set(k, 'friend')
       this.refreshKind(k)
     } else if (ev.action === 'youLeft') {
+      this.invite = null
       for (const [key, m] of [...this.roster]) {
         if (m.from !== 'log') continue
         this.roster.delete(key)
@@ -663,6 +680,17 @@ export class CombatMeter {
   removeMember(name: string): void {
     this.roster.delete(nameKey(name))
     this.refreshKind(nameKey(name))
+    this.changed()
+  }
+
+  /** Everyone out, the log's members and the hand-added alike: the group has changed and the log missed it. */
+  clearGroup(): void {
+    this.invite = null
+    for (const [key] of [...this.roster]) {
+      this.roster.delete(key)
+      this.sides.set(key, 'friend')
+      this.refreshKind(key)
+    }
     this.changed()
   }
 

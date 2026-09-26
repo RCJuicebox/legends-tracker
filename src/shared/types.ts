@@ -100,6 +100,8 @@ export interface TrackingSettings {
   enabled: boolean
   selfBuffs: boolean
   otherBuffs: boolean
+  /** Group buffs on the overlays: timers for buffs others cast on me, and the on-screen "ask X for Y" reminder. */
+  groupBuffs: boolean
   dots: boolean
   debuffs: boolean
   /** Seconds before a self buff ends to warn, unless the spell's rule says otherwise. 0 = off. */

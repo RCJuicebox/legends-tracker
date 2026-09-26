@@ -29,11 +29,12 @@ function strengthNote(info: FocusInfo): string {
 
 type Status = { label: string; tone: 'good' | 'warn' | 'bad' | '' }
 
-function status(have: OwnedFocus[], best: FocusCandidate | undefined): Status {
-  const worn = have.find((h) => h.from === 'worn')?.eff ?? 0
-  const owned = have[0]?.eff ?? 0
+function status(have: OwnedFocus[], best: FocusCandidate | undefined, cap = Infinity): Status {
+  // Anything past the rank called enough counts as that rank: wearing it is "enough", not "a lower rank".
+  const worn = Math.min(cap, have.find((h) => h.from === 'worn')?.eff ?? 0)
+  const owned = Math.min(cap, have[0]?.eff ?? 0)
   const top = Math.max(best?.eff ?? 0, owned)
-  if (worn && worn >= top) return { label: 'Wearing the best', tone: 'good' }
+  if (worn && worn >= top) return { label: cap < Infinity ? 'Wearing enough' : 'Wearing the best', tone: 'good' }
   if (worn && owned > worn) return { label: 'You own a better one', tone: 'warn' }
   if (worn) return { label: 'Wearing a lower rank', tone: 'warn' }
   if (owned) return { label: 'Owned, not worn', tone: 'warn' }
@@ -129,12 +130,18 @@ export function FocusTab({ m }: { m: GearModel }) {
 
 function FocusRow({ m, l }: { m: GearModel; l: FocusLine }) {
   const on = m.wanted.has(l.key)
-  const avail = m.available.get(l.key) ?? []
+  const all = m.available.get(l.key) ?? []
   const have = m.ownedFoci.get(l.key) ?? []
+  const cap = m.capOf(l.key)
+  const capped = cap < Infinity
+  // With a rank called enough, the best to get is the best that is no stronger than it.
+  const avail = capped ? all.filter((c) => c.eff <= cap + 1e-9) : all
   const best = avail[0]
   const topItems = best ? avail.filter((c) => c.eff >= best.eff) : []
-  const st = status(have, best)
+  const st = status(have, best, cap)
   const info = (name: string) => m.report!.foci[name]
+  // The ranks this line comes in, strongest first: what there is to get and what is owned.
+  const ranks = [...new Map([...all.map((c) => [c.focus, c.eff] as const), ...have.map((h) => [h.focus, h.eff] as const)])].sort((a, b) => b[1] - a[1])
   // Worth on its own, wanted or not: what ticking it would bring.
   const worth = (name: string) => (m.worth ? focusValue({ ...m.worth, wanted: new Set([l.key]) }, [name]) : 0)
   const castWord = m.report!.basis === 'casts'
@@ -151,9 +158,22 @@ function FocusRow({ m, l }: { m: GearModel; l: FocusLine }) {
           {l.spells > 3 ? '…' : ''}
         </div>
         {l.kind === 'reagent' && <div className="faint small">Legends' spell file lists no reagents, so this counts every spell as using one.</div>}
+        {on && ranks.length > 1 && (
+          <label className="row tight small" style={{ marginTop: 4 }} title="A rank that is enough for you: stronger ranks count for no more in the finder and the optimizer, so they stop chasing the best">
+            <span className="muted">Enough:</span>
+            <select aria-label={`Enough for ${l.label}`} value={m.enough[l.key] ?? ''} onChange={(e) => m.setEnough(l.key, e.target.value || null)}>
+              <option value="">The best there is</option>
+              {ranks.map(([name, eff]) => (
+                <option key={name} value={name}>
+                  {name} ({pct(eff)})
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
       </div>
       <div className="lt-focus-col">
-        <div className="lt-focus-cap">Best there is</div>
+        <div className="lt-focus-cap">{capped ? 'Enough for you' : 'Best there is'}</div>
         {best ? (
           <>
             <div title={strengthNote(info(best.focus))}>
@@ -180,9 +200,10 @@ function FocusRow({ m, l }: { m: GearModel; l: FocusLine }) {
         ) : (
           <span className="faint small">None in the eras shown that works on your spells</span>
         )}
-        {have[0] && have[0].eff > (best?.eff ?? 0) && best && (
+        {have[0] && have[0].eff > (best?.eff ?? 0) && best && !capped && (
           <div className="small muted">Your {baseName(have[0].via || have[0].item.name)} ({have[0].focus}) beats these: it is from an era not shown.</div>
         )}
+        {capped && !avail.length && all.length > 0 && <span className="faint small">Nothing at that rank or below in the eras shown; stronger ranks still count as enough.</span>}
       </div>
       <div className="lt-focus-col">
         <div className="lt-focus-cap">
@@ -317,7 +338,8 @@ export function OptimizeTab({ m }: { m: GearModel }) {
               const now = bestIn(plan.before, l.key)
               const after = bestIn(plan.after, l.key)
               const owned = m.ownedFoci.get(l.key)?.[0]
-              const best = m.available.get(l.key)?.[0]
+              const cap = m.capOf(l.key)
+              const best = (m.available.get(l.key) ?? []).find((c) => c.eff <= cap + 1e-9)
               const tone = after && after >= (best?.eff ?? 0) ? 'good' : after ? 'warn' : 'bad'
               return (
                 <div key={l.key} className="lt-opt-line">

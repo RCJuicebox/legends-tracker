@@ -143,6 +143,10 @@ export function Settings() {
               <Switch on={t.otherBuffs} onChange={(v) => setT({ otherBuffs: v })} /> Buffs I cast on others
             </label>
             <label className="row">
+              <Switch on={t.groupBuffs} onChange={(v) => setT({ groupBuffs: v })} /> Buffs from my group
+              <span className="faint small">timers for their buffs on me, and whom to ask, on the overlays</span>
+            </label>
+            <label className="row">
               <Switch on={t.dots} onChange={(v) => setT({ dots: v })} /> DoTs
             </label>
             <label className="row">

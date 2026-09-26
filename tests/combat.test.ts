@@ -76,6 +76,8 @@ describe('combat lines', () => {
     expect(p("Xanthar says, 'My leader is Aldric.'")).toEqual({ kind: 'pet', pet: 'Xanthar', owner: 'Aldric' })
     expect(p("Aldric tells you, 'hey'")).toBeNull()
     expect(p('Tobin has joined the group.')).toEqual({ kind: 'group', who: 'Tobin', action: 'joined' })
+    expect(p('Tobin invites you to join a group.')).toEqual({ kind: 'group', who: 'Tobin', action: 'invited' })
+    expect(p('You have joined the group.')).toEqual({ kind: 'group', who: SELF, action: 'youJoined' })
     expect(p('You have been removed from the group.')).toEqual({ kind: 'group', who: SELF, action: 'youLeft' })
     expect(p('You begin casting Envenomed Bolt X.')).toEqual({ kind: 'cast', source: SELF, spell: 'Envenomed Bolt X' })
     expect(p('Jobarab begins casting Malaria.')).toEqual({ kind: 'cast', source: 'Jobarab', spell: 'Malaria' })
@@ -277,6 +279,30 @@ describe('CombatMeter', () => {
     feed('[Thu Sep 24 20:00:08 2026] You have been removed from the group.')
     // A member added by hand stays.
     expect(m.snapshot().roster).toEqual([{ name: 'Dorran', from: 'you' }])
+    // A reset by hand forgets everyone, however they got there.
+    feed('[Thu Sep 24 20:00:09 2026] Tobin has joined the group.')
+    m.clearGroup()
+    expect(m.snapshot().roster).toEqual([])
+    expect(f.entities['tobin'].kind).not.toBe('group')
+  })
+
+  it('accepting an invite puts the inviter in the group, since their own join never prints', () => {
+    const { m, feed } = meter()
+    feed(`
+      [Fri Sep 25 20:41:10 2026] Aldric invites you to join a group.
+      [Fri Sep 25 20:41:14 2026] You have joined the group.
+      [Fri Sep 25 20:46:03 2026] Tobin has joined the group.`)
+    expect(m.groupMembers).toEqual(['Aldric', 'Tobin'])
+    // A disband empties the roster (the line names no group, so it needs its own prefilter entry).
+    feed('[Fri Sep 25 20:50:00 2026] Your group has been disbanded.')
+    expect(m.groupMembers).toEqual([])
+    // A stale invite, and forming your own group, add nobody.
+    feed(`
+      [Fri Sep 25 21:00:00 2026] Aldric invites you to join a group.
+      [Fri Sep 25 21:05:00 2026] You invite Tobin to join your group.
+      [Fri Sep 25 21:05:02 2026] You have joined the group.
+      [Fri Sep 25 21:05:02 2026] Tobin has joined the group.`)
+    expect(m.groupMembers).toEqual(['Tobin'])
   })
 
   it("a group-mate's pet, once it names its leader, is theirs", () => {

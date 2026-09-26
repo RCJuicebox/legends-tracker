@@ -550,6 +550,11 @@ function Roster({ snap }: { snap: CombatSnapshot }) {
       <button className="btn small" onClick={add} disabled={!name.trim()}>
         Add
       </button>
+      {snap.roster.length > 0 && (
+        <button className="btn ghost small" onClick={() => void act('combat:clearGroup')} title="Forget everyone in the group; the log fills it again as people join, or add them by name">
+          Reset group
+        </button>
+      )}
     </div>
   )
 }

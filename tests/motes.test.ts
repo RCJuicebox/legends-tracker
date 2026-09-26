@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { MoteTracker, moteValue, parseMoteLoot, sessionHours, totalMotes, type MoteSession } from '../src/core/motes'
+import { applyMarks, markKey, MoteTracker, moteValue, parseMoteLoot, sessionHours, totalMotes, type MoteSession } from '../src/core/motes'
 import { parseLogLine } from '../src/core/logLine'
 
 function tracker() {
@@ -148,5 +148,28 @@ describe('time outside a run', () => {
     const left = parseLogLine('[Thu Sep 24 11:09:54 2099] x')!.time
     t.stop(left + 5 * 60_000)
     expect(t.state.sessions[0].outsideMs).toBe(5 * 60_000)
+  })
+
+  it('lets the player mark a run a crawl when the game never said so, and keeps the mark over a rescan', () => {
+    // Someone else's instance: Innoruuk dies, motes drop, but the completion line is the owner's.
+    const { t, feed } = tracker()
+    feed(`
+      [Fri Sep 25 21:17:28 2026] You have entered The Plane of Hate - Group 4 (Refined).
+      [Fri Sep 25 21:30:13 2026] You looted a Mote of Major Potential from Innoruuk, the Prince of Hate's corpse and stored it in your currency
+      [Fri Sep 25 21:32:41 2026] You have entered The Oasis of Marr.
+      [Fri Sep 25 21:35:25 2026] You have entered The Plane of Hate 4 (Refined).`)
+    const run = t.state.sessions[0]
+    expect(run).toMatchObject({ name: 'The Plane of Hate - Group 4 (Refined)', kind: 'instance', outcome: 'abandoned' })
+    expect(t.setKind(run.id, 'crawl')).toBe(true)
+    expect(run).toMatchObject({ kind: 'crawl', outcome: 'completed', byHand: true })
+    expect(t.state.marks).toEqual({ [markKey(run)]: 'crawl' })
+    // A rescan rebuilds the run from the log with a new id; the mark finds it by name and start.
+    const rebuilt = { ...run, id: 'instance-later-9', kind: 'instance' as const, outcome: 'abandoned' as const, byHand: undefined }
+    const after = applyMarks({ ...t.state, sessions: [rebuilt] })
+    expect(after.sessions[0]).toMatchObject({ id: 'instance-later-9', kind: 'crawl', outcome: 'completed', byHand: true })
+    // And back to normal, if it was not one after all.
+    expect(t.setKind(run.id, 'instance')).toBe(true)
+    expect(run.kind).toBe('instance')
+    expect(t.setKind('no-such-run', 'crawl')).toBe(false)
   })
 })

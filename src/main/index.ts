@@ -541,10 +541,17 @@ function registerIpc(): void {
   handle('combat:newSession', () => engine.newCombatSession())
   handle('combat:addMember', (name: string) => {
     if (typeof name === 'string') engine.meter.addMember(name.slice(0, 64))
+    engine.groupChanged()
     return engine.combatSnapshot()
   })
   handle('combat:removeMember', (name: string) => {
     if (typeof name === 'string') engine.meter.removeMember(name)
+    engine.groupChanged()
+    return engine.combatSnapshot()
+  })
+  handle('combat:clearGroup', () => {
+    engine.meter.clearGroup()
+    engine.groupChanged()
     return engine.combatSnapshot()
   })
   handle('combat:rebuild', (minutes: number) => engine.rebuildCombat(Math.max(1, Math.min(1440, Number(minutes) || 60))))
@@ -628,6 +635,10 @@ function registerIpc(): void {
   handle('stock:readScreen', () => readMotesFromScreen())
   handle('motes:pause', (at?: number) => engine.motes.pause(at ?? Date.now(), Date.now()))
   handle('motes:resume', () => engine.motes.resume(Date.now()))
+  handle('motes:setKind', (id: string, kind: string) => {
+    if (typeof id === 'string' && (kind === 'crawl' || kind === 'instance') && engine.motes.setKind(id, kind)) store.motes.set(engine.motes.state)
+    return engine.moteView()
+  })
   handle('motes:forget', (id: string) => {
     engine.motes.state.sessions = engine.motes.state.sessions.filter((s) => s.id !== id)
     store.motes.set(engine.motes.state)
@@ -966,9 +977,11 @@ void app.whenReady().then(async () => {
   app.setAppUserModelId(appUserModelId())
   ensureSourceShortcut(appIcon)
   const ownPage = (url: string) => url.startsWith('file:') || url.startsWith(process.env['ELECTRON_RENDERER_URL'] ?? '\u0000')
-  // Output-device names are only visible to pages granted 'media'; grant it to our own pages only.
-  session.defaultSession.setPermissionCheckHandler((wc, permission) => permission === 'media' && !!wc && ownPage(wc.getURL()))
-  session.defaultSession.setPermissionRequestHandler((wc, permission, cb) => cb(permission === 'media' && ownPage(wc.getURL())))
+  // Output-device names are only visible to pages granted 'media', and navigator.clipboard.writeText
+  // (the Copy buttons) needs 'clipboard-sanitized-write'; both go to our own pages only.
+  const granted = new Set(['media', 'clipboard-sanitized-write'])
+  session.defaultSession.setPermissionCheckHandler((wc, permission) => granted.has(permission) && !!wc && ownPage(wc.getURL()))
+  session.defaultSession.setPermissionRequestHandler((wc, permission, cb) => cb(granted.has(permission) && ownPage(wc.getURL())))
   protocol.handle('eqicon', async (req) => {
     const url = new URL(req.url)
     const n = Number(url.pathname.replace(/\//g, ''))

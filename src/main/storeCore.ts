@@ -32,6 +32,7 @@ export function defaultSettings(): AppSettings {
       enabled: true,
       selfBuffs: false,
       otherBuffs: false,
+      groupBuffs: false,
       dots: true,
       debuffs: true,
       buffWarnSec: 12,

@@ -30,6 +30,8 @@ export interface MoteSession {
    * One that ends without them stays 'instance': a normal instance.
    */
   kind: 'instance' | 'crawl' | 'manual'
+  /** The kind was set by the player (see MoteState.marks). */
+  byHand?: boolean
   /** The instance zone: "The Plane of Fear 4 (Refined)". */
   name: string
   startedAt: number
@@ -79,6 +81,22 @@ export function isCrawlInstance(zone: string): boolean {
   return RE_INSTANCE.test(zone)
 }
 
+/** A run's key for MoteState.marks: the same run gets the same key on every rescan, unlike its id. */
+export function markKey(s: Pick<MoteSession, 'name' | 'startedAt'>): string {
+  return `${s.name}@${s.startedAt}`
+}
+
+/** Puts the player's hand-set kinds back on rebuilt runs. */
+export function applyMarks(state: MoteState): MoteState {
+  const marks = state.marks ?? {}
+  const mark = (s: MoteSession): MoteSession => {
+    const kind = s.kind === 'manual' ? undefined : marks[markKey(s)]
+    if (!kind) return s
+    return { ...s, kind, byHand: true, ...(kind === 'crawl' && s.outcome !== 'active' ? { outcome: 'completed' as const } : {}) }
+  }
+  return { ...state, active: state.active ? mark(state.active) : null, sessions: state.sessions.map(mark) }
+}
+
 export function totalMotes(c: MoteCounts): number {
   return Object.values(c).reduce((n, v) => n + (v ?? 0), 0)
 }
@@ -114,6 +132,11 @@ export interface MoteState {
   daily: Record<string, MoteCounts>
   /** The time of the last log line read, so a restart can catch up on what it missed. */
   seenUntil?: number
+  /**
+   * Kinds the player set by hand, by run (see markKey), so a rescan of the logs puts them back. A
+   * crawl in someone else's instance prints no completion line for you, so it needs marking.
+   */
+  marks?: Record<string, 'crawl' | 'instance'>
 }
 
 /**
@@ -252,6 +275,21 @@ export class MoteTracker {
     this.state.sessions = [s, ...this.state.sessions].slice(0, 500)
     this.hooks.onSession?.(s)
     this.hooks.onChange()
+  }
+
+  /**
+   * The player says what a run was: a crawl the log never confirmed (someone else's instance, so the
+   * completion line was theirs), or a normal instance after all. Remembered across rescans.
+   */
+  setKind(id: string, kind: 'crawl' | 'instance'): boolean {
+    const s = this.state.active?.id === id ? this.state.active : this.state.sessions.find((x) => x.id === id)
+    if (!s || s.kind === 'manual') return false
+    s.kind = kind
+    s.byHand = true
+    if (kind === 'crawl' && s.outcome !== 'active') s.outcome = 'completed'
+    ;(this.state.marks ??= {})[markKey(s)] = kind
+    this.hooks.onChange()
+    return true
   }
 
   startManual(now: number, name = 'Manual session'): void {

@@ -18,6 +18,7 @@ export const TRACKING: TrackingSettings = {
   enabled: true,
   selfBuffs: true,
   otherBuffs: true,
+  groupBuffs: true,
   dots: true,
   debuffs: true,
   buffWarnSec: 12,

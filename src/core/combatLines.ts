@@ -34,7 +34,7 @@ export type CombatEvent =
   | { kind: 'kill'; target: string; killer: string | null }
   | { kind: 'resist'; source: string; target: string; spell: string }
   | { kind: 'pet'; pet: string; owner: string }
-  | { kind: 'group'; who: string; action: 'joined' | 'left' | 'youJoined' | 'youLeft' }
+  | { kind: 'group'; who: string; action: 'joined' | 'left' | 'invited' | 'youJoined' | 'youLeft' }
   | { kind: 'cast'; source: string; spell: string }
 
 const VERBS_1ST = 'hit|slash|punch|kick|bash|pierce|crush|bite|claw|strike|shoot|backstab|frenzy|maul|gore|sting|slice|cleave|reave|smash|rake|lacerate|sweep|stomp|whip|burn|impale|gouge|blast'
@@ -71,6 +71,9 @@ const RE_JOINED = /^(.+) has joined the group\.$/
 const RE_LEFT = /^(.+) has left the group\.$/
 const RE_REMOVED = /^(.+) has been removed from the group\.$/
 const RE_YOU_REMOVE = /^You remove (.+) from the group\.$/
+// Accepting an invite logs only "You have joined the group.": the inviter's own join never prints,
+// so the invite line is what names them.
+const RE_INVITED = /^(.+) invites you to join a group\.$/
 const RE_YOU_JOINED = /^You have joined the group\.$/
 const RE_YOU_LEFT = /^(?:You have been removed from the group\.|You have left the group\.|Your group has been disbanded\.|You disband the group\.)$/
 const RE_CAST_YOU = /^You begin (?:casting|singing) (.+)\.$/
@@ -162,6 +165,7 @@ export function parseCombatLine(text: string): CombatEvent | null {
   if ((m = RE_PET_ATTACK.exec(text))) return { kind: 'pet', pet: m[1], owner: SELF }
   if ((m = RE_PET_LEADER.exec(text))) return { kind: 'pet', pet: m[1], owner: self(m[2]) }
   if ((m = RE_JOINED.exec(text))) return { kind: 'group', who: m[1], action: 'joined' }
+  if ((m = RE_INVITED.exec(text))) return { kind: 'group', who: m[1], action: 'invited' }
   if ((m = RE_LEFT.exec(text)) || (m = RE_REMOVED.exec(text))) return { kind: 'group', who: m[1], action: 'left' }
   if ((m = RE_CAST.exec(text))) return { kind: 'cast', source: self(m[1]), spell: m[2] }
   return null
@@ -180,6 +184,8 @@ export function looksLikeCombat(text: string): boolean {
     text.includes(' told you, ') ||
     text.includes('My leader is') ||
     text.includes('the group') ||
+    text.includes(' invites you to join a group') ||
+    text.includes('Your group has been disbanded') ||
     text.includes(' rune ') ||
     text.startsWith('You begin ') ||
     text.includes(' begins ') ||

@@ -379,6 +379,9 @@ export class Engine {
     // Charm pets on or off changes whose every past blow was: the fights on record are read again.
     if (charmWas !== this.meter.charmPets && this.status.watching) void this.rebuildCombat(this.settings.combat.historyMinutes)
     this.triggers.load(this.store.triggers.get(), characterName(this.settings.logFile))
+    // Group buffs switched off: their timers leave the overlay; switched on, the reminder shows again.
+    if (!this.settings.tracking.groupBuffs) this.board.endWhere((t) => t.key.startsWith('buff:'), 'faded')
+    else this.lastAsk = { text: '', at: 0 }
     this.emitStatus()
   }
 
@@ -569,9 +572,9 @@ export class Engine {
     this.buffsDirty = true
   }
 
-  /** Someone else's buff on you: a timer on the buffs overlay, with a word before it fades. */
+  /** Someone else's buff on you: a timer on the buffs overlay, with a word before it fades. Only when group buffs are turned on. */
   private buffLanded(b: ActiveBuff): void {
-    if (b.caster === 'You' || b.endsAt === null) return
+    if (b.caster === 'You' || b.endsAt === null || !this.settings.tracking.groupBuffs) return
     const inGroup = this.meter.groupMembers.some((n) => n.toLowerCase() === b.caster.toLowerCase())
     this.board.upsert({
       key: `buff:${b.spell}`,
@@ -595,9 +598,12 @@ export class Engine {
     })
   }
 
-  /** Says what to ask the group for, when it changes and again every so often, but never mid-fight. */
+  /**
+   * Shows what to ask the group for, when it changes and again every so often, but never mid-fight.
+   * On screen only, no speech, and only while group buffs are turned on; the Buffs page always lists it.
+   */
   private remindBuffs(now: number): void {
-    if (this.combatBacklog || this.simulating || !this.status.watching) return
+    if (this.combatBacklog || this.simulating || !this.status.watching || !this.settings.tracking.groupBuffs) return
     const group = this.groupPeople()
     for (const g of group) {
       if (g.person || this.whoHinted.has(g.name.toLowerCase())) continue
@@ -618,10 +624,13 @@ export class Engine {
     this.lastAsk = { text, at: now }
     for (const n of needs) if (n.from === YOU && permanent(n.spell)) this.selfSaid.add(n.spell)
     this.pushFeed('info', `Buffs: ${text}.`)
-    this.notify([
-      { kind: 'speak', text, interrupt: false },
-      { kind: 'text', text, color: CATEGORY_COLORS.buff, durationSec: 6 }
-    ])
+    this.notify([{ kind: 'text', text, color: CATEGORY_COLORS.buff, durationSec: 6 }])
+  }
+
+  /** The group roster was changed by hand: the buff plan is built on it, so the page hears at once. */
+  groupChanged(): void {
+    this.buffsDirty = true
+    this.lastAsk = { text: '', at: 0 }
   }
 
   respawnView(): RespawnView {

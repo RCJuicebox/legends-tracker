@@ -4,7 +4,8 @@ import { useInvoke } from '../hooks'
 import { useRemembered } from '../remember'
 import { act } from '../toast'
 import { useNow } from '../components/TimerBars'
-import { Info, Pending } from '../components/ui'
+import { Info, Pending, Switch } from '../components/ui'
+import { useApp } from '../state'
 import { wikiUrl } from '../format'
 import { CLASSES } from '../../../core/acModel'
 import { askText, canCast, LINE_LABELS, MIN_ASK_VALUE, MIN_BUFF_SEC, offersFor, YOU, type BuffLine, type BuffOffer, type BuffPlan, type BuffView } from '../../../core/buffs'
@@ -47,6 +48,8 @@ const HOW =
 export function Buffs() {
   const q = useBuffs()
   const v = q.data
+  const { state, patchSettings } = useApp()
+  const groupBuffs = state.settings.tracking.groupBuffs
   const now = useNow(1000, !!v?.active.length)
   const [filter, setFilter] = useState('')
   const [openClasses, setOpenClasses] = useRemembered<string[]>('buffs.openClasses', [])
@@ -77,17 +80,28 @@ export function Buffs() {
         <div>
           <h1>Buffs</h1>
           <p>
-            What your group can buff you with, what is on you now, and when to ask. Pick the buffs you want below; the tracker says whom to ask when one is
+            What your group can buff you with, what is on you now, and when to ask. Pick the buffs you want below; the tracker shows whom to ask when one is
             missing, and warns before one fades. <Info label="How it works" text={HOW} />
           </p>
         </div>
+        <label className="row" title="Timers for buffs others cast on you, and whom to ask for a missing one, on the overlays. Off, this page still shows both.">
+          <Switch on={groupBuffs} onChange={(v) => patchSettings((x) => ({ ...x, tracking: { ...x.tracking, groupBuffs: v } }))} label="Show on overlays" />
+          Show on overlays
+        </label>
       </div>
 
       {!v.spellsLoaded && <div className="notice bad mb-16">The spell file is not loaded yet: set the game folder in Settings.</div>}
 
       <div className="grid two mb-16" style={{ alignItems: 'start' }}>
         <div className="card stack gap-8">
-          <h2 style={{ margin: 0 }}>Your group</h2>
+          <div className="row gap-8" style={{ justifyContent: 'space-between' }}>
+            <h2 style={{ margin: 0 }}>Your group</h2>
+            {v.group.length > 0 && (
+              <button className="btn ghost small" onClick={() => void act('combat:clearGroup').then(() => q.reload())} title="Forget everyone; the log fills the group again as people join, or add them on the Live page">
+                Reset group
+              </button>
+            )}
+          </div>
           <div className="stack" style={{ gap: 2 }}>
             <div className="row gap-8">
               <b>You</b>

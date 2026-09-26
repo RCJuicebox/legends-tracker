@@ -64,6 +64,11 @@ export interface FocusResult {
   steps: string[]
 }
 
+/** A potion or clicky: no class has it as a spell (every class level is 255). */
+export function isItemEffect(spell: Pick<Spell, 'classLevels'>): boolean {
+  return !spell.classLevels.some((l) => l > 0 && l < 255)
+}
+
 /**
  * The total duration focus a spell gets, source by source.
  *
@@ -71,8 +76,12 @@ export interface FocusResult {
  * (+15%, cap 44, 5%) on the level-50 Spirit of the Puma is 15% × 70% = +10.5%. Only the best item
  * focus applies, the usual EverQuest rule for focus effects of one kind; AAs add on top. Kelwyn's
  * Spirit of the Puma X, 10 × 2.0 × (1 + 0.50 + 0.105) = 32 ticks, is the Spell window's 3:12.
+ *
+ * An effect no class casts (a potion, a clicky) gets no focus at all: Elixir of Clarity VI is its
+ * 30 minutes with or without Spell Casting Reinforcement, as observed in game.
  */
 export function focusFor(spell: Spell, character: CharacterSettings, casterLevel: number): FocusResult {
+  if (isItemEffect(spell)) return { pct: 0, steps: ['Cast from an item, not a spell book: focus effects do not apply'] }
   const level = spellLevel(spell, character)
   const baseTicks = formulaTicks(casterLevel, spell.formula, spell.cap)
   const steps: string[] = []

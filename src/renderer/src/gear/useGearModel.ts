@@ -22,7 +22,8 @@ import {
 } from '../../../core/upgrades'
 import { conversions, rawWeights, ROLE_PRESETS, type ClassFactors, type RoleWeights } from '../../../core/statValue'
 import { focusValue, type FocusLine, type FocusReport, type FocusWorth } from '../../../core/itemFocus'
-import { ownedPieces, type Piece, type PieceSource } from '../../../core/gearOptimizer'
+import { optimizeGear, ownedPieces, type Piece, type PieceSource } from '../../../core/gearOptimizer'
+import { candidatePiece, inTheRound } from '../../../core/finderRound'
 import { aaTotal } from '../../../core/aa'
 import { CATALOG_FORMAT, type CatalogItem } from '../../../core/wikiItem'
 import type { CharacterSheet, InventoryView } from '../../../shared/types'
@@ -44,7 +45,7 @@ export interface CatalogState {
   progress: { busy: boolean; pages: number; total: number; error: string }
 }
 
-export type GearMode = 'finder' | 'focus' | 'optimize' | 'pet'
+export type GearMode = 'finder' | 'focus' | 'optimize' | 'merge' | 'pet'
 
 /** A focus effect on something the character owns, and how they have it. */
 export interface OwnedFocus {
@@ -87,6 +88,11 @@ export interface GearModel {
   wanted: Set<string>
   setWanted: (keys: string[], on: boolean) => void
   resetWanted: () => void
+  /** Per line, the focus the player calls enough (a stronger rank counts for no more); absent = the best. */
+  enough: Record<string, string>
+  setEnough: (line: string, focus: string | null) => void
+  /** The strength that counts as the most wanted on a line: the enough focus's, or Infinity. */
+  capOf: (line: string) => number
   points: number
   setPoints: (n: number) => void
   /** Per line, the catalog items with a focus of it that the character could wear, best first. */
@@ -142,9 +148,12 @@ export function useGearModel(view: InventoryView, sheet: CharacterSheet | null, 
   const [hiddenEras, setHiddenEras] = useRemembered<string[]>('finder.hiddenEras.v3', DEFAULT_HIDDEN_ERAS)
   const [slot, setSlot] = useRemembered<string>('finder.slot', 'all')
   const [capMode, setCapMode] = useRemembered<'auto' | 'over' | 'under'>('finder.acCap', 'auto')
+  // 'round': every candidate judged with everything owned rearranged around it; 'slot': one slot, one item out.
+  const [judge, setJudge] = useRemembered<'slot' | 'round'>('finder.judge', 'round')
   const [points, setPoints] = useRemembered<number>('finder.focusPoints.v2', DEFAULT_FOCUS_POINTS)
   const [days, setDays] = useRemembered<number>('focus.days', 14)
   const [focusOff, setFocusOff] = useRemembered<string[] | null>(`focus.off.${view.character}`, null)
+  const [enough, setEnoughAll] = useRemembered<Record<string, string>>(`focus.enough.${view.character}`, {})
   const sheetStats = useMemo(() => readSheet(sheet?.stats), [sheet])
   const trio = sheetStats.classes.filter(Boolean)
   const capsQ = useInvoke<{ ac: Record<string, { cap: number; mult: number }>; factors: Record<string, ClassFactors> }>(
@@ -295,23 +304,34 @@ export function useGearModel(view: InventoryView, sheet: CharacterSheet | null, 
     return out
   }, [pieces, report, fociOf, wearer])
   const worth = useMemo<FocusWorth | null>(
-    () => (report ? { points, wanted, foci: report.foci, shares: Object.fromEntries(report.uses.map((u) => [u.name, u.share])) } : null),
-    [report, points, wanted]
+    () => (report ? { points, wanted, enough, foci: report.foci, shares: Object.fromEntries(report.uses.map((u) => [u.name, u.share])) } : null),
+    [report, points, wanted, enough]
   )
+  const setEnough = (line: string, focus: string | null) => {
+    const next = { ...enough }
+    if (focus) next[line] = focus
+    else delete next[line]
+    setEnoughAll(next)
+  }
+  const capOf = (line: string) => {
+    const name = enough[line]
+    return name && report?.foci[name] ? report.foci[name].eff : Infinity
+  }
   const valueOf = useMemo(() => (names: string[]) => (worth ? focusValue(worth, names) : 0), [worth])
 
   // The finder scores the whole catalog (about 11,000 pieces) against every slot. Its inputs go
   // through a deferred value, so a weight being typed or a button being pressed answers at once and
   // the results catch up in the background.
   const input = useMemo(
-    () => ({ items, wearer, weights, compare, hiddenEras, inv, viewItems: view.items, owned, twoHanders, worth, fociOf, valueOf, eraStatus }),
-    [items, wearer, weights, compare, hiddenEras, inv, view.items, owned, twoHanders, worth, fociOf, valueOf, eraStatus]
+    () => ({ items, wearer, weights, compare, hiddenEras, inv, viewItems: view.items, owned, twoHanders, worth, fociOf, valueOf, eraStatus, pieces, judge }),
+    [items, wearer, weights, compare, hiddenEras, inv, view.items, owned, twoHanders, worth, fociOf, valueOf, eraStatus, pieces, judge]
   )
   const deferred = useDeferredValue(input)
   const results = useMemo(() => {
     const d = deferred
     if (!d.items || !classes.length || mode !== 'finder') return null
-    return findUpgrades({
+    const round = d.judge === 'round'
+    const slots = findUpgrades({
       worn: d.inv.worn,
       statsOf: (it) => statsFor(d.viewItems, it.name),
       catalog: d.items,
@@ -322,7 +342,21 @@ export function useGearModel(view: InventoryView, sheet: CharacterSheet | null, 
       eraStatus: d.eraStatus,
       twoHanders: d.twoHanders,
       owned: d.owned,
-      focus: d.worth ? { worn: (it) => d.fociOf(it).map((f) => f.name), value: d.valueOf } : undefined
+      focus: d.worth ? { worn: (it) => d.fociOf(it).map((f) => f.name), value: d.valueOf } : undefined,
+      // In the round, the stat winners a focus loss would hide get their chance: the optimizer may keep the focus elsewhere.
+      perSlot: round ? 8 : 6,
+      keepStatWinners: round
+    })
+    if (!round) return slots
+    // Each candidate among everything owned, worn as well as it can be; its worth is what the set gains.
+    const opts = { pieces: d.pieces, wearer: d.wearer, weights: d.weights, twoHanders: d.twoHanders, focusValue: d.valueOf }
+    const baseline = optimizeGear(opts)
+    return slots.map((s) => {
+      const judged = s.candidates.map((c) => {
+        const r = inTheRound({ ...opts, candidate: candidatePiece(c.item, c.stats), baseline })
+        return { ...c, round: { delta: r.delta, placed: r.placed, moves: r.moves.map((m) => ({ slot: m.slot, out: m.out?.item.name ?? null, in: m.in?.item.name ?? null })) } }
+      })
+      return { ...s, candidates: judged.filter((c) => c.round.delta > 0).sort((a, b) => b.round.delta - a.round.delta).slice(0, 6) }
     })
   }, [deferred, classes.length, mode])
 
@@ -344,6 +378,9 @@ export function useGearModel(view: InventoryView, sheet: CharacterSheet | null, 
         wanted,
         setWanted,
         resetWanted: () => setFocusOff(null),
+        enough,
+        setEnough,
+        capOf,
         points,
         setPoints,
         available,
@@ -365,6 +402,8 @@ export function useGearModel(view: InventoryView, sheet: CharacterSheet | null, 
     level,
     role,
     conv,
+    /** What a point of each item stat is worth to this character, AC quartered over the soft cap. */
+    weights,
     acState,
     overCap,
     secondaryInUse,
@@ -375,6 +414,6 @@ export function useGearModel(view: InventoryView, sheet: CharacterSheet | null, 
     wanted,
     points,
     setPoints,
-    controls: { preset, setPreset, custom, setCustom, twoHandMode, setTwoHandMode, compare, setCompare, hiddenEras, setHiddenEras, slot, setSlot, capMode, setCapMode }
+    controls: { preset, setPreset, custom, setCustom, twoHandMode, setTwoHandMode, compare, setCompare, hiddenEras, setHiddenEras, slot, setSlot, capMode, setCapMode, judge, setJudge }
   }
 }

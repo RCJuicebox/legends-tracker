@@ -7,7 +7,7 @@ import { fixtureBook } from './helpers'
 describe('SpellBook.search', () => {
   it('sorts every match before cutting to the limit', () => {
     // In file order Superior Healing and Plague come first; alphabetically they do not.
-    expect(fixtureBook().search('e', 2, true).map((s) => s.name)).toEqual(['Envenomed Bolt', 'Extended Enhancement II'])
+    expect(fixtureBook().search('e', 2, true).map((s) => s.name)).toEqual(['Elixir of Clarity VI', 'Envenomed Bolt'])
   })
 })
 

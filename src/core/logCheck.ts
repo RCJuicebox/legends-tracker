@@ -33,7 +33,7 @@ export async function checkAgainstLog(opts: {
     }
   })
   const everything: TrackingSettings = {
-    enabled: true, selfBuffs: true, otherBuffs: true, dots: true, debuffs: true,
+    enabled: true, selfBuffs: true, otherBuffs: true, groupBuffs: true, dots: true, debuffs: true,
     buffWarnSec: 0, dotWarnSec: 0, buffWarnSpeech: '', buffFadeSpeech: '', dotWarnSpeech: '', dotFadeSpeech: '',
     announceOtherBuffFades: false, tierDurationPct: opts.tierPct
   }

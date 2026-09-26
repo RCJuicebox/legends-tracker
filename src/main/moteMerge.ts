@@ -1,4 +1,4 @@
-import { MOTE_RANKS, MoteTracker, type MoteCounts, type MoteSession, type MoteState } from '../core/motes'
+import { applyMarks, MOTE_RANKS, type MoteCounts, type MoteSession, type MoteState, MoteTracker } from '../core/motes'
 import type { CharacterScan, MoteScanResult } from './moteHistory'
 
 // Mote history is one record across characters: live tracking keeps whichever character's log is
@@ -64,7 +64,7 @@ export function mergeRebuilt(current: MoteState, rebuilt: RebuiltMotes): MoteSta
   // A manual session is the player's own doing; it keeps running over the rebuilt history.
   const a = current.active
   const active = a?.kind === 'manual' ? a : (rebuilt.active ?? (a && !known(a) ? a : null))
-  return { ...current, active, sessions, daily }
+  return applyMarks({ ...current, active, sessions, daily })
 }
 
 export function samePath(a: string, b: string): boolean {

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { createRoot } from 'react-dom/client'
 import '../styles.css'
 import { api } from '../api'
@@ -6,7 +6,7 @@ import { TimerBars } from '../components/TimerBars'
 import { LIVE, useSegment } from '../combat'
 import { EntityBar, HealBar, SkillBar } from '../components/MeterBars'
 import { attackerRows, attackerSkillRows, damageRows, durationSec, fmtClock, fmtNum, fmtRate, healSpellRows, healTotals, healerRows, skillRows, totalsOf, type HealRow, type Row, type SkillRow } from '../../../core/combatView'
-import type { CombatSnapshot, MeterMode, MeterOverlayOptions, OverlayConfig, TimerView } from '../../../shared/types'
+import type { CombatSnapshot, MeterMode, MeterOverlayOptions, MeterSpan, OverlayConfig, Segment, SegmentSummary, TimerView } from '../../../shared/types'
 
 interface Alert {
   id: number
@@ -76,14 +76,61 @@ function Overlay() {
 }
 
 /**
+ * Which fight or session the meter shows: a menu drawn inside the overlay. A native <select> would
+ * not do: its list is a popup window that needs focus, and overlay windows are never focusable (the
+ * game must keep the keyboard), so the list never opened.
+ */
+function SegmentMenu({ list, span, selection, live, onPick, onOpen }: { list: SegmentSummary[]; span: MeterSpan; selection: string; live: Segment | null | undefined; onPick: (id: string) => void; onOpen: (open: boolean) => void }) {
+  const [open, setOpen] = useState(false)
+  const toggle = (v: boolean) => {
+    setOpen(v)
+    onOpen(v)
+  }
+  const pick = (id: string) => {
+    onPick(id)
+    toggle(false)
+  }
+  const liveLabel = live ? (span === 'fight' ? 'Live' : 'Now') : 'Last'
+  const current = selection === LIVE ? liveLabel : (list.find((s) => s.id === selection)?.name ?? liveLabel)
+  const time = (t: number) => new Date(t).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+  return (
+    <>
+      <button className={`dm-ov-btn dm-ov-pick${open ? ' on' : ''}`} onClick={() => toggle(!open)} aria-haspopup="listbox" aria-expanded={open} aria-label={span === 'fight' ? 'Which fight' : 'Which session'} title={current}>
+        {current} ▾
+      </button>
+      {open && (
+        <>
+          <div className="dm-ov-shade" onClick={() => toggle(false)} />
+          <div className="dm-ov-menu" role="listbox" aria-label={span === 'fight' ? 'Fights' : 'Sessions'}>
+            <button className={selection === LIVE ? 'on' : ''} role="option" aria-selected={selection === LIVE} onClick={() => pick(LIVE)}>
+              {liveLabel}
+            </button>
+            {list.slice(0, 20).map((s) => (
+              <button key={s.id} className={s.id === selection ? 'on' : ''} role="option" aria-selected={s.id === selection} onClick={() => pick(s.id)}>
+                <span className="dm-ov-menu-time">{time(s.startedAt)}</span>
+                <span className="dm-ov-menu-name">{s.name}</span>
+                <span className="dm-ov-menu-dps">{fmtRate(s.dps)}</span>
+              </button>
+            ))}
+            {!list.length && <div className="dm-ov-empty">No {span === 'fight' ? 'fights' : 'sessions'} yet</div>}
+          </div>
+        </>
+      )}
+    </>
+  )
+}
+
+/**
  * The damage meter over the game. The window lets clicks through; while the pointer is on the
  * header the page asks for the mouse back, so the header's controls work, and gives it back as the
  * pointer leaves. Unlocking (the pin) keeps the mouse for the whole window, so rows can be clicked
- * into, until it is locked again.
+ * into, until it is locked again. An open fight menu keeps it too: the list hangs below the header.
  */
 function MeterOverlay({ config, snap, arranging }: { config: OverlayConfig; snap: CombatSnapshot | null; arranging: boolean }) {
   const opts = config.meter ?? METER_DEFAULTS
   const [unlocked, setUnlocked] = useState(false)
+  const [menuOpen, setMenuOpen] = useState(false)
+  const overHead = useRef(false)
   const [selection, setSelection] = useState(LIVE)
   const [drill, setDrill] = useState<{ key: string; name: string } | null>(null)
   const seg = useSegment(snap, opts.span, selection)
@@ -92,14 +139,16 @@ function MeterOverlay({ config, snap, arranging }: { config: OverlayConfig; snap
 
   useEffect(() => setDrill(null), [opts.mode, opts.span, selection])
   useEffect(() => setSelection(LIVE), [opts.span])
-  // A locked window has the mouse only while the pointer is on the header.
+  // A locked window has the mouse only while the pointer is on the header or the fight menu is open.
+  // The pointer does not leave the header as a menu closes, so that moment is covered here too.
   useEffect(() => {
-    if (!arranging) api.send('overlay:mouse', config.id, unlocked)
-  }, [unlocked, arranging, config.id])
+    if (!arranging) api.send('overlay:mouse', config.id, unlocked || menuOpen || overHead.current)
+  }, [unlocked, menuOpen, arranging, config.id])
 
   const patch = (p: Partial<MeterOverlayOptions>) => api.send('overlay:meter', config.id, p)
   const mouse = (on: boolean) => {
-    if (!unlocked && !arranging) api.send('overlay:mouse', config.id, on)
+    overHead.current = on
+    if (!unlocked && !arranging && !menuOpen) api.send('overlay:mouse', config.id, on)
   }
 
   const rows = useMemo<Row[] | HealRow[]>(() => {
@@ -133,14 +182,7 @@ function MeterOverlay({ config, snap, arranging }: { config: OverlayConfig; snap
               ‹ {drill.name}
             </button>
           ) : (
-            <select className="dm-ov-pick" value={selection} onChange={(e) => setSelection(e.target.value)} aria-label="Which fight" title={name}>
-              <option value={LIVE}>{live ? (opts.span === 'fight' ? 'Live' : 'Now') : 'Last'}</option>
-              {list.slice(0, 20).map((s) => (
-                <option key={s.id} value={s.id}>
-                  {new Date(s.startedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} {s.name} · {fmtRate(s.dps)}
-                </option>
-              ))}
-            </select>
+            <SegmentMenu list={list} span={opts.span} selection={selection} live={live} onPick={setSelection} onOpen={setMenuOpen} />
           )}
           <span className="dm-ov-title" title={name}>
             {name}

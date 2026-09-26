@@ -37,6 +37,17 @@ describe('focusFor', () => {
     expect(focusFor(spell('Envenomed Bolt'), c, 50).pct).toBe(0)
   })
 
+  it('gives a potion no focus: Elixir of Clarity VI is 30 minutes whatever the character wears or has trained', () => {
+    const elixir = spell('Elixir of Clarity VI')
+    const f = focusFor(elixir, c, 50)
+    expect(f.pct).toBe(0)
+    expect(f.steps).toEqual(['Cast from an item, not a spell book: focus effects do not apply'])
+    const d = computeDuration({ spell: elixir, rank: 0, level: 50, tierPct: DEFAULT_TIER_DURATION_PCT, focusPct: f.pct, focusSteps: f.steps })
+    expect(d.spellWindowSec).toBe(30 * 60)
+    // A real spell of the same character still gets the 50% AA.
+    expect(focusFor(spell('Slugs Healing'), c, 50).pct).toBe(65)
+  })
+
   it('makes Spirit of the Puma X read 1:00 (3:12), as the Spell window does', () => {
     const puma = spell('Spirit of the Puma')
     const f = focusFor(puma, c, casterLevel(puma, c))
