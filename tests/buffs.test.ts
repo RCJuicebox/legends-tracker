@@ -22,7 +22,7 @@ describe('who is who', () => {
 })
 
 const spell = (name: string, over: Partial<Spell>): Spell => ({
-  id: 0, name, castMs: 3000, recastMs: 0, formula: 3, cap: 600, beneficial: true, classLevels: Array(16).fill(255), targetType: 5, skill: 5, icon: 0,
+  id: 0, name, castMs: 3000, recastMs: 0, mana: 100, formula: 3, cap: 600, beneficial: true, classLevels: Array(16).fill(255), targetType: 5, skill: 5, icon: 0,
   effects: [], category: 'buff', landSelf: '', landOther: '', fade: '', ...over
 })
 const temperance = spell('Temperance', { landSelf: 'You feel the power of temperance.', fade: 'Your temperance fades.' })

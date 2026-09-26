@@ -15,6 +15,7 @@
 // wiki at run time.
 
 import { CLASSES } from './acModel'
+import { summonsPet } from './spellKinds'
 import { itemKey, type InvItem, type ItemStats } from './inventory'
 import { canWear, isTwoHanded, score, type Restrictions, type Wearer, type Weights } from './upgrades'
 import type { ClassFactors, Conversions, RoleWeights } from './statValue'
@@ -448,9 +449,6 @@ export const sameItem = (a: PetPiece, b: PetPiece) => a === b || (a.from === 'pe
 
 // ---- which pet: the summoning spells ----
 
-/** The summoning effects: summon pet, summon skeleton pet, summon warder. */
-const SUMMON_SPAS = [33, 71, 106]
-
 /** A pet summoning spell the character's classes can cast, for choosing one by hand. */
 export interface PetSpellOption {
   spell: string
@@ -462,7 +460,7 @@ export interface PetSpellOption {
 /** The unranked name of a pet summoning spell, or null when the spell summons nothing. */
 export function petSummonName(book: SpellBook, rankedName: string): string | null {
   const r = book.resolve(rankedName)
-  if (!r || !r.spell.effects.some((e) => SUMMON_SPAS.includes(e.spa))) return null
+  if (!r || !summonsPet(r.spell)) return null
   return r.rank ? rankedName.replace(/\s+[IVXL]+$/, '') : r.spell.name
 }
 
@@ -477,7 +475,7 @@ export function petSpells(book: SpellBook, classes: string[], level: number): Pe
   const idx = (c: string) => CLASS_NAMES.indexOf(CLASS_IDS[c] as (typeof CLASS_NAMES)[number])
   const out = new Map<string, PetSpellOption>()
   for (const s of book.all()) {
-    if (!s.effects.some((e) => SUMMON_SPAS.includes(e.spa))) continue
+    if (!summonsPet(s)) continue
     const mine = classes.filter((c) => {
       const l = s.classLevels[idx(c)]
       return l > 0 && l < 254 && l <= level

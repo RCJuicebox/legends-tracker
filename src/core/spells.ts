@@ -7,7 +7,7 @@ import { CLASS_NAMES, type SpellCategory, type SpellSummary } from '../shared/ty
  * One record from the client's `spells_us.txt`, joined with its messages from `spells_us_str.txt`.
  *
  * Field positions were established against the EQL client (2026-09): 8 cast time (ms), 10 recast,
- * 11 duration formula, 12 duration cap in ticks, 28 beneficial flag, 36–51 class levels (255 = cannot
+ * 11 duration formula, 12 duration cap in ticks, 14 mana, 28 beneficial flag, 36–51 class levels (255 = cannot
  * cast), 30 target type (13 lifetap), 32 casting skill (70 percussion…), 75 icon index, 172 effect
  * slots as `slot|spa|base|base2|formula|max` joined by `$`.
  */
@@ -16,6 +16,7 @@ export interface Spell {
   name: string
   castMs: number
   recastMs: number
+  mana: number
   formula: number
   cap: number
   beneficial: boolean
@@ -52,7 +53,7 @@ export interface RankedSpell {
   rankedName: string
 }
 
-const F = { id: 0, name: 1, cast: 8, recast: 10, formula: 11, cap: 12, good: 28, target: 30, skill: 32, cls: 36, icon: 75, effects: 172 }
+const F = { id: 0, name: 1, cast: 8, recast: 10, formula: 11, mana: 14, cap: 12, good: 28, target: 30, skill: 32, cls: 36, icon: 75, effects: 172 }
 
 const ROMAN: Record<string, number> = {
   I: 1, II: 2, III: 3, IV: 4, V: 5, VI: 6, VII: 7, VIII: 8, IX: 9, X: 10,
@@ -120,6 +121,7 @@ export class SpellBook {
         // A blank or odd field reads as 0, not NaN: a NaN cast time would drop every pending cast.
         castMs: +f[F.cast] || 0,
         recastMs: +f[F.recast] || 0,
+        mana: +f[F.mana] || 0,
         formula,
         cap,
         beneficial,

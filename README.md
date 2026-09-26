@@ -202,7 +202,7 @@ fix it. It is a diagnostic; the timers themselves never learn from the log.
 ### Spell file layout
 
 `spells_us.txt` is caret-delimited: 0 id, 1 name, 8 cast ms, 10 recast ms, 11 duration formula,
-12 duration cap (ticks), 28 beneficial, 36–51 class levels (255 = cannot cast), 75 icon, 172 effects
+12 duration cap (ticks), 14 mana, 28 beneficial, 36–51 class levels (255 = cannot cast), 75 icon, 172 effects
 (`slot|spa|base|…` joined by `$`). `spells_us_str.txt`: id, caster-me, caster-other, cast-on-you,
 cast-on-other, spell-gone. Icons are cut from `uifiles\default\SpellsNN.tga`: 40×40, 36 per sheet.
 
@@ -256,6 +256,35 @@ motes. Manual Start/Stop covers anything else.
 
 On first launch, history is rebuilt from the character's log and its zipped archives.
 
+### Spell upgrades
+
+The Motes page's third tab says which of the spells and songs you cast to put motes into next. It
+counts your casts (`You begin casting …` / `You begin singing …`) over the last 7, 14 or 30 days of
+play, or all your logs, and scores the next rank of each spell with the community's EQL spell upgrade
+(mote) guide:
+
+- A spell at rank N needs 2^N xp for rank N+1, and on a spell every mote counts its xp whatever the
+  spell's rank (Infinitesimal 1, Minor 1, Lesser 2, Potential 4, Major 5, Greater 6, Superior 7,
+  Grand 8, Ascendant 9, Infinite 10). There is no tier limit as on items, so the low ranks that no
+  item of yours can use any more are worth their full xp here, and "Pay with" spends the lowest ranks
+  first (each rank's combine value doubles while its xp barely grows).
+- What a rank gives depends on the category, from the guide's per-tier table: nukes and lifetaps
+  −2% cast, −2% mana, +6% damage; DoTs −4% cast, −2% mana, +5% duration, +3% per tick (unconfirmed);
+  heals −4% cast, −2% mana, about +3% healing; heals over time the same with +5% duration; debuffs,
+  charms, mezzes and buffs −4% cast, −4% mana, +10% duration, with charm and mez raising the highest
+  level they work on and buffs gaining no stats (damage shields confirmed not to). Every spell also
+  gets −2% recovery, −2% reuse and −15 resist modifier per rank; pet summons +1 pet level. Duration
+  bonuses use the spell timers' per-rank table, so heals over time get the fitted 7%. Instant and
+  permanent spells get no duration bonus; zero-mana spells nothing on mana.
+- A point is one cast made one percent better, with weights you can change (damage and healing 1,
+  duration 1, mana ½, cast time ½, recovery and reuse ¼, a level 5). A rank's worth is casts × points
+  per cast; worth per xp is the default order. Spells at rank X are listed last, with nothing to plan.
+  Potions, clickies and abilities granted outside the spell book (Harm Touch, Life Burn) are left
+  out: motes go into spell-book spells.
+
+The rank a spell is at is the highest numeral the log has seen you cast it with, so a spell you
+upgraded but have not cast since shows its old rank until you cast it.
+
 ## Log files
 
 A character log past the size limit (off by default; one switch on the Log Files page) is archived:
@@ -277,7 +306,7 @@ No path loses a line. An archive interrupted by the app closing is finished on t
 
 | Path | What |
 |---|---|
-| `src/core` | Log parsing and tailing, spell book, duration model, spell tracker, triggers, archiver, log check, the damage meter (`combatLines` reads the lines, `combatMeter` keeps the fights, `combatView` sums them for display), the loot ledger (`loot`). Plain TypeScript with no Electron dependency, so it is unit-tested directly |
+| `src/core` | Log parsing and tailing, spell book, duration model, spell tracker, triggers, archiver, log check, the damage meter (`combatLines` reads the lines, `combatMeter` keeps the fights, `combatView` sums them for display), the loot ledger (`loot`), motes (`motes` counts them, `moteCalc` plans item upgrades, `mergeValue` picks the best merge, `spellMotes` the best spell to upgrade). Plain TypeScript with no Electron dependency, so it is unit-tested directly |
 | `src/main` | Electron main process: windows, tray, overlays, speech, icons, persistence, the engine that joins it all |
 | `src/preload` | The IPC bridge |
 | `src/renderer` | The React UI (`index.html`), overlay windows (`overlay.html`), hidden audio mixer (`audio.html`) |

@@ -5,6 +5,7 @@ import { act } from '../toast'
 import { useNow } from '../components/TimerBars'
 import { ConfirmButton, Icon, Info, Pending } from '../components/ui'
 import { MotePlanner } from './MotePlanner'
+import { MoteSpells } from './MoteSpells'
 import { useRemembered } from '../remember'
 import { MOTE_RANKS, localDay, moteValue, moteWorth, pausedHours, sessionHours, totalMotes, type MoteCounts, type MoteSession, type MoteState } from '../../../core/motes'
 
@@ -99,7 +100,7 @@ function PauseControl({ s, now }: { s: MoteSession; now: number }) {
 }
 
 export function Motes() {
-  const [tab, setTab] = useRemembered<'tracking' | 'planner'>('motes.tab', 'tracking')
+  const [tab, setTab] = useRemembered<'tracking' | 'planner' | 'spells'>('motes.tab', 'tracking')
   return (
     <>
       <div className="row gap-6 mb-14" role="group" aria-label="Motes view">
@@ -109,8 +110,25 @@ export function Motes() {
         <button className={`btn${tab === 'planner' ? ' on' : ' ghost'}`} aria-pressed={tab === 'planner'} onClick={() => setTab('planner')}>
           Upgrade planner
         </button>
+        <button className={`btn${tab === 'spells' ? ' on' : ' ghost'}`} aria-pressed={tab === 'spells'} onClick={() => setTab('spells')}>
+          Spell upgrades
+        </button>
       </div>
-      {tab === 'tracking' ? <MoteTracking /> : <MotePlannerPage />}
+      {tab === 'tracking' ? <MoteTracking /> : tab === 'planner' ? <MotePlannerPage /> : <MoteSpellsPage />}
+    </>
+  )
+}
+
+function MoteSpellsPage() {
+  return (
+    <>
+      <div className="page-head">
+        <div>
+          <h1>Spell upgrades</h1>
+          <p>Which of the spells and songs you cast to put motes into next: the most gained per xp, by the guide's categories.</p>
+        </div>
+      </div>
+      <MoteSpells />
     </>
   )
 }

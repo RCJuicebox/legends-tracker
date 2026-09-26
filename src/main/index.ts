@@ -31,6 +31,7 @@ import { focusFromSpell, isDurationFocus } from '../core/focus'
 import { testTrigger } from '../core/triggers'
 import { respawnTrigger, respawnTriggerId } from '../core/respawns'
 import { petSpells, petSummonName } from '../core/pets'
+import { castRows } from '../core/spellMotes'
 import { PetStore, PetWiki, scanPetLog } from './pets'
 import { timerKey } from '../core/spellTracker'
 import { CombatMeter } from '../core/combatMeter'
@@ -713,6 +714,18 @@ function registerIpc(): void {
     }
     const report = focusReport(specs, castableSpells(book.all(), classes, level), classes, level, casts)
     return { ...report, window: recent ? { total: recent.total, from: recent.from, to: recent.to } : null }
+  })
+
+  // Which spells to put motes into: the character's casts over the last `days` days of play, joined
+  // with the spell file. The page scores and sorts them itself.
+  handle('motes:spellCasts', async (character: string, days: number) => {
+    const book = engine.book
+    if (!book) return null
+    const s = store.settings.get()
+    const key = character || characterKey(s.logFile)
+    if (!key) return { rows: [], unknown: [], window: null }
+    const recent = await castHistory.recent({ logPath: join(s.installDir, 'Logs', `eqlog_${key}.txt`), archiveDir: engine.archiveDir(), stem: `eqlog_${key}`, days })
+    return { ...castRows(book, recent.counts, engine.character()), window: { total: recent.total, from: recent.from, to: recent.to } }
   })
 
   handle('stats:caps', async (classes: string[], level: number) => ({

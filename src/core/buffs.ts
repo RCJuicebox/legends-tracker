@@ -16,6 +16,7 @@
 // ranks of one (Legends prints its ranks after the name: "Rune I III").
 
 import { CLASS_NUMBER, type ClassId } from './acModel'
+import { isSong } from './spellKinds'
 import { computeDuration } from './durations'
 import type { Spell, SpellBook } from './spells'
 import { effectValue } from './effectValue'
@@ -167,8 +168,6 @@ function valueOf(effects: { spa: number; base: number; max: number }[], permanen
   return Math.round(v)
 }
 
-/** Casting skills of songs: brass, singing, stringed, wind, percussion. */
-const SONG_SKILLS = [12, 41, 49, 54, 70]
 /** Target types of a buff on a pet: never on a player. */
 const PET_TARGETS = [14, 38]
 /** A buff the caster can only put on themself: listed so the player is reminded to cast their own. */
@@ -187,7 +186,7 @@ const GROUP_TARGETS = [3, 41, 42]
 export function buffOffers(book: SpellBook, tierPct: Record<SpellCategory, number>, maxLevel = LEVEL_CAP): BuffOffer[] {
   const out = new Map<string, BuffOffer>()
   for (const s of book.all()) {
-    if (!s.beneficial || PET_TARGETS.includes(s.targetType) || SONG_SKILLS.includes(s.skill) || /^Item Benefit/i.test(s.name)) continue
+    if (!s.beneficial || PET_TARGETS.includes(s.targetType) || isSong(s) || /^Item Benefit/i.test(s.name)) continue
     const d = computeDuration({ spell: s, rank: 0, level: 50, tierPct, focusPct: 0 })
     if (!d.permanent && d.seconds < MIN_BUFF_SEC) continue
     // Values at the level cap, as a caster at the top would give them.

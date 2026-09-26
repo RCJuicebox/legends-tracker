@@ -12,7 +12,7 @@ const fx = (spa: number, base: number, base2 = 0): SpellEffect => ({ spa, base, 
 /** A spell row as the game's spell file has it; classLevels by classic class number - 1 (4 = SK, 9 = SHM). */
 function spell(id: number, name: string, o: Partial<Spell> = {}): Spell {
   return {
-    id, name, castMs: 3000, recastMs: 0, formula: 0, cap: 0, beneficial: false, classLevels: Array(16).fill(255), targetType: 5, skill: 24, icon: 0,
+    id, name, castMs: 3000, recastMs: 0, mana: 100, formula: 0, cap: 0, beneficial: false, classLevels: Array(16).fill(255), targetType: 5, skill: 24, icon: 0,
     effects: [], category: 'nuke', landSelf: '', landOther: '', fade: '', ...o
   }
 }
