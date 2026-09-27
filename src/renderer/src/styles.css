@@ -1,29 +1,104 @@
+/*
+ * Field Kit (FEAT-015): the game's own windows, bevelled panels and a tick for every six seconds.
+ * Every colour is a token. The dark set is the default; the light set applies when the app's theme
+ * (Settings › Appearance, handed to Windows' nativeTheme) is light, or System on a light Windows.
+ * Overlays keep the dark set whatever the theme: they sit over the game.
+ */
 :root {
-  --bg: #0f1117;
-  --bg-2: #151923;
-  --panel: #1a1f2b;
-  --panel-2: #212736;
-  --line: #2a3142;
-  --line-2: #353d52;
-  --text: #e6e9ef;
-  --text-2: #aab2c2;
-  /* 5.1:1 on --panel, 5.5:1 on --bg-2, 4.7:1 on --panel-2 (WCAG AA for small text). */
-  --text-3: #8690a6;
-  --accent: #e8b44c;
-  --accent-2: #f3cf7a;
-  --teal: #3fb6a8;
-  --violet: #b46ae0;
-  --red: #e25a5a;
+  --bg: #0d1115;
+  --bg-2: #10151a;
+  --panel: #161c22;
+  --panel-2: #1d242c;
+  --well: #0a0d10;
+  --line: #26303a;
+  --line-2: #354250;
+  /* Bevel: the lit top edge and the shadowed bottom edge of a panel. */
+  --hi: #2b343e;
+  --lo: #06080a;
+  --text: #dde4eb;
+  --text-2: #a9b4bf;
+  /* 5.6:1 on --panel, 6:1 on --bg-2 (WCAG AA for small text). */
+  --text-3: #8e9ba8;
+  --accent: #f2b233;
+  --accent-2: #f7c965;
+  --on-accent: #171004;
+  --teal: #40c2b1;
+  --violet: #b48cf0;
+  --red: #ef5a4f;
   --green: #5cc27a;
   --amber: #e0a03a;
-  --radius: 10px;
-  --radius-sm: 6px;
-  --shadow: 0 1px 0 rgba(255, 255, 255, 0.03) inset, 0 8px 24px rgba(0, 0, 0, 0.25);
+  --lime: #6cc46c;
+  --pink: #e05ab4;
+  --orange: #e07a4a;
+  --blue: #6f8fd6;
+  --teal-text: #7fded2;
+  --violet-text: #d4a6f2;
+  --amber-text: #f0c47c;
+  --orange-text: #f2a47f;
+  --green-text: #8fe0a6;
+  --lime-text: #9fe29f;
+  --red-text: #f2a0a0;
+  --pink-text: #f29ad4;
+  --blue-text: #8fb2f0;
+  --knob: #cfd5e1;
+  /* White tints over dark surfaces; black ones in the light set. */
+  --ink: 255 255 255;
+  --radius: 4px;
+  --radius-sm: 3px;
+  --shadow: inset 0 1px 0 var(--hi), inset 0 -1px 0 var(--lo), 0 0 0 1px var(--line);
+  --font-display: 'Bahnschrift', 'Segoe UI Variable Display', 'Segoe UI', sans-serif;
+  --font-mono: 'Cascadia Mono', 'Cascadia Code', Consolas, monospace;
   color-scheme: dark;
   font-family: 'Segoe UI Variable Text', 'Segoe UI', system-ui, sans-serif;
   font-size: 14px;
   color: var(--text);
   background: var(--bg);
+}
+
+@media (prefers-color-scheme: light) {
+  :root:not(.overlay-html) {
+    --bg: #e8ebee;
+    --bg-2: #dfe4e8;
+    --panel: #fbfcfd;
+    --panel-2: #f0f3f6;
+    --well: #e3e8ec;
+    --line: #c8d0d7;
+    --line-2: #aeb9c3;
+    --hi: #ffffff;
+    --lo: #b9c2ca;
+    --text: #141a20;
+    --text-2: #3c4751;
+    --text-3: #55616c;
+    --accent: #9b6500;
+    --accent-2: #875800;
+    --on-accent: #fbfcfd;
+    --teal: #0e7c70;
+    --violet: #6b43b8;
+    --red: #bf3027;
+    --green: #1f7f3f;
+    --amber: #945a00;
+    --lime: #3d8a24;
+    --pink: #a8327f;
+    --orange: #b04f1c;
+    --blue: #2f5bb5;
+    --teal-text: #0b6a60;
+    --violet-text: #5d3aa0;
+    --amber-text: #7f4e00;
+    --orange-text: #9a4516;
+    --green-text: #1a6b35;
+    --lime-text: #33731e;
+    --red-text: #a3281f;
+    --pink-text: #8f2a6c;
+    --blue-text: #274e9c;
+    --knob: #ffffff;
+    --ink: 0 0 0;
+    color-scheme: light;
+  }
+  /* Timer headings are lit for the game behind an overlay; on a light page they are plain text. */
+  :root:not(.overlay-html) .timer-group-head {
+    color: var(--text);
+    text-shadow: none;
+  }
 }
 
 /* Overlay windows are transparent all the way down, or they would hide the game behind a dark box. */
@@ -92,9 +167,11 @@ textarea {
   color: var(--text-2);
 }
 .titlebar .brand {
-  font-weight: 650;
-  letter-spacing: 0.02em;
+  font-weight: 700;
+  letter-spacing: 0.08em;
   color: var(--text);
+  font-family: var(--font-display);
+  text-transform: uppercase;
 }
 .titlebar .brand b {
   color: var(--accent);
@@ -121,16 +198,23 @@ textarea {
   border: none;
   text-align: left;
   cursor: pointer;
-  font-weight: 500;
+  font-weight: 600;
+  font-family: var(--font-display);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-size: 14px;
 }
 .nav-item:hover {
   background: var(--panel);
   color: var(--text);
 }
 .nav-item.active {
-  background: var(--panel-2);
-  color: var(--text);
-  box-shadow: inset 3px 0 0 var(--accent);
+  background: var(--panel);
+  color: var(--accent);
+  box-shadow:
+    inset 2px 0 0 var(--accent),
+    inset 0 1px 0 var(--hi),
+    inset 0 -1px 0 var(--lo);
 }
 .nav-item svg {
   width: 18px;
@@ -142,9 +226,11 @@ textarea {
   margin-left: auto;
   font-size: 11px;
   padding: 1px 7px;
-  border-radius: 10px;
-  background: var(--line);
-  color: var(--text-2);
+  border-radius: 2px;
+  background: var(--accent);
+  color: var(--on-accent);
+  font-family: var(--font-mono);
+  font-weight: 600;
 }
 .nav-item .unsaved-mark {
   margin-left: auto;
@@ -185,7 +271,10 @@ textarea {
   margin: 0;
   font-size: 22px;
   font-weight: 650;
-  letter-spacing: -0.01em;
+  letter-spacing: 0.04em;
+  font-family: var(--font-display);
+  text-transform: uppercase;
+  font-stretch: condensed;
 }
 .page-head p {
   margin: 4px 0 0;
@@ -205,7 +294,7 @@ textarea {
 
 .card {
   background: var(--panel);
-  border: 1px solid var(--line);
+  border: none;
   border-radius: var(--radius);
   box-shadow: var(--shadow);
   padding: 16px;
@@ -213,14 +302,15 @@ textarea {
 }
 .card h2 {
   margin: 0 0 12px;
-  font-size: 13px;
+  font-size: 15px;
   text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: var(--text-2);
-  font-weight: 650;
+  letter-spacing: 0.1em;
+  color: var(--text);
+  font-weight: 700;
   display: flex;
   align-items: center;
   gap: 8px;
+  font-family: var(--font-display);
 }
 .card h2 .spacer {
   flex: 1;
@@ -264,7 +354,7 @@ textarea {
   font-size: 12px;
 }
 .mono {
-  font-family: 'Cascadia Mono', Consolas, monospace;
+  font-family: var(--font-mono);
   font-size: 12.5px;
 }
 .grow {
@@ -289,16 +379,28 @@ textarea {
   background: var(--panel-2);
   color: var(--text);
   cursor: pointer;
-  font-weight: 550;
+  font-weight: 600;
   white-space: nowrap;
+  font-family: var(--font-display);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-size: 13px;
+  box-shadow:
+    inset 0 1px 0 var(--hi),
+    inset 0 -1px 0 var(--lo);
 }
 .btn:hover {
-  border-color: #4a5470;
-  background: #283044;
+  border-color: var(--line-2);
+  background: var(--panel-2);
 }
 
 /* One focus ring for everything reached by Tab. Inputs keep their own border glow. */
 button:focus-visible,
+/* Links read as the accent in either theme, visited or not. */
+a,
+a:visited {
+  color: var(--accent-2);
+}
 a:focus-visible,
 summary:focus-visible,
 [tabindex]:focus-visible {
@@ -312,15 +414,18 @@ summary:focus-visible,
 .btn.primary {
   background: var(--accent);
   border-color: var(--accent);
-  color: #1b1405;
+  color: var(--on-accent);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.35),
+    inset 0 -1px 0 rgb(0 0 0 / 0.25);
 }
 .btn.primary:hover {
   background: var(--accent-2);
 }
 .btn.danger {
-  color: #ffb4b4;
-  border-color: #5a2a2a;
-  background: #2a1a1d;
+  color: var(--red-text);
+  border-color: color-mix(in srgb, var(--red) 40%, transparent);
+  background: color-mix(in srgb, var(--red) 12%, transparent);
 }
 .btn.ghost {
   background: transparent;
@@ -365,7 +470,7 @@ input:focus,
 select:focus,
 textarea:focus {
   border-color: var(--accent);
-  box-shadow: 0 0 0 3px rgba(232, 180, 76, 0.15);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 15%, transparent);
 }
 textarea {
   resize: vertical;
@@ -431,7 +536,7 @@ p.hint {
   width: 14px;
   height: 14px;
   border-radius: 50%;
-  background: #cfd5e1;
+  background: var(--knob);
   transition: transform 0.15s;
 }
 .switch.on {
@@ -445,7 +550,7 @@ p.hint {
 }
 .switch.on::after {
   transform: translateX(14px);
-  background: #1b1405;
+  background: var(--on-accent);
 }
 
 .chip-btn {
@@ -460,50 +565,53 @@ p.hint {
   align-items: center;
   gap: 5px;
   padding: 2px 8px;
-  border-radius: 20px;
+  border-radius: 2px;
   font-size: 11.5px;
   font-weight: 600;
   background: var(--line);
   color: var(--text-2);
   white-space: nowrap;
+  font-family: var(--font-display);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
 }
 .chip.dot {
-  background: rgba(180, 106, 224, 0.16);
-  color: #d4a6f2;
+  background: color-mix(in srgb, var(--violet) 16%, transparent);
+  color: var(--violet-text);
 }
 .chip.buff {
-  background: rgba(63, 182, 168, 0.16);
-  color: #7fded2;
+  background: color-mix(in srgb, var(--teal) 16%, transparent);
+  color: var(--teal-text);
 }
 .chip.hot,
 .chip.heal {
-  background: rgba(108, 196, 108, 0.16);
-  color: #9fe29f;
+  background: color-mix(in srgb, var(--lime) 16%, transparent);
+  color: var(--lime-text);
 }
 .chip.debuff {
-  background: rgba(224, 160, 58, 0.16);
-  color: #f0c47c;
+  background: color-mix(in srgb, var(--amber) 16%, transparent);
+  color: var(--amber-text);
 }
 .chip.mez,
 .chip.charm {
-  background: rgba(224, 90, 180, 0.16);
-  color: #f29ad4;
+  background: color-mix(in srgb, var(--pink) 16%, transparent);
+  color: var(--pink-text);
 }
 .chip.nuke {
-  background: rgba(224, 122, 74, 0.16);
-  color: #f2a47f;
+  background: color-mix(in srgb, var(--orange) 16%, transparent);
+  color: var(--orange-text);
 }
 .chip.ok {
-  background: rgba(92, 194, 122, 0.15);
-  color: #8fe0a6;
+  background: color-mix(in srgb, var(--green) 15%, transparent);
+  color: var(--green-text);
 }
 .chip.warn {
-  background: rgba(224, 160, 58, 0.16);
-  color: #f0c47c;
+  background: color-mix(in srgb, var(--amber) 16%, transparent);
+  color: var(--amber-text);
 }
 .chip.bad {
-  background: rgba(226, 90, 90, 0.16);
-  color: #f2a0a0;
+  background: color-mix(in srgb, var(--red) 16%, transparent);
+  color: var(--red-text);
 }
 /* A mark as well as a colour, for anyone who cannot tell the colours apart. */
 .chip.ok::before {
@@ -525,7 +633,7 @@ p.hint {
 }
 .status-dot.live {
   background: var(--green);
-  box-shadow: 0 0 0 3px rgba(92, 194, 122, 0.2);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--green) 20%, transparent);
 }
 .status-dot.warn {
   background: var(--amber);
@@ -548,6 +656,8 @@ p.hint {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  font-family: var(--font-display);
+  font-variant-numeric: tabular-nums;
 }
 .stat .sub {
   font-size: 12px;
@@ -565,12 +675,13 @@ table.table {
   text-align: left;
   font-size: 11.5px;
   text-transform: uppercase;
-  letter-spacing: 0.07em;
+  letter-spacing: 0.1em;
   color: var(--text-3);
   font-weight: 650;
   padding: 8px 10px;
   border-bottom: 1px solid var(--line);
   white-space: nowrap;
+  font-family: var(--font-display);
 }
 .table td {
   padding: 8px 10px;
@@ -581,10 +692,10 @@ table.table {
   cursor: pointer;
 }
 .table tr.clickable:hover td {
-  background: rgba(255, 255, 255, 0.02);
+  background: rgb(var(--ink) / 0.02);
 }
 .table tr.selected td {
-  background: rgba(232, 180, 76, 0.06);
+  background: color-mix(in srgb, var(--accent) 6%, transparent);
 }
 
 .spell-icon {
@@ -610,20 +721,20 @@ table.table {
 .notice {
   padding: 10px 14px;
   border-radius: var(--radius-sm);
-  background: rgba(232, 180, 76, 0.08);
-  border: 1px solid rgba(232, 180, 76, 0.25);
-  color: #f0d8a6;
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent) 25%, transparent);
+  color: var(--amber-text);
   line-height: 1.45;
 }
 .notice.bad {
-  background: rgba(226, 90, 90, 0.08);
-  border-color: rgba(226, 90, 90, 0.3);
-  color: #f2b8b8;
+  background: color-mix(in srgb, var(--red) 8%, transparent);
+  border-color: color-mix(in srgb, var(--red) 30%, transparent);
+  color: var(--red-text);
 }
 .notice.info {
-  background: rgba(63, 182, 168, 0.07);
-  border-color: rgba(63, 182, 168, 0.25);
-  color: #bfe9e3;
+  background: color-mix(in srgb, var(--teal) 7%, transparent);
+  border-color: color-mix(in srgb, var(--teal) 25%, transparent);
+  color: var(--teal-text);
 }
 
 .steps {
@@ -671,7 +782,7 @@ table.table {
   align-items: baseline;
 }
 .feed-item:hover {
-  background: rgba(255, 255, 255, 0.025);
+  background: rgb(var(--ink) / 0.025);
 }
 .feed-item .t {
   color: var(--text-3);
@@ -693,13 +804,13 @@ table.table {
   color: var(--accent);
 }
 .k-archive {
-  color: #7fb2f0;
+  color: var(--blue-text);
 }
 .k-loot {
-  color: #e8c46c;
+  color: var(--amber-text);
 }
 .k-fight {
-  color: #f2a47f;
+  color: var(--orange-text);
 }
 .k-warn {
   color: var(--red);
@@ -810,9 +921,17 @@ table.table {
   padding-right: 8px;
   border-radius: 6px;
   background: rgba(10, 12, 18, 0.72);
-  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.06) inset;
+  box-shadow: 0 0 0 1px rgb(var(--ink) / 0.06) inset;
 }
 /* The fill is scaled and its bright edge slid, never resized: a tick costs no layout. */
+/* A tick every six seconds, drawn over the fill; TimerBar sets --tick for bars short enough to read. */
+.timer .track::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: repeating-linear-gradient(90deg, transparent 0 calc(var(--tick, 200%) - 2px), rgb(0 0 0 / 0.45) calc(var(--tick, 200%) - 2px) var(--tick, 200%));
+}
 .timer .track {
   position: absolute;
   inset: 0;
@@ -900,7 +1019,7 @@ table.table {
   opacity: 0.55;
 }
 .timer.overdue .fill {
-  background: repeating-linear-gradient(45deg, rgba(255, 255, 255, 0.07) 0 8px, transparent 8px 16px);
+  background: repeating-linear-gradient(45deg, rgb(var(--ink) / 0.07) 0 8px, transparent 8px 16px);
 }
 @keyframes pulse {
   50% {
@@ -943,7 +1062,7 @@ table.table {
   padding: 4px 10px;
   border-radius: 6px;
   background: var(--accent);
-  color: #1b1405;
+  color: var(--on-accent);
   font-weight: 700;
   font-size: 12px;
 }
@@ -1014,7 +1133,7 @@ table.table {
 }
 .ach-chip.on {
   box-shadow: none;
-  background: rgba(232, 180, 76, 0.1);
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
 }
 .ach-tab.complete small,
 .ach-chip.complete small {
@@ -1035,7 +1154,7 @@ table.table {
   margin-bottom: 14px;
 }
 .ach-section.complete {
-  border-color: rgba(92, 194, 122, 0.4);
+  border-color: color-mix(in srgb, var(--green) 40%, transparent);
 }
 .ach-sechead {
   display: flex;
@@ -1161,7 +1280,7 @@ table.table {
   min-width: 0;
 }
 .ach-obj:hover {
-  background: rgba(255, 255, 255, 0.03);
+  background: rgb(var(--ink) / 0.03);
 }
 .ach-obj input {
   position: absolute;
@@ -1185,8 +1304,8 @@ table.table {
   content: '';
   width: 7px;
   height: 4px;
-  border-left: 2px solid #0f1117;
-  border-bottom: 2px solid #0f1117;
+  border-left: 2px solid var(--bg);
+  border-bottom: 2px solid var(--bg);
   transform: rotate(-45deg) translate(1px, -1px);
 }
 .ach-obj.recorded {
@@ -1210,7 +1329,7 @@ table.table {
 .ach-obj.done .ach-objname {
   color: var(--text-3);
   text-decoration: line-through;
-  text-decoration-color: rgba(255, 255, 255, 0.2);
+  text-decoration-color: rgb(var(--ink) / 0.2);
 }
 .ach-obj.single .ach-objname {
   font-weight: 600;
@@ -1292,11 +1411,12 @@ table.table {
 }
 .nav-group {
   margin: 12px 12px 4px;
-  font-size: 10.5px;
+  font-size: 11px;
   font-weight: 650;
-  letter-spacing: 0.1em;
+  letter-spacing: 0.2em;
   text-transform: uppercase;
   color: var(--text-3);
+  font-family: var(--font-display);
 }
 .nav-group:first-child {
   margin-top: 2px;
@@ -1565,7 +1685,7 @@ table.table {
 }
 .char-head {
   margin: 12px 0 4px;
-  color: #8fa8ff;
+  color: var(--blue-text);
   font-weight: 600;
   font-size: 13.5px;
 }
@@ -1639,17 +1759,17 @@ table.table {
     transform 0.12s;
 }
 .lt-tile:hover {
-  border-color: rgba(232, 180, 76, 0.55);
+  border-color: color-mix(in srgb, var(--accent) 55%, transparent);
 }
 .lt-tile.selected {
   border-color: var(--accent);
   box-shadow:
     0 0 0 1px var(--accent),
-    0 6px 18px rgba(232, 180, 76, 0.12);
+    0 6px 18px color-mix(in srgb, var(--accent) 12%, transparent);
 }
 .lt-tile.unknown {
   border-style: dashed;
-  border-color: rgba(224, 160, 58, 0.6);
+  border-color: color-mix(in srgb, var(--amber) 60%, transparent);
 }
 .lt-tile.vacant {
   cursor: default;
@@ -1660,9 +1780,9 @@ table.table {
 .lt-icon {
   flex: none;
   border-radius: 8px;
-  background: #0b0d12;
+  background: var(--well);
   box-shadow:
-    0 0 0 1px rgba(232, 180, 76, 0.28),
+    0 0 0 1px color-mix(in srgb, var(--accent) 28%, transparent),
     inset 0 0 0 1px rgba(0, 0, 0, 0.6);
 }
 .lt-icon.blank {
@@ -1713,7 +1833,7 @@ table.table {
 }
 .lt-pips i.on {
   background: linear-gradient(90deg, var(--accent), var(--accent-2));
-  box-shadow: 0 0 4px rgba(232, 180, 76, 0.45);
+  box-shadow: 0 0 4px color-mix(in srgb, var(--accent) 45%, transparent);
 }
 .lt-augs {
   display: inline-flex;
@@ -1728,7 +1848,7 @@ table.table {
 }
 .lt-augs .lt-icon {
   border-radius: 50%;
-  box-shadow: 0 0 0 1px rgba(180, 106, 224, 0.7);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--violet) 70%, transparent);
 }
 .lt-augdot {
   width: 10px;
@@ -1742,8 +1862,8 @@ table.table {
   gap: 14px;
   padding: 18px 16px 16px;
   border-radius: var(--radius);
-  border: 1px solid rgba(232, 180, 76, 0.35);
-  background: radial-gradient(120% 90% at 50% 0%, rgba(232, 180, 76, 0.12), transparent 60%), var(--panel);
+  border: 1px solid color-mix(in srgb, var(--accent) 35%, transparent);
+  background: radial-gradient(120% 90% at 50% 0%, color-mix(in srgb, var(--accent) 12%, transparent), transparent 60%), var(--panel);
   text-align: center;
 }
 .lt-who {
@@ -1766,7 +1886,7 @@ table.table {
   color: var(--text-2);
 }
 .lt-chip.gold {
-  background: rgba(232, 180, 76, 0.16);
+  background: color-mix(in srgb, var(--accent) 16%, transparent);
   color: var(--accent-2);
 }
 .lt-big {
@@ -1809,7 +1929,7 @@ table.table {
 }
 .lt-panel {
   margin-bottom: 14px;
-  border-color: rgba(232, 180, 76, 0.4);
+  border-color: color-mix(in srgb, var(--accent) 40%, transparent);
 }
 .lt-panel-title {
   font-size: 16px;
@@ -1864,7 +1984,7 @@ table.table {
   display: block;
   height: 100%;
   border-radius: 3px;
-  background: linear-gradient(90deg, rgba(232, 180, 76, 0.55), var(--accent));
+  background: linear-gradient(90deg, color-mix(in srgb, var(--accent) 55%, transparent), var(--accent));
 }
 .lt-kv {
   display: grid;
@@ -1882,7 +2002,7 @@ table.table {
 .lt-seg {
   display: inline-flex;
   padding: 2px;
-  border-radius: 8px;
+  border-radius: var(--radius);
   background: var(--bg-2);
   border: 1px solid var(--line);
 }
@@ -1895,6 +2015,9 @@ table.table {
   border-radius: 6px;
   font-size: 12px;
   cursor: pointer;
+  font-family: var(--font-display);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
 }
 .lt-seg button small {
   color: var(--text-3);
@@ -1903,7 +2026,7 @@ table.table {
 .lt-seg button.on {
   background: var(--panel-2);
   color: var(--accent-2);
-  box-shadow: inset 0 0 0 1px rgba(232, 180, 76, 0.35);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 35%, transparent);
 }
 .lt-list {
   max-height: 440px;
@@ -1959,7 +2082,7 @@ table.table {
   gap: 10px;
   align-items: start;
   padding: 7px 0;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+  border-bottom: 1px solid rgb(var(--ink) / 0.04);
 }
 .lt-cand:last-child {
   border-bottom: none;
@@ -2026,17 +2149,17 @@ table.table {
 
 .lt-chip.focus,
 .lt-chip.good {
-  background: rgba(92, 194, 122, 0.16);
+  background: color-mix(in srgb, var(--green) 16%, transparent);
   color: var(--green);
 }
 .lt-chip.warn {
-  background: rgba(232, 180, 76, 0.16);
+  background: color-mix(in srgb, var(--accent) 16%, transparent);
   color: var(--accent-2);
 }
 .lt-chip.bad {
-  background: rgba(226, 90, 90, 0.16);
+  background: color-mix(in srgb, var(--red) 16%, transparent);
   /* --red on this tint is 3.8:1; the lighter red of .chip.bad reads at AA. */
-  color: #f2a0a0;
+  color: var(--red-text);
 }
 .lt-focus {
   display: grid;
@@ -2049,7 +2172,7 @@ table.table {
   gap: 14px;
   align-items: start;
   padding: 10px 0;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+  border-bottom: 1px solid rgb(var(--ink) / 0.04);
 }
 .lt-focus-row:last-child {
   border-bottom: none;
@@ -2113,7 +2236,7 @@ table.table {
   gap: 12px;
   align-items: start;
   padding: 9px 0;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+  border-bottom: 1px solid rgb(var(--ink) / 0.04);
 }
 .lt-opt-row:last-child {
   border-bottom: none;
@@ -2129,7 +2252,7 @@ table.table {
 }
 .lt-opt-line > span {
   padding: 6px 0;
-  border-top: 1px solid rgba(255, 255, 255, 0.04);
+  border-top: 1px solid rgb(var(--ink) / 0.04);
 }
 .lt-up {
   color: var(--green);
@@ -2354,8 +2477,8 @@ button.tree-item {
   padding: 10px 14px;
   margin-bottom: 12px;
   border-radius: var(--radius-sm);
-  border: 1px solid rgba(232, 180, 76, 0.28);
-  background: radial-gradient(120% 120% at 0% 0%, rgba(232, 180, 76, 0.1), transparent 60%), var(--bg-2);
+  border: 1px solid color-mix(in srgb, var(--accent) 28%, transparent);
+  background: radial-gradient(120% 120% at 0% 0%, color-mix(in srgb, var(--accent) 10%, transparent), transparent 60%), var(--bg-2);
 }
 .dm-title {
   font-size: 15px;
@@ -2479,7 +2602,7 @@ button.tree-item {
   padding: 3px 8px 3px 6px;
   border-radius: 5px;
   border: none;
-  background: rgba(255, 255, 255, 0.03);
+  background: rgb(var(--ink) / 0.03);
   color: var(--text);
   font: inherit;
   font-size: 13px;
@@ -2636,7 +2759,7 @@ button.tree-item {
   width: 28px;
   height: 28px;
   border-radius: 6px;
-  background: #0b0d12;
+  background: var(--well);
   box-shadow: 0 0 0 1px var(--line);
   object-fit: contain;
 }
@@ -2702,24 +2825,24 @@ button.tree-item {
   color: var(--accent-2);
 }
 .chip.kept {
-  background: rgba(92, 194, 122, 0.15);
-  color: #8fe0a6;
+  background: color-mix(in srgb, var(--green) 15%, transparent);
+  color: var(--green-text);
 }
 .chip.merged {
-  background: rgba(232, 180, 76, 0.16);
+  background: color-mix(in srgb, var(--accent) 16%, transparent);
   color: var(--accent-2);
 }
 .chip.sold {
-  background: rgba(255, 255, 255, 0.06);
+  background: rgb(var(--ink) / 0.06);
   color: var(--text-2);
 }
 .chip.depot {
-  background: rgba(111, 143, 214, 0.16);
-  color: #9db4ea;
+  background: color-mix(in srgb, var(--blue) 16%, transparent);
+  color: var(--blue-text);
 }
 .chip.currency {
-  background: rgba(180, 106, 224, 0.16);
-  color: #d4a6f2;
+  background: color-mix(in srgb, var(--violet) 16%, transparent);
+  color: var(--violet-text);
 }
 /* One look for every chip that shows or hides something: off is dashed, faint and struck through. */
 .toggle-chip {
@@ -2733,8 +2856,8 @@ button.tree-item {
   margin-left: 3px;
 }
 .toggle-chip.accent {
-  border-color: rgba(232, 180, 76, 0.55);
-  background: rgba(232, 180, 76, 0.1);
+  border-color: color-mix(in srgb, var(--accent) 55%, transparent);
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
   color: var(--accent-2);
 }
 .toggle-chip.off {
@@ -2742,7 +2865,7 @@ button.tree-item {
   border: 1px dashed var(--line-2);
   color: var(--text-3);
   text-decoration: line-through;
-  text-decoration-color: rgba(255, 255, 255, 0.25);
+  text-decoration-color: rgb(var(--ink) / 0.25);
 }
 /* A small trend line beside a number (respawn gaps). */
 .sparkline {
@@ -2773,12 +2896,12 @@ button.tree-item {
   font-size: var(--fs);
   border-radius: 8px;
   background: rgba(10, 12, 18, 0.72);
-  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.06) inset;
+  box-shadow: 0 0 0 1px rgb(var(--ink) / 0.06) inset;
   color: #fff;
   overflow: hidden;
 }
 .dm-ov.unlocked {
-  box-shadow: 0 0 0 1px rgba(232, 180, 76, 0.7) inset;
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 70%, transparent) inset;
 }
 .dm-ov-head {
   display: flex;
@@ -2786,8 +2909,8 @@ button.tree-item {
   gap: 6px;
   padding: 4px 6px;
   font-size: calc(var(--fs) * 0.85);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-  background: rgba(232, 180, 76, 0.08);
+  border-bottom: 1px solid rgb(var(--ink) / 0.08);
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
   -webkit-app-region: no-drag;
   flex: none;
 }
@@ -2811,7 +2934,7 @@ button.tree-item {
 .dm-ov-total {
   white-space: nowrap;
   font-variant-numeric: tabular-nums;
-  color: rgba(255, 255, 255, 0.85);
+  color: rgb(var(--ink) / 0.85);
   text-shadow: 0 1px 2px #000;
 }
 .dm-ov-total b {
@@ -2828,7 +2951,7 @@ button.tree-item {
 }
 .dm-ov-btn,
 .dm-ov-pick {
-  border: 1px solid rgba(255, 255, 255, 0.16);
+  border: 1px solid rgb(var(--ink) / 0.16);
   border-radius: 4px;
   background: rgba(0, 0, 0, 0.45);
   color: #fff;
@@ -2870,7 +2993,7 @@ button.tree-item {
   gap: 1px;
   padding: 3px;
   border-radius: 6px;
-  border: 1px solid rgba(255, 255, 255, 0.16);
+  border: 1px solid rgb(var(--ink) / 0.16);
   background: rgba(10, 12, 18, 0.96);
   box-shadow: 0 6px 18px rgba(0, 0, 0, 0.6);
   font-size: calc(var(--fs) * 0.85);
@@ -2892,16 +3015,16 @@ button.tree-item {
   white-space: nowrap;
 }
 .dm-ov-menu > button:hover {
-  background: rgba(255, 255, 255, 0.1);
+  background: rgb(var(--ink) / 0.1);
 }
 .dm-ov-menu > button.on {
   color: var(--accent-2);
-  background: rgba(232, 180, 76, 0.14);
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
 }
 .dm-ov-menu-time,
 .dm-ov-menu-dps {
   font-variant-numeric: tabular-nums;
-  color: rgba(255, 255, 255, 0.7);
+  color: rgb(var(--ink) / 0.7);
 }
 .dm-ov-menu-name {
   overflow: hidden;
@@ -2920,7 +3043,7 @@ button.tree-item {
   min-height: calc(var(--fs) * 1.7);
   padding: 1px 6px 1px 4px;
   font-size: var(--fs);
-  background: rgba(255, 255, 255, 0.05);
+  background: rgb(var(--ink) / 0.05);
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.9);
   color: #fff;
 }
@@ -2928,12 +3051,12 @@ button.tree-item {
   background: linear-gradient(90deg, color-mix(in srgb, var(--c) 62%, transparent), color-mix(in srgb, var(--c) 30%, transparent));
 }
 .dm-ov .dm-rank {
-  color: rgba(255, 255, 255, 0.55);
+  color: rgb(var(--ink) / 0.55);
 }
 .dm-ov .dm-tag,
 .dm-ov .dm-stat,
 .dm-ov .dm-right {
-  color: rgba(255, 255, 255, 0.72);
+  color: rgb(var(--ink) / 0.72);
 }
 .dm-ov .dm-right b {
   color: #fff;
@@ -2946,7 +3069,7 @@ button.tree-item {
 .dm-ov-more {
   padding: 4px 6px;
   font-size: calc(var(--fs) * 0.85);
-  color: rgba(255, 255, 255, 0.85);
+  color: rgb(var(--ink) / 0.85);
   text-shadow: 0 1px 2px #000;
 }
 .dm-ov-foot {
@@ -2956,7 +3079,7 @@ button.tree-item {
   font-size: 9px;
   letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: rgba(255, 255, 255, 0.28);
+  color: rgb(var(--ink) / 0.28);
   pointer-events: none;
 }
 

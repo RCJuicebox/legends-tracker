@@ -4,6 +4,11 @@ What changed in each version. The release workflow publishes a version's section
 
 ## Unreleased
 
+### A look of its own, light or dark
+
+- **Field Kit**: the app now looks like the game's own windows: bevelled panels, condensed headings (Windows' Bahnschrift), figures in Cascadia Mono, an amber accent, and a mark on each timer bar for every six-second tick.
+- **Settings › Appearance**: System, Light or Dark. System follows Windows. The overlays stay dark over the game whichever you pick.
+
 ### Safer and lighter
 
 - **Updates save everything first.** Restarting into an update now writes your settings and where mote tracking got to before the installer starts.

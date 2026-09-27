@@ -4,7 +4,7 @@ import { useInvoke } from '../hooks'
 import { act, showError, showToast, actDone } from '../toast'
 import { who } from '../../../core/format'
 import { useUpdate, type UpdateState } from '../update'
-import { Field, LoadError, NumberInput, Switch } from '../components/ui'
+import { Field, LoadError, NumberInput, Segmented, Switch } from '../components/ui'
 import { GameFolderCard } from '../components/GameFolder'
 import type { TrackingSettings } from '../../../shared/types'
 import type { PageId } from '../main'
@@ -123,6 +123,20 @@ export function Settings({ go }: { go?: (page: PageId) => void }) {
             Yield CPU to EverQuest
             <span className="faint small">runs this app below normal priority, so the game wins every tie for a frame; sound stays normal</span>
           </label>
+          <Field label="Appearance" hint="Light or dark, or as Windows is set. Overlays stay dark over the game either way.">
+            <div>
+              <Segmented
+                value={s.theme}
+                options={[
+                  ['system', 'System'],
+                  ['light', 'Light'],
+                  ['dark', 'Dark']
+                ]}
+                onChange={(v) => patchSettings((x) => ({ ...x, theme: v }))}
+                label="Appearance"
+              />
+            </div>
+          </Field>
           <Field label="UI size" hint="The size of everything in this window. Overlays have their own text sizes, on the Overlays page.">
             <select value={s.uiScale} onChange={(e) => patchSettings((x) => ({ ...x, uiScale: Number(e.target.value) }))}>
               {[0.9, 1, 1.1, 1.25, 1.5].map((f) => (

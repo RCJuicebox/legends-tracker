@@ -571,6 +571,10 @@ folder** opens the app's own `logs` folder.
 
 ## Settings
 
+**Appearance** is System, Light or Dark (System follows Windows); the overlays keep the dark set
+over the game either way. Every colour is a token in `styles.css`, with the light set beside the
+dark one.
+
 - The version, **Check for updates** (or **Restart and update**), **Open log folder**, and **Copy
   diagnostics**: the version, your PC, the settings that matter, each process's memory and CPU (see
   [Measuring](#measuring)) and the end of the app's log, ready to paste into a bug report, with no

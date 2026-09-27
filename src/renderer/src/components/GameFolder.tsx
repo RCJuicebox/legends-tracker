@@ -95,7 +95,7 @@ export function GameFolderCard() {
           <tbody>
             {rows.map(([ok, label, detail]) => (
               <tr key={label}>
-                <td style={{ width: 24 }}>{ok ? <span className="chip ok">✓</span> : <span className="chip warn">–</span>}</td>
+                <td style={{ width: 24 }}>{ok ? <span className="chip ok">found</span> : <span className="chip warn">missing</span>}</td>
                 <td className="nowrap" style={{ fontWeight: 600, width: 170 }}>
                   {label}
                 </td>

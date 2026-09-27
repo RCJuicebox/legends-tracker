@@ -1,4 +1,4 @@
-import { app, BrowserWindow, dialog, Menu, nativeImage, Notification, screen, Tray, type Rectangle } from 'electron'
+import { app, BrowserWindow, dialog, Menu, nativeImage, nativeTheme, Notification, screen, Tray, type Rectangle } from 'electron'
 import { join } from 'node:path'
 import { JsonFile, readJsonFile } from './storeCore'
 import { push } from './push'
@@ -92,7 +92,7 @@ export class Windows {
       minWidth: 980,
       minHeight: 640,
       show: false,
-      backgroundColor: '#0f1117',
+      backgroundColor: windowBackground(),
       title: 'Legends Tracker',
       icon: this.opts.icon,
       titleBarStyle: 'hidden',
@@ -136,6 +136,11 @@ export class Windows {
   }
 
   /** The UI size setting, on the main window (overlays have their own text sizes). */
+  /** The theme changed: the window's own background (seen while it paints) follows. */
+  applyTheme(): void {
+    if (this.main && !this.main.isDestroyed()) this.main.setBackgroundColor(windowBackground())
+  }
+
   applyScale(): void {
     if (this.main && !this.main.isDestroyed()) this.main.webContents.setZoomFactor(this.opts.uiScale())
   }
@@ -259,4 +264,9 @@ export class Windows {
     this.rememberPlace()
     return this.place.flush().catch((e) => log.warn('Could not save the window position', e))
   }
+}
+
+/** The main window's background before its page paints: the theme's --bg. */
+function windowBackground(): string {
+  return nativeTheme.shouldUseDarkColors ? '#0d1115' : '#e8ebee'
 }

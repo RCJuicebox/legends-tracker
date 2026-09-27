@@ -177,6 +177,8 @@ export interface AppSettings {
   yieldToGame: boolean
   /** The main window's zoom: 1 is 100%. */
   uiScale: number
+  /** Light or dark, or as Windows is set. Overlays stay dark over the game either way. */
+  theme: 'system' | 'light' | 'dark'
   /** Ctrl+Shift+F9 mutes, F10 starts a new meter session, F11 arranges the overlays, from anywhere. */
   hotkeys: boolean
   combat: CombatSettings

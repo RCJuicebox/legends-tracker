@@ -273,6 +273,7 @@ export function sanitizeSettings(v: unknown, fb: AppSettings): AppSettings | nul
     overlaysOnlyWithGame: bool(v.overlaysOnlyWithGame, fb.overlaysOnlyWithGame),
     yieldToGame: bool(v.yieldToGame, fb.yieldToGame),
     uiScale: num(v.uiScale, fb.uiScale, 0.75, 2),
+    theme: oneOf(v.theme, ['system', 'light', 'dark'] as const, fb.theme),
     hotkeys: bool(v.hotkeys, fb.hotkeys),
     combat
   })

@@ -1,4 +1,4 @@
-import { app, globalShortcut, Notification } from 'electron'
+import { app, globalShortcut, nativeTheme, Notification } from 'electron'
 import { HOTKEYS } from '../shared/hotkeys'
 import { promises as fs, rmSync } from 'node:fs'
 import { basename, join } from 'node:path'
@@ -103,6 +103,9 @@ export function createContext(): AppContext {
   const speech = new SpeechWorker()
   // Microsoft's neural voices, with the player's own Azure key; the Windows voices otherwise.
   const azure = new AzureSpeech()
+  // The theme is Windows' own setting for this app's windows, so every page's prefers-color-scheme
+  // follows it: System, or Light or Dark whatever Windows says.
+  nativeTheme.themeSource = store.settings.get().theme
   const windows = new Windows({ preload: preloadPath, icon: appIcon, audioSettings: () => store.settings.get().audio, uiScale: () => store.settings.get().uiScale })
   const toMain = windows.toMain.bind(windows)
   // Item pages the Gear page looked up, kept a week; a catalog download refreshes them in passing.
@@ -275,6 +278,10 @@ export function createContext(): AppContext {
     store.settings.set(next)
     if (next.yieldToGame !== prev.yieldToGame) ctx.applyPriority()
     if (next.uiScale !== prev.uiScale) windows.applyScale()
+    if (next.theme !== prev.theme) {
+      nativeTheme.themeSource = next.theme
+      windows.applyTheme()
+    }
     if (next.hotkeys !== prev.hotkeys) ctx.applyHotkeys()
     ctx.overlays.apply(next.overlays)
     ctx.refreshOverlayVisibility()
