@@ -4,7 +4,31 @@ What changed in each version. The release workflow publishes a version's section
 
 ## Unreleased
 
-_Nothing yet._
+### Safer and lighter
+
+- **Updates save everything first.** Restarting into an update now writes your settings and where mote tracking got to before the installer starts.
+- **If the app cannot start, it says so** with a message naming the log file, instead of running on with no tray icon.
+- **Hidden windows rest.** The main window in the tray and the overlays hidden with the game are sent nothing and stop redrawing until they show again.
+- **The Windows speech engine starts when first needed** and stops after five quiet minutes; with an Azure voice it may never start at all.
+- **Unsaved trigger edits survive a restart** and are marked in the sidebar until you save them.
+- The **Damage meter** and **Respawns** overlays can no longer be removed by accident; if an older version let you remove them, they come back.
+- Settings read at start are checked the same way a save is, so a hand-edited file cannot stop the app.
+
+### Clearer and more helpful
+
+- **Shadow Knight** is spelled the same way on every page.
+- **Copy diagnostics** (Settings) puts the version, your settings summary and the end of the log on the clipboard for a bug report, without your Windows user name.
+- A page that hits an error shows what happened in its place; the rest of the app keeps working, and a crashed window is brought back.
+- **Following another character:** if your log goes quiet while another character's log is being written, the Live page offers to follow them.
+- Waking the PC from sleep no longer speaks every timer that ran out overnight.
+- Updates show **what's new** on the Settings page, and a failed download is mentioned once.
+
+### Faster lookups
+
+- Casts, melee and purchases are read from your log and archives **in one pass** and remembered, so Gear and Tradeskills open quickly after the first time.
+- **Refreshing the item catalog reads only the wiki pages edited since last time** (a few seconds, where it was minutes), and every wiki request is polite: one at a time, backing off when the wiki is busy.
+- The pet is found by reading only the part of the log written since last time.
+- Downloaded data (the item catalog, recipes, wiki pages, spoken phrases, log counts) moves out of your roaming profile to `%LOCALAPPDATA%\Legends Tracker`.
 
 ## 1.9.0 (2026-09-27)
 
