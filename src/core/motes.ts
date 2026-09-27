@@ -354,3 +354,12 @@ export function pausedHours(s: MoteSession, now: number): number {
   const end = s.endedAt ?? now
   return ((s.pausedMs ?? 0) + (s.pausedSince ? Math.max(0, end - s.pausedSince) : 0)) / 3_600_000
 }
+
+/** "13:05" on the session's day → a timestamp. */
+export function timeOnDay(day: number, hhmm: string): number | null {
+  const m = /^(\d{1,2}):(\d{2})(?::(\d{2}))?$/.exec(hhmm.trim())
+  if (!m) return null
+  const d = new Date(day)
+  d.setHours(+m[1], +m[2], +(m[3] ?? 0), 0)
+  return d.getTime()
+}

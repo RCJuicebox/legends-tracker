@@ -5,7 +5,7 @@ import { recall, useRemembered } from './remember'
 import { showError } from './toast'
 import { classIdOf, className, type ClassName } from '../../shared/game/classes'
 import type { CharacterSettings } from '../../shared/types'
-import type { StatsSheet } from './statsSheet'
+import type { StatsSheet } from '../../core/statsSheet'
 
 // One character record (classes with their levels, race, focus) per character, kept by main in the
 // settings and read by every page: Spell Timers, Stats, Gear, Spell upgrades, Buffs.

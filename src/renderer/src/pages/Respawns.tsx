@@ -6,7 +6,7 @@ import { useRemembered } from '../remember'
 import { useNow } from '../components/TimerBars'
 import { act } from '../toast'
 import { ConfirmButton, Field, FilterBox, Info, NumberInput, Pending, SortTh, Switch, type Sort } from '../components/ui'
-import { SHARED_SEC, type RespawnRow, type RespawnTimerSpec, type RespawnView } from '../../../core/respawns'
+import { parseClock, SHARED_SEC, type RespawnRow, type RespawnTimerSpec, type RespawnView } from '../../../core/respawns'
 
 // How long mobs take to come back, measured from the log, and a timer on an overlay for any of them.
 // A timer is an ordinary trigger in the Respawns folder, so the Triggers page can change it too.
@@ -16,14 +16,6 @@ function useRespawns() {
   const setData = q.setData
   useEffect(() => api.on('state:respawns', (v: RespawnView) => setData(v)), [setData])
   return q
-}
-
-/** "18:47", "1:02:03" or plain seconds; null for anything else. */
-export function parseClock(text: string): number | null {
-  const t = text.trim()
-  if (!/^\d+(?::\d{1,2}){0,2}$/.test(t)) return null
-  const n = t.split(':').reduce((acc, part) => acc * 60 + Number(part), 0)
-  return n > 0 ? n : null
 }
 
 const HOW =

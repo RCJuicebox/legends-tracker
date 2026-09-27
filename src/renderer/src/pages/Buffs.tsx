@@ -6,7 +6,7 @@ import { act } from '../toast'
 import { useNow } from '../components/TimerBars'
 import { ConfirmButton, FilterBox, Info, Pending, Switch } from '../components/ui'
 import { useApp } from '../state'
-import { wikiUrl } from '../format'
+import { wikiUrl } from '../../../core/format'
 import { CLASSES, className } from '../../../shared/game/classes'
 import { askText, canCast, LINE_LABELS, MIN_ASK_VALUE, MIN_BUFF_SEC, offersFor, YOU, type BuffLine, type BuffOffer, type BuffPlan, type BuffView } from '../../../core/buffs'
 

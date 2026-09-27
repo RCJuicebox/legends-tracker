@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { api, errorMessage } from '../api'
 import { useApp, useLive } from '../state'
-import { whoList as who } from '../format'
+import { whoList as who } from '../../../core/format'
 import type { GameFolderCheck } from '../../../shared/types'
 
 /** Finds the game folder again, or lets the player point at it. Reports what happened in a line under the buttons. */

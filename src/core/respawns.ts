@@ -166,6 +166,14 @@ export interface RespawnTimerSpec {
   announce: boolean
 }
 
+/** "18:47", "1:02:03" or plain seconds; null for anything else. */
+export function parseClock(text: string): number | null {
+  const t = text.trim()
+  if (!/^\d+(?::\d{1,2}){0,2}$/.test(t)) return null
+  const n = t.split(':').reduce((acc, part) => acc * 60 + Number(part), 0)
+  return n > 0 ? n : null
+}
+
 /** One trigger per mob name; the id is made from the name so it can be found again. */
 export function respawnTriggerId(name: string): string {
   return 'respawn-' + name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')

@@ -3,7 +3,7 @@ import { useApp, useLive } from '../state'
 import { api, mb, ago, errorMessage } from '../api'
 import { useInvoke } from '../hooks'
 import { act, showError } from '../toast'
-import { who } from '../format'
+import { who } from '../../../core/format'
 import { Field, LoadError, NumberInput, Switch, Pending } from '../components/ui'
 
 export function Logs() {

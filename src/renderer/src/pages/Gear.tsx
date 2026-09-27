@@ -3,16 +3,17 @@ import { api, ago } from '../api'
 import { remember, useRemembered } from '../remember'
 import { showError } from '../toast'
 import { Pending, Tabs } from '../components/ui'
-import { numExact as num, who, wikiUrl } from '../format'
-import { itemKey, mergeLevel, parseStatsBlock, slotLabel, storageTab, wornTotals, SAVE_KEYS, STAT_KEYS, type InvItem } from '../../../core/inventory'
+import { numExact as num, who, wikiUrl } from '../../../core/format'
+import { itemKey, mergeLevel, parseStatsBlock, placeLabel, slotLabel, storageTab, wornTotals, SAVE_KEYS, STAT_KEYS, type InvItem } from '../../../core/inventory'
 import type { CharacterSheet, InventoryView, ItemInfo } from '../../../shared/types'
 import { className } from '../../../shared/game/classes'
 import { MAX_LEVEL } from '../../../core/moteCalc'
-import { useExportCharacter, useInventory, wornSummary, statsFor, type WornSummary } from '../gear/model'
+import { useExportCharacter, useInventory } from '../gear/model'
+import { wornSummary, statsFor, type WornSummary } from '../../../core/wornGear'
 import { ItemIcon } from './gearBits'
 import { GearFinder, type GearMode } from './GearFinder'
 import { useCharacterRecord, withRecord } from '../character'
-import { readSheet } from '../statsSheet'
+import { readSheet } from '../../../core/statsSheet'
 import type { PageId } from '../main'
 import { UPGRADES_TAB } from '../constants'
 
@@ -580,15 +581,6 @@ function ItemPanel({
       </div>
     </div>
   )
-}
-
-/** A readable place: "General 1-Slot3" → "Bag 1, slot 3". */
-function placeLabel(location: string): string {
-  const parts = location.split('-')
-  const top = parts[0]
-  const slot = /^Slot(\d+)$/.exec(parts[1] ?? '')?.[1]
-  const where = /^General (\d+)$/.test(top) ? `Bag ${top.slice(8)}` : /^Bank(\d+)$/.test(top) ? `Bank ${top.slice(4)}` : /^SharedBank(\d+)$/.test(top) ? `Shared bank ${top.slice(10)}` : slotLabel(top)
-  return slot ? `${where}, slot ${slot}${parts[2] ? ' (augment)' : ''}` : where
 }
 
 function Carried({ view }: { view: InventoryView }) {

@@ -5,9 +5,10 @@ import { baseName, slotLabel } from '../../../core/inventory'
 import { restrictions, score, weightsForSlot } from '../../../core/upgrades'
 import { focusValue, KIND_LABELS, KIND_ORDER, KIND_WORTH, type FocusInfo, type FocusLine } from '../../../core/itemFocus'
 import { optimizeGear, pieceName, type Piece } from '../../../core/gearOptimizer'
-import { CATALOG_PER_SLOT, type FocusCandidate, type GearModel, type OwnedFocus } from '../gear/useGearModel'
+import { type FocusCandidate, type GearModel, type OwnedFocus } from '../gear/useGearModel'
+import { CATALOG_PER_SLOT } from '../../../core/gearCatalog'
 import { Info, Pending } from '../components/ui'
-import { num, roundPct as pct, wikiUrl } from '../format'
+import { num, roundPct as pct, wikiUrl } from '../../../core/format'
 import { ItemIcon, source, whereText } from './gearBits'
 
 // The Gear page's focus effects tab and its optimizer for what the character already owns.

@@ -4,7 +4,7 @@ import { useInvoke } from '../hooks'
 import { act } from '../toast'
 import { useNow } from '../components/TimerBars'
 import { ConfirmButton, Icon, Info, Pending } from '../components/ui'
-import { MOTE_RANKS, localDay, moteValue, moteWorth, pausedHours, sessionHours, totalMotes, type MoteCounts, type MoteSession } from '../../../core/motes'
+import { MOTE_RANKS, localDay, moteValue, moteWorth, pausedHours, sessionHours, timeOnDay, totalMotes, type MoteCounts, type MoteSession } from '../../../core/motes'
 import type { MoteScan, MoteView } from '../../../shared/ipc'
 
 type Scan = MoteScan
@@ -50,15 +50,6 @@ function RankChips({ counts }: { counts: MoteCounts }) {
       ))}
     </span>
   )
-}
-
-/** "13:05" on the session's day → a timestamp. */
-function timeOnDay(day: number, hhmm: string): number | null {
-  const m = /^(\d{1,2}):(\d{2})(?::(\d{2}))?$/.exec(hhmm.trim())
-  if (!m) return null
-  const d = new Date(day)
-  d.setHours(+m[1], +m[2], +(m[3] ?? 0), 0)
-  return d.getTime()
 }
 
 function hhmm(t: number): string {

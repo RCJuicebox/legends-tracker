@@ -3,7 +3,7 @@ import { useApp, useLive } from '../state'
 import { api, clock, ago, errorMessage } from '../api'
 import { useInvoke, useSearch } from '../hooks'
 import { act, showError, showUndo } from '../toast'
-import { who } from '../format'
+import { who } from '../../../core/format'
 import { CategoryChip, ConfirmButton, Field, FilterBox, Info, LoadError, NumberInput, SpellIcon, Switch } from '../components/ui'
 import {
   CATEGORY_LABELS, DEFAULT_TIER_DURATION_PCT,

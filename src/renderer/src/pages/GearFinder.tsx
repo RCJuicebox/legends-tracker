@@ -6,7 +6,7 @@ import { ROLE_LABELS, ROLE_PRESETS, type RoleKey } from '../../../core/statValue
 import type { CharacterSheet, InventoryView } from '../../../shared/types'
 import { className } from '../../../shared/game/classes'
 import { Info, Pending, ToggleChip } from '../components/ui'
-import { num, wikiUrl } from '../format'
+import { num, wikiUrl } from '../../../core/format'
 import { AC_OVER_CAP, useGearModel, type CatalogState, type GearMode } from '../gear/useGearModel'
 import { ItemIcon, source } from './gearBits'
 import { FocusTab, OptimizeTab } from './GearFocus'

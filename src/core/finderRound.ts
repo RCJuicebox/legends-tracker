@@ -3,9 +3,9 @@
 // focus it displaces may be carried by something else, and a lore twin may block it: the optimizer
 // settles all of that, and the candidate is worth what the whole set gains.
 
-import { itemKey, type InvItem, type ItemStats } from './inventory'
-import { optimizeGear, type OptimizeOptions, type Piece, type Plan } from './gearOptimizer'
-import { isLore, restrictions } from './upgrades'
+import { itemKey, mergeLevel, type InvItem, type ItemStats } from './inventory'
+import { optimizeGear, pieceName, type OptimizeOptions, type Piece, type Plan } from './gearOptimizer'
+import { isLore, restrictions, type SlotResult } from './upgrades'
 import type { CatalogItem } from './wikiItem'
 import { procOf, wornEffectOf } from './itemEffects'
 
@@ -81,4 +81,45 @@ export function ownedInTheRound(o: Omit<OptimizeOptions, 'pieces' | 'from'> & { 
   }
   const at = o.baseline.after.findIndex(mine)
   return { delta: Math.round(delta * 100) / 100, moves, placed: at >= 0 ? o.baseline.slots[at] : null }
+}
+
+/** The copy of an item the character owns at the highest merge level, among the pieces the optimizer weighs. */
+export function bestOwned(pieces: Piece[], key: string): Piece | null {
+  let best: Piece | null = null
+  for (const p of pieces) if (p.key === key && p.stats && (!best || mergeLevel(p.item.name) > mergeLevel(best.item.name))) best = p
+  return best
+}
+
+type FinderCandidate = SlotResult['candidates'][number]
+export type RoundCandidate = FinderCandidate & {
+  round: { delta: number; placed: string | null; owned: boolean; moves: { slot: string; out: string | null; in: string | null }[] }
+}
+export type RoundSlot = Omit<SlotResult, 'candidates'> & { candidates: RoundCandidate[] }
+
+/** One candidate among everything owned, worn as well as it can be: its worth is what the set gains. */
+export function judgeInTheRound(c: FinderCandidate, slot: string, opts: OptimizeOptions, baseline: Plan): RoundCandidate {
+  // One the character owns is already among the pieces: judged as their own copy, as the optimizer does.
+  const key = itemKey(c.item.title)
+  const mine = !!bestOwned(opts.pieces, key)
+  const r = mine ? ownedInTheRound({ ...opts, key, baseline }) : inTheRound({ ...opts, candidate: candidatePiece(c.item, c.stats), baseline })
+  // One the best set wears just where it is worn now is no upgrade, and one it wears in another
+  // slot is that slot's.
+  const stays =
+    mine && (r.placed !== slot || baseline.after.some((p, i) => p?.key === key && p.from === 'worn' && !p.exalt && baseline.slots[i] === p.item.location))
+  return {
+    ...c,
+    round: {
+      delta: stays ? 0 : r.delta, placed: r.placed, owned: mine,
+      moves: r.moves.map((m) => ({ slot: m.slot, out: m.out ? pieceName(m.out) : null, in: m.in ? pieceName(m.in) : null }))
+    }
+  }
+}
+
+/** A slot's candidates judged in the round: those that gain, the best first, six at most. */
+export function bestInTheRound(candidates: RoundCandidate[]): RoundCandidate[] {
+  // The best thing to have first, as the optimizer's all-gear mode would choose it: a piece to get
+  // gains over the best set of what is owned, which already has the owned candidates in it, so
+  // those rank after any piece to get that beats that set (their own gain still shows).
+  const rank = (c: RoundCandidate) => (c.round.owned ? 0 : c.round.delta)
+  return candidates.filter((c) => c.round.delta > 0).sort((a, b) => rank(b) - rank(a) || b.round.delta - a.round.delta).slice(0, 6)
 }

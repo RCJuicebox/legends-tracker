@@ -78,6 +78,15 @@ export function slotLabel(location: string): string {
   return top === 'Any Slot' ? 'Any slot' : top
 }
 
+/** A readable place: "General 1-Slot3" → "Bag 1, slot 3". */
+export function placeLabel(location: string): string {
+  const parts = location.split('-')
+  const top = parts[0]
+  const slot = /^Slot(\d+)$/.exec(parts[1] ?? '')?.[1]
+  const where = /^General (\d+)$/.test(top) ? `Bag ${top.slice(8)}` : /^Bank(\d+)$/.test(top) ? `Bank ${top.slice(4)}` : /^SharedBank(\d+)$/.test(top) ? `Shared bank ${top.slice(10)}` : slotLabel(top)
+  return slot ? `${where}, slot ${slot}${parts[2] ? ' (augment)' : ''}` : where
+}
+
 /** "Earring of Bashing +7" → 7. Merge levels run 0-10. */
 export function mergeLevel(name: string): number {
   const m = /\+(\d+)$/.exec(String(name).trim())

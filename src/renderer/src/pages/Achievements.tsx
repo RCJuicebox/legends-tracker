@@ -5,7 +5,7 @@ import { usePickedCharacter } from '../character'
 import { useInvoke } from '../hooks'
 import { showError, showToast } from '../toast'
 import { Pending } from '../components/ui'
-import { numExact as num, who } from '../format'
+import { numExact as num, who } from '../../../core/format'
 import {
   AchievementBook,
   compareNames,

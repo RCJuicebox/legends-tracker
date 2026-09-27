@@ -3,9 +3,9 @@ import { api } from '../api'
 import { useInvoke } from '../hooks'
 import { useRemembered } from '../remember'
 import { showError } from '../toast'
-import { readSheet } from '../statsSheet'
-import { characterAc } from '../stats/model'
-import { statsFor, wornSummary } from './model'
+import { readSheet } from '../../../core/statsSheet'
+import { characterAc } from '../../../core/statsModel'
+import { statsFor, wornSummary } from '../../../core/wornGear'
 import { itemFoci, itemKey, mergeLevel, parseStatsBlock, scaledStats, storedEquipment, type InvItem } from '../../../core/inventory'
 import {
   ANY_SLOT,
@@ -15,24 +15,22 @@ import {
   eraOf,
   findUpgrades,
   isLore,
-  isTwoHanded,
   restrictions,
   score,
   handWeights,
-  weightsForSlot,
   type HandWeights,
-  type SlotResult,
   zoneEras,
   type Wearer,
   type Weights
 } from '../../../core/upgrades'
 import { conversions, rawWeights, ROLE_PRESETS, type RoleWeights } from '../../../core/statValue'
 import { focusValue, type FocusLine, type FocusWorth } from '../../../core/itemFocus'
-import { optimizeGear, ownedPieces, pieceName, SLOT_LAYOUT, type EffectValue, type Exaltation, type OptimizeOptions, type Piece, type PieceSource, type Plan } from '../../../core/gearOptimizer'
+import { optimizeGear, ownedPieces, type EffectValue, type Exaltation, type Piece, type PieceSource } from '../../../core/gearOptimizer'
 import { usePet } from './usePet'
 import { effectScore, itemEffects, procOf, procWorth, wornEffectOf, wornStats, wornWorth, type EffectSpell, type EffectWorth } from '../../../core/itemEffects'
 import { meleeProfile, type MeleeProfile } from '../../../core/meleeTally'
-import { candidatePiece, inTheRound, ownedInTheRound } from '../../../core/finderRound'
+import { bestInTheRound, bestOwned, judgeInTheRound, type RoundCandidate, type RoundSlot } from '../../../core/finderRound'
+import { catalogPieces as catalogPiecesOf, HANDS } from '../../../core/gearCatalog'
 import { aaTotal } from '../../../core/aa'
 import { DOUBLE_ATTACK, DUAL_WIELD, TRIPLE_ATTACK, TRIPLE_CLASSES, doubleAttackChance, dualWieldChance, handSwings, tripleAttackChance } from '../../../core/combatModel'
 import { CATALOG_FORMAT, withRaceFix, type CatalogItem } from '../../../core/wikiItem'
@@ -158,12 +156,8 @@ export interface GearEffects {
   loading: boolean
 }
 
-const HANDS = ['Primary', 'Secondary']
 /** How far weapon ratio outweighs the rest in the hands when weapons go by ratio first: 1% of weapon damage then counts 100 times over. */
 const RATIO_FIRST = 100
-/** Each kind of slot once; the Any slots take what the others do. */
-const SLOT_NAMES = [...new Set(SLOT_LAYOUT)].filter((s) => s !== 'Any Slot')
-export const CATALOG_PER_SLOT = 12
 const NO_MELEE = meleeProfile({}, { from: '', to: '' })
 
 /** The wiki's item catalog as stored on this PC, and a way to fetch it again. */
@@ -200,13 +194,6 @@ function useCatalog() {
   return { state, refresh, error: q.error, reload }
 }
 
-/** The copy of an item the character owns at the highest merge level, among the pieces the optimizer weighs. */
-function bestOwned(pieces: Piece[], key: string): Piece | null {
-  let best: Piece | null = null
-  for (const p of pieces) if (p.key === key && p.stats && (!best || mergeLevel(p.item.name) > mergeLevel(best.item.name))) best = p
-  return best
-}
-
 /** How long one slice of judging in the round may hold the page. */
 const SLICE_MS = 10
 
@@ -215,31 +202,6 @@ function nextSlice(): Promise<void> {
   const s = (globalThis as { scheduler?: { yield?: () => Promise<void> } }).scheduler
   if (s?.yield) return s.yield()
   return new Promise((resolve) => setTimeout(resolve, 0))
-}
-
-type FinderCandidate = SlotResult['candidates'][number]
-export type RoundCandidate = FinderCandidate & {
-  round: { delta: number; placed: string | null; owned: boolean; moves: { slot: string; out: string | null; in: string | null }[] }
-}
-type RoundSlot = Omit<SlotResult, 'candidates'> & { candidates: RoundCandidate[] }
-
-/** One candidate among everything owned, worn as well as it can be: its worth is what the set gains. */
-function judgeInTheRound(c: FinderCandidate, slot: string, opts: OptimizeOptions, baseline: Plan): RoundCandidate {
-  // One the character owns is already among the pieces: judged as their own copy, as the optimizer does.
-  const key = itemKey(c.item.title)
-  const mine = !!bestOwned(opts.pieces, key)
-  const r = mine ? ownedInTheRound({ ...opts, key, baseline }) : inTheRound({ ...opts, candidate: candidatePiece(c.item, c.stats), baseline })
-  // One the best set wears just where it is worn now is no upgrade, and one it wears in another
-  // slot is that slot's.
-  const stays =
-    mine && (r.placed !== slot || baseline.after.some((p, i) => p?.key === key && p.from === 'worn' && !p.exalt && baseline.slots[i] === p.item.location))
-  return {
-    ...c,
-    round: {
-      delta: stays ? 0 : r.delta, placed: r.placed, owned: mine,
-      moves: r.moves.map((m) => ({ slot: m.slot, out: m.out ? pieceName(m.out) : null, in: m.in ? pieceName(m.in) : null }))
-    }
-  }
 }
 
 export function useGearModel(view: InventoryView, sheet: CharacterSheet | null, mode: GearMode) {
@@ -539,54 +501,13 @@ export function useGearModel(view: InventoryView, sheet: CharacterSheet | null, 
   // The finder scores the whole catalog (about 11,000 pieces) against every slot. Its inputs go
   // through a deferred value, so a weight being typed or a button being pressed answers at once and
   // the results catch up in the background.
-  // The optimizer's all-gear mode: pieces the character does not own that one of their classes may
-  // wear, from the eras shown. As the finder has them: as they drop (+0), or at the merge level of
-  // what is worn in the slot (the lower of a pair), one piece a level. Each slot keeps its best dozen
-  // by stats, focus and effects; the search picks among those and what is owned.
+  // The optimizer's all-gear mode: the best of what the character does not own, slot by slot (core/gearCatalog).
   const catalogPieces = useMemo<Piece[]>(() => {
     if (mode !== 'optimize' || !items) return []
-    const hidden = new Set(shownEras)
-    const best = new Map<string, { p: Piece; v: number }[]>()
-    const slotLevel = new Map<string, number>()
-    if (compare === 'level')
-      for (const s of SLOT_NAMES) {
-        const levels = inv.worn.filter((w) => w.location === s).map((w) => mergeLevel(w.name))
-        slotLevel.set(s, levels.length ? Math.min(...levels) : 0)
-      }
-    for (const c of items) {
-      const key = itemKey(c.title)
-      if (owned.has(key) || /^Summoned:/i.test(c.title)) continue
-      if (hidden.has(eraOf(c, zones, eraStatus).era)) continue
-      const r = restrictions(c.statsblock)
-      const slots = SLOT_NAMES.filter((s) => canWear(r, wearer, s) && !(s === 'Primary' && isTwoHanded(r) && !twoHanders))
-      if (!slots.length) continue
-      const fx = effectsOfItem(c.title)
-      const base = parseStatsBlock(c.statsblock)
-      const atLevel = new Map<number, Piece>()
-      const pieceAt = (level: number): Piece => {
-        let p = atLevel.get(level)
-        if (!p) {
-          const name = level ? `${c.title} +${level}` : c.title
-          atLevel.set(level, (p = {
-            item: { location: 'Catalog', name, id: 0, count: 1, augs: [] }, from: 'catalog', key, r, stats: level ? scaledStats(base, level) : base,
-            foci: c.focus ? [c.focus] : [], worn: fx?.worn ? [fx.worn] : [], procs: fx?.proc ? [fx.proc] : [], lore: isLore(c.statsblock)
-          }))
-        }
-        return p
-      }
-      const extra = (c.focus ? valueOf([c.focus]) : 0) + (effects.value && fx?.worn ? effects.value.worn([fx.worn]) : 0)
-      for (const s of slots) {
-        const p = pieceAt(slotLevel.get(s) ?? 0)
-        const proc = effects.value && fx?.proc && HANDS.includes(s) ? effects.value.proc(fx.proc) : 0
-        const v = score(p.stats!, weightsForSlot(weights, s, weaponHands)) + extra + proc
-        const list = best.get(s) ?? []
-        list.push({ p, v })
-        best.set(s, list)
-      }
-    }
-    const keep = new Set<Piece>()
-    for (const list of best.values()) for (const { p } of list.sort((a, b) => b.v - a.v).slice(0, CATALOG_PER_SLOT)) keep.add(p)
-    return [...keep]
+    return catalogPiecesOf({
+      items, hiddenEras: shownEras, owned, zones, eraStatus, wearer, twoHanders, effectsOfItem, focusValue: valueOf, effects: effects.value, weights, compare,
+      worn: inv.worn, hands: weaponHands
+    })
   }, [mode, items, shownEras, owned, zones, eraStatus, wearer, twoHanders, effectsOfItem, valueOf, effects.value, weights, compare, inv, weaponHands])
 
   const input = useMemo(
@@ -652,11 +573,7 @@ export function useGearModel(view: InventoryView, sheet: CharacterSheet | null, 
           }
           candidates.push(judgeInTheRound(c, s.slot, opts, baseline))
         }
-        // The best thing to have first, as the optimizer's all-gear mode would choose it: a piece to get
-        // gains over the best set of what is owned, which already has the owned candidates in it, so
-        // those rank after any piece to get that beats that set (their own gain still shows).
-        const rank = (c: RoundCandidate) => (c.round.owned ? 0 : c.round.delta)
-        out.push({ ...s, candidates: candidates.filter((c) => c.round.delta > 0).sort((a, b) => rank(b) - rank(a) || b.round.delta - a.round.delta).slice(0, 6) })
+        out.push({ ...s, candidates: bestInTheRound(candidates) })
       }
       if (!stopped) setJudged({ of: found, slots: out })
     })()

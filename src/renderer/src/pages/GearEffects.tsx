@@ -4,7 +4,7 @@ import { canWear, restrictions, type Restrictions } from '../../../core/upgrades
 import type { EffectWorth } from '../../../core/itemEffects'
 import type { GearModel } from '../gear/useGearModel'
 import { useRemembered } from '../remember'
-import { num, wikiUrl } from '../format'
+import { num, wikiUrl } from '../../../core/format'
 import { ItemIcon, source, whereText } from './gearBits'
 
 // The Gear page's worn effects and procs tabs: what each one on gear the character owns or could get

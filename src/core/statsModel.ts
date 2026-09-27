@@ -1,5 +1,5 @@
-import { computeAc, marginal, type AcInputs } from '../../../core/acModel'
-import { className } from '../../../shared/game/classes'
+import { computeAc, marginal, type AcInputs } from './acModel'
+import { className } from '../shared/game/classes'
 import {
   baseAccuracy,
   classicCritChance,
@@ -18,10 +18,10 @@ import {
   tripleAttackChance,
   WEAPON_SKILLS,
   windowOffense
-} from '../../../core/combatModel'
-import { aaTotal } from '../../../core/aa'
-import { fractionPct as pct, num } from '../format'
-import type { StatsSheet } from '../statsSheet'
+} from './combatModel'
+import { aaTotal } from './aa'
+import { fractionPct as pct, num } from './format'
+import type { StatsSheet } from './statsSheet'
 
 // The Stats page's sums, apart from how they are shown: what the AC and Combat tabs compute, the
 // notes they make and the step-by-step trace. Also the AC result for other pages.

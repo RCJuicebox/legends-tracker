@@ -3,11 +3,10 @@ import { api } from '../api'
 import { useDebounced, useInvoke } from '../hooks'
 import { usePickedCharacter } from '../character'
 import { showError } from '../toast'
-import { itemKey, mergeLevel, parseStatsBlock, scaledStats, wornTotals, SHIELD_NAME, type ItemStats } from '../../../core/inventory'
-import type { CharacterSheet, InventoryView, ItemInfo } from '../../../shared/types'
+import type { CharacterSheet, InventoryView } from '../../../shared/types'
 
-// What the Gear and Stats pages (and the Gear tools) share: which character, its inventory and sheet,
-// and what the worn gear adds up to.
+// What the Gear and Stats pages (and the Gear tools) share: which character, and its inventory and
+// sheet. What the worn gear adds up to is core/wornGear's.
 
 /** How often to look again for an export that is not there yet. */
 const EXPORT_POLL_MS = 5000
@@ -100,27 +99,4 @@ export function useInventory(character: string, ready: boolean, exportsKey = '')
   }, [reloadInv, reloadSheet])
 
   return { view: inv.data, setView, sheet, updateSheet, error: inv.error || sheetQ.error, reload }
-}
-
-/** An item's stats at its merge level, if the wiki has it. */
-export function statsFor(items: Record<string, ItemInfo>, name: string): ItemStats | null {
-  const info = items[itemKey(name)]
-  return info?.found ? scaledStats(parseStatsBlock(info.statsblock), mergeLevel(name)) : null
-}
-
-export type WornSummary = ReturnType<typeof wornSummary>
-
-/** What the worn gear adds up to, with the player's typed-in AC where they gave one. */
-export function wornSummary(view: InventoryView, sheet: CharacterSheet | null) {
-  const worn = view.inventory?.worn ?? []
-  const totals = wornTotals(
-    worn,
-    (it) => statsFor(view.items, it.name),
-    (it) => sheet?.acOverrides[itemKey(it.name)]
-  )
-  const secondary = worn.find((it) => it.location === 'Secondary')
-  const shieldByName = !!secondary && SHIELD_NAME.test(secondary.name)
-  const shield = sheet?.shield ?? shieldByName
-  const shieldAC = shield && secondary ? (sheet?.acOverrides[itemKey(secondary.name)] ?? statsFor(view.items, secondary.name)?.ac ?? 0) : 0
-  return { totals, secondary, shield, shieldByName, shieldAC }
 }

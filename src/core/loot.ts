@@ -2,6 +2,7 @@ import { baseName } from './inventory'
 import { SELF } from './combatLines'
 import { displayName } from './combatMeter'
 import type { LogLine } from './logLine'
+import type { ItemInfo } from '../shared/types'
 
 // Loot, as EverQuest Legends prints it. Auto-loot tells you what became of each item:
 //
@@ -198,4 +199,32 @@ export class LootLedger {
     }
     return { entries: [...this.entries].reverse(), coin, reading: this.reading }
   }
+}
+
+/** What the wiki says an item is, in a line or two. */
+export function describeItem(info: ItemInfo | undefined): { head: string; body: string[] } {
+  if (!info) return { head: '', body: [] }
+  if (!info.found) return { head: 'Not on eqlwiki', body: [] }
+  const lines = info.statsblock
+    .split(/<br\s*\/?>/i)
+    .map((l) => l.replace(/\[\[(?:[^\]|]*\|)?([^\]]*)\]\]/g, '$1').replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim())
+    .filter(Boolean)
+  const slot = lines.find((l) => /^Slot:/i.test(l))
+  const head: string[] = []
+  if (slot) {
+    head.push(slot.replace(/^Slot:\s*/i, ''))
+    for (const l of lines) if (/^(AC|DMG|Skill|Effect|Focus):|^[A-Z]{2,4}: [+-]?\d/.test(l) && !/^(WT|Size):/i.test(l) && head.length < 4) head.push(l)
+    const cls = lines.find((l) => /^Class:/i.test(l))
+    if (cls) head.push(cls.replace(/^Class:\s*/i, ''))
+  } else {
+    const flags = lines[0] && !/^(WT|Size):/i.test(lines[0]) ? lines[0] : ''
+    if (flags) head.push(flags)
+  }
+  const body: string[] = []
+  const u = info.use
+  if (u?.notes) body.push(u.notes)
+  if (u?.quests.length) body.push(`Quests: ${u.quests.slice(0, 4).join(', ')}${u.quests.length > 4 ? ` +${u.quests.length - 4}` : ''}`)
+  if (u?.recipes.length) body.push(`Recipes: ${u.recipes.slice(0, 4).join(', ')}${u.recipes.length > 4 ? ` +${u.recipes.length - 4}` : ''}`)
+  if (u?.value) body.push(`Sells for ${u.value}`)
+  return { head: head.join(' · '), body }
 }

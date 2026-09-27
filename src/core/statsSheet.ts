@@ -1,5 +1,5 @@
-import { DEFAULT_STANCES } from '../../core/combatModel'
-import type { AaSummary } from '../../core/aa'
+import { DEFAULT_STANCES } from './combatModel'
+import type { AaSummary } from './aa'
 
 /** Everything the Stats page keeps for a character. Anything a file provides is not stored here. */
 export interface StatsSheet {

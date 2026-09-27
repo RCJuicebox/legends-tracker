@@ -2,9 +2,9 @@ import { useEffect, useMemo, useState } from 'react'
 import { api } from '../api'
 import { useInvoke, useItemInfo } from '../hooks'
 import { useRemembered } from '../remember'
-import { wikiUrl } from '../format'
+import { wikiUrl } from '../../../core/format'
 import { FilterBox, Icon, Info, Pending, ToggleChip } from '../components/ui'
-import { fmtCoin, type LootEntry, type LootOutcome } from '../../../core/loot'
+import { describeItem, fmtCoin, type LootEntry, type LootOutcome } from '../../../core/loot'
 import { itemKey } from '../../../core/inventory'
 import type { ItemInfo } from '../../../shared/types'
 import type { LootView } from '../../../shared/ipc'
@@ -37,34 +37,6 @@ function useLoot() {
   const setData = q.setData
   useEffect(() => api.on('state:loot', (v: View) => setData(v)), [setData])
   return q
-}
-
-/** What the wiki says an item is, in a line or two. */
-function describe(info: ItemInfo | undefined): { head: string; body: string[] } {
-  if (!info) return { head: '', body: [] }
-  if (!info.found) return { head: 'Not on eqlwiki', body: [] }
-  const lines = info.statsblock
-    .split(/<br\s*\/?>/i)
-    .map((l) => l.replace(/\[\[(?:[^\]|]*\|)?([^\]]*)\]\]/g, '$1').replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim())
-    .filter(Boolean)
-  const slot = lines.find((l) => /^Slot:/i.test(l))
-  const head: string[] = []
-  if (slot) {
-    head.push(slot.replace(/^Slot:\s*/i, ''))
-    for (const l of lines) if (/^(AC|DMG|Skill|Effect|Focus):|^[A-Z]{2,4}: [+-]?\d/.test(l) && !/^(WT|Size):/i.test(l) && head.length < 4) head.push(l)
-    const cls = lines.find((l) => /^Class:/i.test(l))
-    if (cls) head.push(cls.replace(/^Class:\s*/i, ''))
-  } else {
-    const flags = lines[0] && !/^(WT|Size):/i.test(lines[0]) ? lines[0] : ''
-    if (flags) head.push(flags)
-  }
-  const body: string[] = []
-  const u = info.use
-  if (u?.notes) body.push(u.notes)
-  if (u?.quests.length) body.push(`Quests: ${u.quests.slice(0, 4).join(', ')}${u.quests.length > 4 ? ` +${u.quests.length - 4}` : ''}`)
-  if (u?.recipes.length) body.push(`Recipes: ${u.recipes.slice(0, 4).join(', ')}${u.recipes.length > 4 ? ` +${u.recipes.length - 4}` : ''}`)
-  if (u?.value) body.push(`Sells for ${u.value}`)
-  return { head: head.join(' · '), body }
 }
 
 export function Loot() {
@@ -182,7 +154,7 @@ export function Loot() {
 
 function Row({ e, info }: { e: LootEntry; info: ItemInfo | undefined }) {
   const [iconOk, setIconOk] = useState(true)
-  const d = describe(info)
+  const d = describeItem(info)
   const title = info?.found ? info.title : e.base
   const o = OUTCOMES.find((x) => x.key === e.outcome)!
   return (

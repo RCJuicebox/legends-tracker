@@ -238,7 +238,7 @@ Settled findings, 2026-09-12 to 2026-09-15:
 | 2 (Shadowknight / Monk / Shaman) | 15% | 10.5% | 11.32%, 25,721 hits |
 | 3 (Paladin / Shadowknight / Monk) | 20% | 15.75% | 11.11%, 9,419 hits |
 
-Implemented in `src/core/combatModel.ts` `classicCritChance`, kept for comparison only. The measured rate overrides it in `src/renderer/src/stats/model.ts` `combatReport`.
+Implemented in `src/core/combatModel.ts` `classicCritChance`, kept for comparison only. The measured rate overrides it in `src/core/statsModel.ts` `combatReport`.
 
 ## Pets
 
