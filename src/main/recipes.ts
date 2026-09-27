@@ -4,16 +4,14 @@ import { join } from 'node:path'
 import { parseCrafted, parseSkillPage, recipeIndex } from '../core/tradeskills'
 import { field } from '../core/wikiItem'
 import { log } from './log'
+import { wiki } from './sources/wiki'
 import type { BookRecipe, RecipeFile, WikiProgress } from '../shared/ipc'
 
 // Every recipe on eqlwiki.com, for the Tradeskills page: each page in the Player Crafted category
 // carries its recipe and yield, fifty pages a request (about 45 requests), one at a time. Alchemy's
 // table adds the potions whose own pages give no recipe (Elixir of Greater Concentration). Kept in
 // the app's data and refreshed at most once a week, like the item catalog.
-const API = 'https://eqlwiki.com/api.php'
-const AGENT = 'LegendsTracker (https://github.com/RCJuicebox/legends-tracker)'
 const FRESH_MS = 7 * 24 * 3600_000
-const TIMEOUT_MS = 15_000
 // 2: the era tag of every page read (products and their ingredients), for crafted items' eras.
 const FORMAT = 2
 const ERA_TAG = /\{\{\s*([A-Za-z][A-Za-z ]*?)\s+Era\s*\}\}/
@@ -68,82 +66,37 @@ export class RecipeBook {
     for (let i = 0; i < names.length; i += 50) {
       const batch = names.slice(i, i + 50)
       try {
-        const params = new URLSearchParams({
-          action: 'query', format: 'json', formatversion: '2', redirects: '1', prop: 'revisions', rvprop: 'content', rvslots: 'main', titles: batch.join('|')
-        })
-        const body = (await this.get(`${API}?${params}`)) as {
-          query?: {
-            pages?: { title: string; revisions?: { slots: { main: { content: string } } }[] }[]
-            redirects?: { from: string; to: string }[]
-            normalized?: { from: string; to: string }[]
-          }
-        }
-        const tagOf = new Map<string, string>()
-        for (const p of body.query?.pages ?? []) tagOf.set(p.title, ERA_TAG.exec(p.revisions?.[0]?.slots.main.content ?? '')?.[1] ?? '')
-        const to = new Map([...(body.query?.normalized ?? []), ...(body.query?.redirects ?? [])].map((r) => [r.from, r.to]))
-        for (const n of batch) {
-          let t = n
-          for (let hops = 0; hops < 3 && to.has(t); hops++) t = to.get(t)!
-          eras[n] = tagOf.get(t) ?? ''
-        }
+        const pages = await wiki.pages(batch, 'background')
+        for (const n of batch) eras[n] = ERA_TAG.exec(pages.get(n)?.content ?? '')?.[1] ?? ''
       } catch (e) {
         log.warn('Could not read the eras of some recipe ingredients', e)
       }
       this.report({ pages: this.progress.pages + 1 })
-      await new Promise((r) => setTimeout(r, 150))
     }
   }
 
   private async download(): Promise<RecipeFile | null> {
     this.report({ busy: true, pages: 0, total: 0, error: '' })
     try {
-      const info = (await this.get(`${API}?action=query&format=json&formatversion=2&prop=categoryinfo&titles=Category:Player_Crafted`)) as {
-        query?: { pages?: { categoryinfo?: { pages: number } }[] }
-      }
-      this.report({ total: (info.query?.pages?.[0]?.categoryinfo?.pages ?? 2200) + 1 })
+      this.report({ total: ((await wiki.categorySize('Player Crafted')) ?? 2200) + 1 })
       const fromPages: BookRecipe[] = []
       const eras: Record<string, string> = {}
-      let cont: Record<string, string> = {}
       let pages = 0
-      for (;;) {
-        const params = new URLSearchParams({
-          action: 'query',
-          format: 'json',
-          formatversion: '2',
-          generator: 'categorymembers',
-          gcmtitle: 'Category:Player Crafted',
-          gcmlimit: '50',
-          gcmnamespace: '0',
-          prop: 'revisions',
-          rvprop: 'content',
-          rvslots: 'main',
-          ...cont
-        })
-        const body = (await this.get(`${API}?${params}`)) as {
-          query?: { pages?: { title: string; revisions?: { slots: { main: { content: string } } }[] }[] }
-          continue?: Record<string, string>
+      await wiki.category('Player Crafted', (batch) => {
+        for (const p of batch) {
+          const icon = Number(field(p.content, 'lucy_img_ID')) || 0
+          eras[p.title] = ERA_TAG.exec(p.content)?.[1] ?? ''
+          for (const r of parseCrafted(p.title, p.content)) fromPages.push({ ...r, icon })
         }
-        for (const p of body.query?.pages ?? []) {
-          const content = p.revisions?.[0]?.slots.main.content
-          if (!content) continue
-          const icon = Number(field(content, 'lucy_img_ID')) || 0
-          eras[p.title] = ERA_TAG.exec(content)?.[1] ?? ''
-          for (const r of parseCrafted(p.title, content)) fromPages.push({ ...r, icon })
-        }
-        pages += body.query?.pages?.length ?? 0
+        pages += batch.length
         this.report({ pages })
-        if (!body.continue) break
-        cont = body.continue
-        // One request at a time, with a breath between: this is a volunteer-run wiki.
-        await new Promise((r) => setTimeout(r, 150))
-      }
+      })
       // Recipes a product's own page leaves out, from the Alchemy table. The other tradeskill pages'
       // tables are laid out too differently to read reliably, and their products have pages.
       const known = new Set(fromPages.map((r) => r.product.toLowerCase()))
       let fromTable: BookRecipe[] = []
       try {
-        const t = (await this.get(`${API}?action=parse&format=json&formatversion=2&prop=wikitext&page=Skill_Alchemy`)) as { parse?: { wikitext?: string } }
-        fromTable = parseSkillPage('Skill Alchemy', t.parse?.wikitext ?? '')
+        fromTable = parseSkillPage('Skill Alchemy', (await wiki.wikitext('Skill Alchemy', 'background')) ?? '')
           .filter((r) => !known.has(r.product.toLowerCase()))
           .map((r) => ({ ...r, icon: 0 }))
       } catch (e) {
@@ -162,18 +115,6 @@ export class RecipeBook {
       log.warn('Recipe download failed', e)
       this.report({ busy: false, error: (e as Error).message })
       return this.file
-    }
-  }
-
-  private async get(url: string): Promise<unknown> {
-    for (let attempt = 0; ; attempt++) {
-      const res = await fetch(url, { headers: { 'User-Agent': AGENT, 'Api-User-Agent': AGENT }, signal: AbortSignal.timeout(TIMEOUT_MS) })
-      if (res.ok) return res.json()
-      if (attempt < 3 && (res.status === 429 || res.status >= 500)) {
-        await new Promise((r) => setTimeout(r, 2000 * (attempt + 1)))
-        continue
-      }
-      throw new Error(`eqlwiki answered ${res.status}`)
     }
   }
 }

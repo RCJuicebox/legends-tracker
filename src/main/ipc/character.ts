@@ -11,6 +11,7 @@ import type { EffectSpell } from '../../core/itemEffects'
 import { isCharacterKey, sanitizeSheet } from '../validate'
 import { logFileFor, logStem } from '../storeCore'
 import type { AppContext } from '../context'
+import type { CatalogFile } from '../../shared/ipc'
 
 // A character's files and what is looked up for them: achievements, inventory, the sheet, gear
 // (catalog, focus, worn effects), the pet, tradeskills and the Stats page's tables and screen reads.
@@ -39,14 +40,10 @@ export function registerCharacterIpc(ctx: AppContext): void {
   })
 
   // The upgrade finder's catalog: what is stored, and a download when asked (or when none is stored).
-  handle('gear:catalog', async () => {
-    const file = await ctx.wikiCatalog.stored()
-    return { file, stale: ctx.wikiCatalog.isStale(file), progress: ctx.wikiCatalog.progress }
-  })
-  handle('gear:catalogRefresh', async () => {
-    const file = await ctx.wikiCatalog.refresh()
-    return { file, stale: ctx.wikiCatalog.isStale(file), progress: ctx.wikiCatalog.progress }
-  })
+  // The page needs the items, not the revision table kept for the next refresh.
+  const catalogState = (file: CatalogFile | null) => ({ file: file && { ...file, revs: undefined }, stale: ctx.wikiCatalog.isStale(file), progress: ctx.wikiCatalog.progress })
+  handle('gear:catalog', async () => catalogState(await ctx.wikiCatalog.stored()))
+  handle('gear:catalogRefresh', async () => catalogState(await ctx.wikiCatalog.refresh()))
 
   // Focus effects on gear, read from the game's spell file: each one's line and strength for these
   // classes at this level, and which of their spells each line improves. Judged on what the character

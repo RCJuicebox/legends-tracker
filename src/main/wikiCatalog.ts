@@ -4,15 +4,14 @@ import { join } from 'node:path'
 import { CATALOG_FORMAT, parseItemPage, type CatalogItem } from '../core/wikiItem'
 import { parseEraStatus } from '../core/upgrades'
 import { log } from './log'
+import { wiki, type WikiPage } from './sources/wiki'
 import type { CatalogFile, WikiProgress } from '../shared/ipc'
 
-// Every piece of equipment on eqlwiki.com, for the upgrade finder. The wiki's Items category is read
-// fifty pages a request (about 225 requests for the whole of it), politely and one at a time; only
-// equipment is kept, and it is stored in the app's own data, refreshed at most once a week.
-const API = 'https://eqlwiki.com/api.php'
-const AGENT = 'LegendsTracker (https://github.com/RCJuicebox/legends-tracker)'
+// Every piece of equipment on eqlwiki.com, for the upgrade finder. The first download reads the wiki's
+// Items category fifty pages a request (about 225 requests); later ones list its revisions (about 22
+// requests) and read only the pages edited since. Only equipment is kept, in the app's own data,
+// refreshed at most once a week.
 const FRESH_MS = 7 * 24 * 3600_000
-const TIMEOUT_MS = 15_000
 
 /** Bumped when what a download keeps changes, so an older file is fetched again. */
 const FORMAT = CATALOG_FORMAT
@@ -25,7 +24,11 @@ export class WikiCatalog {
   private running: Promise<CatalogFile | null> | null = null
   progress: CatalogProgress = { busy: false, pages: 0, total: 0, error: '' }
 
-  constructor(private readonly onProgress: (p: CatalogProgress) => void) {}
+  /** `onPages` sees every page read, so what else keeps item pages (the Gear page's item cache) can use them. */
+  constructor(
+    private readonly onProgress: (p: CatalogProgress) => void,
+    private readonly onPages?: (pages: WikiPage[]) => void
+  ) {}
 
   private get path(): string {
     return join(app.getPath('userData'), 'item-catalog.json')
@@ -61,57 +64,9 @@ export class WikiCatalog {
   private async download(): Promise<CatalogFile | null> {
     this.report({ busy: true, pages: 0, total: 0, error: '' })
     try {
-      const info = (await this.get(`${API}?action=query&format=json&formatversion=2&prop=categoryinfo&titles=Category:Items`)) as {
-        query?: { pages?: { categoryinfo?: { pages: number } }[] }
-      }
-      this.report({ total: info.query?.pages?.[0]?.categoryinfo?.pages ?? 11000 })
-      const items: CatalogItem[] = []
-      let cont: Record<string, string> = {}
-      let pages = 0
-      for (;;) {
-        const params = new URLSearchParams({
-          action: 'query',
-          format: 'json',
-          formatversion: '2',
-          generator: 'categorymembers',
-          gcmtitle: 'Category:Items',
-          gcmlimit: '50',
-          gcmnamespace: '0',
-          prop: 'revisions',
-          rvprop: 'content',
-          rvslots: 'main',
-          ...cont
-        })
-        const body = (await this.get(`${API}?${params}`)) as {
-          query?: { pages?: { title: string; revisions?: { slots: { main: { content: string } } }[] }[] }
-          continue?: Record<string, string>
-        }
-        for (const p of body.query?.pages ?? []) {
-          const content = p.revisions?.[0]?.slots.main.content
-          if (!content) continue
-          const item = parseItemPage(p.title, content)
-          if (item) items.push(item)
-        }
-        pages += body.query?.pages?.length ?? 0
-        this.report({ pages })
-        if (!body.continue) break
-        cont = body.continue
-        // One request at a time, with a breath between: this is a volunteer-run wiki.
-        await new Promise((r) => setTimeout(r, 150))
-      }
-      // The wiki's own list of which eras are live on EverQuest Legends.
-      let eraStatus: Record<string, 'in' | 'out'> | undefined
-      try {
-        const t = (await this.get(`${API}?action=query&format=json&formatversion=2&prop=revisions&rvprop=content&rvslots=main&titles=Template:PageEra`)) as {
-          query?: { pages?: { revisions?: { slots: { main: { content: string } } }[] }[] }
-        }
-        const parsed = parseEraStatus(t.query?.pages?.[0]?.revisions?.[0]?.slots.main.content ?? '')
-        if (Object.keys(parsed).length) eraStatus = parsed
-      } catch (e) {
-        // The built-in list serves.
-        log.warn('Could not read the era list from eqlwiki', e)
-      }
-      const file: CatalogFile = { fetchedAt: Date.now(), items, eraStatus, format: FORMAT }
+      const old = await this.stored()
+      const file = (old?.revs && (old.format ?? 1) >= FORMAT ? await this.update(old) : null) ?? (await this.whole())
+      file.eraStatus = (await this.eraStatus()) ?? old?.eraStatus
       await fs.writeFile(this.path + '.tmp', JSON.stringify(file), 'utf8')
       await fs.rename(this.path + '.tmp', this.path)
       this.file = file
@@ -124,16 +79,61 @@ export class WikiCatalog {
     }
   }
 
-  private async get(url: string): Promise<unknown> {
-    for (let attempt = 0; ; attempt++) {
-      const res = await fetch(url, { headers: { 'User-Agent': AGENT, 'Api-User-Agent': AGENT }, signal: AbortSignal.timeout(TIMEOUT_MS) })
-      if (res.ok) return res.json()
-      // A busy wiki answers 429 or 503: wait and ask again, a few times.
-      if (attempt < 3 && (res.status === 429 || res.status >= 500)) {
-        await new Promise((r) => setTimeout(r, 2000 * (attempt + 1)))
-        continue
+  /** Every page of the category, fifty a request (about 225 requests). */
+  private async whole(): Promise<CatalogFile> {
+    this.report({ total: (await wiki.categorySize('Items')) ?? 11000 })
+    const items: CatalogItem[] = []
+    const revs: Record<string, number> = {}
+    let pages = 0
+    await wiki.category('Items', (batch) => {
+      this.onPages?.(batch)
+      for (const p of batch) {
+        if (p.revid) revs[p.title] = p.revid
+        const item = parseItemPage(p.title, p.content)
+        if (item) items.push(item)
       }
-      throw new Error(`eqlwiki answered ${res.status}`)
+      pages += batch.length
+      this.report({ pages })
+    })
+    return { fetchedAt: Date.now(), items, revs, format: FORMAT }
+  }
+
+  /**
+   * Only what changed since the last download: the category's revision ids, five hundred a request,
+   * then the pages that are new or edited. Null when so much changed that a whole download is as quick.
+   */
+  private async update(old: CatalogFile): Promise<CatalogFile | null> {
+    const now = await wiki.revisions('Items')
+    const before = old.revs ?? {}
+    const changed = [...now].filter(([title, rev]) => before[title] !== rev).map(([title]) => title)
+    if (changed.length > 2000) return null
+    this.report({ total: changed.length })
+    const edited = new Set(changed)
+    const keep = old.items.filter((it) => now.has(it.title) && !edited.has(it.title))
+    const revs: Record<string, number> = Object.fromEntries([...now].filter(([t]) => !edited.has(t)))
+    const fresh = await wiki.pages(changed, 'background')
+    this.onPages?.([...fresh.values()])
+    const items = [...keep]
+    for (const title of changed) {
+      const p = fresh.get(title)
+      if (!p) continue
+      revs[title] = p.revid ?? now.get(title)!
+      const item = parseItemPage(p.title, p.content)
+      if (item) items.push(item)
+    }
+    this.report({ pages: changed.length })
+    log.info(`Item catalog: ${changed.length} page${changed.length === 1 ? '' : 's'} changed since the last download`)
+    return { fetchedAt: Date.now(), items, revs, format: FORMAT }
+  }
+
+  /** The wiki's own list of which eras are live on EverQuest Legends; null to keep the last one (or the built-in list). */
+  private async eraStatus(): Promise<Record<string, 'in' | 'out'> | null> {
+    try {
+      const parsed = parseEraStatus((await wiki.pages(['Template:PageEra'], 'background')).get('Template:PageEra')?.content ?? '')
+      return Object.keys(parsed).length ? parsed : null
+    } catch (e) {
+      log.warn('Could not read the era list from eqlwiki', e)
+      return null
     }
   }
 }

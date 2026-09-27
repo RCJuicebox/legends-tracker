@@ -7,16 +7,14 @@ import { sameFile } from '../core/fileIdentity'
 import { CAST_BY_YOU } from '../core/phrases'
 import { PET_GEAR_HEAD, PetGearReader, parsePetGuide, parseSummonPage, type PetGearReading, type PetMelee, type PetProfile } from '../core/pets'
 import { log } from './log'
+import { wiki } from './sources/wiki'
 import type { PetState, PetSummon } from '../shared/ipc'
 
 // The pet: what it wears (the log's `/pet inventory check` lists) and which pet it is (the last
 // summoning spell cast), both kept per character so an archived log loses neither; and the pet's
 // classes, level, stats and base melee from its eqlwiki pages, cached a week.
 
-const API = 'https://eqlwiki.com/api.php'
-const AGENT = 'LegendsTracker (https://github.com/RCJuicebox/legends-tracker)'
 const FRESH_MS = 7 * 24 * 3600_000
-const TIMEOUT_MS = 15_000
 
 export type { PetState, PetSummon }
 
@@ -174,13 +172,8 @@ export class PetWiki {
     }
   }
 
-  private async wikitext(title: string): Promise<string | null> {
-    const url = `${API}?action=parse&format=json&formatversion=2&redirects=1&prop=wikitext&page=${encodeURIComponent(title.replace(/ /g, '_'))}`
-    const res = await fetch(url, { headers: { 'User-Agent': AGENT, 'Api-User-Agent': AGENT }, signal: AbortSignal.timeout(TIMEOUT_MS) })
-    if (!res.ok) throw new Error(`eqlwiki answered ${res.status}`)
-    const body = (await res.json()) as { parse?: { wikitext?: string }; error?: { code: string } }
-    if (body.error?.code === 'missingtitle') return null
-    return body.parse?.wikitext ?? null
+  private wikitext(title: string): Promise<string | null> {
+    return wiki.wikitext(title)
   }
 
   /** The pet a spell summons; null when the wiki has no page for it. Stale pages are fetched again, and kept if the wiki is down. */

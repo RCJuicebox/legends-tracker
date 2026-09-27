@@ -40,6 +40,38 @@ function fieldPattern(name: string): RegExp {
   return new RegExp(`\\|\\s*${name}\\s*=([\\s\\S]*?)(?=\\n\\s*\\|\\s*\\w+\\s*=|\\n?\\}\\}\\s*</onlyinclude>|\\n\\}\\}\\s*(?:\\n|$))`)
 }
 
+/**
+ * An item page's stats block: the value of `|statsblock =`, up to the next parameter or the end of
+ * the template. Read bracket by bracket, not by pattern: a `|` inside a [[Page|text]] link or a
+ * {{template|arg}} is part of the value, not the start of the next parameter. '' when there is none.
+ * The workspace's refresh-items.py reads it the same way.
+ */
+export function statsblockOf(content: string): string {
+  const m = /\|\s*statsblock\s*=/.exec(content)
+  if (!m) return ''
+  let depth = 0
+  let links = 0
+  let i = m.index + m[0].length
+  const start = i
+  for (; i < content.length; i++) {
+    if (content.startsWith('{{', i)) {
+      depth++
+      i++
+    } else if (content.startsWith('}}', i)) {
+      if (depth === 0) break
+      depth--
+      i++
+    } else if (content.startsWith('[[', i)) {
+      links++
+      i++
+    } else if (content.startsWith(']]', i) && links) {
+      links--
+      i++
+    } else if (content[i] === '|' && depth === 0 && links === 0) break
+  }
+  return content.slice(start, i).trim()
+}
+
 /** "[[Innoruuk_(God)|Innoruuk]]" → "Innoruuk"; "[[Plane of Hate]]" → "Plane of Hate". */
 export function linkTexts(text: string): string[] {
   return [...text.matchAll(/\[\[([^\]|]+)(?:\|([^\]]+))?\]\]/g)].map((m) => (m[2] ?? m[1]).replace(/_/g, ' ').trim())
@@ -117,7 +149,7 @@ export function parseVendors(content: string): Vendor[] {
 
 /** An item page's parts, or null for a page that is not a piece of equipment (no Slot line). */
 export function parseItemPage(title: string, content: string): CatalogItem | null {
-  const statsblock = field(content, 'statsblock')
+  const statsblock = statsblockOf(content)
   if (!/\bSlot:/i.test(statsblock)) return null
   const drops = field(content, 'dropsfrom')
   const zones: string[] = []

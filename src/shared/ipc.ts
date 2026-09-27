@@ -98,6 +98,8 @@ export interface RecipeState {
 export interface CatalogFile {
   fetchedAt: number
   items: CatalogItem[]
+  /** Every page of the Items category at its revision then, equipment or not: what a later refresh compares against. */
+  revs?: Record<string, number>
   /** The wiki's in/out era list (Template:PageEra), as it stood at the download. */
   eraStatus?: Record<string, 'in' | 'out'>
   format?: number
