@@ -1,6 +1,6 @@
 import { useEffect } from 'react'
 import { api, ago } from '../api'
-import { useApp } from '../state'
+import { useApp, useLive } from '../state'
 import { useInvoke } from '../hooks'
 import { useRemembered } from '../remember'
 import { useCombat } from '../combat'
@@ -33,13 +33,14 @@ interface Step {
 /** First-run setup, step by step, until every step is done or the player hides it. */
 export function SetupChecklist({ go }: { go: Go }) {
   const { state } = useApp()
+  const spellsLoaded = useLive((l) => l.status.spellsLoaded)
   const [hidden, setHidden] = useRemembered<boolean>('setup.hidden', false)
   const [accepted, setAccepted] = useRemembered<string[]>('setup.accepted', [])
   // Set by the shell whenever the overlays are arranged, from anywhere.
   const [arranged] = useRemembered<boolean>(ARRANGED_KEY, false)
   const s = state.settings
   const steps: Step[] = [
-    { id: 'folder', done: !!s.installDir && state.status.spellsLoaded > 0, text: 'Find the game folder, so spells can be timed', page: 'settings', button: 'Settings' },
+    { id: 'folder', done: !!s.installDir && spellsLoaded > 0, text: 'Find the game folder, so spells can be timed', page: 'settings', button: 'Settings' },
     { id: 'log', done: !!s.logFile, text: 'Choose your character log (type /log on in game if there is none)', page: 'settings', button: 'Settings' },
     { id: 'classes', done: Object.keys(state.character.classLevels).length > 0, text: 'Set your classes and their levels, so durations use the right level', page: 'stats', button: 'Stats' },
     { id: 'audio', done: s.audio.deviceId !== 'default', text: 'Pick where speech and sounds play', page: 'audio', button: 'Audio', accept: 'The default is fine' },
@@ -83,10 +84,10 @@ export function SetupChecklist({ go }: { go: Go }) {
 
 /** The game runs but the watched log gets nothing: logging off, or another character being played. */
 export function QuietLogNotice({ go }: { go: Go }) {
-  const { state } = useApp()
+  const status = useLive((l) => l.status)
+  const gameRunning = useLive((l) => l.archive.gameRunning)
   const now = useNow(30_000)
-  const { status, archive } = state
-  const quiet = status.watching && archive.gameRunning && status.lastLineAt > 0 && now - status.lastLineAt > QUIET_MS
+  const quiet = status.watching && gameRunning && status.lastLineAt > 0 && now - status.lastLineAt > QUIET_MS
   if (!quiet || status.elsewhere) return null
   return (
     <div className="notice warn mb-16">

@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { useApp } from '../state'
+import { useApp, useLive } from '../state'
 import { ago, mb } from '../api'
 import { act } from '../toast'
 import { OVERLAY_BUFFS } from '../constants'
@@ -18,7 +18,10 @@ const SAMPLE = `[Tue Sep 01 12:15:08 2026] You begin casting Envenomed Bolt X.
 
 export function Dashboard({ go }: { go: (p: PageId) => void }) {
   const { state, patchSettings } = useApp()
-  const { status, timers, feed, settings } = state
+  const { settings } = state
+  const status = useLive((l) => l.status)
+  const timers = useLive((l) => l.timers)
+  const feed = useLive((l) => l.feed)
   const [sim, setSim] = useState('')
   const [simOpen, setSimOpen] = useState(false)
   useNow(5000)

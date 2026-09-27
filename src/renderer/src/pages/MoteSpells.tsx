@@ -1,5 +1,5 @@
 import { useMemo } from 'react'
-import { useApp } from '../state'
+import { useApp, useLive } from '../state'
 import { roman } from '../api'
 import { useInvoke } from '../hooks'
 import { useRemembered } from '../remember'
@@ -86,6 +86,7 @@ function PayWith({ o }: { o: SpellUpgradeOption }) {
 
 export function MoteSpells() {
   const { state } = useApp()
+  const spellsLoaded = useLive((l) => l.status.spellsLoaded)
   const [days, setDays] = useRemembered<number>('spellmotes.days', 14)
   const [section, setSection] = useRemembered<SectionKey | 'all'>('spellmotes.section', 'all')
   const [sortBy, setSortBy] = useRemembered<'rate' | 'worth' | 'casts'>('spellmotes.sort', 'rate')
@@ -98,7 +99,7 @@ export function MoteSpells() {
   const [whose, setWhose] = useRemembered<'mine' | 'all'>('spellmotes.whose', 'mine')
   const [weights, setWeights] = useRemembered<SpellWeights>('spellmotes.weights', DEFAULT_SPELL_WEIGHTS)
   const tierPct = state.settings.tracking.tierDurationPct
-  const q = useInvoke('motes:spellCasts', [state.characterKey, days], [state.characterKey, days, state.status.spellsLoaded])
+  const q = useInvoke('motes:spellCasts', [state.characterKey, days], [state.characterKey, days, spellsLoaded])
   const stockQ = useStock()
   const stock = stockQ.data?.counts
 

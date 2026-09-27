@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useApp } from '../state'
+import { useApp, useLive } from '../state'
 import { api, mb, ago, errorMessage } from '../api'
 import { useInvoke } from '../hooks'
 import { act, showError } from '../toast'
@@ -8,13 +8,13 @@ import { Field, LoadError, NumberInput, Switch, Pending } from '../components/ui
 
 export function Logs() {
   const { state, patchSettings } = useApp()
-  const q = useInvoke('logs:overview', [], [state.archive.busy, state.settings.archive.archiveDir])
+  const status = useLive((l) => l.archive)
+  const q = useInvoke('logs:overview', [], [status.busy, state.settings.archive.archiveDir])
   const view = q.data
   const refresh = q.reload
   const [zipping, setZipping] = useState(false)
   const [zipErrors, setZipErrors] = useState<string[]>([])
   const a = state.settings.archive
-  const status = state.archive
   const threshold = a.thresholdMB * 1048576
   const setA = (patch: Partial<typeof a>) => patchSettings((s) => ({ ...s, archive: { ...s.archive, ...patch } }))
   const totalZip = view?.archives.filter((x) => !x.loose).reduce((n, x) => n + x.size, 0) ?? 0

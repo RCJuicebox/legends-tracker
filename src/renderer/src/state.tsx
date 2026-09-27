@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from 'react'
 import { api, errorMessage, type AppState, type FeedEntry } from './api'
 import { FEED_MAX } from './constants'
 import { showError } from './toast'
@@ -6,8 +6,15 @@ import type { AppSettings, ArchiveStatus, CharacterSettings, FeedItem, TimerView
 
 type Patch = (s: AppSettings) => AppSettings
 
+/** What changes as the game is played: pushed every second or on every line. */
+type LiveKey = 'status' | 'timers' | 'feed' | 'archive'
+export type LiveState = Pick<AppState, LiveKey>
+/** Everything else: settings, the character, devices. Changes when the player changes something. */
+export type SettledState = Omit<AppState, LiveKey>
+
 interface Ctx {
-  state: AppState
+  /** The settled part of the state; `useLive` has the part that changes while playing. */
+  state: SettledState
   saveSettings: (s: AppSettings) => Promise<void>
   /**
    * Changes the settings at once on screen and saves them. With `debounceMs` the save waits until
@@ -20,15 +27,41 @@ interface Ctx {
 }
 
 const StateContext = createContext<Ctx | null>(null)
+/**
+ * The live part is held outside React and read through `useLive(select)`, so a component renders
+ * again only when the value it picked changes, not on every status tick or feed line.
+ */
+class LiveStore {
+  private value: LiveState | null = null
+  private readonly listeners = new Set<() => void>()
+  get = (): LiveState | null => this.value
+  set(next: LiveState | null | ((s: LiveState | null) => LiveState | null)): void {
+    this.value = typeof next === 'function' ? next(this.value) : next
+    for (const l of this.listeners) l()
+  }
+  subscribe = (l: () => void): (() => void) => {
+    this.listeners.add(l)
+    return () => this.listeners.delete(l)
+  }
+}
+const LiveContext = createContext<LiveStore | null>(null)
+
+const LIVE: LiveKey[] = ['status', 'timers', 'feed', 'archive']
+const split = (s: AppState): [SettledState, LiveState] => {
+  const { status, timers, feed, archive, ...settled } = s
+  return [settled, { status, timers, feed, archive }]
+}
 
 let feedId = 0
 const numbered = (item: FeedItem): FeedEntry => ({ ...item, id: ++feedId })
 
 export function StateProvider({ children }: { children: ReactNode }) {
-  const [state, setState] = useState<AppState | null>(null)
+  const [state, setState] = useState<SettledState | null>(null)
+  const [liveStore] = useState(() => new LiveStore())
+  const setLive = useCallback((next: (s: LiveState | null) => LiveState | null) => liveStore.set(next), [liveStore])
   const [error, setError] = useState('')
   const [attempt, setAttempt] = useState(0)
-  const stateRef = useRef<AppState | null>(null)
+  const stateRef = useRef<SettledState | null>(null)
   stateRef.current = state
   // The settings as the player last set them, ahead of React's render and of the save.
   const settingsRef = useRef<AppSettings | null>(null)
@@ -53,11 +86,14 @@ export function StateProvider({ children }: { children: ReactNode }) {
       (s) => {
         if (!live) return
         settingsRef.current = s.settings
-        setState({ ...s, feed: s.feed.map(numbered) })
+        const [settled, now] = split({ ...s, feed: s.feed.map(numbered) })
+        liveStore.set(now)
+        setState(settled)
       },
       (e) => live && setError(errorMessage(e))
     )
-    const set = <K extends keyof AppState>(key: K) => (value: AppState[K]) => setState((s) => (s ? { ...s, [key]: value } : s))
+    const set = <K extends keyof AppState>(key: K) => (value: AppState[K]) =>
+      (LIVE as string[]).includes(key) ? setLive((s) => (s ? { ...s, [key]: value } : s)) : setState((s) => (s ? { ...s, [key]: value } : s))
     const offs = [
       api.on('state:status', set('status') as (v: WatchStatus) => void),
       api.on('state:timers', set('timers') as (v: TimerView[]) => void),
@@ -67,13 +103,13 @@ export function StateProvider({ children }: { children: ReactNode }) {
       api.on('state:arranging', set('arranging') as (v: boolean) => void),
       api.on('state:devices', set('devices') as (v: AppState['devices']) => void),
       api.on('state:voices', (v: { voices: string[]; error: string }) => setState((s) => (s ? { ...s, voices: v.voices, speechError: v.error } : s))),
-      api.on('state:feed', (item: FeedItem) => setState((s) => (s ? { ...s, feed: [...s.feed.slice(-(FEED_MAX - 1)), numbered(item)] } : s)))
+      api.on('state:feed', (item: FeedItem) => setLive((s) => (s ? { ...s, feed: [...s.feed.slice(-(FEED_MAX - 1)), numbered(item)] } : s)))
     ]
     return () => {
       live = false
       offs.forEach((off) => off())
     }
-  }, [attempt, takeSettings])
+  }, [attempt, takeSettings, liveStore, setLive])
 
   const write = useCallback(async () => {
     const p = pending.current
@@ -129,10 +165,10 @@ export function StateProvider({ children }: { children: ReactNode }) {
     return () => window.removeEventListener('beforeunload', flush)
   }, [write])
 
-  const latest = useCallback(() => stateRef.current!, [])
+  const latest = useCallback((): AppState => ({ ...stateRef.current!, ...liveStore.get()! }), [liveStore])
   const value = useMemo(() => (state ? { state, saveSettings, patchSettings, saveCharacter, latest } : null), [state, saveSettings, patchSettings, saveCharacter, latest])
 
-  if (!value) {
+  if (!value || !liveStore.get()) {
     if (!error) return <div className="empty">Loading…</div>
     return (
       <div className="boot-error" role="alert">
@@ -150,11 +186,26 @@ export function StateProvider({ children }: { children: ReactNode }) {
       </div>
     )
   }
-  return <StateContext.Provider value={value}>{children}</StateContext.Provider>
+  return (
+    <StateContext.Provider value={value}>
+      <LiveContext.Provider value={liveStore}>{children}</LiveContext.Provider>
+    </StateContext.Provider>
+  )
 }
 
 export function useApp(): Ctx {
   const ctx = useContext(StateContext)
   if (!ctx) throw new Error('useApp outside StateProvider')
   return ctx
+}
+
+/**
+ * A value from the state that changes while playing (the watch status, timers, the feed,
+ * archiving). The component renders again only when that value changes, so pick the smallest
+ * thing needed, and return a part of the state rather than a new object.
+ */
+export function useLive<T>(select: (s: LiveState) => T): T {
+  const live = useContext(LiveContext)
+  if (!live) throw new Error('useLive outside StateProvider')
+  return useSyncExternalStore(live.subscribe, () => select(live.get()!))
 }

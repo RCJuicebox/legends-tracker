@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useApp } from '../state'
+import { useApp, useLive } from '../state'
 import { api, clock, ago, errorMessage } from '../api'
 import { useInvoke, useSearch } from '../hooks'
 import { act, showError, showUndo } from '../toast'
@@ -13,7 +13,8 @@ import type { PageId } from '../main'
 
 export function Spells({ go }: { go?: (page: PageId) => void }) {
   const { state } = useApp()
-  const q = useInvoke('spells:known', [], [state.character, state.settings.tracking, state.status.spellsLoaded])
+  const spellsLoaded = useLive((l) => l.status.spellsLoaded)
+  const q = useInvoke('spells:known', [], [state.character, state.settings.tracking, spellsLoaded])
   const known = q.data ?? []
   const setKnown = q.setData
   const [open, setOpen] = useState<string | null>(null)

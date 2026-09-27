@@ -1,4 +1,4 @@
-import { useApp } from '../state'
+import { useApp, useLive } from '../state'
 import { api, mb, ago } from '../api'
 import { useInvoke } from '../hooks'
 import { act, showError, showToast, actDone } from '../toast'
@@ -39,6 +39,7 @@ function noCheckReason(u: UpdateState | null): string | undefined {
 
 export function Settings({ go }: { go?: (page: PageId) => void }) {
   const { state, patchSettings } = useApp()
+  const watching = useLive((l) => l.status.watching)
   const s = state.settings
   const t = s.tracking
   const logsQ = useInvoke('logs:list', [], [s.installDir, s.logFile])
@@ -163,7 +164,7 @@ export function Settings({ go }: { go?: (page: PageId) => void }) {
             </Field>
             <Field label="Rebuild" hint="Forgets every fight and reads that much of the log again.">
               <div>
-                <button className="btn" onClick={() => void actDone(`Read the last ${s.combat.historyMinutes || 60} minutes of the log again.`, 'combat:rebuild', s.combat.historyMinutes || 60)} disabled={!state.status.watching} title={state.status.watching ? 'Forget every fight and read the log again' : 'Start watching first'}>
+                <button className="btn" onClick={() => void actDone(`Read the last ${s.combat.historyMinutes || 60} minutes of the log again.`, 'combat:rebuild', s.combat.historyMinutes || 60)} disabled={!watching} title={watching ? 'Forget every fight and read the log again' : 'Start watching first'}>
                   Read the log again
                 </button>
               </div>

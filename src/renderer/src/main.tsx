@@ -1,7 +1,7 @@
-import { useEffect, type ComponentType } from 'react'
+import { memo, useEffect, type ComponentType } from 'react'
 import { createRoot } from 'react-dom/client'
 import './styles.css'
-import { StateProvider, useApp } from './state'
+import { StateProvider, useApp, useLive } from './state'
 import { Icon } from './components/ui'
 import { ErrorBoundary } from './components/ErrorBoundary'
 import { Jobs } from './components/Jobs'
@@ -53,6 +53,32 @@ const PAGES = [
 
 export type PageId = (typeof PAGES)[number]['id']
 
+/** How many timers run, beside Live in the sidebar. */
+function TimerCount() {
+  const n = useLive((l) => l.timers.length)
+  return n > 0 ? <span className="count">{n}</span> : null
+}
+
+/** Who is being watched, where, and when the log last spoke. */
+function WatchFoot() {
+  const s = useLive((l) => l.status)
+  return (
+    <div className="sidebar-foot">
+      <div className="row tight">
+        <span className={`status-dot${s.watching ? ' live' : ''}`} />
+        <span className="who">{s.character || 'No character'}</span>
+      </div>
+      <div>{s.zone || 'Zone unknown'}</div>
+      <div className="faint">{s.watching ? `Last line ${ago(s.lastLineAt)}` : 'Not watching'}</div>
+    </div>
+  )
+}
+
+/** The open page, rendered again only when it asks to be, not whenever the shell is. */
+const PageHost = memo(function PageHost({ Page, go }: { Page: ComponentType<{ go: (p: PageId) => void }>; go: (p: PageId) => void }) {
+  return <Page go={go} />
+})
+
 function Shell() {
   const { state } = useApp()
   // Opens where it was left, including across restarts.
@@ -61,7 +87,6 @@ function Shell() {
   const wanted = saved === 'inventory' ? 'gear' : saved
   const page = (PAGES.some((p) => p.id === wanted) ? wanted : 'dashboard') as PageId
   const Page = PAGES.find((p) => p.id === page)!.el as ComponentType<{ go: (p: PageId) => void }>
-  const s = state.status
   const update = useUpdate()
   const unsaved = useUnsaved()
   // Arranging the overlays at all, from the tray, a page or the hotkey, is placing them (Live's checklist).
@@ -92,7 +117,7 @@ function Shell() {
           <button key={p.id} className={`nav-item${page === p.id ? ' active' : ''}`} aria-current={page === p.id ? 'page' : undefined} onClick={() => setPage(p.id)}>
             <Icon name={p.icon} />
             {p.label}
-            {p.id === 'dashboard' && state.timers.length > 0 && <span className="count">{state.timers.length}</span>}
+            {p.id === 'dashboard' && <TimerCount />}
             {unsaved.has(p.id) && (
               <span className="unsaved-mark" title="Changes not saved yet">
                 ●<span className="sr-only"> (changes not saved)</span>
@@ -100,19 +125,12 @@ function Shell() {
             )}
           </button>
         ])}
-        <div className="sidebar-foot">
-          <div className="row tight">
-            <span className={`status-dot${s.watching ? ' live' : ''}`} />
-            <span className="who">{s.character || 'No character'}</span>
-          </div>
-          <div>{s.zone || 'Zone unknown'}</div>
-          <div className="faint">{s.watching ? `Last line ${ago(s.lastLineAt)}` : 'Not watching'}</div>
-        </div>
+        <WatchFoot />
       </nav>
       <main className="main">
         <Jobs />
         <ErrorBoundary key={page} what={`The ${PAGES.find((p) => p.id === page)!.label} page`}>
-          <Page go={setPage} />
+          <PageHost Page={Page} go={setPage} />
         </ErrorBoundary>
       </main>
       <Toasts />

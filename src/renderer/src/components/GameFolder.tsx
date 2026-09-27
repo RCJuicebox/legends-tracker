@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { api, errorMessage } from '../api'
-import { useApp } from '../state'
+import { useApp, useLive } from '../state'
 import { whoList as who } from '../format'
 import type { GameFolderCheck } from '../../../shared/types'
 
@@ -35,6 +35,7 @@ function useFolderActions() {
 /** The Settings card: the folder, what it holds, and ways to change it. */
 export function GameFolderCard() {
   const { state, patchSettings } = useApp()
+  const spellsLoaded = useLive((l) => l.status.spellsLoaded)
   const dir = state.settings.installDir
   const [check, setCheck] = useState<GameFolderCheck | null>(null)
   const [checkError, setCheckError] = useState('')
@@ -57,11 +58,11 @@ export function GameFolderCard() {
       live = false
       clearTimeout(t)
     }
-  }, [dir, state.status.spellsLoaded])
+  }, [dir, spellsLoaded])
 
   const rows: [boolean, string, string][] = check
     ? [
-        [check.spells, 'Spell data', check.spells ? `spells_us.txt, ${state.status.spellsLoaded.toLocaleString()} spells` : 'No spells_us.txt here: spell timers need it'],
+        [check.spells, 'Spell data', check.spells ? `spells_us.txt, ${spellsLoaded.toLocaleString()} spells` : 'No spells_us.txt here: spell timers need it'],
         [check.logs.length > 0, 'Character logs', check.logs.length ? who(check.logs) : 'None in Logs yet. Type /log on in game to start one'],
         [check.inventory.length > 0, 'Inventory files', check.inventory.length ? who(check.inventory) : 'None yet. Type /outputfile inventory in game to write one'],
         [check.achievements.length > 0, 'Achievement files', check.achievements.length ? who(check.achievements) : 'None yet. Type /outputfile achievements in game to write one']
@@ -111,9 +112,10 @@ export function GameFolderCard() {
 /** Shown on the Live page when there is no usable game folder: first runs where detection failed. */
 export function GameFolderPrompt() {
   const { state } = useApp()
+  const spellError = useLive((l) => l.status.spellError)
   const { busy, message, find, choose } = useFolderActions()
   const s = state.settings
-  if (s.installDir && !state.status.spellError) return null
+  if (s.installDir && !spellError) return null
   return (
     <div className="notice bad stack gap-8 mb-16">
       <div>
