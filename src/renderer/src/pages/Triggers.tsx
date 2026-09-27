@@ -5,7 +5,7 @@ import { act, showError, actDone } from '../toast'
 import { OVERLAY_TARGETS } from '../constants'
 import { recall, remember } from '../remember'
 import { markUnsaved } from '../unsaved'
-import { Field, Icon, LoadError, NumberInput, Pending, Switch, ConfirmButton } from '../components/ui'
+import { ConfirmButton, Field, FilterBox, Icon, LoadError, NumberInput, Pending, Switch } from '../components/ui'
 import type { Phrase, Trigger, TriggerAction, TriggerTestResult } from '../../../shared/types'
 import type { TriggerError } from '../../../shared/ipc'
 
@@ -187,7 +187,7 @@ export function Triggers() {
 
       <div className="split">
         <div className="card" style={{ padding: 10 }}>
-          <input placeholder="Search triggers…" aria-label="Search triggers" value={query} onChange={(e) => setQuery(e.target.value)} style={{ width: '100%', marginBottom: 6 }} />
+          <FilterBox placeholder="Search triggers…" label="Search triggers" value={query} onChange={setQuery} width="100%" className="mb-6" />
           <div className="tree">
             {folders.length === 0 && <div className="empty">No triggers.</div>}
             {folders.map(([folder, items]) => (

@@ -284,3 +284,56 @@ export function Tabs<T extends string>({
     </div>
   )
 }
+
+/** One of a few choices, side by side: a view's mode, an order, a scope. */
+export function Segmented<T extends string>({ value, options, onChange, label }: { value: T; options: readonly (readonly [T, string])[]; onChange: (v: T) => void; label: string }) {
+  return (
+    <span className="lt-seg" role="group" aria-label={label}>
+      {options.map(([v, text]) => (
+        <button key={v} className={v === value ? 'on' : ''} aria-pressed={v === value} onClick={() => onChange(v)}>
+          {text}
+        </button>
+      ))}
+    </span>
+  )
+}
+
+/** A chip that shows or hides one kind of thing; off is dashed and struck through. */
+export function ToggleChip({ on, onChange, children, title, className = '' }: { on: boolean; onChange: (on: boolean) => void; children: ReactNode; title?: string; className?: string }) {
+  return (
+    <button className={`chip toggle-chip ${className}${on ? '' : ' off'}`.trim()} aria-pressed={on} title={title} onClick={() => onChange(!on)}>
+      {children}
+    </button>
+  )
+}
+
+/** A filter as you type; Escape clears it. */
+export function FilterBox({ value, onChange, label, placeholder = 'Filter…', width, className }: { value: string; onChange: (v: string) => void; label: string; placeholder?: string; width?: number | string; className?: string }) {
+  return (
+    <input
+      type="search"
+      className={className}
+      placeholder={placeholder}
+      aria-label={label}
+      value={value}
+      style={width ? { width, textTransform: 'none' } : { textTransform: 'none' }}
+      onChange={(e) => onChange(e.target.value)}
+      onKeyDown={(e) => e.key === 'Escape' && value && (e.preventDefault(), onChange(''))}
+    />
+  )
+}
+
+export type Sort<K extends string> = { key: K; dir: 1 | -1 }
+
+/** A column header that sorts its table: a click sorts by it, another click reverses. */
+export function SortTh<K extends string>({ k, sort, onSort, children, num, title }: { k: K; sort: Sort<K>; onSort: (s: Sort<K>) => void; children: ReactNode; num?: boolean; title?: string }) {
+  const active = sort.key === k
+  return (
+    <th className={num ? 'num' : undefined} title={title} aria-sort={active ? (sort.dir === 1 ? 'ascending' : 'descending') : 'none'}>
+      <button className="th-sort" onClick={() => onSort({ key: k, dir: active ? (sort.dir === 1 ? -1 : 1) : 1 })}>
+        {children}
+        <span aria-hidden="true">{active ? (sort.dir === 1 ? ' ▲' : ' ▼') : ''}</span>
+      </button>
+    </th>
+  )
+}

@@ -24,6 +24,25 @@ What changed in each version. The release workflow publishes a version's section
 - Updates show **what's new** on the Settings page, and a failed download is mentioned once.
 - **Updates install silently.** The installer is now one-click: no window, no questions, and the app comes back by itself. It always installs to `%LOCALAPPDATA%\Programs\legends-tracker`; the folder can no longer be chosen.
 
+### New places to look
+
+- **Getting set up** on the Live page lists what still needs doing (game folder, log, classes and levels, audio device, overlay placement), each with a link to where it is done. It goes away once everything is set.
+- The **Live page** shows the fight in hand and the session so far (fights, kills, deaths, coin, kills an hour), and warns when the log has gone quiet while the game runs.
+- **Character › Upgrades** gathers every way to spend motes: Best merge, the Merge planner and Spell upgrades. **Plan** on a merge or a worn item opens the planner there. Motes is now tracking alone.
+- **Setup › Data Sources** lists every source the app reads (log, spell data, exports, the wiki, updates and more) with how its last read went, its age and a Refresh.
+- **Long jobs show their progress** in a strip above the page, and each has **Cancel**: the item catalog and recipe downloads, the mote history rebuild, the Spell Timers log check and a meter rebuild.
+- **Hotkeys** from anywhere: Ctrl+Shift+F9 mutes, F10 starts a meter session, F11 arranges the overlays. **UI size** (Settings) zooms the main window from 90% to 150%.
+
+### One character record
+
+- A character's classes, levels and race are kept in one place and edited on the **Stats** page; Spell Timers, Gear, the upgrade finder, Spell upgrades and Buffs all use it. Achievements, Stats, Gear and Tradeskills remember the same character pick.
+
+### Smaller things
+
+- Deleting a trigger, resetting the group and removing the Azure key ask first; Export, New session and Read the log again say they worked.
+- Info popovers close on Escape or a click elsewhere. Status chips carry a mark as well as a colour. Grids wrap in a narrow window. Each overlay card has **Bring on screen**.
+- Every filter box clears with Escape, the show/hide chips on Loot and the upgrade finder look the same, and the **Respawns** table sorts by any of its columns (remembered).
+
 ### Faster lookups
 
 - Casts, melee and purchases are read from your log and archives **in one pass** and remembered, so Gear and Tradeskills open quickly after the first time.

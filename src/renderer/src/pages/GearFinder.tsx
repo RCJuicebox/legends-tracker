@@ -5,7 +5,7 @@ import { DEFAULT_HIDDEN_ERAS, OTHER_ERA, OTHER_OUT_ERA } from '../../../core/upg
 import { ROLE_LABELS, ROLE_PRESETS, type RoleKey } from '../../../core/statValue'
 import type { CharacterSheet, InventoryView } from '../../../shared/types'
 import { className } from '../../../shared/game/classes'
-import { Info, Pending } from '../components/ui'
+import { Info, Pending, ToggleChip } from '../components/ui'
 import { num, wikiUrl } from '../format'
 import { AC_OVER_CAP, useGearModel, type CatalogState, type GearMode } from '../gear/useGearModel'
 import { ItemIcon, source } from './gearBits'
@@ -156,15 +156,15 @@ export function GearFinder({ view, sheet, mode, onPlan }: { view: InventoryView;
             {eraCounts.map(([era, n]) => {
               const on = !hiddenEras.includes(era)
               return (
-                <button
+                <ToggleChip
                   key={era}
-                  className={`lt-era${on ? ' on' : ''}`}
-                  aria-pressed={on}
+                  className="accent"
+                  on={on}
                   title={eraTip(era)}
-                  onClick={() => setHiddenEras(on ? [...hiddenEras, era] : hiddenEras.filter((e) => e !== era))}
+                  onChange={() => setHiddenEras(on ? [...hiddenEras, era] : hiddenEras.filter((e) => e !== era))}
                 >
                   {era} <small>{num(n)}</small>
-                </button>
+                </ToggleChip>
               )
             })}
             <button className="btn ghost small" onClick={() => setHiddenEras(DEFAULT_HIDDEN_ERAS)}>

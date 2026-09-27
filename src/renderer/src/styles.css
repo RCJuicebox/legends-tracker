@@ -349,6 +349,7 @@ summary:focus-visible,
 }
 
 input[type='text'],
+input[type='search'],
 input[type='number'],
 input:not([type]),
 select,
@@ -2021,27 +2022,6 @@ table.table {
   max-width: 760px;
 }
 
-.lt-era {
-  font-size: 12px;
-  padding: 3px 10px;
-  border-radius: 14px;
-  border: 1px dashed var(--line-2);
-  background: none;
-  color: var(--text-3);
-  cursor: pointer;
-  text-decoration: line-through;
-  text-decoration-color: rgba(255, 255, 255, 0.25);
-}
-.lt-era small {
-  color: var(--text-3);
-  margin-left: 3px;
-}
-.lt-era.on {
-  border: 1px solid rgba(232, 180, 76, 0.55);
-  background: rgba(232, 180, 76, 0.1);
-  color: var(--accent-2);
-  text-decoration: none;
-}
 
 .lt-worth {
   line-height: 1.6;
@@ -2727,13 +2707,36 @@ button.tree-item {
   background: rgba(180, 106, 224, 0.16);
   color: #d4a6f2;
 }
-.chip.toggle {
+/* One look for every chip that shows or hides something: off is dashed, faint and struck through. */
+.toggle-chip {
   cursor: pointer;
   border: 1px solid transparent;
+  font: inherit;
+  font-size: 12px;
 }
-.chip.toggle.off {
-  opacity: 0.45;
+.toggle-chip small {
+  color: var(--text-3);
+  margin-left: 3px;
+}
+.toggle-chip.accent {
+  border-color: rgba(232, 180, 76, 0.55);
+  background: rgba(232, 180, 76, 0.1);
+  color: var(--accent-2);
+}
+.toggle-chip.off {
+  background: none;
+  border: 1px dashed var(--line-2);
+  color: var(--text-3);
   text-decoration: line-through;
+  text-decoration-color: rgba(255, 255, 255, 0.25);
+}
+/* A sortable column's header. */
+.th-sort {
+  all: unset;
+  cursor: pointer;
+}
+.th-sort:focus-visible {
+  outline: 2px solid var(--accent);
 }
 
 /* ---------- damage meter (overlay) ---------- */

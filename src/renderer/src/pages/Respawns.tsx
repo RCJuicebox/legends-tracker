@@ -5,7 +5,7 @@ import { useInvoke } from '../hooks'
 import { useRemembered } from '../remember'
 import { useNow } from '../components/TimerBars'
 import { act } from '../toast'
-import { ConfirmButton, Field, Info, NumberInput, Pending, Switch } from '../components/ui'
+import { ConfirmButton, Field, FilterBox, Info, NumberInput, Pending, SortTh, Switch, type Sort } from '../components/ui'
 import { SHARED_SEC, type RespawnRow, type RespawnTimerSpec, type RespawnView } from '../../../core/respawns'
 
 // How long mobs take to come back, measured from the log, and a timer on an overlay for any of them.
@@ -32,6 +32,27 @@ const HOW =
   'respawn time and the shortest gap is the closest. Leaving the zone ends every watch. A gap under ' +
   `${SHARED_SEC} seconds means two mobs share the name; those names are hidden unless you show them.`
 
+type SortKey = 'name' | 'kills' | 'respawn' | 'gap' | 'last'
+
+const SORT_VALUE: Record<SortKey, (r: RespawnRow) => string | number | null> = {
+  name: (r) => r.name.toLowerCase(),
+  kills: (r) => r.kills,
+  respawn: (r) => r.estimate,
+  gap: (r) => r.gaps[r.gaps.length - 1] ?? null,
+  last: (r) => r.lastDeath || null
+}
+
+/** Rows in the chosen order; a row with nothing to sort by goes last either way. */
+function bySort(sort: Sort<SortKey>) {
+  const value = SORT_VALUE[sort.key] ?? SORT_VALUE.last
+  return (a: RespawnRow, b: RespawnRow) => {
+    const x = value(a)
+    const y = value(b)
+    if (x === null || y === null) return x === y ? 0 : x === null ? 1 : -1
+    return (x < y ? -1 : x > y ? 1 : 0) * sort.dir
+  }
+}
+
 export function Respawns() {
   const { state } = useApp()
   const q = useRespawns()
@@ -39,6 +60,7 @@ export function Respawns() {
   const [filter, setFilter] = useState('')
   const [hereOnly, setHereOnly] = useRemembered('respawns.hereOnly', true)
   const [showShared, setShowShared] = useRemembered('respawns.shared', false)
+  const [sort, setSort] = useRemembered<Sort<SortKey>>('respawns.sort', { key: 'last', dir: -1 })
   const [open, setOpen] = useState<string | null>(null)
   const [adding, setAdding] = useState(false)
   const now = useNow(1000, !!view?.rows.some((r) => r.pendingSince))
@@ -50,7 +72,8 @@ export function Respawns() {
       .filter((r) => !hereOnly || !zone || !r.zone || r.zone === zone || !!r.timer)
       .filter((r) => showShared || !r.shared || !!r.timer)
       .filter((r) => !f || r.name.toLowerCase().includes(f) || r.zone.toLowerCase().includes(f))
-  }, [view, filter, hereOnly, showShared, zone])
+      .sort(bySort(sort))
+  }, [view, filter, hereOnly, showShared, zone, sort])
   const hiddenShared = (view?.rows ?? []).filter((r) => r.shared && !r.timer).length
 
   const saved = (v: RespawnView | undefined) => {
@@ -70,7 +93,7 @@ export function Respawns() {
       </div>
 
       <div className="card row mb-16">
-        <input placeholder="Filter by mob or zone…" aria-label="Filter mobs" value={filter} onChange={(e) => setFilter(e.target.value)} style={{ width: 240 }} />
+        <FilterBox placeholder="Filter by mob or zone…" label="Filter mobs" value={filter} onChange={setFilter} width={240} />
         <Switch on={hereOnly} onChange={setHereOnly} label={zone ? `Only ${zone}` : 'Only this zone'} />
         <span className="small muted">{zone ? `Only ${zone}` : 'Only this zone'}</span>
         <Switch on={showShared} onChange={setShowShared} label="Show names several mobs share" />
@@ -111,11 +134,11 @@ export function Respawns() {
           <table className="table">
             <thead>
               <tr>
-                <th>Mob</th>
-                <th title="Kills on record">Kills</th>
-                <th title="The shortest gap between a death and the mob being seen again: the respawn is this or less">Respawn</th>
-                <th title="The most recent gap">Last gap</th>
-                <th>Last killed</th>
+                <SortTh k="name" sort={sort} onSort={setSort}>Mob</SortTh>
+                <SortTh k="kills" sort={sort} onSort={setSort} title="Kills on record">Kills</SortTh>
+                <SortTh k="respawn" sort={sort} onSort={setSort} title="The shortest gap between a death and the mob being seen again: the respawn is this or less">Respawn</SortTh>
+                <SortTh k="gap" sort={sort} onSort={setSort} title="The most recent gap">Last gap</SortTh>
+                <SortTh k="last" sort={sort} onSort={setSort}>Last killed</SortTh>
                 <th title="The timer's length, or the shortest gap, from the last kill">Back in</th>
                 <th>Timer</th>
                 <th />

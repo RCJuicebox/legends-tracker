@@ -4,7 +4,7 @@ import { useInvoke } from '../hooks'
 import { useRemembered } from '../remember'
 import { act } from '../toast'
 import { useNow } from '../components/TimerBars'
-import { Info, Pending, Switch, ConfirmButton } from '../components/ui'
+import { ConfirmButton, FilterBox, Info, Pending, Switch } from '../components/ui'
 import { useApp } from '../state'
 import { wikiUrl } from '../format'
 import { CLASSES, className } from '../../../shared/game/classes'
@@ -215,7 +215,7 @@ export function Buffs() {
           <h2 style={{ margin: 0 }}>Buffs you want</h2>
           <span className="faint small">{v.wanted.length} picked</span>
           <span className="spacer" />
-          <input placeholder="Filter by name or effect…" aria-label="Filter buffs" value={filter} onChange={(e) => setFilter(e.target.value)} style={{ width: 220 }} />
+          <FilterBox placeholder="Filter by name or effect…" label="Filter buffs" value={filter} onChange={setFilter} />
           {!v.defaults && (
             <button className="btn small" onClick={() => void setWanted(null)} title="Every HP & AC, haste, spell haste, mana regen and stat buff worth something">
               Back to the defaults

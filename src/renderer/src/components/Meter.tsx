@@ -3,7 +3,7 @@ import { useApp } from '../state'
 import { act, showToast, actDone } from '../toast'
 import { useRemembered } from '../remember'
 import { LIVE, useCombat, useSegment } from '../combat'
-import { Icon, Info, ConfirmButton } from './ui'
+import { ConfirmButton, Icon, Info, Segmented } from './ui'
 import { EntityBar, HealBar, HEAL_COLOR, KIND_COLOR, PROC_COLOR, PROC_HINT, PROC_WORD, SkillBar, kindTag } from './MeterBars'
 import {
   attackerRows, attackerSkillRows, copyText, damageRows, defenseOf, durationSec, fmtClock, fmtNum, fmtPct, fmtRate,
@@ -27,18 +27,6 @@ const SCOPES: [MeterScope, string][] = [
   ['group', 'Group'],
   ['you', 'You']
 ]
-
-function Seg<T extends string>({ value, options, onChange, label }: { value: T; options: [T, string][]; onChange: (v: T) => void; label: string }) {
-  return (
-    <span className="lt-seg" role="group" aria-label={label}>
-      {options.map(([v, text]) => (
-        <button key={v} className={v === value ? 'on' : ''} aria-pressed={v === value} onClick={() => onChange(v)}>
-          {text}
-        </button>
-      ))}
-    </span>
-  )
-}
 
 function when(t: number): string {
   return new Date(t).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
@@ -120,10 +108,10 @@ export function Meter({ standalone = false }: { standalone?: boolean }) {
         </button>
       </div>
       <div className="dm-controls">
-        <Seg value={span} options={[['fight', 'Fight'], ['session', 'Overall']]} onChange={setSpan} label="Fight or session" />
+        <Segmented value={span} options={[['fight', 'Fight'], ['session', 'Overall']]} onChange={setSpan} label="Fight or session" />
         <SegmentPicker list={list} span={span} selection={selection} onChange={setSelection} live={live} />
-        <Seg value={scope} options={SCOPES} onChange={setScope} label="Whose rows" />
-        <Seg value={mode} options={MODES} onChange={setMode} label="What to list" />
+        <Segmented value={scope} options={SCOPES} onChange={setScope} label="Whose rows" />
+        <Segmented value={mode} options={MODES} onChange={setMode} label="What to list" />
         <span className="spacer" />
         <label className="check small" title="Fold each pet's damage into its owner's row">
           <input type="checkbox" checked={combinePet} onChange={(e) => patchSettings((s) => ({ ...s, combat: { ...s.combat, combinePet: e.target.checked } }))} />

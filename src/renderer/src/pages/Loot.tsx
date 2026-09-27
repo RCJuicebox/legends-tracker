@@ -3,7 +3,7 @@ import { api } from '../api'
 import { useInvoke, useItemInfo } from '../hooks'
 import { useRemembered } from '../remember'
 import { wikiUrl } from '../format'
-import { Icon, Info, Pending } from '../components/ui'
+import { FilterBox, Icon, Info, Pending, ToggleChip } from '../components/ui'
 import { fmtCoin, type LootEntry, type LootOutcome } from '../../../core/loot'
 import { itemKey } from '../../../core/inventory'
 import type { ItemInfo } from '../../../shared/types'
@@ -119,12 +119,12 @@ export function Loot() {
       </div>
 
       <div className="card row mb-16">
-        <input placeholder="Filter by item, mob or looter…" aria-label="Filter loot" value={filter} onChange={(e) => setFilter(e.target.value)} style={{ width: 260 }} />
+        <FilterBox placeholder="Filter by item, mob or looter…" label="Filter loot" value={filter} onChange={setFilter} width={260} />
         <span className="row tight" role="group" aria-label="Outcomes shown">
           {OUTCOMES.map((o) => (
-            <button key={o.key} className={`chip toggle ${o.key}${hidden.includes(o.key) ? ' off' : ''}`} aria-pressed={!hidden.includes(o.key)} title={o.hint} onClick={() => toggle(o.key)}>
+            <ToggleChip key={o.key} className={o.key} on={!hidden.includes(o.key)} title={o.hint} onChange={() => toggle(o.key)}>
               {o.label}
-            </button>
+            </ToggleChip>
           ))}
         </span>
         <span className="spacer" />

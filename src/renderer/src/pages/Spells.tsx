@@ -4,7 +4,7 @@ import { api, clock, ago, errorMessage } from '../api'
 import { useInvoke, useSearch } from '../hooks'
 import { act, showError, showUndo } from '../toast'
 import { who } from '../format'
-import { CategoryChip, ConfirmButton, Field, Info, LoadError, NumberInput, SpellIcon, Switch } from '../components/ui'
+import { CategoryChip, ConfirmButton, Field, FilterBox, Info, LoadError, NumberInput, SpellIcon, Switch } from '../components/ui'
 import {
   CATEGORY_LABELS, DEFAULT_TIER_DURATION_PCT,
   type ClassName, type FocusSource, type KnownSpell, type LogCheckRow, type SpellCategory, type SpellRule
@@ -41,7 +41,7 @@ export function Spells({ go }: { go?: (page: PageId) => void }) {
           <h2>
             Your spells <span className="chip">{known.length}</span>
             <span className="spacer" />
-            <input placeholder="Filter…" aria-label="Filter spells" value={filter} onChange={(e) => setFilter(e.target.value)} style={{ width: 200, textTransform: 'none' }} />
+            <FilterBox label="Filter spells" value={filter} onChange={setFilter} width={200} />
           </h2>
           {known.length === 0 ? (
             <div className="empty">
