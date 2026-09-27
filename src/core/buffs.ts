@@ -269,6 +269,8 @@ export interface BuffWatchHooks {
   onWho?: (p: Person) => void
 }
 
+const CAST_BEGINS = /^(.+?) begins? (?:casting|singing) (.+)\.$/
+
 export class BuffWatch {
   private readonly casts = new Map<string, Cast>()
   private landIndex = new Map<string, Spell[]>()
@@ -296,7 +298,8 @@ export class BuffWatch {
   handle(text: string, at: number, resolve: (ranked: string) => { spell: Spell; rank: number } | undefined): void {
     const who = text.startsWith('[') ? parseWho(text, at) : null
     if (who) return this.hooks.onWho?.(who)
-    const cast = /^(.+?) begins? (?:casting|singing) (.+)\.$/.exec(text)
+    // The regex tries every split of the line, so it runs only on lines that could match.
+    const cast = text.includes(' begin') ? CAST_BEGINS.exec(text) : null
     if (cast) {
       const caster = cast[1]
       const r = resolve(cast[2])

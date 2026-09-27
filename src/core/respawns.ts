@@ -72,16 +72,31 @@ export class RespawnLog {
       return
     }
     // Speech, emotes and /consider all begin with the mob's name. "<name>'s corpse" does not count.
+    const pending = this.watching()
+    if (!pending.length) return
+    const here = zone.toLowerCase()
     const lower = line.text.toLowerCase()
-    for (const r of Object.values(this.records)) {
-      if (r.pendingSince && r.zone.toLowerCase() === zone.toLowerCase() && lower.startsWith(r.name.toLowerCase() + ' ')) this.seen(zone, r.name, line.time)
+    for (const w of pending) {
+      if (w.record.pendingSince && w.zone === here && lower.startsWith(w.prefix)) this.seen(zone, w.record.name, line.time)
     }
+  }
+
+  // The watches open, with their names lowercased once: most lines are not combat, and each is
+  // checked against these. Worked out again after any change.
+  private open: { record: RespawnRecord; zone: string; prefix: string }[] | null = null
+
+  private watching() {
+    this.open ??= Object.values(this.records)
+      .filter((r) => r.pendingSince)
+      .map((record) => ({ record, zone: record.zone.toLowerCase(), prefix: record.name.toLowerCase() + ' ' }))
+    return this.open
   }
 
   /** Forgets a record. */
   forget(key: string): boolean {
     if (!this.records[key]) return false
     delete this.records[key]
+    this.open = null
     this.hooks.onChange()
     return true
   }
@@ -99,6 +114,7 @@ export class RespawnLog {
     r.kills++
     r.lastDeath = at
     r.pendingSince = at
+    this.open = null
     this.prune()
     this.hooks.onChange()
   }
@@ -108,6 +124,7 @@ export class RespawnLog {
     if (!r || !r.pendingSince || at < r.pendingSince + SETTLE_MS) return
     const gap = Math.round((at - r.pendingSince) / 1000)
     r.pendingSince = 0
+    this.open = null
     r.gaps.push(gap)
     if (r.gaps.length > KEEP_GAPS) r.gaps.splice(0, r.gaps.length - KEEP_GAPS)
     if (gap < SHARED_SEC) r.shared = true
@@ -123,7 +140,10 @@ export class RespawnLog {
         changed = true
       }
     }
-    if (changed) this.hooks.onChange()
+    if (changed) {
+      this.open = null
+      this.hooks.onChange()
+    }
   }
 
   private prune(): void {
