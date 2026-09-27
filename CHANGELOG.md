@@ -49,6 +49,12 @@ What changed in each version. The release workflow publishes a version's section
 - **Refreshing the item catalog reads only the wiki pages edited since last time** (a few seconds, where it was minutes), and every wiki request is polite: one at a time, backing off when the wiki is busy.
 - The pet is found by reading only the part of the log written since last time.
 - Downloaded data (the item catalog, recipes, wiki pages, spoken phrases, log counts) moves out of your roaming profile to `%LOCALAPPDATA%\Legends Tracker`.
+- **The upgrade finder no longer freezes** while it judges candidates in the round: the page stays responsive and the results arrive in the same time.
+- **Timer bars drain smoothly by themselves**, and the overlays redraw only to change the clock text.
+- **Pages redraw only when what they show changes**, not every second while you play.
+- **Spell data loads in about two-thirds of the time** and holds a third less memory. The item catalog is no longer kept in memory when no Gear page is open.
+- The **Alerts** overlay is a small page of its own, quicker to start.
+- **Copy diagnostics** lists each window's memory and CPU, for a report about the app being slow or heavy.
 
 ## 1.9.0 (2026-09-27)
 
