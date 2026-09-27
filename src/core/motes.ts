@@ -292,6 +292,15 @@ export class MoteTracker {
     return true
   }
 
+  /** Drops a finished run from the history; false when there is none by that id. */
+  forget(id: string): boolean {
+    const before = this.state.sessions.length
+    this.state.sessions = this.state.sessions.filter((s) => s.id !== id)
+    if (this.state.sessions.length === before) return false
+    this.hooks.onChange()
+    return true
+  }
+
   startManual(now: number, name = 'Manual session'): void {
     if (this.state.active) this.end(this.state.active.kind === 'manual' ? 'stopped' : 'abandoned', now)
     this.begin('manual', name, now)
