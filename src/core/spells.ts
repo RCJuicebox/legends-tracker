@@ -2,14 +2,14 @@ import { promises as fs } from 'node:fs'
 import { join } from 'node:path'
 import { decodeCp1252 } from './logLine'
 import { SPA } from '../shared/game/spa'
-import { CLASS_NAMES, type SpellCategory, type SpellSummary } from '../shared/types'
+import { CLASS_NAMES, type ResistType, type SpellCategory, type SpellSummary } from '../shared/types'
 
 /**
  * One record from the client's `spells_us.txt`, joined with its messages from `spells_us_str.txt`.
  *
- * Field positions were established against the EQL client (2026-09): 8 cast time (ms), 10 recast,
+ * Field positions were established against the EQL client (2026-09): 4 range, 5 area range, 8 cast time (ms), 10 recast,
  * 11 duration formula, 12 duration cap in ticks, 14 mana, 28 beneficial flag, 36–51 class levels (255 = cannot
- * cast), 30 target type (13 lifetap), 32 casting skill (70 percussion…), 75 icon index, 172 effect
+ * cast), 29 resist type (0 none, 1 magic … 9 corruption), 30 target type (13 lifetap), 32 casting skill (70 percussion…), 75 icon index, 172 effect
  * slots as `slot|spa|base|base2|formula|max` joined by `$`.
  */
 export interface Spell {
@@ -24,6 +24,11 @@ export interface Spell {
   classLevels: number[]
   /** The spell file's target type: 5 single, 6 self, 13 lifetap… */
   targetType: number
+  /** What the target resists it with; 'none' for a spell that cannot be resisted this way. */
+  resist: ResistType
+  /** How far it reaches, and the radius it hits around its target (0 for one target). */
+  range: number
+  aeRange: number
   /** The casting skill: 24 evocation, 49 stringed, 54 wind, 70 percussion… */
   skill: number
   icon: number
@@ -54,7 +59,7 @@ export interface RankedSpell {
   rankedName: string
 }
 
-const F = { id: 0, name: 1, cast: 8, recast: 10, formula: 11, mana: 14, cap: 12, good: 28, target: 30, skill: 32, cls: 36, icon: 75, effects: 172 }
+const F = { id: 0, name: 1, range: 4, ae: 5, resist: 29, cast: 8, recast: 10, formula: 11, mana: 14, cap: 12, good: 28, target: 30, skill: 32, cls: 36, icon: 75, effects: 172 }
 /** The fields read; the class levels are taken as one run of 16. */
 const WANTED: boolean[] = []
 for (const i of Object.values(F)) WANTED[i] = true
@@ -88,6 +93,9 @@ class EffectReader {
     return out
   }
 }
+
+/** The spell file's resist types, by number, as EverQuest has always numbered them. */
+const RESISTS: ResistType[] = ['none', 'magic', 'fire', 'cold', 'poison', 'disease', 'chromatic', 'prismatic', 'physical', 'corruption']
 
 const ROMAN: Record<string, number> = {
   I: 1, II: 2, III: 3, IV: 4, V: 5, VI: 6, VII: 7, VIII: 8, IX: 9, X: 10,
@@ -190,6 +198,9 @@ export class SpellBook {
         beneficial,
         classLevels,
         targetType: +f[F.target] || 0,
+        resist: RESISTS[+f[F.resist]] ?? 'none',
+        range: +f[F.range] || 0,
+        aeRange: +f[F.ae] || 0,
         skill: +f[F.skill] || 0,
         icon: +f[F.icon],
         effects,
@@ -265,6 +276,7 @@ export function summarize(s: Spell): SpellSummary {
     beneficial: s.beneficial,
     icon: s.icon,
     castMs: s.castMs,
+    resist: s.resist,
     formula: s.formula,
     cap: s.cap,
     // 254 marks an ability granted outside the spell book (Harm Touch), not a level.

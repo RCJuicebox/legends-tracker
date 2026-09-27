@@ -50,3 +50,11 @@ describe('SpellBook.parse', () => {
     expect(levels.size).toBe(new Set(all.map((s) => s.classLevels.join(','))).size)
   })
 })
+
+describe('what the spell file says about reach and resists', () => {
+  it('reads the resist type, the range and the area range', () => {
+    const bolt = fixtureBook().named('Envenomed Bolt')!
+    expect(bolt).toMatchObject({ resist: 'poison', range: 200, aeRange: 0 })
+    expect(fixtureBook().named('Plague')!.resist).toBe('disease')
+  })
+})

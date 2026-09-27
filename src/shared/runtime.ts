@@ -70,6 +70,9 @@ export interface ArchiveStatus {
   liveRotation: 'unknown' | 'supported' | 'unsupported'
 }
 
+/** What a spell is resisted with, from the spell file. */
+export type ResistType = 'none' | 'magic' | 'fire' | 'cold' | 'poison' | 'disease' | 'chromatic' | 'prismatic' | 'physical' | 'corruption'
+
 export interface SpellSummary {
   id: number
   name: string
@@ -77,6 +80,7 @@ export interface SpellSummary {
   beneficial: boolean
   icon: number
   castMs: number
+  resist: ResistType
   formula: number
   cap: number
   classes: string

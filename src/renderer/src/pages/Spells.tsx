@@ -291,7 +291,14 @@ function SpellRow({ k, open, toggle, onSaved }: { k: KnownSpell; open: boolean; 
           {k.rule.alias && <div className="faint small">{k.rankedName}</div>}
         </td>
         <td>
-          <CategoryChip category={k.category} />
+          <span className="row tight">
+            <CategoryChip category={k.category} />
+            {!k.beneficial && k.resist !== 'none' && (
+              <span className="chip" title={`Resisted with ${k.resist} resistance`}>
+                {k.resist}
+              </span>
+            )}
+          </span>
         </td>
         <td className="mono nowrap">
           {d.permanent ? 'Permanent' : `${clock(d.baseSec)} (${clock(d.spellWindowSec)})`}
