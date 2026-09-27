@@ -524,8 +524,6 @@ export interface BuffsFile {
   active: Record<string, ActiveBuff[]>
 }
 
-export const EMPTY_BUFFS: BuffsFile = { people: {}, wanted: {}, active: {} }
-
 export interface BuffView {
   offers: BuffOffer[]
   wanted: string[]

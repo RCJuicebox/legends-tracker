@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { parseItemPage, withRaceFix, type CatalogItem } from '../src/core/wikiItem'
-import { canWear, findUpgrades, PRESETS, restrictions } from '../src/core/upgrades'
+import { canWear, findUpgrades, restrictions } from '../src/core/upgrades'
 import { parseInventory, parseStatsBlock } from '../src/core/inventory'
+import { PRESETS } from './helpers'
 
 const page = (name: string, era: string, block: string, drops = '') =>
   `{{${era} Era}}\n<onlyinclude>{{Itempage\n|itemname    = ${name}\n|lucy_img_ID = 616\n|statsblock  = \n${block}\n|dropsfrom = \n\n${drops}\n\n}}</onlyinclude>\n[[Category:Fingers]]`

@@ -1,4 +1,4 @@
-import { MOTE_RANKS, type MoteCounts, type MoteKey } from './motes'
+import { MOTE_RANKS, type MoteCounts } from './motes'
 
 // The item-upgrade rules, as the EQL mote guide and play have established them:
 //
@@ -110,12 +110,6 @@ export function moteForLevel(level: number): number {
 
 export function countsToArray(c: MoteCounts): number[] {
   return MOTE_RANKS.map((r) => c[r.key] ?? 0)
-}
-
-export function arrayToCounts(a: number[]): MoteCounts {
-  const out: MoteCounts = {}
-  MOTE_RANKS.forEach((r, i) => (out[r.key as MoteKey] = a[i] ?? 0))
-  return out
 }
 
 /** How many of rank `m` you could have, combining everything below it. */

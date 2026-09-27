@@ -29,12 +29,6 @@ export interface Recipe {
   from: 'page' | 'table'
 }
 
-/** The tradeskill pages whose tables list recipes. */
-export const TRADESKILL_PAGES = [
-  'Skill Alchemy', 'Skill Baking', 'Skill Blacksmithing', 'Skill Brewing', 'Skill Fletching', 'Skill Jewelcrafting', 'Skill Pottery',
-  'Skill Tailoring', 'Skill Tinkering'
-]
-
 export const skillOf = (page: string) => page.replace(/^Skill /, '')
 
 /** Adds up a list that names an ingredient more than once ("Small Vial + Small Vial …"). */

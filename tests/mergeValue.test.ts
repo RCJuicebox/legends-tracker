@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { mergeOptions } from '../src/core/mergeValue'
 import { parseInventory, parseStatsBlock } from '../src/core/inventory'
-import { PRESETS } from '../src/core/upgrades'
+import { PRESETS } from './helpers'
 
 describe('the best merge next', () => {
   const inv = parseInventory(

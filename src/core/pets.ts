@@ -15,7 +15,7 @@
 // wiki at run time.
 
 import { summonsPet } from './spellKinds'
-import { itemKey, type InvItem, type ItemStats } from './inventory'
+import type { InvItem, ItemStats } from './inventory'
 import { canWear, isTwoHanded, score, type Restrictions, type Wearer, type Weights } from './upgrades'
 import type { ClassFactors, Conversions, RoleWeights } from './statValue'
 import { conversions } from './statValue'
@@ -444,9 +444,6 @@ export function sortChoices(list: PetChoice[]): PetChoice[] {
   const rank = (s: string) => (s === 'Primary' ? -2 : s === 'Secondary' ? -1 : ORDER.indexOf(s))
   return [...list].sort((a, b) => rank(a.slot) - rank(b.slot) || a.piece.item.name.localeCompare(b.piece.item.name))
 }
-
-/** The same item, whatever its merge level: for telling what the plan keeps from what it changes. */
-export const sameItem = (a: PetPiece, b: PetPiece) => a === b || (a.from === 'pet' && b.from === 'pet' && itemKey(a.item.name) === itemKey(b.item.name))
 
 // ---- which pet: the summoning spells ----
 

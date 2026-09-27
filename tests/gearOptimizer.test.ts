@@ -3,9 +3,10 @@ import { planTotal } from '../src/core/finderRound'
 import { optimizeGear, ownedPieces, pieceName } from '../src/core/gearOptimizer'
 import { mergeLevel, parseInventory, parseStatsBlock, scaledStats } from '../src/core/inventory'
 import { rawWeights, ROLE_PRESETS, type Conversions } from '../src/core/statValue'
-import { handWeights, isLore, PRESETS, restrictions, weightsForSlot, type Weights } from '../src/core/upgrades'
+import { handWeights, isLore, restrictions, weightsForSlot, type Weights } from '../src/core/upgrades'
 import { doubleAttackChance, dualWieldChance, handSwings, swingsPerRound, tripleAttackChance } from '../src/core/combatModel'
 import { parseItemPage } from '../src/core/wikiItem'
+import { PRESETS } from './helpers'
 
 const page = (name: string, block: string) =>
   `{{Classic Era}}\n<onlyinclude>{{Itempage\n|itemname    = ${name}\n|lucy_img_ID = 600\n|statsblock  = \n${block}\n|dropsfrom = \n\n[[Nagafen's Lair]]\n\n}}</onlyinclude>`

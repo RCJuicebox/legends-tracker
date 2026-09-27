@@ -490,6 +490,3 @@ export function compareNames(x: string, y: string): number {
   const key = (t: string) => String(t).toLowerCase().replace(/^(?:an?|the)\s+/, '')
   return key(x).localeCompare(key(y), undefined, { numeric: true, sensitivity: 'base' })
 }
-
-/** Achievements whose kills are the SAME named mobs as another's: tick either, both tick. Exposed for tests. */
-export const sharedKills = SHARED_KILLS

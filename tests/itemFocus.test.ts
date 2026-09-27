@@ -2,10 +2,11 @@ import { describe, expect, it } from 'vitest'
 import type { Spell, SpellEffect } from '../src/core/spells'
 import { castableSpells, effectivePct, familyName, focusApplies, focusReport, focusSpec, focusValue, type FocusSpec } from '../src/core/itemFocus'
 import { parseItemPage } from '../src/core/wikiItem'
-import { findUpgrades, PRESETS, type Weights } from '../src/core/upgrades'
+import { findUpgrades, type Weights } from '../src/core/upgrades'
 import { parseInventory, parseStatsBlock } from '../src/core/inventory'
 import { optimizeGear, ownedPieces } from '../src/core/gearOptimizer'
 import { restrictions, isLore } from '../src/core/upgrades'
+import { PRESETS } from './helpers'
 
 const fx = (spa: number, base: number, base2 = 0): SpellEffect => ({ spa, base, base2 })
 

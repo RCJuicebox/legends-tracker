@@ -3,8 +3,9 @@ import { effectScore, itemEffects, procDamage, procOf, procsPerMinute, procWorth
 import { meleeCounter, meleeProfile } from '../src/core/meleeTally'
 import { optimizeGear, type Piece } from '../src/core/gearOptimizer'
 import { parseInventory, parseStatsBlock } from '../src/core/inventory'
-import { PRESETS, restrictions, type Weights } from '../src/core/upgrades'
+import { restrictions, type Weights } from '../src/core/upgrades'
 import { parseLogLine } from '../src/core/logLine'
+import { PRESETS } from './helpers'
 
 // Torrid Corruptor's stats block as eqlwiki has it, and its two spells as the EQL spell file has them.
 const TORRID = `MAGIC ITEM  LORE ITEM  NO DROP  <br>
