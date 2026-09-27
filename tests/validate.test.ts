@@ -9,7 +9,7 @@ import {
   sanitizeStockCounts,
   sanitizeStockItem,
   sanitizeTrigger
-} from '../src/main/validate'
+} from '../src/core/validate'
 import { DEFAULT_METER_OPTIONS } from '../src/shared/overlays'
 import type { BuffsFile } from '../src/core/buffs'
 import type { RespawnRecords } from '../src/core/respawns'

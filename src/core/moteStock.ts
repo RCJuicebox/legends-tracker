@@ -1,5 +1,5 @@
-import { MOTE_RANKS, type MoteLoot } from '../core/motes'
-import { StockCursor, fixItem, levelFromName, plan } from '../core/moteCalc'
+import { MOTE_RANKS, type MoteLoot } from './motes'
+import { StockCursor, fixItem, levelFromName, plan } from './moteCalc'
 import type { FeedItem, MoteStock } from '../shared/types'
 
 export interface Cell<T> {

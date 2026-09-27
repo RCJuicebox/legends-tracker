@@ -5,7 +5,6 @@ import { parseItemUse, statsblockOf } from '../core/wikiItem'
 import { wiki, type WikiPage } from './sources/wiki'
 import type { ItemInfo } from '../shared/types'
 import { log } from './log'
-import { cacheDir } from './paths'
 import { sources } from './sources/registry'
 
 // Item stats come from eqlwiki.com, the community wiki for EverQuest Legends: each item page carries
@@ -21,8 +20,11 @@ export class ItemCatalog {
   private cache: Record<string, Cached> | null = null
   private saving: Promise<void> | null = null
 
+  /** `cacheDir`: the app's cache folder (main/paths.ts cacheDir()), where item-cache.json is kept. */
+  constructor(private readonly cacheDir: string) {}
+
   private get path(): string {
-    return join(cacheDir(), 'item-cache.json')
+    return join(this.cacheDir, 'item-cache.json')
   }
 
   private async load(): Promise<Record<string, Cached>> {

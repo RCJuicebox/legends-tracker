@@ -2,11 +2,14 @@ import { promises as fs } from 'node:fs'
 import { join } from 'node:path'
 import type { Readable } from 'node:stream'
 import yauzl from 'yauzl'
-import { decodeCp1252, LogClock, type LogLine } from '../core/logLine'
-import { log } from './log'
+import { decodeCp1252, LogClock, type LogLine } from './logLine'
 
 // Reading character logs and their archives, shared by mote history, cast counts and catch-up.
 // Logs are Windows-1252, one byte per character, so a decoded string's length is its size in bytes.
+// Core has no diagnostic log of its own: what is worth a warning goes to the `warn` the caller passes.
+
+/** Where a warning goes: the main process passes its diagnostic log's log.warn. */
+export type Warn = (message: string, error: unknown) => void
 
 /**
  * Streams a log's lines, yielding to the event loop now and then so the live tailer and overlays keep
@@ -86,12 +89,12 @@ export function isArchiveOf(name: string, stem: string): boolean {
  * The names of one character's archives, oldest first. Archive names carry their dates;
  * "thru-2026-08-07" sorts before "2026-08-07_to_…" on its own, so order by the first date instead.
  */
-export async function characterArchives(archiveDir: string, stem: string): Promise<string[]> {
+export async function characterArchives(archiveDir: string, stem: string, warn: Warn): Promise<string[]> {
   let names: string[] = []
   try {
     names = (await fs.readdir(archiveDir)).filter((f) => isArchiveOf(f, stem))
   } catch (e) {
-    if ((e as NodeJS.ErrnoException).code !== 'ENOENT') log.warn(`Could not list the archive folder ${archiveDir}:`, e)
+    if ((e as NodeJS.ErrnoException).code !== 'ENOENT') warn(`Could not list the archive folder ${archiveDir}:`, e)
     return []
   }
   const firstDate = (p: string) => (/thru-/.test(p) ? '0' : (/(\d{4}-\d{2}-\d{2})/.exec(p)?.[1] ?? ''))
@@ -99,6 +102,6 @@ export async function characterArchives(archiveDir: string, stem: string): Promi
 }
 
 /** The same as characterArchives, as full paths. */
-export async function characterArchivePaths(archiveDir: string, stem: string): Promise<string[]> {
-  return (await characterArchives(archiveDir, stem)).map((f) => join(archiveDir, f))
+export async function characterArchivePaths(archiveDir: string, stem: string, warn: Warn): Promise<string[]> {
+  return (await characterArchives(archiveDir, stem, warn)).map((f) => join(archiveDir, f))
 }

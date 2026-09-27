@@ -12,7 +12,7 @@ import {
   type SpellRule,
   type Trigger
 } from '../shared/types'
-import { sanitizeBuffs, sanitizeRespawns, sanitizeSettings } from './validate'
+import { sanitizeBuffs, sanitizeRespawns, sanitizeSettings } from '../core/validate'
 import { SCHEMAS, upgrade } from './schema'
 import { DEFAULT_OVERLAYS, JsonFile, characterKey, defaultSettings, mergeDefaults, readJsonFile, type ReadResult } from './storeCore'
 

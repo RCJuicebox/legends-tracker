@@ -4,7 +4,7 @@ import { CombatMeter, summarize as summarizeFight } from '../../core/combatMeter
 import { LootLedger } from '../../core/loot'
 import { RespawnLog, respawnView, type RespawnView } from '../../core/respawns'
 import { durationSec, fmtClock, fmtNum } from '../../core/combatView'
-import { readLines } from '../logReading'
+import { readLines } from '../../core/logReading'
 import { offsetBefore } from '../sources/logHistory'
 import { log } from '../log'
 import { Backlog, Throttled } from './throttle'

@@ -1,9 +1,10 @@
 import { createReadStream, promises as fs } from 'node:fs'
 import { basename } from 'node:path'
 import type { Readable } from 'node:stream'
-import { MoteTracker, type MoteState } from '../core/motes'
+import { MoteTracker } from '../core/motes'
 import { localDay } from '../core/dates'
-import { characterArchivePaths, feedZip, readLines, zipTextSize } from './logReading'
+import { characterArchivePaths, feedZip, readLines, zipTextSize } from '../core/logReading'
+import type { CharacterScan, MoteScanResult } from '../core/moteMerge'
 import { log } from './log'
 
 export { readLines }
@@ -18,21 +19,7 @@ export interface MoteScanJob {
   logs: { logPath: string; stem: string; end?: number }[]
 }
 
-export interface CharacterScan {
-  logPath: string
-  stem: string
-  /** This character's history on its own, as of its last line. */
-  state: MoteState
-  lastTime: number
-  /** How far into the live log was read, to the end of the last whole line. */
-  end: number
-}
-
-export interface MoteScanResult {
-  characters: CharacterScan[]
-  /** Every day any of the logs has a line on, "2026-09-24". */
-  days: string[]
-}
+export type { CharacterScan, MoteScanResult }
 
 /**
  * Rebuilds mote history by replaying each character's logs, oldest first: its zipped and loose
@@ -53,7 +40,7 @@ export async function scanMoteHistory(job: MoteScanJob, progress?: (message: str
     report()
   }
 
-  const plan = await Promise.all(job.logs.map(async (l) => ({ ...l, archives: await characterArchivePaths(job.archiveDir, l.stem) })))
+  const plan = await Promise.all(job.logs.map(async (l) => ({ ...l, archives: await characterArchivePaths(job.archiveDir, l.stem, log.warn) })))
   // The whole job in bytes, so progress is honest: a zip counts at its unpacked size.
   const sizeOf = (p: string) => (p.toLowerCase().endsWith('.zip') ? zipTextSize(p) : fs.stat(p).then((s) => s.size)).catch(() => 0)
   const sizes = await Promise.all(plan.flatMap((l) => [...l.archives.map(sizeOf), l.end !== undefined ? Promise.resolve(l.end) : sizeOf(l.logPath)]))

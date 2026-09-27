@@ -1,11 +1,10 @@
-import { app } from 'electron'
 import { promises as fs } from 'node:fs'
 import { join } from 'node:path'
 import { parseInventory, type Inventory } from '../core/inventory'
 import type { ItemCatalog } from './items'
 import type { CharacterSheet, InventoryView } from '../shared/types'
 import { log } from './log'
-import { isCharacterKey } from './validate'
+import { isCharacterKey } from '../core/validate'
 import { sources } from './sources/registry'
 
 const EMPTY_SHEET: CharacterSheet = { acOverrides: {}, shield: null, stats: {} }
@@ -24,6 +23,8 @@ export class InventoryFiles {
   private polling = false
 
   constructor(
+    /** The app's data folder (userData): character sheets go in its characters folder. */
+    private readonly dataDir: string,
     private readonly gameDir: () => string,
     private readonly catalog: ItemCatalog,
     private readonly send: (view: InventoryView) => void
@@ -90,7 +91,7 @@ export class InventoryFiles {
   }
 
   private sheetPath(character: string): string {
-    return join(app.getPath('userData'), 'characters', `${character}.json`)
+    return join(this.dataDir, 'characters', `${character}.json`)
   }
 
   async sheet(character: string): Promise<CharacterSheet> {

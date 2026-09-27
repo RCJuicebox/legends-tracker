@@ -4,7 +4,7 @@ import { handle } from './handle'
 import { log } from '../log'
 import { testTrigger } from '../../core/triggers'
 import { respawnTrigger, respawnTriggerId } from '../../core/respawns'
-import { sanitizeRespawnTimer, sanitizeTrigger, sanitizeTriggers } from '../validate'
+import { sanitizeRespawnTimer, sanitizeTrigger, sanitizeTriggers } from '../../core/validate'
 import type { AppContext } from '../context'
 
 // Triggers, and the respawn timers that are triggers under the hood.

@@ -1,5 +1,6 @@
 import { promises as fs } from 'node:fs'
 import { log } from './log'
+import { sanitizeTradeSaved } from '../core/validate'
 import type { TradeFavorite, TradeSaved } from '../shared/ipc'
 
 // tradeskills.json: the recipes the player starred, how many combines they plan of each, and prices
@@ -8,26 +9,6 @@ import type { TradeFavorite, TradeSaved } from '../shared/ipc'
 export type { TradeFavorite, TradeSaved }
 
 const EMPTY: TradeSaved = { favorites: [], prices: {} }
-
-/** Only what the page is allowed to store: strings where strings go, sane numbers. */
-export function sanitizeTradeSaved(v: unknown): TradeSaved | null {
-  if (!v || typeof v !== 'object' || Array.isArray(v)) return null
-  const o = v as { favorites?: unknown; prices?: unknown }
-  const favorites = (Array.isArray(o.favorites) ? o.favorites : []).flatMap((f): TradeFavorite[] => {
-    if (!f || typeof f !== 'object') return []
-    const x = f as Record<string, unknown>
-    if (typeof x.key !== 'string' || typeof x.product !== 'string' || !x.key) return []
-    const combines = typeof x.combines === 'number' && Number.isFinite(x.combines) ? Math.max(1, Math.min(100_000, Math.round(x.combines))) : 1
-    return [{ key: x.key.slice(0, 2000), product: x.product.slice(0, 200), combines }]
-  })
-  const prices: Record<string, number> = {}
-  if (o.prices && typeof o.prices === 'object' && !Array.isArray(o.prices)) {
-    for (const [k, n] of Object.entries(o.prices as Record<string, unknown>)) {
-      if (typeof n === 'number' && Number.isFinite(n) && n >= 0) prices[k.toLowerCase().slice(0, 200)] = Math.round(n)
-    }
-  }
-  return { favorites, prices }
-}
 
 export class TradeFavorites {
   private data: TradeSaved | null = null

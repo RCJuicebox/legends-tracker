@@ -3,7 +3,7 @@ import { join } from 'node:path'
 import type { Readable } from 'node:stream'
 import { decodeCp1252, parseLogLine, type LogLine } from '../../core/logLine'
 import { fileIdentity, sameFile } from '../../core/fileIdentity'
-import { characterArchives, feedZip, readLines } from '../logReading'
+import { characterArchives, feedZip, readLines } from '../../core/logReading'
 import { log } from '../log'
 import { sources } from './registry'
 
@@ -231,7 +231,7 @@ export class LogHistory {
     let changed = false
     const out: HistorySlice<T> = { archives: [], live: this.consumers[key].empty() as T }
 
-    for (const name of await characterArchives(where.archiveDir, where.stem)) {
+    for (const name of await characterArchives(where.archiveDir, where.stem, log.warn)) {
       // "…_2026-08-07_to_2026-09-24.zip", "…_thru-2026-08-07.zip": the last date is where it ends.
       const end = [...name.matchAll(/(\d{4}-\d{2}-\d{2})/g)].pop()?.[1] ?? ''
       if (!wantArchive(name, end)) continue

@@ -97,7 +97,7 @@ export function createContext(): AppContext {
   const windows = new Windows({ preload: preloadPath, icon: appIcon, audioSettings: () => store.settings.get().audio, uiScale: () => store.settings.get().uiScale })
   const toMain = windows.toMain.bind(windows)
   // Item pages the Gear page looked up, kept a week; a catalog download refreshes them in passing.
-  const itemCatalog = new ItemCatalog()
+  const itemCatalog = new ItemCatalog(cacheDir())
   // Casts, the melee tally and purchases over each character's log and archives, read in one pass.
   // Each had a cache file of its own before; log-history.json replaces them.
   for (const f of ['cast-history.json', 'melee-history.json', 'purchases.json']) rmSync(join(dataDir, f), { force: true })
@@ -114,7 +114,7 @@ export function createContext(): AppContext {
     azure,
     installDir,
     icons: new IconSource(installDir),
-    achievementFiles: new AchievementFiles(installDir, (view) => toMain('state:achievements', view)),
+    achievementFiles: new AchievementFiles(dataDir, installDir, (view) => toMain('state:achievements', view)),
     gameTables: new GameTables(installDir),
     wikiCatalog: new WikiCatalog(
       (p) => toMain('state:catalog', p),
@@ -125,7 +125,7 @@ export function createContext(): AppContext {
     recipeBook: new RecipeBook((p) => toMain('state:recipes', p)),
     purchases: new PurchaseHistory(logHistory, 'purchases'),
     tradeFavorites: new TradeFavorites(join(dataDir, 'tradeskills.json')),
-    inventoryFiles: new InventoryFiles(installDir, itemCatalog, (view) => toMain('state:inventory', view)),
+    inventoryFiles: new InventoryFiles(dataDir, installDir, itemCatalog, (view) => toMain('state:inventory', view)),
     petStore: new PetStore(),
     petWiki: new PetWiki(),
     petScanned: new Set<string>(),

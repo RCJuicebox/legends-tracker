@@ -1,9 +1,25 @@
-import { applyMarks, MOTE_RANKS, type MoteCounts, type MoteSession, type MoteState, MoteTracker } from '../core/motes'
-import type { CharacterScan, MoteScanResult } from './moteHistory'
+import { applyMarks, MOTE_RANKS, type MoteCounts, type MoteSession, type MoteState, MoteTracker } from './motes'
 
 // Mote history is one record across characters: live tracking keeps whichever character's log is
 // being watched. A rebuild reads every character's logs, so its result is merged into what is kept
 // rather than replacing it: sessions the logs no longer hold (a deleted log, a manual session) stay.
+
+/** One character's history as main's moteHistory scan rebuilt it from its logs. */
+export interface CharacterScan {
+  logPath: string
+  stem: string
+  /** This character's history on its own, as of its last line. */
+  state: MoteState
+  lastTime: number
+  /** How far into the live log was read, to the end of the last whole line. */
+  end: number
+}
+
+export interface MoteScanResult {
+  characters: CharacterScan[]
+  /** Every day any of the logs has a line on, "2026-09-24". */
+  days: string[]
+}
 
 export interface RebuiltMotes {
   sessions: MoteSession[]

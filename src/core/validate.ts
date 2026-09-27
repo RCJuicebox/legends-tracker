@@ -13,9 +13,10 @@ import {
   type TriggerAction
 } from '../shared/types'
 import { DEFAULT_METER_OPTIONS } from '../shared/overlays'
-import type { RespawnRecords, RespawnTimerSpec } from '../core/respawns'
-import { MOTE_RANKS } from '../core/motes'
-import type { ActiveBuff, BuffsFile, Person } from '../core/buffs'
+import type { RespawnRecords, RespawnTimerSpec } from './respawns'
+import { MOTE_RANKS } from './motes'
+import type { ActiveBuff, BuffsFile, Person } from './buffs'
+import type { TradeFavorite, TradeSaved } from '../shared/ipc'
 
 // What the pages send the main process is checked here before it is stored. A page is our own code,
 // but a bug in one should not be able to write a setting that breaks the app on its next start.
@@ -437,4 +438,24 @@ export function sanitizeSheet(v: unknown): CharacterSheet | null {
   const stats = isObj(v.stats) ? v.stats : {}
   if (JSON.stringify(stats).length > SHEET_STATS_MAX) return null
   return { acOverrides, shield: typeof v.shield === 'boolean' ? v.shield : null, stats }
+}
+
+/** tradeskills.json, the Tradeskills page's favourites: only what the page is allowed to store, strings where strings go, sane numbers. */
+export function sanitizeTradeSaved(v: unknown): TradeSaved | null {
+  if (!v || typeof v !== 'object' || Array.isArray(v)) return null
+  const o = v as { favorites?: unknown; prices?: unknown }
+  const favorites = (Array.isArray(o.favorites) ? o.favorites : []).flatMap((f): TradeFavorite[] => {
+    if (!f || typeof f !== 'object') return []
+    const x = f as Record<string, unknown>
+    if (typeof x.key !== 'string' || typeof x.product !== 'string' || !x.key) return []
+    const combines = typeof x.combines === 'number' && Number.isFinite(x.combines) ? Math.max(1, Math.min(100_000, Math.round(x.combines))) : 1
+    return [{ key: x.key.slice(0, 2000), product: x.product.slice(0, 200), combines }]
+  })
+  const prices: Record<string, number> = {}
+  if (o.prices && typeof o.prices === 'object' && !Array.isArray(o.prices)) {
+    for (const [k, n] of Object.entries(o.prices as Record<string, unknown>)) {
+      if (typeof n === 'number' && Number.isFinite(n) && n >= 0) prices[k.toLowerCase().slice(0, 200)] = Math.round(n)
+    }
+  }
+  return { favorites, prices }
 }

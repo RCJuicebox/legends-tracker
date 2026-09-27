@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { defaultSettings } from '../src/main/storeCore'
-import { isCharacterKey, sanitizeCharacter, sanitizeSettings, sanitizeTriggers } from '../src/main/validate'
+import { isCharacterKey, sanitizeCharacter, sanitizeSettings, sanitizeTriggers } from '../src/core/validate'
 import { channelAllowed } from '../src/preload/channels'
 
 describe('character keys from a page', () => {

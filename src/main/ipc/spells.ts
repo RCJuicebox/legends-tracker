@@ -2,7 +2,7 @@ import { handle } from './handle'
 import { summarize } from '../../core/spells'
 import { focusFromSpell, isDurationFocus } from '../../core/focus'
 import { castRows } from '../../core/spellMotes'
-import { isCharacterKey, sanitizeSpellRule } from '../validate'
+import { isCharacterKey, sanitizeSpellRule } from '../../core/validate'
 import { logFileFor, logStem } from '../storeCore'
 import type { AppContext } from '../context'
 

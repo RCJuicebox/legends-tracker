@@ -1,5 +1,5 @@
 import { handle } from './handle'
-import { sanitizeStockCounts, sanitizeStockItem } from '../validate'
+import { sanitizeStockCounts, sanitizeStockItem } from '../../core/validate'
 import type { AppContext } from '../context'
 
 // What happens in play: the damage meter, loot, buffs, respawns, motes and the mote stock.

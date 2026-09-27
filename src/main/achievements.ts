@@ -1,10 +1,9 @@
-import { app } from 'electron'
 import { promises as fs } from 'node:fs'
 import { join } from 'node:path'
 import { parseAchievements, type AchMarks } from '../core/achievements'
 import type { AchievementsView } from '../shared/types'
 import { log } from './log'
-import { isCharacterKey } from './validate'
+import { isCharacterKey } from '../core/validate'
 import { sources } from './sources/registry'
 
 const EMPTY_MARKS: AchMarks = { ticks: [], broken: [] }
@@ -20,12 +19,14 @@ export class AchievementFiles {
   private timer: NodeJS.Timeout | null = null
 
   constructor(
+    /** The app's data folder (userData): the player's marks go in its achievements folder. */
+    private readonly dataDir: string,
     private readonly gameDir: () => string,
     private readonly send: (view: AchievementsView) => void
   ) {}
 
   private get marksDir(): string {
-    return join(app.getPath('userData'), 'achievements')
+    return join(this.dataDir, 'achievements')
   }
 
   exportPath(character: string): string {

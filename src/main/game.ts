@@ -5,7 +5,7 @@ import type { ArchiveInfo, GameFolderCheck, LogFileInfo } from '../shared/types'
 import { parseLogLine, zoneEntered } from '../core/logLine'
 import { readBackward } from './sources/logHistory'
 import { log } from './log'
-import { isCharacterKey } from './validate'
+import { isCharacterKey } from '../core/validate'
 
 const INSTALL_SUFFIXES = [
   '\\Daybreak Game Company\\Installed Games\\EverQuest Legends',
