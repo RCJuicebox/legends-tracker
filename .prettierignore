@@ -1,0 +1,10 @@
+# Built, downloaded or generated: not ours to format.
+out/
+dist/
+node_modules/
+coverage/
+tests/fixtures/
+tests/__snapshots__/
+package-lock.json
+# Prose is wrapped by hand.
+*.md
