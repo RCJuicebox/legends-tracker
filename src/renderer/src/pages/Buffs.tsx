@@ -4,7 +4,7 @@ import { useInvoke } from '../hooks'
 import { useRemembered } from '../remember'
 import { act } from '../toast'
 import { useNow } from '../components/TimerBars'
-import { Info, Pending, Switch } from '../components/ui'
+import { Info, Pending, Switch, ConfirmButton } from '../components/ui'
 import { useApp } from '../state'
 import { wikiUrl } from '../format'
 import { CLASSES, className } from '../../../shared/game/classes'
@@ -96,9 +96,14 @@ export function Buffs() {
           <div className="row gap-8" style={{ justifyContent: 'space-between' }}>
             <h2 style={{ margin: 0 }}>Your group</h2>
             {v.group.length > 0 && (
-              <button className="btn ghost small" onClick={() => void act('combat:clearGroup').then(() => q.reload())} title="Forget everyone; the log fills the group again as people join, or add them on the Live page">
+              <ConfirmButton
+                className="btn ghost small"
+                question="Forget everyone in the group?"
+                title="Forget everyone; the log fills the group again as people join, or add them on the Damage Meter page"
+                onConfirm={() => void act('combat:clearGroup').then(() => q.reload())}
+              >
                 Reset group
-              </button>
+              </ConfirmButton>
             )}
           </div>
           <div className="stack" style={{ gap: 2 }}>

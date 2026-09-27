@@ -560,22 +560,29 @@ function vendorZone(vendors: { npc: string; zone: string }[], npc: string): stri
 function PriceCell({ unit, from, last, onSet }: { unit: number; from: PriceSource; last?: Purchase; onSet: (copper: number) => void }) {
   const [editing, setEditing] = useState(false)
   const [text, setText] = useState('')
+  const parsed = parseWikiCoin(text) || (Number(text) > 0 ? Math.round(Number(text)) : 0)
+  // Typed but not a price: said so, and the field stays open rather than dropping what was typed.
+  const bad = !!text.trim() && !parsed
   if (editing || from === 'none') {
     return (
-      <input
-        placeholder="e.g. 2g 5s"
-        aria-label="Price of one"
-        value={text}
-        style={{ width: 90 }}
-        autoFocus={editing}
-        onChange={(e) => setText(e.target.value)}
-        onBlur={() => {
-          const c = parseWikiCoin(text) || (Number(text) > 0 ? Math.round(Number(text)) : 0)
-          if (c) onSet(c)
-          setEditing(false)
-        }}
-        onKeyDown={(e) => e.key === 'Enter' && (e.target as HTMLInputElement).blur()}
-      />
+      <span className="stack gap-6">
+        <input
+          placeholder="e.g. 2g 5s"
+          aria-label="Price of one"
+          aria-invalid={bad}
+          title={bad ? 'Not a price: type it like 2p 5g 3s, or a number of copper' : undefined}
+          value={text}
+          style={{ width: 90 }}
+          autoFocus={editing}
+          onChange={(e) => setText(e.target.value)}
+          onBlur={() => {
+            if (parsed) onSet(parsed)
+            if (!bad) setEditing(false)
+          }}
+          onKeyDown={(e) => e.key === 'Enter' && (e.target as HTMLInputElement).blur()}
+        />
+        {bad && <span className="small bad-text">like 2p 5g 3s</span>}
+      </span>
     )
   }
   const label = from === 'paid' ? `what you paid${last ? `, ${ago(last.at)}` : ''}` : from === 'typed' ? 'typed in' : "the wiki's merchant value"

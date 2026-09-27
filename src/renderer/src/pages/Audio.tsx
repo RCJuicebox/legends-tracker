@@ -4,7 +4,7 @@ import { useInvoke } from '../hooks'
 import { useRemembered } from '../remember'
 import { act } from '../toast'
 import { errorMessage, api } from '../api'
-import { Field, Info, LoadError, Switch } from '../components/ui'
+import { Field, Info, LoadError, Switch, ConfirmButton } from '../components/ui'
 import type { AudioSettings, AzureStatus } from '../../../shared/types'
 
 /** A voice setting naming one of Microsoft's neural voices through Azure (see azureSpeech.ts). */
@@ -13,6 +13,9 @@ const AZURE_HELP =
   'In the Azure portal, create a Speech resource: the free F0 tier allows half a million characters a month, and each phrase is spoken ' +
   'from Azure once, then from this PC. Open the resource, then Keys and Endpoint: copy KEY 1 and the Location/Region. The key is kept ' +
   "encrypted on this PC, in the app's data folder, and is only ever sent to Azure."
+
+/** The name the audio window gives a device Windows reports without one. */
+const UNNAMED = 'Output device'
 
 /** A slider saves once it stops moving for this long; it moves on screen at once. */
 const SLIDER_SAVE_MS = 150
@@ -61,7 +64,14 @@ export function Audio() {
       <div className="grid two" style={{ alignItems: 'start' }}>
         <div className="card stack gap-14">
           <h2>Output</h2>
-          <Field label="Output device" hint="If this device is unplugged, audio falls back to the default instead of going silent.">
+          <Field
+            label="Output device"
+            hint={
+              state.devices.some((d) => d.label === UNNAMED)
+                ? 'If this device is unplugged, audio falls back to the default instead of going silent. Windows gave some devices no name (it can, for a device still starting up or one a driver hides); unplugging and plugging it back in, or restarting the app, usually brings the name back.'
+                : 'If this device is unplugged, audio falls back to the default instead of going silent.'
+            }
+          >
             <select value={a.deviceId} onChange={(e) => set({ deviceId: e.target.value })}>
               <option value="default">System default</option>
               {state.devices.filter((d) => d.deviceId !== 'default' && d.deviceId !== 'communications').map((d) => (
@@ -193,9 +203,9 @@ function AzureCard({ status, error, onSaved }: { status: AzureStatus | null; err
           </span>
           {status.error && <span className="small" style={{ color: 'var(--red)' }}>Last phrase: {status.error}</span>}
           <span className="spacer" />
-          <button className="btn small" disabled={busy} onClick={() => void save('', '')}>
+          <ConfirmButton className="btn small" question="Remove the Azure key? The Windows voice speaks instead." disabled={busy} onConfirm={() => void save('', '')}>
             Remove the key
-          </button>
+          </ConfirmButton>
         </div>
       ) : null}
       <div className="row" style={{ flexWrap: 'wrap', alignItems: 'flex-end' }}>

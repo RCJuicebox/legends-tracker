@@ -5,6 +5,16 @@ import { ConfirmButton, Field, Icon, NumberInput, Switch } from '../components/u
 import type { MeterOverlayOptions, OverlayConfig } from '../../../shared/types'
 import { DEFAULT_METER_OPTIONS } from '../../../shared/overlays'
 
+/** The middle of the screen this window is on, sized to fit it. */
+function bringOnScreen(o: OverlayConfig): Partial<OverlayConfig> {
+  const sc = window.screen as Screen & { availLeft?: number; availTop?: number }
+  const left = sc.availLeft ?? 0
+  const top = sc.availTop ?? 0
+  const width = Math.min(o.width, sc.availWidth - 40)
+  const height = Math.min(o.height, sc.availHeight - 40)
+  return { x: Math.round(left + (sc.availWidth - width) / 2), y: Math.round(top + (sc.availHeight - height) / 2), width, height }
+}
+
 /** The opacity slider saves once it stops moving for this long; the overlay follows it at once. */
 const SLIDER_SAVE_MS = 150
 
@@ -124,8 +134,17 @@ export function Overlays() {
                 </label>
               )}
               {o.kind === 'meter' && <MeterOptions o={o} onChange={(m) => update(o.id, { meter: { ...DEFAULT_METER_OPTIONS, ...o.meter, ...m } })} />}
-              <div className="faint small mono">
-                {o.width}×{o.height} at {o.x}, {o.y}
+              <div className="row tight">
+                <span className="faint small mono grow">
+                  {o.width}×{o.height} at {o.x}, {o.y}
+                </span>
+                <button
+                  className="btn small ghost"
+                  title="Moves it to the middle of the screen this window is on: for an overlay lost off screen after a monitor change"
+                  onClick={() => update(o.id, bringOnScreen(o))}
+                >
+                  Bring on screen
+                </button>
               </div>
               {!BUILTIN_OVERLAYS.includes(o.id) && (
                 <ConfirmButton question={`Remove ${o.name}?`} onConfirm={() => void patchSettings((s) => ({ ...s, overlays: s.overlays.filter((x) => x.id !== o.id) }))}>

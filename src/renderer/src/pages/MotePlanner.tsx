@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { api, errorMessage } from '../api'
-import { useInvoke } from '../hooks'
+import { useDebounced, useInvoke } from '../hooks'
 import { showError } from '../toast'
 import { ConfirmButton, Pending, Switch } from '../components/ui'
 import { numExact as num } from '../format'
@@ -21,6 +21,9 @@ export function useStock() {
 }
 
 /** A stock write; the reply is the stock as stored. A failure is shown and changes nothing. */
+/** How long typing in the planner waits before it is written. */
+const SAVE_MS = 400
+
 type StockWrite = 'stock:counts' | 'stock:item' | 'stock:autoAdd' | 'stock:apply'
 
 async function writeStock<K extends StockWrite>(set: (s: MoteStock) => void, channel: K, ...args: Parameters<Invokes[K]>): Promise<void> {
@@ -132,6 +135,9 @@ export function MotePlanner() {
   const [draft, setDraft] = useState<Record<string, string>>({})
   const item = useMemo(() => fixItem(stock?.item ?? {}), [stock?.item])
   const result = useMemo(() => (stock ? plan(item, stock.counts) : null), [item, stock])
+  // What is typed shows at once and is written once typing stops.
+  const saveItem = useDebounced((d: MoteStock['item']) => void writeStock(setStock, 'stock:item', d), SAVE_MS)
+  const saveCounts = useDebounced((c: MoteStock['counts']) => void writeStock(setStock, 'stock:counts', c), SAVE_MS)
   if (!stock || !result) return <Pending what="your mote stock" error={q.error} retry={q.reload} />
 
   const inv = countsToArray(stock.counts)
@@ -142,12 +148,15 @@ export function MotePlanner() {
       if (lvl !== null) Object.assign(d, { lvl, xp: 0, to: lvl + 1 })
     }
     if (field === 'lvl') d.to = Math.max(Number(d.to) || 0, (Number(d.lvl) || 0) + 1)
-    await writeStock(setStock, 'stock:item', d)
+    setStock({ ...stock, item: d })
+    saveItem.call(d)
   }
   const setCount = async (key: string, value: string) => {
     setDraft((x) => ({ ...x, [key]: value }))
     const v = Math.max(0, Math.floor(Number(value) || 0))
-    await writeStock(setStock, 'stock:counts', { ...stock.counts, [key]: v })
+    const counts = { ...stock.counts, [key]: v }
+    setStock({ ...stock, counts })
+    saveCounts.call(counts)
   }
   const spent = result.after
     ? MOTE_RANKS.map((r, i) => ({ i, d: (stock.counts[r.key] ?? 0) - result.after![i] })).filter((x) => x.d > 0)

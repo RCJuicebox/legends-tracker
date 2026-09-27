@@ -1,11 +1,11 @@
 import { useEffect, useMemo, useState } from 'react'
 import { api, errorMessage } from '../api'
 import { useApp } from '../state'
-import { act, showError } from '../toast'
+import { act, showError, actDone } from '../toast'
 import { OVERLAY_TARGETS } from '../constants'
 import { recall, remember } from '../remember'
 import { markUnsaved } from '../unsaved'
-import { Field, Icon, LoadError, NumberInput, Pending, Switch } from '../components/ui'
+import { Field, Icon, LoadError, NumberInput, Pending, Switch, ConfirmButton } from '../components/ui'
 import type { Phrase, Trigger, TriggerAction, TriggerTestResult } from '../../../shared/types'
 import type { TriggerError } from '../../../shared/ipc'
 
@@ -156,7 +156,7 @@ export function Triggers() {
           }}>
             Import…
           </button>
-          <button className="btn" onClick={() => void act('triggers:export', list)}>
+          <button className="btn" onClick={() => void actDone((saved) => (saved ? `Exported ${list.length} trigger${list.length === 1 ? '' : 's'}.` : null), 'triggers:export', list)}>
             Export…
           </button>
           <button className="btn" onClick={() => {
@@ -197,6 +197,7 @@ export function Triggers() {
                   <div key={t.id} className={`tree-item${t.id === selected ? ' active' : ''}${t.enabled ? '' : ' disabled'}`} onClick={() => setSelected(t.id)}>
                     <button className="name" aria-current={t.id === selected ? 'true' : undefined} onClick={() => setSelected(t.id)}>
                       {t.name}
+                      {!t.enabled && <span className="faint"> (off)</span>}
                     </button>
                     <Switch on={t.enabled} title={t.enabled ? 'Enabled' : 'Disabled'} label={`${t.name} enabled`} onChange={(v) => void setEnabled(t.id, v)} />
                   </div>
@@ -240,7 +241,9 @@ function TriggerEditor({ t, folders, onChange, onDelete, onDuplicate }: { t: Tri
         <h2>
           Trigger <span className="spacer" />
           <button className="btn small" onClick={onDuplicate}>Duplicate</button>
-          <button className="btn small danger" onClick={onDelete}>Delete</button>
+          <ConfirmButton question={`Delete ${t.name || 'this trigger'}?`} onConfirm={onDelete}>
+            Delete
+          </ConfirmButton>
         </h2>
         <div className="grid three">
           <Field label="Name">

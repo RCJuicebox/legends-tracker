@@ -124,7 +124,7 @@ async function reportDevices(): Promise<void> {
   const all = await navigator.mediaDevices.enumerateDevices()
   api.send(
     'audio:devices',
-    all.filter((d) => d.kind === 'audiooutput').map((d) => ({ deviceId: d.deviceId, label: d.label || 'Output device' }))
+    all.filter((d) => d.kind === 'audiooutput').map((d) => ({ deviceId: d.deviceId, label: d.label || 'Output device' /* the Audio page explains a blank name */ }))
   )
 }
 

@@ -1,4 +1,4 @@
-import { app, BrowserWindow, dialog, Menu, nativeImage, screen, Tray, type Rectangle } from 'electron'
+import { app, BrowserWindow, dialog, Menu, nativeImage, Notification, screen, Tray, type Rectangle } from 'electron'
 import { join } from 'node:path'
 import { JsonFile, readJsonFile } from './storeCore'
 import { push } from './push'
@@ -25,6 +25,8 @@ export function loadPage(win: BrowserWindow, page: Page, query: Record<string, s
 interface WindowPlace {
   bounds: Rectangle
   maximized: boolean
+  /** Told once that closing the window leaves the app in the tray. */
+  trayTold?: boolean
 }
 
 export interface TrayActions {
@@ -80,7 +82,7 @@ export class Windows {
   private rememberPlace(): void {
     const w = this.main
     if (!w || w.isDestroyed() || w.isMinimized()) return
-    this.place.set({ bounds: w.getNormalBounds(), maximized: w.isMaximized() })
+    this.place.set({ ...this.place.get(), bounds: w.getNormalBounds(), maximized: w.isMaximized() })
   }
 
   createMain(): void {
@@ -116,9 +118,18 @@ export class Windows {
         // Overlays and audio keep running from the tray.
         e.preventDefault()
         w.hide()
+        this.tellTray()
       }
     })
     loadPage(w, 'index')
+  }
+
+  /** The first time the window closes, a word that the app is still running, and where it went. */
+  private tellTray(): void {
+    const place = this.place.get()
+    if (!place || place.trayTold || !Notification.isSupported()) return
+    this.place.set({ ...place, trayTold: true })
+    new Notification({ title: 'Legends Tracker is still running', body: 'Timers, overlays and speech carry on from the tray. Quit from the tray icon when you are done.', icon: this.opts.icon }).show()
   }
 
   createAudio(): void {

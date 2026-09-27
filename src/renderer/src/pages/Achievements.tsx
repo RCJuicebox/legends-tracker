@@ -1,9 +1,9 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { api, ago } from '../api'
 import { useRemembered } from '../remember'
 import { usePickedCharacter } from '../character'
 import { useInvoke } from '../hooks'
-import { showError } from '../toast'
+import { showError, showToast } from '../toast'
 import { Pending } from '../components/ui'
 import { numExact as num, who } from '../format'
 import {
@@ -22,11 +22,6 @@ import { HUNT } from '../../../core/achievementHunt'
 import type { AchievementsView } from '../../../shared/types'
 
 const isKill = (sectionName: string) => /hunter|raids/i.test(sectionName)
-
-interface Toast {
-  id: number
-  body: ReactNode
-}
 
 /** Open and closed blocks are remembered by name; at most this many, the newest kept. */
 const OPEN_KEEP = 1000
@@ -67,8 +62,6 @@ export function Achievements() {
   // dropping into the Complete list, until the section changes.
   const [touched, setTouched] = useState<Set<string>>(new Set())
   const [flash, setFlash] = useState('')
-  const [toasts, setToasts] = useState<Toast[]>([])
-  const toastId = useRef(0)
 
   const book = useMemo(() => (view ? new AchievementBook(view.sections, { ticks: view.marks.ticks, broken: [] }) : null), [view])
   const cats = useMemo(() => book?.categories() ?? [], [book])
@@ -99,11 +92,7 @@ export function Achievements() {
 
   if (!chars || !view) return <Pending what="your achievements" error={error} retry={retry} />
 
-  const toast = (body: ReactNode) => {
-    const id = ++toastId.current
-    setToasts((t) => [...t.slice(-3), { id, body }])
-    setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), 4200)
-  }
+  const toast = (body: ReactNode) => showToast(body, { ms: 4200 })
 
   const saveMarks = (next: AchMarks) => {
     const marks: AchMarks = { ticks: next.ticks, broken: [] }
@@ -306,13 +295,6 @@ export function Achievements() {
         achievement follows that achievement; click it to jump there. Your ticks are kept when the game writes a new export.
       </p>
 
-      <div className="ach-toasts" aria-live="polite">
-        {toasts.map((x) => (
-          <div key={x.id} className="ach-toast">
-            {x.body}
-          </div>
-        ))}
-      </div>
     </div>
   )
 }

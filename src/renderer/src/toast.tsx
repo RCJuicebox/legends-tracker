@@ -55,6 +55,26 @@ export async function act<K extends InvokeChannel>(channel: K, ...args: Paramete
   }
 }
 
+/**
+ * As act(), and says it worked: `done` is the message, or a function of the answer giving one (null
+ * for nothing to say, as when a save dialog was cancelled).
+ */
+export async function actDone<K extends InvokeChannel>(
+  done: string | ((r: InvokeResult<K>) => string | null),
+  channel: K,
+  ...args: Parameters<Invokes[K]>
+): Promise<InvokeResult<K> | undefined> {
+  try {
+    const r = await api.invoke(channel, ...args)
+    const text = typeof done === 'string' ? done : done(r)
+    if (text) showToast(text)
+    return r
+  } catch (e) {
+    showError('That did not work', e)
+    return undefined
+  }
+}
+
 function subscribe(l: () => void): () => void {
   listeners.add(l)
   return () => listeners.delete(l)

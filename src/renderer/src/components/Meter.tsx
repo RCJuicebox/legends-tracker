@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useApp } from '../state'
-import { act, showToast } from '../toast'
+import { act, showToast, actDone } from '../toast'
 import { useRemembered } from '../remember'
 import { LIVE, useCombat, useSegment } from '../combat'
-import { Icon, Info } from './ui'
+import { Icon, Info, ConfirmButton } from './ui'
 import { EntityBar, HealBar, HEAL_COLOR, KIND_COLOR, PROC_COLOR, PROC_HINT, PROC_WORD, SkillBar, kindTag } from './MeterBars'
 import {
   attackerRows, attackerSkillRows, copyText, damageRows, defenseOf, durationSec, fmtClock, fmtNum, fmtPct, fmtRate,
@@ -12,7 +12,7 @@ import {
 } from '../../../core/combatView'
 import type { CombatSnapshot, Defense, MeterMode, MeterScope, MeterSpan, Segment, SegmentSummary } from '../../../shared/types'
 
-// The damage meter on the Live page: one segment (the fight or the session) read three ways
+// The damage meter on the Damage Meter page: one segment (the fight or the session) read three ways
 // (damage out, damage in, healing), the rows clickable down into skills, targets and attackers.
 
 type Drill = null | { kind: 'entity'; key: string; name: string } | { kind: 'target'; name: string }
@@ -112,7 +112,7 @@ export function Meter({ standalone = false }: { standalone?: boolean }) {
           </h2>
         )}
         <span className="spacer" />
-        <button className="btn small" onClick={() => void act('combat:newSession')} title="Close the current session and start a new one counting from now">
+        <button className="btn small" onClick={() => void actDone('New session started.', 'combat:newSession')} title="Close the current session and start a new one counting from now">
           <Icon name="flag" /> New session
         </button>
         <button className="btn small" onClick={copy} disabled={!seg} title="Copy this list as text, for chat or a note">
@@ -129,12 +129,13 @@ export function Meter({ standalone = false }: { standalone?: boolean }) {
           <input type="checkbox" checked={combinePet} onChange={(e) => patchSettings((s) => ({ ...s, combat: { ...s.combat, combinePet: e.target.checked } }))} />
           Pets with owners
         </label>
-        <label
-          className="check small"
-          title="Count a mob charmed by you or a groupmate as that player's pet. The log names a charm pet as the mob, so this is a guess: it goes wrong when two people charm mobs of one name (their pets then share a row), or when mobs of the pet's name fight other mobs. Turning it on or off reads the last hour again."
-        >
+        <label className="check small">
           <input type="checkbox" checked={state.settings.combat.charmPets} onChange={(e) => patchSettings((s) => ({ ...s, combat: { ...s.combat, charmPets: e.target.checked } }))} />
           Charm pets
+          <Info
+            label="About charm pets"
+            text="Counts a mob charmed by you or a groupmate as that player's pet. The log names a charm pet as the mob, so this is a guess: it goes wrong when two people charm mobs of one name (their pets then share a row), or when mobs of the pet's name fight other mobs. Turning it on or off reads the last hour of the log again."
+          />
         </label>
         <label className="check small" title="Rate over the time actually spent hitting (gaps between hits capped at 3 s) instead of the whole fight">
           <input type="checkbox" checked={active} onChange={(e) => setActive(e.target.checked)} />
@@ -150,6 +151,7 @@ export function Meter({ standalone = false }: { standalone?: boolean }) {
           <Headline seg={seg} name={name} mode={mode} head={head!} active={active} />
           <div className="dm-body">
             <div className="dm-main">
+              {!drill && rows.length > 0 && <p className="hint">Click a row to see what it did, skill by skill.</p>}
               {mode === 'damage' && <DamagePane seg={seg} rows={rows as Row[]} drill={drill} setDrill={setDrill} active={active} scope={scope} />}
               {mode === 'incoming' && <IncomingPane seg={seg} rows={rows as Row[]} drill={drill} setDrill={setDrill} scope={scope} active={active} />}
               {mode === 'healing' && <HealingPane seg={seg} rows={rows as HealRow[]} drill={drill} setDrill={setDrill} />}
@@ -551,9 +553,14 @@ function Roster({ snap }: { snap: CombatSnapshot }) {
         Add
       </button>
       {snap.roster.length > 0 && (
-        <button className="btn ghost small" onClick={() => void act('combat:clearGroup')} title="Forget everyone in the group; the log fills it again as people join, or add them by name">
+        <ConfirmButton
+          className="btn ghost small"
+          question="Forget everyone in the group?"
+          title="Forget everyone in the group; the log fills it again as people join, or add them by name"
+          onConfirm={() => void act('combat:clearGroup')}
+        >
           Reset group
-        </button>
+        </ConfirmButton>
       )}
     </div>
   )

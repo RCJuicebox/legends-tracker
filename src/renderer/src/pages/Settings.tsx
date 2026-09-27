@@ -1,12 +1,13 @@
 import { useApp } from '../state'
 import { api, mb, ago } from '../api'
 import { useInvoke } from '../hooks'
-import { act, showError, showToast } from '../toast'
+import { act, showError, showToast, actDone } from '../toast'
 import { who } from '../format'
 import { useUpdate, type UpdateState } from '../update'
 import { Field, LoadError, NumberInput, Switch } from '../components/ui'
 import { GameFolderCard } from '../components/GameFolder'
 import type { TrackingSettings } from '../../../shared/types'
+import type { PageId } from '../main'
 
 /** One line on where updates stand. */
 function updateText(u: UpdateState | null): string {
@@ -35,7 +36,7 @@ function noCheckReason(u: UpdateState | null): string | undefined {
   return undefined
 }
 
-export function Settings() {
+export function Settings({ go }: { go?: (page: PageId) => void }) {
   const { state, patchSettings } = useApp()
   const s = state.settings
   const t = s.tracking
@@ -110,6 +111,10 @@ export function Settings() {
             <Switch on={s.autoStart} onChange={(v) => patchSettings((x) => ({ ...x, autoStart: v }))} />
             Start watching as soon as the app opens
           </label>
+          <p className="hint">
+            Closing this window keeps Legends Tracker running in the tray, so timers, overlays and speech carry on. To end it, use Quit on the tray
+            icon&apos;s menu.
+          </p>
           <label className="row">
             <Switch on={s.yieldToGame} onChange={(v) => patchSettings((x) => ({ ...x, yieldToGame: v }))} />
             Yield CPU to EverQuest
@@ -128,7 +133,7 @@ export function Settings() {
             </Field>
             <Field label="Rebuild" hint="Forgets every fight and reads that much of the log again.">
               <div>
-                <button className="btn" onClick={() => void act('combat:rebuild', s.combat.historyMinutes || 60)} disabled={!state.status.watching} title={state.status.watching ? 'Forget every fight and read the log again' : 'Start watching first'}>
+                <button className="btn" onClick={() => void actDone(`Read the last ${s.combat.historyMinutes || 60} minutes of the log again.`, 'combat:rebuild', s.combat.historyMinutes || 60)} disabled={!state.status.watching} title={state.status.watching ? 'Forget every fight and read the log again' : 'Start watching first'}>
                   Read the log again
                 </button>
               </div>
@@ -137,7 +142,13 @@ export function Settings() {
           <label className="row">
             <Switch on={s.combat.newSessionOnZone} onChange={(v) => patchSettings((x) => ({ ...x, combat: { ...x.combat, newSessionOnZone: v } }))} />
             Entering a zone starts a new session
-            <span className="faint small">the Overall figures then cover one zone or instance at a time; New session on the Live page splits by hand</span>
+            <span className="faint small">
+              the Overall figures then cover one zone or instance at a time; New session on the{' '}
+              <button className="link-button" onClick={() => go?.('meter')}>
+                Damage Meter
+              </button>{' '}
+              page splits by hand
+            </span>
           </label>
         </div>
 

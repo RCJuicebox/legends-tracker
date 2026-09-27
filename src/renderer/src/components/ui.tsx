@@ -1,4 +1,4 @@
-import { useState, type CSSProperties, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react'
 import type { SpellCategory } from '../../../shared/types'
 import { CATEGORY_LABELS } from '../../../shared/types'
 import { iconUrl } from '../api'
@@ -183,10 +183,41 @@ export function ConfirmButton({
   )
 }
 
-/** An explanation behind a small "i": opens on click or Enter, so it reaches the keyboard as well as the mouse. */
+/** Room the popover needs to the right before it opens leftwards instead. */
+const INFO_WIDTH = 350
+
+/**
+ * An explanation behind a small "i": opens on click or Enter, so it reaches the keyboard as well as the
+ * mouse, and closes on Escape or a click anywhere else. Near the right edge it opens leftwards.
+ */
 export function Info({ text, label = 'What this means' }: { text: ReactNode; label?: string }) {
+  const ref = useRef<HTMLDetailsElement>(null)
+  const [open, setOpen] = useState(false)
+  const [flip, setFlip] = useState(false)
+  useEffect(() => {
+    if (!open) return
+    const close = () => {
+      if (ref.current) ref.current.open = false
+    }
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && close()
+    const onDown = (e: MouseEvent) => !ref.current?.contains(e.target as Node) && close()
+    document.addEventListener('keydown', onKey)
+    document.addEventListener('mousedown', onDown)
+    return () => {
+      document.removeEventListener('keydown', onKey)
+      document.removeEventListener('mousedown', onDown)
+    }
+  }, [open])
   return (
-    <details className="info">
+    <details
+      ref={ref}
+      className={`info${flip ? ' flip' : ''}`}
+      onToggle={(e) => {
+        const d = e.currentTarget
+        if (d.open) setFlip(d.getBoundingClientRect().left + INFO_WIDTH > window.innerWidth)
+        setOpen(d.open)
+      }}
+    >
       <summary aria-label={label} title={typeof text === 'string' ? text : undefined}>
         i
       </summary>
