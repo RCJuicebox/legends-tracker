@@ -1,5 +1,5 @@
 import { createReadStream } from 'node:fs'
-import type { LogLine } from '../../core/logLine'
+import { zoneEntered, type LogLine } from '../../core/logLine'
 import { CombatMeter, summarize as summarizeFight } from '../../core/combatMeter'
 import { LootLedger } from '../../core/loot'
 import { RespawnLog, respawnView, type RespawnView } from '../../core/respawns'
@@ -131,9 +131,17 @@ export class CombatFeed {
       for (let i = 0; i < 200 && attachedAt() < 0 && current(); i++) await sleep(25)
       const end = attachedAt()
       if (end > 0 && current()) {
-        const from = await offsetBefore(logFile, Date.now() - minutes * 60_000)
+        const since = Date.now() - minutes * 60_000
+        // The read starts up to a megabyte early (offsetBefore goes by chunks), so a line from before
+        // the window only tells the meter which zone it is in.
+        const from = await offsetBefore(logFile, since)
         if (end > from && current()) {
-          await readLines(createReadStream(logFile, { start: from, end: end - 1 }), (line) => current() && this.line(line), { flushLast: false })
+          const take = (line: LogLine) => {
+            if (!current()) return
+            if (line.time >= since) this.line(line)
+            else if (zoneEntered(line.text)) this.meter.handle(line)
+          }
+          await readLines(createReadStream(logFile, { start: from, end: end - 1 }), take, { flushLast: false })
         }
       }
     } catch (e) {
