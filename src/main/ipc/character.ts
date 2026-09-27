@@ -13,8 +13,8 @@ import { logFileFor, logStem } from '../storeCore'
 import type { AppContext } from '../context'
 import type { CatalogFile } from '../../shared/ipc'
 
-// A character's files and what is looked up for them: achievements, inventory, the sheet, gear
-// (catalog, focus, worn effects), the pet, tradeskills and the Stats page's tables and screen reads.
+// A character's files and what is looked up for them: achievements, factions, inventory, the sheet,
+// gear (catalog, focus, worn effects), the pet, tradeskills and the Stats page's tables and screen reads.
 
 export function registerCharacterIpc(ctx: AppContext): void {
   const { store, engine } = ctx
@@ -24,6 +24,13 @@ export function registerCharacterIpc(ctx: AppContext): void {
   handle('achievements:characters', async () => ({ current: ctx.characterKey(), available: (await checkGameFolder(ctx.installDir())).achievements }))
   handle('achievements:load', (character) => ctx.achievementFiles.load(character))
   handle('achievements:marks', (character, marks) => ctx.achievementFiles.saveMarks(character, marks))
+
+  // Faction changes, over the character's log and its archives.
+  handle('factions:get', async (character) => {
+    if (!isCharacterKey(character)) throw new Error('Not a character.')
+    if (!ctx.installDir()) return { factions: [] }
+    return ctx.factions.view(history(character))
+  })
 
   // Which characters have a given export, and which one is being played.
   handle('character:exports', async () => {

@@ -429,6 +429,18 @@ follows that one, and a click jumps there. An open Slayer race achievement sugge
 that race in, with their level ranges, from eqlwiki's NPC pages; their race fields are entered by
 hand, so treat them as leads.
 
+## Factions
+
+Faction changes the log recorded, for the character picked (the same pick as Achievements, Stats
+and Gear), from its log and its archives. The game never prints your standing, only each change
+(``Your faction standing with King Ak`Anon has been adjusted by -1.``) and, once a faction can move
+no further, that it `could not possibly get any better` (or `worse`). So each faction shows the net
+of the changes the log saw, how many there were and when the last was, not where you stand: what
+happened before your oldest log, or with logging off, is not in it. A faction the game called best
+or worst is marked **maxed** or **bottomed** until a change the other way. Click a row for its last
+20 changes. The log is read with casts, melee and purchases, in the same one pass, and read on
+every half minute while the page is open.
+
 ## Stats
 
 Your character's record: up to three classes, the level of each, and race (Iksar or any other, which

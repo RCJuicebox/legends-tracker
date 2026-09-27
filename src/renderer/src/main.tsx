@@ -20,6 +20,7 @@ import { Audio } from './pages/Audio'
 import { Logs } from './pages/Logs'
 import { Settings } from './pages/Settings'
 import { Achievements } from './pages/Achievements'
+import { Factions } from './pages/Factions'
 import { Gear } from './pages/Gear'
 import { Upgrades } from './pages/Upgrades'
 import { Stats } from './pages/Stats'
@@ -40,6 +41,7 @@ const PAGES = [
   { id: 'respawns', group: 'Play', label: 'Respawns', icon: 'respawn', el: Respawns },
   { id: 'tradeskills', group: 'Play', label: 'Tradeskills', icon: 'flask', el: Tradeskills },
   { id: 'achievements', group: 'Character', label: 'Achievements', icon: 'trophy', el: Achievements },
+  { id: 'factions', group: 'Character', label: 'Factions', icon: 'flag', el: Factions },
   { id: 'stats', group: 'Character', label: 'Stats', icon: 'stats', el: Stats },
   { id: 'gear', group: 'Character', label: 'Gear', icon: 'bag', el: Gear },
   { id: 'upgrades', group: 'Character', label: 'Upgrades', icon: 'motes', el: Upgrades },
