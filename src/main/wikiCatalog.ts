@@ -21,8 +21,15 @@ const FORMAT = CATALOG_FORMAT
 export type { CatalogFile }
 export type CatalogProgress = WikiProgress
 
+/** How long the parsed catalog stays in memory after it was last asked for. */
+const KEEP_MS = 60_000
+
 export class WikiCatalog {
+  // The catalog (some 10 MB parsed) is wanted only by the Gear pages and a download, so it is read
+  // from disk when asked for and let go a minute later; what the status needs is kept on its own.
   private file: CatalogFile | null = null
+  private summary: Pick<CatalogFile, 'fetchedAt' | 'format'> & { count: number } | null = null
+  private forget: NodeJS.Timeout | null = null
   private running: Promise<CatalogFile | null> | null = null
   progress: CatalogProgress = { busy: false, pages: 0, total: 0, error: '' }
   private job: Job | null = null
@@ -39,19 +46,35 @@ export class WikiCatalog {
 
   /** The stored catalog, whatever its age; null before the first download. */
   async stored(): Promise<CatalogFile | null> {
-    if (this.file) return this.file
-    try {
-      this.file = JSON.parse(await fs.readFile(this.path, 'utf8')) as CatalogFile
-      this.report({})
-    } catch (e) {
-      if ((e as NodeJS.ErrnoException).code !== 'ENOENT') sources.fail('catalog', e)
-      else sources.missing('catalog', 'Not downloaded yet: the Gear page offers to.')
-      this.file = null
+    if (!this.file) {
+      try {
+        this.hold(JSON.parse(await fs.readFile(this.path, 'utf8')) as CatalogFile)
+        this.report({})
+      } catch (e) {
+        if ((e as NodeJS.ErrnoException).code !== 'ENOENT') sources.fail('catalog', e)
+        else sources.missing('catalog', 'Not downloaded yet: the Gear page offers to.')
+        this.file = null
+      }
     }
+    this.forgetLater()
     return this.file
   }
 
-  isStale(file: CatalogFile | null): boolean {
+  private hold(file: CatalogFile): void {
+    this.file = file
+    this.summary = { fetchedAt: file.fetchedAt, format: file.format, count: file.items.length }
+  }
+
+  private forgetLater(): void {
+    if (this.forget) clearTimeout(this.forget)
+    this.forget = setTimeout(() => {
+      this.forget = null
+      if (!this.running) this.file = null
+    }, KEEP_MS)
+    this.forget.unref()
+  }
+
+  isStale(file: Pick<CatalogFile, 'fetchedAt' | 'format'> | null): boolean {
     return !file || (file.format ?? 1) < FORMAT || Date.now() - file.fetchedAt > FRESH_MS
   }
 
@@ -65,11 +88,11 @@ export class WikiCatalog {
     this.progress = { ...this.progress, ...p }
     this.onProgress(this.progress)
     if (this.progress.busy) this.job?.progress(this.progress.total ? this.progress.pages / this.progress.total : null, `${this.progress.pages} of ${this.progress.total || '?'} pages`)
-    const file = this.file
+    const file = this.summary
     if (this.progress.busy) sources.reading('catalog', `${this.progress.pages} of ${this.progress.total || '?'} pages`)
     else if (this.progress.error) sources.fail('catalog', new Error(this.progress.error))
     else if (file) {
-      const what = `${file.items.length.toLocaleString()} items, from ${new Date(file.fetchedAt).toLocaleDateString()}`
+      const what = `${file.count.toLocaleString()} items, from ${new Date(file.fetchedAt).toLocaleDateString()}`
       if (this.isStale(file)) sources.stale('catalog', what)
       else sources.ok('catalog', what)
     }
@@ -84,7 +107,8 @@ export class WikiCatalog {
       file.eraStatus = (await this.eraStatus()) ?? old?.eraStatus
       await fs.writeFile(this.path + '.tmp', JSON.stringify(file), 'utf8')
       await fs.rename(this.path + '.tmp', this.path)
-      this.file = file
+      this.hold(file)
+      this.forgetLater()
       this.report({ busy: false })
       return file
     } catch (e) {
@@ -94,6 +118,7 @@ export class WikiCatalog {
         log.warn('Item catalog download failed', e)
         this.report({ busy: false, error: (e as Error).message })
       }
+      this.forgetLater()
       return this.file
     }
   }
