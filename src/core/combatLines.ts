@@ -40,6 +40,12 @@ export type CombatEvent =
 const VERBS_1ST = 'hit|slash|punch|kick|bash|pierce|crush|bite|claw|strike|shoot|backstab|frenzy|maul|gore|sting|slice|cleave|reave|smash|rake|lacerate|sweep|stomp|whip|burn|impale|gouge|blast'
 const VERBS_3RD = 'hits|slashes|punches|kicks|bashes|pierces|crushes|bites|claws|strikes|shoots|backstabs|frenzies|mauls|gores|stings|slices|cleaves|reaves|smashes|rakes|lacerates|sweeps|stomps|whips|burns|impales|gouges|blasts'
 const TAG = String.raw`(?: \((.+)\))?`
+/**
+ * "slashes" as "slash": a swing is one skill whoever makes it and whether it lands. The log names
+ * another's hit in the third person and their miss ("tries to slash") and all of the player's own
+ * swings in the first, so without this a hit and a miss would be two skills.
+ */
+const BASE_VERB = new Map(VERBS_3RD.split('|').map((v, i) => [v, VERBS_1ST.split('|')[i]]))
 
 const RE_MELEE_YOU = new RegExp(String.raw`^You (${VERBS_1ST}) (.+?) for (\d+) points? of damage\.${TAG}$`)
 const RE_MELEE = new RegExp(String.raw`^(.+?) (${VERBS_3RD}) (.+?) for (\d+) points? of damage\.${TAG}$`)
@@ -139,7 +145,7 @@ export function parseCombatLine(text: string): CombatEvent | null {
     if ((m = RE_YOU_REMOVE.exec(text))) return { kind: 'group', who: m[1], action: 'left' }
     if ((m = RE_CAST_YOU.exec(text))) return { kind: 'cast', source: SELF, spell: m[1] }
   }
-  if ((m = RE_MELEE.exec(text))) return { kind: 'damage', source: self(m[1]), target: self(m[3]), amount: +m[4], how: 'melee', skill: m[2], mods: parseMods(m[5]) }
+  if ((m = RE_MELEE.exec(text))) return { kind: 'damage', source: self(m[1]), target: self(m[3]), amount: +m[4], how: 'melee', skill: BASE_VERB.get(m[2]) ?? m[2], mods: parseMods(m[5]) }
   if ((m = RE_MISS.exec(text))) {
     // "tries to cast a spell on you, but you are protected." is a spell, not a swing.
     const outcome = outcomeOf(m[4])

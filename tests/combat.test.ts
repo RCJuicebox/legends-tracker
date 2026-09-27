@@ -17,7 +17,7 @@ describe('combat lines', () => {
     expect(parseMods('Riposte Critical')).toEqual(['riposte', 'critical'])
   })
   it("reads others' melee: pets, players, mobs on you and on others", () => {
-    expect(p('Jobarab slashes an ire ghast for 47 points of damage.')).toMatchObject({ kind: 'damage', source: 'Jobarab', target: 'an ire ghast', amount: 47, how: 'melee', skill: 'slashes' })
+    expect(p('Jobarab slashes an ire ghast for 47 points of damage.')).toMatchObject({ kind: 'damage', source: 'Jobarab', target: 'an ire ghast', amount: 47, how: 'melee', skill: 'slash' })
     expect(p('A forsaken revenant hits YOU for 122 points of damage.')).toMatchObject({ source: 'A forsaken revenant', target: SELF, amount: 122 })
     expect(p('Grandmaster R`tal pet slashes Jobarab for 14 points of damage.')).toMatchObject({ source: 'Grandmaster R`tal pet', target: 'Jobarab' })
     expect(p('An ire ghast hits YOU for 67 points of damage. (Riposte)')).toMatchObject({ mods: ['riposte'] })
@@ -136,6 +136,22 @@ const FIGHT = `
   [Thu Sep 24 20:00:14 2026] You have slain a fetid fiend!`
 
 describe('CombatMeter', () => {
+  it("counts another's hits and misses with one skill as one row", () => {
+    const { m, feed } = meter()
+    feed(`
+      [Thu Sep 24 20:00:05 2026] Dorran slashes a fetid fiend for 40 points of damage.
+      [Thu Sep 24 20:00:06 2026] Dorran tries to slash a fetid fiend, but misses!
+      [Thu Sep 24 20:00:07 2026] Dorran bashes a fetid fiend for 12 points of damage.
+      [Thu Sep 24 20:00:08 2026] Dorran tries to bash a fetid fiend, but misses!`)
+    const f = m.fights[0]
+    const dorran = damageRows(f, 'everyone', false).find((r) => r.name === 'Dorran')!
+    const rows = skillRows(f, dorran)
+    expect(rows.map((r) => [r.name, r.hits, r.misses])).toEqual([
+      ['slash', 1, 1],
+      ['bash', 1, 1]
+    ])
+  })
+
   it('books one fight from first blow to the kill, per entity and skill', () => {
     const { m, feed } = meter()
     feed(FIGHT)
