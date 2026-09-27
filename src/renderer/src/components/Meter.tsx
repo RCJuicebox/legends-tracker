@@ -57,12 +57,14 @@ export function Meter({ standalone = false }: { standalone?: boolean }) {
   const [active, setActive] = useRemembered<boolean>('meter.active', false)
   const [selection, setSelection] = useState(LIVE)
   const [drill, setDrill] = useState<Drill>(null)
+  const [compareId, setCompareId] = useState('')
   const combinePet = state.settings.combat.combinePet
   const seg = useSegment(snap, span, selection)
 
   // A new span or mode starts at the top; a new segment keeps the drill, so a name can be followed across fights.
   useEffect(() => setDrill(null), [span, mode])
   useEffect(() => setSelection(LIVE), [span])
+  useEffect(() => setCompareId(''), [span])
 
   const list = span === 'fight' ? (snap?.fights ?? []) : (snap?.sessions ?? [])
   const live = span === 'fight' ? (snap?.liveFight ?? null) : (snap?.liveSession ?? null)
@@ -111,6 +113,18 @@ export function Meter({ standalone = false }: { standalone?: boolean }) {
       <div className="dm-controls">
         <Segmented value={span} options={[['fight', 'Fight'], ['session', 'Overall']]} onChange={setSpan} label="Fight or session" />
         <SegmentPicker list={list} span={span} selection={selection} onChange={setSelection} live={live} />
+        {span === 'fight' && list.length > 1 && (
+          <select className="dm-pick" value={compareId} onChange={(e) => setCompareId(e.target.value)} aria-label="Compare with another fight">
+            <option value="">Compare with…</option>
+            {list
+              .filter((s) => s.id !== seg?.id)
+              .map((s) => (
+                <option key={s.id} value={s.id}>
+                  {when(s.startedAt)} · {s.name} · {fmtRate(s.dps)} DPS
+                </option>
+              ))}
+          </select>
+        )}
         <Segmented value={scope} options={SCOPES} onChange={setScope} label="Whose rows" />
         <Segmented value={mode} options={MODES} onChange={setMode} label="What to list" />
         <span className="spacer" />
@@ -138,6 +152,9 @@ export function Meter({ standalone = false }: { standalone?: boolean }) {
       ) : (
         <>
           <Headline seg={seg} name={name} mode={mode} head={head!} active={active} />
+          {compareId && compareId !== seg.id ? (
+            <ComparePane seg={seg} name={name} otherId={compareId} mode={mode} scope={scope} combinePet={combinePet} active={active} close={() => setCompareId('')} />
+          ) : (
           <div className="dm-body">
             <div className="dm-main">
               {!drill && rows.length > 0 && <p className="hint">Click a row to see what it did, skill by skill.</p>}
@@ -154,6 +171,7 @@ export function Meter({ standalone = false }: { standalone?: boolean }) {
               {mode !== 'healing' && <DpsChart seg={seg} />}
             </div>
           </div>
+          )}
         </>
       )}
     </div>
@@ -206,6 +224,73 @@ function Headline({ seg, name, mode, head, active }: { seg: Segment; name: strin
           </span>
         )}
       </div>
+    </div>
+  )
+}
+
+/** The rows a mode lists, in one shape for comparing: a name, its rate and its total. */
+function comparable(seg: Segment, mode: MeterMode, scope: MeterScope, combinePet: boolean, active: boolean) {
+  if (mode === 'healing') return healerRows(seg, scope).map((h) => ({ key: h.key, name: h.name, rate: h.hps, total: h.total }))
+  const rows = mode === 'incoming' ? attackerRows(seg, scope) : damageRows(seg, scope, combinePet)
+  return rows.map((r) => ({ key: r.key, name: r.name, rate: active ? r.activeDps : r.dps, total: r.total }))
+}
+
+/** Two fights side by side: everyone in either, their rate and total in each, and the change. */
+function ComparePane({ seg, name, otherId, mode, scope, combinePet, active, close }: {
+  seg: Segment; name: string; otherId: string; mode: MeterMode; scope: MeterScope; combinePet: boolean; active: boolean; close: () => void
+}) {
+  const other = useInvoke('combat:segment', [otherId], [otherId]).data
+  const rows = useMemo(() => {
+    if (!other) return []
+    const a = comparable(seg, mode, scope, combinePet, active)
+    const b = new Map(comparable(other, mode, scope, combinePet, active).map((r) => [r.key, r]))
+    const keys = [...new Set([...a.map((r) => r.key), ...b.keys()])]
+    const byKey = new Map(a.map((r) => [r.key, r]))
+    return keys
+      .map((k) => ({ key: k, name: byKey.get(k)?.name ?? b.get(k)!.name, now: byKey.get(k), then: b.get(k) }))
+      .sort((x, y) => (y.now?.total ?? 0) + (y.then?.total ?? 0) - ((x.now?.total ?? 0) + (x.then?.total ?? 0)))
+      .slice(0, 20)
+  }, [seg, other, mode, scope, combinePet, active])
+  const unit = mode === 'healing' ? 'HPS' : 'DPS'
+  const change = (now?: { rate: number }, then?: { rate: number }) => {
+    if (!now || !then || !then.rate) return now && !then ? 'new' : then && !now ? 'gone' : '—'
+    const pct = (now.rate - then.rate) / then.rate
+    return `${pct >= 0 ? '+' : '−'}${fmtPct(Math.abs(pct))}`
+  }
+  if (!other) return <div className="empty">Reading the other fight…</div>
+  return (
+    <div className="dm-compare">
+      <div className="row">
+        <span className="small muted">
+          <b>{name}</b> ({fmtClock(durationSec(seg))}, {seg.kills} kill{seg.kills === 1 ? '' : 's'}) against <b>{other.name}</b> ({fmtClock(durationSec(other))}, {other.kills} kill
+          {other.kills === 1 ? '' : 's'}), {mode === 'incoming' ? 'damage taken' : mode === 'healing' ? 'healing' : 'damage dealt'}
+          {active && mode !== 'healing' ? ', active' : ''}
+        </span>
+        <span className="spacer" />
+        <button className="btn ghost small" onClick={close}>
+          Stop comparing
+        </button>
+      </div>
+      <table className="table">
+        <thead>
+          <tr>
+            <th>Who</th>
+            <th className="num">This fight</th>
+            <th className="num">The other</th>
+            <th className="num" title={`The change in ${unit} from the other fight to this one`}>Change</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((r) => (
+            <tr key={r.key}>
+              <td>{r.name}</td>
+              <td className="num mono">{r.now ? `${fmtRate(r.now.rate)} ${unit} · ${fmtNum(r.now.total)}` : '—'}</td>
+              <td className="num mono">{r.then ? `${fmtRate(r.then.rate)} ${unit} · ${fmtNum(r.then.total)}` : '—'}</td>
+              <td className="num mono">{change(r.now, r.then)}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   )
 }

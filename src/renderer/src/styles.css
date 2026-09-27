@@ -2363,6 +2363,13 @@ button.tree-item {
   color: var(--text-3);
   margin-left: 2px;
 }
+/* Two fights side by side, in place of the meter's lists. */
+.dm-compare {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 12px;
+}
 /* Where each fight begins in a session's chart. */
 .dm-chart .dm-chart-mark {
   stroke: var(--line-2);
