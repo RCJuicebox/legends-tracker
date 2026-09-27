@@ -14,6 +14,7 @@ import { MOTE_RANKS } from '../../../core/motes'
 import { ROLE_PRESETS } from '../../../core/statValue'
 import { WEIGHT_LABELS, type HandWeights, type WeightKey, type Weights } from '../../../core/upgrades'
 import type { InventoryView } from '../../../shared/types'
+import { UPGRADES_TAB } from '../constants'
 
 const moteName = (i: number, n: number) => `${n === 1 ? 'Mote' : 'Motes'} of ${MOTE_RANKS[i].name ? MOTE_RANKS[i].name + ' ' : ''}Potential`
 const fmt = (v: number) => (Number.isInteger(v) ? String(v) : v.toFixed(1))
@@ -22,7 +23,7 @@ const HOW =
   'Every worn item the wiki knows, with what its next merge level would add to your stats, weighed the way the upgrade finder weighs them for the role picked ' +
   'above. The cost is the motes that level takes: a +N item needs 2^N xp from the mote of rank N+1, and since two motes of a rank make one of the next, a mote is ' +
   'worth 2^rank Infinitesimal motes. Gain per 100 is the stat gain per 100 Infinitesimal motes’ worth spent, so the cheap low levels of a good item come first ' +
-  'and the top levels of anything come last. Have counts what you could combine up from lower ranks. Plan puts the item in the Motes page’s upgrade planner.'
+  'and the top levels of anything come last. Have counts what you could combine up from lower ranks. Plan puts the item in the Merge planner, on the Upgrades page.'
 
 function Deltas({ d }: { d: Partial<Record<WeightKey, number>> }) {
   const parts = (Object.entries(d) as [WeightKey, number][]).sort((a, b) => Math.abs(b[1]) - Math.abs(a[1]))
@@ -59,8 +60,8 @@ function useSinceExport(view: InventoryView) {
 
 /** The Gear page's Best merge tab: which worn item's next +1 gives the most for its motes. */
 export function MergeTab({
-  view, weights, hands, preset, setPreset, go
-}: { view: InventoryView; weights: Weights; hands: HandWeights | null; preset: string; setPreset: (p: string) => void; go?: (page: 'motes') => void }) {
+  view, weights, hands, preset, setPreset, onPlan
+}: { view: InventoryView; weights: Weights; hands: HandWeights | null; preset: string; setPreset: (p: string) => void; onPlan?: () => void }) {
   const stockQ = useStock()
   const stock = stockQ.data
   const since = useSinceExport(view)
@@ -87,9 +88,9 @@ export function MergeTab({
       showError('Could not set up the planner', e)
       return
     }
-    remember('motes.tab', 'planner')
-    if (go) go('motes')
-    else showToast(`${o.item.name} is set up in Motes › Upgrade planner`)
+    remember(UPGRADES_TAB, 'planner')
+    if (onPlan) onPlan()
+    else showToast(`${o.item.name} is set up in Upgrades › Merge planner`)
   }
 
   return (
@@ -122,7 +123,7 @@ export function MergeTab({
         </div>
         <p className="muted small m-0">
           The next +1 of each item you wear, best stat boost per mote first. What you wear comes from the inventory export
-          {view.modified > 0 ? ` written ${ago(view.modified)}` : ''}; motes on hand from the Motes page{stock ? '' : ' (not loaded yet)'}.
+          {view.modified > 0 ? ` written ${ago(view.modified)}` : ''}; motes on hand from the Merge planner{stock ? '' : ' (not loaded yet)'}.
           {unknown > 0 && ` ${unknown} worn item${unknown === 1 ? ' is' : 's are'} not on the wiki, so ${unknown === 1 ? 'it is' : 'they are'} left out.`}
           {maxed > 0 && ` ${maxed} ${maxed === 1 ? 'is' : 'are'} at +10 already.`}
         </p>
@@ -139,7 +140,7 @@ export function MergeTab({
       {!shown.length ? (
         <div className="card empty">{options.length ? 'Your motes do not cover any next level yet.' : 'Nothing to merge: no worn item the wiki knows is under +10.'}</div>
       ) : (
-        <div className="card">
+        <div className="card table-scroll">
           <table className="table">
             <thead>
               <tr>
@@ -182,7 +183,7 @@ export function MergeTab({
                   <td className="mono num">{num(o.cost)}</td>
                   <td className="mono num">{fmt(o.rate)}</td>
                   <td>
-                    <button className="btn ghost small" onClick={() => void plan(o)} title="Put this item in the Motes page's upgrade planner">
+                    <button className="btn ghost small" onClick={() => void plan(o)} title="Put this item in the Merge planner">
                       Plan
                     </button>
                   </td>

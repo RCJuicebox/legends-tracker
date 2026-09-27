@@ -23,7 +23,7 @@ import {
   type SpellWeights
 } from '../../../core/spellMotes'
 
-// Motes › Spell upgrades: which of the spells you cast to put motes into next.
+// Upgrades › Spell upgrades: which of the spells you cast to put motes into next.
 
 const short = (i: number) => MOTE_RANKS[i].name || 'Potential'
 /** "Shadow Knight" → "SHD", the way /who abbreviates classes. */

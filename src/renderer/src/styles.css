@@ -3037,3 +3037,8 @@ button.tree-item {
 input[aria-invalid='true'] {
   border-color: var(--red);
 }
+
+/* A wide table scrolls inside its card instead of widening the page. */
+.table-scroll {
+  overflow-x: auto;
+}

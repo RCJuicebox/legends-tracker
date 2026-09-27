@@ -27,7 +27,7 @@ function eraTip(era: string): string {
         : `${era}: out of era on EverQuest Legends`
 }
 
-export function GearFinder({ view, sheet, mode, go }: { view: InventoryView; sheet: CharacterSheet | null; mode: GearMode; go?: (page: 'motes') => void }) {
+export function GearFinder({ view, sheet, mode, onPlan }: { view: InventoryView; sheet: CharacterSheet | null; mode: GearMode; onPlan?: () => void }) {
   const g = useGearModel(view, sheet, mode)
   const { catalog, model, results, stats, classes, level, role, conv, acState, overCap, secondaryInUse, twoHanders, eraCounts, fociOf, lines, wanted, points, setPoints } = g
   const { ratioFirst, setRatioFirst, preset, setPreset, setCustom, twoHandMode, setTwoHandMode, compare, setCompare, hiddenEras, setHiddenEras, slot, setSlot, capMode, setCapMode, judge, setJudge } = g.controls
@@ -36,7 +36,7 @@ export function GearFinder({ view, sheet, mode, go }: { view: InventoryView; she
   const refresh = catalog.refresh
 
   // The best merge reads only what is worn and the wiki's stats for it: no catalog needed.
-  if (mode === 'merge') return <MergeTab view={view} weights={g.weights} hands={g.hands} preset={preset} setPreset={setPreset} go={go} />
+  if (mode === 'merge') return <MergeTab view={view} weights={g.weights} hands={g.hands} preset={preset} setPreset={setPreset} onPlan={onPlan} />
 
   if (!state) return <Pending what="the item catalog" error={catalog.error} retry={catalog.reload} />
   const p = state.progress

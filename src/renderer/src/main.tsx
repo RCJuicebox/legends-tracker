@@ -20,6 +20,7 @@ import { Logs } from './pages/Logs'
 import { Settings } from './pages/Settings'
 import { Achievements } from './pages/Achievements'
 import { Gear } from './pages/Gear'
+import { Upgrades } from './pages/Upgrades'
 import { Stats } from './pages/Stats'
 import { Loot } from './pages/Loot'
 import { Respawns } from './pages/Respawns'
@@ -40,6 +41,7 @@ const PAGES = [
   { id: 'achievements', group: 'Character', label: 'Achievements', icon: 'trophy', el: Achievements },
   { id: 'stats', group: 'Character', label: 'Stats', icon: 'stats', el: Stats },
   { id: 'gear', group: 'Character', label: 'Gear', icon: 'bag', el: Gear },
+  { id: 'upgrades', group: 'Character', label: 'Upgrades', icon: 'motes', el: Upgrades },
   { id: 'triggers', group: 'Setup', label: 'Triggers', icon: 'triggers', el: Triggers },
   { id: 'overlays', group: 'Setup', label: 'Overlays', icon: 'overlays', el: Overlays },
   { id: 'audio', group: 'Setup', label: 'Audio', icon: 'audio', el: Audio },

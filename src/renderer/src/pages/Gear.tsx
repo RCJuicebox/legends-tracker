@@ -13,6 +13,8 @@ import { ItemIcon } from './gearBits'
 import { GearFinder, type GearMode } from './GearFinder'
 import { useCharacterRecord, withRecord } from '../character'
 import { readSheet } from '../statsSheet'
+import type { PageId } from '../main'
+import { UPGRADES_TAB } from '../constants'
 
 /** The highest merge an item takes: +10. */
 const MAX_MERGE = MAX_LEVEL
@@ -54,15 +56,18 @@ type Filter = 'all' | 'worn' | 'bags' | 'bank' | 'keyring'
 const MODES: ['sheet' | GearMode, string][] = [
   ['sheet', 'Character sheet'],
   ['finder', 'Upgrade finder'],
-  ['focus', 'Focus effects'],
+  ['focus', 'Focus items'],
   ['effects', 'Worn effects'],
   ['procs', 'Procs'],
   ['optimize', 'Gear optimizer'],
-  ['merge', 'Best merge'],
   ['pet', 'Pet']
 ]
 
-export function Gear({ go }: { go?: (page: 'motes') => void }) {
+/**
+ * The Gear page, or with `only` one of its views on its own (the Upgrades page shows Best merge this
+ * way). `onPlan` is where a merge's Plan button goes.
+ */
+export function Gear({ go, only, onPlan }: { go?: (page: PageId) => void; only?: GearMode; onPlan?: () => void }) {
   const exp = useExportCharacter('inventory')
   const { exports, available, character, setCharacter } = exp
   const inv = useInventory(character, !!exports, available.join(','))
@@ -71,7 +76,9 @@ export function Gear({ go }: { go?: (page: 'motes') => void }) {
   const [selected, setSelected] = useState<string | null>(null)
   const [scaled, setScaled] = useRemembered<boolean>('gear.scaled', true)
   const [refreshing, setRefreshing] = useState(false)
-  const [mode, setMode] = useRemembered<'sheet' | GearMode>('gear.view', 'sheet')
+  const [remembered, setMode] = useRemembered<'sheet' | GearMode>('gear.view', 'sheet')
+  // Best merge moved to the Upgrades page; a remembered 'merge' opens the sheet here.
+  const mode = only ?? (remembered === 'merge' ? 'sheet' : remembered)
   // Worked out once per inventory and sheet, for the card and the totals both.
   const summary = useMemo(() => (view?.inventory ? wornSummary(view, sheet) : null), [view, sheet])
 
@@ -190,12 +197,13 @@ export function Gear({ go }: { go?: (page: 'motes') => void }) {
     </div>
   )
 
+  if (only) return <GearFinder view={view} sheet={sheet} mode={only} onPlan={onPlan} />
   if (mode !== 'sheet')
     return (
       <>
         {head}
         {switcher}
-        <GearFinder view={view} sheet={sheet} mode={mode} go={go} />
+        <GearFinder view={view} sheet={sheet} mode={mode} onPlan={() => go?.('upgrades')} />
       </>
     )
 
@@ -229,8 +237,8 @@ export function Gear({ go }: { go?: (page: 'motes') => void }) {
               showError('Could not set up the planner', e)
               return
             }
-            remember('motes.tab', 'planner')
-            go?.('motes')
+            remember(UPGRADES_TAB, 'planner')
+            go?.('upgrades')
           }}
         />
       )}

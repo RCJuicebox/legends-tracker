@@ -3,10 +3,7 @@ import { api, clock } from '../api'
 import { useInvoke } from '../hooks'
 import { act } from '../toast'
 import { useNow } from '../components/TimerBars'
-import { ConfirmButton, Icon, Info, Pending, Tabs } from '../components/ui'
-import { MotePlanner } from './MotePlanner'
-import { MoteSpells } from './MoteSpells'
-import { useRemembered } from '../remember'
+import { ConfirmButton, Icon, Info, Pending } from '../components/ui'
 import { MOTE_RANKS, localDay, moteValue, moteWorth, pausedHours, sessionHours, totalMotes, type MoteCounts, type MoteSession } from '../../../core/motes'
 import type { MoteScan, MoteView } from '../../../shared/ipc'
 
@@ -101,51 +98,7 @@ function PauseControl({ s, now }: { s: MoteSession; now: number }) {
 }
 
 export function Motes() {
-  const [tab, setTab] = useRemembered<'tracking' | 'planner' | 'spells'>('motes.tab', 'tracking')
-  return (
-    <>
-      <Tabs
-        className="mb-14"
-        label="Motes view"
-        value={tab}
-        onChange={setTab}
-        tabs={[
-          ['tracking', 'Tracking'],
-          ['planner', 'Upgrade planner'],
-          ['spells', 'Spell upgrades']
-        ]}
-      />
-      {tab === 'tracking' ? <MoteTracking /> : tab === 'planner' ? <MotePlannerPage /> : <MoteSpellsPage />}
-    </>
-  )
-}
-
-function MoteSpellsPage() {
-  return (
-    <>
-      <div className="page-head">
-        <div>
-          <h1>Spell upgrades</h1>
-          <p>Which of the spells and songs you cast to put motes into next: the most gained per xp, by the guide's categories.</p>
-        </div>
-      </div>
-      <MoteSpells />
-    </>
-  )
-}
-
-function MotePlannerPage() {
-  return (
-    <>
-      <div className="page-head">
-        <div>
-          <h1>Upgrade planner</h1>
-          <p>Which motes an item needs to reach the level you want, and how to get them from your stock.</p>
-        </div>
-      </div>
-      <MotePlanner />
-    </>
-  )
+  return <MoteTracking />
 }
 
 /** Worth a check once a minute: today's totals roll over at midnight. Completed runs do not move. */
