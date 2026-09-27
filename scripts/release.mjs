@@ -9,6 +9,7 @@
 // an installer locally for testing, without publishing anything.
 import { execSync } from 'node:child_process'
 import { readFileSync } from 'node:fs'
+import { releaseNotes } from './release-notes.mjs'
 
 const run = (cmd) => execSync(cmd, { stdio: 'inherit' })
 const out = (cmd) => execSync(cmd, { encoding: 'utf8' }).trim()
@@ -23,6 +24,10 @@ if (branch !== 'main') throw new Error(`Releases are cut from main; this is ${br
 run('git fetch origin main')
 if (out('git rev-list --count HEAD..origin/main') !== '0') throw new Error('origin/main has commits this checkout lacks. Pull first.')
 if (out(`git ls-remote --tags origin ${tag}`)) throw new Error(`${tag} is already released. Bump "version" in package.json first.`)
+// The release page and the in-app update notice show this version's section of CHANGELOG.md.
+if (!releaseNotes(readFileSync(new URL('../CHANGELOG.md', import.meta.url), 'utf8'), version)) {
+  throw new Error(`CHANGELOG.md has no section "## ${version}". Move the Unreleased notes under it first.`)
+}
 
 run('git push origin HEAD')
 run(`git tag -a ${tag} -m "Legends Tracker ${version}"`)

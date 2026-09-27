@@ -5,6 +5,8 @@ import { join } from 'node:path'
 
 // Azure itself is not called: fetch is replaced, and Electron's app and safeStorage with stand-ins.
 const dir = mkdtempSync(join(tmpdir(), 'lt-azure-'))
+// Spoken phrases are cached under the profile's cache folder: this test's own, so no run finds another's.
+process.env['EQL_USER_DATA'] = dir
 vi.mock('electron', () => ({
   app: { getPath: () => dir },
   safeStorage: {

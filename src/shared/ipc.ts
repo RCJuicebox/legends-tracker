@@ -205,6 +205,8 @@ export type AudioCommand =
 export interface Invokes {
   'app:state': () => AppState
   'app:openLogs': () => string
+  /** Version, machine, settings summary and the end of the log, for a bug report. */
+  'app:diagnostics': () => string
   'settings:save': (settings: AppSettings) => AppSettings
   'character:save': (character: CharacterSettings) => void
   'watch:start': () => void
@@ -366,7 +368,7 @@ export type InvokeResult<K extends InvokeChannel> = Awaited<ReturnType<Invokes[K
 // Every channel by name, so the preload can check a page's call at run time. The Record types make
 // the compiler insist each list is exactly its map's keys.
 const INVOKE_CHANNELS: Record<InvokeChannel, true> = {
-  'app:state': true, 'app:openLogs': true, 'settings:save': true, 'character:save': true, 'watch:start': true, 'watch:stop': true, simulate: true,
+  'app:state': true, 'app:openLogs': true, 'app:diagnostics': true, 'settings:save': true, 'character:save': true, 'watch:start': true, 'watch:stop': true, simulate: true,
   'triggers:get': true, 'triggers:save': true, 'triggers:test': true, 'triggers:import': true, 'triggers:export': true,
   'spells:known': true, 'spells:search': true, 'spells:rule': true, 'spells:checkLog': true, 'focus:search': true,
   'logs:list': true, 'logs:overview': true, 'logs:archive': true, 'logs:compress': true, 'logs:reveal': true,

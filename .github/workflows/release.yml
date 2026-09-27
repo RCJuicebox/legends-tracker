@@ -49,9 +49,10 @@ jobs:
         if: env.PUBLISH == 'true'
         run: |
           version=$(node -p "require('./package.json').version")
+          node scripts/release-notes.mjs "$version" > release-notes.md
           gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1 || gh release create "$GITHUB_REF_NAME" --draft \
             --title "$version" \
-            --notes "Legends Tracker $version. Download Legends-Tracker-Setup-$version.exe below; installed copies update themselves."
+            --notes-file release-notes.md
 
       - run: npx electron-vite build
 

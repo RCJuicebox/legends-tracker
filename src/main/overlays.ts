@@ -132,6 +132,18 @@ export class OverlayManager {
     }
   }
 
+  /** An overlay whose page crashed is closed and made afresh; false when `wc` is not an overlay's. */
+  recover(wc: Electron.WebContents): boolean {
+    for (const [id, win] of this.windows) {
+      if (win.isDestroyed() || win.webContents !== wc) continue
+      win.destroy()
+      this.windows.delete(id)
+      this.apply(this.configs)
+      return true
+    }
+    return false
+  }
+
   /** A meter overlay's page asks for the mouse while the pointer is on its controls, and gives it back after. */
   setMouse(id: string, interactive: boolean): void {
     if (this.arranging) return

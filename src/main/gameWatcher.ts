@@ -34,7 +34,7 @@ export class GameWatcher {
 
   private check(): void {
     const pid = foregroundPid()
-    const running = this.ticks++ % 12 === 0 ? isProcessRunning('eqgame.exe') : this.state.gameRunning
+    const running = this.ticks++ % 12 === 0 ? (isProcessRunning('eqgame.exe') ?? true) : this.state.gameRunning
     const previous = this.state
     if (pid === previous.foregroundPid && running === previous.gameRunning) return
     // The name is only looked up when the foreground process changes.

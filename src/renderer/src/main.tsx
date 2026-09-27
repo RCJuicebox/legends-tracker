@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client'
 import './styles.css'
 import { StateProvider, useApp } from './state'
 import { Icon } from './components/ui'
+import { ErrorBoundary } from './components/ErrorBoundary'
 import { ago } from './api'
 import { act, Toasts } from './toast'
 import { useUpdate } from './update'
@@ -99,7 +100,9 @@ function Shell() {
         </div>
       </nav>
       <main className="main">
-        <Page go={setPage} />
+        <ErrorBoundary key={page} what={`The ${PAGES.find((p) => p.id === page)!.label} page`}>
+          <Page go={setPage} />
+        </ErrorBoundary>
       </main>
       <Toasts />
     </div>
@@ -107,7 +110,9 @@ function Shell() {
 }
 
 createRoot(document.getElementById('root')!).render(
-  <StateProvider>
-    <Shell />
-  </StateProvider>
+  <ErrorBoundary what="Legends Tracker">
+    <StateProvider>
+      <Shell />
+    </StateProvider>
+  </ErrorBoundary>
 )

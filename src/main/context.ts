@@ -27,6 +27,7 @@ import { listLogs, logIsIn } from './game'
 import { Windows, loadPage } from './windows'
 import { appIcon, preloadPath, resources } from './bootstrap'
 import { log } from './log'
+import { settingsSummary } from './diagnostics'
 import type { AppSettings, Trigger } from '../shared/types'
 import type { AudioDevice } from '../shared/ipc'
 import { cacheDir } from './paths'
@@ -73,6 +74,8 @@ export interface AppContext {
   toggleMute(): void
   applyPriority(): void
   refreshOverlayVisibility(): void
+  /** Writes a summary of the settings to the diagnostic log, when it has changed. */
+  logSettings(): void
   /** Set by the lifecycle: restarts into a downloaded update after everything is written. */
   installUpdate(): Promise<void>
 }
@@ -139,9 +142,16 @@ export function createContext(): AppContext {
     ctx.refreshOverlayVisibility()
   })
 
+  let lastUpdate = 'idle'
   ctx.updater = new Updater((s) => {
     toMain('state:update', s)
-    if (s.state === 'downloading') {
+    const was = lastUpdate
+    lastUpdate = s.state
+    if (s.state === 'error' && was === 'downloading') {
+      // A download that failed is said once; the next hourly check tries again.
+      ctx.engine.pushFeed('warn', `The update could not be downloaded: ${s.message}. It will be tried again within the hour.`)
+      announceUpdate(`failed:${Date.now() - (Date.now() % 86_400_000)}`, 'Legends Tracker could not download its update', `${s.message}. It will be tried again within the hour.`, () => windows.showMain())
+    } else if (s.state === 'downloading') {
       announceUpdate(`found:${s.version}`, `Legends Tracker ${s.version} is available`, 'Downloading it now. You can restart into it once it has arrived.', () =>
         windows.showMain()
       )
@@ -237,7 +247,16 @@ export function createContext(): AppContext {
     }
     if (next.logFile !== prev.logFile && (ctx.engine.status.watching || next.autoStart)) void ctx.engine.startWatching()
     toMain('state:settings', next)
+    ctx.logSettings()
     return next
+  }
+
+  let loggedSummary = ''
+  ctx.logSettings = () => {
+    const summary = settingsSummary(store.settings.get(), store.triggers.get().length)
+    if (summary === loggedSummary) return
+    loggedSummary = summary
+    log.info(`Settings: ${summary}`)
   }
 
   async function followNewestLog(dir: string): Promise<void> {
@@ -250,6 +269,7 @@ export function createContext(): AppContext {
     store.triggers.set(list)
     ctx.engine.reconfigure()
     ctx.engine.triggersChanged()
+    ctx.logSettings()
   }
 
   return ctx

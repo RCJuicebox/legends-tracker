@@ -60,6 +60,14 @@ export function Dashboard({ go }: { go: (p: PageId) => void }) {
       </div>
 
       <GameFolderPrompt />
+      {status.elsewhere && (
+        <div className="notice mb-16">
+          {status.elsewhere.character}&apos;s log is being written while {status.character || 'this character'}&apos;s is quiet.{' '}
+          <button className="btn small primary" onClick={() => patchSettings((s) => ({ ...s, logFile: status.elsewhere!.path }))}>
+            Follow {status.elsewhere.character}
+          </button>
+        </div>
+      )}
       {settings.installDir && !status.spellError && !settings.logFile && (
         <div className="notice mb-16">
           No character log selected. <button className="btn small" onClick={() => go('settings')}>Choose one</button>

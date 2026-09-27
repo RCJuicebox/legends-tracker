@@ -3020,3 +3020,12 @@ button.tree-item {
     transition: none;
   }
 }
+
+/* An update's release notes, under Settings › About. */
+.notes {
+  white-space: pre-wrap;
+  max-height: 240px;
+  overflow: auto;
+  margin-top: 6px;
+  color: var(--text-2);
+}

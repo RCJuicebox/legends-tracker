@@ -26,9 +26,15 @@ type Obj = Record<string, unknown>
 
 const isObj = (v: unknown): v is Obj => !!v && typeof v === 'object' && !Array.isArray(v)
 
-/** Character keys as the game names its files: `Name_server`. Anything else could reach outside the app's folders. */
+/**
+ * A character key as the game names its files, `Name_server`. Whatever a file name may hold is
+ * allowed (accented names, hyphens); only what could reach outside the app's folders is not: path
+ * separators, drive colons, wildcards, dot-only names. listLogs goes by the same rule.
+ */
 export function isCharacterKey(v: unknown): v is string {
-  return typeof v === 'string' && /^[A-Za-z0-9_]+$/.test(v)
+  if (typeof v !== 'string' || !v.length || v.length > 64 || /[\\/:*?"<>|]/.test(v) || /^\.+$/.test(v)) return false
+  // No control characters either: a file name cannot hold them.
+  return ![...v].some((c) => c.charCodeAt(0) < 32)
 }
 
 function str(v: unknown, fb: string): string {

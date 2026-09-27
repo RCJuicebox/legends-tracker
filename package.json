@@ -8,6 +8,9 @@
   "engines": {
     "node": ">=24"
   },
+  "os": [
+    "win32"
+  ],
   "scripts": {
     "dev": "electron-vite dev",
     "build": "electron-vite build",

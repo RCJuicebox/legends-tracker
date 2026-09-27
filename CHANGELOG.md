@@ -1,0 +1,212 @@
+# Changelog
+
+What changed in each version. The release workflow publishes a version's section as its release notes, and installed copies show them when an update arrives.
+
+## Unreleased
+
+_Nothing yet._
+
+## 1.9.0 (2026-09-27)
+
+### Gear optimizer: gear you own, or all gear
+
+- **Optimize what you own** is now the **Gear optimizer**, with two modes. **Gear you own** works as before. **All gear** also weighs the best of everything your classes can wear from the eras shown (the top dozen a slot), marks the pieces to get, and says where they drop.
+- Pieces to get are compared the way the upgrade finder's **Compare** setting says: as they drop, or at the merge level of what you wear in that slot. The setting now shows on the optimizer too.
+- The upgrade finder and the optimizer now agree. An item you own is judged as your own copy, listed only in the slot your best set would put it, and ranked after anything to get that beats your best set.
+- Changes that are one move, like a new weapon in Primary pushing the old one to Secondary, show their combined gain.
+
+### Weapons
+
+- **Each hand counts by how often it swings.** Your Dual Wield, Double Attack and Triple Attack skills from your log go through EQEmu's attack rounds, as on the Stats page, so the main hand's weapon ratio and procs count for more than the off hand's.
+- **Weapons: best ratio first** (on by default) keeps the best-ratio weapons in your hands whatever the other weights, so you can tune HP, AC and the rest without a stat-heavy weapon taking over.
+
+### Worn effects and procs
+
+- **Separate tabs.** Worn effects has three sections: In combat, Stats (worn AC, attack, stats, resists and regen, priced by your stat weights) and Utility (Enduring Breath, Ultravision and the like, listed but not valued). Most worn effects were being missed before, because eqlwiki usually writes them as "Effect: X (Worn)".
+- Both tabs filter to **your classes or all classes**, follow the era buttons, and show each item's classes.
+- An exaltation must share a class with the item it goes in; an SK exaltation in a monk weapon is no use to anyone.
+- Procs that land only on undead or summoned creatures are listed but not valued.
+
+### Eras and races
+
+- **Crafted items take their ingredients' eras.** An item with no era of its own is out of era if anything it's made from is, such as a mold from the Epics era. The recipe book now records every ingredient's era and reads recipes laid out one ingredient a line. It downloads again once, in the background.
+- **Dwarven cultural plate** is for dwarves, halflings, gnomes and frogloks only, although eqlwiki says any race can wear it.
+
+## 1.8.0 (2026-09-27)
+
+### Worn effects and procs
+
+Gear's worn effects and combat procs now count, on a new **Worn effects & procs** tab and in the upgrade finder and the optimizer.
+
+- **Valued against your own melee.** Each is worth the damage a minute it adds to your melee, read from your log over the last 7, 14 or 30 days (or all of it), as a share of the melee damage you do now. 1% more is worth your role's Weapon damage (1%) weight, so effects sit on the same scale as stats.
+- **Worn effects** work in any slot and count once however many pieces carry one. Unrighteous Bash (Torrid Corruptor) is worth its +15 on each bash plus the extra bashes from a shorter cooldown, with bash counted no more often than its cooldown allows. So a Torrid Corruptor in an Any slot now earns its keep.
+- **Procs** fire only from a weapon in your hands. The rate is your log's when you have fired the proc, else EQEmu's (2 a minute, raised a little by DEX). The damage is your log's or the spell file's; a proc that lasts counts no more than kept up the whole time, since a new firing refreshes it.
+- Stuns, debuffs, buffs and bashing with a two-hander are listed but not valued yet.
+
+### Exaltations and pet gear
+
+- **Worn and proc exaltations** (slots 9 and 10) bring their item's worn effect and proc in place of the host's, the way focus exaltations already did.
+- **Exaltations kept in Storage › Exaltations** are tried in the focus, worn and proc slots of your pieces of the same kind, and only ones your classes may use.
+- **Gear on your pet** counts as yours: the optimizer suggests taking a pet's piece when it is an upgrade for you. The log's pet list names no exaltations, so those pieces count without them.
+- The optimizer no longer swaps two pieces for nothing, or shows an earring moving from one ear to the other.
+
+### Fixes
+
+- **Damage meter:** another player's hits and misses with one skill ("slashes" and "tries to slash") are now one row, not two with one at 0% landed.
+- **Pet gear:** a pet holding a two-hander is no longer given a shield, even one that also fits the Back slot.
+
+## 1.7.2 (2026-09-27)
+
+### Gear: weapon ratio weighed as damage, Storage gear, and the finder agreeing with the optimizer
+
+- **Weapon ratio is weighed per 1% more damage from the hand.** It used to be weighed per whole point of ratio, so a weapon with a bit more STR could beat one doing half again the damage. The weight is now called **Weapon damage (1%)**, as on the pet planner: Melee 12, Balanced 6, Tank 3 (1% of melee damage is about 6 Offense). Saved Custom weights are converted so they keep their place against Melee. **Ranged damage (1%)** covers the Range slot.
+- **Storage › Equipment counts as gear you own.** The optimizer and the upgrade finder now weigh the gear you keep in Storage, and can suggest taking a piece out to wear.
+- **Items you own are judged as your copy.** On "At your merge level" the finder used to score an item you own at the level of what you wear, and add it as an extra copy. It now uses your best copy at its own merge level, and in the round credits it with what the optimizer's set loses without it, so the finder and the optimizer agree.
+- The Gear page's key ring list is now called **Storage**, with each tab named as the game names it (Equipment, Exaltations, Activated Items).
+
+## 1.7.1 (2026-09-27)
+
+### Fix: focus exaltations replace the item's own focus
+
+- An item's **Focus Exaltation** now takes the place of the item's own focus, the way the game's item window shows it. Before, both were counted, so an exalted Djarn's Amethyst Ring still showed as your Spell Haste II even though its focus had become the exaltation's Extended Range II.
+- **Click, Worn and Proc exaltations** bring no focus.
+- Ordinary augments still add their focus to the item's.
+
+## 1.7.0 (2026-09-27)
+
+### Gear: one haste item, and weapon ratio in the hands only
+
+- **One haste item is enough.** Haste does not stack, and the optimizer now plans for that: it tries each haste item you own as the one you wear, and keeps whichever leaves the rest of the set best. It can now move your haste from your gloves to a belt so better gloves can go on, a trade it could not find one piece at a time.
+- **Weapon ratio counts in Primary and Secondary only.** A new **Ranged ratio** weight covers the Range slot, and it is 0 in every preset, so a melee can value weapon ratio highly and still get stats in the Range slot. Raise Ranged ratio under Custom weights if you want a good bow or throwing weapon there.
+- **Upgrades judged in the round** now start from the best arrangement of what you already own, so a candidate is credited only with what it adds.
+- The optimizer is also a little faster than before.
+- Merge values weigh each item as its slot does, so merging a bow in the Range slot no longer counts weapon ratio.
+
+### Also
+
+- **Damage meter:** charmed pets are followed from the charm spell's own landing line, so Cajole Undead pets (" moans.") are tracked, and a heal cast in between no longer takes the pet.
+
+## 1.6.1 (2026-09-26)
+
+### Spell upgrades, sorted out
+
+Follow-ups to the Spell upgrades tab from 1.6.0.
+
+- **Transport and Misc sections.** The spell file marks a gate or a cure beneficial with no duration, the same as a heal, so gates, ports, rings, circles and binds were filed under Heal with a healing bonus they cannot get. Sections now go by effects too: anything that moves you is **Transport**; bind affinity and a "heal" that heals nothing (cures, summoned items, resurrection) are **Misc**. Neither is in the guide's table, so they get only the cast and mana cuts.
+- **Your trio.** A toggle on its own row keeps only spells one of your current classes has at its level (what `/who` last said, else the character sheet; never over the level cap of 50). A spell a Necromancer gets at 39 is not the Shadow Knight's until 49, so it is left out until then. **Every class you have cast as** shows everything in the window.
+- **Ignore.** Each row has an Ignore button for a spell you will never put motes into; "Show ignored" lists them faint with a Restore button. Kept per character on this machine.
+
+## 1.6.0 (2026-09-26)
+
+### Spell upgrades: which spells to put motes into
+
+The Motes page has a third tab, **Spell upgrades**. It looks at every spell and song you cast over the last 7, 14 or 30 days of play (or all your logs) and scores the next rank of each, so the best value per upgrade comes first.
+
+- **The rules.** A spell at rank N needs 2^N xp for the next rank, and on a spell every mote counts its xp whatever the rank (Infinitesimal 1, Minor 1, Lesser 2, Potential 4, Major 5 … Infinite 10). There is no tier limit as on items, so the low ranks no item of yours can use any more are worth their full xp here.
+- **What a rank gives** comes from the community's EQL spell upgrade (mote) guide, by category: nukes and lifetaps −2% cast, −2% mana, +6% damage; DoTs −4% cast, −2% mana, +5% duration, +3% per tick; heals about +3% healing; debuffs, charms, mezzes and buffs −4% cast, −4% mana, +10% duration; pet summons +1 pet level. Every rank also takes −2% recovery and reuse. Duration bonuses use your Spell Timers' per-rank table.
+- **Worth** is casts × points per cast, where a point is one cast made one percent better, weighed the way you choose (damage and healing, duration, mana, cast time, recovery and reuse, a level). Order by worth per xp, worth, or casts; filter by the guide's sections.
+- **Pay with** lists the cheapest motes in your stock for the step, lowest rank first, since each rank's combine value doubles while its xp barely grows.
+- Spells at rank X are listed last with nothing to plan. Potions, clickies and abilities granted outside the spell book are left out.
+
+### Also
+
+- Spells now carry their mana cost from the spell file.
+
+## 1.5.0 (2026-09-26)
+
+### Gear
+
+- **Upgrade finder judges in the round.** Each candidate is added to everything you own and the optimizer wears the lot as well as it can around it. The gain shown is what the whole set gains, so a belt that pushes your focus belt into a free Any slot loses no focus, and lore twins and two-handers are caught. Cards say where the item lands and what else moves. "This slot only" gives the old one-slot answer.
+- **Best merge tab.** The next +1 of each worn item, ranked by stat gain per mote value. Each step is costed by the mote its level takes, with what your stock can make; Plan sends the item to the Motes planner. A warning shows when gear was looted after your inventory export.
+- **Enough rank for a focus.** On the Focus effects tab, pick a rank that is enough for you; stronger ranks then count for no more, so the finder and optimizer stop chasing the best.
+
+### Buffs
+
+- The missing-buffs reminder is on-screen text only; it is never spoken.
+- Buffs stay off the overlays unless **Buffs from my group** is on (Buffs page or Settings › Spell tracking). It is off by default.
+- Accepting a group invite puts the inviter in your group: the game prints no join line for them, so the invite line is used.
+- **Reset group** on the Live and Buffs pages, for when the log missed a change.
+
+### Timers
+
+- Potions and clickies get no focus: Elixir of Clarity VI is its 30 minutes whatever you wear or have trained.
+
+### Motes
+
+- Click a run's type to mark it a dungeon crawl. The game tells only the instance owner that a crawl was completed, so runs in someone else's instance need marking. Marks survive rescans.
+
+### Fixes
+
+- The damage meter overlay's fight picker opens now (an in-window menu; the old native dropdown needed focus, which overlays never take).
+- Copy buttons on the Live page work again.
+- "Your group has been disbanded." now empties the group.
+
+## 1.4.0 (2026-09-25)
+
+### Buffs: the game's real stacking rules, your own buffs, and every permanent buff worth keeping up
+
+**Stacking, as the game does it.** The best combination now follows the client's own rules (the ones EQEmu reproduces): a buff with the same effect in the same slot is blocked when weaker and replaces the old one otherwise; the block/overwrite commands honour their thresholds at the caster's level; effects the game ignores in stacking (levitate, see invisible, "HP when cast", focus limits) never clash; a DoT blocks regeneration. Order matters and the plan says so: a level-50 Strength stays on under Harnessing of Spirit, but only when Harnessing lands second ("Harnessing of Spirit (after Strength)"). A buff on you that blocks a chosen one is called out to click off first. Verified against every "did not take hold" pair in a real log since the August spell data.
+
+**Your own buffs.** Self-only buffs are listed (marked *self*), and whatever your own classes can cast is yours to keep up, group or no group: the reminder says "Cast Rage; ask Brenna for Temperance". With no group, the best combination is what you can cast yourself. The tracker learns your classes from your own /who line (or the character sheet). A permanent self buff is spoken once per run.
+
+**Every permanent buff that helps.** New *Procs* line for the combat innates (Vampiric Embrace, Divine Might, Instrument of Nife, Scream of Death, Call of Sky) and the rogue poisons, each labelled with the strike it procs; new *Other* line for Breath of the Dead, Hawk Eye and Form of the Great Wolf. Vision buffs are left out. Wards (Ward/Guard of Vie, Alendar, Calrena) and the heal-per-hit blessings (Blessing of the Page line) are offered too.
+
+**Fixes.** Rune I to IV are four enchanter spells, no longer merged into one. Every offered buff was checked against the eqlwiki's era tags: all Classic, all in game. The "Left out" list in the best combination starts collapsed.
+
+## 1.3.0 (2026-09-25)
+
+Legends Tracker 1.3.0. Download `Legends-Tracker-Setup-1.3.0.exe` below; installed copies update themselves.
+
+### New
+
+- **Buffs: the best combination that stacks.** The tracker now works out the set of buffs worth the most that can all be on you at once, from the ones you pick that your group can cast and what is on you already, and asks for what is missing — saying what each would replace. Stacking follows the game's own spell file: two buffs with the same effect in the same slot do not stack, and some block others outright. With a shaman, that is Infusion of Spirit with Strength, Stamina, Dexterity and Agility over Harnessing of Spirit; with a cleric and a paladin, the cleric's Temperance; with only a paladin, the Symbol. The Buffs page shows the combination with your group or with anyone, and what was left out and why. Buffs are valued from their real effects at level 50 (Protection of Nature is +250 HP and +55 AC).
+- **Microsoft neural voices.** On the Audio page, paste your own Azure Speech key (the free tier is plenty) and pick from Microsoft's neural voices — Jenny, Aria, Guy and hundreds more. Each phrase is fetched once and kept on your PC; if Azure cannot be reached, the Windows voice speaks instead. The key is stored encrypted and only ever sent to Azure.
+- **Charm pets on the damage meter can be turned off** (a "Charm pets" checkbox beside "Pets with owners"). A new charm ends the charmer's last one, two people charming mobs of the same name share a pet row instead of one taking the other's, and a charmed pet's "Attacking" tell no longer makes every mob of its name your pet.
+
+### Also in this release
+
+- The installed app now uses the same Windows identity as its shortcuts, so notifications and pinning line up.
+
+## 1.2.1 (2026-09-25)
+
+Legends Tracker 1.2.1. Download `Legends-Tracker-Setup-1.2.1.exe` below; installed copies update themselves.
+
+**If you installed 1.2.0:** it stops at start with "Cannot find module './src/koffi/index.cjs'" and cannot update itself. Install 1.2.1 over it from the download below; your settings and data are kept. 1.2.0 has been withdrawn.
+
+### New
+
+- **Buffs page**: who in your group can buff you with what, and when to ask. Classes come from `/who` (type `/who <name>` for anyone it doesn't know yet). Buffs others land on you are followed until they fade, shown on the Buffs overlay, and a spoken warning comes a minute before one runs out. When a groupmate could give you a buff you want and don't have, it says whom to ask for what — never mid-fight, and at most every ten minutes. Pick the buffs you want from each class's list; out of the box it is each class's best HP & AC, haste, spell haste and mana regen. Songs and buffs under five minutes are left out.
+- **Tradeskills page**: star the recipes you make (Distillate of Clarity, Elixir of Greater Concentration, Celestial Healing…) and see each ingredient, how many you have (bags, bank and the tradeskill depot), what to buy, where to get it (vendors, or where it drops, is foraged or crafted), and what a batch costs. Prices are what your log shows you paying last, else the wiki's merchant value, or one you type in. Recipes come from eqlwiki (a one-minute download, refreshed weekly); every recipe and ingredient links to EQ Traders Corner.
+- **Pet gear** (Gear › Pet): the best items you own for your pet, within the slots your classes give it. The pet's classes, level and base melee come from its eqlwiki page; what it wears now comes from `/pet inventory check`. Weapons are judged by the melee they give the pet under the Pet Guide's rules.
+- **Respawns page**: how long each mob you kill takes to come back, measured from the log, and a one-click timer that starts at every kill of it and counts down on the new Respawns overlay.
+- **Charm pets on the damage meter**: a mob charmed by you or a groupmate is that player's pet, apart from other mobs of its name, until it turns on the group or dies.
+- **New icon**.
+
+### Also in this release
+
+- Speech uses Windows' newer voices too: anything added under Settings › Time & language › Speech › Manage voices shows up on the Audio page after a restart.
+- Loot: sessions fold, folded to start with.
+- The inventory export's tradeskill depot is read.
+
+## 1.1.0 (2026-09-25)
+
+Legends Tracker 1.1.0. Download `Legends-Tracker-Setup-1.1.0.exe` below; installed copies update themselves.
+
+### New
+
+- **Damage meter**, its own page under Play and a floating overlay. Fights open on the first blow and close on the last kill or after an idle gap; sessions per zone or on New session. Damage, Incoming and Healing views for everyone, your group or just you, with drilldowns into skills, targets and attackers, your defence rates, damage by mob, a DPS-over-time chart, active DPS, and copy-as-text. Pets are claimed from the log and can fold into their owner. The overlay's header shows its controls on hover and a pin unlocks its rows. The last hour of the log is read in on start.
+- **Procs card** on the meter: every effect that fired without a cast line, with firings per minute of active combat time; abilities you press and Finishing Blow swings are marked.
+- **Loot page**: everything looted, by session, with coin from corpses and sales, what auto-loot did with each item, and what the item is for from its eqlwiki page (slot and stats, or notes, quests, recipes and merchant value), with links to eqlwiki and Allakhazam.
+- **Updates** are checked every hour, and a Windows notification announces a new version when it is found and again, clickable to restart, when it has downloaded.
+- `Restart Legends Tracker.cmd` for running from source, and a `--quit` request a running copy answers by shutting down cleanly.
+
+### Also in this release
+
+- Gear: focus effects judged on the spells you actually cast; the upgrade finder weighs stats for your character and era; Any slots take any gear; an optimizer for what you own.
+- Stats: attack line (Offense and Accuracy), character sheet read from the in-game window, skill caps from the game's own tables.
+- Achievements and inventory read straight from the game's export files.
+- Motes: per-day and per-run counts, an upgrade planner, counts read from the currency window.
+- Engine: fixes to log parsing, triggers and the archiver; logging to the app's log folder; crash handlers; input validation on every IPC channel; many more tests.
+- Lint with oxlint in CI.
+
+## 1.0.0 (2026-09-24)

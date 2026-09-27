@@ -98,6 +98,7 @@ export class Notifier {
 
   pushFeed(kind: FeedItem['kind'], text: string): void {
     if (kind === 'warn') log.warn(text)
+    else if (kind === 'info') log.info(text)
     const item = { at: Date.now(), kind, text }
     this.items.push(item)
     if (this.items.length > FEED_MAX) this.items.shift()

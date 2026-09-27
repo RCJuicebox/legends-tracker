@@ -1,4 +1,4 @@
-import { app, protocol } from 'electron'
+import { app, dialog, protocol } from 'electron'
 import { cpSync, existsSync, mkdirSync, renameSync, rmSync } from 'node:fs'
 import { release } from 'node:os'
 import { join } from 'node:path'
@@ -14,7 +14,24 @@ app.setPath('userData', process.env['EQL_USER_DATA'] || join(app.getPath('appDat
 // Each profile keeps its own diagnostic log beside its settings.
 initLog(join(app.getPath('userData'), 'logs'))
 log.info(`Legends Tracker ${app.getVersion()}${app.isPackaged ? '' : ' (development)'} on Windows ${release()} ${process.arch}, Electron ${process.versions.electron}`)
-process.on('uncaughtException', (e) => log.error('Uncaught exception:', e))
+// Something unexpected: logged, and shown once with where the log is, since the app may now be in a
+// state nobody meant. A second one ends it rather than carry on further.
+let uncaught = 0
+process.on('uncaughtException', (e) => {
+  log.error('Uncaught exception:', e)
+  if (++uncaught > 1) {
+    app.exit(1)
+    return
+  }
+  try {
+    dialog.showErrorBox(
+      'Legends Tracker hit an unexpected error',
+      `${e instanceof Error ? e.message : String(e)}\n\nIt keeps running, but if it misbehaves, restart it. The details are in ${join(app.getPath('userData'), 'logs', 'main.log')}.`
+    )
+  } catch {
+    // Too early for a dialog; the log has it.
+  }
+})
 process.on('unhandledRejection', (e) => log.error('Unhandled rejection:', e))
 
 protocol.registerSchemesAsPrivileged([{ scheme: 'eqicon', privileges: { standard: true, secure: true, supportFetchAPI: true } }])

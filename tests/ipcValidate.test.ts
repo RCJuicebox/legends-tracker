@@ -11,6 +11,13 @@ describe('character keys from a page', () => {
     expect(isCharacterKey('C:\\x')).toBe(false)
     expect(isCharacterKey('')).toBe(false)
     expect(isCharacterKey(42)).toBe(false)
+    expect(isCharacterKey('..')).toBe(false)
+    expect(isCharacterKey('a*b')).toBe(false)
+  })
+
+  it('takes any name the game can put in a file name', () => {
+    expect(isCharacterKey('Jean-Luc_neriak')).toBe(true)
+    expect(isCharacterKey('Björn_neriak')).toBe(true)
   })
 })
 

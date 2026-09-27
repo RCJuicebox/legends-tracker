@@ -1,4 +1,4 @@
-import { app, shell } from 'electron'
+import { app, powerMonitor, shell } from 'electron'
 import { isOwnPage } from './push'
 import { log } from './log'
 import type { AppContext } from './context'
@@ -22,12 +22,36 @@ export function registerLifecycle(ctx: AppContext): void {
     wc.on('will-navigate', (ev, url) => {
       if (!isOwnPage(url)) ev.preventDefault()
     })
+    // A page's own errors and warnings belong in the diagnostic log, not just its console.
+    wc.on('console-message', (ev) => {
+      if (ev.level !== 'error' && ev.level !== 'warning') return
+      const where = ev.sourceId ? ` (${ev.sourceId.split('/').pop()}:${ev.lineNumber})` : ''
+      ;(ev.level === 'error' ? log.error : log.warn)(`Page ${wc.getURL().split('/').pop()}: ${ev.message}${where}`)
+    })
     wc.setWindowOpenHandler(({ url }) => {
       if (/^https?:/.test(url)) void shell.openExternal(url)
       return { action: 'deny' }
     })
   })
-  app.on('render-process-gone', (_e, wc, d) => log.error(`A page stopped (${d.reason}, exit ${d.exitCode}): ${wc.getURL()}`))
+  // A page that crashed is loaded again: the main window reloads, an overlay or the audio window is
+  // made afresh. Not while quitting, and not for a page that closed normally.
+  app.on('render-process-gone', (_e, wc, d) => {
+    log.error(`A page stopped (${d.reason}, exit ${d.exitCode}): ${wc.getURL()}`)
+    if (ctx.windows.quitting || d.reason === 'clean-exit') return
+    setTimeout(() => {
+      if (ctx.windows.quitting) return
+      if (ctx.windows.recover(wc)) return
+      ctx.overlays.recover(wc)
+    }, 1000)
+  })
+
+  // Asleep, timers ran on in the game's world: one that ended while the PC slept is cleared without a
+  // word, rather than every warning and fade of the night spoken at once on waking.
+  powerMonitor.on('resume', () => {
+    const n = ctx.engine.board.endWhere((t) => t.endsAt < Date.now(), 'expired').length
+    log.info(`Woke from sleep${n ? `; cleared ${n} timer${n === 1 ? '' : 's'} that ran out meanwhile` : ''}`)
+    if (n) ctx.engine.pushFeed('info', `Back from sleep: cleared ${n} timer${n === 1 ? '' : 's'} that ran out meanwhile.`)
+  })
   app.on('child-process-gone', (_e, d) => {
     if (d.reason !== 'clean-exit') log.warn(`${d.type} process${d.name ? ` (${d.name})` : ''} stopped: ${d.reason}, exit ${d.exitCode}`)
   })

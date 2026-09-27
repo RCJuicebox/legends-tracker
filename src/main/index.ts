@@ -66,6 +66,7 @@ async function start(ctx: AppContext): Promise<void> {
   windows.createAudio()
   windows.createMain()
   await engine.init()
+  ctx.logSettings()
   if (store.recovered.length) {
     const names = store.recovered.map((f) => basename(f)).join(', ')
     engine.pushFeed('warn', `Some saved settings could not be read and were set aside (${names}, in the app's data folder); defaults are in use for them.`)

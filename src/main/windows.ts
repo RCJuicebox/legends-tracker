@@ -130,6 +130,20 @@ export class Windows {
     loadPage(this.audio, 'audio')
   }
 
+  /** Brings back a crashed main or audio window; false when `wc` is neither. */
+  recover(wc: Electron.WebContents): boolean {
+    if (this.main && !this.main.isDestroyed() && this.main.webContents === wc) {
+      wc.reload()
+      return true
+    }
+    if (this.audio && !this.audio.isDestroyed() && this.audio.webContents === wc) {
+      this.audio.destroy()
+      this.createAudio()
+      return true
+    }
+    return false
+  }
+
   /** The tray icon: click to open, right-click for the menu. */
   createTray(actions: TrayActions): void {
     this.tray = new Tray(nativeImage.createFromPath(this.opts.icon).resize({ width: 16, height: 16 }))

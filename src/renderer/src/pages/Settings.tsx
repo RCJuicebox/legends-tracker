@@ -1,7 +1,7 @@
 import { useApp } from '../state'
-import { mb, ago } from '../api'
+import { api, mb, ago } from '../api'
 import { useInvoke } from '../hooks'
-import { act } from '../toast'
+import { act, showError, showToast } from '../toast'
 import { who } from '../format'
 import { useUpdate, type UpdateState } from '../update'
 import { Field, LoadError, NumberInput, Switch } from '../components/ui'
@@ -61,6 +61,12 @@ export function Settings() {
             <div className="grow">
               <div style={{ fontWeight: 650 }}>Legends Tracker {update.version}</div>
               <div className="muted small">{updateText(u)}</div>
+              {(u?.state === 'ready' || u?.state === 'downloading') && u.notes && (
+                <details className="small">
+                  <summary>What&apos;s new in {u.version}</summary>
+                  <div className="notes">{u.notes}</div>
+                </details>
+              )}
             </div>
             {u?.state === 'ready' ? (
               <button className="btn primary" onClick={() => void act('update:install')}>
@@ -77,6 +83,12 @@ export function Settings() {
               Open log folder
             </button>
             <span className="faint small">What the app wrote while it ran. Attach the newest file to a bug report.</span>
+          </div>
+          <div className="row">
+            <button className="btn" onClick={() => void copyDiagnostics()}>
+              Copy diagnostics
+            </button>
+            <span className="faint small">The version, your PC, the settings that matter and the end of the log, ready to paste into a bug report. No keys, and no Windows user name.</span>
           </div>
         </div>
 
@@ -189,4 +201,14 @@ export function Settings() {
       </div>
     </>
   )
+}
+
+/** Copies the diagnostics text for a bug report. */
+async function copyDiagnostics(): Promise<void> {
+  try {
+    await navigator.clipboard.writeText(await api.invoke('app:diagnostics'))
+    showToast('Diagnostics copied. Paste them into your bug report.')
+  } catch (e) {
+    showError('Could not copy the diagnostics', e)
+  }
 }

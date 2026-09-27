@@ -2,6 +2,7 @@ import { app, shell } from 'electron'
 import { handle } from './handle'
 import { onSend } from '../push'
 import { logDir } from '../log'
+import { diagnostics } from '../diagnostics'
 import { checkGameFolder, findInstall, resolveGameFolder } from '../game'
 import { meterOptions, sanitizeCharacter, sanitizeSettings } from '../validate'
 import type { AppContext } from '../context'
@@ -26,6 +27,7 @@ export function registerAppIpc(ctx: AppContext): void {
     triggerErrors: engine.triggers.errors
   }))
   handle('app:openLogs', () => shell.openPath(logDir()))
+  handle('app:diagnostics', () => diagnostics(ctx))
   handle('settings:save', (s) => {
     const clean = sanitizeSettings(s, store.settings.get())
     if (!clean) throw new Error('Settings were not saved: they were not in the expected form.')

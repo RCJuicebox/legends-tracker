@@ -79,6 +79,8 @@ export class Engine {
   private archiveTimer: NodeJS.Timeout | null = null
   /** Pasted test lines must not add to the real mote history or stock. */
   private simulating = false
+  /** Other characters' logs the feed has mentioned. */
+  private readonly saidElsewhere = new Set<string>()
   /** The start-up mote catch-up, which the first combat read waits for. */
   private startupRead: Promise<unknown> | undefined
 
@@ -195,7 +197,10 @@ export class Engine {
     }
     await this.loadSpells()
     this.tickTimer = setInterval(() => this.tick(), 200)
-    this.archiveTimer = setInterval(() => void this.archiveCheck(), 30_000)
+    this.archiveTimer = setInterval(() => {
+      void this.archiveCheck()
+      void this.lookElsewhere()
+    }, 30_000)
     this.archives.resumeStaging().catch((e: unknown) => log.error('Finishing interrupted archives failed:', e))
     // Reading history starts the backlog before the tailer can give a line, so nothing slips between.
     const history = this.store.motesFresh ? this.rebuildMoteHistory() : this.catchUpMotes()
@@ -390,6 +395,7 @@ export class Engine {
       this.combat.live(line)
       this.status.lastLineAt = line.time
       this.statusOut.mark()
+      if (this.status.elsewhere) this.status.elsewhere = null
     }
     this.moteHistory.linesRead(t.logFile, end)
   }
@@ -541,6 +547,26 @@ export class Engine {
 
   logsOverview() {
     return this.archives.overview()
+  }
+
+  /**
+   * Another character: the watched log has been quiet for a while and another log in the game folder
+   * was written in the last minute. The Live page offers to switch; the feed says so once per log.
+   */
+  private async lookElsewhere(now = Date.now()): Promise<void> {
+    const quiet = this.status.watching && now - this.status.lastLineAt > 120_000
+    let found: WatchStatus['elsewhere'] = null
+    if (quiet && this.settings.installDir) {
+      const other = (await listLogs(this.settings.installDir)).find((l) => !samePath(l.path, this.settings.logFile) && now - l.modified < 60_000)
+      if (other) found = { path: other.path, character: other.character.split('_')[0] }
+    }
+    if ((found?.path ?? '') === (this.status.elsewhere?.path ?? '')) return
+    this.status.elsewhere = found
+    if (found && !this.saidElsewhere.has(found.path)) {
+      this.saidElsewhere.add(found.path)
+      this.pushFeed('info', `${found.character}'s log is being written while ${this.status.character}'s is quiet. Switch on the Live page to follow ${found.character}.`)
+    }
+    this.emitStatus()
   }
 
   /** The game has closed: nothing it was timing is still running. */

@@ -42,6 +42,8 @@ export interface WatchStatus {
   spellError: string
   lastLineAt: number
   logSize: number
+  /** Another character's log that is being written while the watched one is quiet: likely who is being played now. */
+  elsewhere?: { path: string; character: string } | null
 }
 
 export interface LogFileInfo {
@@ -148,6 +150,6 @@ export type UpdateState =
   | { state: 'dev' }
   | { state: 'idle'; checkedAt: number }
   | { state: 'checking' }
-  | { state: 'downloading'; version: string; percent: number }
-  | { state: 'ready'; version: string }
+  | { state: 'downloading'; version: string; percent: number; notes?: string }
+  | { state: 'ready'; version: string; notes?: string }
   | { state: 'error'; message: string }

@@ -1,10 +1,11 @@
-import { HKEY_CURRENT_USER, HKEY_LOCAL_MACHINE, isProcessRunning, registryString } from './win32'
+import { HKEY_CURRENT_USER, HKEY_LOCAL_MACHINE, isFixedDrive, isProcessRunning, registryString } from './win32'
 import { existsSync, promises as fs } from 'node:fs'
 import { dirname, join } from 'node:path'
 import type { ArchiveInfo, GameFolderCheck, LogFileInfo } from '../shared/types'
 import { parseLogLine, zoneEntered } from '../core/logLine'
 import { readBackward } from './sources/logHistory'
 import { log } from './log'
+import { isCharacterKey } from './validate'
 
 const INSTALL_SUFFIXES = [
   '\\Daybreak Game Company\\Installed Games\\EverQuest Legends',
@@ -65,6 +66,10 @@ export async function findInstall(): Promise<string> {
   const registered = fromUninstallEntry()
   if (registered) return registered
   for (const drive of 'CDEFGHIJKLMNOPQRSTUVWXYZ') {
+    // A disconnected network drive can hold a look at it for the network's timeout: only fixed disks
+    // are tried, or, where Windows cannot be asked, the first few letters.
+    const fixed = isFixedDrive(drive)
+    if (fixed === false || (fixed === null && drive > 'E')) continue
     for (const suffix of INSTALL_SUFFIXES) {
       const p = `${drive}:${suffix}`
       if (isGameFolder(p)) return p
@@ -112,7 +117,8 @@ export async function listLogs(installDir: string): Promise<LogFileInfo[]> {
   const out: LogFileInfo[] = []
   for (const name of names) {
     const m = /^eqlog_(.+)\.txt$/i.exec(name)
-    if (!m) continue
+    // The same rule every other use of a character name goes by.
+    if (!m || !isCharacterKey(m[1])) continue
     // A log archived or deleted since the folder was listed is simply left out.
     const st = await fs.stat(join(dir, name)).catch(() => null)
     if (!st) continue
@@ -146,8 +152,9 @@ function quietIfMissing(e: unknown, what: string): void {
   if ((e as NodeJS.ErrnoException).code !== 'ENOENT') log.warn(what, e)
 }
 
+/** Whether the game is running. Unknown counts as running, so nothing (the archiver) acts on a log the game may hold. */
 export async function isGameRunning(): Promise<boolean> {
-  return isProcessRunning('eqgame.exe')
+  return isProcessRunning('eqgame.exe') ?? true
 }
 
 /**

@@ -9,6 +9,8 @@ for **EverQuest Legends**, driven by the game's chat log and its own data files.
 Read the log, play sound, draw overlays. No process memory reads, no injection, no input sent
 to the game.
 
+Windows only, like the game: it uses Windows' speech, OCR and window APIs.
+
 ## Installing
 
 Run **`Legends-Tracker-Setup-<version>.exe`** from the GitHub Releases page. It installs for the current
@@ -219,8 +221,9 @@ The sound library is the game's own `AudioTriggers\default` and `shared` folders
 
 ## Audio
 
-Speech is rendered by Windows' own speech engine (a resident PowerShell process driving
-`System.Speech`) to WAV, then mixed with alert sounds in one audio context on the device you
+Speech is rendered by Windows' own speech engine (a PowerShell process driving WinRT and
+`System.Speech`, started when first needed and stopped after five quiet minutes) to WAV, or by Azure's
+neural voices with your own key, then mixed with alert sounds in one audio context on the device you
 choose. Speech follows that device instead of the system default. Phrases are cached. Speech plays
 one phrase at a time, and the backlog is capped so warnings about a finished fight get dropped.
 
@@ -234,9 +237,10 @@ meter's list; Windows keeps forwarding mouse moves to it while it ignores clicks
 header hands it the mouse for its controls and moving off hands it back.
 
 By default the overlays show only while the game (or this app's own window) has focus, and hide when
-you tab to anything else; audio cues play regardless. A resident PowerShell loop reads the foreground
-window's process four times a second, and watches for `eqgame.exe`: when the game closes, every timer is
-cleared.
+you tab to anything else; audio cues play regardless. The app asks Windows (through koffi, no helper
+process) for the foreground window's process four times a second, and watches for `eqgame.exe`: when the
+game closes, every timer is cleared. Overlays hidden with the game are sent nothing and slowed until they
+show again.
 
 ## Motes
 

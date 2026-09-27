@@ -15,6 +15,7 @@ interface Api {
   CreateToolhelp32Snapshot: (flags: number, pid: number) => unknown
   Process32FirstW: (snap: unknown, entry: Record<string, unknown>) => boolean
   Process32NextW: (snap: unknown, entry: Record<string, unknown>) => boolean
+  GetDriveTypeW: (root: string) => number
   RegGetValueW: (hkey: number, subKey: string, value: string, flags: number, type: null, data: Buffer, size: number[]) => number
   entrySize: number
 }
@@ -49,6 +50,7 @@ function load(): Api | null {
       Process32FirstW: kernel32.func('bool __stdcall Process32FirstW(void *snap, _Inout_ PROCESSENTRY32W *entry)'),
       Process32NextW: kernel32.func('bool __stdcall Process32NextW(void *snap, _Inout_ PROCESSENTRY32W *entry)'),
       RegGetValueW: advapi32.func('int32 __stdcall RegGetValueW(intptr_t hkey, str16 subKey, str16 value, uint32 flags, void *type, _Out_ uint8_t *data, _Inout_ uint32 *size)'),
+      GetDriveTypeW: kernel32.func('uint32 __stdcall GetDriveTypeW(str16 root)'),
       entrySize: koffi.sizeof(ENTRY)
     }
   } catch (e) {
@@ -99,12 +101,12 @@ export function processName(pid: number): string {
   }
 }
 
-/** Whether a process with this executable name ("eqgame.exe") is running. */
-export function isProcessRunning(exe: string): boolean {
+/** Whether a process with this executable name ("eqgame.exe") is running; null when Windows cannot be asked. */
+export function isProcessRunning(exe: string): boolean | null {
   const w = load()
-  if (!w) return false
+  if (!w) return null
   const snap = w.CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0)
-  if (isNull(snap)) return false
+  if (isNull(snap)) return null
   const want = exe.toLowerCase()
   try {
     const entry: Record<string, unknown> = { dwSize: w.entrySize }
@@ -135,4 +137,14 @@ export function registryString(hkey: number, subKey: string, value: string): str
   const rc = w.RegGetValueW(key, subKey, value, RRF_RT_REG_SZ | RRF_RT_REG_EXPAND_SZ, null, buf, size)
   if (rc !== 0) return ''
   return buf.toString('utf16le', 0, Math.max(0, size[0] - 2)).replace(/\0+$/, '')
+}
+
+/** Drive type 3: a fixed disk, as opposed to removable, network, CD or RAM. */
+const DRIVE_FIXED = 3
+
+/** Whether a drive letter is a local fixed disk; null when Windows cannot be asked. Asking never touches the drive itself. */
+export function isFixedDrive(letter: string): boolean | null {
+  const w = load()
+  if (!w) return null
+  return w.GetDriveTypeW(`${letter}:\\`) === DRIVE_FIXED
 }
