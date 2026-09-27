@@ -9,7 +9,7 @@ import type { AudioCommand, PushChannel, Pushes } from '../shared/ipc'
 // The main window, the hidden audio window and the tray icon: creating them, remembering where the
 // main window was, and sending them things.
 
-export type Page = 'index' | 'overlay' | 'alerts' | 'audio'
+export type Page = 'index' | 'overlay' | 'overlays' | 'alerts' | 'audio'
 
 /** Loads one of the app's pages into a window: from the dev server in development, the built file otherwise. */
 export function loadPage(win: BrowserWindow, page: Page, query: Record<string, string> = {}): void {

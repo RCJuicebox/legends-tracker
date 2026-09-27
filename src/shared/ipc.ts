@@ -270,6 +270,8 @@ export interface Invokes {
   'combat:get': () => CombatSnapshot
   'combat:segment': (id: string) => Segment | null
   'combat:sessionTimeline': (id: string) => StitchedTimeline | null
+  /** A host overlay window asks for its overlays and the newest timers and meter once its page is up. */
+  'overlay:hostState': (display: number) => { configs: OverlayConfig[]; origin: { x: number; y: number }; timers: TimerView[]; combat: CombatSnapshot | null } | null
   'combat:newSession': () => CombatSnapshot
   'combat:addMember': (name: string) => CombatSnapshot
   'combat:removeMember': (name: string) => CombatSnapshot
@@ -399,6 +401,8 @@ export interface Pushes {
   'overlay:timers': (timers: TimerView[]) => void
   'overlay:combat': (snapshot: CombatSnapshot) => void
   'overlay:alert': (alert: { text: string; color: string; durationSec: number }) => void
+  /** The overlays one host window draws, and where the window's top left is on the screen. */
+  'overlay:host': (update: { configs: OverlayConfig[]; origin: { x: number; y: number } }) => void
 
   'audio:config': (audio: AudioSettings) => void
   'audio:play': (command: AudioCommand) => void
@@ -443,7 +447,7 @@ const INVOKE_CHANNELS: Record<InvokeChannel, true> = {
   'overlays:demo': true,
   'combat:get': true,
   'combat:segment': true,
-  'combat:sessionTimeline': true,
+  'combat:sessionTimeline': true, 'overlay:hostState': true,
   'combat:newSession': true,
   'combat:addMember': true,
   'combat:removeMember': true,
@@ -544,6 +548,7 @@ const PUSH_CHANNELS: Record<PushChannel, true> = {
   'overlay:timers': true,
   'overlay:combat': true,
   'overlay:alert': true,
+  'overlay:host': true,
   'audio:config': true,
   'audio:play': true
 }

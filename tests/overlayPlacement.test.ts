@@ -1,7 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { OverlayConfig } from '../src/shared/types'
 
-// onScreen is not exported: it is seen through OverlayManager.apply, which places each window with it.
+// onScreen is not exported: it is seen through OverlayManager.apply, which places each window with it
+// (a host window covering one overlay while playing sits exactly where that overlay does).
 // Electron's windows and screen are stand-ins that record where a window was put.
 type Rect = { x: number; y: number; width: number; height: number }
 const displays: { workArea: Rect }[] = []
@@ -32,7 +33,8 @@ vi.mock('electron', () => {
   }
   return {
     BrowserWindow,
-    screen: { getAllDisplays: () => displays, getPrimaryDisplay: () => displays[0] }
+    // One display id for all: while playing, the overlays of one display share a host window.
+    screen: { getAllDisplays: () => displays, getPrimaryDisplay: () => displays[0], getDisplayMatching: () => ({ id: 1 }) }
   }
 })
 
@@ -70,9 +72,7 @@ function placed(at: Partial<OverlayConfig>, ...areas: Rect[]): Rect {
   // A new id each time, so each call makes a window of its own.
   manager.apply([overlay({ id: `o${created.length + 1}`, ...at })])
   const w = created[created.length - 1]
-  // Created there, then put there again by apply.
-  expect(w.bounds[w.bounds.length - 1]).toEqual(w.opts)
-  return w.opts
+  return w.bounds[w.bounds.length - 1] ?? w.opts
 }
 
 describe('overlay placement', () => {
@@ -121,5 +121,25 @@ describe('overlay placement', () => {
     manager.setArranging(true)
     manager.apply([overlay({ x: 9000, y: 9000 })])
     expect(w.bounds.length).toBe(before)
+  })
+})
+
+describe('host windows', () => {
+  it('draws the overlays of one display in one window over just their area', () => {
+    displays.push({ workArea: PRIMARY })
+    manager.apply([overlay({ id: 'a', x: 100, y: 100, width: 300, height: 200 }), overlay({ id: 'b', x: 900, y: 600, width: 200, height: 100 })])
+    expect(created).toHaveLength(1)
+    const w = created[0]
+    expect(w.bounds[w.bounds.length - 1]).toEqual({ x: 100, y: 100, width: 1000, height: 600 })
+  })
+
+  it('gives each overlay a window of its own while arranging, and one host again after', () => {
+    displays.push({ workArea: PRIMARY })
+    manager.apply([overlay({ id: 'a' }), overlay({ id: 'b', x: 500 }), overlay({ id: 'c', visible: false })])
+    expect(created).toHaveLength(1)
+    manager.setArranging(true)
+    expect(created).toHaveLength(3)
+    manager.setArranging(false)
+    expect(created).toHaveLength(4)
   })
 })

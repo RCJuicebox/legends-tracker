@@ -1,0 +1,15 @@
+<!doctype html>
+<html lang="en" class="overlay-html">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' eqicon: data:; media-src 'self' blob: data:; connect-src 'self' ws: http://localhost:*"
+    />
+    <title>Overlays</title>
+  </head>
+  <body class="overlay-body">
+    <div id="root"></div>
+    <script type="module" src="/src/overlay/host.tsx"></script>
+  </body>
+</html>

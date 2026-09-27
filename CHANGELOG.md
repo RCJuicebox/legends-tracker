@@ -68,7 +68,7 @@ What changed in each version. The release workflow publishes a version's section
 - **Timer bars drain smoothly by themselves**, and the overlays redraw only to change the clock text.
 - **Pages redraw only when what they show changes**, not every second while you play.
 - **Spell data loads in about two-thirds of the time** and holds a third less memory. The item catalog is no longer kept in memory when no Gear page is open.
-- The **Alerts** overlay is a small page of its own, quicker to start.
+- **The overlays on a monitor now share one window** while you play (about 100 MB less memory for each overlay after the first). **Arrange overlays** still gives each its own window to drag and resize, across monitors too.
 - **Copy diagnostics** lists each window's memory and CPU, for a report about the app being slow or heavy.
 
 ## 1.9.0 (2026-09-27)

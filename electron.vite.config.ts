@@ -52,6 +52,7 @@ export default defineConfig({
         input: {
           index: resolve('src/renderer/index.html'),
           overlay: resolve('src/renderer/overlay.html'),
+          overlays: resolve('src/renderer/overlays.html'),
           alerts: resolve('src/renderer/alerts.html'),
           audio: resolve('src/renderer/audio.html')
         }

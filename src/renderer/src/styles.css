@@ -915,6 +915,14 @@ table.table {
   background: transparent !important;
   overflow: hidden;
 }
+/* A host window (overlays/host.tsx): each overlay a region placed where it sits on the screen. */
+.host-region {
+  position: absolute;
+  overflow: hidden;
+}
+.host-region .overlay {
+  position: absolute;
+}
 .overlay {
   position: fixed;
   inset: 0;

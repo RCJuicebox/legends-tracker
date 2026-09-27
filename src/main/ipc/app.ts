@@ -113,6 +113,7 @@ export function registerAppIpc(ctx: AppContext): void {
   })
 
   handle('overlays:arrange', (on) => ctx.setArranging(on === true))
+  handle('overlay:hostState', (display) => ctx.overlays.hostState(Number(display)))
   onSend('overlay:mouse', (id, interactive) => {
     if (typeof id === 'string') ctx.overlays.setMouse(id, interactive === true)
   })
