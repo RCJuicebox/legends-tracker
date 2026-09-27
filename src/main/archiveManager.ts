@@ -116,6 +116,10 @@ export class ArchiveManager {
     const running = await this.deps.isGameRunning()
     if (running !== this.status.gameRunning) this.set({ gameRunning: running })
     const waitForExit = running && this.status.liveRotation === 'unsupported'
+    // A deferred log moved or deleted by hand is no longer waiting; a new file at its path is
+    // judged by size like any other.
+    const gone = this.status.pendingUntilGameExits.filter((p) => !existsSync(p))
+    if (gone.length) this.set({ pendingUntilGameExits: this.status.pendingUntilGameExits.filter((p) => !gone.includes(p)) })
     for (const path of this.status.pendingUntilGameExits) {
       if (!running && existsSync(path) && !this.status.busy) return void (await this.archiveNow(path))
     }
