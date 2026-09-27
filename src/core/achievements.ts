@@ -7,27 +7,9 @@
 // achievement Broken: one the game cannot complete. Broken ones stop counting, and anything that needs
 // one shows as Blocked instead of open. Those marks are kept by name, so they survive a new export.
 
-export interface AchObjective {
-  t: string
-  /** Complete. */
-  d?: boolean
-  /** Optional: never counts toward completion, as the game scores it. */
-  o?: boolean
-  /** Progress, [current, max]. */
-  p?: [number, number]
-}
+import type { AchMarks, AchObjective, AchSection, Achievement } from '../shared/character'
 
-export interface Achievement {
-  n: string
-  d?: boolean
-  c: AchObjective[]
-}
-
-export interface AchSection {
-  cat: string
-  name: string
-  ach: Achievement[]
-}
+export type { AchMarks, AchObjective, AchSection, Achievement }
 
 export interface AchParseStats {
   sections: number
@@ -35,14 +17,6 @@ export interface AchParseStats {
   achDone: number
   comp: number
   compDone: number
-}
-
-/** What the player added on top of the export, kept by name. */
-export interface AchMarks {
-  /** Objectives ticked by hand: objKey(). */
-  ticks: string[]
-  /** Achievements marked Broken: achKey(). */
-  broken: string[]
 }
 
 const PROG = /^(\d+)\s*\/\s*(\d+)$/

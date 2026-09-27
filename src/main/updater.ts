@@ -1,6 +1,7 @@
 import { app } from 'electron'
 import electronUpdater from 'electron-updater'
 import { log } from './log'
+import type { UpdateState } from '../shared/runtime'
 
 // electron-updater checks the GitHub Releases named in the build's `publish` settings, downloads a
 // newer installer in the background, and runs it when the app restarts. Settings live in
@@ -8,13 +9,7 @@ import { log } from './log'
 // runs shortly after start and then every hour; a new version is announced with a Windows
 // notification when it is found and again, to click on, when it has downloaded.
 
-export type UpdateState =
-  | { state: 'dev' }
-  | { state: 'idle'; checkedAt: number }
-  | { state: 'checking' }
-  | { state: 'downloading'; version: string; percent: number }
-  | { state: 'ready'; version: string }
-  | { state: 'error'; message: string }
+export type { UpdateState }
 
 /** Between automatic checks; Check for updates in Settings asks at any time. */
 const CHECK_EVERY_MS = 60 * 60 * 1000

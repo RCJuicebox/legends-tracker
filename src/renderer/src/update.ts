@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { api } from './api'
-import type { UpdateState } from '../../main/updater'
+import type { UpdateState } from '../../shared/runtime'
 
 export type { UpdateState }
 

@@ -2,32 +2,9 @@
 // it does. Stats come from the item's eqlwiki page (its in-game stats block), scaled for the item's
 // +N merge level the way the wiki's own item level slider scales them.
 
-/** One line of the export: a location, the item there, and what sits inside it. */
-export interface InvItem {
-  /** "Head", "General 1-Slot3", "Bank10-Slot2". */
-  location: string
-  name: string
-  id: number
-  count: number
-  /** Augments in its augment slots (worn gear holds its exaltations in slots 7-10). */
-  augs: InvItem[]
-}
+import type { InvItem, Inventory } from '../shared/character'
 
-export interface Inventory {
-  /** Worn slots, in the export's order. The slot is the location. */
-  worn: InvItem[]
-  /** Bags and their contents: General 1-12. */
-  bags: InvItem[]
-  bank: InvItem[]
-  sharedBank: InvItem[]
-  /** The tradeskill depot (Personal-Depot1…), where auto-loot stores tradeskill items; absent from older exports. */
-  depot: InvItem[]
-  /**
-   * The game's Storage window, which the export lists as its key ring: collections by kind (Equipment,
-   * Augmentation, Activated, …). Gear in Storage › Equipment can be taken out and worn.
-   */
-  keyRing: { kind: string; name: string; id: number }[]
-}
+export type { InvItem, Inventory }
 
 /** Storage tabs by the export's kind names, as the game's Storage window titles them. */
 const STORAGE_TABS: Record<string, string> = { Augmentation: 'Exaltations', Activated: 'Activated Items', Equipment: 'Equipment' }
