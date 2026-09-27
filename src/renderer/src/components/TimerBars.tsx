@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, useSyncExternalStore, type ReactNode } from 'react'
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from 'react'
 import type { TimerView } from '../../../shared/types'
 import { clock, iconUrl, roman } from '../api'
 
@@ -26,20 +26,39 @@ export function useNow(intervalMs: number, active = true): number {
   return now
 }
 
+/**
+ * The bar drains by itself: one animation per timer, started where the timer is and run to its
+ * end, so the page renders only to change the text. The fill is scaled and its bright edge slid
+ * along, rather than resized, so the animation costs no layout. An overdue bar is full, striped.
+ */
+function useDrain(startedAt: number, endsAt: number, overdue: boolean) {
+  const fill = useRef<HTMLDivElement>(null)
+  const edge = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    if (overdue) return
+    const timing: KeyframeAnimationOptions = { duration: Math.max(1, endsAt - startedAt), easing: 'linear', fill: 'forwards' }
+    const runs = [
+      fill.current?.animate([{ transform: 'scaleX(1)' }, { transform: 'scaleX(0)' }], timing),
+      edge.current?.animate([{ transform: 'translateX(0)' }, { transform: 'translateX(-100%)' }], timing)
+    ]
+    const elapsed = Math.max(0, Date.now() - startedAt)
+    for (const r of runs) if (r) r.currentTime = elapsed
+    return () => runs.forEach((r) => r?.cancel())
+  }, [startedAt, endsAt, overdue])
+  return { fill, edge }
+}
+
 export function TimerBar({ t, now, showTarget }: { t: TimerView; now: number; showTarget: boolean }) {
-  const total = Math.max(1, t.endsAt - t.startedAt)
   const left = t.endsAt - now
   const overdue = left < 0
   const warning = !overdue && t.warnSec > 0 && left <= t.warnSec * 1000
-  // How much of the bar is filled, 0 to 1. An overdue bar is full, striped. The fill is scaled and
-  // its bright edge slid along, rather than resized, so each tick costs no layout.
-  const shown = overdue ? 1 : Math.max(0, Math.min(1, left / total))
+  const { fill, edge } = useDrain(t.startedAt, t.endsAt, overdue)
   const [iconOk, setIconOk] = useState(true)
   return (
     <div className={`timer${warning ? ' warning' : ''}${overdue ? ' overdue' : ''}`} style={{ ['--c' as string]: t.color }}>
       <div className="track">
-        <div className="fill" style={{ transform: `scaleX(${shown})` }} />
-        <div className="edge" style={{ transform: `translateX(${(shown - 1) * 100}%)` }} />
+        <div className="fill" ref={fill} />
+        <div className="edge" ref={edge} />
       </div>
       {t.icon !== undefined && iconOk ? <img src={iconUrl(t.icon)} alt="" onError={() => setIconOk(false)} /> : <div className="noicon" />}
       <div className="label">
@@ -76,7 +95,15 @@ export function TimerBars({
   fontSize?: number
   empty?: ReactNode
 }) {
-  const now = useNow(100, timers.length > 0)
+  // The bars animate themselves; the clocks read whole seconds, so twice a second is enough, and
+  // four times near a warning so it lands on time.
+  const [fast, setFast] = useState(false)
+  const now = useNow(fast ? 250 : 500, timers.length > 0)
+  const nearWarning = timers.some((t) => {
+    const left = t.endsAt - now
+    return left > -1000 && left <= t.warnSec * 1000 + 1500
+  })
+  if (nearWarning !== fast) setFast(nearWarning)
   // The order and the groups change only when the timers do, not on each tick.
   const sorted = useMemo(() => [...timers].sort((a, b) => a.endsAt - b.endsAt), [timers])
   const ordered = useMemo(() => {
