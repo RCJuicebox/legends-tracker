@@ -97,8 +97,17 @@ describe('combat lines', () => {
   })
 })
 
-function meter(opts: { fightGapSec?: number; newSessionOnZone?: boolean; charmPets?: boolean } = {}) {
-  const m = new CombatMeter({ fightGapSec: opts.fightGapSec ?? 10, newSessionOnZone: opts.newSessionOnZone ?? true, charmPets: opts.charmPets })
+/** Landing lines of two charm spells as spells_us_str.txt gives them; the app reads them from the file. */
+const CHARM_LANDS: Record<string, string> = { 'cajole undead': ' moans.', allure: ' has been charmed.' }
+const charmLand = (spell: string) => CHARM_LANDS[spell.replace(/ [IVX]+$/, '').toLowerCase()]
+
+function meter(opts: { fightGapSec?: number; newSessionOnZone?: boolean; charmPets?: boolean; spellData?: boolean } = {}) {
+  const m = new CombatMeter({
+    fightGapSec: opts.fightGapSec ?? 10,
+    newSessionOnZone: opts.newSessionOnZone ?? true,
+    charmPets: opts.charmPets,
+    charmLand: opts.spellData ? charmLand : undefined
+  })
   m.setSelf('Kelwyn')
   const feed = (text: string) => {
     for (const raw of text.trim().split('\n')) {
@@ -494,6 +503,33 @@ describe('charm pets', () => {
       [Sat Aug 08 20:37:42 2026] an ire ghast has been charmed.
       [Sat Aug 08 20:39:50 2026] An ire ghast hits a haunted chest for 64 points of damage.`)
     expect(m.snapshot().liveSession?.entities['an ire ghast (charmed)']).toBeUndefined()
+  })
+
+  // Real lines (a groupmate's Cajole Undead VII on a kiraikuei, 2026-09-25), names swapped: undead
+  // charms land as "moans.", and a heal begun before it lands is not the charm.
+  const CAJOLE = `
+    [Fri Sep 25 22:01:40 2026] You have entered The Plane of Fear - Group 4 (Refined).
+    [Fri Sep 25 22:01:41 2026] Dorran has joined the group.
+    [Fri Sep 25 22:01:42 2026] Aldric has joined the group.
+    [Fri Sep 25 22:01:47 2026] Dorran begins casting Cajole Undead VII.
+    [Fri Sep 25 22:01:47 2026] You punch an ashenbone drake for 90 points of damage.
+    [Fri Sep 25 22:01:48 2026] Aldric begins casting Superior Healing X.
+    [Fri Sep 25 22:01:49 2026] a kiraikuei moans.
+    [Fri Sep 25 22:01:49 2026] A kiraikuei pierces a kiraikuei for 89 points of damage.
+    [Fri Sep 25 22:01:50 2026] A kiraikuei hits an ashenbone drake for 120 points of damage.`
+
+  it('follows an undead charm, which lands as "moans.", to the one who cast it', () => {
+    const { m, feed } = meter({ charmPets: true, spellData: true })
+    feed(CAJOLE)
+    const pet = m.snapshot().liveSession!.entities['a kiraikuei (charmed)']
+    expect(pet).toMatchObject({ kind: 'pet', owner: 'Dorran' })
+    expect(pet.out.total).toBe(89 + 120)
+  })
+
+  it('reads no "moans." as a charm without the spell data to say so', () => {
+    const { m, feed } = meter({ charmPets: true })
+    feed(CAJOLE)
+    expect(m.snapshot().liveSession!.entities['a kiraikuei (charmed)']).toBeUndefined()
   })
 })
 

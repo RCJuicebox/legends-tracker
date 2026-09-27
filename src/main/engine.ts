@@ -370,7 +370,15 @@ export class Engine {
 
   private meterConfig() {
     const c = this.settings.combat
-    return { fightGapSec: c.fightGapSec, newSessionOnZone: c.newSessionOnZone, charmPets: c.charmPets }
+    return {
+      fightGapSec: c.fightGapSec,
+      newSessionOnZone: c.newSessionOnZone,
+      charmPets: c.charmPets,
+      charmLand: (spell: string) => {
+        const s = this.book?.resolve(spell)?.spell
+        return s?.category === 'charm' && s.landOther ? s.landOther : undefined
+      }
+    }
   }
 
   reconfigure(): void {
