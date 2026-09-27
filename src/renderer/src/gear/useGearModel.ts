@@ -22,7 +22,10 @@ import {
 } from '../../../core/upgrades'
 import { conversions, rawWeights, ROLE_PRESETS, type ClassFactors, type RoleWeights } from '../../../core/statValue'
 import { focusValue, type FocusLine, type FocusReport, type FocusWorth } from '../../../core/itemFocus'
-import { optimizeGear, ownedPieces, type Piece, type PieceSource } from '../../../core/gearOptimizer'
+import { optimizeGear, ownedPieces, pieceName, type EffectValue, type Exaltation, type Piece, type PieceSource } from '../../../core/gearOptimizer'
+import { usePet } from './usePet'
+import { effectScore, itemEffects, procOf, procWorth, wornEffectOf, wornWorth, type EffectSpell, type EffectWorth } from '../../../core/itemEffects'
+import type { MeleeProfile } from '../../../core/meleeTally'
 import { candidatePiece, inTheRound, ownedInTheRound } from '../../../core/finderRound'
 import { aaTotal } from '../../../core/aa'
 import { CATALOG_FORMAT, type CatalogItem } from '../../../core/wikiItem'
@@ -45,7 +48,7 @@ export interface CatalogState {
   progress: { busy: boolean; pages: number; total: number; error: string }
 }
 
-export type GearMode = 'finder' | 'focus' | 'optimize' | 'merge' | 'pet'
+export type GearMode = 'finder' | 'focus' | 'effects' | 'optimize' | 'merge' | 'pet'
 
 /** A focus effect on something the character owns, and how they have it. */
 export interface OwnedFocus {
@@ -100,9 +103,34 @@ export interface GearModel {
   /** Per line, what the character owns with a focus of it, best first. */
   ownedFoci: Map<string, OwnedFocus[]>
   pieces: Piece[]
+  /** Worn effects and procs: the character's melee they are weighed against, their spells, their worth. */
+  effects: GearEffects
+  /** An item's own worn effect and proc, by name; undefined when the wiki does not know it. */
+  effectsOfItem: (name: string) => { worn: string; proc: string } | undefined
+  /** Exaltations kept in Storage, free to put in a piece's focus slot. */
+  exaltations: Exaltation[]
+  /** The pet as the log shows it: what it wears, which one it is. */
+  pet: ReturnType<typeof usePet>
   worth: FocusWorth | null
   focusValue: (names: string[]) => number
 }
+
+export interface GearEffects {
+  /** The character's melee over the days looked at; null while it is read or when there is no log. */
+  profile: MeleeProfile | null
+  spells: Record<string, EffectSpell>
+  /** Worth in the weights' terms; null until the melee is known (nothing to weigh against). */
+  value: EffectValue | null
+  /** Damage a minute and what each does, by spell name. */
+  wornWorth: (name: string) => EffectWorth | null
+  procWorth: (name: string) => EffectWorth | null
+  /** Weapons in hand now that carry a proc, by name. */
+  carriers: Map<string, number>
+  dex: number
+  loading: boolean
+}
+
+const HANDS = ['Primary', 'Secondary']
 
 /** The wiki's item catalog as stored on this PC, and a way to fetch it again. */
 function useCatalog() {
@@ -182,6 +210,7 @@ export function useGearModel(view: InventoryView, sheet: CharacterSheet | null, 
   const classKey = (stats.classes ?? []).filter(Boolean).join(',')
   const classes = useMemo(() => (classKey ? classKey.split(',') : []), [classKey])
   const level = stats.level ?? 50
+  const pet = usePet(view.character, classes, level)
   // Custom weights saved before a weight existed read it as the Balanced role has it.
   const role = useMemo(
     () => (preset === 'Custom' ? { ...ROLE_PRESETS.Balanced, ...custom } : (ROLE_PRESETS[preset] ?? ROLE_PRESETS.Balanced)),
@@ -225,9 +254,15 @@ export function useGearModel(view: InventoryView, sheet: CharacterSheet | null, 
   const secondaryInUse = !!view.inventory?.worn.some((it) => it.location === 'Secondary')
   const twoHanders = twoHandMode === 'any' || (twoHandMode === 'auto' && !secondaryInUse)
   const inv = view.inventory!
+  // What the pet wears is the character's too: the log's list names each piece (not its exaltations).
+  const petGear = pet.data?.gear
+  const petItems = useMemo<InvItem[]>(() => (petGear?.items ?? []).map((g) => ({ location: 'Pet', name: g.name, id: 0, count: 1, augs: [] })), [petGear])
   const owned = useMemo(
-    () => new Set([...inv.worn, ...inv.bags, ...inv.bank, ...inv.sharedBank, ...storedEquipment(inv)].flatMap((i) => [itemKey(i.name), ...i.augs.map((a) => itemKey(a.name))])),
-    [inv]
+    () =>
+      new Set(
+        [...inv.worn, ...inv.bags, ...inv.bank, ...inv.sharedBank, ...storedEquipment(inv), ...petItems].flatMap((i) => [itemKey(i.name), ...i.augs.map((a) => itemKey(a.name))])
+      ),
+    [inv, petItems]
   )
   const wearer = useMemo<Wearer>(() => ({ classes, race: stats.race === 'iksar' ? 'IKS' : '', level }), [classes, stats.race, level])
 
@@ -246,6 +281,11 @@ export function useGearModel(view: InventoryView, sheet: CharacterSheet | null, 
 
   // ---- focus effects ----
   const byKey = useMemo(() => new Map((items ?? []).map((it) => [itemKey(it.title), it])), [items])
+  // Every catalog item's own worn effect and proc, read from its stats block once.
+  const effectsOfItem = useMemo(() => {
+    const byItem = new Map([...byKey].map(([key, c]) => [key, { worn: wornEffectOf(c.statsblock), proc: procOf(c.statsblock) }]))
+    return (name: string) => byItem.get(itemKey(name))
+  }, [byKey])
   const fociOf = useMemo(
     () => (item: InvItem) => itemFoci(item, (name) => byKey.get(itemKey(name))?.focus),
     [byKey]
@@ -296,9 +336,28 @@ export function useGearModel(view: InventoryView, sheet: CharacterSheet | null, 
         const c = byKey.get(itemKey(item.name))
         const stats = statsFor(view.items, item.name) ?? (c ? scaledStats(parseStatsBlock(c.statsblock), mergeLevel(item.name)) : null)
         if (!c && !stats) return null
-        return { r: c ? restrictions(c.statsblock) : null, stats, foci: fociOf(item).map((f) => f.name), lore: c ? isLore(c.statsblock) : true }
+        const fx = itemEffects(item, effectsOfItem)
+        return {
+          r: c ? restrictions(c.statsblock) : null, stats, foci: fociOf(item).map((f) => f.name), worn: fx.worn.map((f) => f.name), procs: fx.procs.map((f) => f.name),
+          lore: c ? isLore(c.statsblock) : true
+        }
+      }, petItems),
+    [inv, byKey, view.items, fociOf, petItems, effectsOfItem]
+  )
+  // Exaltations kept in Storage › Exaltations that bring a focus and the character may use, with what
+  // the item each was made from allows: the slot kind it goes in, and its classes, race and level.
+  const exaltations = useMemo<Exaltation[]>(
+    () =>
+      inv.keyRing.flatMap((k): Exaltation[] => {
+        if (k.kind !== 'Augmentation') return []
+        const c = byKey.get(itemKey(k.name))
+        const fx = effectsOfItem(k.name)
+        if (!c || !(c.focus || fx?.worn || fx?.proc)) return []
+        const r = restrictions(c.statsblock)
+        const item = { location: 'Storage', name: k.name, id: k.id, count: 1, augs: [] }
+        return canWear(r, wearer, ANY_SLOT) ? [{ item, from: 'storage', focus: c.focus, worn: fx?.worn ?? '', proc: fx?.proc ?? '', r }] : []
       }),
-    [inv, byKey, view.items, fociOf]
+    [inv, byKey, wearer, effectsOfItem]
   )
   const ownedFoci = useMemo(() => {
     const out = new Map<string, OwnedFocus[]>()
@@ -331,12 +390,46 @@ export function useGearModel(view: InventoryView, sheet: CharacterSheet | null, 
   }
   const valueOf = useMemo(() => (names: string[]) => (worth ? focusValue(worth, names) : 0), [worth])
 
+  // Worn effects and procs: every one the catalog names, what its spell does, and the character's own
+  // melee over the same days as the focus effects, to weigh them against.
+  const effectNames = useMemo(() => {
+    const out = new Set<string>()
+    for (const it of items ?? []) {
+      const fx = effectsOfItem(it.title)
+      if (fx?.worn) out.add(fx.worn)
+      if (fx?.proc) out.add(fx.proc)
+    }
+    return [...out].sort()
+  }, [items, effectsOfItem])
+  const effectsQ = useInvoke<{ spells: Record<string, EffectSpell>; profile: MeleeProfile | null; loaded: boolean }>(
+    effectNames.length && view.character ? 'gear:effects' : null,
+    [effectNames, view.character, days]
+  )
+  const dex = sheetStats.window?.values.Dexterity?.[0] ?? (sheetStats.dexterity || 150)
+  const effects = useMemo<GearEffects>(() => {
+    const data = effectsQ.data
+    const profile = data?.profile ?? null
+    const spells = data?.spells ?? {}
+    const carriers = new Map<string, number>()
+    for (const p of pieces) if (p.from === 'worn' && HANDS.includes(p.item.location)) for (const n of p.procs ?? []) carriers.set(n, (carriers.get(n) ?? 0) + 1)
+    const wornWorthOf = (name: string) => (profile && spells[name] ? wornWorth(spells[name], profile) : null)
+    const procWorthOf = (name: string) => (profile && spells[name] ? procWorth(spells[name], profile, { level, dex, carriers: carriers.get(name) ?? 1 }) : null)
+    const value: EffectValue | null =
+      profile && profile.dpm > 0
+        ? {
+            worn: (names) => names.reduce((s, n) => s + effectScore(wornWorthOf(n)?.dpm ?? 0, profile, weights.ratio), 0),
+            proc: (name) => effectScore(procWorthOf(name)?.dpm ?? 0, profile, weights.ratio)
+          }
+        : null
+    return { profile, spells, value, wornWorth: wornWorthOf, procWorth: procWorthOf, carriers, dex, loading: !data }
+  }, [effectsQ.data, pieces, level, dex, weights.ratio])
+
   // The finder scores the whole catalog (about 11,000 pieces) against every slot. Its inputs go
   // through a deferred value, so a weight being typed or a button being pressed answers at once and
   // the results catch up in the background.
   const input = useMemo(
-    () => ({ items, wearer, weights, compare, hiddenEras, inv, viewItems: view.items, owned, twoHanders, worth, fociOf, valueOf, eraStatus, pieces, judge }),
-    [items, wearer, weights, compare, hiddenEras, inv, view.items, owned, twoHanders, worth, fociOf, valueOf, eraStatus, pieces, judge]
+    () => ({ items, wearer, weights, compare, hiddenEras, inv, viewItems: view.items, owned, twoHanders, worth, fociOf, valueOf, eraStatus, pieces, exaltations, judge, effects, effectsOfItem }),
+    [items, wearer, weights, compare, hiddenEras, inv, view.items, owned, twoHanders, worth, fociOf, valueOf, eraStatus, pieces, exaltations, judge, effects, effectsOfItem]
   )
   const deferred = useDeferredValue(input)
   const results = useMemo(() => {
@@ -356,20 +449,29 @@ export function useGearModel(view: InventoryView, sheet: CharacterSheet | null, 
       owned: d.owned,
       ownedStats: (key) => bestOwned(d.pieces, key)?.stats ?? null,
       focus: d.worth ? { worn: (it) => d.fociOf(it).map((f) => f.name), value: d.valueOf } : undefined,
+      effects: d.effects.value
+        ? {
+            of: (it) => {
+              const fx = itemEffects(it, d.effectsOfItem)
+              return { worn: fx.worn.map((f) => f.name), procs: fx.procs.map((f) => f.name) }
+            },
+            value: d.effects.value
+          }
+        : undefined,
       // In the round, the stat winners a focus loss would hide get their chance: the optimizer may keep the focus elsewhere.
       perSlot: round ? 8 : 6,
       keepStatWinners: round
     })
     if (!round) return slots
     // Each candidate among everything owned, worn as well as it can be; its worth is what the set gains.
-    const opts = { pieces: d.pieces, wearer: d.wearer, weights: d.weights, twoHanders: d.twoHanders, focusValue: d.valueOf }
+    const opts = { pieces: d.pieces, wearer: d.wearer, weights: d.weights, twoHanders: d.twoHanders, focusValue: d.valueOf, exaltations: d.exaltations, effects: d.effects.value ?? undefined }
     const baseline = optimizeGear(opts)
     return slots.map((s) => {
       const judged = s.candidates.map((c) => {
         // One the character owns is already among the pieces: judged as their own copy, as the optimizer does.
         const key = itemKey(c.item.title)
         const r = bestOwned(d.pieces, key) ? ownedInTheRound({ ...opts, key, baseline }) : inTheRound({ ...opts, candidate: candidatePiece(c.item, c.stats), baseline })
-        return { ...c, round: { delta: r.delta, placed: r.placed, moves: r.moves.map((m) => ({ slot: m.slot, out: m.out?.item.name ?? null, in: m.in?.item.name ?? null })) } }
+        return { ...c, round: { delta: r.delta, placed: r.placed, moves: r.moves.map((m) => ({ slot: m.slot, out: m.out ? pieceName(m.out) : null, in: m.in ? pieceName(m.in) : null })) } }
       })
       return { ...s, candidates: judged.filter((c) => c.round.delta > 0).sort((a, b) => b.round.delta - a.round.delta).slice(0, 6) }
     })
@@ -401,6 +503,10 @@ export function useGearModel(view: InventoryView, sheet: CharacterSheet | null, 
         available,
         ownedFoci,
         pieces,
+        effects,
+        effectsOfItem,
+        exaltations,
+        pet,
         worth,
         focusValue: valueOf
       }

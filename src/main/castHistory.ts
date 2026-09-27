@@ -3,6 +3,7 @@ import { join } from 'node:path'
 import type { Readable } from 'node:stream'
 import { localDay } from '../core/dates'
 import { feedZip, isArchiveOf, readLines } from './logReading'
+import type { LogLine } from '../core/logLine'
 import { log } from './log'
 
 // What a character casts, and how often, counted from their logs: "You begin casting Envenomed Bolt X."
@@ -12,7 +13,18 @@ import { log } from './log'
 
 type Days = Record<string, Record<string, number>>
 
+/** Reads one log line into the day it belongs to. Made fresh for each stretch of log read, so it may keep state across lines. */
+export type DayCounter = (line: LogLine, into: Days) => void
+
 const CAST = /^You begin (?:casting|singing) (.+)\.$/
+
+/** Casts by name: "You begin casting Envenomed Bolt X." */
+export const castCounter = (): DayCounter => (line, into) => {
+  const m = CAST.exec(line.text)
+  if (!m) return
+  const day = (into[localDay(line.time)] ??= {})
+  day[m[1]] = (day[m[1]] ?? 0) + 1
+}
 
 interface LiveCounts {
   path: string
@@ -29,17 +41,9 @@ interface CacheFile {
   live: LiveCounts | null
 }
 
-async function countStream(stream: Readable, into: Days, flushLast = true): Promise<number> {
-  return readLines(
-    stream,
-    (line) => {
-      const m = CAST.exec(line.text)
-      if (!m) return
-      const day = (into[localDay(line.time)] ??= {})
-      day[m[1]] = (day[m[1]] ?? 0) + 1
-    },
-    { flushLast }
-  )
+async function countStream(stream: Readable, into: Days, counter: () => DayCounter, flushLast = true): Promise<number> {
+  const count = counter()
+  return readLines(stream, (line) => count(line, into), { flushLast })
 }
 
 export interface CastCounts {
@@ -56,7 +60,11 @@ export class CastHistory {
   /** One count at a time, so two asking at once never read the same tail twice. */
   private queue: Promise<unknown> = Promise.resolve()
 
-  constructor(private readonly cacheFile: string) {}
+  /** `counter` says what is counted: casts unless told otherwise (the melee tally uses this too). */
+  constructor(
+    private readonly cacheFile: string,
+    private readonly counter: () => DayCounter = castCounter
+  ) {}
 
   private async load(): Promise<CacheFile> {
     if (this.cache) return this.cache
@@ -103,7 +111,7 @@ export class CastHistory {
     }
     if (size > live.offset) {
       const days: Days = structuredClone(live.days)
-      const read = await countStream(createReadStream(logPath, { start: live.offset }), days, false)
+      const read = await countStream(createReadStream(logPath, { start: live.offset }), days, this.counter, false)
       if (read > 0) {
         cache.live = { ...live, offset: live.offset + read, days }
         changed = true
@@ -146,8 +154,8 @@ export class CastHistory {
         if (cache.archives[name]?.size !== size) {
           const days: Days = {}
           try {
-            if (name.toLowerCase().endsWith('.zip')) await feedZip(path, (s) => countStream(s, days))
-            else await countStream(createReadStream(path), days)
+            if (name.toLowerCase().endsWith('.zip')) await feedZip(path, (s) => countStream(s, days, this.counter))
+            else await countStream(createReadStream(path), days, this.counter)
           } catch (e) {
             log.warn(`Cast history: could not read ${path}; leaving it out:`, e)
             continue

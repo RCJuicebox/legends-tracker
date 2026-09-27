@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { planTotal } from '../src/core/finderRound'
-import { optimizeGear, ownedPieces } from '../src/core/gearOptimizer'
+import { optimizeGear, ownedPieces, pieceName } from '../src/core/gearOptimizer'
 import { mergeLevel, parseInventory, parseStatsBlock, scaledStats } from '../src/core/inventory'
 import { rawWeights, ROLE_PRESETS, type Conversions } from '../src/core/statValue'
 import { isLore, PRESETS, restrictions, weightsForSlot, type Weights } from '../src/core/upgrades'
@@ -9,6 +9,7 @@ import { parseItemPage } from '../src/core/wikiItem'
 const page = (name: string, block: string) =>
   `{{Classic Era}}\n<onlyinclude>{{Itempage\n|itemname    = ${name}\n|lucy_img_ID = 600\n|statsblock  = \n${block}\n|dropsfrom = \n\n[[Nagafen's Lair]]\n\n}}</onlyinclude>`
 const item = (name: string, block: string) => parseItemPage(name, page(name, block))!
+const catalogItem = item
 
 describe('the optimizer and haste', () => {
   // Worn: haste gloves with little else, a plain belt, and a charm in each Any slot. In the bags: far
@@ -108,7 +109,7 @@ describe('the optimizer and weapon ratio', () => {
 })
 
 describe('weapon ratio against stats', () => {
-  // Juicebox, 2026-09-26: Wu's Fist of Mastery +10 in Primary (32 dmg / 22 delay, ratio 1.45), +6 in
+  // Kelwyn, 2026-09-26: Wu's Fist of Mastery +10 in Primary (32 dmg / 22 delay, ratio 1.45), +6 in
   // Secondary (25 / 22, 1.14), and a spare Bloodmoon +4 (25 / 28, ratio 0.89, +14 STR), which only
   // goes in Primary. Wearing it would move the +10 fist to the off hand for 0.25 less ratio in all:
   // about a quarter less damage from a hand, worth far more than 14 STR to a melee.
@@ -163,5 +164,85 @@ describe('gear in Storage', () => {
       ['Pauldrons of Power +6', 'worn'],
       ['Sode of Empowerment +4', 'storage']
     ])
+  })
+})
+
+describe('gear on the pet and exaltations in Storage', () => {
+  const catalog = [
+    item('Plain Ring', 'Slot: FINGER<br>\nAC: 5<br>\nClass: ALL<br>\nRace: ALL<br>'),
+    item('Other Ring', 'Slot: FINGER<br>\nAC: 4<br>\nClass: ALL<br>\nRace: ALL<br>'),
+    item('Cloth Tunic', 'Slot: CHEST<br>\nAC: 5<br>\nClass: ALL<br>\nRace: ALL<br>'),
+    item('Indicolite Breastplate', 'Slot: CHEST<br>\nAC: 40<br>\nClass: ALL<br>\nRace: ALL<br>'),
+    item('Moonstone Ring', 'Slot: FINGER<br>\nAC: 1<br>\nClass: ALL<br>\nRace: ALL<br>'),
+    item('Mithril-Runed Tunic', 'Slot: CHEST<br>\nAC: 1<br>\nClass: ALL<br>\nRace: ALL<br>')
+  ]
+  const byName = new Map(catalog.map((c) => [c.title, c]))
+  const focusOf: Record<string, string> = { 'Moonstone Ring': 'Extended Range II', 'Mithril-Runed Tunic': 'Spell Haste II' }
+  const inv = parseInventory(
+    [
+      'Location\tName\tID\tCount\tSlots',
+      'Fingers\tPlain Ring\t1\t1\t10',
+      'Fingers\tOther Ring\t2\t1\t10',
+      'Chest\tCloth Tunic\t3\t1\t10',
+      'KeyRing\tName\tID\t',
+      'Augmentation\tMoonstone Ring (Exaltation)\t10150\t1\t0',
+      'Augmentation\tMithril-Runed Tunic (Exaltation)\t2405\t1\t0'
+    ].join('\n')
+  )
+  const base = (name: string) => byName.get(name.replace(/ \(Exaltation\)$/, '').replace(/ \+\d+$/, ''))!
+  const pet = [{ location: 'Pet', name: 'Indicolite Breastplate +6', id: 0, count: 1, augs: [] }]
+  const pieces = ownedPieces(
+    inv,
+    (it) => {
+      const c = base(it.name)
+      return { r: restrictions(c.statsblock), stats: scaledStats(parseStatsBlock(c.statsblock), mergeLevel(it.name)), foci: [], lore: false }
+    },
+    pet
+  )
+  const exaltations = inv.keyRing.map((k) => ({
+    item: { location: 'Storage', name: k.name, id: k.id, count: 1, augs: [] },
+    from: 'storage' as const,
+    focus: focusOf[k.name.replace(/ \(Exaltation\)$/, '')],
+    r: restrictions(base(k.name).statsblock)
+  }))
+  const weights: Weights = { ...PRESETS.Balanced, ac: 1, hp: 0, mana: 0, end: 0, str: 0, sta: 0, agi: 0, dex: 0, wis: 0, int: 0, cha: 0, resists: 0, haste: 0, attack: 0, hpRegen: 0, manaRegen: 0, endRegen: 0, ratio: 0 }
+  // Spell Haste II is worth 100, Extended Range II 30; they add.
+  const focusValue = (names: string[]) => (names.includes('Spell Haste II') ? 100 : 0) + (names.includes('Extended Range II') ? 30 : 0)
+  const opts = { pieces, wearer: { classes: ['shm'], race: '', level: 50 }, weights, twoHanders: false, focusValue, exaltations }
+  const at = (plan: ReturnType<typeof optimizeGear>, slot: string) => plan.after.filter((_, i) => plan.slots[i] === slot).map((p) => (p ? pieceName(p) : null))
+
+  it("takes the pet's breastplate for the character when it is an upgrade", () => {
+    const plan = optimizeGear({ ...opts, exaltations: [] })
+    expect(at(plan, 'Chest')).toEqual(['Indicolite Breastplate +6'])
+    expect(plan.after[plan.slots.indexOf('Chest')]?.from).toBe('pet')
+  })
+
+  it('puts each stored exaltation in the focus slot of a piece of its own kind, once', () => {
+    const plan = optimizeGear(opts)
+    // The tunic's exaltation goes in the chest, the ring's in one ring only.
+    expect(at(plan, 'Chest')).toEqual(['Indicolite Breastplate +6 with Mithril-Runed Tunic (Exaltation)'])
+    expect(at(plan, 'Fingers').filter((n) => n?.includes('Moonstone Ring (Exaltation)'))).toHaveLength(1)
+    expect(plan.focusAfter).toBe(130)
+    // No piece is worn twice, as it is and exalted.
+    const hosts = plan.after.filter(Boolean).map((p) => p!.host ?? p)
+    expect(new Set(hosts).size).toBe(hosts.length)
+  })
+
+  it("does not use an exaltation the character's classes may not", () => {
+    // Rokyls Channelling Crystal: a secondary for BRD NEC WIZ MAG ENC, its exaltation Extended Enhancement III.
+    const rokyl = catalogItem('Rokyls Channelling Crystal', 'Slot: SECONDARY<br>\nClass: BRD NEC WIZ MAG ENC<br>\nRace: ALL<br>')
+    const crystal = { item: { location: 'Storage', name: 'Rokyls Channelling Crystal (Exaltation)', id: 1, count: 1, augs: [] }, from: 'storage' as const, focus: 'Spell Haste II', r: restrictions(rokyl.statsblock) }
+    const orb = catalogItem('Plain Orb', 'Slot: SECONDARY<br>\nAC: 3<br>\nClass: ALL<br>\nRace: ALL<br>')
+    const orbPiece = { item: { location: 'Secondary', name: 'Plain Orb', id: 2, count: 1, augs: [] }, from: 'worn' as const, key: 'plain orb', r: restrictions(orb.statsblock), stats: parseStatsBlock(orb.statsblock), foci: [], lore: false }
+    const plan = optimizeGear({ ...opts, pieces: [orbPiece], exaltations: [crystal] })
+    expect(plan.after.some((p) => p?.exalt)).toBe(false)
+    // A class that may use it does take it.
+    const mage = optimizeGear({ ...opts, wearer: { classes: ['mag'], race: '', level: 50 }, pieces: [orbPiece], exaltations: [crystal] })
+    expect(mage.after.find((p) => p?.exalt)?.exalt?.item.name).toBe('Rokyls Channelling Crystal (Exaltation)')
+  })
+
+  it('does not put an exaltation in a piece of another kind', () => {
+    const ringOnly = optimizeGear({ ...opts, exaltations: exaltations.filter((e) => e.focus === 'Extended Range II') })
+    expect(ringOnly.after.some((p) => p?.exalt && !p.r!.slots.includes('FINGER'))).toBe(false)
   })
 })

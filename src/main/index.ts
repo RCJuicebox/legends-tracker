@@ -24,6 +24,8 @@ import { checkGameFolder, findInstall, listLogs, logIsIn, resolveGameFolder } fr
 import { summarize } from '../core/spells'
 import { castableSpells, focusReport, focusSpec } from '../core/itemFocus'
 import { CastHistory } from './castHistory'
+import { meleeCounter, meleeProfile } from '../core/meleeTally'
+import type { EffectSpell } from '../core/itemEffects'
 import { RecipeBook } from './recipes'
 import { PurchaseHistory } from './purchases'
 import { TradeFavorites } from './tradeFavorites'
@@ -131,6 +133,8 @@ const achievementFiles = new AchievementFiles(
 const gameTables = new GameTables(() => store.settings.get().installDir)
 const wikiCatalog = new WikiCatalog((p) => toMain('state:catalog', p))
 const castHistory = new CastHistory(join(app.getPath('userData'), 'cast-history.json'))
+// The character's own melee day by day, read the same way: what worn effects and procs are weighed against.
+const meleeHistory = new CastHistory(join(app.getPath('userData'), 'melee-history.json'), meleeCounter)
 const recipeBook = new RecipeBook((p) => toMain('state:recipes', p))
 const purchases = new PurchaseHistory(join(app.getPath('userData'), 'purchases.json'))
 const tradeFavorites = new TradeFavorites(join(app.getPath('userData'), 'tradeskills.json'))
@@ -714,6 +718,27 @@ function registerIpc(): void {
     }
     const report = focusReport(specs, castableSpells(book.all(), classes, level), classes, level, casts)
     return { ...report, window: recent ? { total: recent.total, from: recent.from, to: recent.to } : null }
+  })
+
+  // Worn effects and procs: what their spells do, and the character's melee over the last `days` days
+  // of play (0 for all of it) to weigh them against.
+  handle('gear:effects', async (names: unknown, character: unknown, days: unknown) => {
+    const book = engine.book
+    const list = Array.isArray(names) ? [...new Set(names.filter((n): n is string => typeof n === 'string'))] : []
+    const spells: Record<string, EffectSpell> = {}
+    for (const n of list) {
+      const s = book?.named(n)
+      if (s) spells[n] = { name: s.name, effects: s.effects, formula: s.formula, cap: s.cap, beneficial: s.beneficial }
+    }
+    if (!isCharacterKey(character)) return { spells, profile: null, loaded: !!book }
+    const installDir = store.settings.get().installDir
+    const recent = await meleeHistory
+      .recent({ logPath: join(installDir, 'Logs', `eqlog_${character}.txt`), archiveDir: engine.archiveDir(), stem: `eqlog_${character}`, days: typeof days === 'number' ? days : 14 })
+      .catch((e) => {
+        log.warn('Could not read the melee history:', e)
+        return null
+      })
+    return { spells, profile: recent ? meleeProfile(recent.counts, recent) : null, loaded: !!book }
   })
 
   // Which spells to put motes into: the character's casts over the last `days` days of play, joined

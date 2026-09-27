@@ -3,6 +3,8 @@
 
 import { itemKey, mergeLevel, parseStatsBlock, scaledStats, type InvItem, type ItemStats } from './inventory'
 import type { CatalogItem } from './wikiItem'
+import type { EffectValue } from './gearOptimizer'
+import { procOf, wornEffectOf } from './itemEffects'
 
 /** The class codes the game prints in "Class: …" lines, by the tracker's class ids. */
 const CLASS_CODE: Record<string, string> = {
@@ -244,6 +246,8 @@ export interface Candidate {
   eraInferred: boolean
   /** Its focus effect, and what swapping it in does to the worth of the foci worn (in score points). */
   focus: { name: string; gain: number } | null
+  /** Its worn effect and proc, and what swapping it in does to the worth of those worn (in score points). */
+  effects?: { worn: string; proc: string; gain: number }
   /**
    * Judged in the round (see finderRound.ts): what the whole set gains with it, where it lands, and
    * what else moves. Filled in by the finder page, not here.
@@ -254,8 +258,14 @@ export interface Candidate {
 export interface SlotResult {
   slot: string
   /** The worn item this would replace: the weaker one where the slot comes in pairs. */
-  current: { item: InvItem; score: number; stats: ItemStats | null; focusLoss: number } | null
+  current: { item: InvItem; score: number; stats: ItemStats | null; focusLoss: number; effectLoss?: number } | null
   candidates: Candidate[]
+}
+
+/** Worn effects and procs in the finder: what a worn item carries (with its exaltations) and what they are worth. */
+export interface FinderEffects {
+  of: (item: InvItem) => { worn: string[]; procs: string[] }
+  value: EffectValue
 }
 
 /** Focus effects in the finder: what a worn item carries (with its exaltations) and what a set of foci is worth. */
@@ -288,6 +298,7 @@ export interface FinderOptions {
    */
   ownedStats?: (key: string) => ItemStats | null
   focus?: FinderFocus
+  effects?: FinderEffects
   perSlot?: number
   /**
    * Keep candidates whose stats beat the worn item even when the focus lost with it makes the swap
@@ -300,6 +311,9 @@ interface ParsedItem {
   item: CatalogItem
   r: Restrictions
   base: ItemStats
+  /** Its worn effect and combat proc; '' for none. */
+  worn: string
+  proc: string
   era: string
   inferred: boolean
 }
@@ -317,7 +331,10 @@ function parseCatalog(catalog: CatalogItem[], eraStatus: FinderOptions['eraStatu
   const zones = zoneEras(catalog, eraStatus)
   const items = hit
     ? hit.items.map((p) => ({ ...p, ...eraOf(p.item, zones, eraStatus) }))
-    : catalog.map((item) => ({ item, r: restrictions(item.statsblock), base: parseStatsBlock(item.statsblock), ...eraOf(item, zones, eraStatus) }))
+    : catalog.map((item) => ({
+        item, r: restrictions(item.statsblock), base: parseStatsBlock(item.statsblock), worn: wornEffectOf(item.statsblock), proc: procOf(item.statsblock),
+        ...eraOf(item, zones, eraStatus)
+      }))
   parsedCatalogs.set(catalog, { status: eraStatus, items })
   return items
 }
@@ -340,6 +357,26 @@ export function findUpgrades(o: FinderOptions): SlotResult[] {
   const wornHaste = o.worn.map((w) => o.statsOf(w)?.haste ?? 0)
   const hasteNow = Math.max(0, ...wornHaste)
   const hasteWithout = (item?: InvItem) => Math.max(0, ...wornHaste.filter((_, i) => o.worn[i] !== item))
+  // Worn effects count once wherever worn; procs count on weapons in the hands.
+  const HANDS = ['Primary', 'Secondary']
+  const wornFx = o.worn.map((w) => o.effects?.of(w) ?? { worn: [], procs: [] })
+  const effectsWith = (item: InvItem | undefined, add: { worn: string[]; procs: string[] } | null, slot: string): number => {
+    const fx = o.effects
+    if (!fx) return 0
+    const names = new Set<string>()
+    let t = 0
+    o.worn.forEach((w, i) => {
+      if (w === item) return
+      for (const n of wornFx[i].worn) names.add(n)
+      if (HANDS.includes(w.location)) for (const n of wornFx[i].procs) t += fx.value.proc(n)
+    })
+    if (add) {
+      for (const n of add.worn) names.add(n)
+      if (HANDS.includes(slot)) for (const n of add.procs) t += fx.value.proc(n)
+    }
+    return t + (names.size ? fx.value.worn([...names].sort()) : 0)
+  }
+  const effectsNow = effectsWith(undefined, null, '')
   return slots.map((slot) => {
     const shown = weightsForSlot(o.weights, slot)
     const weights: Weights = { ...shown, haste: 0 }
@@ -347,10 +384,11 @@ export function findUpgrades(o: FinderOptions): SlotResult[] {
     const scored = worn.map((item) => {
       const stats = o.statsOf(item)
       const hasteLoss = (hasteNow - hasteWithout(item)) * o.weights.haste
-      return { item, stats, score: (stats ? score(stats, weights) : 0) + hasteLoss, focusLoss: focusNow - focusWithout(item) }
+      const effectLoss = effectsNow - effectsWith(item, null, slot)
+      return { item, stats, score: (stats ? score(stats, weights) : 0) + hasteLoss, focusLoss: focusNow - focusWithout(item), effectLoss }
     })
-    // The one to replace is the one worth least, its focus effects counted.
-    const current = scored.sort((a, b) => a.score + a.focusLoss - (b.score + b.focusLoss))[0] ?? null
+    // The one to replace is the one worth least, its focus effects, worn effects and procs counted.
+    const current = scored.sort((a, b) => a.score + a.focusLoss + a.effectLoss - (b.score + b.focusLoss + b.effectLoss))[0] ?? null
     const level = current ? mergeLevel(current.item.name) : 0
     const wornKeys = new Set(worn.map((w) => itemKey(w.name)))
     const currentValues = current?.stats ? statValues(current.stats) : null
@@ -370,8 +408,11 @@ export function findUpgrades(o: FinderOptions): SlotResult[] {
       const hasteChange = Math.max(hasteLeft, stats.haste) - hasteNow
       const sc = score(stats, weights) + (Math.max(hasteLeft, stats.haste) - hasteLeft) * o.weights.haste
       const focusGain = !o.focus ? 0 : (p.item.focus ? focusWithout(current?.item, [p.item.focus]) : withoutCurrent) - focusNow
+      const worn = o.effects ? p.worn : ''
+      const proc = o.effects ? p.proc : ''
+      const effectGain = o.effects ? effectsWith(current?.item, { worn: worn ? [worn] : [], procs: proc ? [proc] : [] }, slot) - effectsNow : 0
       const statDelta = sc - (current?.score ?? 0)
-      const delta = statDelta + focusGain
+      const delta = statDelta + focusGain + effectGain
       if (delta <= 0 && !(o.keepStatWinners && statDelta > 0)) continue
       const values = statValues(stats)
       const diffs = (Object.keys(values) as WeightKey[])
@@ -387,13 +428,14 @@ export function findUpgrades(o: FinderOptions): SlotResult[] {
         owned: o.owned.has(key),
         era: p.era,
         eraInferred: p.inferred,
-        focus: p.item.focus ? { name: p.item.focus, gain: focusGain } : null
+        focus: p.item.focus ? { name: p.item.focus, gain: focusGain } : null,
+        ...(worn || proc || effectGain ? { effects: { worn, proc, gain: effectGain } } : {})
       })
     }
     candidates.sort((a, b) => b.delta - a.delta)
     return {
       slot,
-      current: current ? { item: current.item, score: current.score, stats: current.stats, focusLoss: current.focusLoss } : null,
+      current: current ? { item: current.item, score: current.score, stats: current.stats, focusLoss: current.focusLoss, effectLoss: current.effectLoss } : null,
       candidates: candidates.slice(0, perSlot)
     }
   })

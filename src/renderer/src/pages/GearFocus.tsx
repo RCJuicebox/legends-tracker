@@ -2,7 +2,7 @@ import { useMemo } from 'react'
 import { baseName, slotLabel } from '../../../core/inventory'
 import { restrictions } from '../../../core/upgrades'
 import { focusValue, KIND_LABELS, KIND_ORDER, KIND_WORTH, type FocusInfo, type FocusLine } from '../../../core/itemFocus'
-import { optimizeGear, type Piece } from '../../../core/gearOptimizer'
+import { optimizeGear, pieceName, type Piece } from '../../../core/gearOptimizer'
 import type { FocusCandidate, GearModel, OwnedFocus } from '../gear/useGearModel'
 import { Info } from '../components/ui'
 import { num, roundPct as pct, wikiUrl } from '../format'
@@ -231,8 +231,12 @@ function FocusRow({ m, l }: { m: GearModel; l: FocusLine }) {
 
 export function OptimizeTab({ m }: { m: GearModel }) {
   const plan = useMemo(
-    () => optimizeGear({ pieces: m.pieces, wearer: m.wearer, weights: m.weights, twoHanders: m.twoHanders, focusValue: m.focusValue }),
-    [m.pieces, m.wearer, m.weights, m.twoHanders, m.focusValue]
+    () =>
+      optimizeGear({
+        pieces: m.pieces, wearer: m.wearer, weights: m.weights, twoHanders: m.twoHanders, focusValue: m.focusValue, exaltations: m.exaltations,
+        effects: m.effects.value ?? undefined
+      }),
+    [m.pieces, m.wearer, m.weights, m.twoHanders, m.focusValue, m.exaltations, m.effects.value]
   )
   const changes = plan.slots
     .map((slot, i) => ({ slot, i, before: plan.before[i], after: plan.after[i] }))
@@ -240,7 +244,10 @@ export function OptimizeTab({ m }: { m: GearModel }) {
   const sum = (xs: number[]) => xs.reduce((a, b) => a + b, 0)
   const statGain = sum(plan.slotScoreAfter) - sum(plan.slotScoreBefore) + plan.hasteAfter - plan.hasteBefore
   const focusGain = plan.focusAfter - plan.focusBefore
+  const effectsGain = plan.effectsAfter - plan.effectsBefore
   const namesOf = (p: Piece | null) => p?.foci ?? []
+  // Worn effects and procs, for the chips: a proc only counts in the hands, but it goes where its weapon goes.
+  const effectNamesOf = (p: Piece | null) => [...(p?.worn ?? []), ...(p?.procs ?? [])]
   const lineOf = (name: string) => m.report?.foci[name]
   const bestIn = (set: (Piece | null)[], line: string) =>
     Math.max(0, ...set.flatMap((p) => namesOf(p).map((n) => (lineOf(n)?.line === line ? lineOf(n)!.eff : 0))))
@@ -251,9 +258,11 @@ export function OptimizeTab({ m }: { m: GearModel }) {
       <div className="card stack gap-6">
         <h2 style={{ margin: 0 }}>Best use of what you own</h2>
         <p className="small muted" style={{ margin: 0 }}>
-          Every piece you wear, carry, bank and keep in Storage › Equipment ({m.pieces.length} of them), tried in every slot it fits, both Any slots included, scored with these weights plus the focus
-          effects you want. Exaltations stay in the item that holds them. Haste does not stack, so one haste item is all it wears for it: each you own is tried as
-          that one, wherever it leaves the rest of the set best.
+          Every piece you wear, carry, bank, keep in Storage › Equipment or have on your pet ({m.pieces.length} of them), tried in every slot it fits, both Any slots
+          included, scored with these weights plus the focus effects you want and what worn effects and procs add to your melee (Worn effects &amp; procs tab).
+          Exaltations stay in the item that holds them; the {m.exaltations.length} you may use in Storage › Exaltations are tried in the focus, worn and proc slots of
+          each piece of their own kind (a ring's in a ring), in place of what it has there. Your pet's pieces count without any exaltations they hold, which the game
+          does not list. Haste does not stack, so one haste item is all it wears for it: each you own is tried as that one, wherever it leaves the rest of the set best.
         </p>
         {changes.length ? (
           <div className="row" style={{ gap: 18, flexWrap: 'wrap', marginTop: 4 }}>
@@ -268,7 +277,13 @@ export function OptimizeTab({ m }: { m: GearModel }) {
               Focus effects {focusGain >= 0 ? '+' : ''}
               {num(focusGain)}
             </span>
-            <span className="lt-gain">+{num(statGain + focusGain)}</span>
+            {(m.effects.value || effectsGain !== 0) && (
+              <span className={effectsGain >= 0 ? 'lt-up' : 'lt-down'}>
+                Effects {effectsGain >= 0 ? '+' : ''}
+                {num(effectsGain)}
+              </span>
+            )}
+            <span className="lt-gain">+{num(statGain + focusGain + effectsGain)}</span>
           </div>
         ) : (
           <p style={{ margin: '4px 0 0' }}>What you wear is already the best way to wear what you own, by these weights and the focus effects you want.</p>
@@ -278,9 +293,18 @@ export function OptimizeTab({ m }: { m: GearModel }) {
       {changes.length > 0 && (
         <div className="card lt-opt">
           {changes.map((c) => {
-            const moveTo = c.before ? plan.after.indexOf(c.before) : -1
-            const gained = namesOf(c.after).filter((n) => !plan.before.some((p) => namesOf(p).includes(n)))
-            const lost = namesOf(c.before).filter((n) => !plan.after.some((p) => namesOf(p).includes(n)))
+            const hostOf = (p: Piece) => p.host ?? p
+            const moveTo = c.before ? plan.after.findIndex((p) => p && hostOf(p) === hostOf(c.before!)) : -1
+            // The same piece, exalted where it is.
+            const exaltedHere = !!c.after?.exalt && !!c.before && hostOf(c.after) === hostOf(c.before)
+            const gained = [
+              ...namesOf(c.after).filter((n) => !plan.before.some((p) => namesOf(p).includes(n))),
+              ...effectNamesOf(c.after).filter((n) => !plan.before.some((p) => effectNamesOf(p).includes(n)))
+            ]
+            const lost = [
+              ...namesOf(c.before).filter((n) => !plan.after.some((p) => namesOf(p).includes(n))),
+              ...effectNamesOf(c.before).filter((n) => !plan.after.some((p) => effectNamesOf(p).includes(n)))
+            ]
             const delta = plan.slotScoreAfter[c.i] - plan.slotScoreBefore[c.i]
             return (
               <div key={c.i} className="lt-opt-row">
@@ -290,18 +314,27 @@ export function OptimizeTab({ m }: { m: GearModel }) {
                     {c.after ? (
                       <>
                         <b>{c.after.item.name}</b>
-                        <span className="small muted">
-                          {c.after.from === 'worn' ? `from your ${slotLabel(c.after.item.location)}` : whereText(c.after.from, c.after.item).replace(/^in /, 'from ')}
-                        </span>
+                        {!exaltedHere && (
+                          <span className="small muted">
+                            {c.after.from === 'worn' ? `from your ${slotLabel(c.after.item.location)}` : whereText(c.after.from, c.after.item).replace(/^(in|on) /, 'from ')}
+                          </span>
+                        )}
                       </>
                     ) : (
                       <span className="muted">leave empty</span>
                     )}
                   </div>
-                  <div className="small muted">
-                    instead of {c.before ? <b>{c.before.item.name}</b> : 'nothing'}
-                    {c.before && (moveTo >= 0 ? `, which moves to ${slotLabel(plan.slots[moveTo])}` : ', which comes off')}
-                  </div>
+                  {c.after?.exalt && (
+                    <div className="small">
+                      put <b>{c.after.exalt.item.name}</b> in its {c.after.exaltSlot ?? 'focus'} slot, from Storage › Exaltations
+                    </div>
+                  )}
+                  {!exaltedHere && (
+                    <div className="small muted">
+                      instead of {c.before ? <b>{pieceName(c.before)}</b> : 'nothing'}
+                      {c.before && (moveTo >= 0 ? `, which moves to ${slotLabel(plan.slots[moveTo])}` : ', which comes off')}
+                    </div>
+                  )}
                   {(gained.length > 0 || lost.length > 0) && (
                     <div className="lt-diffs">
                       {gained.map((n) => (

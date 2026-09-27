@@ -31,5 +31,6 @@ export function whereText(from: PieceSource, item: InvItem): string {
   if (from === 'bags') return `in your bags (${item.location.split('-')[0]})`
   if (from === 'bank') return 'in your bank'
   if (from === 'storage') return 'in Storage › Equipment'
+  if (from === 'pet') return 'on your pet'
   return 'in the shared bank'
 }

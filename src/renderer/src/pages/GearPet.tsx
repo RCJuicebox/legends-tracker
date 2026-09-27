@@ -1,5 +1,5 @@
-import { useEffect, useMemo } from 'react'
-import { api, ago } from '../api'
+import { useMemo } from 'react'
+import { ago } from '../api'
 import { useInvoke } from '../hooks'
 import { useRemembered } from '../remember'
 import { Info, Pending, Switch } from '../components/ui'
@@ -9,7 +9,7 @@ import { itemKey, mergeLevel, parseStatsBlock, scaledStats, slotLabel, type InvI
 import { restrictions, isLore, score } from '../../../core/upgrades'
 import { rawWeights, type ClassFactors } from '../../../core/statValue'
 import {
-  optimizePetGear, PET_ROLE_PRESETS, petConversions, petMelee, petSlots, type PetChoice, type PetGearReading, type PetPiece, type PetProfile
+  optimizePetGear, PET_ROLE_PRESETS, petConversions, petMelee, petSlots, type PetChoice, type PetPiece, type PetProfile
 } from '../../../core/pets'
 import type { GearModel } from '../gear/useGearModel'
 import { ItemIcon } from './gearBits'
@@ -17,28 +17,7 @@ import { ItemIcon } from './gearBits'
 // The pet's gear: the best items the character owns for the pet to wear, within the pet
 // inventory's slots, against what the pet wears now (the log's `/pet inventory check` list).
 
-interface PetState {
-  character: string
-  gear: PetGearReading | null
-  summon: { spell: string; at: number } | null
-  spells: { spell: string; level: number; classes: string[] }[]
-  spellsLoaded: boolean
-}
-
 const code = (c: string) => c.toUpperCase()
-
-function usePet(character: string, classes: string[], level: number) {
-  const q = useInvoke<PetState>('pet:state', [character, classes, level])
-  const setData = q.setData
-  useEffect(
-    () =>
-      api.on('state:pet', (s: Omit<PetState, 'spells' | 'spellsLoaded'>) =>
-        setData((prev) => (prev && s.character === prev.character ? { ...prev, gear: s.gear, summon: s.summon } : prev))
-      ),
-    [setData]
-  )
-  return q
-}
 
 /** Where an item is now, in a few words. */
 function where(p: PetPiece): string {
@@ -53,7 +32,7 @@ function where(p: PetPiece): string {
 
 export function PetTab({ m }: { m: GearModel }) {
   const character = m.view.character
-  const pet = usePet(character, m.classes, m.level)
+  const pet = m.pet
   const [picked, setPicked] = useRemembered<string>(`pet.spell.${character}`, '')
   const [preset, setPreset] = useRemembered<string>('pet.preset', 'Damage')
   const [includeWorn, setIncludeWorn] = useRemembered<boolean>('pet.includeWorn', false)
@@ -83,7 +62,7 @@ export function PetTab({ m }: { m: GearModel }) {
   const owned = useMemo<PetPiece[]>(
     () =>
       m.pieces.flatMap((p): PetPiece[] => {
-        if (!p.r || !p.stats || (p.from === 'worn' && !includeWorn)) return []
+        if (!p.r || !p.stats || p.from === 'pet' || (p.from === 'worn' && !includeWorn)) return []
         const c = byKey.get(itemKey(p.item.name))
         return [{ item: p.item, from: p.from, key: p.key, r: p.r, stats: p.stats, lore: p.lore, noPet: !!c && /\bNO PET\b/i.test(c.statsblock) }]
       }),

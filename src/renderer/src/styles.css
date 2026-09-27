@@ -2162,12 +2162,22 @@ table.table {
 .lt-down {
   color: var(--red);
 }
+/* Worn effects and procs: the focus row's columns without its tick box. */
+.lt-focus-row.lt-effect-row {
+  grid-template-columns: minmax(220px, 1.3fr) minmax(150px, 0.7fr) minmax(240px, 1.3fr);
+}
 @media (max-width: 900px) {
   .lt-focus-row {
     grid-template-columns: 26px 1fr;
   }
   .lt-focus-row .lt-focus-col {
     grid-column: 2;
+  }
+  .lt-focus-row.lt-effect-row {
+    grid-template-columns: 1fr;
+  }
+  .lt-focus-row.lt-effect-row .lt-focus-col {
+    grid-column: 1;
   }
 }
 

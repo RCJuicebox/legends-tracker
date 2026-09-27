@@ -11,6 +11,7 @@ import { AC_OVER_CAP, useGearModel, type CatalogState, type GearMode } from '../
 import { ItemIcon, source } from './gearBits'
 import { FocusTab, OptimizeTab } from './GearFocus'
 import { PetTab } from './GearPet'
+import { EffectsTab } from './GearEffects'
 import { MergeTab } from './GearMerge'
 
 export type { GearMode }
@@ -267,6 +268,8 @@ export function GearFinder({ view, sheet, mode, go }: { view: InventoryView; she
         <div className="card empty">Set your classes and level on the Stats page, and these tools will know what you can wear.</div>
       ) : mode === 'focus' ? (
         <FocusTab m={model} />
+      ) : mode === 'effects' ? (
+        <EffectsTab m={model} />
       ) : mode === 'optimize' ? (
         <OptimizeTab m={model} />
       ) : (
@@ -283,6 +286,12 @@ export function GearFinder({ view, sheet, mode, go }: { view: InventoryView; she
                         <span title="What its focus effects add, by your focus weighting: a candidate without them has to make up for it">
                           {' '}
                           + {num(r.current.focusLoss)} focus ({fociOf(r.current.item).map((f) => f.name).join(', ')})
+                        </span>
+                      )}
+                      {(r.current.effectLoss ?? 0) > 0 && (
+                        <span title="What its worn effect and proc add to your melee, by your weights: a candidate without them has to make up for it">
+                          {' '}
+                          + {num(r.current.effectLoss!)} effects
                         </span>
                       )}
                     </span>
@@ -311,6 +320,21 @@ export function GearFinder({ view, sheet, mode, go }: { view: InventoryView; she
                             {c.focus.name}
                           </span>
                         )}
+                        {c.effects &&
+                          [
+                            ['worn', c.effects.worn],
+                            ['proc', c.effects.proc]
+                          ]
+                            .filter(([, name]) => name)
+                            .map(([kind, name]) => (
+                              <span
+                                key={kind}
+                                className={`lt-chip ${c.effects!.gain > 0 ? 'focus' : ''}`}
+                                title={`${kind === 'worn' ? 'Worn effect' : 'Proc (from a weapon in your hands)'}${c.effects!.gain ? `; with it the set's worn effects and procs change by ${num(c.effects!.gain)}` : ''}`}
+                              >
+                                {name}
+                              </span>
+                            ))}
                       </div>
                       <div className="lt-diffs">
                         {c.diffs.slice(0, 7).map((d) => (
@@ -355,7 +379,8 @@ export function GearFinder({ view, sheet, mode, go }: { view: InventoryView; she
           <p className="faint small">
             Weights are on outcomes (HP, mana, AC, avoidance, Offense, haste…); a raw stat counts for what it buys you, worked out from your classes, level, current stats
             and AAs, the same formulas the Stats page checks against the game. Focus effects you want (Focus effects tab) count too: a candidate that brings a better one
-            gains, and replacing an item loses what its focus and exaltations gave. Your two Any slots take any piece of gear. Scores only rank items against each other. The
+            gains, and replacing an item loses what its focus and exaltations gave. Worn effects and procs count as what they add to your melee (Worn
+            effects &amp; procs tab). Your two Any slots take any piece of gear. Scores only rank items against each other. The
             wiki holds base stats, so a candidate "as it drops" is at +0 while your gear counts at its merge level; switch to "At your merge level" to compare like with like.
             In era and out of era follow eqlwiki's own list; an item with no era on its page takes the era of the zones it drops in. Item data from eqlwiki.com.
           </p>

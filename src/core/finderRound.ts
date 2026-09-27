@@ -7,6 +7,7 @@ import { itemKey, type InvItem, type ItemStats } from './inventory'
 import { optimizeGear, type OptimizeOptions, type Piece, type Plan } from './gearOptimizer'
 import { isLore, restrictions } from './upgrades'
 import type { CatalogItem } from './wikiItem'
+import { procOf, wornEffectOf } from './itemEffects'
 
 /** Where a piece of gear ends up, when a candidate moves things around. */
 export interface RoundMove {
@@ -29,14 +30,19 @@ export interface RoundResult {
 /** A catalog item as a piece the optimizer can place: it is carried, as if just looted. */
 export function candidatePiece(item: CatalogItem, stats: ItemStats): Piece {
   const inv: InvItem = { location: 'Candidate', name: item.title, id: 0, count: 1, augs: [] }
-  return { item: inv, from: 'bags', key: itemKey(item.title), r: restrictions(item.statsblock), stats, foci: item.focus ? [item.focus] : [], lore: isLore(item.statsblock) }
+  const worn = wornEffectOf(item.statsblock)
+  const proc = procOf(item.statsblock)
+  return {
+    item: inv, from: 'bags', key: itemKey(item.title), r: restrictions(item.statsblock), stats, foci: item.focus ? [item.focus] : [],
+    worn: worn ? [worn] : [], procs: proc ? [proc] : [], lore: isLore(item.statsblock)
+  }
 }
 
 const sum = (xs: number[]) => xs.reduce((a, b) => a + b, 0)
 
-/** A plan's worth once carried out: every slot's stats, the best haste, and the foci worn. */
+/** A plan's worth once carried out: every slot's stats, the best haste, the foci worn, and worn effects and procs. */
 export function planTotal(p: Plan): number {
-  return sum(p.slotScoreAfter) + p.hasteAfter + p.focusAfter
+  return sum(p.slotScoreAfter) + p.hasteAfter + p.focusAfter + p.effectsAfter
 }
 
 /**

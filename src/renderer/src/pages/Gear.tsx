@@ -53,6 +53,7 @@ const MODES: ['sheet' | GearMode, string][] = [
   ['sheet', 'Character sheet'],
   ['finder', 'Upgrade finder'],
   ['focus', 'Focus effects'],
+  ['effects', 'Worn effects & procs'],
   ['optimize', 'Optimize what you own'],
   ['merge', 'Best merge'],
   ['pet', 'Pet']

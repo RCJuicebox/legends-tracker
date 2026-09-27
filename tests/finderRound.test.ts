@@ -60,18 +60,17 @@ describe('a candidate judged in the round', () => {
     expect(kept.candidates.find((c) => c.item.title === 'Big Belt')!.delta).toBe(25 - 450)
   })
 
-  it('gains the whole 30 AC once the focus belt moves to the free Any slot and keeps its focus', () => {
+  it('gains the whole 30 AC in the free Any slot, the focus belt kept where it is', () => {
     const baseline = optimizeGear(opts)
     // Nothing to gain by moving what is owned: the baseline is what is worn.
     expect(planTotal(baseline)).toBe(5 + 1 + 450)
     const big = candidatePiece(byName.get('Big Belt')!, parseStatsBlock(byName.get('Big Belt')!.statsblock))
     const r = inTheRound({ ...opts, candidate: big, baseline })
-    // The focus belt's own 5 AC stays worn too, in the Any slot, so the set gains the belt's full 30.
+    // The focus belt's own 5 AC and its focus stay worn, so the set gains the belt's full 30. Wearing it
+    // at the waist and moving the focus belt to the Any slot gains the same; the one move is kept.
     expect(r.delta).toBe(30)
-    expect(r.placed).toBe('Waist')
-    const where = (name: string) => r.moves.find((m) => m.in?.item.name === name)?.slot
-    expect(where('Big Belt')).toBe('Waist')
-    expect(where('Focus Belt')).toBe('Any Slot')
+    expect(r.placed).toBe('Any Slot')
+    expect(r.moves.map((m) => [m.slot, m.out?.item.name ?? null, m.in?.item.name])).toEqual([['Any Slot', null, 'Big Belt']])
   })
 
   it('finds no place for a candidate that adds nothing', () => {

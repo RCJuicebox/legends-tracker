@@ -82,7 +82,7 @@ describe('item stats', () => {
 })
 
 describe('the focus effects an item carries', () => {
-  // Juicebox's export, 2026-09-26: the ring's own Spell Haste II is replaced by its focus exaltation's
+  // Kelwyn's export, 2026-09-26: the ring's own Spell Haste II is replaced by its focus exaltation's
   // Extended Range II (the game's item window shows only that); the chest has no focus of its own and
   // takes Spell Haste II from its focus exaltation. The ring's click exaltation brings no focus.
   const inv = parseInventory(

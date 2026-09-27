@@ -8,9 +8,15 @@
 // haste gloves for a haste belt so that better gloves can go on (the belt alone costs the old belt,
 // the gloves alone cost the haste), so the search is run again with each haste item owned as the one,
 // the rest of the set free to drop its haste, and the best set of the lot is kept.
+//
+// Gear on the pet counts as owned. Exaltations kept in Storage may go into a piece's focus, worn or
+// proc slot: each is tried as an exalted copy of every piece of its own slot kind, bringing its focus,
+// worn effect or proc in place of the piece's own, and a set wears a piece once (as it is or exalted)
+// and uses each exaltation once. Worn effects count once however many carry them, wherever worn; a
+// proc counts on a weapon in Primary or Secondary.
 
 import { itemKey, storedEquipment, type Inventory, type InvItem, type ItemStats } from './inventory'
-import { canWear, isTwoHanded, score, weightsForSlot, type Restrictions, type Wearer, type Weights } from './upgrades'
+import { ANY_SLOT, canWear, isTwoHanded, score, weightsForSlot, type Restrictions, type Wearer, type Weights } from './upgrades'
 
 /** Every slot gear is worn in, one entry per slot: two ears, two wrists, two rings, two Any slots. */
 export const SLOT_LAYOUT = [
@@ -18,7 +24,7 @@ export const SLOT_LAYOUT = [
   'Fingers', 'Fingers', 'Waist', 'Legs', 'Feet', 'Primary', 'Secondary', 'Range', 'Any Slot', 'Any Slot'
 ]
 
-export type PieceSource = 'worn' | 'bags' | 'bank' | 'sharedBank' | 'storage'
+export type PieceSource = 'worn' | 'bags' | 'bank' | 'sharedBank' | 'storage' | 'pet'
 
 export interface Piece {
   item: InvItem
@@ -29,7 +35,40 @@ export interface Piece {
   stats: ItemStats | null
   /** Its focus effect and its exaltations'. */
   foci: string[]
+  /** Its worn effect and combat proc (its exaltations' in their place); absent for none. */
+  worn?: string[]
+  procs?: string[]
   lore: boolean
+  /** For an exalted copy: the exaltation put in it, the slot it goes in, and the piece it is a copy of. */
+  exalt?: Exaltation
+  exaltSlot?: ExaltSlot
+  host?: Piece
+}
+
+/** An exaltation slot: 7 focus, 9 worn, 10 proc. */
+export type ExaltSlot = 'focus' | 'worn' | 'proc'
+
+/** An exaltation the character keeps, free to put in a piece's focus, worn or proc slot. */
+export interface Exaltation {
+  item: InvItem
+  from: PieceSource
+  /** What the item it was made from carries: a slot of each kind takes that one of it. '' for none. */
+  focus: string
+  worn?: string
+  proc?: string
+  /**
+   * What the item it was made from may be worn by: its slot words ("FINGER", "CHEST") say which
+   * pieces it goes in (one of the same kind), its classes, race and level who may use it.
+   */
+  r: Restrictions
+}
+
+/** What worn effects and procs are worth, in the weights' terms. */
+export interface EffectValue {
+  /** Worn effects worn together; one worn twice counts once. */
+  worn: (names: string[]) => number
+  /** One proc on one weapon in hand. */
+  proc: (name: string) => number
 }
 
 export interface OptimizeOptions {
@@ -38,8 +77,63 @@ export interface OptimizeOptions {
   weights: Weights
   twoHanders: boolean
   focusValue: (names: string[]) => number
+  /** Worn effects and procs; left out, they count for nothing. */
+  effects?: EffectValue
   /** Where the search starts, one entry per slot; what is worn when absent. */
   from?: (Piece | null)[]
+  /** Exaltations kept, to try in pieces' focus, worn and proc slots. */
+  exaltations?: Exaltation[]
+}
+
+// One exalted copy per piece, exaltation and slot, kept across searches so a set from one search (a
+// baseline, say) means the same pieces in the next.
+const exaltedCopies = new WeakMap<Piece, WeakMap<Exaltation, Partial<Record<ExaltSlot, Piece>>>>()
+function exaltedCopy(h: Piece, e: Exaltation, slot: ExaltSlot): Piece {
+  let byExalt = exaltedCopies.get(h)
+  if (!byExalt) exaltedCopies.set(h, (byExalt = new WeakMap()))
+  let bySlot = byExalt.get(e)
+  if (!bySlot) byExalt.set(e, (bySlot = {}))
+  const put: Partial<Piece> = slot === 'focus' ? { foci: [e.focus] } : slot === 'worn' ? { worn: [e.worn!] } : { procs: [e.proc!] }
+  return (bySlot[slot] ??= { ...h, ...put, exalt: e, exaltSlot: slot, host: h })
+}
+
+/** A piece by name, with the exaltation to put in it when it is an exalted copy. */
+export const pieceName = (p: Piece): string =>
+  p.exalt ? `${p.item.name} with ${p.exalt.item.name}${p.exaltSlot && p.exaltSlot !== 'focus' ? ` (${p.exaltSlot} slot)` : ''}` : p.item.name
+
+/**
+ * Every piece, and an exalted copy of each for every exaltation of its slot kind and every slot that
+ * exaltation brings something worth having to, other than what the piece has there now. Exaltations
+ * bringing the same thing to the same kind are one: a second copy of it is worth nothing more.
+ */
+function withExalted(pieces: Piece[], exaltations: Exaltation[], o: Pick<OptimizeOptions, 'focusValue' | 'effects' | 'wearer'>): Piece[] {
+  const kinds = new Map<string, { e: Exaltation; slot: ExaltSlot; what: string }>()
+  for (const e of exaltations) {
+    // One the character's classes, race or level may not use does nothing for them.
+    if (!canWear(e.r, o.wearer, ANY_SLOT)) continue
+    const offers: [ExaltSlot, string | undefined, number][] = [
+      ['focus', e.focus, e.focus ? o.focusValue([e.focus]) : 0],
+      ['worn', e.worn, e.worn && o.effects ? o.effects.worn([e.worn]) : 0],
+      ['proc', e.proc, e.proc && o.effects ? o.effects.proc(e.proc) : 0]
+    ]
+    for (const [slot, what, worth] of offers) {
+      if (!what || worth <= 0) continue
+      const k = `${slot}|${what}|${[...e.r.slots].sort().join(' ')}`
+      if (!kinds.has(k)) kinds.set(k, { e, slot, what })
+    }
+  }
+  if (!kinds.size) return pieces
+  const out = [...pieces]
+  for (const h of pieces) {
+    if (!h.r || !h.stats) continue
+    for (const { e, slot, what } of kinds.values()) {
+      if (!e.r.slots.some((s) => h.r!.slots.includes(s))) continue
+      const now = slot === 'focus' ? h.foci : slot === 'worn' ? (h.worn ?? []) : (h.procs ?? [])
+      if (now.length === 1 && now[0] === what) continue
+      out.push(exaltedCopy(h, e, slot))
+    }
+  }
+  return out
 }
 
 export interface Plan {
@@ -54,11 +148,16 @@ export interface Plan {
   hasteAfter: number
   focusBefore: number
   focusAfter: number
+  /** What the worn effects and the procs in hand are worth, before and after. */
+  effectsBefore: number
+  effectsAfter: number
 }
 
 export function optimizeGear(o: OptimizeOptions): Plan {
   const slots = SLOT_LAYOUT
-  const pieces = o.pieces
+  const pieces = withExalted(o.pieces, o.exaltations ?? [], o)
+  const exalted = pieces.length > o.pieces.length
+  const hostOf = (p: Piece) => p.host ?? p
   // Where each worn piece starts: the first free entry for its slot.
   const start: (Piece | null)[] = slots.map(() => null)
   for (const p of pieces) {
@@ -94,6 +193,17 @@ export function optimizeGear(o: OptimizeOptions): Plan {
       if (lore?.has(p.key)) return false
       ;(lore ??= new Set()).add(p.key)
     }
+    // A piece is worn once, as it is or exalted, and an exaltation goes in one piece.
+    if (exalted) {
+      const used = new Set<unknown>()
+      for (const p of a) {
+        if (!p) continue
+        const h = hostOf(p)
+        if (used.has(h) || (p.exalt && used.has(p.exalt))) return false
+        used.add(h)
+        if (p.exalt) used.add(p.exalt)
+      }
+    }
     const main = a[primary]
     return !(main?.r && isTwoHanded(main.r) && a[secondary])
   }
@@ -108,8 +218,36 @@ export function optimizeGear(o: OptimizeOptions): Plan {
     if (v === undefined) focusCache.set(key, (v = o.focusValue(names)))
     return v
   }
+  // Worn effects count once each wherever worn; a proc counts on a weapon in either hand.
+  const wornCache = new Map<string, number>()
+  const procCache = new Map<string, number>()
+  const effectsOf = (a: (Piece | null)[]): number => {
+    const fx = o.effects
+    if (!fx) return 0
+    let names: string[] | null = null
+    let t = 0
+    for (let i = 0; i < a.length; i++) {
+      const p = a[i]
+      if (!p) continue
+      if (p.worn?.length) (names ??= []).push(...p.worn)
+      if ((i === primary || i === secondary) && p.procs?.length)
+        for (const n of p.procs) {
+          let v = procCache.get(n)
+          if (v === undefined) procCache.set(n, (v = fx.proc(n)))
+          t += v
+        }
+    }
+    if (names) {
+      const unique = [...new Set(names)].sort()
+      const key = unique.join('\u0001')
+      let v = wornCache.get(key)
+      if (v === undefined) wornCache.set(key, (v = fx.worn(unique)))
+      t += v
+    }
+    return t
+  }
   const statsOf = (a: (Piece | null)[]): number => {
-    let t = focusOf(a)
+    let t = focusOf(a) + effectsOf(a)
     for (let i = 0; i < a.length; i++) t += slotScore(a[i], i)
     return t
   }
@@ -141,15 +279,18 @@ export function optimizeGear(o: OptimizeOptions): Plan {
     const main = b[primary]
     if (j === secondary && main?.r && isTwoHanded(main.r)) return
     const focusBase = focusOf(b)
+    const effectsBase = o.effects ? effectsOf(b) : 0
     const hasteBase = h ? 0 : hasteOf(b)
     const lore = new Set(b.filter((p) => p?.lore).map((p) => p!.key))
+    const used = exalted ? new Set(b.flatMap((p) => (p ? [hostOf(p), p.exalt] : []))) : null
     for (const q of fitting[j]) {
       if (b.includes(q) || (q.lore && lore.has(q.key))) continue
+      if (used && (used.has(hostOf(q)) || (q.exalt && used.has(q.exalt)))) continue
       if (j === primary && q.r && isTwoHanded(q.r) && b[secondary]) continue
       let t = base + slotScore(q, j)
-      if (q.foci.length) {
+      if (q.foci.length || (o.effects && (q.worn?.length || ((j === primary || j === secondary) && q.procs?.length)))) {
         b[j] = q
-        t += focusOf(b) - focusBase
+        t += focusOf(b) - focusBase + (o.effects ? effectsOf(b) - effectsBase : 0)
         b[j] = null
       }
       if (!h) t += Math.max(0, (q.stats?.haste ?? 0) * o.weights.haste - hasteBase)
@@ -166,6 +307,7 @@ export function optimizeGear(o: OptimizeOptions): Plan {
       let moved = false
       for (let i = 0; i < slots.length; i++) {
         let bestMove: (Piece | null)[] | null = null
+        let bestChanges = Infinity
         for (const p of fitting[i]) {
           if (a[i] === p) continue
           const b = a.slice()
@@ -174,7 +316,9 @@ export function optimizeGear(o: OptimizeOptions): Plan {
           const j = a.indexOf(p)
           if (j >= 0) refill(b, j, h)
           const t = value(b, h)
-          if (t > best + 1e-6) [best, bestMove] = [t, b]
+          // Of moves worth the same, the one that changes fewest slots: no swapping two pieces for nothing.
+          const changes = j >= 0 && b[j] !== a[j] ? 2 : 1
+          if (t > best + 1e-6 || (bestMove && t > best - 1e-6 && changes < bestChanges)) [best, bestMove, bestChanges] = [Math.max(t, best), b, changes]
         }
         if (bestMove) {
           a = bestMove
@@ -218,6 +362,17 @@ export function optimizeGear(o: OptimizeOptions): Plan {
       }
     }
   }
+  // Slots that come in pairs (ears, wrists, rings, Any slots) are one slot twice: of the two ways to
+  // wear a pair, keep the one that leaves more where the search started, so nothing shows as moving
+  // from one ear to the other.
+  const origin = o.from ?? start
+  for (let i = 0; i < slots.length; i++) {
+    const k = slots.indexOf(slots[i], i + 1)
+    if (k < 0) continue
+    const kept = Number(a[i] === origin[i]) + Number(a[k] === origin[k])
+    const swapped = Number(a[k] === origin[i]) + Number(a[i] === origin[k])
+    if (swapped > kept) [a[i], a[k]] = [a[k], a[i]]
+  }
   return {
     slots,
     before: start,
@@ -227,14 +382,18 @@ export function optimizeGear(o: OptimizeOptions): Plan {
     hasteBefore: hasteOf(start),
     hasteAfter: hasteOf(a),
     focusBefore: focusOf(start),
-    focusAfter: focusOf(a)
+    focusAfter: focusOf(a),
+    effectsBefore: effectsOf(start),
+    effectsAfter: effectsOf(a)
   }
 }
 
-/** A piece for every item the character has: worn, in bags, in the bank, the shared bank and Storage › Equipment. */
+/** A piece for every item the character has: worn, in bags, in the bank, the shared bank, Storage › Equipment and on the pet. */
 export function ownedPieces(
   inv: { worn: InvItem[]; bags: InvItem[]; bank: InvItem[]; sharedBank: InvItem[]; keyRing?: Inventory['keyRing'] },
-  describe: (item: InvItem) => { r: Restrictions | null; stats: ItemStats | null; foci: string[]; lore: boolean } | null
+  describe: (item: InvItem) => { r: Restrictions | null; stats: ItemStats | null; foci: string[]; worn?: string[]; procs?: string[]; lore: boolean } | null,
+  /** What the pet wears, from the log's list of its gear. */
+  pet: InvItem[] = []
 ): Piece[] {
   const out: Piece[] = []
   const add = (items: InvItem[], from: PieceSource) => {
@@ -250,5 +409,6 @@ export function ownedPieces(
   add(inv.bank, 'bank')
   add(inv.sharedBank, 'sharedBank')
   if (inv.keyRing) add(storedEquipment({ keyRing: inv.keyRing }), 'storage')
+  add(pet, 'pet')
   return out
 }
