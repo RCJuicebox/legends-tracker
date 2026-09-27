@@ -217,6 +217,47 @@ function Crumb({ text, back }: { text: string; back: () => void }) {
   )
 }
 
+/** One entity's damage at a glance, above its skills: what the row's hover title used to hold. */
+function EntityStats({ row }: { row: Row }) {
+  const swings = row.hits + row.misses
+  return (
+    <div className="row gap-12 dm-entity-stats">
+      <span className="dm-kv">
+        <b>{fmtNum(row.total)}</b> damage
+      </span>
+      <span className="dm-kv">
+        <b>{fmtRate(row.dps)}</b> DPS
+      </span>
+      {row.activeDps > 0 && row.activeDps !== row.dps && (
+        <span className="dm-kv" title="Over the time spent striking: gaps between hits capped at 3 s">
+          <b>{fmtRate(row.activeDps)}</b> while striking
+        </span>
+      )}
+      <span className="dm-kv">
+        <b>{row.hits}</b> hits
+      </span>
+      {row.hits > 0 && (
+        <span className="dm-kv">
+          <b>{fmtPct(row.crits / row.hits)}</b> crit
+        </span>
+      )}
+      {row.misses > 0 && (
+        <span className="dm-kv" title={`${row.misses} of ${swings} swings missed`}>
+          <b>{fmtPct(row.hits / swings)}</b> landed
+        </span>
+      )}
+      {row.max > 0 && (
+        <span className="dm-kv">
+          <b>{fmtNum(row.max)}</b> best
+        </span>
+      )}
+      <span className="dm-kv">
+        <b>{fmtPct(row.share)}</b> of the damage
+      </span>
+    </div>
+  )
+}
+
 function DamagePane({ seg, rows, drill, setDrill, active, scope }: { seg: Segment; rows: Row[]; drill: Drill; setDrill: (d: Drill) => void; active: boolean; scope: MeterScope }) {
   if (drill?.kind === 'entity') {
     const row = rows.find((r) => r.key === drill.key) ?? damageRows(seg, 'everyone', false).find((r) => r.key === drill.key)
@@ -224,6 +265,7 @@ function DamagePane({ seg, rows, drill, setDrill, active, scope }: { seg: Segmen
     return (
       <>
         <Crumb text={`${drill.name} · back to everyone`} back={() => setDrill(null)} />
+        {row && <EntityStats row={row} />}
         {!skills.length && <div className="empty">Nothing from {drill.name} in this {seg.kind}.</div>}
         {skills.map((s, i) => (
           <SkillBar key={s.key} s={s} rank={i + 1} onClick={s.how === 'pet' ? () => setDrill({ kind: 'entity', key: s.key.slice(2), name: s.name }) : undefined} />

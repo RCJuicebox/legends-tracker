@@ -2363,6 +2363,11 @@ button.tree-item {
   color: var(--text-3);
   margin-left: 2px;
 }
+/* A drilled entity's figures, between the breadcrumb and its skills. */
+.dm-entity-stats {
+  margin: 2px 0 10px;
+  row-gap: 4px;
+}
 .dm-kv {
   font-size: 12px;
   color: var(--text-2);
