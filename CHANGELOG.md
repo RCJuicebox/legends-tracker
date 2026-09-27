@@ -45,6 +45,8 @@ What changed in each version. The release workflow publishes a version's section
 - Every filter box clears with Escape, the show/hide chips on Loot and the upgrade finder look the same, and the **Respawns** table sorts by any of its columns (remembered).
 
 - **Respawns** shows a small line of every gap seen beside the last one. **Damage meter**: a row you click into shows its damage, DPS, hits, crit and landed rates and best hit above its skills.
+- **Damage meter**: **Overall** now charts DPS over time, the session's fights end to end; **Compare with…** sets a fight beside another, everyone's rate and the change.
+- **Spell Timers** shows what a detrimental spell is resisted with (poison, disease, magic…), from the game's spell file.
 - **Try it** (Live) and **Test** (Triggers) share what you paste and point at each other; Test can **Run it for real**.
 - **Spell Timers › Check against your log**: a spell that is off has **Add this focus**, which sets its extra focus to what the log implies.
 
