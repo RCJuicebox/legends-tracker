@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { api } from '../api'
-import { useInvoke } from '../hooks'
+import { useInvoke, useItemInfo } from '../hooks'
 import { useRemembered } from '../remember'
 import { wikiUrl } from '../format'
 import { Icon, Info, Pending } from '../components/ui'
@@ -72,8 +72,6 @@ export function Loot() {
   const view = q.data
   const [filter, setFilter] = useState('')
   const [hidden, setHidden] = useRemembered<LootOutcome[]>('loot.hidden', ['currency'])
-  const [info, setInfo] = useState<Record<string, ItemInfo>>({})
-  const [asked] = useState(() => new Set<string>())
   // Sessions start folded; these are the ones opened. A filter opens every session it matches.
   const [opened, setOpened] = useRemembered<string[]>('loot.open', [])
   const filtering = filter.trim().length > 0
@@ -98,31 +96,12 @@ export function Loot() {
     return out
   }, [entries])
 
-  // The wiki, for what the open sessions show and is not yet known; asked once per name. An answer
-  // is kept whenever it comes (it is keyed by name), so opening another session meanwhile loses none.
-  const mounted = useRef(true)
-  useEffect(() => {
-    mounted.current = true
-    return () => {
-      mounted.current = false
-    }
-  }, [])
+  // The wiki, for what the open sessions show.
   const shownNames = useMemo(
     () => [...new Set(groups.filter((g) => filtering || opened.includes(g.id)).flatMap((g) => g.entries.map((e) => e.base)))],
     [groups, filtering, opened]
   )
-  useEffect(() => {
-    const names = shownNames.filter((n) => !asked.has(itemKey(n)))
-    if (!names.length) return
-    for (const n of names) asked.add(itemKey(n))
-    api.invoke('inventory:lookup', names).then(
-      (r) => mounted.current && setInfo((prev) => ({ ...prev, ...r })),
-      () => {
-        // Offline: the names can be asked again later.
-        for (const n of names) asked.delete(itemKey(n))
-      }
-    )
-  }, [shownNames, asked])
+  const info = useItemInfo(shownNames)
   const sessions = useMemo(() => new Map((view?.sessions ?? []).map((s) => [s.id, s])), [view])
 
   const toggle = (k: LootOutcome) => setHidden(hidden.includes(k) ? hidden.filter((x) => x !== k) : [...hidden, k])
@@ -237,7 +216,7 @@ function Row({ e, info }: { e: LootEntry; info: ItemInfo | undefined }) {
       </div>
       <div className="loot-what">
         {!info ? (
-          <span className="faint">Looking it up…</span>
+          <span className="faint">Loading…</span>
         ) : (
           <>
             {d.head && <b>{d.head}</b>}

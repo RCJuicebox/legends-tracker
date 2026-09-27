@@ -3,7 +3,7 @@ import { api, ago, errorMessage } from '../api'
 import { useRemembered } from '../remember'
 import { useInvoke } from '../hooks'
 import { showUndo } from '../toast'
-import { Pending } from '../components/ui'
+import { Pending, Tabs } from '../components/ui'
 import { fractionPct as pct, num, who } from '../format'
 import { readSheet, type StatsSheet } from '../statsSheet'
 import { useExportCharacter, useInventory, wornSummary } from '../gear/model'
@@ -180,13 +180,7 @@ export function Stats() {
         <AaLine aa={s.aa} status={aaStatus} onRead={() => void readAas(false)} />
       </div>
 
-      <div className="row gap-6 mb-12" role="group" aria-label="Stats view">
-        {TABS.map(([id, label]) => (
-          <button key={id} className={`btn${tab === id ? ' on' : ' ghost'}`} aria-pressed={tab === id} onClick={() => setTab(id)}>
-            {label}
-          </button>
-        ))}
-      </div>
+      <Tabs className="mb-12" label="Stats view" value={tab} onChange={setTab} tabs={TABS} />
 
       {tab === 'character' ? (
         <CharacterTab s={s} set={set} val={val} trio={trio} primary={primary} skill={skill} gear={gear?.totals ?? null} />
@@ -482,11 +476,11 @@ function CombatTab({ s, set, setOverride, auto, val, trio, primary, caps, skill 
           <div className="card">
             <div className="grid four">
               <div className="stat">
-                <span className="label">Attack</span>
+                <span className="label">Attack: offense / accuracy</span>
                 <span className="value stats-big">
                   {num(offense)} / {num(acc)}
                 </span>
-                <span className="sub">before any stance bonus</span>
+                <span className="sub">as the Inventory window shows it, before any stance bonus</span>
               </div>
               <div className="stat">
                 <span className="label">Double attack</span>

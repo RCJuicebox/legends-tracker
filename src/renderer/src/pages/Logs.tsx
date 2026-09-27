@@ -4,7 +4,7 @@ import { api, mb, ago, errorMessage } from '../api'
 import { useInvoke } from '../hooks'
 import { act, showError } from '../toast'
 import { who } from '../format'
-import { Field, LoadError, NumberInput, Switch } from '../components/ui'
+import { Field, LoadError, NumberInput, Switch, Pending } from '../components/ui'
 
 export function Logs() {
   const { state, patchSettings } = useApp()
@@ -49,11 +49,12 @@ export function Logs() {
       <div className="grid two mb-16" style={{ alignItems: 'start' }}>
         <div className="card stack gap-14">
           <h2>Automatic archiving</h2>
-          <div className="row">
+          {/* One sentence, read as one: the switch and the size belong to it. */}
+          <div className="row" role="group" aria-labelledby="archive-when archive-unit">
             <Switch on={a.autoEnabled} label="Archive logs automatically" onChange={(v) => setA({ autoEnabled: v })} />
-            <span>Archive a character log once it passes</span>
+            <span id="archive-when">Archive a character log once it passes</span>
             <NumberInput value={a.thresholdMB} min={10} max={10000} step={10} width={90} label="Archive threshold in MB" onChange={(v) => setA({ thresholdMB: v ?? 150 })} />
-            <span>MB</span>
+            <span id="archive-unit">MB</span>
           </div>
           <Field
             label="Archive folder"
@@ -89,7 +90,7 @@ export function Logs() {
       <div className="card mb-16">
         <h2>Character logs</h2>
         {!view ? (
-          <div className="empty">Reading…</div>
+          <Pending what="the character logs" />
         ) : view.logs.length === 0 ? (
           <div className="empty">No logs found. Turn logging on in game with /log on.</div>
         ) : (

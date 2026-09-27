@@ -53,6 +53,8 @@ export interface AppState {
   arranging: boolean
   devices: AudioDevice[]
   triggerErrors: TriggerError[]
+  /** Global hotkeys another program already holds. */
+  hotkeysTaken: string[]
 }
 
 export interface LogsOverview {

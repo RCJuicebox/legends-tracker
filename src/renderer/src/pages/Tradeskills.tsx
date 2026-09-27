@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { api, ago } from '../api'
-import { useInvoke } from '../hooks'
+import { useInvoke, useItemInfo } from '../hooks'
 import { useRemembered } from '../remember'
 import { act, showError } from '../toast'
 import { Info, Pending } from '../components/ui'
@@ -63,7 +63,6 @@ export function Tradeskills() {
   const [query, setQuery] = useState('')
   // Recipe cards folded shut, by recipe key; kept across restarts.
   const [collapsed, setCollapsed] = useRemembered<string[]>('trade.collapsed', [])
-  const [info, setInfo] = useState<Record<string, ItemInfo>>({})
 
   // New purchases show up as they happen: the log is read on from where it stopped.
   const reloadPurchases = purchasesQ.reload
@@ -107,29 +106,9 @@ export function Tradeskills() {
     return m
   }, [inv.view])
 
-  // Ingredient pages, for who sells them and the wiki's value; asked once per name.
-  // An answer is kept whenever it comes: it is keyed by name, so one that outlives a later ask is
-  // still right, and dropping it would leave its names asked and never answered.
-  const [asked] = useState(() => new Set<string>())
-  const mounted = useRef(true)
-  useEffect(() => {
-    mounted.current = true
-    return () => {
-      mounted.current = false
-    }
-  }, [])
+  // Ingredient pages, for who sells them and the wiki's value.
   const names = useMemo(() => [...new Set(favorites.flatMap(({ r }) => r?.ingredients.map((i) => i.name) ?? []))], [favorites])
-  useEffect(() => {
-    const want = names.filter((n) => !asked.has(itemKey(n)))
-    if (!want.length) return
-    for (const n of want) asked.add(itemKey(n))
-    api.invoke('inventory:lookup', want).then(
-      (r) => mounted.current && setInfo((prev) => ({ ...prev, ...r })),
-      () => {
-        for (const n of want) asked.delete(itemKey(n))
-      }
-    )
-  }, [names, asked])
+  const info = useItemInfo(names)
 
   const bought = purchasesQ.data ?? {}
   const price = (name: string): { unit: number; from: PriceSource } => {

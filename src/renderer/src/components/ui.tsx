@@ -112,9 +112,19 @@ export function Icon({ name }: { name: IconName }) {
   )
 }
 
-/** What a page shows before its data arrives: "Loading…", or why it could not load, with a retry. */
-export function Pending({ error, retry, what = 'this' }: { error?: string; retry?: () => void; what?: string }) {
-  if (!error) return <div className="empty">Loading…</div>
+/**
+ * What a page or card shows before its data arrives: "Loading your motes…", or why it could not load,
+ * with a retry. `hint` says what to check if it takes long.
+ */
+export function Pending({ error, retry, what = 'this', hint }: { error?: string; retry?: () => void; what?: string; hint?: string }) {
+  if (!error) {
+    return (
+      <div className="empty">
+        {what === 'this' ? 'Loading…' : `Loading ${what}…`}
+        {hint && <div className="faint small">{hint}</div>}
+      </div>
+    )
+  }
   return <LoadError error={error} retry={retry} what={what} />
 }
 
@@ -223,5 +233,54 @@ export function Info({ text, label = 'What this means' }: { text: ReactNode; lab
       </summary>
       <div className="info-pop">{text}</div>
     </details>
+  )
+}
+
+/**
+ * A row of tabs: one idiom for every page that has views. Keyboard as a tab list should be: the
+ * arrow keys, Home and End move between tabs, and only the chosen one is in the Tab order. `look`
+ * is buttons (a page's views) or segmented (a mode switch inside a page).
+ */
+export function Tabs<T extends string>({
+  value,
+  tabs,
+  onChange,
+  label,
+  look = 'buttons',
+  className = ''
+}: {
+  value: T
+  tabs: readonly (readonly [T, string])[]
+  onChange: (v: T) => void
+  label: string
+  look?: 'buttons' | 'segmented'
+  className?: string
+}) {
+  const move = (e: React.KeyboardEvent, i: number) => {
+    const to = e.key === 'ArrowRight' ? i + 1 : e.key === 'ArrowLeft' ? i - 1 : e.key === 'Home' ? 0 : e.key === 'End' ? tabs.length - 1 : null
+    if (to === null) return
+    e.preventDefault()
+    const next = tabs[(to + tabs.length) % tabs.length][0]
+    onChange(next)
+    const list = (e.currentTarget as HTMLElement).parentElement
+    requestAnimationFrame(() => list?.querySelector<HTMLElement>(`[data-tab="${next}"]`)?.focus())
+  }
+  return (
+    <div role="tablist" aria-label={label} className={`${look === 'segmented' ? 'lt-seg' : 'row gap-6'} ${className}`.trim()}>
+      {tabs.map(([id, text], i) => (
+        <button
+          key={id}
+          role="tab"
+          data-tab={id}
+          aria-selected={value === id}
+          tabIndex={value === id ? 0 : -1}
+          className={look === 'segmented' ? (value === id ? 'on' : '') : `btn${value === id ? ' on' : ' ghost'}`}
+          onClick={() => onChange(id)}
+          onKeyDown={(e) => move(e, i)}
+        >
+          {text}
+        </button>
+      ))}
+    </div>
   )
 }

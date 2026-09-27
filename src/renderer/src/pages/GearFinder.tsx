@@ -399,7 +399,7 @@ export function GearFinder({ view, sheet, mode, go }: { view: InventoryView; she
                           : 'How much higher it scores than what you wear, by your weights, focus effects included'
                       }
                     >
-                      +{num(c.round ? c.round.delta : c.delta)}
+                      +{num(c.round ? c.round.delta : c.delta)} <span className="faint small">points</span>
                     </span>
                   </div>
                 ))}

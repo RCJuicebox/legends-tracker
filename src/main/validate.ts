@@ -248,6 +248,8 @@ export function sanitizeSettings(v: unknown, fb: AppSettings): AppSettings | nul
     overlays,
     overlaysOnlyWithGame: bool(v.overlaysOnlyWithGame, fb.overlaysOnlyWithGame),
     yieldToGame: bool(v.yieldToGame, fb.yieldToGame),
+    uiScale: num(v.uiScale, fb.uiScale, 0.75, 2),
+    hotkeys: bool(v.hotkeys, fb.hotkeys),
     combat
   })
 }

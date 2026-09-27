@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react'
 import { api, ago } from '../api'
 import { remember, useRemembered } from '../remember'
 import { showError } from '../toast'
-import { Pending } from '../components/ui'
+import { Pending, Tabs } from '../components/ui'
 import { numExact as num, who, wikiUrl } from '../format'
 import { itemKey, mergeLevel, parseStatsBlock, slotLabel, storageTab, wornTotals, SAVE_KEYS, STAT_KEYS, type InvItem } from '../../../core/inventory'
 import type { CharacterSheet, InventoryView, ItemInfo } from '../../../shared/types'
@@ -186,13 +186,7 @@ export function Gear({ go }: { go?: (page: 'motes') => void }) {
 
   const switcher = (
     <div className="row mb-12">
-      <span className="lt-seg" role="group" aria-label="Gear view">
-        {MODES.map(([m, label]) => (
-          <button key={m} className={mode === m ? 'on' : ''} aria-pressed={mode === m} onClick={() => setMode(m)}>
-            {label}
-          </button>
-        ))}
-      </span>
+      <Tabs look="segmented" label="Gear view" value={mode} onChange={setMode} tabs={MODES} />
     </div>
   )
 

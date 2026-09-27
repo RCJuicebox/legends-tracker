@@ -1,4 +1,4 @@
-import { app, powerMonitor, shell } from 'electron'
+import { app, globalShortcut, powerMonitor, shell } from 'electron'
 import { isOwnPage } from './push'
 import { log } from './log'
 import type { AppContext } from './context'
@@ -97,7 +97,8 @@ async function stopAndSave(ctx: AppContext): Promise<void> {
     ['achievement export poller', () => ctx.achievementFiles.stop()],
     ['inventory export poller', () => ctx.inventoryFiles.stop()],
     ['speech', () => ctx.speech.stop()],
-    ['overlays', () => ctx.overlays.destroy()]
+    ['overlays', () => ctx.overlays.destroy()],
+    ['hotkeys', () => globalShortcut.unregisterAll()]
   ] as const) {
     try {
       stop()

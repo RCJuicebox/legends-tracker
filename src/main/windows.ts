@@ -59,7 +59,7 @@ export class Windows {
   private readonly heldFeed: Parameters<Pushes['state:feed']>[] = []
 
   constructor(
-    private readonly opts: { preload: string; icon: string; audioSettings: () => AudioSettings }
+    private readonly opts: { preload: string; icon: string; audioSettings: () => AudioSettings; uiScale: () => number }
   ) {
     const path = join(app.getPath('userData'), 'window.json')
     const r = readJsonFile(path)
@@ -106,6 +106,7 @@ export class Windows {
       if (place?.maximized) w.maximize()
       w.show()
     })
+    w.webContents.on('did-finish-load', () => this.applyScale())
     for (const event of ['move', 'resize', 'maximize', 'unmaximize'] as const) w.on(event as 'move', () => this.rememberPlace())
     w.on('hide', () => this.setMainHidden(true))
     w.on('minimize', () => this.setMainHidden(true))
@@ -130,6 +131,11 @@ export class Windows {
     if (!place || place.trayTold || !Notification.isSupported()) return
     this.place.set({ ...place, trayTold: true })
     new Notification({ title: 'Legends Tracker is still running', body: 'Timers, overlays and speech carry on from the tray. Quit from the tray icon when you are done.', icon: this.opts.icon }).show()
+  }
+
+  /** The UI size setting, on the main window (overlays have their own text sizes). */
+  applyScale(): void {
+    if (this.main && !this.main.isDestroyed()) this.main.webContents.setZoomFactor(this.opts.uiScale())
   }
 
   createAudio(): void {

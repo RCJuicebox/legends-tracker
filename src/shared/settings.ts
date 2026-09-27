@@ -175,5 +175,9 @@ export interface AppSettings {
   overlaysOnlyWithGame: boolean
   /** Run this app's processes at below-normal priority, so the game wins every tie for the CPU. */
   yieldToGame: boolean
+  /** The main window's zoom: 1 is 100%. */
+  uiScale: number
+  /** Ctrl+Shift+F9 mutes, F10 starts a new meter session, F11 arranges the overlays, from anywhere. */
+  hotkeys: boolean
   combat: CombatSettings
 }

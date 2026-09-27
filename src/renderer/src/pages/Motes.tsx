@@ -3,7 +3,7 @@ import { api, clock } from '../api'
 import { useInvoke } from '../hooks'
 import { act } from '../toast'
 import { useNow } from '../components/TimerBars'
-import { ConfirmButton, Icon, Info, Pending } from '../components/ui'
+import { ConfirmButton, Icon, Info, Pending, Tabs } from '../components/ui'
 import { MotePlanner } from './MotePlanner'
 import { MoteSpells } from './MoteSpells'
 import { useRemembered } from '../remember'
@@ -104,17 +104,17 @@ export function Motes() {
   const [tab, setTab] = useRemembered<'tracking' | 'planner' | 'spells'>('motes.tab', 'tracking')
   return (
     <>
-      <div className="row gap-6 mb-14" role="group" aria-label="Motes view">
-        <button className={`btn${tab === 'tracking' ? ' on' : ' ghost'}`} aria-pressed={tab === 'tracking'} onClick={() => setTab('tracking')}>
-          Tracking
-        </button>
-        <button className={`btn${tab === 'planner' ? ' on' : ' ghost'}`} aria-pressed={tab === 'planner'} onClick={() => setTab('planner')}>
-          Upgrade planner
-        </button>
-        <button className={`btn${tab === 'spells' ? ' on' : ' ghost'}`} aria-pressed={tab === 'spells'} onClick={() => setTab('spells')}>
-          Spell upgrades
-        </button>
-      </div>
+      <Tabs
+        className="mb-14"
+        label="Motes view"
+        value={tab}
+        onChange={setTab}
+        tabs={[
+          ['tracking', 'Tracking'],
+          ['planner', 'Upgrade planner'],
+          ['spells', 'Spell upgrades']
+        ]}
+      />
       {tab === 'tracking' ? <MoteTracking /> : tab === 'planner' ? <MotePlannerPage /> : <MoteSpellsPage />}
     </>
   )
@@ -219,7 +219,7 @@ function MoteTracking() {
             <div className="stat">
               <span className="label">Today</span>
               <span className="value">{totalMotes(today)}</span>
-              <span className="sub" title={VALUE_HINT}>{moteValue(today)} value</span>
+              <span className="sub" title={VALUE_HINT}>{moteValue(today)} Infinitesimal-equivalent</span>
             </div>
             <div className="stat">
               <span className="label">Completed crawls</span>
@@ -229,7 +229,7 @@ function MoteTracking() {
             <div className="stat">
               <span className="label">Crawl average</span>
               <span className="value">{perHour(crawlMotes, crawlHours)}/h</span>
-              <span className="sub" title={VALUE_HINT}>{perHour(crawlValue, crawlHours)} value/hour</span>
+              <span className="sub" title={VALUE_HINT}>{perHour(crawlValue, crawlHours)} Infinitesimal-equivalent / hour</span>
             </div>
           </div>
           <div className="small muted mb-6">Today</div>
@@ -269,12 +269,12 @@ function ActiveSession({ a }: { a: MoteSession | null | undefined }) {
             <div className="stat">
               <span className="label">Motes</span>
               <span className="value">{totalMotes(a.motes)}</span>
-              <span className="sub" title={VALUE_HINT}>{moteValue(a.motes)} value</span>
+              <span className="sub" title={VALUE_HINT}>{moteValue(a.motes)} Infinitesimal-equivalent</span>
             </div>
             <div className="stat">
               <span className="label">Per hour</span>
               <span className="value">{perHour(totalMotes(a.motes), sessionHours(a, now))}</span>
-              <span className="sub" title={VALUE_HINT}>{perHour(moteValue(a.motes), sessionHours(a, now))} value/hour</span>
+              <span className="sub" title={VALUE_HINT}>{perHour(moteValue(a.motes), sessionHours(a, now))} Infinitesimal-equivalent / hour</span>
             </div>
           </div>
           <RankChips counts={a.motes} />
@@ -305,7 +305,7 @@ function SessionTable({ sessions, now }: { sessions: MoteSession[]; now: number 
               <th>Time</th>
               <th>Motes</th>
               <th>Per hour</th>
-              <th title={VALUE_HINT}>Value / hour</th>
+              <th title={VALUE_HINT}>Value / hour (Infinitesimal)</th>
               <th />
             </tr>
           </thead>

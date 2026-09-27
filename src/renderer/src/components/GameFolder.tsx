@@ -37,15 +37,19 @@ export function GameFolderCard() {
   const { state, patchSettings } = useApp()
   const dir = state.settings.installDir
   const [check, setCheck] = useState<GameFolderCheck | null>(null)
+  const [checkError, setCheckError] = useState('')
   const { busy, message, find, choose } = useFolderActions()
   useEffect(() => {
     let live = true
     const t = setTimeout(
       () =>
         api.invoke('game:check').then(
-          (c) => live && setCheck(c),
-          // No check: the card just shows no table until the next change.
-          () => {}
+          (c) => {
+            if (!live) return
+            setCheck(c)
+            setCheckError('')
+          },
+          (e) => live && setCheckError(errorMessage(e))
         ),
       300
     )
@@ -66,6 +70,7 @@ export function GameFolderCard() {
 
   return (
     <div className="stack gap-10">
+      {checkError && <div className="notice bad">Could not look in the folder: {checkError}</div>}
       <label className="field">
         <span>EverQuest Legends folder</span>
         <div className="row">

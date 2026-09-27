@@ -1,4 +1,5 @@
-import { app, Notification } from 'electron'
+import { app, globalShortcut, Notification } from 'electron'
+import { HOTKEYS } from '../shared/hotkeys'
 import { promises as fs, rmSync } from 'node:fs'
 import { basename, join } from 'node:path'
 import { Store } from './store'
@@ -75,6 +76,10 @@ export interface AppContext {
   toggleMute(): void
   applyPriority(): void
   refreshOverlayVisibility(): void
+  /** Registers the global hotkeys, or removes them, as the setting says. */
+  applyHotkeys(): void
+  /** Hotkeys another program already holds, from the last registration. */
+  hotkeysTaken: string[]
   /** Writes a summary of the settings to the diagnostic log, when it has changed. */
   logSettings(): void
   /** Set by the lifecycle: restarts into a downloaded update after everything is written. */
@@ -88,7 +93,7 @@ export function createContext(): AppContext {
   const speech = new SpeechWorker()
   // Microsoft's neural voices, with the player's own Azure key; the Windows voices otherwise.
   const azure = new AzureSpeech()
-  const windows = new Windows({ preload: preloadPath, icon: appIcon, audioSettings: () => store.settings.get().audio })
+  const windows = new Windows({ preload: preloadPath, icon: appIcon, audioSettings: () => store.settings.get().audio, uiScale: () => store.settings.get().uiScale })
   const toMain = windows.toMain.bind(windows)
   // Item pages the Gear page looked up, kept a week; a catalog download refreshes them in passing.
   const itemCatalog = new ItemCatalog()
@@ -245,6 +250,8 @@ export function createContext(): AppContext {
     const prev = store.settings.get()
     store.settings.set(next)
     if (next.yieldToGame !== prev.yieldToGame) ctx.applyPriority()
+    if (next.uiScale !== prev.uiScale) windows.applyScale()
+    if (next.hotkeys !== prev.hotkeys) ctx.applyHotkeys()
     ctx.overlays.apply(next.overlays)
     ctx.refreshOverlayVisibility()
     windows.audioConfig()
@@ -279,6 +286,21 @@ export function createContext(): AppContext {
     ctx.engine.reconfigure()
     ctx.engine.triggersChanged()
     ctx.logSettings()
+  }
+
+  ctx.hotkeysTaken = []
+  ctx.applyHotkeys = () => {
+    globalShortcut.unregisterAll()
+    ctx.hotkeysTaken = []
+    if (!store.settings.get().hotkeys) return
+    for (const [accel, run] of [
+      [HOTKEYS.mute, () => ctx.toggleMute()],
+      [HOTKEYS.newSession, () => void ctx.engine.newCombatSession()],
+      [HOTKEYS.arrange, () => ctx.setArranging(!ctx.overlays.isArranging)]
+    ] as const) {
+      if (!globalShortcut.register(accel, run)) ctx.hotkeysTaken.push(accel)
+    }
+    if (ctx.hotkeysTaken.length) log.warn(`Hotkeys another program holds: ${ctx.hotkeysTaken.join(', ')}`)
   }
 
   registerSources(ctx)

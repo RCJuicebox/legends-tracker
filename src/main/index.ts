@@ -81,6 +81,7 @@ async function start(ctx: AppContext): Promise<void> {
   ctx.overlays.apply(store.settings.get().overlays)
   ctx.watcher.start()
   ctx.updater.start()
+  ctx.applyHotkeys()
   // New windows (overlays, the main window reopened) start at normal priority; catch them up.
   ctx.applyPriority()
   // Renderers start a moment after their windows; look again once they have.

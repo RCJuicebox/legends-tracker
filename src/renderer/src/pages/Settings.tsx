@@ -8,6 +8,7 @@ import { Field, LoadError, NumberInput, Switch } from '../components/ui'
 import { GameFolderCard } from '../components/GameFolder'
 import type { TrackingSettings } from '../../../shared/types'
 import type { PageId } from '../main'
+import { HOTKEYS, hotkeyLabel } from '../../../shared/hotkeys'
 
 /** One line on where updates stand. */
 function updateText(u: UpdateState | null): string {
@@ -120,6 +121,35 @@ export function Settings({ go }: { go?: (page: PageId) => void }) {
             Yield CPU to EverQuest
             <span className="faint small">runs this app below normal priority, so the game wins every tie for a frame; sound stays normal</span>
           </label>
+          <Field label="UI size" hint="The size of everything in this window. Overlays have their own text sizes, on the Overlays page.">
+            <select value={s.uiScale} onChange={(e) => patchSettings((x) => ({ ...x, uiScale: Number(e.target.value) }))}>
+              {[0.9, 1, 1.1, 1.25, 1.5].map((f) => (
+                <option key={f} value={f}>
+                  {Math.round(f * 100)}%
+                </option>
+              ))}
+            </select>
+          </Field>
+          <label className="row">
+            <Switch on={s.hotkeys} onChange={(v) => patchSettings((x) => ({ ...x, hotkeys: v }))} />
+            Hotkeys, even with the game in front
+          </label>
+          {s.hotkeys && (
+            <div className="small stack gap-6" style={{ marginLeft: 48 }}>
+              {(
+                [
+                  [HOTKEYS.mute, 'Mute or unmute'],
+                  [HOTKEYS.newSession, 'New damage meter session'],
+                  [HOTKEYS.arrange, 'Arrange or lock the overlays']
+                ] as const
+              ).map(([k, what]) => (
+                <div key={k}>
+                  <span className="mono">{hotkeyLabel(k)}</span> {what}
+                  {state.hotkeysTaken.includes(k) && <span className="chip warn"> another program holds this key</span>}
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
         <div className="card stack gap-14">

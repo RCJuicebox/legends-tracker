@@ -6,7 +6,7 @@ import { restrictions, score, weightsForSlot } from '../../../core/upgrades'
 import { focusValue, KIND_LABELS, KIND_ORDER, KIND_WORTH, type FocusInfo, type FocusLine } from '../../../core/itemFocus'
 import { optimizeGear, pieceName, type Piece } from '../../../core/gearOptimizer'
 import { CATALOG_PER_SLOT, type FocusCandidate, type GearModel, type OwnedFocus } from '../gear/useGearModel'
-import { Info } from '../components/ui'
+import { Info, Pending } from '../components/ui'
 import { num, roundPct as pct, wikiUrl } from '../format'
 import { ItemIcon, source, whereText } from './gearBits'
 
@@ -51,8 +51,8 @@ function ownedText(h: OwnedFocus): string {
 export function FocusTab({ m }: { m: GearModel }) {
   if (!m.report) {
     return (
-      <div className="card empty">
-        Reading focus effects from the game's spell file… If this stays, check the game folder in Settings: the focus effects come from its spells_us.txt.
+      <div className="card">
+        <Pending what="focus effects" hint="If this stays, check the game folder in Settings: focus effects come from its spells_us.txt." />
       </div>
     )
   }

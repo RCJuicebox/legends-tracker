@@ -27,7 +27,8 @@ export function registerAppIpc(ctx: AppContext): void {
     speechError: ctx.speech.failed,
     arranging: ctx.overlays.isArranging,
     devices: ctx.audioDevices,
-    triggerErrors: engine.triggers.errors
+    triggerErrors: engine.triggers.errors,
+    hotkeysTaken: ctx.hotkeysTaken
   }))
   handle('app:openLogs', () => shell.openPath(logDir()))
   handle('app:diagnostics', () => diagnostics(ctx))

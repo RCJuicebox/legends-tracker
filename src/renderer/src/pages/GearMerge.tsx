@@ -151,7 +151,7 @@ export function MergeTab({
                 </th>
                 <th title="The motes the step takes, and how many you could make">Motes</th>
                 <th className="num" title="Those motes' combine value, in Infinitesimal motes">
-                  Value
+                  Value (Infinitesimal)
                 </th>
                 <th className="num" title="Gain per 100 Infinitesimal motes' worth">
                   Gain / 100

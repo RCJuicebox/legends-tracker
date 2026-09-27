@@ -1,11 +1,10 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { useApp } from '../state'
 import { api, clock, ago, errorMessage } from '../api'
-import { useInvoke } from '../hooks'
+import { useInvoke, useSearch } from '../hooks'
 import { act, showError, showUndo } from '../toast'
 import { who } from '../format'
 import { CategoryChip, ConfirmButton, Field, Info, LoadError, NumberInput, SpellIcon, Switch } from '../components/ui'
-import type { InvokeResult } from '../../../shared/ipc'
 import {
   CATEGORY_LABELS, DEFAULT_TIER_DURATION_PCT,
   type ClassName, type FocusSource, type KnownSpell, type LogCheckRow, type SpellCategory, type SpellRule
@@ -55,17 +54,17 @@ export function Spells({ go }: { go?: (page: PageId) => void }) {
                   <th />
                   <th>Spell</th>
                   <th>Type</th>
-                  <th title="As the in-game Spell window shows it: base (with rank and focus)">
+                  <th>
                     Spell window <Info label="About Spell window" text="As the in-game Spell window shows it: base (with rank and focus)" />
                   </th>
-                  <th title="Including the partial tick it lands in">
+                  <th>
                     Wears off <Info label="About Wears off" text="Including the partial tick it lands in" />
                   </th>
                   <th>Tracking</th>
-                  <th title="The spoken &quot;Recast …&quot; warning before it ends">
+                  <th>
                     Recast cue <Info label="About Recast cue" text="The spoken “Recast …” warning before it ends" />
                   </th>
-                  <th title="The spoken announcement when it wears off">
+                  <th>
                     Fade cue <Info label="About Fade cue" text="The spoken announcement when it wears off" />
                   </th>
                   <th>Last cast</th>
@@ -125,28 +124,6 @@ function CharacterCard({ go }: { go?: (page: PageId) => void }) {
       <FocusSources />
     </div>
   )
-}
-
-/** A search as the player types: after a pause, and only the newest answer kept. */
-function useSearch<K extends 'spells:search' | 'focus:search'>(channel: K, q: string): InvokeResult<K> {
-  const [results, setResults] = useState(() => [] as unknown as InvokeResult<K>)
-  useEffect(() => {
-    if (q.trim().length < 3) return setResults([] as unknown as InvokeResult<K>)
-    let live = true
-    const id = setTimeout(
-      () =>
-        (api.invoke as (c: K, q: string) => Promise<InvokeResult<K>>)(channel, q).then(
-          (r) => live && setResults(r),
-          (e) => live && showError('Search failed', e)
-        ),
-      200
-    )
-    return () => {
-      live = false
-      clearTimeout(id)
-    }
-  }, [channel, q])
-  return results
 }
 
 function FocusSources() {
@@ -318,7 +295,7 @@ function SpellRow({ k, open, toggle, onSaved }: { k: KnownSpell; open: boolean; 
         <td className="mono nowrap">
           {d.permanent ? 'Permanent' : `${clock(d.baseSec)} (${clock(d.spellWindowSec)})`}
         </td>
-        <td className="nowrap muted">{d.permanent ? '—' : `${d.earliestSec}–${d.latestSec}s`}</td>
+        <td className="nowrap muted">{d.permanent ? '—' : `${clock(d.earliestSec)}–${clock(d.latestSec)}`}</td>
         <td>
           <span className={`chip${k.rule.track === false ? ' bad' : k.rule.track ? ' ok' : ''}`}>{trackLabel(k.rule)}</span>
         </td>
