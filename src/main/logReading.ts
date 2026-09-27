@@ -2,7 +2,7 @@ import { promises as fs } from 'node:fs'
 import { join } from 'node:path'
 import type { Readable } from 'node:stream'
 import yauzl from 'yauzl'
-import { decodeCp1252, parseLogLine, type LogLine } from '../core/logLine'
+import { decodeCp1252, LogClock, type LogLine } from '../core/logLine'
 import { log } from './log'
 
 // Reading character logs and their archives, shared by mote history, cast counts and catch-up.
@@ -21,20 +21,21 @@ export async function readLines(
   let partial = ''
   let pos = 0
   let n = 0
+  const clock = new LogClock()
   for await (const chunk of stream) {
     opts.onBytes?.((chunk as Buffer).length)
     const lines = (partial + decodeCp1252(chunk as Buffer)).split('\n')
     partial = lines.pop() ?? ''
     for (const raw of lines) {
       pos += raw.length + 1
-      const line = parseLogLine(raw.replace(/\r$/, ''))
+      const line = clock.parse(raw.replace(/\r$/, ''))
       if (line) onLine(line)
     }
     if (++n % 8 === 0) await new Promise((r) => setImmediate(r))
   }
   if (partial && opts.flushLast !== false) {
     pos += partial.length
-    const line = parseLogLine(partial.replace(/\r$/, ''))
+    const line = clock.parse(partial.replace(/\r$/, ''))
     if (line) onLine(line)
   }
   return pos

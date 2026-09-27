@@ -22,6 +22,33 @@ export function parseLogLine(raw: string): LogLine | null {
   return { time, text: m[7] }
 }
 
+const HOUR = 3_600_000
+
+/** Whether a local wall-clock time happens twice (the hour the clocks go back): new Date() gives the first. */
+function repeatedHour(time: number): boolean {
+  const first = new Date(time)
+  const second = new Date(time + HOUR)
+  return first.getHours() === second.getHours() && first.getMinutes() === second.getMinutes()
+}
+
+/**
+ * Reads a log's lines in order, keeping their times in order across the hour the clocks go back.
+ * The log writes local time, so that hour's times come round twice; a time in it that falls about
+ * an hour behind the line before is the second one. One clock per log read from start to end.
+ */
+export class LogClock {
+  private last = -Infinity
+
+  parse(raw: string): LogLine | null {
+    const line = parseLogLine(raw)
+    if (!line) return null
+    // Lines are in order to within a few seconds, so a step back of close to an hour is the repeat.
+    if (line.time < this.last - 60_000 && line.time + HOUR >= this.last - 60_000 && repeatedHour(line.time)) line.time += HOUR
+    this.last = line.time
+    return line
+  }
+}
+
 // Windows-1252, not UTF-8: a UTF-8 decode corrupts extended characters in zone and mob names.
 // Node's decoder passes the five bytes 1252 leaves undefined (0x81, 0x8D, 0x8F, 0x90, 0x9D) through
 // as the same code points, as the hand-written table this replaced did.

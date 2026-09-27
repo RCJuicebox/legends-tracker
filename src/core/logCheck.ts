@@ -1,5 +1,5 @@
 import { promises as fs } from 'node:fs'
-import { decodeCp1252, parseLogLine } from './logLine'
+import { decodeCp1252, LogClock } from './logLine'
 import { computeDuration, focusForObserved, tieredTicks } from './durations'
 import { SpellTracker } from './spellTracker'
 import { TimerBoard, type BoardTimer } from './timers'
@@ -60,6 +60,7 @@ export async function checkAgainstLog(opts: {
     let partial = ''
     let first = pos > 0
     let ticked = -1
+    const clock = new LogClock()
     const chunk = Buffer.alloc(4 << 20)
     const from = pos
     while (pos < size) {
@@ -75,7 +76,7 @@ export async function checkAgainstLog(opts: {
         first = false
       }
       for (const raw of lines) {
-        const line = parseLogLine(raw.replace(/\r$/, ''))
+        const line = clock.parse(raw.replace(/\r$/, ''))
         if (!line) continue
         now = line.time
         tracker.handle(line)

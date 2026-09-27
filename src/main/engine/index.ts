@@ -1,5 +1,5 @@
 import { basename } from 'node:path'
-import { parseLogLine, type LogLine } from '../../core/logLine'
+import { LogClock, parseLogLine, type LogLine } from '../../core/logLine'
 import { LogTailer } from '../../core/tailer'
 import { SpellBook, type Spell } from '../../core/spells'
 import { TimerBoard } from '../../core/timers'
@@ -40,6 +40,8 @@ interface Tail {
   start: number
   /** Just past the last line it gave. -1 until it has given one. */
   end: number
+  /** Keeps the lines' times in order across the hour the clocks go back. */
+  clock: LogClock
 }
 
 /**
@@ -310,6 +312,7 @@ export class Engine {
       logFile,
       start: -1,
       end: -1,
+      clock: new LogClock(),
       tailer: new LogTailer(logFile, {
         startAtEnd: true,
         onLines: (lines, end) => this.tail === tail && this.onLines(tail, lines, end),
@@ -396,7 +399,7 @@ export class Engine {
     t.end = end
     this.notifier.playing(Date.now())
     for (const raw of lines) {
-      const line = parseLogLine(raw)
+      const line = t.clock.parse(raw)
       if (!line) continue
       this.tracker?.handle(line)
       this.triggers.handle(line)

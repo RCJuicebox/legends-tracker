@@ -2,7 +2,7 @@
 // chat: "Ability #<id>: <Name>", "Description: <text>", "Cost per Level: <n>". Each description
 // states the effect at the rank held, so the numbers come straight out of the prose.
 
-import { parseLogLine } from './logLine'
+import { LogClock } from './logLine'
 
 const ABILITY = /^Ability #(\d+): (.+?)\s*$/
 const DESCRIPTION = /^Description: ?(.*)$/
@@ -98,13 +98,14 @@ export function findAaDumps(lines: string[]): RawEntry[][] {
   let cur: RawEntry[] = []
   let entry: RawEntry | null = null
   let lastTime: number | null = null
+  const clock = new LogClock()
   const close = () => {
     if (entry) cur.push(entry)
     entry = null
   }
   for (const line of lines) {
     const raw = line.replace(/\r$/, '')
-    const l = parseLogLine(raw)
+    const l = clock.parse(raw)
     if (!l) {
       // Descriptions wrap onto untimestamped lines.
       if (entry?.inDescription && raw.trim()) entry.description += '\n' + raw.trim()
