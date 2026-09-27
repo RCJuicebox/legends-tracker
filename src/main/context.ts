@@ -22,6 +22,7 @@ import { meleeCounter } from '../core/meleeTally'
 import { RecipeBook } from './recipes'
 import { PurchaseHistory, purchaseConsumer } from './purchases'
 import { FactionHistory, factionConsumer } from './factions'
+import { ProgressionHistory, progressionConsumer } from './progression'
 import { LogHistory } from './sources/logHistory'
 import { TradeFavorites } from './tradeFavorites'
 import { PetStore, PetWiki } from './pets'
@@ -61,6 +62,8 @@ export interface AppContext {
   purchases: PurchaseHistory
   /** Faction changes over the character's log and archives, for the Factions page. */
   factions: FactionHistory
+  /** Levels, skill-ups, AA points and each session's experience over the log and archives, for the Progression page. */
+  progression: ProgressionHistory
   tradeFavorites: TradeFavorites
   petStore: PetStore
   petWiki: PetWiki
@@ -101,7 +104,7 @@ export function createContext(): AppContext {
   const toMain = windows.toMain.bind(windows)
   // Item pages the Gear page looked up, kept a week; a catalog download refreshes them in passing.
   const itemCatalog = new ItemCatalog(cacheDir())
-  // Casts, the melee tally, purchases and faction changes over each character's log and archives,
+  // Casts, the melee tally, purchases, faction changes and progression over each character's log and archives,
   // read in one pass.
   // Each had a cache file of its own before; log-history.json replaces them.
   for (const f of ['cast-history.json', 'melee-history.json', 'purchases.json']) rmSync(join(dataDir, f), { force: true })
@@ -109,7 +112,8 @@ export function createContext(): AppContext {
     casts: dayConsumer(castCounter),
     melee: dayConsumer(meleeCounter),
     purchases: purchaseConsumer,
-    factions: factionConsumer
+    factions: factionConsumer,
+    progression: progressionConsumer
   })
 
   const ctx = {
@@ -130,6 +134,7 @@ export function createContext(): AppContext {
     recipeBook: new RecipeBook((p) => toMain('state:recipes', p)),
     purchases: new PurchaseHistory(logHistory, 'purchases'),
     factions: new FactionHistory(logHistory, 'factions'),
+    progression: new ProgressionHistory(logHistory, 'progression'),
     tradeFavorites: new TradeFavorites(join(dataDir, 'tradeskills.json')),
     inventoryFiles: new InventoryFiles(dataDir, installDir, itemCatalog, (view) => toMain('state:inventory', view)),
     petStore: new PetStore(),
@@ -333,7 +338,7 @@ function registerSources(ctx: AppContext): void {
   } })
   sources.add('icons', { label: 'Icons', kind: 'game file', what: "The game's spell and item icon sheets.", refresh: async () => ctx.icons.clear() })
   sources.add('exports', { label: 'Character exports', kind: 'game file', what: 'The inventory and achievements files the game writes when you type /outputfile inventory or /outputfile achievements. Watched for new ones while their page is open.' })
-  sources.add('history', { label: 'Log history', kind: 'log', what: 'Casts, melee, purchases and faction changes counted over your log and its archives, for the Gear, Spell upgrades, Tradeskills and Factions pages. Only what the log gains is read again.' })
+  sources.add('history', { label: 'Log history', kind: 'log', what: 'Casts, melee, purchases, faction changes and progression counted over your log and its archives, for the Gear, Spell upgrades, Tradeskills, Factions and Progression pages. Only what the log gains is read again.' })
   sources.add('motes', { label: 'Mote history', kind: 'log', what: 'Every mote looted and every instance run, from your logs and archives.', refresh: () => ctx.engine.rebuildMoteHistory() })
   sources.add('items', { label: 'Item lookups', kind: 'wiki', what: 'eqlwiki pages for the items you wear and look at, kept a week.' })
   sources.add('catalog', { label: 'Item catalog', kind: 'wiki', what: "Every piece of equipment on eqlwiki, for the upgrade finder and optimizer. Refreshed weekly, reading only pages edited since.", refresh: () => ctx.wikiCatalog.refresh() })

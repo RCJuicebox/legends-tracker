@@ -472,6 +472,26 @@ also looks on its first visit for a character). The ones that change a sum fill 
 filled in from a file, a game table or the AAs can be typed over. The page's inputs are kept per
 character in `characters\<name>_<server>.json`.
 
+## Progression
+
+What the log recorded of your progress, for the character picked (the same pick as Factions, Stats
+and Gear), from its log and its archives. A strip at the top gives the highest level reached, the
+unspent AA points (the last `You now have N ability points` the game printed, less what was bought
+since), and the skill-ups and experience of the last seven days. Below it:
+
+- **Sessions**, newest first and sortable: play with no gap of 30 minutes between log lines, with its
+  length, experience, AA points, levels and skill-ups, and experience and AA points an hour. EQL
+  prints no experience amounts, only `You gain experience!` (or party, or a Dungeon Crawl reward), so
+  experience is counted in those messages, about one per kill that gave some. Some lines end with a
+  percentage of a level; **Level %** adds up only those printed, so it falls short when lines have none.
+- **Levels**, newest first. EQL levels each class on its own and the level line never says which, so
+  level-ups that follow on from one another are grouped into runs, most likely a class each.
+- **AA purchases**: each rank bought, its cost and when.
+- **Skills**: every skill the log saw go up, its latest value, how many ups and the last, with a filter.
+
+Nothing before your oldest log, or with logging off, is in it. The log is read with casts, melee,
+purchases and factions, in the same one pass, and read on every half minute while the page is open.
+
 ## Gear
 
 What your character is wearing, from the game's inventory export: type `/outputfile inventory` in

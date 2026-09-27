@@ -32,6 +32,7 @@ What changed in each version. The release workflow publishes a version's section
 - **Setup › Data Sources** lists every source the app reads (log, spell data, exports, the wiki, updates and more) with how its last read went, its age and a Refresh.
 - **Long jobs show their progress** in a strip above the page, and each has **Cancel**: the item catalog and recipe downloads, the mote history rebuild, the Spell Timers log check and a meter rebuild.
 - **Character › Factions** lists every faction your log and its archives recorded a change for: the net change, how many, when the last was, whether the game said it could get no better (or worse), and a row's last 20 changes. The game does not print your standing, so it is the net of what the log saw.
+- **Character › Progression** shows what your log and its archives recorded of your progress: levels (grouped into runs, since the log never names the class), skill-ups per skill, AA purchases and unspent points, and each session's experience, AA points, levels and skill-ups with rates an hour. EQL prints no experience amounts, so experience is counted in messages.
 - **Hotkeys** from anywhere: Ctrl+Shift+F9 mutes, F10 starts a meter session, F11 arranges the overlays. **UI size** (Settings) zooms the main window from 90% to 150%.
 
 ### One character record

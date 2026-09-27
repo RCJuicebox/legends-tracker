@@ -24,6 +24,7 @@ import { Factions } from './pages/Factions'
 import { Gear } from './pages/Gear'
 import { Upgrades } from './pages/Upgrades'
 import { Stats } from './pages/Stats'
+import { Progression } from './pages/Progression'
 import { Loot } from './pages/Loot'
 import { Respawns } from './pages/Respawns'
 import { Tradeskills } from './pages/Tradeskills'
@@ -43,6 +44,7 @@ const PAGES = [
   { id: 'achievements', group: 'Character', label: 'Achievements', icon: 'trophy', el: Achievements },
   { id: 'factions', group: 'Character', label: 'Factions', icon: 'flag', el: Factions },
   { id: 'stats', group: 'Character', label: 'Stats', icon: 'stats', el: Stats },
+  { id: 'progression', group: 'Character', label: 'Progression', icon: 'sparkle', el: Progression },
   { id: 'gear', group: 'Character', label: 'Gear', icon: 'bag', el: Gear },
   { id: 'upgrades', group: 'Character', label: 'Upgrades', icon: 'motes', el: Upgrades },
   { id: 'triggers', group: 'Setup', label: 'Triggers', icon: 'triggers', el: Triggers },

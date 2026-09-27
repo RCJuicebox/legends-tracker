@@ -11,6 +11,7 @@ import type { ArchiveOutcome } from '../core/archiver'
 import type { BuffView } from '../core/buffs'
 import type { EffectSpell } from '../core/itemEffects'
 import type { FactionView } from '../core/factions'
+import type { ProgressionView } from '../core/progression'
 import type { FocusReport } from '../core/itemFocus'
 import type { LootSnapshot } from '../core/loot'
 import type { MeleeProfile } from '../core/meleeTally'
@@ -330,6 +331,8 @@ export interface Invokes {
 
   /** Faction changes the character's log and its archives recorded. */
   'factions:get': (character: string) => FactionView
+  /** Levels, skill-ups, AA points and purchases, and each session's experience lines, from the character's log and its archives. */
+  'progression:get': (character: string) => ProgressionView
 
   'character:exports': () => { current: string; achievements: string[]; inventory: string[] }
   'character:sheet': (character: string) => CharacterSheet
@@ -429,7 +432,7 @@ const INVOKE_CHANNELS: Record<InvokeChannel, true> = {
   'stock:get': true, 'stock:counts': true, 'stock:item': true, 'stock:autoAdd': true, 'stock:apply': true, 'stock:readScreen': true,
   'update:status': true, 'update:check': true, 'update:install': true,
   'audio:test': true, 'audio:azure': true, 'audio:setAzure': true, 'audio:sound': true, 'audio:sounds': true, 'audio:voices': true,
-  'achievements:characters': true, 'achievements:load': true, 'achievements:marks': true, 'factions:get': true,
+  'achievements:characters': true, 'achievements:load': true, 'achievements:marks': true, 'factions:get': true, 'progression:get': true,
   'character:exports': true, 'character:sheet': true, 'character:saveSheet': true, 'inventory:load': true, 'inventory:lookup': true,
   'gear:catalog': true, 'gear:catalogRefresh': true, 'gear:foci': true, 'gear:effects': true,
   'stats:caps': true, 'stats:readAAs': true, 'stats:readScreen': true,

@@ -7,13 +7,14 @@ import { castableSpells, focusReport, focusSpec } from '../../core/itemFocus'
 import { meleeProfile } from '../../core/meleeTally'
 import { craftEras } from '../../core/tradeskills'
 import { petSpells, petSummonName } from '../../core/pets'
+import { emptyProgress, progressionView } from '../../core/progression'
 import type { EffectSpell } from '../../core/itemEffects'
 import { isCharacterKey, sanitizeSheet } from '../../core/validate'
 import { logFileFor, logStem } from '../storeCore'
 import type { AppContext } from '../context'
 import type { CatalogFile } from '../../shared/ipc'
 
-// A character's files and what is looked up for them: achievements, factions, inventory, the sheet,
+// A character's files and what is looked up for them: achievements, factions, progression, inventory, the sheet,
 // gear (catalog, focus, worn effects), the pet, tradeskills and the Stats page's tables and screen reads.
 
 export function registerCharacterIpc(ctx: AppContext): void {
@@ -30,6 +31,13 @@ export function registerCharacterIpc(ctx: AppContext): void {
     if (!isCharacterKey(character)) throw new Error('Not a character.')
     if (!ctx.installDir()) return { factions: [] }
     return ctx.factions.view(history(character))
+  })
+
+  // Levels, skill-ups, AA points and purchases, and the sessions of play, over the character's log and its archives.
+  handle('progression:get', async (character) => {
+    if (!isCharacterKey(character)) throw new Error('Not a character.')
+    if (!ctx.installDir()) return progressionView(emptyProgress(), Date.now())
+    return ctx.progression.view(history(character))
   })
 
   // Which characters have a given export, and which one is being played.
