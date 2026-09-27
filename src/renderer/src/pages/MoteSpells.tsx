@@ -222,7 +222,7 @@ export function MoteSpells() {
             title={
               mine.length
                 ? `Your trio: ${mine.map((m) => `${m.name} ${m.level}`).join(', ')}. A spell counts when one of them has it at their level.`
-                : 'Your classes are not known yet: type /who in game, or set class levels on the Spell Timers page'
+                : 'Your classes are not known yet: type /who in game, or set your classes and levels on the Stats page'
             }
           >
             <button className={whose === 'mine' ? 'on' : ''} aria-pressed={whose === 'mine'} onClick={() => setWhose('mine')} disabled={!mine.length}>

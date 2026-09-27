@@ -105,14 +105,15 @@ export function sanitizeCharacter(v: unknown, fb: CharacterSettings): CharacterS
   if (!isObj(v)) return null
   const classLevels: CharacterSettings['classLevels'] = {}
   if (isObj(v.classLevels)) {
-    for (const c of CLASS_NAMES) {
-      const n = v.classLevels[c]
-      if (typeof n === 'number' && Number.isFinite(n)) classLevels[c] = num(n, 1, 1, LEVEL_MAX)
+    // In the order given: the first class is the player's main one.
+    for (const [c, n] of Object.entries(v.classLevels)) {
+      if ((CLASS_NAMES as readonly string[]).includes(c) && typeof n === 'number' && Number.isFinite(n)) classLevels[c as keyof typeof classLevels] = num(n, 1, 1, LEVEL_MAX)
     }
   }
   const out = shape(v, fb, {
     level: num(v.level, fb.level, 1, LEVEL_MAX),
     classLevels: isObj(v.classLevels) ? classLevels : fb.classLevels,
+    race: typeof v.race === 'string' ? v.race.slice(0, 40) : fb.race,
     focusSources: Array.isArray(v.focusSources) ? v.focusSources.map(focusSource).filter((f) => f !== null) : fb.focusSources
   })
   // The old flat figures are read once and then dropped; keep them only as numbers.

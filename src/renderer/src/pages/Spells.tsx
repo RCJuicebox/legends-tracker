@@ -7,11 +7,12 @@ import { who } from '../format'
 import { CategoryChip, ConfirmButton, Field, Info, LoadError, NumberInput, SpellIcon, Switch } from '../components/ui'
 import type { InvokeResult } from '../../../shared/ipc'
 import {
-  CATEGORY_LABELS, CLASS_NAMES, DEFAULT_TIER_DURATION_PCT,
+  CATEGORY_LABELS, DEFAULT_TIER_DURATION_PCT,
   type ClassName, type FocusSource, type KnownSpell, type LogCheckRow, type SpellCategory, type SpellRule
 } from '../../../shared/types'
+import type { PageId } from '../main'
 
-export function Spells() {
+export function Spells({ go }: { go?: (page: PageId) => void }) {
   const { state } = useApp()
   const q = useInvoke('spells:known', [], [state.character, state.settings.tracking, state.status.spellsLoaded])
   const known = q.data ?? []
@@ -35,7 +36,7 @@ export function Spells() {
 
       <div className="stack">
         {q.error && <LoadError what="your spells" error={q.error} retry={q.reload} />}
-        <CharacterCard />
+        <CharacterCard go={go} />
 
         <div className="card">
           <h2>
@@ -87,10 +88,13 @@ export function Spells() {
   )
 }
 
-function CharacterCard() {
-  const { state, saveCharacter } = useApp()
+/**
+ * Whose spells these are: the character's classes, levels and race, which the Stats page edits for
+ * every page, and the duration focus that is this page's own.
+ */
+function CharacterCard({ go }: { go?: (page: PageId) => void }) {
+  const { state } = useApp()
   const c = state.character
-  const [addClass, setAddClass] = useState<ClassName | ''>('')
   const classes = Object.entries(c.classLevels) as [ClassName, number][]
   if (!state.characterKey) {
     return <div className="notice">Choose a character log under Settings to set up focus and levels.</div>
@@ -99,55 +103,25 @@ function CharacterCard() {
     <div className="card">
       <h2>
         {who(state.characterKey)} <span className="spacer" />
+        <button className="btn small" onClick={() => go?.('stats')}>
+          Edit classes and levels
+        </button>
       </h2>
-      <div className="grid two" style={{ alignItems: 'start' }}>
-        <Field label="Level" hint="Used when no class level below applies. Most durations stop growing well before 50.">
-          <NumberInput value={c.level} min={1} max={130} onChange={(v) => saveCharacter({ ...c, level: v ?? 1 })} />
-        </Field>
-        <Field label="Class levels" hint="EQL levels each class separately; a spell uses the level of a class that can cast it.">
-          <div className="row tight">
-            {classes.map(([name, lv]) => (
-              <span key={name} className="chip" style={{ padding: '2px 4px 2px 9px' }}>
-                {name}
-                <input
-                  type="number"
-                  value={lv}
-                  min={1}
-                  max={130}
-                  aria-label={`${name} level`}
-                  style={{ width: 54, padding: '1px 4px' }}
-                  onChange={(e) => saveCharacter({ ...c, classLevels: { ...c.classLevels, [name]: Number(e.target.value) } })}
-                />
-                <button
-                  className="btn ghost small x-btn"
-                  aria-label={`Remove ${name}`}
-                  onClick={() => {
-                    const next = { ...c.classLevels }
-                    delete next[name]
-                    void saveCharacter({ ...c, classLevels: next })
-                  }}
-                >
-                  ×
-                </button>
-              </span>
-            ))}
-            <select
-              aria-label="Add a class"
-              value={addClass}
-              onChange={(e) => {
-                const v = e.target.value as ClassName
-                setAddClass('')
-                if (v) void saveCharacter({ ...c, classLevels: { ...c.classLevels, [v]: c.level } })
-              }}
-            >
-              <option value="">Add class…</option>
-              {CLASS_NAMES.filter((n) => !(n in c.classLevels)).map((n) => (
-                <option key={n}>{n}</option>
-              ))}
-            </select>
-          </div>
-        </Field>
-      </div>
+      {classes.length ? (
+        <div className="row tight mb-12">
+          {classes.map(([name, lv]) => (
+            <span key={name} className="chip">
+              {name} {lv}
+            </span>
+          ))}
+          {c.race && <span className="chip">{c.race}</span>}
+        </div>
+      ) : (
+        <div className="notice warn mb-12">
+          No classes set, so every spell is timed as if cast at level {c.level}. Set your classes and their levels on the Stats page: a spell uses
+          the level of a class that can cast it.
+        </div>
+      )}
       <FocusSources />
     </div>
   )

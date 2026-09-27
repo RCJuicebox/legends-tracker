@@ -9,7 +9,9 @@ import { readSheet, type StatsSheet } from '../statsSheet'
 import { useExportCharacter, useInventory, wornSummary } from '../gear/model'
 import { acInputs, acReport, autoValues, classTrio, combatReport, primaryClass, valOf, type Auto, type Caps, type Note, type Row, type Val } from '../stats/model'
 import { computeAc } from '../../../core/acModel'
-import { CLASSES, className } from '../../../shared/game/classes'
+import { CLASSES, className, type ClassName } from '../../../shared/game/classes'
+import { useCharacterRecord, withClasses, withRecord, recordLevel } from '../character'
+import { LEVEL_CAP } from '../../../core/buffs'
 import { avoidanceFromHitRate, baseAccuracy, hitChance, OFFENSE, skillName, stanceAccuracy, WEAPON_SKILLS, windowOffense } from '../../../core/combatModel'
 import { AA_USES, type AaEffect, type AaSummary } from '../../../core/aa'
 import type { CharacterSheet } from '../../../shared/types'
@@ -26,14 +28,16 @@ const TABS: [Tab, string][] = [
 type SetSheet = (patch: Partial<StatsSheet> | ((s: StatsSheet) => Partial<StatsSheet>)) => void
 
 export function Stats() {
-  const exp = useExportCharacter('inventory', 'stats.character')
+  const exp = useExportCharacter('inventory')
   const { exports, available, character, setCharacter } = exp
   const inv = useInventory(character, !!exports, available.join(','))
   const { view, sheet: charSheet, updateSheet } = inv
   const [tab, setTab] = useRemembered<Tab>('stats.tab', 'character')
   const [aaStatus, setAaStatus] = useState('')
 
-  const s = useMemo(() => readSheet(charSheet?.stats), [charSheet])
+  const rec = useCharacterRecord(character)
+  const record = rec.record
+  const s = useMemo(() => withRecord(readSheet(charSheet?.stats), record), [charSheet, record])
   const trio = useMemo(() => classTrio(s), [s])
   const capsQ = useInvoke('stats:caps', [trio, s.level])
   const caps = capsQ.data
@@ -122,31 +126,52 @@ export function Stats() {
       </div>
 
       <div className="card stack gap-12 mb-14">
+        <p className="hint">
+          {who(character) || 'This character'}&apos;s classes, levels and race, for every page: spell durations, AC and melee, gear and the upgrade
+          finder, spell upgrades and buffs.
+        </p>
         <div className="stats-fields">
-          {[0, 1, 2].map((i) => (
-            <label key={i} className="field">
-              <span>Class {['one', 'two', 'three'][i]}</span>
-              <select
-                value={s.classes[i]}
-                onChange={(e) => {
-                  const c = [...s.classes] as StatsSheet['classes']
-                  c[i] = e.target.value
-                  set({ classes: c })
-                }}
-              >
-                {i > 0 && <option value="">none</option>}
-                {CLASSES.map(([id, name]) => (
-                  <option key={id} value={id}>
-                    {name}
-                  </option>
-                ))}
-              </select>
-            </label>
-          ))}
-          <NumField label="Level" value={s.level} min={1} max={130} onChange={(v) => set({ level: Math.max(1, Math.min(130, v || 1)) })} />
+          {[0, 1, 2].map((i) => {
+            const ids = s.classes
+            const setClass = (id: string) => {
+              const next = [...ids]
+              next[i] = id
+              void rec.save((c) => withClasses(c, [...new Set(next.filter(Boolean))], (x) => c.classLevels[className(x) as ClassName] ?? recordLevel(c)))
+            }
+            const lv = ids[i] ? record?.classLevels[className(ids[i]) as ClassName] : undefined
+            return (
+              <div key={i} className="field">
+                <span>Class {['one', 'two', 'three'][i]}</span>
+                <div className="row tight">
+                  <select aria-label={`Class ${['one', 'two', 'three'][i]}`} value={ids[i]} onChange={(e) => setClass(e.target.value)}>
+                    {i > 0 && <option value="">none</option>}
+                    {CLASSES.map(([id, name]) => (
+                      <option key={id} value={id}>
+                        {name}
+                      </option>
+                    ))}
+                  </select>
+                  {ids[i] && (
+                    <input
+                      type="number"
+                      aria-label={`${className(ids[i])} level`}
+                      style={{ width: 64 }}
+                      min={1}
+                      max={LEVEL_CAP}
+                      value={lv ?? s.level}
+                      onChange={(e) => {
+                        const v = Math.max(1, Math.min(LEVEL_CAP, Number(e.target.value) || 1))
+                        void rec.save((c) => ({ ...c, classLevels: { ...c.classLevels, [className(ids[i])]: v } }))
+                      }}
+                    />
+                  )}
+                </div>
+              </div>
+            )
+          })}
           <label className="field">
             <span>Race</span>
-            <select value={s.race} onChange={(e) => set({ race: e.target.value as StatsSheet['race'] })}>
+            <select value={s.race} onChange={(e) => void rec.save((c) => ({ ...c, race: e.target.value === 'iksar' ? 'Iksar' : '' }))}>
               <option value="other">Any other race</option>
               <option value="iksar">Iksar</option>
             </select>

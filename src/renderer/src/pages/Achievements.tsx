@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { api, ago } from '../api'
 import { useRemembered } from '../remember'
+import { usePickedCharacter } from '../character'
 import { useInvoke } from '../hooks'
 import { showError } from '../toast'
 import { Pending } from '../components/ui'
@@ -34,7 +35,7 @@ function useAchievements() {
   const charsQ = useInvoke('achievements:characters')
   const chars = charsQ.data
   const reloadChars = charsQ.reload
-  const [picked, setPicked] = useRemembered<string>('ach.character', '')
+  const [picked, setPicked] = usePickedCharacter()
   const character = picked && chars?.available.includes(picked) ? picked : chars?.current || chars?.available[0] || ''
   const viewQ = useInvoke(chars ? 'achievements:load' : null, [character])
   const setView = viewQ.setData

@@ -5,7 +5,9 @@ import { logDir } from '../log'
 import { diagnostics } from '../diagnostics'
 import { sources } from '../sources/registry'
 import { checkGameFolder, findInstall, resolveGameFolder } from '../game'
-import { meterOptions, sanitizeCharacter, sanitizeSettings } from '../validate'
+import { isCharacterKey, meterOptions, sanitizeCharacter, sanitizeSettings } from '../validate'
+import { className } from '../../shared/game/classes'
+import type { CharacterSettings } from '../../shared/types'
 import type { AppContext } from '../context'
 
 // The app as a whole: its state, settings, the character, watching the log, the game folder, updates.
@@ -46,6 +48,38 @@ export function registerAppIpc(ctx: AppContext): void {
     engine.reconfigure()
     windows.toMain('state:character', c)
   })
+  handle('character:get', async (key) => {
+    if (!isCharacterKey(key)) throw new Error('Not a character.')
+    const c = store.characterByKey(key)
+    if (Object.keys(c.classLevels).length || c.race) return c
+    // Before one record held them, the Stats page kept a character's classes, level and race in its
+    // own sheet: brought across once.
+    const stats = (await ctx.inventoryFiles.sheet(key)).stats as { classes?: unknown; level?: unknown; race?: unknown }
+    const ids = Array.isArray(stats.classes) ? stats.classes.filter((x): x is string => typeof x === 'string' && !!x) : []
+    if (!ids.length) return c
+    const level = typeof stats.level === 'number' ? stats.level : c.level
+    const seeded = sanitizeCharacter(
+      { ...c, level, classLevels: Object.fromEntries(ids.map((id) => [className(id), level])), race: stats.race === 'iksar' ? 'Iksar' : '' },
+      c
+    )
+    return seeded ? saveCharacterRecord(key, seeded) : c
+  })
+  handle('character:put', (key, input) => {
+    if (!isCharacterKey(key)) throw new Error('Not a character.')
+    const c = sanitizeCharacter(input, store.characterByKey(key))
+    if (!c) throw new Error('The character was not saved: it was not in the expected form.')
+    return saveCharacterRecord(key, c)
+  })
+  /** Stores a character's record; the one being played is taken up at once. */
+  const saveCharacterRecord = (key: string, c: CharacterSettings) => {
+    const s = store.settings.get()
+    store.settings.set({ ...s, characters: { ...s.characters, [key]: c } })
+    if (key === ctx.characterKey()) {
+      engine.reconfigure()
+      windows.toMain('state:character', c)
+    }
+    return c
+  }
   handle('watch:start', () => engine.startWatching())
   handle('watch:stop', () => engine.stopWatching())
   handle('simulate', (text) => engine.simulate(text))

@@ -34,8 +34,13 @@ export interface FocusSource {
 export interface CharacterSettings {
   /** Level used by the duration formulas when no class-specific level applies. */
   level: number
-  /** EQL levels each class separately. A spell uses the level of a class that can cast it. */
+  /**
+   * EQL levels each class separately. A spell uses the level of a class that can cast it. In the
+   * player's own order: the first is the class they think of as their main one.
+   */
   classLevels: Partial<Record<ClassName, number>>
+  /** As /who prints it ("Iksar"); '' or absent when not set. Iksar changes the AC sums. */
+  race?: string
   focusSources: FocusSource[]
   /** Replaced by focusSources; read once to carry an old single figure over. */
   beneficialFocusPct?: number

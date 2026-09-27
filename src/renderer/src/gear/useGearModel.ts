@@ -37,6 +37,7 @@ import { DOUBLE_ATTACK, DUAL_WIELD, TRIPLE_ATTACK, TRIPLE_CLASSES, doubleAttackC
 import { CATALOG_FORMAT, withRaceFix, type CatalogItem } from '../../../core/wikiItem'
 import type { CharacterSheet, InventoryView } from '../../../shared/types'
 import type { CatalogState, FocusData } from '../../../shared/ipc'
+import { useCharacterRecord, withRecord } from '../character'
 
 // Everything the upgrade finder, the focus effects tab and the optimizer work out, apart from how
 // they show it.
@@ -228,7 +229,8 @@ export function useGearModel(view: InventoryView, sheet: CharacterSheet | null, 
   const [days, setDays] = useRemembered<number>('focus.days', 14)
   const [focusOff, setFocusOff] = useRemembered<string[] | null>(`focus.off.${view.character}`, null)
   const [enough, setEnoughAll] = useRemembered<Record<string, string>>(`focus.enough.${view.character}`, {})
-  const sheetStats = useMemo(() => readSheet(sheet?.stats), [sheet])
+  const { record } = useCharacterRecord(view.character)
+  const sheetStats = useMemo(() => withRecord(readSheet(sheet?.stats), record), [sheet, record])
   const trio = sheetStats.classes.filter(Boolean)
   const capsQ = useInvoke(
     trio.length ? 'stats:caps' : null,
@@ -237,7 +239,7 @@ export function useGearModel(view: InventoryView, sheet: CharacterSheet | null, 
   const acCaps = capsQ.data?.ac ?? null
   const factors = useMemo(() => capsQ.data?.factors ?? {}, [capsQ.data])
 
-  const stats = (sheet?.stats ?? {}) as { classes?: string[]; level?: number; race?: string }
+  const stats = sheetStats
   // The same array for as long as the classes are the same, so memos and effects can depend on it.
   const classKey = (stats.classes ?? []).filter(Boolean).join(',')
   const classes = useMemo(() => (classKey ? classKey.split(',') : []), [classKey])

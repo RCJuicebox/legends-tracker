@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { api } from '../api'
 import { useDebounced, useInvoke } from '../hooks'
-import { useRemembered } from '../remember'
+import { usePickedCharacter } from '../character'
 import { showError } from '../toast'
 import { itemKey, mergeLevel, parseStatsBlock, scaledStats, wornTotals, SHIELD_NAME, type ItemStats } from '../../../core/inventory'
 import type { CharacterSheet, InventoryView, ItemInfo } from '../../../shared/types'
@@ -20,10 +20,10 @@ const SHEET_SAVE_MS = 300
  * again when the game writes an export, and every few seconds while the character has none yet, so
  * a page waiting for one fills in on its own.
  */
-export function useExportCharacter(kind: 'inventory' | 'achievements', rememberKey: string) {
+export function useExportCharacter(kind: 'inventory' | 'achievements') {
   const q = useInvoke('character:exports')
   const reload = q.reload
-  const [picked, setPicked] = useRemembered<string>(rememberKey, '')
+  const [picked, setPicked] = usePickedCharacter()
   const exports = q.data
   const available = exports?.[kind] ?? []
   const character = picked && available.includes(picked) ? picked : exports?.current || available[0] || ''

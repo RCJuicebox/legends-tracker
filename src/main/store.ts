@@ -121,8 +121,12 @@ export class Store {
   }
 
   characterOf(logFile: string): CharacterSettings {
+    return this.characterByKey(characterKey(logFile))
+  }
+
+  characterByKey(key: string): CharacterSettings {
     const s = this.settings.get()
-    const c = mergeDefaults(DEFAULT_CHARACTER, s.characters[characterKey(logFile)])
+    const c = mergeDefaults(DEFAULT_CHARACTER, s.characters[key])
     // A character saved with one flat focus figure keeps it, as a single source, until it is replaced.
     if (!c.focusSources.length && (c.beneficialFocusPct || c.detrimentalFocusPct)) {
       const legacy = (pct: number, appliesTo: FocusSource['appliesTo']): FocusSource => ({

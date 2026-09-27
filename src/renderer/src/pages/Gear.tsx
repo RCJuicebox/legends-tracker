@@ -11,6 +11,8 @@ import { MAX_LEVEL } from '../../../core/moteCalc'
 import { useExportCharacter, useInventory, wornSummary, statsFor, type WornSummary } from '../gear/model'
 import { ItemIcon } from './gearBits'
 import { GearFinder, type GearMode } from './GearFinder'
+import { useCharacterRecord, withRecord } from '../character'
+import { readSheet } from '../statsSheet'
 
 /** The highest merge an item takes: +10. */
 const MAX_MERGE = MAX_LEVEL
@@ -61,10 +63,11 @@ const MODES: ['sheet' | GearMode, string][] = [
 ]
 
 export function Gear({ go }: { go?: (page: 'motes') => void }) {
-  const exp = useExportCharacter('inventory', 'inv.character')
+  const exp = useExportCharacter('inventory')
   const { exports, available, character, setCharacter } = exp
   const inv = useInventory(character, !!exports, available.join(','))
   const { view, setView, sheet, updateSheet } = inv
+  const { record } = useCharacterRecord(character)
   const [selected, setSelected] = useState<string | null>(null)
   const [scaled, setScaled] = useRemembered<boolean>('gear.scaled', true)
   const [refreshing, setRefreshing] = useState(false)
@@ -84,8 +87,8 @@ export function Gear({ go }: { go?: (page: 'motes') => void }) {
       />
     )
 
-  const stats = (sheet?.stats ?? {}) as { classes?: string[]; level?: number }
-  const classes = (stats.classes ?? []).filter(Boolean)
+  const stats = withRecord(readSheet(sheet?.stats), record)
+  const classes = stats.classes.filter(Boolean)
   const [name, server] = (view.character || character).split('_')
 
   const head = (

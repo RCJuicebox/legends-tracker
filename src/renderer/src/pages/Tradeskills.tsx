@@ -54,7 +54,7 @@ function useRecipes() {
 }
 
 export function Tradeskills() {
-  const exp = useExportCharacter('inventory', 'inv.character')
+  const exp = useExportCharacter('inventory')
   const character = exp.character
   const inv = useInventory(character, !!exp.exports, exp.available.join(','))
   const recipes = useRecipes()
