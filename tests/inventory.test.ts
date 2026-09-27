@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { baseName, itemKey, mergeLevel, parseInventory, parseStatsBlock, scalePrimary, scaledStats, scaleWeight, wornTotals } from '../src/core/inventory'
+import { baseName, itemFoci, itemKey, mergeLevel, parseInventory, parseStatsBlock, scalePrimary, scaledStats, scaleWeight, wornTotals } from '../src/core/inventory'
 
 const EXPORT = [
   'Location\tName\tID\tCount\tSlots',
@@ -78,5 +78,49 @@ describe('item stats', () => {
     expect(t.ac).toBe(38 + 32 + 14)
     expect(t.haste).toBe(40)
     expect(t.unknown).toBe(0)
+  })
+})
+
+describe('the focus effects an item carries', () => {
+  // Juicebox's export, 2026-09-26: the ring's own Spell Haste II is replaced by its focus exaltation's
+  // Extended Range II (the game's item window shows only that); the chest has no focus of its own and
+  // takes Spell Haste II from its focus exaltation. The ring's click exaltation brings no focus.
+  const inv = parseInventory(
+    [
+      'Location\tName\tID\tCount\tSlots',
+      "Fingers\tDjarn's Amethyst Ring +4\t10366\t1\t10",
+      'Fingers-Slot7\tMoonstone Ring (Exaltation)\t10150\t1\t10',
+      'Fingers-Slot8\tVermilion Sky Ring (Exaltation)\t27730\t1\t10',
+      'Fingers-Slot9\tEmpty\t0\t0\t0',
+      'Chest\tLustrous Russet Breastplate +5\t4832\t1\t10',
+      'Chest-Slot2\tEmpty\t0\t0\t0',
+      'Chest-Slot7\tMithril-Runed Tunic (Exaltation)\t2405\t1\t10',
+      'Hands\tPlain Gloves\t1\t1\t10',
+      'Hands-Slot8\tFocused Charm (Exaltation)\t2\t1\t10',
+      'Neck\tBare Choker\t3\t1\t10',
+      'Neck-Slot7\tDull Charm (Exaltation)\t4\t1\t10'
+    ].join('\n')
+  )
+  const focus: Record<string, string> = {
+    'djarns amethyst ring': 'Spell Haste II',
+    'moonstone ring': 'Extended Range II',
+    'mithril runed tunic': 'Spell Haste II',
+    'vermilion sky ring': 'Improved Damage II',
+    'focused charm': 'Improved Healing II',
+    'bare choker': 'Extended Enhancement II'
+  }
+  const foci = (slot: string) => itemFoci(inv.worn.find((w) => w.location === slot)!, (n) => focus[itemKey(n)])
+
+  it("takes the focus exaltation's focus in place of the item's own", () => {
+    expect(foci('Fingers')).toEqual([{ name: 'Extended Range II', via: 'Moonstone Ring (Exaltation)' }])
+    expect(foci('Chest')).toEqual([{ name: 'Spell Haste II', via: 'Mithril-Runed Tunic (Exaltation)' }])
+  })
+
+  it('takes no focus from a click, worn or proc exaltation', () => {
+    expect(foci('Hands')).toEqual([])
+  })
+
+  it("keeps the item's own focus when its focus exaltation has none known", () => {
+    expect(foci('Neck')).toEqual([{ name: 'Extended Enhancement II', via: '' }])
   })
 })

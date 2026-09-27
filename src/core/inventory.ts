@@ -114,6 +114,28 @@ export function itemKey(name: string): string {
     .trim()
 }
 
+/**
+ * The focus effects an item carries, each with the exaltation or augment it comes from ('' for the
+ * item's own). Gear holds its exaltations in slots 7-10: focus, click, worn and proc, as the item
+ * window lists them. A focus exaltation's focus takes the place of the item's own (the window shows
+ * only it); click, worn and proc exaltations bring no focus. An ordinary augment's focus adds to the
+ * item's. `focusOf` is an item's own focus by name; '' or undefined for none or unknown.
+ */
+export function itemFoci(item: InvItem, focusOf: (name: string) => string | undefined): { name: string; via: string }[] {
+  const exalted = (a: InvItem) => /\(Exaltation\)$/i.test(a.name)
+  const focusSlot = item.augs.find((a) => exalted(a) && /-Slot7$/.test(a.location))
+  // An exaltation with no focus known leaves the item's own in place.
+  const replaced = focusSlot ? focusOf(focusSlot.name) : undefined
+  const out: { name: string; via: string }[] = []
+  const add = (name: string | undefined, via: string) => {
+    if (name && !out.some((o) => o.name === name)) out.push({ name, via })
+  }
+  if (replaced) add(replaced, focusSlot!.name)
+  else add(focusOf(item.name), '')
+  for (const a of item.augs) if (!exalted(a)) add(focusOf(a.name), a.name)
+  return out
+}
+
 export const STAT_KEYS = ['STR', 'STA', 'AGI', 'DEX', 'WIS', 'INT', 'CHA'] as const
 export const POOL_KEYS = ['HP', 'MANA', 'END'] as const
 export const SAVE_KEYS = ['COLD', 'DISEASE', 'FIRE', 'MAGIC', 'POISON', 'CORRUPTION', 'VOID'] as const

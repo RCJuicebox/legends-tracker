@@ -6,7 +6,7 @@ import { showError } from '../toast'
 import { readSheet } from '../statsSheet'
 import { characterAc } from '../stats/model'
 import { statsFor, wornSummary } from './model'
-import { itemKey, mergeLevel, parseStatsBlock, scaledStats, type InvItem } from '../../../core/inventory'
+import { itemFoci, itemKey, mergeLevel, parseStatsBlock, scaledStats, type InvItem } from '../../../core/inventory'
 import {
   ANY_SLOT,
   canWear,
@@ -230,16 +230,7 @@ export function useGearModel(view: InventoryView, sheet: CharacterSheet | null, 
   // ---- focus effects ----
   const byKey = useMemo(() => new Map((items ?? []).map((it) => [itemKey(it.title), it])), [items])
   const fociOf = useMemo(
-    () => (item: InvItem) => {
-      const out: { name: string; via: string }[] = []
-      const own = byKey.get(itemKey(item.name))?.focus
-      if (own) out.push({ name: own, via: '' })
-      for (const a of item.augs) {
-        const f = byKey.get(itemKey(a.name))?.focus
-        if (f && !out.some((o) => o.name === f)) out.push({ name: f, via: a.name })
-      }
-      return out
-    },
+    () => (item: InvItem) => itemFoci(item, (name) => byKey.get(itemKey(name))?.focus),
     [byKey]
   )
   const [report, setReport] = useState<FocusData | null>(null)
