@@ -178,6 +178,16 @@ export function characterKey(logFile: string): string {
   return m ? m[1] : ''
 }
 
+/** A character's log in the game folder: `Kelwyn_neriak` → `<install>\Logs\eqlog_Kelwyn_neriak.txt`. */
+export function logFileFor(installDir: string, key: string): string {
+  return join(installDir, 'Logs', `${logStem(key)}.txt`)
+}
+
+/** The name a character's log and its archives start with: `eqlog_Kelwyn_neriak`. */
+export function logStem(key: string): string {
+  return `eqlog_${key}`
+}
+
 /** `Kelwyn_neriak` → `Kelwyn` */
 export function characterName(logFile: string): string {
   return characterKey(logFile).split('_')[0] ?? ''

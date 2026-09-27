@@ -1,4 +1,5 @@
-import { className, computeAc, marginal, type AcInputs } from '../../../core/acModel'
+import { computeAc, marginal, type AcInputs } from '../../../core/acModel'
+import { className } from '../../../shared/game/classes'
 import {
   baseAccuracy,
   classicCritChance,

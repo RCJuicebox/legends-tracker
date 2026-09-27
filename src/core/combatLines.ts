@@ -21,6 +21,8 @@
 //   You have slain a forsaken revenant!  /  A skeleton has been slain by Gabartik!
 //   Jobarab told you, 'Attacking a forsaken revenant Master.'
 
+import { CAST_BY_OTHER, CAST_BY_YOU, DIED, SLAIN_BY, SLAIN_BY_YOU, YOU_DIED } from './phrases'
+
 /** The player, however the log spells it: You, YOU, you, YOUR, or the character's own name. */
 export const SELF = 'You'
 
@@ -62,10 +64,10 @@ const RE_DS_ON_YOU = /^YOU are \w+ by (.+?)'s (\w+) for (\d+) points? of non-mel
 const RE_DS = /^(.+?) is \w+ by (.+?)'s (\w+) for (\d+) points? of non-melee damage\.$/
 const RE_HEAL = /^(.+?) healed (.+?)( over time)? for (\d+)(?: \((\d+)\))? hit points by (.+?)\.(?: \((.+)\))?$/
 const RE_RUNE = /^(.+?) gains? a rune for (\d+) points? of absorption\.$/
-const RE_SLAIN_YOU = /^You have slain (.+)!$/
-const RE_SLAIN_BY = /^(.+) has been slain by (.+)!$/
-const RE_DIED = /^(.+) died\.$/
-const RE_YOU_DIED = /^You died\.$/
+const RE_SLAIN_YOU = SLAIN_BY_YOU
+const RE_SLAIN_BY = SLAIN_BY
+const RE_DIED = DIED
+const RE_YOU_DIED = YOU_DIED
 const RE_YOU_SLAIN = /^You have been slain by (.+)!$/
 const RE_RESIST_YOU = /^(.+?) resisted your (.+)!$/
 const RE_RESIST = /^(.+?) resisted (.+?)'s (.+)!$/
@@ -82,8 +84,8 @@ const RE_YOU_REMOVE = /^You remove (.+) from the group\.$/
 const RE_INVITED = /^(.+) invites you to join a group\.$/
 const RE_YOU_JOINED = /^You have joined the group\.$/
 const RE_YOU_LEFT = /^(?:You have been removed from the group\.|You have left the group\.|Your group has been disbanded\.|You disband the group\.)$/
-const RE_CAST_YOU = /^You begin (?:casting|singing) (.+)\.$/
-const RE_CAST = /^(.+?) begins (?:casting|singing) (.+)\.$/
+const RE_CAST_YOU = CAST_BY_YOU
+const RE_CAST = CAST_BY_OTHER
 
 /** The log's spellings of the player, in any position. */
 function self(name: string): string {

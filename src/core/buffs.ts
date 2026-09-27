@@ -15,8 +15,9 @@
 // Offers are keyed by the spell file's own names: Rune I to Rune IV are four enchanter spells, not
 // ranks of one (Legends prints its ranks after the name: "Rune I III").
 
-import { CLASS_NUMBER, type ClassId } from './acModel'
+import { CLASS_NUMBER, type ClassId } from '../shared/game/classes'
 import { isSong } from './spellKinds'
+import { RESIST_SPA, STAT_SPA } from '../shared/game/spa'
 import { computeDuration } from './durations'
 import type { Spell, SpellBook } from './spells'
 import { effectValue } from './effectValue'
@@ -77,8 +78,6 @@ export interface BuffEffect {
   value: string
 }
 
-const STAT_SPA: Record<number, string> = { 4: 'STR', 5: 'DEX', 6: 'AGI', 7: 'STA', 8: 'INT', 9: 'WIS', 10: 'CHA' }
-const RESIST_SPA: Record<number, string> = { 46: 'fire', 47: 'cold', 48: 'poison', 49: 'disease', 50: 'magic' }
 
 /** What a proc buff (SPA 85) or a permanent utility buff does: the spell it procs, by id. */
 const PERMANENT_ONLY: Record<number, string> = { 14: 'enduring breath', 57: 'levitate', 58: 'illusion', 184: 'accuracy' }
@@ -107,7 +106,7 @@ function effectOf(spa: number, base: number, max: number, permanent: boolean, pr
   if (spa === 161 && max > 0) return { line: 'rune', label: 'spell ward', value: `${max} (${base}%)` }
   if (spa === 121 && base > 0) return { line: 'hpRegen', label: 'heal per hit', value: `+${base}` }
   if (spa === 97 && base > 0) return { line: 'mana', label: 'mana', value: `+${base}` }
-  if (RESIST_SPA[spa] && base > 0) return { line: 'resist', label: `${RESIST_SPA[spa]} resist`, value: `+${base}` }
+  if (RESIST_SPA[spa] && base > 0) return { line: 'resist', label: `${RESIST_SPA[spa].toLowerCase()} resist`, value: `+${base}` }
   if (spa === 3 && base > 0) return { line: 'move', label: 'run speed', value: `${base}%` }
   return null
 }

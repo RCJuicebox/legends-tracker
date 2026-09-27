@@ -1,36 +1,10 @@
 // Types shared by the main process, the preload bridge and every renderer window.
 
-export const CLASS_NAMES = [
-  'Warrior', 'Cleric', 'Paladin', 'Ranger', 'Shadow Knight', 'Druid', 'Monk', 'Bard',
-  'Rogue', 'Shaman', 'Necromancer', 'Wizard', 'Magician', 'Enchanter', 'Beastlord', 'Berserker'
-] as const
-export type ClassName = (typeof CLASS_NAMES)[number]
+import type { ClassName } from './game/classes'
+import type { SpellCategory } from './game/guide'
 
-/**
- * Spell categories, matching the rows of the EQL per-tier bonus table. The category decides which
- * per-tier duration bonus a ranked spell gets.
- */
-export type SpellCategory = 'nuke' | 'dot' | 'heal' | 'hot' | 'debuff' | 'charm' | 'mez' | 'buff'
-
-export const CATEGORY_LABELS: Record<SpellCategory, string> = {
-  nuke: 'Nuke / Lifetap',
-  dot: 'DoT',
-  heal: 'Heal',
-  hot: 'Heal over Time',
-  debuff: 'Debuff',
-  charm: 'Charm',
-  mez: 'Mez',
-  buff: 'Buff'
-}
-
-/**
- * Duration bonus per tier, in percent, from the EQL spell upgrade (mote) guide. Heal over time is the
- * exception: the guide marks its 5% uncertain, and Slugs Healing V fits only 6–8% (Spell window 0:48
- * with the ring off, 9 ticks in the log with it on), so it is set to 7%.
- */
-export const DEFAULT_TIER_DURATION_PCT: Record<SpellCategory, number> = {
-  nuke: 0, dot: 5, heal: 0, hot: 7, debuff: 10, charm: 10, mez: 10, buff: 10
-}
+export { CLASS_NAMES, type ClassName } from './game/classes'
+export { CATEGORY_LABELS, DEFAULT_TIER_DURATION_PCT, type SpellCategory } from './game/guide'
 
 /**
  * One spell duration focus: an item's focus effect (read from its focus spell in spells_us.txt) or

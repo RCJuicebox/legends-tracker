@@ -21,57 +21,18 @@ import { countsToArray } from './moteCalc'
 import { casterLevel, formulaTicks } from './durations'
 import { isItemEffect } from './focus'
 import { isSong, summonsPet } from './spellKinds'
+import { SPA } from '../shared/game/spa'
 import type { SpellBook } from './spells'
 import { CLASS_NAMES, type CharacterSettings, type SpellCategory } from '../shared/types'
+import { RANK_BONUS, UNIVERSAL, UTILITY_BONUS, type RankBonus } from '../shared/game/guide'
 
 export const MAX_RANK = 10
 
-/** What one rank gives a spell of each category, in percent, from the guide's per-tier table. */
-export interface RankBonus {
-  /** Percent less cast time. */
-  cast: number
-  /** Percent less mana. */
-  mana: number
-  /** Percent more damage or healing; per tick for DoTs and heals over time. 0 when nothing scales. */
-  power: number
-  /** What `power` is, for showing. */
-  powerNote: string
-  /** The highest level the spell works on rises by one (charm and mez). */
-  level?: boolean
-  /** The guide's own caveat on this row. */
-  caveat?: string
-}
-
-export const RANK_BONUS: Record<SpellCategory, RankBonus> = {
-  nuke: { cast: 2, mana: 2, power: 6, powerNote: 'damage' },
-  dot: { cast: 4, mana: 2, power: 3, powerNote: 'per tick', caveat: 'the per-tick gain is unconfirmed; the direct hit of a hybrid gets +6%' },
-  heal: { cast: 4, mana: 2, power: 3, powerNote: 'healing', caveat: 'from a single report (65 → 79 at rank VII)' },
-  hot: { cast: 4, mana: 2, power: 3, powerNote: 'per tick', caveat: 'per-tick gain from the community table only' },
-  debuff: { cast: 4, mana: 4, power: 0, powerNote: '', caveat: 'the effect itself does not scale' },
-  charm: { cast: 4, mana: 4, power: 0, powerNote: '', level: true },
-  mez: { cast: 4, mana: 4, power: 0, powerNote: '', level: true },
-  buff: { cast: 4, mana: 4, power: 0, powerNote: '', caveat: "the buff's stats do not grow (damage shields confirmed not to)" }
-}
-
-/** The same for every category, per rank. */
-export const UNIVERSAL = { recovery: 2, reuse: 2, resist: 15 }
-
-/**
- * Transport and utility spells are not in the guide's table. They get the cast and mana cuts every
- * non-nuke category shares and nothing else: there is no damage, healing or duration to grow.
- */
-export const UTILITY_BONUS: RankBonus = {
-  cast: 4,
-  mana: 2,
-  power: 0,
-  powerNote: '',
-  caveat: 'not in the guide; the cast and mana cuts of other spells assumed'
-}
+export { RANK_BONUS, UNIVERSAL, UTILITY_BONUS, type RankBonus } from '../shared/game/guide'
 
 /** Gate, teleport, succor, translocate, teleport (v2): a spell that moves you. */
 export const TRANSPORT_SPAS = [26, 83, 88, 104, 145]
 /** Bind affinity: misc, with the cures and summons. */
-const SPA_BIND = 25
 /** Effects that heal: hit points now, or over time. */
 const HEAL_SPAS = [0, 79, 100]
 
@@ -123,7 +84,7 @@ export type SectionKey = (typeof SECTIONS)[number]['key']
  */
 export function sectionOf(category: SpellCategory, pet: boolean, effects: { spa: number; base: number }[] = []): SectionKey {
   if (effects.some((e) => TRANSPORT_SPAS.includes(e.spa))) return 'transport'
-  if (effects.some((e) => e.spa === SPA_BIND)) return 'utility'
+  if (effects.some((e) => e.spa === SPA.BIND)) return 'utility'
   if (pet) return 'pet'
   if (category === 'heal' && !effects.some((e) => HEAL_SPAS.includes(e.spa) && e.base > 0)) return 'utility'
   return SECTIONS.find((s) => (s.cats as readonly string[]).includes(category))?.key ?? 'buff'

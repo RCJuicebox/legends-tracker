@@ -14,7 +14,6 @@
 // Nothing about any pet is kept here: the pet's classes, level, stats and base melee come from the
 // wiki at run time.
 
-import { CLASSES } from './acModel'
 import { summonsPet } from './spellKinds'
 import { itemKey, type InvItem, type ItemStats } from './inventory'
 import { canWear, isTwoHanded, score, type Restrictions, type Wearer, type Weights } from './upgrades'
@@ -23,7 +22,7 @@ import { conversions } from './statValue'
 import type { PieceSource } from './gearOptimizer'
 import { parseWikiTables } from './wikiTable'
 import type { SpellBook } from './spells'
-import { CLASS_NAMES } from '../shared/types'
+import { classColumn, classIdOf } from '../shared/game/classes'
 
 // ---- slots ----
 
@@ -121,11 +120,6 @@ export interface PetProfile {
   unsure: string[]
 }
 
-const classId = (name: string): string | null => {
-  const n = name.replace(/[\s_]/g, '').toLowerCase()
-  return CLASSES.find(([, label]) => label.toLowerCase() === n)?.[0] ?? null
-}
-
 const num = (s: string | undefined): number | null => {
   const m = /-?\d+(?:\.\d+)?/.exec(s ?? '')
   return m ? Number(m[0]) : null
@@ -140,7 +134,7 @@ export function parseSummonPage(spell: string, wikitext: string): Omit<PetProfil
     if (raw.includes('?')) unsure.push(key)
     return num(raw)
   }
-  const classes = [...field('Pet Classes').matchAll(/\[\[([^\]|]+)(?:\|[^\]]*)?\]\]/g)].map((m) => classId(m[1])).filter((c): c is string => !!c)
+  const classes = [...field('Pet Classes').matchAll(/\[\[([^\]|]+)(?:\|[^\]]*)?\]\]/g)].map((m) => classIdOf(m[1])).filter((c) => c !== null)
   const dw = val('Dual Wield', 'dual wield')
   return {
     spell,
@@ -471,15 +465,9 @@ export function petSummonName(book: SpellBook, rankedName: string): string | nul
   return r.rank ? rankedName.replace(/\s+[IVXL]+$/, '') : r.spell.name
 }
 
-const CLASS_IDS: Record<string, string> = {
-  war: 'Warrior', clr: 'Cleric', pal: 'Paladin', rng: 'Ranger', shd: 'Shadow Knight', dru: 'Druid', mnk: 'Monk', brd: 'Bard',
-  rog: 'Rogue', shm: 'Shaman', nec: 'Necromancer', wiz: 'Wizard', mag: 'Magician', enc: 'Enchanter', bst: 'Beastlord', ber: 'Berserker'
-}
-
 /** Every pet these classes can summon by this level, lowest first. Class ids are the tracker's. */
 export function petSpells(book: SpellBook, classes: string[], level: number): PetSpellOption[] {
-  // The spell file's class columns run in the game's class order, which CLASS_NAMES follows.
-  const idx = (c: string) => CLASS_NAMES.indexOf(CLASS_IDS[c] as (typeof CLASS_NAMES)[number])
+  const idx = classColumn
   const out = new Map<string, PetSpellOption>()
   for (const s of book.all()) {
     if (!summonsPet(s)) continue

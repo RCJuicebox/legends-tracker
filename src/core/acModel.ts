@@ -5,22 +5,6 @@
 // On EverQuest Legends this reproduces the Inventory window's three AC figures (mitigation, soft cap,
 // avoidance) exactly, checked against in-game readings across several gear and buff changes.
 
-export const CLASSES = [
-  ['war', 'Warrior'], ['pal', 'Paladin'], ['shd', 'Shadowknight'], ['rng', 'Ranger'],
-  ['mnk', 'Monk'], ['brd', 'Bard'], ['rog', 'Rogue'], ['ber', 'Berserker'], ['bst', 'Beastlord'],
-  ['clr', 'Cleric'], ['dru', 'Druid'], ['shm', 'Shaman'],
-  ['enc', 'Enchanter'], ['mag', 'Magician'], ['nec', 'Necromancer'], ['wiz', 'Wizard']
-] as const
-
-export type ClassId = (typeof CLASSES)[number][0]
-
-/** The game files number classes the classic way: 1 Warrior … 16 Berserker. */
-export const CLASS_NUMBER: Record<ClassId, number> = {
-  war: 1, clr: 2, pal: 3, rng: 4, shd: 5, dru: 6, mnk: 7, brd: 8, rog: 9, shm: 10, nec: 11, wiz: 12, mag: 13, enc: 14, bst: 15, ber: 16
-}
-
-export const className = (c: string) => CLASSES.find(([id]) => id === c)?.[1] ?? c
-
 /** Cloth casters: defence counts half, AC buffs and Hero's Fortitude a third. */
 const SILK: string[] = ['enc', 'mag', 'nec', 'wiz']
 /** Armor of Wisdom counts a third for these, a quarter for everyone else. */

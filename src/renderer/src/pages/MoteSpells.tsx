@@ -6,9 +6,8 @@ import { useRemembered } from '../remember'
 import { CategoryChip, Info, NumberInput, Pending, SpellIcon } from '../components/ui'
 import { num, roundPct } from '../format'
 import { useStock } from './MotePlanner'
-import { CLASS_NUMBER } from '../../../core/acModel'
+import { classCode, classIdOf } from '../../../shared/game/classes'
 import { MOTE_RANKS } from '../../../core/motes'
-import { CLASS_NAMES } from '../../../shared/types'
 import {
   DEFAULT_SPELL_WEIGHTS,
   RANK_BONUS,
@@ -38,10 +37,10 @@ interface Casts {
 
 const short = (i: number) => MOTE_RANKS[i].name || 'Potential'
 /** "Shadow Knight" → "SHD", the way /who abbreviates classes. */
-const classId = (name: string) =>
-  Object.entries(CLASS_NUMBER)
-    .find(([, n]) => CLASS_NAMES[n - 1] === name)?.[0]
-    .toUpperCase() ?? name.slice(0, 3)
+const whoCode = (name: string) => {
+  const id = classIdOf(name)
+  return id ? classCode(id) : name.slice(0, 3)
+}
 const fmt = (v: number) => (Number.isInteger(v) ? String(v) : v.toFixed(1))
 
 const HOW =
@@ -237,7 +236,7 @@ export function MoteSpells() {
             }
           >
             <button className={whose === 'mine' ? 'on' : ''} aria-pressed={whose === 'mine'} onClick={() => setWhose('mine')} disabled={!mine.length}>
-              Your trio{mine.length > 0 && <small>{mine.map((m) => classId(m.name)).join('/')}</small>}
+              Your trio{mine.length > 0 && <small>{mine.map((m) => whoCode(m.name)).join('/')}</small>}
             </button>
             <button className={whose === 'all' ? 'on' : ''} aria-pressed={whose === 'all'} onClick={() => setWhose('all')}>
               Every class you have cast as

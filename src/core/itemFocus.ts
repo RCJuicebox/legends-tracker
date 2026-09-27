@@ -12,7 +12,8 @@
 import type { Spell } from './spells'
 import { formulaTicks } from './durations'
 import { effectLimitsAllow } from './focus'
-import { CLASS_NUMBER, type ClassId } from './acModel'
+import { SUMMON_SPAS } from '../shared/game/spa'
+import { CLASS_NUMBER, type ClassId } from '../shared/game/classes'
 
 export type FocusKind = 'damage' | 'healing' | 'haste' | 'duration' | 'range' | 'reagent' | 'mana' | 'pet' | 'instrument'
 
@@ -31,8 +32,6 @@ export const KIND_ORDER: FocusKind[] = ['damage', 'healing', 'haste', 'mana', 'd
 const LIMIT_SPAS = new Set([135, 136, 137, 138, 139, 140, 141, 142, 143, 411, 414])
 /** Limits that make one rank of a line differ from another, not a different line. */
 const RANK_LIMITS = new Set([142, 143])
-/** Pets: magician-style summons, necromancer-style animations, beastlord warders. */
-const PET_SPAS = [33, 71, 106]
 const INSTRUMENTS: Record<number, string> = { 12: 'brass', 49: 'stringed', 54: 'wind', 70: 'percussion' }
 
 export interface FocusSpec {
@@ -139,7 +138,7 @@ export function focusApplies(f: FocusSpec, cast: CastSpell, casterLevel: number,
   if (!effectLimitsAllow(s, include.effect, excludeEffect)) return false
   if (include.target.length && !include.target.includes(s.targetType)) return false
   if (include.spell.length && !include.spell.includes(s.id)) return false
-  if (f.kind === 'pet' && !PET_SPAS.some(has)) return false
+  if (f.kind === 'pet' && !SUMMON_SPAS.some(has)) return false
   return true
 }
 

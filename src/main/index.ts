@@ -3,6 +3,7 @@ import { cpSync, existsSync, mkdirSync, readFileSync, writeFileSync, promises as
 import { release } from 'node:os'
 import { basename, dirname, join, relative, resolve, isAbsolute } from 'node:path'
 import { Store, characterKey } from './store'
+import { logFileFor, logStem } from './storeCore'
 import { Engine, type AudioCommand } from './engine'
 import { appEngineEnv } from './engineEnv'
 import { SpeechWorker } from './speech'
@@ -619,7 +620,7 @@ function registerIpc(): void {
     if (!isCharacterKey(character)) throw new Error('Not a character.')
     const installDir = store.settings.get().installDir
     if (!installDir) return {}
-    return purchases.latest({ logPath: join(installDir, 'Logs', `eqlog_${character}.txt`), archiveDir: engine.archiveDir(), stem: `eqlog_${character}` })
+    return purchases.latest({ logPath: logFileFor(installDir, character), archiveDir: engine.archiveDir(), stem: logStem(character) })
   })
   handle('trade:favorites', () => tradeFavorites.get())
   handle('trade:saveFavorites', (input: unknown) => tradeFavorites.set(input))
@@ -633,7 +634,7 @@ function registerIpc(): void {
     if (!petScanned.has(character) && book) {
       petScanned.add(character)
       const logFile = store.settings.get().logFile
-      const path = characterKey(logFile) === character ? logFile : join(dirname(logFile), `eqlog_${character}.txt`)
+      const path = characterKey(logFile) === character ? logFile : join(dirname(logFile), `${logStem(character)}.txt`)
       if (logFile) await petStore.merge(character, await scanPetLog(path, (name) => petSummonName(book, name)))
     }
     return { character, ...(await petStore.get(character)), spells: book ? petSpells(book, ids, lvl) : [], spellsLoaded: !!book }
@@ -757,7 +758,7 @@ function registerIpc(): void {
     const installDir = store.settings.get().installDir
     const recent = character
       ? await castHistory
-          .recent({ logPath: join(installDir, 'Logs', `eqlog_${character}.txt`), archiveDir: engine.archiveDir(), stem: `eqlog_${character}`, days })
+          .recent({ logPath: logFileFor(installDir, character), archiveDir: engine.archiveDir(), stem: logStem(character), days })
           .catch(() => null)
       : null
     // "Envenomed Bolt X" is Envenomed Bolt at rank X: one spell, whatever the rank.
@@ -783,7 +784,7 @@ function registerIpc(): void {
     if (!isCharacterKey(character)) return { spells, profile: null, loaded: !!book }
     const installDir = store.settings.get().installDir
     const recent = await meleeHistory
-      .recent({ logPath: join(installDir, 'Logs', `eqlog_${character}.txt`), archiveDir: engine.archiveDir(), stem: `eqlog_${character}`, days: typeof days === 'number' ? days : 14 })
+      .recent({ logPath: logFileFor(installDir, character), archiveDir: engine.archiveDir(), stem: logStem(character), days: typeof days === 'number' ? days : 14 })
       .catch((e) => {
         log.warn('Could not read the melee history:', e)
         return null
@@ -799,7 +800,7 @@ function registerIpc(): void {
     const s = store.settings.get()
     const key = character || characterKey(s.logFile)
     if (!key) return { rows: [], unknown: [], window: null, mine: [] }
-    const recent = await castHistory.recent({ logPath: join(s.installDir, 'Logs', `eqlog_${key}.txt`), archiveDir: engine.archiveDir(), stem: `eqlog_${key}`, days })
+    const recent = await castHistory.recent({ logPath: logFileFor(s.installDir, key), archiveDir: engine.archiveDir(), stem: logStem(key), days })
     return { ...castRows(book, recent.counts, engine.character()), window: { total: recent.total, from: recent.from, to: recent.to }, mine: engine.myClasses() }
   })
 

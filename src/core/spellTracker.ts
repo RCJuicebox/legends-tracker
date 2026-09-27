@@ -3,6 +3,7 @@ import type { RankedSpell, Spell, SpellBook } from './spells'
 import { isBeneficialCategory, TICK_MS } from './durations'
 import type { BoardTimer, TimerBoard } from './timers'
 import type { DurationBreakdown, FeedItem, Notification, SpellCategory, SpellRule, TrackingSettings } from '../shared/types'
+import { CAST_BY_YOU, DIED, SLAIN_BY, SLAIN_BY_YOU, YOU_DIED, YOU_WERE_SLAIN } from './phrases'
 
 export type TimerKind = 'selfBuff' | 'otherBuff' | 'dot' | 'debuff'
 
@@ -51,7 +52,7 @@ const CAST_SLACK_MS = 6000
 /** Casts still waiting to land, at most; the oldest is dropped past this. */
 const MAX_PENDING = 6
 
-const RE_CAST = /^You begin (?:casting|singing) (.+)\.$/
+const RE_CAST = CAST_BY_YOU
 const RE_FAIL_NAMED = /^Your (.+?) spell (?:is interrupted|fizzles)[.!]$/
 const RE_FAIL = /^Your spell (?:is interrupted|fizzles)[.!]$/
 const RE_RESIST = /^Your target resisted the (.+) spell\.$/
@@ -69,10 +70,10 @@ const FAIL_PREFIXES = [
 const RE_DOT_TICK = /^(.+) has taken \d+ damage from your (.+)\.$/
 const RE_WORN_OFF = /^Your (.+) spell has worn off of (.+)\.$/
 const RE_PET_WORN_OFF = /^Your pet's (.+) spell has worn off\.$/
-const RE_SLAIN_BY = /^(.+) has been slain by .+!$/
-const RE_YOU_SLEW = /^You have slain (.+)!$/
-const RE_DIED = /^(.+) died\.$/
-const RE_YOU_DIED = /^(?:You died\.|You have been slain by .+!)$/
+const RE_SLAIN_BY = SLAIN_BY
+const RE_YOU_SLEW = SLAIN_BY_YOU
+const RE_DIED = DIED
+const youDied = (text: string) => YOU_DIED.test(text) || YOU_WERE_SLAIN.test(text)
 
 export function targetKey(target: string): string {
   return target.toLowerCase()
@@ -138,7 +139,7 @@ export class SpellTracker {
     if ((m = RE_PET_WORN_OFF.exec(text))) return this.onPetWornOff(m[1])
 
     // Your own death first: "You died." would otherwise be read as a target called "You" dying.
-    if (RE_YOU_DIED.test(text)) {
+    if (youDied(text)) {
       this.board.endWhere((t) => t.source === 'spell' && t.target === SELF, 'died')
       return
     }

@@ -5,6 +5,7 @@ import { localDay } from '../core/dates'
 import { feedZip, isArchiveOf, readLines } from './logReading'
 import type { LogLine } from '../core/logLine'
 import { log } from './log'
+import { CAST_BY_YOU } from '../core/phrases'
 
 // What a character casts, and how often, counted from their logs: "You begin casting Envenomed Bolt X."
 // Counts are kept per day so a window (the last two weeks) can be taken. Archives never change, so
@@ -16,7 +17,7 @@ type Days = Record<string, Record<string, number>>
 /** Reads one log line into the day it belongs to. Made fresh for each stretch of log read, so it may keep state across lines. */
 export type DayCounter = (line: LogLine, into: Days) => void
 
-const CAST = /^You begin (?:casting|singing) (.+)\.$/
+const CAST = CAST_BY_YOU
 
 /** Casts by name: "You begin casting Envenomed Bolt X." */
 export const castCounter = (): DayCounter => (line, into) => {

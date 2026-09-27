@@ -7,7 +7,7 @@ import { useNow } from '../components/TimerBars'
 import { Info, Pending, Switch } from '../components/ui'
 import { useApp } from '../state'
 import { wikiUrl } from '../format'
-import { CLASSES } from '../../../core/acModel'
+import { CLASSES, className } from '../../../shared/game/classes'
 import { askText, canCast, LINE_LABELS, MIN_ASK_VALUE, MIN_BUFF_SEC, offersFor, YOU, type BuffLine, type BuffOffer, type BuffPlan, type BuffView } from '../../../core/buffs'
 
 // What the group can buff you with: who is in it (and their classes, from /who), what is on you
@@ -26,11 +26,10 @@ const code = (c: string) => c.toUpperCase()
 const minutes = (sec: number) => (Number.isFinite(sec) ? (sec >= 3600 ? `${Math.floor(sec / 3600)}h ${Math.round((sec % 3600) / 60)}m` : `${Math.round(sec / 60)}m`) : 'permanent')
 const effectText = (o: BuffOffer) => o.effects.map((e) => `${e.label}${e.value ? ` ${e.value}` : ''}`).join(', ')
 
-const CLASS_LABEL = new Map<string, string>(CLASSES.map(([id, label]) => [id, label]))
 const casters = (o: BuffOffer) =>
   Object.entries(o.classes)
     .sort((a, b) => a[1] - b[1])
-    .map(([c, l]) => `${CLASS_LABEL.get(c) ?? c} ${l}`)
+    .map(([c, l]) => `${className(c)} ${l}`)
     .join(', ')
 
 const HOW =

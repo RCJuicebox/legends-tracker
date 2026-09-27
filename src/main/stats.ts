@@ -1,6 +1,6 @@
 import { promises as fs } from 'node:fs'
 import { join } from 'node:path'
-import { CLASS_NUMBER, type ClassId } from '../core/acModel'
+import { CLASS_NUMBER, type ClassId } from '../shared/game/classes'
 import { latestAas, type AaSummary } from '../core/aa'
 import { decodeCp1252 } from '../core/logLine'
 import { log } from './log'

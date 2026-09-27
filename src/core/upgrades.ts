@@ -5,12 +5,8 @@ import { itemKey, mergeLevel, parseStatsBlock, scaledStats, type InvItem, type I
 import type { CatalogItem } from './wikiItem'
 import type { EffectValue } from './gearOptimizer'
 import { procOf, wornEffectOf } from './itemEffects'
+import { classCode } from '../shared/game/classes'
 
-/** The class codes the game prints in "Class: …" lines, by the tracker's class ids. */
-const CLASS_CODE: Record<string, string> = {
-  war: 'WAR', clr: 'CLR', pal: 'PAL', rng: 'RNG', shd: 'SHD', dru: 'DRU', mnk: 'MNK', brd: 'BRD',
-  rog: 'ROG', shm: 'SHM', nec: 'NEC', wiz: 'WIZ', mag: 'MAG', enc: 'ENC', bst: 'BST', ber: 'BER'
-}
 
 /** Worn locations as the inventory export names them → the words a stats block's "Slot:" line uses. */
 export const SLOT_WORDS: Record<string, string[]> = {
@@ -173,7 +169,7 @@ export interface Wearer {
 export function canWear(r: Restrictions, who: Wearer, slot: string): boolean {
   const words = slot === ANY_SLOT ? EVERY_SLOT_WORD : (SLOT_WORDS[slot] ?? [])
   if (!r.slots.some((s) => words.includes(s))) return false
-  if (!r.classes.includes('ALL') && !who.classes.some((c) => r.classes.includes(CLASS_CODE[c] ?? ''))) return false
+  if (!r.classes.includes('ALL') && !who.classes.some((c) => r.classes.includes(classCode(c)))) return false
   if (who.race && r.races.length && !r.races.includes('ALL') && !r.races.includes(who.race)) return false
   return !(r.reqLevel && r.reqLevel > who.level)
 }

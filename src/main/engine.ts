@@ -33,7 +33,8 @@ import {
   type AppSettings, type ArchiveStatus, type CharacterSettings, type CombatSnapshot, type FeedItem, type KnownSpell, type LogCheckRow, type MoteStock, type Notification,
   type Segment, type SpellRule, type TimerView, type Trigger, type WatchStatus
 } from '../shared/types'
-import { CLASS_NUMBER, type ClassId } from '../core/acModel'
+import { CAST_BY_YOU } from '../core/phrases'
+import { CLASS_NUMBER, type ClassId } from '../shared/game/classes'
 import type { MyClass } from '../core/spellMotes'
 
 export interface EngineOutputs {
@@ -776,8 +777,9 @@ export class Engine {
   /** What the pet wears and which pet it is, as the log tells it. */
   private petLine(line: LogLine): void {
     this.petReader.handle(line.text, line.time)
-    if (this.book && line.text.startsWith('You begin casting ')) {
-      const spell = petSummonName(this.book, line.text.slice(18, -1))
+    const cast = this.book && line.text.startsWith('You begin ') ? CAST_BY_YOU.exec(line.text) : null
+    if (cast) {
+      const spell = petSummonName(this.book!, cast[1])
       if (spell) this.out.pet({ summon: { spell, at: line.time } })
     }
   }

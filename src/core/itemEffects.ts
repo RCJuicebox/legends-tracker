@@ -27,6 +27,7 @@ import type { MeleeProfile } from './meleeTally'
 import type { Spell, SpellEffect } from './spells'
 import { effectValue } from './effectValue'
 import { formulaTicks } from './durations'
+import { RESIST_SPA, STAT_SPA } from '../shared/game/spa'
 
 /** What the spell file says about an effect's spell, as much as valuing it needs. */
 export type EffectSpell = Pick<Spell, 'name' | 'effects' | 'formula' | 'cap' | 'beneficial'> & Partial<Pick<Spell, 'targetType'>>
@@ -73,8 +74,6 @@ export function itemEffects(item: InvItem, effectsOf: (name: string) => { worn: 
   return { worn: pick(9, 'worn'), procs: pick(10, 'proc') }
 }
 
-const STAT_SPA: Record<number, 'STR' | 'DEX' | 'AGI' | 'STA' | 'INT' | 'WIS' | 'CHA'> = { 4: 'STR', 5: 'DEX', 6: 'AGI', 7: 'STA', 8: 'INT', 9: 'WIS', 10: 'CHA' }
-const RESIST_SPA: Record<number, 'FIRE' | 'COLD' | 'POISON' | 'DISEASE' | 'MAGIC'> = { 46: 'FIRE', 47: 'COLD', 48: 'POISON', 49: 'DISEASE', 50: 'MAGIC' }
 const signed = (v: number) => `${v < 0 ? '−' : '+'}${Math.abs(v)}`
 const SIMPLE: Record<number, string> = {
   12: 'invisibility', 13: 'see invisible', 14: 'breathe underwater', 20: 'blindness', 21: 'stun', 22: 'charm', 23: 'fear', 31: 'mesmerize',

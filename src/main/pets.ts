@@ -2,6 +2,7 @@ import { app } from 'electron'
 import { promises as fs } from 'node:fs'
 import { join } from 'node:path'
 import { decodeCp1252, parseLogLine } from '../core/logLine'
+import { CAST_BY_YOU } from '../core/phrases'
 import { PET_GEAR_HEAD, PetGearReader, parsePetGuide, parseSummonPage, type PetGearReading, type PetMelee, type PetProfile } from '../core/pets'
 import { log } from './log'
 
@@ -71,7 +72,7 @@ export async function scanPetLog(logPath: string, isSummon: (name: string) => st
         }
         if (!out.summon && raw.includes('] You begin casting ')) {
           const l = parseLogLine(raw)
-          const name = l && /^You begin casting (.+)\.$/.exec(l.text)?.[1]
+          const name = l && CAST_BY_YOU.exec(l.text)?.[1]
           const spell = name ? isSummon(name) : null
           if (spell && l) out.summon = { spell, at: l.time }
         }

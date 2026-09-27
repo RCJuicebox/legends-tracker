@@ -1,37 +1,33 @@
 import type { Spell } from './spells'
 import { formulaTicks, round2 } from './durations'
+import { SPA } from '../shared/game/spa'
 import { CLASS_NAMES, type CharacterSettings, type FocusSource } from '../shared/types'
 
 // Effect ids (SPA) a duration focus spell is built from, e.g. Extended Enhancement II:
 //   128 increase spell duration 15%, 134 max level 44 losing 5%/level over, 138 beneficial only,
 //   140 at least 4 ticks long, 137 (negative) excludes spells carrying that effect.
-const SPA_DURATION = 128
-const SPA_LIMIT_MAX_LEVEL = 134
-const SPA_LIMIT_EFFECT = 137
-const SPA_LIMIT_TYPE = 138
-const SPA_LIMIT_MIN_TICKS = 140
 
 export function isDurationFocus(spell: Spell): boolean {
-  return spell.effects.some((e) => e.spa === SPA_DURATION && e.base > 0)
+  return spell.effects.some((e) => e.spa === SPA.FOCUS_DURATION && e.base > 0)
 }
 
 /** Reads a focus spell's own limits, so the app applies it exactly as the game does. */
 export function focusFromSpell(spell: Spell, kind: FocusSource['kind'], from: string): FocusSource {
   const effect = (spa: number) => spell.effects.find((e) => e.spa === spa)
-  const type = effect(SPA_LIMIT_TYPE)
+  const type = effect(SPA.LIMIT_TYPE)
   return {
     id: `spell-${spell.id}-${Date.now().toString(36)}`,
     name: spell.name,
     kind,
     from,
     spellId: spell.id,
-    pct: effect(SPA_DURATION)?.base ?? 0,
+    pct: effect(SPA.FOCUS_DURATION)?.base ?? 0,
     appliesTo: type === undefined ? 'both' : type.base === 1 ? 'beneficial' : 'detrimental',
-    maxLevel: effect(SPA_LIMIT_MAX_LEVEL)?.base ?? 0,
-    decayPct: effect(SPA_LIMIT_MAX_LEVEL)?.base2 ?? 0,
-    minTicks: effect(SPA_LIMIT_MIN_TICKS)?.base ?? 0,
-    requireSpas: spell.effects.filter((e) => e.spa === SPA_LIMIT_EFFECT && e.base > 0).map((e) => e.base),
-    excludeSpas: spell.effects.filter((e) => e.spa === SPA_LIMIT_EFFECT && e.base < 0).map((e) => -e.base),
+    maxLevel: effect(SPA.LIMIT_MAX_LEVEL)?.base ?? 0,
+    decayPct: effect(SPA.LIMIT_MAX_LEVEL)?.base2 ?? 0,
+    minTicks: effect(SPA.LIMIT_MIN_TICKS)?.base ?? 0,
+    requireSpas: spell.effects.filter((e) => e.spa === SPA.LIMIT_EFFECT && e.base > 0).map((e) => e.base),
+    excludeSpas: spell.effects.filter((e) => e.spa === SPA.LIMIT_EFFECT && e.base < 0).map((e) => -e.base),
     enabled: true
   }
 }

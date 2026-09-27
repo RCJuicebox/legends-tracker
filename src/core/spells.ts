@@ -1,6 +1,7 @@
 import { promises as fs } from 'node:fs'
 import { join } from 'node:path'
 import { decodeCp1252 } from './logLine'
+import { SPA } from '../shared/game/spa'
 import { CLASS_NAMES, type SpellCategory, type SpellSummary } from '../shared/types'
 
 /**
@@ -61,23 +62,18 @@ const ROMAN: Record<string, number> = {
 }
 const RANK_SUFFIX = /^(.*?) (?:Rk\. )?(I|II|III|IV|V|VI|VII|VIII|IX|X|XI|XII|XIII|XIV|XV)$/
 
-// Effect ids (SPA) that decide a spell's category.
-const SPA_HP = 0
-const SPA_CHARM = 22
-const SPA_MEZ = 31
-const SPA_HOT = 100
 
 export function categorize(beneficial: boolean, hasDuration: boolean, effects: SpellEffect[]): SpellCategory {
   const has = (spa: number, sign?: 1 | -1) =>
     effects.some((e) => e.spa === spa && (sign === undefined || Math.sign(e.base) === sign))
   if (beneficial) {
     if (!hasDuration) return 'heal'
-    return has(SPA_HOT) || has(SPA_HP, 1) ? 'hot' : 'buff'
+    return has(SPA.HEAL_OVER_TIME) || has(SPA.HP, 1) ? 'hot' : 'buff'
   }
   if (!hasDuration) return 'nuke'
-  if (has(SPA_CHARM)) return 'charm'
-  if (has(SPA_MEZ)) return 'mez'
-  if (has(SPA_HP, -1)) return 'dot'
+  if (has(SPA.CHARM)) return 'charm'
+  if (has(SPA.MEZ)) return 'mez'
+  if (has(SPA.HP, -1)) return 'dot'
   return 'debuff'
 }
 
