@@ -1,8 +1,9 @@
 import { useMemo, useState } from 'react'
+import { useRemembered } from '../remember'
 import { useApp, useLive } from '../state'
 import { ago, mb } from '../api'
 import { act } from '../toast'
-import { OVERLAY_BUFFS } from '../constants'
+import { OVERLAY_BUFFS, TRY_LINES } from '../constants'
 import { TimerBars, useNow } from '../components/TimerBars'
 import { Icon } from '../components/ui'
 import { GameFolderPrompt } from '../components/GameFolder'
@@ -22,8 +23,9 @@ export function Dashboard({ go }: { go: (p: PageId) => void }) {
   const status = useLive((l) => l.status)
   const timers = useLive((l) => l.timers)
   const feed = useLive((l) => l.feed)
-  const [sim, setSim] = useState('')
-  const [simOpen, setSimOpen] = useState(false)
+  // Shared with the Triggers page's Test panel: lines pasted in either are waiting in the other.
+  const [sim, setSim] = useRemembered<string>(TRY_LINES, '')
+  const [simOpen, setSimOpen] = useState(() => !!sim)
   useNow(5000)
   const motes = useMotes()
   const crawl = motes?.active
@@ -151,8 +153,12 @@ export function Dashboard({ go }: { go: (p: PageId) => void }) {
             </button>
           </h2>
           <p className="muted small mt-0">
-            Paste log lines to run them through the live tracker and triggers, with their times moved to now. Useful for
-            checking a trigger before relying on it.
+            Paste log lines to run them through the live tracker and triggers, with their times moved to now. To see which
+            trigger a line matches and what it would say, without running it, use{' '}
+            <button className="link-button" onClick={() => go('triggers')}>
+              Test on the Triggers page
+            </button>
+            .
           </p>
           {simOpen ? (
             <div className="stack gap-8">

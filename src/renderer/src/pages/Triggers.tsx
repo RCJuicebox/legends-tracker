@@ -2,8 +2,8 @@ import { useEffect, useMemo, useState } from 'react'
 import { api, errorMessage } from '../api'
 import { useApp } from '../state'
 import { act, showError, actDone } from '../toast'
-import { OVERLAY_TARGETS } from '../constants'
-import { recall, remember } from '../remember'
+import { OVERLAY_TARGETS, TRY_LINES } from '../constants'
+import { recall, remember, useRemembered } from '../remember'
 import { markUnsaved } from '../unsaved'
 import { ConfirmButton, Field, FilterBox, Icon, LoadError, NumberInput, Pending, Switch } from '../components/ui'
 import type { Phrase, Trigger, TriggerAction, TriggerTestResult } from '../../../shared/types'
@@ -415,7 +415,9 @@ function ActionEditor({ a, onChange, onRemove }: { a: TriggerAction; onChange: (
 }
 
 function TestPanel({ t }: { t: Trigger }) {
-  const [line, setLine] = useState('')
+  const [shared, setShared] = useRemembered<string>(TRY_LINES, '')
+  // The last line pasted on Live, if any, is the one to test.
+  const [line, setLine] = useState(() => shared.split(/\r?\n/).filter((l) => l.trim()).pop() ?? '')
   const [result, setResult] = useState<TriggerTestResult | null>(null)
   useEffect(() => {
     if (!line.trim()) return setResult(null)
@@ -436,7 +438,27 @@ function TestPanel({ t }: { t: Trigger }) {
   return (
     <div className="card">
       <h2>Test</h2>
-      <input className="mono" style={{ width: '100%' }} value={line} aria-label="A log line to test" onChange={(e) => setLine(e.target.value)} placeholder="Paste a log line, e.g. [Wed Sep 23 13:29:05 2026] Aldric tells you, 'inc'" />
+      <div className="row">
+        <input
+          className="mono"
+          style={{ flex: 1 }}
+          value={line}
+          aria-label="A log line to test"
+          onChange={(e) => {
+            setLine(e.target.value)
+            setShared(e.target.value)
+          }}
+          placeholder="Paste a log line, e.g. [Wed Sep 23 13:29:05 2026] Aldric tells you, 'inc'"
+        />
+        <button
+          className="btn"
+          disabled={!line.trim()}
+          title="Run the line through the spell tracker and every trigger, as if it had just been logged, as Try it on the Live page does: you hear and see what it does"
+          onClick={() => void act('simulate', line)}
+        >
+          Run it for real
+        </button>
+      </div>
       {result && (
         <div style={{ marginTop: 10 }}>
           {result.error ? (
