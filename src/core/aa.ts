@@ -9,7 +9,8 @@ const DESCRIPTION = /^Description: ?(.*)$/
 const COST = /^Cost per Level: ?(\d+)/
 
 /**
- * Matched literally on purpose. "Melee avoidance" in particular must not be read loosely:
+ * The AA effects read from `/alternateadv list`. This list is the one to keep: the workspace's
+ * parse-aa.py follows it. Matched literally on purpose. "Melee avoidance" in particular must not be read loosely:
  * strikethrough abilities describe the opponent's defences.
  */
 const EFFECTS: [AaEffect, RegExp][] = [
@@ -24,7 +25,9 @@ const EFFECTS: [AaEffect, RegExp][] = [
   ['resists_all', /improves your cold, disease, fire, magic, and poison resistances by (\d+)/i],
   ['double_riposte_pct', /(\d+)% chance to perform a double riposte/i],
   ['strikethrough_pct', /strike through your opponent[^.]*?by (\d+)%/i],
-  ['melee_dmg_pct', /improves the base damage of your melee attacks[^.]*?by (\d+)%/i]
+  ['melee_dmg_pct', /improves the base damage of your melee attacks[^.]*?by (\d+)%/i],
+  ['haste_pct', /(\d+)% increase in your current and maximum haste/i],
+  ['ac', /increases your armor class by (\d+)/i]
 ]
 
 export type AaEffect =
@@ -40,6 +43,8 @@ export type AaEffect =
   | 'double_riposte_pct'
   | 'strikethrough_pct'
   | 'melee_dmg_pct'
+  | 'haste_pct'
+  | 'ac'
 
 /** What each effect feeds. Stats already include Innate Eminence, so it is shown, never added. */
 export const AA_USES: Record<AaEffect, { label: string; unit: string; feeds: string; applied: boolean }> = {
@@ -54,7 +59,9 @@ export const AA_USES: Record<AaEffect, { label: string; unit: string; feeds: str
   resists_all: { label: 'All resists', unit: '', feeds: 'shown only', applied: false },
   double_riposte_pct: { label: 'Double riposte', unit: '%', feeds: 'shown only', applied: false },
   strikethrough_pct: { label: 'Strikethrough', unit: '%', feeds: 'shown only', applied: false },
-  melee_dmg_pct: { label: 'Melee base damage', unit: '%', feeds: 'shown only', applied: false }
+  melee_dmg_pct: { label: 'Melee base damage', unit: '%', feeds: 'shown only', applied: false },
+  haste_pct: { label: 'Haste', unit: '%', feeds: 'shown only', applied: false },
+  ac: { label: 'Armor class', unit: '', feeds: 'shown only', applied: false }
 }
 
 export interface AaAbility {

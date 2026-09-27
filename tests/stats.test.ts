@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { computeAc, type AcInputs } from '../src/core/acModel'
 import { avoidanceFromHitRate, baseAccuracy, doubleAttackChance, dualWieldChance, hitChance, stanceAccuracy, swingsPerRound, tripleAttackChance, windowOffense } from '../src/core/combatModel'
-import { aaTotal, latestAas } from '../src/core/aa'
+import { aaEffects, aaTotal, latestAas } from '../src/core/aa'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 
@@ -119,5 +119,13 @@ describe('AAs from the log, on single-digit days', () => {
     expect(latestAas(across)!.count).toBe(2)
     const apart = [...entry('Thu Sep 10 00:00:00 2026', 33, 'Combat Stability'), ...entry('Thu Sep 10 00:05:00 2026', 34, 'Other')].join('\n')
     expect(latestAas(apart)!.count).toBe(1)
+  })
+})
+
+describe('AA effects', () => {
+  it('reads haste and armor class as well as the calculator figures', () => {
+    expect(aaEffects('This passive ability grants a 10% increase in your current and maximum haste.')).toEqual({ haste_pct: 10 })
+    expect(aaEffects('This passive ability increases your armor class by 24 points.')).toEqual({ ac: 24 })
+    expect(aaEffects('This ability reduces the damage your opponent deals by 5%.')).toEqual({})
   })
 })
