@@ -16,6 +16,10 @@ export async function checkAgainstLog(opts: {
   logPath: string
   book: SpellBook
   megabytes: number
+  /** Stops the read between chunks. */
+  signal?: AbortSignal
+  /** How far through the stretch read, 0 to 1. */
+  onProgress?: (fraction: number) => void
   level: (name: string) => number
   focusPct: (spell: Spell) => number
   tierPct: Record<SpellCategory, number>
@@ -57,7 +61,10 @@ export async function checkAgainstLog(opts: {
     let first = pos > 0
     let ticked = -1
     const chunk = Buffer.alloc(4 << 20)
+    const from = pos
     while (pos < size) {
+      if (opts.signal?.aborted) throw new Error('Cancelled')
+      opts.onProgress?.((pos - from) / Math.max(1, size - from))
       const { bytesRead } = await handle.read(chunk, 0, Math.min(chunk.length, size - pos), pos)
       if (bytesRead <= 0) break
       pos += bytesRead

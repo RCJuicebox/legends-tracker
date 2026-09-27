@@ -4,6 +4,7 @@ import { focusFor } from '../../core/focus'
 import { checkAgainstLog } from '../../core/logCheck'
 import type { CharacterSettings, KnownSpell, LogCheckRow, SpellRule } from '../../shared/types'
 import type { EngineStore } from './contracts'
+import { jobs, type Job } from '../sources/jobs'
 
 /** Spell durations for the character being played, and the Spell Timers page's questions. */
 export class SpellQueries {
@@ -63,7 +64,11 @@ export class SpellQueries {
   }
 
   /** The calculated durations against what the log saw, over its last `megabytes`. */
-  async checkLog(megabytes: number): Promise<LogCheckRow[]> {
+  checkLog(megabytes: number): Promise<LogCheckRow[]> {
+    return jobs.run('checkLog', `Checking durations against the last ${megabytes} MB of the log`, (job) => this.check(megabytes, job))
+  }
+
+  private async check(megabytes: number, job: Job): Promise<LogCheckRow[]> {
     const book = this.book()
     const settings = this.store.settings.get()
     if (!book || !settings.logFile) return []
@@ -72,6 +77,8 @@ export class SpellQueries {
       logPath: settings.logFile,
       book,
       megabytes,
+      signal: job.signal,
+      onProgress: (f) => job.progress(f),
       level: (name) => casterLevel(book.named(name)!, c),
       focusPct: (spell) => focusFor(spell, c, casterLevel(spell, c)).pct + (this.ruleFor(spell.name).extraFocusPct ?? 0),
       tierPct: settings.tracking.tierDurationPct

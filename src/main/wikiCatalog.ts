@@ -7,6 +7,7 @@ import { wiki, type WikiPage } from './sources/wiki'
 import type { CatalogFile, WikiProgress } from '../shared/ipc'
 import { cacheDir } from './paths'
 import { sources } from './sources/registry'
+import { jobs, type Job } from './sources/jobs'
 
 // Every piece of equipment on eqlwiki.com, for the upgrade finder. The first download reads the wiki's
 // Items category fifty pages a request (about 225 requests); later ones list its revisions (about 22
@@ -24,6 +25,7 @@ export class WikiCatalog {
   private file: CatalogFile | null = null
   private running: Promise<CatalogFile | null> | null = null
   progress: CatalogProgress = { busy: false, pages: 0, total: 0, error: '' }
+  private job: Job | null = null
 
   /** `onPages` sees every page read, so what else keeps item pages (the Gear page's item cache) can use them. */
   constructor(
@@ -55,13 +57,14 @@ export class WikiCatalog {
 
   /** Downloads the catalog again. One download at a time; a second call waits for the first. */
   refresh(): Promise<CatalogFile | null> {
-    this.running ??= this.download().finally(() => (this.running = null))
+    this.running ??= jobs.run('catalog', 'Downloading the item catalog from eqlwiki', (job) => this.download(job)).finally(() => (this.running = null))
     return this.running
   }
 
   private report(p: Partial<CatalogProgress>): void {
     this.progress = { ...this.progress, ...p }
     this.onProgress(this.progress)
+    if (this.progress.busy) this.job?.progress(this.progress.total ? this.progress.pages / this.progress.total : null, `${this.progress.pages} of ${this.progress.total || '?'} pages`)
     const file = this.file
     if (this.progress.busy) sources.reading('catalog', `${this.progress.pages} of ${this.progress.total || '?'} pages`)
     else if (this.progress.error) sources.fail('catalog', new Error(this.progress.error))
@@ -72,11 +75,12 @@ export class WikiCatalog {
     }
   }
 
-  private async download(): Promise<CatalogFile | null> {
+  private async download(job: Job): Promise<CatalogFile | null> {
+    this.job = job
     this.report({ busy: true, pages: 0, total: 0, error: '' })
     try {
       const old = await this.stored()
-      const file = (old?.revs && (old.format ?? 1) >= FORMAT ? await this.update(old) : null) ?? (await this.whole())
+      const file = (old?.revs && (old.format ?? 1) >= FORMAT ? await this.update(old, job.signal) : null) ?? (await this.whole(job.signal))
       file.eraStatus = (await this.eraStatus()) ?? old?.eraStatus
       await fs.writeFile(this.path + '.tmp', JSON.stringify(file), 'utf8')
       await fs.rename(this.path + '.tmp', this.path)
@@ -84,14 +88,18 @@ export class WikiCatalog {
       this.report({ busy: false })
       return file
     } catch (e) {
-      log.warn('Item catalog download failed', e)
-      this.report({ busy: false, error: (e as Error).message })
+      // Cancelled: the catalog kept before stays, and nothing failed.
+      if (job.signal.aborted) this.report({ busy: false, error: '' })
+      else {
+        log.warn('Item catalog download failed', e)
+        this.report({ busy: false, error: (e as Error).message })
+      }
       return this.file
     }
   }
 
   /** Every page of the category, fifty a request (about 225 requests). */
-  private async whole(): Promise<CatalogFile> {
+  private async whole(signal: AbortSignal): Promise<CatalogFile> {
     this.report({ total: (await wiki.categorySize('Items')) ?? 11000 })
     const items: CatalogItem[] = []
     const revs: Record<string, number> = {}
@@ -105,7 +113,7 @@ export class WikiCatalog {
       }
       pages += batch.length
       this.report({ pages })
-    })
+    }, 'background', signal)
     return { fetchedAt: Date.now(), items, revs, format: FORMAT }
   }
 
@@ -113,7 +121,7 @@ export class WikiCatalog {
    * Only what changed since the last download: the category's revision ids, five hundred a request,
    * then the pages that are new or edited. Null when so much changed that a whole download is as quick.
    */
-  private async update(old: CatalogFile): Promise<CatalogFile | null> {
+  private async update(old: CatalogFile, signal: AbortSignal): Promise<CatalogFile | null> {
     const now = await wiki.revisions('Items')
     const before = old.revs ?? {}
     const changed = [...now].filter(([title, rev]) => before[title] !== rev).map(([title]) => title)
@@ -122,7 +130,7 @@ export class WikiCatalog {
     const edited = new Set(changed)
     const keep = old.items.filter((it) => now.has(it.title) && !edited.has(it.title))
     const revs: Record<string, number> = Object.fromEntries([...now].filter(([t]) => !edited.has(t)))
-    const fresh = await wiki.pages(changed, 'background')
+    const fresh = await wiki.pages(changed, 'background', signal)
     this.onPages?.([...fresh.values()])
     const items = [...keep]
     for (const title of changed) {

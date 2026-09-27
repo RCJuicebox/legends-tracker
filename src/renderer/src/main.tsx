@@ -4,6 +4,7 @@ import './styles.css'
 import { StateProvider, useApp } from './state'
 import { Icon } from './components/ui'
 import { ErrorBoundary } from './components/ErrorBoundary'
+import { Jobs } from './components/Jobs'
 import { ago } from './api'
 import { act, Toasts } from './toast'
 import { useUpdate } from './update'
@@ -109,6 +110,7 @@ function Shell() {
         </div>
       </nav>
       <main className="main">
+        <Jobs />
         <ErrorBoundary key={page} what={`The ${PAGES.find((p) => p.id === page)!.label} page`}>
           <Page go={setPage} />
         </ErrorBoundary>

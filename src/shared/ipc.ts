@@ -196,6 +196,15 @@ export interface StatsScreenRead {
   screens: number
 }
 
+/** A long job under way, which the player can cancel. */
+export interface JobView {
+  id: string
+  label: string
+  /** 0 to 1, or null when there is no telling. */
+  fraction: number | null
+  detail: string
+}
+
 /** How a source of information last fared (see the Data Sources page). */
 export type SourceStatus = 'ok' | 'stale' | 'error' | 'missing' | 'reading' | 'waiting'
 
@@ -338,6 +347,8 @@ export interface Invokes {
   'dialog:folder': () => string | null
 
   'sources:list': () => SourceView[]
+  'jobs:list': () => JobView[]
+  'jobs:cancel': (id: string) => void
   'sources:refresh': (id: string) => SourceView[]
 }
 
@@ -375,6 +386,7 @@ export interface Pushes {
   'state:inventory': (view: InventoryView) => void
   'state:catalog': (progress: WikiProgress) => void
   'state:sources': (rows: SourceView[]) => void
+  'state:jobs': (jobs: JobView[]) => void
   'state:recipes': (progress: WikiProgress) => void
 
   'overlay:config': (update: { config: OverlayConfig; arranging: boolean }) => void
@@ -417,14 +429,14 @@ const INVOKE_CHANNELS: Record<InvokeChannel, true> = {
   'gear:catalog': true, 'gear:catalogRefresh': true, 'gear:foci': true, 'gear:effects': true,
   'stats:caps': true, 'stats:readAAs': true, 'stats:readScreen': true,
   'game:check': true, 'game:find': true, 'game:choose': true, 'dialog:folder': true,
-  'sources:list': true, 'sources:refresh': true
+  'sources:list': true, 'sources:refresh': true, 'jobs:list': true, 'jobs:cancel': true
 }
 const SEND_CHANNELS: Record<SendChannel, true> = { 'overlay:mouse': true, 'overlay:meter': true, 'audio:devices': true }
 const PUSH_CHANNELS: Record<PushChannel, true> = {
   'state:settings': true, 'state:character': true, 'state:status': true, 'state:timers': true, 'state:feed': true, 'state:archive': true,
   'state:arranging': true, 'state:devices': true, 'state:voices': true, 'state:update': true, 'state:combat': true, 'state:loot': true,
   'state:respawns': true, 'state:buffs': true, 'state:motes': true, 'state:moteScan': true, 'state:stock': true, 'state:pet': true,
-  'state:achievements': true, 'state:inventory': true, 'state:catalog': true, 'state:recipes': true, 'state:sources': true,
+  'state:achievements': true, 'state:inventory': true, 'state:catalog': true, 'state:recipes': true, 'state:sources': true, 'state:jobs': true,
   'overlay:config': true, 'overlay:timers': true, 'overlay:combat': true, 'overlay:alert': true,
   'audio:config': true, 'audio:play': true
 }

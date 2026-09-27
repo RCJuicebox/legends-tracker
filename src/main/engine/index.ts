@@ -28,6 +28,7 @@ import type {
   AppSettings, ArchiveStatus, CharacterSettings, CombatSnapshot, FeedItem, KnownSpell, LogCheckRow, Segment, SpellRule, WatchStatus
 } from '../../shared/types'
 import type { EngineEnv, EngineOutputs, EngineStore, LootView, MoteView, Speaker } from './contracts'
+import { jobs } from '../sources/jobs'
 
 export type { AudioCommand, EngineEnv, EngineOutputs, EngineStore, LootView, MoteScanner, MoteView, Speaker } from './contracts'
 export { workerScanner } from './moteCatchUp'
@@ -332,10 +333,15 @@ export class Engine {
   }
 
   /** Forgets every fight and reads the last `minutes` of the log again. */
-  async rebuildCombat(minutes: number): Promise<void> {
-    if (this.combat.backlog.active) return
-    this.combat.reset()
-    await this.seedCombat(minutes)
+  rebuildCombat(minutes: number): Promise<void> {
+    if (this.combat.backlog.active) return Promise.resolve()
+    return jobs.run('combat', `Reading the last ${minutes} minutes of the log into the meter`, async (job) => {
+      this.combat.reset()
+      const t = this.tail
+      if (!t) return
+      const gen = this.watchGen
+      await this.combat.seed(t.logFile, () => t.start, () => gen === this.watchGen && !job.signal.aborted, minutes)
+    })
   }
 
   stopWatching(): void {

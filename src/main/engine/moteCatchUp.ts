@@ -15,6 +15,7 @@ import { Backlog } from './throttle'
 import { sources } from '../sources/registry'
 import type { EngineEnv, EngineOutputs, EngineStore, MoteScanner } from './contracts'
 import type { Notifier } from './notifier'
+import { jobs, type Job } from '../sources/jobs'
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
 /** In the hour clocks go back, log stamps repeat: catching up by time looks back this much further. */
@@ -222,7 +223,11 @@ export class MoteCatchUp {
    * Rebuilds mote history from every character's log in the Logs folder and their archives, merges
    * it into the history kept, then carries on live. Only progress goes out while it reads.
    */
-  async rebuild(installDir: string, watched: string, view: () => Parameters<EngineOutputs['motes']>[0]): Promise<void> {
+  rebuild(installDir: string, watched: string, view: () => Parameters<EngineOutputs['motes']>[0]): Promise<void> {
+    return jobs.run('motes', 'Rebuilding mote history from your logs', (job) => this.rebuildAs(job, installDir, watched, view))
+  }
+
+  private async rebuildAs(job: Job, installDir: string, watched: string, view: () => Parameters<EngineOutputs['motes']>[0]): Promise<void> {
     if (this.scan || this.backlog.active) {
       this.notifier.pushFeed('info', 'Already reading your logs.')
       return
@@ -238,12 +243,16 @@ export class MoteCatchUp {
         return
       }
       const until = watched ? await this.mark(watched) : -1
-      const job: MoteScanJob = {
+      const scanJob: MoteScanJob = {
         archiveDir: this.hooks.archiveDir(),
         logs: paths.map((p) => ({ logPath: p, stem: basename(p, '.txt'), ...(until >= 0 && samePath(p, watched) ? { end: until } : {}) }))
       }
-      const run = (this.env.scanMotes ?? workerScanner(this.env.moteWorkerPath))(job, (m, f) => this.setScan(m, f))
+      const run = (this.env.scanMotes ?? workerScanner(this.env.moteWorkerPath))(scanJob, (m, f) => {
+        this.setScan(m, f)
+        job.progress(f, m)
+      })
       this.scan = run
+      job.signal.addEventListener('abort', () => run.stop())
       const scanned = await run.done
       const merged = mergeRebuilt(this.motes.state, combineScans(scanned, watched, this.hooks.gameRunning()))
       const w = scanned.characters.find((c) => samePath(c.logPath, watched))
@@ -258,9 +267,13 @@ export class MoteCatchUp {
       this.notifier.pushFeed('loot', `Mote history rebuilt from ${n} character log${n === 1 ? '' : 's'}: ${crawls} crawl${crawls === 1 ? '' : 's'}.`)
       sources.ok('motes', `Rebuilt from ${n} character log${n === 1 ? '' : 's'} and their archives`)
     } catch (e) {
-      log.error('Rebuilding mote history failed:', e)
-      sources.fail('motes', e)
-      this.notifier.pushFeed('warn', `Could not read mote history: ${(e as Error).message}`)
+      if (job.signal.aborted) {
+        this.notifier.pushFeed('info', 'Rebuilding mote history was cancelled; the history kept before is unchanged.')
+      } else {
+        log.error('Rebuilding mote history failed:', e)
+        sources.fail('motes', e)
+        this.notifier.pushFeed('warn', `Could not read mote history: ${(e as Error).message}`)
+      }
     } finally {
       this.scan = null
       this.end(watched, reached)

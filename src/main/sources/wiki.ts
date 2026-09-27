@@ -1,5 +1,6 @@
 import { app } from 'electron'
 import { log } from '../log'
+import { throwIfCancelled } from './jobs'
 
 // The one way the app talks to eqlwiki.com, a volunteer-run MediaWiki: an identifiable agent, one
 // request at a time with a breath between, maxlag so a busy database is left alone, and backing off
@@ -116,9 +117,10 @@ export class WikiClient {
    * Pages by title, fifty a request, following redirects. The answer maps both the title asked and
    * the page's own title to the page; a title with no page is absent.
    */
-  async pages(titles: string[], urgency: Urgency = 'now'): Promise<Map<string, WikiPage>> {
+  async pages(titles: string[], urgency: Urgency = 'now', signal?: AbortSignal): Promise<Map<string, WikiPage>> {
     const out = new Map<string, WikiPage>()
     for (let i = 0; i < titles.length; i += 50) {
+      throwIfCancelled(signal)
       const body = await this.get<QueryPages>(
         { action: 'query', redirects: '1', prop: 'revisions', rvprop: 'content|ids', rvslots: 'main', titles: titles.slice(i, i + 50).join('|') },
         urgency
@@ -140,9 +142,10 @@ export class WikiClient {
   }
 
   /** Every page in a category with its content, fifty a request, handed over a batch at a time. */
-  async category(name: string, onBatch: (pages: WikiPage[]) => void, urgency: Urgency = 'background'): Promise<void> {
+  async category(name: string, onBatch: (pages: WikiPage[]) => void, urgency: Urgency = 'background', signal?: AbortSignal): Promise<void> {
     let cont: Record<string, string> = {}
     for (;;) {
+      throwIfCancelled(signal)
       const body = await this.get<QueryPages>(
         {
           action: 'query', generator: 'categorymembers', gcmtitle: `Category:${name}`, gcmlimit: '50', gcmnamespace: '0',

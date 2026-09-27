@@ -503,7 +503,8 @@ function LogCheck() {
     try {
       setRows(await api.invoke('spells:checkLog', mbs))
     } catch (e) {
-      setError(errorMessage(e))
+      // Stopped from the jobs strip: nothing went wrong.
+      if (errorMessage(e) !== 'Cancelled') setError(errorMessage(e))
     } finally {
       setBusy(false)
     }

@@ -3042,3 +3042,28 @@ input[aria-invalid='true'] {
 .table-scroll {
   overflow-x: auto;
 }
+
+/* Long jobs under way, above the page. */
+.jobs {
+  display: grid;
+  gap: 6px;
+  margin-bottom: 14px;
+}
+.job {
+  padding: 8px 12px;
+  border-radius: var(--radius-sm);
+  background: var(--panel);
+  border: 1px solid var(--line);
+}
+.job-bar {
+  width: 160px;
+  height: 6px;
+  border-radius: 3px;
+  background: var(--line);
+  overflow: hidden;
+}
+.job-bar > span {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+}

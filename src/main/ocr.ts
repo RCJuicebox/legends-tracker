@@ -56,6 +56,9 @@ $stream.Dispose(); Remove-Item $prepared -ErrorAction SilentlyContinue
 [Console]::Out.Write((ConvertTo-Json -Compress -Depth 3 -InputObject @($words)))
 `
 
+/** How long one OCR read may take before it is stopped. */
+const OCR_TIMEOUT_MS = 45_000
+
 let scriptWritten: Promise<string> | null = null
 
 /** The OCR script in the cache folder: written once a run, and again if something cleared it away. */
@@ -80,7 +83,16 @@ export async function ocrImage(path: string, scale = 3, layout?: Composite): Pro
     p.stdout.setEncoding('utf8').on('data', (d: string) => (stdout += d))
     p.stderr.setEncoding('utf8').on('data', (d: string) => (stderr += d))
     p.on('error', reject)
-    p.on('exit', (code) => (code === 0 ? resolve(stdout) : reject(new Error(stderr.split('\n').find((l) => l.trim()) || `OCR exited ${code}`))))
+    // Windows OCR normally answers in a second or two; one that has not in 45 s is not going to.
+    const timer = setTimeout(() => {
+      p.kill()
+      reject(new Error('Reading the screen took too long and was stopped'))
+    }, OCR_TIMEOUT_MS)
+    p.on('exit', (code) => {
+      clearTimeout(timer)
+      if (code === 0) resolve(stdout)
+      else reject(new Error(stderr.split('\n').find((l) => l.trim()) || `OCR exited ${code}`))
+    })
   })
   type Raw = { t: string; x: number; y: number; w: number; h: number }
   // PowerShell writes a single-element array as a bare object.

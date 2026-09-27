@@ -7,6 +7,7 @@ import { wiki } from './sources/wiki'
 import type { BookRecipe, RecipeFile, WikiProgress } from '../shared/ipc'
 import { cacheDir } from './paths'
 import { sources } from './sources/registry'
+import { jobs, type Job } from './sources/jobs'
 
 // Every recipe on eqlwiki.com, for the Tradeskills page: each page in the Player Crafted category
 // carries its recipe and yield, fifty pages a request (about 45 requests), one at a time. Alchemy's
@@ -24,6 +25,7 @@ export class RecipeBook {
   private file: RecipeFile | null = null
   private running: Promise<RecipeFile | null> | null = null
   progress: RecipeProgress = { busy: false, pages: 0, total: 0, error: '' }
+  private job: Job | null = null
 
   constructor(private readonly onProgress: (p: RecipeProgress) => void) {}
 
@@ -49,13 +51,14 @@ export class RecipeBook {
   }
 
   refresh(): Promise<RecipeFile | null> {
-    this.running ??= this.download().finally(() => (this.running = null))
+    this.running ??= jobs.run('recipes', 'Downloading the recipes from eqlwiki', (job) => this.download(job)).finally(() => (this.running = null))
     return this.running
   }
 
   private report(p: Partial<RecipeProgress>): void {
     this.progress = { ...this.progress, ...p }
     this.onProgress(this.progress)
+    if (this.progress.busy) this.job?.progress(this.progress.total ? this.progress.pages / this.progress.total : null, `${this.progress.pages} of ${this.progress.total || '?'} pages`)
     const file = this.file
     if (this.progress.busy) sources.reading('recipes', `${this.progress.pages} of ${this.progress.total || '?'} pages`)
     else if (this.progress.error) sources.fail('recipes', new Error(this.progress.error))
@@ -77,7 +80,7 @@ export class RecipeBook {
     for (let i = 0; i < names.length; i += 50) {
       const batch = names.slice(i, i + 50)
       try {
-        const pages = await wiki.pages(batch, 'background')
+        const pages = await wiki.pages(batch, 'background', this.job?.signal)
         for (const n of batch) eras[n] = ERA_TAG.exec(pages.get(n)?.content ?? '')?.[1] ?? ''
       } catch (e) {
         log.warn('Could not read the eras of some recipe ingredients', e)
@@ -86,7 +89,8 @@ export class RecipeBook {
     }
   }
 
-  private async download(): Promise<RecipeFile | null> {
+  private async download(job: Job): Promise<RecipeFile | null> {
+    this.job = job
     this.report({ busy: true, pages: 0, total: 0, error: '' })
     try {
       this.report({ total: ((await wiki.categorySize('Player Crafted')) ?? 2200) + 1 })
@@ -101,7 +105,7 @@ export class RecipeBook {
         }
         pages += batch.length
         this.report({ pages })
-      })
+      }, 'background', job.signal)
       // Recipes a product's own page leaves out, from the Alchemy table. The other tradeskill pages'
       // tables are laid out too differently to read reliably, and their products have pages.
       const known = new Set(fromPages.map((r) => r.product.toLowerCase()))
@@ -123,8 +127,12 @@ export class RecipeBook {
       this.report({ busy: false })
       return file
     } catch (e) {
-      log.warn('Recipe download failed', e)
-      this.report({ busy: false, error: (e as Error).message })
+      // Cancelled: the recipes kept before stay, and nothing failed.
+      if (job.signal.aborted) this.report({ busy: false, error: '' })
+      else {
+        log.warn('Recipe download failed', e)
+        this.report({ busy: false, error: (e as Error).message })
+      }
       return this.file
     }
   }

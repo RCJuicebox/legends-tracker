@@ -4,6 +4,7 @@ import { onSend } from '../push'
 import { logDir } from '../log'
 import { diagnostics } from '../diagnostics'
 import { sources } from '../sources/registry'
+import { jobs } from '../sources/jobs'
 import { checkGameFolder, findInstall, resolveGameFolder } from '../game'
 import { isCharacterKey, meterOptions, sanitizeCharacter, sanitizeSettings } from '../validate'
 import { className } from '../../shared/game/classes'
@@ -34,6 +35,8 @@ export function registerAppIpc(ctx: AppContext): void {
   handle('app:diagnostics', () => diagnostics(ctx))
   handle('sources:list', () => sources.list())
   handle('sources:refresh', (id) => sources.refresh(String(id)))
+  handle('jobs:list', () => jobs.list())
+  handle('jobs:cancel', (id) => jobs.cancel(String(id)))
   handle('settings:save', (s) => {
     const clean = sanitizeSettings(s, store.settings.get())
     if (!clean) throw new Error('Settings were not saved: they were not in the expected form.')

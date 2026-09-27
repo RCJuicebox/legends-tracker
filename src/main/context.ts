@@ -29,6 +29,7 @@ import { Windows, loadPage } from './windows'
 import { appIcon, preloadPath, resources } from './bootstrap'
 import { log } from './log'
 import { sources } from './sources/registry'
+import { jobs } from './sources/jobs'
 import { settingsSummary } from './diagnostics'
 import type { AppSettings, Trigger, WatchStatus } from '../shared/types'
 import type { AudioDevice } from '../shared/ipc'
@@ -340,6 +341,7 @@ function registerSources(ctx: AppContext): void {
   sources.add('updates', { label: 'Updates', kind: 'app', what: "This app's releases on GitHub, checked hourly.", refresh: () => ctx.updater.check() })
   sources.add('screen', { label: 'Screen reads', kind: 'screen', what: "The game's currency and stats windows, read off the screen with Windows OCR when you ask on the Motes and Stats pages." })
   sources.onChange((rows) => ctx.windows.toMain('state:sources', rows))
+  jobs.onChange((list) => ctx.windows.toMain('state:jobs', list))
   // What can be known without asking anyone: the downloads kept, and whether this copy updates at all.
   void ctx.wikiCatalog.stored()
   void ctx.recipeBook.stored()
