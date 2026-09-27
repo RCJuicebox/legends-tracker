@@ -337,3 +337,24 @@ export function SortTh<K extends string>({ k, sort, onSort, children, num, title
     </th>
   )
 }
+
+/**
+ * A row of values as a small line, oldest on the left, with the last one marked: a trend at a glance
+ * beside the number it belongs to. Nothing is drawn for fewer than two values.
+ */
+export function Sparkline({ values, width = 64, height = 16, title }: { values: number[]; width?: number; height?: number; title?: string }) {
+  if (values.length < 2) return null
+  const lo = Math.min(...values)
+  const hi = Math.max(...values)
+  const x = (i: number) => 1 + (i / (values.length - 1)) * (width - 2)
+  const y = (v: number) => (hi === lo ? height / 2 : height - 2 - ((v - lo) / (hi - lo)) * (height - 4))
+  const points = values.map((v, i) => `${x(i).toFixed(1)},${y(v).toFixed(1)}`).join(' ')
+  const last = values.length - 1
+  return (
+    <svg className="sparkline" width={width} height={height} viewBox={`0 0 ${width} ${height}`} role="img" aria-label={title}>
+      {title && <title>{title}</title>}
+      <polyline points={points} fill="none" stroke="currentColor" strokeWidth="1.25" strokeLinejoin="round" />
+      <circle cx={x(last)} cy={y(values[last])} r="2" fill="currentColor" />
+    </svg>
+  )
+}

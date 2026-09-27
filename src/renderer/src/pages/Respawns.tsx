@@ -5,7 +5,7 @@ import { useInvoke } from '../hooks'
 import { useRemembered } from '../remember'
 import { useNow } from '../components/TimerBars'
 import { act } from '../toast'
-import { ConfirmButton, Field, FilterBox, Info, NumberInput, Pending, SortTh, Switch, type Sort } from '../components/ui'
+import { ConfirmButton, Field, FilterBox, Info, NumberInput, Pending, SortTh, Sparkline, Switch, type Sort } from '../components/ui'
 import { parseClock, SHARED_SEC, type RespawnRow, type RespawnTimerSpec, type RespawnView } from '../../../core/respawns'
 
 // How long mobs take to come back, measured from the log, and a timer on an overlay for any of them.
@@ -201,7 +201,10 @@ function Row({
         {r.estimate !== null ? `≤ ${clock(r.estimate)}` : <span className="faint">{r.pendingSince ? 'watching…' : '—'}</span>}
         {r.gaps.length > 1 && <span className="faint small"> ({r.gaps.length})</span>}
       </td>
-      <td className="mono nowrap">{last !== undefined ? clock(last) : '—'}</td>
+      <td className="mono nowrap">
+        {last !== undefined ? clock(last) : '—'}
+        {r.gaps.length > 1 && <Sparkline values={r.gaps} title={`Every gap seen, oldest first: ${r.gaps.map(clock).join(', ')}`} />}
+      </td>
       <td className="faint small nowrap">{r.lastDeath ? ago(r.lastDeath, now) : '—'}</td>
       <td className="mono nowrap">
         {backIn === null ? <span className="faint">—</span> : backIn > 0 ? clock(backIn / 1000) : <span className="chip ok">up</span>}

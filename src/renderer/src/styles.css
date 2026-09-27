@@ -2705,6 +2705,14 @@ button.tree-item {
   text-decoration: line-through;
   text-decoration-color: rgba(255, 255, 255, 0.25);
 }
+/* A small trend line beside a number (respawn gaps). */
+.sparkline {
+  display: inline-block;
+  vertical-align: middle;
+  margin-left: 8px;
+  color: var(--accent);
+  opacity: 0.85;
+}
 /* A sortable column's header. */
 .th-sort {
   all: unset;
