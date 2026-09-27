@@ -1,0 +1,222 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`twenty minutes of real play, read by the Engine > loot: what was looted, from what, and where it went 1`] = `
+[
+  "You: 1 × Sapphire Necklace +1 from Innoruuk\`s Chosen -> sold",
+  "You: 1 × Crystallized Sulfur from Innoruuk\`s Chosen -> depot",
+  "You: 1 × Eye of Innoruuk +1 from Innoruuk, the Prince of Hate -> sold",
+  "You: 1 × Leatherfoot Sandals +2 from Innoruuk, the Prince of Hate -> merged",
+  "You: 1 × Shattered Emerald of Corruption from Innoruuk, the Prince of Hate -> sold",
+  "You: 1 × Earring of Bashing +2 from Innoruuk, the Prince of Hate -> kept",
+  "You: 1 × Earring of Bashing +2 from Innoruuk, the Prince of Hate -> kept",
+  "You: 1 × Brewer's Mesh Cloak +1 from Innoruuk, the Prince of Hate -> sold",
+  "You: 1 × Crystallized Sulfur from Innoruuk\`s Chosen -> depot",
+  "You: 1 × Blue Diamond from Innoruuk, the Prince of Hate -> depot",
+  "You: 1 × Brewer's Mesh Cloak +2 from Innoruuk, the Prince of Hate -> sold",
+  "You: 1 × Icebelt +2 from Innoruuk, the Prince of Hate -> sold",
+  "You: 1 × Shattered Emerald of Corruption from Innoruuk, the Prince of Hate -> sold",
+  "You: 1 × Ring of Pureblood +2 from Innoruuk, the Prince of Hate -> merged",
+  "You: 1 × Triumphant Mask +2 from Innoruuk, the Prince of Hate -> merged",
+  "You: 1 × Crystallized Sulfur from Innoruuk\`s Chosen -> depot",
+  "You: 1 × Crystallized Sulfur from A haunted chest -> depot",
+  "You: 1 × Crystallized Sulfur from A haunted chest -> depot",
+  "You: 1 × Mote of Major Potential from A haunted chest -> currency",
+]
+`;
+
+exports[`twenty minutes of real play, read by the Engine > motes: the run and what it gave 1`] = `
+{
+  "days": [
+    {
+      "major": 1,
+    },
+  ],
+  "runs": [
+    {
+      "kind": "instance",
+      "motes": {
+        "major": 1,
+      },
+      "name": "The Plane of Hate - Group 4 (Refined)",
+      "outcome": "game closed",
+    },
+  ],
+}
+`;
+
+exports[`twenty minutes of real play, read by the Engine > respawns: the mobs killed, and the gaps seen 1`] = `
+[
+  "The Oasis of Marr / A crypt mummy: 1 kills, gaps -",
+  "The Oasis of Marr / A spectre: 1 kills, gaps -",
+  "The Oasis of Marr / A zombie: 1 kills, gaps -",
+  "The Plane of Hate - Group 2 (Adaptive) / Innoruuk, the Prince of Hate: 1 kills, gaps -",
+  "The Plane of Hate - Group 2 (Adaptive) / Innoruuk\`s Chosen: 2 kills, gaps 70",
+  "The Plane of Hate - Group 2 (Adaptive) / Lord of Ire: 1 kills, gaps -",
+  "The Plane of Hate - Group 4 (Refined) / A haunted chest: 2 kills, gaps 3, shared name",
+  "The Plane of Hate - Group 4 (Refined) / Innoruuk, the Prince of Hate: 1 kills, gaps -",
+  "The Plane of Hate - Group 4 (Refined) / Innoruuk\`s Chosen: 1 kills, gaps -",
+]
+`;
+
+exports[`twenty minutes of real play, read by the Engine > the damage meter: each fight, its kills and who did the damage 1`] = `
+[
+  {
+    "damage": [
+      "Brenna (player) 27883 in 84 hits, 14 crits",
+      "Aldric (player) 27204 in 54 hits, 4 crits",
+      "You (you) 22793 in 153 hits, 15 crits",
+      "Innoruuk, the Prince of Hate (npc) 5389 in 20 hits, 0 crits",
+      "Elund (player) 3388 in 42 hits, 0 crits",
+    ],
+    "deaths": 0,
+    "kills": 1,
+    "name": "Innoruuk, the Prince of Hate +1",
+    "seconds": 55,
+    "zone": "",
+  },
+  {
+    "damage": [
+      "Aldric (player) 16947 in 46 hits, 4 crits",
+      "You (you) 9942 in 68 hits, 9 crits",
+      "Brenna (player) 8536 in 38 hits, 3 crits",
+      "Doria (player) 4415 in 3 hits, 0 crits",
+      "Elund (player) 2362 in 21 hits, 0 crits",
+    ],
+    "deaths": 0,
+    "kills": 1,
+    "name": "Innoruuk\`s Chosen",
+    "seconds": 29,
+    "zone": "",
+  },
+  {
+    "damage": [
+      "Hesper (player) 1984 in 42 hits, 2 crits",
+      "A spectre (npc) 277 in 12 hits, 0 crits",
+    ],
+    "deaths": 0,
+    "kills": 1,
+    "name": "A spectre",
+    "seconds": 20,
+    "zone": "The Oasis of Marr",
+  },
+  {
+    "damage": [
+      "Innoruuk\`s Chosen (npc) 393 in 3 hits, 0 crits",
+    ],
+    "deaths": 0,
+    "kills": 0,
+    "name": "Innoruuk\`s Chosen",
+    "seconds": 0,
+    "zone": "The Plane of Hate - Group 2 (Adaptive)",
+  },
+  {
+    "damage": [
+      "Innoruuk\`s Chosen (npc) 3577 in 28 hits, 0 crits",
+      "Maestro of Rancor (npc) 1419 in 9 hits, 0 crits",
+      "Doria (player) 984 in 22 hits, 0 crits",
+      "Brenna (player) 522 in 18 hits, 0 crits",
+      "A Disciple of Innoruuk (npc) 446 in 3 hits, 0 crits",
+    ],
+    "deaths": 0,
+    "kills": 0,
+    "name": "Innoruuk\`s Chosen +4",
+    "seconds": 33,
+    "zone": "The Plane of Hate - Group 2 (Adaptive)",
+  },
+  {
+    "damage": [
+      "Aldric (player) 27038 in 78 hits, 5 crits",
+      "You (you) 9986 in 83 hits, 8 crits",
+      "Doria (player) 3949 in 3 hits, 0 crits",
+      "Innoruuk\`s Chosen (npc) 1499 in 22 hits, 0 crits",
+    ],
+    "deaths": 0,
+    "kills": 1,
+    "name": "Innoruuk\`s Chosen",
+    "seconds": 41,
+    "zone": "The Plane of Hate - Group 2 (Adaptive)",
+  },
+  {
+    "damage": [
+      "Doria (player) 940 in 2 hits, 1 crits",
+      "Innoruuk\`s Chosen (npc) 548 in 7 hits, 0 crits",
+      "Aldric (player) 63 in 7 hits, 0 crits",
+    ],
+    "deaths": 0,
+    "kills": 0,
+    "name": "Innoruuk\`s Chosen",
+    "seconds": 13,
+    "zone": "The Plane of Hate - Group 2 (Adaptive)",
+  },
+  {
+    "damage": [
+      "You (you) 59055 in 358 hits, 28 crits",
+      "Aldric (player) 43984 in 114 hits, 15 crits",
+      "Brenna (player) 36118 in 136 hits, 15 crits",
+      "Doria (player) 31180 in 83 hits, 7 crits",
+      "Innoruuk, the Prince of Hate (npc) 14268 in 58 hits, 0 crits",
+    ],
+    "deaths": 0,
+    "kills": 1,
+    "name": "Innoruuk, the Prince of Hate +1",
+    "seconds": 109,
+    "zone": "The Plane of Hate - Group 2 (Adaptive)",
+  },
+  {
+    "damage": [
+      "Aldric (player) 51139 in 142 hits, 21 crits",
+      "Doria (player) 49353 in 96 hits, 14 crits",
+      "You (you) 43378 in 229 hits, 23 crits",
+      "Brenna (player) 29402 in 114 hits, 7 crits",
+      "Lord of Ire (npc) 8705 in 56 hits, 0 crits",
+    ],
+    "deaths": 0,
+    "kills": 1,
+    "name": "Lord of Ire +1",
+    "seconds": 93,
+    "zone": "The Plane of Hate - Group 2 (Adaptive)",
+  },
+  {
+    "damage": [
+      "Aldric (player) 16060 in 45 hits, 6 crits",
+      "You (you) 7863 in 49 hits, 5 crits",
+      "Brenna (player) 3037 in 13 hits, 1 crits",
+      "Elund (player) 1528 in 14 hits, 0 crits",
+      "Innoruuk\`s Chosen (npc) 1502 in 18 hits, 0 crits",
+    ],
+    "deaths": 0,
+    "kills": 1,
+    "name": "Innoruuk\`s Chosen",
+    "seconds": 19,
+    "zone": "The Plane of Hate - Group 2 (Adaptive)",
+  },
+  {
+    "damage": [
+      "Aldric (player) 9258 in 15 hits, 1 crits",
+      "You (you) 8848 in 62 hits, 6 crits",
+      "Brenna (player) 5683 in 30 hits, 0 crits",
+      "Doria (player) 3771 in 13 hits, 1 crits",
+      "A haunted chest (npc) 2975 in 105 hits, 0 crits",
+    ],
+    "deaths": 0,
+    "kills": 1,
+    "name": "A haunted chest",
+    "seconds": 18,
+    "zone": "The Plane of Hate - Group 4 (Refined)",
+  },
+  {
+    "damage": [
+      "You (you) 3454 in 23 hits, 0 crits",
+      "Doria (player) 2411 in 4 hits, 1 crits",
+      "Aldric (player) 2288 in 6 hits, 0 crits",
+      "Brenna (player) 1891 in 15 hits, 1 crits",
+      "Corvin (player) 1450 in 22 hits, 0 crits",
+    ],
+    "deaths": 0,
+    "kills": 1,
+    "name": "A haunted chest",
+    "seconds": 11,
+    "zone": "The Plane of Hate - Group 4 (Refined)",
+  },
+]
+`;
