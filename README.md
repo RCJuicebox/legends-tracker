@@ -344,11 +344,17 @@ No path loses a line. An archive interrupted by the app closing is finished on t
 | Path | What |
 |---|---|
 | `src/core` | Log parsing and tailing, spell book, duration model, spell tracker, triggers, archiver, log check, the damage meter (`combatLines` reads the lines, `combatMeter` keeps the fights, `combatView` sums them for display), the loot ledger (`loot`), motes (`motes` counts them, `moteCalc` plans item upgrades, `mergeValue` picks the best merge, `spellMotes` the best spell to upgrade). Plain TypeScript with no Electron dependency, so it is unit-tested directly |
-| `src/main` | Electron main process: windows, tray, overlays, speech, icons, persistence, the engine that joins it all |
-| `src/preload` | The IPC bridge |
-| `src/renderer` | The React UI (`index.html`), overlay windows (`overlay.html`), hidden audio mixer (`audio.html`) |
+| `src/shared` | What both processes use: the IPC contract (`ipc.ts`), settings and view types, the game's tables (`game/`: classes, spell effect numbers, guide bonuses), the default overlays and hotkeys |
+| `src/main` | Electron main process: windows, tray, overlays, speech, icons, persistence, the engine that joins it all (`engine/`), the data sources and long jobs (`sources/`), IPC handlers by family (`ipc/`) |
+| `src/preload` | The IPC bridge, which lets a page use only the channels in the contract |
+| `src/renderer` | The React UI (`index.html`), timer and meter overlays (`overlay.html`), the alerts overlay without React (`alerts.html`), the hidden audio mixer (`audio.html`) |
 | `tests` | Vitest; fixtures are real rows from the client's spell files and real lines from the test character's log |
 | `defaults/triggers.json` | Triggers installed on first run |
+
+The lint (`npm run lint`, part of `npm run check`) holds the layers apart. Core imports neither
+Electron nor another layer. Shared imports only types from core. The renderer imports no Node
+module, Electron, the main process or the preload. Main never imports the renderer. Type-only
+imports may cross, since they vanish at build.
 
 ## Licence and credits
 

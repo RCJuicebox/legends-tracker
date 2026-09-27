@@ -15,6 +15,5 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci
-      - run: npm run typecheck
-      - run: npm run lint
-      - run: npm test
+      # Typecheck, lint (with the layer rules) and the tests.
+      - run: npm run check
