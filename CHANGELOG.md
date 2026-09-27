@@ -43,6 +43,17 @@ What changed in each version. The release workflow publishes a version's section
 - Info popovers close on Escape or a click elsewhere. Status chips carry a mark as well as a colour. Grids wrap in a narrow window. Each overlay card has **Bring on screen**.
 - Every filter box clears with Escape, the show/hide chips on Loot and the upgrade finder look the same, and the **Respawns** table sorts by any of its columns (remembered).
 
+- **Respawns** shows a small line of every gap seen beside the last one. **Damage meter**: a row you click into shows its damage, DPS, hits, crit and landed rates and best hit above its skills.
+- **Try it** (Live) and **Test** (Triggers) share what you paste and point at each other; Test can **Run it for real**.
+- **Spell Timers › Check against your log**: a spell that is off has **Add this focus**, which sets its extra focus to what the log implies.
+
+### Fixes
+
+- Reading the last N minutes into the meter no longer includes older fights from a small log.
+- Log times stay in order through the hour the clocks go back, so an AA list or a fight across it is read whole.
+- Damage written with a thousands separator ("1,234 points") is counted.
+- A log waiting for the game to close that was moved or deleted is no longer archived later at any size.
+
 ### Faster lookups
 
 - Casts, melee and purchases are read from your log and archives **in one pass** and remembered, so Gear and Tradeskills open quickly after the first time.
