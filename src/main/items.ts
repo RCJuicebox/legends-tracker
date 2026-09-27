@@ -6,6 +6,7 @@ import { wiki, type WikiPage } from './sources/wiki'
 import type { ItemInfo } from '../shared/types'
 import { log } from './log'
 import { cacheDir } from './paths'
+import { sources } from './sources/registry'
 
 // Item stats come from eqlwiki.com, the community wiki for EverQuest Legends: each item page carries
 // the in-game stats block. Only the items the player asks about are looked up, a batch at a time,
@@ -55,9 +56,10 @@ export class ItemCatalog {
       try {
         await this.fetchInto(cache, stale)
         await this.save()
+        sources.ok('items', `${Object.keys(cache).length} items looked up and kept`)
       } catch (e) {
         // Offline or the wiki is down: what is cached still serves, however old.
-        log.warn(`Item lookup on eqlwiki failed for ${stale.length} item(s)`, e)
+        sources.fail('items', e, `${stale.length} item(s) could not be looked up; the ones kept serve meanwhile`)
       }
     }
     const out: Record<string, ItemInfo> = {}

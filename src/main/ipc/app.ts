@@ -3,6 +3,7 @@ import { handle } from './handle'
 import { onSend } from '../push'
 import { logDir } from '../log'
 import { diagnostics } from '../diagnostics'
+import { sources } from '../sources/registry'
 import { checkGameFolder, findInstall, resolveGameFolder } from '../game'
 import { meterOptions, sanitizeCharacter, sanitizeSettings } from '../validate'
 import type { AppContext } from '../context'
@@ -28,6 +29,8 @@ export function registerAppIpc(ctx: AppContext): void {
   }))
   handle('app:openLogs', () => shell.openPath(logDir()))
   handle('app:diagnostics', () => diagnostics(ctx))
+  handle('sources:list', () => sources.list())
+  handle('sources:refresh', (id) => sources.refresh(String(id)))
   handle('settings:save', (s) => {
     const clean = sanitizeSettings(s, store.settings.get())
     if (!clean) throw new Error('Settings were not saved: they were not in the expected form.')

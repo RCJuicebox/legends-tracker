@@ -5,6 +5,7 @@ import { parseAchievements, type AchMarks } from '../core/achievements'
 import type { AchievementsView } from '../shared/types'
 import { log } from './log'
 import { isCharacterKey } from './validate'
+import { sources } from './sources/registry'
 
 const EMPTY_MARKS: AchMarks = { ticks: [], broken: [] }
 
@@ -67,10 +68,12 @@ export class AchievementFiles {
       const path = this.exportPath(character)
       const [text, st] = await Promise.all([fs.readFile(path, 'utf8'), fs.stat(path)])
       this.watchedMtime = st.mtimeMs
+      sources.ok('exports', `${file}, written ${new Date(st.mtimeMs).toLocaleString()}`)
       return { ...base, modified: st.mtimeMs, sections: parseAchievements(text).sections }
     } catch (e) {
       const err = e as NodeJS.ErrnoException
-      if (err.code !== 'ENOENT') log.warn(`Could not read ${file}`, e)
+      if (err.code !== 'ENOENT') sources.fail('exports', e, file)
+      else sources.missing('exports', `No ${file} yet: type /outputfile achievements in game.`)
       return { ...base, error: err.code === 'ENOENT' ? 'missing' : err.message }
     }
   }

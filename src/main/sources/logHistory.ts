@@ -5,6 +5,7 @@ import { decodeCp1252, parseLogLine, type LogLine } from '../../core/logLine'
 import { fileIdentity, sameFile } from '../../core/fileIdentity'
 import { characterArchives, feedZip, readLines } from '../logReading'
 import { log } from '../log'
+import { sources } from './registry'
 
 // Reading a character's log history: backwards from the end for the newest of something, forwards
 // over a stretch, and whole (the live log plus every archive) for the counts that pages ask about.
@@ -170,7 +171,16 @@ export class LogHistory {
    * archives are needed, by name and the last date each covers ("2026-09-24"); all by default.
    */
   get<T>(key: string, where: HistoryWhere, wantArchive: (name: string, end: string) => boolean = () => true): Promise<HistorySlice<T>> {
-    const run = this.queue.then(() => this.read<T>(key, where, wantArchive))
+    const run = this.queue.then(() => this.read<T>(key, where, wantArchive)).then(
+      (slice) => {
+        sources.ok('history', `${where.stem.replace(/^eqlog_/, '')}: ${slice.archives.length} archive${slice.archives.length === 1 ? '' : 's'} and the live log`)
+        return slice
+      },
+      (e: unknown) => {
+        sources.fail('history', e)
+        throw e
+      }
+    )
     this.queue = run.catch(() => undefined)
     return run
   }

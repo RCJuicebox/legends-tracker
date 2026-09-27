@@ -6,6 +6,7 @@ import type { ItemCatalog } from './items'
 import type { CharacterSheet, InventoryView } from '../shared/types'
 import { log } from './log'
 import { isCharacterKey } from './validate'
+import { sources } from './sources/registry'
 
 const EMPTY_SHEET: CharacterSheet = { acOverrides: {}, shield: null, stats: {} }
 
@@ -58,9 +59,11 @@ export class InventoryFiles {
       this.watchedMtime = st.mtimeMs
       inventory = parseInventory(text)
       base.modified = st.mtimeMs
+      sources.ok('exports', `${base.file}, written ${new Date(st.mtimeMs).toLocaleString()}`)
     } catch (e) {
       const err = e as NodeJS.ErrnoException
-      if (err.code !== 'ENOENT') log.warn(`Could not read ${base.file}`, e)
+      if (err.code !== 'ENOENT') sources.fail('exports', e, base.file)
+      else sources.missing('exports', `No ${base.file} yet: type /outputfile inventory in game.`)
       return { ...base, error: err.code === 'ENOENT' ? 'missing' : err.message }
     }
     const names = inventory.worn.flatMap((it) => [it.name, ...it.augs.map((a) => a.name)])

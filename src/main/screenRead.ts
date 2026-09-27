@@ -1,4 +1,5 @@
 import { captureScreens, discardScreens, ocrImage } from './ocr'
+import { sources } from './sources/registry'
 import { composeRows, countsFromComposite, findMoteRows, rows as ocrRows, statsWindowFromScreen } from '../core/screenText'
 import type { Windows } from './windows'
 import type { MoteScreenRead, StatsScreenRead } from '../shared/ipc'
@@ -14,7 +15,12 @@ async function withScreens<T>(windows: Windows, read: (shots: string[]) => Promi
   try {
     await new Promise((r) => setTimeout(r, 900))
     shots = await captureScreens()
-    return await read(shots)
+    const out = await read(shots)
+    sources.ok('screen', `${shots.length} screen${shots.length === 1 ? '' : 's'} read`)
+    return out
+  } catch (e) {
+    sources.fail('screen', e)
+    throw e
   } finally {
     void discardScreens(shots)
     back()

@@ -6,6 +6,7 @@ import { log } from './log'
 import { wiki, type WikiPage } from './sources/wiki'
 import type { CatalogFile, WikiProgress } from '../shared/ipc'
 import { cacheDir } from './paths'
+import { sources } from './sources/registry'
 
 // Every piece of equipment on eqlwiki.com, for the upgrade finder. The first download reads the wiki's
 // Items category fifty pages a request (about 225 requests); later ones list its revisions (about 22
@@ -39,8 +40,10 @@ export class WikiCatalog {
     if (this.file) return this.file
     try {
       this.file = JSON.parse(await fs.readFile(this.path, 'utf8')) as CatalogFile
+      this.report({})
     } catch (e) {
-      if ((e as NodeJS.ErrnoException).code !== 'ENOENT') log.warn('The stored item catalog could not be read', e)
+      if ((e as NodeJS.ErrnoException).code !== 'ENOENT') sources.fail('catalog', e)
+      else sources.missing('catalog', 'Not downloaded yet: the Gear page offers to.')
       this.file = null
     }
     return this.file
@@ -59,6 +62,14 @@ export class WikiCatalog {
   private report(p: Partial<CatalogProgress>): void {
     this.progress = { ...this.progress, ...p }
     this.onProgress(this.progress)
+    const file = this.file
+    if (this.progress.busy) sources.reading('catalog', `${this.progress.pages} of ${this.progress.total || '?'} pages`)
+    else if (this.progress.error) sources.fail('catalog', new Error(this.progress.error))
+    else if (file) {
+      const what = `${file.items.length.toLocaleString()} items, from ${new Date(file.fetchedAt).toLocaleDateString()}`
+      if (this.isStale(file)) sources.stale('catalog', what)
+      else sources.ok('catalog', what)
+    }
   }
 
   private async download(): Promise<CatalogFile | null> {

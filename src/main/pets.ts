@@ -10,6 +10,7 @@ import { log } from './log'
 import { wiki } from './sources/wiki'
 import type { PetState, PetSummon } from '../shared/ipc'
 import { cacheDir } from './paths'
+import { sources } from './sources/registry'
 
 // The pet: what it wears (the log's `/pet inventory check` lists) and which pet it is (the last
 // summoning spell cast), both kept per character so an archived log loses neither; and the pet's
@@ -195,8 +196,9 @@ export class PetWiki {
         c.pages[key] = { fetchedAt: now, profile: text ? parseSummonPage(spell, text) : null }
         changed = true
       }
+      sources.ok('petWiki', `${Object.keys(c.pages).length} pet page${Object.keys(c.pages).length === 1 ? '' : 's'} kept`)
     } catch (e) {
-      log.warn(`Could not fetch the wiki pages for ${spell}:`, e)
+      sources.fail('petWiki', e, `Could not fetch the pages for ${spell}`)
       if (!c.pages[key]) throw e
     } finally {
       if (changed) await this.save()

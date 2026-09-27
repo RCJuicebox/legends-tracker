@@ -1,7 +1,7 @@
 import { promises as fs } from 'node:fs'
 import { join } from 'node:path'
 import { crc32, deflateSync } from 'node:zlib'
-import { log } from './log'
+import { sources } from './sources/registry'
 
 // Spell icons come straight from the client: uifiles\default\SpellsNN.tga, 256×256 sheets of
 // 40×40 icons, six by six, numbered by the spell file's icon field. Item icons sit the same way in
@@ -25,6 +25,14 @@ export class IconSource {
   private readonly itemPngs = new Map<number, Buffer>()
 
   constructor(private readonly installDir: () => string) {}
+
+  /** Forgets every sheet read, so the next icon reads them again (a game patch). */
+  clear(): void {
+    this.sheets.clear()
+    this.pngs.clear()
+    this.itemSheets.clear()
+    this.itemPngs.clear()
+  }
 
   async png(index: number): Promise<Buffer | null> {
     const hit = this.pngs.get(index)
@@ -95,9 +103,9 @@ export class IconSource {
   }
 }
 
-/** No game folder set, or no such sheet, is expected; anything else goes in the log. */
+/** No game folder set, or no such sheet, is expected; anything else is reported. */
 function sheetFailed(e: unknown): null {
-  if ((e as NodeJS.ErrnoException).code !== 'ENOENT') log.warn('Could not read an icon sheet', e)
+  if ((e as NodeJS.ErrnoException).code !== 'ENOENT') sources.fail('icons', e)
   return null
 }
 

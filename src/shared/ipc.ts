@@ -194,6 +194,25 @@ export interface StatsScreenRead {
   screens: number
 }
 
+/** How a source of information last fared (see the Data Sources page). */
+export type SourceStatus = 'ok' | 'stale' | 'error' | 'missing' | 'reading' | 'waiting'
+
+export interface SourceView {
+  id: string
+  label: string
+  /** What it is and what uses it, in a sentence. */
+  what: string
+  kind: 'log' | 'game file' | 'wiki' | 'screen' | 'app'
+  status: SourceStatus
+  /** What the last read found ("73,975 spells", "written 3 minutes ago"). */
+  detail: string
+  /** The last failure, until the next good read. */
+  error: string
+  lastOk: number
+  lastTried: number
+  refreshable: boolean
+}
+
 export type AudioCommand =
   | { kind: 'speech'; wav: Uint8Array; interrupt: boolean }
   | { kind: 'speech-fallback'; text: string; interrupt: boolean }
@@ -312,6 +331,9 @@ export interface Invokes {
   'game:find': () => string
   'game:choose': () => { canceled: boolean; picked: string; dir: string }
   'dialog:folder': () => string | null
+
+  'sources:list': () => SourceView[]
+  'sources:refresh': (id: string) => SourceView[]
 }
 
 /** One way, page to main: api.send(channel, ...args). */
@@ -347,6 +369,7 @@ export interface Pushes {
   'state:achievements': (view: AchievementsView) => void
   'state:inventory': (view: InventoryView) => void
   'state:catalog': (progress: WikiProgress) => void
+  'state:sources': (rows: SourceView[]) => void
   'state:recipes': (progress: WikiProgress) => void
 
   'overlay:config': (update: { config: OverlayConfig; arranging: boolean }) => void
@@ -388,14 +411,15 @@ const INVOKE_CHANNELS: Record<InvokeChannel, true> = {
   'character:exports': true, 'character:sheet': true, 'character:saveSheet': true, 'inventory:load': true, 'inventory:lookup': true,
   'gear:catalog': true, 'gear:catalogRefresh': true, 'gear:foci': true, 'gear:effects': true,
   'stats:caps': true, 'stats:readAAs': true, 'stats:readScreen': true,
-  'game:check': true, 'game:find': true, 'game:choose': true, 'dialog:folder': true
+  'game:check': true, 'game:find': true, 'game:choose': true, 'dialog:folder': true,
+  'sources:list': true, 'sources:refresh': true
 }
 const SEND_CHANNELS: Record<SendChannel, true> = { 'overlay:mouse': true, 'overlay:meter': true, 'audio:devices': true }
 const PUSH_CHANNELS: Record<PushChannel, true> = {
   'state:settings': true, 'state:character': true, 'state:status': true, 'state:timers': true, 'state:feed': true, 'state:archive': true,
   'state:arranging': true, 'state:devices': true, 'state:voices': true, 'state:update': true, 'state:combat': true, 'state:loot': true,
   'state:respawns': true, 'state:buffs': true, 'state:motes': true, 'state:moteScan': true, 'state:stock': true, 'state:pet': true,
-  'state:achievements': true, 'state:inventory': true, 'state:catalog': true, 'state:recipes': true,
+  'state:achievements': true, 'state:inventory': true, 'state:catalog': true, 'state:recipes': true, 'state:sources': true,
   'overlay:config': true, 'overlay:timers': true, 'overlay:combat': true, 'overlay:alert': true,
   'audio:config': true, 'audio:play': true
 }

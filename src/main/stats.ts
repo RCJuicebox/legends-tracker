@@ -5,6 +5,7 @@ import { latestAas, type AaSummary } from '../core/aa'
 import { decodeCp1252 } from '../core/logLine'
 import { log } from './log'
 import type { SkillCapRow } from '../shared/ipc'
+import { sources } from './sources/registry'
 
 // The game's own tables, read from its Resources folder:
 //   skillcaps.txt     CLASS^SKILL^LEVEL^CAP^flag^      every class, skill and level
@@ -29,16 +30,25 @@ export class GameTables {
 
   constructor(private readonly gameDir: () => string) {}
 
+  /** Forgets the tables read, so the next question reads them again (a game patch). */
+  clear(): void {
+    this.tables = null
+  }
+
   private async load(): Promise<Tables> {
     const dir = this.gameDir()
     if (this.tables?.dir === dir) return this.tables
     const t: Tables = { dir, skills: new Map(), ac: new Map(), factors: new Map() }
+    const failed: string[] = []
     const read = (f: string) =>
       fs.readFile(join(dir, 'Resources', f), 'utf8').catch((e: unknown) => {
-        log.warn(`Could not read the game table ${f} from ${dir}:`, e)
+        failed.push(`${f}: ${(e as Error).message}`)
         return ''
       })
     const [skills, ac, base] = await Promise.all([read('skillcaps.txt'), read('ACMitigation.txt'), read('basedata.txt')])
+    if (!dir) sources.missing('tables', 'No game folder chosen.')
+    else if (failed.length) sources.fail('tables', new Error(failed.join('; ')))
+    else sources.ok('tables', 'skillcaps.txt, ACMitigation.txt and basedata.txt')
     for (const line of base.split('\n')) {
       const p = line.split('^')
       const [l, c] = [Number(p[0]), Number(p[1])]

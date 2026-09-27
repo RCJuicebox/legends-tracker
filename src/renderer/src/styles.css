@@ -1496,6 +1496,9 @@ table.table {
   height: 100%;
   background: var(--teal);
 }
+.bad-text {
+  color: var(--red);
+}
 .ok-text {
   color: var(--green);
 }
@@ -3028,4 +3031,10 @@ button.tree-item {
   overflow: auto;
   margin-top: 6px;
   color: var(--text-2);
+}
+
+/* Data Sources: the same columns in every card. */
+.sources-table {
+  table-layout: fixed;
+  width: 100%;
 }

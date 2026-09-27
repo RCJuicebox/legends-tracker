@@ -12,6 +12,7 @@ import type { MoteScanJob, MoteScanResult } from '../moteHistory'
 import type { MoteStockKeeper } from '../moteStock'
 import { log } from '../log'
 import { Backlog } from './throttle'
+import { sources } from '../sources/registry'
 import type { EngineEnv, EngineOutputs, EngineStore, MoteScanner } from './contracts'
 import type { Notifier } from './notifier'
 
@@ -202,9 +203,10 @@ export class MoteCatchUp {
       // The tailer attached while this read: read on to where it took over.
       const later = until < 0 && samePath(this.backlogLog, logFile) ? this.backlogFrom : -1
       if (later > reached) reached += await readLines(createReadStream(logFile, { start: reached, end: later - 1 }), onLine, { flushLast: false })
+      sources.ok('motes', `Caught up on ${basename(logFile)} from ${exact ? 'where it left off' : 'the last mote seen'}`)
     } catch (e) {
       if ((e as NodeJS.ErrnoException).code === 'ENOENT') log.info(`No log to catch up on at ${logFile}.`)
-      else log.warn(`Catching up on motes from ${logFile} failed:`, e)
+      else sources.fail('motes', e, `Catching up from ${basename(logFile)}`)
     } finally {
       this.end(logFile, reached)
     }
@@ -254,8 +256,10 @@ export class MoteCatchUp {
       const crawls = merged.sessions.filter((s) => s.kind === 'crawl').length
       const n = scanned.characters.length
       this.notifier.pushFeed('loot', `Mote history rebuilt from ${n} character log${n === 1 ? '' : 's'}: ${crawls} crawl${crawls === 1 ? '' : 's'}.`)
+      sources.ok('motes', `Rebuilt from ${n} character log${n === 1 ? '' : 's'} and their archives`)
     } catch (e) {
       log.error('Rebuilding mote history failed:', e)
+      sources.fail('motes', e)
       this.notifier.pushFeed('warn', `Could not read mote history: ${(e as Error).message}`)
     } finally {
       this.scan = null

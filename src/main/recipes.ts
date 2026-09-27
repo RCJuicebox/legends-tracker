@@ -6,6 +6,7 @@ import { log } from './log'
 import { wiki } from './sources/wiki'
 import type { BookRecipe, RecipeFile, WikiProgress } from '../shared/ipc'
 import { cacheDir } from './paths'
+import { sources } from './sources/registry'
 
 // Every recipe on eqlwiki.com, for the Tradeskills page: each page in the Player Crafted category
 // carries its recipe and yield, fifty pages a request (about 45 requests), one at a time. Alchemy's
@@ -34,8 +35,10 @@ export class RecipeBook {
     if (this.file) return this.file
     try {
       this.file = JSON.parse(await fs.readFile(this.path, 'utf8')) as RecipeFile
+      this.report({})
     } catch (e) {
-      if ((e as NodeJS.ErrnoException).code !== 'ENOENT') log.warn('The stored recipes could not be read', e)
+      if ((e as NodeJS.ErrnoException).code !== 'ENOENT') sources.fail('recipes', e)
+      else sources.missing('recipes', 'Not downloaded yet: the Tradeskills page fetches them.')
       this.file = null
     }
     return this.file
@@ -53,6 +56,14 @@ export class RecipeBook {
   private report(p: Partial<RecipeProgress>): void {
     this.progress = { ...this.progress, ...p }
     this.onProgress(this.progress)
+    const file = this.file
+    if (this.progress.busy) sources.reading('recipes', `${this.progress.pages} of ${this.progress.total || '?'} pages`)
+    else if (this.progress.error) sources.fail('recipes', new Error(this.progress.error))
+    else if (file) {
+      const what = `${file.recipes.length.toLocaleString()} recipes, from ${new Date(file.fetchedAt).toLocaleDateString()}`
+      if (this.isStale(file)) sources.stale('recipes', what)
+      else sources.ok('recipes', what)
+    }
   }
 
   /**

@@ -25,6 +25,7 @@ import { Respawns } from './pages/Respawns'
 import { Tradeskills } from './pages/Tradeskills'
 import { Buffs } from './pages/Buffs'
 import { DamageMeter } from './pages/DamageMeter'
+import { DataSources } from './pages/DataSources'
 
 const PAGES = [
   { id: 'dashboard', group: 'Play', label: 'Live', icon: 'dashboard', el: Dashboard },
@@ -42,6 +43,7 @@ const PAGES = [
   { id: 'overlays', group: 'Setup', label: 'Overlays', icon: 'overlays', el: Overlays },
   { id: 'audio', group: 'Setup', label: 'Audio', icon: 'audio', el: Audio },
   { id: 'logs', group: 'Setup', label: 'Log Files', icon: 'logs', el: Logs },
+  { id: 'sources', group: 'Setup', label: 'Data Sources', icon: 'sources', el: DataSources },
   { id: 'settings', group: 'Setup', label: 'Settings', icon: 'settings', el: Settings }
 ] as const
 

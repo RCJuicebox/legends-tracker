@@ -1,6 +1,6 @@
 import { app, Notification } from 'electron'
-import { rmSync } from 'node:fs'
-import { join } from 'node:path'
+import { promises as fs, rmSync } from 'node:fs'
+import { basename, join } from 'node:path'
 import { Store } from './store'
 import { Engine } from './engine'
 import { appEngineEnv } from './engineEnv'
@@ -27,8 +27,9 @@ import { listLogs, logIsIn } from './game'
 import { Windows, loadPage } from './windows'
 import { appIcon, preloadPath, resources } from './bootstrap'
 import { log } from './log'
+import { sources } from './sources/registry'
 import { settingsSummary } from './diagnostics'
-import type { AppSettings, Trigger } from '../shared/types'
+import type { AppSettings, Trigger, WatchStatus } from '../shared/types'
 import type { AudioDevice } from '../shared/ipc'
 import { cacheDir } from './paths'
 
@@ -147,6 +148,11 @@ export function createContext(): AppContext {
     toMain('state:update', s)
     const was = lastUpdate
     lastUpdate = s.state
+    if (s.state === 'error') sources.fail('updates', new Error(s.message))
+    else if (s.state === 'idle') sources.ok('updates', s.checkedAt ? `Up to date, checked ${new Date(s.checkedAt).toLocaleTimeString()}` : 'Up to date')
+    else if (s.state === 'ready') sources.ok('updates', `${s.version} downloaded; installs at restart`)
+    else if (s.state === 'downloading') sources.reading('updates', `Downloading ${s.version}, ${s.percent}%`)
+    else if (s.state === 'dev') sources.missing('updates', 'Running from source: only the installed app updates.')
     if (s.state === 'error' && was === 'downloading') {
       // A download that failed is said once; the next hourly check tries again.
       ctx.engine.pushFeed('warn', `The update could not be downloaded: ${s.message}. It will be tried again within the hour.`)
@@ -173,7 +179,10 @@ export function createContext(): AppContext {
       },
       alert: (p) => ctx.overlays.alert(p),
       audio: (cmd) => windows.toAudio(cmd),
-      status: (s) => toMain('state:status', s),
+      status: (s) => {
+        toMain('state:status', s)
+        reportStatus(s)
+      },
       feed: (item) => toMain('state:feed', item),
       archive: (a) => toMain('state:archive', a),
       motes: (m) => toMain('state:motes', m),
@@ -272,7 +281,68 @@ export function createContext(): AppContext {
     ctx.logSettings()
   }
 
+  registerSources(ctx)
   return ctx
+}
+
+/** The chat log's and the spell data's rows follow the engine's status. */
+function reportStatus(s: WatchStatus): void {
+  if (s.watching) sources.ok('log', `${basename(s.logFile)}${s.lastLineAt ? `, last line ${new Date(s.lastLineAt).toLocaleTimeString()}` : ''}`)
+  else if (s.logFile) sources.missing('log', `${basename(s.logFile)} is not being watched. Start watching on the Live page.`)
+  else sources.missing('log', 'No character log chosen (Settings).')
+  if (s.spellError) sources.fail('spells', new Error(s.spellError))
+  else if (s.spellsLoaded) sources.ok('spells', `${s.spellsLoaded.toLocaleString()} spells`)
+}
+
+/** Every source the Data Sources page lists, with what it is and how to refresh it. */
+function registerSources(ctx: AppContext): void {
+  sources.add('log', { label: 'Chat log', kind: 'log', what: "Your character's eqlog file, read as the game writes it. Timers, the meter, loot, motes and buffs all come from it.", refresh: () => ctx.engine.startWatching() })
+  sources.add('spells', { label: 'Spell data', kind: 'game file', what: "spells_us.txt and its strings file: every spell's duration, category, effects and messages. Read again when the game updates it.", refresh: () => reloadGameData(ctx, 'Read again by hand') })
+  sources.add('tables', { label: 'Game tables', kind: 'game file', what: "The Resources folder's skill caps, AC soft caps and stat values, for the Stats and Gear pages.", refresh: async () => {
+    ctx.gameTables.clear()
+    await ctx.gameTables.acCaps([], 1)
+  } })
+  sources.add('icons', { label: 'Icons', kind: 'game file', what: "The game's spell and item icon sheets.", refresh: async () => ctx.icons.clear() })
+  sources.add('exports', { label: 'Character exports', kind: 'game file', what: 'The inventory and achievements files the game writes when you type /outputfile inventory or /outputfile achievements. Watched for new ones while their page is open.' })
+  sources.add('history', { label: 'Log history', kind: 'log', what: 'Casts, melee and purchases counted over your log and its archives, for the Gear, Spell upgrades and Tradeskills pages. Only what the log gains is read again.' })
+  sources.add('motes', { label: 'Mote history', kind: 'log', what: 'Every mote looted and every instance run, from your logs and archives.', refresh: () => ctx.engine.rebuildMoteHistory() })
+  sources.add('items', { label: 'Item lookups', kind: 'wiki', what: 'eqlwiki pages for the items you wear and look at, kept a week.' })
+  sources.add('catalog', { label: 'Item catalog', kind: 'wiki', what: "Every piece of equipment on eqlwiki, for the upgrade finder and optimizer. Refreshed weekly, reading only pages edited since.", refresh: () => ctx.wikiCatalog.refresh() })
+  sources.add('recipes', { label: 'Recipes', kind: 'wiki', what: "Every player-crafted recipe on eqlwiki, for the Tradeskills page and crafted items' eras.", refresh: () => ctx.recipeBook.refresh() })
+  sources.add('petWiki', { label: 'Pet pages', kind: 'wiki', what: "eqlwiki's Pet Guide and each pet's summon page, for the pet gear planner." })
+  sources.add('speech', { label: 'Windows voices', kind: 'app', what: "Windows' own speech engine, started when something is to be said and stopped when quiet.", refresh: async () => {
+    await ctx.speech.warm()
+    if (ctx.speech.failed) throw new Error(ctx.speech.failed)
+    sources.ok('speech', `${ctx.speech.voices.length} voices`)
+  } })
+  sources.add('updates', { label: 'Updates', kind: 'app', what: "This app's releases on GitHub, checked hourly.", refresh: () => ctx.updater.check() })
+  sources.add('screen', { label: 'Screen reads', kind: 'screen', what: "The game's currency and stats windows, read off the screen with Windows OCR when you ask on the Motes and Stats pages." })
+  sources.onChange((rows) => ctx.windows.toMain('state:sources', rows))
+  // What can be known without asking anyone: the downloads kept, and whether this copy updates at all.
+  void ctx.wikiCatalog.stored()
+  void ctx.recipeBook.stored()
+  if (ctx.updater.status.state === 'dev') sources.missing('updates', 'Running from source: only the installed app updates.')
+
+  // The game's data files are read once; a game patch changes them while the app sits in the tray.
+  // Looked at every minute: a change reads them again.
+  let seen = 0
+  setInterval(() => {
+    void fs
+      .stat(join(ctx.installDir(), 'spells_us.txt'))
+      .then((st) => {
+        if (seen && st.mtimeMs !== seen) void reloadGameData(ctx, 'The game updated its spell data')
+        seen = st.mtimeMs
+      })
+      .catch(() => undefined)
+  }, 60_000).unref()
+}
+
+/** Reads the spell data, game tables and icons again. */
+async function reloadGameData(ctx: AppContext, why: string): Promise<void> {
+  ctx.gameTables.clear()
+  ctx.icons.clear()
+  await ctx.engine.loadSpells()
+  ctx.engine.pushFeed('info', `${why}: spell data, game tables and icons read again.`)
 }
 
 /** Each step of one version is announced once: an hourly check must not nag. */
