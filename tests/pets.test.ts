@@ -62,7 +62,7 @@ describe('what the pet wears', () => {
       '[Fri Sep 25 12:30:00 2026] You begin casting Spirit of the Puma X.'
     ].join('\r\n')
     writeFileSync(log, text + '\r\n', 'latin1')
-    const s = await scanPetLog(log, (name) => (name.startsWith('Frenzied Spirit') ? 'Frenzied Spirit' : null), 1 << 20)
+    const s = await scanPetLog(log, (name) => (name.startsWith('Frenzied Spirit') ? 'Frenzied Spirit' : null), { maxBytes: 1 << 20 })
     expect(s.summon).toEqual({ spell: 'Frenzied Spirit', at: new Date(2026, 8, 25, 11, 0, 0).getTime() })
     expect(s.gear?.items.map((i) => i.slot)).toEqual(['Arms', 'Primary', 'Chest', 'Legs', 'Waist'])
   })

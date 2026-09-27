@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { Readable } from 'node:stream'
 import { readLines } from '../src/main/moteHistory'
-import { offsetBefore } from '../src/main/logReading'
+import { offsetBefore } from '../src/main/sources/logHistory'
 import { lastZone } from '../src/main/game'
 import { readAasFromLog } from '../src/main/stats'
 import type { LogLine } from '../src/core/logLine'
@@ -40,13 +40,13 @@ describe('offsetBefore', () => {
     const path = join(dir, 'eqlog_A_b.txt')
     const lines = Array.from({ length: 200 }, (_, i) => `[Thu Sep 24 16:${String(Math.floor(i / 60)).padStart(2, '0')}:${String(i % 60).padStart(2, '0')} 2026] line ${i}\r\n`)
     await fs.writeFile(path, lines.join(''))
-    const at = await offsetBefore(path, new Date(2026, 8, 24, 16, 2, 30).getTime(), 256)
+    const at = await offsetBefore(path, new Date(2026, 8, 24, 16, 2, 30).getTime(), { step: 256 })
     const rest = (await fs.readFile(path, 'latin1')).slice(at)
     expect(rest.startsWith('[')).toBe(true)
     const first = Number(/line (\d+)/.exec(rest)![1])
     expect(first).toBeLessThan(150)
     expect(first).toBeGreaterThan(100)
-    expect(await offsetBefore(path, 0, 256)).toBe(0)
+    expect(await offsetBefore(path, 0, { step: 256 })).toBe(0)
   })
 })
 

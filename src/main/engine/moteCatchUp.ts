@@ -4,7 +4,9 @@ import { Worker } from 'node:worker_threads'
 import { parseMoteLoot, type MoteTracker } from '../../core/motes'
 import type { LogLine } from '../../core/logLine'
 import { listLogs } from '../game'
-import { readLines, offsetBefore } from '../logReading'
+import { readLines } from '../logReading'
+import { identityOf, offsetBefore } from '../sources/logHistory'
+import { sameFile } from '../../core/fileIdentity'
 import { combineScans, mergeRebuilt, samePath } from '../moteMerge'
 import type { MoteScanJob, MoteScanResult } from '../moteHistory'
 import type { MoteStockKeeper } from '../moteStock'
@@ -14,6 +16,8 @@ import type { EngineEnv, EngineOutputs, EngineStore, MoteScanner } from './contr
 import type { Notifier } from './notifier'
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
+/** In the hour clocks go back, log stamps repeat: catching up by time looks back this much further. */
+const DST_SLACK_MS = 3600_000
 
 /**
  * catchup.json: how far into which log mote tracking had read when the app last closed. Every line
@@ -151,7 +155,7 @@ export class MoteCatchUp {
     if (!p || this.backlog.active) return
     try {
       const st = statSync(p.logFile, { bigint: true })
-      const mark: CatchUpMark = { logFile: p.logFile, id: `${st.dev}:${st.ino}`, offset: p.offset, seenUntil: this.motes.state.seenUntil ?? 0 }
+      const mark: CatchUpMark = { logFile: p.logFile, id: identityOf(st), offset: p.offset, seenUntil: this.motes.state.seenUntil ?? 0 }
       writeFileSync(this.markFile + '.tmp', JSON.stringify(mark), 'utf8')
       renameSync(this.markFile + '.tmp', this.markFile)
     } catch (e) {
@@ -180,8 +184,8 @@ export class MoteCatchUp {
         log.warn(`Could not remove ${this.markFile}:`, e)
       }
       const st = await fs.stat(logFile, { bigint: true })
-      const exact = !!mark && samePath(mark.logFile, logFile) && mark.id === `${st.dev}:${st.ino}` && mark.seenUntil === motesSince && mark.offset <= Number(st.size)
-      const from = exact ? mark!.offset : await offsetBefore(logFile, since)
+      const exact = !!mark && samePath(mark.logFile, logFile) && sameFile({ id: mark.id, size: mark.offset }, { id: identityOf(st), size: Number(st.size) }) && mark.seenUntil === motesSince
+      const from = exact ? mark!.offset : await offsetBefore(logFile, since, { slackMs: DST_SLACK_MS })
       if (exact) this.hooks.stock.resume()
       const onLine = (line: LogLine) => {
         if (exact || line.time > motesSince) this.motes.handle(line)

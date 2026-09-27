@@ -1,6 +1,7 @@
 import { promises as fs } from 'node:fs'
 import type { FileHandle } from 'node:fs/promises'
 import { decodeCp1252 } from './logLine'
+import { fileIdentity } from './fileIdentity'
 
 export type ResetReason = 'truncated' | 'replaced'
 
@@ -98,7 +99,7 @@ export class LogTailer {
       }
       throw e
     }
-    const identity = `${stat.dev}:${stat.ino}`
+    const identity = fileIdentity(stat)
     const size = Number(stat.size)
     this.missing = false
 
@@ -126,7 +127,7 @@ export class LogTailer {
       // The file could be swapped between the stat and the open; only keep a handle to the one stat
       // saw, and none at all if the tailer was stopped meanwhile.
       const hs = await h.stat({ bigint: true })
-      if (`${hs.dev}:${hs.ino}` !== this.identity || overtaken() || this.handle) {
+      if (fileIdentity(hs) !== this.identity || overtaken() || this.handle) {
         await h.close()
         return
       }

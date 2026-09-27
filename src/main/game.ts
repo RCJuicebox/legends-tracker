@@ -2,7 +2,8 @@ import { HKEY_CURRENT_USER, HKEY_LOCAL_MACHINE, isProcessRunning, registryString
 import { existsSync, promises as fs } from 'node:fs'
 import { dirname, join } from 'node:path'
 import type { ArchiveInfo, GameFolderCheck, LogFileInfo } from '../shared/types'
-import { decodeCp1252, parseLogLine, zoneEntered } from '../core/logLine'
+import { parseLogLine, zoneEntered } from '../core/logLine'
+import { readBackward } from './sources/logHistory'
 import { log } from './log'
 
 const INSTALL_SUFFIXES = [
@@ -151,39 +152,23 @@ export async function isGameRunning(): Promise<boolean> {
 
 /**
  * The client announces the zone once and never repeats it, so a tool attached mid-session reads
- * backwards from the end of the log to find it, a chunk at a time, up to 64 chunks.
+ * backwards from the end of the log to find it, up to 64 chunks.
  */
 export async function lastZone(logPath: string, step = 1 << 20): Promise<string> {
-  let handle
+  let zone = ''
   try {
-    handle = await fs.open(logPath, 'r')
+    await readBackward(
+      logPath,
+      (raw) => {
+        if (!raw.includes('] You have entered ')) return
+        const line = parseLogLine(raw)
+        zone = (line && zoneEntered(line.text)) || ''
+        return !!zone
+      },
+      { step, maxBytes: 64 * step }
+    )
   } catch (e) {
-    if ((e as NodeJS.ErrnoException).code !== 'ENOENT') log.warn(`Could not open ${logPath} to find the zone:`, e)
-    return ''
+    if ((e as NodeJS.ErrnoException).code !== 'ENOENT') log.warn(`Could not read ${logPath} to find the zone:`, e)
   }
-  try {
-    const size = (await handle.stat()).size
-    // The first piece of each chunk may be the end of a line begun in the chunk before it; it is
-    // carried back and joined to that chunk's last piece.
-    let carry = ''
-    for (let end = size; end > 0 && size - end < 64 * step; end -= step) {
-      const start = Math.max(0, end - step)
-      const buf = Buffer.alloc(end - start)
-      await handle.read(buf, 0, buf.length, start)
-      const lines = (decodeCp1252(buf) + carry).split('\n')
-      carry = start > 0 ? (lines.shift() ?? '') : ''
-      for (let i = lines.length - 1; i >= 0; i--) {
-        if (!lines[i].includes('] You have entered ')) continue
-        const line = parseLogLine(lines[i].replace(/\r$/, ''))
-        const zone = line && zoneEntered(line.text)
-        if (zone) return zone
-      }
-    }
-    return ''
-  } catch (e) {
-    log.warn(`Could not read ${logPath} to find the zone:`, e)
-    return ''
-  } finally {
-    await handle.close()
-  }
+  return zone
 }

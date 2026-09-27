@@ -101,37 +101,3 @@ export async function characterArchives(archiveDir: string, stem: string): Promi
 export async function characterArchivePaths(archiveDir: string, stem: string): Promise<string[]> {
   return (await characterArchives(archiveDir, stem)).map((f) => join(archiveDir, f))
 }
-
-/**
- * Where to start reading a log to see every line stamped at or after `time`: the start of a line
- * stamped earlier, found by reading back from the end a chunk at a time. Log lines are written in
- * time order, so everything after that line is newer. 0 when the whole log is newer.
- */
-export async function offsetBefore(path: string, time: number, step = 1 << 20): Promise<number> {
-  const handle = await fs.open(path, 'r')
-  try {
-    const size = (await handle.stat()).size
-    for (let end = size; end > 0; end -= step) {
-      const start = Math.max(0, end - step)
-      const buf = Buffer.alloc(end - start)
-      await handle.read(buf, 0, buf.length, start)
-      const text = decodeCp1252(buf)
-      // The chunk's first piece may be the tail of a line that began in the chunk before.
-      let at = start === 0 ? 0 : text.indexOf('\n') + 1
-      if (at === 0 && start > 0) continue
-      while (at < text.length) {
-        const nl = text.indexOf('\n', at)
-        const line = parseLogLine(text.slice(at, nl < 0 ? undefined : nl).replace(/\r$/, ''))
-        if (line) {
-          if (line.time < time) return start + at
-          break
-        }
-        if (nl < 0) break
-        at = nl + 1
-      }
-    }
-    return 0
-  } finally {
-    await handle.close()
-  }
-}

@@ -4,7 +4,8 @@ import { CombatMeter, summarize as summarizeFight } from '../../core/combatMeter
 import { LootLedger } from '../../core/loot'
 import { RespawnLog, respawnView, type RespawnView } from '../../core/respawns'
 import { durationSec, fmtClock, fmtNum } from '../../core/combatView'
-import { offsetBefore, readLines } from '../logReading'
+import { readLines } from '../logReading'
+import { offsetBefore } from '../sources/logHistory'
 import { log } from '../log'
 import { Backlog, Throttled } from './throttle'
 import type { SpellBook } from '../../core/spells'
@@ -114,9 +115,9 @@ export class CombatFeed {
    * Recent fights: the live tailer starts at the end of the log, so the last `minutes` of it are read
    * here first, with live lines held back until the read is done. The meter's clock is held too, or
    * an old fight would be cut off mid-read. `attachedAt` answers where the tailer took over, -1 until
-   * it knows; `current` turns false when watching has moved on.
+   * it knows; `current` turns false when watching has moved on; `after` is a read to wait for first.
    */
-  async seed(logFile: string, attachedAt: () => number, current: () => boolean, minutes: number): Promise<void> {
+  async seed(logFile: string, attachedAt: () => number, current: () => boolean, minutes: number, after?: Promise<unknown>): Promise<void> {
     if (minutes <= 0 || this.backlog.active) return
     this.backlog.begin()
     this.meter.reading = `Reading the last ${minutes} minutes of the log…`
@@ -124,6 +125,8 @@ export class CombatFeed {
     this.combatOut.mark()
     this.lootOut.mark()
     try {
+      // Another read of the same log goes first (catching up on motes at start-up): one at a time.
+      await after
       // The tailer reads on from where it attached; history is everything before that.
       for (let i = 0; i < 200 && attachedAt() < 0 && current(); i++) await sleep(25)
       const end = attachedAt()

@@ -1,4 +1,5 @@
 import { app, Notification } from 'electron'
+import { rmSync } from 'node:fs'
 import { join } from 'node:path'
 import { Store } from './store'
 import { Engine } from './engine'
@@ -15,10 +16,11 @@ import { InventoryFiles } from './inventory'
 import { ItemCatalog } from './items'
 import { GameTables } from './stats'
 import { WikiCatalog } from './wikiCatalog'
-import { CastHistory } from './castHistory'
+import { CastHistory, castCounter, dayConsumer } from './castHistory'
 import { meleeCounter } from '../core/meleeTally'
 import { RecipeBook } from './recipes'
-import { PurchaseHistory } from './purchases'
+import { PurchaseHistory, purchaseConsumer } from './purchases'
+import { LogHistory } from './sources/logHistory'
 import { TradeFavorites } from './tradeFavorites'
 import { PetStore, PetWiki } from './pets'
 import { listLogs, logIsIn } from './game'
@@ -83,6 +85,14 @@ export function createContext(): AppContext {
   const azure = new AzureSpeech()
   const windows = new Windows({ preload: preloadPath, icon: appIcon, audioSettings: () => store.settings.get().audio })
   const toMain = windows.toMain.bind(windows)
+  // Casts, the melee tally and purchases over each character's log and archives, read in one pass.
+  // Each had a cache file of its own before; log-history.json replaces them.
+  for (const f of ['cast-history.json', 'melee-history.json', 'purchases.json']) rmSync(join(dataDir, f), { force: true })
+  const logHistory = new LogHistory(join(dataDir, 'log-history.json'), {
+    casts: dayConsumer(castCounter),
+    melee: dayConsumer(meleeCounter),
+    purchases: purchaseConsumer
+  })
 
   const ctx = {
     store,
@@ -94,10 +104,10 @@ export function createContext(): AppContext {
     achievementFiles: new AchievementFiles(installDir, (view) => toMain('state:achievements', view)),
     gameTables: new GameTables(installDir),
     wikiCatalog: new WikiCatalog((p) => toMain('state:catalog', p)),
-    castHistory: new CastHistory(join(dataDir, 'cast-history.json')),
-    meleeHistory: new CastHistory(join(dataDir, 'melee-history.json'), meleeCounter),
+    castHistory: new CastHistory(logHistory, 'casts'),
+    meleeHistory: new CastHistory(logHistory, 'melee'),
     recipeBook: new RecipeBook((p) => toMain('state:recipes', p)),
-    purchases: new PurchaseHistory(join(dataDir, 'purchases.json')),
+    purchases: new PurchaseHistory(logHistory, 'purchases'),
     tradeFavorites: new TradeFavorites(join(dataDir, 'tradeskills.json')),
     inventoryFiles: new InventoryFiles(installDir, new ItemCatalog(), (view) => toMain('state:inventory', view)),
     petStore: new PetStore(),

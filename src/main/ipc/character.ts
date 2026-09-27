@@ -1,9 +1,7 @@
-import { dirname, join } from 'node:path'
 import { handle } from './handle'
 import { log } from '../log'
 import { checkGameFolder } from '../game'
 import { readAasFromLog } from '../stats'
-import { scanPetLog } from '../pets'
 import { readMotesFromScreen, readStatsFromScreen } from '../screenRead'
 import { castableSpells, focusReport, focusSpec } from '../../core/itemFocus'
 import { meleeProfile } from '../../core/meleeTally'
@@ -128,9 +126,9 @@ export function registerCharacterIpc(ctx: AppContext): void {
     const book = engine.book
     if (!ctx.petScanned.has(character) && book) {
       ctx.petScanned.add(character)
-      const logFile = store.settings.get().logFile
-      const path = ctx.characterKey() === character ? logFile : join(dirname(logFile), `${logStem(character)}.txt`)
-      if (logFile) await ctx.petStore.merge(character, await scanPetLog(path, (name) => petSummonName(book, name)))
+      // The watched log is the character's own; another character's is in the game's Logs folder.
+      const path = ctx.characterKey() === character ? store.settings.get().logFile : logFileFor(ctx.installDir(), character)
+      await ctx.petStore.scan(character, path, (name) => petSummonName(book, name))
     }
     return { character, ...(await ctx.petStore.get(character)), spells: book ? petSpells(book, ids, lvl) : [], spellsLoaded: !!book }
   })

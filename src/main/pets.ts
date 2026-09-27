@@ -1,7 +1,9 @@
 import { app } from 'electron'
 import { promises as fs } from 'node:fs'
 import { join } from 'node:path'
-import { decodeCp1252, parseLogLine } from '../core/logLine'
+import { parseLogLine } from '../core/logLine'
+import { readBackward, identityOf } from './sources/logHistory'
+import { sameFile } from '../core/fileIdentity'
 import { CAST_BY_YOU } from '../core/phrases'
 import { PET_GEAR_HEAD, PetGearReader, parsePetGuide, parseSummonPage, type PetGearReading, type PetMelee, type PetProfile } from '../core/pets'
 import { log } from './log'
@@ -18,34 +20,23 @@ const TIMEOUT_MS = 15_000
 
 export type { PetState, PetSummon }
 
-
 /**
  * The last gear list and the last summoning cast in a log, read from its end backwards. Stops at the
- * start or after `maxBytes`.
+ * start, after `maxBytes`, or at `stopAt`: where the last scan of this file ended, since the live log
+ * has been followed from there.
  */
-export async function scanPetLog(logPath: string, isSummon: (name: string) => string | null, maxBytes = 256 << 20): Promise<PetState> {
+export async function scanPetLog(
+  logPath: string,
+  isSummon: (name: string) => string | null,
+  opts: { maxBytes?: number; stopAt?: number } = {}
+): Promise<PetState> {
   const out: PetState = { gear: null, summon: null }
-  let handle
+  // Lines after the one being looked at, nearest first: a gear list is found at its heading, after its items.
+  let after: string[] = []
   try {
-    handle = await fs.open(logPath, 'r')
-  } catch (e) {
-    if ((e as NodeJS.ErrnoException).code !== 'ENOENT') log.warn(`Could not open ${logPath} for the pet:`, e)
-    return out
-  }
-  const step = 1 << 20
-  try {
-    const size = (await handle.stat()).size
-    let carry = ''
-    // Lines after the one being looked at, nearest first: a gear list is found at its heading, after its items.
-    let after: string[] = []
-    for (let end = size; end > 0 && size - end < maxBytes && !(out.gear && out.summon); end -= step) {
-      const start = Math.max(0, end - step)
-      const buf = Buffer.alloc(end - start)
-      await handle.read(buf, 0, buf.length, start)
-      const lines = (decodeCp1252(buf) + carry).split('\n')
-      carry = start > 0 ? (lines.shift() ?? '') : ''
-      for (let i = lines.length - 1; i >= 0; i--) {
-        const raw = lines[i].replace(/\r$/, '')
+    await readBackward(
+      logPath,
+      (raw) => {
         if (!out.gear && raw.endsWith(PET_GEAR_HEAD)) {
           const head = parseLogLine(raw)
           if (head) {
@@ -68,31 +59,36 @@ export async function scanPetLog(logPath: string, isSummon: (name: string) => st
           const spell = name ? isSummon(name) : null
           if (spell && l) out.summon = { spell, at: l.time }
         }
-        if (out.gear && out.summon) break
+        if (out.gear && out.summon) return true
         after = [raw, ...after.slice(0, 24)]
-      }
-    }
+      },
+      { maxBytes: opts.maxBytes ?? PET_SCAN_MAX, stopAt: opts.stopAt }
+    )
   } catch (e) {
-    log.warn(`Could not read ${logPath} for the pet:`, e)
-  } finally {
-    await handle.close()
+    if ((e as NodeJS.ErrnoException).code !== 'ENOENT') log.warn(`Could not read ${logPath} for the pet:`, e)
   }
   return out
 }
 
+/** How far back a log is read for the pet: far enough for a session or two, not a whole year of log. */
+const PET_SCAN_MAX = 32 << 20
+
+/** A character's pet, and how far their log has been read back for it. */
+type PetRecord = PetState & { scanned?: { path: string; id: string; size: number } }
+
 /** pets.json: the newest gear list and summoning cast seen, per character. */
 export class PetStore {
-  private data: Record<string, PetState> | null = null
+  private data: Record<string, PetRecord> | null = null
 
   private get path(): string {
     return join(app.getPath('userData'), 'pets.json')
   }
 
-  private async load(): Promise<Record<string, PetState>> {
+  private async load(): Promise<Record<string, PetRecord>> {
     if (this.data) return this.data
     try {
       const v = JSON.parse(await fs.readFile(this.path, 'utf8')) as unknown
-      this.data = v && typeof v === 'object' && !Array.isArray(v) ? (v as Record<string, PetState>) : {}
+      this.data = v && typeof v === 'object' && !Array.isArray(v) ? (v as Record<string, PetRecord>) : {}
     } catch {
       this.data = {}
     }
@@ -101,17 +97,38 @@ export class PetStore {
 
   async get(character: string): Promise<PetState> {
     const d = await this.load()
-    return d[character] ?? { gear: null, summon: null }
+    const p = d[character]
+    return p ? { gear: p.gear, summon: p.summon } : { gear: null, summon: null }
+  }
+
+  /**
+   * Reads a character's log back for the pet, from the end to where the last scan of the same file
+   * stopped (the live log was followed from there), and keeps what it finds.
+   */
+  async scan(character: string, logPath: string, isSummon: (name: string) => string | null): Promise<void> {
+    const d = await this.load()
+    let st
+    try {
+      st = await fs.stat(logPath, { bigint: true })
+    } catch {
+      return
+    }
+    const now = { id: identityOf(st), size: Number(st.size) }
+    const was = d[character]?.scanned
+    const stopAt = was && was.path.toLowerCase() === logPath.toLowerCase() && sameFile(was, now) ? was.size : 0
+    const found = await scanPetLog(logPath, isSummon, { stopAt })
+    d[character] = { ...(d[character] ?? { gear: null, summon: null }), scanned: { path: logPath, ...now } }
+    await this.merge(character, found, true)
   }
 
   /** Keeps whichever of each is newer. Returns true when anything changed. */
-  async merge(character: string, next: Partial<PetState>): Promise<boolean> {
+  async merge(character: string, next: Partial<PetState>, save = false): Promise<boolean> {
     const d = await this.load()
     const cur = d[character] ?? { gear: null, summon: null }
     const gear = next.gear && (!cur.gear || next.gear.at >= cur.gear.at) ? next.gear : cur.gear
     const summon = next.summon && (!cur.summon || next.summon.at >= cur.summon.at) ? next.summon : cur.summon
-    if (gear === cur.gear && summon === cur.summon) return false
-    d[character] = { gear, summon }
+    if (gear === cur.gear && summon === cur.summon && !save) return false
+    d[character] = { ...cur, gear, summon }
     const tmp = this.path + '.tmp'
     try {
       await fs.writeFile(tmp, JSON.stringify(d, null, 2))
@@ -119,7 +136,7 @@ export class PetStore {
     } catch (e) {
       log.warn('Could not save pets.json:', e)
     }
-    return true
+    return gear !== cur.gear || summon !== cur.summon
   }
 }
 
