@@ -654,8 +654,9 @@ the sounds in `AudioTriggers`.
 | Path | What |
 |---|---|
 | `src/core` | Log parsing and tailing, spell book, duration model, spell tracker, triggers, archiver, log check, the damage meter (`combatLines` reads the lines, `combatMeter` keeps the fights, `combatView` sums them for display), the loot ledger (`loot`), motes (`motes` counts them, `moteCalc` plans item upgrades, `mergeValue` picks the best merge, `spellMotes` the best spell to upgrade). Plain TypeScript with no Electron dependency, so it is unit-tested directly |
+| `src/features` | Feature modules, one folder each (factions, progression): the feature's logic (`core.ts`), its main-process side (`main.ts`: the log-history consumer and what the page asks for) and its page (`page.tsx`). `index.ts` lists their pages for the sidebar |
 | `src/shared` | What both processes use: the IPC contract (`ipc.ts`), settings and view types, the game's tables (`game/`: classes, spell effect numbers, guide bonuses), the default overlays and hotkeys |
-| `src/main` | Electron main process: windows, tray, overlays, speech, icons, persistence, the engine that joins it all (`engine/`), the data sources and long jobs (`sources/`), IPC handlers by family (`ipc/`) |
+| `src/main` | Electron main process: windows, tray, overlays, speech, icons, persistence, the engine that joins it all (`engine/`, with the contract its parts keep in `feature.ts`), the data sources and long jobs (`sources/`), IPC handlers by family (`ipc/`) |
 | `src/preload` | The IPC bridge, which lets a page use only the channels in the contract |
 | `src/renderer` | The React UI (`index.html`), timer and meter overlays (`overlay.html`), the alerts overlay without React (`alerts.html`), the hidden audio mixer (`audio.html`) |
 | `tests` | Vitest; fixtures are real rows from the client's spell files and real lines from the test character's log |
@@ -666,6 +667,20 @@ apart. Core imports neither
 Electron nor another layer. Shared imports only types from core. The renderer imports no Node
 module, Electron, the main process or the preload. Main never imports the renderer. Type-only
 imports may cross, since they vanish at build.
+
+A feature module keeps one feature whole instead of spreading it over the layers: its three files
+each follow their own layer's rules (`core.ts` core's, `main.ts` main's, `page.tsx` the renderer's),
+so the page still cannot reach the main process. Its `main.ts` exports a `registerXxxIpc(ctx)` that
+`src/main/index.ts` calls with the other IPC families, and its log-history consumer is added in
+`src/main/context.ts`; its page's entry in `src/features/index.ts` (id, group, label, icon and the
+page it follows) is where the sidebar puts it. Inside the engine the same idea runs the live log:
+each part (the spell tracker, triggers, pet, motes, the combat feed, buffs, the status line and the
+views that go out) is an `EngineFeature` with optional `line`, `tick`, `reset` and `linesRead`
+hooks, and the engine hands every line, tick and change of character down one ordered list. The
+order is behaviour (the tracker sees a line before the triggers; the meter files a fight before the
+loot ledger looks for its session), so a new part goes in where it must run. Views pushed to the
+windows go through one `Throttled` (`engine/throttle.ts`): sent when changed, at most so often, with
+an optional heartbeat for work that must run on a beat anyway.
 
 ## Licence and credits
 

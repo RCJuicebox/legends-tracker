@@ -11,7 +11,7 @@ export default defineConfig({
     // npm run coverage: what the tests reach, for the code that is not the pages.
     coverage: {
       provider: 'v8',
-      include: ['src/core/**', 'src/main/**', 'src/shared/**'],
+      include: ['src/core/**', 'src/main/**', 'src/shared/**', 'src/features/*/core.ts', 'src/features/*/main.ts'],
       reporter: ['text-summary', 'html'],
       reportsDirectory: 'coverage'
     },

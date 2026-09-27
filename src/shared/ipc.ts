@@ -10,8 +10,8 @@ import type { AaSummary } from '../core/aa'
 import type { ArchiveOutcome } from '../core/archiver'
 import type { BuffView } from '../core/buffs'
 import type { EffectSpell } from '../core/itemEffects'
-import type { FactionView } from '../core/factions'
-import type { ProgressionView } from '../core/progression'
+import type { FactionView } from '../features/factions/core'
+import type { ProgressionView } from '../features/progression/core'
 import type { FocusReport } from '../core/itemFocus'
 import type { LootSnapshot } from '../core/loot'
 import type { MeleeProfile } from '../core/meleeTally'
@@ -447,7 +447,8 @@ const INVOKE_CHANNELS: Record<InvokeChannel, true> = {
   'overlays:demo': true,
   'combat:get': true,
   'combat:segment': true,
-  'combat:sessionTimeline': true, 'overlay:hostState': true,
+  'combat:sessionTimeline': true,
+  'overlay:hostState': true,
   'combat:newSession': true,
   'combat:addMember': true,
   'combat:removeMember': true,

@@ -1,13 +1,13 @@
 import { Fragment, useEffect, useMemo, useState } from 'react'
-import { ago } from '../api'
-import { useApp } from '../state'
-import { useInvoke } from '../hooks'
-import { useRemembered } from '../remember'
-import { usePickedCharacter } from '../character'
-import { useNow } from '../components/TimerBars'
-import { FilterBox, Info, Pending, SortTh, type Sort } from '../components/ui'
-import { who } from '../../../core/format'
-import type { FactionRow } from '../../../core/factions'
+import { ago } from '../../renderer/src/api'
+import { useApp } from '../../renderer/src/state'
+import { useInvoke } from '../../renderer/src/hooks'
+import { useRemembered } from '../../renderer/src/remember'
+import { usePickedCharacter } from '../../renderer/src/character'
+import { useNow } from '../../renderer/src/components/TimerBars'
+import { FilterBox, Info, Pending, SortTh, type Sort } from '../../renderer/src/components/ui'
+import { who } from '../../core/format'
+import type { FactionRow } from './core'
 
 // Faction changes the log recorded, from the character's log and its archives. The game never
 // prints a standing, only each change and when one can go no further, so this is the net of those.

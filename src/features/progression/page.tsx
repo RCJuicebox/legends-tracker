@@ -1,13 +1,13 @@
 import { useEffect, useMemo, useState } from 'react'
-import { ago, clock } from '../api'
-import { useApp } from '../state'
-import { useInvoke } from '../hooks'
-import { useRemembered } from '../remember'
-import { usePickedCharacter } from '../character'
-import { useNow } from '../components/TimerBars'
-import { FilterBox, Info, Pending, SortTh, Switch, type Sort } from '../components/ui'
-import { who } from '../../../core/format'
-import { RATE_MIN_MS, SESSION_GAP_MS, type AaPurchase, type ProgressionView, type SessionRow, type SkillTally } from '../../../core/progression'
+import { ago, clock } from '../../renderer/src/api'
+import { useApp } from '../../renderer/src/state'
+import { useInvoke } from '../../renderer/src/hooks'
+import { useRemembered } from '../../renderer/src/remember'
+import { usePickedCharacter } from '../../renderer/src/character'
+import { useNow } from '../../renderer/src/components/TimerBars'
+import { FilterBox, Info, Pending, SortTh, Switch, type Sort } from '../../renderer/src/components/ui'
+import { who } from '../../core/format'
+import { RATE_MIN_MS, SESSION_GAP_MS, type AaPurchase, type ProgressionView, type SessionRow, type SkillTally } from './core'
 
 // What the log recorded of a character's progress, from its log and its archives: levels, skill-ups,
 // AA points and purchases, and each session's experience. EQL prints no experience amounts, so

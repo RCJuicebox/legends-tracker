@@ -2,7 +2,7 @@ import { memo, useEffect, type ComponentType } from 'react'
 import { createRoot } from 'react-dom/client'
 import './styles.css'
 import { StateProvider, useApp, useLive } from './state'
-import { Icon } from './components/ui'
+import { Icon, type IconName } from './components/ui'
 import { ErrorBoundary } from './components/ErrorBoundary'
 import { Jobs } from './components/Jobs'
 import { ago } from './api'
@@ -20,19 +20,21 @@ import { Audio } from './pages/Audio'
 import { Logs } from './pages/Logs'
 import { Settings } from './pages/Settings'
 import { Achievements } from './pages/Achievements'
-import { Factions } from './pages/Factions'
 import { Gear } from './pages/Gear'
 import { Upgrades } from './pages/Upgrades'
 import { Stats } from './pages/Stats'
-import { Progression } from './pages/Progression'
 import { Loot } from './pages/Loot'
 import { Respawns } from './pages/Respawns'
 import { Tradeskills } from './pages/Tradeskills'
 import { Buffs } from './pages/Buffs'
 import { DamageMeter } from './pages/DamageMeter'
 import { DataSources } from './pages/DataSources'
+import { FEATURE_PAGES, type FeaturePageId } from '../../features'
+import { Factions } from '../../features/factions/page'
+import { Progression } from '../../features/progression/page'
 
-const PAGES = [
+/** The pages that are not feature modules, in sidebar order. */
+const SHELL_PAGES = [
   { id: 'dashboard', group: 'Play', label: 'Live', icon: 'dashboard', el: Dashboard },
   { id: 'meter', group: 'Play', label: 'Damage Meter', icon: 'meter', el: DamageMeter },
   { id: 'buffs', group: 'Play', label: 'Buffs', icon: 'sparkle', el: Buffs },
@@ -42,9 +44,7 @@ const PAGES = [
   { id: 'respawns', group: 'Play', label: 'Respawns', icon: 'respawn', el: Respawns },
   { id: 'tradeskills', group: 'Play', label: 'Tradeskills', icon: 'flask', el: Tradeskills },
   { id: 'achievements', group: 'Character', label: 'Achievements', icon: 'trophy', el: Achievements },
-  { id: 'factions', group: 'Character', label: 'Factions', icon: 'flag', el: Factions },
   { id: 'stats', group: 'Character', label: 'Stats', icon: 'stats', el: Stats },
-  { id: 'progression', group: 'Character', label: 'Progression', icon: 'sparkle', el: Progression },
   { id: 'gear', group: 'Character', label: 'Gear', icon: 'bag', el: Gear },
   { id: 'upgrades', group: 'Character', label: 'Upgrades', icon: 'motes', el: Upgrades },
   { id: 'triggers', group: 'Setup', label: 'Triggers', icon: 'triggers', el: Triggers },
@@ -55,7 +55,30 @@ const PAGES = [
   { id: 'settings', group: 'Setup', label: 'Settings', icon: 'settings', el: Settings }
 ] as const
 
-export type PageId = (typeof PAGES)[number]['id']
+export type PageId = (typeof SHELL_PAGES)[number]['id'] | FeaturePageId
+
+type PageComponent = ComponentType<{ go: (p: PageId) => void }>
+
+/** Each feature module's page (src/features/<name>/page.tsx), by id. */
+const FEATURE_ELEMENTS: Record<FeaturePageId, PageComponent> = { factions: Factions, progression: Progression }
+
+interface PageEntry {
+  id: PageId
+  group: string
+  label: string
+  icon: IconName
+  el: PageComponent
+}
+
+/** Every page, in sidebar order: each feature's page goes in after the page its entry names. */
+const PAGES: readonly PageEntry[] = (() => {
+  const pages: PageEntry[] = [...SHELL_PAGES]
+  for (const f of FEATURE_PAGES) {
+    const at = pages.findIndex((p) => p.id === f.after)
+    pages.splice(at < 0 ? pages.length : at + 1, 0, { ...f, el: FEATURE_ELEMENTS[f.id] })
+  }
+  return pages
+})()
 
 /** How many timers run, beside Live in the sidebar. */
 function TimerCount() {
@@ -79,7 +102,7 @@ function WatchFoot() {
 }
 
 /** The open page, rendered again only when it asks to be, not whenever the shell is. */
-const PageHost = memo(function PageHost({ Page, go }: { Page: ComponentType<{ go: (p: PageId) => void }>; go: (p: PageId) => void }) {
+const PageHost = memo(function PageHost({ Page, go }: { Page: PageComponent; go: (p: PageId) => void }) {
   return <Page go={go} />
 })
 
@@ -90,7 +113,7 @@ function Shell() {
   // 'inventory' was Gear's first name.
   const wanted = saved === 'inventory' ? 'gear' : saved
   const page = (PAGES.some((p) => p.id === wanted) ? wanted : 'dashboard') as PageId
-  const Page = PAGES.find((p) => p.id === page)!.el as ComponentType<{ go: (p: PageId) => void }>
+  const Page = PAGES.find((p) => p.id === page)!.el
   const update = useUpdate()
   const unsaved = useUnsaved()
   // Arranging the overlays at all, from the tray, a page or the hotkey, is placing them (Live's checklist).

@@ -13,6 +13,8 @@ import { registerPlayIpc } from './ipc/play'
 import { registerAudioIpc } from './ipc/audio'
 import { registerCharacterIpc } from './ipc/character'
 import { registerDemoIpc } from './demo'
+import { registerFactionIpc } from '../features/factions/main'
+import { registerProgressionIpc } from '../features/progression/main'
 import { appUserModelId, ensureSourceShortcut } from './appIdentity'
 import { appIcon } from './bootstrap'
 import { isOwnPage } from './push'
@@ -50,7 +52,18 @@ async function start(ctx: AppContext): Promise<void> {
     const png = !Number.isFinite(n) ? null : url.hostname === 'item' ? await ctx.icons.itemPng(n) : await ctx.icons.png(n)
     return png ? new Response(new Uint8Array(png), { headers: { 'content-type': 'image/png', 'cache-control': 'max-age=86400' } }) : new Response(null, { status: 404 })
   })
-  for (const register of [registerAppIpc, registerTriggerIpc, registerSpellIpc, registerLogIpc, registerPlayIpc, registerAudioIpc, registerCharacterIpc, registerDemoIpc]) {
+  for (const register of [
+    registerAppIpc,
+    registerTriggerIpc,
+    registerSpellIpc,
+    registerLogIpc,
+    registerPlayIpc,
+    registerAudioIpc,
+    registerCharacterIpc,
+    registerFactionIpc,
+    registerProgressionIpc,
+    registerDemoIpc
+  ]) {
     register(ctx)
   }
   // The tray comes first: closing the window hides it, so without a tray icon a failed start below

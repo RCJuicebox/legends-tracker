@@ -1,4 +1,4 @@
-import type { LogLine } from './logLine'
+import type { LogLine } from '../../core/logLine'
 
 // A character's progression, from the lines the game writes about it:
 //   You have gained a level! Welcome to level 44!          (older wording: "You have reached level 44")

@@ -2,9 +2,9 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { promises as fs } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { addProgressLine, emptyProgress, joinProgress, parseProgressLine, progressionView, RATE_MIN_MS, SESSION_GAP_MS, type ProgressTally } from '../src/core/progression'
-import { progressionConsumer, ProgressionHistory } from '../src/main/progression'
-import { factionConsumer } from '../src/main/factions'
+import { addProgressLine, emptyProgress, joinProgress, parseProgressLine, progressionView, RATE_MIN_MS, SESSION_GAP_MS, type ProgressTally } from '../src/features/progression/core'
+import { progressionConsumer, ProgressionHistory } from '../src/features/progression/main'
+import { factionConsumer } from '../src/features/factions/main'
 import { LogHistory } from '../src/main/sources/logHistory'
 
 const T0 = Date.UTC(2026, 8, 27, 12, 0, 0)

@@ -24,6 +24,7 @@ import { BuffCoordinator } from './buffs'
 import { CombatFeed } from './combat'
 import { MoteCatchUp } from './moteCatchUp'
 import { Throttled } from './throttle'
+import type { EngineFeature } from './feature'
 import type {
   AppSettings,
   ArchiveStatus,
@@ -41,6 +42,7 @@ import type { EngineEnv, EngineOutputs, EngineStore, LootView, MoteView, Speaker
 import { jobs } from '../sources/jobs'
 
 export type { AudioCommand, EngineEnv, EngineOutputs, EngineStore, LootView, MoteScanner, MoteView, Speaker } from './contracts'
+export type { EngineFeature } from './feature'
 export { workerScanner } from './moteCatchUp'
 
 interface Tail {
@@ -87,6 +89,8 @@ export class Engine {
   private readonly motesOut: Throttled
   /** Size and last-line time change with every write; they go out at most once a second. */
   private readonly statusOut: Throttled
+  /** What follows the log, in the order each line, tick and change of character reaches it (see buildFeatures). */
+  private readonly features: readonly EngineFeature[]
 
   private tail: Tail | null = null
   /** Bumped by every start and stop, so a start overtaken while it waited gives up. */
@@ -173,6 +177,39 @@ export class Engine {
       gameRunning: () => this.archive.gameRunning,
       changed: () => this.motesOut.mark()
     })
+    this.features = this.buildFeatures()
+  }
+
+  /**
+   * The parts that follow the log, in order. A line goes to the spell tracker, the triggers, the pet
+   * reader, mote history, the combat feed and then the status line; a tick to the timer board, the pet
+   * reader, motes, the combat feed and buffs, and then the views that go out; a change of character
+   * clears the timers and then the fights. The order matters, so it is kept as it was written by hand.
+   */
+  private buildFeatures(): EngineFeature[] {
+    const output = (id: string, out: Throttled): EngineFeature => ({ id, tick: (now) => out.tick(now) })
+    return [
+      { id: 'timers', tick: (now) => this.board.tick(now), reset: () => this.board.clear() },
+      // The tracker is made when spell data loads, and made again when it reloads: this entry follows the current one.
+      { id: 'spells', line: (line) => this.tracker?.handle(line) },
+      { id: 'triggers', line: (line) => this.triggers.handle(line) },
+      { id: 'pet', line: (line) => this.petLine(line), tick: (now) => this.petReader.tick(now) },
+      { id: 'motes', tick: (now) => this.motes.tick(now) },
+      { id: 'moteHistory', line: (line) => this.moteHistory.live(line), linesRead: (logFile, end) => this.moteHistory.linesRead(logFile, end) },
+      { id: 'combat', line: (line) => this.combat.live(line), tick: (now) => this.combat.tick(now), reset: () => this.combat.reset() },
+      { id: 'buffs', tick: (now) => this.buffs.tick(now) },
+      output('motes:out', this.motesOut),
+      {
+        id: 'status',
+        line: (line) => {
+          this.status.lastLineAt = line.time
+          this.statusOut.mark()
+          if (this.status.elsewhere) this.status.elsewhere = null
+        },
+        tick: (now) => this.statusOut.tick(now)
+      },
+      output('timers:out', this.timersOut)
+    ]
   }
 
   get settings(): AppSettings {
@@ -317,8 +354,7 @@ export class Engine {
     if (this.watchedLog && !samePath(this.watchedLog, logFile)) {
       // Another character: nothing the last one had running applies any more.
       const n = this.board.list().length
-      this.board.clear()
-      this.combat.reset()
+      for (const f of this.features) f.reset?.()
       if (n) this.pushFeed('info', `Switched to ${basename(logFile)}; cleared ${n} timer${n === 1 ? '' : 's'}.`)
     }
     this.watchedLog = logFile
@@ -434,16 +470,9 @@ export class Engine {
     for (const raw of lines) {
       const line = t.clock.parse(raw)
       if (!line) continue
-      this.tracker?.handle(line)
-      this.triggers.handle(line)
-      this.petLine(line)
-      this.moteHistory.live(line)
-      this.combat.live(line)
-      this.status.lastLineAt = line.time
-      this.statusOut.mark()
-      if (this.status.elsewhere) this.status.elsewhere = null
+      for (const f of this.features) f.line?.(line)
     }
-    this.moteHistory.linesRead(t.logFile, end)
+    for (const f of this.features) f.linesRead?.(t.logFile, end)
   }
 
   /** What the pet wears and which pet it is, as the log tells it. */
@@ -479,14 +508,7 @@ export class Engine {
 
   private tick(): void {
     const now = Date.now()
-    this.board.tick(now)
-    this.petReader.tick(now)
-    this.motes.tick(now)
-    this.combat.tick(now)
-    this.buffs.tick(now)
-    this.motesOut.tick(now)
-    this.statusOut.tick(now)
-    this.timersOut.tick(now)
+    for (const f of this.features) f.tick?.(now)
   }
 
   // ---- output ----

@@ -1,14 +1,27 @@
 // Two small shapes the engine repeats: a view pushed at most so often, and live lines held back while
 // history is read.
 
-/** A view that goes out when it has changed, no more than once per `minMs`. */
+/** Work a throttled view does on a steady beat, whether or not anything changed. */
+export interface Heartbeat {
+  /** It runs at least this often. */
+  everyMs: number
+  /** Runs at each beat and before each send, and may mark the view changed. */
+  beat: (now: number) => void
+}
+
+/**
+ * A view that goes out when it has changed, no more than once per `minMs`. With a heartbeat, the
+ * beat also runs whenever `everyMs` has passed since the last time, changed or not; a view it marks
+ * changed goes out with it.
+ */
 export class Throttled {
   private dirty = false
   private sentAt = 0
 
   constructor(
     private readonly minMs: number,
-    private readonly send: () => void
+    private readonly send: () => void,
+    private readonly heartbeat?: Heartbeat
   ) {}
 
   /** Something in the view changed. */
@@ -16,11 +29,14 @@ export class Throttled {
     this.dirty = true
   }
 
-  /** Sends if it changed and the wait is over. */
+  /** Beats if the beat is due, and sends if it changed and the wait is over. */
   tick(now: number): void {
-    if (!this.dirty || now - this.sentAt <= this.minMs) return
-    this.dirty = false
+    const waited = now - this.sentAt
+    if (!((this.dirty && waited > this.minMs) || (this.heartbeat && waited > this.heartbeat.everyMs))) return
     this.sentAt = now
+    this.heartbeat?.beat(now)
+    if (!this.dirty) return
+    this.dirty = false
     this.send()
   }
 

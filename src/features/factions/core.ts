@@ -1,4 +1,4 @@
-import type { LogLine } from './logLine'
+import type { LogLine } from '../../core/logLine'
 
 // Faction changes, from the only lines the game writes about them:
 //   Your faction standing with King Ak`Anon has been adjusted by -1.

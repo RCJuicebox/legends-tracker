@@ -18,7 +18,9 @@
   },
   // The layers (README › Layout): core is plain logic that runs anywhere; shared is the tables and
   // types both processes use; main is Electron's main process; the renderer is the pages. Type
-  // imports cross freely, since they vanish at build.
+  // imports cross freely, since they vanish at build. A feature module (src/features/<name>/) has one
+  // file per layer, and each follows its layer's rules: core.ts core's, main.ts main's, page.tsx and
+  // the list of pages (index.ts) the renderer's.
   "overrides": [
     {
       "files": ["src/core/**"],
@@ -27,7 +29,29 @@
           "error",
           {
             "paths": [{ "name": "electron", "message": "core runs outside Electron too (tests, workers): pass what it needs in." }],
-            "patterns": [{ "group": ["../main", "../main/*", "../renderer/*", "../preload/*"], "message": "core may not import main, the renderer or the preload." }]
+            "patterns": [
+              {
+                "group": ["../main", "../main/**", "../renderer/**", "../preload/**", "../features/*/main", "../features/*/page"],
+                "message": "core may not import main, the renderer or the preload."
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "files": ["src/features/*/core.ts"],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "paths": [{ "name": "electron", "message": "core runs outside Electron too (tests, workers): pass what it needs in." }],
+            "patterns": [
+              {
+                "group": ["../../main", "../../main/**", "../../renderer/**", "../../preload/**", "./main", "./page", "../*/main", "../*/page"],
+                "message": "core may not import main, the renderer or the preload."
+              }
+            ]
           }
         ]
       }
@@ -39,7 +63,11 @@
           "error",
           {
             "patterns": [
-              { "group": ["../core/*", "../main/*", "../renderer/*"], "allowTypeImports": true, "message": "shared holds tables and types: import types only from core." }
+              {
+                "group": ["../core/**", "../main/**", "../renderer/**", "../features/**"],
+                "allowTypeImports": true,
+                "message": "shared holds tables and types: import types only from core."
+              }
             ]
           }
         ]
@@ -55,7 +83,35 @@
             "patterns": [
               { "group": ["node:*", "fs", "path", "os", "child_process"], "allowTypeImports": true, "message": "The renderer is a browser page: ask the main process." },
               {
-                "group": ["../../main/*", "../../../main/*", "../../../../main/*", "../../preload/*", "../../../preload/*"],
+                "group": [
+                  "../../main/**",
+                  "../../../main/**",
+                  "../../../../main/**",
+                  "../../preload/**",
+                  "../../../preload/**",
+                  "../../features/*/main",
+                  "../../../features/*/main",
+                  "../../../../features/*/main"
+                ],
+                "allowTypeImports": true,
+                "message": "The renderer may not import the main process or the preload."
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "files": ["src/features/*/page.tsx", "src/features/index.ts"],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "paths": [{ "name": "electron", "message": "The renderer reaches Electron through the preload bridge (api.ts)." }],
+            "patterns": [
+              { "group": ["node:*", "fs", "path", "os", "child_process"], "allowTypeImports": true, "message": "The renderer is a browser page: ask the main process." },
+              {
+                "group": ["../main/**", "../../main/**", "../preload/**", "../../preload/**", "./main", "../*/main", "./*/main"],
                 "allowTypeImports": true,
                 "message": "The renderer may not import the main process or the preload."
               }
@@ -70,9 +126,20 @@
         "no-restricted-imports": [
           "error",
           {
-            "patterns": [{ "group": ["../renderer/*", "../../renderer/*", "../../../renderer/*"], "message": "The main process may not import the renderer." }]
+            "patterns": [
+              {
+                "group": ["../renderer/**", "../../renderer/**", "../../../renderer/**", "../features/*/page", "../../features/*/page", "../../../features/*/page"],
+                "message": "The main process may not import the renderer."
+              }
+            ]
           }
         ]
+      }
+    },
+    {
+      "files": ["src/features/*/main.ts"],
+      "rules": {
+        "no-restricted-imports": ["error", { "patterns": [{ "group": ["../../renderer/**", "./page", "../*/page"], "message": "The main process may not import the renderer." }] }]
       }
     }
   ],

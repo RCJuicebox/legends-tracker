@@ -21,9 +21,9 @@ import { CastHistory, castCounter, dayConsumer } from './castHistory'
 import { meleeCounter } from '../core/meleeTally'
 import { RecipeBook } from './recipes'
 import { PurchaseHistory, purchaseConsumer } from './purchases'
-import { FactionHistory, factionConsumer } from './factions'
-import { ProgressionHistory, progressionConsumer } from './progression'
-import { LogHistory } from './sources/logHistory'
+import { FactionHistory, factionConsumer } from '../features/factions/main'
+import { ProgressionHistory, progressionConsumer } from '../features/progression/main'
+import { LogHistory, type HistoryWhere } from './sources/logHistory'
 import { TradeFavorites } from './tradeFavorites'
 import { PetStore, PetWiki } from './pets'
 import { listLogs, logIsIn } from './game'
@@ -36,6 +36,7 @@ import { settingsSummary } from './diagnostics'
 import type { AppSettings, Trigger, WatchStatus } from '../shared/types'
 import type { AudioDevice } from '../shared/ipc'
 import { cacheDir } from './paths'
+import { logFileFor, logStem } from './storeCore'
 
 /**
  * Everything the main process runs, built once. The IPC handlers, the lifecycle and the start-up all
@@ -75,6 +76,8 @@ export interface AppContext {
   installDir(): string
   /** The character being played: `Name_server`, or '' with no log chosen. */
   characterKey(): string
+  /** A character's log, with its archives: where the log-history pages read from. */
+  historyOf(character: string): HistoryWhere
   /** Stores settings and makes everything follow them: overlays, audio, priority, the engine. */
   saveSettings(next: AppSettings): AppSettings
   /** Stores the trigger list and makes the engine use it. */
@@ -233,6 +236,7 @@ export function createContext(): AppContext {
   )
 
   ctx.characterKey = () => ctx.engine.characterKey()
+  ctx.historyOf = (character) => ({ logPath: logFileFor(installDir(), character), archiveDir: ctx.engine.archiveDir(), stem: logStem(character) })
 
   ctx.refreshOverlayVisibility = () =>
     ctx.overlays.setShown(

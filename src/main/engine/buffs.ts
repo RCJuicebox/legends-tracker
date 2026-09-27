@@ -9,6 +9,7 @@ import type { MyClass } from '../../core/spellMotes'
 import type { EngineStore } from './contracts'
 import type { Notifier } from './notifier'
 import type { SpellQueries } from './spellQueries'
+import { Throttled } from './throttle'
 
 /** Warned this long before someone else's buff on you is due to fade: time to ask for it again. */
 const BUFF_WARN_SEC = 60
@@ -31,8 +32,8 @@ export interface BuffHooks {
 export class BuffCoordinator {
   readonly watch: BuffWatch
   private offers: BuffOffer[] = []
-  private dirty = false
-  private sentAt = 0
+  /** Prunes and reminds every five seconds; the page hears within a second of a change. */
+  private readonly out: Throttled
   /** The last "ask for" told, and when, so it is not said again every few seconds. */
   private lastAsk = { text: '', at: 0 }
   /** Groupmates the player has been told to /who, once each. */
@@ -47,6 +48,13 @@ export class BuffCoordinator {
     private readonly notifier: Notifier,
     private readonly hooks: BuffHooks
   ) {
+    this.out = new Throttled(1000, () => this.hooks.send(this.view()), {
+      everyMs: 5000,
+      beat: (now) => {
+        this.watch.prune(now)
+        this.remind(now)
+      }
+    })
     this.watch = new BuffWatch([], {
       seconds: (spell, rank, caster) => this.buffSeconds(spell, rank, caster),
       onChange: () => this.changed(),
@@ -68,14 +76,14 @@ export class BuffCoordinator {
   setBook(book: SpellBook): void {
     this.offers = buffOffers(book, this.settings.tracking.tierDurationPct)
     this.watch.setBook(book, this.offers)
-    this.dirty = true
+    this.out.mark()
   }
 
   /** Watching a character's log: their own buffs, the ones the last run saw on them, still running. */
   follow(key: string, now: number): void {
     this.watch.active = this.store.buffs.get().active[key] ?? []
     this.watch.prune(now)
-    this.dirty = true
+    this.out.mark()
   }
 
   handle(text: string, time: number): void {
@@ -91,20 +99,13 @@ export class BuffCoordinator {
 
   /** The group roster was changed by hand: the buff plan is built on it, so the page hears at once. */
   groupChanged(): void {
-    this.dirty = true
+    this.out.mark()
     this.lastAsk = { text: '', at: 0 }
   }
 
   /** Prunes and reminds every five seconds; the page hears within a second of a change. */
   tick(now: number): void {
-    if (now - this.sentAt <= 5000 && !(this.dirty && now - this.sentAt > 1000)) return
-    this.sentAt = now
-    this.watch.prune(now)
-    this.remind(now)
-    if (this.dirty) {
-      this.dirty = false
-      this.hooks.send(this.view())
-    }
+    this.out.tick(now)
   }
 
   private get wanted(): string[] {
@@ -175,7 +176,7 @@ export class BuffCoordinator {
     else delete wanted[key]
     this.store.buffs.set({ ...f, wanted })
     this.lastAsk = { text: '', at: 0 }
-    this.dirty = true
+    this.out.mark()
     return this.view()
   }
 
@@ -194,7 +195,7 @@ export class BuffCoordinator {
     const f = this.store.buffs.get()
     const key = this.characterKey()
     if (key) this.store.buffs.set({ ...f, active: { ...f.active, [key]: this.watch.active } })
-    this.dirty = true
+    this.out.mark()
   }
 
   private learnPerson(p: Person): void {
@@ -202,7 +203,7 @@ export class BuffCoordinator {
     const k = p.name.toLowerCase()
     if (f.people[k] && f.people[k].at >= p.at) return
     this.store.buffs.set({ ...f, people: { ...f.people, [k]: p } })
-    this.dirty = true
+    this.out.mark()
   }
 
   /** Someone else's buff on you: a timer on the buffs overlay, with a word before it fades. Only when group buffs are turned on. */

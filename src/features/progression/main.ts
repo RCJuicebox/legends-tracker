@@ -1,5 +1,8 @@
-import { addProgressLine, emptyProgress, joinProgress, progressionView, type ProgressionView, type ProgressTally } from '../core/progression'
-import type { HistoryConsumer, HistoryWhere, LogHistory } from './sources/logHistory'
+import { addProgressLine, emptyProgress, joinProgress, progressionView, type ProgressionView, type ProgressTally } from './core'
+import { handle } from '../../main/ipc/handle'
+import { isCharacterKey } from '../../core/validate'
+import type { HistoryConsumer, HistoryWhere, LogHistory } from '../../main/sources/logHistory'
+import type { AppContext } from '../../main/context'
 
 // A character's progression (levels, skill-ups, AA points and purchases, and each session's
 // experience lines), over the log and its archives, for the Progression page. The reading is LogHistory's.
@@ -23,4 +26,13 @@ export class ProgressionHistory {
     // Archives oldest first, then the live log.
     return progressionView(joinProgress([...slice.archives.map((a) => a.value), slice.live]), now)
   }
+}
+
+export function registerProgressionIpc(ctx: AppContext): void {
+  // Levels, skill-ups, AA points and purchases, and the sessions of play, over the character's log and its archives.
+  handle('progression:get', async (character) => {
+    if (!isCharacterKey(character)) throw new Error('Not a character.')
+    if (!ctx.installDir()) return progressionView(emptyProgress(), Date.now())
+    return ctx.progression.view(ctx.historyOf(character))
+  })
 }

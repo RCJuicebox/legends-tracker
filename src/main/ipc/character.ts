@@ -7,38 +7,24 @@ import { castableSpells, focusReport, focusSpec } from '../../core/itemFocus'
 import { meleeProfile } from '../../core/meleeTally'
 import { craftEras } from '../../core/tradeskills'
 import { petSpells, petSummonName } from '../../core/pets'
-import { emptyProgress, progressionView } from '../../core/progression'
 import type { EffectSpell } from '../../core/itemEffects'
 import { isCharacterKey, sanitizeSheet } from '../../core/validate'
-import { logFileFor, logStem } from '../storeCore'
+import { logFileFor } from '../storeCore'
 import type { AppContext } from '../context'
 import type { CatalogFile } from '../../shared/ipc'
 
-// A character's files and what is looked up for them: achievements, factions, progression, inventory, the sheet,
-// gear (catalog, focus, worn effects), the pet, tradeskills and the Stats page's tables and screen reads.
+// A character's files and what is looked up for them: achievements, inventory, the sheet, gear (catalog,
+// focus, worn effects), the pet, tradeskills and the Stats page's tables and screen reads. Factions and
+// progression answer from their feature folders (src/features).
 
 export function registerCharacterIpc(ctx: AppContext): void {
   const { store, engine } = ctx
   /** A character's log, with its archives: where cast and melee history are read from. */
-  const history = (character: string) => ({ logPath: logFileFor(ctx.installDir(), character), archiveDir: engine.archiveDir(), stem: logStem(character) })
+  const history = (character: string) => ctx.historyOf(character)
 
   handle('achievements:characters', async () => ({ current: ctx.characterKey(), available: (await checkGameFolder(ctx.installDir())).achievements }))
   handle('achievements:load', (character) => ctx.achievementFiles.load(character))
   handle('achievements:marks', (character, marks) => ctx.achievementFiles.saveMarks(character, marks))
-
-  // Faction changes, over the character's log and its archives.
-  handle('factions:get', async (character) => {
-    if (!isCharacterKey(character)) throw new Error('Not a character.')
-    if (!ctx.installDir()) return { factions: [] }
-    return ctx.factions.view(history(character))
-  })
-
-  // Levels, skill-ups, AA points and purchases, and the sessions of play, over the character's log and its archives.
-  handle('progression:get', async (character) => {
-    if (!isCharacterKey(character)) throw new Error('Not a character.')
-    if (!ctx.installDir()) return progressionView(emptyProgress(), Date.now())
-    return ctx.progression.view(history(character))
-  })
 
   // Which characters have a given export, and which one is being played.
   handle('character:exports', async () => {

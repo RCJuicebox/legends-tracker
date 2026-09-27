@@ -1,5 +1,8 @@
-import { addFactionLine, factionView, joinFactions, type FactionTallies, type FactionView } from '../core/factions'
-import type { HistoryConsumer, HistoryWhere, LogHistory } from './sources/logHistory'
+import { addFactionLine, factionView, joinFactions, type FactionTallies, type FactionView } from './core'
+import { handle } from '../../main/ipc/handle'
+import { isCharacterKey } from '../../core/validate'
+import type { HistoryConsumer, HistoryWhere, LogHistory } from '../../main/sources/logHistory'
+import type { AppContext } from '../../main/context'
 
 // A character's faction changes, from "Your faction standing with X has been adjusted by N." and
 // the cap lines, over the log and its archives, for the Factions page. The reading is LogHistory's.
@@ -23,4 +26,13 @@ export class FactionHistory {
     // Archives oldest first, then the live log.
     return factionView(joinFactions([...slice.archives.map((a) => a.value), slice.live]))
   }
+}
+
+export function registerFactionIpc(ctx: AppContext): void {
+  // Faction changes, over the character's log and its archives.
+  handle('factions:get', async (character) => {
+    if (!isCharacterKey(character)) throw new Error('Not a character.')
+    if (!ctx.installDir()) return { factions: [] }
+    return ctx.factions.view(ctx.historyOf(character))
+  })
 }
