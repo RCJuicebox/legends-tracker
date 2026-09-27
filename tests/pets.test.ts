@@ -222,4 +222,15 @@ describe('pet gear optimizer', () => {
     expect(plan.chosen.map((c) => c.piece.item.name)).toEqual(['Plate Chest'])
     expect(plan.total - plan.current).toBe((30 - 5) * 5)
   })
+  it('gives a pet holding a two-hander no shield, not even in the Back slot it fits', () => {
+    const twoHander = piece('Big Axe', ['Slot: PRIMARY', 'Skill: 2H Slashing Atk Delay: 43', 'DMG: 57', 'Class: SHD'])
+    const shield = piece('Chetari Bonecrafted Shield', ['Slot: BACK SECONDARY', 'AC: 19', 'Class: SHD'])
+    const cloak = piece('Plain Cloak', ['Slot: BACK', 'AC: 2', 'Class: ALL'])
+    const plan = optimizePetGear({ pieces: [twoHander, shield, cloak], current: [], capacity: 3, wearer, weights, melee: wolf, level: 36 })
+    const names = plan.chosen.map((c) => c.piece.item.name)
+    expect(names.includes('Big Axe') && names.includes('Chetari Bonecrafted Shield')).toBe(false)
+    // With no two-hander the shield is fine in the Back slot.
+    const noAxe = optimizePetGear({ pieces: [shield, cloak], current: [], capacity: 3, wearer, weights, melee: wolf, level: 36 })
+    expect(noAxe.chosen.map((c) => c.piece.item.name)).toContain('Chetari Bonecrafted Shield')
+  })
 })

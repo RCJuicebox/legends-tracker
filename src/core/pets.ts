@@ -362,6 +362,12 @@ export function statScorer(weights: Weights): (p: PetPiece) => number {
   }
 }
 
+/**
+ * A shield: made for the off hand, and no weapon. A pet holding a two-hander will not take one in any
+ * slot, the Back included for the shields that also fit there.
+ */
+const isShield = (p: PetPiece) => p.r.slots.includes('SECONDARY') && !p.r.skill
+
 function fits(chosen: PetChoice[], c: PetChoice, capacity: number): boolean {
   if (chosen.length >= capacity) return false
   if (chosen.some((x) => x.piece === c.piece)) return false
@@ -369,7 +375,8 @@ function fits(chosen: PetChoice[], c: PetChoice, capacity: number): boolean {
   if (chosen.filter((x) => x.slot === c.slot).length >= (PET_SLOT_CAPACITY[c.slot] ?? 0)) return false
   const pri = c.slot === 'Primary' ? c.piece : chosen.find((x) => x.slot === 'Primary')?.piece
   const hasSec = c.slot === 'Secondary' || chosen.some((x) => x.slot === 'Secondary')
-  return !(pri && isTwoHanded(pri.r) && hasSec)
+  const hasShield = isShield(c.piece) || chosen.some((x) => isShield(x.piece))
+  return !(pri && isTwoHanded(pri.r) && (hasSec || hasShield))
 }
 
 /**
