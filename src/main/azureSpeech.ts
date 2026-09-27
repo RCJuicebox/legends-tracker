@@ -206,9 +206,14 @@ export class VoiceRouter {
   private warned = false
 
   constructor(
-    private readonly windows: Pick<SpeechWorker, 'synthesize'>,
+    private readonly windows: Pick<SpeechWorker, 'synthesize' | 'warm'>,
     private readonly azure: AzureSpeech
   ) {}
+
+  /** Gets the Windows engine going ahead of the next phrase, unless the voice comes from Azure. */
+  warm(voice: string): void {
+    if (!voice.startsWith(AZURE_PREFIX)) void this.windows.warm()
+  }
 
   async synthesize(text: string, voice: string, rate: number): Promise<Buffer> {
     if (!voice.startsWith(AZURE_PREFIX)) return this.windows.synthesize(text, voice, rate)

@@ -4,7 +4,7 @@ import { PassThrough } from 'node:stream'
 import { crc32 } from 'node:zlib'
 import yazl from 'yazl'
 import yauzl from 'yauzl'
-import { parseLogLine } from './logLine'
+import { decodeCp1252, parseLogLine } from './logLine'
 import { localDay } from './dates'
 
 export type ArchiveOutcome =
@@ -261,8 +261,8 @@ async function archiveStem(path: string, fallback: string): Promise<string> {
     await handle.read(head, 0, head.length, 0)
     const tail = Buffer.alloc(Math.min(TAIL_BYTES, size))
     await handle.read(tail, 0, tail.length, Math.max(0, size - tail.length))
-    const first = head.toString('latin1').split('\n').map((l) => parseLogLine(l.trim())).find(Boolean)
-    const last = tail.toString('latin1').split('\n').reverse().map((l) => parseLogLine(l.trim())).find(Boolean)
+    const first = decodeCp1252(head).split('\n').map((l) => parseLogLine(l.trim())).find(Boolean)
+    const last = decodeCp1252(tail).split('\n').reverse().map((l) => parseLogLine(l.trim())).find(Boolean)
     if (!first || !last) return `${fallback}_${localDay(Date.now())}`
     return `${fallback}_${localDay(first.time)}_to_${localDay(last.time)}`
   } finally {

@@ -3,6 +3,8 @@ import { api, errorMessage } from '../api'
 import { useApp } from '../state'
 import { act, showError } from '../toast'
 import { OVERLAY_TARGETS } from '../constants'
+import { recall, remember } from '../remember'
+import { markUnsaved } from '../unsaved'
 import { Field, Icon, LoadError, NumberInput, Pending, Switch } from '../components/ui'
 import type { Phrase, Trigger, TriggerAction, TriggerTestResult } from '../../../shared/types'
 
@@ -31,11 +33,32 @@ interface Draft {
   selected: string | null
 }
 
-// Unsaved edits live here rather than in the page, so leaving the page and coming back finds them
-// as they were. They last until the app closes.
-let kept: Draft | null = null
-
 const same = (a: Trigger[], b: Trigger[]) => a === b || JSON.stringify(a) === JSON.stringify(b)
+const unsaved = (d: Draft | null) => !!d && !same(d.list, d.saved)
+
+// Unsaved edits live here rather than in the page, so leaving the page and coming back finds them
+// as they were, and in local storage, so a restart or a crash does not lose them either.
+const DRAFT_KEY = 'triggers.draft'
+let kept: Draft | null = recall<Draft | null>(DRAFT_KEY, null)
+markUnsaved('triggers', unsaved(kept))
+
+function keep(d: Draft | null): void {
+  kept = d
+  const open = unsaved(d)
+  markUnsaved('triggers', open)
+  remember(DRAFT_KEY, open ? d : null)
+}
+
+/**
+ * Unsaved edits over what is saved now. Triggers saved from elsewhere since the edits began (a
+ * respawn timer, say) join the list, so saving the edits does not drop them.
+ */
+function rebase(d: Draft, stored: Trigger[]): Draft {
+  if (same(d.saved, stored)) return d
+  const known = new Set(d.saved.map((t) => t.id))
+  const inList = new Set(d.list.map((t) => t.id))
+  return { ...d, list: [...d.list, ...stored.filter((t) => !known.has(t.id) && !inList.has(t.id))], saved: stored }
+}
 // One empty list while nothing is loaded, so the memos below don't see a new one every render.
 const NO_TRIGGERS: Trigger[] = []
 
@@ -48,16 +71,19 @@ export function Triggers() {
   const [errors, setErrors] = useState<TriggerError[]>(state.triggerErrors)
 
   useEffect(() => {
-    kept = draft
+    keep(draft)
   }, [draft])
 
   useEffect(() => {
-    // Edits left from an earlier visit win over a fresh read.
-    if (kept && !same(kept.list, kept.saved)) return
     let live = true
     setLoadError('')
     api.invoke<Trigger[]>('triggers:get').then(
-      (t) => live && setDraft((d) => ({ list: t, saved: t, selected: d?.selected && t.some((x) => x.id === d.selected) ? d.selected : (t[0]?.id ?? null) })),
+      (t) =>
+        live &&
+        setDraft((d) =>
+          // Edits left from an earlier visit win over a fresh read.
+          unsaved(d) ? rebase(d!, t) : { list: t, saved: t, selected: d?.selected && t.some((x) => x.id === d.selected) ? d.selected : (t[0]?.id ?? null) }
+        ),
       (e) => live && setLoadError(errorMessage(e))
     )
     return () => {

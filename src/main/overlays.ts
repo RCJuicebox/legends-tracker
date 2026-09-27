@@ -13,8 +13,10 @@ export interface OverlayHost {
  * - Click-through (ignore mouse events), so a bar over the game never eats a click in combat.
  * - Never focusable: EverQuest stops taking keyboard input the moment it loses focus.
  * - Kept out of the taskbar and Alt-Tab.
- * - Topmost is re-asserted every two seconds: a borderless-windowed game re-asserts its own
- *   z-order and can end up above overlays that were topmost when created.
+ * - Topmost is re-asserted every two seconds while shown: a borderless-windowed game re-asserts its
+ *   own z-order and can end up above overlays that were topmost when created.
+ * - Hidden (the game in the background), they get no pushes and their pages are throttled; the
+ *   newest timers and meter reach them when they show again.
  * - Arrange mode lifts all of that so the windows can be dragged and resized.
  * - A meter overlay still sees the mouse move over it (Windows forwards the moves while the window
  *   ignores clicks), so its page can ask for the mouse back while the pointer is on its controls.
@@ -49,8 +51,12 @@ export class OverlayManager {
       win.setOpacity(c.opacity)
       win.webContents.send('overlay:config', { config: c, arranging: this.arranging })
     }
-    if (!this.topmostTimer) {
+    if (!this.windows.size && this.topmostTimer) {
+      clearInterval(this.topmostTimer)
+      this.topmostTimer = null
+    } else if (this.windows.size && !this.topmostTimer) {
       this.topmostTimer = setInterval(() => {
+        if (!this.shown) return
         for (const w of this.windows.values()) if (!w.isDestroyed()) w.setAlwaysOnTop(true, 'screen-saver')
       }, 2000)
     }
@@ -85,22 +91,32 @@ export class OverlayManager {
       win.webContents.send('overlay:timers', this.lastTimers)
       if (cfg.kind === 'meter' && this.lastCombat) win.webContents.send('overlay:combat', this.lastCombat)
       if (this.shown) win.showInactive()
+      else win.webContents.setBackgroundThrottling(true)
     })
     this.host.load(win, 'overlay', { id: c.id })
     this.windows.set(c.id, win)
     return win
   }
 
-  /** Shows or hides every overlay without closing it, so bars stay current while hidden. */
+  /**
+   * Shows or hides every overlay without closing it. A hidden page is throttled (its timers slow, its
+   * clock stops) and sent nothing; it is brought up to date as it shows again.
+   */
   setShown(show: boolean): void {
     if (show === this.shown) return
     this.shown = show
-    for (const w of this.windows.values()) {
+    for (const [id, w] of this.windows) {
       if (w.isDestroyed()) continue
       if (show) {
+        w.webContents.setBackgroundThrottling(false)
+        w.webContents.send('overlay:timers', this.lastTimers)
+        if (this.lastCombat && this.configs.find((c) => c.id === id)?.kind === 'meter') w.webContents.send('overlay:combat', this.lastCombat)
         w.showInactive()
         w.setAlwaysOnTop(true, 'screen-saver')
-      } else w.hide()
+      } else {
+        w.hide()
+        w.webContents.setBackgroundThrottling(true)
+      }
     }
   }
 
@@ -125,6 +141,7 @@ export class OverlayManager {
 
   combat(snapshot: CombatSnapshot): void {
     this.lastCombat = snapshot
+    if (!this.shown) return
     for (const [id, w] of this.windows) {
       const cfg = this.configs.find((c) => c.id === id)
       if (cfg?.kind === 'meter' && !w.isDestroyed()) w.webContents.send('overlay:combat', snapshot)
@@ -133,10 +150,13 @@ export class OverlayManager {
 
   timers(views: TimerView[]): void {
     this.lastTimers = views
+    if (!this.shown) return
     for (const w of this.windows.values()) if (!w.isDestroyed()) w.webContents.send('overlay:timers', views)
   }
 
   alert(payload: { text: string; color: string; durationSec: number }): void {
+    // An alert is for now; one raised while the overlays are hidden is not shown later.
+    if (!this.shown) return
     for (const [id, w] of this.windows) {
       const cfg = this.configs.find((c) => c.id === id)
       if (cfg?.kind === 'alerts' && !w.isDestroyed()) w.webContents.send('overlay:alert', payload)
@@ -145,6 +165,7 @@ export class OverlayManager {
 
   destroy(): void {
     if (this.topmostTimer) clearInterval(this.topmostTimer)
+    this.topmostTimer = null
     for (const w of this.windows.values()) w.destroy()
     this.windows.clear()
   }

@@ -12,8 +12,8 @@ import {
   type SpellRule,
   type Trigger
 } from '../shared/types'
-import { sanitizeBuffs, sanitizeRespawns } from './validate'
-import { DEFAULT_OVERLAYS, JsonFile, LEGACY_OVERLAY_IDS, characterKey, defaultSettings, mergeDefaults, readJsonFile, type ReadResult } from './storeCore'
+import { sanitizeBuffs, sanitizeRespawns, sanitizeSettings } from './validate'
+import { DEFAULT_OVERLAYS, JsonFile, characterKey, defaultSettings, mergeDefaults, readJsonFile, type ReadResult } from './storeCore'
 
 export { DEFAULT_OVERLAYS, characterKey, characterName, defaultSettings } from './storeCore'
 
@@ -33,8 +33,6 @@ export class Store {
   readonly stock: JsonFile<MoteStock>
   readonly respawns: JsonFile<RespawnRecords>
   readonly buffs: JsonFile<BuffsFile>
-  /** The default overlays this install has been given, so one the player deleted is not brought back. */
-  private readonly seenDefaults: JsonFile<string[]>
   /** True until mote history has been built from the logs once (or after its file was unreadable). */
   readonly motesFresh: boolean
   /** True on a first run, before any settings were saved. An unreadable settings file is not a first run. */
@@ -54,17 +52,17 @@ export class Store {
     if (settingsRead.state === 'corrupt') this.recovered.push(settingsRead.movedTo)
     this.settingsFresh = settingsRead.state === 'missing'
     const savedSettings = settingsRead.state === 'ok' ? settingsRead.value : undefined
-    const seenSaved = read('seen-defaults.json')
-    const seen = new Set<string>(Array.isArray(seenSaved) ? seenSaved.filter((x) => typeof x === 'string') : savedSettings ? LEGACY_OVERLAY_IDS : [])
-    this.settings = new JsonFile(p('settings.json'), mergeDefaults(defaultSettings(), savedSettings, (id) => !seen.has(id)))
-    const allDefaults = DEFAULT_OVERLAYS.map((o) => o.id)
-    this.seenDefaults = new JsonFile(p('seen-defaults.json'), [...new Set([...seen, ...allDefaults])])
-    // Written at the next save or at quit, not on a timer: a second copy of the app, started by
-    // mistake and quitting at once, must not write anything.
-    if (allDefaults.some((id) => !seen.has(id))) {
-      this.seenDefaults.markDirty()
-      // A default just added to the saved overlays must reach settings.json too.
-      if (savedSettings) this.settings.markDirty()
+    // Every default overlay is built in and cannot be removed, so one missing from the saved list (an
+    // older build let the meter and respawn overlays be removed) comes back. The result is checked the
+    // way a save from a page is, so a hand-edited or half-migrated value cannot break the start.
+    const merged = mergeDefaults(defaultSettings(), savedSettings, () => true)
+    this.settings = new JsonFile(p('settings.json'), sanitizeSettings(merged, defaultSettings()) ?? defaultSettings())
+    if (savedSettings) {
+      const saved = (savedSettings as { overlays?: unknown }).overlays
+      const have = new Set(Array.isArray(saved) ? saved.map((o) => (o as { id?: unknown })?.id) : [])
+      // Written at the next save or at quit, not on a timer: a second copy of the app, started by
+      // mistake and quitting at once, must not write anything.
+      if (DEFAULT_OVERLAYS.some((o) => !have.has(o.id))) this.settings.markDirty()
     }
 
     const triggersRead = readJsonFile(p('triggers.json'))
@@ -110,7 +108,7 @@ export class Store {
 
   /** Writes whatever changed. Never rejects: a file that cannot be written is logged. */
   async flushAll(): Promise<void> {
-    const files = [this.settings, this.triggers, this.rules, this.casts, this.motes, this.stock, this.respawns, this.buffs, this.seenDefaults]
+    const files = [this.settings, this.triggers, this.rules, this.casts, this.motes, this.stock, this.respawns, this.buffs]
     await Promise.allSettled(files.map((f) => f.flush()))
   }
 }

@@ -1,7 +1,7 @@
 import { app } from 'electron'
 import { promises as fs } from 'node:fs'
 import { join } from 'node:path'
-import { parseLogLine } from '../core/logLine'
+import { decodeCp1252, parseLogLine } from '../core/logLine'
 import { PET_GEAR_HEAD, PetGearReader, parsePetGuide, parseSummonPage, type PetGearReading, type PetMelee, type PetProfile } from '../core/pets'
 import { log } from './log'
 
@@ -49,7 +49,7 @@ export async function scanPetLog(logPath: string, isSummon: (name: string) => st
       const start = Math.max(0, end - step)
       const buf = Buffer.alloc(end - start)
       await handle.read(buf, 0, buf.length, start)
-      const lines = (buf.toString('latin1') + carry).split('\n')
+      const lines = (decodeCp1252(buf) + carry).split('\n')
       carry = start > 0 ? (lines.shift() ?? '') : ''
       for (let i = lines.length - 1; i >= 0; i--) {
         const raw = lines[i].replace(/\r$/, '')

@@ -3,14 +3,14 @@ import { act } from '../toast'
 import { BUILTIN_OVERLAYS } from '../constants'
 import { ConfirmButton, Field, Icon, NumberInput, Switch } from '../components/ui'
 import type { MeterOverlayOptions, OverlayConfig } from '../../../shared/types'
+import { DEFAULT_METER_OPTIONS } from '../../../shared/overlays'
 
 /** The opacity slider saves once it stops moving for this long; the overlay follows it at once. */
 const SLIDER_SAVE_MS = 150
 
-const METER_DEFAULTS: MeterOverlayOptions = { mode: 'damage', span: 'fight', scope: 'everyone', rows: 8, combinePet: true, header: true }
 
 function MeterOptions({ o, onChange }: { o: OverlayConfig; onChange: (m: Partial<MeterOverlayOptions>) => void }) {
-  const m = { ...METER_DEFAULTS, ...o.meter }
+  const m = { ...DEFAULT_METER_OPTIONS, ...o.meter }
   return (
     <>
       <div className="grid two">
@@ -123,7 +123,7 @@ export function Overlays() {
                   Group bars under each target's name
                 </label>
               )}
-              {o.kind === 'meter' && <MeterOptions o={o} onChange={(m) => update(o.id, { meter: { ...METER_DEFAULTS, ...o.meter, ...m } })} />}
+              {o.kind === 'meter' && <MeterOptions o={o} onChange={(m) => update(o.id, { meter: { ...DEFAULT_METER_OPTIONS, ...o.meter, ...m } })} />}
               <div className="faint small mono">
                 {o.width}×{o.height} at {o.x}, {o.y}
               </div>
@@ -144,7 +144,7 @@ export function Overlays() {
                 ...s,
                 overlays: [
                   ...s.overlays,
-                  { id: `meter-${Date.now()}`, name: 'Meter', kind: 'meter', x: 440, y: 560, width: 380, height: 300, opacity: 1, fontSize: 13, visible: true, groupByTarget: false, meter: { ...METER_DEFAULTS } }
+                  { id: `meter-${Date.now()}`, name: 'Meter', kind: 'meter', x: 440, y: 560, width: 380, height: 300, opacity: 1, fontSize: 13, visible: true, groupByTarget: false, meter: { ...DEFAULT_METER_OPTIONS } }
                 ]
               }))
             }

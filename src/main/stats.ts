@@ -2,6 +2,7 @@ import { promises as fs } from 'node:fs'
 import { join } from 'node:path'
 import { CLASS_NUMBER, type ClassId } from '../core/acModel'
 import { latestAas, type AaSummary } from '../core/aa'
+import { decodeCp1252 } from '../core/logLine'
 import { log } from './log'
 
 // The game's own tables, read from its Resources folder:
@@ -133,7 +134,7 @@ export async function readAasFromLog(logFile: string, opts: { firstSpan?: number
       const start = Math.max(0, size - span)
       const buf = Buffer.alloc(size - start)
       await handle.read(buf, 0, buf.length, start)
-      const text = buf.toString('latin1')
+      const text = decodeCp1252(buf)
       const found = latestAas(text)
       const safe = start === 0 || (found && text.indexOf(`[${found.when}] Ability #`) > 256 * 1024)
       if (found && safe) return found

@@ -4,7 +4,8 @@ import { useCallback, useState } from 'react'
 // was left. Storage can be unavailable or cleared; the default is used then.
 const PREFIX = 'lt:'
 
-function read<T>(key: string, fallback: T): T {
+/** A remembered value, or the fallback when there is none or storage is unavailable. */
+export function recall<T>(key: string, fallback: T): T {
   try {
     const v = localStorage.getItem(PREFIX + key)
     return v === null ? fallback : (JSON.parse(v) as T)
@@ -24,7 +25,7 @@ export function remember<T>(key: string, value: T): void {
 
 /** useState that survives closing the window and restarting the app. */
 export function useRemembered<T>(key: string, fallback: T): [T, (v: T) => void] {
-  const [value, setValue] = useState<T>(() => read(key, fallback))
+  const [value, setValue] = useState<T>(() => recall(key, fallback))
   const set = useCallback(
     (v: T) => {
       setValue(v)

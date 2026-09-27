@@ -146,6 +146,11 @@ textarea {
   background: var(--line);
   color: var(--text-2);
 }
+.nav-item .unsaved-mark {
+  margin-left: auto;
+  font-size: 10px;
+  color: var(--accent);
+}
 
 .sidebar-foot {
   margin-top: auto;

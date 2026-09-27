@@ -2,7 +2,7 @@ import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process'
 import { log } from './log'
 import { yieldPriority } from './priority'
 
-// A resident PowerShell process driving Windows speech. Speech is rendered to WAV and handed to
+// A PowerShell process driving Windows speech, started on first use and stopped when idle. Speech is rendered to WAV and handed to
 // the audio window, which mixes it with alert sounds on the chosen output device. (Chromium's
 // built-in speechSynthesis always plays on the system default device.)
 //
@@ -78,6 +78,8 @@ interface Waiter {
 
 /** A phrase that takes longer than this to render means the engine has hung; it is restarted. */
 const REQUEST_TIMEOUT_MS = 10_000
+/** With nothing said for this long the process is stopped; the next phrase, or warm(), starts it again. */
+const IDLE_MS = 5 * 60_000
 
 export class SpeechWorker {
   private proc: ChildProcessWithoutNullStreams | null = null
@@ -88,6 +90,28 @@ export class SpeechWorker {
   voices: string[] = []
   failed = ''
   private ready: Promise<void> | null = null
+  private idle: NodeJS.Timeout | null = null
+
+  /**
+   * Starts the process if it is not running, so the next phrase comes quickly, and keeps it for
+   * another idle spell. Nothing starts it at launch: with an Azure voice it may never be needed.
+   */
+  warm(): Promise<void> {
+    const ready = this.start()
+    this.touch()
+    return ready
+  }
+
+  private touch(): void {
+    if (this.idle) clearTimeout(this.idle)
+    this.idle = setTimeout(() => {
+      this.idle = null
+      if (this.waiting.size) return this.touch()
+      if (this.proc) log.info('Speech engine idle; stopping it until it is needed')
+      this.stop()
+    }, IDLE_MS)
+    this.idle.unref()
+  }
 
   start(): Promise<void> {
     if (this.ready) return this.ready
@@ -178,7 +202,7 @@ export class SpeechWorker {
     const key = `${voice}|${rate}|${text}`
     const hit = this.cache.get(key)
     if (hit) return hit
-    await this.start()
+    await this.warm()
     const proc = this.proc
     if (!proc) throw new Error(this.failed || 'Speech engine unavailable')
     const id = ++this.seq
@@ -199,6 +223,8 @@ export class SpeechWorker {
   }
 
   stop(): void {
+    if (this.idle) clearTimeout(this.idle)
+    this.idle = null
     const proc = this.proc
     this.proc = null
     this.ready = null

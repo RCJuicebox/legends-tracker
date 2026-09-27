@@ -22,6 +22,8 @@ export function Audio() {
   const a = state.settings.audio
   const [text, setText] = useState('Spirit of the Puma fading')
   const soundsQ = useInvoke<string[]>('audio:sounds')
+  // Starts the Windows speech engine if it is not running; the list arrives as state:voices.
+  useInvoke('audio:voices')
   const sounds = soundsQ.data ?? []
   const set = (patch: Partial<AudioSettings>) => patchSettings((s) => ({ ...s, audio: { ...s.audio, ...patch } }))
   const slide = (patch: Partial<AudioSettings>) => patchSettings((s) => ({ ...s, audio: { ...s.audio, ...patch } }), { debounceMs: SLIDER_SAVE_MS })

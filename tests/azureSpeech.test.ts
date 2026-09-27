@@ -66,7 +66,7 @@ describe('Azure voices', () => {
 })
 
 describe('the voice router', () => {
-  const windows = { synthesize: vi.fn(async (text: string, voice: string) => Buffer.from(`win:${voice}:${text}`)) }
+  const windows = { synthesize: vi.fn(async (text: string, voice: string) => Buffer.from(`win:${voice}:${text}`)), warm: vi.fn(async () => undefined) }
 
   it('sends Windows voices to Windows and azure: voices to Azure', async () => {
     const az = new AzureSpeech()
@@ -81,5 +81,14 @@ describe('the voice router', () => {
     await az.configure('', '')
     const r = new VoiceRouter(windows, az)
     expect((await r.synthesize('Recast Odium', 'azure:en-US-JennyNeural', 1)).toString()).toBe('win::Recast Odium')
+  })
+
+  it('starts the Windows engine ahead of time only for a Windows voice', () => {
+    const r = new VoiceRouter(windows, new AzureSpeech())
+    windows.warm.mockClear()
+    r.warm('azure:en-US-JennyNeural')
+    expect(windows.warm).not.toHaveBeenCalled()
+    r.warm('Microsoft Mark')
+    expect(windows.warm).toHaveBeenCalledOnce()
   })
 })

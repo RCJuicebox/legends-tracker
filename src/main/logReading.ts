@@ -115,7 +115,7 @@ export async function offsetBefore(path: string, time: number, step = 1 << 20): 
       const start = Math.max(0, end - step)
       const buf = Buffer.alloc(end - start)
       await handle.read(buf, 0, buf.length, start)
-      const text = buf.toString('latin1')
+      const text = decodeCp1252(buf)
       // The chunk's first piece may be the tail of a line that began in the chunk before.
       let at = start === 0 ? 0 : text.indexOf('\n') + 1
       if (at === 0 && start > 0) continue

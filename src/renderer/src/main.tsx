@@ -7,6 +7,7 @@ import { ago } from './api'
 import { act, Toasts } from './toast'
 import { useUpdate } from './update'
 import { useRemembered } from './remember'
+import { useUnsaved } from './unsaved'
 import { Dashboard } from './pages/Dashboard'
 import { Spells } from './pages/Spells'
 import { Motes } from './pages/Motes'
@@ -55,6 +56,7 @@ function Shell() {
   const Page = PAGES.find((p) => p.id === page)!.el as ComponentType<{ go: (p: PageId) => void }>
   const s = state.status
   const update = useUpdate()
+  const unsaved = useUnsaved()
   return (
     <div className="shell">
       <div className="titlebar">
@@ -80,6 +82,11 @@ function Shell() {
             <Icon name={p.icon} />
             {p.label}
             {p.id === 'dashboard' && state.timers.length > 0 && <span className="count">{state.timers.length}</span>}
+            {unsaved.has(p.id) && (
+              <span className="unsaved-mark" title="Changes not saved yet">
+                ●<span className="sr-only"> (changes not saved)</span>
+              </span>
+            )}
           </button>
         ])}
         <div className="sidebar-foot">

@@ -9,7 +9,7 @@ import {
   type Trigger,
   type TriggerAction
 } from '../shared/types'
-import { DEFAULT_METER_OPTIONS } from './storeCore'
+import { DEFAULT_METER_OPTIONS } from '../shared/overlays'
 import type { RespawnRecords, RespawnTimerSpec } from '../core/respawns'
 import type { ActiveBuff, BuffsFile, Person } from '../core/buffs'
 

@@ -97,7 +97,7 @@ const updater = new Updater((s) => {
     announceUpdate(`found:${s.version}`, `Legends Tracker ${s.version} is available`, 'Downloading it now. You can restart into it once it has arrived.', () => showMain())
   } else if (s.state === 'ready') {
     engine.pushFeed('info', `Version ${s.version} is ready: restart to update.`)
-    announceUpdate(`ready:${s.version}`, `Legends Tracker ${s.version} is ready`, 'Click to restart and update. Your settings and overlays stay as they are.', () => updater.install())
+    announceUpdate(`ready:${s.version}`, `Legends Tracker ${s.version} is ready`, 'Click to restart and update. Your settings and overlays stay as they are.', () => void installUpdate())
   }
 })
 
@@ -182,8 +182,37 @@ function refreshOverlayVisibility(): void {
   )
 }
 
+/**
+ * While the main window is in the tray or minimised its page is sent nothing: pushes wait here, the
+ * newest of each kind plus every feed line, and go out when it shows again.
+ */
+let mainHidden = false
+const heldPushes = new Map<string, [string, ...unknown[]]>()
+const heldFeed: unknown[][] = []
+/** As many feed lines as the Live page keeps. */
+const HELD_FEED_MAX = 300
+
 function toMain(channel: string, ...args: unknown[]): void {
-  if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send(channel, ...args)
+  if (!mainWindow || mainWindow.isDestroyed()) return
+  if (!mainHidden) return mainWindow.webContents.send(channel, ...args)
+  if (channel === 'state:feed') {
+    heldFeed.push(args)
+    if (heldFeed.length > HELD_FEED_MAX) heldFeed.shift()
+    return
+  }
+  // A pet update is per character; the rest replace what the page shows.
+  const key = channel === 'state:pet' ? `${channel}:${(args[0] as { character?: string } | undefined)?.character}` : channel
+  heldPushes.delete(key)
+  heldPushes.set(key, [channel, ...args])
+}
+
+function setMainHidden(hidden: boolean): void {
+  mainHidden = hidden
+  if (hidden || !mainWindow || mainWindow.isDestroyed()) return
+  for (const [channel, ...args] of heldPushes.values()) mainWindow.webContents.send(channel, ...args)
+  for (const args of heldFeed) mainWindow.webContents.send('state:feed', ...args)
+  heldPushes.clear()
+  heldFeed.length = 0
 }
 
 function toAudio(cmd: AudioCommand | { kind: 'config' }): void {
@@ -292,6 +321,10 @@ function createMainWindow(): void {
     mainWindow?.show()
   })
   for (const event of ['move', 'resize', 'maximize', 'unmaximize'] as const) mainWindow.on(event as 'move', () => rememberWindowPlace())
+  mainWindow.on('hide', () => setMainHidden(true))
+  mainWindow.on('minimize', () => setMainHidden(true))
+  mainWindow.on('show', () => setMainHidden(false))
+  mainWindow.on('restore', () => setMainHidden(false))
   mainWindow.on('close', (e) => {
     rememberWindowPlace(true)
     if (!quitting) {
@@ -316,7 +349,7 @@ function createAudioWindow(): void {
   load(audioWindow, 'audio')
 }
 
-async function createTray(): Promise<void> {
+function createTray(): void {
   tray = new Tray(nativeImage.createFromPath(appIcon).resize({ width: 16, height: 16 }))
   tray.setToolTip('Legends Tracker')
   const menu = () =>
@@ -325,7 +358,7 @@ async function createTray(): Promise<void> {
       { label: overlays.isArranging ? 'Lock overlays' : 'Arrange overlays', click: () => setArranging(!overlays.isArranging) },
       { label: store.settings.get().audio.muted ? 'Unmute' : 'Mute', click: () => toggleMute() },
       ...(updater.status.state === 'ready'
-        ? [{ label: `Restart to update to ${updater.status.version}`, click: () => updater.install() }]
+        ? [{ label: `Restart to update to ${updater.status.version}`, click: () => void installUpdate() }]
         : []),
       { type: 'separator' },
       { label: 'Quit', click: () => app.quit() }
@@ -500,7 +533,6 @@ function registerIpc(): void {
 
   handle('spells:known', () => engine.knownSpells())
   handle('spells:search', (q: string) => engine.book?.search(q).map(summarize) ?? [])
-  handle('spells:explain', (rankedName: string) => engine.explain(rankedName))
   handle('spells:rule', (name: string, rule: SpellRule | null) => {
     const rules = { ...store.rules.get() }
     if (rule && Object.values(rule).some((v) => v !== undefined && v !== '')) rules[name] = rule
@@ -660,7 +692,7 @@ function registerIpc(): void {
 
   handle('update:status', () => ({ status: updater.status, version: app.getVersion() }))
   handle('update:check', () => updater.check())
-  handle('update:install', () => updater.install())
+  handle('update:install', () => installUpdate())
 
   handle('audio:test', (text: string) => engine.speak(text, true))
   handle('audio:azure', async () => {
@@ -671,10 +703,21 @@ function registerIpc(): void {
     if (typeof region !== 'string' || typeof key !== 'string' || key.length > 200 || region.length > 40) throw new Error('Not a region and key.')
     return azure.configure(region, key)
   })
-  // engine.playSound reads any file it is given, absolute paths included; it only ever plays it.
-  handle('audio:sound', (file: string) => engine.playSound(String(file), 1))
+  // A page may play a sound from the sound folders, or a file one of the saved triggers already names.
+  handle('audio:sound', (file: unknown) => {
+    if (typeof file !== 'string') return
+    const named = store.triggers.get().some((t) => t.actions.some((a) => a.type === 'sound' && a.file === file))
+    if (isAbsolute(file) && !named) throw new Error('Only sounds from the sound folders can be played from here.')
+    return engine.playSound(file, 1)
+  })
   handle('audio:sounds', () => engine.listSounds())
-  handle('audio:mute', () => toggleMute())
+  // The Windows voice list needs the speech process; the Audio page asks for it when it opens.
+  handle('audio:voices', async () => {
+    await speech.warm()
+    const v = { voices: speech.voices, error: speech.failed }
+    toMain('state:voices', v)
+    return v
+  })
 
   handle('achievements:characters', async () => ({
     current: characterKey(store.settings.get().logFile),
@@ -682,7 +725,6 @@ function registerIpc(): void {
   }))
   handle('achievements:load', (character: string) => achievementFiles.load(character))
   handle('achievements:marks', (character: string, marks: AchMarks) => achievementFiles.saveMarks(character, marks))
-  handle('achievements:exportPath', (character: string) => achievementFiles.exportPath(character))
 
   // Which characters have a given export, and which one is being played.
   handle('character:exports', async () => {
@@ -877,7 +919,9 @@ function placeOverlaysForNewInstall(): void {
     alerts: { x: a.x + Math.round(a.width / 2) - 400, y: a.y + Math.round(a.height * 0.18), width: 800, height: 180 },
     buffs: { x: a.x + a.width - 720, y: a.y + Math.round(a.height * 0.3), width: 340, height: 420 },
     targets: { x: a.x + a.width - 370, y: a.y + Math.round(a.height * 0.3), width: 340, height: 420 },
-    meter: { x: a.x + 40, y: a.y + a.height - 360, width: 380, height: 300 }
+    meter: { x: a.x + 40, y: a.y + a.height - 360, width: 380, height: 300 },
+    // Under the buffs, kept above the bottom edge on a short screen.
+    respawns: { x: a.x + a.width - 720, y: Math.min(a.y + Math.round(a.height * 0.3) + 440, a.y + a.height - 270), width: 340, height: 260 }
   }
   store.settings.set({ ...s, overlays: s.overlays.map((o) => (place[o.id] ? { ...o, ...place[o.id] } : o)) })
 }
@@ -984,7 +1028,6 @@ app.on('child-process-gone', (_e, d) => {
 
 // Quitting waits (up to a few seconds) for settings to reach disk: a change saved just before Quit is
 // still in its 400 ms wait. The first before-quit holds the quit, shuts down, writes, then quits again.
-// An update's quitAndInstall comes through here the same way.
 let shutDown = false
 let shuttingDown = false
 app.on('before-quit', (e) => {
@@ -994,11 +1037,21 @@ app.on('before-quit', (e) => {
   e.preventDefault()
   if (shuttingDown) return
   shuttingDown = true
+  void stopAndSave().then(() => {
+    shutDown = true
+    app.quit()
+  })
+})
+
+/** Stops every timer and poller and writes whatever changed; never rejects, and gives up waiting after 3 s. */
+async function stopAndSave(): Promise<void> {
   log.info('Quitting')
   for (const [name, stop] of [
     ['engine', () => engine.shutdown()],
     ['updater', () => updater.stop()],
     ['game watcher', () => watcher.stop()],
+    ['achievement export poller', () => achievementFiles.stop()],
+    ['inventory export poller', () => inventoryFiles.stop()],
     ['speech', () => speech.stop()],
     ['overlays', () => overlays.destroy()]
   ] as const) {
@@ -1009,17 +1062,40 @@ app.on('before-quit', (e) => {
     }
   }
   const limit = new Promise<'timeout'>((r) => setTimeout(() => r('timeout'), 3000))
-  void Promise.race([Promise.allSettled([store.flushAll()]), limit]).then((r) => {
-    if (r === 'timeout') log.warn('Saving settings took over 3s; quitting anyway')
-    shutDown = true
-    app.quit()
-  })
-})
+  const r = await Promise.race([Promise.allSettled([store.flushAll()]), limit])
+  if (r === 'timeout') log.warn('Saving settings took over 3s; quitting anyway')
+}
+
+/**
+ * Restarts into a downloaded update. Everything is written first: quitAndInstall starts the installer
+ * straight away, so a flush left to before-quit would race it.
+ */
+async function installUpdate(): Promise<void> {
+  if (updater.status.state !== 'ready' || shuttingDown) return
+  quitting = true
+  shuttingDown = true
+  await stopAndSave()
+  shutDown = true
+  updater.install()
+}
 app.on('window-all-closed', () => {
   // Stay resident in the tray; Quit from the tray menu ends the app.
 })
 
 void app.whenReady().then(async () => {
+  try {
+    await start()
+  } catch (e) {
+    log.error('Start failed:', e)
+    dialog.showErrorBox(
+      'Legends Tracker could not start',
+      `${e instanceof Error ? e.message : String(e)}\n\nThe details are in ${join(logDir(), 'main.log')}. Legends Tracker will close now.`
+    )
+    app.quit()
+  }
+})
+
+async function start(): Promise<void> {
   app.setAppUserModelId(appUserModelId())
   ensureSourceShortcut(appIcon)
   const ownPage = (url: string) => url.startsWith('file:') || url.startsWith(process.env['ELECTRON_RENDERER_URL'] ?? '\u0000')
@@ -1035,9 +1111,11 @@ void app.whenReady().then(async () => {
     return png ? new Response(new Uint8Array(png), { headers: { 'content-type': 'image/png', 'cache-control': 'max-age=86400' } }) : new Response(null, { status: 404 })
   })
   registerIpc()
+  // The tray comes first: closing the window hides it, so without a tray icon a failed start below
+  // would leave a process nobody can reach.
+  createTray()
   createAudioWindow()
   createMainWindow()
-  void speech.start().then(() => toMain('state:voices', { voices: speech.voices, error: speech.failed }))
   await engine.init()
   if (store.recovered.length) {
     const names = store.recovered.map((f) => basename(f)).join(', ')
@@ -1053,5 +1131,4 @@ void app.whenReady().then(async () => {
   for (const ms of [3000, 10_000]) setTimeout(applyPriority, ms).unref()
   app.on('browser-window-created', () => setTimeout(applyPriority, 1500))
   setInterval(applyPriority, 60_000).unref()
-  await createTray()
-})
+}

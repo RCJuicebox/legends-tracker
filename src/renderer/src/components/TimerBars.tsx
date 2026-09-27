@@ -1,14 +1,28 @@
-import { useEffect, useMemo, useState, type ReactNode } from 'react'
+import { useEffect, useMemo, useState, useSyncExternalStore, type ReactNode } from 'react'
 import type { TimerView } from '../../../shared/types'
 import { clock, iconUrl, roman } from '../api'
 
+const onVisibility = (l: () => void) => {
+  document.addEventListener('visibilitychange', l)
+  return () => document.removeEventListener('visibilitychange', l)
+}
+
+/** False while the window is hidden (in the tray, or an overlay hidden with the game). */
+export function usePageVisible(): boolean {
+  return useSyncExternalStore(onVisibility, () => document.visibilityState !== 'hidden')
+}
+
+/** The time, ticking every `intervalMs` while active and the window can be seen. */
 export function useNow(intervalMs: number, active = true): number {
   const [now, setNow] = useState(Date.now())
+  const visible = usePageVisible()
+  const running = active && visible
   useEffect(() => {
-    if (!active) return
+    if (!running) return
+    setNow(Date.now())
     const id = setInterval(() => setNow(Date.now()), intervalMs)
     return () => clearInterval(id)
-  }, [intervalMs, active])
+  }, [intervalMs, running])
   return now
 }
 

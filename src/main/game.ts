@@ -2,7 +2,7 @@ import { HKEY_CURRENT_USER, HKEY_LOCAL_MACHINE, isProcessRunning, registryString
 import { existsSync, promises as fs } from 'node:fs'
 import { dirname, join } from 'node:path'
 import type { ArchiveInfo, GameFolderCheck, LogFileInfo } from '../shared/types'
-import { parseLogLine, zoneEntered } from '../core/logLine'
+import { decodeCp1252, parseLogLine, zoneEntered } from '../core/logLine'
 import { log } from './log'
 
 const INSTALL_SUFFIXES = [
@@ -170,7 +170,7 @@ export async function lastZone(logPath: string, step = 1 << 20): Promise<string>
       const start = Math.max(0, end - step)
       const buf = Buffer.alloc(end - start)
       await handle.read(buf, 0, buf.length, start)
-      const lines = (buf.toString('latin1') + carry).split('\n')
+      const lines = (decodeCp1252(buf) + carry).split('\n')
       carry = start > 0 ? (lines.shift() ?? '') : ''
       for (let i = lines.length - 1; i >= 0; i--) {
         if (!lines[i].includes('] You have entered ')) continue

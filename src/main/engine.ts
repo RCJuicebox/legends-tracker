@@ -98,7 +98,10 @@ export interface EngineStore {
   characterOf(logFile: string): CharacterSettings
 }
 
-export type Speaker = Pick<SpeechWorker, 'synthesize'>
+/** The kinds of file the audio window plays. */
+const SOUND_FILE = /\.(wav|mp3|ogg)$/i
+
+export type Speaker = Pick<SpeechWorker, 'synthesize'> & { warm?(voice: string): void }
 
 /**
  * catchup.json: how far into which log mote tracking had read when the app last closed. Every line
@@ -167,6 +170,7 @@ export class Engine {
   /** Pasted test lines must not add to the real mote history or stock. */
   private simulating = false
   private speechFailed = false
+  private speechWarmedAt = 0
   /** The damage meter. */
   readonly meter: CombatMeter
   private combatDirty = false
@@ -746,6 +750,13 @@ export class Engine {
 
   private onLines(t: Tail, lines: string[], end: number): void {
     t.end = end
+    // The log growing means someone is playing: keep the speech engine up so a cue is not held up
+    // while it starts.
+    const now = Date.now()
+    if (now - this.speechWarmedAt > 60_000) {
+      this.speechWarmedAt = now
+      this.speech.warm?.(this.settings.audio.voice)
+    }
     for (const raw of lines) {
       const line = parseLogLine(raw)
       if (!line) continue
@@ -879,8 +890,12 @@ export class Engine {
     }
   }
 
+  /** A sound file to play: an absolute path (a trigger imported from elsewhere) or a name in the sound folders. Audio files only. */
   resolveSound(file: string): string | null {
+    if (!SOUND_FILE.test(file)) return null
     if (isAbsolute(file)) return existsSync(file) ? file : null
+    // A name, not a path: nothing outside the sound folders.
+    if (basename(file) !== file) return null
     for (const dir of this.env.soundDirs()) {
       const p = join(dir, file)
       if (existsSync(p)) return p
@@ -892,7 +907,7 @@ export class Engine {
     const names = new Set<string>()
     for (const dir of this.env.soundDirs()) {
       try {
-        for (const f of await fs.readdir(dir)) if (/\.(wav|mp3|ogg)$/i.test(f)) names.add(f)
+        for (const f of await fs.readdir(dir)) if (SOUND_FILE.test(f)) names.add(f)
       } catch (e) {
         if ((e as NodeJS.ErrnoException).code !== 'ENOENT') log.warn(`Could not list sounds in ${dir}:`, e)
       }
@@ -936,14 +951,6 @@ export class Engine {
       out.push({ ...summarize(r.spell), rank: r.rank, rankedName, lastCast, duration: d, rule: rules[r.spell.name] ?? {} })
     }
     return out.sort((a, b) => b.lastCast - a.lastCast)
-  }
-
-  explain(rankedName: string): KnownSpell | null {
-    const r = this.book?.resolve(rankedName)
-    if (!r) return null
-    return {
-      ...summarize(r.spell), rank: r.rank, rankedName, lastCast: 0, duration: this.durationFor(r.spell, r.rank), rule: this.ruleFor(r.spell.name)
-    }
   }
 
   async checkLog(megabytes: number): Promise<LogCheckRow[]> {

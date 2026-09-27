@@ -110,4 +110,9 @@ export class InventoryFiles {
     await fs.writeFile(path + '.tmp', JSON.stringify(sheet, null, 2), 'utf8')
     await fs.rename(path + '.tmp', path)
   }
+
+  stop(): void {
+    if (this.timer) clearInterval(this.timer)
+    this.timer = null
+  }
 }

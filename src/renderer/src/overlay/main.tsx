@@ -7,6 +7,7 @@ import { LIVE, useSegment } from '../combat'
 import { EntityBar, HealBar, SkillBar } from '../components/MeterBars'
 import { attackerRows, attackerSkillRows, damageRows, durationSec, fmtClock, fmtNum, fmtRate, healSpellRows, healTotals, healerRows, skillRows, totalsOf, type HealRow, type Row, type SkillRow } from '../../../core/combatView'
 import type { CombatSnapshot, MeterMode, MeterOverlayOptions, MeterSpan, OverlayConfig, Segment, SegmentSummary, TimerView } from '../../../shared/types'
+import { DEFAULT_METER_OPTIONS } from '../../../shared/overlays'
 
 interface Alert {
   id: number
@@ -15,7 +16,6 @@ interface Alert {
   until: number
 }
 
-const METER_DEFAULTS: MeterOverlayOptions = { mode: 'damage', span: 'fight', scope: 'everyone', rows: 8, combinePet: true, header: true }
 const MODE_NEXT: Record<MeterMode, MeterMode> = { damage: 'incoming', incoming: 'healing', healing: 'damage' }
 const MODE_WORD: Record<MeterMode, string> = { damage: 'Damage', incoming: 'Incoming', healing: 'Healing' }
 
@@ -127,7 +127,7 @@ function SegmentMenu({ list, span, selection, live, onPick, onOpen }: { list: Se
  * into, until it is locked again. An open fight menu keeps it too: the list hangs below the header.
  */
 function MeterOverlay({ config, snap, arranging }: { config: OverlayConfig; snap: CombatSnapshot | null; arranging: boolean }) {
-  const opts = config.meter ?? METER_DEFAULTS
+  const opts = config.meter ?? DEFAULT_METER_OPTIONS
   const [unlocked, setUnlocked] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
   const overHead = useRef(false)
