@@ -1,0 +1,958 @@
+{
+  "_about": "The test character's Inventory window, stats tab, read from a screenshot on 2026-09-12. Unbuffed: gear only. Ground truth for the AC, Offense and Accuracy calculators.",
+  "character": {
+    "name": "Tester",
+    "server": "neriak",
+    "race": "Iksar",
+    "_race_source": "Race Unlock - Iksar achievement marks 'created as a Iksar' done; /charinfo origin New Sebilis Expedition",
+    "classes": [
+      "Shadowknight",
+      "Monk",
+      "Shaman"
+    ],
+    "level": 50,
+    "buffs": "none"
+  },
+  "vitals": {
+    "hp": 6240,
+    "mana": 5506,
+    "endurance": 4366,
+    "ac": [
+      467,
+      439,
+      501
+    ],
+    "_ac_reading": "467 = mitigation AC, 439 = soft cap, 501 = avoidance. First two reproduced exactly; the third moved by exactly Dzarn's agility term when agility fell 9.",
+    "attack": [
+      368,
+      781
+    ],
+    "attack_speed_pct": 150,
+    "velocity": 0,
+    "_attack_reading": "Attack = Offense / chance to hit. 368 = Offense (strength rule, confirmed at scale). 781 = Accuracy in Offensive Stance (625 × 1.25). Not heroic dexterity: heroic stats don't exist in EQL (Dan, 2026-09-13). Base source unknown. Compare Accuracy readings only within one stance."
+  },
+  "regen": {
+    "combat_hp": 34,
+    "combat_mana": 70,
+    "combat_endurance": 59
+  },
+  "stats": {
+    "_format": "[value, cap, heroic]",
+    "strength": [
+      223,
+      510,
+      0
+    ],
+    "stamina": [
+      254,
+      510,
+      0
+    ],
+    "intelligence": [
+      211,
+      510,
+      0
+    ],
+    "wisdom": [
+      228,
+      510,
+      0
+    ],
+    "agility": [
+      178,
+      510,
+      0
+    ],
+    "dexterity": [
+      158,
+      510,
+      0
+    ],
+    "charisma": [
+      148,
+      510,
+      0
+    ]
+  },
+  "resists": {
+    "_format": "[value, cap]",
+    "magic": [
+      66,
+      1000
+    ],
+    "fire": [
+      126,
+      1000
+    ],
+    "cold": [
+      81,
+      1000
+    ],
+    "disease": [
+      79,
+      1000
+    ],
+    "poison": [
+      84,
+      1000
+    ],
+    "void": [
+      106,
+      1000
+    ]
+  },
+  "heroic_mods": {
+    "_format": "[value, cap]",
+    "accuracy": [
+      0,
+      150
+    ],
+    "avoidance": [
+      0,
+      100
+    ],
+    "combat_effects": [
+      0,
+      100
+    ],
+    "damage_shielding": [
+      0,
+      35
+    ],
+    "damage_shield_mitigation": [
+      0,
+      25
+    ],
+    "dot_shielding": [
+      0,
+      35
+    ],
+    "melee_shielding": [
+      0,
+      35
+    ],
+    "spell_shielding": [
+      0,
+      35
+    ],
+    "strike_through": [
+      0,
+      35
+    ],
+    "stun_resist": [
+      0,
+      35
+    ]
+  },
+  "spell_mods": {
+    "heal_amount": 0,
+    "spell_damage": 0,
+    "clairvoyance": 0,
+    "luck": 0
+  },
+  "skill_damage_mod": {
+    "_format": "[value, cap]",
+    "bash": [
+      0,
+      100
+    ],
+    "backstab": [
+      0,
+      125
+    ],
+    "dragon_punch": [
+      0,
+      100
+    ],
+    "eagle_strike": [
+      0,
+      100
+    ],
+    "flying_kick": [
+      0,
+      100
+    ],
+    "frenzy": [
+      0,
+      125
+    ],
+    "kick": [
+      0,
+      100
+    ],
+    "round_kick": [
+      0,
+      100
+    ],
+    "tiger_claw": [
+      0,
+      100
+    ]
+  },
+  "calculator_check": {
+    "inputs": {
+      "worn_ac": 249,
+      "_worn_ac_source": "inventory export matched to eqlwiki base AC, scaled for +N merge level",
+      "defense_skill": 230,
+      "functional_agility": 178,
+      "heroic_agility": 0,
+      "shield_ac": 0,
+      "item_avoidance": 0,
+      "spa_259_pct": 12,
+      "_spa_259_source": "/alternateadv list: Combat Stability 10 + Physical Enhancement 2",
+      "soft_cap_table": 392,
+      "post_cap_multiplier": 0.33,
+      "_table_source": "Resources/ACMitigation.txt, Shadowknight level 50, best of the three classes",
+      "monk_weight": "under 17 (worn 28.4, halved by Packrat)"
+    },
+    "ac_sum_parts": {
+      "gear_x_4_3": 332,
+      "defense_over_3": 76,
+      "agility_over_20": 8,
+      "iksar_racial": 35,
+      "monk_weight_bonus": 73,
+      "total": 524
+    },
+    "results": {
+      "soft_cap": {
+        "calculated": 439,
+        "screenshot": 439,
+        "match": true
+      },
+      "mitigation_ac": {
+        "calculated": 467,
+        "screenshot": 467,
+        "match": true
+      },
+      "third_ac_figure": {
+        "reading": "avoidance",
+        "screenshot": 501,
+        "match": "tracks agility exactly"
+      }
+    }
+  },
+  "ring_off": {
+    "_about": "Same session, Engineer's Ring +4 unequipped. Every other slot unchanged.",
+    "ring_contribution": {
+      "ac": 28,
+      "each_stat": 9,
+      "_scaling": "base 20 AC -> 28 and base +5 stats -> +9 at merge +4"
+    },
+    "vitals": {
+      "hp": 6138,
+      "mana_max": 5375,
+      "endurance_max": 4183,
+      "ac": [
+        454,
+        439,
+        499
+      ],
+      "attack": [
+        362,
+        662
+      ]
+    },
+    "stats": {
+      "strength": 214,
+      "stamina": 245,
+      "intelligence": 202,
+      "wisdom": 219,
+      "agility": 169,
+      "dexterity": 149,
+      "charisma": 139
+    },
+    "resists_changed": {
+      "void": [
+        106,
+        102
+      ]
+    },
+    "prediction_before_screenshot": {
+      "mitigation_ac": 454,
+      "soft_cap": 439
+    },
+    "result": {
+      "mitigation_ac": {
+        "predicted": 454,
+        "screenshot": 454,
+        "match": true
+      },
+      "soft_cap": {
+        "predicted": 439,
+        "screenshot": 439,
+        "match": true
+      },
+      "avoidance": {
+        "change_predicted_from_agility_term": -2,
+        "screenshot_change": -2,
+        "match": true
+      },
+      "offense_side": {
+        "change_predicted_from_strength_rule": -6,
+        "screenshot_change": -6,
+        "match": true
+      },
+      "attack_second_figure": {
+        "screenshot_change": -119,
+        "explained": true,
+        "cause": "a stance change in that screenshot, not the ring (Dan confirmed switching stance moves Accuracy)",
+        "note": "Offense still matched the ring removal exactly, so that stance change moved Accuracy but not Offense."
+      }
+    }
+  },
+  "agility_buff": {
+    "_about": "Same session, ring back on, a plain agility buff cast on self. Nothing else changed.",
+    "vitals": {
+      "hp": 6240,
+      "mana_max": 5506,
+      "endurance_max": 4459,
+      "ac": [
+        468,
+        439,
+        512
+      ],
+      "attack": [
+        368,
+        781
+      ]
+    },
+    "stats": {
+      "agility": 223,
+      "_note": "all other stats unchanged from the baseline"
+    },
+    "agility_gain": 45,
+    "result": {
+      "mitigation_ac": {
+        "calculated": 468,
+        "screenshot": 468,
+        "match": true,
+        "_why": "agility/20 went 8 -> 11"
+      },
+      "soft_cap": {
+        "calculated": 439,
+        "screenshot": 439,
+        "match": true
+      },
+      "avoidance": {
+        "dzarn_base": 448,
+        "flat_plus_63_predicted": 511,
+        "multiplier_predicted": 512,
+        "screenshot": 512,
+        "verdict": "flat addition ruled out under both whole-number and fractional arithmetic; multiplier fits all three screenshots, k in [1.14450, 1.14509) whole-number"
+      },
+      "attack": {
+        "screenshot_change": 0,
+        "_note": "agility does not feed Attack - consistent with the Offense side being strength-driven"
+      }
+    },
+    "side_note": "Endurance max rose 93 with agility +45, so agility feeds endurance."
+  },
+  "dexterity_buff": {
+    "_about": "Same session, ring on, a dexterity-only buff cast on self.",
+    "vitals": {
+      "hp": 6240,
+      "mana_max": 5506,
+      "endurance_max": 4483,
+      "ac": [
+        467,
+        439,
+        501
+      ],
+      "attack": [
+        368,
+        781
+      ]
+    },
+    "stats": {
+      "dexterity": 208,
+      "_note": "all other stats unchanged from the baseline"
+    },
+    "dexterity_gain": 50,
+    "result": {
+      "accuracy": {
+        "before": 781,
+        "after": 781,
+        "moved": false,
+        "verdict": "dexterity does not drive Accuracy (agility already ruled out)"
+      },
+      "offense": {
+        "moved": false
+      },
+      "ac_all_three": {
+        "moved": false
+      },
+      "hp_mana": {
+        "moved": false
+      },
+      "endurance": {
+        "before": 4366,
+        "after": 4483,
+        "change": 117
+      }
+    }
+  },
+  "endurance_notes": {
+    "agility_plus_45": 93,
+    "dexterity_plus_50": 117,
+    "per_point": {
+      "strength": 2.313,
+      "stamina": 2.325,
+      "dexterity": 2.34,
+      "agility": 2.067
+    },
+    "vs_eqemu": "Neither EQEmu endurance formula reproduces these. Both sum STR+STA+DEX+AGI, so dexterity and agility are interchangeable there: the classic formula gives +56 for both buffs, the SoD formula needs end_fac 6.64 for one and 7.8 for the other. Not pursued further - endurance is not in the calculators.",
+    "stamina_plus_40": 93,
+    "strength_plus_67": 155
+  },
+  "strength_buff": {
+    "strength": [
+      223,
+      290
+    ],
+    "attack": [
+      [
+        368,
+        781
+      ],
+      [
+        413,
+        781
+      ]
+    ],
+    "endurance_max": [
+      4366,
+      4521
+    ],
+    "result": "Offense +45, exactly floor((290-75)*2/3) - floor((223-75)*2/3) = 143-98. Accuracy unmoved."
+  },
+  "haste_buff": {
+    "attack_speed_pct": [
+      150,
+      185
+    ],
+    "baseline_decomposed": "100 + Cloak of Flames +4 (36% base, flat +4 merge = 40%) + Unbound Alacrity rank 3 (10%) = 150, additive. Multiplicative would read 144.",
+    "open": "the buff's own listed haste %, to tell additive stacking from a cap"
+  },
+  "stamina_buff": {
+    "stamina": [
+      254,
+      294
+    ],
+    "hp_max": [
+      6240,
+      6443
+    ],
+    "endurance_max": [
+      4366,
+      4459
+    ],
+    "result": "HP +203. Accuracy unmoved (stamina ruled out).",
+    "hp_formula": "Not settled. EQEmu SoD with basedata SK hp_fac 4.8 gives 192 raw / 215 with Natural Durability. Only halving stamina over 255 x (SK 4.8 + Monk 4.25) x 1.12 = 202.7 hits it - which needs two classes' factors added, unsupported. Test: unequip Midnight Clad Leggings +4."
+  },
+  "basedata_level_50": {
+    "_columns": "LEVEL^CLASS^hp^mana^end^?^?^hp_fac^mana_fac^end_fac",
+    "shadowknight": [
+      1440,
+      900,
+      652,
+      4.8,
+      4.5,
+      3.25
+    ],
+    "monk": [
+      1275,
+      0,
+      900,
+      4.25,
+      0,
+      4.5
+    ],
+    "shaman": [
+      1275,
+      900,
+      456,
+      4.25,
+      4.5,
+      3.25
+    ]
+  },
+  "leggings_off": {
+    "_about": "Same session, Midnight Clad Leggings +4 unequipped (AC 9, STA +13, INT +9, WIS +9, fire +12, no HP/mana/end).",
+    "vitals": {
+      "hp_max": 6108,
+      "mana_max": 5403,
+      "endurance_max": 4328,
+      "ac": [
+        463,
+        439,
+        501
+      ],
+      "attack": [
+        368,
+        781
+      ]
+    },
+    "stats": {
+      "stamina": 241,
+      "intelligence": 202,
+      "wisdom": 219
+    },
+    "resists_changed": {
+      "fire": [
+        126,
+        115
+      ],
+      "void": [
+        106,
+        102
+      ]
+    },
+    "predictions_made_before": {
+      "mitigation": 463,
+      "avoidance": 501,
+      "offense": 368,
+      "hp": {
+        "shadowknight_only": -70,
+        "shadowknight_plus_monk": -132
+      },
+      "mana": {
+        "one_stat_p99": -42,
+        "both_stats_p99": -85
+      }
+    },
+    "result": {
+      "mitigation": "463 exact",
+      "avoidance_offense": "unchanged, as predicted",
+      "hp": "-132: the Shadowknight + Monk prediction, exactly",
+      "mana": "-103: missed both P99 predictions; EQEmu SoD formula (each caster's own stat, summed) gives exactly -103",
+      "accuracy": "unmoved - intelligence and wisdom ruled out"
+    }
+  },
+  "resource_formulas": {
+    "_source": "EQEmu client_mods.cpp SoD branch + Resources/basedata.txt at level 50; check with check-resources.py",
+    "mana": {
+      "fit": "6 of 6 exact",
+      "rule": "sum over casting classes of mana_fac x converted own stat. Shadowknight: INT x 4.5. Shaman: WIS x 4.5. Monk: none. Conversion: over 200 counts half, then (3*x - 300)/2 + x above 100."
+    },
+    "hp": {
+      "fit": "2 of 3 exact (stamina buff, leggings); Engineer's Ring 2 off",
+      "rule": "two highest hp_fac summed (SK 4.8 + Monk 4.25 = 9.05) x stamina (over 255 counts half), then +12% Natural Durability."
+    },
+    "endurance": {
+      "fit": "4 of 6 within a point; agility and strength buffs miss (+108 vs 93, +163 vs 155)",
+      "rule": "two highest end_fac summed (Monk 4.5 + SK 3.25 = 7.75) x converted average of STR/STA/DEX/AGI."
+    }
+  },
+  "ac_buff": {
+    "_about": "2026-09-13, an AC buff only (value not yet given). Stance with no Accuracy bonus (625).",
+    "vitals": {
+      "hp": 6249,
+      "mana_max": 5524,
+      "endurance_max": 4366,
+      "ac": [
+        474,
+        439,
+        501
+      ],
+      "attack": [
+        368,
+        625
+      ],
+      "attack_speed_pct": 150
+    },
+    "stats": {
+      "strength": 223,
+      "stamina": 256,
+      "intelligence": 213,
+      "wisdom": 230,
+      "agility": 178,
+      "dexterity": 158,
+      "charisma": 148
+    },
+    "vs_baseline": {
+      "mitigation": "+7 (467 -> 474) on the same gear as baseline_2026_09_13",
+      "soft_cap": "unchanged",
+      "avoidance": "unchanged"
+    },
+    "model": {
+      "rule": "buff AC / 4 added to the AC sum",
+      "baseline_ac_sum": 526,
+      "with_buff": 546,
+      "predicted_mitigation": 474,
+      "screenshot": 474,
+      "match": true,
+      "discriminates": "79 AC would give 473; dividing by 3 instead of 4 would give 476"
+    },
+    "repeat_reading": {
+      "when": "2026-09-13, after the new baseline",
+      "ac": [
+        474,
+        439,
+        501
+      ],
+      "attack": [
+        368,
+        625
+      ],
+      "stats": "identical to baseline_2026_09_13",
+      "verdict": "474 reproduced"
+    },
+    "buff": {
+      "name": "Guardian",
+      "spells_us": "spell 389, SPA 1 AC: base 35, formula 102 (base + caster level), max 80",
+      "ac_at_level_50": 80
+    }
+  },
+  "baseline_2026_09_13": {
+    "_about": "New unbuffed baseline, Evasive Stance, after Midnight Clad Headband +4->+5 and Midnight Clad Leggings +4->+5.",
+    "vitals": {
+      "hp": 6249,
+      "mana_max": 5524,
+      "endurance_max": 4366,
+      "ac": [
+        467,
+        439,
+        501
+      ],
+      "attack": [
+        368,
+        625
+      ],
+      "attack_speed_pct": 150
+    },
+    "regen": {
+      "combat_hp": 34,
+      "combat_mana": 35,
+      "combat_endurance": 59
+    },
+    "stats": {
+      "strength": 223,
+      "stamina": 256,
+      "intelligence": 213,
+      "wisdom": 230,
+      "agility": 178,
+      "dexterity": 158,
+      "charisma": 148
+    },
+    "inventory": {
+      "worn_ac": 251,
+      "was": 249,
+      "merges": "headband AC 6->7, STA/INT/WIS 14->15; leggings AC 9->10, STA 13->14, INT/WIS 9->10"
+    },
+    "result": {
+      "mitigation": "467 predicted (AC sum 526, 87 over cap x 0.33 = 28), 467 shown",
+      "soft_cap": "439 exact",
+      "avoidance": "501 unchanged, as expected",
+      "stats": "+2 STA/INT/WIS exactly the two merges",
+      "mana": "+18 predicted, +18 shown",
+      "hp": "+10 predicted (stamina over 255 counts half), +9 shown",
+      "endurance": "0 predicted, 0 shown"
+    }
+  },
+  "weapon_tests_2026_09_14": {
+    "_about": "Striker Stance (Dan, 2026-09-14), no buffs. Striker shows no Accuracy bonus in the window. Offhand Wu's Fist unless noted. Other gear had changed since baseline (STR 230, STA 262, INT 219, AGI 179, DEX 160, CHA 150 bare-fisted).",
+    "tests": [
+      {
+        "primary": "1H Piercing weapon (skill 250), WIS +21 (likely Garduk +4)",
+        "str": 230,
+        "attack": [
+          353,
+          601
+        ]
+      },
+      {
+        "primary": "empty, bare fist = Hand to Hand (skill 270)",
+        "str": 230,
+        "attack": [
+          373,
+          625
+        ]
+      },
+      {
+        "primary": "2H Slashing weapon (skill 250), STR/INT/WIS/DEX up, CHA -18 (likely Torrid Corruptor +4); offhand empty",
+        "str": 252,
+        "attack": [
+          368,
+          601
+        ]
+      },
+      {
+        "primary": "2H Blunt weapon (skill 220), WIS 256 DEX 175",
+        "str": 230,
+        "attack": [
+          323,
+          565
+        ],
+        "predicted_before": {
+          "accuracy": 565,
+          "offense": 323
+        },
+        "match": true
+      }
+    ],
+    "offense_formula": "weapon skill + (2*STR - 150)/3 (integer; EQEmu Mob::offense). 270+98=368, 270+103=373, 250+103=353, 250+118=368. The Offense SKILL is not in it; no ATK term shows in the window.",
+    "accuracy_formula": "floor((Offense skill + weapon skill + 7 + 10) * 121/100), then * (100 + SPA 184 %)/100 (EQEmu compute_tohit + GetTotalToHit). (230+270+17)*1.21=625, (230+250+17)*1.21=601; Offensive 25% -> 781, Balanced 10% -> 687.",
+    "ruled_out": "stats (WIS 232/241/253 all gave the same), offhand weapon, heroic stats (don't exist)",
+    "prediction": "2H Blunt (skill 220): Accuracy 565 predicted before the screenshot, 565 shown; Offense 323 exact"
+  },
+  "resource_formulas_absolute_2026_09_14": {
+    "_source": "EQEmu client_mods.cpp SoD branch (CalcBaseHP/CalcMaxHP, CalcBaseMana, CalcBaseEndurance), basedata level 50, item totals from the 13 Sep inventory + eqlwiki (HP 547, mana 328, endurance 64; merge-scaled). Absolute values, not deltas.",
+    "endurance": {
+      "rule": "sum over the two best end classes (SK, Monk) of [base end + trunc(end_fac x int(converted average of STR/STA/DEX/AGI))] + item endurance",
+      "fit": "6 of 8 exact: 12 Sep 4366, 13 Sep 4366, dex buff 4483, stamina buff 4459, ring off 4183, leggings off 4328",
+      "misses": {
+        "agility buff": "predicted 4475, shown 4459",
+        "strength buff": "predicted 4530, shown 4521"
+      },
+      "note": "the misses look like the buffs counting a few points less than the window's stat; buff names would let spells_us.txt settle it",
+      "buff_spells": {
+        "Agility": "spell 154, SPA 6 (AGI) only, base 21 + level/2, max 45",
+        "Strength": "spell 159, SPA 4 (STR) only, base 42 + level/2, max 67",
+        "verdict": "pure single-stat buffs, so the misses are not side effects"
+      },
+      "weapon_tests": "item endurance 68 inferred from test 2 (4410); tests 3 (4487) and 4 (4448) then exact",
+      "retest_predictions": {
+        "gear": "as weapon test 2 (bare fist, STR 230 STA 262 DEX 160 AGI 179, end 4410)",
+        "Agility": 4525,
+        "Strength": 4572,
+        "why": "the agility and stamina buff screenshots both recorded 4459; a misread is possible"
+      }
+    },
+    "mana": {
+      "rule": "sum over casting classes (SK INT, Shaman WIS) of trunc(base mana 900 + 4.5 x converted stat) + item mana + 4",
+      "fit": "4 of 4 exact with the +4; the +4 is unexplained"
+    },
+    "hp": {
+      "rule": "floor((5 + SK 1440 + Monk 1275 + (4.8 + 4.25) x stamina, over 255 counts half) + item HP) x 1.12)",
+      "fit": "all 5 within 1 point once about +6 is added before the 12%; no single constant makes all 5 exact",
+      "note": "a small HP/mana source is missing, around +6 HP and +4 mana: an augment, AA or merge-scaling detail"
+    }
+  },
+  "crit_check_2026_09_14": {
+    "eqemu_code": "roll Int(1, MeleeCritDifficulty=8900) < dex_bonus; dex_bonus = (DEX + 45), x3/5 without innate crit (only WAR/BER), + dex_bonus x SPA169%/100",
+    "tester": "DEX 158: (203 x 3/5)=121, +5% Combat Fury = 127 -> 1.4% at difficulty 8900",
+    "measured": "11.88% [11.35, 12.44] on Test Fifty Five (10 Sep); Test Sixty 14 Sep so far 10.77% on 418 hits",
+    "reading": "EQL is ~8x EQEmu's default. Same shape with difficulty near 1000-1100 would fit; so would innate crit for everyone with difficulty ~1800. A dexterity buff parse separates 'scales with DEX' from 'flat'."
+  },
+  "hit_parse_2026_09_14": {
+    "offensive": {
+      "target": "Test Sixty",
+      "window": "Mon 14 Sep 15:57-16:53 (stance line 'You assume an offensive stance' at 15:57)",
+      "punch": "4903 hits / 7003 swings = 70.01% [68.93, 71.07]",
+      "solved_avoidance": "468 (452-485) from Accuracy 781",
+      "cross_check_same_parse": {
+        "bash 225": "predicted 67.2, observed 67.06",
+        "kick 221": "predicted 66.9, observed 66.99",
+        "strike 255 (Tiger Claw?)": "predicted 69.1, observed 69.03",
+        "reave 210": "predicted 66.1, observed 63.15 [59.0, 67.1]"
+      },
+      "drift": "punch hit % by 10 min: 72.4, 69.6, 70.4, 68.8, 70.3, 67.8 - possibly Offensive's bonus shrinking below 25% endurance"
+    },
+    "balanced_predictions": {
+      "punch": 65.9,
+      "bash": 62.7,
+      "kick": 62.4,
+      "strike (Tiger Claw)": 64.9,
+      "reave": 61.4
+    },
+    "balanced": {
+      "window": "17:00-18:05 (stance line at 17:00)",
+      "punch": "8117 swings, 66.10% [65.06, 67.12] vs predicted 65.9 (64.7-67.1)",
+      "bash": "60.60 vs 62.7",
+      "kick": "63.41 vs 62.4",
+      "strike": "64.81 vs 64.9",
+      "reave": "60.34 vs 61.4",
+      "solved_avoidance": 466,
+      "crit": "11.44% (Offensive 11.34%)",
+      "drift": "none (Offensive drifted 72->68, consistent with its endurance-gated bonus)"
+    },
+    "swings": {
+      "model": "EQEmu DoAttackRounds: DA (240+50)/500=58%, TA 100*100/900=11% after a main double, DW (252+50+32 Ambidexterity)/375=89.1%, offhand DA (skill>149)",
+      "predicted_per_round": 3.051,
+      "measured": "Offensive 7003 punches / (3369s / 1.4667s) = 3.049; Balanced 3.059",
+      "per_second_histogram": "EQEmu model chi2 ~5; P99 (3.87/round) chi2 1403; no-triple fails (no 5-swing seconds)",
+      "caveat": "round length assumed 2.2s delay / 1.5 (150% attack speed); DW 100% would need 1.55s rounds"
+    }
+  },
+  "dex_crit_parse_2026_09_14": {
+    "buff": "Dexterity (spell 157, DEX +50, duration 630 ticks = 63 min), DEX 160 -> 210, landed 18:13:21, Balanced",
+    "first_60_min": "crit 810/7051 = 11.49% [10.76, 12.25]",
+    "whole_84_min": "crit 11.60% on 10,374 hits (buff may have worn off after ~63 min)",
+    "predicted_if_dex_driven": 14.2,
+    "without_buff": 11.44,
+    "verdict": "dexterity does not drive melee crit on EQL",
+    "side_checks": {
+      "punch_hit": "65.26% (no-buff 66.10%) - DEX does not feed Accuracy",
+      "punches_per_round": 3.042
+    }
+  },
+  "gear_off_2026_09_14": {
+    "_about": "most gear removed, Balanced, Dexterity buff apparently still up (DEX 168)",
+    "vitals": {
+      "hp": 4137,
+      "mana": 2731,
+      "endurance": 2730,
+      "ac": [
+        208,
+        439,
+        488
+      ],
+      "attack": [
+        283,
+        687
+      ]
+    },
+    "stats": {
+      "str": 95,
+      "sta": 100,
+      "int": 95,
+      "wis": 105,
+      "agi": 123,
+      "dex": 168,
+      "cha": 75
+    },
+    "checks": {
+      "offense": "270 + (190-150)/3 = 283 exact",
+      "accuracy": "687 exact",
+      "avoidance": "(408+18+10)*1.12 = 488 exact",
+      "mana": "2731 exact with no item mana and no +4 - the earlier +4 came from gear",
+      "endurance": "formula gives 2737 + item end, window 2730: again a few points low"
+    }
+  },
+  "low_dex_parse_2026_09_14": {
+    "window": "20:14:23-20:41:12 (Dexterity faded 20:14:22), Balanced, most gear off, DEX ~118",
+    "crit": "341/3207 = 10.63% [9.61, 11.75]; EQEmu DEX shape predicted 9.0%, flat 11.4%",
+    "hit_vs_prediction": {
+      "punch": "64.64 vs 66.0",
+      "bash": "61.93 vs 62.8",
+      "kick": "65.75 vs 62.5",
+      "strike": "62.94 vs 65.0",
+      "reave": "61.92 vs 61.5"
+    },
+    "punches_per_round": 3.034,
+    "pooled_crit_test_sixty": "2912/25721 = 11.32% across Offensive, Balanced, Balanced+DEX 210, Balanced low gear",
+    "verdict": "crit ignores stats, gear and stance; hit rates and swings unchanged by gear, as the formulas say"
+  },
+  "three_melee_crit_2026_09_15": {
+    "trio": "Paladin / Shadowknight / Monk (Dan)",
+    "target": "Test Sixty",
+    "window": "15 Sep 10:00-11:59 (no stance change logged)",
+    "crit": "1046/9419 = 11.11%",
+    "compare": "SK/Monk/Shaman pooled 11.32% on 25,721 hits",
+    "thesis_5pct_per_class": "predicted 20% (additive CF) or 15.75% (x1.05) - rejected",
+    "verdict": "going from 2 to 3 melee/hybrid classes does not change crit"
+  },
+  "vampirism_pet_parse_2026_09_15": {
+    "window": "11:41-12:00 Test Sixty, pet Gabtik only (no melee from the test character)",
+    "exaltation": "most likely Improved Vampirism II (spells_us 74092): SPA 124 spell damage +1-25%, limited to level <=44 (5%/level decay), direct damage, instant, detrimental, lifetap target type",
+    "pet_spells": {
+      "Specter Lifetap": "234 casts, all exactly 61",
+      "Lifedraw": "52 casts, all exactly 105",
+      "DoTs": "Engulfing Darkness 11 x99, Negation of Life 20 x32, Heat Blood 43 x14, all constant"
+    },
+    "exaltation_lines": "none during the parse; no heals to the test character",
+    "verdict": "the focus does not apply to the pet's spells - a 1-25% random bonus would have moved almost every cast off 61/105",
+    "control_suggested": "The test character casting Lifedraw with the exaltation on: damage should vary above base if the focus works at all",
+    "without_exaltation": "superseded: the 'without exaltation' window was parse 2, which Dan says to ignore",
+    "without_weapon": {
+      "removed": "~13:45-13:46",
+      "pet_melee_with_weapon": "slash avg 108 (54.7%), cleave 111, bash 42, kick 41",
+      "pet_melee_without": "slash gone, replaced by sting avg 43; cleave avg ~43; bash avg 14; kick ~39 unchanged",
+      "will_not_sufficient": "0 after 13:50 (68 before)",
+      "spells": "Specter Lifetap 61, Lifedraw 105 unchanged",
+      "verdict": "the weapon WAS in use (slash 108 vs bare sting 43, cleave and bash fall too), so the exaltation sat on an active weapon and still did nothing to pet spells. The 'will is not sufficient' message comes from the weapon but does not stop the pet using it."
+    },
+    "parse_labels_from_dan": {
+      "1_khyldorn_with_exaltation": {
+        "window": "11:41-12:38",
+        "weapon": "Khyldorn the Blood Drinker (2H Slashing, DMG 36, delay 43, Class SHD) with the exaltation",
+        "spells": "Specter Lifetap 61 x242, Lifedraw 105 x54",
+        "melee": "slash avg 108.2 (54.6%), cleave 110.8, bash 42.4, kick 40.5",
+        "will_not_sufficient": 66
+      },
+      "2_ignore": "13:42-13:45",
+      "3_no_weapon": {
+        "window": "13:47-14:03",
+        "spells": "Specter Lifetap 61 x102, Lifedraw 105 x10",
+        "melee": "sting avg 42.7 (54.2%), cleave 42.8, bash 14.0, kick 38.9",
+        "will_not_sufficient": 0
+      },
+      "4_garduk_plus_shield": {
+        "window": "14:05:25-14:23:53",
+        "melee": "pierce avg 57.4 (55.6%), cleave 57.8, bash 30.3, kick 40.8",
+        "procs": "Winter's Roar (cold 246) x25 - wiki lists Tagar's Insects for Garduk and Winter's Roar on Barbarian Spiritist's Hammer",
+        "will_not_sufficient": 0
+      },
+      "5_earthshaker": "ignore (Dan)"
+    },
+    "pet_weapon_speed": {
+      "main_swings_per_s": {
+        "Khyldorn (delay 43)": 0.541,
+        "no weapon": 1.331,
+        "Garduk (delay 40)": 0.571
+      },
+      "note": "pet swings at the weapon's delay: ~2.3 swings per delay-second with either weapon",
+      "main_attack_dps": {
+        "Khyldorn": "0.541 x 108.2 x 54.6% = 32.0",
+        "no weapon": "1.331 x 42.7 x 54.2% = 30.8",
+        "Garduk": "0.571 x 57.4 x 55.6% = 18.2"
+      }
+    },
+    "_status": "IGNORE ALL - Dan restarted the pet tests on 15 Sep with a level 49 pet (Kareker) so procs work; see pet_tests_2026_09_15"
+  },
+  "pet_tests_2026_09_15": {
+    "pet": {
+      "name": "Kareker",
+      "level": 49,
+      "class": "SHD/WAR",
+      "illusion": "Petamorph Wand: Murderbee",
+      "hp": 7766,
+      "mana": 950,
+      "ac": [
+        336,
+        513
+      ],
+      "attack": [
+        355,
+        310
+      ],
+      "attack_speed_pct": 170,
+      "hp_regen": 1,
+      "mana_regen": 82,
+      "stats": {
+        "str": 224,
+        "sta": 179,
+        "int": 10,
+        "wis": 10,
+        "agi": 149,
+        "dex": 115,
+        "cha": 10
+      }
+    },
+    "plan": [
+      "1 no weapon",
+      "2 Khyldorn the Blood Drinker (2H Slashing, DMG 36, delay 43, proc Siphon L50)",
+      "3 Garduk (1H Piercing, DMG 23, delay 40) + Bladestopper",
+      "4 Earthshaker (2H Slashing, DMG 37, delay 70, proc Earthquake)"
+    ],
+    "question": "does weapon delay set attack frequency; damage per hit and proc behaviour per weapon",
+    "1_no_weapon": {
+      "window": "14:33:41-15:01:46, Test Sixty, 1684 s engaged",
+      "melee": {
+        "sting (auto)": "2804 swings, 60.2% hit, avg 53.6, 1.665 swings/s",
+        "bash": "560, 64.8%, avg 14.0, 0.333/s",
+        "kick": "552, 62.0%, avg 47.1, 0.328/s",
+        "cleave": "318, 65.1%, avg 53.9, 0.189/s"
+      },
+      "auto_dps": 53.8,
+      "spells": {
+        "Specter Lifetap": "61 x259",
+        "Dooming Darkness DoT": "20 x176",
+        "Negation of Life DoT": "20 x48",
+        "Life Leech": "250 x9",
+        "Harm Touch": "672 x1"
+      },
+      "crits": "no pet crit lines in the log at all - likely filtered or not reported for pets"
+    }
+  }
+}

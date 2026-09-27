@@ -2,24 +2,32 @@ import { describe, expect, it } from 'vitest'
 import { computeAc, type AcInputs } from '../src/core/acModel'
 import { avoidanceFromHitRate, baseAccuracy, doubleAttackChance, dualWieldChance, hitChance, stanceAccuracy, swingsPerRound, tripleAttackChance, windowOffense } from '../src/core/combatModel'
 import { aaTotal, latestAas } from '../src/core/aa'
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
 
-// A Shadowknight/Monk/Shaman Iksar at 50, unbuffed: the in-game Inventory window read 467 / 439 / 501.
+// The test character (Shadowknight/Monk/Shaman Iksar at 50, unbuffed) as the in-game Inventory
+// window read on 12 September, with the calculator inputs worked out then.
+const reading = JSON.parse(readFileSync(join(__dirname, 'fixtures', 'baseline-2026-09-12.json'), 'utf8'))
+const inputs = reading.calculator_check.inputs
 const baseline: AcInputs = {
-  trio: ['shd', 'mnk', 'shm'], cls: 'shd', race: 'iksar', level: 50, defense: 230, agility: 178, heroicAgility: 0, heroicStrength: 0,
-  weight: 14, drunk: 0, itemAC: 251, shieldAC: 0, itemAvoidance: 0, foodDrinkAC: 0, tributeAC: 0, acBuffs: 0, armorOfWisdom: 0,
-  herosFortitude: 0, combatStability: 12, evasion: 12, softCap: 392, multiplier: 0.33
+  trio: ['shd', 'mnk', 'shm'], cls: 'shd', race: 'iksar', level: reading.character.level, defense: inputs.defense_skill, agility: inputs.functional_agility,
+  heroicAgility: inputs.heroic_agility, heroicStrength: 0, drunk: 0, itemAC: inputs.worn_ac, shieldAC: inputs.shield_ac, itemAvoidance: inputs.item_avoidance,
+  foodDrinkAC: 0, tributeAC: 0, acBuffs: 0, armorOfWisdom: 0, herosFortitude: 0, combatStability: inputs.spa_259_pct, softCap: inputs.soft_cap_table,
+  multiplier: inputs.post_cap_multiplier,
+  // Not in the reading as numbers: the Monk's weight is "under 17", and evasion is taken as the same AAs.
+  weight: 14, evasion: inputs.spa_259_pct
 }
 
 describe('AC', () => {
   it("reproduces the Inventory window's mitigation, soft cap and avoidance", () => {
     const r = computeAc(baseline)
-    expect([r.mitigation, r.effCap, r.avoidance]).toEqual([467, 439, 501])
+    expect([r.mitigation, r.effCap, r.avoidance]).toEqual(reading.vitals.ac)
   })
 
-  it('predicted the ring-off reading before it was taken (12 Sep: 249 worn, the ring 28 AC and 9 agility)', () => {
-    expect(computeAc({ ...baseline, itemAC: 249 }).mitigation).toBe(467)
-    const r = computeAc({ ...baseline, itemAC: 249 - 28, agility: 169 })
-    expect([r.mitigation, r.effCap, r.avoidance]).toEqual([454, 439, 499])
+  it('predicted the ring-off reading before it was taken (the ring 28 AC and 9 agility)', () => {
+    const ring = reading.ring_off.ring_contribution
+    const r = computeAc({ ...baseline, itemAC: inputs.worn_ac - ring.ac, agility: inputs.functional_agility - ring.each_stat })
+    expect([r.mitigation, r.effCap, r.avoidance]).toEqual(reading.ring_off.vitals.ac)
   })
 
   it("gives Dzarn's worked example: displayed 10,480 and mitigation 3,413", () => {
@@ -44,7 +52,7 @@ describe('combat', () => {
     expect(windowOffense(270, 230)).toBe(373)
     const acc = baseAccuracy(230, 270)
     expect(acc).toBe(625)
-    expect(stanceAccuracy(acc, 25)).toBe(781)
+    expect(stanceAccuracy(acc, 25)).toBe(reading.vitals.attack[1])
     expect(stanceAccuracy(acc, 10)).toBe(687)
   })
 
