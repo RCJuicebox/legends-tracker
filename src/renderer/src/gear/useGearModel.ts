@@ -21,13 +21,14 @@ import {
   handWeights,
   weightsForSlot,
   type HandWeights,
+  type SlotResult,
   zoneEras,
   type Wearer,
   type Weights
 } from '../../../core/upgrades'
 import { conversions, rawWeights, ROLE_PRESETS, type RoleWeights } from '../../../core/statValue'
 import { focusValue, type FocusLine, type FocusWorth } from '../../../core/itemFocus'
-import { optimizeGear, ownedPieces, pieceName, SLOT_LAYOUT, type EffectValue, type Exaltation, type Piece, type PieceSource } from '../../../core/gearOptimizer'
+import { optimizeGear, ownedPieces, pieceName, SLOT_LAYOUT, type EffectValue, type Exaltation, type OptimizeOptions, type Piece, type PieceSource, type Plan } from '../../../core/gearOptimizer'
 import { usePet } from './usePet'
 import { effectScore, itemEffects, procOf, procWorth, wornEffectOf, wornStats, wornWorth, type EffectSpell, type EffectWorth } from '../../../core/itemEffects'
 import { meleeProfile, type MeleeProfile } from '../../../core/meleeTally'
@@ -204,6 +205,41 @@ function bestOwned(pieces: Piece[], key: string): Piece | null {
   let best: Piece | null = null
   for (const p of pieces) if (p.key === key && p.stats && (!best || mergeLevel(p.item.name) > mergeLevel(best.item.name))) best = p
   return best
+}
+
+/** How long one slice of judging in the round may hold the page. */
+const SLICE_MS = 10
+
+/** Lets the page handle input and draw before the next slice of work. */
+function nextSlice(): Promise<void> {
+  const s = (globalThis as { scheduler?: { yield?: () => Promise<void> } }).scheduler
+  if (s?.yield) return s.yield()
+  return new Promise((resolve) => setTimeout(resolve, 0))
+}
+
+type FinderCandidate = SlotResult['candidates'][number]
+export type RoundCandidate = FinderCandidate & {
+  round: { delta: number; placed: string | null; owned: boolean; moves: { slot: string; out: string | null; in: string | null }[] }
+}
+type RoundSlot = Omit<SlotResult, 'candidates'> & { candidates: RoundCandidate[] }
+
+/** One candidate among everything owned, worn as well as it can be: its worth is what the set gains. */
+function judgeInTheRound(c: FinderCandidate, slot: string, opts: OptimizeOptions, baseline: Plan): RoundCandidate {
+  // One the character owns is already among the pieces: judged as their own copy, as the optimizer does.
+  const key = itemKey(c.item.title)
+  const mine = !!bestOwned(opts.pieces, key)
+  const r = mine ? ownedInTheRound({ ...opts, key, baseline }) : inTheRound({ ...opts, candidate: candidatePiece(c.item, c.stats), baseline })
+  // One the best set wears just where it is worn now is no upgrade, and one it wears in another
+  // slot is that slot's.
+  const stays =
+    mine && (r.placed !== slot || baseline.after.some((p, i) => p?.key === key && p.from === 'worn' && !p.exalt && baseline.slots[i] === p.item.location))
+  return {
+    ...c,
+    round: {
+      delta: stays ? 0 : r.delta, placed: r.placed, owned: mine,
+      moves: r.moves.map((m) => ({ slot: m.slot, out: m.out ? pieceName(m.out) : null, in: m.in ? pieceName(m.in) : null }))
+    }
+  }
 }
 
 export function useGearModel(view: InventoryView, sheet: CharacterSheet | null, mode: GearMode) {
@@ -558,7 +594,7 @@ export function useGearModel(view: InventoryView, sheet: CharacterSheet | null, 
     [items, wearer, weights, compare, hiddenEras, inv, view.items, owned, twoHanders, worth, fociOf, valueOf, eraStatus, pieces, exaltations, judge, effects, effectsOfItem, weaponHands]
   )
   const deferred = useDeferredValue(input)
-  const results = useMemo(() => {
+  const found = useMemo(() => {
     const d = deferred
     if (!d.items || !classes.length || mode !== 'finder') return null
     const round = d.judge === 'round'
@@ -589,35 +625,47 @@ export function useGearModel(view: InventoryView, sheet: CharacterSheet | null, 
       perSlot: round ? 8 : 6,
       keepStatWinners: round
     })
-    if (!round) return slots
     // Each candidate among everything owned, worn as well as it can be; its worth is what the set gains.
     const opts = { pieces: d.pieces, wearer: d.wearer, weights: d.weights, twoHanders: d.twoHanders, focusValue: d.valueOf, exaltations: d.exaltations, effects: d.effects.value ?? undefined, hands: d.hands }
-    const baseline = optimizeGear(opts)
-    return slots.map((s) => {
-      const judged = s.candidates.map((c) => {
-        // One the character owns is already among the pieces: judged as their own copy, as the optimizer does.
-        const key = itemKey(c.item.title)
-        const mine = !!bestOwned(d.pieces, key)
-        const r = mine ? ownedInTheRound({ ...opts, key, baseline }) : inTheRound({ ...opts, candidate: candidatePiece(c.item, c.stats), baseline })
-        // One the best set wears just where it is worn now is no upgrade, and one it wears in another
-        // slot is that slot's.
-        const stays =
-          mine && (r.placed !== s.slot || baseline.after.some((p, i) => p?.key === key && p.from === 'worn' && !p.exalt && baseline.slots[i] === p.item.location))
-        return {
-          ...c,
-          round: {
-            delta: stays ? 0 : r.delta, placed: r.placed, owned: mine,
-            moves: r.moves.map((m) => ({ slot: m.slot, out: m.out ? pieceName(m.out) : null, in: m.in ? pieceName(m.in) : null }))
-          }
-        }
-      })
-      // The best thing to have first, as the optimizer's all-gear mode would choose it: a piece to get
-      // gains over the best set of what is owned, which already has the owned candidates in it, so
-      // those rank after any piece to get that beats that set (their own gain still shows).
-      const rank = (c: (typeof judged)[number]) => (c.round.owned ? 0 : c.round.delta)
-      return { ...s, candidates: judged.filter((c) => c.round.delta > 0).sort((a, b) => rank(b) - rank(a) || b.round.delta - a.round.delta).slice(0, 6) }
-    })
+    return { slots, round: round ? opts : null }
   }, [deferred, classes.length, mode])
+
+  // Judging in the round runs the optimizer once a candidate (some 150 ms in all), so it is done a
+  // slice at a time with the page free in between; the last results stay up, marked stale, meanwhile.
+  const [judged, setJudged] = useState<{ of: NonNullable<typeof found>; slots: RoundSlot[] } | null>(null)
+  useEffect(() => {
+    const opts = found?.round
+    if (!found || !opts) return
+    let stopped = false
+    void (async () => {
+      await nextSlice()
+      const baseline = optimizeGear(opts)
+      const out: RoundSlot[] = []
+      let sliceEnd = performance.now() + SLICE_MS
+      for (const s of found.slots) {
+        const candidates: RoundCandidate[] = []
+        for (const c of s.candidates) {
+          if (performance.now() > sliceEnd) {
+            await nextSlice()
+            if (stopped) return
+            sliceEnd = performance.now() + SLICE_MS
+          }
+          candidates.push(judgeInTheRound(c, s.slot, opts, baseline))
+        }
+        // The best thing to have first, as the optimizer's all-gear mode would choose it: a piece to get
+        // gains over the best set of what is owned, which already has the owned candidates in it, so
+        // those rank after any piece to get that beats that set (their own gain still shows).
+        const rank = (c: RoundCandidate) => (c.round.owned ? 0 : c.round.delta)
+        out.push({ ...s, candidates: candidates.filter((c) => c.round.delta > 0).sort((a, b) => rank(b) - rank(a) || b.round.delta - a.round.delta).slice(0, 6) })
+      }
+      if (!stopped) setJudged({ of: found, slots: out })
+    })()
+    return () => {
+      stopped = true
+    }
+  }, [found])
+  const results = !found ? null : !found.round ? found.slots : (judged?.slots ?? null)
+  const judging = !!found?.round && judged?.of !== found
 
   const model: GearModel | null = state?.file
     ? {
@@ -665,7 +713,7 @@ export function useGearModel(view: InventoryView, sheet: CharacterSheet | null, 
     model,
     results,
     /** The results shown are from before the latest change and are being worked out again. */
-    resultsStale: deferred !== input,
+    resultsStale: deferred !== input || judging,
     stats,
     classes,
     level,
