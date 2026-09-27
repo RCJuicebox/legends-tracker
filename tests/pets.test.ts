@@ -186,7 +186,7 @@ describe('pet gear optimizer', () => {
     const sb = block(lines)
     return { item: { location: 'General 1', name, id: 0, count: 1, augs: [] }, from, key: name.toLowerCase(), r: restrictions(sb), stats: parseStatsBlock(sb) as ItemStats, lore: false, noPet }
   }
-  const weights = { ac: 5, hp: 1, mana: 0, end: 0, str: 1, sta: 1, agi: 1, dex: 0, wis: 0, int: 0, cha: 0, resists: 0, haste: 10, attack: 1, hpRegen: 0, manaRegen: 0, endRegen: 0, ratio: 10 }
+  const weights = { ac: 5, hp: 1, mana: 0, end: 0, str: 1, sta: 1, agi: 1, dex: 0, wis: 0, int: 0, cha: 0, resists: 0, haste: 10, attack: 1, hpRegen: 0, manaRegen: 0, endRegen: 0, ratio: 10, rangedRatio: 0 }
   const wearer = { classes: ['shd', 'mnk', 'shm', 'bst', 'war'], race: '', level: 36 }
   const wolf: PetMelee = { damage: 20, delay: 28, bonus: 11, dualWield: 0.55 }
 

@@ -3,9 +3,14 @@
 // what the focus effects worn are worth. A local search from what is worn now: move one piece into a
 // slot (swapping, or refilling the slot it left), keep the move that adds most, repeat until no move
 // adds anything.
+//
+// Only one haste item is needed: the best worn is all that counts. One move at a time cannot trade the
+// haste gloves for a haste belt so that better gloves can go on (the belt alone costs the old belt,
+// the gloves alone cost the haste), so the search is run again with each haste item owned as the one,
+// the rest of the set free to drop its haste, and the best set of the lot is kept.
 
 import { itemKey, type InvItem, type ItemStats } from './inventory'
-import { canWear, isTwoHanded, score, WEAPON_SLOTS, type Restrictions, type Wearer, type Weights } from './upgrades'
+import { canWear, isTwoHanded, score, weightsForSlot, type Restrictions, type Wearer, type Weights } from './upgrades'
 
 /** Every slot gear is worn in, one entry per slot: two ears, two wrists, two rings, two Any slots. */
 export const SLOT_LAYOUT = [
@@ -33,6 +38,8 @@ export interface OptimizeOptions {
   weights: Weights
   twoHanders: boolean
   focusValue: (names: string[]) => number
+  /** Where the search starts, one entry per slot; what is worn when absent. */
+  from?: (Piece | null)[]
 }
 
 export interface Plan {
@@ -65,9 +72,11 @@ export function optimizeGear(o: OptimizeOptions): Plan {
     if (!canWear(p.r, o.wearer, slots[i])) return false
     return !(slots[i] === 'Primary' && isTwoHanded(p.r) && !o.twoHanders)
   }
-  // A weapon's damage and delay only count in the hands. Haste is counted once for the whole set:
-  // only the best worn works.
-  const slotWeights = slots.map((s) => ({ ...(WEAPON_SLOTS.includes(s) ? o.weights : { ...o.weights, ratio: 0 }), haste: 0 }))
+  // What may go in each slot, worked out once: the search asks it for every move.
+  const fitting = slots.map((_, i) => pieces.filter((p) => fits(p, i)))
+  // Weapon ratio counts in the hands, ranged ratio in the Range slot. Haste is counted once for the
+  // whole set: only the best worn works.
+  const slotWeights = slots.map((s) => ({ ...weightsForSlot(o.weights, s), haste: 0 }))
   const hasteOf = (a: (Piece | null)[]) => Math.max(0, ...a.map((p) => p?.stats?.haste ?? 0)) * o.weights.haste
   const scoreCache = new Map<Piece, number[]>()
   const slotScore = (p: Piece | null, i: number): number => {
@@ -79,11 +88,11 @@ export function optimizeGear(o: OptimizeOptions): Plan {
   const primary = slots.indexOf('Primary')
   const secondary = slots.indexOf('Secondary')
   const valid = (a: (Piece | null)[]): boolean => {
-    const lore = new Set<string>()
+    let lore: Set<string> | null = null
     for (const p of a) {
       if (!p?.lore) continue
-      if (lore.has(p.key)) return false
-      lore.add(p.key)
+      if (lore?.has(p.key)) return false
+      ;(lore ??= new Set()).add(p.key)
     }
     const main = a[primary]
     return !(main?.r && isTwoHanded(main.r) && a[secondary])
@@ -92,56 +101,122 @@ export function optimizeGear(o: OptimizeOptions): Plan {
   // worn in, so it is worked out once per set.
   const focusCache = new Map<string, number>()
   const focusOf = (a: (Piece | null)[]) => {
-    const names = a.flatMap((p) => p?.foci ?? [])
-    const key = names.slice().sort().join('\u0001')
+    const names: string[] = []
+    for (const p of a) if (p?.foci.length) names.push(...p.foci)
+    const key = names.length > 1 ? names.slice().sort().join('\u0001') : (names[0] ?? '')
     let v = focusCache.get(key)
     if (v === undefined) focusCache.set(key, (v = o.focusValue(names)))
     return v
   }
-  const total = (a: (Piece | null)[]): number => {
-    if (!valid(a)) return -Infinity
-    let t = focusOf(a) + hasteOf(a)
+  const statsOf = (a: (Piece | null)[]): number => {
+    let t = focusOf(a)
     for (let i = 0; i < a.length; i++) t += slotScore(a[i], i)
     return t
   }
+  const total = (a: (Piece | null)[]): number => (valid(a) ? statsOf(a) + hasteOf(a) : -Infinity)
+  // With `h` the one haste item: it must be worn, its haste counts whatever else is, and every other
+  // piece is judged on its stats alone. Without, the set's best haste counts.
+  const value = (a: (Piece | null)[], h: Piece | null): number =>
+    !h ? total(a) : valid(a) && a.includes(h) ? statsOf(a) + (h.stats?.haste ?? 0) * o.weights.haste : -Infinity
 
-  let a = start.slice()
-  let best = total(a)
-  for (let pass = 0; pass < 12; pass++) {
-    let moved = false
-    for (let i = 0; i < slots.length; i++) {
-      let bestMove: (Piece | null)[] | null = null
-      for (const p of pieces) {
-        if (a[i] === p || !fits(p, i)) continue
-        const b = a.slice()
-        b[i] = p
-        const j = a.indexOf(p)
-        if (j >= 0) {
-          // Moved from another slot: the piece it replaced goes there if it fits, else the best of the rest.
-          const out = a[i]
-          if (out && fits(out, j)) b[j] = out
-          else {
-            b[j] = null
-            let fill: Piece | null = null
-            let fillScore = total(b)
-            for (const q of pieces) {
-              if (b.includes(q) || !fits(q, j)) continue
-              b[j] = q
-              const t = total(b)
-              if (t > fillScore) [fill, fillScore] = [q, t]
-            }
-            b[j] = fill
-          }
-        }
-        const t = total(b)
-        if (t > best + 1e-6) [best, bestMove] = [t, b]
+  // Slot j of b takes the piece that adds most, or stays empty. Only that slot changes, so b is
+  // weighed once with it empty, and each piece by what it brings: its own score, the foci if it
+  // carries any, the haste if it is quicker.
+  const refill = (b: (Piece | null)[], j: number, h: Piece | null): void => {
+    b[j] = null
+    const base = value(b, h)
+    let fill: Piece | null = null
+    let fillScore = base
+    if (base === -Infinity) {
+      // Only a piece put back can make it whole (the haste item itself): weigh each in full.
+      for (const q of fitting[j]) {
+        if (b.includes(q)) continue
+        b[j] = q
+        const t = value(b, h)
+        if (t > fillScore) [fill, fillScore] = [q, t]
       }
-      if (bestMove) {
-        a = bestMove
-        moved = true
+      b[j] = fill
+      return
+    }
+    const main = b[primary]
+    if (j === secondary && main?.r && isTwoHanded(main.r)) return
+    const focusBase = focusOf(b)
+    const hasteBase = h ? 0 : hasteOf(b)
+    const lore = new Set(b.filter((p) => p?.lore).map((p) => p!.key))
+    for (const q of fitting[j]) {
+      if (b.includes(q) || (q.lore && lore.has(q.key))) continue
+      if (j === primary && q.r && isTwoHanded(q.r) && b[secondary]) continue
+      let t = base + slotScore(q, j)
+      if (q.foci.length) {
+        b[j] = q
+        t += focusOf(b) - focusBase
+        b[j] = null
+      }
+      if (!h) t += Math.max(0, (q.stats?.haste ?? 0) * o.weights.haste - hasteBase)
+      if (t > fillScore) [fill, fillScore] = [q, t]
+    }
+    b[j] = fill
+  }
+
+  // Move one piece at a time while a move adds to the set's value.
+  const search = (from: (Piece | null)[], h: Piece | null): (Piece | null)[] => {
+    let a = from.slice()
+    let best = value(a, h)
+    for (let pass = 0; pass < 12; pass++) {
+      let moved = false
+      for (let i = 0; i < slots.length; i++) {
+        let bestMove: (Piece | null)[] | null = null
+        for (const p of fitting[i]) {
+          if (a[i] === p) continue
+          const b = a.slice()
+          b[i] = p
+          // Moved from another slot: that slot takes the piece it replaced, if it fits, or the best of the rest.
+          const j = a.indexOf(p)
+          if (j >= 0) refill(b, j, h)
+          const t = value(b, h)
+          if (t > best + 1e-6) [best, bestMove] = [t, b]
+        }
+        if (bestMove) {
+          a = bestMove
+          moved = true
+        }
+      }
+      if (!moved) break
+    }
+    return a
+  }
+
+  let a = search(o.from ?? start, null)
+  let best = total(a)
+  if (o.weights.haste > 0) {
+    // Each haste item owned as the one worn (one of each, however many copies). The one already giving
+    // the haste is skipped: with its haste counted either way, no move helps that did not already.
+    const seen = new Set<string>()
+    for (const h of pieces) {
+      const haste = h.stats?.haste ?? 0
+      if (haste <= 0 || seen.has(h.key)) continue
+      seen.add(h.key)
+      if (a.includes(h) && haste * o.weights.haste >= hasteOf(a)) continue
+      // Start from the best set so far, with the haste item put on where it costs least.
+      let from: (Piece | null)[] | null = a.includes(h) ? a : null
+      let fromScore = -Infinity
+      if (!from) {
+        for (let i = 0; i < slots.length; i++) {
+          if (!fitting[i].includes(h)) continue
+          const b = a.slice()
+          b[i] = h
+          const t = value(b, h)
+          if (t > fromScore) [from, fromScore] = [b, t]
+        }
+      }
+      if (!from) continue
+      const b = search(from, h)
+      if (total(b) > best + 1e-6) {
+        // Settled with every haste counted again, so the next haste item starts from a set no move improves.
+        a = search(b, null)
+        best = total(a)
       }
     }
-    if (!moved) break
   }
   return {
     slots,

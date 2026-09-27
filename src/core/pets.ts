@@ -267,9 +267,9 @@ export function petMelee(base: PetMelee, level: number, primary: PetWeapon | nul
  * damage. A pet has no use for endurance, and mana only for its few spells.
  */
 export const PET_ROLE_PRESETS: Record<string, RoleWeights> = {
-  Damage: { hp: 0.3, mana: 0, end: 0, ac: 2, avoidance: 0.3, offense: 2, attack: 1, procs: 0.8, haste: 15, resists: 0.3, hpRegen: 5, manaRegen: 0, endRegen: 0, ratio: 15 },
-  Balanced: { hp: 0.6, mana: 0, end: 0, ac: 5, avoidance: 0.8, offense: 1, attack: 0.5, procs: 0.4, haste: 10, resists: 0.6, hpRegen: 12, manaRegen: 0, endRegen: 0, ratio: 10 },
-  Tank: { hp: 1, mana: 0, end: 0, ac: 8, avoidance: 1.5, offense: 0.5, attack: 0.3, procs: 0.2, haste: 6, resists: 1.2, hpRegen: 25, manaRegen: 0, endRegen: 0, ratio: 6 }
+  Damage: { hp: 0.3, mana: 0, end: 0, ac: 2, avoidance: 0.3, offense: 2, attack: 1, procs: 0.8, haste: 15, resists: 0.3, hpRegen: 5, manaRegen: 0, endRegen: 0, ratio: 15, rangedRatio: 0 },
+  Balanced: { hp: 0.6, mana: 0, end: 0, ac: 5, avoidance: 0.8, offense: 1, attack: 0.5, procs: 0.4, haste: 10, resists: 0.6, hpRegen: 12, manaRegen: 0, endRegen: 0, ratio: 10, rangedRatio: 0 },
+  Tank: { hp: 1, mana: 0, end: 0, ac: 8, avoidance: 1.5, offense: 0.5, attack: 0.3, procs: 0.2, haste: 6, resists: 1.2, hpRegen: 25, manaRegen: 0, endRegen: 0, ratio: 6, rangedRatio: 0 }
 }
 
 /**
@@ -353,7 +353,7 @@ const total = (v: { stats: number; haste: number; melee: number }) => v.stats + 
 
 /** Each piece's stats by the weights, haste and weapon aside (counted over the whole set); worked out once a piece. */
 export function statScorer(weights: Weights): (p: PetPiece) => number {
-  const w = { ...weights, haste: 0, ratio: 0 }
+  const w = { ...weights, haste: 0, ratio: 0, rangedRatio: 0 }
   const memo = new Map<PetPiece, number>()
   return (p) => {
     let v = memo.get(p)

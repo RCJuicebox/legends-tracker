@@ -10,7 +10,7 @@
 import { mergeLevel, scaledStats, type InvItem, type ItemStats } from './inventory'
 import { countsToArray, makeable, MAX_LEVEL, moteForLevel } from './moteCalc'
 import { MOTE_RANKS, moteWorth, type MoteCounts } from './motes'
-import { score, statValues, type WeightKey, type Weights } from './upgrades'
+import { score, statValues, weightsForSlot, type WeightKey, type Weights } from './upgrades'
 
 export interface MergeOption {
   item: InvItem
@@ -60,14 +60,16 @@ export function mergeOptions(o: MergeInput): MergeOption[] {
     if (!base) continue
     const mote = moteForLevel(level)
     if (mote < 0) continue
+    // Weighed as the slot it is worn in reads it: a weapon's ratio only in the hands or the Range slot.
+    const w = weightsForSlot(o.weights, item.location)
     const now = statValues(scaledStats(base, level))
     const then = statValues(scaledStats(base, level + 1))
     const deltas: Partial<Record<WeightKey, number>> = {}
-    for (const k of Object.keys(o.weights) as WeightKey[]) {
+    for (const k of Object.keys(w) as WeightKey[]) {
       const d = round(then[k] - now[k], 2)
-      if (d && o.weights[k]) deltas[k] = d
+      if (d && w[k]) deltas[k] = d
     }
-    const gain = round(score(scaledStats(base, level + 1), o.weights) - score(scaledStats(base, level), o.weights), 2)
+    const gain = round(score(scaledStats(base, level + 1), w) - score(scaledStats(base, level), w), 2)
     const inBar = o.planned && o.planned.name === item.name && o.planned.lvl === level ? o.planned.xp : 0
     const need = Math.max(1, 2 ** level - inBar)
     const motes = Math.ceil(need / MOTE_RANKS[mote].xp)

@@ -252,7 +252,8 @@ export function OptimizeTab({ m }: { m: GearModel }) {
         <h2 style={{ margin: 0 }}>Best use of what you own</h2>
         <p className="small muted" style={{ margin: 0 }}>
           Every piece you wear, carry and bank ({m.pieces.length} of them), tried in every slot it fits, both Any slots included, scored with these weights plus the focus
-          effects you want. Exaltations stay in the item that holds them.
+          effects you want. Exaltations stay in the item that holds them. Haste does not stack, so one haste item is all it wears for it: each you own is tried as
+          that one, wherever it leaves the rest of the set best.
         </p>
         {changes.length ? (
           <div className="row" style={{ gap: 18, flexWrap: 'wrap', marginTop: 4 }}>

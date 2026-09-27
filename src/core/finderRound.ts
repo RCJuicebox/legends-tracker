@@ -45,7 +45,8 @@ export function planTotal(p: Plan): number {
  * adds over that.
  */
 export function inTheRound(o: Omit<OptimizeOptions, 'pieces'> & { pieces: Piece[]; candidate: Piece; baseline: Plan }): RoundResult {
-  const plan = optimizeGear({ ...o, pieces: [...o.pieces, o.candidate] })
+  // Started from the baseline's set, so the search is short and the candidate never ends up behind it.
+  const plan = optimizeGear({ ...o, pieces: [...o.pieces, o.candidate], from: o.baseline.after })
   const delta = planTotal(plan) - planTotal(o.baseline)
   const moves: RoundMove[] = []
   for (let i = 0; i < plan.slots.length; i++) {

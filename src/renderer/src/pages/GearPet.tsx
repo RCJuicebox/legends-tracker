@@ -320,4 +320,4 @@ export function PetTab({ m }: { m: GearModel }) {
 const signed = (n: number) => `${n >= 0 ? '+' : ''}${num(n)}`
 
 /** One item's stats by the pet's weights, haste and weapon aside. */
-const scoreOf = (c: PetChoice, weights: ReturnType<typeof rawWeights> | null) => (weights ? score(c.piece.stats, { ...weights, haste: 0, ratio: 0 }) : 0)
+const scoreOf = (c: PetChoice, weights: ReturnType<typeof rawWeights> | null) => (weights ? score(c.piece.stats, { ...weights, haste: 0, ratio: 0, rangedRatio: 0 }) : 0)

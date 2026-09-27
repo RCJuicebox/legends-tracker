@@ -168,7 +168,11 @@ export function useGearModel(view: InventoryView, sheet: CharacterSheet | null, 
   const classKey = (stats.classes ?? []).filter(Boolean).join(',')
   const classes = useMemo(() => (classKey ? classKey.split(',') : []), [classKey])
   const level = stats.level ?? 50
-  const role = preset === 'Custom' ? custom : (ROLE_PRESETS[preset] ?? ROLE_PRESETS.Balanced)
+  // Custom weights saved before a weight existed read it as the Balanced role has it.
+  const role = useMemo(
+    () => (preset === 'Custom' ? { ...ROLE_PRESETS.Balanced, ...custom } : (ROLE_PRESETS[preset] ?? ROLE_PRESETS.Balanced)),
+    [preset, custom]
+  )
   // What a point of each stat buys this character: its classes, its current stats (the Stats
   // window's when read, else the sheet's), and its AAs.
   const conv = useMemo(() => {

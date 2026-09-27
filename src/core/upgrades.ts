@@ -167,32 +167,40 @@ export function canWear(r: Restrictions, who: Wearer, slot: string): boolean {
 /** Two-handed: it takes the secondary hand too. */
 export const isTwoHanded = (r: Restrictions) => /^2H\b/i.test(r.skill)
 
-/** Slots where a weapon's damage and delay count. */
-export const WEAPON_SLOTS = ['Primary', 'Secondary', 'Range']
+/**
+ * The weights as a slot reads them. A weapon's damage and delay count in the hands (weapon ratio) and
+ * in the Range slot (ranged ratio, weighed apart so a melee's range slot can go to stats); anywhere
+ * else they are no reason to wear it.
+ */
+export function weightsForSlot(w: Weights, slot: string): Weights {
+  const hands = slot === 'Primary' || slot === 'Secondary'
+  return { ...w, ratio: hands ? w.ratio : 0, rangedRatio: slot === 'Range' ? w.rangedRatio : 0 }
+}
 
 export type WeightKey =
   | 'ac' | 'hp' | 'mana' | 'end' | 'str' | 'sta' | 'agi' | 'dex' | 'wis' | 'int' | 'cha'
-  | 'resists' | 'haste' | 'attack' | 'hpRegen' | 'manaRegen' | 'endRegen' | 'ratio'
+  | 'resists' | 'haste' | 'attack' | 'hpRegen' | 'manaRegen' | 'endRegen' | 'ratio' | 'rangedRatio'
 
 export type Weights = Record<WeightKey, number>
 
 export const WEIGHT_LABELS: Record<WeightKey, string> = {
   ac: 'AC', hp: 'HP', mana: 'Mana', end: 'Endurance', str: 'Strength', sta: 'Stamina', agi: 'Agility', dex: 'Dexterity',
   wis: 'Wisdom', int: 'Intelligence', cha: 'Charisma', resists: 'Resists', haste: 'Haste %', attack: 'Attack',
-  hpRegen: 'HP regen', manaRegen: 'Mana regen', endRegen: 'End regen', ratio: 'Weapon ratio'
+  hpRegen: 'HP regen', manaRegen: 'Mana regen', endRegen: 'End regen', ratio: 'Weapon ratio', rangedRatio: 'Ranged ratio'
 }
 
 /** Starting points; every weight can be moved. Per point of the stat. */
 export const PRESETS: Record<string, Weights> = {
-  Balanced: { ac: 2, hp: 0.25, mana: 0.2, end: 0.1, str: 0.6, sta: 0.8, agi: 0.6, dex: 0.5, wis: 0.5, int: 0.5, cha: 0.1, resists: 0.2, haste: 2, attack: 1, hpRegen: 2, manaRegen: 2, endRegen: 1, ratio: 0 },
-  Tank: { ac: 4, hp: 0.4, mana: 0, end: 0.1, str: 0.4, sta: 1.2, agi: 0.8, dex: 0.3, wis: 0.1, int: 0.1, cha: 0, resists: 0.4, haste: 1.5, attack: 0.5, hpRegen: 3, manaRegen: 0, endRegen: 1, ratio: 40 },
-  Melee: { ac: 1, hp: 0.2, mana: 0, end: 0.2, str: 1.2, sta: 0.5, agi: 0.6, dex: 1, wis: 0, int: 0, cha: 0, resists: 0.1, haste: 4, attack: 2, hpRegen: 1, manaRegen: 0, endRegen: 2, ratio: 40 },
-  Caster: { ac: 0.8, hp: 0.25, mana: 0.5, end: 0, str: 0, sta: 0.6, agi: 0.3, dex: 0.1, wis: 1.2, int: 1.2, cha: 0.2, resists: 0.3, haste: 0, attack: 0, hpRegen: 1, manaRegen: 4, endRegen: 0, ratio: 0 }
+  Balanced: { ac: 2, hp: 0.25, mana: 0.2, end: 0.1, str: 0.6, sta: 0.8, agi: 0.6, dex: 0.5, wis: 0.5, int: 0.5, cha: 0.1, resists: 0.2, haste: 2, attack: 1, hpRegen: 2, manaRegen: 2, endRegen: 1, ratio: 0, rangedRatio: 0 },
+  Tank: { ac: 4, hp: 0.4, mana: 0, end: 0.1, str: 0.4, sta: 1.2, agi: 0.8, dex: 0.3, wis: 0.1, int: 0.1, cha: 0, resists: 0.4, haste: 1.5, attack: 0.5, hpRegen: 3, manaRegen: 0, endRegen: 1, ratio: 40, rangedRatio: 0 },
+  Melee: { ac: 1, hp: 0.2, mana: 0, end: 0.2, str: 1.2, sta: 0.5, agi: 0.6, dex: 1, wis: 0, int: 0, cha: 0, resists: 0.1, haste: 4, attack: 2, hpRegen: 1, manaRegen: 0, endRegen: 2, ratio: 40, rangedRatio: 0 },
+  Caster: { ac: 0.8, hp: 0.25, mana: 0.5, end: 0, str: 0, sta: 0.6, agi: 0.3, dex: 0.1, wis: 1.2, int: 1.2, cha: 0.2, resists: 0.3, haste: 0, attack: 0, hpRegen: 1, manaRegen: 4, endRegen: 0, ratio: 0, rangedRatio: 0 }
 }
 
 /** An item's stats as the weights read them. */
 export function statValues(s: ItemStats): Record<WeightKey, number> {
   const resists = Object.values(s.saves).reduce<number>((a, b) => a + (b ?? 0), 0)
+  const ratio = s.damage && s.delay ? Math.round((s.damage / s.delay) * 100) / 100 : 0
   return {
     ac: s.ac,
     hp: s.pools.HP ?? 0,
@@ -211,7 +219,8 @@ export function statValues(s: ItemStats): Record<WeightKey, number> {
     hpRegen: s.hpRegen,
     manaRegen: s.manaRegen,
     endRegen: s.endRegen,
-    ratio: s.damage && s.delay ? Math.round((s.damage / s.delay) * 100) / 100 : 0
+    ratio,
+    rangedRatio: ratio
   }
 }
 
@@ -324,8 +333,7 @@ export function findUpgrades(o: FinderOptions): SlotResult[] {
   const hasteNow = Math.max(0, ...wornHaste)
   const hasteWithout = (item?: InvItem) => Math.max(0, ...wornHaste.filter((_, i) => o.worn[i] !== item))
   return slots.map((slot) => {
-    // A weapon's damage and delay only matter in the hands; anywhere else they are no reason to wear it.
-    const shown: Weights = WEAPON_SLOTS.includes(slot) ? o.weights : { ...o.weights, ratio: 0 }
+    const shown = weightsForSlot(o.weights, slot)
     const weights: Weights = { ...shown, haste: 0 }
     const worn = o.worn.filter((w) => w.location === slot)
     const scored = worn.map((item) => {
