@@ -1,0 +1,186 @@
+import { createReadStream } from 'node:fs'
+import type { LogLine } from '../../core/logLine'
+import { CombatMeter, summarize as summarizeFight } from '../../core/combatMeter'
+import { LootLedger } from '../../core/loot'
+import { RespawnLog, respawnView, type RespawnView } from '../../core/respawns'
+import { durationSec, fmtClock, fmtNum } from '../../core/combatView'
+import { offsetBefore, readLines } from '../logReading'
+import { log } from '../log'
+import { Backlog, Throttled } from './throttle'
+import type { SpellBook } from '../../core/spells'
+import type { CombatSnapshot, Segment } from '../../shared/types'
+import type { EngineOutputs, EngineStore, LootView } from './contracts'
+import type { Notifier } from './notifier'
+import type { BuffCoordinator } from './buffs'
+
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
+
+export interface CombatHooks {
+  book: () => SpellBook | null
+  /** The zone the status line shows, for a line the meter has not placed. */
+  zone: () => string
+}
+
+/**
+ * The damage meter, the loot ledger and the respawn log, which all read the same lines and file what
+ * they find under the meter's fights and sessions. Recent fights are read back from the log when
+ * watching starts, with live lines held until that is done so everything is seen in order.
+ */
+export class CombatFeed {
+  readonly meter: CombatMeter
+  readonly loot: LootLedger
+  /** How long mobs take to respawn, from kills and sightings. */
+  readonly respawns: RespawnLog
+  readonly backlog = new Backlog<LogLine>()
+  private readonly combatOut: Throttled
+  private readonly lootOut: Throttled
+  private readonly respawnsOut: Throttled
+
+  constructor(
+    private readonly store: EngineStore,
+    private readonly out: Pick<EngineOutputs, 'combat' | 'loot' | 'respawns'>,
+    private readonly notifier: Notifier,
+    private readonly buffs: BuffCoordinator,
+    private readonly hooks: CombatHooks
+  ) {
+    this.combatOut = new Throttled(500, () => this.out.combat(this.meter.snapshot()))
+    this.lootOut = new Throttled(500, () => this.out.loot(this.lootView()))
+    this.respawnsOut = new Throttled(1000, () => this.out.respawns(this.respawnView()))
+    this.loot = new LootLedger({
+      onChange: () => this.lootOut.mark(),
+      onLoot: (e) => {
+        // What was kept or merged is news; what auto-loot sold or stored is not, and history is not.
+        if (this.backlog.active || (e.outcome !== 'kept' && e.outcome !== 'merged')) return
+        const who = e.looter === 'You' ? 'Looted' : `${e.looter} looted`
+        this.notifier.pushFeed('loot', `${who} ${e.count > 1 ? `${e.count} × ` : ''}${e.item} from ${e.source}${e.into ? ` → ${e.into}` : ''}`)
+      }
+    })
+    this.meter = new CombatMeter(this.meterConfig(), {
+      onChange: () => this.combatOut.mark(),
+      onFightEnd: (f) => {
+        // Fights read from history are not news.
+        if (this.backlog.active || !f.mine) return
+        const sum = summarizeFight(f)
+        this.notifier.pushFeed('fight', `${sum.name} · ${fmtClock(durationSec(f))} · ${fmtNum(sum.dps)} DPS (yours ${fmtNum(sum.yours / durationSec(f))})`)
+      }
+    })
+    this.respawns = new RespawnLog(store.respawns.get(), {
+      onChange: () => {
+        this.store.respawns.set(this.respawns.records)
+        this.respawnsOut.mark()
+      },
+      kindOf: (name) => this.meter.kindOf(name).kind
+    })
+  }
+
+  meterConfig() {
+    const c = this.store.settings.get().combat
+    return {
+      fightGapSec: c.fightGapSec,
+      newSessionOnZone: c.newSessionOnZone,
+      charmPets: c.charmPets,
+      charmLand: (spell: string) => {
+        const s = this.hooks.book()?.resolve(spell)?.spell
+        return s?.category === 'charm' && s.landOther ? s.landOther : undefined
+      }
+    }
+  }
+
+  /** New settings; true when charm pets were switched, which changes whose every past blow was. */
+  reconfigure(): boolean {
+    const charmWas = this.meter.charmPets
+    this.meter.configure(this.meterConfig())
+    return charmWas !== this.meter.charmPets
+  }
+
+  /** A live line: held while history is read, else through the meter and the rest. */
+  live(line: LogLine): void {
+    if (!this.backlog.hold(line)) this.line(line)
+  }
+
+  /**
+   * A line through the damage meter, then the loot ledger, which files loot under the meter's
+   * session, and the respawn log, which goes by the meter's idea of who is a mob.
+   */
+  private line(line: LogLine): void {
+    const ev = this.meter.handle(line)
+    this.buffs.handle(line.text, line.time)
+    this.respawns.handle(line, this.meter.currentZone || this.hooks.zone(), ev)
+    const c = line.text.charCodeAt(0)
+    if (c === 89 || c === 45) this.loot.handle(line, this.meter.currentZone, this.meter.sessionAt(line.time).id)
+  }
+
+  /**
+   * Recent fights: the live tailer starts at the end of the log, so the last `minutes` of it are read
+   * here first, with live lines held back until the read is done. The meter's clock is held too, or
+   * an old fight would be cut off mid-read. `attachedAt` answers where the tailer took over, -1 until
+   * it knows; `current` turns false when watching has moved on.
+   */
+  async seed(logFile: string, attachedAt: () => number, current: () => boolean, minutes: number): Promise<void> {
+    if (minutes <= 0 || this.backlog.active) return
+    this.backlog.begin()
+    this.meter.reading = `Reading the last ${minutes} minutes of the log…`
+    this.loot.reading = this.meter.reading
+    this.combatOut.mark()
+    this.lootOut.mark()
+    try {
+      // The tailer reads on from where it attached; history is everything before that.
+      for (let i = 0; i < 200 && attachedAt() < 0 && current(); i++) await sleep(25)
+      const end = attachedAt()
+      if (end > 0 && current()) {
+        const from = await offsetBefore(logFile, Date.now() - minutes * 60_000)
+        if (end > from && current()) {
+          await readLines(createReadStream(logFile, { start: from, end: end - 1 }), (line) => current() && this.line(line), { flushLast: false })
+        }
+      }
+    } catch (e) {
+      if ((e as NodeJS.ErrnoException).code !== 'ENOENT') log.warn(`Reading recent fights from ${logFile} failed:`, e)
+    } finally {
+      for (const line of this.backlog.end()) this.line(line)
+      this.meter.reading = ''
+      this.loot.reading = ''
+      this.combatOut.mark()
+      this.lootOut.mark()
+    }
+  }
+
+  /** Another character: nothing the last one had running applies any more. */
+  reset(): void {
+    this.meter.reset()
+    this.loot.reset()
+  }
+
+  tick(now: number): void {
+    if (!this.backlog.active) this.meter.tick(now)
+    this.combatOut.tick(now)
+    this.lootOut.tick(now)
+    this.respawnsOut.tick(now)
+  }
+
+  /** The page shows which mobs have timers, so it hears when the triggers change. */
+  triggersChanged(): void {
+    this.respawnsOut.mark()
+  }
+
+  respawnView(): RespawnView {
+    return respawnView(this.respawns.records, this.store.triggers.get(), this.hooks.zone())
+  }
+
+  lootView(): LootView {
+    return { ...this.loot.snapshot(), sessions: [...this.meter.sessions].reverse().map(summarizeFight) }
+  }
+
+  snapshot(): CombatSnapshot {
+    return this.meter.snapshot()
+  }
+
+  segment(id: string): Segment | null {
+    return this.meter.segment(id)
+  }
+
+  newSession(): CombatSnapshot {
+    this.meter.newSession(Date.now())
+    this.notifier.pushFeed('fight', 'New session started.')
+    return this.meter.snapshot()
+  }
+}

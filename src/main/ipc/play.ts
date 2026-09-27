@@ -51,13 +51,13 @@ export function registerPlayIpc(ctx: AppContext): void {
     return engine.moteView()
   })
 
-  handle('stock:get', () => engine.stockView())
-  handle('stock:counts', (counts) => engine.setStockCounts(sanitizeStockCounts(counts)))
+  handle('stock:get', () => engine.stock.view())
+  handle('stock:counts', (counts) => engine.stock.setCounts(sanitizeStockCounts(counts)))
   handle('stock:item', (input) => {
     const item = sanitizeStockItem(input)
     if (!item) throw new Error('Not an item to plan.')
-    return engine.setStockItem(item)
+    return engine.stock.setItem(item)
   })
-  handle('stock:autoAdd', (on) => engine.setStockAutoAdd(on === true))
-  handle('stock:apply', () => engine.applyPlan())
+  handle('stock:autoAdd', (on) => engine.stock.setAutoAdd(on === true))
+  handle('stock:apply', () => engine.stock.applyPlan())
 }
