@@ -25,8 +25,8 @@ import {
   type Wearer,
   type Weights
 } from '../../../core/upgrades'
-import { conversions, rawWeights, ROLE_PRESETS, type ClassFactors, type RoleWeights } from '../../../core/statValue'
-import { focusValue, type FocusLine, type FocusReport, type FocusWorth } from '../../../core/itemFocus'
+import { conversions, rawWeights, ROLE_PRESETS, type RoleWeights } from '../../../core/statValue'
+import { focusValue, type FocusLine, type FocusWorth } from '../../../core/itemFocus'
 import { optimizeGear, ownedPieces, pieceName, SLOT_LAYOUT, type EffectValue, type Exaltation, type Piece, type PieceSource } from '../../../core/gearOptimizer'
 import { usePet } from './usePet'
 import { effectScore, itemEffects, procOf, procWorth, wornEffectOf, wornStats, wornWorth, type EffectSpell, type EffectWorth } from '../../../core/itemEffects'
@@ -36,6 +36,7 @@ import { aaTotal } from '../../../core/aa'
 import { DOUBLE_ATTACK, DUAL_WIELD, TRIPLE_ATTACK, TRIPLE_CLASSES, doubleAttackChance, dualWieldChance, handSwings, tripleAttackChance } from '../../../core/combatModel'
 import { CATALOG_FORMAT, withRaceFix, type CatalogItem } from '../../../core/wikiItem'
 import type { CharacterSheet, InventoryView } from '../../../shared/types'
+import type { CatalogState, FocusData } from '../../../shared/ipc'
 
 // Everything the upgrade finder, the focus effects tab and the optimizer work out, apart from how
 // they show it.
@@ -45,14 +46,7 @@ export const AC_OVER_CAP = 0.25
 /** Points, to start with, for a focus that made every spell cast 10% better. */
 const DEFAULT_FOCUS_POINTS = 300
 
-/** The focus report, with the window of casts it was judged on. */
-export type FocusData = FocusReport & { window: { total: number; from: string; to: string } | null }
-
-export interface CatalogState {
-  file: { fetchedAt: number; items: CatalogItem[]; eraStatus?: Record<string, 'in' | 'out'>; format?: number } | null
-  stale: boolean
-  progress: { busy: boolean; pages: number; total: number; error: string }
-}
+export type { CatalogState, FocusData }
 
 export type GearMode = 'finder' | 'focus' | 'effects' | 'procs' | 'optimize' | 'merge' | 'pet'
 
@@ -172,7 +166,7 @@ const NO_MELEE = meleeProfile({}, { from: '', to: '' })
 
 /** The wiki's item catalog as stored on this PC, and a way to fetch it again. */
 function useCatalog() {
-  const q = useInvoke<CatalogState>('gear:catalog')
+  const q = useInvoke('gear:catalog')
   const { setData, reload } = q
   useEffect(
     () =>
@@ -185,7 +179,7 @@ function useCatalog() {
   )
   const refresh = useCallback(async () => {
     try {
-      await api.invoke<CatalogState>('gear:catalogRefresh')
+      await api.invoke('gear:catalogRefresh')
     } catch (e) {
       showError('Could not download the item catalog', e)
     }
@@ -236,7 +230,7 @@ export function useGearModel(view: InventoryView, sheet: CharacterSheet | null, 
   const [enough, setEnoughAll] = useRemembered<Record<string, string>>(`focus.enough.${view.character}`, {})
   const sheetStats = useMemo(() => readSheet(sheet?.stats), [sheet])
   const trio = sheetStats.classes.filter(Boolean)
-  const capsQ = useInvoke<{ ac: Record<string, { cap: number; mult: number }>; factors: Record<string, ClassFactors> }>(
+  const capsQ = useInvoke(
     trio.length ? 'stats:caps' : null,
     [trio, sheetStats.level]
   )
@@ -329,7 +323,7 @@ export function useGearModel(view: InventoryView, sheet: CharacterSheet | null, 
 
   // Crafted items without an era of their own take their ingredients' eras (from the recipe book, which
   // the main process fetches again in the background when it is old; asked again once it has been).
-  const craftQ = useInvoke<Record<string, string[]>>('trade:craftEras')
+  const craftQ = useInvoke('trade:craftEras')
   const reloadCraft = craftQ.reload
   useEffect(() => api.on('state:recipes', (p: { busy: boolean }) => !p.busy && reloadCraft()), [reloadCraft])
   const rawItems = state?.file?.items
@@ -369,7 +363,7 @@ export function useGearModel(view: InventoryView, sheet: CharacterSheet | null, 
     if (!items || !classes.length) return
     let live = true
     const names = [...new Set(items.map((it) => it.focus).filter(Boolean))]
-    api.invoke<FocusData | null>('gear:foci', names, classes, level, view.character, days).then(
+    api.invoke('gear:foci', names, classes, level, view.character, days).then(
       (r) => live && setReport(r),
       (e) => live && showError('Could not read the focus effects', e)
     )
@@ -480,7 +474,7 @@ export function useGearModel(view: InventoryView, sheet: CharacterSheet | null, 
     }
     return [...out].sort()
   }, [items, effectsOfItem])
-  const effectsQ = useInvoke<{ spells: Record<string, EffectSpell>; profile: MeleeProfile | null; loaded: boolean }>(
+  const effectsQ = useInvoke(
     effectNames.length && view.character ? 'gear:effects' : null,
     [effectNames, view.character, days]
   )

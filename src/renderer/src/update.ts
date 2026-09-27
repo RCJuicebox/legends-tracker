@@ -9,7 +9,7 @@ export function useUpdate(): { status: UpdateState | null; version: string } {
   const [version, setVersion] = useState('')
   useEffect(() => {
     let live = true
-    api.invoke<{ status: UpdateState; version: string }>('update:status').then(
+    api.invoke('update:status').then(
       (r) => {
         if (!live) return
         setStatus(r.status)

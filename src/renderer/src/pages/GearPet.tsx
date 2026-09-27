@@ -7,9 +7,9 @@ import { num, wikiUrl } from '../format'
 import { className } from '../../../shared/game/classes'
 import { itemKey, mergeLevel, parseStatsBlock, scaledStats, slotLabel, type InvItem } from '../../../core/inventory'
 import { restrictions, isLore, score } from '../../../core/upgrades'
-import { rawWeights, type ClassFactors } from '../../../core/statValue'
+import { rawWeights } from '../../../core/statValue'
 import {
-  optimizePetGear, PET_ROLE_PRESETS, petConversions, petMelee, petSlots, type PetChoice, type PetPiece, type PetProfile
+  optimizePetGear, PET_ROLE_PRESETS, petConversions, petMelee, petSlots, type PetChoice, type PetPiece
 } from '../../../core/pets'
 import type { GearModel } from '../gear/useGearModel'
 import { ItemIcon } from './gearBits'
@@ -40,12 +40,12 @@ export function PetTab({ m }: { m: GearModel }) {
   const spells = state?.spells ?? []
   // The pet chosen here, else the last one summoned, else the best the classes have.
   const spell = picked || state?.summon?.spell || spells[spells.length - 1]?.spell || ''
-  const profileQ = useInvoke<{ spell: string; profile: PetProfile | null }>(spell ? 'pet:profile' : null, [spell])
+  const profileQ = useInvoke(spell ? 'pet:profile' : null, [spell])
   // The answer for the pet shown, not one asked for before it.
   const loading = !!spell && profileQ.data?.spell !== spell
   const profile = loading ? null : (profileQ.data?.profile ?? null)
   const petClasses = useMemo(() => profile?.classes ?? [], [profile])
-  const capsQ = useInvoke<{ factors: Record<string, ClassFactors> }>(profile ? 'stats:caps' : null, [petClasses, profile?.level ?? 1])
+  const capsQ = useInvoke(profile ? 'stats:caps' : null, [petClasses, profile?.level ?? 1])
 
   const capacity = petSlots(m.classes)
   const byKey = useMemo(() => new Map(m.catalog.map((it) => [itemKey(it.title), it])), [m.catalog])

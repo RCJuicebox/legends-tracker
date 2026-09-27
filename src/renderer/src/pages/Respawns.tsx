@@ -12,7 +12,7 @@ import { SHARED_SEC, type RespawnRow, type RespawnTimerSpec, type RespawnView } 
 // A timer is an ordinary trigger in the Respawns folder, so the Triggers page can change it too.
 
 function useRespawns() {
-  const q = useInvoke<RespawnView>('respawns:get')
+  const q = useInvoke('respawns:get')
   const setData = q.setData
   useEffect(() => api.on('state:respawns', (v: RespawnView) => setData(v)), [setData])
   return q
@@ -213,7 +213,7 @@ function Row({
   )
 }
 
-const forget = (key: string) => act<RespawnView>('respawns:forget', key)
+const forget = (key: string) => act('respawns:forget', key)
 
 function TimerEditor({
   initialName, initialSeconds, measured, timer, overlays, onDone, onCancel
@@ -242,14 +242,14 @@ function TimerEditor({
     if (!seconds) return setError('Give the length as minutes:seconds, e.g. 18:30.')
     const spec: RespawnTimerSpec = { name: name.trim(), seconds, overlay, warnSec, announce }
     try {
-      onDone(await api.invoke<RespawnView>('respawns:setTimer', spec))
+      onDone(await api.invoke('respawns:setTimer', spec))
     } catch (e) {
       setError(errorMessage(e))
     }
   }
   const remove = async () => {
     try {
-      onDone(await api.invoke<RespawnView>('respawns:removeTimer', name))
+      onDone(await api.invoke('respawns:removeTimer', name))
     } catch (e) {
       setError(errorMessage(e))
     }

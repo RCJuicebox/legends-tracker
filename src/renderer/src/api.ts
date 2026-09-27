@@ -1,11 +1,11 @@
-import type {
-  AppSettings, ArchiveStatus, CharacterSettings, FeedItem, TimerView, WatchStatus
-} from '../../shared/types'
+import type { FeedItem } from '../../shared/types'
+import type { AppState as WireState, InvokeChannel, InvokeResult, Invokes, PushChannel, Pushes, SendChannel, Sends } from '../../shared/ipc'
 
+/** The preload's bridge, typed by the channel contract in shared/ipc.ts. */
 interface Bridge {
-  invoke<T = unknown>(channel: string, ...args: unknown[]): Promise<T>
-  send(channel: string, ...args: unknown[]): void
-  on(channel: string, listener: (...args: any[]) => void): () => void
+  invoke<K extends InvokeChannel>(channel: K, ...args: Parameters<Invokes[K]>): Promise<InvokeResult<K>>
+  send<K extends SendChannel>(channel: K, ...args: Parameters<Sends[K]>): void
+  on<K extends PushChannel>(channel: K, listener: Pushes[K]): () => void
 }
 
 declare global {
@@ -25,20 +25,8 @@ export function errorMessage(e: unknown): string {
 /** An activity line, numbered as it arrives so the list can keep each row. */
 export type FeedEntry = FeedItem & { id: number }
 
-export interface AppState {
-  settings: AppSettings
-  status: WatchStatus
-  timers: TimerView[]
-  feed: FeedEntry[]
-  archive: ArchiveStatus
-  character: CharacterSettings
-  characterKey: string
-  voices: string[]
-  speechError: string
-  arranging: boolean
-  devices: { deviceId: string; label: string }[]
-  triggerErrors: { trigger: string; error: string }[]
-}
+/** The main window's state: what app:state gives, with the feed numbered. */
+export type AppState = Omit<WireState, 'feed'> & { feed: FeedEntry[] }
 
 export const iconUrl = (n?: number) => (n === undefined || n < 0 ? '' : `eqicon://icon/${n}`)
 

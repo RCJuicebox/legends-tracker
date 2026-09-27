@@ -6,7 +6,7 @@ import { who } from '../format'
 import { useUpdate, type UpdateState } from '../update'
 import { Field, LoadError, NumberInput, Switch } from '../components/ui'
 import { GameFolderCard } from '../components/GameFolder'
-import type { LogFileInfo, TrackingSettings } from '../../../shared/types'
+import type { TrackingSettings } from '../../../shared/types'
 
 /** One line on where updates stand. */
 function updateText(u: UpdateState | null): string {
@@ -39,7 +39,7 @@ export function Settings() {
   const { state, patchSettings } = useApp()
   const s = state.settings
   const t = s.tracking
-  const logsQ = useInvoke<LogFileInfo[]>('logs:list', [], [s.installDir, s.logFile])
+  const logsQ = useInvoke('logs:list', [], [s.installDir, s.logFile])
   const logs = logsQ.data ?? []
   const setT = (patch: Partial<TrackingSettings>) => patchSettings((x) => ({ ...x, tracking: { ...x.tracking, ...patch } }))
   const update = useUpdate()

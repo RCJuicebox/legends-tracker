@@ -35,7 +35,7 @@ export function Stats() {
 
   const s = useMemo(() => readSheet(charSheet?.stats), [charSheet])
   const trio = useMemo(() => classTrio(s), [s])
-  const capsQ = useInvoke<Caps>('stats:caps', [trio, s.level])
+  const capsQ = useInvoke('stats:caps', [trio, s.level])
   const caps = capsQ.data
 
   // Builds on the latest sheet, so a change that lands after an await (the AAs, a screen read) never
@@ -60,7 +60,7 @@ export function Stats() {
   const readAas = async (quiet: boolean) => {
     setAaStatus('Reading your log…')
     try {
-      const aa = await api.invoke<AaSummary | null>('stats:readAAs')
+      const aa = await api.invoke('stats:readAAs')
       if (aa) {
         set({ aa })
         setAaStatus('')
@@ -773,7 +773,7 @@ function CharacterTab({
     setBusy(true)
     setMessage('')
     try {
-      const r = await api.invoke<{ values: Record<string, number[]>; rows: string[]; screens: number }>('stats:readScreen')
+      const r = await api.invoke('stats:readScreen')
       const found = Object.keys(r.values).length
       if (found < 5) {
         setMessage(`Could not find the Stats window on ${r.screens} screen${r.screens === 1 ? '' : 's'}. Open your Inventory window on its Stats tab, uncovered, and try again.`)

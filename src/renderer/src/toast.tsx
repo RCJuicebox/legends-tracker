@@ -1,5 +1,6 @@
 import { useSyncExternalStore, type ReactNode } from 'react'
 import { api, errorMessage } from './api'
+import type { InvokeChannel, InvokeResult, Invokes } from '../../shared/ipc'
 
 // Short messages in the corner: a call to the main process that failed, or an undo for something
 // just removed. They outlive the page that raised them.
@@ -45,9 +46,9 @@ export function showUndo(text: ReactNode, undo: () => void): void {
  * A call to the main process whose answer nothing waits on (a button's action, a save). A failure
  * shows in the corner instead of vanishing into the console.
  */
-export async function act<T = unknown>(channel: string, ...args: unknown[]): Promise<T | undefined> {
+export async function act<K extends InvokeChannel>(channel: K, ...args: Parameters<Invokes[K]>): Promise<InvokeResult<K> | undefined> {
   try {
-    return await api.invoke<T>(channel, ...args)
+    return await api.invoke(channel, ...args)
   } catch (e) {
     showError('That did not work', e)
     return undefined

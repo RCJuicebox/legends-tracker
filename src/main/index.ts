@@ -4,6 +4,7 @@ import { release } from 'node:os'
 import { basename, dirname, join, relative, resolve, isAbsolute } from 'node:path'
 import { Store, characterKey } from './store'
 import { logFileFor, logStem } from './storeCore'
+import { fromOwnPage, isOwnPage, onSend, push } from './push'
 import { Engine, type AudioCommand } from './engine'
 import { appEngineEnv } from './engineEnv'
 import { SpeechWorker } from './speech'
@@ -40,10 +41,14 @@ import { PetStore, PetWiki, scanPetLog } from './pets'
 import { timerKey } from '../core/spellTracker'
 import { CombatMeter } from '../core/combatMeter'
 import { parseLogLine } from '../core/logLine'
-import type { AppSettings, CharacterSettings, CharacterSheet, SpellRule, Trigger } from '../shared/types'
+import type { AppSettings, CharacterSettings, Trigger } from '../shared/types'
+import type { InvokeChannel, InvokeResult, Invokes, PushChannel, Pushes } from '../shared/ipc'
 import type { AchMarks } from '../core/achievements'
 import { initLog, log, logDir } from './log'
-import { isCharacterKey, meterOptions, sanitizeCharacter, sanitizeRespawnTimer, sanitizeSettings, sanitizeTrigger, sanitizeTriggers } from './validate'
+import {
+  isCharacterKey, meterOptions, sanitizeCharacter, sanitizeRespawnTimer, sanitizeSettings, sanitizeSheet, sanitizeSpellRule, sanitizeStockCounts, sanitizeStockItem,
+  sanitizeTrigger, sanitizeTriggers
+} from './validate'
 
 // Settings live in %APPDATA%\Legends Tracker. EQL_USER_DATA points a development or test run at a
 // separate profile, so a trial never touches real settings.
@@ -188,38 +193,38 @@ function refreshOverlayVisibility(): void {
  * newest of each kind plus every feed line, and go out when it shows again.
  */
 let mainHidden = false
-const heldPushes = new Map<string, [string, ...unknown[]]>()
-const heldFeed: unknown[][] = []
+const heldPushes = new Map<string, () => void>()
+const heldFeed: Parameters<Pushes['state:feed']>[] = []
 /** As many feed lines as the Live page keeps. */
 const HELD_FEED_MAX = 300
 
-function toMain(channel: string, ...args: unknown[]): void {
+function toMain<K extends PushChannel>(channel: K, ...args: Parameters<Pushes[K]>): void {
   if (!mainWindow || mainWindow.isDestroyed()) return
-  if (!mainHidden) return mainWindow.webContents.send(channel, ...args)
+  if (!mainHidden) return push(mainWindow.webContents, channel, ...args)
   if (channel === 'state:feed') {
-    heldFeed.push(args)
+    heldFeed.push(args as Parameters<Pushes['state:feed']>)
     if (heldFeed.length > HELD_FEED_MAX) heldFeed.shift()
     return
   }
   // A pet update is per character; the rest replace what the page shows.
   const key = channel === 'state:pet' ? `${channel}:${(args[0] as { character?: string } | undefined)?.character}` : channel
   heldPushes.delete(key)
-  heldPushes.set(key, [channel, ...args])
+  heldPushes.set(key, () => mainWindow && !mainWindow.isDestroyed() && push(mainWindow.webContents, channel, ...args))
 }
 
 function setMainHidden(hidden: boolean): void {
   mainHidden = hidden
   if (hidden || !mainWindow || mainWindow.isDestroyed()) return
-  for (const [channel, ...args] of heldPushes.values()) mainWindow.webContents.send(channel, ...args)
-  for (const args of heldFeed) mainWindow.webContents.send('state:feed', ...args)
+  for (const send of heldPushes.values()) send()
+  for (const args of heldFeed) push(mainWindow.webContents, 'state:feed', ...args)
   heldPushes.clear()
   heldFeed.length = 0
 }
 
 function toAudio(cmd: AudioCommand | { kind: 'config' }): void {
   if (!audioWindow || audioWindow.isDestroyed()) return
-  if (cmd.kind === 'config') audioWindow.webContents.send('audio:config', store.settings.get().audio)
-  else audioWindow.webContents.send('audio:play', cmd)
+  if (cmd.kind === 'config') push(audioWindow.webContents, 'audio:config', store.settings.get().audio)
+  else push(audioWindow.webContents, 'audio:play', cmd)
 }
 
 const engine = new Engine(
@@ -334,10 +339,6 @@ function createMainWindow(): void {
       mainWindow?.hide()
     }
   })
-  mainWindow.webContents.setWindowOpenHandler(({ url }) => {
-    if (/^https?:/.test(url)) void shell.openExternal(url)
-    return { action: 'deny' }
-  })
   load(mainWindow, 'index')
 }
 
@@ -443,11 +444,14 @@ function isInside(dir: string, path: string): boolean {
 }
 
 function registerIpc(): void {
-  // A handler that fails is logged under its channel; the page still sees the rejection.
-  const handle = <A extends unknown[], R>(channel: string, fn: (...args: A) => R) =>
-    ipcMain.handle(channel, async (_e, ...args) => {
+  // A handler that fails is logged under its channel; the page still sees the rejection. The
+  // contract types what the page sends, but nothing checks it on the way in: a handler still checks
+  // any argument it stores or builds a path from.
+  const handle = <K extends InvokeChannel>(channel: K, fn: (...args: Parameters<Invokes[K]>) => InvokeResult<K> | Promise<InvokeResult<K>>) =>
+    ipcMain.handle(channel, async (e, ...args) => {
+      if (!fromOwnPage(e, channel)) throw new Error('Not allowed.')
       try {
-        return await fn(...(args as A))
+        return await fn(...(args as Parameters<Invokes[K]>))
       } catch (e) {
         log.error(`${channel} failed:`, e)
         throw e
@@ -534,7 +538,9 @@ function registerIpc(): void {
 
   handle('spells:known', () => engine.knownSpells())
   handle('spells:search', (q: string) => engine.book?.search(q).map(summarize) ?? [])
-  handle('spells:rule', (name: string, rule: SpellRule | null) => {
+  handle('spells:rule', (name, input) => {
+    if (typeof name !== 'string' || !name) throw new Error('Not a spell.')
+    const rule = sanitizeSpellRule(input)
     const rules = { ...store.rules.get() }
     if (rule && Object.values(rule).some((v) => v !== undefined && v !== '')) rules[name] = rule
     else delete rules[name]
@@ -558,16 +564,16 @@ function registerIpc(): void {
     const archive = engine.archiveDir()
     const allowed = typeof path === 'string' && !!path && ((!!installDir && isInside(join(installDir, 'Logs'), path)) || isInside(archive, path))
     if (allowed && existsSync(path)) return shell.showItemInFolder(path)
-    return shell.openPath(archive)
+    void shell.openPath(archive)
   })
 
   handle('overlays:arrange', (on: boolean) => setArranging(on))
   handle('overlays:demo', () => demoTimers())
-  ipcMain.on('overlay:mouse', (_e, id: string, interactive: boolean) => {
+  onSend('overlay:mouse', (id, interactive) => {
     if (typeof id === 'string') overlays.setMouse(id, interactive === true)
   })
   // A meter overlay's own header changes what it shows; the choice is kept with the overlay.
-  ipcMain.on('overlay:meter', (_e, id: string, patch: unknown) => {
+  onSend('overlay:meter', (id, patch: unknown) => {
     const s = store.settings.get()
     const o = s.overlays.find((x) => x.id === id && x.kind === 'meter')
     if (!o || !patch || typeof patch !== 'object') return
@@ -674,8 +680,12 @@ function registerIpc(): void {
   handle('motes:stop', () => engine.motes.stop(Date.now()))
   handle('motes:rescan', () => engine.rebuildMoteHistory())
   handle('stock:get', () => engine.stockView())
-  handle('stock:counts', (counts: Record<string, number>) => engine.setStockCounts(counts))
-  handle('stock:item', (item: { name: string; lvl: number; xp: number; to: number }) => engine.setStockItem(item))
+  handle('stock:counts', (counts) => engine.setStockCounts(sanitizeStockCounts(counts)))
+  handle('stock:item', (input) => {
+    const item = sanitizeStockItem(input)
+    if (!item) throw new Error('Not an item to plan.')
+    return engine.setStockItem(item)
+  })
   handle('stock:autoAdd', (on: boolean) => engine.setStockAutoAdd(on))
   handle('stock:apply', () => engine.applyPlan())
   handle('stock:readScreen', () => readMotesFromScreen())
@@ -735,7 +745,11 @@ function registerIpc(): void {
   handle('inventory:load', (character: string, refresh?: boolean) => inventoryFiles.load(character, !!refresh))
   handle('inventory:lookup', (names: string[]) => inventoryFiles.lookup(names))
   handle('character:sheet', (character: string) => inventoryFiles.sheet(character))
-  handle('character:saveSheet', (character: string, sheet: CharacterSheet) => inventoryFiles.saveSheet(character, sheet))
+  handle('character:saveSheet', (character, input) => {
+    const sheet = sanitizeSheet(input)
+    if (!sheet) throw new Error('The character sheet is not in the expected form.')
+    return inventoryFiles.saveSheet(character, sheet)
+  })
 
   // The upgrade finder's catalog: what is stored, and a download when asked (or when none is stored).
   handle('gear:catalog', async () => {
@@ -756,7 +770,7 @@ function registerIpc(): void {
     if (!book) return null
     const specs = [...new Set(names)].map((n) => book.named(n)).flatMap((s) => (s ? [focusSpec(s)] : [])).filter((f) => f !== null)
     const installDir = store.settings.get().installDir
-    const recent = character
+    const recent = isCharacterKey(character)
       ? await castHistory
           .recent({ logPath: logFileFor(installDir, character), archiveDir: engine.archiveDir(), stem: logStem(character), days })
           .catch(() => null)
@@ -799,7 +813,7 @@ function registerIpc(): void {
     if (!book) return null
     const s = store.settings.get()
     const key = character || characterKey(s.logFile)
-    if (!key) return { rows: [], unknown: [], window: null, mine: [] }
+    if (!isCharacterKey(key)) return { rows: [], unknown: [], window: null, mine: [] }
     const recent = await castHistory.recent({ logPath: logFileFor(s.installDir, key), archiveDir: engine.archiveDir(), stem: logStem(key), days })
     return { ...castRows(book, recent.counts, engine.character()), window: { total: recent.total, from: recent.from, to: recent.to }, mine: engine.myClasses() }
   })
@@ -837,9 +851,10 @@ function registerIpc(): void {
     return r.canceled ? null : r.filePaths[0]
   })
 
-  ipcMain.on('audio:devices', (_e, devices: { deviceId: string; label: string }[]) => {
-    audioDevices = devices
-    toMain('state:devices', devices)
+  onSend('audio:devices', (devices) => {
+    if (!Array.isArray(devices)) return
+    audioDevices = devices.filter((d) => d && typeof d.deviceId === 'string' && typeof d.label === 'string').map((d) => ({ deviceId: d.deviceId, label: d.label }))
+    toMain('state:devices', audioDevices)
   })
 }
 
@@ -1022,6 +1037,17 @@ app.on('second-instance', (_e, argv) => {
     app.quit()
   } else showMain()
 })
+// No window of ours goes anywhere but our own pages, and none opens another: a web link goes to the
+// default browser instead.
+app.on('web-contents-created', (_e, wc) => {
+  wc.on('will-navigate', (ev, url) => {
+    if (!isOwnPage(url)) ev.preventDefault()
+  })
+  wc.setWindowOpenHandler(({ url }) => {
+    if (/^https?:/.test(url)) void shell.openExternal(url)
+    return { action: 'deny' }
+  })
+})
 app.on('render-process-gone', (_e, wc, d) => log.error(`A page stopped (${d.reason}, exit ${d.exitCode}): ${wc.getURL()}`))
 app.on('child-process-gone', (_e, d) => {
   if (d.reason !== 'clean-exit') log.warn(`${d.type} process${d.name ? ` (${d.name})` : ''} stopped: ${d.reason}, exit ${d.exitCode}`)
@@ -1099,12 +1125,11 @@ void app.whenReady().then(async () => {
 async function start(): Promise<void> {
   app.setAppUserModelId(appUserModelId())
   ensureSourceShortcut(appIcon)
-  const ownPage = (url: string) => url.startsWith('file:') || url.startsWith(process.env['ELECTRON_RENDERER_URL'] ?? '\u0000')
   // Output-device names are only visible to pages granted 'media', and navigator.clipboard.writeText
   // (the Copy buttons) needs 'clipboard-sanitized-write'; both go to our own pages only.
   const granted = new Set(['media', 'clipboard-sanitized-write'])
-  session.defaultSession.setPermissionCheckHandler((wc, permission) => granted.has(permission) && !!wc && ownPage(wc.getURL()))
-  session.defaultSession.setPermissionRequestHandler((wc, permission, cb) => cb(granted.has(permission) && ownPage(wc.getURL())))
+  session.defaultSession.setPermissionCheckHandler((wc, permission) => granted.has(permission) && !!wc && isOwnPage(wc.getURL()))
+  session.defaultSession.setPermissionRequestHandler((wc, permission, cb) => cb(granted.has(permission) && isOwnPage(wc.getURL())))
   protocol.handle('eqicon', async (req) => {
     const url = new URL(req.url)
     const n = Number(url.pathname.replace(/\//g, ''))

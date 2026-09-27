@@ -116,16 +116,20 @@ describe('triggers from a page or a file', () => {
 })
 
 describe('the preload channel list', () => {
-  it('lets through every channel the pages use', () => {
-    for (const c of ['app:state', 'app:openLogs', 'settings:save', 'simulate', 'state:moteScan', 'gear:catalogRefresh', 'character:saveSheet', 'overlay:config', 'overlays:arrange', 'audio:play', 'logs:reveal']) {
-      expect(channelAllowed(c), c).toBe(true)
+  it('lets through every channel the contract names, each only the way it is used', () => {
+    for (const c of ['app:state', 'app:openLogs', 'settings:save', 'simulate', 'gear:catalogRefresh', 'character:saveSheet', 'overlays:arrange', 'logs:reveal']) {
+      expect(channelAllowed(c, 'invoke'), c).toBe(true)
     }
+    for (const c of ['state:moteScan', 'overlay:config', 'audio:play']) expect(channelAllowed(c, 'on'), c).toBe(true)
+    for (const c of ['overlay:mouse', 'overlay:meter', 'audio:devices']) expect(channelAllowed(c, 'send'), c).toBe(true)
+    expect(channelAllowed('state:moteScan', 'invoke')).toBe(false)
+    expect(channelAllowed('settings:save', 'on')).toBe(false)
   })
 
-  it('needs the colon, and takes simulate only whole', () => {
-    for (const c of ['statement', 'appfoo', 'state', 'simulated', 'simulate:x', 'state:', 'app:state:x', 'other:thing', 'app: state', '', 'APP:state']) {
-      expect(channelAllowed(c), c).toBe(false)
+  it('refuses channels nobody declared', () => {
+    for (const c of ['statement', 'state', 'simulated', 'simulate:x', 'app:state:x', 'other:thing', 'spells:explain', 'audio:mute', '', 'APP:state', 'toString', '__proto__']) {
+      expect(channelAllowed(c, 'invoke'), c).toBe(false)
     }
-    expect(channelAllowed(undefined)).toBe(false)
+    expect(channelAllowed(undefined, 'invoke')).toBe(false)
   })
 })

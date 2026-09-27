@@ -116,7 +116,7 @@ export function Gear({ go }: { go?: (page: 'motes') => void }) {
             onClick={async () => {
               setRefreshing(true)
               try {
-                setView(await api.invoke<InventoryView>('inventory:load', character, true))
+                setView(await api.invoke('inventory:load', character, true))
               } catch (e) {
                 showError('Could not fetch the item stats', e)
               } finally {

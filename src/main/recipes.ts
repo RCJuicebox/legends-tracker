@@ -1,9 +1,10 @@
 import { app } from 'electron'
 import { promises as fs } from 'node:fs'
 import { join } from 'node:path'
-import { parseCrafted, parseSkillPage, recipeIndex, type Recipe } from '../core/tradeskills'
+import { parseCrafted, parseSkillPage, recipeIndex } from '../core/tradeskills'
 import { field } from '../core/wikiItem'
 import { log } from './log'
+import type { BookRecipe, RecipeFile, WikiProgress } from '../shared/ipc'
 
 // Every recipe on eqlwiki.com, for the Tradeskills page: each page in the Player Crafted category
 // carries its recipe and yield, fifty pages a request (about 45 requests), one at a time. Alchemy's
@@ -17,22 +18,8 @@ const TIMEOUT_MS = 15_000
 const FORMAT = 2
 const ERA_TAG = /\{\{\s*([A-Za-z][A-Za-z ]*?)\s+Era\s*\}\}/
 
-export type BookRecipe = Recipe & { icon: number }
-
-export interface RecipeFile {
-  fetchedAt: number
-  format: number
-  recipes: BookRecipe[]
-  /** Each page's era tag ('Epics', 'Classic'; '' for none), by title: products and their ingredients. */
-  eras?: Record<string, string>
-}
-
-export interface RecipeProgress {
-  busy: boolean
-  pages: number
-  total: number
-  error: string
-}
+export type { BookRecipe, RecipeFile }
+export type RecipeProgress = WikiProgress
 
 export class RecipeBook {
   private file: RecipeFile | null = null

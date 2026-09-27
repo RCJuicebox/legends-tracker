@@ -7,32 +7,31 @@ import { numExact as num } from '../format'
 import { MOTE_RANKS } from '../../../core/motes'
 import { countsToArray, fixItem, levelFromName, makeable, plan, MAX_LEVEL } from '../../../core/moteCalc'
 import type { MoteStock } from '../../../shared/types'
+import type { Invokes } from '../../../shared/ipc'
+import type { MoteScreenRead } from '../../../shared/ipc'
 
 const short = (i: number) => MOTE_RANKS[i].name || 'Potential'
 const long = (i: number, n: number) => `${n === 1 ? 'Mote' : 'Motes'} of ${MOTE_RANKS[i].name ? MOTE_RANKS[i].name + ' ' : ''}Potential`
 
 export function useStock() {
-  const q = useInvoke<MoteStock>('stock:get')
+  const q = useInvoke('stock:get')
   const setData = q.setData
   useEffect(() => api.on('state:stock', (s: MoteStock) => setData(s)), [setData])
   return q
 }
 
 /** A stock write; the reply is the stock as stored. A failure is shown and changes nothing. */
-async function writeStock(set: (s: MoteStock) => void, channel: string, ...args: unknown[]): Promise<void> {
+type StockWrite = 'stock:counts' | 'stock:item' | 'stock:autoAdd' | 'stock:apply'
+
+async function writeStock<K extends StockWrite>(set: (s: MoteStock) => void, channel: K, ...args: Parameters<Invokes[K]>): Promise<void> {
   try {
-    set(await api.invoke<MoteStock>(channel, ...args))
+    set(await api.invoke(channel, ...args))
   } catch (e) {
     showError('Could not update your motes', e)
   }
 }
 
-interface ScreenRead {
-  counts: Record<string, number>
-  rows: string[]
-  nearMisses: string[]
-  screens: number
-}
+type ScreenRead = MoteScreenRead
 
 function ReadFromScreen({ stock, onApplied }: { stock: MoteStock; onApplied: (s: MoteStock) => void }) {
   const [busy, setBusy] = useState(false)
@@ -42,7 +41,7 @@ function ReadFromScreen({ stock, onApplied }: { stock: MoteStock; onApplied: (s:
     setBusy(true)
     setError('')
     try {
-      setRead(await api.invoke<ScreenRead>('stock:readScreen'))
+      setRead(await api.invoke('stock:readScreen'))
     } catch (e) {
       setError(errorMessage(e))
     } finally {
@@ -101,7 +100,7 @@ function ReadFromScreen({ stock, onApplied }: { stock: MoteStock; onApplied: (s:
               className="btn primary"
               onClick={async () => {
                 try {
-                  onApplied(await api.invoke<MoteStock>('stock:counts', { ...stock.counts, ...read.counts }))
+                  onApplied(await api.invoke('stock:counts', { ...stock.counts, ...read.counts }))
                   setRead(null)
                 } catch (e) {
                   setError(errorMessage(e))

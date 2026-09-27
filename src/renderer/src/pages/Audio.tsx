@@ -21,14 +21,14 @@ export function Audio() {
   const { state, patchSettings } = useApp()
   const a = state.settings.audio
   const [text, setText] = useState('Spirit of the Puma fading')
-  const soundsQ = useInvoke<string[]>('audio:sounds')
+  const soundsQ = useInvoke('audio:sounds')
   // Starts the Windows speech engine if it is not running; the list arrives as state:voices.
   useInvoke('audio:voices')
   const sounds = soundsQ.data ?? []
   const set = (patch: Partial<AudioSettings>) => patchSettings((s) => ({ ...s, audio: { ...s.audio, ...patch } }))
   const slide = (patch: Partial<AudioSettings>) => patchSettings((s) => ({ ...s, audio: { ...s.audio, ...patch } }), { debounceMs: SLIDER_SAVE_MS })
   const pct = (v: number) => `${Math.round(v * 100)}%`
-  const azureQ = useInvoke<AzureStatus>('audio:azure')
+  const azureQ = useInvoke('audio:azure')
   const azure = azureQ.data
   const [allLanguages, setAllLanguages] = useRemembered<boolean>('audio.allLanguages', false)
   const azureVoices = (azure?.voices ?? []).filter((v) => allLanguages || v.locale.startsWith('en-') || `${AZURE}${v.name}` === a.voice)
@@ -164,7 +164,7 @@ function AzureCard({ status, error, onSaved }: { status: AzureStatus | null; err
     setBusy(true)
     setProblem('')
     try {
-      onSaved(await api.invoke<AzureStatus>('audio:setAzure', r, k))
+      onSaved(await api.invoke('audio:setAzure', r, k))
       setKey('')
     } catch (e) {
       setProblem(errorMessage(e))

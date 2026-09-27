@@ -5,18 +5,10 @@ import { useInvoke } from '../hooks'
 import { act, showError } from '../toast'
 import { who } from '../format'
 import { Field, LoadError, NumberInput, Switch } from '../components/ui'
-import type { ArchiveInfo, ArchiveStatus, LogFileInfo } from '../../../shared/types'
-
-interface Overview {
-  logs: LogFileInfo[]
-  archives: ArchiveInfo[]
-  archiveDir: string
-  status: ArchiveStatus
-}
 
 export function Logs() {
   const { state, patchSettings } = useApp()
-  const q = useInvoke<Overview>('logs:overview', [], [state.archive.busy, state.settings.archive.archiveDir])
+  const q = useInvoke('logs:overview', [], [state.archive.busy, state.settings.archive.archiveDir])
   const view = q.data
   const refresh = q.reload
   const [zipping, setZipping] = useState(false)
@@ -70,7 +62,7 @@ export function Logs() {
             <div className="row">
               <input className="grow" value={a.archiveDir} placeholder="Logs\archive (default)" onChange={(e) => setA({ archiveDir: e.target.value })} />
               <button className="btn" onClick={async () => {
-                const dir = await act<string | null>('dialog:folder')
+                const dir = await act('dialog:folder')
                 if (dir) void setA({ archiveDir: dir })
               }}>Browse…</button>
             </div>

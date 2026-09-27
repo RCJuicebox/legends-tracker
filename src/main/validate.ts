@@ -2,6 +2,9 @@ import {
   CLASS_NAMES,
   type AppSettings,
   type CharacterSettings,
+  type CharacterSheet,
+  type MoteStock,
+  type SpellRule,
   type FocusSource,
   type MeterOverlayOptions,
   type OverlayConfig,
@@ -11,6 +14,7 @@ import {
 } from '../shared/types'
 import { DEFAULT_METER_OPTIONS } from '../shared/overlays'
 import type { RespawnRecords, RespawnTimerSpec } from '../core/respawns'
+import { MOTE_RANKS } from '../core/motes'
 import type { ActiveBuff, BuffsFile, Person } from '../core/buffs'
 
 // What the pages send the main process is checked here before it is stored. A page is our own code,
@@ -383,4 +387,45 @@ export function sanitizeBuffs(v: unknown): BuffsFile {
     }
   }
   return out
+}
+
+/** A spell's own settings from the Spell Timers page: known fields only, each of its own kind; null when not an object. */
+export function sanitizeSpellRule(v: unknown): SpellRule | null {
+  if (!isObj(v)) return null
+  const out: SpellRule = {}
+  for (const k of ['track', 'recastCue', 'fadeCue'] as const) if (typeof v[k] === 'boolean') out[k] = v[k] as boolean
+  for (const k of ['alias', 'warnSpeech', 'fadeSpeech', 'color', 'overlay'] as const) if (typeof v[k] === 'string') out[k] = (v[k] as string).slice(0, 500)
+  if (typeof v.warnSec === 'number' && Number.isFinite(v.warnSec)) out.warnSec = num(v.warnSec, 0, 0, 3600)
+  if (typeof v.durationOverrideSec === 'number' && Number.isFinite(v.durationOverrideSec)) out.durationOverrideSec = num(v.durationOverrideSec, 0, 0, 7 * DAY)
+  if (typeof v.extraFocusPct === 'number' && Number.isFinite(v.extraFocusPct)) out.extraFocusPct = num(v.extraFocusPct, 0, -100, 1000)
+  return out
+}
+
+/** Motes on hand as the planner sends them: known ranks only, whole numbers from 0. */
+export function sanitizeStockCounts(v: unknown): MoteStock['counts'] {
+  const out: MoteStock['counts'] = {}
+  if (!isObj(v)) return out
+  for (const { key } of MOTE_RANKS) if (typeof v[key] === 'number' && Number.isFinite(v[key])) out[key] = Math.round(num(v[key], 0, 0, 1e9))
+  return out
+}
+
+/** The item being planned; null when it is not an object. */
+export function sanitizeStockItem(v: unknown): MoteStock['item'] | null {
+  if (!isObj(v)) return null
+  return { name: str(v.name, '').slice(0, 200), lvl: Math.round(num(v.lvl, 0, 0, 100)), xp: num(v.xp, 0, 0, 1e9), to: Math.round(num(v.to, 1, 0, 100)) }
+}
+
+/** The largest Stats page input the sheet keeps, as JSON: far above any real one. */
+const SHEET_STATS_MAX = 200_000
+
+/** A character sheet from the Stats and Gear pages; null when it is not one. */
+export function sanitizeSheet(v: unknown): CharacterSheet | null {
+  if (!isObj(v)) return null
+  const acOverrides: Record<string, number> = {}
+  if (isObj(v.acOverrides)) {
+    for (const [k, n] of Object.entries(v.acOverrides)) if (typeof n === 'number' && Number.isFinite(n)) acOverrides[k.slice(0, 200)] = num(n, 0, -10_000, 10_000)
+  }
+  const stats = isObj(v.stats) ? v.stats : {}
+  if (JSON.stringify(stats).length > SHEET_STATS_MAX) return null
+  return { acOverrides, shield: typeof v.shield === 'boolean' ? v.shield : null, stats }
 }

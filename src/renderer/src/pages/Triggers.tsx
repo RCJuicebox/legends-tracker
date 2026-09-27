@@ -7,6 +7,7 @@ import { recall, remember } from '../remember'
 import { markUnsaved } from '../unsaved'
 import { Field, Icon, LoadError, NumberInput, Pending, Switch } from '../components/ui'
 import type { Phrase, Trigger, TriggerAction, TriggerTestResult } from '../../../shared/types'
+import type { TriggerError } from '../../../shared/ipc'
 
 const newId = () => (crypto.randomUUID ? crypto.randomUUID() : String(Math.random()).slice(2))
 
@@ -23,7 +24,6 @@ function blankAction(type: TriggerAction['type']): TriggerAction {
   }
 }
 
-type TriggerError = { trigger: string; error: string }
 
 interface Draft {
   /** What is being edited. */
@@ -77,7 +77,7 @@ export function Triggers() {
   useEffect(() => {
     let live = true
     setLoadError('')
-    api.invoke<Trigger[]>('triggers:get').then(
+    api.invoke('triggers:get').then(
       (t) =>
         live &&
         setDraft((d) =>
@@ -100,7 +100,7 @@ export function Triggers() {
 
   const write = async (next: Trigger[]): Promise<boolean> => {
     try {
-      setErrors(await api.invoke<TriggerError[]>('triggers:save', next))
+      setErrors(await api.invoke('triggers:save', next))
       return true
     } catch (e) {
       showError('Could not save the triggers', e)
@@ -148,7 +148,7 @@ export function Triggers() {
         <div className="actions">
           <button className="btn" onClick={async () => {
             try {
-              const imported = await api.invoke<Trigger[] | null>('triggers:import')
+              const imported = await api.invoke('triggers:import')
               if (imported) setList((l) => [...l, ...imported.map((t) => ({ ...blankTrigger(''), ...t, id: newId() }))])
             } catch (e) {
               showError('Could not import that file', e)
@@ -318,7 +318,7 @@ function ActionEditor({ a, onChange, onRemove }: { a: TriggerAction; onChange: (
   useEffect(() => {
     if (a.type !== 'sound') return
     let live = true
-    api.invoke<string[]>('audio:sounds').then(
+    api.invoke('audio:sounds').then(
       (s) => live && setSounds(s),
       () => {}
     )
@@ -419,7 +419,7 @@ function TestPanel({ t }: { t: Trigger }) {
     let live = true
     const id = setTimeout(
       () =>
-        api.invoke<TriggerTestResult>('triggers:test', t, line).then(
+        api.invoke('triggers:test', t, line).then(
           (r) => live && setResult(r),
           (e) => live && setResult({ matched: false, phraseIndex: -1, captures: {}, outputs: [], error: errorMessage(e) })
         ),

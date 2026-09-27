@@ -4,14 +4,14 @@ import type { Readable } from 'node:stream'
 import { parsePurchase, type Purchase } from '../core/tradeskills'
 import { feedZip, isArchiveOf, readLines } from './logReading'
 import { log } from './log'
+import type { Purchases } from '../shared/ipc'
 
 // What a character paid for things, from their logs: "You purchased 100 Small Vial from Kizzie
 // Mintopp for 1 platinum." The last purchase of each item is kept, with who sold it. Archives never
 // change, so each is read once; the live log is read on from where the last read stopped, as the
 // cast history does.
 
-/** The newest purchase of each item, by lower-cased name. */
-export type Purchases = Record<string, Purchase>
+export type { Purchases }
 
 interface CacheFile {
   version: 1

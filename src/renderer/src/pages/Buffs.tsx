@@ -16,7 +16,7 @@ import { askText, canCast, LINE_LABELS, MIN_ASK_VALUE, MIN_BUFF_SEC, offersFor, 
 const LINE_ORDER: BuffLine[] = ['hpac', 'haste', 'spellHaste', 'manaRegen', 'hpRegen', 'ds', 'rune', 'attack', 'proc', 'stats', 'mana', 'resist', 'move', 'other']
 
 function useBuffs() {
-  const q = useInvoke<BuffView>('buffs:get')
+  const q = useInvoke('buffs:get')
   const setData = q.setData
   useEffect(() => api.on('state:buffs', (v: BuffView) => setData(v)), [setData])
   return q
@@ -60,7 +60,7 @@ export function Buffs() {
 
   const wanted = new Set(v.wanted)
   const setWanted = async (next: string[] | null) => {
-    const r = await act<BuffView>('buffs:setWanted', next)
+    const r = await act('buffs:setWanted', next)
     if (r) q.setData(r)
   }
   const toggle = (spell: string) => void setWanted(wanted.has(spell) ? v.wanted.filter((s) => s !== spell) : [...v.wanted, spell])

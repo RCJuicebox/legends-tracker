@@ -1,8 +1,10 @@
-// Pages reach the main process only through these channel families: `family:name`, plus the one
-// channel without a family, `simulate`.
-export const ALLOWED_CHANNEL =
-  /^(?:simulate$|(?:app|settings|character|watch|triggers|spells|focus|motes|stock|update|logs|overlays|overlay|audio|dialog|game|achievements|inventory|stats|gear|combat|loot|respawns|pet|trade|buffs|state):[A-Za-z0-9]+$)/
+import { isInvokeChannel, isPushChannel, isSendChannel } from '../shared/ipc'
 
-export function channelAllowed(channel: unknown): boolean {
-  return typeof channel === 'string' && ALLOWED_CHANNEL.test(channel)
+// Pages reach the main process only through the channels the contract in shared/ipc.ts names, each
+// used the one way it is declared: invoked, sent, or listened to.
+
+export type ChannelUse = 'invoke' | 'send' | 'on'
+
+export function channelAllowed(channel: unknown, use: ChannelUse): boolean {
+  return use === 'invoke' ? isInvokeChannel(channel) : use === 'send' ? isSendChannel(channel) : isPushChannel(channel)
 }

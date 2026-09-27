@@ -45,9 +45,9 @@ function Deltas({ d }: { d: Partial<Record<WeightKey, number>> }) {
  * what is worn, so after those the list may be behind the game.
  */
 function useSinceExport(view: InventoryView) {
-  const q = useInvoke<{ entries: LootEntry[] }>('loot:get')
+  const q = useInvoke('loot:get')
   const setData = q.setData
-  useEffect(() => api.on('state:loot', (v: { entries: LootEntry[] }) => setData(v)), [setData])
+  useEffect(() => api.on('state:loot', (v) => setData(v)), [setData])
   const me = (view.character || '').split('_')[0].toLowerCase()
   return useMemo(() => {
     const mine = (e: LootEntry) => e.looter === 'You' || e.looter.toLowerCase() === me

@@ -4,6 +4,7 @@ import { CLASS_NUMBER, type ClassId } from '../shared/game/classes'
 import { latestAas, type AaSummary } from '../core/aa'
 import { decodeCp1252 } from '../core/logLine'
 import { log } from './log'
+import type { SkillCapRow } from '../shared/ipc'
 
 // The game's own tables, read from its Resources folder:
 //   skillcaps.txt     CLASS^SKILL^LEVEL^CAP^flag^      every class, skill and level
@@ -21,12 +22,7 @@ interface Tables {
   factors: Map<number, Map<number, { hp: number; mana: number; end: number }>>
 }
 
-export interface SkillCapRow {
-  id: number
-  cap: number
-  /** Which of the classes has that best cap. */
-  from: string
-}
+export type { SkillCapRow }
 
 export class GameTables {
   private tables: Tables | null = null

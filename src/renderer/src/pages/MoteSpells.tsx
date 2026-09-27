@@ -18,22 +18,12 @@ import {
   castableByMine,
   spellUpgradeOptions,
   stockXp,
-  type MyClass,
   type SectionKey,
-  type SpellCastRow,
   type SpellUpgradeOption,
   type SpellWeights
 } from '../../../core/spellMotes'
 
 // Motes › Spell upgrades: which of the spells you cast to put motes into next.
-
-interface Casts {
-  rows: SpellCastRow[]
-  unknown: { name: string; casts: number }[]
-  window: { total: number; from: string; to: string } | null
-  /** Your classes as the game names them, each with its level, from /who or the character sheet. */
-  mine: MyClass[]
-}
 
 const short = (i: number) => MOTE_RANKS[i].name || 'Potential'
 /** "Shadow Knight" → "SHD", the way /who abbreviates classes. */
@@ -108,7 +98,7 @@ export function MoteSpells() {
   const [whose, setWhose] = useRemembered<'mine' | 'all'>('spellmotes.whose', 'mine')
   const [weights, setWeights] = useRemembered<SpellWeights>('spellmotes.weights', DEFAULT_SPELL_WEIGHTS)
   const tierPct = state.settings.tracking.tierDurationPct
-  const q = useInvoke<Casts | null>('motes:spellCasts', [state.characterKey, days], [state.characterKey, days, state.status.spellsLoaded])
+  const q = useInvoke('motes:spellCasts', [state.characterKey, days], [state.characterKey, days, state.status.spellsLoaded])
   const stockQ = useStock()
   const stock = stockQ.data?.counts
 

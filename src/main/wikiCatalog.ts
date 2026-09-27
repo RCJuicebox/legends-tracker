@@ -4,6 +4,7 @@ import { join } from 'node:path'
 import { CATALOG_FORMAT, parseItemPage, type CatalogItem } from '../core/wikiItem'
 import { parseEraStatus } from '../core/upgrades'
 import { log } from './log'
+import type { CatalogFile, WikiProgress } from '../shared/ipc'
 
 // Every piece of equipment on eqlwiki.com, for the upgrade finder. The wiki's Items category is read
 // fifty pages a request (about 225 requests for the whole of it), politely and one at a time; only
@@ -16,20 +17,8 @@ const TIMEOUT_MS = 15_000
 /** Bumped when what a download keeps changes, so an older file is fetched again. */
 const FORMAT = CATALOG_FORMAT
 
-export interface CatalogFile {
-  fetchedAt: number
-  items: CatalogItem[]
-  /** The wiki's in/out era list (Template:PageEra), as it stood at the download. */
-  eraStatus?: Record<string, 'in' | 'out'>
-  format?: number
-}
-
-export interface CatalogProgress {
-  busy: boolean
-  pages: number
-  total: number
-  error: string
-}
+export type { CatalogFile }
+export type CatalogProgress = WikiProgress
 
 export class WikiCatalog {
   private file: CatalogFile | null = null

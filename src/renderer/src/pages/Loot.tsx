@@ -4,14 +4,15 @@ import { useInvoke } from '../hooks'
 import { useRemembered } from '../remember'
 import { wikiUrl } from '../format'
 import { Icon, Info, Pending } from '../components/ui'
-import { fmtCoin, type LootEntry, type LootOutcome, type LootSnapshot } from '../../../core/loot'
+import { fmtCoin, type LootEntry, type LootOutcome } from '../../../core/loot'
 import { itemKey } from '../../../core/inventory'
-import type { ItemInfo, SegmentSummary } from '../../../shared/types'
+import type { ItemInfo } from '../../../shared/types'
+import type { LootView } from '../../../shared/ipc'
 
 // What has dropped, session by session, with a line on what each item is for and a link to its
 // page. The looking-up is the Gear page's: eqlwiki, cached a week.
 
-type View = LootSnapshot & { sessions: SegmentSummary[] }
+type View = LootView
 
 const OUTCOMES: { key: LootOutcome; label: string; hint: string }[] = [
   { key: 'kept', label: 'Kept', hint: 'Put in your bags' },
@@ -32,7 +33,7 @@ const SHOWN = 400
 const OPEN_KEPT = 50
 
 function useLoot() {
-  const q = useInvoke<View>('loot:get')
+  const q = useInvoke('loot:get')
   const setData = q.setData
   useEffect(() => api.on('state:loot', (v: View) => setData(v)), [setData])
   return q
@@ -114,7 +115,7 @@ export function Loot() {
     const names = shownNames.filter((n) => !asked.has(itemKey(n)))
     if (!names.length) return
     for (const n of names) asked.add(itemKey(n))
-    api.invoke<Record<string, ItemInfo>>('inventory:lookup', names).then(
+    api.invoke('inventory:lookup', names).then(
       (r) => mounted.current && setInfo((prev) => ({ ...prev, ...r })),
       () => {
         // Offline: the names can be asked again later.

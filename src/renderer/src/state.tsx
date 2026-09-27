@@ -49,7 +49,7 @@ export function StateProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     let live = true
     setError('')
-    api.invoke<AppState>('app:state').then(
+    api.invoke('app:state').then(
       (s) => {
         if (!live) return
         settingsRef.current = s.settings
@@ -84,7 +84,7 @@ export function StateProvider({ children }: { children: ReactNode }) {
     if (!next) return
     try {
       await api.invoke('settings:save', next)
-      const fresh = await api.invoke<AppState>('app:state')
+      const fresh = await api.invoke('app:state')
       setState((s) => (s ? { ...s, character: fresh.character, characterKey: fresh.characterKey } : s))
     } catch (e) {
       // What was typed stays on screen rather than snapping back mid-edit (typing 200 passes

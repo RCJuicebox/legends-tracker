@@ -5,6 +5,7 @@ import { decodeCp1252, parseLogLine } from '../core/logLine'
 import { CAST_BY_YOU } from '../core/phrases'
 import { PET_GEAR_HEAD, PetGearReader, parsePetGuide, parseSummonPage, type PetGearReading, type PetMelee, type PetProfile } from '../core/pets'
 import { log } from './log'
+import type { PetState, PetSummon } from '../shared/ipc'
 
 // The pet: what it wears (the log's `/pet inventory check` lists) and which pet it is (the last
 // summoning spell cast), both kept per character so an archived log loses neither; and the pet's
@@ -15,16 +16,7 @@ const AGENT = 'LegendsTracker (https://github.com/RCJuicebox/legends-tracker)'
 const FRESH_MS = 7 * 24 * 3600_000
 const TIMEOUT_MS = 15_000
 
-export interface PetSummon {
-  /** Unranked: "Frenzied Spirit". */
-  spell: string
-  at: number
-}
-
-export interface PetState {
-  gear: PetGearReading | null
-  summon: PetSummon | null
-}
+export type { PetState, PetSummon }
 
 
 /**

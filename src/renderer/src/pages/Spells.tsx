@@ -5,14 +5,15 @@ import { useInvoke } from '../hooks'
 import { act, showError, showUndo } from '../toast'
 import { who } from '../format'
 import { CategoryChip, ConfirmButton, Field, Info, LoadError, NumberInput, SpellIcon, Switch } from '../components/ui'
+import type { InvokeResult } from '../../../shared/ipc'
 import {
   CATEGORY_LABELS, CLASS_NAMES, DEFAULT_TIER_DURATION_PCT,
-  type ClassName, type FocusSource, type KnownSpell, type LogCheckRow, type SpellCategory, type SpellRule, type SpellSummary
+  type ClassName, type FocusSource, type KnownSpell, type LogCheckRow, type SpellCategory, type SpellRule
 } from '../../../shared/types'
 
 export function Spells() {
   const { state } = useApp()
-  const q = useInvoke<KnownSpell[]>('spells:known', [], [state.character, state.settings.tracking, state.status.spellsLoaded])
+  const q = useInvoke('spells:known', [], [state.character, state.settings.tracking, state.status.spellsLoaded])
   const known = q.data ?? []
   const setKnown = q.setData
   const [open, setOpen] = useState<string | null>(null)
@@ -153,14 +154,14 @@ function CharacterCard() {
 }
 
 /** A search as the player types: after a pause, and only the newest answer kept. */
-function useSearch<T>(channel: string, q: string): T[] {
-  const [results, setResults] = useState<T[]>([])
+function useSearch<K extends 'spells:search' | 'focus:search'>(channel: K, q: string): InvokeResult<K> {
+  const [results, setResults] = useState(() => [] as unknown as InvokeResult<K>)
   useEffect(() => {
-    if (q.trim().length < 3) return setResults([])
+    if (q.trim().length < 3) return setResults([] as unknown as InvokeResult<K>)
     let live = true
     const id = setTimeout(
       () =>
-        api.invoke<T[]>(channel, q).then(
+        (api.invoke as (c: K, q: string) => Promise<InvokeResult<K>>)(channel, q).then(
           (r) => live && setResults(r),
           (e) => live && showError('Search failed', e)
         ),
@@ -178,7 +179,7 @@ function FocusSources() {
   const { state, saveCharacter, latest } = useApp()
   const c = state.character
   const [q, setQ] = useState('')
-  const results = useSearch<FocusSource>('focus:search', q)
+  const results = useSearch('focus:search', q)
   const [from, setFrom] = useState('')
   const save = (list: FocusSource[]) => saveCharacter({ ...c, focusSources: list })
   const update = (id: string, patch: Partial<FocusSource>) => save(c.focusSources.map((f) => (f.id === id ? { ...f, ...patch } : f)))
@@ -305,7 +306,7 @@ function FocusSources() {
 /** Flips one of a spell's cues straight from the table, keeping the rest of its rule. */
 async function setCue(k: KnownSpell, patch: Partial<SpellRule>, onSaved: (list: KnownSpell[]) => void): Promise<void> {
   try {
-    onSaved(await api.invoke<KnownSpell[]>('spells:rule', k.name, { ...k.rule, ...patch }))
+    onSaved(await api.invoke('spells:rule', k.name, { ...k.rule, ...patch }))
   } catch (e) {
     showError(`Could not change ${k.name}`, e)
   }
@@ -398,7 +399,7 @@ function RuleEditor({ k, onSaved }: { k: KnownSpell; onSaved: (list: KnownSpell[
   const save = async (r: SpellRule | null) => {
     setError('')
     try {
-      onSaved(await api.invoke<KnownSpell[]>('spells:rule', k.name, r))
+      onSaved(await api.invoke('spells:rule', k.name, r))
     } catch (e) {
       setError(errorMessage(e))
     }
@@ -509,7 +510,7 @@ function RuleEditor({ k, onSaved }: { k: KnownSpell; onSaved: (list: KnownSpell[
 
 function AddSpell({ onAdded }: { onAdded: (list: KnownSpell[]) => void }) {
   const [q, setQ] = useState('')
-  const results = useSearch<SpellSummary>('spells:search', q)
+  const results = useSearch('spells:search', q)
   const withDuration = results.filter((r) => r.formula !== 0 || r.cap !== 0)
   return (
     <div className="mt-14">
@@ -521,7 +522,7 @@ function AddSpell({ onAdded }: { onAdded: (list: KnownSpell[]) => void }) {
           {withDuration.map((r) => (
             <button key={r.id} className="tree-item" onClick={async () => {
               try {
-                onAdded(await api.invoke<KnownSpell[]>('spells:rule', r.name, { track: true }))
+                onAdded(await api.invoke('spells:rule', r.name, { track: true }))
                 setQ('')
               } catch (e) {
                 showError(`Could not add ${r.name}`, e)
@@ -549,7 +550,7 @@ function LogCheck() {
     setBusy(true)
     setError('')
     try {
-      setRows(await api.invoke<LogCheckRow[]>('spells:checkLog', mbs))
+      setRows(await api.invoke('spells:checkLog', mbs))
     } catch (e) {
       setError(errorMessage(e))
     } finally {

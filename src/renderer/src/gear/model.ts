@@ -9,12 +9,6 @@ import type { CharacterSheet, InventoryView, ItemInfo } from '../../../shared/ty
 // What the Gear and Stats pages (and the Gear tools) share: which character, its inventory and sheet,
 // and what the worn gear adds up to.
 
-interface Exports {
-  current: string
-  achievements: string[]
-  inventory: string[]
-}
-
 /** How often to look again for an export that is not there yet. */
 const EXPORT_POLL_MS = 5000
 
@@ -27,7 +21,7 @@ const SHEET_SAVE_MS = 300
  * a page waiting for one fills in on its own.
  */
 export function useExportCharacter(kind: 'inventory' | 'achievements', rememberKey: string) {
-  const q = useInvoke<Exports>('character:exports')
+  const q = useInvoke('character:exports')
   const reload = q.reload
   const [picked, setPicked] = useRemembered<string>(rememberKey, '')
   const exports = q.data
@@ -52,8 +46,8 @@ export function useExportCharacter(kind: 'inventory' | 'achievements', rememberK
  * `updateSheet` takes an updater, so a change that lands after an await builds on the latest sheet.
  */
 export function useInventory(character: string, ready: boolean, exportsKey = '') {
-  const inv = useInvoke<InventoryView>(ready ? 'inventory:load' : null, [character], [exportsKey])
-  const sheetQ = useInvoke<CharacterSheet>(ready ? 'character:sheet' : null, [character])
+  const inv = useInvoke(ready ? 'inventory:load' : null, [character], [exportsKey])
+  const sheetQ = useInvoke(ready ? 'character:sheet' : null, [character])
   const setView = inv.setData
   const [sheet, setSheet] = useState<CharacterSheet | null>(null)
   const sheetRef = useRef<CharacterSheet | null>(null)

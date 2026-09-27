@@ -13,7 +13,7 @@ import type { ArchiveOutcome } from '../core/archiver'
 import { checkAgainstLog } from '../core/logCheck'
 import { MoteTracker, moteName, parseMoteLoot, type MoteState } from '../core/motes'
 import { CombatMeter, summarize as summarizeFight } from '../core/combatMeter'
-import { LootLedger, type LootSnapshot } from '../core/loot'
+import { LootLedger } from '../core/loot'
 import { RespawnLog, respawnView, type RespawnRecords, type RespawnView } from '../core/respawns'
 import { PetGearReader, petSummonName, type PetGearReading } from '../core/pets'
 import { askText, BuffWatch, buffOffers, buffPlan, defaultWanted, LEVEL_CAP, YOU, type ActiveBuff, type BuffOffer, type BuffsFile, type BuffView, type Person } from '../core/buffs'
@@ -36,6 +36,7 @@ import {
 import { CAST_BY_YOU } from '../core/phrases'
 import { CLASS_NUMBER, type ClassId } from '../shared/game/classes'
 import type { MyClass } from '../core/spellMotes'
+import type { AudioCommand, LootView, MoteScan, MoteView } from '../shared/ipc'
 
 export interface EngineOutputs {
   timers: (views: TimerView[]) => void
@@ -46,7 +47,7 @@ export interface EngineOutputs {
   archive: (status: ArchiveStatus) => void
   motes: (state: MoteView) => void
   /** Progress of a mote history rebuild alone, without the history itself. */
-  moteScan: (scan: { scanning: string; scanProgress: number }) => void
+  moteScan: (scan: MoteScan) => void
   stock: (stock: MoteStock) => void
   combat: (snapshot: CombatSnapshot) => void
   loot: (snapshot: LootView) => void
@@ -56,15 +57,7 @@ export interface EngineOutputs {
   buffs: (view: BuffView) => void
 }
 
-/** The loot ledger with the meter's sessions, which its entries are filed under. */
-export type LootView = LootSnapshot & { sessions: import('../shared/types').SegmentSummary[] }
-
-export type MoteView = MoteState & { scanning: string; scanProgress: number }
-
-export type AudioCommand =
-  | { kind: 'speech'; wav: Uint8Array; interrupt: boolean }
-  | { kind: 'speech-fallback'; text: string; interrupt: boolean }
-  | { kind: 'sound'; data: Uint8Array; volume: number; name: string }
+export type { AudioCommand, LootView, MoteView }
 
 /** Reads mote history somewhere (a worker thread in the app); `stop` abandons it. */
 export type MoteScanner = (

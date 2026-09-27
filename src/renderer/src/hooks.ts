@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { api, errorMessage } from './api'
+import type { InvokeChannel, InvokeResult, Invokes } from '../../shared/ipc'
 
 export interface Invoked<T> {
   data: T | null
@@ -16,17 +17,22 @@ export interface Invoked<T> {
  * the newest call's answer is kept: a slow reply to an older call never overwrites a newer one. A
  * failed call keeps what was there and says why. A null channel asks nothing (not ready yet).
  */
-export function useInvoke<T>(channel: string | null, args: unknown[] = [], deps: unknown[] = []): Invoked<T> {
+export function useInvoke<K extends InvokeChannel>(
+  channel: K | null,
+  args?: Parameters<Invokes[K]>,
+  deps: unknown[] = []
+): Invoked<InvokeResult<K>> {
+  type T = InvokeResult<K>
   const [data, setDataState] = useState<T | null>(null)
   const [error, setError] = useState('')
   const [tick, setTick] = useState(0)
   const argsRef = useRef(args)
   argsRef.current = args
-  const key = JSON.stringify(args)
+  const key = JSON.stringify(args ?? [])
   useEffect(() => {
     if (channel === null) return
     let live = true
-    api.invoke<T>(channel, ...argsRef.current).then(
+    api.invoke(channel, ...((argsRef.current ?? []) as Parameters<Invokes[K]>)).then(
       (v) => {
         if (!live) return
         setDataState(v)

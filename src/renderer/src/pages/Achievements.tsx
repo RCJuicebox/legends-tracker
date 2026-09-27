@@ -31,12 +31,12 @@ interface Toast {
 const OPEN_KEEP = 1000
 
 function useAchievements() {
-  const charsQ = useInvoke<{ current: string; available: string[] }>('achievements:characters')
+  const charsQ = useInvoke('achievements:characters')
   const chars = charsQ.data
   const reloadChars = charsQ.reload
   const [picked, setPicked] = useRemembered<string>('ach.character', '')
   const character = picked && chars?.available.includes(picked) ? picked : chars?.current || chars?.available[0] || ''
-  const viewQ = useInvoke<AchievementsView>(chars ? 'achievements:load' : null, [character])
+  const viewQ = useInvoke(chars ? 'achievements:load' : null, [character])
   const setView = viewQ.setData
   useEffect(() => {
     if (!chars) return

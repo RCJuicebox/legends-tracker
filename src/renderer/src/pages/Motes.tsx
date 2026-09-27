@@ -7,17 +7,18 @@ import { ConfirmButton, Icon, Info, Pending } from '../components/ui'
 import { MotePlanner } from './MotePlanner'
 import { MoteSpells } from './MoteSpells'
 import { useRemembered } from '../remember'
-import { MOTE_RANKS, localDay, moteValue, moteWorth, pausedHours, sessionHours, totalMotes, type MoteCounts, type MoteSession, type MoteState } from '../../../core/motes'
+import { MOTE_RANKS, localDay, moteValue, moteWorth, pausedHours, sessionHours, totalMotes, type MoteCounts, type MoteSession } from '../../../core/motes'
+import type { MoteScan, MoteView } from '../../../shared/ipc'
 
-type Scan = { scanning: string; scanProgress: number }
-type View = MoteState & Scan
+type Scan = MoteScan
+type View = MoteView
 
 /**
  * The mote history. While it is being rebuilt from the logs only the progress is pushed; the whole
  * state follows once the rebuild is done.
  */
 export function useMotesQuery() {
-  const q = useInvoke<View>('motes:get')
+  const q = useInvoke('motes:get')
   const setData = q.setData
   useEffect(() => {
     const offs = [

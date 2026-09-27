@@ -1,5 +1,6 @@
 import { BrowserWindow, screen } from 'electron'
 import type { CombatSnapshot, OverlayConfig, TimerView } from '../shared/types'
+import { push } from './push'
 
 export interface OverlayHost {
   load: (win: BrowserWindow, page: 'overlay', query: Record<string, string>) => void
@@ -49,7 +50,7 @@ export class OverlayManager {
       const win = this.windows.get(c.id) ?? this.create(c)
       if (!this.arranging) win.setBounds(onScreen(c))
       win.setOpacity(c.opacity)
-      win.webContents.send('overlay:config', { config: c, arranging: this.arranging })
+      push(win.webContents, 'overlay:config', { config: c, arranging: this.arranging })
     }
     if (!this.windows.size && this.topmostTimer) {
       clearInterval(this.topmostTimer)
@@ -87,9 +88,9 @@ export class OverlayManager {
     win.on('resized', report)
     win.webContents.on('did-finish-load', () => {
       const cfg = this.configs.find((x) => x.id === c.id) ?? c
-      win.webContents.send('overlay:config', { config: cfg, arranging: this.arranging })
-      win.webContents.send('overlay:timers', this.lastTimers)
-      if (cfg.kind === 'meter' && this.lastCombat) win.webContents.send('overlay:combat', this.lastCombat)
+      push(win.webContents, 'overlay:config', { config: cfg, arranging: this.arranging })
+      push(win.webContents, 'overlay:timers', this.lastTimers)
+      if (cfg.kind === 'meter' && this.lastCombat) push(win.webContents, 'overlay:combat', this.lastCombat)
       if (this.shown) win.showInactive()
       else win.webContents.setBackgroundThrottling(true)
     })
@@ -109,8 +110,8 @@ export class OverlayManager {
       if (w.isDestroyed()) continue
       if (show) {
         w.webContents.setBackgroundThrottling(false)
-        w.webContents.send('overlay:timers', this.lastTimers)
-        if (this.lastCombat && this.configs.find((c) => c.id === id)?.kind === 'meter') w.webContents.send('overlay:combat', this.lastCombat)
+        push(w.webContents, 'overlay:timers', this.lastTimers)
+        if (this.lastCombat && this.configs.find((c) => c.id === id)?.kind === 'meter') push(w.webContents, 'overlay:combat', this.lastCombat)
         w.showInactive()
         w.setAlwaysOnTop(true, 'screen-saver')
       } else {
@@ -127,7 +128,7 @@ export class OverlayManager {
       ignoreMouse(win, cfg?.kind ?? 'timers', !on)
       win.setFocusable(on)
       win.setResizable(on)
-      if (cfg) win.webContents.send('overlay:config', { config: cfg, arranging: on })
+      if (cfg) push(win.webContents, 'overlay:config', { config: cfg, arranging: on })
     }
   }
 
@@ -144,14 +145,14 @@ export class OverlayManager {
     if (!this.shown) return
     for (const [id, w] of this.windows) {
       const cfg = this.configs.find((c) => c.id === id)
-      if (cfg?.kind === 'meter' && !w.isDestroyed()) w.webContents.send('overlay:combat', snapshot)
+      if (cfg?.kind === 'meter' && !w.isDestroyed()) push(w.webContents, 'overlay:combat', snapshot)
     }
   }
 
   timers(views: TimerView[]): void {
     this.lastTimers = views
     if (!this.shown) return
-    for (const w of this.windows.values()) if (!w.isDestroyed()) w.webContents.send('overlay:timers', views)
+    for (const w of this.windows.values()) if (!w.isDestroyed()) push(w.webContents, 'overlay:timers', views)
   }
 
   alert(payload: { text: string; color: string; durationSec: number }): void {
@@ -159,7 +160,7 @@ export class OverlayManager {
     if (!this.shown) return
     for (const [id, w] of this.windows) {
       const cfg = this.configs.find((c) => c.id === id)
-      if (cfg?.kind === 'alerts' && !w.isDestroyed()) w.webContents.send('overlay:alert', payload)
+      if (cfg?.kind === 'alerts' && !w.isDestroyed()) push(w.webContents, 'overlay:alert', payload)
     }
   }
 

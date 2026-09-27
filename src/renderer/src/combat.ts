@@ -8,7 +8,7 @@ import type { CombatSnapshot, MeterSpan, Segment } from '../../shared/types'
 
 /** The live meter snapshot, pushed by the main process twice a second while anything changes. */
 export function useCombat(): CombatSnapshot | null {
-  const q = useInvoke<CombatSnapshot>('combat:get')
+  const q = useInvoke('combat:get')
   const setData = q.setData
   useEffect(() => api.on('state:combat', (v: CombatSnapshot) => setData(v)), [setData])
   return q.data
@@ -37,7 +37,7 @@ export function useSegment(snap: CombatSnapshot | null, span: MeterSpan, selecti
   useEffect(() => {
     if (!wanted || fromSnapshot || cache.current.has(wanted)) return
     let on = true
-    api.invoke<Segment | null>('combat:segment', wanted).then(
+    api.invoke('combat:segment', wanted).then(
       (seg) => {
         if (!on || !seg) return
         cache.current.set(wanted, seg)

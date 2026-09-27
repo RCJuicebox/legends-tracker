@@ -12,7 +12,7 @@ function useFolderActions() {
     setBusy(true)
     setMessage('')
     try {
-      const dir = await api.invoke<string>('game:find')
+      const dir = await api.invoke('game:find')
       setMessage(dir ? '' : 'Could not find it on any drive. Choose the folder yourself.')
     } catch (e) {
       setMessage(`Could not look for it: ${errorMessage(e)}`)
@@ -23,7 +23,7 @@ function useFolderActions() {
   const choose = async () => {
     setMessage('')
     try {
-      const r = await api.invoke<{ canceled: boolean; picked: string; dir: string }>('game:choose')
+      const r = await api.invoke('game:choose')
       if (!r.canceled && !r.dir) setMessage(`${r.picked} is not an EverQuest Legends folder: it has no spells_us.txt. Pick the folder the game is installed in.`)
     } catch (e) {
       setMessage(`Could not use that folder: ${errorMessage(e)}`)
@@ -42,7 +42,7 @@ export function GameFolderCard() {
     let live = true
     const t = setTimeout(
       () =>
-        api.invoke<GameFolderCheck>('game:check').then(
+        api.invoke('game:check').then(
           (c) => live && setCheck(c),
           // No check: the card just shows no table until the next change.
           () => {}

@@ -1,21 +1,11 @@
 import { promises as fs } from 'node:fs'
 import { log } from './log'
+import type { TradeFavorite, TradeSaved } from '../shared/ipc'
 
 // tradeskills.json: the recipes the player starred, how many combines they plan of each, and prices
 // they typed in for things the log has never seen them buy.
 
-export interface TradeFavorite {
-  /** The recipe's key: its product and ingredients (see recipeKey). */
-  key: string
-  product: string
-  combines: number
-}
-
-export interface TradeSaved {
-  favorites: TradeFavorite[]
-  /** Copper for one, by lower-cased item name. */
-  prices: Record<string, number>
-}
+export type { TradeFavorite, TradeSaved }
 
 const EMPTY: TradeSaved = { favorites: [], prices: {} }
 

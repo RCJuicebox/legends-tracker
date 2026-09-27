@@ -7,32 +7,16 @@ import { Info, Pending } from '../components/ui'
 import { wikiUrl } from '../format'
 import { fmtCoin } from '../../../core/loot'
 import { itemKey } from '../../../core/inventory'
-import { parseWikiCoin, recipeKey, shopping, unitPrice, type PriceSource, type Purchase, type Recipe } from '../../../core/tradeskills'
+import { parseWikiCoin, recipeKey, shopping, unitPrice, type PriceSource, type Purchase } from '../../../core/tradeskills'
 import type { ItemInfo } from '../../../shared/types'
 import { useExportCharacter, useInventory } from '../gear/model'
 import { ItemIcon } from './gearBits'
+import type { BookRecipe, TradeSaved } from '../../../shared/ipc'
 
 // Recipes the player keeps making: what goes in, what they have (bags, bank, tradeskill depot), where
 // to buy the rest and what a batch costs.
 
-type BookRecipe = Recipe & { icon: number }
-
-interface RecipeState {
-  file: { fetchedAt: number; recipes: BookRecipe[] } | null
-  stale: boolean
-  progress: { busy: boolean; pages: number; total: number; error: string }
-}
-
-interface Favorite {
-  key: string
-  product: string
-  combines: number
-}
-
-interface Saved {
-  favorites: Favorite[]
-  prices: Record<string, number>
-}
+type Saved = TradeSaved
 
 /** Prices under a copper (one of a stack bought for a copper or two) still read as something. */
 const coin = (copper: number) => (copper <= 0 ? '—' : copper < 1 ? '<1c' : fmtCoin(Math.round(copper)))
@@ -48,11 +32,11 @@ const SEARCH_SHOWN = 30
 const eqtraders = (name: string) => `https://duckduckgo.com/?q=${encodeURIComponent(`\\site:eqtraders.com "${name}"`)}`
 
 function useRecipes() {
-  const q = useInvoke<RecipeState>('trade:recipes')
+  const q = useInvoke('trade:recipes')
   const { setData, reload } = q
   useEffect(
     () =>
-      api.on('state:recipes', (progress: RecipeState['progress']) => {
+      api.on('state:recipes', (progress) => {
         setData((s) => (s ? { ...s, progress } : s))
         if (!progress.busy) reload()
       }),
@@ -74,8 +58,8 @@ export function Tradeskills() {
   const character = exp.character
   const inv = useInventory(character, !!exp.exports, exp.available.join(','))
   const recipes = useRecipes()
-  const savedQ = useInvoke<Saved>('trade:favorites')
-  const purchasesQ = useInvoke<Record<string, Purchase>>(character ? 'trade:purchases' : null, [character])
+  const savedQ = useInvoke('trade:favorites')
+  const purchasesQ = useInvoke(character ? 'trade:purchases' : null, [character])
   const [query, setQuery] = useState('')
   // Recipe cards folded shut, by recipe key; kept across restarts.
   const [collapsed, setCollapsed] = useRemembered<string[]>('trade.collapsed', [])
@@ -91,7 +75,7 @@ export function Tradeskills() {
   const saved = savedQ.data
   const save = async (next: Saved) => {
     savedQ.setData(next)
-    const r = await act<Saved>('trade:saveFavorites', next)
+    const r = await act('trade:saveFavorites', next)
     if (r) savedQ.setData(r)
   }
 
@@ -139,7 +123,7 @@ export function Tradeskills() {
     const want = names.filter((n) => !asked.has(itemKey(n)))
     if (!want.length) return
     for (const n of want) asked.add(itemKey(n))
-    api.invoke<Record<string, ItemInfo>>('inventory:lookup', want).then(
+    api.invoke('inventory:lookup', want).then(
       (r) => mounted.current && setInfo((prev) => ({ ...prev, ...r })),
       () => {
         for (const n of want) asked.delete(itemKey(n))
