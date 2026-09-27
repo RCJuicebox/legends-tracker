@@ -49,21 +49,24 @@ const TAG = String.raw`(?: \((.+)\))?`
  */
 const BASE_VERB = new Map(VERBS_3RD.split('|').map((v, i) => [v, VERBS_1ST.split('|')[i]]))
 
-const RE_MELEE_YOU = new RegExp(String.raw`^You (${VERBS_1ST}) (.+?) for (\d+) points? of damage\.${TAG}$`)
-const RE_MELEE = new RegExp(String.raw`^(.+?) (${VERBS_3RD}) (.+?) for (\d+) points? of damage\.${TAG}$`)
+/** An amount as the log prints it; a thousands separator is allowed, as the Python parser allows it. */
+const num = (s: string) => +s.replace(/,/g, '')
+
+const RE_MELEE_YOU = new RegExp(String.raw`^You (${VERBS_1ST}) (.+?) for ([\d,]+) points? of damage\.${TAG}$`)
+const RE_MELEE = new RegExp(String.raw`^(.+?) (${VERBS_3RD}) (.+?) for ([\d,]+) points? of damage\.${TAG}$`)
 const RE_MISS_YOU = /^You try to (\w+) (.+?), but (.+)!(?: \((.+)\))?$/
 const RE_MISS = /^(.+?) tries to (\w+) (.+?), but (.+)!(?: \((.+)\))?$/
-const RE_SPELL_YOU = /^You hit (.+?) for (\d+) points? of (\w+) damage by (.+?)\.(?: \((.+)\))?$/
-const RE_SPELL = /^(.+?) hit (.+?) for (\d+) points? of (\w+) damage by (.+?)\.(?: \((.+)\))?$/
-const RE_DOT_YOU = /^(.+?) has taken (\d+) damage from your (.+?)\.(?: \((.+)\))?$/
-const RE_DOT_ON_YOU = /^You have taken (\d+) damage from (.+?) by (.+?)\.(?: \((.+)\))?$/
-const RE_DOT = /^(.+?) has taken (\d+) damage from (.+?) by (.+?)\.(?: \((.+)\))?$/
-const RE_DOT_NO_CASTER = /^(.+?) has taken (\d+) damage by (.+?)\.(?: \((.+)\))?$/
-const RE_DS_YOU = /^(.+?) is \w+ by YOUR (\w+) for (\d+) points? of non-melee damage\.$/
-const RE_DS_ON_YOU = /^YOU are \w+ by (.+?)'s (\w+) for (\d+) points? of non-melee damage!$/
-const RE_DS = /^(.+?) is \w+ by (.+?)'s (\w+) for (\d+) points? of non-melee damage\.$/
-const RE_HEAL = /^(.+?) healed (.+?)( over time)? for (\d+)(?: \((\d+)\))? hit points by (.+?)\.(?: \((.+)\))?$/
-const RE_RUNE = /^(.+?) gains? a rune for (\d+) points? of absorption\.$/
+const RE_SPELL_YOU = /^You hit (.+?) for ([\d,]+) points? of (\w+) damage by (.+?)\.(?: \((.+)\))?$/
+const RE_SPELL = /^(.+?) hit (.+?) for ([\d,]+) points? of (\w+) damage by (.+?)\.(?: \((.+)\))?$/
+const RE_DOT_YOU = /^(.+?) has taken ([\d,]+) damage from your (.+?)\.(?: \((.+)\))?$/
+const RE_DOT_ON_YOU = /^You have taken ([\d,]+) damage from (.+?) by (.+?)\.(?: \((.+)\))?$/
+const RE_DOT = /^(.+?) has taken ([\d,]+) damage from (.+?) by (.+?)\.(?: \((.+)\))?$/
+const RE_DOT_NO_CASTER = /^(.+?) has taken ([\d,]+) damage by (.+?)\.(?: \((.+)\))?$/
+const RE_DS_YOU = /^(.+?) is \w+ by YOUR (\w+) for ([\d,]+) points? of non-melee damage\.$/
+const RE_DS_ON_YOU = /^YOU are \w+ by (.+?)'s (\w+) for ([\d,]+) points? of non-melee damage!$/
+const RE_DS = /^(.+?) is \w+ by (.+?)'s (\w+) for ([\d,]+) points? of non-melee damage\.$/
+const RE_HEAL = /^(.+?) healed (.+?)( over time)? for ([\d,]+)(?: \(([\d,]+)\))? hit points by (.+?)\.(?: \((.+)\))?$/
+const RE_RUNE = /^(.+?) gains? a rune for ([\d,]+) points? of absorption\.$/
 const RE_SLAIN_YOU = SLAIN_BY_YOU
 const RE_SLAIN_BY = SLAIN_BY
 const RE_DIED = DIED
@@ -131,14 +134,14 @@ export function parseCombatLine(text: string): CombatEvent | null {
   const c = text.charCodeAt(0)
   // Most lines start "You"; the cheap checks first.
   if (c === 89 /* Y */) {
-    if ((m = RE_MELEE_YOU.exec(text))) return { kind: 'damage', source: SELF, target: self(m[2]), amount: +m[3], how: 'melee', skill: m[1], mods: parseMods(m[4]) }
+    if ((m = RE_MELEE_YOU.exec(text))) return { kind: 'damage', source: SELF, target: self(m[2]), amount: num(m[3]), how: 'melee', skill: m[1], mods: parseMods(m[4]) }
     if ((m = RE_MISS_YOU.exec(text))) {
       const outcome = outcomeOf(m[3])
       return outcome ? { kind: 'miss', source: SELF, target: self(m[2]), skill: m[1], outcome, mods: parseMods(m[4]) } : null
     }
-    if ((m = RE_SPELL_YOU.exec(text))) return { kind: 'damage', source: SELF, target: self(m[1]), amount: +m[2], how: 'spell', skill: spell(m[4]), mods: parseMods(m[5]) }
-    if ((m = RE_DOT_ON_YOU.exec(text))) return { kind: 'damage', source: m[3], target: SELF, amount: +m[1], how: 'dot', skill: spell(m[2]), mods: parseMods(m[4]) }
-    if ((m = RE_DS_ON_YOU.exec(text))) return { kind: 'damage', source: m[1], target: SELF, amount: +m[3], how: 'ds', skill: `Damage shield (${m[2]})`, mods: [] }
+    if ((m = RE_SPELL_YOU.exec(text))) return { kind: 'damage', source: SELF, target: self(m[1]), amount: num(m[2]), how: 'spell', skill: spell(m[4]), mods: parseMods(m[5]) }
+    if ((m = RE_DOT_ON_YOU.exec(text))) return { kind: 'damage', source: m[3], target: SELF, amount: num(m[1]), how: 'dot', skill: spell(m[2]), mods: parseMods(m[4]) }
+    if ((m = RE_DS_ON_YOU.exec(text))) return { kind: 'damage', source: m[1], target: SELF, amount: num(m[3]), how: 'ds', skill: `Damage shield (${m[2]})`, mods: [] }
     if ((m = RE_SLAIN_YOU.exec(text))) return { kind: 'kill', target: m[1], killer: SELF }
     if (RE_YOU_DIED.test(text)) return { kind: 'kill', target: SELF, killer: null }
     if ((m = RE_YOU_SLAIN.exec(text))) return { kind: 'kill', target: SELF, killer: m[1] }
@@ -147,25 +150,25 @@ export function parseCombatLine(text: string): CombatEvent | null {
     if ((m = RE_YOU_REMOVE.exec(text))) return { kind: 'group', who: m[1], action: 'left' }
     if ((m = RE_CAST_YOU.exec(text))) return { kind: 'cast', source: SELF, spell: m[1] }
   }
-  if ((m = RE_MELEE.exec(text))) return { kind: 'damage', source: self(m[1]), target: self(m[3]), amount: +m[4], how: 'melee', skill: BASE_VERB.get(m[2]) ?? m[2], mods: parseMods(m[5]) }
+  if ((m = RE_MELEE.exec(text))) return { kind: 'damage', source: self(m[1]), target: self(m[3]), amount: num(m[4]), how: 'melee', skill: BASE_VERB.get(m[2]) ?? m[2], mods: parseMods(m[5]) }
   if ((m = RE_MISS.exec(text))) {
     // "tries to cast a spell on you, but you are protected." is a spell, not a swing.
     const outcome = outcomeOf(m[4])
     return outcome ? { kind: 'miss', source: self(m[1]), target: self(m[3]), skill: m[2], outcome, mods: parseMods(m[5]) } : null
   }
-  if ((m = RE_SPELL.exec(text))) return { kind: 'damage', source: self(m[1]), target: self(m[2]), amount: +m[3], how: 'spell', skill: spell(m[5]), mods: parseMods(m[6]) }
-  if ((m = RE_DOT_YOU.exec(text))) return { kind: 'damage', source: SELF, target: self(m[1]), amount: +m[2], how: 'dot', skill: spell(m[3]), mods: parseMods(m[4]) }
-  if ((m = RE_DOT.exec(text))) return { kind: 'damage', source: self(m[4]), target: self(m[1]), amount: +m[2], how: 'dot', skill: spell(m[3]), mods: parseMods(m[5]) }
-  if ((m = RE_DOT_NO_CASTER.exec(text))) return { kind: 'damage', source: '', target: self(m[1]), amount: +m[2], how: 'dot', skill: spell(m[3]), mods: parseMods(m[4]) }
-  if ((m = RE_DS_YOU.exec(text))) return { kind: 'damage', source: SELF, target: self(m[1]), amount: +m[3], how: 'ds', skill: `Damage shield (${m[2]})`, mods: [] }
-  if ((m = RE_DS.exec(text))) return { kind: 'damage', source: self(m[2]), target: self(m[1]), amount: +m[4], how: 'ds', skill: `Damage shield (${m[3]})`, mods: [] }
+  if ((m = RE_SPELL.exec(text))) return { kind: 'damage', source: self(m[1]), target: self(m[2]), amount: num(m[3]), how: 'spell', skill: spell(m[5]), mods: parseMods(m[6]) }
+  if ((m = RE_DOT_YOU.exec(text))) return { kind: 'damage', source: SELF, target: self(m[1]), amount: num(m[2]), how: 'dot', skill: spell(m[3]), mods: parseMods(m[4]) }
+  if ((m = RE_DOT.exec(text))) return { kind: 'damage', source: self(m[4]), target: self(m[1]), amount: num(m[2]), how: 'dot', skill: spell(m[3]), mods: parseMods(m[5]) }
+  if ((m = RE_DOT_NO_CASTER.exec(text))) return { kind: 'damage', source: '', target: self(m[1]), amount: num(m[2]), how: 'dot', skill: spell(m[3]), mods: parseMods(m[4]) }
+  if ((m = RE_DS_YOU.exec(text))) return { kind: 'damage', source: SELF, target: self(m[1]), amount: num(m[3]), how: 'ds', skill: `Damage shield (${m[2]})`, mods: [] }
+  if ((m = RE_DS.exec(text))) return { kind: 'damage', source: self(m[2]), target: self(m[1]), amount: num(m[4]), how: 'ds', skill: `Damage shield (${m[3]})`, mods: [] }
   if ((m = RE_HEAL.exec(text))) {
     const source = self(m[1])
     const target = reflexive(m[2]) ? source : self(m[2])
-    const amount = +m[4]
-    return { kind: 'heal', source, target, amount, raw: m[5] ? +m[5] : amount, spell: m[6], hot: !!m[3], mods: parseMods(m[7]) }
+    const amount = num(m[4])
+    return { kind: 'heal', source, target, amount, raw: m[5] ? num(m[5]) : amount, spell: m[6], hot: !!m[3], mods: parseMods(m[7]) }
   }
-  if ((m = RE_RUNE.exec(text))) return { kind: 'rune', target: self(m[1]), amount: +m[2] }
+  if ((m = RE_RUNE.exec(text))) return { kind: 'rune', target: self(m[1]), amount: num(m[2]) }
   if ((m = RE_SLAIN_BY.exec(text))) return { kind: 'kill', target: self(m[1]), killer: self(m[2]) }
   if ((m = RE_DIED.exec(text))) return { kind: 'kill', target: self(m[1]), killer: null }
   if ((m = RE_RESIST_YOU.exec(text))) return { kind: 'resist', source: SELF, target: self(m[1]), spell: m[2] }

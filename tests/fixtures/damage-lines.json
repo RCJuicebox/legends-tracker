@@ -1,0 +1,648 @@
+{
+  "_about": "The player's own damage and misses, one line of each shape seen in the test character's log (targets are mobs), plus a thousands separator and a damage shield. tests/damageGrammar.test.ts and the workspace's dps/test_grammar.py both read it, so the app's parser and the Python one cannot drift apart.",
+  "lines": [
+    {
+      "line": "You kick a marsh bear cub for 79 points of damage.",
+      "expect": {
+        "kind": "melee",
+        "target": "a marsh bear cub",
+        "skill": "kick",
+        "amount": 79,
+        "crit": false,
+        "riposte": false
+      }
+    },
+    {
+      "line": "You kick a marsh bear cub for 59 points of damage. (Critical)",
+      "expect": {
+        "kind": "melee",
+        "target": "a marsh bear cub",
+        "skill": "kick",
+        "amount": 59,
+        "crit": true,
+        "riposte": false
+      }
+    },
+    {
+      "line": "You punch a swamp alligator for 48 points of damage.",
+      "expect": {
+        "kind": "melee",
+        "target": "a swamp alligator",
+        "skill": "punch",
+        "amount": 48,
+        "crit": false,
+        "riposte": false
+      }
+    },
+    {
+      "line": "You hit a marsh bear for 182 points of prismatic damage by Puma Maw.",
+      "expect": {
+        "kind": "spell",
+        "target": "a marsh bear",
+        "skill": "Puma Maw",
+        "amount": 182,
+        "crit": false,
+        "riposte": false
+      }
+    },
+    {
+      "line": "A scareling has taken 46 damage from your Selo's Chords of Cessation.",
+      "expect": {
+        "kind": "dot",
+        "target": "A scareling",
+        "skill": "Selo's Chords of Cessation",
+        "amount": 46,
+        "crit": false,
+        "riposte": false
+      }
+    },
+    {
+      "line": "You hit a scareling pet for 2013 points of magic damage by Denon's Desperate Dirge. (Critical)",
+      "expect": {
+        "kind": "spell",
+        "target": "a scareling pet",
+        "skill": "Denon's Desperate Dirge",
+        "amount": 2013,
+        "crit": true,
+        "riposte": false
+      }
+    },
+    {
+      "line": "You hit a scareling for 2452 points of magic damage by Denon's Desperate Dirge VII.",
+      "expect": {
+        "kind": "spell",
+        "target": "a scareling",
+        "skill": "Denon's Desperate Dirge VII",
+        "amount": 2452,
+        "crit": false,
+        "riposte": false
+      }
+    },
+    {
+      "line": "A scareling has taken 140 damage from your Selo's Chords of Cessation. (Critical)",
+      "expect": {
+        "kind": "dot",
+        "target": "A scareling",
+        "skill": "Selo's Chords of Cessation",
+        "amount": 140,
+        "crit": true,
+        "riposte": false
+      }
+    },
+    {
+      "line": "You try to punch a scareling, but miss! (Riposte)",
+      "expect": {
+        "kind": "miss",
+        "target": "a scareling",
+        "skill": "punch",
+        "outcome": "miss",
+        "riposte": true
+      }
+    },
+    {
+      "line": "You try to punch a fetid fiend, but miss!",
+      "expect": {
+        "kind": "miss",
+        "target": "a fetid fiend",
+        "skill": "punch",
+        "outcome": "miss",
+        "riposte": false
+      }
+    },
+    {
+      "line": "You try to punch a fetid fiend, but a fetid fiend parries!",
+      "expect": {
+        "kind": "miss",
+        "target": "a fetid fiend",
+        "skill": "punch",
+        "outcome": "parry",
+        "riposte": false
+      }
+    },
+    {
+      "line": "You try to kick a fetid fiend, but miss!",
+      "expect": {
+        "kind": "miss",
+        "target": "a fetid fiend",
+        "skill": "kick",
+        "outcome": "miss",
+        "riposte": false
+      }
+    },
+    {
+      "line": "You try to kick a fetid fiend, but a fetid fiend parries!",
+      "expect": {
+        "kind": "miss",
+        "target": "a fetid fiend",
+        "skill": "kick",
+        "outcome": "parry",
+        "riposte": false
+      }
+    },
+    {
+      "line": "You punch a fetid fiend for 221 points of damage. (Finishing Blow)",
+      "expect": {
+        "kind": "melee",
+        "target": "a fetid fiend",
+        "skill": "punch",
+        "amount": 221,
+        "crit": false,
+        "riposte": false
+      }
+    },
+    {
+      "line": "You try to punch a fetid fiend, but a fetid fiend dodges!",
+      "expect": {
+        "kind": "miss",
+        "target": "a fetid fiend",
+        "skill": "punch",
+        "outcome": "dodge",
+        "riposte": false
+      }
+    },
+    {
+      "line": "You punch a decrepit warder for 56 points of damage. (Riposte)",
+      "expect": {
+        "kind": "melee",
+        "target": "a decrepit warder",
+        "skill": "punch",
+        "amount": 56,
+        "crit": false,
+        "riposte": true
+      }
+    },
+    {
+      "line": "You punch a shiverback for 209 points of damage. (Critical)",
+      "expect": {
+        "kind": "melee",
+        "target": "a shiverback",
+        "skill": "punch",
+        "amount": 209,
+        "crit": true,
+        "riposte": false
+      }
+    },
+    {
+      "line": "You try to kick a shiverback, but a shiverback dodges!",
+      "expect": {
+        "kind": "miss",
+        "target": "a shiverback",
+        "skill": "kick",
+        "outcome": "dodge",
+        "riposte": false
+      }
+    },
+    {
+      "line": "You punch a decrepit warder for 96 points of damage. (Riposte Critical)",
+      "expect": {
+        "kind": "melee",
+        "target": "a decrepit warder",
+        "skill": "punch",
+        "amount": 96,
+        "crit": true,
+        "riposte": true
+      }
+    },
+    {
+      "line": "You try to punch a scareling, but a scareling's magical skin absorbs the blow! (Riposte)",
+      "expect": {
+        "kind": "miss",
+        "target": "a scareling",
+        "skill": "punch",
+        "outcome": "absorb",
+        "riposte": true
+      }
+    },
+    {
+      "line": "You try to punch a scareling pet, but a scareling pet blocks!",
+      "expect": {
+        "kind": "miss",
+        "target": "a scareling pet",
+        "skill": "punch",
+        "outcome": "block",
+        "riposte": false
+      }
+    },
+    {
+      "line": "You kick a fetid fiend for 238 points of damage. (Finishing Blow)",
+      "expect": {
+        "kind": "melee",
+        "target": "a fetid fiend",
+        "skill": "kick",
+        "amount": 238,
+        "crit": false,
+        "riposte": false
+      }
+    },
+    {
+      "line": "You try to strike an ire ghast, but miss!",
+      "expect": {
+        "kind": "miss",
+        "target": "an ire ghast",
+        "skill": "strike",
+        "outcome": "miss",
+        "riposte": false
+      }
+    },
+    {
+      "line": "You strike an abhorrent for 48 points of damage.",
+      "expect": {
+        "kind": "melee",
+        "target": "an abhorrent",
+        "skill": "strike",
+        "amount": 48,
+        "crit": false,
+        "riposte": false
+      }
+    },
+    {
+      "line": "You bash an abhorrent for 107 points of damage. (Critical)",
+      "expect": {
+        "kind": "melee",
+        "target": "an abhorrent",
+        "skill": "bash",
+        "amount": 107,
+        "crit": true,
+        "riposte": false
+      }
+    },
+    {
+      "line": "You try to reave an abhorrent, but miss!",
+      "expect": {
+        "kind": "miss",
+        "target": "an abhorrent",
+        "skill": "reave",
+        "outcome": "miss",
+        "riposte": false
+      }
+    },
+    {
+      "line": "You reave an abhorrent for 74 points of damage.",
+      "expect": {
+        "kind": "melee",
+        "target": "an abhorrent",
+        "skill": "reave",
+        "amount": 74,
+        "crit": false,
+        "riposte": false
+      }
+    },
+    {
+      "line": "You bash an ire ghast for 20 points of damage.",
+      "expect": {
+        "kind": "melee",
+        "target": "an ire ghast",
+        "skill": "bash",
+        "amount": 20,
+        "crit": false,
+        "riposte": false
+      }
+    },
+    {
+      "line": "You strike an ire ghast for 129 points of damage. (Critical)",
+      "expect": {
+        "kind": "melee",
+        "target": "an ire ghast",
+        "skill": "strike",
+        "amount": 129,
+        "crit": true,
+        "riposte": false
+      }
+    },
+    {
+      "line": "You try to bash an ire ghast, but miss!",
+      "expect": {
+        "kind": "miss",
+        "target": "an ire ghast",
+        "skill": "bash",
+        "outcome": "miss",
+        "riposte": false
+      }
+    },
+    {
+      "line": "You strike an ire ghast for 313 points of damage. (Finishing Blow)",
+      "expect": {
+        "kind": "melee",
+        "target": "an ire ghast",
+        "skill": "strike",
+        "amount": 313,
+        "crit": false,
+        "riposte": false
+      }
+    },
+    {
+      "line": "You reave an abhorrent for 72 points of damage. (Critical)",
+      "expect": {
+        "kind": "melee",
+        "target": "an abhorrent",
+        "skill": "reave",
+        "amount": 72,
+        "crit": true,
+        "riposte": false
+      }
+    },
+    {
+      "line": "You try to bash an ire ghast, but an ire ghast dodges!",
+      "expect": {
+        "kind": "miss",
+        "target": "an ire ghast",
+        "skill": "bash",
+        "outcome": "dodge",
+        "riposte": false
+      }
+    },
+    {
+      "line": "You try to strike an ire ghast, but an ire ghast parries!",
+      "expect": {
+        "kind": "miss",
+        "target": "an ire ghast",
+        "skill": "strike",
+        "outcome": "parry",
+        "riposte": false
+      }
+    },
+    {
+      "line": "You hit an abhorrent for 600 points of prismatic damage by Puma Maw V. (Critical)",
+      "expect": {
+        "kind": "spell",
+        "target": "an abhorrent",
+        "skill": "Puma Maw V",
+        "amount": 600,
+        "crit": true,
+        "riposte": false
+      }
+    },
+    {
+      "line": "You hit an abhorrent for 54 points of poison damage by Envenomed Bolt X.",
+      "expect": {
+        "kind": "spell",
+        "target": "an abhorrent",
+        "skill": "Envenomed Bolt X",
+        "amount": 54,
+        "crit": false,
+        "riposte": false
+      }
+    },
+    {
+      "line": "You try to bash an abhorrent, but an abhorrent parries!",
+      "expect": {
+        "kind": "miss",
+        "target": "an abhorrent",
+        "skill": "bash",
+        "outcome": "parry",
+        "riposte": false
+      }
+    },
+    {
+      "line": "You try to reave an abhorrent, but an abhorrent parries!",
+      "expect": {
+        "kind": "miss",
+        "target": "an abhorrent",
+        "skill": "reave",
+        "outcome": "parry",
+        "riposte": false
+      }
+    },
+    {
+      "line": "You try to punch a haunted chest, but a haunted chest's magical skin absorbs the blow!",
+      "expect": {
+        "kind": "miss",
+        "target": "a haunted chest",
+        "skill": "punch",
+        "outcome": "absorb",
+        "riposte": false
+      }
+    },
+    {
+      "line": "You try to reave a haunted chest, but a haunted chest dodges!",
+      "expect": {
+        "kind": "miss",
+        "target": "a haunted chest",
+        "skill": "reave",
+        "outcome": "dodge",
+        "riposte": false
+      }
+    },
+    {
+      "line": "You try to bash a loathling lich, but a loathling lich's magical skin absorbs the blow!",
+      "expect": {
+        "kind": "miss",
+        "target": "a loathling lich",
+        "skill": "bash",
+        "outcome": "absorb",
+        "riposte": false
+      }
+    },
+    {
+      "line": "You hit a loathling lich for 167 points of poison damage by Envenomed Bolt X. (Critical)",
+      "expect": {
+        "kind": "spell",
+        "target": "a loathling lich",
+        "skill": "Envenomed Bolt X",
+        "amount": 167,
+        "crit": true,
+        "riposte": false
+      }
+    },
+    {
+      "line": "You reave a loathling lich for 212 points of damage. (Finishing Blow)",
+      "expect": {
+        "kind": "melee",
+        "target": "a loathling lich",
+        "skill": "reave",
+        "amount": 212,
+        "crit": false,
+        "riposte": false
+      }
+    },
+    {
+      "line": "You try to strike an ire ghast, but an ire ghast dodges!",
+      "expect": {
+        "kind": "miss",
+        "target": "an ire ghast",
+        "skill": "strike",
+        "outcome": "dodge",
+        "riposte": false
+      }
+    },
+    {
+      "line": "You try to strike a loathling lich, but a loathling lich's magical skin absorbs the blow!",
+      "expect": {
+        "kind": "miss",
+        "target": "a loathling lich",
+        "skill": "strike",
+        "outcome": "absorb",
+        "riposte": false
+      }
+    },
+    {
+      "line": "You try to kick a loathling lich, but a loathling lich's magical skin absorbs the blow!",
+      "expect": {
+        "kind": "miss",
+        "target": "a loathling lich",
+        "skill": "kick",
+        "outcome": "absorb",
+        "riposte": false
+      }
+    },
+    {
+      "line": "You try to reave a loathling lich, but a loathling lich's magical skin absorbs the blow!",
+      "expect": {
+        "kind": "miss",
+        "target": "a loathling lich",
+        "skill": "reave",
+        "outcome": "absorb",
+        "riposte": false
+      }
+    },
+    {
+      "line": "You hit a loathling lich for 208 points of disease damage by Plague X.",
+      "expect": {
+        "kind": "spell",
+        "target": "a loathling lich",
+        "skill": "Plague X",
+        "amount": 208,
+        "crit": false,
+        "riposte": false
+      }
+    },
+    {
+      "line": "You bash a forsaken revenant for 267 points of damage. (Finishing Blow)",
+      "expect": {
+        "kind": "melee",
+        "target": "a forsaken revenant",
+        "skill": "bash",
+        "amount": 267,
+        "crit": false,
+        "riposte": false
+      }
+    },
+    {
+      "line": "You try to strike a kiraikuei, but a kiraikuei blocks!",
+      "expect": {
+        "kind": "miss",
+        "target": "a kiraikuei",
+        "skill": "strike",
+        "outcome": "block",
+        "riposte": false
+      }
+    },
+    {
+      "line": "You try to kick a kiraikuei, but a kiraikuei blocks!",
+      "expect": {
+        "kind": "miss",
+        "target": "a kiraikuei",
+        "skill": "kick",
+        "outcome": "block",
+        "riposte": false
+      }
+    },
+    {
+      "line": "You try to bash a kiraikuei, but a kiraikuei blocks!",
+      "expect": {
+        "kind": "miss",
+        "target": "a kiraikuei",
+        "skill": "bash",
+        "outcome": "block",
+        "riposte": false
+      }
+    },
+    {
+      "line": "You hit a forsaken revenant for 1001 points of unresistable damage by Harm Touch X.",
+      "expect": {
+        "kind": "spell",
+        "target": "a forsaken revenant",
+        "skill": "Harm Touch X",
+        "amount": 1001,
+        "crit": false,
+        "riposte": false
+      }
+    },
+    {
+      "line": "You punch a scorn banshee for 576 points of damage. (Riposte Finishing Blow)",
+      "expect": {
+        "kind": "melee",
+        "target": "a scorn banshee",
+        "skill": "punch",
+        "amount": 576,
+        "crit": false,
+        "riposte": true
+      }
+    },
+    {
+      "line": "You try to reave a kiraikuei, but a kiraikuei blocks!",
+      "expect": {
+        "kind": "miss",
+        "target": "a kiraikuei",
+        "skill": "reave",
+        "outcome": "block",
+        "riposte": false
+      }
+    },
+    {
+      "line": "You hit a samhain for 10 points of physical damage by Dragon Force I.",
+      "expect": {
+        "kind": "spell",
+        "target": "a samhain",
+        "skill": "Dragon Force I",
+        "amount": 10,
+        "crit": false,
+        "riposte": false
+      }
+    },
+    {
+      "line": "You hit a lioness for 30 points of physical damage by Dragon Force I. (Critical)",
+      "expect": {
+        "kind": "spell",
+        "target": "a lioness",
+        "skill": "Dragon Force I",
+        "amount": 30,
+        "crit": true,
+        "riposte": false
+      }
+    },
+    {
+      "line": "You hit a spite golem for 599 points of disease damage by Plague X. (Critical)",
+      "expect": {
+        "kind": "spell",
+        "target": "a spite golem",
+        "skill": "Plague X",
+        "amount": 599,
+        "crit": true,
+        "riposte": false
+      }
+    },
+    {
+      "line": "You slash a gnoll for 1,234 points of damage. (Critical)",
+      "expect": {
+        "kind": "melee",
+        "target": "a gnoll",
+        "skill": "slash",
+        "amount": 1234,
+        "crit": true,
+        "riposte": false
+      }
+    },
+    {
+      "line": "A gnoll has taken 2,048 damage from your Envenomed Bolt X.",
+      "expect": {
+        "kind": "dot",
+        "target": "A gnoll",
+        "skill": "Envenomed Bolt X",
+        "amount": 2048,
+        "crit": false,
+        "riposte": false
+      }
+    },
+    {
+      "line": "A gnoll is burned by YOUR flames for 12 points of non-melee damage.",
+      "expect": {
+        "kind": "ds",
+        "target": "A gnoll",
+        "amount": 12,
+        "crit": false,
+        "riposte": false
+      }
+    }
+  ]
+}
