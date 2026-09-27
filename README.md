@@ -50,7 +50,8 @@ they survive updates and uninstalls.
 
 Running the Release workflow by hand (Actions → Release → Run workflow) is a dry run: it builds the
 installer and attaches it to the run, publishing nothing. Every push to `main` also runs
-`npm run check`, which is the type-check, lint and tests (`ci.yml`).
+`npm run check`, which is the type-check, lint and tests, then a smoke test of the built app and
+of a packaged copy (`ci.yml`).
 
 `npm run dist` builds the installer into `dist\` without publishing anything.
 
@@ -73,7 +74,9 @@ npm run build
 npm test
 ```
 
-`npm run check` runs the type-check, lint and tests together, as CI does. `npm run dev` runs with
+`npm run check` runs the type-check, lint and tests together, as CI does. After `npm run build`,
+`npm run smoke` starts the app on a throwaway profile, checks its window answers, and quits it;
+`node scripts/smoke.mjs <path to the exe>` does the same for a packaged copy. `npm run dev` runs with
 hot reload. Settings live in `%APPDATA%\Legends Tracker`; [Your data](#your-data) lists every file.
 Setting `EQL_USER_DATA` to another folder runs against a separate profile.
 

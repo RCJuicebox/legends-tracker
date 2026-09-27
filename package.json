@@ -19,6 +19,7 @@
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "lint": "oxlint",
     "check": "npm run typecheck && npm run lint && npm test",
+    "smoke": "node scripts/smoke.mjs",
     "icon": "electron scripts/render-icon.cjs",
     "dist": "electron-vite build && electron-builder --win --publish never",
     "release": "node scripts/release.mjs"

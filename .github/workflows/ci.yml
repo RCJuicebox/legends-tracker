@@ -17,3 +17,9 @@ jobs:
       - run: npm ci
       # Typecheck, lint (with the layer rules) and the tests.
       - run: npm run check
+      # The app starts on a throwaway profile, answers app:state and quits when asked: built from
+      # source, then packaged as the installer would lay it out.
+      - run: npm run build
+      - run: npm run smoke
+      - run: npx electron-builder --win --dir --publish never
+      - run: node scripts/smoke.mjs "dist/win-unpacked/Legends Tracker.exe"
