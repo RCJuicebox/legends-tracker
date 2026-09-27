@@ -307,10 +307,19 @@ fix it. It is a diagnostic; the timers themselves never learn from the log.
 
 ### Spell file layout
 
-`spells_us.txt` is caret-delimited: 0 id, 1 name, 8 cast ms, 10 recast ms, 11 duration formula,
-12 duration cap (ticks), 14 mana, 28 beneficial, 36–51 class levels (255 = cannot cast), 75 icon, 172 effects
-(`slot|spa|base|…` joined by `$`). `spells_us_str.txt`: id, caster-me, caster-other, cast-on-you,
-cast-on-other, spell-gone. Icons are cut from `uifiles\default\SpellsNN.tga`: 40×40, 36 per sheet.
+`spells_us.txt` is caret-delimited: 0 id, 1 name, 4 range, 5 area range, 8 cast ms, 10 recast ms,
+11 duration formula, 12 duration cap (ticks), 14 mana, 28 beneficial, 29 resist type (0 none, 1 magic,
+2 fire, 3 cold, 4 poison, 5 disease, 6 chromatic, 7 prismatic, 8 physical, 9 corruption), 36–51 class
+levels (255 = cannot cast), 75 icon, 172 effects (`slot|spa|base|…` joined by `$`). `spells_us_str.txt`:
+id, caster-me, caster-other, cast-on-you, cast-on-other, spell-gone. Icons are cut from
+`uifiles\default\SpellsNN.tga`: 40×40, 36 per sheet.
+
+Two other client files were looked at and are not read, since no page needs them yet.
+`dbstr_us.txt` is `id^type^text^flag`: type 1 is AA names, 4 AA descriptions (at the rank held,
+as the `/alternateadv list` dump prints them), 40 spell-stacking group names, and much of the rest
+is mercenary, overseer and event text. `eqstr_us.txt` holds the client's message templates by
+number (`469 Your faction standing with %B1(45) could not possibly get any worse.`), which is the
+place to confirm a log line's exact wording.
 
 ## Triggers
 
