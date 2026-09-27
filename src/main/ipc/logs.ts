@@ -1,6 +1,6 @@
 import { shell } from 'electron'
 import { existsSync } from 'node:fs'
-import { isAbsolute, join, relative, resolve } from 'node:path'
+import { isAbsolute, join, relative, resolve, sep } from 'node:path'
 import { handle } from './handle'
 import { listLogs } from '../game'
 import type { AppContext } from '../context'
@@ -10,7 +10,8 @@ import type { AppContext } from '../context'
 /** Whether `path` is `dir` or somewhere inside it. */
 export function isInside(dir: string, path: string): boolean {
   const r = relative(resolve(dir), resolve(path))
-  return r === '' || (!r.startsWith('..') && !isAbsolute(r))
+  // A step up is ".." itself or "..\…"; a file named "..notes.txt" is inside.
+  return r === '' || (r !== '..' && !r.startsWith('..' + sep) && !isAbsolute(r))
 }
 
 export function registerLogIpc(ctx: AppContext): void {
