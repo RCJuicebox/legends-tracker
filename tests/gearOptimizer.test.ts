@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { planTotal } from '../src/core/finderRound'
 import { optimizeGear, ownedPieces } from '../src/core/gearOptimizer'
-import { parseInventory, parseStatsBlock } from '../src/core/inventory'
+import { mergeLevel, parseInventory, parseStatsBlock, scaledStats } from '../src/core/inventory'
+import { rawWeights, ROLE_PRESETS, type Conversions } from '../src/core/statValue'
 import { isLore, PRESETS, restrictions, weightsForSlot, type Weights } from '../src/core/upgrades'
 import { parseItemPage } from '../src/core/wikiItem'
 
@@ -101,7 +102,66 @@ describe('the optimizer and weapon ratio', () => {
 
   it('reads weapon ratio in the hands only, ranged ratio in the Range slot only', () => {
     const w = { ...melee, rangedRatio: 7 }
-    expect([weightsForSlot(w, 'Primary').ratio, weightsForSlot(w, 'Secondary').ratio, weightsForSlot(w, 'Range').ratio]).toEqual([40, 40, 0])
-    expect([weightsForSlot(w, 'Primary').rangedRatio, weightsForSlot(w, 'Range').rangedRatio, weightsForSlot(w, 'Any Slot').ratio]).toEqual([0, 7, 0])
+    expect([weightsForSlot(w, 'Primary').ratio, weightsForSlot(w, 'Secondary').ratio, weightsForSlot(w, 'Range').ratio]).toEqual([4000, 4000, 0])
+    expect([weightsForSlot(w, 'Primary').rangedRatio, weightsForSlot(w, 'Range').rangedRatio, weightsForSlot(w, 'Any Slot').ratio]).toEqual([0, 700, 0])
+  })
+})
+
+describe('weapon ratio against stats', () => {
+  // Juicebox, 2026-09-26: Wu's Fist of Mastery +10 in Primary (32 dmg / 22 delay, ratio 1.45), +6 in
+  // Secondary (25 / 22, 1.14), and a spare Bloodmoon +4 (25 / 28, ratio 0.89, +14 STR), which only
+  // goes in Primary. Wearing it would move the +10 fist to the off hand for 0.25 less ratio in all:
+  // about a quarter less damage from a hand, worth far more than 14 STR to a melee.
+  const catalog = [
+    item("Wu's Fist of Mastery", 'Slot: PRIMARY SECONDARY<br>\nSkill: Hand to Hand  Atk Delay: 22<br>\nDMG: 16 <br>\nClass: ALL<br>\nRace: ALL<br>'),
+    item('Bloodmoon', 'Slot: PRIMARY<br>\nSkill: 1H Slashing  Atk Delay: 28<br>\nDMG: 18 <br>\nSTR: +10<br>\nClass: ALL<br>\nRace: ALL<br>')
+  ]
+  const byName = new Map(catalog.map((c) => [c.title, c]))
+  const inv = parseInventory(
+    ['Location\tName\tID\tCount\tSlots', "Primary\tWu's Fist of Mastery +10\t1\t1\t10", "Secondary\tWu's Fist of Mastery +6\t1\t1\t10", 'General 1-Slot1\tBloodmoon +4\t2\t1\t10'].join('\n')
+  )
+  const pieces = ownedPieces(inv, (it) => {
+    const c = byName.get(it.name.replace(/ \+\d+$/, ''))!
+    return { r: restrictions(c.statsblock), stats: scaledStats(parseStatsBlock(c.statsblock), mergeLevel(it.name)), foci: [], lore: false }
+  })
+  // A melee's conversions, STR on the generous side: ⅔ Offense and 10 endurance a point.
+  const conv: Conversions = {
+    hpPerSta: 10, manaPerWis: 0, manaPerInt: 0, endPer: { STR: 10, STA: 10, AGI: 10, DEX: 10 },
+    offensePerStr: 2 / 3, avoidancePerAgi: 0.22, acPerAgi: 0.04, notes: []
+  }
+  const wearer = { classes: ['war'], race: '', level: 50 }
+
+  it('keeps the better ratio in the hands over a weapon with more STR', () => {
+    const plan = optimizeGear({ pieces, wearer, weights: rawWeights(ROLE_PRESETS.Melee, conv), twoHanders: false, focusValue: () => 0 })
+    expect(plan.after[plan.slots.indexOf('Primary')]?.item.name).toBe("Wu's Fist of Mastery +10")
+    expect(plan.after[plan.slots.indexOf('Secondary')]?.item.name).toBe("Wu's Fist of Mastery +6")
+  })
+
+  it('weighs a point of ratio as 100 of the per-1% weight', () => {
+    const w = rawWeights(ROLE_PRESETS.Melee, conv)
+    expect(weightsForSlot(w, 'Primary').ratio).toBe(ROLE_PRESETS.Melee.ratio * 100)
+  })
+})
+
+describe('gear in Storage', () => {
+  // The export lists the game's Storage window as its key ring. Gear in Storage › Equipment can be
+  // taken out and worn, so the optimizer weighs it; the Exaltations and Activated Items tabs are not gear.
+  const inv = parseInventory(
+    [
+      'Location\tName\tID\tCount\tSlots',
+      'Shoulders\tPauldrons of Power +6\t1542\t1\t10',
+      'KeyRing\tName\tID\t',
+      'Augmentation\tBloodmoon (Exaltation)\t11558\t1\t0',
+      'Activated\tRefugee Shroud +4\t1\t1\t0',
+      'Equipment\tSode of Empowerment +4\t2\t1\t0'
+    ].join('\n')
+  )
+  const pieces = ownedPieces(inv, () => ({ r: restrictions('Slot: SHOULDERS<br>\nClass: ALL<br>\nRace: ALL<br>'), stats: null, foci: [], lore: true }))
+
+  it('weighs Storage › Equipment and nothing else in Storage', () => {
+    expect(pieces.map((p) => [p.item.name, p.from])).toEqual([
+      ['Pauldrons of Power +6', 'worn'],
+      ['Sode of Empowerment +4', 'storage']
+    ])
   })
 })

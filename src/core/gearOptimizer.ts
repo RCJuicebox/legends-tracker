@@ -9,7 +9,7 @@
 // the gloves alone cost the haste), so the search is run again with each haste item owned as the one,
 // the rest of the set free to drop its haste, and the best set of the lot is kept.
 
-import { itemKey, type InvItem, type ItemStats } from './inventory'
+import { itemKey, storedEquipment, type Inventory, type InvItem, type ItemStats } from './inventory'
 import { canWear, isTwoHanded, score, weightsForSlot, type Restrictions, type Wearer, type Weights } from './upgrades'
 
 /** Every slot gear is worn in, one entry per slot: two ears, two wrists, two rings, two Any slots. */
@@ -18,7 +18,7 @@ export const SLOT_LAYOUT = [
   'Fingers', 'Fingers', 'Waist', 'Legs', 'Feet', 'Primary', 'Secondary', 'Range', 'Any Slot', 'Any Slot'
 ]
 
-export type PieceSource = 'worn' | 'bags' | 'bank' | 'sharedBank'
+export type PieceSource = 'worn' | 'bags' | 'bank' | 'sharedBank' | 'storage'
 
 export interface Piece {
   item: InvItem
@@ -231,9 +231,9 @@ export function optimizeGear(o: OptimizeOptions): Plan {
   }
 }
 
-/** A piece for every item the character has: worn, in bags, in the bank and the shared bank. */
+/** A piece for every item the character has: worn, in bags, in the bank, the shared bank and Storage › Equipment. */
 export function ownedPieces(
-  inv: { worn: InvItem[]; bags: InvItem[]; bank: InvItem[]; sharedBank: InvItem[] },
+  inv: { worn: InvItem[]; bags: InvItem[]; bank: InvItem[]; sharedBank: InvItem[]; keyRing?: Inventory['keyRing'] },
   describe: (item: InvItem) => { r: Restrictions | null; stats: ItemStats | null; foci: string[]; lore: boolean } | null
 ): Piece[] {
   const out: Piece[] = []
@@ -249,5 +249,6 @@ export function ownedPieces(
   add(inv.bags, 'bags')
   add(inv.bank, 'bank')
   add(inv.sharedBank, 'sharedBank')
+  if (inv.keyRing) add(storedEquipment({ keyRing: inv.keyRing }), 'storage')
   return out
 }

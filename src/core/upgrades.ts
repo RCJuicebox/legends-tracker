@@ -170,11 +170,13 @@ export const isTwoHanded = (r: Restrictions) => /^2H\b/i.test(r.skill)
 /**
  * The weights as a slot reads them. A weapon's damage and delay count in the hands (weapon ratio) and
  * in the Range slot (ranged ratio, weighed apart so a melee's range slot can go to stats); anywhere
- * else they are no reason to wear it.
+ * else they are no reason to wear it. Both weights are per 1% more damage from that slot, as the pet
+ * planner has them; a weapon's ratio (damage ÷ delay, near 1) moves that by about 1% each 0.01, so a
+ * whole point of ratio is worth 100 times the weight.
  */
 export function weightsForSlot(w: Weights, slot: string): Weights {
   const hands = slot === 'Primary' || slot === 'Secondary'
-  return { ...w, ratio: hands ? w.ratio : 0, rangedRatio: slot === 'Range' ? w.rangedRatio : 0 }
+  return { ...w, ratio: hands ? w.ratio * 100 : 0, rangedRatio: slot === 'Range' ? w.rangedRatio * 100 : 0 }
 }
 
 export type WeightKey =
@@ -279,6 +281,12 @@ export interface FinderOptions {
   twoHanders?: boolean
   /** itemKeys of everything the character owns anywhere. */
   owned: Set<string>
+  /**
+   * The stats of the best copy the character owns (at its merge level), by itemKey; null when none
+   * is known. An owned candidate is judged as that copy, whatever `compare` says: it is the one they
+   * would put on, and the one the optimizer weighs.
+   */
+  ownedStats?: (key: string) => ItemStats | null
   focus?: FinderFocus
   perSlot?: number
   /**
@@ -357,7 +365,8 @@ export function findUpgrades(o: FinderOptions): SlotResult[] {
       if (slot === 'Primary' && !o.twoHanders && isTwoHanded(p.r)) continue
       const key = itemKey(p.item.title)
       if (wornKeys.has(key) || (wornAnywhere.has(key) && isLore(p.item.statsblock))) continue
-      const stats = o.compare === 'level' && level ? scaledStats(p.base, level) : p.base
+      const mine = o.owned.has(key) ? o.ownedStats?.(key) : null
+      const stats = mine ?? (o.compare === 'level' && level ? scaledStats(p.base, level) : p.base)
       const hasteChange = Math.max(hasteLeft, stats.haste) - hasteNow
       const sc = score(stats, weights) + (Math.max(hasteLeft, stats.haste) - hasteLeft) * o.weights.haste
       const focusGain = !o.focus ? 0 : (p.item.focus ? focusWithout(current?.item, [p.item.focus]) : withoutCurrent) - focusNow

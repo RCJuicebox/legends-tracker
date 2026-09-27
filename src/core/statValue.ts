@@ -104,19 +104,22 @@ export type RoleWeights = Record<RoleKey, number>
 export const ROLE_LABELS: Record<RoleKey, string> = {
   hp: 'HP', mana: 'Mana', end: 'Endurance', ac: 'AC (gear)', avoidance: 'Avoidance', offense: 'Offense', attack: 'Attack (ATK)',
   procs: 'Procs (DEX)', haste: 'Haste %', resists: 'Resists', hpRegen: 'HP regen', manaRegen: 'Mana regen', endRegen: 'End regen',
-  ratio: 'Weapon ratio', rangedRatio: 'Ranged ratio'
+  ratio: 'Weapon damage (1%)', rangedRatio: 'Ranged damage (1%)'
 }
 
 /**
  * What each role values, per unit of outcome. Tank is in HP-equivalents: 1 gear AC ≈ 8 HP (tanks
  * commonly count 7-12 under the cap; the soft-cap rule then quarters it), a point of HP regen a tick
  * ≈ 25 HP over a fight. Melee values Offense, haste and weapon ratio; Caster values mana and its regen.
- * Weapon ratio is the hands'; ranged ratio (the Range slot's) is 0 in every role, so it goes to stats.
+ * Weapon ratio is worth per 1% more damage from the hands (0.01 of ratio), as the pet planner weighs
+ * it: by EQEmu's d20 damage roll, 1% of damage is about 6 Offense at the Offense of a level-50 melee,
+ * so each role's is 6 × its Offense weight. Ranged ratio (the Range slot's) is 0 in every role, so
+ * that slot goes to stats.
  */
 export const ROLE_PRESETS: Record<string, RoleWeights> = {
-  Balanced: { hp: 0.6, mana: 0.4, end: 0.2, ac: 5, avoidance: 0.8, offense: 1, attack: 0.5, procs: 0.4, haste: 8, resists: 0.8, hpRegen: 15, manaRegen: 12, endRegen: 3, ratio: 40, rangedRatio: 0 },
-  Tank: { hp: 1, mana: 0.15, end: 0.1, ac: 8, avoidance: 1.5, offense: 0.5, attack: 0.3, procs: 0.2, haste: 6, resists: 1.2, hpRegen: 25, manaRegen: 3, endRegen: 3, ratio: 40, rangedRatio: 0 },
-  Melee: { hp: 0.25, mana: 0, end: 0.3, ac: 2, avoidance: 0.3, offense: 2, attack: 1, procs: 0.8, haste: 15, resists: 0.3, hpRegen: 5, manaRegen: 0, endRegen: 5, ratio: 80, rangedRatio: 0 },
+  Balanced: { hp: 0.6, mana: 0.4, end: 0.2, ac: 5, avoidance: 0.8, offense: 1, attack: 0.5, procs: 0.4, haste: 8, resists: 0.8, hpRegen: 15, manaRegen: 12, endRegen: 3, ratio: 6, rangedRatio: 0 },
+  Tank: { hp: 1, mana: 0.15, end: 0.1, ac: 8, avoidance: 1.5, offense: 0.5, attack: 0.3, procs: 0.2, haste: 6, resists: 1.2, hpRegen: 25, manaRegen: 3, endRegen: 3, ratio: 3, rangedRatio: 0 },
+  Melee: { hp: 0.25, mana: 0, end: 0.3, ac: 2, avoidance: 0.3, offense: 2, attack: 1, procs: 0.8, haste: 15, resists: 0.3, hpRegen: 5, manaRegen: 0, endRegen: 5, ratio: 12, rangedRatio: 0 },
   Caster: { hp: 0.3, mana: 1, end: 0, ac: 1.5, avoidance: 0.2, offense: 0, attack: 0, procs: 0, haste: 0, resists: 0.6, hpRegen: 5, manaRegen: 30, endRegen: 0, ratio: 0, rangedRatio: 0 }
 }
 

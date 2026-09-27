@@ -30,5 +30,6 @@ export function whereText(from: PieceSource, item: InvItem): string {
   if (from === 'worn') return `worn in ${slotLabel(item.location)}`
   if (from === 'bags') return `in your bags (${item.location.split('-')[0]})`
   if (from === 'bank') return 'in your bank'
+  if (from === 'storage') return 'in Storage › Equipment'
   return 'in the shared bank'
 }

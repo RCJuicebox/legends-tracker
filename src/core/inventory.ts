@@ -22,8 +22,20 @@ export interface Inventory {
   sharedBank: InvItem[]
   /** The tradeskill depot (Personal-Depot1…), where auto-loot stores tradeskill items; absent from older exports. */
   depot: InvItem[]
-  /** The key ring: collections by kind (Equipment, Augmentation, Activated, …). */
+  /**
+   * The game's Storage window, which the export lists as its key ring: collections by kind (Equipment,
+   * Augmentation, Activated, …). Gear in Storage › Equipment can be taken out and worn.
+   */
   keyRing: { kind: string; name: string; id: number }[]
+}
+
+/** Storage tabs by the export's kind names, as the game's Storage window titles them. */
+const STORAGE_TABS: Record<string, string> = { Augmentation: 'Exaltations', Activated: 'Activated Items', Equipment: 'Equipment' }
+export const storageTab = (kind: string): string => STORAGE_TABS[kind] ?? kind
+
+/** Gear kept in Storage › Equipment, as items the character owns and can wear. */
+export function storedEquipment(inv: Pick<Inventory, 'keyRing'>): InvItem[] {
+  return inv.keyRing.filter((k) => k.kind === 'Equipment').map((k) => ({ location: 'Storage', name: k.name, id: k.id, count: 1, augs: [] }))
 }
 
 /** Worn slots in the order the game lists them. "Any Slot" is the charm slot. */

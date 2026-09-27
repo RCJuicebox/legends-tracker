@@ -4,7 +4,7 @@ import { remember, useRemembered } from '../remember'
 import { showError } from '../toast'
 import { Pending } from '../components/ui'
 import { numExact as num, who, wikiUrl } from '../format'
-import { itemKey, mergeLevel, parseStatsBlock, slotLabel, wornTotals, SAVE_KEYS, STAT_KEYS, type InvItem } from '../../../core/inventory'
+import { itemKey, mergeLevel, parseStatsBlock, slotLabel, storageTab, wornTotals, SAVE_KEYS, STAT_KEYS, type InvItem } from '../../../core/inventory'
 import type { CharacterSheet, InventoryView, ItemInfo } from '../../../shared/types'
 import { className } from '../../../core/acModel'
 import { MAX_LEVEL } from '../../../core/moteCalc'
@@ -599,14 +599,14 @@ function Carried({ view }: { view: InventoryView }) {
     add('worn', inv.worn)
     add('bags', inv.bags)
     add('bank', [...inv.bank, ...inv.sharedBank])
-    for (const k of inv.keyRing) out.push({ kind: 'keyring', name: k.name, where: `Key ring: ${k.kind}`, count: 1 })
+    for (const k of inv.keyRing) out.push({ kind: 'keyring', name: k.name, where: `Storage › ${storageTab(k.kind)}`, count: 1 })
     return out
   }, [inv])
   const counts = { all: rows.length, worn: 0, bags: 0, bank: 0, keyring: 0 }
   for (const r of rows) counts[r.kind]++
   const query = q.trim().toLowerCase()
   const shown = rows.filter((r) => (filter === 'all' || r.kind === filter) && (!query || r.name.toLowerCase().includes(query)))
-  const label: Record<Filter, string> = { all: 'Everything', worn: 'Worn', bags: 'Bags', bank: 'Bank', keyring: 'Key ring' }
+  const label: Record<Filter, string> = { all: 'Everything', worn: 'Worn', bags: 'Bags', bank: 'Bank', keyring: 'Storage' }
   return (
     <div className="card lt-carried">
       <div className="row mb-12">

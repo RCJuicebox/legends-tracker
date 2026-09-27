@@ -47,6 +47,7 @@ function where(p: PetPiece): string {
   if (p.from === 'worn') return `you wear it (${slotLabel(loc)})`
   if (p.from === 'bags') return `in your bags (${loc.replace(/-Slot(\d+)$/, ', slot $1')})`
   if (p.from === 'bank') return `in your bank (${loc.replace(/^Bank(\d+)(?:-Slot(\d+))?$/, (_, b, s) => `bank ${b}${s ? `, slot ${s}` : ''}`)})`
+  if (p.from === 'storage') return 'in Storage › Equipment'
   return 'in the shared bank'
 }
 

@@ -6,7 +6,7 @@ import { showError } from '../toast'
 import { readSheet } from '../statsSheet'
 import { characterAc } from '../stats/model'
 import { statsFor, wornSummary } from './model'
-import { itemFoci, itemKey, mergeLevel, parseStatsBlock, scaledStats, type InvItem } from '../../../core/inventory'
+import { itemFoci, itemKey, mergeLevel, parseStatsBlock, scaledStats, storedEquipment, type InvItem } from '../../../core/inventory'
 import {
   ANY_SLOT,
   canWear,
@@ -23,7 +23,7 @@ import {
 import { conversions, rawWeights, ROLE_PRESETS, type ClassFactors, type RoleWeights } from '../../../core/statValue'
 import { focusValue, type FocusLine, type FocusReport, type FocusWorth } from '../../../core/itemFocus'
 import { optimizeGear, ownedPieces, type Piece, type PieceSource } from '../../../core/gearOptimizer'
-import { candidatePiece, inTheRound } from '../../../core/finderRound'
+import { candidatePiece, inTheRound, ownedInTheRound } from '../../../core/finderRound'
 import { aaTotal } from '../../../core/aa'
 import { CATALOG_FORMAT, type CatalogItem } from '../../../core/wikiItem'
 import type { CharacterSheet, InventoryView } from '../../../shared/types'
@@ -138,11 +138,25 @@ function useCatalog() {
   return { state, refresh, error: q.error, reload }
 }
 
+/** The copy of an item the character owns at the highest merge level, among the pieces the optimizer weighs. */
+function bestOwned(pieces: Piece[], key: string): Piece | null {
+  let best: Piece | null = null
+  for (const p of pieces) if (p.key === key && p.stats && (!best || mergeLevel(p.item.name) > mergeLevel(best.item.name))) best = p
+  return best
+}
+
 export function useGearModel(view: InventoryView, sheet: CharacterSheet | null, mode: GearMode) {
   const catalog = useCatalog()
   const state = catalog.state
   const [preset, setPreset] = useRemembered<string>('finder.preset', 'Balanced')
-  const [custom, setCustom] = useRemembered<RoleWeights>('finder.roleWeights', ROLE_PRESETS.Balanced)
+  // v2: weapon ratio per 1% of damage. Custom weights saved before keep their place against the
+  // Melee role, whose weight went from 80 to 12.
+  const [savedCustom, saveCustom] = useRemembered<RoleWeights & { v?: number }>('finder.roleWeights', { ...ROLE_PRESETS.Balanced, v: 2 })
+  const custom = useMemo<RoleWeights>(() => {
+    const { v, ...w } = savedCustom
+    return v === 2 ? w : { ...w, ratio: Math.round((w.ratio ?? 0) * (12 / 80) * 10) / 10 }
+  }, [savedCustom])
+  const setCustom = useCallback((w: RoleWeights) => saveCustom({ ...w, v: 2 }), [saveCustom])
   const [twoHandMode, setTwoHandMode] = useRemembered<'auto' | 'one' | 'any'>('finder.twoHand', 'auto')
   const [compare, setCompare] = useRemembered<'drop' | 'level'>('finder.compare', 'drop')
   const [hiddenEras, setHiddenEras] = useRemembered<string[]>('finder.hiddenEras.v3', DEFAULT_HIDDEN_ERAS)
@@ -211,7 +225,10 @@ export function useGearModel(view: InventoryView, sheet: CharacterSheet | null, 
   const secondaryInUse = !!view.inventory?.worn.some((it) => it.location === 'Secondary')
   const twoHanders = twoHandMode === 'any' || (twoHandMode === 'auto' && !secondaryInUse)
   const inv = view.inventory!
-  const owned = useMemo(() => new Set([...inv.worn, ...inv.bags, ...inv.bank, ...inv.sharedBank].flatMap((i) => [itemKey(i.name), ...i.augs.map((a) => itemKey(a.name))])), [inv])
+  const owned = useMemo(
+    () => new Set([...inv.worn, ...inv.bags, ...inv.bank, ...inv.sharedBank, ...storedEquipment(inv)].flatMap((i) => [itemKey(i.name), ...i.augs.map((a) => itemKey(a.name))])),
+    [inv]
+  )
   const wearer = useMemo<Wearer>(() => ({ classes, race: stats.race === 'iksar' ? 'IKS' : '', level }), [classes, stats.race, level])
 
   const items = state?.file?.items
@@ -337,6 +354,7 @@ export function useGearModel(view: InventoryView, sheet: CharacterSheet | null, 
       eraStatus: d.eraStatus,
       twoHanders: d.twoHanders,
       owned: d.owned,
+      ownedStats: (key) => bestOwned(d.pieces, key)?.stats ?? null,
       focus: d.worth ? { worn: (it) => d.fociOf(it).map((f) => f.name), value: d.valueOf } : undefined,
       // In the round, the stat winners a focus loss would hide get their chance: the optimizer may keep the focus elsewhere.
       perSlot: round ? 8 : 6,
@@ -348,7 +366,9 @@ export function useGearModel(view: InventoryView, sheet: CharacterSheet | null, 
     const baseline = optimizeGear(opts)
     return slots.map((s) => {
       const judged = s.candidates.map((c) => {
-        const r = inTheRound({ ...opts, candidate: candidatePiece(c.item, c.stats), baseline })
+        // One the character owns is already among the pieces: judged as their own copy, as the optimizer does.
+        const key = itemKey(c.item.title)
+        const r = bestOwned(d.pieces, key) ? ownedInTheRound({ ...opts, key, baseline }) : inTheRound({ ...opts, candidate: candidatePiece(c.item, c.stats), baseline })
         return { ...c, round: { delta: r.delta, placed: r.placed, moves: r.moves.map((m) => ({ slot: m.slot, out: m.out?.item.name ?? null, in: m.in?.item.name ?? null })) } }
       })
       return { ...s, candidates: judged.filter((c) => c.round.delta > 0).sort((a, b) => b.round.delta - a.round.delta).slice(0, 6) }

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import { candidatePiece, inTheRound, planTotal } from '../src/core/finderRound'
+import { candidatePiece, inTheRound, ownedInTheRound, planTotal } from '../src/core/finderRound'
 import { optimizeGear, ownedPieces } from '../src/core/gearOptimizer'
-import { parseInventory, parseStatsBlock } from '../src/core/inventory'
+import { itemKey, mergeLevel, parseInventory, parseStatsBlock, scaledStats } from '../src/core/inventory'
 import { findUpgrades, isLore, PRESETS, restrictions, type Weights } from '../src/core/upgrades'
 import { parseItemPage } from '../src/core/wikiItem'
 
@@ -82,5 +82,58 @@ describe('a candidate judged in the round', () => {
     expect(r.delta).toBe(0)
     expect(r.placed).toBeNull()
     expect(r.moves).toEqual([])
+  })
+})
+
+describe('an item the character owns, in the finder and the optimizer', () => {
+  // Pauldrons +6 worn (16 AC), charms filling both Any slots. In the bank: Wraps +0 (12 AC, 19 at +6)
+  // and a Mantle +0 (20 AC). The finder at "your merge level" used to judge the Wraps as a +6 copy and
+  // call them an upgrade the optimizer never makes; now it judges the copy owned, as the optimizer does.
+  const catalog = [
+    item('Pauldrons', 'Slot: SHOULDERS<br>\nAC: 10<br>\nClass: ALL<br>\nRace: ALL<br>'),
+    item('Wraps', 'Slot: SHOULDERS<br>\nAC: 12<br>\nClass: ALL<br>\nRace: ALL<br>'),
+    item('Mantle', 'Slot: SHOULDERS<br>\nAC: 20<br>\nClass: ALL<br>\nRace: ALL<br>'),
+    item('Big Charm', 'Slot: CHARM<br>\nAC: 50<br>\nClass: ALL<br>\nRace: ALL<br>')
+  ]
+  const byName = new Map(catalog.map((c) => [c.title, c]))
+  const inv = parseInventory(
+    [
+      'Location\tName\tID\tCount\tSlots',
+      'Shoulders\tPauldrons +6\t1\t1\t10',
+      'Any Slot\tBig Charm\t4\t1\t10',
+      'Any Slot\tBig Charm\t5\t1\t10',
+      'Bank1\tWraps\t2\t1\t10',
+      'Bank2\tMantle\t3\t1\t10'
+    ].join('\n')
+  )
+  const statsOf = (name: string) => scaledStats(parseStatsBlock(byName.get(name.replace(/ \+\d+$/, ''))!.statsblock), mergeLevel(name))
+  const pieces = ownedPieces(inv, (it) => {
+    const c = byName.get(it.name.replace(/ \+\d+$/, ''))!
+    return { r: restrictions(c.statsblock), stats: statsOf(it.name), foci: [], lore: isLore(c.statsblock) }
+  })
+  const acOnly: Weights = { ...PRESETS.Balanced, ac: 1, hp: 0, mana: 0, end: 0, str: 0, sta: 0, agi: 0, dex: 0, wis: 0, int: 0, cha: 0, resists: 0, haste: 0, attack: 0, hpRegen: 0, manaRegen: 0, endRegen: 0, ratio: 0 }
+  const wearer = { classes: ['shm'], race: '', level: 50 }
+  const opts = { pieces, wearer, weights: acOnly, twoHanders: false, focusValue: () => 0 }
+  const owned = new Set(['wraps', 'mantle'])
+  const shoulders = (ownedStats?: (key: string) => ReturnType<typeof statsOf> | null) =>
+    findUpgrades({ worn: inv.worn, statsOf: (it) => statsOf(it.name), catalog, wearer, weights: acOnly, compare: 'level', hiddenEras: [], owned, ownedStats })
+      .find((s) => s.slot === 'Shoulders')!
+      .candidates.map((c) => c.item.title)
+
+  it('judges an owned candidate as the copy owned, not at the worn merge level', () => {
+    expect(shoulders()).toEqual(['Mantle', 'Wraps'])
+    expect(shoulders((key) => (key === 'wraps' ? statsOf('Wraps') : key === 'mantle' ? statsOf('Mantle') : null))).toEqual(['Mantle'])
+  })
+
+  it('in the round, gives an owned item what the optimizer gains from it, and nothing when it leaves it off', () => {
+    const baseline = optimizeGear(opts)
+    expect(baseline.after[baseline.slots.indexOf('Shoulders')]?.item.name).toBe('Mantle')
+    // The mantle is worth what the optimizer's set loses without it: 20 AC over the Pauldrons' 16.
+    const mantle = ownedInTheRound({ ...opts, key: itemKey('Mantle'), baseline })
+    expect(mantle.placed).toBe('Shoulders')
+    expect(mantle.delta).toBe(4)
+    expect(mantle.moves.map((m) => [m.slot, m.out?.item.name, m.in?.item.name])).toEqual([['Shoulders', 'Pauldrons +6', 'Mantle']])
+    // The optimizer leaves the Wraps in the bank, so they gain nothing.
+    expect(ownedInTheRound({ ...opts, key: itemKey('Wraps'), baseline })).toEqual({ delta: 0, moves: [], placed: null })
   })
 })

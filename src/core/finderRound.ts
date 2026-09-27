@@ -57,3 +57,22 @@ export function inTheRound(o: Omit<OptimizeOptions, 'pieces'> & { pieces: Piece[
   const at = plan.after.indexOf(o.candidate)
   return { delta: Math.round(delta * 100) / 100, moves, placed: at >= 0 ? plan.slots[at] : null }
 }
+
+/**
+ * An item the character owns, judged in the round. Its copies are already among what the baseline
+ * weighs, so a fresh copy would count it twice; it is worth what the baseline loses without them.
+ * That is nothing when the optimizer leaves it off, so the finder and the optimizer agree.
+ */
+export function ownedInTheRound(o: Omit<OptimizeOptions, 'pieces' | 'from'> & { pieces: Piece[]; key: string; baseline: Plan }): RoundResult {
+  const mine = (p: Piece | null) => !!p && p.key === o.key
+  const without = optimizeGear({ ...o, pieces: o.pieces.filter((p) => !mine(p)), from: o.baseline.after.map((p) => (mine(p) ? null : p)) })
+  const delta = planTotal(o.baseline) - planTotal(without)
+  const moves: RoundMove[] = []
+  for (let i = 0; i < without.slots.length; i++) {
+    const out = without.after[i]
+    const now = o.baseline.after[i]
+    if (out !== now) moves.push({ slot: without.slots[i], out, in: now })
+  }
+  const at = o.baseline.after.findIndex(mine)
+  return { delta: Math.round(delta * 100) / 100, moves, placed: at >= 0 ? o.baseline.slots[at] : null }
+}
