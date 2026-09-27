@@ -1,4 +1,3 @@
-import { app } from 'electron'
 import { promises as fs } from 'node:fs'
 import { join } from 'node:path'
 import { CATALOG_FORMAT, parseItemPage, type CatalogItem } from '../core/wikiItem'
@@ -6,6 +5,7 @@ import { parseEraStatus } from '../core/upgrades'
 import { log } from './log'
 import { wiki, type WikiPage } from './sources/wiki'
 import type { CatalogFile, WikiProgress } from '../shared/ipc'
+import { cacheDir } from './paths'
 
 // Every piece of equipment on eqlwiki.com, for the upgrade finder. The first download reads the wiki's
 // Items category fifty pages a request (about 225 requests); later ones list its revisions (about 22
@@ -31,7 +31,7 @@ export class WikiCatalog {
   ) {}
 
   private get path(): string {
-    return join(app.getPath('userData'), 'item-catalog.json')
+    return join(cacheDir(), 'item-catalog.json')
   }
 
   /** The stored catalog, whatever its age; null before the first download. */

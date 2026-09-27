@@ -1,4 +1,3 @@
-import { app } from 'electron'
 import { promises as fs } from 'node:fs'
 import { join } from 'node:path'
 import { baseName, itemKey } from '../core/inventory'
@@ -6,6 +5,7 @@ import { parseItemUse, statsblockOf } from '../core/wikiItem'
 import { wiki, type WikiPage } from './sources/wiki'
 import type { ItemInfo } from '../shared/types'
 import { log } from './log'
+import { cacheDir } from './paths'
 
 // Item stats come from eqlwiki.com, the community wiki for EverQuest Legends: each item page carries
 // the in-game stats block. Only the items the player asks about are looked up, a batch at a time,
@@ -21,7 +21,7 @@ export class ItemCatalog {
   private saving: Promise<void> | null = null
 
   private get path(): string {
-    return join(app.getPath('userData'), 'item-cache.json')
+    return join(cacheDir(), 'item-cache.json')
   }
 
   private async load(): Promise<Record<string, Cached>> {

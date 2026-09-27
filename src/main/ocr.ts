@@ -1,11 +1,11 @@
 import { spawn } from 'node:child_process'
 import { desktopCapturer, screen } from 'electron'
 import { existsSync, promises as fs } from 'node:fs'
-import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import type { Composite, OcrWord } from '../core/screenText'
 import { log } from './log'
 import { yieldPriority } from './priority'
+import { cacheDir } from './paths'
 
 // Reads text off the screen with Windows' own OCR (Windows.Media.Ocr). It looks at pixels, the way a
 // player reads a window; it never touches the game's process or memory. The capture is enlarged 3×
@@ -58,9 +58,9 @@ $stream.Dispose(); Remove-Item $prepared -ErrorAction SilentlyContinue
 
 let scriptWritten: Promise<string> | null = null
 
-/** The OCR script in the temp folder: written once a run, and again if something cleared it away. */
+/** The OCR script in the cache folder: written once a run, and again if something cleared it away. */
 function scriptFile(): Promise<string> {
-  const path = join(tmpdir(), 'legends-tracker-ocr.ps1')
+  const path = join(cacheDir(), 'ocr.ps1')
   if (scriptWritten && existsSync(path)) return scriptWritten
   scriptWritten = fs.writeFile(path, SCRIPT, 'utf8').then(() => path)
   scriptWritten.catch(() => (scriptWritten = null))
@@ -106,7 +106,7 @@ export async function captureScreens(): Promise<string[]> {
   const stamp = Date.now().toString(36)
   try {
     for (const [i, s] of sources.entries()) {
-      const p = join(tmpdir(), `legends-tracker-screen-${stamp}-${i}.png`)
+      const p = join(cacheDir(), `screen-${stamp}-${i}.png`)
       paths.push(p)
       await fs.writeFile(p, s.thumbnail.toPNG())
     }
@@ -117,7 +117,7 @@ export async function captureScreens(): Promise<string[]> {
   return paths
 }
 
-/** Deletes captures: they are pictures of the whole desktop, and have no business staying in %TEMP%. */
+/** Deletes captures: they are pictures of the whole desktop, and have no business staying on disk. */
 export async function discardScreens(paths: string[]): Promise<void> {
   await Promise.all(
     paths.map((p) =>

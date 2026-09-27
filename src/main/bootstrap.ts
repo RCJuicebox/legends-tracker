@@ -1,8 +1,9 @@
 import { app, protocol } from 'electron'
-import { cpSync, existsSync, mkdirSync } from 'node:fs'
+import { cpSync, existsSync, mkdirSync, renameSync, rmSync } from 'node:fs'
 import { release } from 'node:os'
 import { join } from 'node:path'
 import { initLog, log } from './log'
+import { cacheDir } from './paths'
 
 // What has to happen before anything else is built: where settings and the log live, the icon scheme,
 // and whether this copy is the one that runs. Imported first by index.ts, for its side effects.
@@ -26,6 +27,33 @@ protocol.registerSchemesAsPrivileged([{ scheme: 'eqicon', privileges: { standard
 export const primaryInstance = app.requestSingleInstanceLock() && !process.argv.includes('--quit')
 if (!primaryInstance) app.quit()
 else if (!process.env['EQL_USER_DATA']) carryOverSettings(join(app.getPath('appData'), 'EQL Audio Triggers'), app.getPath('userData'))
+
+if (primaryInstance) moveCaches(app.getPath('userData'), cacheDir())
+
+/** Caches used to live beside the settings; they move once, and a copy that cannot move is left to be fetched again. */
+function moveCaches(from: string, to: string): void {
+  try {
+    mkdirSync(to, { recursive: true })
+  } catch (e) {
+    log.warn(`Could not make the cache folder ${to}`, e)
+    return
+  }
+  for (const name of ['item-cache.json', 'item-catalog.json', 'tradeskill-recipes.json', 'pet-wiki.json', 'log-history.json', 'speech-cache']) {
+    const src = join(from, name)
+    if (!existsSync(src) || existsSync(join(to, name))) continue
+    try {
+      renameSync(src, join(to, name))
+    } catch {
+      try {
+        // Another drive: copy, then remove the old one.
+        cpSync(src, join(to, name), { recursive: true })
+        rmSync(src, { recursive: true, force: true })
+      } catch (e) {
+        log.warn(`Could not move ${name} to the cache folder`, e)
+      }
+    }
+  }
+}
 
 /** The app's own files: the resources folder installed, the checkout in development. */
 export const resources = app.isPackaged ? process.resourcesPath : join(__dirname, '../..')

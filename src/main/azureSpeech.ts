@@ -5,6 +5,7 @@ import { join } from 'node:path'
 import { log } from './log'
 import type { SpeechWorker } from './speech'
 import type { AzureStatus, AzureVoice } from '../shared/types'
+import { cacheDir } from './paths'
 
 // Microsoft's neural voices (Jenny, Aria, Guy…) through Azure AI Speech, with the player's own key:
 // the free tier allows half a million characters a month. A phrase is rendered once and kept on disk,
@@ -47,7 +48,7 @@ export class AzureSpeech {
   }
 
   private get cacheDir(): string {
-    return join(app.getPath('userData'), 'speech-cache')
+    return join(cacheDir(), 'speech-cache')
   }
 
   load(): Promise<void> {

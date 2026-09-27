@@ -3,6 +3,7 @@ import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSy
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { DEFAULT_OVERLAYS, JsonFile, characterKey, characterName, defaultSettings, mergeDefaults, readJsonFile } from '../src/main/storeCore'
+import { upgrade } from '../src/main/schema'
 
 describe('merging saved settings over the defaults', () => {
   it('fills fields an older build did not save, and keeps what was saved', () => {
@@ -122,5 +123,45 @@ describe('the settings files on disk', () => {
     mkdirSync(join(dir, 'missing-folder'))
     await f.flush()
     expect(JSON.parse(readFileSync(path, 'utf8'))).toEqual({ n: 2 })
+  })
+})
+
+describe('schema versions', () => {
+  let dir: string
+  beforeEach(() => {
+    dir = mkdtempSync(join(tmpdir(), 'lt-schema-'))
+  })
+  afterEach(() => rmSync(dir, { recursive: true, force: true }))
+
+  it('brings an older file forward through each migration in turn, keeping a backup of it', () => {
+    const path = join(dir, 'settings.json')
+    writeFileSync(path, JSON.stringify({ volume: 5 }))
+    const migrations = [
+      { file: 'settings.json', to: 3, run: (v: unknown) => ({ ...(v as object), three: true }) },
+      { file: 'settings.json', to: 2, run: (v: unknown) => ({ level: (v as { volume: number }).volume / 10 }) }
+    ]
+    const r = upgrade(path, { volume: 5 }, 1, { 'settings.json': 3 }, migrations)
+    expect(r.value).toEqual({ level: 0.5, three: true })
+    expect(r.state).toEqual({ state: 'migrated', from: 1, backup: join(dir, 'settings.pre-3.json') })
+    expect(JSON.parse(readFileSync(join(dir, 'settings.pre-3.json'), 'utf8'))).toEqual({ volume: 5 })
+  })
+
+  it('leaves a file a newer build wrote as it is, and says so', () => {
+    const r = upgrade(join(dir, 'settings.json'), { x: 1 }, 4, { 'settings.json': 1 }, [])
+    expect(r).toEqual({ value: { x: 1 }, state: { state: 'newer', version: 4 } })
+    expect(upgrade(join(dir, 'settings.json'), { x: 1 }, 1, { 'settings.json': 1 }, []).state).toEqual({ state: 'current' })
+  })
+
+  it('never writes a frozen file', async () => {
+    const path = join(dir, 'motes.json')
+    const f = new JsonFile(path, { a: 1 }, { pretty: false })
+    f.freeze('newer')
+    f.set({ a: 2 })
+    await f.flush()
+    expect(existsSync(path)).toBe(false)
+    const g = new JsonFile(path, { a: 1 }, { pretty: false })
+    g.set({ a: 2 })
+    await g.flush()
+    expect(readFileSync(path, 'utf8')).toBe('{"a":2}')
   })
 })

@@ -29,6 +29,7 @@ import { appIcon, preloadPath, resources } from './bootstrap'
 import { log } from './log'
 import type { AppSettings, Trigger } from '../shared/types'
 import type { AudioDevice } from '../shared/ipc'
+import { cacheDir } from './paths'
 
 /**
  * Everything the main process runs, built once. The IPC handlers, the lifecycle and the start-up all
@@ -90,7 +91,7 @@ export function createContext(): AppContext {
   // Casts, the melee tally and purchases over each character's log and archives, read in one pass.
   // Each had a cache file of its own before; log-history.json replaces them.
   for (const f of ['cast-history.json', 'melee-history.json', 'purchases.json']) rmSync(join(dataDir, f), { force: true })
-  const logHistory = new LogHistory(join(dataDir, 'log-history.json'), {
+  const logHistory = new LogHistory(join(cacheDir(), 'log-history.json'), {
     casts: dayConsumer(castCounter),
     melee: dayConsumer(meleeCounter),
     purchases: purchaseConsumer

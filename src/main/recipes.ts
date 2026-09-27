@@ -1,4 +1,3 @@
-import { app } from 'electron'
 import { promises as fs } from 'node:fs'
 import { join } from 'node:path'
 import { parseCrafted, parseSkillPage, recipeIndex } from '../core/tradeskills'
@@ -6,6 +5,7 @@ import { field } from '../core/wikiItem'
 import { log } from './log'
 import { wiki } from './sources/wiki'
 import type { BookRecipe, RecipeFile, WikiProgress } from '../shared/ipc'
+import { cacheDir } from './paths'
 
 // Every recipe on eqlwiki.com, for the Tradeskills page: each page in the Player Crafted category
 // carries its recipe and yield, fifty pages a request (about 45 requests), one at a time. Alchemy's
@@ -27,7 +27,7 @@ export class RecipeBook {
   constructor(private readonly onProgress: (p: RecipeProgress) => void) {}
 
   private get path(): string {
-    return join(app.getPath('userData'), 'tradeskill-recipes.json')
+    return join(cacheDir(), 'tradeskill-recipes.json')
   }
 
   async stored(): Promise<RecipeFile | null> {

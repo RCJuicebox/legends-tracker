@@ -70,6 +70,12 @@ async function start(ctx: AppContext): Promise<void> {
     const names = store.recovered.map((f) => basename(f)).join(', ')
     engine.pushFeed('warn', `Some saved settings could not be read and were set aside (${names}, in the app's data folder); defaults are in use for them.`)
   }
+  if (store.newer.length) {
+    engine.pushFeed(
+      'warn',
+      `${store.newer.join(', ')} ${store.newer.length === 1 ? 'was' : 'were'} saved by a newer version of Legends Tracker. They are read, but changes made in this version are not saved to them; update to keep changes.`
+    )
+  }
   if (store.settingsFresh) placeOverlaysForNewInstall(ctx)
   ctx.overlays.apply(store.settings.get().overlays)
   ctx.watcher.start()

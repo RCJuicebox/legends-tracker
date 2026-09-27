@@ -110,16 +110,33 @@ function setAside(path: string, now: Date): ReadResult {
 
 const pause = (ms: number) => new Promise((r) => setTimeout(r, ms))
 
-/** A JSON file held in memory. Changes are written 400 ms after the last one, or at flush(). */
+export interface JsonFileOptions {
+  /** How long after the last change it is written. Settings go quickly; files the log keeps changing wait. */
+  delayMs?: number
+  /** Indented for a person to read; files only the app reads are written compact. */
+  pretty?: boolean
+}
+
+/** A write that fails (a virus scanner or backup tool holding the file) is tried again after these waits. */
+const RETRY_MS = [250, 750, 2000]
+
+/** A JSON file held in memory. Changes are written a little after the last one, or at flush(). */
 export class JsonFile<T> {
   private timer: NodeJS.Timeout | null = null
   private dirty = false
   private writing: Promise<void> = Promise.resolve()
+  private frozen = ''
+  private readonly delayMs: number
+  private readonly pretty: boolean
 
   constructor(
     readonly path: string,
-    private value: T
-  ) {}
+    private value: T,
+    opts: JsonFileOptions = {}
+  ) {
+    this.delayMs = opts.delayMs ?? 400
+    this.pretty = opts.pretty ?? true
+  }
 
   get(): T {
     return this.value
@@ -129,12 +146,17 @@ export class JsonFile<T> {
     this.value = value
     this.dirty = true
     if (this.timer) clearTimeout(this.timer)
-    this.timer = setTimeout(() => void this.flush(), 400)
+    this.timer = setTimeout(() => void this.flush(), this.delayMs)
   }
 
   /** Counts the value as changed, to be written at the next flush, without a timed write of its own. */
   markDirty(): void {
     this.dirty = true
+  }
+
+  /** Never writes the file again this run: it holds what a newer build saved, which this one must not overwrite. */
+  freeze(reason: string): void {
+    this.frozen = reason
   }
 
   /** Writes the file if anything changed since the last write. Never rejects; failures are logged. */
@@ -149,18 +171,18 @@ export class JsonFile<T> {
   private async write(): Promise<void> {
     if (!this.dirty) return
     this.dirty = false
-    const text = JSON.stringify(this.value, null, 2)
+    if (this.frozen) return
+    const text = this.pretty ? JSON.stringify(this.value, null, 2) : JSON.stringify(this.value)
     const tmp = this.path + '.tmp'
-    for (let attempt = 1; ; attempt++) {
+    for (let attempt = 0; ; attempt++) {
       try {
         await fs.writeFile(tmp, text, 'utf8')
         await fs.rename(tmp, this.path)
         return
       } catch (e) {
-        // A virus scanner or backup tool holding the file (EBUSY, EPERM) usually lets go quickly.
-        if (attempt < 2) {
+        if (attempt < RETRY_MS.length) {
           log.warn(`Could not save ${this.path}; trying again`, e)
-          await pause(250)
+          await pause(RETRY_MS[attempt])
           continue
         }
         log.error(`Could not save ${this.path}`, e)

@@ -9,6 +9,7 @@ import { PET_GEAR_HEAD, PetGearReader, parsePetGuide, parseSummonPage, type PetG
 import { log } from './log'
 import { wiki } from './sources/wiki'
 import type { PetState, PetSummon } from '../shared/ipc'
+import { cacheDir } from './paths'
 
 // The pet: what it wears (the log's `/pet inventory check` lists) and which pet it is (the last
 // summoning spell cast), both kept per character so an archived log loses neither; and the pet's
@@ -148,7 +149,7 @@ export class PetWiki {
   private cache: WikiCache | null = null
 
   private get path(): string {
-    return join(app.getPath('userData'), 'pet-wiki.json')
+    return join(cacheDir(), 'pet-wiki.json')
   }
 
   private async load(): Promise<WikiCache> {
