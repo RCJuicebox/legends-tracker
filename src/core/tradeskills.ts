@@ -65,16 +65,36 @@ function ingredientOf(text: string): Ingredient | null {
 export function parseCrafted(product: string, content: string): Recipe[] {
   const out: Recipe[] = []
   let head: { skill: string; trivial: number; yields: number } | null = null
+  // The other layout: markers under the skill line, then one ingredient a line.
+  //   ** '''Yield: Enchanted Dwarven Plate Greaves''' x1
+  //   ** In [[Forge|Stormguard Forge]]:
+  //   :: {{SmIcon|703}} 1 x [[Earthen Temper]] - Crafted
+  let listed: Ingredient[] = []
+  const flush = () => {
+    if (head && listed.length) out.push({ product, ...head, ingredients: tally(listed), from: 'page' })
+    listed = []
+  }
   for (const line of field(content, 'playercrafted').split('\n')) {
     const t = line.trim()
-    if (t.startsWith('**') && head) {
-      const ingredients = tally(t.replace(/^\*+/, '').split(/\s\+\s/).map(ingredientOf).filter((x): x is Ingredient => !!x))
-      if (ingredients.length) out.push({ product, ...head, ingredients, from: 'page' })
+    if (t.startsWith(':') && head) {
+      const m = /(\d+)\s*x\s*\[\[([^\]|]+)(?:\|[^\]]*)?\]\]/i.exec(t)
+      if (m) listed.push({ name: m[2].trim(), count: Number(m[1]) })
+    } else if (t.startsWith('**') && head) {
+      const body = t.replace(/^\*+/, '').trim()
+      const yields = /^'*\s*Yield\b.*?x\s*(\d+)/i.exec(body)
+      if (yields) head = { skill: head.skill, trivial: head.trivial, yields: Number(yields[1]) }
+      // The container it is made in is not used up.
+      else if (!/^In\s+\[\[/i.test(body)) {
+        const ingredients = tally(body.split(/\s\+\s/).map(ingredientOf).filter((x): x is Ingredient => !!x))
+        if (ingredients.length) out.push({ product, ...head, ingredients, from: 'page' })
+      }
     } else if (t.startsWith('*')) {
+      flush()
       const skill = linkTexts(t)[0] ?? ''
       head = { skill: skill.replace(/^Skill /, ''), trivial: Number(/trivial:?\s*(\d+)/i.exec(t)?.[1] ?? 0), yields: Number(/yields?\s*(\d+)/i.exec(t)?.[1] ?? 1) }
     }
   }
+  flush()
   return out
 }
 
@@ -202,4 +222,45 @@ export function shopping(r: Recipe, combines: number, have: (name: string) => nu
     each: combines > 0 ? batch / (combines * Math.max(1, r.yields)) : 0,
     unpriced: lines.some((l) => l.priceFrom === 'none' && l.toBuy > 0)
   }
+}
+
+/**
+ * The era tags an untagged product needs, found down its recipe: an ingredient's own tag (a mold
+ * from the Epics era), or, for an untagged ingredient that is crafted too, what its recipe needs.
+ * Of several recipes for one thing, the one needing the fewest tags. `eras` holds the tag of every
+ * page the recipe book read ('' for none), by title. Only products that come to at least one tag.
+ */
+export function craftEras(recipes: Pick<Recipe, 'product' | 'ingredients'>[], eras: Record<string, string>): Record<string, string[]> {
+  const tagOf = new Map(Object.entries(eras).map(([k, v]) => [k.toLowerCase(), v]))
+  const byProduct = new Map<string, Pick<Recipe, 'product' | 'ingredients'>[]>()
+  for (const r of recipes) {
+    const k = r.product.toLowerCase()
+    byProduct.set(k, [...(byProduct.get(k) ?? []), r])
+  }
+  const memo = new Map<string, string[]>()
+  const needs = (name: string, seen: Set<string>): string[] => {
+    const k = name.toLowerCase()
+    const hit = memo.get(k)
+    if (hit) return hit
+    const own = tagOf.get(k)
+    if (own) return [own]
+    // A recipe that goes round in a circle needs nothing more than it has already.
+    if (seen.has(k)) return []
+    seen.add(k)
+    let best: string[] | null = null
+    for (const r of byProduct.get(k) ?? []) {
+      const tags = [...new Set(r.ingredients.flatMap((i) => needs(i.name, seen)))].sort()
+      if (!best || tags.length < best.length) best = tags
+    }
+    seen.delete(k)
+    memo.set(k, best ?? [])
+    return best ?? []
+  }
+  const out: Record<string, string[]> = {}
+  for (const [k, rs] of byProduct) {
+    if (tagOf.get(k)) continue
+    const tags = needs(rs[0].product, new Set())
+    if (tags.length) out[rs[0].product] = tags
+  }
+  return out
 }

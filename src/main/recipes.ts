@@ -13,7 +13,9 @@ const API = 'https://eqlwiki.com/api.php'
 const AGENT = 'LegendsTracker (https://github.com/RCJuicebox/legends-tracker)'
 const FRESH_MS = 7 * 24 * 3600_000
 const TIMEOUT_MS = 15_000
-const FORMAT = 1
+// 2: the era tag of every page read (products and their ingredients), for crafted items' eras.
+const FORMAT = 2
+const ERA_TAG = /\{\{\s*([A-Za-z][A-Za-z ]*?)\s+Era\s*\}\}/
 
 export type BookRecipe = Recipe & { icon: number }
 
@@ -21,6 +23,8 @@ export interface RecipeFile {
   fetchedAt: number
   format: number
   recipes: BookRecipe[]
+  /** Each page's era tag ('Epics', 'Classic'; '' for none), by title: products and their ingredients. */
+  eras?: Record<string, string>
 }
 
 export interface RecipeProgress {
@@ -66,6 +70,43 @@ export class RecipeBook {
     this.onProgress(this.progress)
   }
 
+  /**
+   * The era tag of every ingredient page not read already, fifty titles a request, following the
+   * wiki's redirects: an ingredient out of era (a mold from the Epics era) puts what it makes out of era.
+   */
+  private async ingredientEras(recipes: BookRecipe[], eras: Record<string, string>): Promise<void> {
+    const known = new Set(Object.keys(eras).map((t) => t.toLowerCase()))
+    const names = [...new Set(recipes.flatMap((r) => r.ingredients.map((i) => i.name)))].filter((n) => !known.has(n.toLowerCase()))
+    this.report({ total: this.progress.pages + Math.ceil(names.length / 50) })
+    for (let i = 0; i < names.length; i += 50) {
+      const batch = names.slice(i, i + 50)
+      try {
+        const params = new URLSearchParams({
+          action: 'query', format: 'json', formatversion: '2', redirects: '1', prop: 'revisions', rvprop: 'content', rvslots: 'main', titles: batch.join('|')
+        })
+        const body = (await this.get(`${API}?${params}`)) as {
+          query?: {
+            pages?: { title: string; revisions?: { slots: { main: { content: string } } }[] }[]
+            redirects?: { from: string; to: string }[]
+            normalized?: { from: string; to: string }[]
+          }
+        }
+        const tagOf = new Map<string, string>()
+        for (const p of body.query?.pages ?? []) tagOf.set(p.title, ERA_TAG.exec(p.revisions?.[0]?.slots.main.content ?? '')?.[1] ?? '')
+        const to = new Map([...(body.query?.normalized ?? []), ...(body.query?.redirects ?? [])].map((r) => [r.from, r.to]))
+        for (const n of batch) {
+          let t = n
+          for (let hops = 0; hops < 3 && to.has(t); hops++) t = to.get(t)!
+          eras[n] = tagOf.get(t) ?? ''
+        }
+      } catch (e) {
+        log.warn('Could not read the eras of some recipe ingredients', e)
+      }
+      this.report({ pages: this.progress.pages + 1 })
+      await new Promise((r) => setTimeout(r, 150))
+    }
+  }
+
   private async download(): Promise<RecipeFile | null> {
     this.report({ busy: true, pages: 0, total: 0, error: '' })
     try {
@@ -74,6 +115,7 @@ export class RecipeBook {
       }
       this.report({ total: (info.query?.pages?.[0]?.categoryinfo?.pages ?? 2200) + 1 })
       const fromPages: BookRecipe[] = []
+      const eras: Record<string, string> = {}
       let cont: Record<string, string> = {}
       let pages = 0
       for (;;) {
@@ -98,6 +140,7 @@ export class RecipeBook {
           const content = p.revisions?.[0]?.slots.main.content
           if (!content) continue
           const icon = Number(field(content, 'lucy_img_ID')) || 0
+          eras[p.title] = ERA_TAG.exec(content)?.[1] ?? ''
           for (const r of parseCrafted(p.title, content)) fromPages.push({ ...r, icon })
         }
         pages += body.query?.pages?.length ?? 0
@@ -121,7 +164,8 @@ export class RecipeBook {
       }
       this.report({ pages: pages + 1 })
       const recipes = recipeIndex([fromPages, fromTable]) as BookRecipe[]
-      const file: RecipeFile = { fetchedAt: Date.now(), format: FORMAT, recipes }
+      await this.ingredientEras(recipes, eras)
+      const file: RecipeFile = { fetchedAt: Date.now(), format: FORMAT, recipes, eras }
       await fs.writeFile(this.path + '.tmp', JSON.stringify(file), 'utf8')
       await fs.rename(this.path + '.tmp', this.path)
       this.file = file

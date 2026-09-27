@@ -3,7 +3,8 @@ import { planTotal } from '../src/core/finderRound'
 import { optimizeGear, ownedPieces, pieceName } from '../src/core/gearOptimizer'
 import { mergeLevel, parseInventory, parseStatsBlock, scaledStats } from '../src/core/inventory'
 import { rawWeights, ROLE_PRESETS, type Conversions } from '../src/core/statValue'
-import { isLore, PRESETS, restrictions, weightsForSlot, type Weights } from '../src/core/upgrades'
+import { handWeights, isLore, PRESETS, restrictions, weightsForSlot, type Weights } from '../src/core/upgrades'
+import { doubleAttackChance, dualWieldChance, handSwings, swingsPerRound, tripleAttackChance } from '../src/core/combatModel'
 import { parseItemPage } from '../src/core/wikiItem'
 
 const page = (name: string, block: string) =>
@@ -244,5 +245,73 @@ describe('gear on the pet and exaltations in Storage', () => {
   it('does not put an exaltation in a piece of another kind', () => {
     const ringOnly = optimizeGear({ ...opts, exaltations: exaltations.filter((e) => e.focus === 'Extended Range II') })
     expect(ringOnly.after.some((p) => p?.exalt && !p.r!.slots.includes('FINGER'))).toBe(false)
+  })
+})
+
+describe('each hand counted by how often it swings', () => {
+  // Kelwyn at level 50: Dual Wield 252, Double Attack 240, Triple Attack 100, no Ambidexterity.
+  const double = doubleAttackChance(240, 50)
+  const triple = tripleAttackChance(100)
+  const dual = dualWieldChance(252, 50)
+  const swings = handSwings({ double, triple, dual, doubleSkill: 240 })
+
+  it('splits a round into main-hand and offhand swings, as the Stats page counts them', () => {
+    expect(double).toBeCloseTo(0.58, 6)
+    expect(triple).toBe(0.11)
+    expect(dual).toBeCloseTo(302 / 375, 6)
+    expect(swings.main).toBeCloseTo(1 + 0.58 + 0.58 * 0.11, 6)
+    expect(swings.off).toBeCloseTo((302 / 375) * 1.58, 6)
+    expect(swings.main + swings.off).toBeCloseTo(swingsPerRound({ double, triple, dual, doubleSkill: 240 }), 9)
+  })
+
+  it('weighs weapon ratio in each hand by its swings, the two averaging 1', () => {
+    const hands = handWeights(swings)
+    expect((hands.main + hands.off) / 2).toBeCloseTo(1, 9)
+    expect(hands.main).toBeGreaterThan(1)
+    expect(weightsForSlot({ ...PRESETS.Melee, ratio: 12 }, 'Primary', hands).ratio).toBeCloseTo(1200 * hands.main, 6)
+    expect(weightsForSlot({ ...PRESETS.Melee, ratio: 12 }, 'Secondary', hands).ratio).toBeCloseTo(1200 * hands.off, 6)
+    // No one to dual wield: the offhand weapon counts for nothing.
+    expect(handWeights({ main: 1.5, off: 0 })).toEqual({ main: 2, off: 0 })
+  })
+
+  it('puts the better weapon in the hand that swings more', () => {
+    const fist = (name: string, dmg: number, where: string) =>
+      ({
+        item: { location: where, name, id: 0, count: 1, augs: [] }, from: 'worn' as const, key: name.toLowerCase(),
+        r: restrictions(`Slot: PRIMARY SECONDARY<br>\nSkill: Hand to Hand Atk Delay: 22<br>\nDMG: ${dmg}<br>\nClass: ALL<br>\nRace: ALL<br>`),
+        stats: parseStatsBlock(`Skill: Hand to Hand Atk Delay: 22<br>\nDMG: ${dmg}<br>`), foci: [], lore: false
+      })
+    // Worn the wrong way round: the weaker fist in the main hand.
+    const pieces = [fist('Weak Fist', 25, 'Primary'), fist('Strong Fist', 32, 'Secondary')]
+    const w = { ...PRESETS.Melee, ac: 0, hp: 0, str: 0, sta: 0, agi: 0, dex: 0, haste: 0, attack: 0, end: 0, endRegen: 0, hpRegen: 0, resists: 0, ratio: 12 }
+    const plan = optimizeGear({ pieces, wearer: { classes: ['mnk'], race: '', level: 50 }, weights: w, twoHanders: false, focusValue: () => 0, hands: handWeights(swings) })
+    expect(plan.after[plan.slots.indexOf('Primary')]?.item.name).toBe('Strong Fist')
+    // Counted alike, there is nothing to gain by swapping them.
+    const alike = optimizeGear({ pieces, wearer: { classes: ['mnk'], race: '', level: 50 }, weights: w, twoHanders: false, focusValue: () => 0 })
+    expect(alike.after[alike.slots.indexOf('Primary')]?.item.name).toBe('Weak Fist')
+  })
+})
+
+describe('weapons by ratio first', () => {
+  // A fist with the better ratio and no stats, a hammer with a worse ratio and a lot of STR, and
+  // weights that value STR highly: the hammer wins on the weights alone, the fist with ratio first.
+  const piece = (name: string, block: string, where: string) => ({
+    item: { location: where, name, id: 0, count: 1, augs: [] }, from: where === 'Bag' ? ('bags' as const) : ('worn' as const), key: name.toLowerCase(),
+    r: restrictions(block), stats: parseStatsBlock(block), foci: [], lore: false
+  })
+  const fist = piece('Fist', 'Slot: PRIMARY<br>\nSkill: Hand to Hand Atk Delay: 22<br>\nDMG: 32<br>\nClass: ALL<br>\nRace: ALL<br>', 'Primary')
+  const hammer = piece('Hammer', 'Slot: PRIMARY<br>\nSkill: 1H Blunt Atk Delay: 30<br>\nDMG: 20<br>\nSTR: +100<br>\nClass: ALL<br>\nRace: ALL<br>', 'Bag')
+  // Both Any slots hold something better, so the hammer's STR counts only in the hand.
+  const charm = (n: string) => piece(n, 'Slot: CHARM<br>\nSTR: +200<br>\nClass: ALL<br>\nRace: ALL<br>', 'Any Slot')
+  const w = { ...PRESETS.Melee, str: 20, ratio: 12 }
+  const opts = { pieces: [fist, hammer, charm('Red Charm'), charm('Blue Charm')], wearer: { classes: ['mnk'], race: '', level: 50 }, weights: w, twoHanders: false, focusValue: () => 0 }
+  const main = (plan: ReturnType<typeof optimizeGear>) => plan.after[plan.slots.indexOf('Primary')]?.item.name
+
+  it('lets the weights pick the weapon when ratio is one weight among many', () => {
+    expect(main(optimizeGear(opts))).toBe('Hammer')
+  })
+
+  it('keeps the better-ratio weapon in hand when weapon ratio counts first', () => {
+    expect(main(optimizeGear({ ...opts, hands: { main: 100, off: 100 } }))).toBe('Fist')
   })
 })

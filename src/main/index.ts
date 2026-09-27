@@ -27,6 +27,7 @@ import { CastHistory } from './castHistory'
 import { meleeCounter, meleeProfile } from '../core/meleeTally'
 import type { EffectSpell } from '../core/itemEffects'
 import { RecipeBook } from './recipes'
+import { craftEras } from '../core/tradeskills'
 import { PurchaseHistory } from './purchases'
 import { TradeFavorites } from './tradeFavorites'
 import { focusFromSpell, isDurationFocus } from '../core/focus'
@@ -571,6 +572,13 @@ function registerIpc(): void {
     const file = await recipeBook.stored()
     return { file, stale: recipeBook.isStale(file), progress: recipeBook.progress }
   })
+  // Crafted items' eras for the Gear page: the era tags each untagged product's ingredients need. A
+  // stale recipe book is fetched again in the background; the page asks again when it has been.
+  handle('trade:craftEras', async () => {
+    const file = await recipeBook.stored()
+    if (recipeBook.isStale(file) && !recipeBook.progress.busy) void recipeBook.refresh().catch((e) => log.warn('Could not refresh the recipes', e))
+    return file?.eras ? craftEras(file.recipes, file.eras) : {}
+  })
   handle('trade:refresh', async () => {
     const file = await recipeBook.refresh()
     return { file, stale: recipeBook.isStale(file), progress: recipeBook.progress }
@@ -728,7 +736,7 @@ function registerIpc(): void {
     const spells: Record<string, EffectSpell> = {}
     for (const n of list) {
       const s = book?.named(n)
-      if (s) spells[n] = { name: s.name, effects: s.effects, formula: s.formula, cap: s.cap, beneficial: s.beneficial }
+      if (s) spells[n] = { name: s.name, effects: s.effects, formula: s.formula, cap: s.cap, beneficial: s.beneficial, targetType: s.targetType }
     }
     if (!isCharacterKey(character)) return { spells, profile: null, loaded: !!book }
     const installDir = store.settings.get().installDir

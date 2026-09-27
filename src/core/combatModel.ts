@@ -98,7 +98,13 @@ export const TRIPLE_CLASSES = ['war', 'mnk', 'ber', 'rng']
  * and 3.06 where this gives 3.05.
  */
 export function swingsPerRound(p: { double: number; triple: number; dual: number; doubleSkill: number }): number {
-  return 1 + p.double + p.double * p.triple + p.dual * (1 + (p.doubleSkill > 149 ? p.double : 0))
+  const h = handSwings(p)
+  return h.main + h.off
+}
+
+/** A round's swings by hand: the main hand with its double and triple, the offhand with its own double. */
+export function handSwings(p: { double: number; triple: number; dual: number; doubleSkill: number }): { main: number; off: number } {
+  return { main: 1 + p.double + p.double * p.triple, off: p.dual * (1 + (p.doubleSkill > 149 ? p.double : 0)) }
 }
 
 /** The melee damage table rows below level 51 (EQEmu, the commit Project 1999 cites). */

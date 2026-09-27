@@ -10,13 +10,14 @@
 // the rest of the set free to drop its haste, and the best set of the lot is kept.
 //
 // Gear on the pet counts as owned. Exaltations kept in Storage may go into a piece's focus, worn or
-// proc slot: each is tried as an exalted copy of every piece of its own slot kind, bringing its focus,
+// proc slot: each is tried as an exalted copy of every piece of its own slot kind that one of the
+// character's classes may wear with it (the piece and the exaltation share the class), bringing its focus,
 // worn effect or proc in place of the piece's own, and a set wears a piece once (as it is or exalted)
 // and uses each exaltation once. Worn effects count once however many carry them, wherever worn; a
 // proc counts on a weapon in Primary or Secondary.
 
 import { itemKey, storedEquipment, type Inventory, type InvItem, type ItemStats } from './inventory'
-import { ANY_SLOT, canWear, isTwoHanded, score, weightsForSlot, type Restrictions, type Wearer, type Weights } from './upgrades'
+import { ANY_SLOT, canWear, isTwoHanded, score, weightsForSlot, type HandWeights, type Restrictions, type Wearer, type Weights } from './upgrades'
 
 /** Every slot gear is worn in, one entry per slot: two ears, two wrists, two rings, two Any slots. */
 export const SLOT_LAYOUT = [
@@ -24,7 +25,8 @@ export const SLOT_LAYOUT = [
   'Fingers', 'Fingers', 'Waist', 'Legs', 'Feet', 'Primary', 'Secondary', 'Range', 'Any Slot', 'Any Slot'
 ]
 
-export type PieceSource = 'worn' | 'bags' | 'bank' | 'sharedBank' | 'storage' | 'pet'
+/** Where a piece is now; 'catalog' is one the character does not own, from the wiki (the optimizer's all-gear mode). */
+export type PieceSource = 'worn' | 'bags' | 'bank' | 'sharedBank' | 'storage' | 'pet' | 'catalog'
 
 export interface Piece {
   item: InvItem
@@ -83,6 +85,8 @@ export interface OptimizeOptions {
   from?: (Piece | null)[]
   /** Exaltations kept, to try in pieces' focus, worn and proc slots. */
   exaltations?: Exaltation[]
+  /** How much each hand's weapon counts, from how often it swings; alike when absent. */
+  hands?: HandWeights | null
 }
 
 // One exalted copy per piece, exaltation and slot, kept across searches so a set from one search (a
@@ -102,6 +106,17 @@ export const pieceName = (p: Piece): string =>
   p.exalt ? `${p.item.name} with ${p.exalt.item.name}${p.exaltSlot && p.exaltSlot !== 'focus' ? ` (${p.exaltSlot} slot)` : ''}` : p.item.name
 
 /**
+ * Whether a piece and an exaltation are both for one of the character's classes: an exalted piece
+ * may be worn only by a class both allow, so an SK exaltation in a monk weapon is no use to anyone.
+ */
+function sharedClass(host: Restrictions, exalt: Restrictions, wearer: Wearer): boolean {
+  return wearer.classes.some((c) => {
+    const one = { ...wearer, classes: [c] }
+    return canWear(host, one, ANY_SLOT) && canWear(exalt, one, ANY_SLOT)
+  })
+}
+
+/**
  * Every piece, and an exalted copy of each for every exaltation of its slot kind and every slot that
  * exaltation brings something worth having to, other than what the piece has there now. Exaltations
  * bringing the same thing to the same kind are one: a second copy of it is worth nothing more.
@@ -118,7 +133,7 @@ function withExalted(pieces: Piece[], exaltations: Exaltation[], o: Pick<Optimiz
     ]
     for (const [slot, what, worth] of offers) {
       if (!what || worth <= 0) continue
-      const k = `${slot}|${what}|${[...e.r.slots].sort().join(' ')}`
+      const k = `${slot}|${what}|${[...e.r.slots].sort().join(' ')}|${[...e.r.classes].sort().join(' ')}`
       if (!kinds.has(k)) kinds.set(k, { e, slot, what })
     }
   }
@@ -127,7 +142,7 @@ function withExalted(pieces: Piece[], exaltations: Exaltation[], o: Pick<Optimiz
   for (const h of pieces) {
     if (!h.r || !h.stats) continue
     for (const { e, slot, what } of kinds.values()) {
-      if (!e.r.slots.some((s) => h.r!.slots.includes(s))) continue
+      if (!e.r.slots.some((s) => h.r!.slots.includes(s)) || !sharedClass(h.r, e.r, o.wearer)) continue
       const now = slot === 'focus' ? h.foci : slot === 'worn' ? (h.worn ?? []) : (h.procs ?? [])
       if (now.length === 1 && now[0] === what) continue
       out.push(exaltedCopy(h, e, slot))
@@ -175,7 +190,9 @@ export function optimizeGear(o: OptimizeOptions): Plan {
   const fitting = slots.map((_, i) => pieces.filter((p) => fits(p, i)))
   // Weapon ratio counts in the hands, ranged ratio in the Range slot. Haste is counted once for the
   // whole set: only the best worn works.
-  const slotWeights = slots.map((s) => ({ ...weightsForSlot(o.weights, s), haste: 0 }))
+  const slotWeights = slots.map((s) => ({ ...weightsForSlot(o.weights, s, o.hands), haste: 0 }))
+  // An offhand proc fires on offhand swings, so it counts as often as the offhand swings against the main hand.
+  const offProc = o.hands && o.hands.main > 0 ? o.hands.off / o.hands.main : 1
   const hasteOf = (a: (Piece | null)[]) => Math.max(0, ...a.map((p) => p?.stats?.haste ?? 0)) * o.weights.haste
   const scoreCache = new Map<Piece, number[]>()
   const slotScore = (p: Piece | null, i: number): number => {
@@ -234,7 +251,7 @@ export function optimizeGear(o: OptimizeOptions): Plan {
         for (const n of p.procs) {
           let v = procCache.get(n)
           if (v === undefined) procCache.set(n, (v = fx.proc(n)))
-          t += v
+          t += i === secondary ? v * offProc : v
         }
     }
     if (names) {

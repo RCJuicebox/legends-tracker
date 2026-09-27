@@ -105,15 +105,27 @@ export function zoneEras(catalog: CatalogItem[], status?: Record<string, 'in' | 
 }
 
 /**
- * An item's era group: its own tag, or, for an untagged item, the earliest group among the zones it
- * drops in (it can be had in the earliest of them). Other when neither says.
+ * An item's era group: its own tag; for an untagged crafted item, the latest group its recipe's
+ * ingredients need (it is made only once all can be had); else the earliest group among the zones it
+ * drops in (it can be had in the earliest of them). Other when none says.
  */
-export function eraOf(item: CatalogItem, zones: Map<string, string>, status?: Record<string, 'in' | 'out'>): { era: string; inferred: boolean } {
+export function eraOf(
+  item: CatalogItem,
+  zones: Map<string, string>,
+  status?: Record<string, 'in' | 'out'>
+): { era: string; inferred: boolean; by?: 'zone' | 'recipe' } {
   const own = normalizeEra(item.era, status)
   if (own) return { era: own, inferred: false }
+  // Crafted: made only once every ingredient can be had, so the latest era among them.
+  const made = (item.craftEras ?? []).map((t) => normalizeEra(t, status)).filter(Boolean)
+  const byRecipe = made.length ? made.sort((a, b) => eraRank(b) - eraRank(a))[0] : ''
+  // Dropped: had in the earliest zone it drops in.
   const eras = item.zones.map((z) => zones.get(z)).filter((e): e is string => !!e)
-  if (!eras.length) return { era: OTHER_ERA, inferred: false }
-  return { era: eras.sort((a, b) => eraRank(a) - eraRank(b))[0], inferred: true }
+  const byZone = eras.length ? eras.sort((a, b) => eraRank(a) - eraRank(b))[0] : ''
+  // Both: whichever way comes first.
+  if (byRecipe && (!byZone || eraRank(byRecipe) < eraRank(byZone))) return { era: byRecipe, inferred: true, by: 'recipe' }
+  if (byZone) return { era: byZone, inferred: true, by: 'zone' }
+  return { era: OTHER_ERA, inferred: false }
 }
 
 export interface Restrictions {
@@ -176,9 +188,24 @@ export const isTwoHanded = (r: Restrictions) => /^2H\b/i.test(r.skill)
  * planner has them; a weapon's ratio (damage ÷ delay, near 1) moves that by about 1% each 0.01, so a
  * whole point of ratio is worth 100 times the weight.
  */
-export function weightsForSlot(w: Weights, slot: string): Weights {
-  const hands = slot === 'Primary' || slot === 'Secondary'
-  return { ...w, ratio: hands ? w.ratio * 100 : 0, rangedRatio: slot === 'Range' ? w.rangedRatio * 100 : 0 }
+export function weightsForSlot(w: Weights, slot: string, hands?: HandWeights | null): Weights {
+  const hand = slot === 'Primary' ? (hands?.main ?? 1) : slot === 'Secondary' ? (hands?.off ?? 1) : 0
+  return { ...w, ratio: w.ratio * 100 * hand, rangedRatio: slot === 'Range' ? w.rangedRatio * 100 : 0 }
+}
+
+/**
+ * How much each hand's weapon counts, from how often it swings: the main hand every round (with its
+ * double and triple attacks), the offhand only when dual wield comes up. Scaled so the two average
+ * 1, as when both count alike: a hand that swings more is worth more ratio, and procs more.
+ */
+export interface HandWeights {
+  main: number
+  off: number
+}
+
+export function handWeights(swings: { main: number; off: number }): HandWeights {
+  const both = swings.main + swings.off
+  return both > 0 ? { main: (2 * swings.main) / both, off: (2 * swings.off) / both } : { main: 1, off: 1 }
 }
 
 export type WeightKey =
@@ -244,6 +271,8 @@ export interface Candidate {
   era: string
   /** The era came from the zones it drops in, not a tag on its page. */
   eraInferred: boolean
+  /** What the era was worked out from, when inferred: the zones it drops in, or its recipe's ingredients. */
+  eraBy?: 'zone' | 'recipe'
   /** Its focus effect, and what swapping it in does to the worth of the foci worn (in score points). */
   focus: { name: string; gain: number } | null
   /** Its worn effect and proc, and what swapping it in does to the worth of those worn (in score points). */
@@ -299,6 +328,8 @@ export interface FinderOptions {
   ownedStats?: (key: string) => ItemStats | null
   focus?: FinderFocus
   effects?: FinderEffects
+  /** How much each hand's weapon counts; alike when absent. */
+  hands?: HandWeights | null
   perSlot?: number
   /**
    * Keep candidates whose stats beat the worn item even when the focus lost with it makes the swap
@@ -316,6 +347,7 @@ interface ParsedItem {
   proc: string
   era: string
   inferred: boolean
+  by?: 'zone' | 'recipe'
 }
 
 /** Parsed catalogs, by the catalog array itself: the finder runs again on every slider move. */
@@ -359,6 +391,8 @@ export function findUpgrades(o: FinderOptions): SlotResult[] {
   const hasteWithout = (item?: InvItem) => Math.max(0, ...wornHaste.filter((_, i) => o.worn[i] !== item))
   // Worn effects count once wherever worn; procs count on weapons in the hands.
   const HANDS = ['Primary', 'Secondary']
+  // An offhand proc fires on offhand swings: as often as the offhand swings against the main hand.
+  const procShare = (slot: string) => (slot === 'Secondary' && o.hands ? o.hands.off / o.hands.main : 1)
   const wornFx = o.worn.map((w) => o.effects?.of(w) ?? { worn: [], procs: [] })
   const effectsWith = (item: InvItem | undefined, add: { worn: string[]; procs: string[] } | null, slot: string): number => {
     const fx = o.effects
@@ -368,17 +402,17 @@ export function findUpgrades(o: FinderOptions): SlotResult[] {
     o.worn.forEach((w, i) => {
       if (w === item) return
       for (const n of wornFx[i].worn) names.add(n)
-      if (HANDS.includes(w.location)) for (const n of wornFx[i].procs) t += fx.value.proc(n)
+      if (HANDS.includes(w.location)) for (const n of wornFx[i].procs) t += fx.value.proc(n) * procShare(w.location)
     })
     if (add) {
       for (const n of add.worn) names.add(n)
-      if (HANDS.includes(slot)) for (const n of add.procs) t += fx.value.proc(n)
+      if (HANDS.includes(slot)) for (const n of add.procs) t += fx.value.proc(n) * procShare(slot)
     }
     return t + (names.size ? fx.value.worn([...names].sort()) : 0)
   }
   const effectsNow = effectsWith(undefined, null, '')
   return slots.map((slot) => {
-    const shown = weightsForSlot(o.weights, slot)
+    const shown = weightsForSlot(o.weights, slot, o.hands)
     const weights: Weights = { ...shown, haste: 0 }
     const worn = o.worn.filter((w) => w.location === slot)
     const scored = worn.map((item) => {
@@ -428,6 +462,7 @@ export function findUpgrades(o: FinderOptions): SlotResult[] {
         owned: o.owned.has(key),
         era: p.era,
         eraInferred: p.inferred,
+        eraBy: p.by,
         focus: p.item.focus ? { name: p.item.focus, gain: focusGain } : null,
         ...(worn || proc || effectGain ? { effects: { worn, proc, gain: effectGain } } : {})
       })

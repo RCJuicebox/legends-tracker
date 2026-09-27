@@ -15,20 +15,26 @@ import {
   eraOf,
   findUpgrades,
   isLore,
+  isTwoHanded,
   restrictions,
+  score,
+  handWeights,
+  weightsForSlot,
+  type HandWeights,
   zoneEras,
   type Wearer,
   type Weights
 } from '../../../core/upgrades'
 import { conversions, rawWeights, ROLE_PRESETS, type ClassFactors, type RoleWeights } from '../../../core/statValue'
 import { focusValue, type FocusLine, type FocusReport, type FocusWorth } from '../../../core/itemFocus'
-import { optimizeGear, ownedPieces, pieceName, type EffectValue, type Exaltation, type Piece, type PieceSource } from '../../../core/gearOptimizer'
+import { optimizeGear, ownedPieces, pieceName, SLOT_LAYOUT, type EffectValue, type Exaltation, type Piece, type PieceSource } from '../../../core/gearOptimizer'
 import { usePet } from './usePet'
-import { effectScore, itemEffects, procOf, procWorth, wornEffectOf, wornWorth, type EffectSpell, type EffectWorth } from '../../../core/itemEffects'
-import type { MeleeProfile } from '../../../core/meleeTally'
+import { effectScore, itemEffects, procOf, procWorth, wornEffectOf, wornStats, wornWorth, type EffectSpell, type EffectWorth } from '../../../core/itemEffects'
+import { meleeProfile, type MeleeProfile } from '../../../core/meleeTally'
 import { candidatePiece, inTheRound, ownedInTheRound } from '../../../core/finderRound'
 import { aaTotal } from '../../../core/aa'
-import { CATALOG_FORMAT, type CatalogItem } from '../../../core/wikiItem'
+import { DOUBLE_ATTACK, DUAL_WIELD, TRIPLE_ATTACK, TRIPLE_CLASSES, doubleAttackChance, dualWieldChance, handSwings, tripleAttackChance } from '../../../core/combatModel'
+import { CATALOG_FORMAT, withRaceFix, type CatalogItem } from '../../../core/wikiItem'
 import type { CharacterSheet, InventoryView } from '../../../shared/types'
 
 // Everything the upgrade finder, the focus effects tab and the optimizer work out, apart from how
@@ -48,7 +54,7 @@ export interface CatalogState {
   progress: { busy: boolean; pages: number; total: number; error: string }
 }
 
-export type GearMode = 'finder' | 'focus' | 'effects' | 'optimize' | 'merge' | 'pet'
+export type GearMode = 'finder' | 'focus' | 'effects' | 'procs' | 'optimize' | 'merge' | 'pet'
 
 /** A focus effect on something the character owns, and how they have it. */
 export interface OwnedFocus {
@@ -103,10 +109,22 @@ export interface GearModel {
   /** Per line, what the character owns with a focus of it, best first. */
   ownedFoci: Map<string, OwnedFocus[]>
   pieces: Piece[]
+  /** How much each hand's weapon counts, from how often it swings; null when the log gives no Dual Wield skill. */
+  hands: HandInfo | null
+  /** What the finder and the optimizer weigh the hands' weapon ratio by: `hands`, raised when weapons go by ratio first. */
+  weaponHands: HandWeights | null
+  /** For the optimizer's all-gear mode: the best of what is not owned, slot by slot (empty on other tabs). */
+  catalogPieces: Piece[]
+  /** The finder's comparison: pieces to get as they drop, or at the merge level of what they replace. */
+  compare: 'drop' | 'level'
   /** Worn effects and procs: the character's melee they are weighed against, their spells, their worth. */
   effects: GearEffects
   /** An item's own worn effect and proc, by name; undefined when the wiki does not know it. */
   effectsOfItem: (name: string) => { worn: string; proc: string } | undefined
+  /** Every exaltation kept in Storage with a focus, worn effect or proc, whoever may use it. */
+  storedExaltations: Exaltation[]
+  /** Whether the era buttons hide a catalog item. */
+  eraHidden: (c: CatalogItem) => boolean
   /** Exaltations kept in Storage, free to put in a piece's focus slot. */
   exaltations: Exaltation[]
   /** The pet as the log shows it: what it wears, which one it is. */
@@ -115,15 +133,29 @@ export interface GearModel {
   focusValue: (names: string[]) => number
 }
 
+/** Each hand's weight, and what it came from. */
+export interface HandInfo extends HandWeights {
+  swings: { main: number; off: number }
+  dualWield: number
+  doubleAttack: number
+  ambidexterity: number
+  /** The chance the offhand swings in a round. */
+  dual: number
+}
+
 export interface GearEffects {
   /** The character's melee over the days looked at; null while it is read or when there is no log. */
   profile: MeleeProfile | null
   spells: Record<string, EffectSpell>
-  /** Worth in the weights' terms; null until the melee is known (nothing to weigh against). */
+  /** Worth in the weights' terms, for the finder and the optimizer; null until the spell file is read. */
   value: EffectValue | null
-  /** Damage a minute and what each does, by spell name. */
+  /** What each does and the damage a minute it adds (0 with no melee to weigh against), by spell name. */
   wornWorth: (name: string) => EffectWorth | null
   procWorth: (name: string) => EffectWorth | null
+  /** Worth in the weights' terms, all told and (for a worn effect) the part that is stats. */
+  wornScore: (name: string) => number
+  wornStatScore: (name: string) => number
+  procScore: (name: string) => number
   /** Weapons in hand now that carry a proc, by name. */
   carriers: Map<string, number>
   dex: number
@@ -131,6 +163,12 @@ export interface GearEffects {
 }
 
 const HANDS = ['Primary', 'Secondary']
+/** How far weapon ratio outweighs the rest in the hands when weapons go by ratio first: 1% of weapon damage then counts 100 times over. */
+const RATIO_FIRST = 100
+/** Each kind of slot once; the Any slots take what the others do. */
+const SLOT_NAMES = [...new Set(SLOT_LAYOUT)].filter((s) => s !== 'Any Slot')
+export const CATALOG_PER_SLOT = 12
+const NO_MELEE = meleeProfile({}, { from: '', to: '' })
 
 /** The wiki's item catalog as stored on this PC, and a way to fetch it again. */
 function useCatalog() {
@@ -250,6 +288,29 @@ export function useGearModel(view: InventoryView, sheet: CharacterSheet | null, 
     const w = rawWeights(role, conv)
     return overCap ? { ...w, ac: w.ac * AC_OVER_CAP } : w
   }, [role, conv, overCap])
+  // How much each hand's weapon counts, from how often it swings: EQEmu's attack rounds (the Stats
+  // page's, checked against hour-long parses) on the skills the log's skill-up lines give. Unknown
+  // (no Dual Wield skill in the log) counts both hands alike.
+  const hands = useMemo<HandInfo | null>(() => {
+    const k = sheetStats.skills
+    const dw = k[DUAL_WIELD] ?? 0
+    if (!dw) return null
+    const da = k[DOUBLE_ATTACK] ?? 0
+    const amb = sheetStats.overrides.ambidexterity ?? aaTotal(sheetStats.aa, 'dual_wield_pct')
+    const double = doubleAttackChance(da, level, sheetStats.doubleAttackBonus)
+    const triple = classes.some((c) => TRIPLE_CLASSES.includes(c)) ? tripleAttackChance(k[TRIPLE_ATTACK] ?? 0) : 0
+    const dual = dualWieldChance(dw, level, amb)
+    const swings = handSwings({ double, triple, dual, doubleSkill: da })
+    return { ...handWeights(swings), swings, dualWield: dw, doubleAttack: da, ambidexterity: amb, dual }
+  }, [sheetStats, level, classes])
+  // "Weapons: best ratio first": in the hands, weapon ratio outweighs everything else, whatever the
+  // other weights, so the weights pick among weapons of about the same ratio. Only the hands' weapon
+  // ratio is raised: worn effects, procs and merges are weighed as before.
+  const [ratioFirst, setRatioFirst] = useRemembered<boolean>('finder.ratioFirst', true)
+  const weaponHands = useMemo<HandWeights | null>(
+    () => (ratioFirst ? { main: (hands?.main ?? 1) * RATIO_FIRST, off: (hands?.off ?? 1) * RATIO_FIRST } : hands),
+    [ratioFirst, hands]
+  )
   // Two-handers only when the secondary hand is free, unless the player says otherwise.
   const secondaryInUse = !!view.inventory?.worn.some((it) => it.location === 'Secondary')
   const twoHanders = twoHandMode === 'any' || (twoHandMode === 'auto' && !secondaryInUse)
@@ -266,7 +327,20 @@ export function useGearModel(view: InventoryView, sheet: CharacterSheet | null, 
   )
   const wearer = useMemo<Wearer>(() => ({ classes, race: stats.race === 'iksar' ? 'IKS' : '', level }), [classes, stats.race, level])
 
-  const items = state?.file?.items
+  // Crafted items without an era of their own take their ingredients' eras (from the recipe book, which
+  // the main process fetches again in the background when it is old; asked again once it has been).
+  const craftQ = useInvoke<Record<string, string[]>>('trade:craftEras')
+  const reloadCraft = craftQ.reload
+  useEffect(() => api.on('state:recipes', (p: { busy: boolean }) => !p.busy && reloadCraft()), [reloadCraft])
+  const rawItems = state?.file?.items
+  // And race lines the wiki has wrong are put right (RACE_FIXES).
+  const items = useMemo(() => {
+    const made = craftQ.data ?? {}
+    return rawItems?.map((it) => {
+      const fixed = withRaceFix(it)
+      return !fixed.era && made[fixed.title] ? { ...fixed, craftEras: made[fixed.title] } : fixed
+    })
+  }, [rawItems, craftQ.data])
   const eraStatus = state?.file?.eraStatus
   const zones = useMemo(() => zoneEras(items ?? [], eraStatus), [items, eraStatus])
   // Every era in the catalog with how many pieces it holds, tagged or worked out from drop zones.
@@ -346,19 +420,24 @@ export function useGearModel(view: InventoryView, sheet: CharacterSheet | null, 
   )
   // Exaltations kept in Storage › Exaltations that bring a focus and the character may use, with what
   // the item each was made from allows: the slot kind it goes in, and its classes, race and level.
-  const exaltations = useMemo<Exaltation[]>(
+  const storedExaltations = useMemo<Exaltation[]>(
     () =>
       inv.keyRing.flatMap((k): Exaltation[] => {
         if (k.kind !== 'Augmentation') return []
         const c = byKey.get(itemKey(k.name))
         const fx = effectsOfItem(k.name)
         if (!c || !(c.focus || fx?.worn || fx?.proc)) return []
-        const r = restrictions(c.statsblock)
         const item = { location: 'Storage', name: k.name, id: k.id, count: 1, augs: [] }
-        return canWear(r, wearer, ANY_SLOT) ? [{ item, from: 'storage', focus: c.focus, worn: fx?.worn ?? '', proc: fx?.proc ?? '', r }] : []
+        return [{ item, from: 'storage', focus: c.focus, worn: fx?.worn ?? '', proc: fx?.proc ?? '', r: restrictions(c.statsblock) }]
       }),
-    [inv, byKey, wearer, effectsOfItem]
+    [inv, byKey, effectsOfItem]
   )
+  const exaltations = useMemo(() => storedExaltations.filter((e) => canWear(e.r, wearer, ANY_SLOT)), [storedExaltations, wearer])
+  // An item's era group, as the era buttons name them, and whether those buttons hide it.
+  const eraHidden = useMemo(() => {
+    const hidden = new Set(shownEras)
+    return (c: CatalogItem) => hidden.has(eraOf(c, zones, eraStatus).era)
+  }, [shownEras, zones, eraStatus])
   const ownedFoci = useMemo(() => {
     const out = new Map<string, OwnedFocus[]>()
     if (!report) return out
@@ -412,24 +491,75 @@ export function useGearModel(view: InventoryView, sheet: CharacterSheet | null, 
     const spells = data?.spells ?? {}
     const carriers = new Map<string, number>()
     for (const p of pieces) if (p.from === 'worn' && HANDS.includes(p.item.location)) for (const n of p.procs ?? []) carriers.set(n, (carriers.get(n) ?? 0) + 1)
-    const wornWorthOf = (name: string) => (profile && spells[name] ? wornWorth(spells[name], profile) : null)
-    const procWorthOf = (name: string) => (profile && spells[name] ? procWorth(spells[name], profile, { level, dex, carriers: carriers.get(name) ?? 1 }) : null)
-    const value: EffectValue | null =
-      profile && profile.dpm > 0
-        ? {
-            worn: (names) => names.reduce((s, n) => s + effectScore(wornWorthOf(n)?.dpm ?? 0, profile, weights.ratio), 0),
-            proc: (name) => effectScore(procWorthOf(name)?.dpm ?? 0, profile, weights.ratio)
-          }
-        : null
-    return { profile, spells, value, wornWorth: wornWorthOf, procWorth: procWorthOf, carriers, dex, loading: !data }
-  }, [effectsQ.data, pieces, level, dex, weights.ratio])
+    // With no melee in the log, what an effect does is still shown and its stats still count.
+    const melee = profile ?? NO_MELEE
+    const wornWorthOf = (name: string) => (spells[name] ? wornWorth(spells[name], melee, level) : null)
+    const procWorthOf = (name: string) => (spells[name] ? procWorth(spells[name], melee, { level, dex, carriers: carriers.get(name) ?? 1 }) : null)
+    // Stats a worn effect gives are priced as on an item: set-wide, so no weapon ratio or haste.
+    const statWeights = { ...weights, ratio: 0, rangedRatio: 0, haste: 0 }
+    const wornStatScore = (name: string) => (spells[name] ? score(wornStats(spells[name], level), statWeights) : 0)
+    const wornScore = (name: string) => effectScore(wornWorthOf(name)?.dpm ?? 0, melee, weights.ratio) + wornStatScore(name)
+    const procScore = (name: string) => effectScore(procWorthOf(name)?.dpm ?? 0, melee, weights.ratio)
+    const value: EffectValue | null = data ? { worn: (names) => names.reduce((s, n) => s + wornScore(n), 0), proc: procScore } : null
+    return { profile, spells, value, wornWorth: wornWorthOf, procWorth: procWorthOf, wornScore, wornStatScore, procScore, carriers, dex, loading: !data }
+  }, [effectsQ.data, pieces, level, dex, weights])
 
   // The finder scores the whole catalog (about 11,000 pieces) against every slot. Its inputs go
   // through a deferred value, so a weight being typed or a button being pressed answers at once and
   // the results catch up in the background.
+  // The optimizer's all-gear mode: pieces the character does not own that one of their classes may
+  // wear, from the eras shown. As the finder has them: as they drop (+0), or at the merge level of
+  // what is worn in the slot (the lower of a pair), one piece a level. Each slot keeps its best dozen
+  // by stats, focus and effects; the search picks among those and what is owned.
+  const catalogPieces = useMemo<Piece[]>(() => {
+    if (mode !== 'optimize' || !items) return []
+    const hidden = new Set(shownEras)
+    const best = new Map<string, { p: Piece; v: number }[]>()
+    const slotLevel = new Map<string, number>()
+    if (compare === 'level')
+      for (const s of SLOT_NAMES) {
+        const levels = inv.worn.filter((w) => w.location === s).map((w) => mergeLevel(w.name))
+        slotLevel.set(s, levels.length ? Math.min(...levels) : 0)
+      }
+    for (const c of items) {
+      const key = itemKey(c.title)
+      if (owned.has(key) || /^Summoned:/i.test(c.title)) continue
+      if (hidden.has(eraOf(c, zones, eraStatus).era)) continue
+      const r = restrictions(c.statsblock)
+      const slots = SLOT_NAMES.filter((s) => canWear(r, wearer, s) && !(s === 'Primary' && isTwoHanded(r) && !twoHanders))
+      if (!slots.length) continue
+      const fx = effectsOfItem(c.title)
+      const base = parseStatsBlock(c.statsblock)
+      const atLevel = new Map<number, Piece>()
+      const pieceAt = (level: number): Piece => {
+        let p = atLevel.get(level)
+        if (!p) {
+          const name = level ? `${c.title} +${level}` : c.title
+          atLevel.set(level, (p = {
+            item: { location: 'Catalog', name, id: 0, count: 1, augs: [] }, from: 'catalog', key, r, stats: level ? scaledStats(base, level) : base,
+            foci: c.focus ? [c.focus] : [], worn: fx?.worn ? [fx.worn] : [], procs: fx?.proc ? [fx.proc] : [], lore: isLore(c.statsblock)
+          }))
+        }
+        return p
+      }
+      const extra = (c.focus ? valueOf([c.focus]) : 0) + (effects.value && fx?.worn ? effects.value.worn([fx.worn]) : 0)
+      for (const s of slots) {
+        const p = pieceAt(slotLevel.get(s) ?? 0)
+        const proc = effects.value && fx?.proc && HANDS.includes(s) ? effects.value.proc(fx.proc) : 0
+        const v = score(p.stats!, weightsForSlot(weights, s, weaponHands)) + extra + proc
+        const list = best.get(s) ?? []
+        list.push({ p, v })
+        best.set(s, list)
+      }
+    }
+    const keep = new Set<Piece>()
+    for (const list of best.values()) for (const { p } of list.sort((a, b) => b.v - a.v).slice(0, CATALOG_PER_SLOT)) keep.add(p)
+    return [...keep]
+  }, [mode, items, shownEras, owned, zones, eraStatus, wearer, twoHanders, effectsOfItem, valueOf, effects.value, weights, compare, inv, weaponHands])
+
   const input = useMemo(
-    () => ({ items, wearer, weights, compare, hiddenEras, inv, viewItems: view.items, owned, twoHanders, worth, fociOf, valueOf, eraStatus, pieces, exaltations, judge, effects, effectsOfItem }),
-    [items, wearer, weights, compare, hiddenEras, inv, view.items, owned, twoHanders, worth, fociOf, valueOf, eraStatus, pieces, exaltations, judge, effects, effectsOfItem]
+    () => ({ items, wearer, weights, compare, hiddenEras, inv, viewItems: view.items, owned, twoHanders, worth, fociOf, valueOf, eraStatus, pieces, exaltations, judge, effects, effectsOfItem, hands: weaponHands }),
+    [items, wearer, weights, compare, hiddenEras, inv, view.items, owned, twoHanders, worth, fociOf, valueOf, eraStatus, pieces, exaltations, judge, effects, effectsOfItem, weaponHands]
   )
   const deferred = useDeferredValue(input)
   const results = useMemo(() => {
@@ -448,6 +578,7 @@ export function useGearModel(view: InventoryView, sheet: CharacterSheet | null, 
       twoHanders: d.twoHanders,
       owned: d.owned,
       ownedStats: (key) => bestOwned(d.pieces, key)?.stats ?? null,
+      hands: d.hands,
       focus: d.worth ? { worn: (it) => d.fociOf(it).map((f) => f.name), value: d.valueOf } : undefined,
       effects: d.effects.value
         ? {
@@ -464,16 +595,31 @@ export function useGearModel(view: InventoryView, sheet: CharacterSheet | null, 
     })
     if (!round) return slots
     // Each candidate among everything owned, worn as well as it can be; its worth is what the set gains.
-    const opts = { pieces: d.pieces, wearer: d.wearer, weights: d.weights, twoHanders: d.twoHanders, focusValue: d.valueOf, exaltations: d.exaltations, effects: d.effects.value ?? undefined }
+    const opts = { pieces: d.pieces, wearer: d.wearer, weights: d.weights, twoHanders: d.twoHanders, focusValue: d.valueOf, exaltations: d.exaltations, effects: d.effects.value ?? undefined, hands: d.hands }
     const baseline = optimizeGear(opts)
     return slots.map((s) => {
       const judged = s.candidates.map((c) => {
         // One the character owns is already among the pieces: judged as their own copy, as the optimizer does.
         const key = itemKey(c.item.title)
-        const r = bestOwned(d.pieces, key) ? ownedInTheRound({ ...opts, key, baseline }) : inTheRound({ ...opts, candidate: candidatePiece(c.item, c.stats), baseline })
-        return { ...c, round: { delta: r.delta, placed: r.placed, moves: r.moves.map((m) => ({ slot: m.slot, out: m.out ? pieceName(m.out) : null, in: m.in ? pieceName(m.in) : null })) } }
+        const mine = !!bestOwned(d.pieces, key)
+        const r = mine ? ownedInTheRound({ ...opts, key, baseline }) : inTheRound({ ...opts, candidate: candidatePiece(c.item, c.stats), baseline })
+        // One the best set wears just where it is worn now is no upgrade, and one it wears in another
+        // slot is that slot's.
+        const stays =
+          mine && (r.placed !== s.slot || baseline.after.some((p, i) => p?.key === key && p.from === 'worn' && !p.exalt && baseline.slots[i] === p.item.location))
+        return {
+          ...c,
+          round: {
+            delta: stays ? 0 : r.delta, placed: r.placed, owned: mine,
+            moves: r.moves.map((m) => ({ slot: m.slot, out: m.out ? pieceName(m.out) : null, in: m.in ? pieceName(m.in) : null }))
+          }
+        }
       })
-      return { ...s, candidates: judged.filter((c) => c.round.delta > 0).sort((a, b) => b.round.delta - a.round.delta).slice(0, 6) }
+      // The best thing to have first, as the optimizer's all-gear mode would choose it: a piece to get
+      // gains over the best set of what is owned, which already has the owned candidates in it, so
+      // those rank after any piece to get that beats that set (their own gain still shows).
+      const rank = (c: (typeof judged)[number]) => (c.round.owned ? 0 : c.round.delta)
+      return { ...s, candidates: judged.filter((c) => c.round.delta > 0).sort((a, b) => rank(b) - rank(a) || b.round.delta - a.round.delta).slice(0, 6) }
     })
   }, [deferred, classes.length, mode])
 
@@ -485,7 +631,7 @@ export function useGearModel(view: InventoryView, sheet: CharacterSheet | null, 
         wearer,
         weights,
         twoHanders,
-        catalog: state.file.items,
+        catalog: items ?? state.file.items,
         fociOf,
         report,
         days,
@@ -503,8 +649,14 @@ export function useGearModel(view: InventoryView, sheet: CharacterSheet | null, 
         available,
         ownedFoci,
         pieces,
+        catalogPieces,
+        compare,
+        hands,
+        weaponHands,
         effects,
         effectsOfItem,
+        storedExaltations,
+        eraHidden,
         exaltations,
         pet,
         worth,
@@ -525,6 +677,7 @@ export function useGearModel(view: InventoryView, sheet: CharacterSheet | null, 
     conv,
     /** What a point of each item stat is worth to this character, AC quartered over the soft cap. */
     weights,
+    hands,
     acState,
     overCap,
     secondaryInUse,
@@ -535,6 +688,6 @@ export function useGearModel(view: InventoryView, sheet: CharacterSheet | null, 
     wanted,
     points,
     setPoints,
-    controls: { preset, setPreset, custom, setCustom, twoHandMode, setTwoHandMode, compare, setCompare, hiddenEras, setHiddenEras, slot, setSlot, capMode, setCapMode, judge, setJudge }
+    controls: { ratioFirst, setRatioFirst, preset, setPreset, custom, setCustom, twoHandMode, setTwoHandMode, compare, setCompare, hiddenEras, setHiddenEras, slot, setSlot, capMode, setCapMode, judge, setJudge }
   }
 }

@@ -17,23 +17,32 @@
 //                  EQEmu's rate: 2 a minute, raised 0.075% a point of DEX. Damage: as the log has
 //                  it, else the spell's direct damage, or its damage a tick over its duration; one
 //                  that lasts no more than kept up the whole time, since a firing refreshes it.
-// Anything else they do (a two-handed bash, a stun, a debuff) is listed without a value.
+//   worn, stats    AC, attack, stats, resists, max HP and mana, HP and mana a tick: priced by the stat
+//                  weights as the same stats on an item would be (wornStats)
+// Anything else they do (breathing underwater, a two-handed bash, a stun, a debuff) is listed without a
+// value, and so are procs that land only on undead or summoned creatures (the spell's target type 10 or 11).
 
-import type { InvItem } from './inventory'
+import { parseStatsBlock, type InvItem, type ItemStats } from './inventory'
 import type { MeleeProfile } from './meleeTally'
-import type { Spell } from './spells'
+import type { Spell, SpellEffect } from './spells'
 import { effectValue } from './effectValue'
 import { formulaTicks } from './durations'
 
 /** What the spell file says about an effect's spell, as much as valuing it needs. */
-export type EffectSpell = Pick<Spell, 'name' | 'effects' | 'formula' | 'cap' | 'beneficial'>
+export type EffectSpell = Pick<Spell, 'name' | 'effects' | 'formula' | 'cap' | 'beneficial'> & Partial<Pick<Spell, 'targetType'>>
 
-const RE_WORN = /Worn Effect:\s*(?:\[\[)?([^\]|<\n]+?)(?:\|[^\]]*)?(?:\]\])?\s*(?:<br>|\n|$|\()/i
+/** Target types that only land on some creatures: a proc of one is worth nothing against the rest. */
+const ONLY_ON: Record<number, string> = { 10: 'undead', 11: 'summoned creatures' }
+
+// "Worn Effect: [[Unrighteous Bash]]" on a few pages; "Effect: [[Enduring Breath]] (Worn)" on most.
+const RE_WORN =
+  /Worn Effect:\s*(?:\[\[)?([^\]|<\n(]+?)(?:\|[^\]]*)?(?:\]\])?\s*(?:<br>|\n|$|\()|(?<!Focus |Worn )Effect:\s*(?:\[\[)?([^\]|<\n(]+?)(?:\|[^\]]*)?(?:\]\])?\s*\(Worn\b/i
 const RE_PROC = /(?<!Worn )Effect:\s*(?:\[\[)?([^\]|<\n(]+?)(?:\|[^\]]*)?(?:\]\])?\s*\(Combat/i
 
 /** The worn effect an item's stats block names; '' for none. */
 export function wornEffectOf(statsblock: string): string {
-  return RE_WORN.exec(statsblock)?.[1].trim() ?? ''
+  const m = RE_WORN.exec(statsblock)
+  return (m?.[1] ?? m?.[2] ?? '').trim()
 }
 
 /** The combat proc an item's stats block names; '' for none. */
@@ -64,14 +73,55 @@ export function itemEffects(item: InvItem, effectsOf: (name: string) => { worn: 
   return { worn: pick(9, 'worn'), procs: pick(10, 'proc') }
 }
 
-/** What an effect the value leaves out does, in a few words. */
-const SPA_WORDS: Record<number, string> = {
-  1: 'AC', 2: 'attack', 3: 'movement speed', 4: 'strength', 5: 'dexterity', 6: 'agility', 7: 'stamina', 8: 'intelligence', 9: 'wisdom',
-  11: 'attack speed', 15: 'mana', 21: 'stun', 35: 'disease counters', 36: 'poison counters', 46: 'fire resist', 47: 'cold resist',
-  48: 'poison resist', 49: 'disease resist', 50: 'magic resist', 55: 'rune', 59: 'damage shield', 116: 'curse counters'
+const STAT_SPA: Record<number, 'STR' | 'DEX' | 'AGI' | 'STA' | 'INT' | 'WIS' | 'CHA'> = { 4: 'STR', 5: 'DEX', 6: 'AGI', 7: 'STA', 8: 'INT', 9: 'WIS', 10: 'CHA' }
+const RESIST_SPA: Record<number, 'FIRE' | 'COLD' | 'POISON' | 'DISEASE' | 'MAGIC'> = { 46: 'FIRE', 47: 'COLD', 48: 'POISON', 49: 'DISEASE', 50: 'MAGIC' }
+const signed = (v: number) => `${v < 0 ? '−' : '+'}${Math.abs(v)}`
+const SIMPLE: Record<number, string> = {
+  12: 'invisibility', 13: 'see invisible', 14: 'breathe underwater', 20: 'blindness', 21: 'stun', 22: 'charm', 23: 'fear', 31: 'mesmerize',
+  35: 'disease counters', 36: 'poison counters', 40: 'invulnerability', 57: 'levitation', 65: 'infravision', 66: 'ultravision', 99: 'root',
+  116: 'curse counters', 457: 'returns some of the damage as health'
 }
-const unvalued = (spa: number, base: number) =>
-  SPA_WORDS[spa] ? `${base < 0 ? 'lowers' : 'raises'} ${SPA_WORDS[spa]} (not valued)` : `spell effect ${spa} (not valued)`
+
+/** What one effect of a spell does, in a few words, at the character's level; '' for a slot left blank. */
+export function spaWords(e: SpellEffect, level: number): string {
+  const v = effectValue(e, level)
+  if (STAT_SPA[e.spa]) return v ? `${STAT_SPA[e.spa]} ${signed(v)}` : ''
+  if (RESIST_SPA[e.spa]) return v ? `${RESIST_SPA[e.spa].toLowerCase()} resist ${signed(v)}` : ''
+  switch (e.spa) {
+    case 0: return v > 0 ? `HP ${signed(v)} a tick` : `${-v} damage`
+    case 1: return `AC ${signed(v)}`
+    case 2: return `attack ${signed(v)}`
+    case 3: return `movement ${signed(v)}%`
+    case 11: return v > 100 ? `haste ${v - 100}%` : `slows ${100 - v}%`
+    case 15: return `mana ${signed(v)} a tick`
+    case 55: return `rune of ${v}`
+    case 59: return `damage shield ${Math.abs(v)}`
+    case 69: return `max HP ${signed(v)}`
+    case 97: return `max mana ${signed(v)}`
+    case 254: return ''
+  }
+  return SIMPLE[e.spa] ?? `spell effect ${e.spa}`
+}
+
+/**
+ * What a worn effect adds that item stats also give (AC, attack, stats, resists, max HP and mana,
+ * HP and mana a tick), as item stats: the weights price them as they would on the item.
+ */
+export function wornStats(spell: EffectSpell, level: number): ItemStats {
+  const s = parseStatsBlock('')
+  for (const e of spell.effects) {
+    const v = effectValue(e, level)
+    if (STAT_SPA[e.spa]) s.stats[STAT_SPA[e.spa]] = (s.stats[STAT_SPA[e.spa]] ?? 0) + v
+    else if (RESIST_SPA[e.spa]) s.saves[RESIST_SPA[e.spa]] = (s.saves[RESIST_SPA[e.spa]] ?? 0) + v
+    else if (e.spa === 0 && v > 0) s.hpRegen += v
+    else if (e.spa === 15 && v > 0) s.manaRegen += v
+    else if (e.spa === 1) s.ac += v
+    else if (e.spa === 2) s.attack += v
+    else if (e.spa === 69) s.pools.HP = (s.pools.HP ?? 0) + v
+    else if (e.spa === 97) s.pools.MANA = (s.pools.MANA ?? 0) + v
+  }
+  return s
+}
 
 /** A melee skill by its classic id, as the log names its swings, and its reuse in seconds (EQEmu's). */
 const SKILLS: Record<number, { verb: string; reuse: number; label: string }> = {
@@ -92,7 +142,6 @@ export interface EffectWorth {
   basis: string
 }
 
-/** A skill's use a minute swinging: hits and misses both used it. */
 /**
  * A skill's use a minute swinging: hits and misses both used it. No more than its cooldown allows:
  * more swings under its name than that are another skill the log names alike (an Iksar's tail rake
@@ -109,7 +158,7 @@ function uses(profile: MeleeProfile, skill: { verb: string; reuse: number }) {
 }
 
 /** A worn effect: what it does and what it adds to the character's melee. */
-export function wornWorth(spell: EffectSpell, profile: MeleeProfile): EffectWorth {
+export function wornWorth(spell: EffectSpell, profile: MeleeProfile, level = 50): EffectWorth {
   const does: string[] = []
   const parts: string[] = []
   let dpm = 0
@@ -149,7 +198,10 @@ export function wornWorth(spell: EffectSpell, profile: MeleeProfile): EffectWort
         parts.push(`${e.base}% of ${Math.round(base)} a minute`)
       }
     } else if (e.spa === 226) does.push('bash while holding a two-handed weapon')
-    else if (e.spa !== 10 && e.spa !== 254) does.push(unvalued(e.spa, e.base))
+    else {
+      const w = spaWords(e, level)
+      if (w) does.push(w)
+    }
   }
   return { dpm, does, basis: parts.join(' + ') }
 }
@@ -186,15 +238,16 @@ export function procWorth(spell: EffectSpell, profile: MeleeProfile, o: { level:
   const damage = procDamage(spell, o.level)
   if (damage > 0) does.push(`${Math.round(damage)} damage each time it fires`)
   for (const e of spell.effects) {
-    if (e.spa === 0 || e.spa === 79 || e.spa === 10 || e.spa === 254) continue
-    if (e.spa === 457) does.push('returns some of the damage as health')
-    else if (e.spa === 21) does.push('stuns')
-    else if (e.spa === 11) does.push(e.base > 100 ? `haste ${e.base - 100}%` : `slows ${100 - e.base}%`)
-    else does.push(unvalued(e.spa, e.base))
+    if ((e.spa === 0 || e.spa === 79) && e.base < 0) continue
+    const w = spaWords(e, o.level)
+    if (w) does.push(w)
   }
   const ceiling = procCeiling(spell, o.level)
   const capped = (dpm: number, basis: string): EffectWorth =>
     dpm > ceiling ? { dpm: ceiling, does, basis: `${basis}, held to ${Math.round(ceiling)}: it refreshes rather than stacks` } : { dpm, does, basis }
+  // One that lands only on undead or summoned creatures is left out: most of what is fought is neither.
+  const only = ONLY_ON[spell.targetType ?? -1]
+  if (only) return { dpm: 0, does: [...does, `works only on ${only}`], basis: 'Not valued: most of what you fight is neither.' }
   const seen = profile.procs[spell.name]
   if (seen && seen.count >= 3 && profile.activeMin > 0) {
     const ppm = seen.count / profile.activeMin / Math.max(1, o.carriers)

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
+import { eraOf } from '../src/core/upgrades'
 import {
-  parseCrafted, parsePurchase, parseSkillPage, parseVendors, parseWikiCoin, recipeIndex, recipeKey, shopping, unitPrice, type Recipe
+  craftEras, parseCrafted, parsePurchase, parseSkillPage, parseVendors, parseWikiCoin, recipeIndex, recipeKey, shopping, unitPrice, type Recipe
 } from '../src/core/tradeskills'
 import { parseInventory } from '../src/core/inventory'
 import { parseSources } from '../src/core/wikiItem'
@@ -168,5 +169,73 @@ describe('where an item comes from', () => {
       foraged: ['Everfrost Peaks'],
       crafted: false
     })
+  })
+})
+
+describe('crafted items and their eras', () => {
+  // eqlwiki's Enchanted Dwarven Plate Greaves page, 2026-09-27: one ingredient a line, under markers.
+  const greaves = `<onlyinclude>{{Itempage
+|itemname    = Enchanted Dwarven Plate Greaves
+|playercrafted = 
+
+* [[Blacksmithing]] (Trivial: 208)
+** '''Yield: Enchanted Dwarven Plate Greaves''' x1
+** In [[Forge|Stormguard Forge]]:
+:: {{SmIcon|567}} 1 x [[Dwarven Smithy Hammer]] - Bought, Returned on Failure, Returned on Success
+:: {{SmIcon|703}} 1 x [[Earthen Temper]] - Crafted
+:: {{SmIcon|620}} 1 x [[Enchanted Brellium Jointing]] - Crafted
+:: {{SmIcon|1036}} 3 x [[Enchanted Folded Brellium Sheet]] - Crafted
+:: {{SmIcon|555}} 1 x [[Leather Padding]] - Crafted
+:: {{SmIcon|1151}} 1 x [[Small Plate Greaves Mold]] - Bought
+}}</onlyinclude>`
+
+  it('reads a recipe laid out one ingredient a line, the container left out', () => {
+    expect(parseCrafted('Enchanted Dwarven Plate Greaves', greaves)).toEqual([
+      {
+        product: 'Enchanted Dwarven Plate Greaves', skill: 'Blacksmithing', trivial: 208, yields: 1, from: 'page',
+        ingredients: [
+          { name: 'Dwarven Smithy Hammer', count: 1 },
+          { name: 'Earthen Temper', count: 1 },
+          { name: 'Enchanted Brellium Jointing', count: 1 },
+          { name: 'Enchanted Folded Brellium Sheet', count: 3 },
+          { name: 'Leather Padding', count: 1 },
+          { name: 'Small Plate Greaves Mold', count: 1 }
+        ]
+      }
+    ])
+  })
+
+  const recipes = [
+    ...parseCrafted('Enchanted Dwarven Plate Greaves', greaves),
+    { product: 'Enchanted Folded Brellium Sheet', ingredients: [{ name: 'Enchanted Block of Brellium', count: 1 }] },
+    // Two ways to make a tonic: one needs a Luclin herb, the other nothing out of the ordinary.
+    { product: 'Tonic', ingredients: [{ name: 'Luclin Herb', count: 1 }] },
+    { product: 'Tonic', ingredients: [{ name: 'Water', count: 1 }] },
+    // A loop: each made from the other.
+    { product: 'Loop A', ingredients: [{ name: 'Loop B', count: 1 }] },
+    { product: 'Loop B', ingredients: [{ name: 'Loop A', count: 1 }] }
+  ]
+  const eras = {
+    'Enchanted Dwarven Plate Greaves': '', 'Small Plate Greaves Mold': 'Epics', 'Enchanted Block of Brellium': 'Classic', 'Luclin Herb': 'Luclin', Water: '',
+    'Leather Padding': '', 'Earthen Temper': ''
+  }
+
+  it('takes an untagged product’s eras from its ingredients, down its recipes, the fewest-era recipe first', () => {
+    const made = craftEras(recipes, eras)
+    expect(made['Enchanted Dwarven Plate Greaves']).toEqual(['Classic', 'Epics'])
+    expect(made['Enchanted Folded Brellium Sheet']).toEqual(['Classic'])
+    expect(made.Tonic).toBeUndefined()
+    expect(made['Loop A']).toBeUndefined()
+  })
+
+  it('puts a crafted item in the latest era its ingredients need', () => {
+    const made = craftEras(recipes, eras)
+    const item = (title: string) => ({ title, statsblock: '', icon: 0, focus: '', era: '', zones: [], mobs: [], quest: false, crafted: true, craftEras: made[title] })
+    // Epics counts as Kunark, which is out of era.
+    expect(eraOf(item('Enchanted Dwarven Plate Greaves'), new Map())).toEqual({ era: 'Kunark', inferred: true, by: 'recipe' })
+    expect(eraOf(item('Enchanted Folded Brellium Sheet'), new Map())).toEqual({ era: 'Classic', inferred: true, by: 'recipe' })
+    // One that also drops in a Classic zone can be had there, whatever its recipe needs.
+    const dropped = { ...item('Enchanted Dwarven Plate Greaves'), zones: ['Kaladim'] }
+    expect(eraOf(dropped, new Map([['Kaladim', 'Classic']]))).toEqual({ era: 'Classic', inferred: true, by: 'zone' })
   })
 })

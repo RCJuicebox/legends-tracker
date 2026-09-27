@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { parseItemPage } from '../src/core/wikiItem'
+import { parseItemPage, withRaceFix, type CatalogItem } from '../src/core/wikiItem'
 import { canWear, findUpgrades, PRESETS, restrictions } from '../src/core/upgrades'
 import { parseInventory, parseStatsBlock } from '../src/core/inventory'
 
@@ -101,5 +101,29 @@ describe('haste in the finder', () => {
     // 5 more haste than the cloak's, at 10 a point, less the plain belt's 2 AC.
     expect(waist.candidates[0].delta).toBe(5 * 10 - 2)
     expect(waist.candidates[0].diffs.find((d) => d.key === 'haste')?.delta).toBe(5)
+  })
+})
+
+describe('race lines the wiki has wrong', () => {
+  // eqlwiki gives every dwarven cultural plate piece "Race: ALL"; they are for the small races.
+  const greaves: CatalogItem = {
+    title: 'Enchanted Dwarven Plate Greaves', icon: 540, focus: '', era: '', zones: [], mobs: [], quest: false, crafted: true,
+    statsblock: 'MAGIC ITEM<br>\nSlot: LEGS<br>\nAC: 20<br>\nClass: WAR CLR PAL SHD<br>\nRace: ALL<br>'
+  }
+  const who = (race: string) => ({ classes: ['shd'], race, level: 50 })
+
+  it('puts the dwarven plate right: dwarves, halflings, gnomes and frogloks, not iksar', () => {
+    const r = restrictions(withRaceFix(greaves).statsblock)
+    expect(r.races).toEqual(['DWF', 'HFL', 'GNM', 'FRG'])
+    expect(canWear(r, who('IKS'), 'Legs')).toBe(false)
+    expect(canWear(r, who('DWF'), 'Legs')).toBe(true)
+    expect(canWear(restrictions(greaves.statsblock), who('IKS'), 'Legs')).toBe(true)
+  })
+
+  it('leaves every other item as its page has it', () => {
+    const other = { ...greaves, title: 'Dwarven Ale Mug' }
+    expect(withRaceFix(other)).toBe(other)
+    for (const t of ['Imbued Dwarven Breastplate', 'Dwarven Plate Visor (Enchanted Imbued)', 'Dwarven Plate Boots'])
+      expect(restrictions(withRaceFix({ ...greaves, title: t }).statsblock).races).toEqual(['DWF', 'HFL', 'GNM', 'FRG'])
   })
 })

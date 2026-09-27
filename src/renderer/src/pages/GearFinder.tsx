@@ -30,13 +30,13 @@ function eraTip(era: string): string {
 export function GearFinder({ view, sheet, mode, go }: { view: InventoryView; sheet: CharacterSheet | null; mode: GearMode; go?: (page: 'motes') => void }) {
   const g = useGearModel(view, sheet, mode)
   const { catalog, model, results, stats, classes, level, role, conv, acState, overCap, secondaryInUse, twoHanders, eraCounts, fociOf, lines, wanted, points, setPoints } = g
-  const { preset, setPreset, setCustom, twoHandMode, setTwoHandMode, compare, setCompare, hiddenEras, setHiddenEras, slot, setSlot, capMode, setCapMode, judge, setJudge } = g.controls
+  const { ratioFirst, setRatioFirst, preset, setPreset, setCustom, twoHandMode, setTwoHandMode, compare, setCompare, hiddenEras, setHiddenEras, slot, setSlot, capMode, setCapMode, judge, setJudge } = g.controls
   const [showWeights, setShowWeights] = useState(false)
   const state = catalog.state
   const refresh = catalog.refresh
 
   // The best merge reads only what is worn and the wiki's stats for it: no catalog needed.
-  if (mode === 'merge') return <MergeTab view={view} weights={g.weights} preset={preset} setPreset={setPreset} go={go} />
+  if (mode === 'merge') return <MergeTab view={view} weights={g.weights} hands={g.hands} preset={preset} setPreset={setPreset} go={go} />
 
   if (!state) return <Pending what="the item catalog" error={catalog.error} retry={catalog.reload} />
   const p = state.progress
@@ -88,11 +88,18 @@ export function GearFinder({ view, sheet, mode, go }: { view: InventoryView; she
                 </button>
               ))}
             </span>
+            <label
+              className="row tight small"
+              title="In Primary and Secondary, a better weapon ratio wins over any stats, focus or effects: the weights only choose between weapons of about the same ratio. Change the other weights freely; the hands keep the best-ratio weapons. Worn effects, procs and merges are weighed as before."
+            >
+              <input type="checkbox" checked={ratioFirst} onChange={(e) => setRatioFirst(e.target.checked)} />
+              Weapons: best ratio first
+            </label>
             <button className="btn ghost small" aria-expanded={showWeights} onClick={() => setShowWeights(!showWeights)}>
               {showWeights ? 'Hide weights' : 'Show weights'}
             </button>
             <span className="grow" />
-            {mode === 'finder' && (
+            {(mode === 'finder' || mode === 'optimize') && (
               <>
                 <b>Compare</b>
                 <span className="lt-seg" role="group" aria-label="Compare">
@@ -105,8 +112,12 @@ export function GearFinder({ view, sheet, mode, go }: { view: InventoryView; she
                 </span>
                 <Info
                   label="About Compare"
-                  text="As they drop: candidates at +0, against your gear at its merge level. At your merge level: candidates merged to the same level as the item they would replace."
+                  text="As they drop: candidates at +0, against your gear at its merge level. At your merge level: candidates merged to the same level as the item they would replace. The Gear optimizer's All gear mode compares them the same way."
                 />
+              </>
+            )}
+            {mode === 'finder' && (
+              <>
                 <b>Judge</b>
                 <span className="lt-seg" role="group" aria-label="Judge">
                   <button className={judge === 'round' ? 'on' : ''} aria-pressed={judge === 'round'} onClick={() => setJudge('round')} title="Everything you own rearranged around the candidate: the item it pushes out may go to an Any slot and keep its focus">
@@ -208,6 +219,17 @@ export function GearFinder({ view, sheet, mode, go }: { view: InventoryView; she
             <div className="small muted lt-worth">
               <b>What a point is worth to you:</b> {conv.notes.join(' · ')}
               {conv.offensePerStr ? ' · STR adds ⅔ Offense' : ''} · AGI adds {conv.avoidancePerAgi.toFixed(2)} avoidance · DEX only helps procs (it does not move crit on Legends)
+              {g.hands ? (
+                <span
+                  title={`Swings a round: ${g.hands.swings.main.toFixed(2)} main hand, ${g.hands.swings.off.toFixed(2)} off hand. Dual wield ${Math.round(g.hands.dual * 100)}% = (Dual Wield ${g.hands.dualWield} + level ${g.level}${g.hands.ambidexterity ? ` + Ambidexterity ${g.hands.ambidexterity}` : ''}) ÷ 375; the off hand doubles with Double Attack ${g.hands.doubleAttack}${g.hands.doubleAttack < 150 ? ' only from 150' : ''}. EQEmu's attack rounds, as on the Stats page, with your skills from the log.`}
+                >
+                  {' '}
+                  · the off hand swings {Math.round((g.hands.swings.off / g.hands.swings.main) * 100)}% as often as the main hand, so a weapon counts{' '}
+                  {g.hands.main.toFixed(2)}× in Primary and {g.hands.off.toFixed(2)}× in Secondary
+                </span>
+              ) : (
+                ' · weapons count alike in both hands (no Dual Wield skill in your log yet)'
+              )}
             </div>
             {showWeights && (
               <div className="lt-weights">
@@ -268,8 +290,8 @@ export function GearFinder({ view, sheet, mode, go }: { view: InventoryView; she
         <div className="card empty">Set your classes and level on the Stats page, and these tools will know what you can wear.</div>
       ) : mode === 'focus' ? (
         <FocusTab m={model} />
-      ) : mode === 'effects' ? (
-        <EffectsTab m={model} />
+      ) : mode === 'effects' || mode === 'procs' ? (
+        <EffectsTab key={mode} m={model} kind={mode === 'effects' ? 'worn' : 'proc'} />
       ) : mode === 'optimize' ? (
         <OptimizeTab m={model} />
       ) : (
@@ -279,6 +301,11 @@ export function GearFinder({ view, sheet, mode, go }: { view: InventoryView; she
               <div key={r.slot} className="card lt-finder-slot">
                 <div className="lt-finder-head">
                   <span className="lt-slot">{slotLabel(r.slot)}</span>
+                  {ratioFirst && (r.slot === 'Primary' || r.slot === 'Secondary') && (
+                    <span className="lt-chip" title="Weapons go by ratio first: gains in the hands count weapon ratio 100 times over, so a better-ratio weapon always comes first">
+                      ratio first
+                    </span>
+                  )}
                   {r.current ? (
                     <span className="small muted">
                       replaces <b>{r.current.item.name}</b> · score {num(r.current.score)}
@@ -308,9 +335,18 @@ export function GearFinder({ view, sheet, mode, go }: { view: InventoryView; she
                           {c.item.title}
                         </a>
                         {c.owned && <span className="lt-chip gold">you have one</span>}
-                        <span className="lt-chip" title={c.eraInferred ? 'Worked out from the zones it drops in; the wiki page has no era' : undefined}>
+                        <span
+                          className="lt-chip"
+                          title={
+                            c.eraInferred
+                              ? c.eraBy === 'recipe'
+                                ? 'Worked out from what it is made of: the latest era among its ingredients; the wiki page has no era'
+                                : 'Worked out from the zones it drops in; the wiki page has no era'
+                              : undefined
+                          }
+                        >
                           {c.era}
-                          {c.eraInferred ? ' · by zone' : ''}
+                          {c.eraInferred ? ` · by ${c.eraBy ?? 'zone'}` : ''}
                         </span>
                         {c.focus && (
                           <span
@@ -379,8 +415,8 @@ export function GearFinder({ view, sheet, mode, go }: { view: InventoryView; she
           <p className="faint small">
             Weights are on outcomes (HP, mana, AC, avoidance, Offense, haste…); a raw stat counts for what it buys you, worked out from your classes, level, current stats
             and AAs, the same formulas the Stats page checks against the game. Focus effects you want (Focus effects tab) count too: a candidate that brings a better one
-            gains, and replacing an item loses what its focus and exaltations gave. Worn effects and procs count as what they add to your melee (Worn
-            effects &amp; procs tab). Your two Any slots take any piece of gear. Scores only rank items against each other. The
+            gains, and replacing an item loses what its focus and exaltations gave. Worn effects and procs count as what they add to your melee and,
+            for worn effects, the stats they give (Worn effects and Procs tabs). Your two Any slots take any piece of gear. Scores only rank items against each other. The
             wiki holds base stats, so a candidate "as it drops" is at +0 while your gear counts at its merge level; switch to "At your merge level" to compare like with like.
             In era and out of era follow eqlwiki's own list; an item with no era on its page takes the era of the zones it drops in. Item data from eqlwiki.com.
           </p>

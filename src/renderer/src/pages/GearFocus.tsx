@@ -1,9 +1,11 @@
 import { useMemo } from 'react'
+import { useRemembered } from '../remember'
+import type { CatalogItem } from '../../../core/wikiItem'
 import { baseName, slotLabel } from '../../../core/inventory'
-import { restrictions } from '../../../core/upgrades'
+import { restrictions, score, weightsForSlot } from '../../../core/upgrades'
 import { focusValue, KIND_LABELS, KIND_ORDER, KIND_WORTH, type FocusInfo, type FocusLine } from '../../../core/itemFocus'
 import { optimizeGear, pieceName, type Piece } from '../../../core/gearOptimizer'
-import type { FocusCandidate, GearModel, OwnedFocus } from '../gear/useGearModel'
+import { CATALOG_PER_SLOT, type FocusCandidate, type GearModel, type OwnedFocus } from '../gear/useGearModel'
 import { Info } from '../components/ui'
 import { num, roundPct as pct, wikiUrl } from '../format'
 import { ItemIcon, source, whereText } from './gearBits'
@@ -229,20 +231,45 @@ function FocusRow({ m, l }: { m: GearModel; l: FocusLine }) {
   )
 }
 
+/** Where a piece to get comes from: its era and where it drops. */
+const catalogWhere = (c: CatalogItem | undefined) => (c ? [c.era, source(c)].filter(Boolean).join(' · ') : '')
+
 export function OptimizeTab({ m }: { m: GearModel }) {
+  // What it chooses from: what the character owns, or that and the best of every piece they could get.
+  const [scope, setScope] = useRemembered<'owned' | 'all'>('optimize.scope', 'owned')
+  const all = scope === 'all'
+  const pieces = useMemo(() => (all ? [...m.pieces, ...m.catalogPieces] : m.pieces), [all, m.pieces, m.catalogPieces])
+  const byTitle = useMemo(() => new Map(m.catalog.map((c) => [c.title, c])), [m.catalog])
   const plan = useMemo(
     () =>
       optimizeGear({
-        pieces: m.pieces, wearer: m.wearer, weights: m.weights, twoHanders: m.twoHanders, focusValue: m.focusValue, exaltations: m.exaltations,
-        effects: m.effects.value ?? undefined
+        pieces, wearer: m.wearer, weights: m.weights, twoHanders: m.twoHanders, focusValue: m.focusValue, exaltations: m.exaltations,
+        effects: m.effects.value ?? undefined, hands: m.weaponHands
       }),
-    [m.pieces, m.wearer, m.weights, m.twoHanders, m.focusValue, m.exaltations, m.effects.value]
+    [pieces, m.wearer, m.weights, m.twoHanders, m.focusValue, m.exaltations, m.effects.value, m.weaponHands]
   )
+  const toGet = plan.after.filter((p) => p?.from === 'catalog').length
+  // Stats as shown: at the weights' own worth. With weapons by ratio first the plan weighs the hands'
+  // weapon ratio far above the rest to choose them; the numbers shown keep it at its own weight.
+  const shownScore = (p: Piece | null, i: number) => (p?.stats ? score(p.stats, { ...weightsForSlot(m.weights, plan.slots[i], m.hands), haste: 0 }) : 0)
+  const shownBefore = plan.before.map(shownScore)
+  const shownAfter = plan.after.map(shownScore)
   const changes = plan.slots
     .map((slot, i) => ({ slot, i, before: plan.before[i], after: plan.after[i] }))
     .filter((c) => c.before !== c.after)
+  // Changes that are one move: a piece leaving one slot for another ties the two slots together, and
+  // a slot's own stats may fall for the set to gain (a new weapon in Primary, the old one to Secondary).
+  const hostOf = (p: Piece) => p.host ?? p
+  const root = plan.slots.map((_, i) => i)
+  const find = (i: number): number => (root[i] === i ? i : (root[i] = find(root[i])))
+  for (const c of changes) {
+    const k = c.before ? plan.after.findIndex((p) => p && hostOf(p) === hostOf(c.before!)) : -1
+    if (k >= 0 && k !== c.i) root[find(k)] = find(c.i)
+  }
+  const moveOf = (i: number) => changes.filter((c) => find(c.i) === find(i))
+  const moveGain = (move: { i: number }[]) => sum(move.map((o) => shownAfter[o.i] - shownBefore[o.i]))
   const sum = (xs: number[]) => xs.reduce((a, b) => a + b, 0)
-  const statGain = sum(plan.slotScoreAfter) - sum(plan.slotScoreBefore) + plan.hasteAfter - plan.hasteBefore
+  const statGain = sum(shownAfter) - sum(shownBefore) + plan.hasteAfter - plan.hasteBefore
   const focusGain = plan.focusAfter - plan.focusBefore
   const effectsGain = plan.effectsAfter - plan.effectsBefore
   const namesOf = (p: Piece | null) => p?.foci ?? []
@@ -256,10 +283,33 @@ export function OptimizeTab({ m }: { m: GearModel }) {
   return (
     <div className="stack gap-12">
       <div className="card stack gap-6">
-        <h2 style={{ margin: 0 }}>Best use of what you own</h2>
+        <div className="row">
+          <h2 style={{ margin: 0 }}>{all ? 'Best set from all gear' : 'Best use of what you own'}</h2>
+          <span className="grow" />
+          <span className="lt-seg" role="group" aria-label="Choose from">
+            {(
+              [
+                ['owned', 'Gear you own'],
+                ['all', 'All gear']
+              ] as const
+            ).map(([k, label]) => (
+              <button key={k} className={scope === k ? 'on' : ''} aria-pressed={scope === k} onClick={() => setScope(k)}>
+                {label}
+              </button>
+            ))}
+          </span>
+        </div>
+        {all && (
+          <p className="small" style={{ margin: 0 }}>
+            With the best of everything your classes can wear from the eras shown ({m.catalogPieces.length} pieces, the top {CATALOG_PER_SLOT} a slot by these weights, focus and
+            effects),{' '}
+            {m.compare === 'level' ? 'at the merge level of what you wear in the slot' : 'as they drop (+0)'}, as the upgrade finder compares them (its “Compare” setting).
+            Pieces to get are marked; the rest is what you own.
+          </p>
+        )}
         <p className="small muted" style={{ margin: 0 }}>
           Every piece you wear, carry, bank, keep in Storage › Equipment or have on your pet ({m.pieces.length} of them), tried in every slot it fits, both Any slots
-          included, scored with these weights plus the focus effects you want and what worn effects and procs add to your melee (Worn effects &amp; procs tab).
+          included, scored with these weights plus the focus effects you want and what worn effects and procs add to your melee (Worn effects and Procs tabs).
           Exaltations stay in the item that holds them; the {m.exaltations.length} you may use in Storage › Exaltations are tried in the focus, worn and proc slots of
           each piece of their own kind (a ring's in a ring), in place of what it has there. Your pet's pieces count without any exaltations they hold, which the game
           does not list. Haste does not stack, so one haste item is all it wears for it: each you own is tried as that one, wherever it leaves the rest of the set best.
@@ -268,6 +318,7 @@ export function OptimizeTab({ m }: { m: GearModel }) {
           <div className="row" style={{ gap: 18, flexWrap: 'wrap', marginTop: 4 }}>
             <span>
               <b>{changes.length}</b> change{changes.length === 1 ? '' : 's'}
+              {toGet > 0 && `, ${toGet} to get`}
             </span>
             <span className={statGain >= 0 ? 'lt-up' : 'lt-down'}>
               Stats {statGain >= 0 ? '+' : ''}
@@ -286,14 +337,18 @@ export function OptimizeTab({ m }: { m: GearModel }) {
             <span className="lt-gain">+{num(statGain + focusGain + effectsGain)}</span>
           </div>
         ) : (
-          <p style={{ margin: '4px 0 0' }}>What you wear is already the best way to wear what you own, by these weights and the focus effects you want.</p>
+          <p style={{ margin: '4px 0 0' }}>
+            {all
+              ? 'Nothing you could get beats what you wear, by these weights, the focus effects you want and worn effects and procs.'
+              : 'What you wear is already the best way to wear what you own, by these weights, the focus effects you want and worn effects and procs.'}
+          </p>
         )}
       </div>
 
       {changes.length > 0 && (
         <div className="card lt-opt">
           {changes.map((c) => {
-            const hostOf = (p: Piece) => p.host ?? p
+            const together = moveOf(c.i)
             const moveTo = c.before ? plan.after.findIndex((p) => p && hostOf(p) === hostOf(c.before!)) : -1
             // The same piece, exalted where it is.
             const exaltedHere = !!c.after?.exalt && !!c.before && hostOf(c.after) === hostOf(c.before)
@@ -305,7 +360,7 @@ export function OptimizeTab({ m }: { m: GearModel }) {
               ...namesOf(c.before).filter((n) => !plan.after.some((p) => namesOf(p).includes(n))),
               ...effectNamesOf(c.before).filter((n) => !plan.after.some((p) => effectNamesOf(p).includes(n)))
             ]
-            const delta = plan.slotScoreAfter[c.i] - plan.slotScoreBefore[c.i]
+            const delta = shownAfter[c.i] - shownBefore[c.i]
             return (
               <div key={c.i} className="lt-opt-row">
                 <span className="lt-slot">{slotLabel(c.slot)}</span>
@@ -313,11 +368,23 @@ export function OptimizeTab({ m }: { m: GearModel }) {
                   <div className="row gap-8">
                     {c.after ? (
                       <>
-                        <b>{c.after.item.name}</b>
-                        {!exaltedHere && (
-                          <span className="small muted">
-                            {c.after.from === 'worn' ? `from your ${slotLabel(c.after.item.location)}` : whereText(c.after.from, c.after.item).replace(/^(in|on) /, 'from ')}
-                          </span>
+                        {c.after.from === 'catalog' ? (
+                          <>
+                            <a href={wikiUrl(baseName(c.after.item.name))} target="_blank" rel="noreferrer">
+                              <b>{c.after.item.name}</b>
+                            </a>
+                            <span className="lt-chip warn">to get</span>
+                            <span className="small muted">{catalogWhere(byTitle.get(baseName(c.after.item.name)))}</span>
+                          </>
+                        ) : (
+                          <>
+                            <b>{c.after.item.name}</b>
+                            {!exaltedHere && (
+                              <span className="small muted">
+                                {c.after.from === 'worn' ? `from your ${slotLabel(c.after.item.location)}` : whereText(c.after.from, c.after.item).replace(/^(in|on) /, 'from ')}
+                              </span>
+                            )}
+                          </>
                         )}
                       </>
                     ) : (
@@ -335,6 +402,16 @@ export function OptimizeTab({ m }: { m: GearModel }) {
                       {c.before && (moveTo >= 0 ? `, which moves to ${slotLabel(plan.slots[moveTo])}` : ', which comes off')}
                     </div>
                   )}
+                  {together.length > 1 && (
+                    <div className="small muted" title="The stats of every slot this move changes, by your weights">
+                      one move with {together.filter((o) => o.i !== c.i).map((o) => slotLabel(o.slot)).join(' and ')}: together{' '}
+                      <b className={moveGain(together) >= 0 ? 'lt-up' : 'lt-down'}>
+                        {moveGain(together) >= 0 ? '+' : ''}
+                        {num(moveGain(together))}
+                      </b>{' '}
+                      in stats
+                    </div>
+                  )}
                   {(gained.length > 0 || lost.length > 0) && (
                     <div className="lt-diffs">
                       {gained.map((n) => (
@@ -350,7 +427,7 @@ export function OptimizeTab({ m }: { m: GearModel }) {
                     </div>
                   )}
                 </div>
-                <span className="lt-gain" title="Stats in this slot, by your weights (focus effects are counted over all slots, above)">
+                <span className="lt-gain" title="Stats in this slot alone, by your weights: haste, focus effects, worn effects and procs are counted over all slots, above">
                   {delta >= 0 ? '+' : ''}
                   {num(delta)}
                 </span>

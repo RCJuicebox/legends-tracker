@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { effectScore, itemEffects, procDamage, procOf, procsPerMinute, procWorth, wornEffectOf, wornWorth, type EffectSpell } from '../src/core/itemEffects'
+import { effectScore, itemEffects, procDamage, procOf, procsPerMinute, procWorth, wornEffectOf, wornStats, wornWorth, type EffectSpell } from '../src/core/itemEffects'
 import { meleeCounter, meleeProfile } from '../src/core/meleeTally'
 import { optimizeGear, type Piece } from '../src/core/gearOptimizer'
 import { parseInventory, parseStatsBlock } from '../src/core/inventory'
@@ -62,6 +62,23 @@ describe('your melee from the log', () => {
 })
 
 describe('effects on gear', () => {
+  it('reads worn effects written "Effect: X (Worn)", as most pages have them', () => {
+    expect(wornEffectOf("Slot: BACK<br>\nEffect:  [[Enduring Breath]] (Worn)<br>\nClass: ALL<br>")).toBe('Enduring Breath')
+    expect(wornEffectOf('Effect: [[Flowing Thought I]] (Worn, Casting Time: Instant)<br>')).toBe('Flowing Thought I')
+    // A clicky or a focus is no worn effect.
+    expect(wornEffectOf('Effect:  [[Levitate]] (Must Equip, Casting Time: Instant) at Level 45<br>')).toBe('')
+    expect(wornEffectOf('Focus Effect: [[Spell Haste II]]<br>')).toBe('')
+  })
+
+  it('says what a utility or stat worn effect does, and prices its stats as an item’s', () => {
+    const breath: EffectSpell = { name: 'Enduring Breath', formula: 0, cap: 0, beneficial: true, effects: [{ spa: 14, base: 1, base2: 0 }] }
+    expect(wornWorth(breath, meleeProfile({}, { from: '', to: '' })).does).toEqual(['breathe underwater'])
+    const battle: EffectSpell = { name: 'Aura of Battle', formula: 0, cap: 0, beneficial: true, effects: [{ spa: 2, base: 10, base2: 0 }, { spa: 15, base: 1, base2: 0 }, { spa: 10, base: 0, base2: 0 }] }
+    expect(wornWorth(battle, meleeProfile({}, { from: '', to: '' })).does).toEqual(['attack +10', 'mana +1 a tick'])
+    const s = wornStats(battle, 50)
+    expect([s.attack, s.manaRegen, s.ac]).toEqual([10, 1, 0])
+  })
+
   it('reads the worn effect and the combat proc from a stats block', () => {
     expect(wornEffectOf(TORRID)).toBe('Unrighteous Bash')
     expect(procOf(TORRID)).toBe("Oathbreaker's Curse")
@@ -113,6 +130,15 @@ describe('what an effect is worth', () => {
     // Never fired: 2 a minute raised 15% by 200 DEX, and the spell's 42 at level 50 (36 + 50, capped at 42).
     expect(procsPerMinute(200)).toBeCloseTo(2.3, 6)
     expect(procWorth(LIFEBITE, profile, { level: 50, dex: 200, carriers: 1 }).dpm).toBeCloseTo(2.3 * 42, 6)
+  })
+
+  it('gives a proc that lands only on undead or summoned creatures no value', () => {
+    // Dismiss Summoned (Thelvorn, Blade of Light): 180 damage, target type 11, summoned creatures only.
+    const dismiss: EffectSpell = { name: 'Dismiss Summoned', formula: 0, cap: 0, beneficial: false, targetType: 11, effects: [{ spa: 0, base: -180, base2: 0 }] }
+    const w = procWorth(dismiss, profile, { level: 50, dex: 200, carriers: 1 })
+    expect(w.dpm).toBe(0)
+    expect(w.does).toContain('works only on summoned creatures')
+    expect(procWorth({ ...dismiss, name: 'Dismiss Undead', targetType: 10 }, profile, { level: 50, dex: 200, carriers: 1 }).dpm).toBe(0)
   })
 
   it('counts a damage-over-time proc for every tick', () => {
@@ -170,6 +196,22 @@ describe('the optimizer and effects', () => {
     // The second fang goes to the off hand, where its proc counts too.
     expect(plan.effectsAfter).toBe(40)
     expect(plan.after[plan.slots.indexOf('Secondary')]?.item.name).toBe('Fang B')
+  })
+
+  it('puts an exaltation only in a piece that shares a class of the character with it', () => {
+    // Kelwyn is SHD/MNK/SHM: a monk-only fist and an SK-only proc exaltation are each theirs, but
+    // together no class may wear them. An all-class blade takes it instead.
+    const trio = { classes: ['shd', 'mnk', 'shm'], race: '', level: 50 }
+    const fist = piece("Wu's Fist", 'Primary', 'Slot: PRIMARY SECONDARY<br>\nSkill: Hand to Hand Atk Delay: 22<br>\nDMG: 16<br>\nClass: MNK<br>\nRace: ALL<br>')
+    const blade = piece('Plain Blade', 'Secondary', 'Slot: PRIMARY SECONDARY<br>\nSkill: 1H Slashing Atk Delay: 22<br>\nDMG: 16<br>\nClass: ALL<br>\nRace: ALL<br>')
+    const khyldorn = {
+      item: { location: 'Storage', name: 'Khyldorn the Blood Drinker (Exaltation)', id: 1, count: 1, augs: [] }, from: 'storage' as const, focus: '', worn: '', proc: 'Lifebite',
+      r: restrictions('Slot: PRIMARY<br>\nClass: SHD<br>\nRace: ALL<br>')
+    }
+    const onlyFist = optimizeGear({ pieces: [fist], wearer: trio, weights, twoHanders: false, focusValue: () => 0, effects, exaltations: [khyldorn] })
+    expect(onlyFist.after.some((p) => p?.exalt)).toBe(false)
+    const both = optimizeGear({ pieces: [fist, blade], wearer: trio, weights, twoHanders: false, focusValue: () => 0, effects, exaltations: [khyldorn] })
+    expect(both.after.filter((p) => p?.exalt).map((p) => p!.item.name)).toEqual(['Plain Blade'])
   })
 
   it('puts a stored proc exaltation in a weapon of its own kind', () => {

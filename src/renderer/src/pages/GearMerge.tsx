@@ -12,7 +12,7 @@ import { mergeOptions, type MergeOption } from '../../../core/mergeValue'
 import { MAX_LEVEL } from '../../../core/moteCalc'
 import { MOTE_RANKS } from '../../../core/motes'
 import { ROLE_PRESETS } from '../../../core/statValue'
-import { WEIGHT_LABELS, type WeightKey, type Weights } from '../../../core/upgrades'
+import { WEIGHT_LABELS, type HandWeights, type WeightKey, type Weights } from '../../../core/upgrades'
 import type { InventoryView } from '../../../shared/types'
 
 const moteName = (i: number, n: number) => `${n === 1 ? 'Mote' : 'Motes'} of ${MOTE_RANKS[i].name ? MOTE_RANKS[i].name + ' ' : ''}Potential`
@@ -58,7 +58,9 @@ function useSinceExport(view: InventoryView) {
 }
 
 /** The Gear page's Best merge tab: which worn item's next +1 gives the most for its motes. */
-export function MergeTab({ view, weights, preset, setPreset, go }: { view: InventoryView; weights: Weights; preset: string; setPreset: (p: string) => void; go?: (page: 'motes') => void }) {
+export function MergeTab({
+  view, weights, hands, preset, setPreset, go
+}: { view: InventoryView; weights: Weights; hands: HandWeights | null; preset: string; setPreset: (p: string) => void; go?: (page: 'motes') => void }) {
   const stockQ = useStock()
   const stock = stockQ.data
   const since = useSinceExport(view)
@@ -71,9 +73,9 @@ export function MergeTab({ view, weights, preset, setPreset, go }: { view: Inven
       const info = view.items[itemKey(item.name)]
       return info?.found ? parseStatsBlock(info.statsblock) : null
     }
-    const all = mergeOptions({ worn, baseStatsOf, weights, stock: stock?.counts, planned: stock?.item })
+    const all = mergeOptions({ worn, baseStatsOf, weights, hands, stock: stock?.counts, planned: stock?.item })
     return sortBy === 'gain' ? [...all].sort((a, b) => b.gain - a.gain || a.cost - b.cost) : all
-  }, [worn, view.items, weights, stock, sortBy])
+  }, [worn, view.items, weights, hands, stock, sortBy])
   const shown = onlyAffordable ? options.filter((o) => o.affordable) : options
   const unknown = worn.filter((it) => !view.items[itemKey(it.name)]?.found).length
   const maxed = worn.filter((it) => /\+10$/.test(it.name.trim())).length

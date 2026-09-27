@@ -32,5 +32,6 @@ export function whereText(from: PieceSource, item: InvItem): string {
   if (from === 'bank') return 'in your bank'
   if (from === 'storage') return 'in Storage › Equipment'
   if (from === 'pet') return 'on your pet'
+  if (from === 'catalog') return 'to get'
   return 'in the shared bank'
 }

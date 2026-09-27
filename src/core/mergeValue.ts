@@ -10,7 +10,7 @@
 import { mergeLevel, scaledStats, type InvItem, type ItemStats } from './inventory'
 import { countsToArray, makeable, MAX_LEVEL, moteForLevel } from './moteCalc'
 import { MOTE_RANKS, moteWorth, type MoteCounts } from './motes'
-import { score, statValues, weightsForSlot, type WeightKey, type Weights } from './upgrades'
+import { score, statValues, weightsForSlot, type HandWeights, type WeightKey, type Weights } from './upgrades'
 
 export interface MergeOption {
   item: InvItem
@@ -41,6 +41,8 @@ export interface MergeInput {
   /** An item's base (unmerged) stats, from the wiki; null when unknown. */
   baseStatsOf: (item: InvItem) => ItemStats | null
   weights: Weights
+  /** How much each hand's weapon counts; alike when absent. */
+  hands?: HandWeights | null
   /** Motes on hand, for what is affordable now. */
   stock?: MoteCounts
   /** The planner's item, whose xp bar is partly filled. */
@@ -61,7 +63,7 @@ export function mergeOptions(o: MergeInput): MergeOption[] {
     const mote = moteForLevel(level)
     if (mote < 0) continue
     // Weighed as the slot it is worn in reads it: a weapon's ratio only in the hands or the Range slot.
-    const w = weightsForSlot(o.weights, item.location)
+    const w = weightsForSlot(o.weights, item.location, o.hands)
     const now = statValues(scaledStats(base, level))
     const then = statValues(scaledStats(base, level + 1))
     const deltas: Partial<Record<WeightKey, number>> = {}

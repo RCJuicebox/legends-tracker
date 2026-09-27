@@ -16,6 +16,8 @@ export interface CatalogItem {
   focus: string
   /** The page's era template name without " Era": 'Classic', 'Chardok Revamp' …; '' when untagged. */
   era: string
+  /** For an untagged crafted item: the era tags its recipe's ingredients carry (from the recipe book). */
+  craftEras?: string[]
   /** Zones the page lists it dropping in. */
   zones: string[]
   /** Creatures the page lists dropping it. */
@@ -136,4 +138,24 @@ export function parseItemPage(title: string, content: string): CatalogItem | nul
     quest: /\S/.test(field(content, 'relatedquests')),
     crafted: /\S/.test(field(content, 'playercrafted'))
   }
+}
+
+/**
+ * Race lines eqlwiki has wrong, put right from a source that has them: its pages give "Race: ALL" to
+ * armor only some races may wear. Every item whose title matches takes the races given.
+ */
+export const RACE_FIXES: { match: RegExp; races: string; source: string }[] = [
+  // The dwarven cultural plate, all four kinds: the small races only (eqlwiki's Cultural Tradeskills:
+  // Dwarf page says as much in prose; its item pages say ALL).
+  { match: /^(?:(?:Enchanted|Imbued) )?Dwarven (?:Plate \w+|Breastplate)\b/i, races: 'DWF HFL GNM FRG', source: 'Allakhazam, Enchanted Dwarven Plate Greaves (item 8010)' }
+]
+
+/** The item with its race line put right, when RACE_FIXES knows better than its page; the same item otherwise. */
+export function withRaceFix(item: CatalogItem): CatalogItem {
+  const fix = RACE_FIXES.find((f) => f.match.test(item.title))
+  if (!fix) return item
+  const statsblock = /\bRace:/.test(item.statsblock)
+    ? item.statsblock.replace(/\bRace:\s*[A-Za-z ]*?(?=\s*(?:<br>|\n|$))/, `Race: ${fix.races}`)
+    : `${item.statsblock}\nRace: ${fix.races}<br>`
+  return { ...item, statsblock }
 }
