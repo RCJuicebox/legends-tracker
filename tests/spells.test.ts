@@ -20,4 +20,33 @@ describe('SpellBook.parse', () => {
     const book = SpellBook.parse(f.join('^'), readFileSync(join(dir, 'spells_us_str.txt'), 'latin1'))
     expect(book.named('Spirit of the Puma')!.castMs).toBe(0)
   })
+
+  const dir = join(__dirname, 'fixtures')
+  const spells = () => readFileSync(join(dir, 'spells_us.txt'), 'latin1')
+  const strings = () => readFileSync(join(dir, 'spells_us_str.txt'), 'latin1')
+  const summary = (b: SpellBook) => [...b.all()].map((s) => [s.id, s.name, s.classLevels.join(','), s.effects.map((e) => `${e.slot}:${e.spa}:${e.base}`).join(' ')])
+
+  it('reads the same with CRLF or LF lines, and skips comments and blank lines', () => {
+    const lf = spells().replace(/\r\n/g, '\n')
+    const crlf = '# a comment^1^2\r\n\r\n' + lf.replace(/\n/g, '\r\n')
+    expect(summary(SpellBook.parse(crlf, strings()))).toEqual(summary(SpellBook.parse(lf, strings())))
+  })
+
+  it('still finds the effects when a client adds fields after them', () => {
+    const plain = SpellBook.parse(spells(), strings())
+    const longer = spells()
+      .split('\n')
+      .map((l) => (l.replace(/\r$/, '').split('^').length > 100 ? l.replace(/\r$/, '') + '^extra^0' : l))
+      .join('\n')
+    const book = SpellBook.parse(longer, strings())
+    expect(summary(book)).toEqual(summary(plain))
+    expect(book.named('Spirit of the Puma')!.effects.length).toBeGreaterThan(0)
+  })
+
+  it('holds identical class levels and effects once', () => {
+    const book = SpellBook.parse(spells(), strings())
+    const all = [...book.all()]
+    const levels = new Set(all.map((s) => s.classLevels))
+    expect(levels.size).toBe(new Set(all.map((s) => s.classLevels.join(','))).size)
+  })
 })

@@ -55,6 +55,39 @@ export interface RankedSpell {
 }
 
 const F = { id: 0, name: 1, cast: 8, recast: 10, formula: 11, mana: 14, cap: 12, good: 28, target: 30, skill: 32, cls: 36, icon: 75, effects: 172 }
+/** The fields read; the class levels are taken as one run of 16. */
+const WANTED: boolean[] = []
+for (const i of Object.values(F)) WANTED[i] = true
+
+/**
+ * Effect slots, `slot|spa|base|base2|formula|max` joined by `$`. Of some 275,000 effects in the
+ * file only 81,000 differ, and many spells have the same list, so each distinct effect and list is
+ * held once (a third of the book's memory). Nothing changes a spell's effects once read.
+ */
+class EffectReader {
+  private readonly lists = new Map<string, SpellEffect[]>()
+  private readonly one = new Map<string, SpellEffect>()
+  private readonly none: SpellEffect[] = []
+
+  read(field: string | undefined): SpellEffect[] {
+    if (!field) return this.none
+    let out = this.lists.get(field)
+    if (out) return out
+    out = []
+    for (const part of field.split('$')) {
+      let effect = this.one.get(part)
+      if (!effect) {
+        const e = part.split('|')
+        if (e.length <= 2) continue
+        effect = { slot: +e[0] || 0, spa: +e[1], base: +e[2], base2: +(e[3] ?? 0), formula: +(e[4] ?? 100) || 100, max: +(e[5] ?? 0) || 0 }
+        this.one.set(part, effect)
+      }
+      out.push(effect)
+    }
+    this.lists.set(field, out)
+    return out
+  }
+}
 
 const ROMAN: Record<string, number> = {
   I: 1, II: 2, III: 3, IV: 4, V: 5, VI: 6, VII: 7, VIII: 8, IX: 9, X: 10,
@@ -97,19 +130,53 @@ export class SpellBook {
       const f = line.replace(/\r$/, '').split('^')
       messages.set(+f[0], f)
     }
-    for (const line of spellsText.split('\n')) {
-      if (!line || line[0] === '#') continue
-      const f = line.replace(/\r$/, '').split('^')
-      if (f.length < 80) continue
+    // Most spells (an NPC's, an item's) have the same class levels, so each distinct set is held once.
+    const levelSets = new Map<string, number[]>()
+    const effectsOf = new EffectReader()
+    // The wanted fields of a line are found with indexOf rather than by splitting all ~250 of them.
+    const f: string[] = []
+    let effectsLast: boolean | null = null
+    const text = spellsText
+    for (let lineStart = 0; lineStart < text.length; ) {
+      let lineEnd = text.indexOf('\n', lineStart)
+      if (lineEnd < 0) lineEnd = text.length
+      const next = lineEnd + 1
+      if (lineEnd > lineStart && text.charCodeAt(lineEnd - 1) === 13) lineEnd--
+      if (lineEnd === lineStart || text[lineStart] === '#') {
+        lineStart = next
+        continue
+      }
+      f.length = 0
+      let count = 0
+      let clsFrom = -1
+      let clsTo = -1
+      // The effect slots are the last field (173 a line in the 2026-09 client), so the scan stops
+      // after the icon and takes them from the end; the first line checks that the layout holds.
+      const stopAt = effectsLast ? F.icon + 1 : Infinity
+      let at = lineStart
+      for (; at <= lineEnd && count < stopAt; count++) {
+        let end = text.indexOf('^', at)
+        if (end < 0 || end > lineEnd) end = lineEnd
+        if (WANTED[count]) f[count] = text.slice(at, end)
+        if (count === F.cls) clsFrom = at
+        if (count === F.cls + 15) clsTo = end
+        at = end + 1
+      }
+      if (effectsLast === null && count > F.effects) effectsLast = count === F.effects + 1
+      else if (effectsLast && count === stopAt && at <= lineEnd) {
+        f[F.effects] = text.slice(text.lastIndexOf('^', lineEnd - 1) + 1, lineEnd)
+        count = F.effects + 1
+      }
+      lineStart = next
+      if (count < 80) continue
       const id = +f[F.id]
       const formula = +f[F.formula]
       const cap = +f[F.cap]
       const beneficial = f[F.good] === '1'
-      const effects = (f[F.effects] ?? '')
-        .split('$')
-        .map((e) => e.split('|'))
-        .filter((e) => e.length > 2)
-        .map((e) => ({ slot: +e[0] || 0, spa: +e[1], base: +e[2], base2: +(e[3] ?? 0), formula: +(e[4] ?? 100) || 100, max: +(e[5] ?? 0) || 0 }))
+      const effects = effectsOf.read(f[F.effects])
+      const levelKey = text.slice(clsFrom, clsTo)
+      let classLevels = levelSets.get(levelKey)
+      if (!classLevels) levelSets.set(levelKey, (classLevels = levelKey.split('^').map(Number)))
       const msg = messages.get(id) ?? []
       const spell: Spell = {
         id,
@@ -121,7 +188,7 @@ export class SpellBook {
         formula,
         cap,
         beneficial,
-        classLevels: f.slice(F.cls, F.cls + 16).map(Number),
+        classLevels,
         targetType: +f[F.target] || 0,
         skill: +f[F.skill] || 0,
         icon: +f[F.icon],
