@@ -20,7 +20,7 @@ import type { MyClass, SpellCastRow } from '../core/spellMotes'
 import type { Purchase, Recipe } from '../core/tradeskills'
 import type { CatalogItem } from '../core/wikiItem'
 import type { AchMarks, AchievementsView, CharacterSheet, GameFolderCheck, InventoryView, ItemInfo, MoteStock } from './character'
-import type { CombatSnapshot, Segment, SegmentSummary } from './combat'
+import type { CombatSnapshot, Segment, SegmentSummary, StitchedTimeline } from './combat'
 import type { AppSettings, AudioSettings, CharacterSettings, FocusSource, MeterOverlayOptions, OverlayConfig, SpellRule } from './settings'
 import type { Trigger, TriggerTestResult } from './triggers'
 import type {
@@ -269,6 +269,7 @@ export interface Invokes {
 
   'combat:get': () => CombatSnapshot
   'combat:segment': (id: string) => Segment | null
+  'combat:sessionTimeline': (id: string) => StitchedTimeline | null
   'combat:newSession': () => CombatSnapshot
   'combat:addMember': (name: string) => CombatSnapshot
   'combat:removeMember': (name: string) => CombatSnapshot
@@ -413,7 +414,7 @@ const INVOKE_CHANNELS: Record<InvokeChannel, true> = {
   'spells:known': true, 'spells:search': true, 'spells:rule': true, 'spells:checkLog': true, 'focus:search': true,
   'logs:list': true, 'logs:overview': true, 'logs:archive': true, 'logs:compress': true, 'logs:reveal': true,
   'overlays:arrange': true, 'overlays:demo': true,
-  'combat:get': true, 'combat:segment': true, 'combat:newSession': true, 'combat:addMember': true, 'combat:removeMember': true, 'combat:clearGroup': true,
+  'combat:get': true, 'combat:segment': true, 'combat:sessionTimeline': true, 'combat:newSession': true, 'combat:addMember': true, 'combat:removeMember': true, 'combat:clearGroup': true,
   'combat:rebuild': true,
   'loot:get': true, 'buffs:get': true, 'buffs:setWanted': true,
   'respawns:get': true, 'respawns:setTimer': true, 'respawns:removeTimer': true, 'respawns:forget': true,

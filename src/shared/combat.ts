@@ -116,6 +116,11 @@ export interface Timeline {
   inc: number[]
 }
 
+/** A session's fights' timelines end to end, a short gap between them; `marks` say where each fight begins. */
+export interface StitchedTimeline extends Timeline {
+  marks: { at: number; name: string }[]
+}
+
 export interface Segment {
   id: string
   kind: SegmentKind

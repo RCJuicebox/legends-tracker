@@ -1,8 +1,6 @@
 import { parseCombatLine, looksLikeCombat, SELF, type CombatEvent } from './combatLines'
 import { zoneEntered, type LogLine } from './logLine'
-import type {
-  CombatSnapshot, DamageHow, Defense, Entity, EntityKind, HealTally, ProcOrigin, RosterMember, Segment, SegmentSummary, SkillStat, Tally
-} from '../shared/types'
+import type { CombatSnapshot, DamageHow, Defense, Entity, EntityKind, HealTally, ProcOrigin, RosterMember, Segment, SegmentSummary, SkillStat, Tally, StitchedTimeline } from '../shared/types'
 
 // The damage meter: every combat line sorted into fights and sessions, per entity.
 //
@@ -29,6 +27,8 @@ const FIGHTS_KEPT = 300
 const SESSIONS_KEPT = 60
 /** A fight's per-second timeline stops growing past an hour. */
 const TIMELINE_MAX = 3600
+/** Quiet seconds between two fights in a session's chart. */
+const STITCH_GAP_SEC = 3
 
 export interface MeterConfig {
   fightGapSec: number
@@ -726,6 +726,28 @@ export class CombatMeter {
 
   segment(id: string): Segment | null {
     return this.fights.find((f) => f.id === id) ?? this.sessions.find((s) => s.id === id) ?? null
+  }
+
+  /**
+   * A session's DPS over time: its fights' timelines end to end with a few quiet seconds between
+   * them, so the chart shows the fighting and not the minutes between pulls.
+   */
+  sessionTimeline(id: string): StitchedTimeline | null {
+    const s = this.sessions.find((x) => x.id === id) ?? (this.session?.id === id ? this.session : null)
+    if (!s) return null
+    const end = s.open ? Infinity : s.endedAt
+    const fights = this.fights.filter((f) => f.timeline && f.startedAt >= s.startedAt && f.startedAt <= end).sort((a, b) => a.startedAt - b.startedAt)
+    const out: StitchedTimeline = { you: [], pet: [], group: [], inc: [], marks: [] }
+    const keys = ['you', 'pet', 'group', 'inc'] as const
+    for (const f of fights) {
+      const tl = f.timeline!
+      if (out.you.length) for (const k of keys) out[k].push(...new Array<number>(STITCH_GAP_SEC).fill(0))
+      out.marks.push({ at: out.you.length, name: f.name })
+      // A fight's timeline has holes for its quiet seconds.
+      const len = Math.max(...keys.map((k) => tl[k].length))
+      for (const k of keys) for (let i = 0; i < len; i++) out[k].push(tl[k][i] ?? 0)
+    }
+    return out
   }
 
   get liveFight(): Segment | null {

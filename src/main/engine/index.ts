@@ -24,9 +24,7 @@ import { BuffCoordinator } from './buffs'
 import { CombatFeed } from './combat'
 import { MoteCatchUp } from './moteCatchUp'
 import { Throttled } from './throttle'
-import type {
-  AppSettings, ArchiveStatus, CharacterSettings, CombatSnapshot, FeedItem, KnownSpell, LogCheckRow, Segment, SpellRule, WatchStatus
-} from '../../shared/types'
+import type { AppSettings, ArchiveStatus, CharacterSettings, CombatSnapshot, FeedItem, KnownSpell, LogCheckRow, Segment, SpellRule, WatchStatus, StitchedTimeline } from '../../shared/types'
 import type { EngineEnv, EngineOutputs, EngineStore, LootView, MoteView, Speaker } from './contracts'
 import { jobs } from '../sources/jobs'
 
@@ -519,6 +517,10 @@ export class Engine {
 
   combatSegment(id: string): Segment | null {
     return this.combat.segment(id)
+  }
+
+  sessionTimeline(id: string): StitchedTimeline | null {
+    return this.combat.meter.sessionTimeline(id)
   }
 
   newCombatSession(): CombatSnapshot {

@@ -2363,6 +2363,11 @@ button.tree-item {
   color: var(--text-3);
   margin-left: 2px;
 }
+/* Where each fight begins in a session's chart. */
+.dm-chart .dm-chart-mark {
+  stroke: var(--line-2);
+  stroke-dasharray: 2 3;
+}
 /* A drilled entity's figures, between the breadcrumb and its skills. */
 .dm-entity-stats {
   margin: 2px 0 10px;

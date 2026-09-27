@@ -3,6 +3,7 @@ import { useApp } from '../state'
 import { act, showToast, actDone } from '../toast'
 import { useRemembered } from '../remember'
 import { LIVE, useCombat, useSegment } from '../combat'
+import { useInvoke } from '../hooks'
 import { ConfirmButton, Icon, Info, Segmented } from './ui'
 import { EntityBar, HealBar, HEAL_COLOR, KIND_COLOR, PROC_COLOR, PROC_HINT, PROC_WORD, SkillBar, kindTag } from './MeterBars'
 import {
@@ -484,17 +485,22 @@ const WINDOW_SEC = 6
 
 function DpsChart({ seg }: { seg: Segment }) {
   const [hidden, setHidden] = useRemembered<string[]>('meter.chartHidden', [])
-  const tl = seg.timeline
-  const seconds = Math.max(1, Math.ceil(durationSec(seg)))
+  const session = seg.kind === 'session'
+  // A session's chart is its fights end to end, from the main process; asked again at most every
+  // ten seconds while the session runs.
+  const stitched = useInvoke(session ? 'combat:sessionTimeline' : null, [seg.id], [session && seg.open ? Math.floor(seg.endedAt / 10_000) : 0]).data
+  const tl = session ? stitched : seg.timeline
+  const seconds = Math.max(1, session ? (stitched?.you.length ?? 0) : Math.ceil(durationSec(seg)))
+  const marks = session ? (stitched?.marks ?? []) : []
   const series = useMemo(() => {
     if (!tl) return null
     return LINES.map((l) => ({ ...l, values: rolling(tl[l.key], seconds, WINDOW_SEC), any: tl[l.key].some((v) => v > 0) }))
   }, [tl, seconds])
-  if (!series) {
+  if (!series || (session && !marks.length)) {
     return (
       <div className="dm-aux">
         <div className="dm-aux-head">DPS over time</div>
-        <div className="faint small">A session has no chart; pick a fight.</div>
+        <div className="faint small">{session ? 'No fights in this session yet.' : 'Nothing to chart yet.'}</div>
       </div>
     )
   }
@@ -513,9 +519,9 @@ function DpsChart({ seg }: { seg: Segment }) {
   return (
     <div className="dm-aux">
       <div className="dm-aux-head">
-        DPS over time <span className="faint small">{WINDOW_SEC}s rolling</span>
+        DPS over time <span className="faint small">{session ? `${marks.length} fight${marks.length === 1 ? '' : 's'} end to end · ` : ''}{WINDOW_SEC}s rolling</span>
       </div>
-      <svg viewBox={`0 0 ${W} ${H}`} className="stats-chart dm-chart" role="img" aria-label="Damage per second over the fight">
+      <svg viewBox={`0 0 ${W} ${H}`} className="stats-chart dm-chart" role="img" aria-label={session ? 'Damage per second over the fights of this session, end to end' : 'Damage per second over the fight'}>
         {[0.5, 1].map((f) => (
           <g key={f}>
             <line className="grid" x1={L} x2={W - 6} y1={y(max * f)} y2={y(max * f)} />
@@ -529,6 +535,11 @@ function DpsChart({ seg }: { seg: Segment }) {
           <text key={t} x={x(t)} y={H - 4} textAnchor="middle">
             {fmtClock(t)}
           </text>
+        ))}
+        {marks.slice(1).map((m) => (
+          <line key={m.at} className="dm-chart-mark" x1={x(m.at)} x2={x(m.at)} y1={6} y2={H - B}>
+            <title>{m.name}</title>
+          </line>
         ))}
         {shown.map((s) => (
           <path key={s.key} d={path(s.values)} fill="none" stroke={s.color} strokeWidth={s.key === 'inc' ? 1.2 : 1.8} opacity={s.key === 'inc' ? 0.8 : 1} />

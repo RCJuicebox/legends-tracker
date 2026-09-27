@@ -608,3 +608,29 @@ describe('charm pets, when they go wrong', () => {
     expect(e.out.total).toBe(50)
   })
 })
+
+describe("a session's DPS over time", () => {
+  it('puts its fights end to end, a few quiet seconds apart, and marks where each begins', () => {
+    const { m, feed } = meter()
+    feed(`
+      [Thu Sep 24 20:00:00 2026] You have entered The Plane of Fear 4 (Refined).
+      [Thu Sep 24 20:00:05 2026] You punch a fetid fiend for 100 points of damage.
+      [Thu Sep 24 20:00:07 2026] You punch a fetid fiend for 100 points of damage.
+      [Thu Sep 24 20:00:08 2026] You have slain a fetid fiend!
+      [Thu Sep 24 20:05:00 2026] You punch a scareling for 50 points of damage.
+      [Thu Sep 24 20:05:01 2026] You have slain a scareling!`)
+    const tl = m.sessionTimeline(m.sessions[m.sessions.length - 1].id)!
+    expect(tl.marks.map((k) => k.name.toLowerCase())).toEqual(['a fetid fiend', 'a scareling'])
+    // Five minutes between the pulls become three seconds.
+    expect(tl.you.length).toBeLessThan(20)
+    expect(tl.marks[0].at).toBe(0)
+    const firstEnds = tl.marks[1].at - 3
+    expect(tl.you.slice(firstEnds, tl.marks[1].at)).toEqual([0, 0, 0])
+    expect(tl.you.reduce((a, b) => a + b, 0)).toBe(250)
+    expect(tl.you.length).toBe(tl.inc.length)
+  })
+
+  it('has nothing for an id that is not a session', () => {
+    expect(meter().m.sessionTimeline('nope')).toBeNull()
+  })
+})

@@ -9,6 +9,7 @@ export function registerPlayIpc(ctx: AppContext): void {
 
   handle('combat:get', () => engine.combatSnapshot())
   handle('combat:segment', (id) => (typeof id === 'string' ? engine.combatSegment(id) : null))
+  handle('combat:sessionTimeline', (id) => (typeof id === 'string' ? engine.sessionTimeline(id) : null))
   handle('combat:newSession', () => engine.newCombatSession())
   handle('combat:addMember', (name) => {
     if (typeof name === 'string') engine.meter.addMember(name.slice(0, 64))
