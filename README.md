@@ -13,8 +13,8 @@ Windows only, like the game: it uses Windows' speech, OCR and window APIs.
 
 ## Installing
 
-Run **`Legends-Tracker-Setup-<version>.exe`** from the GitHub Releases page. It installs for the current
-user (no admin prompt) into `%LOCALAPPDATA%\Programs\legends-tracker`, with Start menu and desktop
+Run **`Legends-Tracker-Setup-<version>.exe`** from the GitHub Releases page. It installs in one step,
+with no questions, for the current user (no admin prompt) into `%LOCALAPPDATA%\Programs\legends-tracker`, with Start menu and desktop
 shortcuts and an uninstaller. The app lives in the tray; closing the window keeps the overlays and audio
 running, and **Quit** is on the tray menu.
 
@@ -27,7 +27,8 @@ The installed app checks GitHub Releases shortly after it starts and every hour 
 whenever **Check for updates** is pressed in Settings), downloads a newer version in the background,
 and offers **Restart and update** in the title bar, the tray menu and Settings. A Windows notification
 says when a new version has been found and again, to click on, when it is ready to install; each is
-said once per version. Settings live in `%APPDATA%\Legends Tracker`, outside the install folder, so
+said once per version. The update installs silently, with no installer window, and the app starts again
+by itself; if you just quit instead, it installs on the way out. Settings live in `%APPDATA%\Legends Tracker`, outside the install folder, so
 they survive updates and uninstalls.
 
 ### Releasing a new version

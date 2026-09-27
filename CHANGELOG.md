@@ -22,6 +22,7 @@ What changed in each version. The release workflow publishes a version's section
 - **Following another character:** if your log goes quiet while another character's log is being written, the Live page offers to follow them.
 - Waking the PC from sleep no longer speaks every timer that ran out overnight.
 - Updates show **what's new** on the Settings page, and a failed download is mentioned once.
+- **Updates install silently.** The installer is now one-click: no window, no questions, and the app comes back by itself. It always installs to `%LOCALAPPDATA%\Programs\legends-tracker`; the folder can no longer be chosen.
 
 ### Faster lookups
 

@@ -90,9 +90,8 @@
       "icon": "build/icon.png"
     },
     "nsis": {
-      "oneClick": false,
+      "oneClick": true,
       "perMachine": false,
-      "allowToChangeInstallationDirectory": true,
       "artifactName": "Legends-Tracker-Setup-${version}.${ext}",
       "shortcutName": "Legends Tracker",
       "createDesktopShortcut": true,
