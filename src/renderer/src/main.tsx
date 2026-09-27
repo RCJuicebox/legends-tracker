@@ -1,4 +1,4 @@
-import { type ComponentType } from 'react'
+import { useEffect, type ComponentType } from 'react'
 import { createRoot } from 'react-dom/client'
 import './styles.css'
 import { StateProvider, useApp } from './state'
@@ -7,7 +7,8 @@ import { ErrorBoundary } from './components/ErrorBoundary'
 import { ago } from './api'
 import { act, Toasts } from './toast'
 import { useUpdate } from './update'
-import { useRemembered } from './remember'
+import { remember, useRemembered } from './remember'
+import { ARRANGED_KEY } from './components/LiveSummary'
 import { useUnsaved } from './unsaved'
 import { Dashboard } from './pages/Dashboard'
 import { Spells } from './pages/Spells'
@@ -60,6 +61,10 @@ function Shell() {
   const s = state.status
   const update = useUpdate()
   const unsaved = useUnsaved()
+  // Arranging the overlays at all, from the tray, a page or the hotkey, is placing them (Live's checklist).
+  useEffect(() => {
+    if (state.arranging) remember(ARRANGED_KEY, true)
+  }, [state.arranging])
   return (
     <div className="shell">
       <div className="titlebar">

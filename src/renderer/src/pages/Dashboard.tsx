@@ -6,6 +6,7 @@ import { OVERLAY_BUFFS } from '../constants'
 import { TimerBars, useNow } from '../components/TimerBars'
 import { Icon } from '../components/ui'
 import { GameFolderPrompt } from '../components/GameFolder'
+import { FightSummary, QuietLogNotice, SetupChecklist } from '../components/LiveSummary'
 import type { PageId } from '../main'
 import { perHour, useMotes } from './Motes'
 import { localDay, sessionHours, totalMotes } from '../../../core/motes'
@@ -60,6 +61,8 @@ export function Dashboard({ go }: { go: (p: PageId) => void }) {
       </div>
 
       <GameFolderPrompt />
+      <SetupChecklist go={go} />
+      <QuietLogNotice go={go} />
       {status.elsewhere && (
         <div className="notice mb-16">
           {status.elsewhere.character}&apos;s log is being written while {status.character || 'this character'}&apos;s is quiet.{' '}
@@ -103,6 +106,8 @@ export function Dashboard({ go }: { go: (p: PageId) => void }) {
           </span>
         </button>
       </div>
+
+      <FightSummary go={go} />
 
       <div className="grid two mb-16">
         <div className="card">
