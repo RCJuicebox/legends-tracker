@@ -269,6 +269,9 @@ export class MoteCatchUp {
     } catch (e) {
       if (job.signal.aborted) {
         this.notifier.pushFeed('info', 'Rebuilding mote history was cancelled; the history kept before is unchanged.')
+      } else if ((e as Error).message === 'stopped') {
+        // Stopped by the app itself (quitting, or watching another log): nothing went wrong.
+        log.info('Rebuilding mote history stopped before it finished')
       } else {
         log.error('Rebuilding mote history failed:', e)
         sources.fail('motes', e)

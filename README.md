@@ -75,6 +75,27 @@ npm test
 (`settings.json`, `triggers.json`, `spell-rules.json`, `casts.json`, and a `sounds` folder).
 Setting `EQL_USER_DATA` to another folder runs against a separate profile.
 
+### Measuring
+
+Check memory and CPU with the game running and a fight or two on the meter, since an idle app
+tells you little.
+
+- **Settings › Copy diagnostics** lists every process with its memory (working set, as Task
+  Manager counts it) and CPU: the main process, each window and overlay by name, and the GPU
+  process. It also gives the main process's JavaScript heap.
+- **The log** (`main.log` in the log folder) records the spell data's load on each start, for
+  example `Spell data: 73975 spells in 300 ms; the heap grew 60 MB reading it`. That is the
+  largest thing the app reads; about 42 MB of it stays once the garbage is collected.
+- **Task Manager**, Details tab, with the *Command line* column added: each `electron.exe` or
+  `Legends Tracker.exe` is one of the processes above. Its `--type=renderer` processes are the
+  windows.
+- **Resource Monitor**, Disk tab, filtered to the app: shows the log being read and what is
+  written. The history files (casts, motes, respawns, buffs) are written at most every 15
+  seconds, not on every line.
+- **A trace**: run from source with `--remote-debugging-port=9222`, open `chrome://inspect` in
+  Chrome, and record a Performance profile of a window (the main one, or an overlay), or take a
+  heap snapshot. For the main process, add `--inspect` and use the same page's Node target.
+
 ## Damage meter
 
 Its own page under Play, and a floating overlay of its own. Every combat line the game prints is

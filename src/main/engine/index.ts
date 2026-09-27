@@ -215,7 +215,11 @@ export class Engine {
 
   async loadSpells(): Promise<void> {
     try {
+      const heapBefore = process.memoryUsage().heapUsed
+      const started = performance.now()
       this.book = await SpellBook.load(this.settings.installDir)
+      // The largest thing the app reads; its cost is logged so a change to it shows (see README, Measuring).
+      log.info(`Spell data: ${this.book.size} spells in ${Math.round(performance.now() - started)} ms; the heap grew ${Math.round((process.memoryUsage().heapUsed - heapBefore) / 1048576)} MB reading it`)
       this.status.spellsLoaded = this.book.size
       this.buffs.setBook(this.book)
       this.status.spellError = ''

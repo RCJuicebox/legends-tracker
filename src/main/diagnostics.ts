@@ -1,4 +1,4 @@
-import { app } from 'electron'
+import { app, BrowserWindow } from 'electron'
 import { readFileSync } from 'node:fs'
 import { homedir, release } from 'node:os'
 import { basename, join } from 'node:path'
@@ -35,6 +35,29 @@ export function settingsSummary(s: AppSettings, triggers: number): string {
   )
 }
 
+/**
+ * Memory and CPU by process: the main process, each window's renderer, the GPU. Working set is
+ * what Task Manager shows as memory; the heap line is the main process's JavaScript alone.
+ */
+export function processMetrics(): string[] {
+  const titles = new Map<number, string>()
+  for (const w of BrowserWindow.getAllWindows()) {
+    if (w.isDestroyed()) continue
+    const url = w.webContents.getURL()
+    const page = url.split('/').pop()?.split('?')[0].replace('.html', '') ?? ''
+    const id = new URL(url || 'file:///').searchParams.get('id')
+    titles.set(w.webContents.getOSProcessId(), id ? `${page} ${id}` : page)
+  }
+  const mb = (kb: number) => `${Math.round(kb / 1024)} MB`
+  const rows = app.getAppMetrics().map((m) => {
+    const what = m.type === 'Tab' ? (titles.get(m.pid) ?? 'window') : m.type === 'Browser' ? 'main' : m.type.toLowerCase()
+    return `  ${what.padEnd(20)} ${mb(m.memory.workingSetSize).padStart(7)}  cpu ${m.cpu.percentCPUUsage.toFixed(1)}%`
+  })
+  const total = app.getAppMetrics().reduce((n, m) => n + m.memory.workingSetSize, 0)
+  const heap = process.memoryUsage()
+  return [`Processes (${mb(total)} in all; main heap ${Math.round(heap.heapUsed / 1048576)} of ${Math.round(heap.heapTotal / 1048576)} MB):`, ...rows]
+}
+
 /** The last `n` lines of the diagnostic log. */
 function logTail(n: number): string {
   try {
@@ -55,6 +78,7 @@ export function diagnostics(ctx: AppContext): string {
     `Watching: ${ctx.engine.status.watching ? 'yes' : 'no'}; spells loaded ${ctx.engine.status.spellsLoaded}${ctx.engine.status.spellError ? ` (${ctx.engine.status.spellError})` : ''}; game ${ctx.watcher.state.gameRunning ? 'running' : 'not running'}`,
     `Update: ${u.state}${'version' in u ? ` ${u.version}` : ''}${u.state === 'error' ? ` (${u.message})` : ''}`
   ]
+  lines.push(...processMetrics())
   if (ctx.store.recovered.length) lines.push(`Set aside at start (unreadable): ${ctx.store.recovered.map((f) => basename(f)).join(', ')}`)
   if (ctx.store.newer.length) lines.push(`Written by a newer version: ${ctx.store.newer.join(', ')}`)
   lines.push('', '--- main.log, last 300 lines ---', logTail(300))
