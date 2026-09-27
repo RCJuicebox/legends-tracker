@@ -77,7 +77,10 @@ export function autoValues(s: StatsSheet, acCaps: AcCaps, primary: string, gear:
 }
 
 /** A typed-over figure, else the filled-in one, else 0. */
-export const valOf = (s: StatsSheet, auto: Auto): Val => (k) => s.overrides[k] ?? auto[k] ?? 0
+export const valOf =
+  (s: StatsSheet, auto: Auto): Val =>
+  (k) =>
+    s.overrides[k] ?? auto[k] ?? 0
 
 export function acInputs(s: StatsSheet, trio: string[], primary: string, val: Val, skill: Skill): AcInputs {
   return {
@@ -124,7 +127,11 @@ export function acReport(i: AcInputs, primary: string) {
   const sum = Math.max(1, r.srv.total)
   const notes: Note[] = []
   if (r.srv.twinkCapped)
-    notes.push(['warn', 'The anti-twink cap is biting.', `Below level 50 the server holds worn AC at 25 + 6 × level = ${num(r.srv.twink)}, cutting ${num(r.disp.eqmath - r.srv.twink)}. Your Inventory window never shows that cut.`])
+    notes.push([
+      'warn',
+      'The anti-twink cap is biting.',
+      `Below level 50 the server holds worn AC at 25 + 6 × level = ${num(r.srv.twink)}, cutting ${num(r.disp.eqmath - r.srv.twink)}. Your Inventory window never shows that cut.`
+    ])
   if (r.shield) notes.push(['good', `Your shield carries ${num(r.shield)} AC.`, 'It lifts the soft cap point for point, so every one of those counts in full.'])
   else notes.push(['tip', 'No shield.', 'A shield raises the soft cap by its own AC, which makes shield AC the best AC in the game.'])
   if (r.over) {
@@ -133,14 +140,17 @@ export function acReport(i: AcInputs, primary: string) {
     notes.push([
       '',
       `One more AC on gear is worth ${g.toFixed(2)} mitigation AC;`,
-      r.shield ? `one more on your shield is worth ${sh.toFixed(2)}, about ${g > 0 ? (sh / g).toFixed(1) : '—'}× as much.` : 'a shield would be worth far more, because its AC lifts the cap as well.'
+      r.shield
+        ? `one more on your shield is worth ${sh.toFixed(2)}, about ${g > 0 ? (sh / g).toFixed(1) : '—'}× as much.`
+        : 'a shield would be worth far more, because its AC lifts the cap as well.'
     ])
     const buff = marginal(i, ['acBuffs'])
     notes.push(['', `An AC buff point is worth ${buff.toFixed(2)}.`, `Buff AC counts a ${r.srv.silk ? 'third' : 'quarter'} before the cap, where gear counts 4/3.`])
   } else notes.push(['good', 'You are under the soft cap.', `${num(r.effCap - r.srv.total)} to go, and every point counts in full until then.`])
   if (r.srv.rc.caps) {
     const c = r.srv.rc.caps
-    if (r.srv.rc.monkPenalty) notes.push(['warn', 'Over the monk weight hard cap.', `Carrying ${num(i.weight)} against a hard cap of ${c.hard} costs you ${num(-r.srv.rc.monk)} AC.`])
+    if (r.srv.rc.monkPenalty)
+      notes.push(['warn', 'Over the monk weight hard cap.', `Carrying ${num(i.weight)} against a hard cap of ${c.hard} costs you ${num(-r.srv.rc.monk)} AC.`])
     else notes.push([r.srv.rc.monk > 0 ? 'good' : '', `Monk weight bonus: ${num(r.srv.rc.monk)} AC.`, `Soft cap ${c.soft}, hard cap ${c.hard}, carrying ${num(i.weight)}.`])
   }
   if (r.srv.rc.cls) notes.push(['good', `Agility bonus: ${num(r.srv.rc.cls)} AC.`, `From level ${i.level} at ${num(i.agility)} agility.`])
@@ -208,12 +218,21 @@ export function combatReport(s: StatsSheet, val: Val, trio: string[], caps: Caps
   const melee = trio.some((c) => MELEE_CLASSES.includes(c))
 
   const notes: Note[] = [
-    ['good', `Attack line: ${num(offense)} / ${num(acc)}.`, `Offense is your ${weaponName} skill (${num(wsk)}) plus ${num(strengthOffense(s.strength))} from strength. Accuracy is Offense skill + weapon skill + 17, times 1.21. Both are EQEmu's formulas and match the stats window exactly.`],
-    ['good', `${swings.toFixed(3)} swings a round.`, "EQEmu's attack rounds: double attack over 500, triple attack as skill ÷ (skill + 800) after a double, dual wield over 375. Hour-long parses on the test dummies matched it to within 0.01."]
+    [
+      'good',
+      `Attack line: ${num(offense)} / ${num(acc)}.`,
+      `Offense is your ${weaponName} skill (${num(wsk)}) plus ${num(strengthOffense(s.strength))} from strength. Accuracy is Offense skill + weapon skill + 17, times 1.21. Both are EQEmu's formulas and match the stats window exactly.`
+    ],
+    [
+      'good',
+      `${swings.toFixed(3)} swings a round.`,
+      "EQEmu's attack rounds: double attack over 500, triple attack as skill ÷ (skill + 800) after a double, dual wield over 375. Hour-long parses on the test dummies matched it to within 0.01."
+    ]
   ]
   if (val('attackAA') || s.itemATK)
     notes.push(['', 'ATK does not show in the window.', `Your ${num(val('attackAA') + s.itemATK)} ATK from AAs and gear is left out of Offense, as the window leaves it out.`])
-  if (s.measuredCrit > 0) notes.push(['good', 'Using your measured crit rate.', `The classic model gives ${pct(classic.p)} for this character, which parses contradict. The measurement wins.`])
+  if (s.measuredCrit > 0)
+    notes.push(['good', 'Using your measured crit rate.', `The classic model gives ${pct(classic.p)} for this character, which parses contradict. The measurement wins.`])
   notes.push([
     'warn',
     'The classic crit model does not hold on EverQuest Legends.',

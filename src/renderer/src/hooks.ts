@@ -20,11 +20,7 @@ export interface Invoked<T> {
  * the newest call's answer is kept: a slow reply to an older call never overwrites a newer one. A
  * failed call keeps what was there and says why. A null channel asks nothing (not ready yet).
  */
-export function useInvoke<K extends InvokeChannel>(
-  channel: K | null,
-  args?: Parameters<Invokes[K]>,
-  deps: unknown[] = []
-): Invoked<InvokeResult<K>> {
+export function useInvoke<K extends InvokeChannel>(channel: K | null, args?: Parameters<Invokes[K]>, deps: unknown[] = []): Invoked<InvokeResult<K>> {
   type T = InvokeResult<K>
   const [data, setDataState] = useState<T | null>(null)
   const [error, setError] = useState('')

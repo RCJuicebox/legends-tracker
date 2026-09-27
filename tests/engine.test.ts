@@ -80,7 +80,22 @@ function makeEngine(o: { logFile: string; motes?: MoteState; stock?: MoteStock }
   const engine = new Engine(
     store,
     { synthesize: async () => Buffer.alloc(0) },
-    { timers: noop, alert: noop, audio: noop, status: noop, feed: (i) => feed.push(i), archive: noop, motes: noop, moteScan: noop, stock: noop, combat: noop, loot: noop, respawns: noop, pet: noop, buffs: noop },
+    {
+      timers: noop,
+      alert: noop,
+      audio: noop,
+      status: noop,
+      feed: (i) => feed.push(i),
+      archive: noop,
+      motes: noop,
+      moteScan: noop,
+      stock: noop,
+      combat: noop,
+      loot: noop,
+      respawns: noop,
+      pet: noop,
+      buffs: noop
+    },
     env
   )
   engines.push(engine)
@@ -90,8 +105,21 @@ function makeEngine(o: { logFile: string; motes?: MoteState; stock?: MoteStock }
 function timer(key: string): BoardTimer {
   const now = Date.now()
   return {
-    key, id: key, label: 'Envenomed Bolt', target: 'a ratman', source: 'spell', color: '#fff', overlay: 'targets',
-    startedAt: now, endsAt: now + 60_000, exact: false, warnSec: 12, onWarn: [], onExpire: [], warned: false, graceMs: 0
+    key,
+    id: key,
+    label: 'Envenomed Bolt',
+    target: 'a ratman',
+    source: 'spell',
+    color: '#fff',
+    overlay: 'targets',
+    startedAt: now,
+    endsAt: now + 60_000,
+    exact: false,
+    warnSec: 12,
+    onWarn: [],
+    onExpire: [],
+    warned: false,
+    graceMs: 0
   } as BoardTimer
 }
 
@@ -125,7 +153,9 @@ describe('Engine', () => {
     const before = JSON.stringify(engine.motes.state)
     const stock = JSON.stringify(store.stock.get())
     engine.simulate(
-      '[Thu Sep 24 16:00:00 2026] You have entered The Plane of Fear 4 (Refined).\n' + LOOT('Thu Sep 24 16:23:16 2026') + '[Thu Sep 24 16:24:00 2026] You have completed the Dungeon Crawl!'
+      '[Thu Sep 24 16:00:00 2026] You have entered The Plane of Fear 4 (Refined).\n' +
+        LOOT('Thu Sep 24 16:23:16 2026') +
+        '[Thu Sep 24 16:24:00 2026] You have completed the Dungeon Crawl!'
     )
     expect(JSON.stringify(engine.motes.state)).toBe(before)
     expect(JSON.stringify(store.stock.get())).toBe(stock)
@@ -212,16 +242,35 @@ describe('Engine', () => {
     )
     await fs.writeFile(
       join(logs, 'eqlog_Beta_srv.txt'),
-      ["[Thu Sep 24 11:00:00 2026] You have entered Nagafen's Lair 3 (Refined).", LOOT('Thu Sep 24 11:05:00 2026', 1).trimEnd(), '[Thu Sep 24 11:10:00 2026] You have completed the Dungeon Crawl!'].join('\r\n')
+      [
+        "[Thu Sep 24 11:00:00 2026] You have entered Nagafen's Lair 3 (Refined).",
+        LOOT('Thu Sep 24 11:05:00 2026', 1).trimEnd(),
+        '[Thu Sep 24 11:10:00 2026] You have completed the Dungeon Crawl!'
+      ].join('\r\n')
     )
     await fs.mkdir(join(logs, 'archive'))
     await fs.writeFile(join(logs, 'archive', 'eqlog_Beta_srv_2026-09-02_to_2026-09-02.txt'), LOOT('Wed Sep  2 09:00:00 2026', 2, 'Minor'))
 
     const old: MoteSession = {
-      id: 'crawl-1', kind: 'crawl', name: 'Old Zone 3 (Refined)', startedAt: new Date(2026, 8, 1, 9).getTime(), endedAt: new Date(2026, 8, 1, 10).getTime(),
-      outcome: 'completed', motes: { minor: 3 }, outsideSince: null, outsideMs: 0
+      id: 'crawl-1',
+      kind: 'crawl',
+      name: 'Old Zone 3 (Refined)',
+      startedAt: new Date(2026, 8, 1, 9).getTime(),
+      endedAt: new Date(2026, 8, 1, 10).getTime(),
+      outcome: 'completed',
+      motes: { minor: 3 },
+      outsideSince: null,
+      outsideMs: 0
     }
-    const manual: MoteSession = { ...old, id: 'manual-1', kind: 'manual', name: 'Manual session', startedAt: new Date(2026, 8, 24, 10, 1).getTime(), endedAt: new Date(2026, 8, 24, 10, 2).getTime(), outcome: 'stopped' }
+    const manual: MoteSession = {
+      ...old,
+      id: 'manual-1',
+      kind: 'manual',
+      name: 'Manual session',
+      startedAt: new Date(2026, 8, 24, 10, 1).getTime(),
+      endedAt: new Date(2026, 8, 24, 10, 2).getTime(),
+      outcome: 'stopped'
+    }
     const current: MoteState = {
       active: null,
       sessions: [old, manual],

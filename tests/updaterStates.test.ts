@@ -126,7 +126,13 @@ describe('the updater in an installed copy', () => {
   it('is ready to install once downloaded, with notes from a list of versions', () => {
     const { u, seen } = packaged()
     emit('update-available', { version: '2.0.0' })
-    emit('update-downloaded', { version: '2.0.0', releaseNotes: [{ version: '2.0.0', note: '<ul><li>One</li><li>Two</li></ul>' }, { version: '1.9.0', note: 'Older' }] })
+    emit('update-downloaded', {
+      version: '2.0.0',
+      releaseNotes: [
+        { version: '2.0.0', note: '<ul><li>One</li><li>Two</li></ul>' },
+        { version: '1.9.0', note: 'Older' }
+      ]
+    })
     expect(u.status).toEqual({ state: 'ready', version: '2.0.0', notes: '- One\n- Two\n\nOlder' })
     expect(seen.map((s) => s.state)).toEqual(['downloading', 'ready'])
   })

@@ -83,8 +83,18 @@ const LEVEL_MAX = 255
 function focusSource(v: unknown): FocusSource | null {
   if (!isObj(v) || typeof v.id !== 'string' || !v.id) return null
   const fb: FocusSource = {
-    id: v.id, name: '', kind: 'item', from: '', pct: 0, appliesTo: 'both', maxLevel: 0, decayPct: 0, minTicks: 0,
-    requireSpas: [], excludeSpas: [], enabled: true
+    id: v.id,
+    name: '',
+    kind: 'item',
+    from: '',
+    pct: 0,
+    appliesTo: 'both',
+    maxLevel: 0,
+    decayPct: 0,
+    minTicks: 0,
+    requireSpas: [],
+    excludeSpas: [],
+    enabled: true
   }
   return shape(v, fb, {
     name: str(v.name, ''),
@@ -141,7 +151,17 @@ export function meterOptions(v: unknown, fb: MeterOverlayOptions | undefined): M
 function overlay(v: unknown, fb: OverlayConfig | undefined): OverlayConfig | null {
   if (!isObj(v) || typeof v.id !== 'string' || !v.id) return null
   const base: OverlayConfig = fb ?? {
-    id: v.id, name: v.id, kind: 'timers', x: 100, y: 100, width: 340, height: 420, opacity: 1, fontSize: 15, visible: true, groupByTarget: true
+    id: v.id,
+    name: v.id,
+    kind: 'timers',
+    x: 100,
+    y: 100,
+    width: 340,
+    height: 420,
+    opacity: 1,
+    fontSize: 15,
+    visible: true,
+    groupByTarget: true
   }
   const kind = oneOf(v.kind, ['timers', 'alerts', 'meter'] as const, base.kind)
   const meter = kind === 'meter' ? (meterOptions(v.meter, base.meter) ?? { ...DEFAULT_METER_OPTIONS }) : undefined
@@ -222,7 +242,10 @@ export function sanitizeSettings(v: unknown, fb: AppSettings): AppSettings | nul
     const seen = new Set<string>()
     overlays = []
     for (const o of v.overlays) {
-      const clean = overlay(o, fb.overlays.find((x) => isObj(o) && x.id === o.id))
+      const clean = overlay(
+        o,
+        fb.overlays.find((x) => isObj(o) && x.id === o.id)
+      )
       if (!clean || seen.has(clean.id)) continue
       seen.add(clean.id)
       overlays.push(clean)

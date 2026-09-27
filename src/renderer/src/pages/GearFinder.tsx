@@ -30,7 +30,25 @@ function eraTip(era: string): string {
 export function GearFinder({ view, sheet, mode, onPlan }: { view: InventoryView; sheet: CharacterSheet | null; mode: GearMode; onPlan?: () => void }) {
   const g = useGearModel(view, sheet, mode)
   const { catalog, model, results, stats, classes, level, role, conv, acState, overCap, secondaryInUse, twoHanders, eraCounts, fociOf, lines, wanted, points, setPoints } = g
-  const { ratioFirst, setRatioFirst, preset, setPreset, setCustom, twoHandMode, setTwoHandMode, compare, setCompare, hiddenEras, setHiddenEras, slot, setSlot, capMode, setCapMode, judge, setJudge } = g.controls
+  const {
+    ratioFirst,
+    setRatioFirst,
+    preset,
+    setPreset,
+    setCustom,
+    twoHandMode,
+    setTwoHandMode,
+    compare,
+    setCompare,
+    hiddenEras,
+    setHiddenEras,
+    slot,
+    setSlot,
+    capMode,
+    setCapMode,
+    judge,
+    setJudge
+  } = g.controls
   const [showWeights, setShowWeights] = useState(false)
   const state = catalog.state
   const refresh = catalog.refresh
@@ -46,8 +64,8 @@ export function GearFinder({ view, sheet, mode, onPlan }: { view: InventoryView;
       <div className="card stack gap-12 lt-finder-intro">
         <h2 style={{ margin: 0 }}>Item catalog</h2>
         <p className="muted" style={{ margin: 0 }}>
-          The upgrade finder, the focus effects and the optimizer read every piece of equipment on eqlwiki.com: what your classes, race and level can use, and what focus
-          effects it carries. That needs the wiki's item catalog first: about a minute to download, once a week, kept on this PC.
+          The upgrade finder, the focus effects and the optimizer read every piece of equipment on eqlwiki.com: what your classes, race and level can use, and what focus effects it
+          carries. That needs the wiki's item catalog first: about a minute to download, once a week, kept on this PC.
         </p>
         {p.busy ? (
           <Progress p={p} />
@@ -68,7 +86,11 @@ export function GearFinder({ view, sheet, mode, onPlan }: { view: InventoryView;
   }
 
   if (mode === 'pet')
-    return classes.length ? <PetTab m={model} /> : <div className="card empty">Set your classes and level on the Stats page, and the pet tools will know what your pet can wear.</div>
+    return classes.length ? (
+      <PetTab m={model} />
+    ) : (
+      <div className="card empty">Set your classes and level on the Stats page, and the pet tools will know what your pet can wear.</div>
+    )
 
   const shown = (results ?? []).filter((r) => slot === 'all' || r.slot === slot)
   const withUpgrades = shown.filter((r) => r.candidates.length)
@@ -103,10 +125,20 @@ export function GearFinder({ view, sheet, mode, onPlan }: { view: InventoryView;
               <>
                 <b>Compare</b>
                 <span className="lt-seg" role="group" aria-label="Compare">
-                  <button className={compare === 'drop' ? 'on' : ''} aria-pressed={compare === 'drop'} onClick={() => setCompare('drop')} title="Candidates as they drop, at +0, against your gear at its merge level">
+                  <button
+                    className={compare === 'drop' ? 'on' : ''}
+                    aria-pressed={compare === 'drop'}
+                    onClick={() => setCompare('drop')}
+                    title="Candidates as they drop, at +0, against your gear at its merge level"
+                  >
                     As they drop
                   </button>
-                  <button className={compare === 'level' ? 'on' : ''} aria-pressed={compare === 'level'} onClick={() => setCompare('level')} title="Candidates merged to the same level as the item they would replace">
+                  <button
+                    className={compare === 'level' ? 'on' : ''}
+                    aria-pressed={compare === 'level'}
+                    onClick={() => setCompare('level')}
+                    title="Candidates merged to the same level as the item they would replace"
+                  >
                     At your merge level
                   </button>
                 </span>
@@ -120,10 +152,20 @@ export function GearFinder({ view, sheet, mode, onPlan }: { view: InventoryView;
               <>
                 <b>Judge</b>
                 <span className="lt-seg" role="group" aria-label="Judge">
-                  <button className={judge === 'round' ? 'on' : ''} aria-pressed={judge === 'round'} onClick={() => setJudge('round')} title="Everything you own rearranged around the candidate: the item it pushes out may go to an Any slot and keep its focus">
+                  <button
+                    className={judge === 'round' ? 'on' : ''}
+                    aria-pressed={judge === 'round'}
+                    onClick={() => setJudge('round')}
+                    title="Everything you own rearranged around the candidate: the item it pushes out may go to an Any slot and keep its focus"
+                  >
                     In the round
                   </button>
-                  <button className={judge === 'slot' ? 'on' : ''} aria-pressed={judge === 'slot'} onClick={() => setJudge('slot')} title="One slot, one item out: quicker, and blind to where the displaced item could go">
+                  <button
+                    className={judge === 'slot' ? 'on' : ''}
+                    aria-pressed={judge === 'slot'}
+                    onClick={() => setJudge('slot')}
+                    title="One slot, one item out: quicker, and blind to where the displaced item could go"
+                  >
                     This slot only
                   </button>
                 </span>
@@ -190,9 +232,7 @@ export function GearFinder({ view, sheet, mode, onPlan }: { view: InventoryView;
                 ))}
               </span>
               <span className="muted">
-                {overCap
-                  ? `AC counts at ${AC_OVER_CAP * 100}% of its weight: past the soft cap most of it is lost.`
-                  : 'AC counts in full: you are under the soft cap.'}
+                {overCap ? `AC counts at ${AC_OVER_CAP * 100}% of its weight: past the soft cap most of it is lost.` : 'AC counts in full: you are under the soft cap.'}
                 {acState && capMode === 'auto' && ` Mitigation ${num(acState.mitigation)} against a soft cap of ${num(acState.cap)}, from ${acState.from}.`}
               </span>
             </div>
@@ -211,9 +251,7 @@ export function GearFinder({ view, sheet, mode, onPlan }: { view: InventoryView;
                   </button>
                 ))}
               </span>
-              <span className="muted">
-                {twoHanders ? 'Two-handed weapons are suggested for Primary.' : 'Two-handed weapons are left out: your secondary hand is in use.'}
-              </span>
+              <span className="muted">{twoHanders ? 'Two-handed weapons are suggested for Primary.' : 'Two-handed weapons are left out: your secondary hand is in use.'}</span>
             </div>
             <FocusPoints points={points} setPoints={setPoints} wanted={wanted.size} lines={lines.length} />
             <div className="small muted lt-worth">
@@ -224,8 +262,8 @@ export function GearFinder({ view, sheet, mode, onPlan }: { view: InventoryView;
                   title={`Swings a round: ${g.hands.swings.main.toFixed(2)} main hand, ${g.hands.swings.off.toFixed(2)} off hand. Dual wield ${Math.round(g.hands.dual * 100)}% = (Dual Wield ${g.hands.dualWield} + level ${g.level}${g.hands.ambidexterity ? ` + Ambidexterity ${g.hands.ambidexterity}` : ''}) ÷ 375; the off hand doubles with Double Attack ${g.hands.doubleAttack}${g.hands.doubleAttack < 150 ? ' only from 150' : ''}. EQEmu's attack rounds, as on the Stats page, with your skills from the log.`}
                 >
                   {' '}
-                  · the off hand swings {Math.round((g.hands.swings.off / g.hands.swings.main) * 100)}% as often as the main hand, so a weapon counts{' '}
-                  {g.hands.main.toFixed(2)}× in Primary and {g.hands.off.toFixed(2)}× in Secondary
+                  · the off hand swings {Math.round((g.hands.swings.off / g.hands.swings.main) * 100)}% as often as the main hand, so a weapon counts {g.hands.main.toFixed(2)}× in
+                  Primary and {g.hands.off.toFixed(2)}× in Secondary
                 </span>
               ) : (
                 ' · weapons count alike in both hands (no Dual Wield skill in your log yet)'
@@ -312,7 +350,11 @@ export function GearFinder({ view, sheet, mode, onPlan }: { view: InventoryView;
                       {r.current.focusLoss > 0 && (
                         <span title="What its focus effects add, by your focus weighting: a candidate without them has to make up for it">
                           {' '}
-                          + {num(r.current.focusLoss)} focus ({fociOf(r.current.item).map((f) => f.name).join(', ')})
+                          + {num(r.current.focusLoss)} focus (
+                          {fociOf(r.current.item)
+                            .map((f) => f.name)
+                            .join(', ')}
+                          )
                         </span>
                       )}
                       {(r.current.effectLoss ?? 0) > 0 && (
@@ -413,12 +455,12 @@ export function GearFinder({ view, sheet, mode, onPlan }: { view: InventoryView;
             </p>
           )}
           <p className="faint small">
-            Weights are on outcomes (HP, mana, AC, avoidance, Offense, haste…); a raw stat counts for what it buys you, worked out from your classes, level, current stats
-            and AAs, the same formulas the Stats page checks against the game. Focus effects you want (Focus effects tab) count too: a candidate that brings a better one
-            gains, and replacing an item loses what its focus and exaltations gave. Worn effects and procs count as what they add to your melee and,
-            for worn effects, the stats they give (Worn effects and Procs tabs). Your two Any slots take any piece of gear. Scores only rank items against each other. The
-            wiki holds base stats, so a candidate "as it drops" is at +0 while your gear counts at its merge level; switch to "At your merge level" to compare like with like.
-            In era and out of era follow eqlwiki's own list; an item with no era on its page takes the era of the zones it drops in. Item data from eqlwiki.com.
+            Weights are on outcomes (HP, mana, AC, avoidance, Offense, haste…); a raw stat counts for what it buys you, worked out from your classes, level, current stats and AAs,
+            the same formulas the Stats page checks against the game. Focus effects you want (Focus effects tab) count too: a candidate that brings a better one gains, and
+            replacing an item loses what its focus and exaltations gave. Worn effects and procs count as what they add to your melee and, for worn effects, the stats they give
+            (Worn effects and Procs tabs). Your two Any slots take any piece of gear. Scores only rank items against each other. The wiki holds base stats, so a candidate "as it
+            drops" is at +0 while your gear counts at its merge level; switch to "At your merge level" to compare like with like. In era and out of era follow eqlwiki's own list;
+            an item with no era on its page takes the era of the zones it drops in. Item data from eqlwiki.com.
           </p>
         </>
       )}
@@ -431,7 +473,15 @@ function FocusPoints({ points, setPoints, wanted, lines }: { points: number; set
     <div className="row small">
       <b>Focus effects</b>
       <span className="muted">making every spell you cast 10% better is worth</span>
-      <input type="number" min={0} step={25} value={points} style={{ width: 72 }} aria-label="Points for making every spell 10% better" onChange={(e) => setPoints(Math.max(0, Number(e.target.value) || 0))} />
+      <input
+        type="number"
+        min={0}
+        step={25}
+        value={points}
+        style={{ width: 72 }}
+        aria-label="Points for making every spell 10% better"
+        onChange={(e) => setPoints(Math.max(0, Number(e.target.value) || 0))}
+      />
       <span className="muted">
         points; a focus counts for the spells it touches, by how often you cast them. {wanted} of the {lines} that touch your spells are wanted (Focus effects tab).
       </span>

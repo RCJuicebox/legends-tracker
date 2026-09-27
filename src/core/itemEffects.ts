@@ -76,9 +76,23 @@ export function itemEffects(item: InvItem, effectsOf: (name: string) => { worn: 
 
 const signed = (v: number) => `${v < 0 ? '−' : '+'}${Math.abs(v)}`
 const SIMPLE: Record<number, string> = {
-  12: 'invisibility', 13: 'see invisible', 14: 'breathe underwater', 20: 'blindness', 21: 'stun', 22: 'charm', 23: 'fear', 31: 'mesmerize',
-  35: 'disease counters', 36: 'poison counters', 40: 'invulnerability', 57: 'levitation', 65: 'infravision', 66: 'ultravision', 99: 'root',
-  116: 'curse counters', 457: 'returns some of the damage as health'
+  12: 'invisibility',
+  13: 'see invisible',
+  14: 'breathe underwater',
+  20: 'blindness',
+  21: 'stun',
+  22: 'charm',
+  23: 'fear',
+  31: 'mesmerize',
+  35: 'disease counters',
+  36: 'poison counters',
+  40: 'invulnerability',
+  57: 'levitation',
+  65: 'infravision',
+  66: 'ultravision',
+  99: 'root',
+  116: 'curse counters',
+  457: 'returns some of the damage as health'
 }
 
 /** What one effect of a spell does, in a few words, at the character's level; '' for a slot left blank. */
@@ -87,17 +101,28 @@ export function spaWords(e: SpellEffect, level: number): string {
   if (STAT_SPA[e.spa]) return v ? `${STAT_SPA[e.spa]} ${signed(v)}` : ''
   if (RESIST_SPA[e.spa]) return v ? `${RESIST_SPA[e.spa].toLowerCase()} resist ${signed(v)}` : ''
   switch (e.spa) {
-    case 0: return v > 0 ? `HP ${signed(v)} a tick` : `${-v} damage`
-    case 1: return `AC ${signed(v)}`
-    case 2: return `attack ${signed(v)}`
-    case 3: return `movement ${signed(v)}%`
-    case 11: return v > 100 ? `haste ${v - 100}%` : `slows ${100 - v}%`
-    case 15: return `mana ${signed(v)} a tick`
-    case 55: return `rune of ${v}`
-    case 59: return `damage shield ${Math.abs(v)}`
-    case 69: return `max HP ${signed(v)}`
-    case 97: return `max mana ${signed(v)}`
-    case 254: return ''
+    case 0:
+      return v > 0 ? `HP ${signed(v)} a tick` : `${-v} damage`
+    case 1:
+      return `AC ${signed(v)}`
+    case 2:
+      return `attack ${signed(v)}`
+    case 3:
+      return `movement ${signed(v)}%`
+    case 11:
+      return v > 100 ? `haste ${v - 100}%` : `slows ${100 - v}%`
+    case 15:
+      return `mana ${signed(v)} a tick`
+    case 55:
+      return `rune of ${v}`
+    case 59:
+      return `damage shield ${Math.abs(v)}`
+    case 69:
+      return `max HP ${signed(v)}`
+    case 97:
+      return `max mana ${signed(v)}`
+    case 254:
+      return ''
   }
   return SIMPLE[e.spa] ?? `spell effect ${e.spa}`
 }

@@ -8,11 +8,37 @@ import { baseAccuracy, OFFENSE, windowOffense } from '../../../core/combatModel'
 import type { WornTotals } from '../../../core/inventory'
 import type { SetSheet } from './statsBits'
 
-const HEROIC = ['Accuracy', 'Avoidance', 'Combat Effects', 'Damage Shielding', 'Damage Shield Mitigation', 'DoT Shielding', 'Melee Shielding', 'Spell Shielding', 'Strike Through', 'Stun Resist']
+const HEROIC = [
+  'Accuracy',
+  'Avoidance',
+  'Combat Effects',
+  'Damage Shielding',
+  'Damage Shield Mitigation',
+  'DoT Shielding',
+  'Melee Shielding',
+  'Spell Shielding',
+  'Strike Through',
+  'Stun Resist'
+]
 const SPELL_MODS = ['Heal Amount', 'Spell Damage', 'Clairvoyance', 'Luck']
 const SKILL_MODS = ['Bash', 'Backstab', 'Dragon Punch', 'Eagle Strike', 'Flying Kick', 'Frenzy', 'Kick', 'Round Kick', 'Tiger Claw']
-const STATS: [string, string][] = [['Strength', 'STR'], ['Stamina', 'STA'], ['Intelligence', 'INT'], ['Wisdom', 'WIS'], ['Agility', 'AGI'], ['Dexterity', 'DEX'], ['Charisma', 'CHA']]
-const RESISTS: [string, string][] = [['Magic', 'MAGIC'], ['Fire', 'FIRE'], ['Cold', 'COLD'], ['Disease', 'DISEASE'], ['Poison', 'POISON'], ['Void', 'VOID']]
+const STATS: [string, string][] = [
+  ['Strength', 'STR'],
+  ['Stamina', 'STA'],
+  ['Intelligence', 'INT'],
+  ['Wisdom', 'WIS'],
+  ['Agility', 'AGI'],
+  ['Dexterity', 'DEX'],
+  ['Charisma', 'CHA']
+]
+const RESISTS: [string, string][] = [
+  ['Magic', 'MAGIC'],
+  ['Fire', 'FIRE'],
+  ['Cold', 'COLD'],
+  ['Disease', 'DISEASE'],
+  ['Poison', 'POISON'],
+  ['Void', 'VOID']
+]
 
 /**
  * The in-game Inventory window's Stats tab, read off the screen, with what the tracker predicts
@@ -186,8 +212,8 @@ export function CharacterTab({
         </div>
       )}
       <p className="faint small">
-        Read with Windows&apos; own text recognition from a picture of your screen; nothing touches the game. A dash is a line it could not read. The notes beside each figure
-        are what the AC and Combat tabs work out from your current inputs (a tick when they agree with the game) and what your worn gear adds.
+        Read with Windows&apos; own text recognition from a picture of your screen; nothing touches the game. A dash is a line it could not read. The notes beside each figure are
+        what the AC and Combat tabs work out from your current inputs (a tick when they agree with the game) and what your worn gear adds.
       </p>
     </div>
   )

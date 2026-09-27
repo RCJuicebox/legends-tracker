@@ -31,7 +31,7 @@ export type AppState = Omit<WireState, 'feed'> & { feed: FeedEntry[] }
 export const iconUrl = (n?: number) => (n === undefined || n < 0 ? '' : `eqicon://icon/${n}`)
 
 const ROMAN = ['', 'I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X', 'XI', 'XII', 'XIII', 'XIV', 'XV']
-export const roman = (n?: number) => (n ? ROMAN[n] ?? String(n) : '')
+export const roman = (n?: number) => (n ? (ROMAN[n] ?? String(n)) : '')
 
 export function clock(sec: number): string {
   if (!Number.isFinite(sec)) return '∞'

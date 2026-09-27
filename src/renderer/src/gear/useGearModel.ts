@@ -105,11 +105,44 @@ export function useGearModel(view: InventoryView, sheet: CharacterSheet | null, 
     useFocusModel({ view, items, classes, level, zones, eraStatus, wearer, owned, pieces, fociOf, shownEras })
   const effects = useEffectsModel({ view, items, effectsOfItem, days, sheetStats: stats, pieces, level, weights })
   const catalogPieces = useCatalogPieces({
-    mode, items, shownEras, owned, zones, eraStatus, wearer, twoHanders, effectsOfItem, valueOf, effects, weights, compare, inv, weaponHands
+    mode,
+    items,
+    shownEras,
+    owned,
+    zones,
+    eraStatus,
+    wearer,
+    twoHanders,
+    effectsOfItem,
+    valueOf,
+    effects,
+    weights,
+    compare,
+    inv,
+    weaponHands
   })
   const finder = useFinderResults({
-    mode, classes, items, wearer, weights, compare, hiddenEras, inv, view, owned, twoHanders, worth, fociOf, valueOf, eraStatus, pieces, exaltations, judge, effects,
-    effectsOfItem, weaponHands
+    mode,
+    classes,
+    items,
+    wearer,
+    weights,
+    compare,
+    hiddenEras,
+    inv,
+    view,
+    owned,
+    twoHanders,
+    worth,
+    fociOf,
+    valueOf,
+    eraStatus,
+    pieces,
+    exaltations,
+    judge,
+    effects,
+    effectsOfItem,
+    weaponHands
   })
 
   const model: GearModel | null = state?.file

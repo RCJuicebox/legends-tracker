@@ -12,7 +12,12 @@ describe('release notes from GitHub', () => {
   })
 
   it('join a list of versions, and are absent when empty', () => {
-    expect(notesText([{ version: '1.2', note: '<p>a</p>' }, { version: '1.1', note: null }])).toBe('a')
+    expect(
+      notesText([
+        { version: '1.2', note: '<p>a</p>' },
+        { version: '1.1', note: null }
+      ])
+    ).toBe('a')
     expect(notesText('')).toBeUndefined()
     expect(notesText(null)).toBeUndefined()
   })

@@ -2,16 +2,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { promises as fs } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import {
-  addProgressLine,
-  emptyProgress,
-  joinProgress,
-  parseProgressLine,
-  progressionView,
-  RATE_MIN_MS,
-  SESSION_GAP_MS,
-  type ProgressTally
-} from '../src/core/progression'
+import { addProgressLine, emptyProgress, joinProgress, parseProgressLine, progressionView, RATE_MIN_MS, SESSION_GAP_MS, type ProgressTally } from '../src/core/progression'
 import { progressionConsumer, ProgressionHistory } from '../src/main/progression'
 import { factionConsumer } from '../src/main/factions'
 import { LogHistory } from '../src/main/sources/logHistory'
@@ -70,7 +61,9 @@ describe('parseProgressLine', () => {
   })
 
   it('reads the two AA cap lines', () => {
-    expect(parseProgressLine('You have reached the AA point cap, and cannot gain any further experience until some of your stored AA point pool is used.')).toEqual({ kind: 'aaCap' })
+    expect(parseProgressLine('You have reached the AA point cap, and cannot gain any further experience until some of your stored AA point pool is used.')).toEqual({
+      kind: 'aaCap'
+    })
     expect(parseProgressLine('You must spend some of your ability points. You will no longer gain ability points.')).toEqual({ kind: 'aaCap' })
   })
 
@@ -85,7 +78,7 @@ describe('parseProgressLine', () => {
 })
 
 describe('progress tallies', () => {
-  it('keeps each skill\'s last value, how many ups and when', () => {
+  it("keeps each skill's last value, how many ups and when", () => {
     const t = tally(seconds([skill('Dual Wield', 150), skill('Offense', 20), skill('Dual Wield', 151), skill('dual wield', 152)]))
     expect(t.skills['dual wield']).toEqual({ name: 'dual wield', value: 152, ups: 3, first: T0, last: T0 + 3000 })
     expect(t.skills['offense']).toMatchObject({ value: 20, ups: 1 })
@@ -116,7 +109,19 @@ describe('progress tallies', () => {
     ])
     expect(t.sessions).toHaveLength(2)
     expect(t.sessions[0]).toEqual({
-      start: T0, end: T0 + 49 * MIN, solo: 2, party: 1, reward: 0, pctLines: 2, pct: 1.75, noXp: 0, aaPoints: 1, aaBought: 0, aaSpent: 0, levels: 1, skillUps: 1
+      start: T0,
+      end: T0 + 49 * MIN,
+      solo: 2,
+      party: 1,
+      reward: 0,
+      pctLines: 2,
+      pct: 1.75,
+      noXp: 0,
+      aaPoints: 1,
+      aaBought: 0,
+      aaSpent: 0,
+      levels: 1,
+      skillUps: 1
     })
     expect(t.sessions[1]).toMatchObject({ start: T0 + 49 * MIN + SESSION_GAP_MS, solo: 0, reward: 1, aaBought: 1, aaSpent: 6, levels: 0 })
   })
@@ -201,7 +206,13 @@ describe('progressionView', () => {
     expect(progressionView(t, T0).points).toEqual({ total: 13, at: T0, spentSince: 10, unspent: 3, atCap: false })
     const full = tally(seconds([point(40), 'You have reached the AA point cap, and cannot gain any further experience until some of your stored AA point pool is used.']))
     expect(progressionView(full, T0).points).toMatchObject({ unspent: 40, atCap: true })
-    const spent = tally(seconds(['You have reached the AA point cap, and cannot gain any further experience until some of your stored AA point pool is used.', point(40), improved('Offense Mastery', 1, 5)]))
+    const spent = tally(
+      seconds([
+        'You have reached the AA point cap, and cannot gain any further experience until some of your stored AA point pool is used.',
+        point(40),
+        improved('Offense Mastery', 1, 5)
+      ])
+    )
     expect(progressionView(spent, T0).points).toMatchObject({ unspent: 35, atCap: false })
     expect(progressionView(tally(seconds([XP])), T0).points).toBeNull()
   })

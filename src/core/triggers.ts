@@ -179,10 +179,14 @@ export function testTrigger(trigger: Trigger, line: string, character: string): 
       const outputs = trigger.actions.map((a) => {
         const r = (s: string) => renderTemplate(s, captures, character, text)
         switch (a.type) {
-          case 'speak': return `Speak: "${r(a.text)}"`
-          case 'sound': return `Play: ${a.file}`
-          case 'text': return `Show: "${r(a.text)}"`
-          case 'timer': return `Timer: "${r(a.name) || trigger.name}" for ${a.durationSec}s`
+          case 'speak':
+            return `Speak: "${r(a.text)}"`
+          case 'sound':
+            return `Play: ${a.file}`
+          case 'text':
+            return `Show: "${r(a.text)}"`
+          case 'timer':
+            return `Timer: "${r(a.name) || trigger.name}" for ${a.durationSec}s`
         }
       })
       return { matched: true, phraseIndex: i, captures, outputs, error: '' }

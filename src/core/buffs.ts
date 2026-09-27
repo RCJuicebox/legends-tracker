@@ -42,7 +42,10 @@ const RE_WHO = /^\[(\d+) ([A-Z]{3}(?:\/[A-Z]{3}){0,2})\] (\S+) \(([^)]+)\)/
 export function parseWho(text: string, at: number): Person | null {
   const m = RE_WHO.exec(text)
   if (!m) return null
-  const classes = m[2].split('/').map((c) => c.toLowerCase()).filter((c) => c in CLASS_NUMBER)
+  const classes = m[2]
+    .split('/')
+    .map((c) => c.toLowerCase())
+    .filter((c) => c in CLASS_NUMBER)
   if (!classes.length) return null
   return { name: m[3], classes, level: Number(m[1]), race: m[4], at }
 }
@@ -77,7 +80,6 @@ export interface BuffEffect {
   /** The spell file's figure where it reads as one ("HP 800", "haste 70%"); '' where it does not. */
   value: string
 }
-
 
 /** What a proc buff (SPA 85) or a permanent utility buff does: the spell it procs, by id. */
 const PERMANENT_ONLY: Record<number, string> = { 14: 'enduring breath', 57: 'levitate', 58: 'illusion', 184: 'accuracy' }
@@ -141,9 +143,34 @@ export interface BuffOffer {
  * for the HP it brings, charisma nothing. Haste and spell haste are per percent, regen per point a tick.
  */
 export const VALUE_PER_POINT: Record<number, number> = {
-  69: 1, 1: 2, 4: 1, 5: 1, 6: 1, 7: 1.5, 8: 1, 9: 1, 10: 0, 2: 1,
-  11: 20, 98: 20, 119: 20, 127: 30, 15: 30, 0: 10, 121: 10, 59: 5, 55: 0.5, 161: 0.5, 162: 0.5, 97: 1,
-  46: 0.5, 47: 0.5, 48: 0.5, 49: 0.5, 50: 0.5, 3: 1
+  69: 1,
+  1: 2,
+  4: 1,
+  5: 1,
+  6: 1,
+  7: 1.5,
+  8: 1,
+  9: 1,
+  10: 0,
+  2: 1,
+  11: 20,
+  98: 20,
+  119: 20,
+  127: 30,
+  15: 30,
+  0: 10,
+  121: 10,
+  59: 5,
+  55: 0.5,
+  161: 0.5,
+  162: 0.5,
+  97: 1,
+  46: 0.5,
+  47: 0.5,
+  48: 0.5,
+  49: 0.5,
+  50: 0.5,
+  3: 1
 }
 
 /** What a weapon proc, and a permanent utility effect, count for: flat, since neither is a number of anything. */
@@ -161,7 +188,18 @@ function valueOf(effects: { spa: number; base: number; max: number }[], permanen
     if (permanent && PERMANENT_ONLY[e.spa]) v += OTHER_VALUE
     const w = VALUE_PER_POINT[e.spa]
     if (!w) continue
-    const n = e.spa === 11 ? e.base - 100 : e.spa === 98 || e.spa === 119 ? (e.base > 100 ? e.base - 100 : e.base) : e.spa === 59 ? -e.base : e.spa === 161 || e.spa === 162 ? e.max : e.base
+    const n =
+      e.spa === 11
+        ? e.base - 100
+        : e.spa === 98 || e.spa === 119
+          ? e.base > 100
+            ? e.base - 100
+            : e.base
+          : e.spa === 59
+            ? -e.base
+            : e.spa === 161 || e.spa === 162
+              ? e.max
+              : e.base
     if (n > 0) v += n * w
   }
   return Math.round(v)
@@ -231,7 +269,10 @@ export function byValue(a: BuffOffer, b: BuffOffer): number {
  * Which of them to ask for is the best combination's call, so the pool can be wide.
  */
 export function defaultWanted(offers: BuffOffer[]): string[] {
-  return offers.filter((o) => DEFAULT_LINES.includes(o.line) && o.value > 0).sort(byValue).map((o) => o.spell)
+  return offers
+    .filter((o) => DEFAULT_LINES.includes(o.line) && o.value > 0)
+    .sort(byValue)
+    .map((o) => o.spell)
 }
 
 // ---- what is on you ----
@@ -462,13 +503,19 @@ export function buffPlan(o: { offers: BuffOffer[]; wanted: string[]; group: Pers
     .filter((i) => best.chosen.has(i.key))
     .map((i): PlanItem => {
       const offer = byName.get(i.key)!
-      return { spell: i.key, line: offer.line, value: offer.value, from: i.keep ? '' : from.get(i.key) ?? '', on: i.keep, after: best.after.get(i.key) ?? [] }
+      return { spell: i.key, line: offer.line, value: offer.value, from: i.keep ? '' : (from.get(i.key) ?? ''), on: i.keep, after: best.after.get(i.key) ?? [] }
     })
     .sort((a, b) => LINE_ORDER.indexOf(a.line) - LINE_ORDER.indexOf(b.line) || b.value - a.value)
   for (const i of items) {
     if (best.chosen.has(i.key) || i.keep) continue
     const offer = byName.get(i.key)!
-    leftOut.push({ spell: i.key, line: offer.line, value: offer.value, reason: 'stack', blockedBy: chosen.filter((c) => pairOrder(i, item.get(c.spell)!) === null).map((c) => c.spell) })
+    leftOut.push({
+      spell: i.key,
+      line: offer.line,
+      value: offer.value,
+      reason: 'stack',
+      blockedBy: chosen.filter((c) => pairOrder(i, item.get(c.spell)!) === null).map((c) => c.spell)
+    })
   }
   const needs = chosen
     .filter((c) => !c.on)
@@ -502,7 +549,10 @@ export function buffNeeds(o: { offers: BuffOffer[]; wanted: string[]; group: Per
 export function askText(needs: BuffNeed[]): string {
   const byWho = new Map<string, string[]>()
   const name = (n: BuffNeed) => {
-    const notes = [...(n.after.length ? [`after ${list(n.after)}`] : []), ...(n.clickOff.length ? [`once ${list(n.clickOff)} ${n.clickOff.length > 1 ? 'are' : 'is'} clicked off`] : [])]
+    const notes = [
+      ...(n.after.length ? [`after ${list(n.after)}`] : []),
+      ...(n.clickOff.length ? [`once ${list(n.clickOff)} ${n.clickOff.length > 1 ? 'are' : 'is'} clicked off`] : [])
+    ]
     return notes.length ? `${n.spell} (${notes.join(', ')})` : n.spell
   }
   for (const n of needs) byWho.set(n.from, [...(byWho.get(n.from) ?? []), name(n)])

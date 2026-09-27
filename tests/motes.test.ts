@@ -13,13 +13,17 @@ function tracker() {
 describe('parseMoteLoot', () => {
   it('reads single, stacked and unnamed-rank motes', () => {
     expect(parseMoteLoot("You looted a Mote of Major Potential from a turmoil toad's corpse and stored it in your currency")).toEqual({
-      rank: 'major', count: 1, source: 'a turmoil toad'
+      rank: 'major',
+      count: 1,
+      source: 'a turmoil toad'
     })
     expect(parseMoteLoot('You looted 4 Mote of Major Potential from Reward Chest and stored it in your currency')).toEqual({
-      rank: 'major', count: 4, source: 'Reward Chest'
+      rank: 'major',
+      count: 4,
+      source: 'Reward Chest'
     })
     expect(parseMoteLoot("You looted a Mote of Potential from a scareling's corpse and stored it in your currency")?.rank).toBe('potential')
-    expect(parseMoteLoot('You looted a Puma Skin from a snow leopard\'s corpse and stored it in your tradeskill depot')).toBeNull()
+    expect(parseMoteLoot("You looted a Puma Skin from a snow leopard's corpse and stored it in your tradeskill depot")).toBeNull()
   })
 })
 

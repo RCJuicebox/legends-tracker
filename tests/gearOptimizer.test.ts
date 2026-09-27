@@ -42,7 +42,27 @@ describe('the optimizer and haste', () => {
     const c = byName.get(it.name)
     return c ? { r: restrictions(c.statsblock), stats: parseStatsBlock(c.statsblock), foci: [], lore: isLore(c.statsblock) } : null
   })
-  const weights: Weights = { ...PRESETS.Balanced, ac: 1, hp: 0, mana: 0, end: 0, str: 0, sta: 0, agi: 0, dex: 0, wis: 0, int: 0, cha: 0, resists: 0, haste: 1, attack: 0, hpRegen: 0, manaRegen: 0, endRegen: 0, ratio: 0 }
+  const weights: Weights = {
+    ...PRESETS.Balanced,
+    ac: 1,
+    hp: 0,
+    mana: 0,
+    end: 0,
+    str: 0,
+    sta: 0,
+    agi: 0,
+    dex: 0,
+    wis: 0,
+    int: 0,
+    cha: 0,
+    resists: 0,
+    haste: 1,
+    attack: 0,
+    hpRegen: 0,
+    manaRegen: 0,
+    endRegen: 0,
+    ratio: 0
+  }
   const opts = { pieces, wearer: { classes: ['war'], race: '', level: 50 }, weights, twoHanders: false, focusValue: () => 0 }
 
   it('wears one haste item, in whichever slot leaves the best set', () => {
@@ -121,7 +141,12 @@ describe('weapon ratio against stats', () => {
   ]
   const byName = new Map(catalog.map((c) => [c.title, c]))
   const inv = parseInventory(
-    ['Location\tName\tID\tCount\tSlots', "Primary\tWu's Fist of Mastery +10\t1\t1\t10", "Secondary\tWu's Fist of Mastery +6\t1\t1\t10", 'General 1-Slot1\tBloodmoon +4\t2\t1\t10'].join('\n')
+    [
+      'Location\tName\tID\tCount\tSlots',
+      "Primary\tWu's Fist of Mastery +10\t1\t1\t10",
+      "Secondary\tWu's Fist of Mastery +6\t1\t1\t10",
+      'General 1-Slot1\tBloodmoon +4\t2\t1\t10'
+    ].join('\n')
   )
   const pieces = ownedPieces(inv, (it) => {
     const c = byName.get(it.name.replace(/ \+\d+$/, ''))!
@@ -129,8 +154,14 @@ describe('weapon ratio against stats', () => {
   })
   // A melee's conversions, STR on the generous side: ⅔ Offense and 10 endurance a point.
   const conv: Conversions = {
-    hpPerSta: 10, manaPerWis: 0, manaPerInt: 0, endPer: { STR: 10, STA: 10, AGI: 10, DEX: 10 },
-    offensePerStr: 2 / 3, avoidancePerAgi: 0.22, acPerAgi: 0.04, notes: []
+    hpPerSta: 10,
+    manaPerWis: 0,
+    manaPerInt: 0,
+    endPer: { STR: 10, STA: 10, AGI: 10, DEX: 10 },
+    offensePerStr: 2 / 3,
+    avoidancePerAgi: 0.22,
+    acPerAgi: 0.04,
+    notes: []
   }
   const wearer = { classes: ['war'], race: '', level: 50 }
 
@@ -207,7 +238,27 @@ describe('gear on the pet and exaltations in Storage', () => {
     focus: focusOf[k.name.replace(/ \(Exaltation\)$/, '')],
     r: restrictions(base(k.name).statsblock)
   }))
-  const weights: Weights = { ...PRESETS.Balanced, ac: 1, hp: 0, mana: 0, end: 0, str: 0, sta: 0, agi: 0, dex: 0, wis: 0, int: 0, cha: 0, resists: 0, haste: 0, attack: 0, hpRegen: 0, manaRegen: 0, endRegen: 0, ratio: 0 }
+  const weights: Weights = {
+    ...PRESETS.Balanced,
+    ac: 1,
+    hp: 0,
+    mana: 0,
+    end: 0,
+    str: 0,
+    sta: 0,
+    agi: 0,
+    dex: 0,
+    wis: 0,
+    int: 0,
+    cha: 0,
+    resists: 0,
+    haste: 0,
+    attack: 0,
+    hpRegen: 0,
+    manaRegen: 0,
+    endRegen: 0,
+    ratio: 0
+  }
   // Spell Haste II is worth 100, Extended Range II 30; they add.
   const focusValue = (names: string[]) => (names.includes('Spell Haste II') ? 100 : 0) + (names.includes('Extended Range II') ? 30 : 0)
   const opts = { pieces, wearer: { classes: ['shm'], race: '', level: 50 }, weights, twoHanders: false, focusValue, exaltations }
@@ -233,9 +284,22 @@ describe('gear on the pet and exaltations in Storage', () => {
   it("does not use an exaltation the character's classes may not", () => {
     // Rokyls Channelling Crystal: a secondary for BRD NEC WIZ MAG ENC, its exaltation Extended Enhancement III.
     const rokyl = catalogItem('Rokyls Channelling Crystal', 'Slot: SECONDARY<br>\nClass: BRD NEC WIZ MAG ENC<br>\nRace: ALL<br>')
-    const crystal = { item: { location: 'Storage', name: 'Rokyls Channelling Crystal (Exaltation)', id: 1, count: 1, augs: [] }, from: 'storage' as const, focus: 'Spell Haste II', r: restrictions(rokyl.statsblock) }
+    const crystal = {
+      item: { location: 'Storage', name: 'Rokyls Channelling Crystal (Exaltation)', id: 1, count: 1, augs: [] },
+      from: 'storage' as const,
+      focus: 'Spell Haste II',
+      r: restrictions(rokyl.statsblock)
+    }
     const orb = catalogItem('Plain Orb', 'Slot: SECONDARY<br>\nAC: 3<br>\nClass: ALL<br>\nRace: ALL<br>')
-    const orbPiece = { item: { location: 'Secondary', name: 'Plain Orb', id: 2, count: 1, augs: [] }, from: 'worn' as const, key: 'plain orb', r: restrictions(orb.statsblock), stats: parseStatsBlock(orb.statsblock), foci: [], lore: false }
+    const orbPiece = {
+      item: { location: 'Secondary', name: 'Plain Orb', id: 2, count: 1, augs: [] },
+      from: 'worn' as const,
+      key: 'plain orb',
+      r: restrictions(orb.statsblock),
+      stats: parseStatsBlock(orb.statsblock),
+      foci: [],
+      lore: false
+    }
     const plan = optimizeGear({ ...opts, pieces: [orbPiece], exaltations: [crystal] })
     expect(plan.after.some((p) => p?.exalt)).toBe(false)
     // A class that may use it does take it.
@@ -276,12 +340,15 @@ describe('each hand counted by how often it swings', () => {
   })
 
   it('puts the better weapon in the hand that swings more', () => {
-    const fist = (name: string, dmg: number, where: string) =>
-      ({
-        item: { location: where, name, id: 0, count: 1, augs: [] }, from: 'worn' as const, key: name.toLowerCase(),
-        r: restrictions(`Slot: PRIMARY SECONDARY<br>\nSkill: Hand to Hand Atk Delay: 22<br>\nDMG: ${dmg}<br>\nClass: ALL<br>\nRace: ALL<br>`),
-        stats: parseStatsBlock(`Skill: Hand to Hand Atk Delay: 22<br>\nDMG: ${dmg}<br>`), foci: [], lore: false
-      })
+    const fist = (name: string, dmg: number, where: string) => ({
+      item: { location: where, name, id: 0, count: 1, augs: [] },
+      from: 'worn' as const,
+      key: name.toLowerCase(),
+      r: restrictions(`Slot: PRIMARY SECONDARY<br>\nSkill: Hand to Hand Atk Delay: 22<br>\nDMG: ${dmg}<br>\nClass: ALL<br>\nRace: ALL<br>`),
+      stats: parseStatsBlock(`Skill: Hand to Hand Atk Delay: 22<br>\nDMG: ${dmg}<br>`),
+      foci: [],
+      lore: false
+    })
     // Worn the wrong way round: the weaker fist in the main hand.
     const pieces = [fist('Weak Fist', 25, 'Primary'), fist('Strong Fist', 32, 'Secondary')]
     const w = { ...PRESETS.Melee, ac: 0, hp: 0, str: 0, sta: 0, agi: 0, dex: 0, haste: 0, attack: 0, end: 0, endRegen: 0, hpRegen: 0, resists: 0, ratio: 12 }
@@ -297,15 +364,26 @@ describe('weapons by ratio first', () => {
   // A fist with the better ratio and no stats, a hammer with a worse ratio and a lot of STR, and
   // weights that value STR highly: the hammer wins on the weights alone, the fist with ratio first.
   const piece = (name: string, block: string, where: string) => ({
-    item: { location: where, name, id: 0, count: 1, augs: [] }, from: where === 'Bag' ? ('bags' as const) : ('worn' as const), key: name.toLowerCase(),
-    r: restrictions(block), stats: parseStatsBlock(block), foci: [], lore: false
+    item: { location: where, name, id: 0, count: 1, augs: [] },
+    from: where === 'Bag' ? ('bags' as const) : ('worn' as const),
+    key: name.toLowerCase(),
+    r: restrictions(block),
+    stats: parseStatsBlock(block),
+    foci: [],
+    lore: false
   })
   const fist = piece('Fist', 'Slot: PRIMARY<br>\nSkill: Hand to Hand Atk Delay: 22<br>\nDMG: 32<br>\nClass: ALL<br>\nRace: ALL<br>', 'Primary')
   const hammer = piece('Hammer', 'Slot: PRIMARY<br>\nSkill: 1H Blunt Atk Delay: 30<br>\nDMG: 20<br>\nSTR: +100<br>\nClass: ALL<br>\nRace: ALL<br>', 'Bag')
   // Both Any slots hold something better, so the hammer's STR counts only in the hand.
   const charm = (n: string) => piece(n, 'Slot: CHARM<br>\nSTR: +200<br>\nClass: ALL<br>\nRace: ALL<br>', 'Any Slot')
   const w = { ...PRESETS.Melee, str: 20, ratio: 12 }
-  const opts = { pieces: [fist, hammer, charm('Red Charm'), charm('Blue Charm')], wearer: { classes: ['mnk'], race: '', level: 50 }, weights: w, twoHanders: false, focusValue: () => 0 }
+  const opts = {
+    pieces: [fist, hammer, charm('Red Charm'), charm('Blue Charm')],
+    wearer: { classes: ['mnk'], race: '', level: 50 },
+    weights: w,
+    twoHanders: false,
+    focusValue: () => 0
+  }
   const main = (plan: ReturnType<typeof optimizeGear>) => plan.after[plan.slots.indexOf('Primary')]?.item.name
 
   it('lets the weights pick the weapon when ratio is one weight among many', () => {

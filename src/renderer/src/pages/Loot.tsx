@@ -69,10 +69,7 @@ export function Loot() {
   }, [entries])
 
   // The wiki, for what the open sessions show.
-  const shownNames = useMemo(
-    () => [...new Set(groups.filter((g) => filtering || opened.includes(g.id)).flatMap((g) => g.entries.map((e) => e.base)))],
-    [groups, filtering, opened]
-  )
+  const shownNames = useMemo(() => [...new Set(groups.filter((g) => filtering || opened.includes(g.id)).flatMap((g) => g.entries.map((e) => e.base)))], [groups, filtering, opened])
   const info = useItemInfo(shownNames)
   const sessions = useMemo(() => new Map((view?.sessions ?? []).map((s) => [s.id, s])), [view])
 
@@ -84,8 +81,8 @@ export function Loot() {
         <div>
           <h1>Loot</h1>
           <p>
-            Everything looted, newest first, by session: what each item is, from its page on eqlwiki, and a link there or to Allakhazam
-            for the rest. The last hour of the log is read in when watching starts.
+            Everything looted, newest first, by session: what each item is, from its page on eqlwiki, and a link there or to Allakhazam for the rest. The last hour of the log is
+            read in when watching starts.
           </p>
         </div>
       </div>
@@ -101,9 +98,7 @@ export function Loot() {
         </span>
         <span className="spacer" />
         {view?.reading && <span className="chip warn">{view.reading}</span>}
-        <span className="faint small">
-          {view ? `${view.entries.length} item${view.entries.length === 1 ? '' : 's'} on record` : ''}
-        </span>
+        <span className="faint small">{view ? `${view.entries.length} item${view.entries.length === 1 ? '' : 's'} on record` : ''}</span>
       </div>
 
       {!view ? (
@@ -140,8 +135,16 @@ export function Loot() {
                 <span className="chip">
                   {g.entries.length} item{g.entries.length === 1 ? '' : 's'}
                 </span>
-                {coin && coin.corpse > 0 && <span className="chip" title="Coin picked up from corpses">{fmtCoin(coin.corpse)} looted</span>}
-                {coin && coin.sales > 0 && <span className="chip" title="Coin from items sold, by auto-loot or at a merchant">{fmtCoin(coin.sales)} sold</span>}
+                {coin && coin.corpse > 0 && (
+                  <span className="chip" title="Coin picked up from corpses">
+                    {fmtCoin(coin.corpse)} looted
+                  </span>
+                )}
+                {coin && coin.sales > 0 && (
+                  <span className="chip" title="Coin from items sold, by auto-loot or at a merchant">
+                    {fmtCoin(coin.sales)} sold
+                  </span>
+                )}
               </div>
               {open && g.entries.map((e) => <Row key={e.id} e={e} info={info[itemKey(e.base)]} />)}
             </div>
@@ -198,7 +201,8 @@ function Row({ e, info }: { e: LootEntry; info: ItemInfo | undefined }) {
             {!d.head && !d.body.length && info.found && <span className="faint">The page says nothing about what it is for.</span>}
             {!info.found && (
               <span className="faint">
-                Not on eqlwiki under this name; try Allakhazam. <Info label="About the lookup" text="Item names are matched to eqlwiki page titles, then searched for. A page with a different spelling can be missed." />
+                Not on eqlwiki under this name; try Allakhazam.{' '}
+                <Info label="About the lookup" text="Item names are matched to eqlwiki page titles, then searched for. A page with a different spelling can be missed." />
               </span>
             )}
           </>

@@ -6,18 +6,7 @@ import { useInvoke } from '../hooks'
 import { showError, showToast } from '../toast'
 import { Pending } from '../components/ui'
 import { numExact as num, who } from '../../../core/format'
-import {
-  AchievementBook,
-  compareNames,
-  norm,
-  placeOf,
-  secKey,
-  type AchMarks,
-  type AchObjective,
-  type AchRef,
-  type Achievement,
-  type ObjRef
-} from '../../../core/achievements'
+import { AchievementBook, compareNames, norm, placeOf, secKey, type AchMarks, type AchObjective, type AchRef, type Achievement, type ObjRef } from '../../../core/achievements'
 import { HUNT } from '../../../core/achievementHunt'
 import type { AchievementsView } from '../../../shared/types'
 
@@ -72,10 +61,7 @@ export function Achievements() {
   // Forget blocks no longer in the book, and keep the list from growing without end.
   // An export that failed to read has no sections; that is no reason to forget anything.
   const readFailed = !!view?.error
-  const known = useMemo(
-    () => (book && book.sections.length ? new Set(book.sections.flatMap((s) => s.ach.map((a) => `${secKey(s)} > ${a.n}`))) : null),
-    [book]
-  )
+  const known = useMemo(() => (book && book.sections.length ? new Set(book.sections.flatMap((s) => s.ach.map((a) => `${secKey(s)} > ${a.n}`))) : null), [book])
   useEffect(() => {
     if (!known || readFailed) return
     const kept = Object.entries(open).filter(([k]) => known.has(k))
@@ -122,7 +108,6 @@ export function Achievements() {
       )
     saveMarks(book!.withTick(r, on, view.marks))
   }
-
 
   const goTo = ([si, ai]: AchRef) => {
     const s = book!.sections[si]
@@ -177,7 +162,9 @@ export function Achievements() {
               In game, type <span className="mono">/outputfile achievements</span>. The game writes the file into its folder and this page picks it up within a few seconds.
             </>
           ) : (
-            <>Could not read {view.file}: {view.error}</>
+            <>
+              Could not read {view.file}: {view.error}
+            </>
           )}
         </div>
       </>
@@ -264,20 +251,21 @@ export function Achievements() {
       </div>
 
       <div className="row ach-controls">
-        <input className="grow" type="search" placeholder="Find an achievement or objective in any section" aria-label="Find an achievement or objective" value={q} onChange={(e) => setQ(e.target.value)} />
+        <input
+          className="grow"
+          type="search"
+          placeholder="Find an achievement or objective in any section"
+          aria-label="Find an achievement or objective"
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+        />
         <button className={`btn${remaining ? ' on' : ' ghost'}`} aria-pressed={remaining} onClick={() => setRemaining(!remaining)}>
           Remaining only
         </button>
-        <button
-          className="btn ghost"
-          onClick={() => cur && setOpen({ ...open, ...Object.fromEntries(cur.s.ach.map((a) => [`${secKey(cur.s)} > ${a.n}`, true])) })}
-        >
+        <button className="btn ghost" onClick={() => cur && setOpen({ ...open, ...Object.fromEntries(cur.s.ach.map((a) => [`${secKey(cur.s)} > ${a.n}`, true])) })}>
           Expand all
         </button>
-        <button
-          className="btn ghost"
-          onClick={() => cur && setOpen({ ...open, ...Object.fromEntries(cur.s.ach.map((a) => [`${secKey(cur.s)} > ${a.n}`, false])) })}
-        >
+        <button className="btn ghost" onClick={() => cur && setOpen({ ...open, ...Object.fromEntries(cur.s.ach.map((a) => [`${secKey(cur.s)} > ${a.n}`, false])) })}>
           Collapse all
         </button>
       </div>
@@ -291,10 +279,9 @@ export function Achievements() {
       )}
 
       <p className="faint small mt-18">
-        Optional objectives never count toward completion, the same way the game scores them. An objective that names another
-        achievement follows that achievement; click it to jump there. Your ticks are kept when the game writes a new export.
+        Optional objectives never count toward completion, the same way the game scores them. An objective that names another achievement follows that achievement; click it to jump
+        there. Your ticks are kept when the game writes a new export.
       </p>
-
     </div>
   )
 }
@@ -356,7 +343,12 @@ function Blocks({ book, si, entries, query, ctx }: { book: AchievementBook; si: 
   const out: React.ReactNode[] = []
   let singles: React.ReactNode[] = []
   const flush = () => {
-    if (singles.length) out.push(<div key={`s${out.length}`} className="ach-singles">{singles}</div>)
+    if (singles.length)
+      out.push(
+        <div key={`s${out.length}`} className="ach-singles">
+          {singles}
+        </div>
+      )
     singles = []
   }
   for (const e of entries) {
@@ -464,7 +456,8 @@ function NamesLine({ label, names }: { label: string; names: string[] }) {
   if (!names.length) return null
   return (
     <p className="small muted ach-names">
-      {label}: {names.map((n, i) => (
+      {label}:{' '}
+      {names.map((n, i) => (
         <span key={i}>
           {i > 0 && ', '}
           <b>{n}</b>
@@ -491,7 +484,12 @@ function Block({ book, r, rows, query, ctx }: { book: AchievementBook; r: AchRef
     count = (
       <>
         {st.done} / {st.req}
-        {st.opt > 0 && <em> · {st.optDone} / {st.opt} opt</em>}
+        {st.opt > 0 && (
+          <em>
+            {' '}
+            · {st.optDone} / {st.opt} opt
+          </em>
+        )}
         {st.ign > 0 && <em> · {st.ign} broken</em>}
         {state === 'blocked' && <em> · blocked</em>}
       </>
@@ -524,9 +522,7 @@ function Block({ book, r, rows, query, ctx }: { book: AchievementBook; r: AchRef
           {rows.length ? (
             rows.map(({ c, ci }) => <ObjectiveRow key={ci} book={book} r={[si, ai, ci]} c={c} label={c.t} ctx={ctx} />)
           ) : (
-            <div className="faint small p-8">
-              {ctx.remaining && !query ? 'Nothing left here.' : 'No matches.'}
-            </div>
+            <div className="faint small p-8">{ctx.remaining && !query ? 'Nothing left here.' : 'No matches.'}</div>
           )}
         </div>
       )}
@@ -600,7 +596,11 @@ function ObjectiveRow({ book, r, c, label, sub, ctx, single }: { book: Achieveme
   if (place) {
     const others = book.otherPlaces(c, place)
     const kin = book.kinOf(r).length > 0
-    const tip = !others.length ? '' : kin ? `One kill counts for ${others.join(', ')} too. Ticking it here ticks it there.` : `Also listed in ${others.join(', ')}, but that is a separate kill.`
+    const tip = !others.length
+      ? ''
+      : kin
+        ? `One kill counts for ${others.join(', ')} too. Ticking it here ticks it there.`
+        : `Also listed in ${others.join(', ')}, but that is a separate kill.`
     zone = (
       <span className={`ach-zone${kin ? ' kin' : ''}`} title={tip}>
         {place}

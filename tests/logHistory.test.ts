@@ -76,7 +76,13 @@ describe('LogHistory', () => {
     )
     await fs.writeFile(logPath, line('Thu Sep 24 16:00:00 2026', 'You begin casting Envenomed Bolt X.'))
     let reads = 0
-    const counting: HistoryConsumer<Days> = { ...dayConsumer(castCounter), reader: () => { reads++; return castCounter() } }
+    const counting: HistoryConsumer<Days> = {
+      ...dayConsumer(castCounter),
+      reader: () => {
+        reads++
+        return castCounter()
+      }
+    }
     const history = new LogHistory(join(dir, 'log-history.json'), { casts: counting, purchases: purchaseConsumer })
     const where = { logPath, archiveDir, stem: 'eqlog_Kelwyn_neriak' }
 

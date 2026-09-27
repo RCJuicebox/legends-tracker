@@ -21,8 +21,28 @@ import { ANY_SLOT, canWear, isTwoHanded, score, weightsForSlot, type HandWeights
 
 /** Every slot gear is worn in, one entry per slot: two ears, two wrists, two rings, two Any slots. */
 export const SLOT_LAYOUT = [
-  'Head', 'Face', 'Ear', 'Ear', 'Neck', 'Shoulders', 'Back', 'Arms', 'Chest', 'Wrist', 'Wrist', 'Hands',
-  'Fingers', 'Fingers', 'Waist', 'Legs', 'Feet', 'Primary', 'Secondary', 'Range', 'Any Slot', 'Any Slot'
+  'Head',
+  'Face',
+  'Ear',
+  'Ear',
+  'Neck',
+  'Shoulders',
+  'Back',
+  'Arms',
+  'Chest',
+  'Wrist',
+  'Wrist',
+  'Hands',
+  'Fingers',
+  'Fingers',
+  'Waist',
+  'Legs',
+  'Feet',
+  'Primary',
+  'Secondary',
+  'Range',
+  'Any Slot',
+  'Any Slot'
 ]
 
 /** Where a piece is now; 'catalog' is one the character does not own, from the wiki (the optimizer's all-gear mode). */
@@ -271,8 +291,7 @@ export function optimizeGear(o: OptimizeOptions): Plan {
   const total = (a: (Piece | null)[]): number => (valid(a) ? statsOf(a) + hasteOf(a) : -Infinity)
   // With `h` the one haste item: it must be worn, its haste counts whatever else is, and every other
   // piece is judged on its stats alone. Without, the set's best haste counts.
-  const value = (a: (Piece | null)[], h: Piece | null): number =>
-    !h ? total(a) : valid(a) && a.includes(h) ? statsOf(a) + (h.stats?.haste ?? 0) * o.weights.haste : -Infinity
+  const value = (a: (Piece | null)[], h: Piece | null): number => (!h ? total(a) : valid(a) && a.includes(h) ? statsOf(a) + (h.stats?.haste ?? 0) * o.weights.haste : -Infinity)
 
   // Slot j of b takes the piece that adds most, or stays empty. Only that slot changes, so b is
   // weighed once with it empty, and each piece by what it brings: its own score, the foci if it

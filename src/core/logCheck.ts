@@ -37,9 +37,20 @@ export async function checkAgainstLog(opts: {
     }
   })
   const everything: TrackingSettings = {
-    enabled: true, selfBuffs: true, otherBuffs: true, groupBuffs: true, dots: true, debuffs: true,
-    buffWarnSec: 0, dotWarnSec: 0, buffWarnSpeech: '', buffFadeSpeech: '', dotWarnSpeech: '', dotFadeSpeech: '',
-    announceOtherBuffFades: false, tierDurationPct: opts.tierPct
+    enabled: true,
+    selfBuffs: true,
+    otherBuffs: true,
+    groupBuffs: true,
+    dots: true,
+    debuffs: true,
+    buffWarnSec: 0,
+    dotWarnSec: 0,
+    buffWarnSpeech: '',
+    buffFadeSpeech: '',
+    dotWarnSpeech: '',
+    dotFadeSpeech: '',
+    announceOtherBuffFades: false,
+    tierDurationPct: opts.tierPct
   }
   const tracker = new SpellTracker(
     book,
@@ -47,8 +58,7 @@ export async function checkAgainstLog(opts: {
     {
       tracking: everything,
       ruleFor: () => ({}),
-      durationFor: (spell, rank) =>
-        computeDuration({ spell, rank, level: opts.level(spell.name), tierPct: opts.tierPct, focusPct: opts.focusPct(spell) })
+      durationFor: (spell, rank) => computeDuration({ spell, rank, level: opts.level(spell.name), tierPct: opts.tierPct, focusPct: opts.focusPct(spell) })
     },
     { notify: () => {}, feed: () => {} }
   )

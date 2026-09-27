@@ -44,7 +44,10 @@ export async function scanMoteHistory(job: MoteScanJob, progress?: (message: str
   // The whole job in bytes, so progress is honest: a zip counts at its unpacked size.
   const sizeOf = (p: string) => (p.toLowerCase().endsWith('.zip') ? zipTextSize(p) : fs.stat(p).then((s) => s.size)).catch(() => 0)
   const sizes = await Promise.all(plan.flatMap((l) => [...l.archives.map(sizeOf), l.end !== undefined ? Promise.resolve(l.end) : sizeOf(l.logPath)]))
-  const total = Math.max(1, sizes.reduce((a, b) => a + b, 0))
+  const total = Math.max(
+    1,
+    sizes.reduce((a, b) => a + b, 0)
+  )
 
   const days = new Set<string>()
   let dayFrom = 0

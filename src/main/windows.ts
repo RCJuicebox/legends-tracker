@@ -58,9 +58,7 @@ export class Windows {
   private readonly held = new Map<string, () => void>()
   private readonly heldFeed: Parameters<Pushes['state:feed']>[] = []
 
-  constructor(
-    private readonly opts: { preload: string; icon: string; audioSettings: () => AudioSettings; uiScale: () => number }
-  ) {
+  constructor(private readonly opts: { preload: string; icon: string; audioSettings: () => AudioSettings; uiScale: () => number }) {
     const path = join(app.getPath('userData'), 'window.json')
     const r = readJsonFile(path)
     this.place = new JsonFile<WindowPlace | null>(path, r.state === 'ok' ? (r.value as WindowPlace) : null)
@@ -130,7 +128,11 @@ export class Windows {
     const place = this.place.get()
     if (!place || place.trayTold || !Notification.isSupported()) return
     this.place.set({ ...place, trayTold: true })
-    new Notification({ title: 'Legends Tracker is still running', body: 'Timers, overlays and speech carry on from the tray. Quit from the tray icon when you are done.', icon: this.opts.icon }).show()
+    new Notification({
+      title: 'Legends Tracker is still running',
+      body: 'Timers, overlays and speech carry on from the tray. Quit from the tray icon when you are done.',
+      icon: this.opts.icon
+    }).show()
   }
 
   /** The UI size setting, on the main window (overlays have their own text sizes). */

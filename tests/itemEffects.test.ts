@@ -19,12 +19,26 @@ WT: 0.1  Size: LARGE<br>
 Class: PAL SHD<br>
 Race: ALL<br>`
 const UNRIGHTEOUS_BASH: EffectSpell = {
-  name: 'Unrighteous Bash', formula: 50, cap: 0, beneficial: true,
-  effects: [{ spa: 227, base: 1, base2: 10 }, { spa: 220, base: 15, base2: 10 }, { spa: 226, base: 1, base2: 0 }]
+  name: 'Unrighteous Bash',
+  formula: 50,
+  cap: 0,
+  beneficial: true,
+  effects: [
+    { spa: 227, base: 1, base2: 10 },
+    { spa: 220, base: 15, base2: 10 },
+    { spa: 226, base: 1, base2: 0 }
+  ]
 }
 const OATHBREAKERS_CURSE: EffectSpell = {
-  name: "Oathbreaker's Curse", formula: 2, cap: 9, beneficial: false,
-  effects: [{ spa: 0, base: -80, base2: 0, formula: 100, max: 80 }, { spa: 457, base: 1000, base2: 0 }, { spa: 116, base: 9, base2: 0 }]
+  name: "Oathbreaker's Curse",
+  formula: 2,
+  cap: 9,
+  beneficial: false,
+  effects: [
+    { spa: 0, base: -80, base2: 0, formula: 100, max: 80 },
+    { spa: 457, base: 1000, base2: 0 },
+    { spa: 116, base: 9, base2: 0 }
+  ]
 }
 const LIFEBITE: EffectSpell = { name: 'Lifebite', formula: 0, cap: 0, beneficial: false, effects: [{ spa: 0, base: -36, base2: 0, formula: 102, max: 42 }] }
 
@@ -64,7 +78,7 @@ describe('your melee from the log', () => {
 
 describe('effects on gear', () => {
   it('reads worn effects written "Effect: X (Worn)", as most pages have them', () => {
-    expect(wornEffectOf("Slot: BACK<br>\nEffect:  [[Enduring Breath]] (Worn)<br>\nClass: ALL<br>")).toBe('Enduring Breath')
+    expect(wornEffectOf('Slot: BACK<br>\nEffect:  [[Enduring Breath]] (Worn)<br>\nClass: ALL<br>')).toBe('Enduring Breath')
     expect(wornEffectOf('Effect: [[Flowing Thought I]] (Worn, Casting Time: Instant)<br>')).toBe('Flowing Thought I')
     // A clicky or a focus is no worn effect.
     expect(wornEffectOf('Effect:  [[Levitate]] (Must Equip, Casting Time: Instant) at Level 45<br>')).toBe('')
@@ -74,7 +88,17 @@ describe('effects on gear', () => {
   it('says what a utility or stat worn effect does, and prices its stats as an item’s', () => {
     const breath: EffectSpell = { name: 'Enduring Breath', formula: 0, cap: 0, beneficial: true, effects: [{ spa: 14, base: 1, base2: 0 }] }
     expect(wornWorth(breath, meleeProfile({}, { from: '', to: '' })).does).toEqual(['breathe underwater'])
-    const battle: EffectSpell = { name: 'Aura of Battle', formula: 0, cap: 0, beneficial: true, effects: [{ spa: 2, base: 10, base2: 0 }, { spa: 15, base: 1, base2: 0 }, { spa: 10, base: 0, base2: 0 }] }
+    const battle: EffectSpell = {
+      name: 'Aura of Battle',
+      formula: 0,
+      cap: 0,
+      beneficial: true,
+      effects: [
+        { spa: 2, base: 10, base2: 0 },
+        { spa: 15, base: 1, base2: 0 },
+        { spa: 10, base: 0, base2: 0 }
+      ]
+    }
     expect(wornWorth(battle, meleeProfile({}, { from: '', to: '' })).does).toEqual(['attack +10', 'mana +1 a tick'])
     const s = wornStats(battle, 50)
     expect([s.attack, s.manaRegen, s.ac]).toEqual([10, 1, 0])
@@ -101,7 +125,16 @@ describe('effects on gear', () => {
       'torrid corruptor': { worn: 'Unrighteous Bash', proc: "Oathbreaker's Curse" },
       "cherista's fangs": { worn: '', proc: 'Lifebite' }
     }
-    const fx = itemEffects(inv.worn[0], (n) => own[n.replace(/ \(Exaltation\)$/, '').replace(/ \+\d+$/, '').toLowerCase()])
+    const fx = itemEffects(
+      inv.worn[0],
+      (n) =>
+        own[
+          n
+            .replace(/ \(Exaltation\)$/, '')
+            .replace(/ \+\d+$/, '')
+            .toLowerCase()
+        ]
+    )
     expect(fx.worn).toEqual([{ name: 'Unrighteous Bash', via: 'Torrid Corruptor (Exaltation)' }])
     expect(fx.procs).toEqual([{ name: 'Lifebite', via: "Cherista's Fangs (Exaltation)" }])
   })
@@ -111,7 +144,7 @@ describe('what an effect is worth', () => {
   // Ten minutes swinging: 110 bashes tried (11 a minute, near the 12 a 5 s cooldown allows), 100 of them hits for 40 each.
   const profile = meleeProfile({ active: 600_000, 'm|bash|h': 100, 'm|bash|d': 4000, 'm|bash|x': 10, 'm|punch|h': 600, 'm|punch|d': 48_000 }, { from: 'a', to: 'b' })
 
-  it("prices Unrighteous Bash: +15 on each bash hit, and bashing a second sooner when bash is used on cooldown", () => {
+  it('prices Unrighteous Bash: +15 on each bash hit, and bashing a second sooner when bash is used on cooldown', () => {
     const w = wornWorth(UNRIGHTEOUS_BASH, profile)
     expect(w.does).toEqual(['bash ready 1s sooner', '+15 damage to each bash', 'bash while holding a two-handed weapon'])
     // 10 hits a minute × 15, plus 11 tries a minute at a 4 s cooldown instead of 5: 11 × (5/4 − 1) = 2.75 more,
@@ -172,10 +205,36 @@ describe('what an effect is worth', () => {
 
 describe('the optimizer and effects', () => {
   const wearer = { classes: ['shd'], race: '', level: 50 }
-  const weights: Weights = { ...PRESETS.Balanced, ac: 1, hp: 0, mana: 0, end: 0, str: 0, sta: 0, agi: 0, dex: 0, wis: 0, int: 0, cha: 0, resists: 0, haste: 0, attack: 0, hpRegen: 0, manaRegen: 0, endRegen: 0, ratio: 0 }
+  const weights: Weights = {
+    ...PRESETS.Balanced,
+    ac: 1,
+    hp: 0,
+    mana: 0,
+    end: 0,
+    str: 0,
+    sta: 0,
+    agi: 0,
+    dex: 0,
+    wis: 0,
+    int: 0,
+    cha: 0,
+    resists: 0,
+    haste: 0,
+    attack: 0,
+    hpRegen: 0,
+    manaRegen: 0,
+    endRegen: 0,
+    ratio: 0
+  }
   const piece = (name: string, location: string, block: string, extra: Partial<Piece> = {}): Piece => ({
-    item: { location, name, id: 0, count: 1, augs: [] }, from: location === 'Bag' ? 'bags' : 'worn', key: name.toLowerCase(), r: restrictions(block),
-    stats: parseStatsBlock(block), foci: [], lore: false, ...extra
+    item: { location, name, id: 0, count: 1, augs: [] },
+    from: location === 'Bag' ? 'bags' : 'worn',
+    key: name.toLowerCase(),
+    r: restrictions(block),
+    stats: parseStatsBlock(block),
+    foci: [],
+    lore: false,
+    ...extra
   })
   const charm = (n: string, ac: number) => piece(n, 'Any Slot', `Slot: CHARM<br>\nAC: ${ac}<br>\nClass: ALL<br>\nRace: ALL<br>`)
   const effects = { worn: (names: string[]) => (names.includes('Unrighteous Bash') ? 30 : 0), proc: (n: string) => (n === 'Lifebite' ? 20 : 0) }
@@ -191,7 +250,8 @@ describe('the optimizer and effects', () => {
   })
 
   it('counts a proc only on a weapon in the hands', () => {
-    const fang = (n: string, where: string) => piece(n, where, 'Slot: PRIMARY SECONDARY<br>\nSkill: 1H Piercing Atk Delay: 20<br>\nDMG: 10<br>\nClass: ALL<br>\nRace: ALL<br>', { procs: ['Lifebite'] })
+    const fang = (n: string, where: string) =>
+      piece(n, where, 'Slot: PRIMARY SECONDARY<br>\nSkill: 1H Piercing Atk Delay: 20<br>\nDMG: 10<br>\nClass: ALL<br>\nRace: ALL<br>', { procs: ['Lifebite'] })
     const plan = optimizeGear({ pieces: [fang('Fang A', 'Primary'), fang('Fang B', 'Any Slot')], wearer, weights, twoHanders: false, focusValue: () => 0, effects })
     expect(plan.effectsBefore).toBe(20)
     // The second fang goes to the off hand, where its proc counts too.
@@ -206,7 +266,11 @@ describe('the optimizer and effects', () => {
     const fist = piece("Wu's Fist", 'Primary', 'Slot: PRIMARY SECONDARY<br>\nSkill: Hand to Hand Atk Delay: 22<br>\nDMG: 16<br>\nClass: MNK<br>\nRace: ALL<br>')
     const blade = piece('Plain Blade', 'Secondary', 'Slot: PRIMARY SECONDARY<br>\nSkill: 1H Slashing Atk Delay: 22<br>\nDMG: 16<br>\nClass: ALL<br>\nRace: ALL<br>')
     const khyldorn = {
-      item: { location: 'Storage', name: 'Khyldorn the Blood Drinker (Exaltation)', id: 1, count: 1, augs: [] }, from: 'storage' as const, focus: '', worn: '', proc: 'Lifebite',
+      item: { location: 'Storage', name: 'Khyldorn the Blood Drinker (Exaltation)', id: 1, count: 1, augs: [] },
+      from: 'storage' as const,
+      focus: '',
+      worn: '',
+      proc: 'Lifebite',
       r: restrictions('Slot: PRIMARY<br>\nClass: SHD<br>\nRace: ALL<br>')
     }
     const onlyFist = optimizeGear({ pieces: [fist], wearer: trio, weights, twoHanders: false, focusValue: () => 0, effects, exaltations: [khyldorn] })
@@ -218,7 +282,11 @@ describe('the optimizer and effects', () => {
   it('puts a stored proc exaltation in a weapon of its own kind', () => {
     const fist = piece("Wu's Fist", 'Primary', 'Slot: PRIMARY SECONDARY<br>\nSkill: Hand to Hand Atk Delay: 22<br>\nDMG: 16<br>\nClass: ALL<br>\nRace: ALL<br>')
     const fangs = {
-      item: { location: 'Storage', name: "Cherista's Fangs (Exaltation)", id: 1, count: 1, augs: [] }, from: 'storage' as const, focus: '', worn: '', proc: 'Lifebite',
+      item: { location: 'Storage', name: "Cherista's Fangs (Exaltation)", id: 1, count: 1, augs: [] },
+      from: 'storage' as const,
+      focus: '',
+      worn: '',
+      proc: 'Lifebite',
       r: restrictions('Slot: PRIMARY SECONDARY<br>\nClass: ALL<br>\nRace: ALL<br>')
     }
     const plan = optimizeGear({ pieces: [fist], wearer, weights, twoHanders: false, focusValue: () => 0, effects, exaltations: [fangs] })

@@ -43,8 +43,8 @@ export function Audio() {
         <div>
           <h1>Audio</h1>
           <p>
-            Speech and sounds share one output, so they follow the device you choose here rather than the system default.
-            Speech plays one phrase at a time; a long backlog is dropped rather than read out after the fight.
+            Speech and sounds share one output, so they follow the device you choose here rather than the system default. Speech plays one phrase at a time; a long backlog is
+            dropped rather than read out after the fight.
           </p>
         </div>
         <div className="actions">
@@ -55,10 +55,7 @@ export function Audio() {
       </div>
 
       {state.speechError && (
-        <div className="notice bad mb-16">
-          The Windows speech engine did not start ({state.speechError}). Speech falls back to the browser voice on the default
-          device.
-        </div>
+        <div className="notice bad mb-16">The Windows speech engine did not start ({state.speechError}). Speech falls back to the browser voice on the default device.</div>
       )}
 
       <div className="grid two" style={{ alignItems: 'start' }}>
@@ -74,11 +71,13 @@ export function Audio() {
           >
             <select value={a.deviceId} onChange={(e) => set({ deviceId: e.target.value })}>
               <option value="default">System default</option>
-              {state.devices.filter((d) => d.deviceId !== 'default' && d.deviceId !== 'communications').map((d) => (
-                <option key={d.deviceId} value={d.deviceId}>
-                  {d.label}
-                </option>
-              ))}
+              {state.devices
+                .filter((d) => d.deviceId !== 'default' && d.deviceId !== 'communications')
+                .map((d) => (
+                  <option key={d.deviceId} value={d.deviceId}>
+                    {d.label}
+                  </option>
+                ))}
             </select>
           </Field>
           <Field label={`Master volume ${pct(a.masterVolume)}`}>
@@ -148,8 +147,7 @@ export function Audio() {
           </h2>
           {soundsQ.error && <LoadError what="the sound library" error={soundsQ.error} retry={soundsQ.reload} />}
           <p className="muted small mt-0">
-            Read from the game's own <code>AudioTriggers</code> folders and this app's <code>sounds</code> folder. Drop .wav or
-            .mp3 files into either to use them in triggers.
+            Read from the game's own <code>AudioTriggers</code> folders and this app's <code>sounds</code> folder. Drop .wav or .mp3 files into either to use them in triggers.
           </p>
           <div className="row">
             {sounds.map((s) => (
@@ -201,7 +199,11 @@ function AzureCard({ status, error, onSaved }: { status: AzureStatus | null; err
           <span className="small">
             Region <b>{status.region}</b>, {status.voices.length} voices. Pick one in the Voice list above.
           </span>
-          {status.error && <span className="small" style={{ color: 'var(--red)' }}>Last phrase: {status.error}</span>}
+          {status.error && (
+            <span className="small" style={{ color: 'var(--red)' }}>
+              Last phrase: {status.error}
+            </span>
+          )}
           <span className="spacer" />
           <ConfirmButton className="btn small" question="Remove the Azure key? The Windows voice speaks instead." disabled={busy} onConfirm={() => void save('', '')}>
             Remove the key

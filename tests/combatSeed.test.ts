@@ -35,7 +35,9 @@ function line(minutesAgo: number, text: string, plusSec = 0): string {
 
 /** A short fight with one mob, ended by its death. */
 function fight(minutesAgo: number, mob: string): string {
-  return line(minutesAgo, `You punch ${mob} for 48 points of damage.`) + line(minutesAgo, `You kick ${mob} for 59 points of damage.`, 1) + line(minutesAgo, `You have slain ${mob}!`, 2)
+  return (
+    line(minutesAgo, `You punch ${mob} for 48 points of damage.`) + line(minutesAgo, `You kick ${mob} for 59 points of damage.`, 1) + line(minutesAgo, `You have slain ${mob}!`, 2)
+  )
 }
 
 function cell<T>(value: T) {
@@ -62,7 +64,7 @@ beforeEach(async () => {
   logFile = join(logs, 'eqlog_Kelwyn_neriak.txt')
   // An old fight half an hour ago and a recent one three minutes ago, over a megabyte apart: the
   // start of the window is found a megabyte chunk at a time (offsetBefore), so a small log is read whole.
-  const filler = line(20, 'You feel better.').repeat(Math.ceil(1.2 * 1048576 / line(20, 'You feel better.').length))
+  const filler = line(20, 'You feel better.').repeat(Math.ceil((1.2 * 1048576) / line(20, 'You feel better.').length))
   await fs.writeFile(logFile, line(40, 'You have entered Neriak.') + fight(30, 'an old ratman') + filler + fight(3, 'a young ratman') + line(1, 'You feel better.'))
   engines = []
 })
@@ -100,7 +102,22 @@ function makeEngine(historyMinutes: number) {
   const engine = new Engine(
     store,
     { synthesize: async () => Buffer.alloc(0) },
-    { timers: noop, alert: noop, audio: noop, status: noop, feed: (i) => feed.push(i), archive: noop, motes: noop, moteScan: noop, stock: noop, combat: noop, loot: noop, respawns: noop, pet: noop, buffs: noop },
+    {
+      timers: noop,
+      alert: noop,
+      audio: noop,
+      status: noop,
+      feed: (i) => feed.push(i),
+      archive: noop,
+      motes: noop,
+      moteScan: noop,
+      stock: noop,
+      combat: noop,
+      loot: noop,
+      respawns: noop,
+      pet: noop,
+      buffs: noop
+    },
     env
   )
   engines.push(engine)

@@ -1,7 +1,17 @@
 import { describe, expect, it } from 'vitest'
 import { eraOf } from '../src/core/upgrades'
 import {
-  craftEras, parseCrafted, parsePurchase, parseSkillPage, parseVendors, parseWikiCoin, recipeIndex, recipeKey, shopping, unitPrice, type Recipe
+  craftEras,
+  parseCrafted,
+  parsePurchase,
+  parseSkillPage,
+  parseVendors,
+  parseWikiCoin,
+  recipeIndex,
+  recipeKey,
+  shopping,
+  unitPrice,
+  type Recipe
 } from '../src/core/tradeskills'
 import { parseInventory } from '../src/core/inventory'
 import { parseSources } from '../src/core/wikiItem'
@@ -22,8 +32,28 @@ describe('recipes from the wiki', () => {
 
 }}</onlyinclude>`
     expect(parseCrafted('Test Draught', page)).toEqual([
-      { product: 'Test Draught', skill: 'Alchemy', trivial: 120, yields: 5, ingredients: [{ name: 'Small Vial', count: 3 }, { name: 'Herb A', count: 1 }], from: 'page' },
-      { product: 'Test Draught', skill: 'Brewing', trivial: 40, yields: 1, ingredients: [{ name: 'Water Flask', count: 2 }, { name: 'Herb B', count: 3 }], from: 'page' }
+      {
+        product: 'Test Draught',
+        skill: 'Alchemy',
+        trivial: 120,
+        yields: 5,
+        ingredients: [
+          { name: 'Small Vial', count: 3 },
+          { name: 'Herb A', count: 1 }
+        ],
+        from: 'page'
+      },
+      {
+        product: 'Test Draught',
+        skill: 'Brewing',
+        trivial: 40,
+        yields: 1,
+        ingredients: [
+          { name: 'Water Flask', count: 2 },
+          { name: 'Herb B', count: 3 }
+        ],
+        from: 'page'
+      }
     ])
   })
 
@@ -40,8 +70,22 @@ describe('recipes from the wiki', () => {
 |}`
     const r = parseSkillPage('Skill Alchemy', page)
     expect(r.map((x) => [x.product, x.trivial, x.ingredients])).toEqual([
-      ['Test Elixir', 244, [{ name: 'Sap', count: 1 }, { name: 'Vine', count: 1 }]],
-      ['Test Tonic', 212, [{ name: 'Sap', count: 1 }, { name: 'Small Vial', count: 5 }]]
+      [
+        'Test Elixir',
+        244,
+        [
+          { name: 'Sap', count: 1 },
+          { name: 'Vine', count: 1 }
+        ]
+      ],
+      [
+        'Test Tonic',
+        212,
+        [
+          { name: 'Sap', count: 1 },
+          { name: 'Small Vial', count: 5 }
+        ]
+      ]
     ])
     expect(r[0]).toMatchObject({ skill: 'Alchemy', yields: 1, from: 'table' })
   })
@@ -94,14 +138,27 @@ describe('what was paid', () => {
 
 describe('a batch', () => {
   const r: Recipe = {
-    product: 'Distillate', skill: 'Alchemy', trivial: 302, yields: 5, from: 'page',
-    ingredients: [{ name: 'Comfrey', count: 1 }, { name: 'Katuka Bark', count: 1 }, { name: 'Small Vial', count: 5 }]
+    product: 'Distillate',
+    skill: 'Alchemy',
+    trivial: 302,
+    yields: 5,
+    from: 'page',
+    ingredients: [
+      { name: 'Comfrey', count: 1 },
+      { name: 'Katuka Bark', count: 1 },
+      { name: 'Small Vial', count: 5 }
+    ]
   }
   const have: Record<string, number> = { Comfrey: 12, 'Katuka Bark': 3, 'Small Vial': 800 }
   const prices: Record<string, number> = { Comfrey: 35_000, 'Katuka Bark': 524, 'Small Vial': 10 }
 
   it('counts what to buy and what it costs', () => {
-    const s = shopping(r, 10, (n) => have[n] ?? 0, (n) => ({ unit: prices[n], from: 'paid' }))
+    const s = shopping(
+      r,
+      10,
+      (n) => have[n] ?? 0,
+      (n) => ({ unit: prices[n], from: 'paid' })
+    )
     expect(s.canMake).toBe(3)
     expect(s.lines.map((l) => [l.name, l.need, l.toBuy, l.cost])).toEqual([
       ['Comfrey', 10, 0, 0],
@@ -115,7 +172,12 @@ describe('a batch', () => {
   })
 
   it('says when a price is missing', () => {
-    const s = shopping(r, 1, () => 0, (n) => (n === 'Comfrey' ? { unit: 0, from: 'none' } : { unit: prices[n], from: 'wiki' }))
+    const s = shopping(
+      r,
+      1,
+      () => 0,
+      (n) => (n === 'Comfrey' ? { unit: 0, from: 'none' } : { unit: prices[n], from: 'wiki' })
+    )
     expect(s.unpriced).toBe(true)
     expect(s.toBuy).toBe(524 + 50)
   })
@@ -192,7 +254,11 @@ describe('crafted items and their eras', () => {
   it('reads a recipe laid out one ingredient a line, the container left out', () => {
     expect(parseCrafted('Enchanted Dwarven Plate Greaves', greaves)).toEqual([
       {
-        product: 'Enchanted Dwarven Plate Greaves', skill: 'Blacksmithing', trivial: 208, yields: 1, from: 'page',
+        product: 'Enchanted Dwarven Plate Greaves',
+        skill: 'Blacksmithing',
+        trivial: 208,
+        yields: 1,
+        from: 'page',
         ingredients: [
           { name: 'Dwarven Smithy Hammer', count: 1 },
           { name: 'Earthen Temper', count: 1 },
@@ -216,8 +282,13 @@ describe('crafted items and their eras', () => {
     { product: 'Loop B', ingredients: [{ name: 'Loop A', count: 1 }] }
   ]
   const eras = {
-    'Enchanted Dwarven Plate Greaves': '', 'Small Plate Greaves Mold': 'Epics', 'Enchanted Block of Brellium': 'Classic', 'Luclin Herb': 'Luclin', Water: '',
-    'Leather Padding': '', 'Earthen Temper': ''
+    'Enchanted Dwarven Plate Greaves': '',
+    'Small Plate Greaves Mold': 'Epics',
+    'Enchanted Block of Brellium': 'Classic',
+    'Luclin Herb': 'Luclin',
+    Water: '',
+    'Leather Padding': '',
+    'Earthen Temper': ''
   }
 
   it('takes an untagged product’s eras from its ingredients, down its recipes, the fewest-era recipe first', () => {

@@ -67,10 +67,26 @@ export function FocusTab({ m }: { m: GearModel }) {
         <div className="row">
           <h2 style={{ margin: 0 }}>Focus effects for your spells</h2>
           <span className="grow" />
-          <button className="btn ghost small" onClick={() => m.setWanted(m.lines.map((l) => l.key), true)}>
+          <button
+            className="btn ghost small"
+            onClick={() =>
+              m.setWanted(
+                m.lines.map((l) => l.key),
+                true
+              )
+            }
+          >
             Want all
           </button>
-          <button className="btn ghost small" onClick={() => m.setWanted(m.lines.map((l) => l.key), false)}>
+          <button
+            className="btn ghost small"
+            onClick={() =>
+              m.setWanted(
+                m.lines.map((l) => l.key),
+                false
+              )
+            }
+          >
             Want none
           </button>
           <button className="btn ghost small" onClick={m.resetWanted} title="Every focus but reagent use">
@@ -100,10 +116,18 @@ export function FocusTab({ m }: { m: GearModel }) {
           </span>
         </div>
         <p className="small muted" style={{ margin: 0 }}>
-          A focus is worth what it does to the spells you actually cast, spell by spell: its strength on each (less on a spell above its level cap), times how often you
-          cast that spell. Only the best focus of a kind works on a spell, as in game. Making every spell you cast 10% better counts as{' '}
-          <input type="number" min={0} step={25} value={m.points} style={{ width: 64 }} aria-label="Points for making every spell 10% better" onChange={(e) => m.setPoints(Math.max(0, Number(e.target.value) || 0))} /> points in
-          the upgrade finder and the optimizer; spell range and reagents count a quarter as much. Tick the ones you want: {wantedCount} of {m.lines.length} are.
+          A focus is worth what it does to the spells you actually cast, spell by spell: its strength on each (less on a spell above its level cap), times how often you cast that
+          spell. Only the best focus of a kind works on a spell, as in game. Making every spell you cast 10% better counts as{' '}
+          <input
+            type="number"
+            min={0}
+            step={25}
+            value={m.points}
+            style={{ width: 64 }}
+            aria-label="Points for making every spell 10% better"
+            onChange={(e) => m.setPoints(Math.max(0, Number(e.target.value) || 0))}
+          />{' '}
+          points in the upgrade finder and the optimizer; spell range and reagents count a quarter as much. Tick the ones you want: {wantedCount} of {m.lines.length} are.
         </p>
       </div>
 
@@ -123,9 +147,9 @@ export function FocusTab({ m }: { m: GearModel }) {
       )}
       <p className="faint small">
         What each focus does comes from the game's own spell file: its strength, its level cap and how fast it fades past it, and which spells it touches (beneficial or
-        detrimental, instant or over time, pets, lifetaps, instruments). Foci that differ only in strength and level cap are ranks of one line; Extended Enhancement III and
-        Tavee's Greater Diuturnity are the same focus. Casts come from your log and its archives ("You begin casting"); the percentages shown are a focus's strength
-        averaged over the casts it touches (hover one for each spell). Which item carries which focus comes from eqlwiki.com.
+        detrimental, instant or over time, pets, lifetaps, instruments). Foci that differ only in strength and level cap are ranks of one line; Extended Enhancement III and Tavee's
+        Greater Diuturnity are the same focus. Casts come from your log and its archives ("You begin casting"); the percentages shown are a focus's strength averaged over the casts
+        it touches (hover one for each spell). Which item carries which focus comes from eqlwiki.com.
       </p>
     </div>
   )
@@ -162,7 +186,11 @@ function FocusRow({ m, l }: { m: GearModel; l: FocusLine }) {
         </div>
         {l.kind === 'reagent' && <div className="faint small">Legends' spell file lists no reagents, so this counts every spell as using one.</div>}
         {on && ranks.length > 1 && (
-          <label className="row tight small" style={{ marginTop: 4 }} title="A rank that is enough for you: stronger ranks count for no more in the finder and the optimizer, so they stop chasing the best">
+          <label
+            className="row tight small"
+            style={{ marginTop: 4 }}
+            title="A rank that is enough for you: stronger ranks count for no more in the finder and the optimizer, so they stop chasing the best"
+          >
             <span className="muted">Enough:</span>
             <select aria-label={`Enough for ${l.label}`} value={m.enough[l.key] ?? ''} onChange={(e) => m.setEnough(l.key, e.target.value || null)}>
               <option value="">The best there is</option>
@@ -204,7 +232,9 @@ function FocusRow({ m, l }: { m: GearModel; l: FocusLine }) {
           <span className="faint small">None in the eras shown that works on your spells</span>
         )}
         {have[0] && have[0].eff > (best?.eff ?? 0) && best && !capped && (
-          <div className="small muted">Your {baseName(have[0].via || have[0].item.name)} ({have[0].focus}) beats these: it is from an era not shown.</div>
+          <div className="small muted">
+            Your {baseName(have[0].via || have[0].item.name)} ({have[0].focus}) beats these: it is from an era not shown.
+          </div>
         )}
         {capped && !avail.length && all.length > 0 && <span className="faint small">Nothing at that rank or below in the eras shown; stronger ranks still count as enough.</span>}
       </div>
@@ -215,7 +245,8 @@ function FocusRow({ m, l }: { m: GearModel; l: FocusLine }) {
         {have.length ? (
           <>
             <div title={strengthNote(info(have[0].focus))}>
-              <b>{have[0].focus}</b> <span className="muted">{pct(have[0].eff)}</span> <Info label={`What ${have[0].focus} does`} text={strengthNote(info(have[0].focus))} /> <span className="faint small">· worth {num(worth(have[0].focus))}</span>
+              <b>{have[0].focus}</b> <span className="muted">{pct(have[0].eff)}</span> <Info label={`What ${have[0].focus} does`} text={strengthNote(info(have[0].focus))} />{' '}
+              <span className="faint small">· worth {num(worth(have[0].focus))}</span>
             </div>
             <div className="small muted">{ownedText(have[0])}</div>
             {have[0].from !== 'worn' && have.some((h) => h.from === 'worn') && (
@@ -244,8 +275,14 @@ export function OptimizeTab({ m }: { m: GearModel }) {
   const plan = useMemo(
     () =>
       optimizeGear({
-        pieces, wearer: m.wearer, weights: m.weights, twoHanders: m.twoHanders, focusValue: m.focusValue, exaltations: m.exaltations,
-        effects: m.effects.value ?? undefined, hands: m.weaponHands
+        pieces,
+        wearer: m.wearer,
+        weights: m.weights,
+        twoHanders: m.twoHanders,
+        focusValue: m.focusValue,
+        exaltations: m.exaltations,
+        effects: m.effects.value ?? undefined,
+        hands: m.weaponHands
       }),
     [pieces, m.wearer, m.weights, m.twoHanders, m.focusValue, m.exaltations, m.effects.value, m.weaponHands]
   )
@@ -255,9 +292,7 @@ export function OptimizeTab({ m }: { m: GearModel }) {
   const shownScore = (p: Piece | null, i: number) => (p?.stats ? score(p.stats, { ...weightsForSlot(m.weights, plan.slots[i], m.hands), haste: 0 }) : 0)
   const shownBefore = plan.before.map(shownScore)
   const shownAfter = plan.after.map(shownScore)
-  const changes = plan.slots
-    .map((slot, i) => ({ slot, i, before: plan.before[i], after: plan.after[i] }))
-    .filter((c) => c.before !== c.after)
+  const changes = plan.slots.map((slot, i) => ({ slot, i, before: plan.before[i], after: plan.after[i] })).filter((c) => c.before !== c.after)
   // Changes that are one move: a piece leaving one slot for another ties the two slots together, and
   // a slot's own stats may fall for the set to gain (a new weapon in Primary, the old one to Secondary).
   const hostOf = (p: Piece) => p.host ?? p
@@ -277,8 +312,7 @@ export function OptimizeTab({ m }: { m: GearModel }) {
   // Worn effects and procs, for the chips: a proc only counts in the hands, but it goes where its weapon goes.
   const effectNamesOf = (p: Piece | null) => [...(p?.worn ?? []), ...(p?.procs ?? [])]
   const lineOf = (name: string) => m.report?.foci[name]
-  const bestIn = (set: (Piece | null)[], line: string) =>
-    Math.max(0, ...set.flatMap((p) => namesOf(p).map((n) => (lineOf(n)?.line === line ? lineOf(n)!.eff : 0))))
+  const bestIn = (set: (Piece | null)[], line: string) => Math.max(0, ...set.flatMap((p) => namesOf(p).map((n) => (lineOf(n)?.line === line ? lineOf(n)!.eff : 0))))
   const wantedLines = m.lines.filter((l) => m.wanted.has(l.key))
 
   return (
@@ -303,17 +337,16 @@ export function OptimizeTab({ m }: { m: GearModel }) {
         {all && (
           <p className="small" style={{ margin: 0 }}>
             With the best of everything your classes can wear from the eras shown ({m.catalogPieces.length} pieces, the top {CATALOG_PER_SLOT} a slot by these weights, focus and
-            effects),{' '}
-            {m.compare === 'level' ? 'at the merge level of what you wear in the slot' : 'as they drop (+0)'}, as the upgrade finder compares them (its “Compare” setting).
-            Pieces to get are marked; the rest is what you own.
+            effects), {m.compare === 'level' ? 'at the merge level of what you wear in the slot' : 'as they drop (+0)'}, as the upgrade finder compares them (its “Compare”
+            setting). Pieces to get are marked; the rest is what you own.
           </p>
         )}
         <p className="small muted" style={{ margin: 0 }}>
-          Every piece you wear, carry, bank, keep in Storage › Equipment or have on your pet ({m.pieces.length} of them), tried in every slot it fits, both Any slots
-          included, scored with these weights plus the focus effects you want and what worn effects and procs add to your melee (Worn effects and Procs tabs).
-          Exaltations stay in the item that holds them; the {m.exaltations.length} you may use in Storage › Exaltations are tried in the focus, worn and proc slots of
-          each piece of their own kind (a ring's in a ring), in place of what it has there. Your pet's pieces count without any exaltations they hold, which the game
-          does not list. Haste does not stack, so one haste item is all it wears for it: each you own is tried as that one, wherever it leaves the rest of the set best.
+          Every piece you wear, carry, bank, keep in Storage › Equipment or have on your pet ({m.pieces.length} of them), tried in every slot it fits, both Any slots included,
+          scored with these weights plus the focus effects you want and what worn effects and procs add to your melee (Worn effects and Procs tabs). Exaltations stay in the item
+          that holds them; the {m.exaltations.length} you may use in Storage › Exaltations are tried in the focus, worn and proc slots of each piece of their own kind (a ring's in
+          a ring), in place of what it has there. Your pet's pieces count without any exaltations they hold, which the game does not list. Haste does not stack, so one haste item
+          is all it wears for it: each you own is tried as that one, wherever it leaves the rest of the set best.
         </p>
         {changes.length ? (
           <div className="row" style={{ gap: 18, flexWrap: 'wrap', marginTop: 4 }}>
@@ -405,7 +438,12 @@ export function OptimizeTab({ m }: { m: GearModel }) {
                   )}
                   {together.length > 1 && (
                     <div className="small muted" title="The stats of every slot this move changes, by your weights">
-                      one move with {together.filter((o) => o.i !== c.i).map((o) => slotLabel(o.slot)).join(' and ')}: together{' '}
+                      one move with{' '}
+                      {together
+                        .filter((o) => o.i !== c.i)
+                        .map((o) => slotLabel(o.slot))
+                        .join(' and ')}
+                      : together{' '}
                       <b className={moveGain(together) >= 0 ? 'lt-up' : 'lt-down'}>
                         {moveGain(together) >= 0 ? '+' : ''}
                         {num(moveGain(together))}
@@ -488,8 +526,8 @@ export function OptimizeTab({ m }: { m: GearModel }) {
         </div>
       )}
       <p className="faint small">
-        A search from what you wear now: it moves one piece at a time into the slot where it adds most (swapping, or refilling the slot it left) until no move adds
-        anything. Stats are scored exactly as in the upgrade finder, at each piece's merge level; lore items go on once. Items with no wiki page stay where they are.
+        A search from what you wear now: it moves one piece at a time into the slot where it adds most (swapping, or refilling the slot it left) until no move adds anything. Stats
+        are scored exactly as in the upgrade finder, at each piece's merge level; lore items go on once. Items with no wiki page stay where they are.
       </p>
     </div>
   )

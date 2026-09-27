@@ -3,15 +3,7 @@ import type { MoteState } from '../core/motes'
 import type { RespawnRecords } from '../core/respawns'
 import type { BuffsFile } from '../core/buffs'
 import { join } from 'node:path'
-import {
-  DEFAULT_CHARACTER,
-  type AppSettings,
-  type CharacterSettings,
-  type FocusSource,
-  type MoteStock,
-  type SpellRule,
-  type Trigger
-} from '../shared/types'
+import { DEFAULT_CHARACTER, type AppSettings, type CharacterSettings, type FocusSource, type MoteStock, type SpellRule, type Trigger } from '../shared/types'
 import { sanitizeBuffs, sanitizeRespawns, sanitizeSettings } from '../core/validate'
 import { SCHEMAS, upgrade } from './schema'
 import { DEFAULT_OVERLAYS, JsonFile, characterKey, defaultSettings, mergeDefaults, readJsonFile, type ReadResult } from './storeCore'
@@ -101,17 +93,21 @@ export class Store {
     const motes = read('motes.json') as MoteState | undefined
     this.motesFresh = !motes
     this.motes = new JsonFile(p('motes.json'), motes ?? { active: null, sessions: [], daily: {} }, often)
-    this.stock = new JsonFile(
-      p('mote-stock.json'),
-      mergeDefaults<MoteStock>({ counts: {}, item: { name: '', lvl: 0, xp: 0, to: 1 }, autoAdd: true }, read('mote-stock.json')),
-      { delayMs: 3000 }
-    )
+    this.stock = new JsonFile(p('mote-stock.json'), mergeDefaults<MoteStock>({ counts: {}, item: { name: '', lvl: 0, xp: 0, to: 1 }, autoAdd: true }, read('mote-stock.json')), {
+      delayMs: 3000
+    })
     this.respawns = new JsonFile(p('respawns.json'), sanitizeRespawns(read('respawns.json')), often)
     this.buffs = new JsonFile(p('buffs.json'), sanitizeBuffs(read('buffs.json')), often)
 
     const byName: Record<string, JsonFile<unknown>> = {
-      'settings.json': this.settings, 'triggers.json': this.triggers, 'spell-rules.json': this.rules, 'casts.json': this.casts,
-      'motes.json': this.motes, 'mote-stock.json': this.stock, 'respawns.json': this.respawns, 'buffs.json': this.buffs
+      'settings.json': this.settings,
+      'triggers.json': this.triggers,
+      'spell-rules.json': this.rules,
+      'casts.json': this.casts,
+      'motes.json': this.motes,
+      'mote-stock.json': this.stock,
+      'respawns.json': this.respawns,
+      'buffs.json': this.buffs
     }
     for (const f of this.newer) byName[f]?.freeze('written by a newer version')
     // Brought forward: written in the new shape at the next save or at quit.
@@ -130,8 +126,18 @@ export class Store {
     // A character saved with one flat focus figure keeps it, as a single source, until it is replaced.
     if (!c.focusSources.length && (c.beneficialFocusPct || c.detrimentalFocusPct)) {
       const legacy = (pct: number, appliesTo: FocusSource['appliesTo']): FocusSource => ({
-        id: `legacy-${appliesTo}`, name: `${appliesTo === 'beneficial' ? 'Beneficial' : 'Detrimental'} duration focus`, kind: 'aa', from: 'earlier setting',
-        pct, appliesTo, maxLevel: 0, decayPct: 0, minTicks: 0, requireSpas: [], excludeSpas: [], enabled: true
+        id: `legacy-${appliesTo}`,
+        name: `${appliesTo === 'beneficial' ? 'Beneficial' : 'Detrimental'} duration focus`,
+        kind: 'aa',
+        from: 'earlier setting',
+        pct,
+        appliesTo,
+        maxLevel: 0,
+        decayPct: 0,
+        minTicks: 0,
+        requireSpas: [],
+        excludeSpas: [],
+        enabled: true
       })
       c.focusSources = [
         ...(c.beneficialFocusPct ? [legacy(c.beneficialFocusPct, 'beneficial')] : []),

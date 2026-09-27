@@ -153,20 +153,10 @@ export function MoteSpells() {
           <span className="grow" />
           <b>Order by</b>
           <span className="lt-seg" role="group" aria-label="Order by">
-            <button
-              className={sortBy === 'rate' ? 'on' : ''}
-              aria-pressed={sortBy === 'rate'}
-              onClick={() => setSortBy('rate')}
-              title="The most gained per xp spent"
-            >
+            <button className={sortBy === 'rate' ? 'on' : ''} aria-pressed={sortBy === 'rate'} onClick={() => setSortBy('rate')} title="The most gained per xp spent">
               Worth per xp
             </button>
-            <button
-              className={sortBy === 'worth' ? 'on' : ''}
-              aria-pressed={sortBy === 'worth'}
-              onClick={() => setSortBy('worth')}
-              title="The biggest gain, whatever it costs"
-            >
+            <button className={sortBy === 'worth' ? 'on' : ''} aria-pressed={sortBy === 'worth'} onClick={() => setSortBy('worth')} title="The biggest gain, whatever it costs">
               Worth
             </button>
             <button className={sortBy === 'casts' ? 'on' : ''} aria-pressed={sortBy === 'casts'} onClick={() => setSortBy('casts')} title="Most cast first">
@@ -187,14 +177,7 @@ export function MoteSpells() {
               }
             >
               <span className="muted">{WEIGHT_LABELS[k]}</span>
-              <NumberInput
-                value={weights[k]}
-                min={0}
-                step={0.25}
-                width={58}
-                label={`${WEIGHT_LABELS[k]} weight`}
-                onChange={(v) => setWeights({ ...weights, [k]: v ?? 0 })}
-              />
+              <NumberInput value={weights[k]} min={0} step={0.25} width={58} label={`${WEIGHT_LABELS[k]} weight`} onChange={(v) => setWeights({ ...weights, [k]: v ?? 0 })} />
             </label>
           ))}
           <button className="btn ghost small" onClick={() => setWeights(DEFAULT_SPELL_WEIGHTS)}>
@@ -205,9 +188,9 @@ export function MoteSpells() {
           {w && w.total > 0
             ? `${num(w.total)} casts from ${w.from} to ${w.to}, ${options.length} spell${options.length === 1 ? '' : 's'}${maxed ? `, ${maxed} at rank X already` : ''}${ignoredCount ? `, ${ignoredCount} ignored` : ''}.`
             : 'No casts in your log for this window.'}{' '}
-          {stock ? `Your motes are worth ${num(xp)} xp on spells.` : 'Motes on hand are not loaded yet, so nothing is marked affordable.'} Spend the low ranks
-          here: on an item a mote only works at its own tier, but on a spell it always counts its xp. Every rank also takes −{UNIVERSAL.recovery}% recovery, −
-          {UNIVERSAL.reuse}% reuse and −{UNIVERSAL.resist} off the resist modifier of resistable spells.
+          {stock ? `Your motes are worth ${num(xp)} xp on spells.` : 'Motes on hand are not loaded yet, so nothing is marked affordable.'} Spend the low ranks here: on an item a
+          mote only works at its own tier, but on a spell it always counts its xp. Every rank also takes −{UNIVERSAL.recovery}% recovery, −{UNIVERSAL.reuse}% reuse and −
+          {UNIVERSAL.resist} off the resist modifier of resistable spells.
           {unknown.length > 0 &&
             ` Not spell-book spells (clickies, potions, abilities), so left out: ${unknown
               .slice(0, 5)
@@ -269,9 +252,7 @@ export function MoteSpells() {
       </div>
 
       {!shown.length ? (
-        <div className="card empty">
-          {options.length ? 'Nothing to show with these filters.' : 'No spells cast in this window. Cast something, or widen the window.'}
-        </div>
+        <div className="card empty">{options.length ? 'Nothing to show with these filters.' : 'No spells cast in this window. Cast something, or widen the window.'}</div>
       ) : (
         SECTIONS.filter((s) => shown.some((o) => o.section === s.key)).map((s) => (
           <div key={s.key} className="card">
@@ -341,11 +322,7 @@ export function MoteSpells() {
                             Restore
                           </button>
                         ) : (
-                          <button
-                            className="btn ghost small"
-                            onClick={() => ignore(o.row.name, true)}
-                            title="Leave this spell out: you will not put motes into it"
-                          >
+                          <button className="btn ghost small" onClick={() => ignore(o.row.name, true)} title="Leave this spell out: you will not put motes into it">
                             Ignore
                           </button>
                         )}

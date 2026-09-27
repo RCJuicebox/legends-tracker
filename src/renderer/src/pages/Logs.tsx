@@ -26,13 +26,17 @@ export function Logs() {
         <div>
           <h1>Log Files</h1>
           <p>
-            Keeps character logs small. An archived log is zipped, named by the dates it covers, read back and checked
-            byte-for-byte, and only then removed. The game starts a fresh log on its next line.
+            Keeps character logs small. An archived log is zipped, named by the dates it covers, read back and checked byte-for-byte, and only then removed. The game starts a fresh
+            log on its next line.
           </p>
         </div>
         <div className="actions">
-          <button className="btn" onClick={refresh}>Refresh</button>
-          <button className="btn" onClick={() => void act('logs:reveal', view?.archiveDir ?? '')}>Open archive folder</button>
+          <button className="btn" onClick={refresh}>
+            Refresh
+          </button>
+          <button className="btn" onClick={() => void act('logs:reveal', view?.archiveDir ?? '')}>
+            Open archive folder
+          </button>
         </div>
       </div>
 
@@ -56,16 +60,18 @@ export function Logs() {
             <NumberInput value={a.thresholdMB} min={10} max={10000} step={10} width={90} label="Archive threshold in MB" onChange={(v) => setA({ thresholdMB: v ?? 150 })} />
             <span id="archive-unit">MB</span>
           </div>
-          <Field
-            label="Archive folder"
-            hint={a.archiveDir ? undefined : `Default: ${view?.archiveDir ?? 'Logs\\archive'}`}
-          >
+          <Field label="Archive folder" hint={a.archiveDir ? undefined : `Default: ${view?.archiveDir ?? 'Logs\\archive'}`}>
             <div className="row">
               <input className="grow" value={a.archiveDir} placeholder="Logs\archive (default)" onChange={(e) => setA({ archiveDir: e.target.value })} />
-              <button className="btn" onClick={async () => {
-                const dir = await act('dialog:folder')
-                if (dir) void setA({ archiveDir: dir })
-              }}>Browse…</button>
+              <button
+                className="btn"
+                onClick={async () => {
+                  const dir = await act('dialog:folder')
+                  if (dir) void setA({ archiveDir: dir })
+                }}
+              >
+                Browse…
+              </button>
             </div>
           </Field>
         </div>
@@ -146,7 +152,9 @@ export function Logs() {
         <h2>
           Archives <span className="chip">{view?.archives.length ?? 0}</span>
           <span className="spacer" />
-          <span className="faint small" style={{ textTransform: 'none', letterSpacing: 0 }}>{mb(totalZip)} zipped</span>
+          <span className="faint small" style={{ textTransform: 'none', letterSpacing: 0 }}>
+            {mb(totalZip)} zipped
+          </span>
         </h2>
         {loose.length > 0 && (
           <div className="notice row mb-10">
@@ -199,7 +207,9 @@ export function Logs() {
                   <td className="muted nowrap">{mb(x.size)}</td>
                   <td className="faint small nowrap">{new Date(x.modified).toLocaleDateString()}</td>
                   <td style={{ textAlign: 'right' }}>
-                    <button className="btn ghost small" onClick={() => void act('logs:reveal', x.path)}>Show</button>
+                    <button className="btn ghost small" onClick={() => void act('logs:reveal', x.path)}>
+                      Show
+                    </button>
                   </td>
                 </tr>
               ))}

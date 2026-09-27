@@ -12,7 +12,7 @@ afterAll(() => {
   else process.env.TZ = zone
 })
 
-const at = (clock: string, text = 'You say, \'hi\'') => `[Sun Nov 01 ${clock} 2026] ${text}`
+const at = (clock: string, text = "You say, 'hi'") => `[Sun Nov 01 ${clock} 2026] ${text}`
 
 describe('the hour the clocks go back', () => {
   it('is read twice the same way by the plain parser, which is why the clock is needed', () => {
@@ -36,8 +36,12 @@ describe('the hour the clocks go back', () => {
 
   it('keeps an AA dump whole when it runs across the change', () => {
     const lines = [
-      at('01:59:58', 'Ability #1: Combat Stability'), at('01:59:58', 'Description: Raises your armor class soft cap by 10%.'), at('01:59:58', 'Cost per Level: 3'),
-      at('01:00:00', 'Ability #2: Combat Fury'), at('01:00:00', 'Description: Improves your chance to land a critical hit with all skills by 5%.'), at('01:00:00', 'Cost per Level: 3')
+      at('01:59:58', 'Ability #1: Combat Stability'),
+      at('01:59:58', 'Description: Raises your armor class soft cap by 10%.'),
+      at('01:59:58', 'Cost per Level: 3'),
+      at('01:00:00', 'Ability #2: Combat Fury'),
+      at('01:00:00', 'Description: Improves your chance to land a critical hit with all skills by 5%.'),
+      at('01:00:00', 'Cost per Level: 3')
     ]
     expect(findAaDumps(lines).map((d) => d.length)).toEqual([2])
   })

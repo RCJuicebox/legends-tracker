@@ -151,11 +151,7 @@ export function isAbility(spell: { classLevels: number[] }): boolean {
  * or clicky no class casts, or an ability granted outside the spell book (Harm Touch, Life Burn:
  * class level 254).
  */
-export function castRows(
-  book: SpellBook,
-  counts: Record<string, number>,
-  character: CharacterSettings
-): { rows: SpellCastRow[]; unknown: { name: string; casts: number }[] } {
+export function castRows(book: SpellBook, counts: Record<string, number>, character: CharacterSettings): { rows: SpellCastRow[]; unknown: { name: string; casts: number }[] } {
   const rows = new Map<string, SpellCastRow>()
   const unknown: { name: string; casts: number }[] = []
   for (const [name, casts] of Object.entries(counts)) {
@@ -338,7 +334,5 @@ export function spellUpgradeOptions(o: SpellUpgradeInput): SpellUpgradeOption[] 
       maxed
     })
   }
-  return out.sort(
-    (a, b) => Number(a.maxed) - Number(b.maxed) || b.rate - a.rate || b.worth - a.worth || b.row.casts - a.row.casts || a.row.name.localeCompare(b.row.name)
-  )
+  return out.sort((a, b) => Number(a.maxed) - Number(b.maxed) || b.rate - a.rate || b.worth - a.worth || b.row.casts - a.row.casts || a.row.name.localeCompare(b.row.name))
 }

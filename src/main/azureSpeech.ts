@@ -164,7 +164,12 @@ export class AzureSpeech {
       signal: AbortSignal.timeout(TIMEOUT_MS)
     })
     if (!res.ok) {
-      this.error = res.status === 401 || res.status === 403 ? 'Azure turned the key down.' : res.status === 429 ? 'Azure says the key is over its limit for now.' : `Azure answered ${res.status}.`
+      this.error =
+        res.status === 401 || res.status === 403
+          ? 'Azure turned the key down.'
+          : res.status === 429
+            ? 'Azure says the key is over its limit for now.'
+            : `Azure answered ${res.status}.`
       throw new Error(this.error)
     }
     const wav = Buffer.from(await res.arrayBuffer())

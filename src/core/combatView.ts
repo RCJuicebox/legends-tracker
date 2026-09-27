@@ -105,9 +105,19 @@ function finish<T extends { total: number; fill: number; share: number }>(rows: 
 
 function entityRow(e: Entity, ms: number): Row {
   return {
-    key: nameKey(e.name), name: e.name, kind: e.kind, ...(e.owner ? { owner: e.owner } : {}),
-    total: e.out.total, dps: rate(e.out.total, ms), activeDps: rate(e.out.total, e.activeMs), fill: 0, share: 0,
-    hits: e.out.hits, crits: e.out.crits, misses: Object.values(e.skills).reduce((s, k) => s + k.misses, 0), max: e.out.max
+    key: nameKey(e.name),
+    name: e.name,
+    kind: e.kind,
+    ...(e.owner ? { owner: e.owner } : {}),
+    total: e.out.total,
+    dps: rate(e.out.total, ms),
+    activeDps: rate(e.out.total, e.activeMs),
+    fill: 0,
+    share: 0,
+    hits: e.out.hits,
+    crits: e.out.crits,
+    misses: Object.values(e.skills).reduce((s, k) => s + k.misses, 0),
+    max: e.out.max
   }
 }
 
@@ -156,14 +166,41 @@ export function skillRows(seg: Segment, row: Row): SkillRow[] {
   for (const s of Object.values(e?.skills ?? {})) {
     const proc = procTag(e, s.name)
     out.push({
-      key: `s:${s.name}`, name: s.name, how: s.how, ...(proc ? { proc } : {}), total: s.total, dps: rate(s.total, ms), fill: 0, share: 0,
-      hits: s.hits, crits: s.crits, misses: s.misses, resists: s.resists, max: s.max, min: s.min, avg: s.hits ? s.total / s.hits : 0, mods: s.mods
+      key: `s:${s.name}`,
+      name: s.name,
+      how: s.how,
+      ...(proc ? { proc } : {}),
+      total: s.total,
+      dps: rate(s.total, ms),
+      fill: 0,
+      share: 0,
+      hits: s.hits,
+      crits: s.crits,
+      misses: s.misses,
+      resists: s.resists,
+      max: s.max,
+      min: s.min,
+      avg: s.hits ? s.total / s.hits : 0,
+      mods: s.mods
     })
   }
   for (const p of row.pets ?? []) {
     out.push({
-      key: `p:${p.key}`, name: p.name, how: 'pet', total: p.total, dps: p.dps, fill: 0, share: 0,
-      hits: p.hits, crits: p.crits, misses: p.misses, resists: 0, max: p.max, min: 0, avg: p.hits ? p.total / p.hits : 0, mods: {}
+      key: `p:${p.key}`,
+      name: p.name,
+      how: 'pet',
+      total: p.total,
+      dps: p.dps,
+      fill: 0,
+      share: 0,
+      hits: p.hits,
+      crits: p.crits,
+      misses: p.misses,
+      resists: 0,
+      max: p.max,
+      min: 0,
+      avg: p.hits ? p.total / p.hits : 0,
+      mods: {}
     })
   }
   return finish(out)
@@ -176,7 +213,20 @@ export function targetRows(seg: Segment, scope: MeterScope): Row[] {
   for (const e of scoped(seg, scope)) {
     for (const [name, t] of Object.entries(e.targets)) {
       const k = nameKey(name)
-      const r = sums.get(k) ?? { key: k, name: seg.entities[k]?.name ?? name, kind: seg.entities[k]?.kind ?? 'npc', total: 0, dps: 0, activeDps: 0, fill: 0, share: 0, hits: 0, crits: 0, misses: 0, max: 0 }
+      const r = sums.get(k) ?? {
+        key: k,
+        name: seg.entities[k]?.name ?? name,
+        kind: seg.entities[k]?.kind ?? 'npc',
+        total: 0,
+        dps: 0,
+        activeDps: 0,
+        fill: 0,
+        share: 0,
+        hits: 0,
+        crits: 0,
+        misses: 0,
+        max: 0
+      }
       r.total += t.total
       r.hits += t.hits
       r.crits += t.crits
@@ -235,8 +285,21 @@ export function attackerSkillRows(seg: Segment, scope: MeterScope, attacker: str
   const out: SkillRow[] = []
   for (const s of Object.values(a.skills)) {
     out.push({
-      key: `s:${s.name}`, name: allInScope ? s.name : `${s.name} (all targets)`, how: s.how, total: s.total, dps: rate(s.total, ms), fill: 0, share: 0,
-      hits: s.hits, crits: s.crits, misses: s.misses, resists: s.resists, max: s.max, min: s.min, avg: s.hits ? s.total / s.hits : 0, mods: s.mods
+      key: `s:${s.name}`,
+      name: allInScope ? s.name : `${s.name} (all targets)`,
+      how: s.how,
+      total: s.total,
+      dps: rate(s.total, ms),
+      fill: 0,
+      share: 0,
+      hits: s.hits,
+      crits: s.crits,
+      misses: s.misses,
+      resists: s.resists,
+      max: s.max,
+      min: s.min,
+      avg: s.hits ? s.total / s.hits : 0,
+      mods: s.mods
     })
   }
   return finish(out)
@@ -260,14 +323,28 @@ export function defenseOf(seg: Segment, scope: MeterScope): Defense {
 
 function healRow(key: string, name: string, kind: EntityKind, h: HealTally, ms: number): HealRow {
   return {
-    key, name, kind, total: h.total, raw: h.raw, overheal: h.raw > 0 ? (h.raw - h.total) / h.raw : 0,
-    hps: rate(h.total, ms), fill: 0, share: 0, count: h.count, crits: h.crits, max: h.max
+    key,
+    name,
+    kind,
+    total: h.total,
+    raw: h.raw,
+    overheal: h.raw > 0 ? (h.raw - h.total) / h.raw : 0,
+    hps: rate(h.total, ms),
+    fill: 0,
+    share: 0,
+    count: h.count,
+    crits: h.crits,
+    max: h.max
   }
 }
 
 export function healerRows(seg: Segment, scope: MeterScope): HealRow[] {
   const ms = durationMs(seg)
-  return finish(scoped(seg, scope).filter((e) => e.healOut.count > 0).map((e) => healRow(nameKey(e.name), e.name, e.kind, e.healOut, ms)))
+  return finish(
+    scoped(seg, scope)
+      .filter((e) => e.healOut.count > 0)
+      .map((e) => healRow(nameKey(e.name), e.name, e.kind, e.healOut, ms))
+  )
 }
 
 export function healSpellRows(seg: Segment, healer: string): HealRow[] {
@@ -329,8 +406,16 @@ export function procRows(seg: Segment, scope: MeterScope): ProcRow[] {
   for (const e of scoped(seg, scope)) {
     for (const p of Object.values(e.procs)) {
       rows.push({
-        key: `${nameKey(e.name)}|${p.name}`, name: p.name, origin: p.origin, source: e.name, sourceKind: e.kind,
-        count: p.count, damage: p.damage, healed: p.healed, ppm: perMinute(p.count, e.activeMs), fill: 0
+        key: `${nameKey(e.name)}|${p.name}`,
+        name: p.name,
+        origin: p.origin,
+        source: e.name,
+        sourceKind: e.kind,
+        count: p.count,
+        damage: p.damage,
+        healed: p.healed,
+        ppm: perMinute(p.count, e.activeMs),
+        fill: 0
       })
     }
   }
@@ -342,7 +427,9 @@ export function procRows(seg: Segment, scope: MeterScope): ProcRow[] {
 
 export function procSummary(seg: Segment, scope: MeterScope, rows: ProcRow[]): ProcSummary {
   const sources = new Set(rows.map((r) => nameKey(r.source)))
-  const activeMs = scoped(seg, scope).filter((e) => sources.has(nameKey(e.name))).reduce((s, e) => s + e.activeMs, 0)
+  const activeMs = scoped(seg, scope)
+    .filter((e) => sources.has(nameKey(e.name)))
+    .reduce((s, e) => s + e.activeMs, 0)
   const count = rows.reduce((s, r) => s + r.count, 0)
   return { count, ppm: perMinute(count, activeMs), activeSec: activeMs / 1000 }
 }

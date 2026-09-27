@@ -42,16 +42,32 @@ export function SetupChecklist({ go }: { go: Go }) {
   const steps: Step[] = [
     { id: 'folder', done: !!s.installDir && spellsLoaded > 0, text: 'Find the game folder, so spells can be timed', page: 'settings', button: 'Settings' },
     { id: 'log', done: !!s.logFile, text: 'Choose your character log (type /log on in game if there is none)', page: 'settings', button: 'Settings' },
-    { id: 'classes', done: Object.keys(state.character.classLevels).length > 0, text: 'Set your classes and their levels, so durations use the right level', page: 'stats', button: 'Stats' },
+    {
+      id: 'classes',
+      done: Object.keys(state.character.classLevels).length > 0,
+      text: 'Set your classes and their levels, so durations use the right level',
+      page: 'stats',
+      button: 'Stats'
+    },
     { id: 'audio', done: s.audio.deviceId !== 'default', text: 'Pick where speech and sounds play', page: 'audio', button: 'Audio', accept: 'The default is fine' },
-    { id: 'overlays', done: arranged, text: 'Place the overlays over your game (Arrange, drag, then Lock)', page: 'overlays', button: 'Overlays', accept: 'They are fine where they are' }
+    {
+      id: 'overlays',
+      done: arranged,
+      text: 'Place the overlays over your game (Arrange, drag, then Lock)',
+      page: 'overlays',
+      button: 'Overlays',
+      accept: 'They are fine where they are'
+    }
   ]
   const left = steps.filter((x) => !x.done && !accepted.includes(x.id))
   if (hidden || !left.length) return null
   return (
     <div className="card mb-16">
       <h2>
-        Getting set up <span className="chip">{steps.length - left.length} of {steps.length}</span>
+        Getting set up{' '}
+        <span className="chip">
+          {steps.length - left.length} of {steps.length}
+        </span>
         <span className="spacer" />
         <button className="btn small ghost" onClick={() => setHidden(true)}>
           Hide
@@ -133,7 +149,9 @@ export function FightSummary({ go }: { go: Go }) {
           {fightsInSession} fight{fightsInSession === 1 ? '' : 's'} · {session?.kills ?? 0} killed · {session?.deaths ?? 0} died
         </span>
         <span className="sub">
-          {session ? `${fmtClock(durationSec(session))} · coin ${fmtCoin((coin?.corpse ?? 0) + (coin?.sales ?? 0))} · ${Math.round((session.kills ?? 0) / sessionHours)} kills/hour` : 'no session yet'}
+          {session
+            ? `${fmtClock(durationSec(session))} · coin ${fmtCoin((coin?.corpse ?? 0) + (coin?.sales ?? 0))} · ${Math.round((session.kills ?? 0) / sessionHours)} kills/hour`
+            : 'no session yet'}
         </span>
       </button>
     </div>

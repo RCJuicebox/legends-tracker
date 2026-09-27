@@ -173,15 +173,23 @@ export function createContext(): AppContext {
     if (s.state === 'error' && was === 'downloading') {
       // A download that failed is said once; the next hourly check tries again.
       ctx.engine.pushFeed('warn', `The update could not be downloaded: ${s.message}. It will be tried again within the hour.`)
-      announceUpdate(`failed:${Date.now() - (Date.now() % 86_400_000)}`, 'Legends Tracker could not download its update', `${s.message}. It will be tried again within the hour.`, () => windows.showMain())
+      announceUpdate(
+        `failed:${Date.now() - (Date.now() % 86_400_000)}`,
+        'Legends Tracker could not download its update',
+        `${s.message}. It will be tried again within the hour.`,
+        () => windows.showMain()
+      )
     } else if (s.state === 'downloading') {
       announceUpdate(`found:${s.version}`, `Legends Tracker ${s.version} is available`, 'Downloading it now. You can restart into it once it has arrived.', () =>
         windows.showMain()
       )
     } else if (s.state === 'ready') {
       ctx.engine.pushFeed('info', `Version ${s.version} is ready: restart to update.`)
-      announceUpdate(`ready:${s.version}`, `Legends Tracker ${s.version} is ready`, 'Click to restart and update. Your settings and overlays stay as they are.', () =>
-        void ctx.installUpdate()
+      announceUpdate(
+        `ready:${s.version}`,
+        `Legends Tracker ${s.version} is ready`,
+        'Click to restart and update. Your settings and overlays stay as they are.',
+        () => void ctx.installUpdate()
       )
     }
   })
@@ -330,27 +338,74 @@ function reportStatus(s: WatchStatus): void {
 
 /** Every source the Data Sources page lists, with what it is and how to refresh it. */
 function registerSources(ctx: AppContext): void {
-  sources.add('log', { label: 'Chat log', kind: 'log', what: "Your character's eqlog file, read as the game writes it. Timers, the meter, loot, motes and buffs all come from it.", refresh: () => ctx.engine.startWatching() })
-  sources.add('spells', { label: 'Spell data', kind: 'game file', what: "spells_us.txt and its strings file: every spell's duration, category, effects and messages. Read again when the game updates it.", refresh: () => reloadGameData(ctx, 'Read again by hand') })
-  sources.add('tables', { label: 'Game tables', kind: 'game file', what: "The Resources folder's skill caps, AC soft caps and stat values, for the Stats and Gear pages.", refresh: async () => {
-    ctx.gameTables.clear()
-    await ctx.gameTables.acCaps([], 1)
-  } })
+  sources.add('log', {
+    label: 'Chat log',
+    kind: 'log',
+    what: "Your character's eqlog file, read as the game writes it. Timers, the meter, loot, motes and buffs all come from it.",
+    refresh: () => ctx.engine.startWatching()
+  })
+  sources.add('spells', {
+    label: 'Spell data',
+    kind: 'game file',
+    what: "spells_us.txt and its strings file: every spell's duration, category, effects and messages. Read again when the game updates it.",
+    refresh: () => reloadGameData(ctx, 'Read again by hand')
+  })
+  sources.add('tables', {
+    label: 'Game tables',
+    kind: 'game file',
+    what: "The Resources folder's skill caps, AC soft caps and stat values, for the Stats and Gear pages.",
+    refresh: async () => {
+      ctx.gameTables.clear()
+      await ctx.gameTables.acCaps([], 1)
+    }
+  })
   sources.add('icons', { label: 'Icons', kind: 'game file', what: "The game's spell and item icon sheets.", refresh: async () => ctx.icons.clear() })
-  sources.add('exports', { label: 'Character exports', kind: 'game file', what: 'The inventory and achievements files the game writes when you type /outputfile inventory or /outputfile achievements. Watched for new ones while their page is open.' })
-  sources.add('history', { label: 'Log history', kind: 'log', what: 'Casts, melee, purchases, faction changes and progression counted over your log and its archives, for the Gear, Spell upgrades, Tradeskills, Factions and Progression pages. Only what the log gains is read again.' })
-  sources.add('motes', { label: 'Mote history', kind: 'log', what: 'Every mote looted and every instance run, from your logs and archives.', refresh: () => ctx.engine.rebuildMoteHistory() })
+  sources.add('exports', {
+    label: 'Character exports',
+    kind: 'game file',
+    what: 'The inventory and achievements files the game writes when you type /outputfile inventory or /outputfile achievements. Watched for new ones while their page is open.'
+  })
+  sources.add('history', {
+    label: 'Log history',
+    kind: 'log',
+    what: 'Casts, melee, purchases, faction changes and progression counted over your log and its archives, for the Gear, Spell upgrades, Tradeskills, Factions and Progression pages. Only what the log gains is read again.'
+  })
+  sources.add('motes', {
+    label: 'Mote history',
+    kind: 'log',
+    what: 'Every mote looted and every instance run, from your logs and archives.',
+    refresh: () => ctx.engine.rebuildMoteHistory()
+  })
   sources.add('items', { label: 'Item lookups', kind: 'wiki', what: 'eqlwiki pages for the items you wear and look at, kept a week.' })
-  sources.add('catalog', { label: 'Item catalog', kind: 'wiki', what: "Every piece of equipment on eqlwiki, for the upgrade finder and optimizer. Refreshed weekly, reading only pages edited since.", refresh: () => ctx.wikiCatalog.refresh() })
-  sources.add('recipes', { label: 'Recipes', kind: 'wiki', what: "Every player-crafted recipe on eqlwiki, for the Tradeskills page and crafted items' eras.", refresh: () => ctx.recipeBook.refresh() })
+  sources.add('catalog', {
+    label: 'Item catalog',
+    kind: 'wiki',
+    what: 'Every piece of equipment on eqlwiki, for the upgrade finder and optimizer. Refreshed weekly, reading only pages edited since.',
+    refresh: () => ctx.wikiCatalog.refresh()
+  })
+  sources.add('recipes', {
+    label: 'Recipes',
+    kind: 'wiki',
+    what: "Every player-crafted recipe on eqlwiki, for the Tradeskills page and crafted items' eras.",
+    refresh: () => ctx.recipeBook.refresh()
+  })
   sources.add('petWiki', { label: 'Pet pages', kind: 'wiki', what: "eqlwiki's Pet Guide and each pet's summon page, for the pet gear planner." })
-  sources.add('speech', { label: 'Windows voices', kind: 'app', what: "Windows' own speech engine, started when something is to be said and stopped when quiet.", refresh: async () => {
-    await ctx.speech.warm()
-    if (ctx.speech.failed) throw new Error(ctx.speech.failed)
-    sources.ok('speech', `${ctx.speech.voices.length} voices`)
-  } })
+  sources.add('speech', {
+    label: 'Windows voices',
+    kind: 'app',
+    what: "Windows' own speech engine, started when something is to be said and stopped when quiet.",
+    refresh: async () => {
+      await ctx.speech.warm()
+      if (ctx.speech.failed) throw new Error(ctx.speech.failed)
+      sources.ok('speech', `${ctx.speech.voices.length} voices`)
+    }
+  })
   sources.add('updates', { label: 'Updates', kind: 'app', what: "This app's releases on GitHub, checked hourly.", refresh: () => ctx.updater.check() })
-  sources.add('screen', { label: 'Screen reads', kind: 'screen', what: "The game's currency and stats windows, read off the screen with Windows OCR when you ask on the Motes and Stats pages." })
+  sources.add('screen', {
+    label: 'Screen reads',
+    kind: 'screen',
+    what: "The game's currency and stats windows, read off the screen with Windows OCR when you ask on the Motes and Stats pages."
+  })
   sources.onChange((rows) => ctx.windows.toMain('state:sources', rows))
   jobs.onChange((list) => ctx.windows.toMain('state:jobs', list))
   // What can be known without asking anyone: the downloads kept, and whether this copy updates at all.

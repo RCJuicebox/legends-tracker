@@ -28,7 +28,7 @@ export class WikiCatalog {
   // The catalog (some 10 MB parsed) is wanted only by the Gear pages and a download, so it is read
   // from disk when asked for and let go a minute later; what the status needs is kept on its own.
   private file: CatalogFile | null = null
-  private summary: Pick<CatalogFile, 'fetchedAt' | 'format'> & { count: number } | null = null
+  private summary: (Pick<CatalogFile, 'fetchedAt' | 'format'> & { count: number }) | null = null
   private forget: NodeJS.Timeout | null = null
   private running: Promise<CatalogFile | null> | null = null
   progress: CatalogProgress = { busy: false, pages: 0, total: 0, error: '' }
@@ -87,7 +87,8 @@ export class WikiCatalog {
   private report(p: Partial<CatalogProgress>): void {
     this.progress = { ...this.progress, ...p }
     this.onProgress(this.progress)
-    if (this.progress.busy) this.job?.progress(this.progress.total ? this.progress.pages / this.progress.total : null, `${this.progress.pages} of ${this.progress.total || '?'} pages`)
+    if (this.progress.busy)
+      this.job?.progress(this.progress.total ? this.progress.pages / this.progress.total : null, `${this.progress.pages} of ${this.progress.total || '?'} pages`)
     const file = this.summary
     if (this.progress.busy) sources.reading('catalog', `${this.progress.pages} of ${this.progress.total || '?'} pages`)
     else if (this.progress.error) sources.fail('catalog', new Error(this.progress.error))
@@ -129,16 +130,21 @@ export class WikiCatalog {
     const items: CatalogItem[] = []
     const revs: Record<string, number> = {}
     let pages = 0
-    await wiki.category('Items', (batch) => {
-      this.onPages?.(batch)
-      for (const p of batch) {
-        if (p.revid) revs[p.title] = p.revid
-        const item = parseItemPage(p.title, p.content)
-        if (item) items.push(item)
-      }
-      pages += batch.length
-      this.report({ pages })
-    }, 'background', signal)
+    await wiki.category(
+      'Items',
+      (batch) => {
+        this.onPages?.(batch)
+        for (const p of batch) {
+          if (p.revid) revs[p.title] = p.revid
+          const item = parseItemPage(p.title, p.content)
+          if (item) items.push(item)
+        }
+        pages += batch.length
+        this.report({ pages })
+      },
+      'background',
+      signal
+    )
     return { fetchedAt: Date.now(), items, revs, format: FORMAT }
   }
 

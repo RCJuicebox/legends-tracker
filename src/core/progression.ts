@@ -128,7 +128,19 @@ export interface ProgressTally {
 export const emptyProgress = (): ProgressTally => ({ levels: [], skills: {}, purchases: [], points: null, capAt: 0, sessions: [] })
 
 const blankSession = (at: number): ProgressSession => ({
-  start: at, end: at, solo: 0, party: 0, reward: 0, pctLines: 0, pct: 0, noXp: 0, aaPoints: 0, aaBought: 0, aaSpent: 0, levels: 0, skillUps: 0
+  start: at,
+  end: at,
+  solo: 0,
+  party: 0,
+  reward: 0,
+  pctLines: 0,
+  pct: 0,
+  noXp: 0,
+  aaPoints: 0,
+  aaBought: 0,
+  aaSpent: 0,
+  levels: 0,
+  skillUps: 0
 })
 
 /** Reads one line into a stretch's tally. Every line counts toward the sessions; only progression lines toward the rest. */

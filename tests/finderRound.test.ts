@@ -21,7 +21,27 @@ describe('a candidate judged in the round', () => {
   ]
   const byName = new Map(catalog.map((c) => [c.title, c]))
   const inv = parseInventory(['Location\tName\tID\tCount\tSlots', 'Waist\tFocus Belt\t1\t1\t10', 'Any Slot\tTiny Charm\t2\t1\t10'].join('\n'))
-  const acOnly: Weights = { ...PRESETS.Balanced, ac: 1, hp: 0, mana: 0, end: 0, str: 0, sta: 0, agi: 0, dex: 0, wis: 0, int: 0, cha: 0, resists: 0, haste: 0, attack: 0, hpRegen: 0, manaRegen: 0, endRegen: 0, ratio: 0 }
+  const acOnly: Weights = {
+    ...PRESETS.Balanced,
+    ac: 1,
+    hp: 0,
+    mana: 0,
+    end: 0,
+    str: 0,
+    sta: 0,
+    agi: 0,
+    dex: 0,
+    wis: 0,
+    int: 0,
+    cha: 0,
+    resists: 0,
+    haste: 0,
+    attack: 0,
+    hpRegen: 0,
+    manaRegen: 0,
+    endRegen: 0,
+    ratio: 0
+  }
   const focusValue = (names: string[]) => (names.includes('Extended Enhancement III') ? 450 : 0)
   const wearer = { classes: ['shm'], race: '', level: 50 }
   const pieces = ownedPieces(inv, (it) => {
@@ -111,7 +131,27 @@ describe('an item the character owns, in the finder and the optimizer', () => {
     const c = byName.get(it.name.replace(/ \+\d+$/, ''))!
     return { r: restrictions(c.statsblock), stats: statsOf(it.name), foci: [], lore: isLore(c.statsblock) }
   })
-  const acOnly: Weights = { ...PRESETS.Balanced, ac: 1, hp: 0, mana: 0, end: 0, str: 0, sta: 0, agi: 0, dex: 0, wis: 0, int: 0, cha: 0, resists: 0, haste: 0, attack: 0, hpRegen: 0, manaRegen: 0, endRegen: 0, ratio: 0 }
+  const acOnly: Weights = {
+    ...PRESETS.Balanced,
+    ac: 1,
+    hp: 0,
+    mana: 0,
+    end: 0,
+    str: 0,
+    sta: 0,
+    agi: 0,
+    dex: 0,
+    wis: 0,
+    int: 0,
+    cha: 0,
+    resists: 0,
+    haste: 0,
+    attack: 0,
+    hpRegen: 0,
+    manaRegen: 0,
+    endRegen: 0,
+    ratio: 0
+  }
   const wearer = { classes: ['shm'], race: '', level: 50 }
   const opts = { pieces, wearer, weights: acOnly, twoHanders: false, focusValue: () => 0 }
   const owned = new Set(['wraps', 'mantle'])

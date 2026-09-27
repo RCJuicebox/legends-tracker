@@ -31,10 +31,7 @@ export interface EngineOutputs {
 }
 
 /** Reads mote history somewhere (a worker thread in the app); `stop` abandons it. */
-export type MoteScanner = (
-  job: MoteScanJob,
-  progress: (message: string, fraction: number) => void
-) => { done: Promise<MoteScanResult>; stop: () => void }
+export type MoteScanner = (job: MoteScanJob, progress: (message: string, fraction: number) => void) => { done: Promise<MoteScanResult>; stop: () => void }
 
 /** What the engine needs from the running app. */
 export interface EngineEnv {

@@ -76,7 +76,10 @@ describe('settings from a page', () => {
 
   it('checks each character', () => {
     const s = defaultSettings()
-    const out = sanitizeSettings({ ...s, characters: { Kel_x: { level: 500, classLevels: { Druid: 60, Pirate: 3 }, focusSources: [{ id: 'f', pct: 'x' }, 'bad'] }, Bad: 'x' } }, current)!
+    const out = sanitizeSettings(
+      { ...s, characters: { Kel_x: { level: 500, classLevels: { Druid: 60, Pirate: 3 }, focusSources: [{ id: 'f', pct: 'x' }, 'bad'] }, Bad: 'x' } },
+      current
+    )!
     expect(Object.keys(out.characters)).toEqual(['Kel_x'])
     expect(out.characters.Kel_x.level).toBe(255)
     expect(out.characters.Kel_x.classLevels).toEqual({ Druid: 60 })
@@ -85,7 +88,10 @@ describe('settings from a page', () => {
   })
 
   it('keeps an old flat focus figure only as a number', () => {
-    const c = sanitizeCharacter({ level: 50, classLevels: {}, focusSources: [], beneficialFocusPct: 15, detrimentalFocusPct: 'x' }, { level: 50, classLevels: {}, focusSources: [] })!
+    const c = sanitizeCharacter(
+      { level: 50, classLevels: {}, focusSources: [], beneficialFocusPct: 15, detrimentalFocusPct: 'x' },
+      { level: 50, classLevels: {}, focusSources: [] }
+    )!
     expect(c.beneficialFocusPct).toBe(15)
     expect('detrimentalFocusPct' in c).toBe(false)
   })
@@ -99,15 +105,32 @@ describe('triggers from a page or a file', () => {
 
   it('fills missing fields, drops junk entries and unknown actions', () => {
     const out = sanitizeTriggers([
-      { id: 'a', name: 'Mez', phrases: [{ text: 'You have been mesmerized', regex: false }, 'plain text', { regex: true }], cooldownSec: -5, actions: [{ type: 'speak', text: 'mez' }, { type: 'explode' }, { type: 'sound', file: 'x.wav', volume: 3 }] },
+      {
+        id: 'a',
+        name: 'Mez',
+        phrases: [{ text: 'You have been mesmerized', regex: false }, 'plain text', { regex: true }],
+        cooldownSec: -5,
+        actions: [{ type: 'speak', text: 'mez' }, { type: 'explode' }, { type: 'sound', file: 'x.wav', volume: 3 }]
+      },
       'junk',
       { name: 'No id' }
     ])!
     expect(out).toHaveLength(2)
     expect(out[0]).toEqual({
-      id: 'a', name: 'Mez', folder: '', enabled: true, comment: '', cooldownSec: 0,
-      phrases: [{ text: 'You have been mesmerized', regex: false }, { text: 'plain text', regex: false }],
-      actions: [{ type: 'speak', text: 'mez', interrupt: false }, { type: 'sound', file: 'x.wav', volume: 1 }]
+      id: 'a',
+      name: 'Mez',
+      folder: '',
+      enabled: true,
+      comment: '',
+      cooldownSec: 0,
+      phrases: [
+        { text: 'You have been mesmerized', regex: false },
+        { text: 'plain text', regex: false }
+      ],
+      actions: [
+        { type: 'speak', text: 'mez', interrupt: false },
+        { type: 'sound', file: 'x.wav', volume: 1 }
+      ]
     })
     expect(out[1].id).toMatch(/^t/)
     expect(out[1].phrases).toEqual([])
@@ -116,8 +139,16 @@ describe('triggers from a page or a file', () => {
   it('checks timer actions', () => {
     const [t] = sanitizeTriggers([{ id: 't', actions: [{ type: 'timer', name: 'Pull', durationSec: 'long', restart: 'sometimes', endEarly: [{ text: 'dies', regex: false }] }] }])!
     expect(t.actions[0]).toEqual({
-      type: 'timer', name: 'Pull', durationSec: 30, color: '#e8b44c', overlay: 'targets', warnSec: 0, warnSpeech: '', endSpeech: '',
-      restart: 'restart', endEarly: [{ text: 'dies', regex: false }]
+      type: 'timer',
+      name: 'Pull',
+      durationSec: 30,
+      color: '#e8b44c',
+      overlay: 'targets',
+      warnSec: 0,
+      warnSpeech: '',
+      endSpeech: '',
+      restart: 'restart',
+      endEarly: [{ text: 'dies', regex: false }]
     })
   })
 })

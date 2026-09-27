@@ -176,8 +176,19 @@ export class LootLedger {
     }
     const plus = Number(/\+(\d+)$/.exec(ev.item)?.[1] ?? 0)
     const entry: LootEntry = {
-      id: ++this.seq, at: line.time, zone, sessionId, looter: ev.looter, item: ev.item, base: baseName(ev.item), plus, count: ev.count,
-      source: ev.source, outcome: ev.outcome, copper: ev.copper, ...(ev.into ? { into: ev.into } : {})
+      id: ++this.seq,
+      at: line.time,
+      zone,
+      sessionId,
+      looter: ev.looter,
+      item: ev.item,
+      base: baseName(ev.item),
+      plus,
+      count: ev.count,
+      source: ev.source,
+      outcome: ev.outcome,
+      copper: ev.copper,
+      ...(ev.into ? { into: ev.into } : {})
     }
     this.entries.push(entry)
     if (this.entries.length > KEPT) this.entries.shift()
@@ -207,7 +218,13 @@ export function describeItem(info: ItemInfo | undefined): { head: string; body: 
   if (!info.found) return { head: 'Not on eqlwiki', body: [] }
   const lines = info.statsblock
     .split(/<br\s*\/?>/i)
-    .map((l) => l.replace(/\[\[(?:[^\]|]*\|)?([^\]]*)\]\]/g, '$1').replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim())
+    .map((l) =>
+      l
+        .replace(/\[\[(?:[^\]|]*\|)?([^\]]*)\]\]/g, '$1')
+        .replace(/<[^>]+>/g, '')
+        .replace(/\s+/g, ' ')
+        .trim()
+    )
     .filter(Boolean)
   const slot = lines.find((l) => /^Slot:/i.test(l))
   const head: string[] = []

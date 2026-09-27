@@ -58,7 +58,8 @@ export class RecipeBook {
   private report(p: Partial<RecipeProgress>): void {
     this.progress = { ...this.progress, ...p }
     this.onProgress(this.progress)
-    if (this.progress.busy) this.job?.progress(this.progress.total ? this.progress.pages / this.progress.total : null, `${this.progress.pages} of ${this.progress.total || '?'} pages`)
+    if (this.progress.busy)
+      this.job?.progress(this.progress.total ? this.progress.pages / this.progress.total : null, `${this.progress.pages} of ${this.progress.total || '?'} pages`)
     const file = this.file
     if (this.progress.busy) sources.reading('recipes', `${this.progress.pages} of ${this.progress.total || '?'} pages`)
     else if (this.progress.error) sources.fail('recipes', new Error(this.progress.error))
@@ -97,15 +98,20 @@ export class RecipeBook {
       const fromPages: BookRecipe[] = []
       const eras: Record<string, string> = {}
       let pages = 0
-      await wiki.category('Player Crafted', (batch) => {
-        for (const p of batch) {
-          const icon = Number(field(p.content, 'lucy_img_ID')) || 0
-          eras[p.title] = ERA_TAG.exec(p.content)?.[1] ?? ''
-          for (const r of parseCrafted(p.title, p.content)) fromPages.push({ ...r, icon })
-        }
-        pages += batch.length
-        this.report({ pages })
-      }, 'background', job.signal)
+      await wiki.category(
+        'Player Crafted',
+        (batch) => {
+          for (const p of batch) {
+            const icon = Number(field(p.content, 'lucy_img_ID')) || 0
+            eras[p.title] = ERA_TAG.exec(p.content)?.[1] ?? ''
+            for (const r of parseCrafted(p.title, p.content)) fromPages.push({ ...r, icon })
+          }
+          pages += batch.length
+          this.report({ pages })
+        },
+        'background',
+        job.signal
+      )
       // Recipes a product's own page leaves out, from the Alchemy table. The other tradeskill pages'
       // tables are laid out too differently to read reliably, and their products have pages.
       const known = new Set(fromPages.map((r) => r.product.toLowerCase()))

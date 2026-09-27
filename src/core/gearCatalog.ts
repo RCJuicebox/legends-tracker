@@ -60,10 +60,20 @@ export function catalogPieces(o: CatalogPiecesInput): Piece[] {
       let p = atLevel.get(level)
       if (!p) {
         const name = level ? `${c.title} +${level}` : c.title
-        atLevel.set(level, (p = {
-          item: { location: 'Catalog', name, id: 0, count: 1, augs: [] }, from: 'catalog', key, r, stats: level ? scaledStats(base, level) : base,
-          foci: c.focus ? [c.focus] : [], worn: fx?.worn ? [fx.worn] : [], procs: fx?.proc ? [fx.proc] : [], lore: isLore(c.statsblock)
-        }))
+        atLevel.set(
+          level,
+          (p = {
+            item: { location: 'Catalog', name, id: 0, count: 1, augs: [] },
+            from: 'catalog',
+            key,
+            r,
+            stats: level ? scaledStats(base, level) : base,
+            foci: c.focus ? [c.focus] : [],
+            worn: fx?.worn ? [fx.worn] : [],
+            procs: fx?.proc ? [fx.proc] : [],
+            lore: isLore(c.statsblock)
+          })
+        )
       }
       return p
     }

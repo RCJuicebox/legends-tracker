@@ -10,55 +10,116 @@ import { at } from './helpers'
 describe('combat lines', () => {
   const p = parseCombatLine
   it('reads your melee, with its modifiers', () => {
-    expect(p('You punch a fetid fiend for 48 points of damage.')).toEqual({ kind: 'damage', source: SELF, target: 'a fetid fiend', amount: 48, how: 'melee', skill: 'punch', mods: [] })
+    expect(p('You punch a fetid fiend for 48 points of damage.')).toEqual({
+      kind: 'damage',
+      source: SELF,
+      target: 'a fetid fiend',
+      amount: 48,
+      how: 'melee',
+      skill: 'punch',
+      mods: []
+    })
     expect(p('You kick a marsh bear cub for 59 points of damage. (Critical)')).toMatchObject({ mods: ['critical'] })
     expect(p('You punch Amygdalan warrior for 18 points of damage. (Riposte)')).toMatchObject({ target: 'Amygdalan warrior', mods: ['riposte'] })
     expect(p('You punch a fetid fiend for 221 points of damage. (Finishing Blow)')).toMatchObject({ mods: ['finishing blow'] })
     expect(parseMods('Riposte Critical')).toEqual(['riposte', 'critical'])
   })
   it("reads others' melee: pets, players, mobs on you and on others", () => {
-    expect(p('Jobarab slashes an ire ghast for 47 points of damage.')).toMatchObject({ kind: 'damage', source: 'Jobarab', target: 'an ire ghast', amount: 47, how: 'melee', skill: 'slash' })
+    expect(p('Jobarab slashes an ire ghast for 47 points of damage.')).toMatchObject({
+      kind: 'damage',
+      source: 'Jobarab',
+      target: 'an ire ghast',
+      amount: 47,
+      how: 'melee',
+      skill: 'slash'
+    })
     expect(p('A forsaken revenant hits YOU for 122 points of damage.')).toMatchObject({ source: 'A forsaken revenant', target: SELF, amount: 122 })
     expect(p('Grandmaster R`tal pet slashes Jobarab for 14 points of damage.')).toMatchObject({ source: 'Grandmaster R`tal pet', target: 'Jobarab' })
     expect(p('An ire ghast hits YOU for 67 points of damage. (Riposte)')).toMatchObject({ mods: ['riposte'] })
     expect(p('Innoruuk`s Chosen punches YOU for 93 points of damage.')).toMatchObject({ source: 'Innoruuk`s Chosen' })
   })
   it('reads misses and every avoidance', () => {
-    expect(p('You try to punch a scareling, but miss! (Riposte)')).toEqual({ kind: 'miss', source: SELF, target: 'a scareling', skill: 'punch', outcome: 'miss', mods: ['riposte'] })
+    expect(p('You try to punch a scareling, but miss! (Riposte)')).toEqual({
+      kind: 'miss',
+      source: SELF,
+      target: 'a scareling',
+      skill: 'punch',
+      outcome: 'miss',
+      mods: ['riposte']
+    })
     expect(p('A scareling tries to hit YOU, but YOU dodge!')).toMatchObject({ kind: 'miss', source: 'A scareling', target: SELF, outcome: 'dodge' })
     expect(p('A shiverback tries to hit YOU, but YOU block!')).toMatchObject({ outcome: 'block' })
     expect(p('Amygdalan warrior tries to bash YOU, but YOU parry!')).toMatchObject({ outcome: 'parry' })
     expect(p('Amygdalan warrior pet tries to punch YOU, but YOU riposte!')).toMatchObject({ outcome: 'riposte' })
     expect(p('Amygdalan warrior pet tries to kick YOU, but YOUR magical skin absorbs the blow!')).toMatchObject({ outcome: 'absorb' })
     expect(p('You try to punch a fetid fiend, but a fetid fiend parries!')).toMatchObject({ outcome: 'parry', target: 'a fetid fiend' })
-    expect(p('You try to bash a loathling lich, but a loathling lich\'s magical skin absorbs the blow!')).toMatchObject({ outcome: 'absorb' })
+    expect(p("You try to bash a loathling lich, but a loathling lich's magical skin absorbs the blow!")).toMatchObject({ outcome: 'absorb' })
     expect(p('A snow orc trooper tries to hit YOU, but misses!')).toMatchObject({ outcome: 'miss' })
     expect(p('Merik tries to pierce Cleric of Innoruuk, but Cleric of Innoruuk dodges!')).toMatchObject({ source: 'Merik', target: 'Cleric of Innoruuk', outcome: 'dodge' })
     // A spell being shrugged off is not a swing.
     expect(p('Malrik tries to cast a spell on you, but you are protected.')).toBeNull()
   })
   it('reads direct spells, yours, theirs and on you', () => {
-    expect(p('You hit a fetid fiend for 444 points of magic damage by Drain Spirit.')).toEqual({ kind: 'damage', source: SELF, target: 'a fetid fiend', amount: 444, how: 'spell', skill: 'Drain Spirit', mods: [] })
-    expect(p('You hit a scareling pet for 2013 points of magic damage by Denon\'s Desperate Dirge. (Critical)')).toMatchObject({ target: 'a scareling pet', skill: "Denon's Desperate Dirge", mods: ['critical'] })
+    expect(p('You hit a fetid fiend for 444 points of magic damage by Drain Spirit.')).toEqual({
+      kind: 'damage',
+      source: SELF,
+      target: 'a fetid fiend',
+      amount: 444,
+      how: 'spell',
+      skill: 'Drain Spirit',
+      mods: []
+    })
+    expect(p("You hit a scareling pet for 2013 points of magic damage by Denon's Desperate Dirge. (Critical)")).toMatchObject({
+      target: 'a scareling pet',
+      skill: "Denon's Desperate Dirge",
+      mods: ['critical']
+    })
     expect(p('Jobarab hit an ire ghast for 200 points of prismatic damage by Puma Maw V.')).toMatchObject({ source: 'Jobarab', skill: 'Puma Maw V', how: 'spell' })
-    expect(p('a fetid fiend hit you for 220 points of fire damage by Scorching Arrow.')).toMatchObject({ source: 'a fetid fiend', target: SELF, amount: 220, skill: 'Scorching Arrow' })
+    expect(p('a fetid fiend hit you for 220 points of fire damage by Scorching Arrow.')).toMatchObject({
+      source: 'a fetid fiend',
+      target: SELF,
+      amount: 220,
+      skill: 'Scorching Arrow'
+    })
   })
   it('reads DoT ticks, yours, theirs, on you, and unattributed', () => {
-    expect(p('Cleric of Innoruuk has taken 499 damage from your Odium X.')).toEqual({ kind: 'damage', source: SELF, target: 'Cleric of Innoruuk', amount: 499, how: 'dot', skill: 'Odium X', mods: [] })
+    expect(p('Cleric of Innoruuk has taken 499 damage from your Odium X.')).toEqual({
+      kind: 'damage',
+      source: SELF,
+      target: 'Cleric of Innoruuk',
+      amount: 499,
+      how: 'dot',
+      skill: 'Odium X',
+      mods: []
+    })
     expect(p('Cleric of Innoruuk has taken 1483 damage from your Odium X. (Critical)')).toMatchObject({ mods: ['critical'] })
-    expect(p('A loathling lich has taken 80 damage from Oathbreaker\'s Curse by Jobarab.')).toMatchObject({ source: 'Jobarab', target: 'A loathling lich', amount: 80, skill: "Oathbreaker's Curse" })
+    expect(p("A loathling lich has taken 80 damage from Oathbreaker's Curse by Jobarab.")).toMatchObject({
+      source: 'Jobarab',
+      target: 'A loathling lich',
+      amount: 80,
+      skill: "Oathbreaker's Curse"
+    })
     expect(p('You have taken 105 damage from Scorching Arrow by a fetid fiend.')).toMatchObject({ source: 'a fetid fiend', target: SELF, amount: 105, how: 'dot' })
     expect(p('Jobarab has taken 30 damage by Deadly Poison.')).toMatchObject({ source: '', target: 'Jobarab', amount: 30, skill: 'Deadly Poison' })
   })
   it('reads damage shields both ways', () => {
     expect(p('A fetid fiend is pierced by YOUR thorns for 3 points of non-melee damage.')).toMatchObject({ source: SELF, target: 'A fetid fiend', amount: 3, how: 'ds' })
-    expect(p('YOU are burned by a fetid fiend\'s flames for 24 points of non-melee damage!')).toMatchObject({ source: 'a fetid fiend', target: SELF, amount: 24, how: 'ds' })
-    expect(p('Dorran is burned by a decrepit warder\'s flames for 16 points of non-melee damage.')).toMatchObject({ source: 'a decrepit warder', target: 'Dorran', amount: 16 })
-    expect(p('Jobarab is pierced by Coercer T`vala\'s thorns for 19 points of non-melee damage.')).toMatchObject({ source: 'Coercer T`vala', target: 'Jobarab' })
+    expect(p("YOU are burned by a fetid fiend's flames for 24 points of non-melee damage!")).toMatchObject({ source: 'a fetid fiend', target: SELF, amount: 24, how: 'ds' })
+    expect(p("Dorran is burned by a decrepit warder's flames for 16 points of non-melee damage.")).toMatchObject({ source: 'a decrepit warder', target: 'Dorran', amount: 16 })
+    expect(p("Jobarab is pierced by Coercer T`vala's thorns for 19 points of non-melee damage.")).toMatchObject({ source: 'Coercer T`vala', target: 'Jobarab' })
   })
   it('reads heals, with overheal and heals over time', () => {
-    expect(p('You healed Kelwyn for 444 hit points by Drain Spirit.')).toEqual({ kind: 'heal', source: SELF, target: 'Kelwyn', amount: 444, raw: 444, spell: 'Drain Spirit', hot: false, mods: [] })
-    expect(p('Brenna healed itself for 0 (80) hit points by Oathbreaker\'s Curse.')).toMatchObject({ source: 'Brenna', target: 'Brenna', amount: 0, raw: 80 })
+    expect(p('You healed Kelwyn for 444 hit points by Drain Spirit.')).toEqual({
+      kind: 'heal',
+      source: SELF,
+      target: 'Kelwyn',
+      amount: 444,
+      raw: 444,
+      spell: 'Drain Spirit',
+      hot: false,
+      mods: []
+    })
+    expect(p("Brenna healed itself for 0 (80) hit points by Oathbreaker's Curse.")).toMatchObject({ source: 'Brenna', target: 'Brenna', amount: 0, raw: 80 })
     expect(p('Elowen healed itself for 255 (270) hit points by Skin like Nature.')).toMatchObject({ amount: 255, raw: 270 })
     expect(p('You healed Kelwyn over time for 469 hit points by Slugs Healing. (Critical)')).toMatchObject({ hot: true, mods: ['critical'] })
     expect(p('Lord of Ire healed you for 451 hit points by Leech Touch I.')).toMatchObject({ source: 'Lord of Ire', target: SELF })
@@ -70,8 +131,8 @@ describe('combat lines', () => {
     expect(p('A skeleton has been slain by Gabartik!')).toEqual({ kind: 'kill', target: 'A skeleton', killer: 'Gabartik' })
     expect(p('Cleric of Innoruuk died.')).toEqual({ kind: 'kill', target: 'Cleric of Innoruuk', killer: null })
     expect(p('You have been slain by a spinechiller spider!')).toEqual({ kind: 'kill', target: SELF, killer: 'a spinechiller spider' })
-    expect(p('A scareling resisted your Selo\'s Chords of Cessation!')).toEqual({ kind: 'resist', source: SELF, target: 'A scareling', spell: "Selo's Chords of Cessation" })
-    expect(p('A decrepit warder resisted Dorran\'s Malaria!')).toEqual({ kind: 'resist', source: 'Dorran', target: 'A decrepit warder', spell: 'Malaria' })
+    expect(p("A scareling resisted your Selo's Chords of Cessation!")).toEqual({ kind: 'resist', source: SELF, target: 'A scareling', spell: "Selo's Chords of Cessation" })
+    expect(p("A decrepit warder resisted Dorran's Malaria!")).toEqual({ kind: 'resist', source: 'Dorran', target: 'A decrepit warder', spell: 'Malaria' })
     expect(p("Jobarab told you, 'Attacking a forsaken revenant Master.'")).toEqual({ kind: 'pet', pet: 'Jobarab', owner: SELF })
     expect(p("Xanthar says, 'My leader is Aldric.'")).toEqual({ kind: 'pet', pet: 'Xanthar', owner: 'Aldric' })
     expect(p("Aldric tells you, 'hey'")).toBeNull()

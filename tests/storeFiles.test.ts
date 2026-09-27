@@ -23,8 +23,14 @@ const { DEFAULT_OVERLAYS, defaultSettings } = await import('../src/main/storeCor
 const { SCHEMAS } = await import('../src/main/schema')
 
 const DEFAULT_TRIGGER: Trigger = {
-  id: 'default-1', name: 'Incoming tell', folder: 'Chat', enabled: true, comment: '', cooldownSec: 0,
-  phrases: [{ text: 'tells you', regex: false }], actions: [{ type: 'speak', text: 'tell', interrupt: false }]
+  id: 'default-1',
+  name: 'Incoming tell',
+  folder: 'Chat',
+  enabled: true,
+  comment: '',
+  cooldownSec: 0,
+  phrases: [{ text: 'tells you', regex: false }],
+  actions: [{ type: 'speak', text: 'tell', interrupt: false }]
 }
 
 let defaultsDir = ''
@@ -96,9 +102,7 @@ describe('saving and starting again', () => {
       characters: { Tester_test: { level: 60, classLevels: { Druid: 60, Cleric: 12 }, race: 'Iksar', focusSources: [] } }
     }
   }
-  const triggers: Trigger[] = [
-    { ...DEFAULT_TRIGGER, id: 'mine', name: 'Mez', phrases: [{ text: 'You have been mesmerized', regex: false }], cooldownSec: 5 }
-  ]
+  const triggers: Trigger[] = [{ ...DEFAULT_TRIGGER, id: 'mine', name: 'Mez', phrases: [{ text: 'You have been mesmerized', regex: false }], cooldownSec: 5 }]
   const motes: MoteState = { active: null, sessions: [], daily: { '2026-09-27': { major: 4 } }, seenUntil: 1_790_000_000_000 }
   const respawns: RespawnRecords = {
     'zone|a mob': { zone: 'zone', name: 'A mob', kills: 3, lastDeath: 1_790_000_000_000, pendingSince: 0, gaps: [400, 420], shared: false }
@@ -200,7 +204,12 @@ describe('settings read back from disk', () => {
     const text = JSON.stringify(saved)
     writeFileSync(file('settings.json'), text)
     const store = new Store(defaultTriggers)
-    expect(store.settings.get().overlays.map((o) => o.id).sort()).toEqual(DEFAULT_OVERLAYS.map((o) => o.id).sort())
+    expect(
+      store.settings
+        .get()
+        .overlays.map((o) => o.id)
+        .sort()
+    ).toEqual(DEFAULT_OVERLAYS.map((o) => o.id).sort())
     // Not on a timer: nothing is written until a flush.
     expect(readFileSync(file('settings.json'), 'utf8')).toBe(text)
     await store.flushAll()

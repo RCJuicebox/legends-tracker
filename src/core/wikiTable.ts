@@ -12,7 +12,13 @@ export function parseWikiTables(wikitext: string): { headers: string[]; rows: st
       const cells: string[] = []
       for (const raw of chunk.split('\n')) {
         const line = raw.trim()
-        if (line.startsWith('!')) headers.push(...line.slice(1).split('!!').map((h) => cellText(h)))
+        if (line.startsWith('!'))
+          headers.push(
+            ...line
+              .slice(1)
+              .split('!!')
+              .map((h) => cellText(h))
+          )
         else if (line.startsWith('|') && !line.startsWith('|+') && !line.startsWith('|}')) cells.push(...splitCells(line.slice(1)))
       }
       if (!cells.length) continue
@@ -67,4 +73,3 @@ export function cellText(cell: string): string {
   if (bar >= 0 && /=/.test(outside.slice(0, bar))) s = s.slice(bar + 1)
   return s.replace(/'''/g, '').trim()
 }
-

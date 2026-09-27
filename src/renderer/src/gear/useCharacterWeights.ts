@@ -45,10 +45,7 @@ export function useCharacterWeights(view: InventoryView, sheet: CharacterSheet |
   const { record } = useCharacterRecord(view.character)
   const sheetStats = useMemo(() => withRecord(readSheet(sheet?.stats), record), [sheet, record])
   const trio = sheetStats.classes.filter(Boolean)
-  const capsQ = useInvoke(
-    trio.length ? 'stats:caps' : null,
-    [trio, sheetStats.level]
-  )
+  const capsQ = useInvoke(trio.length ? 'stats:caps' : null, [trio, sheetStats.level])
   const acCaps = capsQ.data?.ac ?? null
   const factors = useMemo(() => capsQ.data?.factors ?? {}, [capsQ.data])
 
@@ -58,10 +55,7 @@ export function useCharacterWeights(view: InventoryView, sheet: CharacterSheet |
   const classes = useMemo(() => (classKey ? classKey.split(',') : []), [classKey])
   const level = stats.level ?? 50
   // Custom weights saved before a weight existed read it as the Balanced role has it.
-  const role = useMemo(
-    () => (preset === 'Custom' ? { ...ROLE_PRESETS.Balanced, ...custom } : (ROLE_PRESETS[preset] ?? ROLE_PRESETS.Balanced)),
-    [preset, custom]
-  )
+  const role = useMemo(() => (preset === 'Custom' ? { ...ROLE_PRESETS.Balanced, ...custom } : (ROLE_PRESETS[preset] ?? ROLE_PRESETS.Balanced)), [preset, custom])
   // What a point of each stat buys this character: its classes, its current stats (the Stats
   // window's when read, else the sheet's), and its AAs.
   const conv = useMemo(() => {

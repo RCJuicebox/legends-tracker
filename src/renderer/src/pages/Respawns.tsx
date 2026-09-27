@@ -78,8 +78,8 @@ export function Respawns() {
         <div>
           <h1>Respawns</h1>
           <p>
-            How long each mob you kill takes to come back, measured from the log. Once you know, add a timer: it starts at every kill of
-            that mob and counts down on an overlay. <Info label="How it is measured" text={HOW} />
+            How long each mob you kill takes to come back, measured from the log. Once you know, add a timer: it starts at every kill of that mob and counts down on an overlay.{' '}
+            <Info label="How it is measured" text={HOW} />
           </p>
         </div>
       </div>
@@ -89,9 +89,7 @@ export function Respawns() {
         <Switch on={hereOnly} onChange={setHereOnly} label={zone ? `Only ${zone}` : 'Only this zone'} />
         <span className="small muted">{zone ? `Only ${zone}` : 'Only this zone'}</span>
         <Switch on={showShared} onChange={setShowShared} label="Show names several mobs share" />
-        <span className="small muted">
-          Shared names{hiddenShared && !showShared ? ` (${hiddenShared} hidden)` : ''}
-        </span>
+        <span className="small muted">Shared names{hiddenShared && !showShared ? ` (${hiddenShared} hidden)` : ''}</span>
         <span className="spacer" />
         <button className="btn" onClick={() => setAdding((a) => !a)} aria-expanded={adding}>
           Add a timer by name
@@ -126,11 +124,21 @@ export function Respawns() {
           <table className="table">
             <thead>
               <tr>
-                <SortTh k="name" sort={sort} onSort={setSort}>Mob</SortTh>
-                <SortTh k="kills" sort={sort} onSort={setSort} title="Kills on record">Kills</SortTh>
-                <SortTh k="respawn" sort={sort} onSort={setSort} title="The shortest gap between a death and the mob being seen again: the respawn is this or less">Respawn</SortTh>
-                <SortTh k="gap" sort={sort} onSort={setSort} title="The most recent gap">Last gap</SortTh>
-                <SortTh k="last" sort={sort} onSort={setSort}>Last killed</SortTh>
+                <SortTh k="name" sort={sort} onSort={setSort}>
+                  Mob
+                </SortTh>
+                <SortTh k="kills" sort={sort} onSort={setSort} title="Kills on record">
+                  Kills
+                </SortTh>
+                <SortTh k="respawn" sort={sort} onSort={setSort} title="The shortest gap between a death and the mob being seen again: the respawn is this or less">
+                  Respawn
+                </SortTh>
+                <SortTh k="gap" sort={sort} onSort={setSort} title="The most recent gap">
+                  Last gap
+                </SortTh>
+                <SortTh k="last" sort={sort} onSort={setSort}>
+                  Last killed
+                </SortTh>
                 <th title="The timer's length, or the shortest gap, from the last kill">Back in</th>
                 <th>Timer</th>
                 <th />
@@ -169,7 +177,13 @@ export function Respawns() {
 }
 
 function Row({
-  r, now, zone, open, toggle, overlays, onSaved
+  r,
+  now,
+  zone,
+  open,
+  toggle,
+  overlays,
+  onSaved
 }: {
   r: RespawnRow
   now: number
@@ -182,7 +196,7 @@ function Row({
   const last = r.gaps[r.gaps.length - 1]
   const length = r.timer?.seconds ?? r.estimate
   const backIn = r.pendingSince && length ? r.pendingSince + length * 1000 - now : null
-  const overlayName = r.timer ? overlays.find((o) => o.id === r.timer!.overlay)?.name ?? r.timer.overlay : ''
+  const overlayName = r.timer ? (overlays.find((o) => o.id === r.timer!.overlay)?.name ?? r.timer.overlay) : ''
   return (
     <tr className={`clickable${open ? ' selected' : ''}`} onClick={toggle}>
       <td>
@@ -206,9 +220,7 @@ function Row({
         {r.gaps.length > 1 && <Sparkline values={r.gaps} title={`Every gap seen, oldest first: ${r.gaps.map(clock).join(', ')}`} />}
       </td>
       <td className="faint small nowrap">{r.lastDeath ? ago(r.lastDeath, now) : '—'}</td>
-      <td className="mono nowrap">
-        {backIn === null ? <span className="faint">—</span> : backIn > 0 ? clock(backIn / 1000) : <span className="chip ok">up</span>}
-      </td>
+      <td className="mono nowrap">{backIn === null ? <span className="faint">—</span> : backIn > 0 ? clock(backIn / 1000) : <span className="chip ok">up</span>}</td>
       <td onClick={(e) => e.stopPropagation()}>
         {r.timer ? (
           <button className="chip ok" onClick={toggle} title={`On the ${overlayName} overlay. Click to change it.`}>
@@ -222,7 +234,13 @@ function Row({
       </td>
       <td onClick={(e) => e.stopPropagation()}>
         {r.lastDeath > 0 && (
-          <ConfirmButton className="btn small ghost" question="Forget it?" label={`Forget ${r.name}`} title="Forget this mob's kills and gaps (a timer stays)" onConfirm={() => void forget(r.key).then(onSaved)}>
+          <ConfirmButton
+            className="btn small ghost"
+            question="Forget it?"
+            label={`Forget ${r.name}`}
+            title="Forget this mob's kills and gaps (a timer stays)"
+            onConfirm={() => void forget(r.key).then(onSaved)}
+          >
             ×
           </ConfirmButton>
         )}
@@ -234,7 +252,13 @@ function Row({
 const forget = (key: string) => act('respawns:forget', key)
 
 function TimerEditor({
-  initialName, initialSeconds, measured, timer, overlays, onDone, onCancel
+  initialName,
+  initialSeconds,
+  measured,
+  timer,
+  overlays,
+  onDone,
+  onCancel
 }: {
   initialName: string
   initialSeconds: number | null
@@ -248,7 +272,7 @@ function TimerEditor({
   const timerOverlays = overlays.filter((o) => o.kind === 'timers')
   const [name, setName] = useState(initialName)
   const [length, setLength] = useState(initialSeconds ? clock(initialSeconds) : '')
-  const [overlay, setOverlay] = useState(timer?.overlay ?? (timerOverlays.some((o) => o.id === 'respawns') ? 'respawns' : timerOverlays[0]?.id ?? 'targets'))
+  const [overlay, setOverlay] = useState(timer?.overlay ?? (timerOverlays.some((o) => o.id === 'respawns') ? 'respawns' : (timerOverlays[0]?.id ?? 'targets')))
   const [warnSec, setWarnSec] = useState(timer?.warnSec ?? 30)
   const [announce, setAnnounce] = useState(timer?.announce ?? true)
   const [error, setError] = useState('')

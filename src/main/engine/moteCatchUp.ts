@@ -186,7 +186,8 @@ export class MoteCatchUp {
         log.warn(`Could not remove ${this.markFile}:`, e)
       }
       const st = await fs.stat(logFile, { bigint: true })
-      const exact = !!mark && samePath(mark.logFile, logFile) && sameFile({ id: mark.id, size: mark.offset }, { id: identityOf(st), size: Number(st.size) }) && mark.seenUntil === motesSince
+      const exact =
+        !!mark && samePath(mark.logFile, logFile) && sameFile({ id: mark.id, size: mark.offset }, { id: identityOf(st), size: Number(st.size) }) && mark.seenUntil === motesSince
       const from = exact ? mark!.offset : await offsetBefore(logFile, since, { slackMs: DST_SLACK_MS })
       if (exact) this.hooks.stock.resume()
       const onLine = (line: LogLine) => {

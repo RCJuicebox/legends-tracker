@@ -89,7 +89,11 @@ export async function checkGameFolder(dir: string): Promise<GameFolderCheck> {
     quietIfMissing(e, `Could not list the game folder ${dir}:`)
     return empty
   }
-  const characters = (re: RegExp) => names.map((n) => re.exec(n)?.[1]).filter((c): c is string => !!c).sort()
+  const characters = (re: RegExp) =>
+    names
+      .map((n) => re.exec(n)?.[1])
+      .filter((c): c is string => !!c)
+      .sort()
   return {
     dir,
     exists: true,

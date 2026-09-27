@@ -30,7 +30,9 @@ const stamp = (d: Date) => `${DAYS[d.getDay()]} ${MONTHS[d.getMonth()]} ${two(d.
 
 /** The fixture with its stamps moved so its last line was a minute ago: the read goes back from now. */
 function shifted(): string {
-  const lines = readFileSync(join(__dirname, 'fixtures', 'golden-session.txt'), 'utf8').trimEnd().split(/\r?\n/)
+  const lines = readFileSync(join(__dirname, 'fixtures', 'golden-session.txt'), 'utf8')
+    .trimEnd()
+    .split(/\r?\n/)
   const at = (l: string) => {
     const m = /^\[\w{3} (\w{3}) +(\d+) (\d\d):(\d\d):(\d\d) (\d{4})\]/.exec(l)!
     return new Date(+m[6], MONTHS.indexOf(m[1]), +m[2], +m[3], +m[4], +m[5]).getTime()
@@ -86,7 +88,22 @@ beforeAll(async () => {
   engine = new Engine(
     store,
     { synthesize: async () => Buffer.alloc(0) },
-    { timers: noop, alert: noop, audio: noop, status: noop, feed: (i) => feed.push(i), archive: noop, motes: noop, moteScan: noop, stock: noop, combat: noop, loot: noop, respawns: noop, pet: noop, buffs: noop },
+    {
+      timers: noop,
+      alert: noop,
+      audio: noop,
+      status: noop,
+      feed: (i) => feed.push(i),
+      archive: noop,
+      motes: noop,
+      moteScan: noop,
+      stock: noop,
+      combat: noop,
+      loot: noop,
+      respawns: noop,
+      pet: noop,
+      buffs: noop
+    },
     env
   )
   await engine.startWatching()

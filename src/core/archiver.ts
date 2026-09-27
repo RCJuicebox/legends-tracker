@@ -71,7 +71,11 @@ export async function archiveLog(logPath: string, archiveDir: string, deps: Arch
  */
 async function moveAcrossDrives(logPath: string, staging: string, archiveDir: string, deps: ArchiverDeps): Promise<ArchiveOutcome> {
   if (await deps.isGameRunning()) {
-    return { status: 'deferred', reason: 'locked', message: 'The archive folder is on another drive, so the log can only be moved there while the game is closed. It will be archived then.' }
+    return {
+      status: 'deferred',
+      reason: 'locked',
+      message: 'The archive folder is on another drive, so the log can only be moved there while the game is closed. It will be archived then.'
+    }
   }
   try {
     await fs.copyFile(logPath, staging)
@@ -171,7 +175,9 @@ export async function findStaging(archiveDir: string): Promise<string[]> {
 
 /** `.staging-eqlog_Kelwyn_neriak-1727000000000.txt` → `eqlog_Kelwyn_neriak.txt` */
 export function stagingOriginalName(stagingPath: string): string {
-  return basename(stagingPath).slice(STAGING_PREFIX.length).replace(/-\d+\.txt$/, '.txt')
+  return basename(stagingPath)
+    .slice(STAGING_PREFIX.length)
+    .replace(/-\d+\.txt$/, '.txt')
 }
 
 const PARTIAL = '.partial'
@@ -261,8 +267,15 @@ async function archiveStem(path: string, fallback: string): Promise<string> {
     await handle.read(head, 0, head.length, 0)
     const tail = Buffer.alloc(Math.min(TAIL_BYTES, size))
     await handle.read(tail, 0, tail.length, Math.max(0, size - tail.length))
-    const first = decodeCp1252(head).split('\n').map((l) => parseLogLine(l.trim())).find(Boolean)
-    const last = decodeCp1252(tail).split('\n').reverse().map((l) => parseLogLine(l.trim())).find(Boolean)
+    const first = decodeCp1252(head)
+      .split('\n')
+      .map((l) => parseLogLine(l.trim()))
+      .find(Boolean)
+    const last = decodeCp1252(tail)
+      .split('\n')
+      .reverse()
+      .map((l) => parseLogLine(l.trim()))
+      .find(Boolean)
     if (!first || !last) return `${fallback}_${localDay(Date.now())}`
     return `${fallback}_${localDay(first.time)}_to_${localDay(last.time)}`
   } finally {

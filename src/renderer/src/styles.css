@@ -792,7 +792,9 @@ table.table {
   font-weight: 700;
   letter-spacing: 0.04em;
   color: #f1f3f7;
-  text-shadow: 0 1px 2px #000, 0 0 6px rgba(0, 0, 0, 0.8);
+  text-shadow:
+    0 1px 2px #000,
+    0 0 6px rgba(0, 0, 0, 0.8);
   padding: 2px 2px 0;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -836,7 +838,9 @@ table.table {
   position: absolute;
   inset: 0;
   border-radius: inherit;
-  box-shadow: 0 0 0 2px var(--c) inset, 0 0 14px color-mix(in srgb, var(--c) 60%, transparent);
+  box-shadow:
+    0 0 0 2px var(--c) inset,
+    0 0 14px color-mix(in srgb, var(--c) 60%, transparent);
   opacity: 0;
   pointer-events: none;
 }
@@ -1313,7 +1317,10 @@ table.table {
   background: var(--bg-2);
   border: 1px solid var(--line);
   border-radius: var(--radius-sm);
-  font: 12px/1.45 Consolas, 'Cascadia Mono', monospace;
+  font:
+    12px/1.45 Consolas,
+    'Cascadia Mono',
+    monospace;
   white-space: pre-wrap;
   color: var(--text-2);
 }
@@ -1619,14 +1626,18 @@ table.table {
   border-radius: var(--radius);
   border: 1px solid var(--line);
   background: linear-gradient(180deg, var(--panel-2), var(--panel));
-  transition: border-color 0.12s, transform 0.12s;
+  transition:
+    border-color 0.12s,
+    transform 0.12s;
 }
 .lt-tile:hover {
   border-color: rgba(232, 180, 76, 0.55);
 }
 .lt-tile.selected {
   border-color: var(--accent);
-  box-shadow: 0 0 0 1px var(--accent), 0 6px 18px rgba(232, 180, 76, 0.12);
+  box-shadow:
+    0 0 0 1px var(--accent),
+    0 6px 18px rgba(232, 180, 76, 0.12);
 }
 .lt-tile.unknown {
   border-style: dashed;
@@ -1642,7 +1653,9 @@ table.table {
   flex: none;
   border-radius: 8px;
   background: #0b0d12;
-  box-shadow: 0 0 0 1px rgba(232, 180, 76, 0.28), inset 0 0 0 1px rgba(0, 0, 0, 0.6);
+  box-shadow:
+    0 0 0 1px rgba(232, 180, 76, 0.28),
+    inset 0 0 0 1px rgba(0, 0, 0, 0.6);
 }
 .lt-icon.blank {
   display: inline-block;
@@ -1997,7 +2010,6 @@ table.table {
   max-width: 760px;
 }
 
-
 .lt-worth {
   line-height: 1.6;
 }
@@ -2194,7 +2206,9 @@ button.tree-item {
   border-radius: 50%;
   border: 1px solid var(--line-2);
   color: var(--text-2);
-  font: italic 600 10.5px/1 Georgia, serif;
+  font:
+    italic 600 10.5px/1 Georgia,
+    serif;
   cursor: pointer;
   user-select: none;
 }

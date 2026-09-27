@@ -17,8 +17,25 @@ export function storedEquipment(inv: Pick<Inventory, 'keyRing'>): InvItem[] {
 
 /** Worn slots in the order the game lists them. "Any Slot" is the charm slot. */
 export const WORN_SLOTS = [
-  'Any Slot', 'Ear', 'Head', 'Face', 'Neck', 'Shoulders', 'Arms', 'Back', 'Wrist', 'Range', 'Hands',
-  'Primary', 'Secondary', 'Fingers', 'Chest', 'Legs', 'Feet', 'Waist', 'Ammo'
+  'Any Slot',
+  'Ear',
+  'Head',
+  'Face',
+  'Neck',
+  'Shoulders',
+  'Arms',
+  'Back',
+  'Wrist',
+  'Range',
+  'Hands',
+  'Primary',
+  'Secondary',
+  'Fingers',
+  'Chest',
+  'Legs',
+  'Feet',
+  'Waist',
+  'Ammo'
 ]
 
 const EMPTY = (name: string) => !name || name === 'Empty'
@@ -83,7 +100,13 @@ export function placeLabel(location: string): string {
   const parts = location.split('-')
   const top = parts[0]
   const slot = /^Slot(\d+)$/.exec(parts[1] ?? '')?.[1]
-  const where = /^General (\d+)$/.test(top) ? `Bag ${top.slice(8)}` : /^Bank(\d+)$/.test(top) ? `Bank ${top.slice(4)}` : /^SharedBank(\d+)$/.test(top) ? `Shared bank ${top.slice(10)}` : slotLabel(top)
+  const where = /^General (\d+)$/.test(top)
+    ? `Bag ${top.slice(8)}`
+    : /^Bank(\d+)$/.test(top)
+      ? `Bank ${top.slice(4)}`
+      : /^SharedBank(\d+)$/.test(top)
+        ? `Shared bank ${top.slice(10)}`
+        : slotLabel(top)
   return slot ? `${where}, slot ${slot}${parts[2] ? ' (augment)' : ''}` : where
 }
 

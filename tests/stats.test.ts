@@ -1,6 +1,16 @@
 import { describe, expect, it } from 'vitest'
 import { computeAc, type AcInputs } from '../src/core/acModel'
-import { avoidanceFromHitRate, baseAccuracy, doubleAttackChance, dualWieldChance, hitChance, stanceAccuracy, swingsPerRound, tripleAttackChance, windowOffense } from '../src/core/combatModel'
+import {
+  avoidanceFromHitRate,
+  baseAccuracy,
+  doubleAttackChance,
+  dualWieldChance,
+  hitChance,
+  stanceAccuracy,
+  swingsPerRound,
+  tripleAttackChance,
+  windowOffense
+} from '../src/core/combatModel'
 import { aaEffects, aaTotal, latestAas } from '../src/core/aa'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
@@ -10,12 +20,29 @@ import { join } from 'node:path'
 const reading = JSON.parse(readFileSync(join(__dirname, 'fixtures', 'baseline-2026-09-12.json'), 'utf8'))
 const inputs = reading.calculator_check.inputs
 const baseline: AcInputs = {
-  trio: ['shd', 'mnk', 'shm'], cls: 'shd', race: 'iksar', level: reading.character.level, defense: inputs.defense_skill, agility: inputs.functional_agility,
-  heroicAgility: inputs.heroic_agility, heroicStrength: 0, drunk: 0, itemAC: inputs.worn_ac, shieldAC: inputs.shield_ac, itemAvoidance: inputs.item_avoidance,
-  foodDrinkAC: 0, tributeAC: 0, acBuffs: 0, armorOfWisdom: 0, herosFortitude: 0, combatStability: inputs.spa_259_pct, softCap: inputs.soft_cap_table,
+  trio: ['shd', 'mnk', 'shm'],
+  cls: 'shd',
+  race: 'iksar',
+  level: reading.character.level,
+  defense: inputs.defense_skill,
+  agility: inputs.functional_agility,
+  heroicAgility: inputs.heroic_agility,
+  heroicStrength: 0,
+  drunk: 0,
+  itemAC: inputs.worn_ac,
+  shieldAC: inputs.shield_ac,
+  itemAvoidance: inputs.item_avoidance,
+  foodDrinkAC: 0,
+  tributeAC: 0,
+  acBuffs: 0,
+  armorOfWisdom: 0,
+  herosFortitude: 0,
+  combatStability: inputs.spa_259_pct,
+  softCap: inputs.soft_cap_table,
   multiplier: inputs.post_cap_multiplier,
   // Not in the reading as numbers: the Monk's weight is "under 17", and evasion is taken as the same AAs.
-  weight: 14, evasion: inputs.spa_259_pct
+  weight: 14,
+  evasion: inputs.spa_259_pct
 }
 
 describe('AC', () => {
@@ -32,9 +59,28 @@ describe('AC', () => {
 
   it("gives Dzarn's worked example: displayed 10,480 and mitigation 3,413", () => {
     const r = computeAc({
-      trio: ['shd'], cls: 'shd', race: 'other', level: 100, defense: 390, agility: 1295, heroicAgility: 395, heroicStrength: 310, weight: 0, drunk: 0,
-      itemAC: 5470, shieldAC: 350, itemAvoidance: 100, foodDrinkAC: 0, tributeAC: 0, acBuffs: 0, armorOfWisdom: 620, herosFortitude: 500,
-      combatStability: 82, evasion: 0, softCap: 488, multiplier: 0.33
+      trio: ['shd'],
+      cls: 'shd',
+      race: 'other',
+      level: 100,
+      defense: 390,
+      agility: 1295,
+      heroicAgility: 395,
+      heroicStrength: 310,
+      weight: 0,
+      drunk: 0,
+      itemAC: 5470,
+      shieldAC: 350,
+      itemAvoidance: 100,
+      foodDrinkAC: 0,
+      tributeAC: 0,
+      acBuffs: 0,
+      armorOfWisdom: 620,
+      herosFortitude: 500,
+      combatStability: 82,
+      evasion: 0,
+      softCap: 488,
+      multiplier: 0.33
     })
     expect(r.displayed).toBe(10480)
     expect(r.mitigation).toBe(3413)

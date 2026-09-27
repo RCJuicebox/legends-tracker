@@ -44,7 +44,12 @@ const plainName = (name: string) => name.replace(/\s*\+\d+$/, '')
 /** Ten pips for the ten merge levels, filled up to this item's. */
 function MergePips({ level }: { level: number }) {
   return (
-    <span className="lt-pips" title={level ? `Merged to +${level} of ${MAX_MERGE}` : 'Not merged yet'} role="img" aria-label={level ? `Merged to +${level} of ${MAX_MERGE}` : 'Not merged yet'}>
+    <span
+      className="lt-pips"
+      title={level ? `Merged to +${level} of ${MAX_MERGE}` : 'Not merged yet'}
+      role="img"
+      aria-label={level ? `Merged to +${level} of ${MAX_MERGE}` : 'Not merged yet'}
+    >
       {Array.from({ length: MAX_MERGE }, (_, i) => (
         <i key={i} className={i < level ? 'on' : ''} />
       ))}
@@ -149,11 +154,13 @@ export function Gear({ go, only, onPlan }: { go?: (page: PageId) => void; only?:
         <div className="card empty">
           {view.error === 'missing' || !character ? (
             <>
-              No inventory export for {character ? <b>{who(character)}</b> : 'this character'} yet. Type <span className="mono">/outputfile inventory</span> in game and this
-              page fills in within a few seconds.
+              No inventory export for {character ? <b>{who(character)}</b> : 'this character'} yet. Type <span className="mono">/outputfile inventory</span> in game and this page
+              fills in within a few seconds.
             </>
           ) : (
-            <>Could not read {view.file}: {view.error}</>
+            <>
+              Could not read {view.file}: {view.error}
+            </>
           )}
         </div>
       </>
@@ -246,9 +253,12 @@ export function Gear({ go, only, onPlan }: { go?: (page: PageId) => void; only?:
       <GearTotals view={view} sheet={sheet} updateSheet={updateSheet} summary={summary} scaled={scaled} setScaled={setScaled} />
       <Carried view={view} />
       <p className="faint small mt-14">
-        Item stats and icon numbers come from <a href="https://eqlwiki.com" target="_blank" rel="noreferrer">eqlwiki.com</a>, the community wiki, scaled for each item's +N
-        merge level the way the wiki's item level slider scales them; the icons themselves are the game's own. Exaltation augments add nothing on top: their effects are
-        already part of the item's figures.
+        Item stats and icon numbers come from{' '}
+        <a href="https://eqlwiki.com" target="_blank" rel="noreferrer">
+          eqlwiki.com
+        </a>
+        , the community wiki, scaled for each item's +N merge level the way the wiki's item level slider scales them; the icons themselves are the game's own. Exaltation augments
+        add nothing on top: their effects are already part of the item's figures.
       </p>
     </>
   )
@@ -268,7 +278,11 @@ function SlotTile({ slot, item, view, wide, selected, onSelect }: { slot: string
       </div>
     )
   return (
-    <button className={`lt-tile${wide ? ' wide' : ''}${selected ? ' selected' : ''}${info && !info.found ? ' unknown' : ''}`} onClick={onSelect} title={info && !info.found ? 'Not on the wiki' : 'Show this item'}>
+    <button
+      className={`lt-tile${wide ? ' wide' : ''}${selected ? ' selected' : ''}${info && !info.found ? ' unknown' : ''}`}
+      onClick={onSelect}
+      title={info && !info.found ? 'Not on the wiki' : 'Show this item'}
+    >
       <ItemIcon icon={info?.icon} size={36} />
       <div className="lt-tile-body">
         <span className="lt-slot">
@@ -297,7 +311,21 @@ function AugDot({ name, view }: { name: string; view: InventoryView }) {
 }
 
 /** The middle of the sheet: who it is, and what the gear adds up to. */
-function CharacterCard({ name, server, level, classes, view, summary }: { name: string; server?: string; level?: number; classes: string[]; view: InventoryView; summary: WornSummary }) {
+function CharacterCard({
+  name,
+  server,
+  level,
+  classes,
+  view,
+  summary
+}: {
+  name: string
+  server?: string
+  level?: number
+  classes: string[]
+  view: InventoryView
+  summary: WornSummary
+}) {
   const { totals } = summary
   const worn = view.inventory?.worn ?? []
   const levels = worn.map((it) => mergeLevel(it.name))
@@ -528,9 +556,7 @@ function ItemPanel({
         <div>
           {info?.found ? (
             <>
-              <div className="small faint mb-4">
-                The wiki's stats, base values{lvl ? `; at +${lvl}: AC ${s?.ac ?? 0}` : ''}
-              </div>
+              <div className="small faint mb-4">The wiki's stats, base values{lvl ? `; at +${lvl}: AC ${s?.ac ?? 0}` : ''}</div>
               <pre className="inv-block">{statsText(info)}</pre>
             </>
           ) : (

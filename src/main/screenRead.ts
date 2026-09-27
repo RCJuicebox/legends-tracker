@@ -69,7 +69,11 @@ export function readMotesFromScreen(windows: Windows): Promise<MoteScreenRead> {
           rowsRead.push(`${row.text.replace(/\s*\d[\d,.]*$/, '')} → ${n}`)
         })
       }
-      if (!sample.length) sample = ocrRows(words).map((x) => x.text).filter((t) => /potential|mote/i.test(t)).slice(0, 20)
+      if (!sample.length)
+        sample = ocrRows(words)
+          .map((x) => x.text)
+          .filter((t) => /potential|mote/i.test(t))
+          .slice(0, 20)
     }
     return { counts: found, rows: rowsRead, nearMisses: rowsRead.length ? [] : sample, screens: shots.length }
   })

@@ -10,24 +10,56 @@ export const TICK_MS = 6000
 export function formulaTicks(level: number, formula: number, cap: number): number {
   let t: number
   switch (formula) {
-    case 0: return 0
-    case 1: t = level > 3 ? Math.floor(level / 2) : 1; break
-    case 2: t = level > 3 ? Math.floor(level / 2) + 5 : 6; break
-    case 3: t = 30 * level; break
-    case 4: t = 50; break
-    case 5: t = 2; break
-    case 6: t = Math.floor(level / 2) + 2; break
-    case 7: t = level; break
-    case 8: t = level + 10; break
-    case 9: t = 2 * level + 10; break
-    case 10: t = 3 * level + 10; break
-    case 11: t = 30 * (level + 3); break
-    case 12: t = level > 7 ? Math.floor(level / 4) : 1; break
-    case 13: t = 4 * level + 10; break
-    case 14: t = 5 * (level + 2); break
-    case 15: t = 10 * (level + 10); break
+    case 0:
+      return 0
+    case 1:
+      t = level > 3 ? Math.floor(level / 2) : 1
+      break
+    case 2:
+      t = level > 3 ? Math.floor(level / 2) + 5 : 6
+      break
+    case 3:
+      t = 30 * level
+      break
+    case 4:
+      t = 50
+      break
+    case 5:
+      t = 2
+      break
+    case 6:
+      t = Math.floor(level / 2) + 2
+      break
+    case 7:
+      t = level
+      break
+    case 8:
+      t = level + 10
+      break
+    case 9:
+      t = 2 * level + 10
+      break
+    case 10:
+      t = 3 * level + 10
+      break
+    case 11:
+      t = 30 * (level + 3)
+      break
+    case 12:
+      t = level > 7 ? Math.floor(level / 4) : 1
+      break
+    case 13:
+      t = 4 * level + 10
+      break
+    case 14:
+      t = 5 * (level + 2)
+      break
+    case 15:
+      t = 10 * (level + 10)
+      break
     case 50:
-    case 51: return -1
+    case 51:
+      return -1
     default:
       if (formula < 200) return 0
       t = formula
@@ -90,7 +122,17 @@ export function computeDuration(input: DurationInput): DurationBreakdown {
   const base = formulaTicks(level, spell.formula, spell.cap)
   const steps: string[] = []
   if (base < 0) {
-    return { ticks: -1, wholeTicks: -1, permanent: true, seconds: Infinity, earliestSec: Infinity, latestSec: Infinity, spellWindowSec: Infinity, baseSec: Infinity, steps: ['Permanent until removed'] }
+    return {
+      ticks: -1,
+      wholeTicks: -1,
+      permanent: true,
+      seconds: Infinity,
+      earliestSec: Infinity,
+      latestSec: Infinity,
+      spellWindowSec: Infinity,
+      baseSec: Infinity,
+      steps: ['Permanent until removed']
+    }
   }
   if (base === 0) {
     return { ticks: 0, wholeTicks: 0, permanent: false, seconds: 0, earliestSec: 0, latestSec: 0, spellWindowSec: 0, baseSec: 0, steps: ['Instant: no duration'] }

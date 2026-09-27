@@ -106,8 +106,8 @@ export function Stats() {
         <div>
           <h1>Stats</h1>
           <p>
-            AC and melee for {who(character) || 'your character'}, worked out the way the server does. Worn gear comes from the Inventory page, skill caps and soft
-            caps from the game's own tables, and AAs from your log.
+            AC and melee for {who(character) || 'your character'}, worked out the way the server does. Worn gear comes from the Inventory page, skill caps and soft caps from the
+            game's own tables, and AAs from your log.
           </p>
         </div>
         {available.length > 1 && (
@@ -125,8 +125,8 @@ export function Stats() {
 
       <div className="card stack gap-12 mb-14">
         <p className="hint">
-          {who(character) || 'This character'}&apos;s classes, levels and race, for every page: spell durations, AC and melee, gear and the upgrade
-          finder, spell upgrades and buffs.
+          {who(character) || 'This character'}&apos;s classes, levels and race, for every page: spell durations, AC and melee, gear and the upgrade finder, spell upgrades and
+          buffs.
         </p>
         <div className="stats-fields">
           {[0, 1, 2].map((i) => {
@@ -229,11 +229,7 @@ function AaLine({ aa, status, onRead }: { aa: AaSummary | null; status: string; 
               <b>{a.name}</b>
               {a.cost !== null && <span className="faint"> · cost {a.cost}</span>}
               {Object.keys(a.effects).length > 0 && (
-                <span className="muted">
-                  {' '}
-                  ·{' '}
-                  {(Object.entries(a.effects) as [AaEffect, number][]).map(([k, v]) => `${AA_USES[k].label} ${v}${AA_USES[k].unit}`).join(', ')}
-                </span>
+                <span className="muted"> · {(Object.entries(a.effects) as [AaEffect, number][]).map(([k, v]) => `${AA_USES[k].label} ${v}${AA_USES[k].unit}`).join(', ')}</span>
               )}
             </div>
           ))}

@@ -25,11 +25,7 @@ export type { PetState, PetSummon }
  * start, after `maxBytes`, or at `stopAt`: where the last scan of this file ended, since the live log
  * has been followed from there.
  */
-export async function scanPetLog(
-  logPath: string,
-  isSummon: (name: string) => string | null,
-  opts: { maxBytes?: number; stopAt?: number } = {}
-): Promise<PetState> {
+export async function scanPetLog(logPath: string, isSummon: (name: string) => string | null, opts: { maxBytes?: number; stopAt?: number } = {}): Promise<PetState> {
   const out: PetState = { gear: null, summon: null }
   // Lines after the one being looked at, nearest first: a gear list is found at its heading, after its items.
   let after: string[] = []

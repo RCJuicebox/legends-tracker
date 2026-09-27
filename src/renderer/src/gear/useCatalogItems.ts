@@ -43,10 +43,7 @@ export function useCatalogItems(state: CatalogState | null, shownEras: string[])
     const byItem = new Map([...byKey].map(([key, c]) => [key, { worn: wornEffectOf(c.statsblock), proc: procOf(c.statsblock) }]))
     return (name: string) => byItem.get(itemKey(name))
   }, [byKey])
-  const fociOf = useMemo(
-    () => (item: InvItem) => itemFoci(item, (name) => byKey.get(itemKey(name))?.focus),
-    [byKey]
-  )
+  const fociOf = useMemo(() => (item: InvItem) => itemFoci(item, (name) => byKey.get(itemKey(name))?.focus), [byKey])
   // An item's era group, as the era buttons name them, and whether those buttons hide it.
   const eraHidden = useMemo(() => {
     const hidden = new Set(shownEras)

@@ -1,15 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import {
-  castableByMine,
-  castRows,
-  DEFAULT_SPELL_WEIGHTS,
-  isAbility,
-  rankGain,
-  sectionOf,
-  spellUpgradeOptions,
-  spendOnSpell,
-  stockXp
-} from '../src/core/spellMotes'
+import { castableByMine, castRows, DEFAULT_SPELL_WEIGHTS, isAbility, rankGain, sectionOf, spellUpgradeOptions, spendOnSpell, stockXp } from '../src/core/spellMotes'
 import { DEFAULT_TIER_DURATION_PCT } from '../src/shared/types'
 import { fixtureBook } from './helpers'
 

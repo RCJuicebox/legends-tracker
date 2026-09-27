@@ -40,16 +40,24 @@ export function useOwnedGear({
 
   const pieces = useMemo(
     () =>
-      ownedPieces(inv, (item) => {
-        const c = byKey.get(itemKey(item.name))
-        const stats = statsFor(view.items, item.name) ?? (c ? scaledStats(parseStatsBlock(c.statsblock), mergeLevel(item.name)) : null)
-        if (!c && !stats) return null
-        const fx = itemEffects(item, effectsOfItem)
-        return {
-          r: c ? restrictions(c.statsblock) : null, stats, foci: fociOf(item).map((f) => f.name), worn: fx.worn.map((f) => f.name), procs: fx.procs.map((f) => f.name),
-          lore: c ? isLore(c.statsblock) : true
-        }
-      }, petItems),
+      ownedPieces(
+        inv,
+        (item) => {
+          const c = byKey.get(itemKey(item.name))
+          const stats = statsFor(view.items, item.name) ?? (c ? scaledStats(parseStatsBlock(c.statsblock), mergeLevel(item.name)) : null)
+          if (!c && !stats) return null
+          const fx = itemEffects(item, effectsOfItem)
+          return {
+            r: c ? restrictions(c.statsblock) : null,
+            stats,
+            foci: fociOf(item).map((f) => f.name),
+            worn: fx.worn.map((f) => f.name),
+            procs: fx.procs.map((f) => f.name),
+            lore: c ? isLore(c.statsblock) : true
+          }
+        },
+        petItems
+      ),
     [inv, byKey, view.items, fociOf, petItems, effectsOfItem]
   )
   // Exaltations kept in Storage › Exaltations that bring a focus and the character may use, with what

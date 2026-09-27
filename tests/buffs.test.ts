@@ -12,7 +12,11 @@ import { DEFAULT_TIER_DURATION_PCT } from '../src/shared/types'
 describe('who is who', () => {
   it('reads /who lines, three classes and all', () => {
     expect(parseWho('[50 SHD/BRD/WIZ] Aldric (Erudite) <Test Guild> ZONE: The Plane of Hate 10025 (hateplane)  ', 7)).toEqual({
-      name: 'Aldric', classes: ['shd', 'brd', 'wiz'], level: 50, race: 'Erudite', at: 7
+      name: 'Aldric',
+      classes: ['shd', 'brd', 'wiz'],
+      level: 50,
+      race: 'Erudite',
+      at: 7
     })
     expect(parseWho('[24 WAR/BRD/WIZ] Corvin (Dark Elf) <Other Guild> ZONE: The Estate of Unrest (unrest)', 0)?.classes).toEqual(['war', 'brd', 'wiz'])
     expect(parseWho('[50 CLR] Brenna (Human)', 0)?.classes).toEqual(['clr'])
@@ -22,8 +26,27 @@ describe('who is who', () => {
 })
 
 const spell = (name: string, over: Partial<Spell>): Spell => ({
-  id: 0, name, castMs: 3000, recastMs: 0, mana: 100, formula: 3, cap: 600, beneficial: true, classLevels: Array(16).fill(255), targetType: 5, skill: 5, icon: 0, resist: 'none', range: 0, aeRange: 0,
-  effects: [], category: 'buff', landSelf: '', landOther: '', fade: '', ...over
+  id: 0,
+  name,
+  castMs: 3000,
+  recastMs: 0,
+  mana: 100,
+  formula: 3,
+  cap: 600,
+  beneficial: true,
+  classLevels: Array(16).fill(255),
+  targetType: 5,
+  skill: 5,
+  icon: 0,
+  resist: 'none',
+  range: 0,
+  aeRange: 0,
+  effects: [],
+  category: 'buff',
+  landSelf: '',
+  landOther: '',
+  fade: '',
+  ...over
 })
 const temperance = spell('Temperance', { landSelf: 'You feel the power of temperance.', fade: 'Your temperance fades.' })
 const aegis = spell('Holy Aegis', { landSelf: 'You feel the power of temperance.', fade: 'Your temperance fades.' })
@@ -31,7 +54,15 @@ const clarity = spell('Clarity', { landSelf: 'A soft breeze passes over you.', f
 const book = { all: () => [temperance, aegis, clarity].values() } as unknown as SpellBook
 /** An offer with its effects slot by slot: [slot, spa, value] (stacking commands: [slot, 148/149, spa, slot, below]). */
 const offer = (name: string, line: BuffOffer['line'], classes: Record<string, number>, value = 100, stack: number[][] = [[1, 100 + name.length, 1]]): BuffOffer => ({
-  spell: name, line, effects: [], classes, seconds: 3600, group: false, self: false, category: 'buff', value,
+  spell: name,
+  line,
+  effects: [],
+  classes,
+  seconds: 3600,
+  group: false,
+  self: false,
+  category: 'buff',
+  value,
   stack: stack.map(([slot, spa, base, base2 = 0, max = 0]) => ({ slot, spa, base, base2, formula: 100, max }))
 })
 const OFFERS = [offer('Temperance', 'hpac', { clr: 40 }), offer('Holy Aegis', 'hpac', { pal: 45 }), offer('Clarity', 'manaRegen', { enc: 26 })]
@@ -94,8 +125,21 @@ describe('what to ask for', () => {
   const on = (spell: string, line: BuffOffer['line'] = 'hpac'): ActiveBuff => ({ spell, ranked: spell, line, caster: 'someone', landedAt: 0, endsAt: null })
 
   // The slot layouts of the spell file (spa 69 HP, 1 AC, 4 STR, 5 DEX, 6 AGI, 7 STA; 148 blocks, and 149 overwrites, slot-3 HP below 2800).
-  const temperance = offer('Temperance', 'hpac', { clr: 40 }, 1120, [[1, 148, 69, 3, 2800], [2, 69, 800], [4, 1, 160], [5, 149, 69, 3, 2800]])
-  const blessing = { ...offer('Blessing of Temperance', 'hpac', { clr: 45 }, 1120, [[1, 148, 69, 3, 2800], [2, 69, 800], [4, 1, 160], [5, 149, 69, 3, 2800]]), group: true }
+  const temperance = offer('Temperance', 'hpac', { clr: 40 }, 1120, [
+    [1, 148, 69, 3, 2800],
+    [2, 69, 800],
+    [4, 1, 160],
+    [5, 149, 69, 3, 2800]
+  ])
+  const blessing = {
+    ...offer('Blessing of Temperance', 'hpac', { clr: 45 }, 1120, [
+      [1, 148, 69, 3, 2800],
+      [2, 69, 800],
+      [4, 1, 160],
+      [5, 149, 69, 3, 2800]
+    ]),
+    group: true
+  }
   const symbol = offer('Symbol of Pinzarn', 'hpac', { pal: 46, clr: 31 }, 307, [[3, 69, 307]])
   const HP = [temperance, blessing, symbol]
 
@@ -125,8 +169,20 @@ describe('what to ask for', () => {
 
   it('picks the combination that stacks for the most over the single biggest buff', () => {
     // Harnessing: HP and STR/DEX in slots 1, 4, 5; it overwrites slot-1 STR below 67 and DEX below 50, and blocks them below 1067/1050.
-    const harnessing = offer('Harnessing of Spirit', 'hpac', { shm: 46 }, 368, [[1, 69, 251], [4, 4, 67], [5, 5, 50], [6, 149, 4, 1, 67], [7, 149, 5, 1, 50], [8, 148, 4, 1, 1067], [9, 148, 5, 1, 1050]])
-    const infusion = offer('Infusion of Spirit', 'stats', { shm: 49 }, 173, [[4, 4, 50], [5, 5, 55], [6, 7, 45]])
+    const harnessing = offer('Harnessing of Spirit', 'hpac', { shm: 46 }, 368, [
+      [1, 69, 251],
+      [4, 4, 67],
+      [5, 5, 50],
+      [6, 149, 4, 1, 67],
+      [7, 149, 5, 1, 50],
+      [8, 148, 4, 1, 1067],
+      [9, 148, 5, 1, 1050]
+    ])
+    const infusion = offer('Infusion of Spirit', 'stats', { shm: 49 }, 173, [
+      [4, 4, 50],
+      [5, 5, 55],
+      [6, 7, 45]
+    ])
     const strength = offer('Strength', 'stats', { shm: 44 }, 67, [[1, 4, 67]])
     const dexterity = offer('Dexterity', 'stats', { shm: 48 }, 50, [[1, 5, 50]])
     const stamina = offer('Stamina', 'stats', { shm: 44 }, 60, [[1, 7, 40]])
@@ -146,7 +202,13 @@ describe('what to ask for', () => {
   })
 
   it('says the order when it matters: Harnessing of Spirit after Strength', () => {
-    const harnessing = offer('Harnessing of Spirit', 'hpac', { shm: 46 }, 368, [[1, 69, 251], [4, 4, 67], [5, 5, 50], [6, 149, 4, 1, 67], [8, 148, 4, 1, 1067]])
+    const harnessing = offer('Harnessing of Spirit', 'hpac', { shm: 46 }, 368, [
+      [1, 69, 251],
+      [4, 4, 67],
+      [5, 5, 50],
+      [6, 149, 4, 1, 67],
+      [8, 148, 4, 1, 1067]
+    ])
     const strength = offer('Strength', 'stats', { shm: 44 }, 67, [[1, 4, 67]])
     const plan = buffPlan({ offers: [harnessing, strength], wanted: ['Harnessing of Spirit', 'Strength'], group: [shaman], active: [] })
     expect(plan.chosen.map((c) => [c.spell, c.after])).toEqual([
@@ -155,14 +217,18 @@ describe('what to ask for', () => {
     ])
     expect(askText(plan.needs)).toBe('Ask Dorran for Harnessing of Spirit (after Strength) and Strength')
     // Strength on already: only Harnessing to ask for. Harnessing on: Strength cannot go on.
-    expect(buffNeeds({ offers: [harnessing, strength], wanted: ['Harnessing of Spirit', 'Strength'], group: [shaman], active: [on('Strength', 'stats')] }).map((n) => n.spell)).toEqual(['Harnessing of Spirit'])
+    expect(
+      buffNeeds({ offers: [harnessing, strength], wanted: ['Harnessing of Spirit', 'Strength'], group: [shaman], active: [on('Strength', 'stats')] }).map((n) => n.spell)
+    ).toEqual(['Harnessing of Spirit'])
     const blocked = buffPlan({ offers: [harnessing, strength], wanted: ['Harnessing of Spirit', 'Strength'], group: [shaman], active: [on('Harnessing of Spirit')] })
     expect(blocked.needs).toEqual([])
     expect(blocked.leftOut).toEqual([{ spell: 'Strength', line: 'stats', value: 67, reason: 'stack', blockedBy: ['Harnessing of Spirit'] }])
     // A level-46 shaman's Strength is weaker than the threshold, so Harnessing simply replaces it: the two are not both worth having.
     const low: Person = { ...shaman, level: 46 }
     const weak = { ...strength, stack: [{ slot: 1, spa: 4, base: 42, base2: 0, formula: 101, max: 67 }] }
-    expect(buffPlan({ offers: [harnessing, weak], wanted: ['Harnessing of Spirit', 'Strength'], group: [low], active: [] }).chosen.map((c) => c.spell)).toEqual(['Harnessing of Spirit'])
+    expect(buffPlan({ offers: [harnessing, weak], wanted: ['Harnessing of Spirit', 'Strength'], group: [low], active: [] }).chosen.map((c) => c.spell)).toEqual([
+      'Harnessing of Spirit'
+    ])
   })
 
   it('leaves out what nobody here can cast or is too small to ask for', () => {
@@ -183,7 +249,13 @@ describe('what to ask for', () => {
   })
 
   it('counts your own self-only buffs as yours to cast, once /who has said what you are', () => {
-    const yaulp = { ...offer('Yaulp IV', 'attack', { clr: 44 }, 90, [[1, 2, 40], [2, 4, 30]]), self: true }
+    const yaulp = {
+      ...offer('Yaulp IV', 'attack', { clr: 44 }, 90, [
+        [1, 2, 40],
+        [2, 4, 30]
+      ]),
+      self: true
+    }
     const me: Person = { name: 'Kelwyn', classes: ['clr', 'mnk', 'shm'], level: 50, race: 'Iksar', at: 0 }
     const stranger: Person = { ...me, classes: ['mnk', 'shm', 'nec'] }
     // A groupmate cleric cannot cast it on you; you can.
@@ -224,7 +296,12 @@ describe('what to ask for', () => {
   })
 
   it('wants every buff of the main lines worth something out of the box, worth most first', () => {
-    const offers = [offer('Courage', 'hpac', { clr: 1 }, 30), offer('Temperance', 'hpac', { clr: 40 }, 1120), offer('Charisma', 'stats', { shm: 30 }, 0), offer('Clarity', 'manaRegen', { enc: 26 }, 270)]
+    const offers = [
+      offer('Courage', 'hpac', { clr: 1 }, 30),
+      offer('Temperance', 'hpac', { clr: 40 }, 1120),
+      offer('Charisma', 'stats', { shm: 30 }, 0),
+      offer('Clarity', 'manaRegen', { enc: 26 }, 270)
+    ]
     expect(defaultWanted(offers)).toEqual(['Temperance', 'Clarity', 'Courage'])
   })
 })
@@ -244,13 +321,22 @@ describe('effect values', () => {
 })
 
 describe('offers from the spell file', () => {
-  const book = SpellBook.parse(readFileSync(join(__dirname, 'fixtures', 'stacking_spells_us.txt'), 'latin1'), readFileSync(join(__dirname, 'fixtures', 'stacking_spells_us_str.txt'), 'latin1'))
+  const book = SpellBook.parse(
+    readFileSync(join(__dirname, 'fixtures', 'stacking_spells_us.txt'), 'latin1'),
+    readFileSync(join(__dirname, 'fixtures', 'stacking_spells_us_str.txt'), 'latin1')
+  )
   const offers = buffOffers(book, DEFAULT_TIER_DURATION_PCT)
   const named = (n: string) => offers.find((o) => o.spell === n)
 
   it('offers permanent procs and utility buffs, but nothing timed of the kind and no vision', () => {
     // Vampiric Embrace: a permanent self-only weapon proc (a combat innate).
-    expect(named('Vampiric Embrace')).toMatchObject({ line: 'proc', self: true, seconds: Infinity, value: PROC_VALUE, effects: [{ line: 'proc', label: 'proc', value: 'Vampiric Embrace' }] })
+    expect(named('Vampiric Embrace')).toMatchObject({
+      line: 'proc',
+      self: true,
+      seconds: Infinity,
+      value: PROC_VALUE,
+      effects: [{ line: 'proc', label: 'proc', value: 'Vampiric Embrace' }]
+    })
     expect(named('Divine Might')?.effects[0].value).toBe('Divine Might Strike')
     expect(named('Breath of the Dead')).toMatchObject({ line: 'other', effects: [{ label: 'enduring breath' }] })
     // Deadeye is see-invisible and infravision only; Levitate is timed.
@@ -261,7 +347,12 @@ describe('offers from the spell file', () => {
   })
 
   it('keeps Rune I to IV apart, and reads wards and heal-per-hit', () => {
-    expect(offers.filter((o) => /^Rune /.test(o.spell)).map((o) => [o.spell, o.classes.enc])).toEqual([['Rune I', 13], ['Rune II', 22], ['Rune III', 33], ['Rune IV', 40]])
+    expect(offers.filter((o) => /^Rune /.test(o.spell)).map((o) => [o.spell, o.classes.enc])).toEqual([
+      ['Rune I', 13],
+      ['Rune II', 22],
+      ['Rune III', 33],
+      ['Rune IV', 40]
+    ])
     expect(named('Guard of Vie')).toMatchObject({ line: 'rune', value: 350, effects: [{ label: 'melee ward', value: '700 (10%)' }] })
     expect(named('Blessing of the Knight')).toMatchObject({ line: 'hpRegen', effects: [{ label: 'heal per hit', value: '+4' }] })
   })

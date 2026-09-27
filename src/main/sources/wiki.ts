@@ -148,8 +148,15 @@ export class WikiClient {
       throwIfCancelled(signal)
       const body = await this.get<QueryPages>(
         {
-          action: 'query', generator: 'categorymembers', gcmtitle: `Category:${name}`, gcmlimit: '50', gcmnamespace: '0',
-          prop: 'revisions', rvprop: 'content|ids', rvslots: 'main', ...cont
+          action: 'query',
+          generator: 'categorymembers',
+          gcmtitle: `Category:${name}`,
+          gcmlimit: '50',
+          gcmnamespace: '0',
+          prop: 'revisions',
+          rvprop: 'content|ids',
+          rvslots: 'main',
+          ...cont
         },
         urgency
       )
@@ -167,7 +174,10 @@ export class WikiClient {
     const out = new Map<string, number>()
     let cont: Record<string, string> = {}
     for (;;) {
-      const body = await this.get<QueryPages>({ action: 'query', generator: 'categorymembers', gcmtitle: `Category:${name}`, gcmlimit: '500', gcmnamespace: '0', prop: 'info', ...cont }, urgency)
+      const body = await this.get<QueryPages>(
+        { action: 'query', generator: 'categorymembers', gcmtitle: `Category:${name}`, gcmlimit: '500', gcmnamespace: '0', prop: 'info', ...cont },
+        urgency
+      )
       for (const p of body.query?.pages ?? []) if (p.lastrevid) out.set(p.title, p.lastrevid)
       if (!body.continue) return out
       cont = body.continue
@@ -176,10 +186,7 @@ export class WikiClient {
 
   /** How many pages a category holds. */
   async categorySize(name: string, urgency: Urgency = 'background'): Promise<number | null> {
-    const body = await this.get<{ query?: { pages?: { categoryinfo?: { pages: number } }[] } }>(
-      { action: 'query', prop: 'categoryinfo', titles: `Category:${name}` },
-      urgency
-    )
+    const body = await this.get<{ query?: { pages?: { categoryinfo?: { pages: number } }[] } }>({ action: 'query', prop: 'categoryinfo', titles: `Category:${name}` }, urgency)
     return body.query?.pages?.[0]?.categoryinfo?.pages ?? null
   }
 

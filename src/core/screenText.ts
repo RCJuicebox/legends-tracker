@@ -102,7 +102,8 @@ export function findMoteRows(words: OcrWord[]): MoteRow[] {
     if (!rank) continue
     const p = ws[pi]
     let first = pi
-    while (first > 0 && pi - first < 3 && p.x - (ws[first - 1].x + ws[first - 1].w) < p.h * NAME_REACH && ws[first].x - (ws[first - 1].x + ws[first - 1].w) < p.h * NAME_WORD_GAP) first--
+    while (first > 0 && pi - first < 3 && p.x - (ws[first - 1].x + ws[first - 1].w) < p.h * NAME_REACH && ws[first].x - (ws[first - 1].x + ws[first - 1].w) < p.h * NAME_WORD_GAP)
+      first--
     const left = ws[first].x
     const right = p.x + p.w
     const top = Math.min(...ws.slice(first, pi + 1).map((w) => w.y))
@@ -111,16 +112,27 @@ export function findMoteRows(words: OcrWord[]): MoteRow[] {
     const name: Box = { x: left - pad, y: top - pad, w: right - left + pad * 2, h: bottom - top + pad * 2 }
     // The nearest Quantity header above the row and to its right. Counts are right-aligned under it,
     // so the cell hugs its right edge, wide enough for six digits.
-    const header = headers
-      .filter((h) => h.x > right && h.y < p.y && p.y - h.y < HEADER_REACH_PX)
-      .sort((a, b) => a.x - right - (b.x - right) || b.y - a.y)[0]
+    const header = headers.filter((h) => h.x > right && h.y < p.y && p.y - h.y < HEADER_REACH_PX).sort((a, b) => a.x - right - (b.x - right) || b.y - a.y)[0]
     const cell: Box = header
       ? { x: header.x + header.w - p.h * CELL_LEFT, y: name.y, w: p.h * CELL_WIDTH, h: name.h }
       : { x: right + p.h, y: name.y, w: p.w * CELL_WIDTH_NO_HEADER, h: name.h }
-    const numbers = ws.filter((w) => w.x >= cell.x && w.x + w.w <= cell.x + cell.w + p.h).map((w) => readCount(w.text)).filter((n): n is number => n !== null)
+    const numbers = ws
+      .filter((w) => w.x >= cell.x && w.x + w.w <= cell.x + cell.w + p.h)
+      .map((w) => readCount(w.text))
+      .filter((n): n is number => n !== null)
     // No padding on its left: that would pick up the end of the rank word before it.
     const word: Box = { x: p.x, y: name.y, w: p.w + pad, h: name.h }
-    out.push({ rank, text: ws.slice(first).map((w) => w.text).join(' '), name, cell, word, count: numbers.length ? numbers[numbers.length - 1] : null })
+    out.push({
+      rank,
+      text: ws
+        .slice(first)
+        .map((w) => w.text)
+        .join(' '),
+      name,
+      cell,
+      word,
+      count: numbers.length ? numbers[numbers.length - 1] : null
+    })
   }
   return out
 }
@@ -165,9 +177,7 @@ export function countsFromComposite(words: OcrWord[], found: MoteRow[], layout: 
   return found.map((_, i) => {
     const top = margin + i * layout.rowHeight
     const [, cell, end] = layout.pieces.slice(i * 3, i * 3 + 3)
-    const inRow = words
-      .filter((w) => w.y + w.h / 2 >= top && w.y + w.h / 2 < top + layout.rowHeight && w.x + w.w / 2 > cell.x && w.x + w.w / 2 < end.x)
-      .sort((a, b) => a.x - b.x)
+    const inRow = words.filter((w) => w.y + w.h / 2 >= top && w.y + w.h / 2 < top + layout.rowHeight && w.x + w.w / 2 > cell.x && w.x + w.w / 2 < end.x).sort((a, b) => a.x - b.x)
     const numbers = inRow.map((w) => readCount(w.text)).filter((n): n is number => n !== null)
     return numbers.length ? numbers[numbers.length - 1] : null
   })
@@ -194,12 +204,53 @@ export function moteCountsFromScreen(words: OcrWord[]): { counts: Partial<Record
  * on the same lines. Longer labels come first so "Attack Speed" is not read as "Attack".
  */
 export const STAT_WINDOW_LABELS = [
-  'Combat HP Regen', 'Combat Mana Regen', 'Combat End Regen', 'Damage Shield Mitigation', 'Damage Shield Mitiga', 'Damage Shielding',
-  'DoT Shielding', 'Melee Shielding', 'Spell Shielding', 'Strike Through', 'Stun Resist', 'Combat Effects', 'Heal Amount',
-  'Spell Damage', 'Dragon Punch', 'Eagle Strike', 'Flying Kick', 'Round Kick', 'Tiger Claw', 'Attack Speed',
-  'HP', 'Mana', 'Endurance', 'AC', 'Attack', 'Velocity', 'Strength', 'Stamina', 'Intelligence', 'Wisdom', 'Agility', 'Dexterity',
-  'Charisma', 'Magic', 'Fire', 'Cold', 'Disease', 'Poison', 'Void', 'Accuracy', 'Avoidance', 'Clairvoyance', 'Luck', 'Bash',
-  'Backstab', 'Frenzy', 'Kick'
+  'Combat HP Regen',
+  'Combat Mana Regen',
+  'Combat End Regen',
+  'Damage Shield Mitigation',
+  'Damage Shield Mitiga',
+  'Damage Shielding',
+  'DoT Shielding',
+  'Melee Shielding',
+  'Spell Shielding',
+  'Strike Through',
+  'Stun Resist',
+  'Combat Effects',
+  'Heal Amount',
+  'Spell Damage',
+  'Dragon Punch',
+  'Eagle Strike',
+  'Flying Kick',
+  'Round Kick',
+  'Tiger Claw',
+  'Attack Speed',
+  'HP',
+  'Mana',
+  'Endurance',
+  'AC',
+  'Attack',
+  'Velocity',
+  'Strength',
+  'Stamina',
+  'Intelligence',
+  'Wisdom',
+  'Agility',
+  'Dexterity',
+  'Charisma',
+  'Magic',
+  'Fire',
+  'Cold',
+  'Disease',
+  'Poison',
+  'Void',
+  'Accuracy',
+  'Avoidance',
+  'Clairvoyance',
+  'Luck',
+  'Bash',
+  'Backstab',
+  'Frenzy',
+  'Kick'
 ] as const
 
 const labelWords = STAT_WINDOW_LABELS.map((l) => ({ label: l, words: l.toLowerCase().split(' ') }))
@@ -207,11 +258,38 @@ const CANONICAL: Record<string, string> = { 'Damage Shield Mitiga': 'Damage Shie
 
 /** The most a value can show, where the window prints "value / most". */
 const WINDOW_CAPS: Record<string, number> = {
-  Strength: 510, Stamina: 510, Intelligence: 510, Wisdom: 510, Agility: 510, Dexterity: 510, Charisma: 510,
-  Magic: 1000, Fire: 1000, Cold: 1000, Disease: 1000, Poison: 1000, Void: 1000,
-  Accuracy: 150, Avoidance: 100, 'Combat Effects': 100, 'Damage Shielding': 35, 'Damage Shield Mitigation': 25, 'DoT Shielding': 35,
-  'Melee Shielding': 35, 'Spell Shielding': 35, 'Strike Through': 35, 'Stun Resist': 35,
-  Bash: 100, Backstab: 125, 'Dragon Punch': 100, 'Eagle Strike': 100, 'Flying Kick': 100, Frenzy: 125, Kick: 100, 'Round Kick': 100, 'Tiger Claw': 100
+  Strength: 510,
+  Stamina: 510,
+  Intelligence: 510,
+  Wisdom: 510,
+  Agility: 510,
+  Dexterity: 510,
+  Charisma: 510,
+  Magic: 1000,
+  Fire: 1000,
+  Cold: 1000,
+  Disease: 1000,
+  Poison: 1000,
+  Void: 1000,
+  Accuracy: 150,
+  Avoidance: 100,
+  'Combat Effects': 100,
+  'Damage Shielding': 35,
+  'Damage Shield Mitigation': 25,
+  'DoT Shielding': 35,
+  'Melee Shielding': 35,
+  'Spell Shielding': 35,
+  'Strike Through': 35,
+  'Stun Resist': 35,
+  Bash: 100,
+  Backstab: 125,
+  'Dragon Punch': 100,
+  'Eagle Strike': 100,
+  'Flying Kick': 100,
+  Frenzy: 125,
+  Kick: 100,
+  'Round Kick': 100,
+  'Tiger Claw': 100
 }
 /** Lines that print "current / most" with no fixed most. */
 const PAIRS = new Set(['HP', 'Mana', 'Endurance', 'Attack'])
@@ -257,7 +335,10 @@ function valuesFor(label: string, tokens: string[]): number[] {
     }
     if (!pair) return []
     // Stats carry their heroic bonus after: "234/510 +0".
-    const extra = rest.map((t) => /^[+-]?\d+$/.exec(clean(t))?.[0]).filter(Boolean).map(Number)
+    const extra = rest
+      .map((t) => /^[+-]?\d+$/.exec(clean(t))?.[0])
+      .filter(Boolean)
+      .map(Number)
     return [...pair, ...extra]
   }
   if (label === 'AC') {
@@ -283,14 +364,24 @@ export function statsWindowFromScreen(words: OcrWord[]): { values: Record<string
   // Lines with a known most ("68/1000") read reliably, and their numbers end at the window's right
   // edge. Anything further right belongs to another window.
   let edge = Infinity
-  const capped = segments.filter((g) => WINDOW_CAPS[g.label] !== undefined && valuesFor(g.label, g.words.map((w) => w.text)).length)
+  const capped = segments.filter(
+    (g) =>
+      WINDOW_CAPS[g.label] !== undefined &&
+      valuesFor(
+        g.label,
+        g.words.map((w) => w.text)
+      ).length
+  )
   if (capped.length >= 3) {
     const ends = capped.map((g) => g.words.find((w) => /\d/.test(w.text))!).map((w) => w.x + w.w)
     edge = Math.max(...ends) + 12
   }
   for (const g of segments) {
     const inside = g.words.filter((w) => w.x <= edge)
-    const v = valuesFor(g.label, inside.map((w) => w.text))
+    const v = valuesFor(
+      g.label,
+      inside.map((w) => w.text)
+    )
     if (!v.length || values[g.label]) continue
     values[g.label] = v
     used.push(...g.all.filter((w) => w.x <= edge))

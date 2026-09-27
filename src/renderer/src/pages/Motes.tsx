@@ -44,7 +44,12 @@ function RankChips({ counts }: { counts: MoteCounts }) {
   return (
     <span className="row tight">
       {ranks.map((r) => (
-        <span key={r.key} className="chip" title={`Worth ${moteWorth(MOTE_RANKS.indexOf(r))} Infinitesimal each`} aria-label={`${counts[r.key]} ${r.name || 'Potential'}, worth ${moteWorth(MOTE_RANKS.indexOf(r))} Infinitesimal each`}>
+        <span
+          key={r.key}
+          className="chip"
+          title={`Worth ${moteWorth(MOTE_RANKS.indexOf(r))} Infinitesimal each`}
+          aria-label={`${counts[r.key]} ${r.name || 'Potential'}, worth ${moteWorth(MOTE_RANKS.indexOf(r))} Infinitesimal each`}
+        >
           {counts[r.key]} {r.name || 'Potential'}
         </span>
       ))}
@@ -78,7 +83,15 @@ function PauseControl({ s, now }: { s: MoteSession; now: number }) {
     <div className="notice row">
       <b>Paused</b>
       <span>since</span>
-      <input value={since} aria-label="Paused since (hh:mm:ss)" onChange={(e) => setSince(e.target.value)} onBlur={apply} onKeyDown={(e) => e.key === 'Enter' && apply()} style={{ width: 96 }} className="mono" />
+      <input
+        value={since}
+        aria-label="Paused since (hh:mm:ss)"
+        onChange={(e) => setSince(e.target.value)}
+        onBlur={apply}
+        onKeyDown={(e) => e.key === 'Enter' && apply()}
+        style={{ width: 96 }}
+        className="mono"
+      />
       <span className="muted">({clock((now - s.pausedSince) / 1000)} so far; not counted)</span>
       <span className="grow" />
       <button className="btn primary" onClick={() => void act('motes:resume')}>
@@ -116,10 +129,9 @@ function MoteTracking() {
         <div>
           <h1>Motes</h1>
           <p>
-            Every mote you loot, counted from the log. Every instance run is timed from when you enter; the log cannot tell
-            a Dungeon Crawl from a normal instance, so a run becomes a crawl when the game says it is complete (reward chest
-            included). Only the instance owner gets that line, so click a run's type to mark it a crawl yourself. Use a manual
-            session for anything else.
+            Every mote you loot, counted from the log. Every instance run is timed from when you enter; the log cannot tell a Dungeon Crawl from a normal instance, so a run becomes
+            a crawl when the game says it is complete (reward chest included). Only the instance owner gets that line, so click a run's type to mark it a crawl yourself. Use a
+            manual session for anything else.
           </p>
         </div>
         <div className="actions">
@@ -163,7 +175,9 @@ function MoteTracking() {
             <div className="stat">
               <span className="label">Today</span>
               <span className="value">{totalMotes(today)}</span>
-              <span className="sub" title={VALUE_HINT}>{moteValue(today)} Infinitesimal-equivalent</span>
+              <span className="sub" title={VALUE_HINT}>
+                {moteValue(today)} Infinitesimal-equivalent
+              </span>
             </div>
             <div className="stat">
               <span className="label">Completed crawls</span>
@@ -173,12 +187,16 @@ function MoteTracking() {
             <div className="stat">
               <span className="label">Crawl average</span>
               <span className="value">{perHour(crawlMotes, crawlHours)}/h</span>
-              <span className="sub" title={VALUE_HINT}>{perHour(crawlValue, crawlHours)} Infinitesimal-equivalent / hour</span>
+              <span className="sub" title={VALUE_HINT}>
+                {perHour(crawlValue, crawlHours)} Infinitesimal-equivalent / hour
+              </span>
             </div>
           </div>
           <div className="small muted mb-6">Today</div>
           <RankChips counts={today} />
-          <div className="small muted" style={{ margin: '12px 0 6px' }}>Everything in your logs</div>
+          <div className="small muted" style={{ margin: '12px 0 6px' }}>
+            Everything in your logs
+          </div>
           <RankChips counts={allTime} />
         </div>
       </div>
@@ -213,12 +231,16 @@ function ActiveSession({ a }: { a: MoteSession | null | undefined }) {
             <div className="stat">
               <span className="label">Motes</span>
               <span className="value">{totalMotes(a.motes)}</span>
-              <span className="sub" title={VALUE_HINT}>{moteValue(a.motes)} Infinitesimal-equivalent</span>
+              <span className="sub" title={VALUE_HINT}>
+                {moteValue(a.motes)} Infinitesimal-equivalent
+              </span>
             </div>
             <div className="stat">
               <span className="label">Per hour</span>
               <span className="value">{perHour(totalMotes(a.motes), sessionHours(a, now))}</span>
-              <span className="sub" title={VALUE_HINT}>{perHour(moteValue(a.motes), sessionHours(a, now))} Infinitesimal-equivalent / hour</span>
+              <span className="sub" title={VALUE_HINT}>
+                {perHour(moteValue(a.motes), sessionHours(a, now))} Infinitesimal-equivalent / hour
+              </span>
             </div>
           </div>
           <RankChips counts={a.motes} />
@@ -295,7 +317,13 @@ function SessionTable({ sessions, now }: { sessions: MoteSession[]; now: number 
                   <td className="mono">{perHour(totalMotes(s.motes), h)}</td>
                   <td className="mono">{perHour(moteValue(s.motes), h)}</td>
                   <td>
-                    <ConfirmButton className="btn ghost small x-btn" title="Remove from the list" label={`Remove ${s.name} from the list`} question="Remove it?" onConfirm={() => void act('motes:forget', s.id)}>
+                    <ConfirmButton
+                      className="btn ghost small x-btn"
+                      title="Remove from the list"
+                      label={`Remove ${s.name} from the list`}
+                      question="Remove it?"
+                      onConfirm={() => void act('motes:forget', s.id)}
+                    >
                       ×
                     </ConfirmButton>
                   </td>

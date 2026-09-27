@@ -74,7 +74,11 @@ describe('item stats', () => {
       'Cloak of Flames +4': scaledStats(cloak, 4),
       'Fleeting Memory +7': { ...scaledStats(ring, 0), ac: 50 }
     }
-    const t = wornTotals(inv.worn, (it) => stats[it.name] ?? null, (it) => (it.name.startsWith('Bladestopper') ? 38 : undefined))
+    const t = wornTotals(
+      inv.worn,
+      (it) => stats[it.name] ?? null,
+      (it) => (it.name.startsWith('Bladestopper') ? 38 : undefined)
+    )
     expect(t.ac).toBe(38 + 32 + 14)
     expect(t.haste).toBe(40)
     expect(t.unknown).toBe(0)
@@ -109,7 +113,11 @@ describe('the focus effects an item carries', () => {
     'focused charm': 'Improved Healing II',
     'bare choker': 'Extended Enhancement II'
   }
-  const foci = (slot: string) => itemFoci(inv.worn.find((w) => w.location === slot)!, (n) => focus[itemKey(n)])
+  const foci = (slot: string) =>
+    itemFoci(
+      inv.worn.find((w) => w.location === slot)!,
+      (n) => focus[itemKey(n)]
+    )
 
   it("takes the focus exaltation's focus in place of the item's own", () => {
     expect(foci('Fingers')).toEqual([{ name: 'Extended Range II', via: 'Moonstone Ring (Exaltation)' }])

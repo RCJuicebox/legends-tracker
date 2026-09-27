@@ -28,8 +28,7 @@ const LEVELS_HOW =
   'a level gained with logging off breaks a run in two.'
 
 const POINTS_HOW =
-  'The last "You now have N ability points" the game printed, less what purchases since then cost. Points given ' +
-  'without such a line are not seen until the next one.'
+  'The last "You now have N ability points" the game printed, less what purchases since then cost. Points given ' + 'without such a line are not seen until the next one.'
 
 /** Rows shown in a list before "Show all". */
 const FIRST_ROWS = 25
@@ -117,9 +116,8 @@ export function Progression() {
         <div>
           <h1>Progression</h1>
           <p>
-            Levels, skill-ups, AA points and purchases the log recorded for {who(character) || 'your character'}, from its log and its archives, and
-            what each session of play brought. The game prints no experience amounts, so experience is counted in messages.{' '}
-            <Info label="How it is counted" text={HOW} />
+            Levels, skill-ups, AA points and purchases the log recorded for {who(character) || 'your character'}, from its log and its archives, and what each session of play
+            brought. The game prints no experience amounts, so experience is counted in messages. <Info label="How it is counted" text={HOW} />
           </p>
         </div>
         {chars.available.length > 1 && (
@@ -219,15 +217,33 @@ function Sessions({ view }: { view: ProgressionView }) {
         <table className="table">
           <thead>
             <tr>
-              <SortTh k="start" sort={sort} onSort={setSort}>Started</SortTh>
-              <SortTh k="length" sort={sort} onSort={setSort} num title="From the session's first log line to its last">Length</SortTh>
-              <SortTh k="xp" sort={sort} onSort={setSort} num title="Experience messages: yours, a group's and rewards">Experience</SortTh>
-              <SortTh k="xpRate" sort={sort} onSort={setSort} num title="Experience messages an hour">Exp/hour</SortTh>
-              <SortTh k="pct" sort={sort} onSort={setSort} num title="The percentages of a level the experience lines printed, added up. Lines without one are not in it.">Level %</SortTh>
-              <SortTh k="aa" sort={sort} onSort={setSort} num title="Ability points the game said you gained">AA points</SortTh>
-              <SortTh k="aaRate" sort={sort} onSort={setSort} num title="Ability points an hour">AA/hour</SortTh>
-              <SortTh k="levels" sort={sort} onSort={setSort} num>Levels</SortTh>
-              <SortTh k="skills" sort={sort} onSort={setSort} num>Skill-ups</SortTh>
+              <SortTh k="start" sort={sort} onSort={setSort}>
+                Started
+              </SortTh>
+              <SortTh k="length" sort={sort} onSort={setSort} num title="From the session's first log line to its last">
+                Length
+              </SortTh>
+              <SortTh k="xp" sort={sort} onSort={setSort} num title="Experience messages: yours, a group's and rewards">
+                Experience
+              </SortTh>
+              <SortTh k="xpRate" sort={sort} onSort={setSort} num title="Experience messages an hour">
+                Exp/hour
+              </SortTh>
+              <SortTh k="pct" sort={sort} onSort={setSort} num title="The percentages of a level the experience lines printed, added up. Lines without one are not in it.">
+                Level %
+              </SortTh>
+              <SortTh k="aa" sort={sort} onSort={setSort} num title="Ability points the game said you gained">
+                AA points
+              </SortTh>
+              <SortTh k="aaRate" sort={sort} onSort={setSort} num title="Ability points an hour">
+                AA/hour
+              </SortTh>
+              <SortTh k="levels" sort={sort} onSort={setSort} num>
+                Levels
+              </SortTh>
+              <SortTh k="skills" sort={sort} onSort={setSort} num>
+                Skill-ups
+              </SortTh>
             </tr>
           </thead>
           <tbody>
@@ -398,10 +414,18 @@ function Skills({ view, now }: { view: ProgressionView; now: number }) {
         <table className="table">
           <thead>
             <tr>
-              <SortTh k="name" sort={sort} onSort={setSort}>Skill</SortTh>
-              <SortTh k="value" sort={sort} onSort={setSort} num title="The value the last skill-up gave">Value</SortTh>
-              <SortTh k="ups" sort={sort} onSort={setSort} num title="Skill-ups the log recorded">Ups</SortTh>
-              <SortTh k="last" sort={sort} onSort={setSort}>Last up</SortTh>
+              <SortTh k="name" sort={sort} onSort={setSort}>
+                Skill
+              </SortTh>
+              <SortTh k="value" sort={sort} onSort={setSort} num title="The value the last skill-up gave">
+                Value
+              </SortTh>
+              <SortTh k="ups" sort={sort} onSort={setSort} num title="Skill-ups the log recorded">
+                Ups
+              </SortTh>
+              <SortTh k="last" sort={sort} onSort={setSort}>
+                Last up
+              </SortTh>
             </tr>
           </thead>
           <tbody>

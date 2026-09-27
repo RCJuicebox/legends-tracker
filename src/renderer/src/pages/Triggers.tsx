@@ -12,18 +12,30 @@ import type { TriggerError } from '../../../shared/ipc'
 const newId = () => (crypto.randomUUID ? crypto.randomUUID() : String(Math.random()).slice(2))
 
 function blankTrigger(folder: string): Trigger {
-  return { id: newId(), name: 'New trigger', folder, enabled: true, comment: '', phrases: [{ text: '', regex: false }], cooldownSec: 0, actions: [{ type: 'speak', text: '', interrupt: false }] }
+  return {
+    id: newId(),
+    name: 'New trigger',
+    folder,
+    enabled: true,
+    comment: '',
+    phrases: [{ text: '', regex: false }],
+    cooldownSec: 0,
+    actions: [{ type: 'speak', text: '', interrupt: false }]
+  }
 }
 
 function blankAction(type: TriggerAction['type']): TriggerAction {
   switch (type) {
-    case 'speak': return { type, text: '', interrupt: false }
-    case 'sound': return { type, file: '', volume: 1 }
-    case 'text': return { type, text: '', color: '#ffd84d', durationSec: 5 }
-    case 'timer': return { type, name: '', durationSec: 30, color: '#e8b44c', overlay: OVERLAY_TARGETS, warnSec: 5, warnSpeech: '', endSpeech: '', restart: 'restart', endEarly: [] }
+    case 'speak':
+      return { type, text: '', interrupt: false }
+    case 'sound':
+      return { type, file: '', volume: 1 }
+    case 'text':
+      return { type, text: '', color: '#ffd84d', durationSec: 5 }
+    case 'timer':
+      return { type, name: '', durationSec: 30, color: '#e8b44c', overlay: OVERLAY_TARGETS, warnSec: 5, warnSpeech: '', endSpeech: '', restart: 'restart', endEarly: [] }
   }
 }
-
 
 interface Draft {
   /** What is being edited. */
@@ -140,30 +152,36 @@ export function Triggers() {
       <div className="page-head">
         <div>
           <h1>Triggers</h1>
-          <p>
-            Your own alerts for any log line. Spell durations don't need a trigger; the spell tracker handles every spell
-            you cast.
-          </p>
+          <p>Your own alerts for any log line. Spell durations don't need a trigger; the spell tracker handles every spell you cast.</p>
         </div>
         <div className="actions">
-          <button className="btn" onClick={async () => {
-            try {
-              const imported = await api.invoke('triggers:import')
-              if (imported) setList((l) => [...l, ...imported.map((t) => ({ ...blankTrigger(''), ...t, id: newId() }))])
-            } catch (e) {
-              showError('Could not import that file', e)
-            }
-          }}>
+          <button
+            className="btn"
+            onClick={async () => {
+              try {
+                const imported = await api.invoke('triggers:import')
+                if (imported) setList((l) => [...l, ...imported.map((t) => ({ ...blankTrigger(''), ...t, id: newId() }))])
+              } catch (e) {
+                showError('Could not import that file', e)
+              }
+            }}
+          >
             Import…
           </button>
-          <button className="btn" onClick={() => void actDone((saved) => (saved ? `Exported ${list.length} trigger${list.length === 1 ? '' : 's'}.` : null), 'triggers:export', list)}>
+          <button
+            className="btn"
+            onClick={() => void actDone((saved) => (saved ? `Exported ${list.length} trigger${list.length === 1 ? '' : 's'}.` : null), 'triggers:export', list)}
+          >
             Export…
           </button>
-          <button className="btn" onClick={() => {
-            const t = blankTrigger(current?.folder ?? '')
-            setList((l) => [...l, t])
-            setSelected(t.id)
-          }}>
+          <button
+            className="btn"
+            onClick={() => {
+              const t = blankTrigger(current?.folder ?? '')
+              setList((l) => [...l, t])
+              setSelected(t.id)
+            }}
+          >
             <Icon name="plus" /> New trigger
           </button>
           <button className="btn primary" disabled={!dirty} onClick={() => void save()}>
@@ -231,7 +249,19 @@ export function Triggers() {
   )
 }
 
-function TriggerEditor({ t, folders, onChange, onDelete, onDuplicate }: { t: Trigger; folders: string[]; onChange: (t: Trigger) => void; onDelete: () => void; onDuplicate: () => void }) {
+function TriggerEditor({
+  t,
+  folders,
+  onChange,
+  onDelete,
+  onDuplicate
+}: {
+  t: Trigger
+  folders: string[]
+  onChange: (t: Trigger) => void
+  onDelete: () => void
+  onDuplicate: () => void
+}) {
   const set = (patch: Partial<Trigger>) => onChange({ ...t, ...patch })
   const setPhrase = (i: number, p: Phrase) => set({ phrases: t.phrases.map((x, j) => (j === i ? p : x)) })
   const setAction = (i: number, a: TriggerAction) => set({ actions: t.actions.map((x, j) => (j === i ? a : x)) })
@@ -240,7 +270,9 @@ function TriggerEditor({ t, folders, onChange, onDelete, onDuplicate }: { t: Tri
       <div className="card">
         <h2>
           Trigger <span className="spacer" />
-          <button className="btn small" onClick={onDuplicate}>Duplicate</button>
+          <button className="btn small" onClick={onDuplicate}>
+            Duplicate
+          </button>
           <ConfirmButton question={`Delete ${t.name || 'this trigger'}?`} onConfirm={onDelete}>
             Delete
           </ConfirmButton>
@@ -276,25 +308,37 @@ function TriggerEditor({ t, folders, onChange, onDelete, onDuplicate }: { t: Tri
         <div className="stack gap-8">
           {t.phrases.map((p, i) => (
             <div className="phrase-row" key={i}>
-              <input className="mono" value={p.text} aria-label={`Phrase ${i + 1}`} onChange={(e) => setPhrase(i, { ...p, text: e.target.value })} placeholder={p.regex ? "^(?<S1>\\w+) tells you, '(?<S2>.+)'$" : 'You feel yourself starting to appear.'} />
+              <input
+                className="mono"
+                value={p.text}
+                aria-label={`Phrase ${i + 1}`}
+                onChange={(e) => setPhrase(i, { ...p, text: e.target.value })}
+                placeholder={p.regex ? "^(?<S1>\\w+) tells you, '(?<S2>.+)'$" : 'You feel yourself starting to appear.'}
+              />
               <label className="check small">
                 <input type="checkbox" checked={p.regex} onChange={(e) => setPhrase(i, { ...p, regex: e.target.checked })} /> Regex
               </label>
-              <button className="btn ghost small x-btn" aria-label={`Remove phrase ${i + 1}`} onClick={() => set({ phrases: t.phrases.filter((_, j) => j !== i) })}>×</button>
+              <button className="btn ghost small x-btn" aria-label={`Remove phrase ${i + 1}`} onClick={() => set({ phrases: t.phrases.filter((_, j) => j !== i) })}>
+                ×
+              </button>
             </div>
           ))}
         </div>
         <p className="faint small" style={{ marginBottom: 0 }}>
-          Plain text matches anywhere in the line, ignoring case. Snippets: <code>{'{C}'}</code> your character,{' '}
-          <code>{'{S1}'}</code> any text, <code>{'{N1}'}</code> a number, <code>{'${Name}'}</code> a named capture. Use them in
-          the outputs below too.
+          Plain text matches anywhere in the line, ignoring case. Snippets: <code>{'{C}'}</code> your character, <code>{'{S1}'}</code> any text, <code>{'{N1}'}</code> a number,{' '}
+          <code>{'${Name}'}</code> a named capture. Use them in the outputs below too.
         </p>
       </div>
 
       <div className="card">
         <h2>
           Then <span className="spacer" />
-          <select value="" aria-label="Add an action" onChange={(e) => e.target.value && set({ actions: [...t.actions, blankAction(e.target.value as TriggerAction['type'])] })} style={{ textTransform: 'none', letterSpacing: 0 }}>
+          <select
+            value=""
+            aria-label="Add an action"
+            onChange={(e) => e.target.value && set({ actions: [...t.actions, blankAction(e.target.value as TriggerAction['type'])] })}
+            style={{ textTransform: 'none', letterSpacing: 0 }}
+          >
             <option value="">Add an action…</option>
             <option value="speak">Speak</option>
             <option value="sound">Play a sound</option>
@@ -335,7 +379,9 @@ function ActionEditor({ a, onChange, onRemove }: { a: TriggerAction; onChange: (
       <div className="row">
         <b>{head}</b>
         <span className="grow" />
-        <button className="btn ghost small" onClick={onRemove}>Remove</button>
+        <button className="btn ghost small" onClick={onRemove}>
+          Remove
+        </button>
       </div>
       {a.type === 'speak' && (
         <div className="row">
@@ -343,7 +389,9 @@ function ActionEditor({ a, onChange, onRemove }: { a: TriggerAction; onChange: (
           <label className="check small">
             <input type="checkbox" checked={a.interrupt} onChange={(e) => onChange({ ...a, interrupt: e.target.checked })} /> Interrupt other speech
           </label>
-          <button className="btn small" onClick={() => void act('audio:test', a.text.replace(/\{\w+\}|\$\{\w+\}/g, 'something'))}>Hear</button>
+          <button className="btn small" onClick={() => void act('audio:test', a.text.replace(/\{\w+\}|\$\{\w+\}/g, 'something'))}>
+            Hear
+          </button>
         </div>
       )}
       {a.type === 'sound' && (
@@ -356,7 +404,9 @@ function ActionEditor({ a, onChange, onRemove }: { a: TriggerAction; onChange: (
           </select>
           <span className="muted small">Volume</span>
           <input type="range" min={0} max={1} step={0.05} value={a.volume} aria-label="Volume" onChange={(e) => onChange({ ...a, volume: Number(e.target.value) })} />
-          <button className="btn small" disabled={!a.file} title={a.file ? undefined : 'Choose a sound first'} onClick={() => void act('audio:sound', a.file)}>Play</button>
+          <button className="btn small" disabled={!a.file} title={a.file ? undefined : 'Choose a sound first'} onClick={() => void act('audio:sound', a.file)}>
+            Play
+          </button>
         </div>
       )}
       {a.type === 'text' && (
@@ -377,9 +427,13 @@ function ActionEditor({ a, onChange, onRemove }: { a: TriggerAction; onChange: (
           </Field>
           <Field label="Overlay">
             <select value={a.overlay} onChange={(e) => onChange({ ...a, overlay: e.target.value })}>
-              {state.settings.overlays.filter((o) => o.kind === 'timers').map((o) => (
-                <option key={o.id} value={o.id}>{o.name}</option>
-              ))}
+              {state.settings.overlays
+                .filter((o) => o.kind === 'timers')
+                .map((o) => (
+                  <option key={o.id} value={o.id}>
+                    {o.name}
+                  </option>
+                ))}
             </select>
           </Field>
           <Field label="Warn at (seconds left)">
@@ -417,7 +471,13 @@ function ActionEditor({ a, onChange, onRemove }: { a: TriggerAction; onChange: (
 function TestPanel({ t }: { t: Trigger }) {
   const [shared, setShared] = useRemembered<string>(TRY_LINES, '')
   // The last line pasted on Live, if any, is the one to test.
-  const [line, setLine] = useState(() => shared.split(/\r?\n/).filter((l) => l.trim()).pop() ?? '')
+  const [line, setLine] = useState(
+    () =>
+      shared
+        .split(/\r?\n/)
+        .filter((l) => l.trim())
+        .pop() ?? ''
+  )
   const [result, setResult] = useState<TriggerTestResult | null>(null)
   useEffect(() => {
     if (!line.trim()) return setResult(null)
@@ -468,11 +528,15 @@ function TestPanel({ t }: { t: Trigger }) {
               <div className="row">
                 <span className="chip ok">Matches phrase {result.phraseIndex + 1}</span>
                 {Object.entries(result.captures).map(([k, v]) => (
-                  <span key={k} className="chip mono">{k} = {v}</span>
+                  <span key={k} className="chip mono">
+                    {k} = {v}
+                  </span>
                 ))}
               </div>
               {result.outputs.map((o, i) => (
-                <div key={i} className="mono small muted">→ {o}</div>
+                <div key={i} className="mono small muted">
+                  → {o}
+                </div>
               ))}
             </div>
           ) : (

@@ -24,7 +24,19 @@ import { BuffCoordinator } from './buffs'
 import { CombatFeed } from './combat'
 import { MoteCatchUp } from './moteCatchUp'
 import { Throttled } from './throttle'
-import type { AppSettings, ArchiveStatus, CharacterSettings, CombatSnapshot, FeedItem, KnownSpell, LogCheckRow, Segment, SpellRule, WatchStatus, StitchedTimeline } from '../../shared/types'
+import type {
+  AppSettings,
+  ArchiveStatus,
+  CharacterSettings,
+  CombatSnapshot,
+  FeedItem,
+  KnownSpell,
+  LogCheckRow,
+  Segment,
+  SpellRule,
+  WatchStatus,
+  StitchedTimeline
+} from '../../shared/types'
 import type { EngineEnv, EngineOutputs, EngineStore, LootView, MoteView, Speaker } from './contracts'
 import { jobs } from '../sources/jobs'
 
@@ -56,7 +68,14 @@ export class Engine {
   readonly stock: MoteStockKeeper
   readonly motes: MoteTracker
   readonly status: WatchStatus = {
-    watching: false, logFile: '', character: '', zone: '', spellsLoaded: 0, spellError: '', lastLineAt: 0, logSize: 0
+    watching: false,
+    logFile: '',
+    character: '',
+    zone: '',
+    spellsLoaded: 0,
+    spellError: '',
+    lastLineAt: 0,
+    logSize: 0
   }
   private readonly notifier: Notifier
   private readonly queries: SpellQueries
@@ -110,7 +129,11 @@ export class Engine {
       onStatus: (a) => out.archive(a),
       feed: (kind, text) => this.pushFeed(kind, text)
     })
-    this.stock = new MoteStockKeeper(store.stock, (s) => out.stock(s), (kind, text) => this.pushFeed(kind, text))
+    this.stock = new MoteStockKeeper(
+      store.stock,
+      (s) => out.stock(s),
+      (kind, text) => this.pushFeed(kind, text)
+    )
     this.buffs = new BuffCoordinator(store, this.board, this.queries, this.notifier, {
       book: () => this.book,
       group: () => this.combat.meter.groupMembers,
@@ -133,8 +156,7 @@ export class Engine {
         if (!this.simulating) this.stock.add(loot, time)
         this.pushFeed('loot', `${loot.count > 1 ? `${loot.count} × ` : ''}${moteName(loot.rank)} from ${loot.source}${session ? '' : ' (no session running)'}`)
       },
-      onSession: (s) =>
-        this.pushFeed('loot', s.kind === 'crawl' ? `Dungeon crawl completed: ${s.name}` : `${s.kind === 'manual' ? 'Session' : 'Normal instance'} ended: ${s.name}`)
+      onSession: (s) => this.pushFeed('loot', s.kind === 'crawl' ? `Dungeon crawl completed: ${s.name}` : `${s.kind === 'manual' ? 'Session' : 'Normal instance'} ended: ${s.name}`)
     })
     this.moteHistory = new MoteCatchUp(store, env, out, this.notifier, {
       motes: () => this.motes,
@@ -219,7 +241,9 @@ export class Engine {
       const started = performance.now()
       this.book = await SpellBook.load(this.settings.installDir)
       // The largest thing the app reads; its cost is logged so a change to it shows (see README, Measuring).
-      log.info(`Spell data: ${this.book.size} spells in ${Math.round(performance.now() - started)} ms; the heap grew ${Math.round((process.memoryUsage().heapUsed - heapBefore) / 1048576)} MB reading it`)
+      log.info(
+        `Spell data: ${this.book.size} spells in ${Math.round(performance.now() - started)} ms; the heap grew ${Math.round((process.memoryUsage().heapUsed - heapBefore) / 1048576)} MB reading it`
+      )
       this.status.spellsLoaded = this.book.size
       this.buffs.setBook(this.book)
       this.status.spellError = ''
@@ -334,7 +358,13 @@ export class Engine {
     const gen = this.watchGen
     const after = this.startupRead
     this.startupRead = undefined
-    await this.combat.seed(t.logFile, () => t.start, () => gen === this.watchGen, minutes, after)
+    await this.combat.seed(
+      t.logFile,
+      () => t.start,
+      () => gen === this.watchGen,
+      minutes,
+      after
+    )
   }
 
   /** Forgets every fight and reads the last `minutes` of the log again. */
@@ -345,7 +375,12 @@ export class Engine {
       const t = this.tail
       if (!t) return
       const gen = this.watchGen
-      await this.combat.seed(t.logFile, () => t.start, () => gen === this.watchGen && !job.signal.aborted, minutes)
+      await this.combat.seed(
+        t.logFile,
+        () => t.start,
+        () => gen === this.watchGen && !job.signal.aborted,
+        minutes
+      )
     })
   }
 
@@ -425,7 +460,10 @@ export class Engine {
   simulate(text: string): void {
     this.simulating = true
     try {
-      const parsed = text.split(/\r?\n/).map((l) => parseLogLine(l.trim())).filter((l) => l !== null)
+      const parsed = text
+        .split(/\r?\n/)
+        .map((l) => parseLogLine(l.trim()))
+        .filter((l) => l !== null)
       if (!parsed.length) return
       const shift = Date.now() - parsed[parsed.length - 1].time
       for (const line of parsed) {

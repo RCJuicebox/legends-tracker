@@ -59,7 +59,11 @@ export function Dashboard({ go }: { go: (p: PageId) => void }) {
           <button className={`btn${state.arranging ? ' on' : ''}`} aria-pressed={state.arranging} onClick={() => void act('overlays:arrange', !state.arranging)}>
             <Icon name="move" /> {state.arranging ? 'Lock overlays' : 'Arrange overlays'}
           </button>
-          <button className={`btn${settings.audio.muted ? ' on' : ''}`} aria-pressed={settings.audio.muted} onClick={() => patchSettings((s) => ({ ...s, audio: { ...s.audio, muted: !s.audio.muted } }))}>
+          <button
+            className={`btn${settings.audio.muted ? ' on' : ''}`}
+            aria-pressed={settings.audio.muted}
+            onClick={() => patchSettings((s) => ({ ...s, audio: { ...s.audio, muted: !s.audio.muted } }))}
+          >
             <Icon name="mute" /> {settings.audio.muted ? 'Unmute' : 'Mute'}
           </button>
         </div>
@@ -78,7 +82,10 @@ export function Dashboard({ go }: { go: (p: PageId) => void }) {
       )}
       {settings.installDir && !status.spellError && !settings.logFile && (
         <div className="notice mb-16">
-          No character log selected. <button className="btn small" onClick={() => go('settings')}>Choose one</button>
+          No character log selected.{' '}
+          <button className="btn small" onClick={() => go('settings')}>
+            Choose one
+          </button>
         </div>
       )}
 
@@ -106,9 +113,7 @@ export function Dashboard({ go }: { go: (p: PageId) => void }) {
         <button className="card stat card-button" onClick={() => go('logs')}>
           <span className="label">Log size</span>
           <span className="value">{status.logSize ? mb(status.logSize) : '—'}</span>
-          <span className="sub">
-            {settings.archive.autoEnabled ? `archives at ${settings.archive.thresholdMB} MB` : 'auto-archive off'}
-          </span>
+          <span className="sub">{settings.archive.autoEnabled ? `archives at ${settings.archive.thresholdMB} MB` : 'auto-archive off'}</span>
         </button>
       </div>
 
@@ -153,8 +158,8 @@ export function Dashboard({ go }: { go: (p: PageId) => void }) {
             </button>
           </h2>
           <p className="muted small mt-0">
-            Paste log lines to run them through the live tracker and triggers, with their times moved to now. To see which
-            trigger a line matches and what it would say, without running it, use{' '}
+            Paste log lines to run them through the live tracker and triggers, with their times moved to now. To see which trigger a line matches and what it would say, without
+            running it, use{' '}
             <button className="link-button" onClick={() => go('triggers')}>
               Test on the Triggers page
             </button>

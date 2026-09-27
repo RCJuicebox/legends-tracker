@@ -208,7 +208,22 @@ describe('Quitting with the real engine', () => {
     const engine = new Engine(
       store,
       { synthesize: async () => Buffer.alloc(0) },
-      { timers: noop, alert: noop, audio: noop, status: noop, feed: noop, archive: noop, motes: noop, moteScan: noop, stock: noop, combat: noop, loot: noop, respawns: noop, pet: noop, buffs: noop },
+      {
+        timers: noop,
+        alert: noop,
+        audio: noop,
+        status: noop,
+        feed: noop,
+        archive: noop,
+        motes: noop,
+        moteScan: noop,
+        stock: noop,
+        combat: noop,
+        loot: noop,
+        respawns: noop,
+        pet: noop,
+        buffs: noop
+      },
       env
     )
     try {

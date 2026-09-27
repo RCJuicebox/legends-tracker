@@ -176,7 +176,13 @@ export function parseClock(text: string): number | null {
 
 /** One trigger per mob name; the id is made from the name so it can be found again. */
 export function respawnTriggerId(name: string): string {
-  return 'respawn-' + name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
+  return (
+    'respawn-' +
+    name
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-|-$/g, '')
+  )
 }
 
 const escapeRegex = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')

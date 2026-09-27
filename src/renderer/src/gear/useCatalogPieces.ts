@@ -44,8 +44,20 @@ export function useCatalogPieces({
   const catalogPieces = useMemo<Piece[]>(() => {
     if (mode !== 'optimize' || !items) return []
     return catalogPiecesOf({
-      items, hiddenEras: shownEras, owned, zones, eraStatus, wearer, twoHanders, effectsOfItem, focusValue: valueOf, effects: effects.value, weights, compare,
-      worn: inv.worn, hands: weaponHands
+      items,
+      hiddenEras: shownEras,
+      owned,
+      zones,
+      eraStatus,
+      wearer,
+      twoHanders,
+      effectsOfItem,
+      focusValue: valueOf,
+      effects: effects.value,
+      weights,
+      compare,
+      worn: inv.worn,
+      hands: weaponHands
     })
   }, [mode, items, shownEras, owned, zones, eraStatus, wearer, twoHanders, effectsOfItem, valueOf, effects.value, weights, compare, inv, weaponHands])
   return catalogPieces

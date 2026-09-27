@@ -73,7 +73,12 @@ const INVALID_HANDLE = -1n
 const isNull = (h: unknown) => h === null || koffi.address(h) === 0n || koffi.address(h) === BigInt.asUintN(64, INVALID_HANDLE)
 
 /** "C:\...\eqgame.exe" → "eqgame" */
-const baseName = (path: string) => path.split(/[\\/]/).pop()!.replace(/\.exe$/i, '').toLowerCase()
+const baseName = (path: string) =>
+  path
+    .split(/[\\/]/)
+    .pop()!
+    .replace(/\.exe$/i, '')
+    .toLowerCase()
 
 /** The id of the process that owns the foreground window; 0 when there is none. */
 export function foregroundPid(): number {

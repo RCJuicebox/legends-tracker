@@ -60,8 +60,20 @@ function useSinceExport(view: InventoryView) {
 
 /** The Gear page's Best merge tab: which worn item's next +1 gives the most for its motes. */
 export function MergeTab({
-  view, weights, hands, preset, setPreset, onPlan
-}: { view: InventoryView; weights: Weights; hands: HandWeights | null; preset: string; setPreset: (p: string) => void; onPlan?: () => void }) {
+  view,
+  weights,
+  hands,
+  preset,
+  setPreset,
+  onPlan
+}: {
+  view: InventoryView
+  weights: Weights
+  hands: HandWeights | null
+  preset: string
+  setPreset: (p: string) => void
+  onPlan?: () => void
+}) {
   const stockQ = useStock()
   const stock = stockQ.data
   const since = useSinceExport(view)

@@ -62,10 +62,7 @@ export function registerAppIpc(ctx: AppContext): void {
     const ids = Array.isArray(stats.classes) ? stats.classes.filter((x): x is string => typeof x === 'string' && !!x) : []
     if (!ids.length) return c
     const level = typeof stats.level === 'number' ? stats.level : c.level
-    const seeded = sanitizeCharacter(
-      { ...c, level, classLevels: Object.fromEntries(ids.map((id) => [className(id), level])), race: stats.race === 'iksar' ? 'Iksar' : '' },
-      c
-    )
+    const seeded = sanitizeCharacter({ ...c, level, classLevels: Object.fromEntries(ids.map((id) => [className(id), level])), race: stats.race === 'iksar' ? 'Iksar' : '' }, c)
     return seeded ? saveCharacterRecord(key, seeded) : c
   })
   handle('character:put', (key, input) => {

@@ -63,7 +63,14 @@ export function CombatTab({ s, set, setOverride, auto, val, trio, primary, caps,
               <NumField label="Dexterity" value={s.dexterity} onChange={(v) => set({ dexterity: v ?? 0 })} />
               <NumField label="ATK from items" hint="not in the window" value={s.itemATK} onChange={(v) => set({ itemATK: v ?? 0 })} />
               <NumField label="Attack power AAs" value={s.overrides.attackAA} auto={auto.attackAA} autoFrom="AAs" onChange={(v) => setOverride('attackAA', v)} />
-              <NumField label="Ambidexterity" hint="dual wield bonus" value={s.overrides.ambidexterity} auto={auto.ambidexterity} autoFrom="AAs" onChange={(v) => setOverride('ambidexterity', v)} />
+              <NumField
+                label="Ambidexterity"
+                hint="dual wield bonus"
+                value={s.overrides.ambidexterity}
+                auto={auto.ambidexterity}
+                autoFrom="AAs"
+                onChange={(v) => setOverride('ambidexterity', v)}
+              />
               <NumField label="Double attack bonus" hint="%" value={s.doubleAttackBonus} onChange={(v) => set({ doubleAttackBonus: v ?? 0 })} />
             </div>
           </div>
@@ -80,9 +87,8 @@ export function CombatTab({ s, set, setOverride, auto, val, trio, primary, caps,
         </div>
       </div>
       <p className="faint small">
-        Skill caps from the game's own Resources/skillcaps.txt, best of your {trio.length > 1 ? 'three classes' : 'class'} per skill (classic EverQuest numbering). Attack,
-        hit and swing formulas are EQEmu's zone/attack.cpp, confirmed against the stats window and parses; the crit model is not. Primary class for class rules:{' '}
-        {className(primary)}.
+        Skill caps from the game's own Resources/skillcaps.txt, best of your {trio.length > 1 ? 'three classes' : 'class'} per skill (classic EverQuest numbering). Attack, hit and
+        swing formulas are EQEmu's zone/attack.cpp, confirmed against the stats window and parses; the crit model is not. Primary class for class rules: {className(primary)}.
       </p>
     </div>
   )
@@ -116,34 +122,34 @@ function SkillsCard({ s, set, caps, trio }: { s: StatsSheet; set: SetSheet; caps
         {[...caps.skills]
           .sort((a, b) => Number(!(s.skills[a.id] > 0)) - Number(!(s.skills[b.id] > 0)) || skillName(a.id).localeCompare(skillName(b.id)))
           .map((x) => {
-          const have = s.skills[x.id] ?? 0
-          return (
-            <div key={x.id} className="stats-skill">
-              <span className="small">{skillName(x.id)}</span>
-              <span className="stats-skillbar">
-                <i style={{ width: `${x.cap ? Math.min(100, (have / x.cap) * 100) : 0}%` }} />
-              </span>
-              <span className={`small ${have >= x.cap && have > 0 ? 'ok-text' : 'faint'}`} title={`${className(x.from)} has the best cap`}>
-                {have >= x.cap && have > 0 ? 'capped' : x.cap}
-                {trio.length > 1 && <span className="faint"> {x.from}</span>}
-              </span>
-              <input
-                type="number"
-                min={0}
-                max={x.cap}
-                value={s.skills[x.id] ?? ''}
-                placeholder="0"
-                aria-label={`${skillName(x.id)} skill`}
-                onChange={(e) => {
-                  const next = { ...s.skills }
-                  if (e.target.value === '') delete next[x.id]
-                  else next[x.id] = Math.max(0, Math.floor(Number(e.target.value) || 0))
-                  set({ skills: next })
-                }}
-              />
-            </div>
-          )
-        })}
+            const have = s.skills[x.id] ?? 0
+            return (
+              <div key={x.id} className="stats-skill">
+                <span className="small">{skillName(x.id)}</span>
+                <span className="stats-skillbar">
+                  <i style={{ width: `${x.cap ? Math.min(100, (have / x.cap) * 100) : 0}%` }} />
+                </span>
+                <span className={`small ${have >= x.cap && have > 0 ? 'ok-text' : 'faint'}`} title={`${className(x.from)} has the best cap`}>
+                  {have >= x.cap && have > 0 ? 'capped' : x.cap}
+                  {trio.length > 1 && <span className="faint"> {x.from}</span>}
+                </span>
+                <input
+                  type="number"
+                  min={0}
+                  max={x.cap}
+                  value={s.skills[x.id] ?? ''}
+                  placeholder="0"
+                  aria-label={`${skillName(x.id)} skill`}
+                  onChange={(e) => {
+                    const next = { ...s.skills }
+                    if (e.target.value === '') delete next[x.id]
+                    else next[x.id] = Math.max(0, Math.floor(Number(e.target.value) || 0))
+                    set({ skills: next })
+                  }}
+                />
+              </div>
+            )
+          })}
       </div>
     </div>
   )
@@ -159,8 +165,7 @@ function StanceCard({ s, set, baseAcc, weaponName }: { s: StatsSheet; set: SetSh
     <div className="card stack gap-12">
       <h2>Stances and chance to hit</h2>
       <p className="faint small" style={{ margin: 0 }}>
-        Your Accuracy ({num(baseAcc)} with {weaponName}) is multiplied by the stance's hit bonus, then rolled against the target's avoidance. Each stance is a point
-        on one curve.
+        Your Accuracy ({num(baseAcc)} with {weaponName}) is multiplied by the stance's hit bonus, then rolled against the target's avoidance. Each stance is a point on one curve.
       </p>
       <HitChart stances={stances} avoidance={D} />
       <table className="table small">
@@ -180,12 +185,25 @@ function StanceCard({ s, set, baseAcc, weaponName }: { s: StatsSheet; set: SetSh
                 <input value={st.name} maxLength={40} aria-label={`Stance ${i + 1} name`} onChange={(e) => setStance(i, { name: e.target.value })} />
               </td>
               <td>
-                <input type="number" min={0} max={200} style={{ width: 70 }} aria-label={`${st.name} hit bonus %`} value={st.pct} onChange={(e) => setStance(i, { pct: Math.max(0, Math.min(200, Math.floor(Number(e.target.value) || 0))) })} />
+                <input
+                  type="number"
+                  min={0}
+                  max={200}
+                  style={{ width: 70 }}
+                  aria-label={`${st.name} hit bonus %`}
+                  value={st.pct}
+                  onChange={(e) => setStance(i, { pct: Math.max(0, Math.min(200, Math.floor(Number(e.target.value) || 0))) })}
+                />
               </td>
               <td className="mono">{num(st.acc)}</td>
               <td className="mono">{pct(hitChance(st.acc, D))}</td>
               <td>
-                <button className="btn ghost small x-btn" aria-label={`Remove ${st.name}`} disabled={s.stances.length < 2} onClick={() => set({ stances: s.stances.filter((_, j) => j !== i) })}>
+                <button
+                  className="btn ghost small x-btn"
+                  aria-label={`Remove ${st.name}`}
+                  disabled={s.stances.length < 2}
+                  onClick={() => set({ stances: s.stances.filter((_, j) => j !== i) })}
+                >
                   ×
                 </button>
               </td>
@@ -218,8 +236,8 @@ function StanceCard({ s, set, baseAcc, weaponName }: { s: StatsSheet; set: SetSh
         <span className="muted">{solveNote}</span>
       </div>
       <p className="faint small" style={{ margin: 0 }}>
-        Against avoidance {num(D)}: {ladder} Accuracy. It never reaches 100%; each doubling of Accuracy halves your misses. Striker's +25% applies to skill attacks
-        only and Ranged's to archery, so both are 0% on this melee curve.
+        Against avoidance {num(D)}: {ladder} Accuracy. It never reaches 100%; each doubling of Accuracy halves your misses. Striker's +25% applies to skill attacks only and
+        Ranged's to archery, so both are 0% on this melee curve.
       </p>
     </div>
   )

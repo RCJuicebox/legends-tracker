@@ -125,7 +125,10 @@ describe('joinFactions', () => {
 
   it('keeps the last changes over the stretches', () => {
     const a = tally(Array.from({ length: 15 }, () => adjusted('Gem Choppers', 1)))
-    const b = tally(Array.from({ length: 15 }, () => adjusted('Gem Choppers', -1)), T0 + 60_000)
+    const b = tally(
+      Array.from({ length: 15 }, () => adjusted('Gem Choppers', -1)),
+      T0 + 60_000
+    )
     const g = joinFactions([a, b])['gem choppers']
     expect(g).toMatchObject({ net: 0, changes: 30, first: T0 })
     expect(g.recent).toHaveLength(RECENT_KEPT)

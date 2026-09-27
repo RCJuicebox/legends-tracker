@@ -33,8 +33,15 @@ export function candidatePiece(item: CatalogItem, stats: ItemStats): Piece {
   const worn = wornEffectOf(item.statsblock)
   const proc = procOf(item.statsblock)
   return {
-    item: inv, from: 'bags', key: itemKey(item.title), r: restrictions(item.statsblock), stats, foci: item.focus ? [item.focus] : [],
-    worn: worn ? [worn] : [], procs: proc ? [proc] : [], lore: isLore(item.statsblock)
+    item: inv,
+    from: 'bags',
+    key: itemKey(item.title),
+    r: restrictions(item.statsblock),
+    stats,
+    foci: item.focus ? [item.focus] : [],
+    worn: worn ? [worn] : [],
+    procs: proc ? [proc] : [],
+    lore: isLore(item.statsblock)
   }
 }
 
@@ -104,12 +111,13 @@ export function judgeInTheRound(c: FinderCandidate, slot: string, opts: Optimize
   const r = mine ? ownedInTheRound({ ...opts, key, baseline }) : inTheRound({ ...opts, candidate: candidatePiece(c.item, c.stats), baseline })
   // One the best set wears just where it is worn now is no upgrade, and one it wears in another
   // slot is that slot's.
-  const stays =
-    mine && (r.placed !== slot || baseline.after.some((p, i) => p?.key === key && p.from === 'worn' && !p.exalt && baseline.slots[i] === p.item.location))
+  const stays = mine && (r.placed !== slot || baseline.after.some((p, i) => p?.key === key && p.from === 'worn' && !p.exalt && baseline.slots[i] === p.item.location))
   return {
     ...c,
     round: {
-      delta: stays ? 0 : r.delta, placed: r.placed, owned: mine,
+      delta: stays ? 0 : r.delta,
+      placed: r.placed,
+      owned: mine,
       moves: r.moves.map((m) => ({ slot: m.slot, out: m.out ? pieceName(m.out) : null, in: m.in ? pieceName(m.in) : null }))
     }
   }
@@ -121,5 +129,8 @@ export function bestInTheRound(candidates: RoundCandidate[]): RoundCandidate[] {
   // gains over the best set of what is owned, which already has the owned candidates in it, so
   // those rank after any piece to get that beats that set (their own gain still shows).
   const rank = (c: RoundCandidate) => (c.round.owned ? 0 : c.round.delta)
-  return candidates.filter((c) => c.round.delta > 0).sort((a, b) => rank(b) - rank(a) || b.round.delta - a.round.delta).slice(0, 6)
+  return candidates
+    .filter((c) => c.round.delta > 0)
+    .sort((a, b) => rank(b) - rank(a) || b.round.delta - a.round.delta)
+    .slice(0, 6)
 }

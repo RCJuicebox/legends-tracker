@@ -24,8 +24,15 @@ describe('merging saved settings over the defaults', () => {
   })
 
   it('merges a list of things with ids item by item, so saved overlays gain new fields', () => {
-    const base = [{ id: 'a', x: 1, extra: 'new' }, { id: 'b', x: 2, extra: 'new' }]
-    const saved = [{ id: 'b', x: 20 }, { id: 'a', x: 10 }, { id: 'mine', x: 5 }]
+    const base = [
+      { id: 'a', x: 1, extra: 'new' },
+      { id: 'b', x: 2, extra: 'new' }
+    ]
+    const saved = [
+      { id: 'b', x: 20 },
+      { id: 'a', x: 10 },
+      { id: 'mine', x: 5 }
+    ]
     expect(mergeDefaults(base, saved)).toEqual([
       { id: 'b', x: 20, extra: 'new' },
       { id: 'a', x: 10, extra: 'new' },
@@ -40,9 +47,17 @@ describe('merging saved settings over the defaults', () => {
   })
 
   it('adds a default overlay this install has never had', () => {
-    const base = { overlays: [{ id: 'buffs', x: 1 }, { id: 'brand-new', x: 2 }] }
+    const base = {
+      overlays: [
+        { id: 'buffs', x: 1 },
+        { id: 'brand-new', x: 2 }
+      ]
+    }
     const merged = mergeDefaults(base, { overlays: [{ id: 'buffs', x: 9 }] }, (id) => id === 'brand-new')
-    expect(merged.overlays).toEqual([{ id: 'buffs', x: 9 }, { id: 'brand-new', x: 2 }])
+    expect(merged.overlays).toEqual([
+      { id: 'buffs', x: 9 },
+      { id: 'brand-new', x: 2 }
+    ])
   })
 
   it('keeps an empty saved list empty', () => {

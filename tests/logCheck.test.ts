@@ -37,7 +37,15 @@ describe('checkAgainstLog', () => {
   it('finds the model fits when the focus is right, and skips spells seen fading only once', async () => {
     const rows = await check(PUMA, 60.5)
     expect(rows).toHaveLength(1)
-    expect(rows[0]).toMatchObject({ rankedName: 'Spirit of the Puma X', samples: 2, observedMedianSec: 196, calculatedEarliestSec: 192, calculatedLatestSec: 198, fits: true, impliedFocusPct: null })
+    expect(rows[0]).toMatchObject({
+      rankedName: 'Spirit of the Puma X',
+      samples: 2,
+      observedMedianSec: 196,
+      calculatedEarliestSec: 192,
+      calculatedLatestSec: 198,
+      fits: true,
+      impliedFocusPct: null
+    })
   })
 
   it('names the focus that would make a mismatch fit', async () => {
@@ -54,17 +62,21 @@ describe('checkAgainstLog', () => {
   })
 
   it('leaves out a timer joined part way, whose start was not seen', async () => {
-    const rows = await check(`
+    const rows = await check(
+      `
 [Tue Sep 01 12:15:14 2026] Bazzt Zzzt has taken 489 damage from your Envenomed Bolt X.
 [Tue Sep 01 12:16:08 2026] Your Envenomed Bolt spell has worn off of Bazzt Zzzt.
 [Tue Sep 01 12:20:14 2026] Bazzt Zzzt has taken 489 damage from your Envenomed Bolt X.
-[Tue Sep 01 12:21:08 2026] Your Envenomed Bolt spell has worn off of Bazzt Zzzt.`, 0)
+[Tue Sep 01 12:21:08 2026] Your Envenomed Bolt spell has worn off of Bazzt Zzzt.`,
+      0
+    )
     expect(rows).toEqual([])
   })
 
   it('counts nothing for a timer that already expired when its fade line comes', async () => {
     // Envenomed Bolt X: 10 ticks, pinned by the tick at 12:15:14 to end at 12:16:08; exact ends get 3s grace.
-    const rows = await check(`
+    const rows = await check(
+      `
 [Tue Sep 01 12:15:08 2026] You begin casting Envenomed Bolt X.
 [Tue Sep 01 12:15:09 2026] Bazzt Zzzt has been poisoned.
 [Tue Sep 01 12:15:14 2026] Bazzt Zzzt has taken 489 damage from your Envenomed Bolt X.
@@ -77,7 +89,9 @@ describe('checkAgainstLog', () => {
 [Tue Sep 01 12:25:08 2026] You begin casting Envenomed Bolt X.
 [Tue Sep 01 12:25:09 2026] Bazzt Zzzt has been poisoned.
 [Tue Sep 01 12:25:14 2026] Bazzt Zzzt has taken 489 damage from your Envenomed Bolt X.
-[Tue Sep 01 12:26:08 2026] Your Envenomed Bolt spell has worn off of Bazzt Zzzt.`, 0)
+[Tue Sep 01 12:26:08 2026] Your Envenomed Bolt spell has worn off of Bazzt Zzzt.`,
+      0
+    )
     expect(rows).toHaveLength(1)
     expect(rows[0]).toMatchObject({ rankedName: 'Envenomed Bolt X', samples: 2, observedMedianSec: 59 })
   })

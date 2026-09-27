@@ -166,7 +166,12 @@ describe('more tracking rules', () => {
       [Wed Sep 23 13:29:06 2026] Aldric is healed by the spirit of the slug.
       [Wed Sep 23 13:29:06 2026] Brenna is healed by the spirit of the slug.
       [Wed Sep 23 13:29:08 2026] Corvin is healed by the spirit of the slug.`)
-    expect(h.board.list().map((t) => t.target).sort()).toEqual(['Aldric', 'Brenna'])
+    expect(
+      h.board
+        .list()
+        .map((t) => t.target)
+        .sort()
+    ).toEqual(['Aldric', 'Brenna'])
   })
 
   it("ends the newest matching buff on another when a pet's buff wears off", () => {
@@ -193,7 +198,11 @@ describe('more tracking rules', () => {
 
   it('keeps at most six casts waiting to land, dropping the oldest', () => {
     const casts = (bolts: number) =>
-      ['[Sat Sep 12 23:11:04 2026] You begin casting Odium X.', ...Array(bolts).fill('[Sat Sep 12 23:11:04 2026] You begin casting Envenomed Bolt X.'), '[Sat Sep 12 23:11:05 2026] A ratman warrior staggers under a dark curse.'].join('\n')
+      [
+        '[Sat Sep 12 23:11:04 2026] You begin casting Odium X.',
+        ...Array(bolts).fill('[Sat Sep 12 23:11:04 2026] You begin casting Envenomed Bolt X.'),
+        '[Sat Sep 12 23:11:05 2026] A ratman warrior staggers under a dark curse.'
+      ].join('\n')
     const kept = harness()
     kept.feed(casts(5))
     expect(kept.board.list().map((t) => t.spell)).toEqual(['Odium'])

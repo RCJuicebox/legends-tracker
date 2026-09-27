@@ -119,7 +119,11 @@ function ReadFromScreen({ stock, onApplied }: { stock: MoteStock; onApplied: (s:
           </div>
           <details className="small faint">
             <summary>Rows it read</summary>
-            <div className="mono">{read.rows.map((r, i) => <div key={i}>{r}</div>)}</div>
+            <div className="mono">
+              {read.rows.map((r, i) => (
+                <div key={i}>{r}</div>
+              ))}
+            </div>
           </details>
         </div>
       )}
@@ -158,17 +162,14 @@ export function MotePlanner() {
     setStock({ ...stock, counts })
     saveCounts.call(counts)
   }
-  const spent = result.after
-    ? MOTE_RANKS.map((r, i) => ({ i, d: (stock.counts[r.key] ?? 0) - result.after![i] })).filter((x) => x.d > 0)
-    : []
+  const spent = result.after ? MOTE_RANKS.map((r, i) => ({ i, d: (stock.counts[r.key] ?? 0) - result.after![i] })).filter((x) => x.d > 0) : []
 
   return (
     <div className="grid two" style={{ alignItems: 'start' }}>
       <div className="card stack gap-14">
         <h2>Item</h2>
         <p className="muted small" style={{ margin: 0 }}>
-          Put in the item's level and the xp in its bar. It works out which motes you need, how many, and what to combine
-          from your stock.
+          Put in the item's level and the xp in its bar. It works out which motes you need, how many, and what to combine from your stock.
         </p>
         <label className="field">
           <span>Name</span>
@@ -251,9 +252,8 @@ export function MotePlanner() {
           </div>
         )}
         <p className="faint small" style={{ margin: 0 }}>
-          Each mote works on one item level, one below its rank: Greater on +5 items, Superior on +6. Two motes combine into one
-          of the next rank. XP left over past the next level is assumed lost, so a plan spanning several levels may slightly
-          overcount.
+          Each mote works on one item level, one below its rank: Greater on +5 items, Superior on +6. Two motes combine into one of the next rank. XP left over past the next level
+          is assumed lost, so a plan spanning several levels may slightly overcount.
         </p>
       </div>
 

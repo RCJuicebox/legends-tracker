@@ -84,17 +84,7 @@ export function TimerBar({ t, now, showTarget }: { t: TimerView; now: number; sh
  * Bars sorted soonest-first, so the urgent one is always in the same place. Grouped mode puts a
  * heading over each target, which is how you read DoTs across several mobs at a glance.
  */
-export function TimerBars({
-  timers,
-  grouped,
-  fontSize = 15,
-  empty
-}: {
-  timers: TimerView[]
-  grouped: boolean
-  fontSize?: number
-  empty?: ReactNode
-}) {
+export function TimerBars({ timers, grouped, fontSize = 15, empty }: { timers: TimerView[]; grouped: boolean; fontSize?: number; empty?: ReactNode }) {
   // The bars animate themselves; the clocks read whole seconds, so twice a second is enough, and
   // four times near a warning so it lands on time.
   const [fast, setFast] = useState(false)

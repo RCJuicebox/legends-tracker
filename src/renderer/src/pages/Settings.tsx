@@ -91,7 +91,9 @@ export function Settings({ go }: { go?: (page: PageId) => void }) {
             <button className="btn" onClick={() => void copyDiagnostics()}>
               Copy diagnostics
             </button>
-            <span className="faint small">The version, your PC, the settings that matter and the end of the log, ready to paste into a bug report. No keys, and no Windows user name.</span>
+            <span className="faint small">
+              The version, your PC, the settings that matter and the end of the log, ready to paste into a bug report. No keys, and no Windows user name.
+            </span>
           </div>
         </div>
 
@@ -114,8 +116,7 @@ export function Settings({ go }: { go?: (page: PageId) => void }) {
             Start watching as soon as the app opens
           </label>
           <p className="hint">
-            Closing this window keeps Legends Tracker running in the tray, so timers, overlays and speech carry on. To end it, use Quit on the tray
-            icon&apos;s menu.
+            Closing this window keeps Legends Tracker running in the tray, so timers, overlays and speech carry on. To end it, use Quit on the tray icon&apos;s menu.
           </p>
           <label className="row">
             <Switch on={s.yieldToGame} onChange={(v) => patchSettings((x) => ({ ...x, yieldToGame: v }))} />
@@ -164,7 +165,12 @@ export function Settings({ go }: { go?: (page: PageId) => void }) {
             </Field>
             <Field label="Rebuild" hint="Forgets every fight and reads that much of the log again.">
               <div>
-                <button className="btn" onClick={() => void actDone(`Read the last ${s.combat.historyMinutes || 60} minutes of the log again.`, 'combat:rebuild', s.combat.historyMinutes || 60)} disabled={!watching} title={watching ? 'Forget every fight and read the log again' : 'Start watching first'}>
+                <button
+                  className="btn"
+                  onClick={() => void actDone(`Read the last ${s.combat.historyMinutes || 60} minutes of the log again.`, 'combat:rebuild', s.combat.historyMinutes || 60)}
+                  disabled={!watching}
+                  title={watching ? 'Forget every fight and read the log again' : 'Start watching first'}
+                >
                   Read the log again
                 </button>
               </div>
@@ -213,7 +219,10 @@ export function Settings({ go }: { go?: (page: PageId) => void }) {
         <div className="grid two">
           <div className="card stack gap-12">
             <h2>Buff announcements</h2>
-            <Field label="Warn before a buff on me ends" hint="Seconds; 0 turns it off. Buff ends are known to within one 6-second tick, so this counts from the earliest they could end.">
+            <Field
+              label="Warn before a buff on me ends"
+              hint="Seconds; 0 turns it off. Buff ends are known to within one 6-second tick, so this counts from the earliest they could end."
+            >
               <NumberInput value={t.buffWarnSec} min={0} onChange={(v) => setT({ buffWarnSec: v ?? 0 })} />
             </Field>
             <Field label="Warning" hint="{spell} and {target} are filled in.">

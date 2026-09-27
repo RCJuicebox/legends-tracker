@@ -57,9 +57,19 @@ export class TimerBoard {
     return this.list()
       .sort((a, b) => a.endsAt - b.endsAt)
       .map((t) => ({
-        id: t.id, label: t.label, target: t.target, source: t.source, category: t.category, icon: t.icon,
-        color: t.color, overlay: t.overlay, startedAt: t.startedAt, endsAt: t.endsAt, exact: t.exact,
-        warnSec: t.warnSec, rank: t.rank
+        id: t.id,
+        label: t.label,
+        target: t.target,
+        source: t.source,
+        category: t.category,
+        icon: t.icon,
+        color: t.color,
+        overlay: t.overlay,
+        startedAt: t.startedAt,
+        endsAt: t.endsAt,
+        exact: t.exact,
+        warnSec: t.warnSec,
+        rank: t.rank
       }))
   }
 

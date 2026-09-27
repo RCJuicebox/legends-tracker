@@ -82,7 +82,7 @@ describe('a profile saved at an older schema', () => {
     expect(existsSync(file('settings.pre-2.json'))).toBe(false)
   })
 
-  it('leaves files already at this build\'s schema without a backup', () => {
+  it("leaves files already at this build's schema without a backup", () => {
     writeFileSync(file('settings.json'), JSON.stringify({ zoom: 1.5 }))
     writeFileSync(file('triggers.json'), '[]')
     new Store(defaultTriggers)

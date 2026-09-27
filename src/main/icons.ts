@@ -116,7 +116,7 @@ export function decodeDds(d: Buffer): Sheet | null {
   const width = d.readUInt32LE(16)
   const pixels = Buffer.alloc(width * height * 4)
   let p = 128
-  const rgb565 = (c: number) => [((c >> 11) & 31) * 255 / 31, ((c >> 5) & 63) * 255 / 63, (c & 31) * 255 / 31]
+  const rgb565 = (c: number) => [(((c >> 11) & 31) * 255) / 31, (((c >> 5) & 63) * 255) / 63, ((c & 31) * 255) / 31]
   for (let by = 0; by < height; by += 4) {
     for (let bx = 0; bx < width; bx += 4) {
       // Alpha: two endpoints and 16 three-bit indices.
@@ -204,10 +204,5 @@ export function encodePng(w: number, h: number, rgba: Buffer): Buffer {
   ihdr.writeUInt32BE(h, 4)
   ihdr[8] = 8
   ihdr[9] = 6
-  return Buffer.concat([
-    Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
-    chunk('IHDR', ihdr),
-    chunk('IDAT', deflateSync(raw)),
-    chunk('IEND', Buffer.alloc(0))
-  ])
+  return Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), chunk('IHDR', ihdr), chunk('IDAT', deflateSync(raw)), chunk('IEND', Buffer.alloc(0))])
 }

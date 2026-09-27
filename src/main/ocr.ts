@@ -74,9 +74,26 @@ function scriptFile(): Promise<string> {
 export async function ocrImage(path: string, scale = 3, layout?: Composite): Promise<OcrWord[]> {
   const script = await scriptFile()
   const out = await new Promise<string>((resolve, reject) => {
-    const p = spawn('powershell.exe', ['-NoLogo', '-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', script, '-Path', path, '-Scale', String(scale), ...(layout ? ['-Compose', composeArg(layout)] : [])], {
-      windowsHide: true
-    })
+    const p = spawn(
+      'powershell.exe',
+      [
+        '-NoLogo',
+        '-NoProfile',
+        '-NonInteractive',
+        '-ExecutionPolicy',
+        'Bypass',
+        '-File',
+        script,
+        '-Path',
+        path,
+        '-Scale',
+        String(scale),
+        ...(layout ? ['-Compose', composeArg(layout)] : [])
+      ],
+      {
+        windowsHide: true
+      }
+    )
     yieldPriority(p.pid)
     let stdout = ''
     let stderr = ''
@@ -109,10 +126,12 @@ function composeArg(c: Composite): string {
 
 /** Captures every monitor at full resolution and returns the PNG paths. Pass them to discardScreens() when done. */
 export async function captureScreens(): Promise<string[]> {
-  const largest = screen.getAllDisplays().reduce(
-    (m, d) => ({ width: Math.max(m.width, Math.round(d.size.width * d.scaleFactor)), height: Math.max(m.height, Math.round(d.size.height * d.scaleFactor)) }),
-    { width: 0, height: 0 }
-  )
+  const largest = screen
+    .getAllDisplays()
+    .reduce((m, d) => ({ width: Math.max(m.width, Math.round(d.size.width * d.scaleFactor)), height: Math.max(m.height, Math.round(d.size.height * d.scaleFactor)) }), {
+      width: 0,
+      height: 0
+    })
   const sources = await desktopCapturer.getSources({ types: ['screen'], thumbnailSize: largest })
   const paths: string[] = []
   const stamp = Date.now().toString(36)
@@ -131,9 +150,5 @@ export async function captureScreens(): Promise<string[]> {
 
 /** Deletes captures: they are pictures of the whole desktop, and have no business staying on disk. */
 export async function discardScreens(paths: string[]): Promise<void> {
-  await Promise.all(
-    paths.map((p) =>
-      fs.rm(p, { force: true }).catch((e) => log.warn(`Could not delete the screen capture ${p}`, e))
-    )
-  )
+  await Promise.all(paths.map((p) => fs.rm(p, { force: true }).catch((e) => log.warn(`Could not delete the screen capture ${p}`, e))))
 }

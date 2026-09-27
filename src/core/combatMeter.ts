@@ -1,6 +1,20 @@
 import { parseCombatLine, looksLikeCombat, SELF, type CombatEvent } from './combatLines'
 import { zoneEntered, type LogLine } from './logLine'
-import type { CombatSnapshot, DamageHow, Defense, Entity, EntityKind, HealTally, ProcOrigin, RosterMember, Segment, SegmentSummary, SkillStat, Tally, StitchedTimeline } from '../shared/types'
+import type {
+  CombatSnapshot,
+  DamageHow,
+  Defense,
+  Entity,
+  EntityKind,
+  HealTally,
+  ProcOrigin,
+  RosterMember,
+  Segment,
+  SegmentSummary,
+  SkillStat,
+  Tally,
+  StitchedTimeline
+} from '../shared/types'
 
 // The damage meter: every combat line sorted into fights and sessions, per entity.
 //
@@ -78,10 +92,31 @@ export function spellBase(name: string): string {
 
 function newEntity(name: string, kind: EntityKind, owner: string | undefined, at: number): Entity {
   return {
-    name, kind, ...(owner ? { owner } : {}),
-    out: tally(), in: tally(), skills: {}, targets: {}, attackers: {}, takenBy: {}, procs: {}, defense: defense(),
-    healOut: healTally(), healIn: healTally(), healSpells: {}, healTargets: {}, healers: {},
-    runes: 0, casts: 0, resisted: 0, kills: 0, deaths: 0, firstAt: at, lastAt: at, activeMs: 0, lastHitAt: 0
+    name,
+    kind,
+    ...(owner ? { owner } : {}),
+    out: tally(),
+    in: tally(),
+    skills: {},
+    targets: {},
+    attackers: {},
+    takenBy: {},
+    procs: {},
+    defense: defense(),
+    healOut: healTally(),
+    healIn: healTally(),
+    healSpells: {},
+    healTargets: {},
+    healers: {},
+    runes: 0,
+    casts: 0,
+    resisted: 0,
+    kills: 0,
+    deaths: 0,
+    firstAt: at,
+    lastAt: at,
+    activeMs: 0,
+    lastHitAt: 0
   }
 }
 
@@ -290,8 +325,21 @@ export class CombatMeter {
 
   private newSegment(kind: Segment['kind'], at: number, name: string): Segment {
     return {
-      id: `${kind[0]}${++this.seq}-${at}`, kind, name, zone: this.zone, startedAt: at, endedAt: at, open: true,
-      activeMs: 0, lastHitAt: 0, entities: {}, enemies: {}, kills: 0, deaths: 0, enemyHeal: 0, mine: false,
+      id: `${kind[0]}${++this.seq}-${at}`,
+      kind,
+      name,
+      zone: this.zone,
+      startedAt: at,
+      endedAt: at,
+      open: true,
+      activeMs: 0,
+      lastHitAt: 0,
+      entities: {},
+      enemies: {},
+      kills: 0,
+      deaths: 0,
+      enemyHeal: 0,
+      mine: false,
       ...(kind === 'fight' ? { timeline: { you: [], pet: [], group: [], inc: [] } } : {})
     }
   }
@@ -799,8 +847,17 @@ export function summarize(seg: Segment): SegmentSummary {
     if (e.kind === 'you' || (e.kind === 'pet' && e.owner === SELF)) yours += e.out.total
   }
   return {
-    id: seg.id, kind: seg.kind, name: seg.kind === 'fight' ? fightName(seg) : seg.name || seg.zone || 'Session', zone: seg.zone,
-    startedAt: seg.startedAt, endedAt: seg.endedAt, open: seg.open,
-    total, dps: total / (durationMs(seg) / 1000), yours, kills: seg.kills, mine: seg.mine
+    id: seg.id,
+    kind: seg.kind,
+    name: seg.kind === 'fight' ? fightName(seg) : seg.name || seg.zone || 'Session',
+    zone: seg.zone,
+    startedAt: seg.startedAt,
+    endedAt: seg.endedAt,
+    open: seg.open,
+    total,
+    dps: total / (durationMs(seg) / 1000),
+    yours,
+    kills: seg.kills,
+    mine: seg.mine
   }
 }

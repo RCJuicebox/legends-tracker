@@ -16,11 +16,7 @@ export type Warn = (message: string, error: unknown) => void
  * running. Returns how many bytes were read up to the end of the last line handed over. A last line
  * with no newline yet is handed over too unless `flushLast` is false: a live log may be mid-write.
  */
-export async function readLines(
-  stream: Readable,
-  onLine: (line: LogLine) => void,
-  opts: { onBytes?: (bytes: number) => void; flushLast?: boolean } = {}
-): Promise<number> {
+export async function readLines(stream: Readable, onLine: (line: LogLine) => void, opts: { onBytes?: (bytes: number) => void; flushLast?: boolean } = {}): Promise<number> {
   let partial = ''
   let pos = 0
   let n = 0

@@ -26,7 +26,12 @@ export function registerSpellIpc(ctx: AppContext): void {
   })
   handle('spells:checkLog', (mb) => engine.checkLog(mb))
   // Duration focus effects from the spell book, e.g. "Extended Enhancement II", with their limits.
-  handle('focus:search', (q) => (engine.book?.search(q, 200, true) ?? []).filter(isDurationFocus).slice(0, 30).map((s) => focusFromSpell(s, 'item', '')))
+  handle('focus:search', (q) =>
+    (engine.book?.search(q, 200, true) ?? [])
+      .filter(isDurationFocus)
+      .slice(0, 30)
+      .map((s) => focusFromSpell(s, 'item', ''))
+  )
 
   // Which spells to put motes into: the character's casts over the last `days` days of play, joined
   // with the spell file. The page scores and sorts them itself.

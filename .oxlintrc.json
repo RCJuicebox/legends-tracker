@@ -23,38 +23,56 @@
     {
       "files": ["src/core/**"],
       "rules": {
-        "no-restricted-imports": ["error", {
-          "paths": [{ "name": "electron", "message": "core runs outside Electron too (tests, workers): pass what it needs in." }],
-          "patterns": [{ "group": ["../main", "../main/*", "../renderer/*", "../preload/*"], "message": "core may not import main, the renderer or the preload." }]
-        }]
+        "no-restricted-imports": [
+          "error",
+          {
+            "paths": [{ "name": "electron", "message": "core runs outside Electron too (tests, workers): pass what it needs in." }],
+            "patterns": [{ "group": ["../main", "../main/*", "../renderer/*", "../preload/*"], "message": "core may not import main, the renderer or the preload." }]
+          }
+        ]
       }
     },
     {
       "files": ["src/shared/**"],
       "rules": {
-        "no-restricted-imports": ["error", {
-          "patterns": [{ "group": ["../core/*", "../main/*", "../renderer/*"], "allowTypeImports": true, "message": "shared holds tables and types: import types only from core." }]
-        }]
+        "no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              { "group": ["../core/*", "../main/*", "../renderer/*"], "allowTypeImports": true, "message": "shared holds tables and types: import types only from core." }
+            ]
+          }
+        ]
       }
     },
     {
       "files": ["src/renderer/**"],
       "rules": {
-        "no-restricted-imports": ["error", {
-          "paths": [{ "name": "electron", "message": "The renderer reaches Electron through the preload bridge (api.ts)." }],
-          "patterns": [
-            { "group": ["node:*", "fs", "path", "os", "child_process"], "allowTypeImports": true, "message": "The renderer is a browser page: ask the main process." },
-            { "group": ["../../main/*", "../../../main/*", "../../../../main/*", "../../preload/*", "../../../preload/*"], "allowTypeImports": true, "message": "The renderer may not import the main process or the preload." }
-          ]
-        }]
+        "no-restricted-imports": [
+          "error",
+          {
+            "paths": [{ "name": "electron", "message": "The renderer reaches Electron through the preload bridge (api.ts)." }],
+            "patterns": [
+              { "group": ["node:*", "fs", "path", "os", "child_process"], "allowTypeImports": true, "message": "The renderer is a browser page: ask the main process." },
+              {
+                "group": ["../../main/*", "../../../main/*", "../../../../main/*", "../../preload/*", "../../../preload/*"],
+                "allowTypeImports": true,
+                "message": "The renderer may not import the main process or the preload."
+              }
+            ]
+          }
+        ]
       }
     },
     {
       "files": ["src/main/**", "src/preload/**"],
       "rules": {
-        "no-restricted-imports": ["error", {
-          "patterns": [{ "group": ["../renderer/*", "../../renderer/*", "../../../renderer/*"], "message": "The main process may not import the renderer." }]
-        }]
+        "no-restricted-imports": [
+          "error",
+          {
+            "patterns": [{ "group": ["../renderer/*", "../../renderer/*", "../../../renderer/*"], "message": "The main process may not import the renderer." }]
+          }
+        ]
       }
     }
   ],

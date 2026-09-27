@@ -183,7 +183,12 @@ describe("A groupmate's buff on you", () => {
   it('goes on the buffs overlay with a spoken warning a minute before it fades, naming who to ask', () => {
     const timer = land(T0 + 10_000)
     expect(timer).toMatchObject({
-      label: SYMBOL, target: 'You', overlay: 'buffs', category: 'buff', startedAt: T0 + 10_000, warnSec: 60,
+      label: SYMBOL,
+      target: 'You',
+      overlay: 'buffs',
+      category: 'buff',
+      startedAt: T0 + 10_000,
+      warnSec: 60,
       onWarn: [{ kind: 'speak', text: `${SYMBOL} is fading, ask Brenna`, interrupt: false }]
     })
     expect(timer!.endsAt).toBe(s.buffs.watch.active[0].endsAt)

@@ -79,8 +79,8 @@ export function Buffs() {
         <div>
           <h1>Buffs</h1>
           <p>
-            What your group can buff you with, what is on you now, and when to ask. Pick the buffs you want below; the tracker shows whom to ask when one is
-            missing, and warns before one fades. <Info label="How it works" text={HOW} />
+            What your group can buff you with, what is on you now, and when to ask. Pick the buffs you want below; the tracker shows whom to ask when one is missing, and warns
+            before one fades. <Info label="How it works" text={HOW} />
           </p>
         </div>
         <label className="row" title="Timers for buffs others cast on you, and whom to ask for a missing one, on the overlays. Off, this page still shows both.">
@@ -150,11 +150,7 @@ export function Buffs() {
                       </span>
                     )}
                   </div>
-                  {g.person && (
-                    <div className="small">
-                      {can.length ? can.map((o) => o.spell).join(', ') : <span className="faint">none of the buffs you want</span>}
-                    </div>
-                  )}
+                  {g.person && <div className="small">{can.length ? can.map((o) => o.spell).join(', ') : <span className="faint">none of the buffs you want</span>}</div>}
                 </div>
               )
             })
@@ -169,7 +165,11 @@ export function Buffs() {
                     (
                     {v.needs
                       .filter((n) => n.replaces || n.clickOff.length)
-                      .map((n) => [n.replaces && `${n.spell} would replace ${n.replaces}`, n.clickOff.length && `${n.spell} needs ${n.clickOff.join(', ')} clicked off first`].filter(Boolean).join('; '))
+                      .map((n) =>
+                        [n.replaces && `${n.spell} would replace ${n.replaces}`, n.clickOff.length && `${n.spell} needs ${n.clickOff.join(', ')} clicked off first`]
+                          .filter(Boolean)
+                          .join('; ')
+                      )
                       .join('; ')}
                     )
                   </span>
@@ -233,13 +233,7 @@ export function Buffs() {
           return (
             <div key={c} className="stack" style={{ gap: 4 }}>
               <div className="row gap-8">
-                <button
-                  className="btn small ghost"
-                  aria-expanded={open}
-                  aria-label={open ? `Collapse ${label}` : `Expand ${label}`}
-                  onClick={() => flip(c)}
-                  style={{ width: 28 }}
-                >
+                <button className="btn small ghost" aria-expanded={open} aria-label={open ? `Collapse ${label}` : `Expand ${label}`} onClick={() => flip(c)} style={{ width: 28 }}>
                   {open ? '▾' : '▸'}
                 </button>
                 <b>{label}</b>
@@ -260,7 +254,11 @@ export function Buffs() {
                           <a href={wikiUrl(o.spell)} target="_blank" rel="noreferrer">
                             {o.spell}
                           </a>
-                          {o.group && <span className="lt-chip" style={{ marginLeft: 6 }}>group</span>}
+                          {o.group && (
+                            <span className="lt-chip" style={{ marginLeft: 6 }}>
+                              group
+                            </span>
+                          )}
                           {o.self && (
                             <span className="lt-chip" style={{ marginLeft: 6 }} title="Only the caster can have it: yours to cast when your classes can">
                               self
@@ -305,7 +303,8 @@ function BestCombination({ view, unpick }: { view: BuffView; unpick: (spell: str
           </button>
         </span>
         <span className="small muted">
-          {scope === 'group' ? 'From what your group and you can cast, and what is on you.' : 'From every class at level 50, and your own self-only buffs, to plan with.'} Worth {total.toLocaleString()} in all.
+          {scope === 'group' ? 'From what your group and you can cast, and what is on you.' : 'From every class at level 50, and your own self-only buffs, to plan with.'} Worth{' '}
+          {total.toLocaleString()} in all.
         </span>
       </div>
       {!plan.chosen.length ? (
@@ -329,7 +328,13 @@ function BestCombination({ view, unpick }: { view: BuffView; unpick: (spell: str
                     <span className="muted" style={{ minWidth: 200 }}>
                       {o ? effectText(o) : ''}
                     </span>
-                    {c.on ? <span className="lt-chip good">on you</span> : c.from === YOU ? <span className="lt-chip warn">cast it yourself</span> : <span className="lt-chip warn">ask {c.from}</span>}
+                    {c.on ? (
+                      <span className="lt-chip good">on you</span>
+                    ) : c.from === YOU ? (
+                      <span className="lt-chip warn">cast it yourself</span>
+                    ) : (
+                      <span className="lt-chip warn">ask {c.from}</span>
+                    )}
                     {c.after.length > 0 && (
                       <span className="faint" title="By the stacking rules it holds only when it lands after these">
                         after {c.after.join(', ')}
@@ -347,24 +352,31 @@ function BestCombination({ view, unpick }: { view: BuffView; unpick: (spell: str
       {stacked.length > 0 && (
         <div className="stack" style={{ gap: 2 }}>
           <div className="row gap-8">
-            <button className="btn small ghost" aria-expanded={leftOpen} aria-label={leftOpen ? 'Collapse left out' : 'Expand left out'} onClick={() => setLeftOpen(!leftOpen)} style={{ width: 28 }}>
+            <button
+              className="btn small ghost"
+              aria-expanded={leftOpen}
+              aria-label={leftOpen ? 'Collapse left out' : 'Expand left out'}
+              onClick={() => setLeftOpen(!leftOpen)}
+              style={{ width: 28 }}
+            >
               {leftOpen ? '▾' : '▸'}
             </button>
             <b className="small">Left out: {stacked.length} that do not stack with the combination</b>
           </div>
-          {leftOpen && stacked.map((l) => (
-            <div key={l.spell} className="row gap-8 small">
-              <span style={{ minWidth: 200 }} className="muted">
-                {l.spell}
-              </span>
-              <span className="faint">blocked by {l.blockedBy.join(', ') || 'the rest'}</span>
-              <span className="spacer" />
-              <span className="faint mono">{l.value.toLocaleString()}</span>
-              <button className="btn small ghost" aria-label={`Stop wanting ${l.spell}`} title="Stop wanting it" onClick={() => unpick(l.spell)}>
-                ✕
-              </button>
-            </div>
-          ))}
+          {leftOpen &&
+            stacked.map((l) => (
+              <div key={l.spell} className="row gap-8 small">
+                <span style={{ minWidth: 200 }} className="muted">
+                  {l.spell}
+                </span>
+                <span className="faint">blocked by {l.blockedBy.join(', ') || 'the rest'}</span>
+                <span className="spacer" />
+                <span className="faint mono">{l.value.toLocaleString()}</span>
+                <button className="btn small ghost" aria-label={`Stop wanting ${l.spell}`} title="Stop wanting it" onClick={() => unpick(l.spell)}>
+                  ✕
+                </button>
+              </div>
+            ))}
         </div>
       )}
     </div>

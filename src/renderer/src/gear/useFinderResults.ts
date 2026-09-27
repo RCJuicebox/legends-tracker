@@ -71,8 +71,48 @@ export function useFinderResults({
   // through a deferred value, so a weight being typed or a button being pressed answers at once and
   // the results catch up in the background.
   const input = useMemo(
-    () => ({ items, wearer, weights, compare, hiddenEras, inv, viewItems: view.items, owned, twoHanders, worth, fociOf, valueOf, eraStatus, pieces, exaltations, judge, effects, effectsOfItem, hands: weaponHands }),
-    [items, wearer, weights, compare, hiddenEras, inv, view.items, owned, twoHanders, worth, fociOf, valueOf, eraStatus, pieces, exaltations, judge, effects, effectsOfItem, weaponHands]
+    () => ({
+      items,
+      wearer,
+      weights,
+      compare,
+      hiddenEras,
+      inv,
+      viewItems: view.items,
+      owned,
+      twoHanders,
+      worth,
+      fociOf,
+      valueOf,
+      eraStatus,
+      pieces,
+      exaltations,
+      judge,
+      effects,
+      effectsOfItem,
+      hands: weaponHands
+    }),
+    [
+      items,
+      wearer,
+      weights,
+      compare,
+      hiddenEras,
+      inv,
+      view.items,
+      owned,
+      twoHanders,
+      worth,
+      fociOf,
+      valueOf,
+      eraStatus,
+      pieces,
+      exaltations,
+      judge,
+      effects,
+      effectsOfItem,
+      weaponHands
+    ]
   )
   const deferred = useDeferredValue(input)
   const found = useMemo(() => {
@@ -107,7 +147,16 @@ export function useFinderResults({
       keepStatWinners: round
     })
     // Each candidate among everything owned, worn as well as it can be; its worth is what the set gains.
-    const opts = { pieces: d.pieces, wearer: d.wearer, weights: d.weights, twoHanders: d.twoHanders, focusValue: d.valueOf, exaltations: d.exaltations, effects: d.effects.value ?? undefined, hands: d.hands }
+    const opts = {
+      pieces: d.pieces,
+      wearer: d.wearer,
+      weights: d.weights,
+      twoHanders: d.twoHanders,
+      focusValue: d.valueOf,
+      exaltations: d.exaltations,
+      effects: d.effects.value ?? undefined,
+      hands: d.hands
+    }
     return { slots, round: round ? opts : null }
   }, [deferred, classes.length, mode])
 

@@ -487,6 +487,9 @@ function linkCandidates(t: string): string[] {
 
 /** Sorts ignoring a leading article, reading numbers as numbers: "a froglok scryer" under F, Baking (100) after Baking (50). */
 export function compareNames(x: string, y: string): number {
-  const key = (t: string) => String(t).toLowerCase().replace(/^(?:an?|the)\s+/, '')
+  const key = (t: string) =>
+    String(t)
+      .toLowerCase()
+      .replace(/^(?:an?|the)\s+/, '')
   return key(x).localeCompare(key(y), undefined, { numeric: true, sensitivity: 'base' })
 }

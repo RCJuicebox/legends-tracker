@@ -37,8 +37,23 @@ export function petSlots(classes: string[]): number {
 
 /** Where a pet wears things: one of each, two ears, wrists and rings. No charm or ammo slot is known to work. */
 export const PET_SLOT_CAPACITY: Record<string, number> = {
-  Head: 1, Face: 1, Ear: 2, Neck: 1, Shoulders: 1, Back: 1, Arms: 1, Chest: 1, Wrist: 2, Hands: 1,
-  Fingers: 2, Waist: 1, Legs: 1, Feet: 1, Primary: 1, Secondary: 1, Range: 1
+  Head: 1,
+  Face: 1,
+  Ear: 2,
+  Neck: 1,
+  Shoulders: 1,
+  Back: 1,
+  Arms: 1,
+  Chest: 1,
+  Wrist: 2,
+  Hands: 1,
+  Fingers: 2,
+  Waist: 1,
+  Legs: 1,
+  Feet: 1,
+  Primary: 1,
+  Secondary: 1,
+  Range: 1
 }
 
 // ---- what the pet wears now: /pet inventory check ----
@@ -261,9 +276,57 @@ export function petMelee(base: PetMelee, level: number, primary: PetWeapon | nul
  * damage. A pet has no use for endurance, and mana only for its few spells.
  */
 export const PET_ROLE_PRESETS: Record<string, RoleWeights> = {
-  Damage: { hp: 0.3, mana: 0, end: 0, ac: 2, avoidance: 0.3, offense: 2, attack: 1, procs: 0.8, haste: 15, resists: 0.3, hpRegen: 5, manaRegen: 0, endRegen: 0, ratio: 15, rangedRatio: 0 },
-  Balanced: { hp: 0.6, mana: 0, end: 0, ac: 5, avoidance: 0.8, offense: 1, attack: 0.5, procs: 0.4, haste: 10, resists: 0.6, hpRegen: 12, manaRegen: 0, endRegen: 0, ratio: 10, rangedRatio: 0 },
-  Tank: { hp: 1, mana: 0, end: 0, ac: 8, avoidance: 1.5, offense: 0.5, attack: 0.3, procs: 0.2, haste: 6, resists: 1.2, hpRegen: 25, manaRegen: 0, endRegen: 0, ratio: 6, rangedRatio: 0 }
+  Damage: {
+    hp: 0.3,
+    mana: 0,
+    end: 0,
+    ac: 2,
+    avoidance: 0.3,
+    offense: 2,
+    attack: 1,
+    procs: 0.8,
+    haste: 15,
+    resists: 0.3,
+    hpRegen: 5,
+    manaRegen: 0,
+    endRegen: 0,
+    ratio: 15,
+    rangedRatio: 0
+  },
+  Balanced: {
+    hp: 0.6,
+    mana: 0,
+    end: 0,
+    ac: 5,
+    avoidance: 0.8,
+    offense: 1,
+    attack: 0.5,
+    procs: 0.4,
+    haste: 10,
+    resists: 0.6,
+    hpRegen: 12,
+    manaRegen: 0,
+    endRegen: 0,
+    ratio: 10,
+    rangedRatio: 0
+  },
+  Tank: {
+    hp: 1,
+    mana: 0,
+    end: 0,
+    ac: 8,
+    avoidance: 1.5,
+    offense: 0.5,
+    attack: 0.3,
+    procs: 0.2,
+    haste: 6,
+    resists: 1.2,
+    hpRegen: 25,
+    manaRegen: 0,
+    endRegen: 0,
+    ratio: 6,
+    rangedRatio: 0
+  }
 }
 
 /**
@@ -480,4 +543,3 @@ export function petSpells(book: SpellBook, classes: string[], level: number): Pe
   }
   return [...out.values()].sort((a, b) => a.level - b.level || a.spell.localeCompare(b.spell))
 }
-

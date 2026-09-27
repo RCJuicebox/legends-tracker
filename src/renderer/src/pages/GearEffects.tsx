@@ -53,8 +53,7 @@ export function EffectsTab({ m, kind }: { m: GearModel; kind: EffectKind }) {
       return r
     }
     // For the character's classes: one of them may wear it (in the hands, for a proc).
-    const forYou = (r: Restrictions) =>
-      kind === 'worn' ? canWear(r, wearer, 'Any Slot') : canWear(r, wearer, 'Primary') || canWear(r, wearer, 'Secondary')
+    const forYou = (r: Restrictions) => (kind === 'worn' ? canWear(r, wearer, 'Any Slot') : canWear(r, wearer, 'Primary') || canWear(r, wearer, 'Secondary'))
     // What the character owns: worn, carried, banked, in Storage, on the pet, and exaltations kept.
     for (const p of pieces) {
       if (who === 'yours' && p.from !== 'worn' && p.r && !forYou(p.r)) continue
@@ -78,8 +77,13 @@ export function EffectsTab({ m, kind }: { m: GearModel; kind: EffectKind }) {
       const rw = row(n)
       if (rw.carriers.some((x) => x.owned && x.name.startsWith(c.title))) continue
       rw.carriers.push({
-        name: c.title, where: `${r.slots.map((s) => s.toLowerCase()).join(' ')}${c.era ? ` · ${c.era}` : ''}`, classes: classesOf(r), owned: false, active: false,
-        icon: c.icon, title: source(c)
+        name: c.title,
+        where: `${r.slots.map((s) => s.toLowerCase()).join(' ')}${c.era ? ` · ${c.era}` : ''}`,
+        classes: classesOf(r),
+        owned: false,
+        active: false,
+        icon: c.icon,
+        title: source(c)
       })
     }
     return [...out.values()].sort((a, b) => b.score - a.score || (b.worth?.dpm ?? 0) - (a.worth?.dpm ?? 0) || a.name.localeCompare(b.name))
@@ -89,12 +93,22 @@ export function EffectsTab({ m, kind }: { m: GearModel; kind: EffectKind }) {
     kind === 'worn'
       ? [
           { title: 'In combat', note: 'What they add to your melee.', rows: rows.filter((r) => (r.worth?.dpm ?? 0) > 0), all: false },
-          { title: 'Stats', note: 'Priced by your stat weights, as the same stats on an item would be.', rows: rows.filter((r) => !(r.worth?.dpm ?? 0) && r.statScore > 0), all: false },
+          {
+            title: 'Stats',
+            note: 'Priced by your stat weights, as the same stats on an item would be.',
+            rows: rows.filter((r) => !(r.worth?.dpm ?? 0) && r.statScore > 0),
+            all: false
+          },
           { title: 'Utility', note: 'Not valued: what they are worth is up to you.', rows: rows.filter((r) => !(r.worth?.dpm ?? 0) && r.statScore <= 0), all: true }
         ]
       : [
           { title: 'Damage', note: 'What they add to your melee.', rows: rows.filter((r) => (r.worth?.dpm ?? 0) > 0), all: false },
-          { title: 'Other', note: 'Not valued: stuns, debuffs, buffs, and procs that land only on undead or summoned creatures.', rows: rows.filter((r) => !(r.worth?.dpm ?? 0)), all: false }
+          {
+            title: 'Other',
+            note: 'Not valued: stuns, debuffs, buffs, and procs that land only on undead or summoned creatures.',
+            rows: rows.filter((r) => !(r.worth?.dpm ?? 0)),
+            all: false
+          }
         ]
 
   const topSkills = profile
@@ -218,9 +232,7 @@ function EffectLine({ r, kind }: { r: EffectRow; kind: EffectKind }) {
         )}
       </div>
       <div className="lt-focus-col">
-        <div className="lt-focus-cap">
-          You have {chip && <span className={`lt-chip ${chip.tone}`}>{chip.label}</span>}
-        </div>
+        <div className="lt-focus-cap">You have {chip && <span className={`lt-chip ${chip.tone}`}>{chip.label}</span>}</div>
         {mine.slice(0, 3).map((c) => (
           <div key={c.name + c.where} className="small">
             {c.name} <span className="faint">{c.where}</span>

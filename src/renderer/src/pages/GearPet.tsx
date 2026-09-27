@@ -8,9 +8,7 @@ import { className } from '../../../shared/game/classes'
 import { itemKey, mergeLevel, parseStatsBlock, scaledStats, slotLabel, type InvItem } from '../../../core/inventory'
 import { restrictions, isLore, score } from '../../../core/upgrades'
 import { rawWeights } from '../../../core/statValue'
-import {
-  optimizePetGear, PET_ROLE_PRESETS, petConversions, petMelee, petSlots, type PetChoice, type PetPiece
-} from '../../../core/pets'
+import { optimizePetGear, PET_ROLE_PRESETS, petConversions, petMelee, petSlots, type PetChoice, type PetPiece } from '../../../core/pets'
 import type { GearModel } from '../gear/useGearModel'
 import { ItemIcon } from './gearBits'
 
@@ -75,8 +73,13 @@ export function PetTab({ m }: { m: GearModel }) {
         if (!c) return []
         const item: InvItem = { location: g.slot, name: g.name, id: 0, count: 1, augs: [] }
         const piece: PetPiece = {
-          item, from: 'pet', key: itemKey(g.name), r: restrictions(c.statsblock), stats: scaledStats(parseStatsBlock(c.statsblock), mergeLevel(g.name)),
-          lore: isLore(c.statsblock), noPet: false
+          item,
+          from: 'pet',
+          key: itemKey(g.name),
+          r: restrictions(c.statsblock),
+          stats: scaledStats(parseStatsBlock(c.statsblock), mergeLevel(g.name)),
+          lore: isLore(c.statsblock),
+          noPet: false
         }
         return [{ piece, slot: g.slot }]
       }),
@@ -114,9 +117,7 @@ export function PetTab({ m }: { m: GearModel }) {
             ))}
           </select>
           {state.summon && (
-            <span className="small muted">
-              {state.summon.spell === spell ? `your last summon, ${ago(state.summon.at)}` : `you last summoned ${state.summon.spell}`}
-            </span>
+            <span className="small muted">{state.summon.spell === spell ? `your last summon, ${ago(state.summon.at)}` : `you last summoned ${state.summon.spell}`}</span>
           )}
           {picked && (
             <button className="btn ghost small" onClick={() => setPicked('')}>
@@ -173,7 +174,11 @@ export function PetTab({ m }: { m: GearModel }) {
                 <span className="faint">No base melee on the Pet Guide yet: weapons are scored on their stats only</span>
               )}
             </span>
-            {profile.unsure.length > 0 && <span className="lt-chip warn" title="The wiki marks these with a question mark">unconfirmed: {profile.unsure.join(', ')}</span>}
+            {profile.unsure.length > 0 && (
+              <span className="lt-chip warn" title="The wiki marks these with a question mark">
+                unconfirmed: {profile.unsure.join(', ')}
+              </span>
+            )}
             <Info
               label="How the pet is scored"
               text={
@@ -183,9 +188,9 @@ export function PetTab({ m }: { m: GearModel }) {
                     melee come from its wiki pages. Item level requirements are checked against the pet's level.
                   </div>
                   <div>
-                    Stats are weighed the way the upgrade finder weighs yours, with the pet's classes and stats: {profile.stats.STR} STR, {profile.stats.STA} STA, {profile.stats.AGI} AGI.
-                    Haste counts once, the best worn. Weapons count by the melee damage they give the pet under the Pet Guide's rules (a better ratio is used outright; more damage
-                    at a worse ratio keeps the pet's delay), with a hit averaging bonus + 1.5 × damage. A two-hander gives up the off hand.
+                    Stats are weighed the way the upgrade finder weighs yours, with the pet's classes and stats: {profile.stats.STR} STR, {profile.stats.STA} STA,{' '}
+                    {profile.stats.AGI} AGI. Haste counts once, the best worn. Weapons count by the melee damage they give the pet under the Pet Guide's rules (a better ratio is
+                    used outright; more damage at a worse ratio keeps the pet's delay), with a hit averaging bonus + 1.5 × damage. A two-hander gives up the off hand.
                   </div>
                   <div>Focus effects and procs are not counted: nothing yet says whether a pet's gear focuses anything.</div>
                 </>
@@ -241,8 +246,8 @@ export function PetTab({ m }: { m: GearModel }) {
         <div className="card stack gap-6">
           <h2 style={{ margin: 0 }}>Best use of what you own</h2>
           <p className="small muted" style={{ margin: 0 }}>
-            {owned.length + onPet.length} pieces you {includeWorn ? 'wear, ' : ''}carry, bank or have on the pet, tried in every slot they fit, at most {capacity}. Give them in this order:
-            the main-hand weapon before the off hand, or the pet will not dual wield.
+            {owned.length + onPet.length} pieces you {includeWorn ? 'wear, ' : ''}carry, bank or have on the pet, tried in every slot they fit, at most {capacity}. Give them in
+            this order: the main-hand weapon before the off hand, or the pet will not dual wield.
           </p>
           <div className="row" style={{ gap: 18, flexWrap: 'wrap', marginTop: 4 }}>
             {gain > 0.5 ? (

@@ -51,7 +51,6 @@ export interface SpellEffect {
   max?: number
 }
 
-
 export interface RankedSpell {
   spell: Spell
   /** The rank numeral, which is also the number of upgrade tiers. 0 for an unranked spell. */
@@ -98,15 +97,26 @@ class EffectReader {
 const RESISTS: ResistType[] = ['none', 'magic', 'fire', 'cold', 'poison', 'disease', 'chromatic', 'prismatic', 'physical', 'corruption']
 
 const ROMAN: Record<string, number> = {
-  I: 1, II: 2, III: 3, IV: 4, V: 5, VI: 6, VII: 7, VIII: 8, IX: 9, X: 10,
-  XI: 11, XII: 12, XIII: 13, XIV: 14, XV: 15
+  I: 1,
+  II: 2,
+  III: 3,
+  IV: 4,
+  V: 5,
+  VI: 6,
+  VII: 7,
+  VIII: 8,
+  IX: 9,
+  X: 10,
+  XI: 11,
+  XII: 12,
+  XIII: 13,
+  XIV: 14,
+  XV: 15
 }
 const RANK_SUFFIX = /^(.*?) (?:Rk\. )?(I|II|III|IV|V|VI|VII|VIII|IX|X|XI|XII|XIII|XIV|XV)$/
 
-
 export function categorize(beneficial: boolean, hasDuration: boolean, effects: SpellEffect[]): SpellCategory {
-  const has = (spa: number, sign?: 1 | -1) =>
-    effects.some((e) => e.spa === spa && (sign === undefined || Math.sign(e.base) === sign))
+  const has = (spa: number, sign?: 1 | -1) => effects.some((e) => e.spa === spa && (sign === undefined || Math.sign(e.base) === sign))
   if (beneficial) {
     if (!hasDuration) return 'heal'
     return has(SPA.HEAL_OVER_TIME) || has(SPA.HP, 1) ? 'hot' : 'buff'
@@ -123,10 +133,7 @@ export class SpellBook {
   private readonly byName = new Map<string, Spell>()
 
   static async load(installDir: string): Promise<SpellBook> {
-    const [spells, strings] = await Promise.all([
-      fs.readFile(join(installDir, 'spells_us.txt')),
-      fs.readFile(join(installDir, 'spells_us_str.txt'))
-    ])
+    const [spells, strings] = await Promise.all([fs.readFile(join(installDir, 'spells_us.txt')), fs.readFile(join(installDir, 'spells_us_str.txt'))])
     return SpellBook.parse(decodeCp1252(spells), decodeCp1252(strings))
   }
 
@@ -145,7 +152,7 @@ export class SpellBook {
     const f: string[] = []
     let effectsLast: boolean | null = null
     const text = spellsText
-    for (let lineStart = 0; lineStart < text.length; ) {
+    for (let lineStart = 0; lineStart < text.length;) {
       let lineEnd = text.indexOf('\n', lineStart)
       if (lineEnd < 0) lineEnd = text.length
       const next = lineEnd + 1

@@ -11,7 +11,10 @@ export function releaseNotes(changelog, version) {
   const start = lines.findIndex((l) => l === heading || l.startsWith(`${heading} `))
   if (start < 0) return null
   const end = lines.findIndex((l, i) => i > start && l.startsWith('## '))
-  const body = lines.slice(start + 1, end < 0 ? undefined : end).join('\n').trim()
+  const body = lines
+    .slice(start + 1, end < 0 ? undefined : end)
+    .join('\n')
+    .trim()
   // Sections inside a version are ### in the changelog and ## on the release page.
   return body ? body.replace(/^###/gm, '##') : null
 }

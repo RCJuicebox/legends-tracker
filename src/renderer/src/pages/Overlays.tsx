@@ -18,7 +18,6 @@ function bringOnScreen(o: OverlayConfig): Partial<OverlayConfig> {
 /** The opacity slider saves once it stops moving for this long; the overlay follows it at once. */
 const SLIDER_SAVE_MS = 150
 
-
 function MeterOptions({ o, onChange }: { o: OverlayConfig; onChange: (m: Partial<MeterOverlayOptions>) => void }) {
   const m = { ...DEFAULT_METER_OPTIONS, ...o.meter }
   return (
@@ -58,7 +57,9 @@ function MeterOptions({ o, onChange }: { o: OverlayConfig; onChange: (m: Partial
         <input type="checkbox" checked={m.header} onChange={(e) => onChange({ header: e.target.checked })} />
         Header with the fight name and controls
       </label>
-      <p className="faint small m-0">Hover the header over the game for its controls: fight or session, what it lists, whose rows, a new session, and a pin to unlock the rows for clicking.</p>
+      <p className="faint small m-0">
+        Hover the header over the game for its controls: fight or session, what it lists, whose rows, a new session, and a pin to unlock the rows for clicking.
+      </p>
     </>
   )
 }
@@ -75,8 +76,8 @@ export function Overlays() {
         <div>
           <h1>Overlays</h1>
           <p>
-            Transparent windows over the game. They let clicks through and never take focus, so they never cost you a keypress
-            mid-fight. The game must run in windowed or borderless mode for them to show over it.
+            Transparent windows over the game. They let clicks through and never take focus, so they never cost you a keypress mid-fight. The game must run in windowed or
+            borderless mode for them to show over it.
           </p>
         </div>
         <div className="actions">
@@ -90,12 +91,16 @@ export function Overlays() {
       </div>
 
       <div className="card row mb-16">
-        <Switch on={state.settings.overlaysOnlyWithGame} label="Only show overlays while the game has focus" onChange={(v) => patchSettings((s) => ({ ...s, overlaysOnlyWithGame: v }))} />
+        <Switch
+          on={state.settings.overlaysOnlyWithGame}
+          label="Only show overlays while the game has focus"
+          onChange={(v) => patchSettings((s) => ({ ...s, overlaysOnlyWithGame: v }))}
+        />
         <div className="grow">
           <div style={{ fontWeight: 600 }}>Only show overlays while the game has focus</div>
           <div className="muted small">
-            They hide when you tab to anything else and come back as soon as the game is in front. They also show while this
-            window has focus, so arranging and the demo still work. Audio cues play either way.
+            They hide when you tab to anything else and come back as soon as the game is in front. They also show while this window has focus, so arranging and the demo still work.
+            Audio cues play either way.
           </div>
         </div>
       </div>
@@ -163,7 +168,20 @@ export function Overlays() {
                 ...s,
                 overlays: [
                   ...s.overlays,
-                  { id: `meter-${Date.now()}`, name: 'Meter', kind: 'meter', x: 440, y: 560, width: 380, height: 300, opacity: 1, fontSize: 13, visible: true, groupByTarget: false, meter: { ...DEFAULT_METER_OPTIONS } }
+                  {
+                    id: `meter-${Date.now()}`,
+                    name: 'Meter',
+                    kind: 'meter',
+                    x: 440,
+                    y: 560,
+                    width: 380,
+                    height: 300,
+                    opacity: 1,
+                    fontSize: 13,
+                    visible: true,
+                    groupByTarget: false,
+                    meter: { ...DEFAULT_METER_OPTIONS }
+                  }
                 ]
               }))
             }
@@ -180,7 +198,19 @@ export function Overlays() {
                 ...s,
                 overlays: [
                   ...s.overlays,
-                  { id: `timers-${Date.now()}`, name: 'Extra timers', kind: 'timers', x: 200, y: 200, width: 320, height: 300, opacity: 1, fontSize: 15, visible: true, groupByTarget: false }
+                  {
+                    id: `timers-${Date.now()}`,
+                    name: 'Extra timers',
+                    kind: 'timers',
+                    x: 200,
+                    y: 200,
+                    width: 320,
+                    height: 300,
+                    opacity: 1,
+                    fontSize: 15,
+                    visible: true,
+                    groupByTarget: false
+                  }
                 ]
               }))
             }

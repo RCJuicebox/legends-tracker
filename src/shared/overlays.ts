@@ -16,7 +16,17 @@ export const DEFAULT_OVERLAYS: OverlayConfig[] = [
   { id: OVERLAY_TARGETS, name: 'DoTs & Timers', kind: 'timers', x: 2400, y: 420, width: 340, height: 520, opacity: 1, fontSize: 15, visible: true, groupByTarget: true },
   { id: OVERLAY_ALERTS, name: 'Alerts', kind: 'alerts', x: 1220, y: 300, width: 1000, height: 220, opacity: 1, fontSize: 30, visible: true, groupByTarget: false },
   {
-    id: OVERLAY_METER, name: 'Damage meter', kind: 'meter', x: 40, y: 560, width: 380, height: 300, opacity: 1, fontSize: 13, visible: true, groupByTarget: false,
+    id: OVERLAY_METER,
+    name: 'Damage meter',
+    kind: 'meter',
+    x: 40,
+    y: 560,
+    width: 380,
+    height: 300,
+    opacity: 1,
+    fontSize: 13,
+    visible: true,
+    groupByTarget: false,
     meter: { ...DEFAULT_METER_OPTIONS }
   },
   { id: OVERLAY_RESPAWNS, name: 'Respawns', kind: 'timers', x: 2040, y: 960, width: 340, height: 260, opacity: 1, fontSize: 15, visible: true, groupByTarget: false }

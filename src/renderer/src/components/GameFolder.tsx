@@ -119,9 +119,8 @@ export function GameFolderPrompt() {
   return (
     <div className="notice bad stack gap-8 mb-16">
       <div>
-        <b>{s.installDir ? `No EverQuest Legends game files in ${s.installDir}.` : 'Could not find your EverQuest Legends folder.'}</b> The tracker reads
-        your logs, spell data, inventory and achievement files from it. Point it at the folder the game is installed in, usually
-        …\Daybreak Game Company\Installed Games\EverQuest Legends.
+        <b>{s.installDir ? `No EverQuest Legends game files in ${s.installDir}.` : 'Could not find your EverQuest Legends folder.'}</b> The tracker reads your logs, spell data,
+        inventory and achievement files from it. Point it at the folder the game is installed in, usually …\Daybreak Game Company\Installed Games\EverQuest Legends.
       </div>
       <div className="row">
         <button className="btn primary" onClick={() => void choose()}>

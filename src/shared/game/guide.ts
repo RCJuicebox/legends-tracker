@@ -51,7 +51,14 @@ export const RANK_BONUS: Record<SpellCategory, RankBonus> = {
  * only 6–8% (Spell window 0:48 with the ring off, 9 ticks in the log with it on), so it is set to 7%.
  */
 export const DEFAULT_TIER_DURATION_PCT: Record<SpellCategory, number> = {
-  nuke: 0, dot: 5, heal: 0, hot: 7, debuff: 10, charm: 10, mez: 10, buff: 10
+  nuke: 0,
+  dot: 5,
+  heal: 0,
+  hot: 7,
+  debuff: 10,
+  charm: 10,
+  mez: 10,
+  buff: 10
 }
 
 /** The same for every category, per rank. */

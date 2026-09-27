@@ -13,8 +13,27 @@ const fx = (spa: number, base: number, base2 = 0): SpellEffect => ({ spa, base, 
 /** A spell row as the game's spell file has it; classLevels by classic class number - 1 (4 = SK, 9 = SHM). */
 function spell(id: number, name: string, o: Partial<Spell> = {}): Spell {
   return {
-    id, name, castMs: 3000, recastMs: 0, mana: 100, formula: 0, cap: 0, beneficial: false, classLevels: Array(16).fill(255), targetType: 5, skill: 24, icon: 0, resist: 'magic', range: 200, aeRange: 0,
-    effects: [], category: 'nuke', landSelf: '', landOther: '', fade: '', ...o
+    id,
+    name,
+    castMs: 3000,
+    recastMs: 0,
+    mana: 100,
+    formula: 0,
+    cap: 0,
+    beneficial: false,
+    classLevels: Array(16).fill(255),
+    targetType: 5,
+    skill: 24,
+    icon: 0,
+    resist: 'magic',
+    range: 200,
+    aeRange: 0,
+    effects: [],
+    category: 'nuke',
+    landSelf: '',
+    landOther: '',
+    fade: '',
+    ...o
   }
 }
 const at = (levels: Record<number, number>) => Array.from({ length: 16 }, (_, i) => levels[i] ?? 255)
@@ -25,9 +44,7 @@ const EE = (id: number, name: string, cap: number) =>
 const ee2 = focusSpec(EE(2334, 'Extended Enhancement II', 44))!
 const ee3 = focusSpec(EE(2335, 'Extended Enhancement III', 60))!
 const tavee = focusSpec(EE(2219, "Tavee's Greater Diuturnity", 60))!
-const dmg2 = focusSpec(
-  spell(2337, 'Improved Damage II', { effects: [fx(124, 1, 20), fx(134, 44, 5), fx(137, 0), fx(141, 1), fx(138, 0), fx(136, -2), fx(136, -4), fx(311, 0)] })
-)!
+const dmg2 = focusSpec(spell(2337, 'Improved Damage II', { effects: [fx(124, 1, 20), fx(134, 44, 5), fx(137, 0), fx(141, 1), fx(138, 0), fx(136, -2), fx(136, -4), fx(311, 0)] }))!
 
 // The character's spells: a level-50 SHM buff that lasts, a level-49 SK nuke, a level-10 SHM buff too short for the focus.
 const puma = spell(1, 'Spirit of the Puma', { beneficial: true, formula: 3, cap: 360, targetType: 6, classLevels: at({ 9: 50 }), effects: [fx(0, 10)] })
@@ -65,7 +82,10 @@ describe('reading focus spells', () => {
     expect(spells.map((s) => s.spell.name).sort()).toEqual(['Short Buff', 'Spear of Pain', 'Spirit of the Puma'])
     const r = focusReport([ee2, ee3, tavee, dmg2], spells, ['shd', 'mnk', 'shm'], 50, { 'Spirit of the Puma': 30, 'Spear of Pain': 70, 'Wizard Nuke': 5 })
     expect(r.basis).toBe('casts')
-    expect(r.uses.map((u) => [u.name, u.share])).toEqual([['Spear of Pain', 0.7], ['Spirit of the Puma', 0.3]])
+    expect(r.uses.map((u) => [u.name, u.share])).toEqual([
+      ['Spear of Pain', 0.7],
+      ['Spirit of the Puma', 0.3]
+    ])
     const duration = r.lines.find((l) => l.kind === 'duration')!
     expect(duration).toMatchObject({ spells: 1, share: 0.3, families: ['Extended Enhancement', "Tavee's Diuturnity"] })
     expect(r.foci['Extended Enhancement II']).toMatchObject({ eff: 10.5, on: { 'Spirit of the Puma': 10.5 } })
@@ -159,7 +179,9 @@ describe('Any slots and focus effects in the finder and the optimizer', () => {
 
   it('moves owned pieces into the Any slots when the stats and foci are worth it', () => {
     const inv = parseInventory(
-      ['Location\tName\tID\tCount\tSlots', 'Any Slot\tTiny Charm\t4\t1\t10', 'Waist\tPlain Belt\t1\t1\t10', 'Bank1\tDrakescale Belt\t2\t1\t10', 'Bank2\tBig Shield\t3\t1\t10'].join('\n')
+      ['Location\tName\tID\tCount\tSlots', 'Any Slot\tTiny Charm\t4\t1\t10', 'Waist\tPlain Belt\t1\t1\t10', 'Bank1\tDrakescale Belt\t2\t1\t10', 'Bank2\tBig Shield\t3\t1\t10'].join(
+        '\n'
+      )
     )
     const pieces = ownedPieces(inv, (it) => {
       const c = byTitle.get(it.name.toLowerCase())

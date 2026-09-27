@@ -9,7 +9,10 @@ const page = (name: string, era: string, block: string, drops = '') =>
 
 describe('reading a wiki item page', () => {
   it('keeps the stats block, icon, era and where it drops', () => {
-    const item = parseItemPage("Engineer's Ring", page("Engineer's Ring", 'Classic', 'Slot: FINGER<br>\nAC: 20<br>\nClass: WAR SHD<br>\nRace: ALL<br>', '[[Plane of Hate]]\n\n* [[Innoruuk_(God)|Innoruuk]]'))!
+    const item = parseItemPage(
+      "Engineer's Ring",
+      page("Engineer's Ring", 'Classic', 'Slot: FINGER<br>\nAC: 20<br>\nClass: WAR SHD<br>\nRace: ALL<br>', '[[Plane of Hate]]\n\n* [[Innoruuk_(God)|Innoruuk]]')
+    )!
     expect(item).toMatchObject({ icon: 616, era: 'Classic', zones: ['Plane of Hate'], mobs: ['Innoruuk'], quest: false })
     expect(item.statsblock).toContain('AC: 20')
   })
@@ -108,7 +111,14 @@ describe('haste in the finder', () => {
 describe('race lines the wiki has wrong', () => {
   // eqlwiki gives every dwarven cultural plate piece "Race: ALL"; they are for the small races.
   const greaves: CatalogItem = {
-    title: 'Enchanted Dwarven Plate Greaves', icon: 540, focus: '', era: '', zones: [], mobs: [], quest: false, crafted: true,
+    title: 'Enchanted Dwarven Plate Greaves',
+    icon: 540,
+    focus: '',
+    era: '',
+    zones: [],
+    mobs: [],
+    quest: false,
+    crafted: true,
     statsblock: 'MAGIC ITEM<br>\nSlot: LEGS<br>\nAC: 20<br>\nClass: WAR CLR PAL SHD<br>\nRace: ALL<br>'
   }
   const who = (race: string) => ({ classes: ['shd'], race, level: 50 })

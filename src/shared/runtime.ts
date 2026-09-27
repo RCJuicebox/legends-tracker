@@ -23,9 +23,7 @@ export interface TimerView {
 }
 
 export type Notification =
-  | { kind: 'speak'; text: string; interrupt: boolean }
-  | { kind: 'sound'; file: string; volume: number }
-  | { kind: 'text'; text: string; color: string; durationSec: number }
+  { kind: 'speak'; text: string; interrupt: boolean } | { kind: 'sound'; file: string; volume: number } | { kind: 'text'; text: string; color: string; durationSec: number }
 
 export interface FeedItem {
   at: number

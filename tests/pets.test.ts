@@ -3,8 +3,17 @@ import { mkdtempSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import {
-  optimizePetGear, parsePetGuide, parseSummonPage, petMelee, petSlots, petSwing, PetGearReader, weaponDamageBonus,
-  type PetGearReading, type PetMelee, type PetPiece
+  optimizePetGear,
+  parsePetGuide,
+  parseSummonPage,
+  petMelee,
+  petSlots,
+  petSwing,
+  PetGearReader,
+  weaponDamageBonus,
+  type PetGearReading,
+  type PetMelee,
+  type PetPiece
 } from '../src/core/pets'
 import { parseLogLine } from '../src/core/logLine'
 import { parseWikiTables } from '../src/core/wikiTable'
@@ -175,7 +184,7 @@ describe('pet melee', () => {
 
   it('gives up the off hand for a two-hander', () => {
     const bare = petMelee(wolf, 36, null, null)
-    expect(bare).toBeCloseTo((11 + 30) / 28 + 0.55 * 30 / 28, 6)
+    expect(bare).toBeCloseTo((11 + 30) / 28 + (0.55 * 30) / 28, 6)
     expect(petMelee(wolf, 36, { damage: 57, delay: 43, twoHanded: true }, null)).toBeCloseTo((8 + 85.5) / 43, 6)
   })
 })
@@ -184,9 +193,37 @@ describe('pet gear optimizer', () => {
   const block = (lines: string[]) => lines.join('<br>')
   const piece = (name: string, lines: string[], from: PetPiece['from'] = 'bags', noPet = false): PetPiece => {
     const sb = block(lines)
-    return { item: { location: 'General 1', name, id: 0, count: 1, augs: [] }, from, key: name.toLowerCase(), r: restrictions(sb), stats: parseStatsBlock(sb) as ItemStats, lore: false, noPet }
+    return {
+      item: { location: 'General 1', name, id: 0, count: 1, augs: [] },
+      from,
+      key: name.toLowerCase(),
+      r: restrictions(sb),
+      stats: parseStatsBlock(sb) as ItemStats,
+      lore: false,
+      noPet
+    }
   }
-  const weights = { ac: 5, hp: 1, mana: 0, end: 0, str: 1, sta: 1, agi: 1, dex: 0, wis: 0, int: 0, cha: 0, resists: 0, haste: 10, attack: 1, hpRegen: 0, manaRegen: 0, endRegen: 0, ratio: 10, rangedRatio: 0 }
+  const weights = {
+    ac: 5,
+    hp: 1,
+    mana: 0,
+    end: 0,
+    str: 1,
+    sta: 1,
+    agi: 1,
+    dex: 0,
+    wis: 0,
+    int: 0,
+    cha: 0,
+    resists: 0,
+    haste: 10,
+    attack: 1,
+    hpRegen: 0,
+    manaRegen: 0,
+    endRegen: 0,
+    ratio: 10,
+    rangedRatio: 0
+  }
   const wearer = { classes: ['shd', 'mnk', 'shm', 'bst', 'war'], race: '', level: 36 }
   const wolf: PetMelee = { damage: 20, delay: 28, bonus: 11, dualWield: 0.55 }
 

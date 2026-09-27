@@ -7,12 +7,27 @@ import type { EffectValue } from './gearOptimizer'
 import { procOf, wornEffectOf } from './itemEffects'
 import { classCode } from '../shared/game/classes'
 
-
 /** Worn locations as the inventory export names them → the words a stats block's "Slot:" line uses. */
 export const SLOT_WORDS: Record<string, string[]> = {
-  Ear: ['EAR'], Head: ['HEAD'], Face: ['FACE'], Neck: ['NECK'], Shoulders: ['SHOULDERS', 'SHOULDER'], Arms: ['ARMS'], Back: ['BACK'],
-  Wrist: ['WRIST'], Range: ['RANGE'], Hands: ['HANDS'], Primary: ['PRIMARY'], Secondary: ['SECONDARY'], Fingers: ['FINGER', 'FINGERS'],
-  Chest: ['CHEST'], Legs: ['LEGS'], Feet: ['FEET'], Waist: ['WAIST'], Ammo: ['AMMO'], 'Any Slot': ['CHARM']
+  Ear: ['EAR'],
+  Head: ['HEAD'],
+  Face: ['FACE'],
+  Neck: ['NECK'],
+  Shoulders: ['SHOULDERS', 'SHOULDER'],
+  Arms: ['ARMS'],
+  Back: ['BACK'],
+  Wrist: ['WRIST'],
+  Range: ['RANGE'],
+  Hands: ['HANDS'],
+  Primary: ['PRIMARY'],
+  Secondary: ['SECONDARY'],
+  Fingers: ['FINGER', 'FINGERS'],
+  Chest: ['CHEST'],
+  Legs: ['LEGS'],
+  Feet: ['FEET'],
+  Waist: ['WAIST'],
+  Ammo: ['AMMO'],
+  'Any Slot': ['CHARM']
 }
 
 /** Legends' two Any slots take any piece of gear: a shield, a necklace, a charm. */
@@ -35,9 +50,26 @@ export const ERA_ORDER = ['Classic', OTHER_ERA, 'Kunark', 'Velious', 'Luclin', O
  * fallback. Anything not listed is out, as on the wiki.
  */
 export const DEFAULT_ERA_STATUS: Record<string, 'in' | 'out'> = {
-  classic: 'in', fear: 'in', hate: 'in', hole: 'in', sky: 'in', stonebrunt: 'in', temple: 'in', warrens: 'in', paineel: 'in',
-  kunark: 'out', velious: 'out', luclin: 'out', chardok: 'out', chardokrevamp: 'out', holevp: 'out', warrensfearhaterevamp: 'out',
-  fearhaterevamp: 'out', epics: 'out', epicquests: 'out', unknown: 'out'
+  classic: 'in',
+  fear: 'in',
+  hate: 'in',
+  hole: 'in',
+  sky: 'in',
+  stonebrunt: 'in',
+  temple: 'in',
+  warrens: 'in',
+  paineel: 'in',
+  kunark: 'out',
+  velious: 'out',
+  luclin: 'out',
+  chardok: 'out',
+  chardokrevamp: 'out',
+  holevp: 'out',
+  warrensfearhaterevamp: 'out',
+  fearhaterevamp: 'out',
+  epics: 'out',
+  epicquests: 'out',
+  unknown: 'out'
 }
 
 /** Reads the in/out list out of Template:PageEra's source ("| kunark = out"). */
@@ -105,11 +137,7 @@ export function zoneEras(catalog: CatalogItem[], status?: Record<string, 'in' | 
  * ingredients need (it is made only once all can be had); else the earliest group among the zones it
  * drops in (it can be had in the earliest of them). Other when none says.
  */
-export function eraOf(
-  item: CatalogItem,
-  zones: Map<string, string>,
-  status?: Record<string, 'in' | 'out'>
-): { era: string; inferred: boolean; by?: 'zone' | 'recipe' } {
+export function eraOf(item: CatalogItem, zones: Map<string, string>, status?: Record<string, 'in' | 'out'>): { era: string; inferred: boolean; by?: 'zone' | 'recipe' } {
   const own = normalizeEra(item.era, status)
   if (own) return { era: own, inferred: false }
   // Crafted: made only once every ingredient can be had, so the latest era among them.
@@ -143,12 +171,7 @@ const RE_WORDS = {
 
 export function restrictions(block: string): Restrictions {
   const text = block.replace(/<br\s*\/?>/gi, '\n').replace(/<[^>]+>/g, '')
-  const words = (label: keyof typeof RE_WORDS) =>
-    (RE_WORDS[label].exec(text)?.[1] ?? '')
-      .trim()
-      .toUpperCase()
-      .split(/\s+/)
-      .filter(Boolean)
+  const words = (label: keyof typeof RE_WORDS) => (RE_WORDS[label].exec(text)?.[1] ?? '').trim().toUpperCase().split(/\s+/).filter(Boolean)
   return {
     slots: words('Slot'),
     skill: /\bSkill:\s*([0-9A-Za-z ]+?)(?:\s{2,}|\s*Atk Delay|\s*$|\n)/m.exec(text)?.[1].trim() ?? '',
@@ -205,15 +228,48 @@ export function handWeights(swings: { main: number; off: number }): HandWeights 
 }
 
 export type WeightKey =
-  | 'ac' | 'hp' | 'mana' | 'end' | 'str' | 'sta' | 'agi' | 'dex' | 'wis' | 'int' | 'cha'
-  | 'resists' | 'haste' | 'attack' | 'hpRegen' | 'manaRegen' | 'endRegen' | 'ratio' | 'rangedRatio'
+  | 'ac'
+  | 'hp'
+  | 'mana'
+  | 'end'
+  | 'str'
+  | 'sta'
+  | 'agi'
+  | 'dex'
+  | 'wis'
+  | 'int'
+  | 'cha'
+  | 'resists'
+  | 'haste'
+  | 'attack'
+  | 'hpRegen'
+  | 'manaRegen'
+  | 'endRegen'
+  | 'ratio'
+  | 'rangedRatio'
 
 export type Weights = Record<WeightKey, number>
 
 export const WEIGHT_LABELS: Record<WeightKey, string> = {
-  ac: 'AC', hp: 'HP', mana: 'Mana', end: 'Endurance', str: 'Strength', sta: 'Stamina', agi: 'Agility', dex: 'Dexterity',
-  wis: 'Wisdom', int: 'Intelligence', cha: 'Charisma', resists: 'Resists', haste: 'Haste %', attack: 'Attack',
-  hpRegen: 'HP regen', manaRegen: 'Mana regen', endRegen: 'End regen', ratio: 'Weapon ratio', rangedRatio: 'Ranged ratio'
+  ac: 'AC',
+  hp: 'HP',
+  mana: 'Mana',
+  end: 'Endurance',
+  str: 'Strength',
+  sta: 'Stamina',
+  agi: 'Agility',
+  dex: 'Dexterity',
+  wis: 'Wisdom',
+  int: 'Intelligence',
+  cha: 'Charisma',
+  resists: 'Resists',
+  haste: 'Haste %',
+  attack: 'Attack',
+  hpRegen: 'HP regen',
+  manaRegen: 'Mana regen',
+  endRegen: 'End regen',
+  ratio: 'Weapon ratio',
+  rangedRatio: 'Ranged ratio'
 }
 
 /** An item's stats as the weights read them. */
@@ -352,7 +408,11 @@ function parseCatalog(catalog: CatalogItem[], eraStatus: FinderOptions['eraStatu
   const items = hit
     ? hit.items.map((p) => ({ ...p, ...eraOf(p.item, zones, eraStatus) }))
     : catalog.map((item) => ({
-        item, r: restrictions(item.statsblock), base: parseStatsBlock(item.statsblock), worn: wornEffectOf(item.statsblock), proc: procOf(item.statsblock),
+        item,
+        r: restrictions(item.statsblock),
+        base: parseStatsBlock(item.statsblock),
+        worn: wornEffectOf(item.statsblock),
+        proc: procOf(item.statsblock),
         ...eraOf(item, zones, eraStatus)
       }))
   parsedCatalogs.set(catalog, { status: eraStatus, items })
@@ -370,8 +430,7 @@ export function findUpgrades(o: FinderOptions): SlotResult[] {
   // The foci worn now, item by item, and what they are worth together.
   const wornFoci = o.worn.map((w) => o.focus?.worn(w) ?? [])
   const focusNow = o.focus ? o.focus.value(wornFoci.flat()) : 0
-  const focusWithout = (item: InvItem | undefined, add: string[] = []) =>
-    o.focus ? o.focus.value([...wornFoci.filter((_, i) => o.worn[i] !== item).flat(), ...add]) : 0
+  const focusWithout = (item: InvItem | undefined, add: string[] = []) => (o.focus ? o.focus.value([...wornFoci.filter((_, i) => o.worn[i] !== item).flat(), ...add]) : 0)
   // Haste does not add up: only the best worn counts. Items are scored without it, and haste is
   // counted as what the best worn one gives, so a second haste item is worth only what it adds.
   const wornHaste = o.worn.map((w) => o.statsOf(w)?.haste ?? 0)

@@ -6,8 +6,14 @@ import { act, showError, showUndo } from '../toast'
 import { who } from '../../../core/format'
 import { CategoryChip, ConfirmButton, Field, FilterBox, Info, LoadError, NumberInput, SpellIcon, Switch } from '../components/ui'
 import {
-  CATEGORY_LABELS, DEFAULT_TIER_DURATION_PCT,
-  type ClassName, type FocusSource, type KnownSpell, type LogCheckRow, type SpellCategory, type SpellRule
+  CATEGORY_LABELS,
+  DEFAULT_TIER_DURATION_PCT,
+  type ClassName,
+  type FocusSource,
+  type KnownSpell,
+  type LogCheckRow,
+  type SpellCategory,
+  type SpellRule
 } from '../../../shared/types'
 import type { PageId } from '../main'
 
@@ -28,8 +34,8 @@ export function Spells({ go }: { go?: (page: PageId) => void }) {
         <div>
           <h1>Spell Timers</h1>
           <p>
-            Durations are calculated from the game's spell data, your level, the spell's rank and your focus effects —
-            the same sum the in-game Spell window shows in brackets. Every spell you cast appears here automatically.
+            Durations are calculated from the game's spell data, your level, the spell's rank and your focus effects — the same sum the in-game Spell window shows in brackets.
+            Every spell you cast appears here automatically.
           </p>
         </div>
       </div>
@@ -45,9 +51,7 @@ export function Spells({ go }: { go?: (page: PageId) => void }) {
             <FilterBox label="Filter spells" value={filter} onChange={setFilter} width={200} />
           </h2>
           {known.length === 0 ? (
-            <div className="empty">
-              No spells yet. Cast something while watching, or add a spell below.
-            </div>
+            <div className="empty">No spells yet. Cast something while watching, or add a spell below.</div>
           ) : (
             <table className="table">
               <thead>
@@ -118,8 +122,8 @@ function CharacterCard({ go }: { go?: (page: PageId) => void }) {
         </div>
       ) : (
         <div className="notice warn mb-12">
-          No classes set, so every spell is timed as if cast at level {c.level}. Set your classes and their levels on the Stats page: a spell uses
-          the level of a class that can cast it.
+          No classes set, so every spell is timed as if cast at level {c.level}. Set your classes and their levels on the Stats page: a spell uses the level of a class that can
+          cast it.
         </div>
       )}
       <FocusSources />
@@ -151,8 +155,18 @@ function FocusSources() {
     save([
       ...c.focusSources,
       {
-        id: `custom-${Date.now().toString(36)}`, name: 'New focus', kind: 'aa', from: 'AA', pct: 10, appliesTo: 'beneficial',
-        maxLevel: 0, decayPct: 0, minTicks: 0, requireSpas: [], excludeSpas: [], enabled: true
+        id: `custom-${Date.now().toString(36)}`,
+        name: 'New focus',
+        kind: 'aa',
+        from: 'AA',
+        pct: 10,
+        appliesTo: 'beneficial',
+        maxLevel: 0,
+        decayPct: 0,
+        minTicks: 0,
+        requireSpas: [],
+        excludeSpas: [],
+        enabled: true
       }
     ])
   return (
@@ -160,8 +174,8 @@ function FocusSources() {
       <div className="field mb-8">
         <span>Duration focus effects</span>
         <div className="hint">
-          Each applies spell by spell with its own level cap: past the cap it loses its decay percentage of itself per
-          level. Only the best item focus counts; AAs add on top. Each spell's breakdown shows exactly what applied.
+          Each applies spell by spell with its own level cap: past the cap it loses its decay percentage of itself per level. Only the best item focus counts; AAs add on top. Each
+          spell's breakdown shows exactly what applied.
         </div>
       </div>
       {c.focusSources.length > 0 && (
@@ -195,7 +209,13 @@ function FocusSources() {
                   </select>
                 </td>
                 <td>
-                  <input value={f.from} placeholder="Which item?" aria-label={`${f.name} comes from`} onChange={(e) => update(f.id, { from: e.target.value })} style={{ width: 150 }} />
+                  <input
+                    value={f.from}
+                    placeholder="Which item?"
+                    aria-label={`${f.name} comes from`}
+                    onChange={(e) => update(f.id, { from: e.target.value })}
+                    style={{ width: 150 }}
+                  />
                 </td>
                 <td className="nowrap">
                   <NumberInput value={f.pct} width={64} label={`${f.name} bonus %`} onChange={(v) => update(f.id, { pct: v ?? 0 })} /> %
@@ -224,7 +244,13 @@ function FocusSources() {
         </table>
       )}
       <div className="row">
-        <input className="grow" placeholder="Add an item focus by name, e.g. Extended Enhancement II" aria-label="Add an item focus by name" value={q} onChange={(e) => setQ(e.target.value)} />
+        <input
+          className="grow"
+          placeholder="Add an item focus by name, e.g. Extended Enhancement II"
+          aria-label="Add an item focus by name"
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+        />
         <input placeholder="On which item? (optional)" aria-label="On which item (optional)" value={from} onChange={(e) => setFrom(e.target.value)} style={{ width: 220 }} />
         <button className="btn" onClick={addCustom}>
           Add an AA or other
@@ -300,21 +326,29 @@ function SpellRow({ k, open, toggle, onSaved }: { k: KnownSpell; open: boolean; 
             )}
           </span>
         </td>
-        <td className="mono nowrap">
-          {d.permanent ? 'Permanent' : `${clock(d.baseSec)} (${clock(d.spellWindowSec)})`}
-        </td>
+        <td className="mono nowrap">{d.permanent ? 'Permanent' : `${clock(d.baseSec)} (${clock(d.spellWindowSec)})`}</td>
         <td className="nowrap muted">{d.permanent ? '—' : `${clock(d.earliestSec)}–${clock(d.latestSec)}`}</td>
         <td>
           <span className={`chip${k.rule.track === false ? ' bad' : k.rule.track ? ' ok' : ''}`}>{trackLabel(k.rule)}</span>
         </td>
         <td onClick={(e) => e.stopPropagation()}>
           <span className="row tight nowrap">
-            <Switch on={k.rule.recastCue !== false} title="Recast warning" label={`Recast warning for ${k.rankedName}`} onChange={(v) => void setCue(k, { recastCue: v ? undefined : false }, onSaved)} />
+            <Switch
+              on={k.rule.recastCue !== false}
+              title="Recast warning"
+              label={`Recast warning for ${k.rankedName}`}
+              onChange={(v) => void setCue(k, { recastCue: v ? undefined : false }, onSaved)}
+            />
             {k.rule.recastCue !== false && <span className="faint small">{k.rule.warnSec !== undefined ? `${k.rule.warnSec}s` : 'default'}</span>}
           </span>
         </td>
         <td onClick={(e) => e.stopPropagation()}>
-          <Switch on={k.rule.fadeCue !== false} title="Fade announcement" label={`Fade announcement for ${k.rankedName}`} onChange={(v) => void setCue(k, { fadeCue: v ? undefined : false }, onSaved)} />
+          <Switch
+            on={k.rule.fadeCue !== false}
+            title="Fade announcement"
+            label={`Fade announcement for ${k.rankedName}`}
+            onChange={(v) => void setCue(k, { fadeCue: v ? undefined : false }, onSaved)}
+          />
         </td>
         <td className="faint small nowrap">{k.lastCast ? ago(k.lastCast) : 'rule only'}</td>
       </tr>
@@ -383,7 +417,12 @@ function RuleEditor({ k, onSaved }: { k: KnownSpell; onSaved: (list: KnownSpell[
         </ol>
         <div className="small faint" style={{ lineHeight: 1.6 }}>
           {k.landSelf && <div>Lands on you: “{k.landSelf}”</div>}
-          {k.landOther && <div>Lands on others: “<i>Name</i>{k.landOther}”</div>}
+          {k.landOther && (
+            <div>
+              Lands on others: “<i>Name</i>
+              {k.landOther}”
+            </div>
+          )}
           {k.fade && <div>Fades: “{k.fade}”</div>}
         </div>
       </div>
@@ -423,10 +462,18 @@ function RuleEditor({ k, onSaved }: { k: KnownSpell; onSaved: (list: KnownSpell[
             </select>
           </Field>
           <Field label="Warning speech" hint="{spell} and {target} are filled in.">
-            <input value={rule.warnSpeech ?? ''} placeholder={beneficial ? t.buffWarnSpeech : t.dotWarnSpeech} onChange={(e) => set({ warnSpeech: e.target.value === '' ? undefined : e.target.value })} />
+            <input
+              value={rule.warnSpeech ?? ''}
+              placeholder={beneficial ? t.buffWarnSpeech : t.dotWarnSpeech}
+              onChange={(e) => set({ warnSpeech: e.target.value === '' ? undefined : e.target.value })}
+            />
           </Field>
           <Field label="Fade speech" hint="Leave blank for the default.">
-            <input value={rule.fadeSpeech ?? ''} placeholder={beneficial ? t.buffFadeSpeech : t.dotFadeSpeech} onChange={(e) => set({ fadeSpeech: e.target.value === '' ? undefined : e.target.value })} />
+            <input
+              value={rule.fadeSpeech ?? ''}
+              placeholder={beneficial ? t.buffFadeSpeech : t.dotFadeSpeech}
+              onChange={(e) => set({ fadeSpeech: e.target.value === '' ? undefined : e.target.value })}
+            />
           </Field>
           <Field label="Extra focus for this spell" hint="Percent, added to your character focus (e.g. an item that only extends this line).">
             <NumberInput value={rule.extraFocusPct} placeholder="0" onChange={(v) => set({ extraFocusPct: v })} />
@@ -449,7 +496,15 @@ function RuleEditor({ k, onSaved }: { k: KnownSpell; onSaved: (list: KnownSpell[
           <button className="btn primary" onClick={() => void save(rule)}>
             Save
           </button>
-          <button className="btn" onClick={() => void act('audio:test', (rule.warnSpeech ?? (beneficial ? t.buffWarnSpeech : t.dotWarnSpeech)).replace(/\{spell\}/gi, rule.alias || k.name).replace(/\{target\}/gi, 'a gnoll'))}>
+          <button
+            className="btn"
+            onClick={() =>
+              void act(
+                'audio:test',
+                (rule.warnSpeech ?? (beneficial ? t.buffWarnSpeech : t.dotWarnSpeech)).replace(/\{spell\}/gi, rule.alias || k.name).replace(/\{target\}/gi, 'a gnoll')
+              )
+            }
+          >
             Hear warning
           </button>
           <span className="grow" />
@@ -474,19 +529,29 @@ function AddSpell({ onAdded }: { onAdded: (list: KnownSpell[]) => void }) {
   return (
     <div className="mt-14">
       <div className="row">
-        <input placeholder="Add a spell you haven't cast yet — search the spell book…" aria-label="Add a spell: search the spell book" value={q} onChange={(e) => setQ(e.target.value)} style={{ flex: 1 }} />
+        <input
+          placeholder="Add a spell you haven't cast yet — search the spell book…"
+          aria-label="Add a spell: search the spell book"
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+          style={{ flex: 1 }}
+        />
       </div>
       {withDuration.length > 0 && (
         <div className="stack" style={{ gap: 2, marginTop: 8, maxHeight: 260, overflow: 'auto' }}>
           {withDuration.map((r) => (
-            <button key={r.id} className="tree-item" onClick={async () => {
-              try {
-                onAdded(await api.invoke('spells:rule', r.name, { track: true }))
-                setQ('')
-              } catch (e) {
-                showError(`Could not add ${r.name}`, e)
-              }
-            }}>
+            <button
+              key={r.id}
+              className="tree-item"
+              onClick={async () => {
+                try {
+                  onAdded(await api.invoke('spells:rule', r.name, { track: true }))
+                  setQ('')
+                } catch (e) {
+                  showError(`Could not add ${r.name}`, e)
+                }
+              }}
+            >
               <SpellIcon icon={r.icon} />
               <span className="name">{r.name}</span>
               <CategoryChip category={r.category} />
@@ -546,9 +611,8 @@ function LogCheck({ known, onSaved }: { known: KnownSpell[]; onSaved: (k: KnownS
         </button>
       </h2>
       <p className="muted small mt-0">
-        A diagnostic, not a data source: replays recent history and compares each spell's real landing-to-fade time with
-        the calculation. A mismatch usually means a focus effect missing from, or wrongly set in, the list above;
-        the row shows the total focus that spell would need.
+        A diagnostic, not a data source: replays recent history and compares each spell's real landing-to-fade time with the calculation. A mismatch usually means a focus effect
+        missing from, or wrongly set in, the list above; the row shows the total focus that spell would need.
       </p>
       {error && (
         <div className="notice bad" role="alert">
@@ -590,7 +654,10 @@ function LogCheck({ known, onSaved }: { known: KnownSpell[]; onSaved: (k: KnownS
                       </span>
                       {r.impliedFocusPct !== null &&
                         (added[r.rankedName] !== undefined ? (
-                          <span className="chip ok">Extra focus set: {added[r.rankedName] > 0 ? '+' : ''}{added[r.rankedName]}%</span>
+                          <span className="chip ok">
+                            Extra focus set: {added[r.rankedName] > 0 ? '+' : ''}
+                            {added[r.rankedName]}%
+                          </span>
                         ) : (
                           <button
                             className="btn small"
@@ -615,7 +682,7 @@ function LogCheck({ known, onSaved }: { known: KnownSpell[]; onSaved: (k: KnownS
 function TierTable() {
   const { state, patchSettings } = useApp()
   const pct = state.settings.tracking.tierDurationPct
-  const cats = (['dot', 'hot', 'buff', 'debuff', 'mez', 'charm'] as SpellCategory[])
+  const cats = ['dot', 'hot', 'buff', 'debuff', 'mez', 'charm'] as SpellCategory[]
   return (
     <div className="card">
       <h2>
@@ -625,9 +692,8 @@ function TierTable() {
         </button>
       </h2>
       <p className="muted small mt-0">
-        Duration bonus per rank, from the EQL spell upgrade guide: rank X is ten tiers, an unranked spell none. Confirmed
-        in game for DoTs (Envenomed Bolt X 0:36 → 0:54) and buffs (Spirit of the Puma X). Heal over time is fitted
-        rather than from the guide: 7% matches Slugs Healing V's Spell window and log, where the guide's 5% does not.
+        Duration bonus per rank, from the EQL spell upgrade guide: rank X is ten tiers, an unranked spell none. Confirmed in game for DoTs (Envenomed Bolt X 0:36 → 0:54) and buffs
+        (Spirit of the Puma X). Heal over time is fitted rather than from the guide: 7% matches Slugs Healing V's Spell window and log, where the guide's 5% does not.
       </p>
       <div className="grid three">
         {cats.map((c) => (
@@ -646,4 +712,3 @@ function TierTable() {
     </div>
   )
 }
-

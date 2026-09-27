@@ -7,9 +7,34 @@ import { useInvoke } from '../hooks'
 import { ConfirmButton, Icon, Info, Segmented } from './ui'
 import { EntityBar, HealBar, HEAL_COLOR, KIND_COLOR, PROC_COLOR, PROC_HINT, PROC_WORD, SkillBar, kindTag } from './MeterBars'
 import {
-  attackerRows, attackerSkillRows, copyText, damageRows, defenseOf, durationSec, fmtClock, fmtNum, fmtPct, fmtRate,
-  healSpellRows, healTargetRows, healTotals, healedRows, healerRows, MIN_PROC_ACTIVE_SEC, procAmount, procRows, procSummary, procText, rolling, skillRows, sourcesFor, takenRows, targetRows, totalsOf,
-  type HealRow, type Row
+  attackerRows,
+  attackerSkillRows,
+  copyText,
+  damageRows,
+  defenseOf,
+  durationSec,
+  fmtClock,
+  fmtNum,
+  fmtPct,
+  fmtRate,
+  healSpellRows,
+  healTargetRows,
+  healTotals,
+  healedRows,
+  healerRows,
+  MIN_PROC_ACTIVE_SEC,
+  procAmount,
+  procRows,
+  procSummary,
+  procText,
+  rolling,
+  skillRows,
+  sourcesFor,
+  takenRows,
+  targetRows,
+  totalsOf,
+  type HealRow,
+  type Row
 } from '../../../core/combatView'
 import type { CombatSnapshot, Defense, MeterMode, MeterScope, MeterSpan, Segment, SegmentSummary } from '../../../shared/types'
 
@@ -33,7 +58,19 @@ function when(t: number): string {
   return new Date(t).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
 }
 
-function SegmentPicker({ list, span, selection, onChange, live }: { list: SegmentSummary[]; span: MeterSpan; selection: string; onChange: (id: string) => void; live: Segment | null }) {
+function SegmentPicker({
+  list,
+  span,
+  selection,
+  onChange,
+  live
+}: {
+  list: SegmentSummary[]
+  span: MeterSpan
+  selection: string
+  onChange: (id: string) => void
+  live: Segment | null
+}) {
   const liveLabel = span === 'fight' ? (live ? 'Live fight' : list[0] ? 'Last fight' : 'No fights yet') : 'Current session'
   return (
     <select className="dm-pick" value={selection} onChange={(e) => onChange(e.target.value)} aria-label={span === 'fight' ? 'Which fight' : 'Which session'}>
@@ -103,7 +140,11 @@ export function Meter({ standalone = false }: { standalone?: boolean }) {
           </h2>
         )}
         <span className="spacer" />
-        <button className="btn small" onClick={() => void actDone('New session started.', 'combat:newSession')} title="Close the current session and start a new one counting from now">
+        <button
+          className="btn small"
+          onClick={() => void actDone('New session started.', 'combat:newSession')}
+          title="Close the current session and start a new one counting from now"
+        >
           <Icon name="flag" /> New session
         </button>
         <button className="btn small" onClick={copy} disabled={!seg} title="Copy this list as text, for chat or a note">
@@ -111,7 +152,15 @@ export function Meter({ standalone = false }: { standalone?: boolean }) {
         </button>
       </div>
       <div className="dm-controls">
-        <Segmented value={span} options={[['fight', 'Fight'], ['session', 'Overall']]} onChange={setSpan} label="Fight or session" />
+        <Segmented
+          value={span}
+          options={[
+            ['fight', 'Fight'],
+            ['session', 'Overall']
+          ]}
+          onChange={setSpan}
+          label="Fight or session"
+        />
         <SegmentPicker list={list} span={span} selection={selection} onChange={setSelection} live={live} />
         {span === 'fight' && list.length > 1 && (
           <select className="dm-pick" value={compareId} onChange={(e) => setCompareId(e.target.value)} aria-label="Compare with another fight">
@@ -133,7 +182,11 @@ export function Meter({ standalone = false }: { standalone?: boolean }) {
           Pets with owners
         </label>
         <label className="check small">
-          <input type="checkbox" checked={state.settings.combat.charmPets} onChange={(e) => patchSettings((s) => ({ ...s, combat: { ...s.combat, charmPets: e.target.checked } }))} />
+          <input
+            type="checkbox"
+            checked={state.settings.combat.charmPets}
+            onChange={(e) => patchSettings((s) => ({ ...s, combat: { ...s.combat, charmPets: e.target.checked } }))}
+          />
           Charm pets
           <Info
             label="About charm pets"
@@ -148,29 +201,33 @@ export function Meter({ standalone = false }: { standalone?: boolean }) {
       {scope === 'group' && snap && <Roster snap={snap} />}
 
       {!seg ? (
-        <div className="empty">{snap?.reading ? 'Reading recent fights from the log…' : 'No fights yet. Hit something while watching and it appears here, with the last hour read from the log at start.'}</div>
+        <div className="empty">
+          {snap?.reading
+            ? 'Reading recent fights from the log…'
+            : 'No fights yet. Hit something while watching and it appears here, with the last hour read from the log at start.'}
+        </div>
       ) : (
         <>
           <Headline seg={seg} name={name} mode={mode} head={head!} active={active} />
           {compareId && compareId !== seg.id ? (
             <ComparePane seg={seg} name={name} otherId={compareId} mode={mode} scope={scope} combinePet={combinePet} active={active} close={() => setCompareId('')} />
           ) : (
-          <div className="dm-body">
-            <div className="dm-main">
-              {!drill && rows.length > 0 && <p className="hint">Click a row to see what it did, skill by skill.</p>}
-              {mode === 'damage' && <DamagePane seg={seg} rows={rows as Row[]} drill={drill} setDrill={setDrill} active={active} scope={scope} />}
-              {mode === 'incoming' && <IncomingPane seg={seg} rows={rows as Row[]} drill={drill} setDrill={setDrill} scope={scope} active={active} />}
-              {mode === 'healing' && <HealingPane seg={seg} rows={rows as HealRow[]} drill={drill} setDrill={setDrill} />}
+            <div className="dm-body">
+              <div className="dm-main">
+                {!drill && rows.length > 0 && <p className="hint">Click a row to see what it did, skill by skill.</p>}
+                {mode === 'damage' && <DamagePane seg={seg} rows={rows as Row[]} drill={drill} setDrill={setDrill} active={active} scope={scope} />}
+                {mode === 'incoming' && <IncomingPane seg={seg} rows={rows as Row[]} drill={drill} setDrill={setDrill} scope={scope} active={active} />}
+                {mode === 'healing' && <HealingPane seg={seg} rows={rows as HealRow[]} drill={drill} setDrill={setDrill} />}
+              </div>
+              <div className="dm-side">
+                {mode === 'damage' && <TargetsCard seg={seg} scope={scope} drill={drill} setDrill={setDrill} />}
+                {mode !== 'incoming' && <ProcsCard seg={seg} scope={scope} name={name} />}
+                {mode === 'incoming' && <DefenseCard d={defenseOf(seg, scope)} scope={scope} />}
+                {mode === 'incoming' && <TakenCard seg={seg} scope={scope} />}
+                {mode === 'healing' && <HealedCard seg={seg} scope={scope} />}
+                {mode !== 'healing' && <DpsChart seg={seg} />}
+              </div>
             </div>
-            <div className="dm-side">
-              {mode === 'damage' && <TargetsCard seg={seg} scope={scope} drill={drill} setDrill={setDrill} />}
-              {mode !== 'incoming' && <ProcsCard seg={seg} scope={scope} name={name} />}
-              {mode === 'incoming' && <DefenseCard d={defenseOf(seg, scope)} scope={scope} />}
-              {mode === 'incoming' && <TakenCard seg={seg} scope={scope} />}
-              {mode === 'healing' && <HealedCard seg={seg} scope={scope} />}
-              {mode !== 'healing' && <DpsChart seg={seg} />}
-            </div>
-          </div>
           )}
         </>
       )}
@@ -236,8 +293,24 @@ function comparable(seg: Segment, mode: MeterMode, scope: MeterScope, combinePet
 }
 
 /** Two fights side by side: everyone in either, their rate and total in each, and the change. */
-function ComparePane({ seg, name, otherId, mode, scope, combinePet, active, close }: {
-  seg: Segment; name: string; otherId: string; mode: MeterMode; scope: MeterScope; combinePet: boolean; active: boolean; close: () => void
+function ComparePane({
+  seg,
+  name,
+  otherId,
+  mode,
+  scope,
+  combinePet,
+  active,
+  close
+}: {
+  seg: Segment
+  name: string
+  otherId: string
+  mode: MeterMode
+  scope: MeterScope
+  combinePet: boolean
+  active: boolean
+  close: () => void
 }) {
   const other = useInvoke('combat:segment', [otherId], [otherId]).data
   const rows = useMemo(() => {
@@ -277,7 +350,9 @@ function ComparePane({ seg, name, otherId, mode, scope, combinePet, active, clos
             <th>Who</th>
             <th className="num">This fight</th>
             <th className="num">The other</th>
-            <th className="num" title={`The change in ${unit} from the other fight to this one`}>Change</th>
+            <th className="num" title={`The change in ${unit} from the other fight to this one`}>
+              Change
+            </th>
           </tr>
         </thead>
         <tbody>
@@ -352,7 +427,11 @@ function DamagePane({ seg, rows, drill, setDrill, active, scope }: { seg: Segmen
       <>
         <Crumb text={`${drill.name} · back to everyone`} back={() => setDrill(null)} />
         {row && <EntityStats row={row} />}
-        {!skills.length && <div className="empty">Nothing from {drill.name} in this {seg.kind}.</div>}
+        {!skills.length && (
+          <div className="empty">
+            Nothing from {drill.name} in this {seg.kind}.
+          </div>
+        )}
         {skills.map((s, i) => (
           <SkillBar key={s.key} s={s} rank={i + 1} onClick={s.how === 'pet' ? () => setDrill({ kind: 'entity', key: s.key.slice(2), name: s.name }) : undefined} />
         ))}
@@ -362,7 +441,11 @@ function DamagePane({ seg, rows, drill, setDrill, active, scope }: { seg: Segmen
   return (
     <>
       {drill?.kind === 'target' && <Crumb text={`Damage to ${drill.name} · back to all targets`} back={() => setDrill(null)} />}
-      {!rows.length && <div className="empty">No damage dealt {scope === 'you' ? 'by you' : scope === 'group' ? 'by your group' : ''} in this {seg.kind} yet.</div>}
+      {!rows.length && (
+        <div className="empty">
+          No damage dealt {scope === 'you' ? 'by you' : scope === 'group' ? 'by your group' : ''} in this {seg.kind} yet.
+        </div>
+      )}
       {rows.map((r, i) => (
         <EntityBar key={r.key} r={r} rank={i + 1} activeDps={active} onClick={() => setDrill({ kind: 'entity', key: r.key, name: r.name })} />
       ))}
@@ -370,7 +453,21 @@ function DamagePane({ seg, rows, drill, setDrill, active, scope }: { seg: Segmen
   )
 }
 
-function IncomingPane({ seg, rows, drill, setDrill, scope, active }: { seg: Segment; rows: Row[]; drill: Drill; setDrill: (d: Drill) => void; scope: MeterScope; active: boolean }) {
+function IncomingPane({
+  seg,
+  rows,
+  drill,
+  setDrill,
+  scope,
+  active
+}: {
+  seg: Segment
+  rows: Row[]
+  drill: Drill
+  setDrill: (d: Drill) => void
+  scope: MeterScope
+  active: boolean
+}) {
   if (drill?.kind === 'entity') {
     const skills = attackerSkillRows(seg, scope, drill.name)
     return (
@@ -386,7 +483,11 @@ function IncomingPane({ seg, rows, drill, setDrill, scope, active }: { seg: Segm
   const who = scope === 'you' ? 'you' : scope === 'group' ? 'your group' : 'your side'
   return (
     <>
-      {!rows.length && <div className="empty">Nothing has hit {who} in this {seg.kind}.</div>}
+      {!rows.length && (
+        <div className="empty">
+          Nothing has hit {who} in this {seg.kind}.
+        </div>
+      )}
       {rows.map((r, i) => (
         <EntityBar key={r.key} r={r} rank={i + 1} activeDps={active} onClick={() => setDrill({ kind: 'entity', key: r.key, name: r.name })} />
       ))}
@@ -431,7 +532,13 @@ function TargetsCard({ seg, scope, drill, setDrill }: { seg: Segment; scope: Met
       </div>
       {!targets.length && <div className="faint small">Nothing hit yet.</div>}
       {targets.slice(0, 12).map((t, i) => (
-        <EntityBar key={t.key} r={t} rank={i + 1} selected={drill?.kind === 'target' && drill.name === t.name} onClick={() => setDrill(drill?.kind === 'target' && drill.name === t.name ? null : { kind: 'target', name: t.name })} />
+        <EntityBar
+          key={t.key}
+          r={t}
+          rank={i + 1}
+          selected={drill?.kind === 'target' && drill.name === t.name}
+          onClick={() => setDrill(drill?.kind === 'target' && drill.name === t.name ? null : { kind: 'target', name: t.name })}
+        />
       ))}
       {targets.length > 12 && <div className="faint small">+{targets.length - 12} more</div>}
     </div>
@@ -550,11 +657,7 @@ function HealedCard({ seg, scope }: { seg: Segment; scope: MeterScope }) {
       {rows.slice(0, 10).map((h, i) => (
         <HealBar key={h.key} h={h} rank={i + 1} />
       ))}
-      {runes > 0 && (
-        <div className="faint small mt-10">
-          Runes absorbed {fmtNum(runes)} on top.
-        </div>
-      )}
+      {runes > 0 && <div className="faint small mt-10">Runes absorbed {fmtNum(runes)} on top.</div>}
       {seg.enemyHeal > 0 && <div className="faint small">Enemies healed themselves for {fmtNum(seg.enemyHeal)}.</div>}
     </div>
   )
@@ -604,9 +707,18 @@ function DpsChart({ seg }: { seg: Segment }) {
   return (
     <div className="dm-aux">
       <div className="dm-aux-head">
-        DPS over time <span className="faint small">{session ? `${marks.length} fight${marks.length === 1 ? '' : 's'} end to end · ` : ''}{WINDOW_SEC}s rolling</span>
+        DPS over time{' '}
+        <span className="faint small">
+          {session ? `${marks.length} fight${marks.length === 1 ? '' : 's'} end to end · ` : ''}
+          {WINDOW_SEC}s rolling
+        </span>
       </div>
-      <svg viewBox={`0 0 ${W} ${H}`} className="stats-chart dm-chart" role="img" aria-label={session ? 'Damage per second over the fights of this session, end to end' : 'Damage per second over the fight'}>
+      <svg
+        viewBox={`0 0 ${W} ${H}`}
+        className="stats-chart dm-chart"
+        role="img"
+        aria-label={session ? 'Damage per second over the fights of this session, end to end' : 'Damage per second over the fight'}
+      >
         {[0.5, 1].map((f) => (
           <g key={f}>
             <line className="grid" x1={L} x2={W - 6} y1={y(max * f)} y2={y(max * f)} />
@@ -674,7 +786,14 @@ function Roster({ snap }: { snap: CombatSnapshot }) {
           {pet} <small className="faint">{kindTag('pet', owner)}</small>
         </span>
       ))}
-      <input value={name} placeholder="Add a name" aria-label="Add a group member by name" onChange={(e) => setName(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && add()} style={{ width: 130 }} />
+      <input
+        value={name}
+        placeholder="Add a name"
+        aria-label="Add a group member by name"
+        onChange={(e) => setName(e.target.value)}
+        onKeyDown={(e) => e.key === 'Enter' && add()}
+        style={{ width: 130 }}
+      />
       <button className="btn small" onClick={add} disabled={!name.trim()}>
         Add
       </button>

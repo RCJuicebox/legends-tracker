@@ -5,7 +5,13 @@ import { PRESETS } from './helpers'
 
 describe('the best merge next', () => {
   const inv = parseInventory(
-    ['Location\tName\tID\tCount\tSlots', 'Fingers\tPlain Ring +2\t1\t1\t10', 'Fingers\tGood Ring\t2\t1\t10', 'Ear\tDone Earring +10\t3\t1\t10', 'Neck\tUnknown Necklace\t4\t1\t10'].join('\n')
+    [
+      'Location\tName\tID\tCount\tSlots',
+      'Fingers\tPlain Ring +2\t1\t1\t10',
+      'Fingers\tGood Ring\t2\t1\t10',
+      'Ear\tDone Earring +10\t3\t1\t10',
+      'Neck\tUnknown Necklace\t4\t1\t10'
+    ].join('\n')
   )
   const blocks: Record<string, string> = {
     'Plain Ring +2': 'Slot: FINGER<br>\nAC: 2<br>',

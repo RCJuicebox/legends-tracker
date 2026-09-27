@@ -6,9 +6,22 @@ const speak = (text: string): Notification => ({ kind: 'speak', text, interrupt:
 
 function timer(over: Partial<BoardTimer>): BoardTimer {
   return {
-    key: 'k', id: 't1', label: 'Test', target: '', source: 'trigger', color: '#fff', overlay: 'targets',
-    startedAt: 0, endsAt: 60_000, exact: false, warnSec: 10, onWarn: [speak('warn')], onExpire: [speak('end')],
-    warned: false, graceMs: 0, ...over
+    key: 'k',
+    id: 't1',
+    label: 'Test',
+    target: '',
+    source: 'trigger',
+    color: '#fff',
+    overlay: 'targets',
+    startedAt: 0,
+    endsAt: 60_000,
+    exact: false,
+    warnSec: 10,
+    onWarn: [speak('warn')],
+    onExpire: [speak('end')],
+    warned: false,
+    graceMs: 0,
+    ...over
   }
 }
 
@@ -73,7 +86,11 @@ describe('TimerBoard', () => {
     expect(b.end('a', 'faded')?.key).toBe('a')
     expect(b.end('a', 'faded')).toBeUndefined()
     expect(b.endWhere((t) => t.target === 'rat', 'died').map((t) => t.key)).toEqual(['b', 'c'])
-    expect(ended).toEqual([['a', 'faded'], ['b', 'died'], ['c', 'died']])
+    expect(ended).toEqual([
+      ['a', 'faded'],
+      ['b', 'died'],
+      ['c', 'died']
+    ])
     b.upsert(timer({ key: 'd' }))
     const before = changes()
     b.clear()

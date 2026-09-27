@@ -66,7 +66,10 @@ export function registerCharacterIpc(ctx: AppContext): void {
   handle('gear:foci', async (names, classes, level, character, days) => {
     const book = engine.book
     if (!book) return null
-    const specs = [...new Set(names)].map((n) => book.named(n)).flatMap((s) => (s ? [focusSpec(s)] : [])).filter((f) => f !== null)
+    const specs = [...new Set(names)]
+      .map((n) => book.named(n))
+      .flatMap((s) => (s ? [focusSpec(s)] : []))
+      .filter((f) => f !== null)
     const recent = isCharacterKey(character) ? await ctx.castHistory.recent({ ...history(character), days }).catch(() => null) : null
     // "Envenomed Bolt X" is Envenomed Bolt at rank X: one spell, whatever the rank.
     const casts: Record<string, number> = {}

@@ -36,7 +36,9 @@ describe('respawn records read back from disk', () => {
   })
 
   it('hold each number to its range and drop fields nobody knows', () => {
-    const out = sanitizeRespawns({ k: { zone: 'z', name: 'A mob', kills: -4, lastDeath: 'yesterday', pendingSince: Number.NaN, gaps: [5, -1, 'x', Infinity, 0], shared: 'yes', note: 'junk' } })
+    const out = sanitizeRespawns({
+      k: { zone: 'z', name: 'A mob', kills: -4, lastDeath: 'yesterday', pendingSince: Number.NaN, gaps: [5, -1, 'x', Infinity, 0], shared: 'yes', note: 'junk' }
+    })
     expect(out.k).toEqual({ zone: 'z', name: 'A mob', kills: 0, lastDeath: 0, pendingSince: 0, gaps: [5, 0], shared: false })
     expect(sanitizeRespawns({ k: { zone: 'z', name: 'A mob', kills: 1e12, lastDeath: 1e20 } }).k).toMatchObject({ kills: 1e9, lastDeath: 1e15 })
   })
@@ -62,7 +64,13 @@ describe('a respawn timer from the Respawns page', () => {
   })
 
   it('fills the optional fields and drops unknown ones', () => {
-    expect(sanitizeRespawnTimer({ name: 'A mob', seconds: 60, overlay: 7, announce: 'yes', junk: 1 })).toEqual({ name: 'A mob', seconds: 60, overlay: 'respawns', warnSec: 0, announce: true })
+    expect(sanitizeRespawnTimer({ name: 'A mob', seconds: 60, overlay: 7, announce: 'yes', junk: 1 })).toEqual({
+      name: 'A mob',
+      seconds: 60,
+      overlay: 'respawns',
+      warnSec: 0,
+      announce: true
+    })
   })
 
   it('holds the length to a second through a day, in whole seconds', () => {
@@ -134,7 +142,19 @@ describe('buffs read back from disk', () => {
 
 describe("a spell's own settings from the Spell Timers page", () => {
   it('pass good settings through unchanged', () => {
-    const rule = { track: true, recastCue: false, fadeCue: true, alias: 'SoW', warnSec: 20, warnSpeech: 'Recast {spell}', fadeSpeech: '{spell} down', color: '#ffcc00', overlay: 'buffs', durationOverrideSec: 3600, extraFocusPct: 15 }
+    const rule = {
+      track: true,
+      recastCue: false,
+      fadeCue: true,
+      alias: 'SoW',
+      warnSec: 20,
+      warnSpeech: 'Recast {spell}',
+      fadeSpeech: '{spell} down',
+      color: '#ffcc00',
+      overlay: 'buffs',
+      durationOverrideSec: 3600,
+      extraFocusPct: 15
+    }
     expect(sanitizeSpellRule({ ...rule })).toEqual(rule)
     expect(sanitizeSpellRule({})).toEqual({})
   })
@@ -226,8 +246,14 @@ describe('one trigger for the trigger tester', () => {
   it('is checked the way a list of them is', () => {
     const t = sanitizeTrigger({ id: 'a', name: 'Mez', phrases: ['mesmerized'], cooldownSec: -1, actions: [{ type: 'speak', text: 'mez' }, { type: 'explode' }] })
     expect(t).toEqual({
-      id: 'a', name: 'Mez', folder: '', enabled: true, comment: '', cooldownSec: 0,
-      phrases: [{ text: 'mesmerized', regex: false }], actions: [{ type: 'speak', text: 'mez', interrupt: false }]
+      id: 'a',
+      name: 'Mez',
+      folder: '',
+      enabled: true,
+      comment: '',
+      cooldownSec: 0,
+      phrases: [{ text: 'mesmerized', regex: false }],
+      actions: [{ type: 'speak', text: 'mez', interrupt: false }]
     })
   })
 

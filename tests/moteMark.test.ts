@@ -96,9 +96,18 @@ const env = (): EngineEnv => ({
 function catchUpRig() {
   const store = makeStore(logFile, { active: null, sessions: [], daily: {}, seenUntil: SEEN })
   const feed: FeedItem[] = []
-  const notifier = new Notifier({ synthesize: async () => Buffer.alloc(0) }, { alert: () => {}, audio: () => {}, feed: (i) => feed.push(i) }, () => store.settings.get(), () => [])
+  const notifier = new Notifier(
+    { synthesize: async () => Buffer.alloc(0) },
+    { alert: () => {}, audio: () => {}, feed: (i) => feed.push(i) },
+    () => store.settings.get(),
+    () => []
+  )
   const tracker = new MoteTracker(store.motes.get(), { onChange: () => {} })
-  const stock = new MoteStockKeeper(store.stock, () => {}, () => {})
+  const stock = new MoteStockKeeper(
+    store.stock,
+    () => {},
+    () => {}
+  )
   const tail = { logFile: '', position: -1, settling: true, asked: false }
   const catchUp = new MoteCatchUp(store, env(), { moteScan: () => {}, motes: () => {} }, notifier, {
     motes: () => tracker,
@@ -243,7 +252,22 @@ describe('The engine when the watched log is truncated', () => {
     const engine = new Engine(
       makeStore(logFile, { active: null, sessions: [], daily: {} }),
       { synthesize: async () => Buffer.alloc(0) },
-      { timers: noop, alert: noop, audio: noop, status: noop, feed: (i) => feed.push(i), archive: noop, motes: noop, moteScan: noop, stock: noop, combat: noop, loot: noop, respawns: noop, pet: noop, buffs: noop },
+      {
+        timers: noop,
+        alert: noop,
+        audio: noop,
+        status: noop,
+        feed: (i) => feed.push(i),
+        archive: noop,
+        motes: noop,
+        moteScan: noop,
+        stock: noop,
+        combat: noop,
+        loot: noop,
+        respawns: noop,
+        pet: noop,
+        buffs: noop
+      },
       env()
     )
     try {

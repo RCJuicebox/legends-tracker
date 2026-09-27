@@ -60,10 +60,7 @@ export function useEffectsModel({
     }
     return [...out].sort()
   }, [items, effectsOfItem])
-  const effectsQ = useInvoke(
-    effectNames.length && view.character ? 'gear:effects' : null,
-    [effectNames, view.character, days]
-  )
+  const effectsQ = useInvoke(effectNames.length && view.character ? 'gear:effects' : null, [effectNames, view.character, days])
   const dex = sheetStats.window?.values.Dexterity?.[0] ?? (sheetStats.dexterity || 150)
   const effects = useMemo<GearEffects>(() => {
     const data = effectsQ.data

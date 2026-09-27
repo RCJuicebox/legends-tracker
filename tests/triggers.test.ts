@@ -5,7 +5,15 @@ import { parseLogLine } from '../src/core/logLine'
 import type { Notification, Trigger } from '../src/shared/types'
 
 const trig = (over: Partial<Trigger>): Trigger => ({
-  id: 'x', name: 'Test', folder: '', enabled: true, comment: '', phrases: [], cooldownSec: 0, actions: [], ...over
+  id: 'x',
+  name: 'Test',
+  folder: '',
+  enabled: true,
+  comment: '',
+  phrases: [],
+  cooldownSec: 0,
+  actions: [],
+  ...over
 })
 
 describe('compilePhrase', () => {
@@ -43,11 +51,20 @@ describe('TriggerEngine', () => {
         trig({
           id: 'mez',
           phrases: [{ text: '${Target} has been mesmerized.', regex: false }],
-          actions: [{
-            type: 'timer', name: 'Mez ${Target}', durationSec: 24, color: '#fff', overlay: 'targets', warnSec: 6,
-            warnSpeech: 'mez ending', endSpeech: 'mez off', restart: 'restart',
-            endEarly: [{ text: '${Target} has been awakened', regex: false }]
-          }]
+          actions: [
+            {
+              type: 'timer',
+              name: 'Mez ${Target}',
+              durationSec: 24,
+              color: '#fff',
+              overlay: 'targets',
+              warnSec: 6,
+              warnSpeech: 'mez ending',
+              endSpeech: 'mez off',
+              restart: 'restart',
+              endEarly: [{ text: '${Target} has been awakened', regex: false }]
+            }
+          ]
         })
       ],
       'Kelwyn'
@@ -59,7 +76,12 @@ describe('TriggerEngine', () => {
 
     feed('[Wed Sep 23 13:00:10 2026] A gnoll pup has been mesmerized.')
     feed('[Wed Sep 23 13:00:11 2026] A gnoll scout has been mesmerized.')
-    expect(board.list().map((t) => t.label).sort()).toEqual(['Mez A gnoll pup', 'Mez A gnoll scout'])
+    expect(
+      board
+        .list()
+        .map((t) => t.label)
+        .sort()
+    ).toEqual(['Mez A gnoll pup', 'Mez A gnoll scout'])
     feed('[Wed Sep 23 13:00:12 2026] A gnoll pup has been awakened by Aldric.')
     expect(board.list().map((t) => t.label)).toEqual(['Mez A gnoll scout'])
   })
@@ -86,11 +108,20 @@ describe('TriggerEngine end-early with snippets', () => {
         trig({
           id: 'mez',
           phrases: [{ text: '{S1} has been mesmerized.', regex: false }],
-          actions: [{
-            type: 'timer', name: 'Mez {S1}', durationSec: 24, color: '#fff', overlay: 'targets', warnSec: 0,
-            warnSpeech: '', endSpeech: '', restart: 'restart',
-            endEarly: [{ text: '{S1} has been awakened', regex: false }]
-          }]
+          actions: [
+            {
+              type: 'timer',
+              name: 'Mez {S1}',
+              durationSec: 24,
+              color: '#fff',
+              overlay: 'targets',
+              warnSec: 0,
+              warnSpeech: '',
+              endSpeech: '',
+              restart: 'restart',
+              endEarly: [{ text: '{S1} has been awakened', regex: false }]
+            }
+          ]
         })
       ],
       'Kelwyn'
@@ -110,11 +141,20 @@ describe('TriggerEngine end-early with snippets', () => {
         trig({
           id: 'n',
           phrases: [{ text: 'Countdown {N1} for {S1}', regex: false }],
-          actions: [{
-            type: 'timer', name: '{S1} {N1}', durationSec: 60, color: '#fff', overlay: 'targets', warnSec: 0,
-            warnSpeech: '', endSpeech: '', restart: 'restart',
-            endEarly: [{ text: '^Stop {N1} for {S1}$', regex: true }]
-          }]
+          actions: [
+            {
+              type: 'timer',
+              name: '{S1} {N1}',
+              durationSec: 60,
+              color: '#fff',
+              overlay: 'targets',
+              warnSec: 0,
+              warnSpeech: '',
+              endSpeech: '',
+              restart: 'restart',
+              endEarly: [{ text: '^Stop {N1} for {S1}$', regex: true }]
+            }
+          ]
         })
       ],
       'Kelwyn'

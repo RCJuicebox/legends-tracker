@@ -65,8 +65,7 @@ function closeOpenRun(c: CharacterScan, close: boolean): MoteState {
  * twice gives the same history.
  */
 export function mergeRebuilt(current: MoteState, rebuilt: RebuiltMotes): MoteState {
-  const overlaps = (a: MoteSession, b: MoteSession) =>
-    a.name === b.name && a.startedAt <= (b.endedAt ?? Infinity) && b.startedAt <= (a.endedAt ?? Infinity)
+  const overlaps = (a: MoteSession, b: MoteSession) => a.name === b.name && a.startedAt <= (b.endedAt ?? Infinity) && b.startedAt <= (a.endedAt ?? Infinity)
   const fresh = rebuilt.active ? [...rebuilt.sessions, rebuilt.active] : rebuilt.sessions
   const known = (s: MoteSession) => fresh.some((r) => overlaps(r, s))
   const kept = current.sessions.filter((s) => s.kind === 'manual' || !known(s))

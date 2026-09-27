@@ -34,8 +34,18 @@ export const TRACKING: TrackingSettings = {
 
 /** The AA from Kelwyn's /alternateadv list: "increases the duration of beneficial spells that you cast by 50%". */
 export const SPELL_CASTING_REINFORCEMENT: FocusSource = {
-  id: 'scr', name: 'Spell Casting Reinforcement', kind: 'aa', from: 'AA', pct: 50, appliesTo: 'beneficial',
-  maxLevel: 0, decayPct: 0, minTicks: 0, requireSpas: [], excludeSpas: [], enabled: true
+  id: 'scr',
+  name: 'Spell Casting Reinforcement',
+  kind: 'aa',
+  from: 'AA',
+  pct: 50,
+  appliesTo: 'beneficial',
+  maxLevel: 0,
+  decayPct: 0,
+  minTicks: 0,
+  requireSpas: [],
+  excludeSpas: [],
+  enabled: true
 }
 
 /** Kelwyn as of 2026-09-23: the AA plus Extended Enhancement II from the Engineer's Ring's exaltation. */
@@ -92,8 +102,88 @@ export function at(stamp: string): number {
 
 /** Fixed weights for the gear tests, per point of the stat (the app derives its own from ROLE_PRESETS). */
 export const PRESETS: Record<string, Weights> = {
-  Balanced: { ac: 2, hp: 0.25, mana: 0.2, end: 0.1, str: 0.6, sta: 0.8, agi: 0.6, dex: 0.5, wis: 0.5, int: 0.5, cha: 0.1, resists: 0.2, haste: 2, attack: 1, hpRegen: 2, manaRegen: 2, endRegen: 1, ratio: 0, rangedRatio: 0 },
-  Tank: { ac: 4, hp: 0.4, mana: 0, end: 0.1, str: 0.4, sta: 1.2, agi: 0.8, dex: 0.3, wis: 0.1, int: 0.1, cha: 0, resists: 0.4, haste: 1.5, attack: 0.5, hpRegen: 3, manaRegen: 0, endRegen: 1, ratio: 40, rangedRatio: 0 },
-  Melee: { ac: 1, hp: 0.2, mana: 0, end: 0.2, str: 1.2, sta: 0.5, agi: 0.6, dex: 1, wis: 0, int: 0, cha: 0, resists: 0.1, haste: 4, attack: 2, hpRegen: 1, manaRegen: 0, endRegen: 2, ratio: 40, rangedRatio: 0 },
-  Caster: { ac: 0.8, hp: 0.25, mana: 0.5, end: 0, str: 0, sta: 0.6, agi: 0.3, dex: 0.1, wis: 1.2, int: 1.2, cha: 0.2, resists: 0.3, haste: 0, attack: 0, hpRegen: 1, manaRegen: 4, endRegen: 0, ratio: 0, rangedRatio: 0 }
+  Balanced: {
+    ac: 2,
+    hp: 0.25,
+    mana: 0.2,
+    end: 0.1,
+    str: 0.6,
+    sta: 0.8,
+    agi: 0.6,
+    dex: 0.5,
+    wis: 0.5,
+    int: 0.5,
+    cha: 0.1,
+    resists: 0.2,
+    haste: 2,
+    attack: 1,
+    hpRegen: 2,
+    manaRegen: 2,
+    endRegen: 1,
+    ratio: 0,
+    rangedRatio: 0
+  },
+  Tank: {
+    ac: 4,
+    hp: 0.4,
+    mana: 0,
+    end: 0.1,
+    str: 0.4,
+    sta: 1.2,
+    agi: 0.8,
+    dex: 0.3,
+    wis: 0.1,
+    int: 0.1,
+    cha: 0,
+    resists: 0.4,
+    haste: 1.5,
+    attack: 0.5,
+    hpRegen: 3,
+    manaRegen: 0,
+    endRegen: 1,
+    ratio: 40,
+    rangedRatio: 0
+  },
+  Melee: {
+    ac: 1,
+    hp: 0.2,
+    mana: 0,
+    end: 0.2,
+    str: 1.2,
+    sta: 0.5,
+    agi: 0.6,
+    dex: 1,
+    wis: 0,
+    int: 0,
+    cha: 0,
+    resists: 0.1,
+    haste: 4,
+    attack: 2,
+    hpRegen: 1,
+    manaRegen: 0,
+    endRegen: 2,
+    ratio: 40,
+    rangedRatio: 0
+  },
+  Caster: {
+    ac: 0.8,
+    hp: 0.25,
+    mana: 0.5,
+    end: 0,
+    str: 0,
+    sta: 0.6,
+    agi: 0.3,
+    dex: 0.1,
+    wis: 1.2,
+    int: 1.2,
+    cha: 0.2,
+    resists: 0.3,
+    haste: 0,
+    attack: 0,
+    hpRegen: 1,
+    manaRegen: 4,
+    endRegen: 0,
+    ratio: 0,
+    rangedRatio: 0
+  }
 }

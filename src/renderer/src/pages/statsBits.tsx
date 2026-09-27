@@ -107,7 +107,7 @@ export function Trace({ rows }: { rows: Row[] }) {
               <tr key={i}>
                 <td>{label}</td>
                 <td className="mono" style={{ textAlign: 'right', fontWeight: 600 }}>
-                  {typeof value === "number" ? num(value) : value}
+                  {typeof value === 'number' ? num(value) : value}
                 </td>
                 <td className="faint">{note}</td>
               </tr>

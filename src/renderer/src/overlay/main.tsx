@@ -5,7 +5,23 @@ import { api } from '../api'
 import { TimerBars } from '../components/TimerBars'
 import { LIVE, useSegment } from '../combat'
 import { EntityBar, HealBar, SkillBar } from '../components/MeterBars'
-import { attackerRows, attackerSkillRows, damageRows, durationSec, fmtClock, fmtNum, fmtRate, healSpellRows, healTotals, healerRows, skillRows, totalsOf, type HealRow, type Row, type SkillRow } from '../../../core/combatView'
+import {
+  attackerRows,
+  attackerSkillRows,
+  damageRows,
+  durationSec,
+  fmtClock,
+  fmtNum,
+  fmtRate,
+  healSpellRows,
+  healTotals,
+  healerRows,
+  skillRows,
+  totalsOf,
+  type HealRow,
+  type Row,
+  type SkillRow
+} from '../../../core/combatView'
 import type { CombatSnapshot, MeterMode, MeterOverlayOptions, MeterSpan, OverlayConfig, Segment, SegmentSummary, TimerView } from '../../../shared/types'
 import { DEFAULT_METER_OPTIONS } from '../../../shared/overlays'
 
@@ -50,7 +66,21 @@ function Overlay() {
  * not do: its list is a popup window that needs focus, and overlay windows are never focusable (the
  * game must keep the keyboard), so the list never opened.
  */
-function SegmentMenu({ list, span, selection, live, onPick, onOpen }: { list: SegmentSummary[]; span: MeterSpan; selection: string; live: Segment | null | undefined; onPick: (id: string) => void; onOpen: (open: boolean) => void }) {
+function SegmentMenu({
+  list,
+  span,
+  selection,
+  live,
+  onPick,
+  onOpen
+}: {
+  list: SegmentSummary[]
+  span: MeterSpan
+  selection: string
+  live: Segment | null | undefined
+  onPick: (id: string) => void
+  onOpen: (open: boolean) => void
+}) {
   const [open, setOpen] = useState(false)
   const toggle = (v: boolean) => {
     setOpen(v)
@@ -65,7 +95,14 @@ function SegmentMenu({ list, span, selection, live, onPick, onOpen }: { list: Se
   const time = (t: number) => new Date(t).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
   return (
     <>
-      <button className={`dm-ov-btn dm-ov-pick${open ? ' on' : ''}`} onClick={() => toggle(!open)} aria-haspopup="listbox" aria-expanded={open} aria-label={span === 'fight' ? 'Which fight' : 'Which session'} title={current}>
+      <button
+        className={`dm-ov-btn dm-ov-pick${open ? ' on' : ''}`}
+        onClick={() => toggle(!open)}
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        aria-label={span === 'fight' ? 'Which fight' : 'Which session'}
+        title={current}
+      >
         {current} ▾
       </button>
       {open && (
@@ -128,7 +165,13 @@ function MeterOverlay({ config, snap, arranging }: { config: OverlayConfig; snap
     return healerRows(seg, opts.scope)
   }, [seg, opts.mode, opts.scope, opts.combinePet])
   const head = seg ? (opts.mode === 'healing' ? healTotals(seg, rows as HealRow[]) : totalsOf(seg, rows)) : null
-  const name = seg ? (seg.kind === 'fight' ? (list.find((s) => s.id === seg.id)?.name ?? seg.name ?? 'Fight') : seg.name || seg.zone || 'Session') : opts.span === 'fight' ? 'No fight yet' : 'No session yet'
+  const name = seg
+    ? seg.kind === 'fight'
+      ? (list.find((s) => s.id === seg.id)?.name ?? seg.name ?? 'Fight')
+      : seg.name || seg.zone || 'Session'
+    : opts.span === 'fight'
+      ? 'No fight yet'
+      : 'No session yet'
   const shown = rows.slice(0, drill ? 50 : opts.rows)
   const more = rows.length - shown.length
 
@@ -167,19 +210,31 @@ function MeterOverlay({ config, snap, arranging }: { config: OverlayConfig; snap
             )}
           </span>
           <span className="dm-ov-tools">
-            <button className="dm-ov-btn" onClick={() => patch({ span: opts.span === 'fight' ? 'session' : 'fight' })} title={opts.span === 'fight' ? 'Showing the fight; click for the whole session' : 'Showing the session; click for the fight'}>
+            <button
+              className="dm-ov-btn"
+              onClick={() => patch({ span: opts.span === 'fight' ? 'session' : 'fight' })}
+              title={opts.span === 'fight' ? 'Showing the fight; click for the whole session' : 'Showing the session; click for the fight'}
+            >
               {opts.span === 'fight' ? 'Fight' : 'Overall'}
             </button>
             <button className="dm-ov-btn" onClick={() => patch({ mode: MODE_NEXT[opts.mode] })} title="Damage → Incoming → Healing">
               {MODE_WORD[opts.mode]}
             </button>
-            <button className="dm-ov-btn" onClick={() => patch({ scope: opts.scope === 'everyone' ? 'group' : opts.scope === 'group' ? 'you' : 'everyone' })} title="Everyone → Group → You">
+            <button
+              className="dm-ov-btn"
+              onClick={() => patch({ scope: opts.scope === 'everyone' ? 'group' : opts.scope === 'group' ? 'you' : 'everyone' })}
+              title="Everyone → Group → You"
+            >
               {opts.scope === 'everyone' ? 'All' : opts.scope === 'group' ? 'Group' : 'You'}
             </button>
             <button className="dm-ov-btn" onClick={() => void api.invoke('combat:newSession').catch(() => {})} title="Start a new session from now">
               ⚑
             </button>
-            <button className={`dm-ov-btn${unlocked ? ' on' : ''}`} onClick={() => setUnlocked(!unlocked)} title={unlocked ? 'Rows can be clicked; lock to let clicks through to the game' : 'Unlock to click rows for their breakdown'}>
+            <button
+              className={`dm-ov-btn${unlocked ? ' on' : ''}`}
+              onClick={() => setUnlocked(!unlocked)}
+              title={unlocked ? 'Rows can be clicked; lock to let clicks through to the game' : 'Unlock to click rows for their breakdown'}
+            >
               {unlocked ? '🔓' : '📌'}
             </button>
           </span>

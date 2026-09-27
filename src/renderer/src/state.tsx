@@ -74,10 +74,7 @@ export function StateProvider({ children }: { children: ReactNode }) {
     setState((s) => (s ? { ...s, settings: next } : s))
   }, [])
 
-  const takeSettings = useCallback(
-    (incoming: AppSettings) => showSettings(pending.current.fns.reduce((s, fn) => fn(s), incoming)),
-    [showSettings]
-  )
+  const takeSettings = useCallback((incoming: AppSettings) => showSettings(pending.current.fns.reduce((s, fn) => fn(s), incoming)), [showSettings])
 
   useEffect(() => {
     let live = true
@@ -92,8 +89,10 @@ export function StateProvider({ children }: { children: ReactNode }) {
       },
       (e) => live && setError(errorMessage(e))
     )
-    const set = <K extends keyof AppState>(key: K) => (value: AppState[K]) =>
-      (LIVE as string[]).includes(key) ? setLive((s) => (s ? { ...s, [key]: value } : s)) : setState((s) => (s ? { ...s, [key]: value } : s))
+    const set =
+      <K extends keyof AppState>(key: K) =>
+      (value: AppState[K]) =>
+        (LIVE as string[]).includes(key) ? setLive((s) => (s ? { ...s, [key]: value } : s)) : setState((s) => (s ? { ...s, [key]: value } : s))
     const offs = [
       api.on('state:status', set('status') as (v: WatchStatus) => void),
       api.on('state:timers', set('timers') as (v: TimerView[]) => void),

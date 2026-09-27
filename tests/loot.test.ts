@@ -9,20 +9,50 @@ describe('loot lines', () => {
   const p = parseLootLine
   it('reads what auto-loot did with each item', () => {
     expect(p("You looted a Shadow Rage Helm +4 from Cleric of Innoruuk's corpse and sold it for free.")).toEqual({
-      kind: 'loot', looter: 'You', item: 'Shadow Rage Helm +4', count: 1, source: 'Cleric of Innoruuk', outcome: 'sold', copper: 0
+      kind: 'loot',
+      looter: 'You',
+      item: 'Shadow Rage Helm +4',
+      count: 1,
+      source: 'Cleric of Innoruuk',
+      outcome: 'sold',
+      copper: 0
     })
-    expect(p("You looted a Fetid Skin from a fetid fiend's corpse and sold it for 6 gold, 7 silver and 9 copper.")).toMatchObject({ item: 'Fetid Skin', source: 'A fetid fiend', outcome: 'sold', copper: 679 })
+    expect(p("You looted a Fetid Skin from a fetid fiend's corpse and sold it for 6 gold, 7 silver and 9 copper.")).toMatchObject({
+      item: 'Fetid Skin',
+      source: 'A fetid fiend',
+      outcome: 'sold',
+      copper: 679
+    })
     expect(p("You looted a Fire Emerald Ring +4 from an ire ghast's corpse and sold it for 107 platinum, 1 gold, 4 silver and 3 copper.")).toMatchObject({ copper: 107_143 })
-    expect(p("You looted a Crystallized Sulfur from an ire ghast's corpse and stored it in your tradeskill depot")).toMatchObject({ item: 'Crystallized Sulfur', source: 'An ire ghast', outcome: 'depot' })
+    expect(p("You looted a Crystallized Sulfur from an ire ghast's corpse and stored it in your tradeskill depot")).toMatchObject({
+      item: 'Crystallized Sulfur',
+      source: 'An ire ghast',
+      outcome: 'depot'
+    })
     expect(p("You looted 2 Giant Bat Wing from a sonic bat's corpse and stored it in your tradeskill depot")).toMatchObject({ count: 2, outcome: 'depot' })
     expect(p("You looted a Mote of Major Potential from a loathling lich's corpse and stored it in your currency")).toMatchObject({ outcome: 'currency' })
     expect(p('You looted 4 Mote of Major Potential from Reward Chest and stored it in your currency')).toMatchObject({ count: 4, source: 'Reward Chest', outcome: 'currency' })
     expect(p('You looted an Indicolite Bracer +4 from Reward Chest to create an Indicolite Bracer +6')).toEqual({
-      kind: 'loot', looter: 'You', item: 'Indicolite Bracer +4', count: 1, source: 'Reward Chest', outcome: 'merged', copper: 0, into: 'Indicolite Bracer +6'
+      kind: 'loot',
+      looter: 'You',
+      item: 'Indicolite Bracer +4',
+      count: 1,
+      source: 'Reward Chest',
+      outcome: 'merged',
+      copper: 0,
+      into: 'Indicolite Bracer +6'
     })
   })
-  it('reads what was kept, yours and a group-mate\'s', () => {
-    expect(p("--You have looted a Star Ruby from a fetid fiend's corpse.--")).toEqual({ kind: 'loot', looter: 'You', item: 'Star Ruby', count: 1, source: 'A fetid fiend', outcome: 'kept', copper: 0 })
+  it("reads what was kept, yours and a group-mate's", () => {
+    expect(p("--You have looted a Star Ruby from a fetid fiend's corpse.--")).toEqual({
+      kind: 'loot',
+      looter: 'You',
+      item: 'Star Ruby',
+      count: 1,
+      source: 'A fetid fiend',
+      outcome: 'kept',
+      copper: 0
+    })
     expect(p("--You have looted 2 Bone Chips from a putrid skeleton's corpse.--")).toMatchObject({ item: 'Bone Chips', count: 2 })
     expect(p("--You have looted a Note from *Duggin Scumber's corpse.--")).toMatchObject({ item: 'Note', source: 'Duggin Scumber' })
     expect(p("--Aldric has looted a Rusty Sword from a skeleton's corpse.--")).toMatchObject({ looter: 'Aldric', item: 'Rusty Sword', outcome: 'kept' })
@@ -49,11 +79,14 @@ describe('LootLedger', () => {
   }
   it('files loot and coin under the session, newest first, with the +N split off', () => {
     const l = new LootLedger()
-    feed(l, `
+    feed(
+      l,
+      `
       [Thu Sep 24 20:00:01 2026] You receive 4 platinum, 2 gold, 9 silver and 8 copper from the corpse.
       [Thu Sep 24 20:00:02 2026] You looted a Shadow Rage Helm +4 from Cleric of Innoruuk's corpse and sold it for free.
       [Thu Sep 24 20:00:03 2026] --You have looted a Star Ruby from a fetid fiend's corpse.--
-      [Thu Sep 24 20:00:04 2026] You looted a Fetid Skin from a fetid fiend's corpse and sold it for 6 gold, 7 silver and 9 copper.`)
+      [Thu Sep 24 20:00:04 2026] You looted a Fetid Skin from a fetid fiend's corpse and sold it for 6 gold, 7 silver and 9 copper.`
+    )
     feed(l, '[Thu Sep 24 20:10:00 2026] You receive 6 gold from Zok Zribb.', 's2', 'Neriak')
     const snap = l.snapshot()
     expect(snap.entries.map((e) => [e.item, e.base, e.plus, e.outcome, e.sessionId])).toEqual([

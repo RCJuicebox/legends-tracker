@@ -86,11 +86,12 @@ describe('LogTailer', () => {
   })
 })
 
-const LOG = [
-  '[Tue Sep 01 12:15:08 2026] You begin casting Envenomed Bolt X.',
-  '[Tue Sep 01 12:15:09 2026] Bazzt Zzzt has been poisoned.',
-  '[Wed Sep 23 13:29:06 2026] You begin to snarl as your features become feline.'
-].join('\r\n') + '\r\n'
+const LOG =
+  [
+    '[Tue Sep 01 12:15:08 2026] You begin casting Envenomed Bolt X.',
+    '[Tue Sep 01 12:15:09 2026] Bazzt Zzzt has been poisoned.',
+    '[Wed Sep 23 13:29:06 2026] You begin to snarl as your features become feline.'
+  ].join('\r\n') + '\r\n'
 
 async function unzipOnly(zipPath: string): Promise<{ name: string; text: string }> {
   return new Promise((resolve, reject) => {

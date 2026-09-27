@@ -27,8 +27,12 @@ function productionCsp(): Plugin {
   return {
     name: 'lt-production-csp',
     apply: 'build',
-    transformIndexHtml(html) {
-      return html.replace(/(<meta http-equiv="Content-Security-Policy" content=")([^"]*)(")/, (_m, a: string, policy: string, b: string) => a + tighten(policy) + b)
+    transformIndexHtml(html, ctx) {
+      // The tag may be wrapped over several lines (the formatter does that). A page whose policy
+      // cannot be found stops the build rather than shipping the development one.
+      const csp = /(<meta\s+http-equiv="Content-Security-Policy"\s+content=")([^"]*)(")/
+      if (!csp.test(html)) throw new Error(`${ctx.filename}: no Content-Security-Policy meta tag to tighten`)
+      return html.replace(csp, (_m, a: string, policy: string, b: string) => a + tighten(policy) + b)
     }
   }
 }

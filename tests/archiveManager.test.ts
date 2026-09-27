@@ -126,7 +126,11 @@ describe('archiving logs past the size limit', () => {
 describe('waiting for the game to exit', () => {
   it('waits for the game to exit when it keeps its log open, then archives it', async () => {
     const big = await writeLog('eqlog_Tester_testzone.txt', BIG)
-    const held: ArchiveOutcome = { status: 'deferred', reason: 'held-open', message: 'The game keeps its log open while running, so the log was put back. It will be archived once the game closes.' }
+    const held: ArchiveOutcome = {
+      status: 'deferred',
+      reason: 'held-open',
+      message: 'The game keeps its log open while running, so the log was put back. It will be archived once the game closes.'
+    }
     vi.mocked(archiver.archiveLog).mockResolvedValueOnce(held)
     running = true
     const { m, feed } = manager()
@@ -152,7 +156,11 @@ describe('waiting for the game to exit', () => {
   it('skips only the locked log while the game runs, where the game is known to hand logs off', async () => {
     const tester = await writeLog('eqlog_Tester_testzone.txt', BIG)
     const other = await writeLog('eqlog_Other_testzone.txt', SMALL)
-    vi.mocked(archiver.archiveLog).mockResolvedValueOnce({ status: 'deferred', reason: 'locked', message: 'The game has the log locked. It will be archived once the game closes.' })
+    vi.mocked(archiver.archiveLog).mockResolvedValueOnce({
+      status: 'deferred',
+      reason: 'locked',
+      message: 'The game has the log locked. It will be archived once the game closes.'
+    })
     running = true
     const { m } = manager()
     await m.check()
@@ -161,7 +169,13 @@ describe('waiting for the game to exit', () => {
 
     // The other log grows past the limit: it is tried; the locked one is not tried again yet.
     await fs.writeFile(other, BIG)
-    vi.mocked(archiver.archiveLog).mockResolvedValueOnce({ status: 'archived', zipPath: join(logs, 'archive', 'x.zip'), originalBytes: 2 * 1048576, zipBytes: 1048576, liveHandoff: true })
+    vi.mocked(archiver.archiveLog).mockResolvedValueOnce({
+      status: 'archived',
+      zipPath: join(logs, 'archive', 'x.zip'),
+      originalBytes: 2 * 1048576,
+      zipBytes: 1048576,
+      liveHandoff: true
+    })
     await m.check()
     expect(vi.mocked(archiver.archiveLog).mock.calls.map((c) => c[0])).toEqual([tester, other])
     expect(m.status.liveRotation).toBe('supported')

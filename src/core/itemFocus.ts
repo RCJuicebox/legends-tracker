@@ -18,12 +18,27 @@ import { CLASS_NUMBER, type ClassId } from '../shared/game/classes'
 export type FocusKind = 'damage' | 'healing' | 'haste' | 'duration' | 'range' | 'reagent' | 'mana' | 'pet' | 'instrument'
 
 const KIND_OF_SPA: Record<number, FocusKind> = {
-  124: 'damage', 125: 'healing', 127: 'haste', 128: 'duration', 129: 'range', 131: 'reagent', 132: 'mana', 167: 'pet', 413: 'instrument'
+  124: 'damage',
+  125: 'healing',
+  127: 'haste',
+  128: 'duration',
+  129: 'range',
+  131: 'reagent',
+  132: 'mana',
+  167: 'pet',
+  413: 'instrument'
 }
 
 export const KIND_LABELS: Record<FocusKind, string> = {
-  damage: 'Spell damage', healing: 'Healing', haste: 'Casting speed', duration: 'Spell duration', range: 'Spell range',
-  reagent: 'Reagent use', mana: 'Mana cost', pet: 'Pet power', instrument: 'Instrument'
+  damage: 'Spell damage',
+  healing: 'Healing',
+  haste: 'Casting speed',
+  duration: 'Spell duration',
+  range: 'Spell range',
+  reagent: 'Reagent use',
+  mana: 'Mana cost',
+  pet: 'Pet power',
+  instrument: 'Instrument'
 }
 
 /** The order kinds are listed in. */
@@ -266,7 +281,16 @@ export function focusReport(specs: FocusSpec[], classSpells: CastSpell[], classe
         weighted += eff * u.casts
         casts += u.casts
       }
-      foci[f.name] = { name: f.name, line: key, kind: f.kind, pct: f.pct, maxLevel: f.maxLevel, decayPct: f.decayPct, eff: casts ? Math.round((weighted / casts) * 100) / 100 : 0, on }
+      foci[f.name] = {
+        name: f.name,
+        line: key,
+        kind: f.kind,
+        pct: f.pct,
+        maxLevel: f.maxLevel,
+        decayPct: f.decayPct,
+        eff: casts ? Math.round((weighted / casts) * 100) / 100 : 0,
+        on
+      }
     }
   }
   lines.sort((a, b) => KIND_ORDER.indexOf(a.kind) - KIND_ORDER.indexOf(b.kind) || b.share - a.share || a.label.localeCompare(b.label))
@@ -278,7 +302,15 @@ export function focusReport(specs: FocusSpec[], classSpells: CastSpell[], classe
  * reach or fewer reagents rarely decides anything, so they count for a quarter.
  */
 export const KIND_WORTH: Record<FocusKind, number> = {
-  damage: 1, healing: 1, haste: 1, duration: 1, mana: 1, pet: 1, instrument: 1, range: 0.25, reagent: 0.25
+  damage: 1,
+  healing: 1,
+  haste: 1,
+  duration: 1,
+  mana: 1,
+  pet: 1,
+  instrument: 1,
+  range: 0.25,
+  reagent: 0.25
 }
 
 /** What wearing a set of foci is worth to one character. */

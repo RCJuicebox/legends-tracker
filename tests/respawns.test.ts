@@ -2,9 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { CombatMeter } from '../src/core/combatMeter'
 import { parseLogLine } from '../src/core/logLine'
 import { compilePhrase } from '../src/core/triggers'
-import {
-  RespawnLog, respawnEstimate, respawnKey, respawnPhrase, respawnTrigger, respawnTriggerId, respawnView, type RespawnRecords
-} from '../src/core/respawns'
+import { RespawnLog, respawnEstimate, respawnKey, respawnPhrase, respawnTrigger, respawnTriggerId, respawnView, type RespawnRecords } from '../src/core/respawns'
 import type { Trigger } from '../src/shared/types'
 
 // Line shapes copied from the log (September 2026); times moved to make the gaps.
@@ -149,7 +147,16 @@ describe('respawn timers', () => {
     const t = respawnTrigger({ name: 'Coercer T`vala', seconds: 1127, overlay: 'respawns', warnSec: 30, announce: true })
     expect(t).toMatchObject({ id: 'respawn-coercer-t-vala', folder: 'Respawns', enabled: true })
     expect(t.actions).toEqual([
-      expect.objectContaining({ type: 'timer', name: 'Coercer T`vala', durationSec: 1127, overlay: 'respawns', warnSec: 30, warnSpeech: 'Coercer Tvala in 30 seconds', endSpeech: 'Coercer Tvala is up', restart: 'restart' })
+      expect.objectContaining({
+        type: 'timer',
+        name: 'Coercer T`vala',
+        durationSec: 1127,
+        overlay: 'respawns',
+        warnSec: 30,
+        warnSpeech: 'Coercer Tvala in 30 seconds',
+        endSpeech: 'Coercer Tvala is up',
+        restart: 'restart'
+      })
     ])
     const edited: Trigger = { ...t, folder: 'Camps', actions: [...t.actions, { type: 'sound', file: 'ding.wav', volume: 1 }] }
     const again = respawnTrigger({ name: 'Coercer T`vala', seconds: 1100, overlay: 'targets', warnSec: 0, announce: false }, edited)
@@ -168,7 +175,10 @@ describe('respawn timers', () => {
       respawnTrigger({ name: 'Fippy Darkpaw', seconds: 400, overlay: 'respawns', warnSec: 0, announce: true })
     ]
     const v = respawnView(f.records, triggers, ZONE)
-    expect(v.rows.map((r) => [r.name, r.timer?.seconds])).toEqual([['Coercer T`vala', 1127], ['Fippy Darkpaw', 400]])
+    expect(v.rows.map((r) => [r.name, r.timer?.seconds])).toEqual([
+      ['Coercer T`vala', 1127],
+      ['Fippy Darkpaw', 400]
+    ])
     expect(v.rows[1]).toMatchObject({ zone: '', kills: 0, key: `timer|${respawnTriggerId('Fippy Darkpaw')}` })
   })
 })

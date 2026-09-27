@@ -108,7 +108,14 @@ export function parseItemUse(content: string): ItemUse {
       recipes.push(`${skill ? `${skill}: ` : ''}${names[0]}${trivial ? ` (${trivial})` : ''}`)
     } else skill = names[0]
   }
-  return { notes, quests: linkTexts(field(content, 'relatedquests')), recipes, value: plainText(field(content, 'merchant_value')), vendors: parseVendors(content), sources: parseSources(content) }
+  return {
+    notes,
+    quests: linkTexts(field(content, 'relatedquests')),
+    recipes,
+    value: plainText(field(content, 'merchant_value')),
+    vendors: parseVendors(content),
+    sources: parseSources(content)
+  }
 }
 
 /**
@@ -140,8 +147,8 @@ export function parseVendors(content: string): Vendor[] {
   const out: Vendor[] = []
   for (const m of field(content, 'soldby').matchAll(/\{\{ItemWhereRow\w*\s*\|([^\n]*?)\}\}/g)) {
     const cells = m[1].split(/\|(?![^[]*\]\])/).map((c) => c.trim())
-    const zone = linkTexts(cells[0] ?? '')[0] ?? (cells[0] ?? '')
-    const npc = linkTexts(cells[1] ?? '')[0] ?? (cells[1] ?? '')
+    const zone = linkTexts(cells[0] ?? '')[0] ?? cells[0] ?? ''
+    const npc = linkTexts(cells[1] ?? '')[0] ?? cells[1] ?? ''
     if (npc) out.push({ zone, npc, note: plainText(cells[2] ?? '') })
   }
   return out
@@ -163,7 +170,10 @@ export function parseItemPage(title: string, content: string): CatalogItem | nul
     title,
     statsblock,
     icon: Number(field(content, 'lucy_img_ID')) || 0,
-    focus: field(content, 'focus_effect').replace(/\[\[(?:[^\]|]*\|)?([^\]]*)\]\]/g, '$1').replace(/_/g, ' ').trim(),
+    focus: field(content, 'focus_effect')
+      .replace(/\[\[(?:[^\]|]*\|)?([^\]]*)\]\]/g, '$1')
+      .replace(/_/g, ' ')
+      .trim(),
     era: /\{\{\s*([A-Za-z][A-Za-z ]*?)\s+Era\s*\}\}/.exec(content)?.[1] ?? '',
     zones: [...new Set(zones)],
     mobs: [...new Set(mobs)],

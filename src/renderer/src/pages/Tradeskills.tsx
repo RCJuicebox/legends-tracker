@@ -150,14 +150,10 @@ export function Tradeskills() {
               label="Where the numbers come from"
               text={
                 <>
+                  <div>Recipes are eqlwiki's: each crafted item's page gives its recipe and how many a combine makes; the Alchemy table adds potions whose pages do not.</div>
                   <div>
-                    Recipes are eqlwiki's: each crafted item's page gives its recipe and how many a combine makes; the Alchemy table adds potions whose pages do
-                    not.
-                  </div>
-                  <div>
-                    Prices are what your log shows you paying last ("You purchased 100 Small Vial from Kizzie Mintopp for 1 platinum"), from the log and its
-                    archives. An item you have never bought takes a price you type in, else the wiki's merchant value, which is what a vendor asks at best:
-                    faction and charisma change it.
+                    Prices are what your log shows you paying last ("You purchased 100 Small Vial from Kizzie Mintopp for 1 platinum"), from the log and its archives. An item you
+                    have never bought takes a price you type in, else the wiki's merchant value, which is what a vendor asks at best: faction and charisma change it.
                   </div>
                 </>
               }
@@ -359,13 +355,7 @@ function RecipeCard({
           {r.trivial ? `, trivial ${r.trivial}` : ''}
           {r.yields > 1 ? ` · ${r.yields} a combine` : ''}
         </span>
-        <a
-          className="small"
-          href={eqtraders(r.product)}
-          target="_blank"
-          rel="noreferrer"
-          title="Look it up on EQ Traders Corner (EverQuest Live's tradeskill site)"
-        >
+        <a className="small" href={eqtraders(r.product)} target="_blank" rel="noreferrer" title="Look it up on EQ Traders Corner (EverQuest Live's tradeskill site)">
           EQTraders
         </a>
         <span className="spacer" />
@@ -516,7 +506,8 @@ function Sources({ info, craftedBy }: { info: ItemInfo; craftedBy?: string }) {
   if (src?.foraged.length) {
     lines.push({ text: `Foraged in ${src.foraged.slice(0, 2).join(', ')}${src.foraged.length > 2 ? ` +${src.foraged.length - 2}` : ''}`, title: src.foraged.join('\n') })
   }
-  if (use?.quests.length) lines.push({ text: `Quest: ${use.quests.slice(0, 2).join(', ')}${use.quests.length > 2 ? ` +${use.quests.length - 2}` : ''}`, title: use.quests.join('\n') })
+  if (use?.quests.length)
+    lines.push({ text: `Quest: ${use.quests.slice(0, 2).join(', ')}${use.quests.length > 2 ? ` +${use.quests.length - 2}` : ''}`, title: use.quests.join('\n') })
   // Nothing else to go on: what the page says in words.
   if (!lines.length && use?.notes) lines.push({ text: use.notes, title: 'From the item page' })
   if (!lines.length) return <span className="faint">no source on the wiki</span>

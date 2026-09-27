@@ -82,8 +82,8 @@ export function Factions() {
         <div>
           <h1>Factions</h1>
           <p>
-            Faction changes the log recorded for {who(character) || 'your character'}, from its log and its archives. The game does not print your standing
-            itself, so this is the net of what the log saw. <Info label="How it is counted" text={HOW} />
+            Faction changes the log recorded for {who(character) || 'your character'}, from its log and its archives. The game does not print your standing itself, so this is the
+            net of what the log saw. <Info label="How it is counted" text={HOW} />
           </p>
         </div>
         {chars.available.length > 1 && (
@@ -120,11 +120,21 @@ export function Factions() {
           <table className="table">
             <thead>
               <tr>
-                <SortTh k="name" sort={sort} onSort={setSort}>Faction</SortTh>
-                <SortTh k="net" sort={sort} onSort={setSort} num title="Every change the log recorded, added up">Net change</SortTh>
-                <SortTh k="changes" sort={sort} onSort={setSort} num title="How many changes the log recorded">Changes</SortTh>
-                <SortTh k="cap" sort={sort} onSort={setSort} title="Whether the game last said it could get no better, or no worse">At the cap</SortTh>
-                <SortTh k="last" sort={sort} onSort={setSort}>Last changed</SortTh>
+                <SortTh k="name" sort={sort} onSort={setSort}>
+                  Faction
+                </SortTh>
+                <SortTh k="net" sort={sort} onSort={setSort} num title="Every change the log recorded, added up">
+                  Net change
+                </SortTh>
+                <SortTh k="changes" sort={sort} onSort={setSort} num title="How many changes the log recorded">
+                  Changes
+                </SortTh>
+                <SortTh k="cap" sort={sort} onSort={setSort} title="Whether the game last said it could get no better, or no worse">
+                  At the cap
+                </SortTh>
+                <SortTh k="last" sort={sort} onSort={setSort}>
+                  Last changed
+                </SortTh>
               </tr>
             </thead>
             <tbody>
@@ -182,7 +192,11 @@ function History({ r }: { r: FactionRow }) {
     <div className="stack gap-6 small" style={{ padding: '6px 4px' }}>
       <span className="faint">
         First seen {stamp(r.first)}.{' '}
-        {r.recent.length ? (r.changes > r.recent.length ? `The last ${r.recent.length} of ${r.changes} changes, newest first:` : 'Every change, newest first:') : 'No changes recorded, only the cap.'}
+        {r.recent.length
+          ? r.changes > r.recent.length
+            ? `The last ${r.recent.length} of ${r.changes} changes, newest first:`
+            : 'Every change, newest first:'
+          : 'No changes recorded, only the cap.'}
       </span>
       {r.recent.length > 0 && (
         <div className="row tight">

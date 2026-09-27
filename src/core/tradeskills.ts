@@ -79,7 +79,12 @@ export function parseCrafted(product: string, content: string): Recipe[] {
       if (yields) head = { skill: head.skill, trivial: head.trivial, yields: Number(yields[1]) }
       // The container it is made in is not used up.
       else if (!/^In\s+\[\[/i.test(body)) {
-        const ingredients = tally(body.split(/\s\+\s/).map(ingredientOf).filter((x): x is Ingredient => !!x))
+        const ingredients = tally(
+          body
+            .split(/\s\+\s/)
+            .map(ingredientOf)
+            .filter((x): x is Ingredient => !!x)
+        )
         if (ingredients.length) out.push({ product, ...head, ingredients, from: 'page' })
       }
     } else if (t.startsWith('*')) {
@@ -107,7 +112,14 @@ export function parseSkillPage(page: string, wikitext: string): Recipe[] {
       if (!trivialCell || items.length < 2) continue
       const product = linkTexts(items[0])[0]
       if (!product || /^(Skill |Category:|File:)/i.test(product)) continue
-      const ingredients = tally(items.slice(1).flatMap((c) => c.split(/\s\+\s/).map(ingredientOf).filter((x): x is Ingredient => !!x)))
+      const ingredients = tally(
+        items.slice(1).flatMap((c) =>
+          c
+            .split(/\s\+\s/)
+            .map(ingredientOf)
+            .filter((x): x is Ingredient => !!x)
+        )
+      )
       if (!ingredients.length) continue
       out.push({ product, skill, trivial: Math.max(...trivialCell.split('-').map(Number)), yields: 1, ingredients, from: 'table' })
     }
@@ -117,7 +129,10 @@ export function parseSkillPage(page: string, wikitext: string): Recipe[] {
 
 /** A recipe's identity: its product and what goes in, so two recipes for one product stay apart. */
 export const recipeKey = (r: Pick<Recipe, 'product' | 'ingredients'>) =>
-  `${r.product.toLowerCase()}|${r.ingredients.map((i) => `${i.name.toLowerCase()}x${i.count}`).sort().join('+')}`
+  `${r.product.toLowerCase()}|${r.ingredients
+    .map((i) => `${i.name.toLowerCase()}x${i.count}`)
+    .sort()
+    .join('+')}`
 
 /** Every recipe once, by product: the same product in two tables is kept once, the higher trivial winning ties. */
 export function recipeIndex(lists: Recipe[][]): Recipe[] {
