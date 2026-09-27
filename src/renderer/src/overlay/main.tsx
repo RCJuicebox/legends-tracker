@@ -9,21 +9,14 @@ import { attackerRows, attackerSkillRows, damageRows, durationSec, fmtClock, fmt
 import type { CombatSnapshot, MeterMode, MeterOverlayOptions, MeterSpan, OverlayConfig, Segment, SegmentSummary, TimerView } from '../../../shared/types'
 import { DEFAULT_METER_OPTIONS } from '../../../shared/overlays'
 
-interface Alert {
-  id: number
-  text: string
-  color: string
-  until: number
-}
-
 const MODE_NEXT: Record<MeterMode, MeterMode> = { damage: 'incoming', incoming: 'healing', healing: 'damage' }
 const MODE_WORD: Record<MeterMode, string> = { damage: 'Damage', incoming: 'Incoming', healing: 'Healing' }
 
+/** Timers and the damage meter; the alerts overlay has a page of its own (src/alerts). */
 function Overlay() {
   const [config, setConfig] = useState<OverlayConfig | null>(null)
   const [arranging, setArranging] = useState(false)
   const [timers, setTimers] = useState<TimerView[]>([])
-  const [alerts, setAlerts] = useState<Alert[]>([])
   const [combat, setCombat] = useState<CombatSnapshot | null>(null)
 
   useEffect(() => {
@@ -33,20 +26,10 @@ function Overlay() {
         setArranging(p.arranging)
       }),
       api.on('overlay:timers', (views: TimerView[]) => setTimers(views)),
-      api.on('overlay:combat', (snap: CombatSnapshot) => setCombat(snap)),
-      api.on('overlay:alert', (a: { text: string; color: string; durationSec: number }) => {
-        const id = Math.random()
-        setAlerts((list) => [...list.slice(-5), { id, text: a.text, color: a.color || '#ffd84d', until: Date.now() + (a.durationSec || 5) * 1000 }])
-      })
+      api.on('overlay:combat', (snap: CombatSnapshot) => setCombat(snap))
     ]
     return () => offs.forEach((off) => off())
   }, [])
-
-  useEffect(() => {
-    if (!alerts.length) return
-    const id = setInterval(() => setAlerts((list) => list.filter((a) => a.until > Date.now())), 250)
-    return () => clearInterval(id)
-  }, [alerts.length])
 
   if (!config) return null
   const mine = timers.filter((t) => t.overlay === config.id)
@@ -56,20 +39,7 @@ function Overlay() {
         <TimerBars timers={mine} grouped={config.groupByTarget} fontSize={config.fontSize} />
       ) : config.kind === 'meter' ? (
         <MeterOverlay config={config} snap={combat} arranging={arranging} />
-      ) : (
-        <div className="alerts">
-          {alerts.map((a) => (
-            <div key={a.id} className="alert-line" style={{ color: a.color, fontSize: config.fontSize }}>
-              {a.text}
-            </div>
-          ))}
-          {arranging && !alerts.length && (
-            <div className="alert-line" style={{ color: '#ffd84d', fontSize: config.fontSize }}>
-              Alert text appears here
-            </div>
-          )}
-        </div>
-      )}
+      ) : null}
       {arranging && <div className="arrange-label">{config.name} — drag to move, drag edges to resize</div>}
     </div>
   )

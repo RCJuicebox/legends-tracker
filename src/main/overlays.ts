@@ -2,8 +2,12 @@ import { BrowserWindow, screen } from 'electron'
 import type { CombatSnapshot, OverlayConfig, TimerView } from '../shared/types'
 import { push } from './push'
 
+/** The alerts overlay has a page of its own, without React or the meter; the rest share one. */
+type OverlayPage = 'overlay' | 'alerts'
+const pageFor = (kind: OverlayConfig['kind']): OverlayPage => (kind === 'alerts' ? 'alerts' : 'overlay')
+
 export interface OverlayHost {
-  load: (win: BrowserWindow, page: 'overlay', query: Record<string, string>) => void
+  load: (win: BrowserWindow, page: OverlayPage, query: Record<string, string>) => void
   preload: string
   onBoundsChanged: (id: string, bounds: { x: number; y: number; width: number; height: number }) => void
 }
@@ -24,6 +28,7 @@ export interface OverlayHost {
  */
 export class OverlayManager {
   private readonly windows = new Map<string, BrowserWindow>()
+  private readonly pages = new Map<string, OverlayPage>()
   private configs: OverlayConfig[] = []
   private arranging = false
   private topmostTimer: NodeJS.Timeout | null = null
@@ -40,9 +45,12 @@ export class OverlayManager {
   apply(configs: OverlayConfig[]): void {
     this.configs = configs
     for (const [id, win] of this.windows) {
-      if (!configs.some((c) => c.id === id && c.visible)) {
+      // Gone, hidden, or now another kind, whose page is another.
+      const c = configs.find((x) => x.id === id)
+      if (!c?.visible || pageFor(c.kind) !== this.pages.get(id)) {
         win.destroy()
         this.windows.delete(id)
+        this.pages.delete(id)
       }
     }
     for (const c of configs) {
@@ -94,8 +102,10 @@ export class OverlayManager {
       if (this.shown) win.showInactive()
       else win.webContents.setBackgroundThrottling(true)
     })
-    this.host.load(win, 'overlay', { id: c.id })
+    const page = pageFor(c.kind)
+    this.host.load(win, page, { id: c.id })
     this.windows.set(c.id, win)
+    this.pages.set(c.id, page)
     return win
   }
 
@@ -181,6 +191,7 @@ export class OverlayManager {
     this.topmostTimer = null
     for (const w of this.windows.values()) w.destroy()
     this.windows.clear()
+    this.pages.clear()
   }
 }
 
