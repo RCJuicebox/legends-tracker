@@ -97,14 +97,15 @@ export async function checkAgainstLog(opts: {
     if (!r || samples.length < 2) continue
     const sorted = [...samples].sort((a, b) => a - b)
     const median = sorted[Math.floor(sorted.length / 2)]
-    const calc = computeDuration({
-      spell: r.spell, rank: r.rank, level: opts.level(r.spell.name), tierPct: opts.tierPct, focusPct: opts.focusPct(r.spell)
-    })
+    const focusPct = opts.focusPct(r.spell)
+    const calc = computeDuration({ spell: r.spell, rank: r.rank, level: opts.level(r.spell.name), tierPct: opts.tierPct, focusPct })
     if (calc.permanent || calc.wholeTicks <= 0) continue
     const fits = median >= calc.earliestSec - 1 && median <= calc.latestSec + 1
     const range = fits ? null : focusForObserved(tieredTicks(r.spell, r.rank, opts.level(r.spell.name), opts.tierPct), median)
     rows.push({
       rankedName,
+      spell: r.spell.name,
+      focusPct,
       category: r.spell.category,
       samples: samples.length,
       observedMedianSec: Math.round(median),

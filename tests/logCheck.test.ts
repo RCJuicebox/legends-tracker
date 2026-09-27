@@ -48,6 +48,11 @@ describe('checkAgainstLog', () => {
     expect(hi).toBeGreaterThanOrEqual(60.5)
   })
 
+  it('says which spell and what focus the calculation used, for Add this focus to make up the difference', async () => {
+    const [row] = await check(PUMA, 12)
+    expect(row).toMatchObject({ spell: 'Spirit of the Puma', focusPct: 12 })
+  })
+
   it('leaves out a timer joined part way, whose start was not seen', async () => {
     const rows = await check(`
 [Tue Sep 01 12:15:14 2026] Bazzt Zzzt has taken 489 damage from your Envenomed Bolt X.

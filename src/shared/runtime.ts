@@ -115,6 +115,10 @@ export interface KnownSpell extends SpellSummary {
 
 export interface LogCheckRow {
   rankedName: string
+  /** The spell without its rank, as its settings are kept. */
+  spell: string
+  /** The focus percent the calculation used, the spell's own extra included. */
+  focusPct: number
   category: SpellCategory
   samples: number
   observedMedianSec: number

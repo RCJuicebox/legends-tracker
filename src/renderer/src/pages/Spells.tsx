@@ -81,7 +81,7 @@ export function Spells({ go }: { go?: (page: PageId) => void }) {
           <AddSpell onAdded={setKnown} />
         </div>
 
-        <LogCheck />
+        <LogCheck known={known} onSaved={setKnown} />
         <TierTable />
       </div>
     </>
@@ -492,8 +492,22 @@ function AddSpell({ onAdded }: { onAdded: (list: KnownSpell[]) => void }) {
   )
 }
 
-function LogCheck() {
+function LogCheck({ known, onSaved }: { known: KnownSpell[]; onSaved: (k: KnownSpell[]) => void }) {
   const [rows, setRows] = useState<LogCheckRow[] | null>(null)
+  const [added, setAdded] = useState<Record<string, number>>({})
+
+  /** Sets the spell's extra focus so the calculation uses the focus the log implies. */
+  const addFocus = async (r: LogCheckRow) => {
+    if (r.impliedFocusPct === null) return
+    const rule = known.find((k) => k.name === r.spell)?.rule ?? {}
+    const extra = (rule.extraFocusPct ?? 0) + (r.impliedFocusPct - r.focusPct)
+    try {
+      onSaved(await api.invoke('spells:rule', r.spell, { ...rule, extraFocusPct: extra || undefined }))
+      setAdded((a) => ({ ...a, [r.rankedName]: extra }))
+    } catch (e) {
+      showError(`Could not set the focus on ${r.spell}`, e)
+    }
+  }
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [mbs, setMbs] = useState(100)
@@ -563,8 +577,22 @@ function LogCheck() {
                   {r.fits ? (
                     <span className="chip ok">Fits</span>
                   ) : (
-                    <span className="chip warn" title={r.impliedFocusRange ? `Fits with focus ${r.impliedFocusRange[0]}% to ${r.impliedFocusRange[1]}%` : ''}>
-                      Off{r.impliedFocusPct !== null ? ` — needs ≈ ${r.impliedFocusPct}% focus in total` : ''}
+                    <span className="row tight">
+                      <span className="chip warn" title={r.impliedFocusRange ? `Fits with focus ${r.impliedFocusRange[0]}% to ${r.impliedFocusRange[1]}%` : ''}>
+                        Off{r.impliedFocusPct !== null ? ` — needs ≈ ${r.impliedFocusPct}% focus in total` : ''}
+                      </span>
+                      {r.impliedFocusPct !== null &&
+                        (added[r.rankedName] !== undefined ? (
+                          <span className="chip ok">Extra focus set: {added[r.rankedName] > 0 ? '+' : ''}{added[r.rankedName]}%</span>
+                        ) : (
+                          <button
+                            className="btn small"
+                            title={`Sets ${r.spell}'s extra focus so its focus comes to ${r.impliedFocusPct}% (it is ${r.focusPct}% now). Run the check again to see it fit.`}
+                            onClick={() => void addFocus(r)}
+                          >
+                            Add this focus
+                          </button>
+                        ))}
                     </span>
                   )}
                 </td>
