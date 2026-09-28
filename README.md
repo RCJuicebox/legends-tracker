@@ -46,7 +46,8 @@ they survive updates and uninstalls.
    the installer from that commit on a clean Windows machine, runs the type-check, lint and tests,
    creates the release as a draft, uploads the installer with `latest.yml` and its blockmap, checks
    all three arrived, and publishes. Every installed copy picks it up on its next check.
-   `gh run watch` follows the build.
+   `gh run watch` follows the build. GitHub now and then starts two runs for one tag: the second waits
+   for the first, finds the version published and builds nothing.
 
 Running the Release workflow by hand (Actions → Release → Run workflow) is a dry run: it builds the
 installer and attaches it to the run, publishing nothing. Every push to `main` also runs

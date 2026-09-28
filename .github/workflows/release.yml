@@ -14,8 +14,36 @@ on:
 permissions:
   contents: write
 
+# GitHub now and then starts two runs for one tag push (2.3.0 got two). Run side by side they each
+# made a draft, and the publish step found the empty one. A second run for a tag waits for the first
+# here, then finds the release published and builds nothing.
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
+  # Whether this version is out already: then there is nothing to build. A second build would upload to
+  # the published release all over again, taking its files down while it replaces them.
+  check:
+    runs-on: ubuntu-latest
+    outputs:
+      published: ${{ steps.look.outputs.published }}
+    steps:
+      - id: look
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          published=false
+          if [ "${{ startsWith(github.ref, 'refs/tags/v') }}" = true ] &&
+            [ "$(gh release view "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --json isDraft --jq .isDraft 2>/dev/null)" = false ]; then
+            published=true
+            echo "::notice::$GITHUB_REF_NAME is published already; nothing to build."
+          fi
+          echo "published=$published" >> "$GITHUB_OUTPUT"
+
   build:
+    needs: check
+    if: needs.check.outputs.published != 'true'
     runs-on: windows-latest
     defaults:
       run:
@@ -59,15 +87,29 @@ jobs:
       - name: Build the installer
         run: npx electron-builder --win --publish ${{ env.PUBLISH == 'true' && 'always' || 'never' }}
 
+      # The release for this tag that has every file, by its id: a stray draft for the same tag (one an
+      # earlier run left) is passed over rather than looked at by tag name.
       - name: Publish once every file is up
         if: env.PUBLISH == 'true'
         run: |
           version=$(node -p "require('./package.json').version")
-          assets=$(gh release view "$GITHUB_REF_NAME" --json assets --jq '.assets[].name')
-          for need in latest.yml "Legends-Tracker-Setup-$version.exe" "Legends-Tracker-Setup-$version.exe.blockmap"; do
-            echo "$assets" | grep -qxF "$need" || { echo "::error::$need did not upload; the release is left as a draft"; exit 1; }
+          need="latest.yml Legends-Tracker-Setup-$version.exe Legends-Tracker-Setup-$version.exe.blockmap"
+          id=''
+          for rid in $(gh api "repos/$GITHUB_REPOSITORY/releases?per_page=50" --jq ".[] | select(.tag_name == \"$GITHUB_REF_NAME\") | .id"); do
+            assets=$(gh api "repos/$GITHUB_REPOSITORY/releases/$rid/assets" --jq '.[].name')
+            ok=true
+            for n in $need; do echo "$assets" | grep -qxF "$n" || ok=false; done
+            if [ "$ok" = true ]; then
+              id=$rid
+              break
+            fi
           done
-          gh release edit "$GITHUB_REF_NAME" --draft=false --latest
+          if [ -z "$id" ]; then
+            echo "::error::No $GITHUB_REF_NAME release has latest.yml, the installer and its blockmap; it is left as a draft"
+            exit 1
+          fi
+          gh api -X PATCH "repos/$GITHUB_REPOSITORY/releases/$id" -F draft=false -f make_latest=true >/dev/null
+          echo "Published release $id"
 
       - name: Keep the installer from a dry run
         if: env.PUBLISH != 'true'
