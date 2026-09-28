@@ -2,7 +2,7 @@
 
 What changed in each version. The release workflow publishes a version's section as its release notes, and installed copies show them when an update arrives.
 
-## Unreleased
+## 2.3.0 (2026-09-28)
 
 - **Factions: where you stand.** Type `/outputfile faction` in game and the Factions page reads the file the game writes: every faction's standing (-2000 to 2000), how it cons (Ally, Warmly … Scowling) and how far it is to the next con up. Faction changes your log records after the export are added on, so the standings keep up as you play; type it again now and then to refresh. Factions the game lists by number only (Faction723) are hidden until you show them.
 - **Factions: achievements.** **Achievements to Do** lists the factions whose EverQuest › Progression achievement is still open (83 factions have one), with how many points are left to 2000. Open a row for what raises that faction, from eqlwiki: the mobs to kill (by zone), the quests and the zones. Rows start closed.
