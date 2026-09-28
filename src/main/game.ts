@@ -6,6 +6,7 @@ import { parseLogLine, zoneEntered } from '../core/logLine'
 import { readBackward } from './sources/logHistory'
 import { log } from './log'
 import { isCharacterKey } from '../core/validate'
+import { FACTIONS_FILE } from '../features/factions/core'
 
 const INSTALL_SUFFIXES = [
   '\\Daybreak Game Company\\Installed Games\\EverQuest Legends',
@@ -78,9 +79,9 @@ export async function findInstall(): Promise<string> {
   return ''
 }
 
-/** What the tracker can use in a game folder: spell data, character logs, inventory and achievement exports. */
+/** What the tracker can use in a game folder: spell data, character logs, inventory, achievement and faction exports. */
 export async function checkGameFolder(dir: string): Promise<GameFolderCheck> {
-  const empty: GameFolderCheck = { dir, exists: false, spells: false, logs: [], inventory: [], achievements: [] }
+  const empty: GameFolderCheck = { dir, exists: false, spells: false, logs: [], inventory: [], achievements: [], factions: [] }
   if (!dir) return empty
   let names: string[]
   try {
@@ -100,7 +101,9 @@ export async function checkGameFolder(dir: string): Promise<GameFolderCheck> {
     spells: names.some((n) => n.toLowerCase() === 'spells_us.txt'),
     logs: (await listLogs(dir)).map((l) => l.character),
     inventory: characters(/^(.+)-Inventory\.txt$/i),
-    achievements: characters(/^(.+)-Achievements\.txt$/i)
+    achievements: characters(/^(.+)-Achievements\.txt$/i),
+    // The factions export names the class too: Kelwyn_neriak-MNK-Factions.txt.
+    factions: [...new Set(characters(FACTIONS_FILE))]
   }
 }
 

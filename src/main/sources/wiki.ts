@@ -166,6 +166,31 @@ export class WikiClient {
     }
   }
 
+  /** Every article that uses a template ("Template:Factionpage") with its content, fifty a request, handed over a batch at a time. */
+  async embeddedIn(template: string, onBatch: (pages: WikiPage[]) => void, urgency: Urgency = 'background', signal?: AbortSignal): Promise<void> {
+    let cont: Record<string, string> = {}
+    for (;;) {
+      throwIfCancelled(signal)
+      const body = await this.get<QueryPages>(
+        {
+          action: 'query',
+          generator: 'embeddedin',
+          geititle: template,
+          geilimit: '50',
+          geinamespace: '0',
+          prop: 'revisions',
+          rvprop: 'content|ids',
+          rvslots: 'main',
+          ...cont
+        },
+        urgency
+      )
+      onBatch((body.query?.pages ?? []).flatMap((p) => (p.revisions?.[0] ? [{ title: p.title, content: p.revisions[0].slots.main.content, revid: p.revisions[0].revid }] : [])))
+      if (!body.continue) return
+      cont = body.continue
+    }
+  }
+
   /**
    * Every page in a category with its latest revision id and no content, five hundred a request: a
    * cheap way to see what changed since a download.

@@ -21,8 +21,7 @@ import { CastHistory, castCounter, dayConsumer } from './castHistory'
 import { meleeCounter } from '../core/meleeTally'
 import { RecipeBook } from './recipes'
 import { PurchaseHistory, purchaseConsumer } from './purchases'
-import { FactionHistory, factionConsumer } from '../features/factions/main'
-import { ProgressionHistory, progressionConsumer } from '../features/progression/main'
+import { FactionBook, FactionHistory, FactionSourceHistory, FactionWiki, factionConsumer, factionSourceConsumer } from '../features/factions/main'
 import { LogHistory, type HistoryWhere } from './sources/logHistory'
 import { TradeFavorites } from './tradeFavorites'
 import { PetStore, PetWiki } from './pets'
@@ -63,8 +62,11 @@ export interface AppContext {
   purchases: PurchaseHistory
   /** Faction changes over the character's log and archives, for the Factions page. */
   factions: FactionHistory
-  /** Levels, skill-ups, AA points and each session's experience over the log and archives, for the Progression page. */
-  progression: ProgressionHistory
+  factionWiki: FactionWiki
+  /** What caused each faction change, kill or hand-in, for the Factions page's plan. */
+  factionSources: FactionSourceHistory
+  /** eqlwiki's faction pages and the quest pages they name, for the plan. */
+  factionBook: FactionBook
   tradeFavorites: TradeFavorites
   petStore: PetStore
   petWiki: PetWiki
@@ -110,7 +112,7 @@ export function createContext(): AppContext {
   const toMain = windows.toMain.bind(windows)
   // Item pages the Gear page looked up, kept a week; a catalog download refreshes them in passing.
   const itemCatalog = new ItemCatalog(cacheDir())
-  // Casts, the melee tally, purchases, faction changes and progression over each character's log and archives,
+  // Casts, the melee tally, purchases and faction changes over each character's log and archives,
   // read in one pass.
   // Each had a cache file of its own before; log-history.json replaces them.
   for (const f of ['cast-history.json', 'melee-history.json', 'purchases.json']) rmSync(join(dataDir, f), { force: true })
@@ -119,7 +121,7 @@ export function createContext(): AppContext {
     melee: dayConsumer(meleeCounter),
     purchases: purchaseConsumer,
     factions: factionConsumer,
-    progression: progressionConsumer
+    factionSources: factionSourceConsumer
   })
 
   const ctx = {
@@ -140,7 +142,9 @@ export function createContext(): AppContext {
     recipeBook: new RecipeBook((p) => toMain('state:recipes', p)),
     purchases: new PurchaseHistory(logHistory, 'purchases'),
     factions: new FactionHistory(logHistory, 'factions'),
-    progression: new ProgressionHistory(logHistory, 'progression'),
+    factionWiki: new FactionWiki(),
+    factionSources: new FactionSourceHistory(logHistory, 'factionSources'),
+    factionBook: new FactionBook(),
     tradeFavorites: new TradeFavorites(join(dataDir, 'tradeskills.json')),
     inventoryFiles: new InventoryFiles(dataDir, installDir, itemCatalog, (view) => toMain('state:inventory', view)),
     petStore: new PetStore(),
@@ -385,12 +389,12 @@ function registerSources(ctx: AppContext): void {
   sources.add('exports', {
     label: 'Character exports',
     kind: 'game file',
-    what: 'The inventory and achievements files the game writes when you type /outputfile inventory or /outputfile achievements. Watched for new ones while their page is open.'
+    what: 'The inventory, achievements and factions files the game writes when you type /outputfile inventory, /outputfile achievements or /outputfile faction. Watched for new ones while their page is open.'
   })
   sources.add('history', {
     label: 'Log history',
     kind: 'log',
-    what: 'Casts, melee, purchases, faction changes and progression counted over your log and its archives, for the Gear, Spell upgrades, Tradeskills, Factions and Progression pages. Only what the log gains is read again.'
+    what: 'Casts, melee, purchases, faction changes and the kills and hand-ins behind them, counted over your log and its archives, for the Gear, Spell upgrades, Tradeskills and Factions pages. Only what the log gains is read again.'
   })
   sources.add('motes', {
     label: 'Mote history',
@@ -410,6 +414,12 @@ function registerSources(ctx: AppContext): void {
     kind: 'wiki',
     what: "Every player-crafted recipe on eqlwiki, for the Tradeskills page and crafted items' eras.",
     refresh: () => ctx.recipeBook.refresh()
+  })
+  sources.add('factionWiki', {
+    label: 'Faction pages',
+    kind: 'wiki',
+    what: "eqlwiki's faction pages and the quest pages they name, for what raises a faction and the Factions page's plan. Kept a week.",
+    refresh: () => ctx.factionBook.get(true)
   })
   sources.add('petWiki', { label: 'Pet pages', kind: 'wiki', what: "eqlwiki's Pet Guide and each pet's summon page, for the pet gear planner." })
   sources.add('speech', {

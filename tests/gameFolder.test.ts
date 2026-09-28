@@ -15,6 +15,9 @@ describe('finding the game folder from what the player picked', () => {
     writeFileSync(join(game, 'Logs', 'eqlog_Kelwyn_neriak.txt'), 'x')
     writeFileSync(join(game, 'Kelwyn_neriak-Inventory.txt'), '')
     writeFileSync(join(game, 'Kelwyn_neriak-Achievements.txt'), '')
+    // One per class played: the character is listed once.
+    writeFileSync(join(game, 'Kelwyn_neriak-MNK-Factions.txt'), '')
+    writeFileSync(join(game, 'Kelwyn_neriak-WAR-Factions.txt'), '')
     writeFileSync(join(game, 'Kelwyn_neriak_LO1.ini'), '')
   })
   afterAll(() => rmSync(root, { recursive: true, force: true }))
@@ -33,14 +36,15 @@ describe('finding the game folder from what the player picked', () => {
     rmSync(elsewhere, { recursive: true, force: true })
   })
 
-  it('reports the logs, inventory and achievement files it holds', async () => {
+  it('reports the logs, inventory, achievement and faction files it holds', async () => {
     expect(await checkGameFolder(game)).toEqual({
       dir: game,
       exists: true,
       spells: true,
       logs: ['Kelwyn_neriak'],
       inventory: ['Kelwyn_neriak'],
-      achievements: ['Kelwyn_neriak']
+      achievements: ['Kelwyn_neriak'],
+      factions: ['Kelwyn_neriak']
     })
     expect((await checkGameFolder(join(root, 'missing'))).exists).toBe(false)
   })

@@ -14,7 +14,6 @@ import { registerAudioIpc } from './ipc/audio'
 import { registerCharacterIpc } from './ipc/character'
 import { registerDemoIpc } from './demo'
 import { registerFactionIpc } from '../features/factions/main'
-import { registerProgressionIpc } from '../features/progression/main'
 import { appUserModelId, ensureSourceShortcut } from './appIdentity'
 import { appIcon } from './bootstrap'
 import { isOwnPage } from './push'
@@ -61,7 +60,6 @@ async function start(ctx: AppContext): Promise<void> {
     registerAudioIpc,
     registerCharacterIpc,
     registerFactionIpc,
-    registerProgressionIpc,
     registerDemoIpc
   ]) {
     register(ctx)

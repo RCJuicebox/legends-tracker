@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 
 import type { SpellCategory } from '../../../shared/types'
 import { CATEGORY_LABELS } from '../../../shared/types'
 import { iconUrl } from '../api'
+import { showToast } from '../toast'
 
 /** An on/off switch. Give it a `label` unless a wrapping <label> already names it. */
 export function Switch({ on, onChange, title, label }: { on: boolean; onChange: (v: boolean) => void; title?: string; label?: string }) {
@@ -89,6 +90,7 @@ const paths = {
   sparkle: <path d="M12 2l2.4 7.4H22l-6.2 4.5 2.4 7.4L12 16.8l-6.2 4.5 2.4-7.4L2 9.4h7.6z" />,
   meter: <path d="M3 4h18v3H3zm0 6.5h12v3H3zm0 6.5h7v3H3z" />,
   flag: <path d="M5 2h2v20H5zm4 1h10l-2.5 4L19 11H9z" />,
+  check: <path d="M9 16.2 4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4z" />,
   copy: <path d="M8 2h10a2 2 0 0 1 2 2v12h-2V4H8zm-4 4h10a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2zm0 2v12h10V8z" />,
   back: <path d="M20 11H7.8l5.6-5.6L12 4l-8 8 8 8 1.4-1.4L7.8 13H20z" />,
   flask: <path d="M19.8 18.4 14 10.67V6.5l1.35-1.69c.26-.33.03-.81-.39-.81H9.04c-.42 0-.65.48-.39.81L10 6.5v4.17L4.2 18.4c-.49.66-.02 1.6.8 1.6h14c.82 0 1.29-.94.8-1.6z" />,
@@ -110,6 +112,48 @@ export function Icon({ name }: { name: IconName }) {
       {paths[name]}
     </svg>
   )
+}
+
+/**
+ * A command to type in game, such as /outputfile inventory, with a button beside it that copies it,
+ * to paste into the chat box instead of typing it.
+ */
+export function GameCommand({ cmd }: { cmd: string }) {
+  const [copied, setCopied] = useState(false)
+  useEffect(() => {
+    if (!copied) return
+    const t = setTimeout(() => setCopied(false), 1500)
+    return () => clearTimeout(t)
+  }, [copied])
+  const copy = (e: React.MouseEvent) => {
+    // It sits inside clickable rows and labels too: the copy is all the click does.
+    e.stopPropagation()
+    e.preventDefault()
+    navigator.clipboard.writeText(cmd).then(
+      () => {
+        setCopied(true)
+        showToast(`Copied ${cmd}: paste it into the game's chat box`)
+      },
+      () => showToast('Could not copy', { tone: 'bad' })
+    )
+  }
+  return (
+    <span className="game-cmd">
+      <span className="mono">{cmd}</span>
+      <button type="button" className={`game-cmd-copy${copied ? ' done' : ''}`} onClick={copy} title={`Copy ${cmd}`} aria-label={`Copy ${cmd} to the clipboard`}>
+        <Icon name={copied ? 'check' : 'copy'} />
+      </button>
+    </span>
+  )
+}
+
+const GAME_COMMAND = /(\/outputfile [a-z]+)/i
+
+/** Text with each /outputfile command in it shown as a GameCommand, for messages written as plain strings. */
+export function WithCommands({ text }: { text: string }) {
+  const parts = text.split(GAME_COMMAND)
+  if (parts.length === 1) return <>{text}</>
+  return <>{parts.map((p, i) => (i % 2 ? <GameCommand key={i} cmd={p} /> : p))}</>
 }
 
 /**

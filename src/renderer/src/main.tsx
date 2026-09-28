@@ -31,7 +31,6 @@ import { DamageMeter } from './pages/DamageMeter'
 import { DataSources } from './pages/DataSources'
 import { FEATURE_PAGES, type FeaturePageId } from '../../features'
 import { Factions } from '../../features/factions/page'
-import { Progression } from '../../features/progression/page'
 
 /** The pages that are not feature modules, in sidebar order. */
 const SHELL_PAGES = [
@@ -60,7 +59,7 @@ export type PageId = (typeof SHELL_PAGES)[number]['id'] | FeaturePageId
 type PageComponent = ComponentType<{ go: (p: PageId) => void }>
 
 /** Each feature module's page (src/features/<name>/page.tsx), by id. */
-const FEATURE_ELEMENTS: Record<FeaturePageId, PageComponent> = { factions: Factions, progression: Progression }
+const FEATURE_ELEMENTS: Record<FeaturePageId, PageComponent> = { factions: Factions }
 
 interface PageEntry {
   id: PageId

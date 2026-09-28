@@ -192,6 +192,9 @@ export class LogHistory {
     try {
       const p = JSON.parse(await fs.readFile(this.cacheFile, 'utf8')) as CacheFile
       if (p.version === 1 && p.archives && p.live) {
+        // Values of a consumer the app no longer has (a page since removed) are dropped, not kept for ever.
+        for (const entry of [...Object.values(p.archives), ...Object.values(p.live)])
+          for (const k of Object.keys(entry.values ?? {})) if (!(k in this.consumers)) delete entry.values[k]
         this.cache = p
         for (const [k, v] of Object.entries(p.live)) this.savedOffsets.set(k, v.offset)
       }

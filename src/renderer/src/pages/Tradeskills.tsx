@@ -3,7 +3,7 @@ import { api, ago } from '../api'
 import { useInvoke, useItemInfo } from '../hooks'
 import { useRemembered } from '../remember'
 import { act, showError } from '../toast'
-import { Info, Pending } from '../components/ui'
+import { GameCommand, Info, Pending } from '../components/ui'
 import { wikiUrl } from '../../../core/format'
 import { fmtCoin } from '../../../core/loot'
 import { itemKey } from '../../../core/inventory'
@@ -143,8 +143,7 @@ export function Tradeskills() {
         <div>
           <h1>Tradeskills</h1>
           <p>
-            Recipes you make, what goes in, what you have, where to buy the rest and what a batch costs. Counts are from your last{' '}
-            <span className="mono">/outputfile inventory</span>
+            Recipes you make, what goes in, what you have, where to buy the rest and what a batch costs. Counts are from your last <GameCommand cmd="/outputfile inventory" />
             {exportAge ? ` (${exportAge})` : ''}: bags, bank and tradeskill depot.{' '}
             <Info
               label="Where the numbers come from"

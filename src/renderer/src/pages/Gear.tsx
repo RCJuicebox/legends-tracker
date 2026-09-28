@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react'
 import { api, ago } from '../api'
 import { remember, useRemembered } from '../remember'
 import { showError } from '../toast'
-import { Pending, Tabs } from '../components/ui'
+import { GameCommand, Pending, Tabs } from '../components/ui'
 import { numExact as num, who, wikiUrl } from '../../../core/format'
 import { itemKey, mergeLevel, parseStatsBlock, placeLabel, slotLabel, storageTab, wornTotals, SAVE_KEYS, STAT_KEYS, type InvItem } from '../../../core/inventory'
 import type { CharacterSheet, InventoryView, ItemInfo } from '../../../shared/types'
@@ -110,7 +110,7 @@ export function Gear({ go, only, onPlan }: { go?: (page: PageId) => void; only?:
         <h1>Gear</h1>
         <p>
           What {name || 'your character'} is wearing, from the game's inventory export: every item at its merge level, with the stats the wiki gives it. Type{' '}
-          <span className="mono">/outputfile inventory</span> in game after a change; this page follows the file
+          <GameCommand cmd="/outputfile inventory" /> in game after a change; this page follows the file
           {view.modified > 0 ? ` (last written ${ago(view.modified)})` : ''}.
         </p>
       </div>
@@ -154,8 +154,8 @@ export function Gear({ go, only, onPlan }: { go?: (page: PageId) => void; only?:
         <div className="card empty">
           {view.error === 'missing' || !character ? (
             <>
-              No inventory export for {character ? <b>{who(character)}</b> : 'this character'} yet. Type <span className="mono">/outputfile inventory</span> in game and this page
-              fills in within a few seconds.
+              No inventory export for {character ? <b>{who(character)}</b> : 'this character'} yet. Type <GameCommand cmd="/outputfile inventory" /> in game and this page fills in
+              within a few seconds.
             </>
           ) : (
             <>

@@ -15,9 +15,6 @@ export interface FeaturePage {
   readonly after: string
 }
 
-export const FEATURE_PAGES = [
-  { id: 'factions', group: 'Character', label: 'Factions', icon: 'flag', after: 'achievements' },
-  { id: 'progression', group: 'Character', label: 'Progression', icon: 'sparkle', after: 'stats' }
-] as const satisfies readonly FeaturePage[]
+export const FEATURE_PAGES = [{ id: 'factions', group: 'Character', label: 'Factions', icon: 'flag', after: 'achievements' }] as const satisfies readonly FeaturePage[]
 
 export type FeaturePageId = (typeof FEATURE_PAGES)[number]['id']

@@ -10,8 +10,8 @@ import type { AaSummary } from '../core/aa'
 import type { ArchiveOutcome } from '../core/archiver'
 import type { BuffView } from '../core/buffs'
 import type { EffectSpell } from '../core/itemEffects'
-import type { FactionView } from '../features/factions/core'
-import type { ProgressionView } from '../features/progression/core'
+import type { FactionSources, FactionView } from '../features/factions/core'
+import type { FactionPlanData } from '../features/factions/planner'
 import type { FocusReport } from '../core/itemFocus'
 import type { LootSnapshot } from '../core/loot'
 import type { MeleeProfile } from '../core/meleeTally'
@@ -331,10 +331,12 @@ export interface Invokes {
 
   /** Faction changes the character's log and its archives recorded. */
   'factions:get': (character: string) => FactionView
-  /** Levels, skill-ups, AA points and purchases, and each session's experience lines, from the character's log and its archives. */
-  'progression:get': (character: string) => ProgressionView
+  /** What raises a faction, from its eqlwiki page; sources is null when the wiki has none. */
+  'factions:sources': (faction: string) => { sources: FactionSources | null }
+  /** What the Plan tab plans the faction achievements still to do from; `refresh` reads eqlwiki's pages again, `wide` adds the ways to raise every other faction. */
+  'factions:plan': (character: string, refresh?: boolean, wide?: boolean) => FactionPlanData
 
-  'character:exports': () => { current: string; achievements: string[]; inventory: string[] }
+  'character:exports': () => { current: string; achievements: string[]; inventory: string[]; factions: string[] }
   'character:sheet': (character: string) => CharacterSheet
   'character:saveSheet': (character: string, sheet: CharacterSheet) => void
   'inventory:load': (character: string, refresh?: boolean) => InventoryView
@@ -498,7 +500,8 @@ const INVOKE_CHANNELS: Record<InvokeChannel, true> = {
   'achievements:load': true,
   'achievements:marks': true,
   'factions:get': true,
-  'progression:get': true,
+  'factions:sources': true,
+  'factions:plan': true,
   'character:exports': true,
   'character:sheet': true,
   'character:saveSheet': true,

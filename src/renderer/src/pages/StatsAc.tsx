@@ -2,6 +2,7 @@ import { num } from '../../../core/format'
 import { acInputs, acReport } from '../../../core/statsModel'
 import { className } from '../../../shared/game/classes'
 import { Notes, NumField, Trace, type TabProps } from './statsBits'
+import { GameCommand } from '../components/ui'
 
 export function AcTab({
   s,
@@ -93,7 +94,11 @@ export function AcTab({
             <NumField label="AC from food and drink" value={s.foodDrinkAC} onChange={(v) => set({ foodDrinkAC: v ?? 0 })} />
             <NumField label="AC from tribute and trophies" value={s.tributeAC} onChange={(v) => set({ tributeAC: v ?? 0 })} />
           </div>
-          {!hasInventory && <p className="faint small">No inventory export yet, so type your worn AC. Type /outputfile inventory in game to fill it in.</p>}
+          {!hasInventory && (
+            <p className="faint small">
+              No inventory export yet, so type your worn AC. Type <GameCommand cmd="/outputfile inventory" /> in game to fill it in.
+            </p>
+          )}
         </div>
         <div className="card stack gap-10">
           <h2>Character</h2>

@@ -99,4 +99,21 @@ describe('LogHistory', () => {
     await fs.appendFile(logPath, line('Thu Sep 24 16:00:30 2026', 'You begin casting Odium.'))
     expect((await history.get<Days>('casts', where)).live).toEqual({ '2026-09-24': { 'Envenomed Bolt X': 1, Odium: 1 } })
   })
+
+  it('drops what a consumer the app no longer has left in the cache', async () => {
+    const logPath = join(dir, 'eqlog_Kelwyn_neriak.txt')
+    const cacheFile = join(dir, 'log-history.json')
+    const where = { logPath, archiveDir: join(dir, 'archive'), stem: 'eqlog_Kelwyn_neriak' }
+    await fs.writeFile(logPath, line('Thu Sep 24 16:00:00 2026', 'You purchased 5 Small Vial from Kizzie for 5 copper.'))
+    await new LogHistory(cacheFile, { casts: dayConsumer(castCounter), purchases: purchaseConsumer }).get('casts', where)
+    expect(await fs.readFile(cacheFile, 'utf8')).toContain('"purchases"')
+
+    // Purchases gone from the app: its values go with the next save.
+    const history = new LogHistory(cacheFile, { casts: dayConsumer(castCounter) })
+    await fs.appendFile(logPath, line('Thu Sep 24 16:00:30 2026', 'You begin casting Odium.'))
+    expect((await history.get<Days>('casts', where)).live).toEqual({ '2026-09-24': { Odium: 1 } })
+    const saved = await fs.readFile(cacheFile, 'utf8')
+    expect(saved).toContain('"casts"')
+    expect(saved).not.toContain('"purchases"')
+  })
 })

@@ -4,7 +4,7 @@ import { useRemembered } from '../remember'
 import { usePickedCharacter } from '../character'
 import { useInvoke } from '../hooks'
 import { showError, showToast } from '../toast'
-import { Pending } from '../components/ui'
+import { GameCommand, Pending } from '../components/ui'
 import { numExact as num, who } from '../../../core/format'
 import { AchievementBook, compareNames, norm, placeOf, secKey, type AchMarks, type AchObjective, type AchRef, type Achievement, type ObjRef } from '../../../core/achievements'
 import { HUNT } from '../../../core/achievementHunt'
@@ -131,9 +131,14 @@ export function Achievements() {
       <div>
         <h1>Achievements</h1>
         <p>
-          {view.modified
-            ? `${who(view.character)} · from ${view.file}, written by the game ${ago(view.modified)}. Type /outputfile achievements in game to refresh it; this page updates on its own.`
-            : 'Read from the achievements export the game writes into its folder.'}
+          {view.modified ? (
+            <>
+              {who(view.character)} · from {view.file}, written by the game {ago(view.modified)}. Type <GameCommand cmd="/outputfile achievements" /> in game to refresh it; this
+              page updates on its own.
+            </>
+          ) : (
+            'Read from the achievements export the game writes into its folder.'
+          )}
         </p>
       </div>
       {chars.available.length > 1 && (
@@ -159,7 +164,7 @@ export function Achievements() {
             <>
               No achievements export for {character ? <b>{who(character)}</b> : 'this character'} yet.
               <br />
-              In game, type <span className="mono">/outputfile achievements</span>. The game writes the file into its folder and this page picks it up within a few seconds.
+              In game, type <GameCommand cmd="/outputfile achievements" />. The game writes the file into its folder and this page picks it up within a few seconds.
             </>
           ) : (
             <>

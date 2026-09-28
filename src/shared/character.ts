@@ -140,6 +140,7 @@ export interface GameFolderCheck {
   logs: string[]
   inventory: string[]
   achievements: string[]
+  factions: string[]
 }
 
 export interface MoteStock {

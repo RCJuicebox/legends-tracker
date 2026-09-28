@@ -3,6 +3,7 @@ import { api, errorMessage } from '../api'
 import { useApp, useLive } from '../state'
 import { whoList as who } from '../../../core/format'
 import type { GameFolderCheck } from '../../../shared/types'
+import { WithCommands } from './ui'
 
 /** Finds the game folder again, or lets the player point at it. Reports what happened in a line under the buttons. */
 function useFolderActions() {
@@ -65,7 +66,8 @@ export function GameFolderCard() {
         [check.spells, 'Spell data', check.spells ? `spells_us.txt, ${spellsLoaded.toLocaleString()} spells` : 'No spells_us.txt here: spell timers need it'],
         [check.logs.length > 0, 'Character logs', check.logs.length ? who(check.logs) : 'None in Logs yet. Type /log on in game to start one'],
         [check.inventory.length > 0, 'Inventory files', check.inventory.length ? who(check.inventory) : 'None yet. Type /outputfile inventory in game to write one'],
-        [check.achievements.length > 0, 'Achievement files', check.achievements.length ? who(check.achievements) : 'None yet. Type /outputfile achievements in game to write one']
+        [check.achievements.length > 0, 'Achievement files', check.achievements.length ? who(check.achievements) : 'None yet. Type /outputfile achievements in game to write one'],
+        [check.factions.length > 0, 'Faction files', check.factions.length ? who(check.factions) : 'None yet. Type /outputfile faction in game to write one']
       ]
     : []
 
@@ -99,7 +101,9 @@ export function GameFolderCard() {
                 <td className="nowrap" style={{ fontWeight: 600, width: 170 }}>
                   {label}
                 </td>
-                <td className={ok ? '' : 'muted'}>{detail}</td>
+                <td className={ok ? '' : 'muted'}>
+                  <WithCommands text={detail} />
+                </td>
               </tr>
             ))}
           </tbody>
@@ -120,7 +124,7 @@ export function GameFolderPrompt() {
     <div className="notice bad stack gap-8 mb-16">
       <div>
         <b>{s.installDir ? `No EverQuest Legends game files in ${s.installDir}.` : 'Could not find your EverQuest Legends folder.'}</b> The tracker reads your logs, spell data,
-        inventory and achievement files from it. Point it at the folder the game is installed in, usually …\Daybreak Game Company\Installed Games\EverQuest Legends.
+        inventory, achievement and faction files from it. Point it at the folder the game is installed in, usually …\Daybreak Game Company\Installed Games\EverQuest Legends.
       </div>
       <div className="row">
         <button className="btn primary" onClick={() => void choose()}>

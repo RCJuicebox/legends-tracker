@@ -14,8 +14,8 @@ import type { AppContext } from '../context'
 import type { CatalogFile } from '../../shared/ipc'
 
 // A character's files and what is looked up for them: achievements, inventory, the sheet, gear (catalog,
-// focus, worn effects), the pet, tradeskills and the Stats page's tables and screen reads. Factions and
-// progression answer from their feature folders (src/features).
+// focus, worn effects), the pet, tradeskills and the Stats page's tables and screen reads. Factions
+// answers from its feature folder (src/features).
 
 export function registerCharacterIpc(ctx: AppContext): void {
   const { store, engine } = ctx
@@ -29,7 +29,7 @@ export function registerCharacterIpc(ctx: AppContext): void {
   // Which characters have a given export, and which one is being played.
   handle('character:exports', async () => {
     const check = await checkGameFolder(ctx.installDir())
-    return { current: ctx.characterKey(), achievements: check.achievements, inventory: check.inventory }
+    return { current: ctx.characterKey(), achievements: check.achievements, inventory: check.inventory, factions: check.factions }
   })
   handle('inventory:load', (character, refresh) => ctx.inventoryFiles.load(character, !!refresh))
   handle('inventory:lookup', (names, force) =>

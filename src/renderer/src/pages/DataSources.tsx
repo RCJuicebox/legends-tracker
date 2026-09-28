@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { api, ago } from '../api'
 import { useInvoke } from '../hooks'
 import { act, showError } from '../toast'
-import { Pending } from '../components/ui'
+import { Pending, WithCommands } from '../components/ui'
 import type { SourceView } from '../../../shared/ipc'
 
 // Where everything the app shows comes from, and how each source last fared: the place to look when a
@@ -85,11 +85,17 @@ export function DataSources() {
                     <tr key={r.id}>
                       <td>
                         <div style={{ fontWeight: 600 }}>{r.label}</div>
-                        <div className="faint small">{r.what}</div>
+                        <div className="faint small">
+                          <WithCommands text={r.what} />
+                        </div>
                       </td>
                       <td>
                         <span className={`chip ${STATUS[r.status].chip}`}>{STATUS[r.status].word}</span>
-                        {r.detail && <div className="small">{r.detail}</div>}
+                        {r.detail && (
+                          <div className="small">
+                            <WithCommands text={r.detail} />
+                          </div>
+                        )}
                         {r.error && <div className="small bad-text">{r.error}</div>}
                       </td>
                       <td className="small">{r.lastOk ? ago(r.lastOk) : '—'}</td>

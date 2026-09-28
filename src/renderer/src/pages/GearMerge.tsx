@@ -3,7 +3,7 @@ import { ago, api } from '../api'
 import { useInvoke } from '../hooks'
 import { remember, useRemembered } from '../remember'
 import { showError, showToast } from '../toast'
-import { Info } from '../components/ui'
+import { GameCommand, Info } from '../components/ui'
 import { num } from '../../../core/format'
 import { useStock } from './MotePlanner'
 import { itemKey, parseStatsBlock, slotLabel, type InvItem } from '../../../core/inventory'
@@ -145,7 +145,7 @@ export function MergeTab({
         <div className="notice bad">
           Since that export you looted {since.looted} piece{since.looted === 1 ? '' : 's'} of gear
           {since.merged > 0 ? ` and merged ${since.merged} into ${since.into.length ? since.into.join(', ') : 'your gear'}` : ''}, so this list may not be what you wear now. Type{' '}
-          <span className="mono">/outputfile inventory</span> in game and it follows the new file.
+          <GameCommand cmd="/outputfile inventory" /> in game and it follows the new file.
         </div>
       )}
 

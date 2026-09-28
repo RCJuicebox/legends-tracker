@@ -1,0 +1,753 @@
+import { Fragment, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react'
+import { ago, api } from '../../renderer/src/api'
+import { showError } from '../../renderer/src/toast'
+import { useInvoke } from '../../renderer/src/hooks'
+import { useRemembered } from '../../renderer/src/remember'
+import { useNow } from '../../renderer/src/components/TimerBars'
+import { GameCommand, Info, NumberInput, Pending, Segmented } from '../../renderer/src/components/ui'
+import { who, wikiUrl } from '../../core/format'
+import { fmtCoin } from '../../core/loot'
+import { STANDING_MAX, type FactionView } from './core'
+import {
+  DEFAULT_SETTINGS,
+  NO_CHOICES,
+  planFactions,
+  planFor,
+  plannable,
+  type FactionPlan,
+  type PlanFor,
+  type PlanGoal,
+  type PlanShape,
+  type HandInItem,
+  type PlanActivity,
+  type PlanChoices,
+  type PlanOption,
+  type PlanSettings,
+  type PlanStep
+} from './planner'
+
+// The Factions page's Plan tab: the quickest known way to finish every faction achievement still to
+// do, step by step, and every way there is to raise each one, to lock one in (the plan is then built
+// around it) or rule one out. The plan itself is worked out here (planner.ts) from what the main
+// process gathers, so a change of choices or assumptions shows at once.
+//
+// What is still to do, and where each faction stands, is the Standings tab's own view of the
+// character picked, read every ten seconds: the plan follows play, and plans for whichever character
+// it is. The catalog of ways (the log's kills and hand-ins, eqlwiki) changes slowly and is read once a
+// minute, or at once when an achievement it was not built for turns up.
+
+const HOW =
+  'Each achievement is done the moment its standing reaches 2000, and stays done whatever the standing does after. So the plan orders the ' +
+  'work: something that lowers an achievement still to do comes after that achievement is done, where it costs nothing. At each step it ' +
+  'takes whatever does the most for the achievements still to do per hour, counting points it would take off another one as work to do ' +
+  'again; then it tries other orders and other ways for each achievement and keeps any that save time. ' +
+  'What raises a faction comes from your own log first (every kill and hand-in that moved a faction, with the amounts Legends gives and ' +
+  'how fast you got through them), and from eqlwiki (faction pages, quest pages, item pages) where your log has nothing; the wiki often ' +
+  'says only "got better", and then your log’s usual amount stands in (or typical Legends amounts when your log has too few to say). Mobs the wiki names are grouped into camps by zone: common mobs go at ' +
+  'your kill pace, named ones at one per respawn, so a camp of one or two named mobs loses to a quest. Hand-ins take the stack at once, so ' +
+  'what counts is getting the items: bought ones are quick, gathered ones take the time you set, and what you already hold is free. ' +
+  'A quest step counts as repeatable when it wants one kind of item nobody in the walkthrough hands you; chain steps, big one-off ' +
+  'rewards and hand-ins your log saw fewer than three times are listed but not planned, unless you lock one in. ' +
+  'Two goals: Fastest takes every achievement in the least time. Most factions positive also counts every faction that ends at 0 or ' +
+  'above, each worth the hours you set, so it may take a slower way that keeps a faction up, or add steps at the end that bring ' +
+  'factions back from below zero. Either way, where a faction ends is what counts: points an early step takes and a later one gives ' +
+  'back cost nothing.'
+
+/** "3 h 20 min", "12 min", "40 s". */
+function span(seconds: number): string {
+  const s = Math.round(seconds)
+  if (s < 90) return `${s} s`
+  const m = Math.round(s / 60)
+  if (m < 90) return `${m} min`
+  const h = Math.floor(m / 60)
+  return m % 60 ? `${h} h ${m % 60} min` : `${h} h`
+}
+
+const signed = (n: number) => (n > 0 ? `+${fmt(n)}` : n < 0 ? `−${fmt(-n)}` : '0')
+const fmt = (n: number) => (Number.isInteger(n) ? n.toLocaleString() : n.toFixed(1))
+const plain = (n: number) => (n < 0 ? `−${-n}` : String(n))
+
+const KIND_LABEL: Record<PlanActivity['kind'], string> = { kill: 'Kill', turnin: 'Hand-in', quest: 'Quest' }
+
+/** Where a hand-in's item comes from, in a few words. */
+function itemSource(it: HandInItem): string {
+  const where = it.where ? ` ${it.where}` : ''
+  switch (it.how) {
+    case 'coin':
+      return 'coin'
+    case 'bought':
+      return `you bought it from${where}${it.each ? `, ${fmtCoin(Math.round(it.each))} each` : ''}`
+    case 'vendor':
+      return `sold by${where}`
+    case 'crafted':
+      return 'crafted'
+    case 'drop':
+      return it.named ? `from${where || ' a named mob'} (named: one a respawn)` : `drops${it.where ? ` from ${it.where}` : ''}`
+    default:
+      return 'the wiki does not say where it comes from'
+  }
+}
+
+function ItemsLine({ items, units }: { items: HandInItem[]; units?: number }) {
+  if (!items.length) return <span className="faint">The walkthrough does not say what goes in.</span>
+  return (
+    <>
+      {items.map((it, i) => (
+        <Fragment key={it.name + i}>
+          {i > 0 && ', '}
+          <span className="mono">{it.count}</span> {it.name}
+          {it.makes && <span className="faint"> (combined into {it.makes})</span>}
+          <span className="faint"> — {itemSource(it)}</span>
+          {!!it.have && (
+            <span className="ok-text">
+              {' '}
+              · you hold {it.have.toLocaleString()}
+              {units ? ` (${Math.min(units, Math.floor(it.have / it.count)).toLocaleString()} hand-ins' worth)` : ''}
+            </span>
+          )}
+        </Fragment>
+      ))}
+    </>
+  )
+}
+
+/** "Kill A gnoll, A gnoll guardsman and 19 more", "Hand in to Lashun Novashine", "Bone Chips (Kaladim)". */
+function Doing({ a }: { a: PlanActivity }) {
+  const link = a.page ? (
+    <a href={wikiUrl(a.page)} target="_blank" rel="noreferrer" title="Open on eqlwiki" onClick={(e) => e.stopPropagation()}>
+      {a.kind === 'quest' ? a.title : '↗'}
+    </a>
+  ) : null
+  if (a.kind === 'kill')
+    return (
+      <span title={a.mobs?.join(', ')}>
+        Kill <b>{a.title}</b> {a.page && link}
+      </span>
+    )
+  if (a.kind === 'turnin')
+    return (
+      <span>
+        Hand in to <b>{a.npc ?? a.title}</b>
+      </span>
+    )
+  return (
+    <span>
+      <b>{link ?? a.title}</b>
+      {a.npc ? <span className="faint"> — hand in to {a.npc}</span> : null}
+    </span>
+  )
+}
+
+/** Where a figure came from. */
+function sourceNote(a: PlanActivity): string {
+  if (a.source === 'log') return `from your log (${(a.seen ?? 0).toLocaleString()} ${a.kind === 'kill' ? 'kills' : 'hand-ins'})`
+  return a.guessed?.length ? 'from eqlwiki, amounts guessed' : 'from eqlwiki'
+}
+
+function useChoices(character: string): [PlanChoices, (c: PlanChoices) => void] {
+  const [stored, set] = useRemembered<PlanChoices>(`factions.plan.${character}`, NO_CHOICES)
+  const choices = useMemo<PlanChoices>(() => ({ locks: stored?.locks ?? {}, excluded: stored?.excluded ?? [], perHour: stored?.perHour ?? {} }), [stored])
+  return [choices, set]
+}
+
+export function PlanTab({ character, view }: { character: string; view: FactionView | null }) {
+  const [stored, setSettings] = useRemembered<Partial<PlanSettings>>('factions.plan.settings', {})
+  const aim: PlanGoal = stored.goal === 'positive' ? 'positive' : 'fastest'
+  // Most factions positive wants the ways to raise every faction, not only the achievements.
+  const wide = aim === 'positive'
+  const q = useInvoke(character ? 'factions:plan' : null, [character, false, wide])
+  const data = q.data
+  // Every ten seconds brings a new view: the plan is worked out again only when what it is for changed.
+  const liveKey = useMemo(() => (view ? JSON.stringify(planFor(view)) : ''), [view])
+  const live = useMemo<PlanFor | null>(() => (liveKey ? (JSON.parse(liveKey) as PlanFor) : null), [liveKey])
+  const todo: PlanFor | null = live ?? data
+  const [reading, setReading] = useState(false)
+  // Reads eqlwiki's pages again, once: the reloads each minute go on from the pages kept.
+  const readAgain = async () => {
+    setReading(true)
+    try {
+      q.setData(await api.invoke('factions:plan', character, true, wide))
+    } catch (e) {
+      showError("Could not read eqlwiki's faction pages again", e)
+    } finally {
+      setReading(false)
+    }
+  }
+  const now = useNow(30_000)
+  const [choices, setChoices] = useChoices(character)
+  const [open, setOpen] = useState<string | null>(null)
+
+  // New kills and hand-ins show up as the log grows; the catalog comes from caches after the first read.
+  const reload = q.reload
+  useEffect(() => {
+    const t = setInterval(reload, 60_000)
+    return () => clearInterval(t)
+  }, [reload])
+  // An achievement the catalog was not built for (one fallen back below 2000 with no achievements export): read it again now.
+  const unknown = !!live && !!data && live.targets.some((t) => !data.targets.some((d) => d.faction === t.faction))
+  useEffect(() => {
+    if (unknown) reload()
+  }, [unknown, reload])
+
+  const logPace = data?.catalog.killsPerHour ?? null
+  const settings = useMemo<PlanSettings>(() => ({ ...DEFAULT_SETTINGS, killsPerHour: logPace ?? DEFAULT_SETTINGS.killsPerHour, ...stored }), [stored, logPace])
+  const deferredSettings = useDeferredValue(settings)
+  const deferredChoices = useDeferredValue(choices)
+  // The order is kept while only the standings move, so the steps are not reshuffled mid-grind. An
+  // achievement done, a change of choices or assumptions, or Plan afresh searches for the order again.
+  const [afresh, setAfresh] = useState(0)
+  const openSet = todo ? todo.targets.flatMap((t) => (t.standing < STANDING_MAX ? [t.faction] : [])).join('|') : ''
+  // A catalog with other ways in it (the wider one Most factions positive reads, or a hand-in newly seen three times) plans afresh too.
+  const structure = JSON.stringify([openSet, deferredSettings, deferredChoices, afresh, data?.catalog.activities.length ?? 0])
+  const keptShape = useRef<{ key: string; shape: PlanShape } | null>(null)
+  const plan = useMemo(() => {
+    if (!data || !todo) return null
+    const keep = keptShape.current?.key === structure ? keptShape.current.shape : undefined
+    const p = planFactions({ targets: todo.targets, maxed: todo.maxed, standings: todo.standings, activities: data.catalog.activities }, deferredSettings, deferredChoices, keep)
+    keptShape.current = { key: structure, shape: p.shape }
+    return p
+  }, [data, todo, deferredSettings, deferredChoices, structure])
+
+  if (!data)
+    return (
+      <Pending
+        error={q.error}
+        retry={q.reload}
+        what="the plan"
+        hint="The first plan for a character reads its whole log and eqlwiki's faction, quest and item pages; it can take a minute."
+      />
+    )
+
+  const { targets, achievementsExport } = todo ?? data
+  const toDo = targets.filter((t) => t.standing < STANDING_MAX)
+  if (!targets.length)
+    return (
+      <div className="card empty">
+        Every faction achievement is done for {who(character)}. Type <GameCommand cmd="/outputfile achievements" /> in game if that is not so: this page goes by the achievements
+        export.
+      </div>
+    )
+
+  /** Locks achievements to an activity, or unlocks them (null), in one change. */
+  const lock = (factions: string[], id: string | null) => {
+    const locks = { ...choices.locks }
+    for (const f of factions) {
+      if (id) locks[f] = id
+      else delete locks[f]
+    }
+    setChoices({ ...choices, locks, excluded: id ? choices.excluded.filter((x) => x !== id) : choices.excluded })
+  }
+  const exclude = (id: string, out: boolean) => {
+    const locks = Object.fromEntries(Object.entries(choices.locks).filter(([, v]) => !out || v !== id))
+    setChoices({ ...choices, locks, excluded: out ? [...new Set([...choices.excluded, id])] : choices.excluded.filter((x) => x !== id) })
+  }
+  const pace = (id: string, perHour: number | undefined) => {
+    const next = { ...choices.perHour }
+    if (perHour && perHour > 0) next[id] = perHour
+    else delete next[id]
+    setChoices({ ...choices, perHour: next })
+  }
+  const chose = Object.keys(choices.locks).length + choices.excluded.length + Object.keys(choices.perHour).length
+  const byId = new Map(data.catalog.activities.map((a) => [a.id, a]))
+  const stepOf = new Map<string, number>()
+  plan?.steps.forEach((st, i) => st.finishes.forEach((f) => stepOf.set(f, i + 1)))
+
+  return (
+    <>
+      {!(view?.export ?? data.export) && (
+        <div className="notice mb-16">
+          No factions export for {who(character)} yet, so every standing counts from 0. Type <GameCommand cmd="/outputfile faction" /> in game for a plan from where you really
+          stand.
+        </div>
+      )}
+      {!achievementsExport && (
+        <div className="notice mb-16">
+          No achievements export for {who(character)} yet, so an achievement counts as done only while its standing is at 2000: any finished and then fallen back from are planned
+          again. Type <GameCommand cmd="/outputfile achievements" /> in game to plan only what is really left.
+        </div>
+      )}
+      {data.wiki.error && (
+        <div className="notice bad mb-16">
+          Could not read eqlwiki again ({data.wiki.error}); the pages read {ago(data.wiki.fetchedAt, now)} serve meanwhile.
+        </div>
+      )}
+
+      <div className="card mb-16">
+        <div className="row mb-12">
+          <Segmented
+            label="What the plan aims for"
+            value={aim}
+            onChange={(g) => setSettings({ ...stored, goal: g })}
+            options={[
+              ['fastest', 'Fastest'],
+              ['positive', 'Most factions positive']
+            ]}
+          />
+          <span className="faint small">
+            {aim === 'positive'
+              ? `Every achievement, ending with as many factions at 0 or above as is worth the time (${settings.positiveHours} h each; set in Assumptions)`
+              : 'Every achievement in the least time'}
+          </span>
+        </div>
+        <div className="fp-stats">
+          <div className="stat">
+            <span className="label">Achievements to do</span>
+            <span className="value">{toDo.length}</span>
+          </div>
+          <div className="stat">
+            <span className="label">Plan</span>
+            <span className="value">{plan ? `≈ ${span(plan.seconds)}` : '…'}</span>
+            <span className="sub">{plan ? `${plan.steps.length} step${plan.steps.length === 1 ? '' : 's'}` : ''}</span>
+          </div>
+          <div className="stat">
+            <span className="label">Not planned</span>
+            <span className="value">{plan?.unplanned.length ?? 0}</span>
+            <span className="sub">{plan?.unplanned.length ? 'nothing repeatable known' : 'every one has a way'}</span>
+          </div>
+          <div className="stat">
+            <span className="label">Below zero at the end</span>
+            <span className="value">{plan ? plan.belowZero.after : '…'}</span>
+            <span className="sub">{plan ? `${plan.belowZero.now} now` : ''}</span>
+          </div>
+          <div className="stat">
+            <span className="label">Off maxed factions</span>
+            <span className="value">{plan ? Math.round(plan.maxedLost).toLocaleString() : '…'}</span>
+            <span className="sub">points by the end; achievements kept</span>
+          </div>
+          <span className="spacer" />
+          <div className="stack gap-6" style={{ alignItems: 'flex-end' }}>
+            {plan?.kept && (
+              <button
+                className="btn small ghost"
+                onClick={() => setAfresh((n) => n + 1)}
+                title="The order is kept while you play, with the counts kept up to date; this searches for the quickest order again from where you stand now"
+              >
+                Plan afresh
+              </button>
+            )}
+            {chose > 0 && (
+              <button className="btn small ghost" onClick={() => setChoices(NO_CHOICES)} title="Clear every lock, rule-out and pace you set">
+                Clear my choices ({chose})
+              </button>
+            )}
+            <button className="btn small ghost" disabled={reading} onClick={() => void readAgain()} title="Read eqlwiki's faction and quest pages again (they are kept a week)">
+              {reading ? 'Reading eqlwiki…' : 'Read eqlwiki again'}
+            </button>
+          </div>
+        </div>
+        <p className="faint small mb-0">
+          For the achievements {who(character)} has still to do, from that character&apos;s log ({data.log.handIns.toLocaleString()} hand-ins and {data.log.kills.toLocaleString()}{' '}
+          kills that moved a faction)
+          {data.export ? `, ${data.export.file} (written ${ago(data.export.modified, now)})` : ''}
+          {data.inventory ? `, what you hold at ${data.inventory.file} (written ${ago(data.inventory.modified, now)})` : ''} and eqlwiki ({data.wiki.pages} faction pages,{' '}
+          {data.wiki.quests} quests, read {ago(data.wiki.fetchedAt, now)}). <Info label="How the plan is made" text={HOW} />
+        </p>
+        <Assumptions settings={settings} stored={stored} logPace={logPace} onChange={setSettings} />
+      </div>
+
+      {plan && plan.staleLocks.length > 0 && (
+        <div className="notice mb-16">
+          {plan.staleLocks.length === 1 ? 'A lock' : 'Some locks'} no longer {plan.staleLocks.length === 1 ? 'fits' : 'fit'}: {plan.staleLocks.join(', ')}. What was locked in is
+          gone or no longer raises it, so the plan chooses again.{' '}
+          <button className="link-button" onClick={() => lock(plan.staleLocks, null)}>
+            Clear {plan.staleLocks.length === 1 ? 'it' : 'them'}
+          </button>
+        </div>
+      )}
+
+      {plan && <Steps plan={plan} choices={choices} onLock={lock} onExclude={exclude} />}
+
+      <div className="card mb-16" style={{ padding: 0 }}>
+        <h2 style={{ padding: '14px 16px 0' }}>Achievements to do</h2>
+        <p className="faint small" style={{ padding: '0 16px' }}>
+          Open one for every way to raise it. Lock one in and the plan finishes that achievement with it, and is built around it; rule one out and the plan leaves it alone.
+        </p>
+        <table className="table">
+          <thead>
+            <tr>
+              <th>Achievement</th>
+              <th className="num">Standing</th>
+              <th className="num">To go</th>
+              <th>In the plan</th>
+            </tr>
+          </thead>
+          <tbody>
+            {[...targets]
+              .sort((a, b) => (stepOf.get(a.faction) ?? 999) - (stepOf.get(b.faction) ?? 999) || a.faction.localeCompare(b.faction))
+              .map((t) => {
+                const isOpen = open === t.faction
+                const toggle = () => setOpen(isOpen ? null : t.faction)
+                const step = stepOf.get(t.faction)
+                const lockedTo = choices.locks[t.faction] ? byId.get(choices.locks[t.faction]) : undefined
+                const done = t.standing >= STANDING_MAX
+                return (
+                  <Fragment key={t.faction}>
+                    <tr className={`clickable${isOpen ? ' selected' : ''}`} onClick={toggle}>
+                      <td>
+                        <button className="link-button" aria-expanded={isOpen} onClick={(e) => (e.stopPropagation(), toggle())}>
+                          {t.achievement}
+                        </button>
+                        {t.achievement !== t.faction && <span className="faint small"> ({t.faction})</span>}
+                        {lockedTo && (
+                          <span className="chip fp-lock" title={`Locked in: ${lockedTo.title}`}>
+                            locked
+                          </span>
+                        )}
+                      </td>
+                      <td className="num mono">{plain(Math.round(t.standing))}</td>
+                      <td className="num mono">{done ? '—' : Math.round(STANDING_MAX - t.standing).toLocaleString()}</td>
+                      <td>
+                        {done ? (
+                          <span className="chip ok" title="At 2000 now: the achievement shows done at your next achievements export">
+                            at 2000
+                          </span>
+                        ) : step ? (
+                          <span>
+                            <span className="fp-num-inline">{step}</span> <Doing a={plan!.steps[step - 1].activity} />
+                          </span>
+                        ) : (
+                          <span className="chip warn" title="Nothing the planner may use raises it: open it for what there is">
+                            not planned
+                          </span>
+                        )}
+                      </td>
+                    </tr>
+                    {isOpen && !done && plan && (
+                      <tr>
+                        <td colSpan={4} style={{ background: 'var(--bg-2)' }}>
+                          <Options faction={t.faction} options={plan.options[t.faction] ?? []} choices={choices} onLock={lock} onExclude={exclude} onPace={pace} />
+                        </td>
+                      </tr>
+                    )}
+                  </Fragment>
+                )
+              })}
+          </tbody>
+        </table>
+      </div>
+
+      {choices.excluded.length > 0 && (
+        <div className="card mb-16">
+          <h2>Ruled out</h2>
+          <div className="stack gap-6">
+            {choices.excluded.map((id) => {
+              const a = byId.get(id)
+              return (
+                <div key={id} className="row tight">
+                  <button className="btn small ghost" onClick={() => exclude(id, false)}>
+                    Allow again
+                  </button>
+                  {a ? (
+                    <>
+                      <Doing a={a} /> <span className="faint small">{a.zone}</span>
+                    </>
+                  ) : (
+                    <span className="faint">Something no longer on offer ({id})</span>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
+    </>
+  )
+}
+
+/** The settings that are numbers, typed into the Assumptions. */
+type NumberSetting = { [K in keyof PlanSettings]: PlanSettings[K] extends number ? K : never }[keyof PlanSettings]
+
+function Assumptions({
+  settings,
+  stored,
+  logPace,
+  onChange
+}: {
+  settings: PlanSettings
+  stored: Partial<PlanSettings>
+  logPace: number | null
+  onChange: (s: Partial<PlanSettings>) => void
+}) {
+  const set = (k: NumberSetting) => (v: number | undefined) => {
+    const next = { ...stored }
+    if (v === undefined || !(v >= 0)) delete next[k]
+    else next[k] = v
+    onChange(next)
+  }
+  const changed = Object.keys(stored).some((k) => k !== 'goal')
+  return (
+    <details className="fp-assume">
+      <summary>Assumptions</summary>
+      <div className="fp-assume-grid">
+        <label>
+          <span>Getting to a new zone (min)</span>
+          <NumberInput value={stored.travelMin} placeholder={String(DEFAULT_SETTINGS.travelMin)} min={0} max={120} width={80} onChange={set('travelMin')} />
+        </label>
+        <label>
+          <span>Kills an hour, common mobs</span>
+          <NumberInput value={stored.killsPerHour} placeholder={String(logPace ?? DEFAULT_SETTINGS.killsPerHour)} min={1} max={1000} width={80} onChange={set('killsPerHour')} />
+          <span className="faint small">{logPace ? `${logPace} is your log's pace` : 'your log has too few kills to say'}</span>
+        </label>
+        <label>
+          <span>A named mob comes back every (min)</span>
+          <NumberInput value={stored.namedRespawnMin} placeholder={String(DEFAULT_SETTINGS.namedRespawnMin)} min={1} max={600} width={80} onChange={set('namedRespawnMin')} />
+        </label>
+        <label>
+          <span>A hand-in (s)</span>
+          <NumberInput value={stored.handInSec} placeholder={String(DEFAULT_SETTINGS.handInSec)} min={0} max={600} width={80} onChange={set('handInSec')} />
+          <span className="faint small">where your log has not timed one</span>
+        </label>
+        <label>
+          <span>Gathering one item (s)</span>
+          <NumberInput value={stored.gatherSec} placeholder={String(DEFAULT_SETTINGS.gatherSec)} min={0} max={3600} width={80} onChange={set('gatherSec')} />
+          <span className="faint small">a drop from common mobs, foraged or crafted</span>
+        </label>
+        <label>
+          <span>A hand-in no one says the items of (s)</span>
+          <NumberInput value={stored.unknownSec} placeholder={String(DEFAULT_SETTINGS.unknownSec)} min={0} max={3600} width={80} onChange={set('unknownSec')} />
+        </label>
+        <label>
+          <span>A faction kept at 0 or above is worth (h)</span>
+          <NumberInput value={stored.positiveHours} placeholder={String(settings.positiveHours)} min={0} max={100} step={0.5} width={80} onChange={set('positiveHours')} />
+          <span className="faint small">Most factions positive: the most extra time it spends on one</span>
+        </label>
+      </div>
+      {changed && (
+        <button className="btn small ghost mt-10" onClick={() => onChange(stored.goal ? { goal: stored.goal } : {})}>
+          Back to the defaults
+        </button>
+      )}
+    </details>
+  )
+}
+
+/** What a step does to the achievements: done here, raised on the way, lowered, and what it takes off maxed factions. */
+function Effects({ step }: { step: PlanStep }) {
+  const also = Object.entries(step.raises).filter(([f]) => !step.finishes.includes(f))
+  const lowers = Object.entries(step.lowers)
+  const maxed = Object.entries(step.maxedLowered)
+  return (
+    <>
+      {step.finishes.map((f) => (
+        <span key={f} className="chip ok" title={step.locked.includes(f) ? 'Done here, as you locked in' : 'Done here'}>
+          {f}
+          {step.locked.includes(f) ? ' (locked)' : ''}
+        </span>
+      ))}
+      {also.map(([f, v]) => (
+        <span key={f} className="chip" title="Raised on the way; finished in a later step">
+          {f} {signed(v)}
+        </span>
+      ))}
+      {lowers.map(([f, v]) => (
+        <span key={f} className="chip warn" title="Lowered while still to do: the plan makes these points up later">
+          {f} {signed(-v)}
+        </span>
+      ))}
+      {step.lifts.map((f) => (
+        <span key={`up ${f}`} className="chip ok" title="Brought back from below zero here">
+          {f} back to 0+
+        </span>
+      ))}
+      {step.sinks.map((f) => (
+        <span key={`down ${f}`} className="chip bad" title="Taken below zero here">
+          {f} below 0
+        </span>
+      ))}
+      {maxed.length > 0 && (
+        <span
+          className="faint small"
+          title={maxed
+            .sort((a, b) => b[1] - a[1])
+            .map(([f, v]) => `${f} ${signed(-v)}`)
+            .join('\n')}
+        >
+          {maxed.length <= 2
+            ? `takes ${maxed.map(([f, v]) => `${Math.round(v).toLocaleString()} off ${f}`).join(' and ')} (maxed)`
+            : `takes ${Math.round(maxed.reduce((n, [, v]) => n + v, 0)).toLocaleString()} off ${maxed.length} maxed factions`}
+        </span>
+      )}
+    </>
+  )
+}
+
+function Steps({
+  plan,
+  choices,
+  onLock,
+  onExclude
+}: {
+  plan: FactionPlan
+  choices: PlanChoices
+  onLock: (factions: string[], id: string | null) => void
+  onExclude: (id: string, out: boolean) => void
+}) {
+  if (!plan.steps.length) return <div className="card empty mb-16">Nothing the planner knows raises the achievements left. Open each one below for what there is.</div>
+  return (
+    <div className="card mb-16">
+      <h2>
+        The plan, step by step<span className="spacer"></span>
+        <span className="faint small mono">≈ {span(plan.seconds)}</span>
+      </h2>
+      <ol className="fp-steps">
+        {plan.steps.map((st, i) => {
+          const a = st.activity
+          const lockable = st.finishes.filter((f) => choices.locks[f] !== a.id)
+          return (
+            <li key={a.id + i} className="fp-step">
+              <span className="fp-num">{i + 1}</span>
+              <div className="fp-body">
+                <div className="fp-head">
+                  <span className="fp-zone">{a.zone || 'Somewhere'}</span>
+                  <span className={`chip fp-kind ${a.kind}`}>{KIND_LABEL[a.kind]}</span>
+                  {st.restores && (
+                    <span className="chip fp-restore" title="It finishes no achievement: it brings factions back to 0 or above">
+                      restore
+                    </span>
+                  )}
+                  <Doing a={a} />
+                  <span className="spacer" />
+                  <span className="mono" title={`${st.units.toLocaleString()} ${a.kind === 'kill' ? 'kills' : 'hand-ins'}`}>
+                    ×{st.units.toLocaleString()}
+                  </span>
+                  <span className="mono fp-time" title={st.travel ? `Including ${span(st.travel)} to get there` : undefined}>
+                    {span(st.seconds)}
+                  </span>
+                </div>
+                {a.items && a.items.length > 0 && (
+                  <div className="small">
+                    <ItemsLine items={a.items} units={st.units} />
+                    {st.copper > 0 && <span className="faint"> · about {fmtCoin(Math.round(st.copper))} to buy</span>}
+                  </div>
+                )}
+                {a.kind === 'kill' && a.mobs && a.mobs.length > 2 && <div className="faint small fp-mobs">{a.mobs.join(', ')}</div>}
+                <div className="row tight fp-effects">
+                  <Effects step={st} />
+                  <span className="spacer" />
+                  <span className="faint small">{sourceNote(a)}</span>
+                  {lockable.length > 0 && (
+                    <button className="btn small ghost" onClick={() => onLock(lockable, a.id)} title={`Keep this for ${lockable.join(', ')}: the plan is built around it`}>
+                      Lock in
+                    </button>
+                  )}
+                  {st.locked.length === 0 && (
+                    <button className="btn small ghost" onClick={() => onExclude(a.id, true)} title="Leave this out of the plan">
+                      Rule out
+                    </button>
+                  )}
+                </div>
+              </div>
+            </li>
+          )
+        })}
+      </ol>
+    </div>
+  )
+}
+
+const SHOWN = 8
+
+function Options({
+  faction,
+  options,
+  choices,
+  onLock,
+  onExclude,
+  onPace
+}: {
+  faction: string
+  options: PlanOption[]
+  choices: PlanChoices
+  onLock: (factions: string[], id: string | null) => void
+  onExclude: (id: string, out: boolean) => void
+  onPace: (id: string, perHour: number | undefined) => void
+}) {
+  const [all, setAll] = useState(false)
+  if (!options.length)
+    return (
+      <div className="faint small" style={{ padding: '6px 4px' }}>
+        Neither your log nor eqlwiki knows anything that raises {faction}.{' '}
+        <a href={wikiUrl(faction)} target="_blank" rel="noreferrer">
+          eqlwiki
+        </a>
+      </div>
+    )
+  const shown = all ? options : options.slice(0, SHOWN)
+  return (
+    <div className="stack gap-6 fp-options">
+      {shown.map((o) => {
+        const a = o.activity
+        const locked = choices.locks[faction] === a.id
+        const out = choices.excluded.includes(a.id)
+        const usable = plannable(a, choices)
+        const h = a.hits[faction]
+        return (
+          <div key={a.id} className={`fp-opt${locked ? ' locked' : ''}${usable ? '' : ' unusable'}`}>
+            <div className="row tight">
+              <span className={`chip fp-kind ${a.kind}`}>{KIND_LABEL[a.kind]}</span>
+              <Doing a={a} />
+              <span className="faint small">{a.zone}</span>
+              {o.chosen && <span className="chip ok">in the plan</span>}
+              {!o.chosen && o.used && <span className="chip">in the plan for others</span>}
+              {a.once && !locked && (
+                <span className="chip warn" title={`Taken to be once only: ${a.once}. Lock it in if you know it repeats.`}>
+                  one-time?
+                </span>
+              )}
+              <span className="spacer" />
+              <span
+                className="mono small"
+                title={a.guessed?.includes(faction) ? 'Amount guessed: the usual one in your log, or a typical Legends amount when it has too few' : undefined}
+              >
+                {signed(h)}
+                {a.guessed?.includes(faction) ? '?' : ''} each
+              </span>
+              <span className="mono small">
+                ×{o.units.toLocaleString()} ≈ {span(o.seconds)}
+              </span>
+            </div>
+            {a.items && a.items.length > 0 && (
+              <div className="small">
+                <ItemsLine items={a.items} units={o.units} />
+              </div>
+            )}
+            {a.line && a.kind === 'quest' && <div className="faint small">“{a.line}”</div>}
+            <div className="row tight">
+              <span className="faint small">
+                {sourceNote(a)}; {o.rateFrom === 'yours' ? 'your pace' : o.rateFrom === 'log' ? 'the pace from your log' : 'an estimated pace'}, {span(o.unitSeconds)} a{' '}
+                {a.kind === 'kill' ? 'kill' : 'hand-in'}
+                {a.once ? `; once only? ${a.once}` : ''}
+                {a.note ? `; ${a.note}` : ''}
+              </span>
+              {o.lowersOpen.length > 0 && <span className="warn-text small">lowers {o.lowersOpen.join(', ')}</span>}
+              <span className="spacer" />
+              <label className="row tight small faint" title={`Your own ${a.kind === 'kill' ? 'kills' : 'hand-ins'} an hour, when you know better than the estimate`}>
+                per hour
+                <NumberInput value={choices.perHour[a.id]} placeholder={String(Math.round(3600 / o.unitSeconds))} min={0} width={70} onChange={(v) => onPace(a.id, v)} />
+              </label>
+              {locked ? (
+                <button className="btn small on" onClick={() => onLock([faction], null)} title="Let the plan choose again">
+                  Locked in ✕
+                </button>
+              ) : (
+                <button className="btn small ghost" onClick={() => onLock([faction], a.id)} title={`Finish ${faction} with this, and build the plan around it`}>
+                  Lock in
+                </button>
+              )}
+              {!locked && (
+                <button className="btn small ghost" onClick={() => onExclude(a.id, !out)} title={out ? 'Let the plan use it again' : 'Leave it out of the plan'}>
+                  {out ? 'Allow' : 'Rule out'}
+                </button>
+              )}
+            </div>
+          </div>
+        )
+      })}
+      {options.length > SHOWN && (
+        <button className="link-button small" onClick={() => setAll(!all)}>
+          {all ? 'Show fewer' : `Show all ${options.length}`}
+        </button>
+      )}
+    </div>
+  )
+}

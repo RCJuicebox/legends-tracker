@@ -5,25 +5,50 @@ import { useInvoke } from '../../renderer/src/hooks'
 import { useRemembered } from '../../renderer/src/remember'
 import { usePickedCharacter } from '../../renderer/src/character'
 import { useNow } from '../../renderer/src/components/TimerBars'
-import { FilterBox, Info, Pending, SortTh, type Sort } from '../../renderer/src/components/ui'
+import { FilterBox, GameCommand, Info, Pending, Segmented, SortTh, Tabs, ToggleChip, type Sort } from '../../renderer/src/components/ui'
+import { wikiUrl } from '../../core/format'
 import { who } from '../../core/format'
-import type { FactionRow } from './core'
+import { STANDING_MAX, standingBand, type FactionMob, type FactionRow, type FactionRowAchievement, type FactionStandingNow } from './core'
+import { PlanTab } from './planPage'
 
-// Faction changes the log recorded, from the character's log and its archives. The game never
-// prints a standing, only each change and when one can go no further, so this is the net of those.
+// Where the character stands with each faction, from the game's factions export, and the faction
+// changes the log recorded, from the character's log and its archives. The log never prints a
+// standing, only each change and when one can go no further, so without an export this is the net
+// of those. The Plan tab (planPage.tsx) plans the faction achievements still to do.
+
+type View = 'standings' | 'plan'
+const VIEWS: [View, string][] = [
+  ['standings', 'Standings'],
+  ['plan', 'Optimize']
+]
 
 const HOW =
-  'Each "Your faction standing with … has been adjusted by N" line adds N to that faction. When the game says it ' +
-  '"could not possibly get any better" (or worse), the faction is marked maxed (or bottomed) until a change the ' +
-  'other way. Only what the log recorded counts: changes from before your oldest log or archive, or with logging ' +
-  'off, are not in it, so the net is what changed, not where you stand.'
+  'Standing is from the factions export the game writes when you type /outputfile faction, plus every change the log ' +
+  'recorded after it was written, so it keeps up as you play. The con words are EQEmu’s bands (Ally from 1100, ' +
+  'Warmly 750, Kindly 500, Amiably 100, Indifferent 0, Apprehensive −100, Dubious −500, Threatening −750, Scowling ' +
+  'below); that EverQuest Legends uses the same ones is not confirmed. Net change adds up each "Your faction standing ' +
+  'with … has been adjusted by N" line in the log and its archives. When the game says a faction "could not possibly ' +
+  'get any better" (or worse), or the standing is at 2000 (or −2000), it is marked maxed (or bottomed).'
 
-type SortKey = 'name' | 'net' | 'changes' | 'cap' | 'last'
+type SortKey = 'name' | 'standing' | 'ach' | 'net' | 'changes' | 'cap' | 'last'
+
+/** Which factions to list: all, or the ones whose achievement is still open. */
+type Show = 'all' | 'open'
+
+const SHOWN: Record<Show, (r: FactionRow) => boolean> = {
+  all: () => true,
+  open: (r) => !!r.achievement && r.achievement.done !== true
+}
+
+/** Open achievements first, nearest to done first; then the done ones; then factions without one. */
+const achOrder = (r: FactionRow) => (!r.achievement ? -Infinity : r.achievement.done ? -1 : (r.standing?.value ?? -STANDING_MAX - 1))
 
 const CAP_ORDER = { top: 2, bottom: 0 }
 
 const SORT_VALUE: Record<SortKey, (r: FactionRow) => string | number> = {
   name: (r) => r.name.toLowerCase(),
+  standing: (r) => r.standing?.value ?? -Infinity,
+  ach: achOrder,
   net: (r) => r.net,
   changes: (r) => r.changes,
   cap: (r) => (r.cap ? CAP_ORDER[r.cap] : 1),
@@ -39,17 +64,32 @@ function bySort(sort: Sort<SortKey>) {
   }
 }
 
+/** "Faction723": a faction the game has no name for. */
+const UNNAMED = /^Faction\d+$/
+
 /** +3, −2 (a true minus), 0: the sign says the direction as well as the colour. */
 const signed = (n: number) => (n > 0 ? `+${n}` : n < 0 ? `−${-n}` : '0')
+/** A standing, with a true minus. */
+const plain = (n: number) => (n < 0 ? `−${-n}` : String(n))
 const tone = (n: number) => (n > 0 ? 'ok-text' : n < 0 ? 'bad-text' : 'faint')
 const stamp = (t: number) => new Date(t).toLocaleString([], { weekday: 'short', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
 
-/** Characters with a log in the game's Logs folder, and the one picked on the character pages. */
+/** How a standing was reached: the export's value, and what the log added since. */
+function standingNote(s: FactionStandingNow): string {
+  const band = standingBand(s.value)
+  const next = band.next ? ` ${band.next.points} more to ${band.next.word}.` : ''
+  if (!s.since && s.sinceAll) return `${plain(s.value)} in the factions export.${next}`
+  const part = s.sinceAll ? '' : ' The log saw more changes since than it keeps, so it may be further off: type /outputfile faction to refresh it.'
+  return `${plain(s.atExport)} in the factions export, ${signed(s.since)} from the log since.${next}${part}`
+}
+
+/** Characters with a log in the game's Logs folder or a factions export, and the one picked on the character pages. */
 function useFactionCharacter() {
   const { state } = useApp()
   const logsQ = useInvoke('logs:list', [], [state.settings.installDir, state.settings.logFile])
+  const exportsQ = useInvoke('character:exports', [], [state.settings.installDir])
   const [picked, setPicked] = usePickedCharacter()
-  const available = useMemo(() => [...new Set((logsQ.data ?? []).map((l) => l.character))].sort(), [logsQ.data])
+  const available = useMemo(() => [...new Set([...(logsQ.data ?? []).map((l) => l.character), ...(exportsQ.data?.factions ?? [])])].sort(), [logsQ.data, exportsQ.data])
   const character = picked && available.includes(picked) ? picked : state.characterKey || available[0] || ''
   return { available, character, setCharacter: setPicked, ready: !!logsQ.data, error: logsQ.error, reload: logsQ.reload }
 }
@@ -60,21 +100,36 @@ export function Factions() {
   const q = useInvoke(character ? 'factions:get' : null, [character])
   const view = q.data
   const [filter, setFilter] = useState('')
+  const [showUnnamed, setShowUnnamed] = useRemembered('factions.unnamed', false)
+  const [show, setShow] = useRemembered<Show>('factions.show', 'all')
   const [sort, setSort] = useRemembered<Sort<SortKey>>('factions.sort', { key: 'last', dir: -1 })
   const [open, setOpen] = useState<string | null>(null)
+  const [tab, setTab] = useRemembered<View>('factions.view', 'standings')
+  const viewing: View = tab === 'plan' ? 'plan' : 'standings'
   const now = useNow(30_000)
 
-  // New changes show up as they happen: the log is read on from where it stopped.
+  // New changes show up as they happen, since the log is read on from where it stopped, and a new
+  // export within a few seconds of the game writing it.
   const reload = q.reload
   useEffect(() => {
-    const t = setInterval(reload, 30_000)
+    const t = setInterval(reload, 10_000)
     return () => clearInterval(t)
   }, [reload])
 
+  const hasExport = !!view?.export
+  const unnamed = useMemo(() => (view?.factions ?? []).filter((r) => UNNAMED.test(r.name)).length, [view])
+  const achCount = useMemo(() => {
+    const withAch = (view?.factions ?? []).filter((r) => r.achievement)
+    return { all: withAch.length, open: withAch.filter(SHOWN.open).length }
+  }, [view])
+  // A remembered filter the data cannot serve (no achievements known, or one no longer offered) shows everything.
+  const showing: Show = achCount.all && Object.hasOwn(SHOWN, show) ? show : 'all'
+  const withAchColumn = showing !== 'all'
   const rows = useMemo(() => {
     const f = filter.trim().toLowerCase()
-    return (view?.factions ?? []).filter((r) => !f || r.name.toLowerCase().includes(f)).sort(bySort(sort))
-  }, [view, filter, sort])
+    return (view?.factions ?? []).filter((r) => SHOWN[showing](r) && (showUnnamed || !UNNAMED.test(r.name)) && (!f || r.name.toLowerCase().includes(f))).sort(bySort(sort))
+  }, [view, filter, sort, showUnnamed, showing])
+  const cols = 5 + (hasExport ? 1 : 0) + (withAchColumn ? 1 : 0)
 
   return (
     <>
@@ -82,8 +137,18 @@ export function Factions() {
         <div>
           <h1>Factions</h1>
           <p>
-            Faction changes the log recorded for {who(character) || 'your character'}, from its log and its archives. The game does not print your standing itself, so this is the
-            net of what the log saw. <Info label="How it is counted" text={HOW} />
+            {view?.export ? (
+              <>
+                Where {who(character) || 'your character'} stands with each faction, from {view.export.file} (written by the game {ago(view.export.modified, now)}), plus the
+                changes the log recorded since. Type <GameCommand cmd="/outputfile faction" /> in game to refresh it; this page follows the file.
+              </>
+            ) : (
+              <>
+                Faction changes the log recorded for {who(character) || 'your character'}, from its log and its archives. The log does not print your standing, so this is the net
+                of what it saw. Type <GameCommand cmd="/outputfile faction" /> in game to see where you stand with every faction.
+              </>
+            )}{' '}
+            <Info label="How it is counted" text={HOW} />
           </p>
         </div>
         {chars.available.length > 1 && (
@@ -99,104 +164,306 @@ export function Factions() {
         )}
       </div>
 
-      <div className="card row mb-16">
-        <FilterBox placeholder="Filter by faction…" label="Filter factions" value={filter} onChange={setFilter} width={260} />
-        <span className="spacer" />
-        <span className="faint small">{view ? `${view.factions.length} faction${view.factions.length === 1 ? '' : 's'} on record` : ''}</span>
+      <div className="row mb-12">
+        <Tabs look="segmented" label="Factions view" value={viewing} onChange={setTab} tabs={VIEWS} />
       </div>
 
-      {!chars.ready ? (
-        <Pending error={chars.error} retry={chars.reload} what="your characters" />
-      ) : !character ? (
-        <div className="card empty">No character log yet. Choose the game folder on the Settings page and play with logging on (/log on).</div>
-      ) : !view ? (
-        <Pending error={q.error} retry={q.reload} what="the faction changes" hint="The first look reads the whole log and its archives." />
-      ) : !rows.length ? (
-        <div className="card empty">
-          {view.factions.length ? 'Nothing matches the filter.' : 'No faction changes in this log or its archives yet. Kill something with a faction and it appears here.'}
-        </div>
+      {viewing === 'plan' ? (
+        !chars.ready ? (
+          <Pending error={chars.error} retry={chars.reload} what="your characters" />
+        ) : !character ? (
+          <div className="card empty">
+            No character yet. Choose the game folder on the Settings page, then play with logging on (/log on) or type <GameCommand cmd="/outputfile faction" /> in game.
+          </div>
+        ) : (
+          <PlanTab key={character} character={character} view={view ?? null} />
+        )
       ) : (
-        <div className="card" style={{ padding: 0 }}>
-          <table className="table">
-            <thead>
-              <tr>
-                <SortTh k="name" sort={sort} onSort={setSort}>
-                  Faction
-                </SortTh>
-                <SortTh k="net" sort={sort} onSort={setSort} num title="Every change the log recorded, added up">
-                  Net change
-                </SortTh>
-                <SortTh k="changes" sort={sort} onSort={setSort} num title="How many changes the log recorded">
-                  Changes
-                </SortTh>
-                <SortTh k="cap" sort={sort} onSort={setSort} title="Whether the game last said it could get no better, or no worse">
-                  At the cap
-                </SortTh>
-                <SortTh k="last" sort={sort} onSort={setSort}>
-                  Last changed
-                </SortTh>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((r) => {
-                const key = r.name.toLowerCase()
-                const isOpen = open === key
-                const toggle = () => setOpen(isOpen ? null : key)
-                return (
-                  <Fragment key={key}>
-                    <tr className={`clickable${isOpen ? ' selected' : ''}`} onClick={toggle}>
-                      <td>
-                        <button className="link-button" aria-expanded={isOpen} onClick={(e) => (e.stopPropagation(), toggle())}>
-                          {r.name}
-                        </button>
-                      </td>
-                      <td className={`num mono ${tone(r.net)}`}>{signed(r.net)}</td>
-                      <td className="num mono">{r.changes || '—'}</td>
-                      <td>
-                        {r.cap === 'top' ? (
-                          <span className="chip ok" title="The game last said this could not possibly get any better">
-                            maxed
-                          </span>
-                        ) : r.cap === 'bottom' ? (
-                          <span className="chip bad" title="The game last said this could not possibly get any worse">
-                            bottomed
-                          </span>
-                        ) : (
-                          <span className="faint">—</span>
-                        )}
-                      </td>
-                      <td className="faint small nowrap" title={stamp(r.last)}>
-                        {ago(r.last, now)}
-                      </td>
-                    </tr>
-                    {isOpen && (
-                      <tr>
-                        <td colSpan={5} style={{ background: 'var(--bg-2)' }}>
-                          <History r={r} />
-                        </td>
-                      </tr>
+        <>
+          {view?.exportError && (
+            <div className="notice bad mb-16" role="alert">
+              Could not read the factions export: {view.exportError}. Showing the log’s changes only.
+            </div>
+          )}
+
+          <div className="card row mb-16">
+            <FilterBox placeholder="Filter by faction…" label="Filter factions" value={filter} onChange={setFilter} width={260} />
+            {achCount.all > 0 && (
+              <Segmented
+                label="Which factions"
+                value={showing}
+                onChange={setShow}
+                options={[
+                  ['all', 'All'],
+                  ['open', `Achievements to Do (${achCount.open})`]
+                ]}
+              />
+            )}
+            {unnamed > 0 && (
+              <ToggleChip on={showUnnamed} onChange={setShowUnnamed} title={`${unnamed} faction${unnamed === 1 ? '' : 's'} the game lists by number only, such as Faction723`}>
+                Unnamed ({unnamed})
+              </ToggleChip>
+            )}
+            <span className="spacer" />
+            <span className="faint small">{view ? `${view.factions.length} faction${view.factions.length === 1 ? '' : 's'} on record` : ''}</span>
+          </div>
+
+          {!chars.ready ? (
+            <Pending error={chars.error} retry={chars.reload} what="your characters" />
+          ) : !character ? (
+            <div className="card empty">
+              No character yet. Choose the game folder on the Settings page, then play with logging on (/log on) or type <GameCommand cmd="/outputfile faction" /> in game.
+            </div>
+          ) : !view ? (
+            <Pending error={q.error} retry={q.reload} what="the factions" hint="The first look reads the whole log and its archives." />
+          ) : !rows.length ? (
+            <div className="card empty">
+              {view.factions.length ? (
+                'Nothing matches the filter.'
+              ) : (
+                <>
+                  No faction changes in this log or its archives yet. Type <GameCommand cmd="/outputfile faction" /> in game to see every standing, or kill something with a faction
+                  and it appears here.
+                </>
+              )}
+            </div>
+          ) : (
+            <div className="card" style={{ padding: 0 }}>
+              <table className="table">
+                <thead>
+                  <tr>
+                    <SortTh k="name" sort={sort} onSort={setSort}>
+                      Faction
+                    </SortTh>
+                    {hasExport && (
+                      <SortTh k="standing" sort={sort} onSort={setSort} title="From the factions export, plus what the log recorded since">
+                        Standing
+                      </SortTh>
                     )}
-                  </Fragment>
-                )
-              })}
-            </tbody>
-          </table>
-        </div>
+                    {withAchColumn && (
+                      <SortTh k="ach" sort={sort} onSort={setSort} title="EverQuest › Progression: done at the maximum standing, 2000">
+                        Achievement
+                      </SortTh>
+                    )}
+                    <SortTh k="net" sort={sort} onSort={setSort} num title="Every change the log recorded, added up">
+                      Net change
+                    </SortTh>
+                    <SortTh k="changes" sort={sort} onSort={setSort} num title="How many changes the log recorded">
+                      Changes
+                    </SortTh>
+                    <SortTh k="cap" sort={sort} onSort={setSort} title="Whether it can get no better, or no worse">
+                      At the cap
+                    </SortTh>
+                    <SortTh k="last" sort={sort} onSort={setSort}>
+                      Last changed
+                    </SortTh>
+                  </tr>
+                </thead>
+                <tbody>
+                  {rows.map((r) => {
+                    const key = r.name.toLowerCase()
+                    const isOpen = open === key
+                    const toggle = () => setOpen(isOpen ? null : key)
+                    return (
+                      <Fragment key={key}>
+                        <tr className={`clickable${isOpen ? ' selected' : ''}`} onClick={toggle}>
+                          <td>
+                            <button className="link-button" aria-expanded={isOpen} onClick={(e) => (e.stopPropagation(), toggle())}>
+                              {r.name}
+                            </button>
+                          </td>
+                          {hasExport && (
+                            <td className="nowrap">
+                              <Standing s={r.standing} />
+                            </td>
+                          )}
+                          {withAchColumn && (
+                            <td className="nowrap">
+                              <AchievementCell a={r.achievement} s={r.standing} />
+                            </td>
+                          )}
+                          <td className={`num mono ${tone(r.net)}`}>{r.changes ? signed(r.net) : <span className="faint">—</span>}</td>
+                          <td className="num mono">{r.changes || '—'}</td>
+                          <td>
+                            {r.cap === 'top' ? (
+                              <span className="chip ok" title="It can get no better">
+                                maxed
+                              </span>
+                            ) : r.cap === 'bottom' ? (
+                              <span className="chip bad" title="It can get no worse">
+                                bottomed
+                              </span>
+                            ) : (
+                              <span className="faint">—</span>
+                            )}
+                          </td>
+                          <td className="faint small nowrap" title={r.last ? stamp(r.last) : 'The log has no changes for it'}>
+                            {r.last ? ago(r.last, now) : '—'}
+                          </td>
+                        </tr>
+                        {isOpen && (
+                          <tr>
+                            <td colSpan={cols} style={{ background: 'var(--bg-2)' }}>
+                              <History r={r} />
+                            </td>
+                          </tr>
+                        )}
+                      </Fragment>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </>
       )}
     </>
+  )
+}
+
+/** A faction's achievement: done, or the points still to go to 2000. */
+function AchievementCell({ a, s }: { a: FactionRowAchievement | null; s: FactionStandingNow | null }) {
+  if (!a) return <span className="faint">—</span>
+  const why = a.from === 'achievements' ? 'from your achievements export' : a.from === 'standing' ? 'from your standing' : ''
+  if (a.done) {
+    return (
+      <span className="chip ok" title={`${a.name}: done, ${why}`}>
+        done
+      </span>
+    )
+  }
+  if (a.done === null || !s) {
+    return (
+      <span className="chip" title={`${a.name}. Type /outputfile faction in game to see how far there is to go.`}>
+        open
+      </span>
+    )
+  }
+  return (
+    <span className="row tight" title={`${a.name}: open, ${why}. Done at ${STANDING_MAX}.`}>
+      <span className="chip warn">open</span>
+      <span className="faint small">{STANDING_MAX - s.value} to go</span>
+    </span>
+  )
+}
+
+/** The standing, its con word and what is left to the next one. */
+function Standing({ s }: { s: FactionStandingNow | null }) {
+  if (!s) {
+    return (
+      <span className="faint" title="The factions export does not list it">
+        —
+      </span>
+    )
+  }
+  const band = standingBand(s.value)
+  return (
+    <span className="row tight" title={standingNote(s)}>
+      <span className="mono" style={{ minWidth: '4.5ch', textAlign: 'right' }}>
+        {s.sinceAll ? '' : '≈'}
+        {plain(s.value)}
+      </span>
+      <span className={`chip${band.tone === 'plain' ? '' : ` ${band.tone}`}`}>{band.word}</span>
+      {band.next && (
+        <span className="faint small">
+          {band.next.points} to {band.next.word}
+        </span>
+      )}
+    </span>
+  )
+}
+
+/** Mobs by zone, zones in the order the page first names them. */
+function byZone(mobs: FactionMob[]): [string, FactionMob[]][] {
+  const zones = new Map<string, FactionMob[]>()
+  for (const m of mobs) {
+    const z = m.zone || 'Somewhere'
+    zones.set(z, [...(zones.get(z) ?? []), m])
+  }
+  return [...zones]
+}
+
+/** What raises a faction, from its eqlwiki page: fetched when the row is opened, and kept a week. */
+function Sources({ name }: { name: string }) {
+  const q = useInvoke('factions:sources', [name])
+  if (!q.data) return <Pending error={q.error} retry={q.reload} what="what raises it, from eqlwiki" />
+  const s = q.data.sources
+  if (!s) return <span className="faint">eqlwiki has no faction page for {name}, so what raises it is not known here.</span>
+  const link = (title: string, text = title) => (
+    <a href={wikiUrl(title)} target="_blank" rel="noreferrer">
+      {text}
+    </a>
+  )
+  const none = !s.mobs.length && !s.quests.length && !s.zones.length
+  return (
+    <div className="stack gap-6">
+      <span className="faint">
+        What raises it, from eqlwiki’s {link(s.page, s.page)} page (community-kept, so treat these as leads).{none ? ' The page lists nothing yet.' : ''}
+      </span>
+      {s.mobs.length > 0 && (
+        <div>
+          <b>Kill</b>
+          <ul className="faction-sources">
+            {byZone(s.mobs).map(([zone, mobs]) => (
+              <li key={zone}>
+                <span className="faint">{zone}:</span>{' '}
+                {mobs.map((m, i) => (
+                  <Fragment key={m.name + i}>
+                    {i > 0 && ', '}
+                    {link(m.name)}
+                    {m.note && <span className="faint"> ({m.note})</span>}
+                  </Fragment>
+                ))}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+      {s.quests.length > 0 && (
+        <div>
+          <b>Quests</b>{' '}
+          {s.quests.map((t, i) => (
+            <Fragment key={t + i}>
+              {i > 0 && ', '}
+              {link(t)}
+            </Fragment>
+          ))}
+        </div>
+      )}
+      {s.zones.length > 0 && (
+        <div>
+          <b>Zones</b>{' '}
+          {s.zones.map((t, i) => (
+            <Fragment key={t + i}>
+              {i > 0 && ', '}
+              {link(t)}
+            </Fragment>
+          ))}
+        </div>
+      )}
+    </div>
   )
 }
 
 function History({ r }: { r: FactionRow }) {
   return (
     <div className="stack gap-6 small" style={{ padding: '6px 4px' }}>
+      {r.achievement && (
+        <span>
+          Achievement: <b>{r.achievement.name}</b>, done at the maximum standing ({STANDING_MAX}).
+        </span>
+      )}
+      {r.standing && <span>{standingNote(r.standing)}</span>}
+      <Sources name={r.name} />
       <span className="faint">
-        First seen {stamp(r.first)}.{' '}
+        {r.first ? `First seen in the log ${stamp(r.first)}. ` : ''}
         {r.recent.length
           ? r.changes > r.recent.length
             ? `The last ${r.recent.length} of ${r.changes} changes, newest first:`
             : 'Every change, newest first:'
-          : 'No changes recorded, only the cap.'}
+          : r.first
+            ? 'No changes recorded, only the cap.'
+            : 'The log has no changes for it.'}
       </span>
       {r.recent.length > 0 && (
         <div className="row tight">

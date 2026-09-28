@@ -440,15 +440,94 @@ hand, so treat them as leads.
 
 ## Factions
 
-Faction changes the log recorded, for the character picked (the same pick as Achievements, Stats
-and Gear), from its log and its archives. The game never prints your standing, only each change
-(``Your faction standing with King Ak`Anon has been adjusted by -1.``) and, once a faction can move
-no further, that it `could not possibly get any better` (or `worse`). So each faction shows the net
-of the changes the log saw, how many there were and when the last was, not where you stand: what
-happened before your oldest log, or with logging off, is not in it. A faction the game called best
-or worst is marked **maxed** or **bottomed** until a change the other way. Click a row for its last
-20 changes. The log is read with casts, melee and purchases, in the same one pass, and read on
-every half minute while the page is open.
+Where the character picked (the same pick as Achievements, Stats and Gear) stands with each
+faction, and the faction changes its log and archives recorded. Type `/outputfile faction` (or `factions`) in game
+and the game writes `Name_server-CLS-Factions.txt` (the class is in the name) into its folder: a
+line per faction with its ID, name, standing (-2000 to 2000) and points to max. The page reads the
+newest one for the character, shows each standing with its con (Ally, Warmly, Kindly, Amiably,
+Indifferent, Apprehensive, Dubious, Threatening, Scowling) and the points to the next con up, and
+adds on every change the log recorded after the export was written, so the standing keeps up as you
+play. The con bands are EQEmu's (Ally from 1100, Warmly 750, Kindly 500, Amiably 100, Indifferent 0,
+Apprehensive -100, Dubious -500, Threatening -750); that EverQuest Legends uses the same ones is not
+confirmed. A faction keeps only its last 20 changes, so after more than that since the export the
+standing is marked `≈`: type the command again to refresh it. Factions the game has no name for
+(`Faction723`) are hidden behind the **Unnamed** chip.
+
+83 factions have an achievement under EverQuest › Progression, done at the maximum standing: the
+raw 2000 of the export, not the standing with race, class and deity added. **Achievements to
+Do** lists the open ones, with an **Achievement** column: done, or the
+points still to go. The link is the client's own list (`Resources\Achievements\AchievementsClient.txt`,
+where each is numbered 80000 + the faction's id, so New Sebilis Expedition still finds New
+Sebilisian Expedition). The achievements export lists only the achievements still open, so one it
+leaves out counts as done, even when the standing has dropped since; without that export, a standing
+of 2000 is done. Rows start closed; open one for what raises the faction, from its eqlwiki page
+(`{{Factionpage}}`, or `<name> (Faction)` where a zone or NPC has the name): the mobs to kill,
+grouped by zone, the quests and the zones. It is fetched when a row is first opened and kept a week.
+
+The log never prints a standing, only each change (``Your faction standing with King Ak`Anon has
+been adjusted by -1.``) and, once a faction can move no further, that it `could not possibly get any
+better` (or `worse`). So **Net change** is the sum of the changes the log saw, with how many there
+were and when the last was: what happened before your oldest log, or with logging off, is not in it.
+Without an export that is all the page has. A faction is marked **maxed** or **bottomed** when the
+game says so (until a change the other way) or its standing is at 2000 or -2000. Click a row for how
+its standing was reached and its last 20 changes. The log is read with casts, melee and purchases,
+in the same one pass, and read on, with the export looked at again, every ten seconds while the page
+is open.
+
+Wherever the app asks you to type an `/outputfile` command, the copy icon beside it puts it on the
+clipboard, to paste into the game's chat box.
+
+### Optimize: a plan for the achievements still to do
+
+The **Optimize** tab plans every faction achievement still open for the character picked, whoever
+it is and however many it has done: the steps, each a zone and what to kill or hand in there, how
+many and about how long, in the order that finishes them all soonest. What is still to do, and where
+each faction stands, is the Standings tab's own view, read every ten seconds, so the plan follows
+play: the counts go down as you kill and hand in, and the order is kept while only the standings
+move, so nothing is reshuffled mid-grind. An achievement done, or a change of locks or assumptions,
+plans the order afresh; so does **Plan afresh**. Without that character's factions export every
+standing counts from 0, and without its achievements export an achievement counts as done only
+while it is at 2000; the tab says so.
+An achievement is done the moment the raw standing reaches 2000 and stays done whatever happens to
+the standing after, so the order is what matters: work that lowers an achievement still to do comes
+after that achievement is done, where it costs nothing. When two orders take as long, the one that
+finishes achievements sooner wins, so stopping part way leaves the most done.
+
+Two goals, switched at the top of the tab. **Fastest** takes every achievement in the least time.
+**Most factions positive** takes every achievement too, and also counts every faction that ends at 0
+or above (of those whose standing the factions export gives), each worth the hours set in
+**Assumptions** (3 by default): it may take a slower way that keeps a faction up, and add
+**restore** steps at the end that bring factions back from below zero, including ones below zero
+now, when that is worth the time. Either way a faction is judged by where it ends: points an early
+step takes and a later step gives back cost nothing. The tab shows how many factions are below zero
+now and at the end of the plan, and the points left off factions that were at 2000.
+
+What raises a faction comes from two places. Your log first: every faction change is put down to
+the kill or hand-in around it (the faction lines of a kill come just before `You have slain …!`,
+those of a hand-in just after `You offered N item to NPC.` and what the NPC says; Legends takes a
+whole stack at once, one completion per item), so each kill camp and hand-in has the amounts Legends
+really gives and the pace you got through them. A hand-in seen fewer than three times is taken to
+be a quest's one-time reward, done. Then eqlwiki, read a week at a time: every faction page's mobs
+and quests, each quest page's hand-ins and faction lines (where a page says only `got better`, your
+log's usual amount stands in), and each hand-in item's page (a merchant, a drop, a recipe). Mobs are
+grouped into camps: the mobs of a zone that move the same factions. A camp of common mobs goes at
+your kill pace (from the log where you have killed there, else the median of your runs), a named
+mob at one per respawn, so a camp of one or two named mobs loses to a quest. A quest step counts as
+repeatable when it wants one kind of item that can be had and that nobody in the walkthrough hands
+you; chain steps, rewards of 50 points or more and hand-ins the walkthrough does not make plain are
+listed, not planned. Hand-ins take the stack at once, so what counts is getting the items: coin and
+bought items are quick, gathered ones take the time set, and what you hold (bags, bank, shared bank
+and depot, at your last `/outputfile inventory`) goes first.
+
+The plan is found by building it greedily (at each point, whatever does the most for the
+achievements still open per hour, points it takes off another open one counted as work to do again),
+several times with a little noise, then moving steps and trying other ways for each achievement and
+keeping whatever saves time. The same choices always give the same plan. Open an achievement for
+every way to raise it, quickest first: **Lock in** one and the plan finishes that achievement with it
+and is built around it (a lock also tells the planner a one-time quest repeats); **Rule out** one
+and the plan leaves it alone; or type your own kills or hand-ins an hour. **Assumptions** holds the
+rest: getting to a new zone, kills an hour, a named mob's respawn, a hand-in, gathering one item, and
+what a faction kept at 0 or above is worth to Most factions positive. Locks are kept per character.
 
 ## Stats
 
@@ -471,26 +550,6 @@ AAs come from your log: type `/alternateadv list` in game and press **Read from 
 also looks on its first visit for a character). The ones that change a sum fill it in. Anything
 filled in from a file, a game table or the AAs can be typed over. The page's inputs are kept per
 character in `characters\<name>_<server>.json`.
-
-## Progression
-
-What the log recorded of your progress, for the character picked (the same pick as Factions, Stats
-and Gear), from its log and its archives. A strip at the top gives the highest level reached, the
-unspent AA points (the last `You now have N ability points` the game printed, less what was bought
-since), and the skill-ups and experience of the last seven days. Below it:
-
-- **Sessions**, newest first and sortable: play with no gap of 30 minutes between log lines, with its
-  length, experience, AA points, levels and skill-ups, and experience and AA points an hour. EQL
-  prints no experience amounts, only `You gain experience!` (or party, or a Dungeon Crawl reward), so
-  experience is counted in those messages, about one per kill that gave some. Some lines end with a
-  percentage of a level; **Level %** adds up only those printed, so it falls short when lines have none.
-- **Levels**, newest first. EQL levels each class on its own and the level line never says which, so
-  level-ups that follow on from one another are grouped into runs, most likely a class each.
-- **AA purchases**: each rank bought, its cost and when.
-- **Skills**: every skill the log saw go up, its latest value, how many ups and the last, with a filter.
-
-Nothing before your oldest log, or with logging off, is in it. The log is read with casts, melee,
-purchases and factions, in the same one pass, and read on every half minute while the page is open.
 
 ## Gear
 
@@ -658,7 +717,7 @@ the sounds in `AudioTriggers`.
 | Path | What |
 |---|---|
 | `src/core` | Log parsing and tailing, spell book, duration model, spell tracker, triggers, archiver, log check, the damage meter (`combatLines` reads the lines, `combatMeter` keeps the fights, `combatView` sums them for display), the loot ledger (`loot`), motes (`motes` counts them, `moteCalc` plans item upgrades, `mergeValue` picks the best merge, `spellMotes` the best spell to upgrade). Plain TypeScript with no Electron dependency, so it is unit-tested directly |
-| `src/features` | Feature modules, one folder each (factions, progression): the feature's logic (`core.ts`), its main-process side (`main.ts`: the log-history consumer and what the page asks for) and its page (`page.tsx`). `index.ts` lists their pages for the sidebar |
+| `src/features` | Feature modules, one folder each (factions): the feature's logic (`core.ts`; for factions also `attribution.ts`, what caused each change, `questPages.ts`, eqlwiki's quest pages, and `planner.ts`, the achievement plan), its main-process side (`main.ts`: the log-history consumers and what the page asks for) and its pages (`page.tsx`, `planPage.tsx`). `index.ts` lists their pages for the sidebar |
 | `src/shared` | What both processes use: the IPC contract (`ipc.ts`), settings and view types, the game's tables (`game/`: classes, spell effect numbers, guide bonuses), the default overlays and hotkeys |
 | `src/main` | Electron main process: windows, tray, overlays, speech, icons, persistence, the engine that joins it all (`engine/`, with the contract its parts keep in `feature.ts`), the data sources and long jobs (`sources/`), IPC handlers by family (`ipc/`) |
 | `src/preload` | The IPC bridge, which lets a page use only the channels in the contract |

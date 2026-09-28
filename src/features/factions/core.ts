@@ -1,11 +1,18 @@
 import type { LogLine } from '../../core/logLine'
+import type { AchSection } from '../../shared/character'
 
 // Faction changes, from the only lines the game writes about them:
 //   Your faction standing with King Ak`Anon has been adjusted by -1.
 //   Your faction standing with King Ak`Anon could not possibly get any better.
 //   Your faction standing with King Ak`Anon could not possibly get any worse.
-// The game never prints the standing itself, so what is kept is the net of what the log saw. Each
+// The log never prints the standing itself, so what is kept is the net of what the log saw. Each
 // stretch of log (an archive, the live log) is tallied on its own and the tallies joined oldest first.
+//
+// The standing comes from the factions export instead (/outputfile faction; factions works too), which the game writes
+// as Kelwyn_neriak-MNK-Factions.txt: a header line, then one line per faction,
+//   ID<tab>Name<tab>StandingValue<tab>PointsToMax          e.g. 65, Brownies of Faydwer, -6, 2006
+// StandingValue runs from -2000 to 2000 and PointsToMax is what is left to 2000. Factions without a
+// name come as "Faction723". The page shows the export's standing plus what the log saw since.
 
 /** Where a faction was last seen stuck: "could not possibly get any better" (top) or "… any worse" (bottom). */
 export type FactionCap = 'top' | 'bottom'
@@ -112,26 +119,338 @@ export function joinFactions(stretches: FactionTallies[]): FactionTallies {
   return all
 }
 
+/** The factions export's file name; [1] is the character key. The class in it is optional, to be safe. */
+export const FACTIONS_FILE = /^(.+?)(?:-[a-z]+)?-Factions\.txt$/i
+
+export const STANDING_MAX = 2000
+export const STANDING_MIN = -2000
+
+/** One line of the factions export. */
+export interface FactionStanding {
+  id: number
+  name: string
+  value: number
+  toMax: number
+}
+
+const INT = /^-?\d+$/
+
+/** The factions export's lines; the header, and anything else that is not one, is passed over. */
+export function parseFactionsExport(text: string): FactionStanding[] {
+  const out: FactionStanding[] = []
+  for (const raw of String(text).replace(/^﻿/, '').split(/\r?\n/)) {
+    const [id, name, value, toMax] = raw.split('\t').map((c) => c.trim())
+    if (!INT.test(id ?? '') || !name || !INT.test(value ?? '')) continue
+    const v = parseInt(value, 10)
+    out.push({ id: parseInt(id, 10), name, value: v, toMax: INT.test(toMax ?? '') ? parseInt(toMax, 10) : STANDING_MAX - v })
+  }
+  if (!out.length) throw new Error('No factions found. Expected lines like "65<tab>Brownies of Faydwer<tab>-6<tab>2006".')
+  return out
+}
+
+/** A factions export as read: the file, when the game wrote it, and its lines. */
+export interface FactionExport {
+  file: string
+  modified: number
+  standings: FactionStanding[]
+}
+
+export type StandingTone = 'ok' | 'plain' | 'warn' | 'bad'
+
+/**
+ * How a standing cons, highest first. These are EQEmu's bands (Ally from 1100, Scowling at -751 and
+ * below); that EverQuest Legends uses the same ones is not confirmed.
+ */
+export const STANDINGS: readonly { min: number; word: string; tone: StandingTone }[] = [
+  { min: 1100, word: 'Ally', tone: 'ok' },
+  { min: 750, word: 'Warmly', tone: 'ok' },
+  { min: 500, word: 'Kindly', tone: 'ok' },
+  { min: 100, word: 'Amiably', tone: 'plain' },
+  { min: 0, word: 'Indifferent', tone: 'plain' },
+  { min: -100, word: 'Apprehensive', tone: 'warn' },
+  { min: -500, word: 'Dubious', tone: 'warn' },
+  { min: -750, word: 'Threatening', tone: 'bad' },
+  { min: -Infinity, word: 'Scowling', tone: 'bad' }
+]
+
+/** The band a standing is in, and the next one up with the points still to go (none for Ally). */
+export function standingBand(value: number): { word: string; tone: StandingTone; next: { word: string; points: number } | null } {
+  const i = STANDINGS.findIndex((s) => value >= s.min)
+  const band = STANDINGS[i]
+  const up = i > 0 ? STANDINGS[i - 1] : null
+  return { word: band.word, tone: band.tone, next: up ? { word: up.word, points: up.min - value } : null }
+}
+
+/** A faction's standing now: the export's, plus what the log saw since. */
+export interface FactionStandingNow {
+  id: number
+  /** The export's value plus `since`, held to -2000…2000. */
+  value: number
+  /** As the export gave it. */
+  atExport: number
+  /** The net of the changes the log saw after the export was written. */
+  since: number
+  /** False when the log saw more changes since the export than a faction keeps, so `since` is only part of it. */
+  sinceAll: boolean
+}
+
 /** One faction as the Factions page shows it. */
 export interface FactionRow {
   name: string
   net: number
   changes: number
+  /** The first and last line naming it; 0 when the log never did (a faction only the export lists). */
   first: number
   last: number
   cap: FactionCap | null
   /** The last adjustments, newest first. */
   recent: FactionChange[]
+  /** From the factions export; null when there is none or it does not list this faction. */
+  standing: FactionStandingNow | null
+  /** Its EverQuest › Progression achievement, when it has one. */
+  achievement: FactionRowAchievement | null
+}
+
+export interface FactionRowAchievement {
+  id: number
+  name: string
+  /** Done or not; null when neither export says (no achievements export, no standing). */
+  done: boolean | null
+  /** Where `done` comes from: the achievements export, or the standing (2000 is done). */
+  from: 'achievements' | 'standing' | null
 }
 
 export interface FactionView {
-  /** Most recently seen first. */
+  /** Most recently seen first, then the ones only the export lists, by name. */
   factions: FactionRow[]
+  /** The factions export the standings came from, when there is one. */
+  export: { file: string; modified: number } | null
+  /** Why the factions export could not be read; '' when it was, or there is none. */
+  exportError: string
 }
 
-export function factionView(tallies: FactionTallies): FactionView {
-  const factions = Object.values(tallies)
-    .map((t) => ({ name: t.name, net: t.net, changes: t.changes, first: t.first, last: t.last, cap: t.cap, recent: [...t.recent].reverse() }))
-    .sort((a, b) => b.last - a.last || a.name.localeCompare(b.name))
-  return { factions }
+// ---------- faction achievements ----------
+// EverQuest › Progression holds one achievement per faction, done by "reaching maximum faction
+// standing with X": the raw 2000 of the factions export, not the standing with race, class and deity
+// added. The client's Resources/Achievements/AchievementsClient.txt (id^name^description^…) numbers
+// each one 80000 + the faction's id; the name can differ from the faction's (New Sebilis Expedition is
+// faction 722, New Sebilisian Expedition), so the id is what joins them. The achievements export lists
+// only achievements still open (one character's lists 31 of the 83; 45 of the ones it leaves out are at 2000),
+// so one it leaves out is done: a standing that dropped since does not undo it.
+
+export const FACTION_ACH_BASE = 80000
+const MAX_STANDING = /reaching maximum faction standing with (.+?)\.?\s*$/i
+
+/** One faction's achievement, from the client's achievement list. */
+export interface FactionAchievement {
+  id: number
+  name: string
+  factionId: number
+  /** As the description names it. */
+  faction: string
+}
+
+/** The faction achievements in the client's AchievementsClient.txt. */
+export function parseFactionAchievements(text: string): FactionAchievement[] {
+  const out: FactionAchievement[] = []
+  for (const line of String(text).split(/\r?\n/)) {
+    const [id, name, description] = line.split('^')
+    const m = description && MAX_STANDING.exec(description)
+    const n = parseInt(id, 10)
+    if (!m || !(n > FACTION_ACH_BASE) || !name) continue
+    out.push({ id: n, name: name.trim(), factionId: n - FACTION_ACH_BASE, faction: m[1].trim() })
+  }
+  return out
+}
+
+/**
+ * Which faction achievements an achievements export lists, by lower-cased name, and whether each is
+ * done. Null without an export; an export with no Progression section lists none, so all are done.
+ */
+export function progressionStatus(sections: AchSection[] | null): Map<string, boolean> | null {
+  if (!sections?.length) return null
+  const sec = sections.find((s) => s.cat === 'EverQuest' && s.name === 'Progression')
+  return new Map((sec?.ach ?? []).map((a) => [a.n.toLowerCase(), !!a.d]))
+}
+
+/** The faction achievements, and what the achievements export says of them. */
+export interface FactionAchievements {
+  list: FactionAchievement[]
+  status: Map<string, boolean> | null
+}
+
+const blankRow = (name: string): FactionRow => ({ name, net: 0, changes: 0, first: 0, last: 0, cap: null, recent: [], standing: null, achievement: null })
+
+/** A standing brought up to date with the log's changes after the export was written. */
+function standingNow(s: FactionStanding, t: FactionTally | undefined, since: number): FactionStandingNow {
+  const sum = t ? t.recent.filter((c) => c.at > since).reduce((n, c) => n + c.amount, 0) : 0
+  // The kept changes hold everything since the export if they are every change, or reach back past it.
+  const sinceAll = !t || t.changes <= t.recent.length || t.recent[0].at <= since
+  const value = Math.max(STANDING_MIN, Math.min(STANDING_MAX, s.value + sum))
+  return { id: s.id, value, atExport: s.value, since: sum, sinceAll }
+}
+
+export function factionView(tallies: FactionTallies, exported: FactionExport | null = null, achievements: FactionAchievements | null = null): FactionView {
+  const row = (t: FactionTally): FactionRow => ({
+    name: t.name,
+    net: t.net,
+    changes: t.changes,
+    first: t.first,
+    last: t.last,
+    cap: t.cap,
+    recent: [...t.recent].reverse(),
+    standing: null,
+    achievement: null
+  })
+  const rows = new Map(Object.entries(tallies).map(([k, t]) => [k, row(t)]))
+  if (exported) {
+    for (const s of exported.standings) {
+      const key = s.name.toLowerCase()
+      const t = tallies[key]
+      const standing = standingNow(s, t, exported.modified)
+      const r = rows.get(key) ?? blankRow(s.name)
+      r.standing = standing
+      // A cap line since the export says where it is stuck; otherwise the standing does.
+      if (!(t && t.capAt > exported.modified)) r.cap = standing.value >= STANDING_MAX ? 'top' : standing.value <= STANDING_MIN ? 'bottom' : null
+      rows.set(key, r)
+    }
+  }
+  if (achievements) {
+    const byId = new Map([...rows.values()].flatMap((r) => (r.standing ? [[r.standing.id, r] as const] : [])))
+    for (const a of achievements.list) {
+      const key = a.faction.toLowerCase()
+      let r = byId.get(a.factionId) ?? rows.get(key)
+      if (!r) rows.set(key, (r = blankRow(a.faction)))
+      const status = achievements.status
+      r.achievement = status
+        ? { id: a.id, name: a.name, done: status.get(a.name.toLowerCase()) ?? true, from: 'achievements' }
+        : r.standing
+          ? { id: a.id, name: a.name, done: r.standing.value >= STANDING_MAX, from: 'standing' }
+          : { id: a.id, name: a.name, done: null, from: null }
+    }
+  }
+  const factions = [...rows.values()].sort((a, b) => b.last - a.last || a.name.localeCompare(b.name))
+  return { factions, export: exported ? { file: exported.file, modified: exported.modified } : null, exportError: '' }
+}
+
+// ---------- what raises a faction ----------
+// eqlwiki's faction pages ({{Factionpage}}) list what raises and lowers each faction: zones_raise,
+// quests_raise and mobs_raise, one bullet each, a mob with where it is:
+//   * [[Guard Korlack]]  <span class='fmz'>(Paineel)</span>
+//   * [[Azzar Habbib]] <span class='fmz'>(Paineel - Quest NPC)</span>
+// Community-maintained, so leads rather than the game's own list.
+
+/** A mob whose death raises the faction: where it is, and the page's note ("Quest NPC", "Merchant"). */
+export interface FactionMob {
+  name: string
+  zone: string
+  note: string
+}
+
+export interface FactionSources {
+  /** The wiki page it came from. */
+  page: string
+  mobs: FactionMob[]
+  quests: string[]
+  zones: string[]
+}
+
+/** The template's parameters, each value as written. */
+function templateParams(text: string): Map<string, string> {
+  const out = new Map<string, string>()
+  const re = /(?:^|\n)\|\s*([a-z_]+)\s*=([\s\S]*?)(?=\n\|\s*[a-z_]+\s*=|\n\}\}|$)/g
+  for (const m of text.matchAll(re)) out.set(m[1].toLowerCase(), m[2])
+  return out
+}
+
+const LINK = /\[\[([^\]|]+)(?:\|([^\]]+))?\]\]/
+const plainText = (s: string) =>
+  s
+    .replace(/\[\[(?:[^\]|]+\|)?([^\]]+)\]\]/g, '$1')
+    .replace(/<[^>]+>/g, '')
+    .replace(/'{2,}/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+
+/** A bullet list's lines, without the bullet. */
+const bullets = (v: string | undefined) =>
+  (v ?? '')
+    .split('\n')
+    .filter((l) => /^\s*\*/.test(l))
+    .map((l) => l.replace(/^\s*\*+\s*/, ''))
+
+/** A bullet's link text (the label, else the page), else its plain text. */
+const named = (line: string) => {
+  const m = LINK.exec(line)
+  return (m ? (m[2] ?? m[1]) : plainText(line)).trim()
+}
+
+/** What a page writes where it has no mob to list: "none", "unknown". */
+export const NO_MOB = /^(?:none|unknown|n\/?a|various|tbd|\?+|-+)$/i
+
+function mob(line: string): FactionMob | null {
+  const name = named(line)
+  if (!name || NO_MOB.test(name)) return null
+  const span = /<span[^>]*>([\s\S]*?)<\/span>/.exec(line)
+  const rest = plainText(span ? span[1] : line.replace(LINK, '')).replace(/^\((.*)\)$/, '$1')
+  const cut = rest.indexOf(' - ')
+  return { name, zone: (cut < 0 ? rest : rest.slice(0, cut)).trim(), note: cut < 0 ? '' : rest.slice(cut + 3).trim() }
+}
+
+/** A bullet's link target, the page it goes to without any #section; else its plain text. */
+const linkTarget = (line: string) => {
+  const m = LINK.exec(line)
+  return (m ? m[1].replace(/#.*$/, '') : plainText(line)).replace(/_/g, ' ').trim()
+}
+
+/** What a faction page lists on one side: the mobs, the quest pages and the zones. */
+export interface FactionSide {
+  mobs: FactionMob[]
+  /** Quest page titles, as linked (the label can differ: [[Innoruuk Symbol Quests|Innoruuk Disciple]]). */
+  quests: string[]
+  zones: string[]
+}
+
+/** Everything a faction page lists: what raises the faction and what lowers it. */
+export interface FactionPageData {
+  page: string
+  raise: FactionSide
+  lower: FactionSide
+}
+
+/** Both sides of a faction page; null when the page is not a faction page. */
+export function parseFactionPageFull(page: string, text: string): FactionPageData | null {
+  if (!/\{\{\s*Factionpage/i.test(text)) return null
+  const p = templateParams(text)
+  const side = (which: 'raise' | 'lower'): FactionSide => ({
+    mobs: bullets(p.get(`mobs_${which}`))
+      .map(mob)
+      .filter((m): m is FactionMob => !!m),
+    quests: [
+      ...new Set(
+        bullets(p.get(`quests_${which}`))
+          .map(linkTarget)
+          .filter(Boolean)
+      )
+    ],
+    zones: bullets(p.get(`zones_${which}`))
+      .map(named)
+      .filter(Boolean)
+  })
+  return { page, raise: side('raise'), lower: side('lower') }
+}
+
+/** What raises a faction, from its eqlwiki page; null when the page is not a faction page. */
+export function parseFactionPage(page: string, text: string): FactionSources | null {
+  if (!/\{\{\s*Factionpage/i.test(text)) return null
+  const p = templateParams(text)
+  const list = (key: string) => bullets(p.get(key)).map(named).filter(Boolean)
+  return {
+    page,
+    mobs: bullets(p.get('mobs_raise'))
+      .map(mob)
+      .filter((m): m is FactionMob => !!m),
+    quests: list('quests_raise'),
+    zones: list('zones_raise')
+  }
 }
