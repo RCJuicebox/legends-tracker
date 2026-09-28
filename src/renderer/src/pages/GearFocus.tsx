@@ -1,10 +1,10 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { useRemembered } from '../remember'
 import type { CatalogItem } from '../../../core/wikiItem'
 import { baseName, slotLabel } from '../../../core/inventory'
-import { restrictions, score, weightsForSlot } from '../../../core/upgrades'
+import { canWear, restrictions, score, weightsForSlot } from '../../../core/upgrades'
 import { focusValue, KIND_LABELS, KIND_ORDER, KIND_WORTH, type FocusInfo, type FocusLine } from '../../../core/itemFocus'
-import { optimizeGear, pieceName, type Piece } from '../../../core/gearOptimizer'
+import { optimizeGear, pieceName, SLOT_LAYOUT, type GearLock, type Piece, type PieceSource, type Plan } from '../../../core/gearOptimizer'
 import { type FocusCandidate, type GearModel, type OwnedFocus } from '../gear/useGearModel'
 import { CATALOG_PER_SLOT } from '../../../core/gearCatalog'
 import { Info, Pending } from '../components/ui'
@@ -266,12 +266,48 @@ function FocusRow({ m, l }: { m: GearModel; l: FocusLine }) {
 /** Where a piece to get comes from: its era and where it drops. */
 const catalogWhere = (c: CatalogItem | undefined) => (c ? [c.era, source(c)].filter(Boolean).join(' · ') : '')
 
+/** A piece locked into a slot, kept by what finds it again in the next inventory export. */
+interface LockRef {
+  slot: number
+  name: string
+  from: PieceSource
+  location: string
+}
+
+/** Where pieces come from, in the lock picker's order. */
+const PICK_GROUPS: [PieceSource, string][] = [
+  ['worn', 'Worn'],
+  ['bags', 'Bags'],
+  ['bank', 'Bank'],
+  ['sharedBank', 'Shared bank'],
+  ['storage', 'Storage › Equipment'],
+  ['pet', 'On your pet'],
+  ['catalog', 'To get']
+]
+
+/** A piece in the lock picker: copies of one item in one place (three in the bags, say) are one choice. */
+const pieceId = (p: Piece) => `${p.from}|${p.from === 'worn' ? p.item.location : ''}|${p.item.name}`
+
 export function OptimizeTab({ m }: { m: GearModel }) {
   // What it chooses from: what the character owns, or that and the best of every piece they could get.
   const [scope, setScope] = useRemembered<'owned' | 'all'>('optimize.scope', 'owned')
   const all = scope === 'all'
   const pieces = useMemo(() => (all ? [...m.pieces, ...m.catalogPieces] : m.pieces), [all, m.pieces, m.catalogPieces])
   const byTitle = useMemo(() => new Map(m.catalog.map((c) => [c.title, c])), [m.catalog])
+  // Pieces locked into a slot, per character: found again where they were, or by name wherever they
+  // went since (a piece to get only with All gear).
+  const [lockRefs, setLockRefs] = useRemembered<LockRef[]>(`optimize.locks.${m.view.character}`, [])
+  const lockPieces = useMemo(
+    () =>
+      lockRefs.map(
+        (r) =>
+          pieces.find((p) => !p.exalt && p.item.name === r.name && p.from === r.from && p.item.location === r.location) ??
+          pieces.find((p) => !p.exalt && p.item.name === r.name && p.from === r.from) ??
+          pieces.find((p) => !p.exalt && p.item.name === r.name && (p.from === 'catalog') === (r.from === 'catalog'))
+      ),
+    [lockRefs, pieces]
+  )
+  const locks = useMemo(() => lockRefs.flatMap((r, i): GearLock[] => (lockPieces[i] ? [{ slot: r.slot, piece: lockPieces[i] }] : [])), [lockRefs, lockPieces])
   const plan = useMemo(
     () =>
       optimizeGear({
@@ -282,10 +318,20 @@ export function OptimizeTab({ m }: { m: GearModel }) {
         focusValue: m.focusValue,
         exaltations: m.exaltations,
         effects: m.effects.value ?? undefined,
-        hands: m.weaponHands
+        hands: m.weaponHands,
+        locks
       }),
-    [pieces, m.wearer, m.weights, m.twoHanders, m.focusValue, m.exaltations, m.effects.value, m.weaponHands]
+    [pieces, m.wearer, m.weights, m.twoHanders, m.focusValue, m.exaltations, m.effects.value, m.weaponHands, locks]
   )
+  const hostOf = (p: Piece) => p.host ?? p
+  /** Locks `p` into slot `i`, in place of any lock on that slot or that piece. */
+  const lock = (i: number, p: Piece) => {
+    const h = hostOf(p)
+    const kept = lockRefs.filter((r, k) => r.slot !== i && lockPieces[k] !== h)
+    setLockRefs([...kept, { slot: i, name: h.item.name, from: h.from, location: h.item.location }])
+  }
+  const unlock = (i: number) => setLockRefs(lockRefs.filter((r) => r.slot !== i))
+  const lockedSlots = new Set(plan.locked)
   const toGet = plan.after.filter((p) => p?.from === 'catalog').length
   // Stats as shown: at the weights' own worth. With weapons by ratio first the plan weighs the hands'
   // weapon ratio far above the rest to choose them; the numbers shown keep it at its own weight.
@@ -295,7 +341,6 @@ export function OptimizeTab({ m }: { m: GearModel }) {
   const changes = plan.slots.map((slot, i) => ({ slot, i, before: plan.before[i], after: plan.after[i] })).filter((c) => c.before !== c.after)
   // Changes that are one move: a piece leaving one slot for another ties the two slots together, and
   // a slot's own stats may fall for the set to gain (a new weapon in Primary, the old one to Secondary).
-  const hostOf = (p: Piece) => p.host ?? p
   const root = plan.slots.map((_, i) => i)
   const find = (i: number): number => (root[i] === i ? i : (root[i] = find(root[i])))
   for (const c of changes) {
@@ -372,12 +417,16 @@ export function OptimizeTab({ m }: { m: GearModel }) {
           </div>
         ) : (
           <p style={{ margin: '4px 0 0' }}>
-            {all
-              ? 'Nothing you could get beats what you wear, by these weights, the focus effects you want and worn effects and procs.'
-              : 'What you wear is already the best way to wear what you own, by these weights, the focus effects you want and worn effects and procs.'}
+            {plan.locked.length
+              ? 'With the pieces locked in, what you wear is already the best way to wear the rest, by these weights, the focus effects you want and worn effects and procs.'
+              : all
+                ? 'Nothing you could get beats what you wear, by these weights, the focus effects you want and worn effects and procs.'
+                : 'What you wear is already the best way to wear what you own, by these weights, the focus effects you want and worn effects and procs.'}
           </p>
         )}
       </div>
+
+      <LockCard plan={plan} pieces={pieces} m={m} refs={lockRefs} found={lockPieces} all={all} lock={lock} unlock={unlock} clear={() => setLockRefs([])} />
 
       {changes.length > 0 && (
         <div className="card lt-opt">
@@ -400,6 +449,11 @@ export function OptimizeTab({ m }: { m: GearModel }) {
                 <span className="lt-slot">{slotLabel(c.slot)}</span>
                 <div className="lt-cand-body">
                   <div className="row gap-8">
+                    {lockedSlots.has(c.i) && (
+                      <span className="lt-chip gold" title="Locked in: the rest of the set is worn around it">
+                        locked
+                      </span>
+                    )}
                     {c.after ? (
                       <>
                         {c.after.from === 'catalog' ? (
@@ -466,9 +520,20 @@ export function OptimizeTab({ m }: { m: GearModel }) {
                     </div>
                   )}
                 </div>
-                <span className="lt-gain" title="Stats in this slot alone, by your weights: haste, focus effects, worn effects and procs are counted over all slots, above">
-                  {delta >= 0 ? '+' : ''}
-                  {num(delta)}
+                <span className="stack gap-6" style={{ alignItems: 'flex-end' }}>
+                  <span className="lt-gain" title="Stats in this slot alone, by your weights: haste, focus effects, worn effects and procs are counted over all slots, above">
+                    {delta >= 0 ? '+' : ''}
+                    {num(delta)}
+                  </span>
+                  {c.before && c.before.from === 'worn' && !lockedSlots.has(c.i) && (
+                    <button
+                      className="btn ghost small"
+                      title={`Lock ${pieceName(c.before)} in your ${slotLabel(c.slot)} and wear the rest around it`}
+                      onClick={() => lock(c.i, c.before!)}
+                    >
+                      Keep it
+                    </button>
+                  )}
                 </span>
               </div>
             )
@@ -529,6 +594,129 @@ export function OptimizeTab({ m }: { m: GearModel }) {
         A search from what you wear now: it moves one piece at a time into the slot where it adds most (swapping, or refilling the slot it left) until no move adds anything. Stats
         are scored exactly as in the upgrade finder, at each piece's merge level; lore items go on once. Items with no wiki page stay where they are.
       </p>
+    </div>
+  )
+}
+
+/** The pieces locked in, and a picker to lock another: any piece in any slot it fits. */
+function LockCard({
+  plan,
+  pieces,
+  m,
+  refs,
+  found,
+  all,
+  lock,
+  unlock,
+  clear
+}: {
+  plan: Plan
+  pieces: Piece[]
+  m: GearModel
+  refs: LockRef[]
+  found: (Piece | undefined)[]
+  all: boolean
+  lock: (i: number, p: Piece) => void
+  unlock: (i: number) => void
+  clear: () => void
+}) {
+  const [pick, setPick] = useState('')
+  const [pickSlot, setPickSlot] = useState('')
+  // Every piece with a wiki page (one without stays where it is), once each.
+  const choices = useMemo(() => {
+    const seen = new Set<string>()
+    return pieces.filter((p) => p.r && !p.exalt && !seen.has(pieceId(p)) && !!seen.add(pieceId(p))).sort((a, b) => a.item.name.localeCompare(b.item.name))
+  }, [pieces])
+  const chosen = choices.find((p) => pieceId(p) === pick)
+  const slotNames = chosen?.r ? [...new Set(SLOT_LAYOUT)].filter((s) => canWear(chosen.r!, m.wearer, s)) : []
+  // At first, where it is worn, or where the plan puts it.
+  const planned = chosen ? plan.slots[plan.after.findIndex((p) => p && (p.host ?? p) === chosen)] : undefined
+  const slotName = slotNames.includes(pickSlot) ? pickSlot : (slotNames.find((s) => s === chosen?.item.location || s === planned) ?? slotNames[0] ?? '')
+  // Of a pair of slots, the one the piece is in, then the one the plan puts it in, then one not locked.
+  const indexFor = (p: Piece, name: string): number => {
+    const at = SLOT_LAYOUT.flatMap((s, i) => (s === name ? [i] : []))
+    const taken = new Set(refs.map((r) => r.slot))
+    return at.find((i) => plan.before[i] === p) ?? at.find((i) => plan.after[i] && (plan.after[i]!.host ?? plan.after[i]) === p) ?? at.find((i) => !taken.has(i)) ?? at[0]
+  }
+  const locked = new Set(plan.locked)
+  const why = (r: LockRef, p: Piece | undefined): string => {
+    if (!p) return r.from === 'catalog' && !all ? 'a piece to get: it counts with All gear' : 'not in your latest inventory export'
+    return locked.has(r.slot) ? '' : 'not used: it cannot go there with the other locks'
+  }
+  return (
+    <div className="card stack gap-8">
+      <div className="row gap-8">
+        <b>Locked in</b>
+        <Info
+          label="About locking"
+          text="A piece locked into a slot stays there whatever the weights say, and the optimizer wears everything else around it; it may still put an exaltation from Storage in it. Locks are kept for this character until you unlock them, and a piece that moves between exports is found again by name. A lock goes unused when its piece cannot go there with the others: the same lore item twice, or a two-hander in Primary with Secondary locked."
+        />
+        {!refs.length && <span className="small muted">nothing yet: lock a piece to keep it in a slot and optimize the rest around it.</span>}
+        <span className="grow" />
+        {refs.length > 1 && (
+          <button className="btn ghost small" onClick={clear}>
+            Unlock all
+          </button>
+        )}
+      </div>
+      {refs.map((r, k) => {
+        const note = why(r, found[k])
+        return (
+          <div key={`${r.slot}|${r.name}`} className="row gap-8 small">
+            <span className="lt-slot">{slotLabel(SLOT_LAYOUT[r.slot] ?? '')}</span>
+            <b>{r.name}</b>
+            {found[k] && <span className="muted">{whereText(found[k]!.from, found[k]!.item)}</span>}
+            {note && <span className="lt-chip warn">{note}</span>}
+            <span className="grow" />
+            <button className="btn ghost small" aria-label={`Unlock ${r.name}`} onClick={() => unlock(r.slot)}>
+              Unlock
+            </button>
+          </div>
+        )
+      })}
+      <div className="row gap-8 small">
+        <select aria-label="Piece to lock" value={pick} onChange={(e) => setPick(e.target.value)} style={{ maxWidth: 360 }}>
+          <option value="">Lock a piece…</option>
+          {PICK_GROUPS.map(([from, label]) => {
+            const group = choices.filter((p) => p.from === from)
+            return group.length ? (
+              <optgroup key={from} label={label}>
+                {group.map((p) => (
+                  <option key={pieceId(p)} value={pieceId(p)}>
+                    {p.item.name}
+                    {from === 'worn' ? ` (${slotLabel(p.item.location)})` : ''}
+                  </option>
+                ))}
+              </optgroup>
+            ) : null
+          })}
+        </select>
+        {chosen &&
+          (slotNames.length ? (
+            <>
+              <span className="muted">in</span>
+              <select aria-label="Slot to lock it in" value={slotName} onChange={(e) => setPickSlot(e.target.value)}>
+                {slotNames.map((s) => (
+                  <option key={s} value={s}>
+                    {slotLabel(s)}
+                  </option>
+                ))}
+              </select>
+              <button
+                className="btn small"
+                onClick={() => {
+                  lock(indexFor(chosen, slotName), chosen)
+                  setPick('')
+                  setPickSlot('')
+                }}
+              >
+                Lock
+              </button>
+            </>
+          ) : (
+            <span className="muted">your classes, race or level cannot wear it</span>
+          ))}
+      </div>
     </div>
   )
 }

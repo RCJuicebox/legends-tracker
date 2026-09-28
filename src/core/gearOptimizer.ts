@@ -15,6 +15,9 @@
 // worn effect or proc in place of the piece's own, and a set wears a piece once (as it is or exalted)
 // and uses each exaltation once. Worn effects count once however many carry them, wherever worn; a
 // proc counts on a weapon in Primary or Secondary.
+//
+// A piece may be locked into a slot: it stays there (exalted, if an exaltation is worth putting in it),
+// no other slot takes it, and the rest of the set is worn around it.
 
 import { itemKey, storedEquipment, type Inventory, type InvItem, type ItemStats } from './inventory'
 import { ANY_SLOT, canWear, isTwoHanded, score, weightsForSlot, type HandWeights, type Restrictions, type Wearer, type Weights } from './upgrades'
@@ -107,6 +110,13 @@ export interface OptimizeOptions {
   exaltations?: Exaltation[]
   /** How much each hand's weapon counts, from how often it swings; alike when absent. */
   hands?: HandWeights | null
+  /** Pieces to keep in a slot, by the slot's index in SLOT_LAYOUT, whatever the weights say. */
+  locks?: GearLock[]
+}
+
+export interface GearLock {
+  slot: number
+  piece: Piece
 }
 
 // One exalted copy per piece, exaltation and slot, kept across searches so a set from one search (a
@@ -186,6 +196,11 @@ export interface Plan {
   /** What the worn effects and the procs in hand are worth, before and after. */
   effectsBefore: number
   effectsAfter: number
+  /**
+   * The slots held by a lock. A lock is dropped when its piece cannot go in the slot, is locked in an
+   * earlier slot, is lore like an earlier lock's piece, or wants Secondary empty for a locked two-hander.
+   */
+  locked: number[]
 }
 
 export function optimizeGear(o: OptimizeOptions): Plan {
@@ -206,8 +221,29 @@ export function optimizeGear(o: OptimizeOptions): Plan {
     if (!canWear(p.r, o.wearer, slots[i])) return false
     return !(slots[i] === 'Primary' && isTwoHanded(p.r) && !o.twoHanders)
   }
-  // What may go in each slot, worked out once: the search asks it for every move.
-  const fitting = slots.map((_, i) => pieces.filter((p) => fits(p, i)))
+  // Locked slots, in the order asked: each lock's piece (not an exalted copy), where it may go.
+  const primary = slots.indexOf('Primary')
+  const secondary = slots.indexOf('Secondary')
+  const lockedAt = new Map<number, Piece>()
+  for (const l of o.locks ?? []) {
+    const p = hostOf(l.piece)
+    const i = l.slot
+    if (!slots[i] || lockedAt.has(i) || !pieces.includes(p)) continue
+    // Locked by hand: a two-hander may go in Primary even when they are left out of suggestions.
+    if (p.r ? !canWear(p.r, o.wearer, slots[i]) : home.get(p) !== i) continue
+    const others = [...lockedAt.values()]
+    if (others.includes(p) || (p.lore && others.some((q) => q.lore && q.key === p.key))) continue
+    const twoHander = (q: Piece | undefined) => !!q?.r && isTwoHanded(q.r)
+    if ((i === secondary && twoHander(lockedAt.get(primary))) || (i === primary && twoHander(p) && lockedAt.has(secondary))) continue
+    lockedAt.set(i, p)
+  }
+  const lockedPieces = new Set(lockedAt.values())
+  // What may go in each slot, worked out once: the search asks it for every move. A locked slot takes
+  // its piece or an exalted copy of it, and no other slot takes either.
+  const fitting = slots.map((_, i) => {
+    const l = lockedAt.get(i)
+    return l ? pieces.filter((p) => hostOf(p) === l) : pieces.filter((p) => fits(p, i) && !lockedPieces.has(hostOf(p)))
+  })
   // Weapon ratio counts in the hands, ranged ratio in the Range slot. Haste is counted once for the
   // whole set: only the best worn works.
   const slotWeights = slots.map((s) => ({ ...weightsForSlot(o.weights, s, o.hands), haste: 0 }))
@@ -221,8 +257,6 @@ export function optimizeGear(o: OptimizeOptions): Plan {
     if (!row) scoreCache.set(p, (row = []))
     return (row[i] ??= score(p.stats, slotWeights[i]))
   }
-  const primary = slots.indexOf('Primary')
-  const secondary = slots.indexOf('Secondary')
   const valid = (a: (Piece | null)[]): boolean => {
     let lore: Set<string> | null = null
     for (const p of a) {
@@ -366,7 +400,18 @@ export function optimizeGear(o: OptimizeOptions): Plan {
     return a
   }
 
-  let a = search(o.from ?? start, null)
+  // The search starts with every locked piece on: off any other slot it was in, the other copies of a
+  // lore piece off, and Secondary empty for a locked two-hander.
+  const first = (o.from ?? start).slice()
+  for (const [i, l] of lockedAt) {
+    for (let k = 0; k < first.length; k++) {
+      const q = first[k]
+      if (q && k !== i && (hostOf(q) === l || (l.lore && q.lore && q.key === l.key))) first[k] = null
+    }
+    if (!first[i] || hostOf(first[i]!) !== l) first[i] = l
+    if (i === primary && l.r && isTwoHanded(l.r)) first[secondary] = null
+  }
+  let a = search(first, null)
   let best = total(a)
   if (o.weights.haste > 0) {
     // Each haste item owned as the one worn (one of each, however many copies). The one already giving
@@ -404,7 +449,7 @@ export function optimizeGear(o: OptimizeOptions): Plan {
   const origin = o.from ?? start
   for (let i = 0; i < slots.length; i++) {
     const k = slots.indexOf(slots[i], i + 1)
-    if (k < 0) continue
+    if (k < 0 || lockedAt.has(i) || lockedAt.has(k)) continue
     const kept = Number(a[i] === origin[i]) + Number(a[k] === origin[k])
     const swapped = Number(a[k] === origin[i]) + Number(a[i] === origin[k])
     if (swapped > kept) [a[i], a[k]] = [a[k], a[i]]
@@ -420,7 +465,8 @@ export function optimizeGear(o: OptimizeOptions): Plan {
     focusBefore: focusOf(start),
     focusAfter: focusOf(a),
     effectsBefore: effectsOf(start),
-    effectsAfter: effectsOf(a)
+    effectsAfter: effectsOf(a),
+    locked: [...lockedAt.keys()].sort((x, y) => x - y)
   }
 }
 

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { planTotal } from '../src/core/finderRound'
-import { optimizeGear, ownedPieces, pieceName } from '../src/core/gearOptimizer'
+import { optimizeGear, ownedPieces, pieceName, SLOT_LAYOUT } from '../src/core/gearOptimizer'
 import { mergeLevel, parseInventory, parseStatsBlock, scaledStats } from '../src/core/inventory'
 import { rawWeights, ROLE_PRESETS, type Conversions } from '../src/core/statValue'
 import { handWeights, isLore, restrictions, weightsForSlot, type Weights } from '../src/core/upgrades'
@@ -79,6 +79,40 @@ describe('the optimizer and haste', () => {
     const plan = optimizeGear(opts)
     expect(plan.hasteBefore).toBe(30)
     expect(plan.slotScoreBefore.reduce((a, b) => a + b, 0)).toBe(1 + 5 + 10 + 10)
+  })
+
+  const piece = (name: string) => pieces.find((p) => p.item.name === name)!
+  const slot = (name: string, nth = 0) => SLOT_LAYOUT.indexOf(name, nth ? SLOT_LAYOUT.indexOf(name) + 1 : 0)
+
+  it('keeps a locked piece where it is and wears the rest around it', () => {
+    const plan = optimizeGear({ ...opts, locks: [{ slot: slot('Hands'), piece: piece('Haste Gloves') }] })
+    expect(plan.locked).toEqual([slot('Hands')])
+    expect(plan.after[slot('Hands')]?.item.name).toBe('Haste Gloves')
+    // The big gloves cannot have the hands, so they take an Any slot from a charm; the haste belt adds nothing.
+    const worn = plan.after.map((p) => p?.item.name)
+    expect(worn).toContain('Big Gloves')
+    expect(worn).not.toContain('Haste Belt')
+    expect(planTotal(plan)).toBe(1 + 5 + 20 + 10 + 30)
+  })
+
+  it('puts on a locked piece from the bags, in the slot asked for', () => {
+    const plan = optimizeGear({ ...opts, locks: [{ slot: slot('Any Slot', 1), piece: piece('Haste Belt') }] })
+    expect(plan.after[slot('Any Slot', 1)]?.item.name).toBe('Haste Belt')
+    expect(plan.after.filter((p) => p?.item.name === 'Haste Belt')).toHaveLength(1)
+  })
+
+  it('drops a lock the piece cannot keep', () => {
+    const plan = optimizeGear({
+      ...opts,
+      locks: [
+        { slot: slot('Head'), piece: piece('Plain Belt') },
+        { slot: slot('Waist'), piece: piece('Haste Belt') },
+        { slot: slot('Any Slot'), piece: piece('Haste Belt') }
+      ]
+    })
+    // A belt does not go on the head, and a piece is locked in one slot: the first asked.
+    expect(plan.locked).toEqual([slot('Waist')])
+    expect(plan.after[slot('Waist')]?.item.name).toBe('Haste Belt')
   })
 })
 
