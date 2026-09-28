@@ -200,6 +200,7 @@ describe('CombatMeter', () => {
   it("counts another's hits and misses with one skill as one row", () => {
     const { m, feed } = meter()
     feed(`
+      [Thu Sep 24 20:00:04 2026] You punch a fetid fiend for 100 points of damage.
       [Thu Sep 24 20:00:05 2026] Dorran slashes a fetid fiend for 40 points of damage.
       [Thu Sep 24 20:00:06 2026] Dorran tries to slash a fetid fiend, but misses!
       [Thu Sep 24 20:00:07 2026] Dorran bashes a fetid fiend for 12 points of damage.
@@ -338,7 +339,8 @@ describe('CombatMeter', () => {
     const f = m.liveFight!
     expect(f.entities['dorran'].kind).toBe('player')
     expect(f.entities['phoboplasm'].kind).toBe('npc')
-    expect(f.entities['dorran'].out.total).toBe(81)
+    // The warder is Dorran's own fight, never yours: only the sting on the mob hitting you counts.
+    expect(f.entities['dorran'].out.total).toBe(35)
     // Dorran is not you: the meter's own scope leaves them out, Everyone lists them.
     expect(damageRows(f, 'you', true)).toHaveLength(0)
     expect(damageRows(f, 'everyone', true).map((r) => r.name)).toEqual(['Dorran'])
@@ -389,6 +391,48 @@ describe('CombatMeter', () => {
       [Fri Sep 25 21:05:02 2026] You have joined the group.
       [Fri Sep 25 21:05:02 2026] Tobin has joined the group.`)
     expect(m.groupMembers).toEqual(['Tobin'])
+  })
+
+  it("leaves out other players' fights nearby: no fight of their own, nothing in the session", () => {
+    const { m, feed } = meter()
+    feed(`
+      [Thu Sep 24 20:00:00 2026] You have entered Kedge Keep.
+      [Thu Sep 24 20:00:01 2026] Dorran tries to shoot a swirlspine seahorse, but misses!
+      [Thu Sep 24 20:00:02 2026] Tobin tries to slash a swirlspine seahorse, but misses!
+      [Thu Sep 24 20:00:03 2026] Dorran shoots a swirlspine seahorse for 271 points of damage. (Finishing Blow)
+      [Thu Sep 24 20:00:03 2026] A swirlspine seahorse has been slain by Dorran!`)
+    expect(m.fights).toHaveLength(0)
+    expect(m.liveFight).toBeNull()
+    expect(damageRows(m.snapshot().liveSession!, 'everyone', true)).toHaveLength(0)
+    expect(m.snapshot().liveSession!.kills).toBe(0)
+  })
+
+  it("does not let a stranger's fight nearby keep yours going", () => {
+    const { m, feed } = meter()
+    feed(`
+      [Thu Sep 24 20:00:00 2026] You punch a fetid fiend for 100 points of damage.
+      [Thu Sep 24 20:00:05 2026] Dorran slashes a decrepit warder for 40 points of damage.
+      [Thu Sep 24 20:00:14 2026] Dorran slashes a decrepit warder for 40 points of damage.
+      [Thu Sep 24 20:00:23 2026] Dorran slashes a decrepit warder for 40 points of damage.
+      [Thu Sep 24 20:00:30 2026] You punch a scareling for 100 points of damage.`)
+    // Twenty seconds quiet on your side: two fights, and Dorran's blows in neither.
+    expect(m.fights.map(fightName)).toEqual(['A fetid fiend', 'A scareling'])
+    expect(m.fights.every((f) => !f.entities['dorran'])).toBe(true)
+  })
+
+  it("counts a raid's pull from its first blow when you join in on that enemy", () => {
+    const { m, feed } = meter()
+    feed(`
+      [Thu Sep 24 20:00:00 2026] Dorran slashes a fetid fiend for 40 points of damage.
+      [Thu Sep 24 20:00:08 2026] A fetid fiend hits Dorran for 30 points of damage.
+      [Thu Sep 24 20:00:15 2026] Dorran slashes a fetid fiend for 40 points of damage.
+      [Thu Sep 24 20:00:20 2026] You punch a fetid fiend for 100 points of damage.
+      [Thu Sep 24 20:00:21 2026] Dorran slashes a scareling for 25 points of damage.`)
+    const f = m.liveFight!
+    // The pull ran twenty seconds before you swung, never ten quiet: all of it is the fight's.
+    expect(f.startedAt).toBe(at('Thu Sep 24 20:00:00 2026'))
+    // Dorran fought beside you, so the add Dorran takes on counts too.
+    expect(f.entities['dorran'].out.total).toBe(105)
   })
 
   it("a group-mate's pet, once it names its leader, is theirs", () => {

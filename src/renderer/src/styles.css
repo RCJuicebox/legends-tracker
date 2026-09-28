@@ -2699,7 +2699,8 @@ button.tree-item {
   position: absolute;
   inset: 0;
   width: var(--fill);
-  background: linear-gradient(90deg, color-mix(in srgb, var(--c) 42%, transparent), color-mix(in srgb, var(--c) 18%, transparent));
+  /* Light enough for the grey figures over it to read (4.5:1 on the amber of your own bars). */
+  background: linear-gradient(90deg, color-mix(in srgb, var(--c) 26%, transparent), color-mix(in srgb, var(--c) 10%, transparent));
   border-right: 2px solid color-mix(in srgb, var(--c) 80%, transparent);
   pointer-events: none;
 }

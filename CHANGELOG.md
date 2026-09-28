@@ -5,6 +5,8 @@ What changed in each version. The release workflow publishes a version's section
 ## Unreleased
 
 - **Gear optimizer: keep what you wear.** The lock card now shows everything you are wearing, slot by slot: click a piece to lock it, and the optimizer leaves it on and works around it. Any other piece still goes in a slot from **Or put another piece in a slot**. The card folds away from its heading and says what is locked while folded. The **Keep it** button on suggested changes, which sat beside the new item and read as if it kept that, is gone.
+- **Damage meter: only fights you're in.** Other players' fights nearby are left out: a fight needs you, your pet or your group, and a stranger's blows no longer open a fight of their own, show in Overall, or keep your fight from ending. Anyone fighting your enemy still counts, with the adds they take on. If your raid pulls before you swing, the fight starts at the pull.
+- **Damage meter:** a player who only missed says so ("1 swing, all missed") instead of showing an empty row; "1 hits" reads "1 hit"; and the bars are lighter, so the figures on your own (amber) bars are easier to read.
 
 ## 2.1.0 (2026-09-27)
 

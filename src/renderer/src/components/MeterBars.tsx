@@ -104,7 +104,7 @@ export function EntityBar({ r, rank, onClick, selected, activeDps }: { r: Row; r
       rank={rank}
       name={r.name}
       tag={kindTag(r.kind, r.owner) + pets}
-      stat={r.hits ? `${fmtPct(r.share)}` : undefined}
+      stat={r.hits ? `${fmtPct(r.share)}` : r.misses ? `${r.misses} swing${r.misses === 1 ? '' : 's'}, all missed` : undefined}
       right={
         <>
           <b>{fmtRate(activeDps ? r.activeDps : r.dps)}</b> · {fmtNum(r.total)}
@@ -112,7 +112,7 @@ export function EntityBar({ r, rank, onClick, selected, activeDps }: { r: Row; r
       }
       onClick={onClick}
       selected={selected}
-      title={`${fmtNum(r.total)} damage, ${fmtNum(r.dps)} per second over the whole ${r.activeDps ? 'time; ' + fmtNum(r.activeDps) + ' while striking' : 'time'}; ${r.hits} hits, ${r.crits} critical, ${r.misses} missed, best ${fmtNum(r.max)}`}
+      title={`${fmtNum(r.total)} damage, ${fmtNum(r.dps)} per second over the whole ${r.activeDps ? 'time; ' + fmtNum(r.activeDps) + ' while striking' : 'time'}; ${r.hits} hit${r.hits === 1 ? '' : 's'}, ${r.crits} critical, ${r.misses} missed, best ${fmtNum(r.max)}`}
     />
   )
 }

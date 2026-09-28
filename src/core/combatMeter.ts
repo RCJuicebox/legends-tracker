@@ -38,6 +38,8 @@ export const CAST_WINDOW_MS = 20_000
 /** Abilities the game lists as ones you press, whose effect prints like a proc. */
 const ACTIVATED = new Set(['reaving strike', 'harm touch', 'leech touch'])
 const FIGHTS_KEPT = 300
+/** Others' blows held at most on one enemy, while waiting to see whether your side joins in. */
+const HELD_MAX = 2000
 const SESSIONS_KEPT = 60
 /** A fight's per-second timeline stops growing past an hour. */
 const TIMELINE_MAX = 3600
@@ -184,6 +186,12 @@ export class CombatMeter {
   private lastFriendCast: { who: string; at: number } | null = null
   /** Charm spells friends began casting, newest last, each with the line that says it landed. */
   private charmCasts: { who: string; at: number; land: string }[] = []
+  /**
+   * Blows between others, by enemy, held while that fight goes on (no gap longer than a fight's) in
+   * case your side joins in on it: a raid's tank pulls well before the rest of it swings.
+   */
+  private held = new Map<string, { last: number; blows: { ev: Extract<CombatEvent, { kind: 'damage' | 'miss' }>; at: number }[] }>()
+  private replaying = false
   private seq = 0
   /** A note shown while the log's history is being read. */
   reading = ''
@@ -236,6 +244,7 @@ export class CombatMeter {
     this.charmed.clear()
     this.lastFriendCast = null
     this.charmCasts = []
+    this.held.clear()
     this.zone = ''
     this.changed()
   }
@@ -263,6 +272,59 @@ export class CombatMeter {
     if (!SINGLE_WORD.test(name)) return { kind: 'npc' }
     const side = this.sides.get(k)
     return { kind: side === 'friend' ? 'player' : side === 'enemy' ? 'npc' : 'unknown' }
+  }
+
+  /** You, your pet, and your group and their pets (a pet two charmed is either's): the side the meter is about. */
+  private ours(name: string): boolean {
+    const { kind, owner } = this.kindOf(name)
+    if (kind === 'you' || kind === 'group') return true
+    return kind === 'pet' && !!owner && owner.split(' or ').some((o) => o === SELF || this.roster.has(nameKey(o)))
+  }
+
+  /**
+   * Whether a blow is the meter's business: one your side gives or takes, one on an enemy your side
+   * is fighting, or one by an ally of this fight (anyone who has fought its enemies: a raid, and the
+   * adds it takes on). Other players' fights nearby are left out altogether: seen in passing
+   * through a zone they are nothing to do with you, and counted they would open fights of their own
+   * or keep yours from ever ending.
+   */
+  private counts(friend: string, enemy: string): boolean {
+    if (this.replaying || this.ours(friend) || this.ours(enemy)) return true
+    const f = this.live
+    return !!f && (nameKey(enemy) in f.enemies || !!f.entities[nameKey(friend)])
+  }
+
+  /**
+   * Sorts a blow: the meter's, or held for a fight's gap. When one of your side's lands on an enemy
+   * others were already fighting (a raid's pull, a moment before you joined), their held blows on it
+   * go in first, so the fight starts where it did.
+   */
+  private admit(ev: Extract<CombatEvent, { kind: 'damage' | 'miss' }>, at: number, friend: string, enemy: string): boolean {
+    const gapMs = this.config.fightGapSec * 1000
+    for (const [k, h] of this.held) if (at - h.last > gapMs) this.held.delete(k)
+    const k = nameKey(enemy)
+    if (!this.counts(friend, enemy)) {
+      const h = this.held.get(k) ?? { last: at, blows: [] }
+      h.last = at
+      h.blows.push({ ev, at })
+      if (h.blows.length > HELD_MAX) h.blows.shift()
+      this.held.set(k, h)
+      return false
+    }
+    const h = this.replaying ? undefined : this.held.get(k)
+    if (h) {
+      this.held.delete(k)
+      this.replaying = true
+      try {
+        for (const b of h.blows) {
+          if (b.ev.kind === 'damage') this.onDamage(b.ev, b.at)
+          else this.onMiss(b.ev, b.at)
+        }
+      } finally {
+        this.replaying = false
+      }
+    }
+    return true
   }
 
   private sideOf(name: string): Side {
@@ -576,6 +638,7 @@ export class CombatMeter {
     const source = ev.source ? this.norm(ev.source) : ev.skill
     const [ss, ts] = this.place(source, target, true)
     if (ss === 'unknown' || ts === 'unknown' || ss === ts) return
+    if (!this.admit(ev, at, ss === 'friend' ? source : target, ss === 'enemy' ? source : target)) return
     const crit = ev.mods.includes('critical')
     const proc = ss === 'friend' && ev.how === 'spell' ? this.procOrigin(source, ev.skill, at) : null
     if (proc) this.lastProc.set(`${nameKey(source)}|${ev.skill}`, at)
@@ -622,6 +685,7 @@ export class CombatMeter {
     const target = this.norm(ev.target)
     const [ss, ts] = this.place(source, target, true)
     if (ss === 'unknown' || ts === 'unknown' || ss === ts) return
+    if (!this.admit(ev, at, ss === 'friend' ? source : target, ss === 'enemy' ? source : target)) return
     for (const seg of this.liveSegments(at, true)) {
       const src = this.ent(seg, source, at)
       const tgt = this.ent(seg, target, at)
@@ -649,7 +713,10 @@ export class CombatMeter {
     // line follows its damage line: the same firing, not another.
     const proc = ss === 'friend' && !ev.hot ? this.procOrigin(source, ev.spell, at) : null
     const firing = !!proc && Math.abs(at - (this.lastProc.get(`${nameKey(source)}|${ev.spell}`) ?? -Infinity)) > 1000
+    const ours = this.ours(source) || this.ours(target)
     for (const seg of this.liveSegments(at, false)) {
+      // A heal between strangers is no more yours than their fight: it counts once either is in the segment.
+      if (!ours && !seg.entities[nameKey(source)] && !seg.entities[nameKey(target)]) continue
       if (ss === 'enemy') {
         // Only a fight cares what the enemy healed: it is damage undone.
         if (seg.kind === 'fight') seg.enemyHeal += ev.amount
@@ -677,7 +744,7 @@ export class CombatMeter {
     const k = nameKey(target)
     for (const seg of this.liveSegments(at, false)) {
       if (side === 'enemy') {
-        if (seg.kind === 'fight' && !(k in seg.enemies)) continue
+        if (!(k in seg.enemies)) continue
         seg.kills++
         if (killer && this.sideOf(killer) === 'friend') this.ent(seg, killer, at).kills++
         if (k in seg.enemies) seg.enemies[k] = false

@@ -70,7 +70,7 @@ exports[`twenty minutes of real play, read by the Engine > the damage meter: eac
     ],
     "deaths": 0,
     "kills": 1,
-    "name": "Innoruuk, the Prince of Hate +1",
+    "name": "Innoruuk, the Prince of Hate",
     "seconds": 55,
     "zone": "",
   },
@@ -90,41 +90,6 @@ exports[`twenty minutes of real play, read by the Engine > the damage meter: eac
   },
   {
     "damage": [
-      "Hesper (player) 1984 in 42 hits, 2 crits",
-      "A spectre (npc) 277 in 12 hits, 0 crits",
-    ],
-    "deaths": 0,
-    "kills": 1,
-    "name": "A spectre",
-    "seconds": 20,
-    "zone": "The Oasis of Marr",
-  },
-  {
-    "damage": [
-      "Innoruuk\`s Chosen (npc) 393 in 3 hits, 0 crits",
-    ],
-    "deaths": 0,
-    "kills": 0,
-    "name": "Innoruuk\`s Chosen",
-    "seconds": 0,
-    "zone": "The Plane of Hate - Group 2 (Adaptive)",
-  },
-  {
-    "damage": [
-      "Innoruuk\`s Chosen (npc) 3577 in 28 hits, 0 crits",
-      "Maestro of Rancor (npc) 1419 in 9 hits, 0 crits",
-      "Doria (player) 984 in 22 hits, 0 crits",
-      "Brenna (player) 522 in 18 hits, 0 crits",
-      "A Disciple of Innoruuk (npc) 446 in 3 hits, 0 crits",
-    ],
-    "deaths": 0,
-    "kills": 0,
-    "name": "Innoruuk\`s Chosen +4",
-    "seconds": 33,
-    "zone": "The Plane of Hate - Group 2 (Adaptive)",
-  },
-  {
-    "damage": [
       "Aldric (player) 27038 in 78 hits, 5 crits",
       "You (you) 9986 in 83 hits, 8 crits",
       "Doria (player) 3949 in 3 hits, 0 crits",
@@ -138,20 +103,8 @@ exports[`twenty minutes of real play, read by the Engine > the damage meter: eac
   },
   {
     "damage": [
-      "Doria (player) 940 in 2 hits, 1 crits",
-      "Innoruuk\`s Chosen (npc) 548 in 7 hits, 0 crits",
-      "Aldric (player) 63 in 7 hits, 0 crits",
-    ],
-    "deaths": 0,
-    "kills": 0,
-    "name": "Innoruuk\`s Chosen",
-    "seconds": 13,
-    "zone": "The Plane of Hate - Group 2 (Adaptive)",
-  },
-  {
-    "damage": [
       "You (you) 59055 in 358 hits, 28 crits",
-      "Aldric (player) 43984 in 114 hits, 15 crits",
+      "Aldric (player) 43930 in 108 hits, 15 crits",
       "Brenna (player) 36118 in 136 hits, 15 crits",
       "Doria (player) 31180 in 83 hits, 7 crits",
       "Innoruuk, the Prince of Hate (npc) 14268 in 58 hits, 0 crits",
@@ -159,7 +112,7 @@ exports[`twenty minutes of real play, read by the Engine > the damage meter: eac
     "deaths": 0,
     "kills": 1,
     "name": "Innoruuk, the Prince of Hate +1",
-    "seconds": 109,
+    "seconds": 94,
     "zone": "The Plane of Hate - Group 2 (Adaptive)",
   },
   {

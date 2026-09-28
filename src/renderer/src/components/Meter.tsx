@@ -395,7 +395,7 @@ function EntityStats({ row }: { row: Row }) {
         </span>
       )}
       <span className="dm-kv">
-        <b>{row.hits}</b> hits
+        <b>{row.hits}</b> hit{row.hits === 1 ? '' : 's'}
       </span>
       {row.hits > 0 && (
         <span className="dm-kv">
