@@ -58,6 +58,10 @@ What changed in each version. The release workflow publishes a version's section
 
 ### Fixes
 
+- A `/who` of yourself fills in your race on the Stats page if it was empty, and your zone if the app did not know it yet.
+- Item details on **Loot** and **Gear** say when the wiki was last read for them; on Loot, **Look up again** reads that item's page now.
+- If a game patch changes the layout of the spell file, the app says so instead of timing spells from the wrong columns.
+- Reading the mote counts off the screen finds the Quantity column at any UI size.
 - Reading the last N minutes into the meter no longer includes older fights from a small log.
 - Log times stay in order through the hour the clocks go back, so an AA list or a fight across it is read whole.
 - Damage written with a thousands separator ("1,234 points") is counted.
