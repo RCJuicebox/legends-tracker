@@ -73,8 +73,8 @@ const plain = (w: OcrWord) => w.text.toLowerCase().replace(/[^a-z-]/g, '')
 const NAME_REACH = 4
 /** …with gaps between its words no wider than this. */
 const NAME_WORD_GAP = 1.5
-/** A Quantity header this many pixels above a row or less can head its column. */
-const HEADER_REACH_PX = 800
+/** A Quantity header this far above a row or less can head its column (800 px at the usual 20 px text). */
+const HEADER_REACH = 40
 /** The count cell under a header: it starts this far left of the header's right edge… */
 const CELL_LEFT = 4
 /** …and is this wide. */
@@ -112,7 +112,7 @@ export function findMoteRows(words: OcrWord[]): MoteRow[] {
     const name: Box = { x: left - pad, y: top - pad, w: right - left + pad * 2, h: bottom - top + pad * 2 }
     // The nearest Quantity header above the row and to its right. Counts are right-aligned under it,
     // so the cell hugs its right edge, wide enough for six digits.
-    const header = headers.filter((h) => h.x > right && h.y < p.y && p.y - h.y < HEADER_REACH_PX).sort((a, b) => a.x - right - (b.x - right) || b.y - a.y)[0]
+    const header = headers.filter((h) => h.x > right && h.y < p.y && p.y - h.y < p.h * HEADER_REACH).sort((a, b) => a.x - right - (b.x - right) || b.y - a.y)[0]
     const cell: Box = header
       ? { x: header.x + header.w - p.h * CELL_LEFT, y: name.y, w: p.h * CELL_WIDTH, h: name.h }
       : { x: right + p.h, y: name.y, w: p.w * CELL_WIDTH_NO_HEADER, h: name.h }
@@ -199,100 +199,71 @@ export function moteCountsFromScreen(words: OcrWord[]): { counts: Partial<Record
 }
 
 /**
- * The labels of the in-game Inventory window's Stats tab, as it lays them out: a left column
- * (vitals, regen, stats, resists) and a right column (heroic mods, spell mods, skill damage mods)
- * on the same lines. Longer labels come first so "Attack Speed" is not read as "Attack".
+ * The in-game Inventory window's Stats tab, line by line, in one place: each label as it lays them
+ * out (a left column of vitals, regen, stats and resists, a right column of heroic, spell and skill
+ * damage mods, on the same lines), with the most a line can show where it prints "value / most",
+ * or `pair` where it prints "current / most" with no fixed most. Longer labels come first so
+ * "Attack Speed" is not read as "Attack".
  */
-export const STAT_WINDOW_LABELS = [
-  'Combat HP Regen',
-  'Combat Mana Regen',
-  'Combat End Regen',
-  'Damage Shield Mitigation',
-  'Damage Shield Mitiga',
-  'Damage Shielding',
-  'DoT Shielding',
-  'Melee Shielding',
-  'Spell Shielding',
-  'Strike Through',
-  'Stun Resist',
-  'Combat Effects',
-  'Heal Amount',
-  'Spell Damage',
-  'Dragon Punch',
-  'Eagle Strike',
-  'Flying Kick',
-  'Round Kick',
-  'Tiger Claw',
-  'Attack Speed',
-  'HP',
-  'Mana',
-  'Endurance',
-  'AC',
-  'Attack',
-  'Velocity',
-  'Strength',
-  'Stamina',
-  'Intelligence',
-  'Wisdom',
-  'Agility',
-  'Dexterity',
-  'Charisma',
-  'Magic',
-  'Fire',
-  'Cold',
-  'Disease',
-  'Poison',
-  'Void',
-  'Accuracy',
-  'Avoidance',
-  'Clairvoyance',
-  'Luck',
-  'Bash',
-  'Backstab',
-  'Frenzy',
-  'Kick'
-] as const
+const STAT_WINDOW: { label: string; most?: number; pair?: true }[] = [
+  { label: 'Combat HP Regen' },
+  { label: 'Combat Mana Regen' },
+  { label: 'Combat End Regen' },
+  { label: 'Damage Shield Mitigation', most: 25 },
+  { label: 'Damage Shield Mitiga', most: 25 },
+  { label: 'Damage Shielding', most: 35 },
+  { label: 'DoT Shielding', most: 35 },
+  { label: 'Melee Shielding', most: 35 },
+  { label: 'Spell Shielding', most: 35 },
+  { label: 'Strike Through', most: 35 },
+  { label: 'Stun Resist', most: 35 },
+  { label: 'Combat Effects', most: 100 },
+  { label: 'Heal Amount' },
+  { label: 'Spell Damage' },
+  { label: 'Dragon Punch', most: 100 },
+  { label: 'Eagle Strike', most: 100 },
+  { label: 'Flying Kick', most: 100 },
+  { label: 'Round Kick', most: 100 },
+  { label: 'Tiger Claw', most: 100 },
+  { label: 'Attack Speed' },
+  { label: 'HP', pair: true },
+  { label: 'Mana', pair: true },
+  { label: 'Endurance', pair: true },
+  { label: 'AC' },
+  { label: 'Attack', pair: true },
+  { label: 'Velocity' },
+  { label: 'Strength', most: 510 },
+  { label: 'Stamina', most: 510 },
+  { label: 'Intelligence', most: 510 },
+  { label: 'Wisdom', most: 510 },
+  { label: 'Agility', most: 510 },
+  { label: 'Dexterity', most: 510 },
+  { label: 'Charisma', most: 510 },
+  { label: 'Magic', most: 1000 },
+  { label: 'Fire', most: 1000 },
+  { label: 'Cold', most: 1000 },
+  { label: 'Disease', most: 1000 },
+  { label: 'Poison', most: 1000 },
+  { label: 'Void', most: 1000 },
+  { label: 'Accuracy', most: 150 },
+  { label: 'Avoidance', most: 100 },
+  { label: 'Clairvoyance' },
+  { label: 'Luck' },
+  { label: 'Bash', most: 100 },
+  { label: 'Backstab', most: 125 },
+  { label: 'Frenzy', most: 125 },
+  { label: 'Kick', most: 100 }
+]
+
+export const STAT_WINDOW_LABELS = STAT_WINDOW.map((l) => l.label)
 
 const labelWords = STAT_WINDOW_LABELS.map((l) => ({ label: l, words: l.toLowerCase().split(' ') }))
 const CANONICAL: Record<string, string> = { 'Damage Shield Mitiga': 'Damage Shield Mitigation' }
 
 /** The most a value can show, where the window prints "value / most". */
-const WINDOW_CAPS: Record<string, number> = {
-  Strength: 510,
-  Stamina: 510,
-  Intelligence: 510,
-  Wisdom: 510,
-  Agility: 510,
-  Dexterity: 510,
-  Charisma: 510,
-  Magic: 1000,
-  Fire: 1000,
-  Cold: 1000,
-  Disease: 1000,
-  Poison: 1000,
-  Void: 1000,
-  Accuracy: 150,
-  Avoidance: 100,
-  'Combat Effects': 100,
-  'Damage Shielding': 35,
-  'Damage Shield Mitigation': 25,
-  'DoT Shielding': 35,
-  'Melee Shielding': 35,
-  'Spell Shielding': 35,
-  'Strike Through': 35,
-  'Stun Resist': 35,
-  Bash: 100,
-  Backstab: 125,
-  'Dragon Punch': 100,
-  'Eagle Strike': 100,
-  'Flying Kick': 100,
-  Frenzy: 125,
-  Kick: 100,
-  'Round Kick': 100,
-  'Tiger Claw': 100
-}
+const WINDOW_CAPS: Record<string, number> = Object.fromEntries(STAT_WINDOW.flatMap((l) => (l.most ? [[CANONICAL[l.label] ?? l.label, l.most]] : [])))
 /** Lines that print "current / most" with no fixed most. */
-const PAIRS = new Set(['HP', 'Mana', 'Endurance', 'Attack'])
+const PAIRS = new Set(STAT_WINDOW.filter((l) => l.pair).map((l) => l.label))
 
 const clean = ocrDigits
 
