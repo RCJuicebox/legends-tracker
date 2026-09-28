@@ -923,12 +923,14 @@ table.table {
   background: rgba(10, 12, 18, 0.72);
   box-shadow: 0 0 0 1px rgb(var(--ink) / 0.06) inset;
 }
-/* The fill is scaled and its bright edge slid, never resized: a tick costs no layout. */
+/* The fill is scaled and its bright edge slid, never resized: a tick costs no layout. Both paint in
+   the track's colour, the timer's own until its last seconds shift it to amber and red. */
 .timer .track {
   position: absolute;
   inset: 0;
   overflow: hidden;
   border-radius: inherit;
+  color: var(--c);
 }
 .timer .fill,
 .timer .edge {
@@ -936,12 +938,20 @@ table.table {
   inset: 0;
   will-change: transform;
 }
+/* A comet: faint where the timer started, full colour at the leading edge, which glows. */
 .timer .fill {
   transform-origin: left;
-  background: linear-gradient(90deg, color-mix(in srgb, var(--c) 70%, transparent), color-mix(in srgb, var(--c) 38%, transparent));
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, currentColor 6%, transparent) 0%,
+    color-mix(in srgb, currentColor 35%, transparent) 55%,
+    color-mix(in srgb, currentColor 88%, transparent) 100%
+  );
 }
 .timer .edge {
-  box-shadow: inset -2px 0 0 var(--c);
+  box-shadow:
+    inset -2px 0 0 color-mix(in srgb, currentColor 50%, #fff),
+    inset -18px 0 16px -10px currentColor;
 }
 /* The warning glow is its own layer, faded in and out. */
 .timer::before {
@@ -1009,6 +1019,9 @@ table.table {
 }
 .timer.overdue {
   opacity: 0.55;
+}
+.timer.overdue .edge {
+  box-shadow: none;
 }
 .timer.overdue .fill {
   background: repeating-linear-gradient(45deg, rgb(var(--ink) / 0.07) 0 8px, transparent 8px 16px);

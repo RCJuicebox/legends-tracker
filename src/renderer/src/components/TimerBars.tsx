@@ -26,12 +26,20 @@ export function useNow(intervalMs: number, active = true): number {
   return now
 }
 
+/** The last seconds of a bar: its own colour until SHIFT_MS are left, amber halfway, red at the end. */
+const SHIFT_MS = 12_000
+const AMBER = '#e0a03a'
+const RED = '#ef5a4f'
+
 /**
  * The bar drains by itself: one animation per timer, started where the timer is and run to its
  * end, so the page renders only to change the text. The fill is scaled and its bright edge slid
- * along, rather than resized, so the animation costs no layout. An overdue bar is full, striped.
+ * along, rather than resized, so the animation costs no layout. Over its last twelve seconds the
+ * bar's colour (the track's `color`, which the fill and edge paint with) runs to amber and then red:
+ * a colour animation that only starts then. An overdue bar is full, striped.
  */
-function useDrain(startedAt: number, endsAt: number, overdue: boolean) {
+function useDrain(startedAt: number, endsAt: number, overdue: boolean, color: string) {
+  const track = useRef<HTMLDivElement>(null)
   const fill = useRef<HTMLDivElement>(null)
   const edge = useRef<HTMLDivElement>(null)
   useEffect(() => {
@@ -41,22 +49,26 @@ function useDrain(startedAt: number, endsAt: number, overdue: boolean) {
       fill.current?.animate([{ transform: 'scaleX(1)' }, { transform: 'scaleX(0)' }], timing),
       edge.current?.animate([{ transform: 'translateX(0)' }, { transform: 'translateX(-100%)' }], timing)
     ]
-    const elapsed = Math.max(0, Date.now() - startedAt)
+    const now = Date.now()
+    const elapsed = Math.max(0, now - startedAt)
     for (const r of runs) if (r) r.currentTime = elapsed
-    return () => runs.forEach((r) => r?.cancel())
-  }, [startedAt, endsAt, overdue])
-  return { fill, edge }
+    // Before its last twelve seconds the shift has not started: a negative time holds its first colour.
+    const shift = track.current?.animate([{ color }, { color: AMBER }, { color: RED }], { duration: SHIFT_MS, easing: 'linear', fill: 'both' })
+    if (shift) shift.currentTime = now - (endsAt - SHIFT_MS)
+    return () => [...runs, shift].forEach((r) => r?.cancel())
+  }, [startedAt, endsAt, overdue, color])
+  return { track, fill, edge }
 }
 
 export function TimerBar({ t, now, showTarget }: { t: TimerView; now: number; showTarget: boolean }) {
   const left = t.endsAt - now
   const overdue = left < 0
   const warning = !overdue && t.warnSec > 0 && left <= t.warnSec * 1000
-  const { fill, edge } = useDrain(t.startedAt, t.endsAt, overdue)
+  const { track, fill, edge } = useDrain(t.startedAt, t.endsAt, overdue, t.color)
   const [iconOk, setIconOk] = useState(true)
   return (
     <div className={`timer${warning ? ' warning' : ''}${overdue ? ' overdue' : ''}`} style={{ ['--c' as string]: t.color }}>
-      <div className="track">
+      <div className="track" ref={track}>
         <div className="fill" ref={fill} />
         <div className="edge" ref={edge} />
       </div>
