@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { api } from '../api'
+import { ago, api } from '../api'
 import { useInvoke, useItemInfo } from '../hooks'
 import { useRemembered } from '../remember'
 import { wikiUrl } from '../../../core/format'
@@ -70,7 +70,7 @@ export function Loot() {
 
   // The wiki, for what the open sessions show.
   const shownNames = useMemo(() => [...new Set(groups.filter((g) => filtering || opened.includes(g.id)).flatMap((g) => g.entries.map((e) => e.base)))], [groups, filtering, opened])
-  const info = useItemInfo(shownNames)
+  const { info, refresh } = useItemInfo(shownNames)
   const sessions = useMemo(() => new Map((view?.sessions ?? []).map((s) => [s.id, s])), [view])
 
   const toggle = (k: LootOutcome) => setHidden(hidden.includes(k) ? hidden.filter((x) => x !== k) : [...hidden, k])
@@ -146,7 +146,7 @@ export function Loot() {
                   </span>
                 )}
               </div>
-              {open && g.entries.map((e) => <Row key={e.id} e={e} info={info[itemKey(e.base)]} />)}
+              {open && g.entries.map((e) => <Row key={e.id} e={e} info={info[itemKey(e.base)]} refresh={refresh} />)}
             </div>
           )
         })
@@ -155,7 +155,8 @@ export function Loot() {
   )
 }
 
-function Row({ e, info }: { e: LootEntry; info: ItemInfo | undefined }) {
+function Row({ e, info, refresh }: { e: LootEntry; info: ItemInfo | undefined; refresh: (name: string) => Promise<void> }) {
+  const [refreshing, setRefreshing] = useState(false)
   const [iconOk, setIconOk] = useState(true)
   const d = describeItem(info)
   const title = info?.found ? info.title : e.base
@@ -205,6 +206,21 @@ function Row({ e, info }: { e: LootEntry; info: ItemInfo | undefined }) {
                 <Info label="About the lookup" text="Item names are matched to eqlwiki page titles, then searched for. A page with a different spelling can be missed." />
               </span>
             )}
+            {info.fetchedAt ? (
+              <div className="faint small">
+                From eqlwiki, looked up {ago(info.fetchedAt)}.{' '}
+                <button
+                  className="link-button"
+                  disabled={refreshing}
+                  onClick={() => {
+                    setRefreshing(true)
+                    void refresh(e.base).finally(() => setRefreshing(false))
+                  }}
+                >
+                  {refreshing ? 'Looking up…' : 'Look up again'}
+                </button>
+              </div>
+            ) : null}
           </>
         )}
       </div>

@@ -558,6 +558,7 @@ function ItemPanel({
             <>
               <div className="small faint mb-4">The wiki's stats, base values{lvl ? `; at +${lvl}: AC ${s?.ac ?? 0}` : ''}</div>
               <pre className="inv-block">{statsText(info)}</pre>
+              {info.fetchedAt ? <p className="faint small">From eqlwiki, looked up {ago(info.fetchedAt)}; Refresh item stats reads every worn item's page again.</p> : null}
             </>
           ) : (
             <p className="small muted">eqlwiki has no page for this item, so it adds nothing to the totals unless you type its AC below.</p>

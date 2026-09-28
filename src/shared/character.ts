@@ -105,6 +105,8 @@ export interface ItemInfo {
   icon?: number
   /** Absent on entries cached before it was kept. */
   use?: ItemUse
+  /** When the page was read from eqlwiki. */
+  fetchedAt?: number
 }
 
 /** A character's inventory export, with what the wiki says about the items worn. */

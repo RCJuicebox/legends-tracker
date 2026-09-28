@@ -130,5 +130,5 @@ export class ItemCatalog {
 }
 
 function strip(c: Cached): ItemInfo {
-  return { title: c.title, found: c.found, statsblock: c.statsblock, icon: c.icon, ...(c.use ? { use: c.use } : {}) }
+  return { title: c.title, found: c.found, statsblock: c.statsblock, icon: c.icon, fetchedAt: c.fetchedAt, ...(c.use ? { use: c.use } : {}) }
 }

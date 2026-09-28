@@ -89,7 +89,7 @@ export function useDebounced<A extends unknown[]>(fn: (...args: A) => void, ms: 
  * kept whenever it comes (it is keyed by name), so one that outlives a later ask is still right; a
  * failed lookup (offline) lets the names be asked again next time.
  */
-export function useItemInfo(names: string[]): Record<string, ItemInfo> {
+export function useItemInfo(names: string[]): { info: Record<string, ItemInfo>; refresh: (name: string) => Promise<void> } {
   const [info, setInfo] = useState<Record<string, ItemInfo>>({})
   const [asked] = useState(() => new Set<string>())
   const mounted = useRef(true)
@@ -110,7 +110,12 @@ export function useItemInfo(names: string[]): Record<string, ItemInfo> {
       }
     )
   }, [names, asked])
-  return info
+  /** Reads one item's page again from eqlwiki. */
+  const refresh = useCallback(async (name: string) => {
+    const r = await api.invoke('inventory:lookup', [name], true)
+    if (mounted.current) setInfo((prev) => ({ ...prev, ...r }))
+  }, [])
+  return { info, refresh }
 }
 
 /** A search as the player types: after a pause, and only the newest answer kept. */

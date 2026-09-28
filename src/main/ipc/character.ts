@@ -32,7 +32,9 @@ export function registerCharacterIpc(ctx: AppContext): void {
     return { current: ctx.characterKey(), achievements: check.achievements, inventory: check.inventory }
   })
   handle('inventory:load', (character, refresh) => ctx.inventoryFiles.load(character, !!refresh))
-  handle('inventory:lookup', (names) => ctx.inventoryFiles.lookup(Array.isArray(names) ? names.filter((n): n is string => typeof n === 'string') : []))
+  handle('inventory:lookup', (names, force) =>
+    ctx.inventoryFiles.lookup(Array.isArray(names) ? names.filter((n): n is string => typeof n === 'string').slice(0, 500) : [], force === true)
+  )
   handle('character:sheet', (character) => ctx.inventoryFiles.sheet(character))
   handle('character:saveSheet', (character, input) => {
     const sheet = sanitizeSheet(input)

@@ -338,7 +338,8 @@ export interface Invokes {
   'character:sheet': (character: string) => CharacterSheet
   'character:saveSheet': (character: string, sheet: CharacterSheet) => void
   'inventory:load': (character: string, refresh?: boolean) => InventoryView
-  'inventory:lookup': (names: string[]) => Record<string, ItemInfo>
+  /** `force` reads the pages again from eqlwiki, however recently they were read. */
+  'inventory:lookup': (names: string[], force?: boolean) => Record<string, ItemInfo>
 
   'gear:catalog': () => CatalogState
   'gear:catalogRefresh': () => CatalogState

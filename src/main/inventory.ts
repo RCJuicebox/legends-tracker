@@ -72,8 +72,8 @@ export class InventoryFiles {
   }
 
   /** Looks up more items on demand (an item in a bag, opened to see what it is). */
-  lookup(names: string[]) {
-    return this.catalog.lookup(names)
+  lookup(names: string[], force = false) {
+    return this.catalog.lookup(names, force)
   }
 
   private async poll(): Promise<void> {

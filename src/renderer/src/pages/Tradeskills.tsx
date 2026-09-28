@@ -108,7 +108,7 @@ export function Tradeskills() {
 
   // Ingredient pages, for who sells them and the wiki's value.
   const names = useMemo(() => [...new Set(favorites.flatMap(({ r }) => r?.ingredients.map((i) => i.name) ?? []))], [favorites])
-  const info = useItemInfo(names)
+  const { info } = useItemInfo(names)
 
   const bought = purchasesQ.data ?? {}
   const price = (name: string): { unit: number; from: PriceSource } => {
