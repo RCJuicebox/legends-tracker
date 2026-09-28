@@ -488,18 +488,6 @@ export function OptimizeTab({ m }: { m: GearModel }) {
                     <div className="small muted">
                       instead of {c.before ? <b>{pieceName(c.before)}</b> : 'nothing'}
                       {c.before && (moveTo >= 0 ? `, which moves to ${slotLabel(plan.slots[moveTo])}` : ', which comes off')}
-                      {c.before && c.before.from === 'worn' && !lockedSlots.has(c.i) && (
-                        <>
-                          {' · '}
-                          <button
-                            className="link-button inline"
-                            title={`Lock ${pieceName(c.before)} in your ${slotLabel(c.slot)}: the optimizer leaves it on and works around it`}
-                            onClick={() => lock(c.i, c.before!)}
-                          >
-                            Keep wearing {c.before.item.name}
-                          </button>
-                        </>
-                      )}
                     </div>
                   )}
                   {together.length > 1 && (
@@ -623,7 +611,7 @@ function LockCard({
 }) {
   const [pick, setPick] = useState('')
   const [pickSlot, setPickSlot] = useState('')
-  const [showWorn, setShowWorn] = useRemembered('optimize.showWorn', true)
+  const [open, setOpen] = useRemembered('optimize.keepOpen', true)
   // What you wear, slot by slot, and whether each is locked where it is.
   const worn = plan.before.flatMap((p, i) => (p?.from === 'worn' ? [{ i, p }] : []))
   const wornLocked = (i: number, p: Piece) => refs.some((r, k) => r.slot === i && found[k] === p)
@@ -651,23 +639,24 @@ function LockCard({
   return (
     <div className="card stack gap-8">
       <div className="row gap-8">
-        <b>Keep what you wear</b>
+        <button className="lt-collapse" aria-expanded={open} onClick={() => setOpen(!open)}>
+          <span aria-hidden="true">{open ? '▾' : '▸'}</span> Keep what you wear
+        </button>
         <Info
           label="About locking"
           text="A piece locked into a slot stays there whatever the weights say, and the optimizer wears everything else around it; it may still put an exaltation from Storage in it. Lock what you wear below, or put any other piece you own in a slot. Locks are kept for this character until you unlock them, and a piece that moves between exports is found again by name. A lock goes unused when its piece cannot go there with the others: the same lore item twice, or a two-hander in Primary with Secondary locked."
         />
-        <span className="small muted">{refs.length ? `${refs.length} locked` : 'Lock a piece and the optimizer leaves it on and works around it.'}</span>
+        <span className="small muted">
+          {refs.length ? `${refs.length} locked${open ? '' : `: ${refs.map((r) => r.name).join(', ')}`}` : 'Lock a piece and the optimizer leaves it on and works around it.'}
+        </span>
         <span className="grow" />
-        <button className="btn ghost small" aria-expanded={showWorn} onClick={() => setShowWorn(!showWorn)}>
-          {showWorn ? 'Hide your gear' : 'Show your gear'}
-        </button>
         {refs.length > 1 && (
           <button className="btn ghost small" onClick={clear}>
             Unlock all
           </button>
         )}
       </div>
-      {showWorn && (
+      {open && (
         <div className="lt-keep" role="group" aria-label="What you wear">
           {worn.map(({ i, p }) => {
             const on = wornLocked(i, p)
@@ -687,67 +676,70 @@ function LockCard({
           })}
         </div>
       )}
-      {refs.map((r, k) => {
-        // Pieces locked where you wear them show in the grid while it is open.
-        if (showWorn && found[k] && plan.before[r.slot] === found[k] && locked.has(r.slot)) return null
-        const note = why(r, found[k])
-        return (
-          <div key={`${r.slot}|${r.name}`} className="row gap-8 small">
-            <span className="lt-slot">{slotLabel(SLOT_LAYOUT[r.slot] ?? '')}</span>
-            <b>{r.name}</b>
-            {found[k] && <span className="muted">{whereText(found[k]!.from, found[k]!.item)}</span>}
-            {note && <span className="lt-chip warn">{note}</span>}
-            <span className="grow" />
-            <button className="btn ghost small" aria-label={`Unlock ${r.name}`} onClick={() => unlock(r.slot)}>
-              Unlock
-            </button>
-          </div>
-        )
-      })}
-      <div className="row gap-8 small">
-        <span className="muted">Or put another piece in a slot:</span>
-        <select aria-label="Piece to lock" value={pick} onChange={(e) => setPick(e.target.value)} style={{ maxWidth: 360 }}>
-          <option value="">Choose a piece…</option>
-          {PICK_GROUPS.map(([from, label]) => {
-            const group = choices.filter((p) => p.from === from)
-            return group.length ? (
-              <optgroup key={from} label={label}>
-                {group.map((p) => (
-                  <option key={pieceId(p)} value={pieceId(p)}>
-                    {p.item.name}
-                    {from === 'worn' ? ` (${slotLabel(p.item.location)})` : ''}
-                  </option>
-                ))}
-              </optgroup>
-            ) : null
-          })}
-        </select>
-        {chosen &&
-          (slotNames.length ? (
-            <>
-              <span className="muted">in</span>
-              <select aria-label="Slot to lock it in" value={slotName} onChange={(e) => setPickSlot(e.target.value)}>
-                {slotNames.map((s) => (
-                  <option key={s} value={s}>
-                    {slotLabel(s)}
-                  </option>
-                ))}
-              </select>
-              <button
-                className="btn small"
-                onClick={() => {
-                  lock(indexFor(chosen, slotName), chosen)
-                  setPick('')
-                  setPickSlot('')
-                }}
-              >
-                Lock
+      {open &&
+        refs.map((r, k) => {
+          // Pieces locked where you wear them show in the grid.
+          if (found[k] && plan.before[r.slot] === found[k] && locked.has(r.slot)) return null
+          const note = why(r, found[k])
+          return (
+            <div key={`${r.slot}|${r.name}`} className="row gap-8 small">
+              <span className="lt-slot">{slotLabel(SLOT_LAYOUT[r.slot] ?? '')}</span>
+              <b>{r.name}</b>
+              {found[k] && <span className="muted">{whereText(found[k]!.from, found[k]!.item)}</span>}
+              {note && <span className="lt-chip warn">{note}</span>}
+              <span className="grow" />
+              <button className="btn ghost small" aria-label={`Unlock ${r.name}`} onClick={() => unlock(r.slot)}>
+                Unlock
               </button>
-            </>
-          ) : (
-            <span className="muted">your classes, race or level cannot wear it</span>
-          ))}
-      </div>
+            </div>
+          )
+        })}
+      {open && (
+        <div className="row gap-8 small">
+          <span className="muted">Or put another piece in a slot:</span>
+          <select aria-label="Piece to lock" value={pick} onChange={(e) => setPick(e.target.value)} style={{ maxWidth: 360 }}>
+            <option value="">Choose a piece…</option>
+            {PICK_GROUPS.map(([from, label]) => {
+              const group = choices.filter((p) => p.from === from)
+              return group.length ? (
+                <optgroup key={from} label={label}>
+                  {group.map((p) => (
+                    <option key={pieceId(p)} value={pieceId(p)}>
+                      {p.item.name}
+                      {from === 'worn' ? ` (${slotLabel(p.item.location)})` : ''}
+                    </option>
+                  ))}
+                </optgroup>
+              ) : null
+            })}
+          </select>
+          {chosen &&
+            (slotNames.length ? (
+              <>
+                <span className="muted">in</span>
+                <select aria-label="Slot to lock it in" value={slotName} onChange={(e) => setPickSlot(e.target.value)}>
+                  {slotNames.map((s) => (
+                    <option key={s} value={s}>
+                      {slotLabel(s)}
+                    </option>
+                  ))}
+                </select>
+                <button
+                  className="btn small"
+                  onClick={() => {
+                    lock(indexFor(chosen, slotName), chosen)
+                    setPick('')
+                    setPickSlot('')
+                  }}
+                >
+                  Lock
+                </button>
+              </>
+            ) : (
+              <span className="muted">your classes, race or level cannot wear it</span>
+            ))}
+        </div>
+      )}
     </div>
   )
 }
