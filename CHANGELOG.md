@@ -5,6 +5,7 @@ What changed in each version. The release workflow publishes a version's section
 ## Unreleased
 
 - **Gear › Gear optimizer: lock a piece in.** Choose any piece you own (or, with All gear, one to get) and a slot it fits, and the optimizer keeps it there and wears everything else around it. It may still put an exaltation from Storage in the piece. **Keep it** on a suggested change locks what you wear in that slot. Locks are kept per character until you unlock them.
+- **Timer bars are smooth again**: the six-second tick marks on the bars are gone.
 
 ## 2.0.0 (2026-09-27)
 

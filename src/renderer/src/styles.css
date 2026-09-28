@@ -1,5 +1,5 @@
 /*
- * Field Kit (FEAT-015): the game's own windows, bevelled panels and a tick for every six seconds.
+ * Field Kit (FEAT-015): the game's own windows and bevelled panels.
  * Every colour is a token. The dark set is the default; the light set applies when the app's theme
  * (Settings › Appearance, handed to Windows' nativeTheme) is light, or System on a light Windows.
  * Overlays keep the dark set whatever the theme: they sit over the game.
@@ -924,14 +924,6 @@ table.table {
   box-shadow: 0 0 0 1px rgb(var(--ink) / 0.06) inset;
 }
 /* The fill is scaled and its bright edge slid, never resized: a tick costs no layout. */
-/* A tick every six seconds, drawn over the fill; TimerBar sets --tick for bars short enough to read. */
-.timer .track::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  background: repeating-linear-gradient(90deg, transparent 0 calc(var(--tick, 200%) - 2px), rgb(0 0 0 / 0.45) calc(var(--tick, 200%) - 2px) var(--tick, 200%));
-}
 .timer .track {
   position: absolute;
   inset: 0;

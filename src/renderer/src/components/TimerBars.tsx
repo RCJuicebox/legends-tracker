@@ -48,13 +48,6 @@ function useDrain(startedAt: number, endsAt: number, overdue: boolean) {
   return { fill, edge }
 }
 
-/** EverQuest counts buffs and DoTs in six-second ticks: a mark for each, on bars short enough to read them. */
-const TICK_MS = 6000
-function tickStyle(t: TimerView): Record<string, string> {
-  const total = t.endsAt - t.startedAt
-  return total > 0 && total <= 40 * TICK_MS ? { '--tick': `${((TICK_MS / total) * 100).toFixed(3)}%` } : {}
-}
-
 export function TimerBar({ t, now, showTarget }: { t: TimerView; now: number; showTarget: boolean }) {
   const left = t.endsAt - now
   const overdue = left < 0
@@ -62,7 +55,7 @@ export function TimerBar({ t, now, showTarget }: { t: TimerView; now: number; sh
   const { fill, edge } = useDrain(t.startedAt, t.endsAt, overdue)
   const [iconOk, setIconOk] = useState(true)
   return (
-    <div className={`timer${warning ? ' warning' : ''}${overdue ? ' overdue' : ''}`} style={{ ['--c' as string]: t.color, ...tickStyle(t) }}>
+    <div className={`timer${warning ? ' warning' : ''}${overdue ? ' overdue' : ''}`} style={{ ['--c' as string]: t.color }}>
       <div className="track">
         <div className="fill" ref={fill} />
         <div className="edge" ref={edge} />
