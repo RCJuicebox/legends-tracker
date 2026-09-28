@@ -488,6 +488,18 @@ export function OptimizeTab({ m }: { m: GearModel }) {
                     <div className="small muted">
                       instead of {c.before ? <b>{pieceName(c.before)}</b> : 'nothing'}
                       {c.before && (moveTo >= 0 ? `, which moves to ${slotLabel(plan.slots[moveTo])}` : ', which comes off')}
+                      {c.before && c.before.from === 'worn' && !lockedSlots.has(c.i) && (
+                        <>
+                          {' · '}
+                          <button
+                            className="link-button inline"
+                            title={`Lock ${pieceName(c.before)} in your ${slotLabel(c.slot)}: the optimizer leaves it on and works around it`}
+                            onClick={() => lock(c.i, c.before!)}
+                          >
+                            Keep wearing {c.before.item.name}
+                          </button>
+                        </>
+                      )}
                     </div>
                   )}
                   {together.length > 1 && (
@@ -520,20 +532,9 @@ export function OptimizeTab({ m }: { m: GearModel }) {
                     </div>
                   )}
                 </div>
-                <span className="stack gap-6" style={{ alignItems: 'flex-end' }}>
-                  <span className="lt-gain" title="Stats in this slot alone, by your weights: haste, focus effects, worn effects and procs are counted over all slots, above">
-                    {delta >= 0 ? '+' : ''}
-                    {num(delta)}
-                  </span>
-                  {c.before && c.before.from === 'worn' && !lockedSlots.has(c.i) && (
-                    <button
-                      className="btn ghost small"
-                      title={`Lock ${pieceName(c.before)} in your ${slotLabel(c.slot)} and wear the rest around it`}
-                      onClick={() => lock(c.i, c.before!)}
-                    >
-                      Keep it
-                    </button>
-                  )}
+                <span className="lt-gain" title="Stats in this slot alone, by your weights: haste, focus effects, worn effects and procs are counted over all slots, above">
+                  {delta >= 0 ? '+' : ''}
+                  {num(delta)}
                 </span>
               </div>
             )
@@ -622,6 +623,10 @@ function LockCard({
 }) {
   const [pick, setPick] = useState('')
   const [pickSlot, setPickSlot] = useState('')
+  const [showWorn, setShowWorn] = useRemembered('optimize.showWorn', true)
+  // What you wear, slot by slot, and whether each is locked where it is.
+  const worn = plan.before.flatMap((p, i) => (p?.from === 'worn' ? [{ i, p }] : []))
+  const wornLocked = (i: number, p: Piece) => refs.some((r, k) => r.slot === i && found[k] === p)
   // Every piece with a wiki page (one without stays where it is), once each.
   const choices = useMemo(() => {
     const seen = new Set<string>()
@@ -646,20 +651,45 @@ function LockCard({
   return (
     <div className="card stack gap-8">
       <div className="row gap-8">
-        <b>Locked in</b>
+        <b>Keep what you wear</b>
         <Info
           label="About locking"
-          text="A piece locked into a slot stays there whatever the weights say, and the optimizer wears everything else around it; it may still put an exaltation from Storage in it. Locks are kept for this character until you unlock them, and a piece that moves between exports is found again by name. A lock goes unused when its piece cannot go there with the others: the same lore item twice, or a two-hander in Primary with Secondary locked."
+          text="A piece locked into a slot stays there whatever the weights say, and the optimizer wears everything else around it; it may still put an exaltation from Storage in it. Lock what you wear below, or put any other piece you own in a slot. Locks are kept for this character until you unlock them, and a piece that moves between exports is found again by name. A lock goes unused when its piece cannot go there with the others: the same lore item twice, or a two-hander in Primary with Secondary locked."
         />
-        {!refs.length && <span className="small muted">nothing yet: lock a piece to keep it in a slot and optimize the rest around it.</span>}
+        <span className="small muted">{refs.length ? `${refs.length} locked` : 'Lock a piece and the optimizer leaves it on and works around it.'}</span>
         <span className="grow" />
+        <button className="btn ghost small" aria-expanded={showWorn} onClick={() => setShowWorn(!showWorn)}>
+          {showWorn ? 'Hide your gear' : 'Show your gear'}
+        </button>
         {refs.length > 1 && (
           <button className="btn ghost small" onClick={clear}>
             Unlock all
           </button>
         )}
       </div>
+      {showWorn && (
+        <div className="lt-keep" role="group" aria-label="What you wear">
+          {worn.map(({ i, p }) => {
+            const on = wornLocked(i, p)
+            return (
+              <button
+                key={i}
+                className="lt-keep-slot"
+                aria-pressed={on}
+                title={on ? `Locked: ${pieceName(p)} stays in your ${slotLabel(plan.slots[i])}. Click to unlock.` : `Lock ${pieceName(p)} in your ${slotLabel(plan.slots[i])}`}
+                onClick={() => (on ? unlock(i) : lock(i, p))}
+              >
+                <span className="lt-slot">{slotLabel(plan.slots[i])}</span>
+                <span className="name">{p.item.name}</span>
+                <span className="state">{on ? 'Locked' : 'Lock'}</span>
+              </button>
+            )
+          })}
+        </div>
+      )}
       {refs.map((r, k) => {
+        // Pieces locked where you wear them show in the grid while it is open.
+        if (showWorn && found[k] && plan.before[r.slot] === found[k] && locked.has(r.slot)) return null
         const note = why(r, found[k])
         return (
           <div key={`${r.slot}|${r.name}`} className="row gap-8 small">
@@ -675,8 +705,9 @@ function LockCard({
         )
       })}
       <div className="row gap-8 small">
+        <span className="muted">Or put another piece in a slot:</span>
         <select aria-label="Piece to lock" value={pick} onChange={(e) => setPick(e.target.value)} style={{ maxWidth: 360 }}>
-          <option value="">Lock a piece…</option>
+          <option value="">Choose a piece…</option>
           {PICK_GROUPS.map(([from, label]) => {
             const group = choices.filter((p) => p.from === from)
             return group.length ? (

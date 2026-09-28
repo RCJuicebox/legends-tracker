@@ -2305,6 +2305,62 @@ table.table {
   font-weight: 600;
   cursor: pointer;
 }
+.link-button.inline {
+  display: inline;
+  color: var(--accent-2);
+}
+.link-button.inline:hover {
+  text-decoration: underline;
+}
+/* The optimizer's worn gear, a lock toggle a slot. */
+.lt-keep {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 6px;
+}
+.lt-keep-slot {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 1px 10px;
+  align-items: center;
+  padding: 6px 10px;
+  border: none;
+  border-radius: var(--radius);
+  background: var(--panel-2);
+  box-shadow: var(--shadow);
+  text-align: left;
+  cursor: pointer;
+}
+.lt-keep-slot .name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
+}
+.lt-keep-slot .state {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+  font: 600 11px/1 var(--font-display);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-3);
+}
+.lt-keep-slot:hover .state {
+  color: var(--text);
+}
+.lt-keep-slot[aria-pressed='true'] {
+  background: color-mix(in srgb, var(--accent) 12%, var(--panel-2));
+  box-shadow:
+    inset 0 0 0 1px var(--accent),
+    var(--shadow);
+}
+.lt-keep-slot[aria-pressed='true'] .state {
+  color: var(--accent);
+}
+.lt-keep-slot:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
 button.tree-item {
   width: 100%;
   border: none;

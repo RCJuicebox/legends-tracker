@@ -2,6 +2,10 @@
 
 What changed in each version. The release workflow publishes a version's section as its release notes, and installed copies show them when an update arrives.
 
+## Unreleased
+
+- **Gear optimizer: keep what you wear.** The lock card now shows everything you are wearing, slot by slot. Click a piece to lock it, and the optimizer leaves it on and works around it. On a suggested change, **Keep wearing <item>** names the piece you have on, so it's clear what stays. The **Keep it** button, which sat beside the new item and read as if it kept that, is gone. Any other piece still goes in a slot from **Or put another piece in a slot**.
+
 ## 2.1.0 (2026-09-27)
 
 - **Gear › Gear optimizer: lock a piece in.** Choose any piece you own (or, with All gear, one to get) and a slot it fits, and the optimizer keeps it there and wears everything else around it. It may still put an exaltation from Storage in the piece. **Keep it** on a suggested change locks what you wear in that slot. Locks are kept per character until you unlock them.
