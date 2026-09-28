@@ -148,6 +148,8 @@ export class SpellBook {
     // Most spells (an NPC's, an item's) have the same class levels, so each distinct set is held once.
     const levelSets = new Map<string, number[]>()
     const effectsOf = new EffectReader()
+    let rows = 0
+    let misread = 0
     // The wanted fields of a line are found with indexOf rather than by splitting all ~250 of them.
     const f: string[] = []
     let effectsLast: boolean | null = null
@@ -184,6 +186,7 @@ export class SpellBook {
       }
       lineStart = next
       if (count < 80) continue
+      rows++
       const id = +f[F.id]
       const formula = +f[F.formula]
       const cap = +f[F.cap]
@@ -192,6 +195,17 @@ export class SpellBook {
       const levelKey = text.slice(clsFrom, clsTo)
       let classLevels = levelSets.get(levelKey)
       if (!classLevels) levelSets.set(levelKey, (classLevels = levelKey.split('^').map(Number)))
+      // The row as this layout expects it: a whole id, a name, sixteen class levels 0-255, an icon.
+      if (
+        !Number.isInteger(id) ||
+        !f[F.name] ||
+        classLevels.length !== 16 ||
+        !classLevels.every((l) => Number.isInteger(l) && l >= 0 && l <= 255) ||
+        !Number.isFinite(+f[F.icon])
+      ) {
+        misread++
+        continue
+      }
       const msg = messages.get(id) ?? []
       const spell: Spell = {
         id,
@@ -220,6 +234,11 @@ export class SpellBook {
       book.byId.set(id, spell)
       const existing = book.byName.get(spell.name)
       if (!existing || (!castable(existing) && castable(spell))) book.byName.set(spell.name, spell)
+    }
+    // A game patch that moves the columns shows as rows that no longer read right: say so, rather
+    // than time every spell from the wrong fields.
+    if (rows >= 100 && misread / rows > 0.01) {
+      throw new Error(`spells_us.txt does not read as expected (${misread} of ${rows} rows): the game may have changed its layout`)
     }
     return book
   }

@@ -64,3 +64,18 @@ describe('what the spell file says about reach and resists', () => {
     expect(fixtureBook().named('Plague')!.resist).toBe('disease')
   })
 })
+
+const NL = String.fromCharCode(10)
+
+describe('a spell file laid out differently', () => {
+  it('is refused rather than read from the wrong columns', () => {
+    const rows = readFileSync(join(__dirname, 'fixtures', 'spells_us.txt'), 'latin1')
+      .split(NL)
+      .filter((l) => l.split('^').length > 100)
+    const shifted = Array.from({ length: 12 }, () => rows)
+      .flat()
+      .map((l) => 'x^' + l)
+      .join(NL)
+    expect(() => SpellBook.parse(shifted, readFileSync(join(__dirname, 'fixtures', 'spells_us_str.txt'), 'latin1'))).toThrow(/does not read as expected/)
+  })
+})
