@@ -1,6 +1,6 @@
 import { itemKey } from '../../core/inventory'
 import type { ItemInfo } from '../../shared/types'
-import { baseZone, usualAmount, type FactionSourceTallies, type SourceTally } from './attribution'
+import { baseZone, usualAmount, type FactionSourceTallies, type SharedFrom, type SourceTally } from './attribution'
 import { NO_MOB, STANDING_MAX, STANDING_MIN, type FactionMob, type FactionPageData, type FactionView } from './core'
 import type { QuestHandIn, QuestPage } from './questPages'
 
@@ -89,6 +89,11 @@ export interface PlanActivity {
   page?: string
   /** A wiki mob's note ("Quest NPC", "Merchant"). */
   note?: string
+  /** Log: the player's other characters whose logs saw it too; `theirs` when only they did, not this one. */
+  others?: string[]
+  theirs?: boolean
+  /** A kill camp of a city's people (guards, merchants, guildmasters): the guards may join in. */
+  city?: boolean
 }
 
 // ---------- names ----------
@@ -155,6 +160,49 @@ export function zoneKey(zone: string): string {
   return ZONE_ALIASES[k] ?? k
 }
 
+/** The cities, where killing the people brings the guards down on you. */
+const CITIES = new Set(
+  [
+    'South Qeynos',
+    'North Qeynos',
+    'Surefall Glade',
+    'West Freeport',
+    'North Freeport',
+    'East Freeport',
+    'Neriak - Foreign Quarter',
+    'Neriak - Commons',
+    'Neriak - Third Gate',
+    'Grobb',
+    'Oggok',
+    'North Kaladim',
+    'South Kaladim',
+    "Ak'Anon",
+    'Kelethin',
+    'Northern Felwithe',
+    'Southern Felwithe',
+    'North Felwithe',
+    'South Felwithe',
+    'Erudin',
+    'Erudin Palace',
+    'Paineel',
+    'Halas',
+    'Rivervale',
+    'Highpass Hold',
+    'East Cabilis',
+    'West Cabilis',
+    'Cabilis East',
+    'Cabilis West',
+    'Thurgadin',
+    'Shar Vahl'
+  ].map(zoneKey)
+)
+
+/** Whether a zone is a city. */
+export const isCity = (zone: string) => CITIES.has(zoneKey(zone))
+
+/** A city's people rather than its vermin: named, or by what they are. */
+const CITY_PEOPLE = /\b(?:guards?|guardsman|citizens?|merchant|guildmaster|banker|captain|sentry|sentinel|watchman|lieutenant|sergeant|priest(?:ess)?|paladin|knight|warden)\b/i
+
 // ---------- the catalog ----------
 
 /** The amounts a guess stands in for: the usual ones in the player's own log. */
@@ -184,6 +232,8 @@ export interface CatalogInput {
   items: Record<string, ItemInfo>
   /** Also the ways to raise every other faction the character has, to bring factions back from below zero (the Most factions positive goal). */
   wide?: boolean
+  /** What the player's other characters' logs saw, by tally key: `sources` has it added in (shareSources). */
+  shared?: SharedFrom
 }
 
 export interface FactionCatalog {
@@ -207,6 +257,8 @@ export interface FactionPlanData extends PlanFor {
   wiki: { fetchedAt: number; pages: number; quests: number; error: string }
   /** Kills and hand-ins in the log that moved a faction, and changes nothing around them explained. */
   log: { kills: number; handIns: number; unexplained: number }
+  /** The player's other characters whose logs the plan also learns from, and what those saw. */
+  shared: { characters: string[]; kills: number; handIns: number }
 }
 
 const median = (xs: number[]) => {
@@ -216,7 +268,7 @@ const median = (xs: number[]) => {
 }
 
 /** The usual amounts in the log, each amount counted once per time it was seen. */
-function guessesFrom(sources: FactionSourceTallies): Guesses {
+export function guessesFrom(sources: FactionSourceTallies): Guesses {
   const by: Record<string, number[]> = { killUp: [], killDown: [], handUp: [], handDown: [] }
   for (const t of Object.values(sources.acts)) {
     for (const amounts of Object.values(t.hits)) {
@@ -354,7 +406,20 @@ export function buildCatalog(input: CatalogInput): FactionCatalog {
   const guesses = guessesFrom(input.sources)
   const { isThing, isZone } = notItems(input)
   const activities: PlanActivity[] = []
-  const acts = Object.values(input.sources.acts)
+  const entries = Object.entries(input.sources.acts)
+  const acts = entries.map(([, t]) => t)
+  // Which of the player's other characters saw each tally: all of it their doing, or some of it.
+  const keyOf = new Map(entries.map(([k, t]) => [t, k]))
+  const sharedBy = (ts: SourceTally[]): Pick<PlanActivity, 'others' | 'theirs'> => {
+    const others = new Set<string>()
+    let theirs = true
+    for (const t of ts) {
+      const s = input.shared?.[keyOf.get(t) ?? '']
+      s?.others.forEach((c) => others.add(c))
+      if (!s || s.own) theirs = false
+    }
+    return others.size ? { others: [...others].sort(), ...(theirs ? { theirs: true } : {}) } : {}
+  }
   const withStock = (it: HandInItem): HandInItem => {
     const have = input.have[itemKey(it.name)] ?? 0
     return have > 0 ? { ...it, have } : it
@@ -388,7 +453,8 @@ export function buildCatalog(input: CatalogInput): FactionCatalog {
       seen: t.n,
       ...(t.runN >= 5 && t.runMs > 0 ? { measured: clamp(t.runN / (t.runMs / 3_600_000), 1, 72_000) } : {}),
       items,
-      ...(repeatable ? {} : { once: `done ${t.n === 1 ? 'once' : 'twice'} in your log` })
+      ...(repeatable ? {} : { once: `done ${t.n === 1 ? 'once' : 'twice'} in your logs` }),
+      ...sharedBy([t])
     }
     activities.push(a)
     const k = t.name.toLowerCase()
@@ -434,7 +500,9 @@ export function buildCatalog(input: CatalogInput): FactionCatalog {
       seen: kills,
       ...(rate ? { measured: clamp(rate * Math.max(0.5, share), 5, 600) } : {}),
       common: members.filter((m) => isCommon(m.name)).length,
-      named: members.filter((m) => !isCommon(m.name)).length
+      named: members.filter((m) => !isCommon(m.name)).length,
+      ...sharedBy(members),
+      ...(isCity(zone) && members.some((m) => !isCommon(m.name) || CITY_PEOPLE.test(m.name)) ? { city: true } : {})
     })
   }
 
@@ -478,11 +546,12 @@ export function buildCatalog(input: CatalogInput): FactionCatalog {
     for (const m of members) for (const f of m.lower) lowered.set(f, (lowered.get(f) ?? 0) + 1)
     for (const [f, n] of lowered) if (!(f in hits)) hits[f] = Math.round(((guesses.killDown * n) / members.length) * 10) / 10
     const notes = [...new Set(members.map((m) => m.mob.note).filter(Boolean))]
+    const zone = members[0].mob.zone
     activities.push({
       id: `wikikill:${k}`,
       kind: 'kill',
       title: shortList(members.map((m) => m.mob.name)),
-      zone: members[0].mob.zone,
+      zone,
       mobs: members.slice(0, MOBS_KEPT).map((m) => m.mob.name),
       hits,
       guessed: Object.keys(hits),
@@ -490,7 +559,8 @@ export function buildCatalog(input: CatalogInput): FactionCatalog {
       common: members.filter((m) => isCommon(m.mob.name, m.mob.note)).length,
       named: members.filter((m) => !isCommon(m.mob.name, m.mob.note)).length,
       page: members[0].page,
-      ...(notes.length ? { note: notes.join(', ') } : {})
+      ...(notes.length ? { note: notes.join(', ') } : {}),
+      ...(isCity(zone) && members.some((m) => !isCommon(m.mob.name, m.mob.note) || CITY_PEOPLE.test(m.mob.name)) ? { city: true } : {})
     })
   }
 
@@ -601,6 +671,8 @@ export interface PlanSettings {
   goal: PlanGoal
   /** For the 'positive' goal: what one faction ending at 0 or above is worth, in hours of play. */
   positiveHours: number
+  /** Leave out kill camps of a city's people (guards, merchants, guildmasters), unless locked in. */
+  avoidCity: boolean
 }
 
 /** 'fastest': every achievement in the least time. 'positive': every achievement, ending with as many factions at 0 or above as is worth the time. */
@@ -617,7 +689,8 @@ export const DEFAULT_SETTINGS: PlanSettings = {
   unknownSec: 60,
   keepMaxed: KEEP_MAXED.light,
   goal: 'fastest',
-  positiveHours: 3
+  positiveHours: 3,
+  avoidCity: false
 }
 
 /** Buying one item from a merchant, in stacks. */
@@ -740,13 +813,16 @@ export interface PlanStep {
   locked: string[]
 }
 
-export interface PlanOption {
+/** One way to raise a faction to 2000 from where it stands, with this alone: how many, and how long with the trip there. */
+export interface Way {
   activity: PlanActivity
-  /** To finish the achievement with this alone, from where it stands now. */
   units: number
   seconds: number
   unitSeconds: number
   rateFrom: UnitTime['from']
+}
+
+export interface PlanOption extends Way {
   /** Open achievements it lowers. */
   lowersOpen: string[]
   /** The plan finishes this achievement with it. */
@@ -844,10 +920,10 @@ function riskOf(a: PlanActivity, choices: PlanChoices, locked: boolean): number 
   return a.guessed?.length ? 1.35 : 1.2
 }
 
-/** Whether the planner may use an activity: not ruled out, and not once only, unless locked in. */
-export const plannable = (a: PlanActivity, choices: PlanChoices) => {
+/** Whether the planner may use an activity: not ruled out, not once only, and not a city camp left out, unless locked in. */
+export const plannable = (a: PlanActivity, choices: PlanChoices, settings?: Pick<PlanSettings, 'avoidCity'>) => {
   const locked = Object.values(choices.locks).includes(a.id)
-  return locked || (!a.once && !choices.excluded.includes(a.id))
+  return locked || (!a.once && !choices.excluded.includes(a.id) && !(settings?.avoidCity && a.city))
 }
 
 /**
@@ -894,7 +970,7 @@ export function planFactions(input: PlanInput, settings: PlanSettings, choices: 
     return t
   }
   for (const a of activities) {
-    if (!plannable(a, choices)) continue
+    if (!plannable(a, choices, settings)) continue
     const touch: { i: number; h: number }[] = []
     let raisesTarget = false
     let raisesAny = false
@@ -1330,6 +1406,7 @@ export function planFactions(input: PlanInput, settings: PlanSettings, choices: 
   }))
 
   // ---- every way to raise each achievement still open ----
+  // (the same reckoning as waysToRaise, with what the plan made of each)
   const chosenFor = new Map<string, string>()
   for (const step of steps) for (const f of step.finishes) if (!chosenFor.has(f)) chosenFor.set(f, step.activity.id)
   const used = new Set(steps.map((step) => step.activity.id))
@@ -1343,24 +1420,28 @@ export function planFactions(input: PlanInput, settings: PlanSettings, choices: 
     const lowered = Object.entries(a.hits)
       .filter(([f, h]) => h < 0 && stillOpen.has(f))
       .map(([f]) => f)
-    for (const [f, h] of raised) {
-      const units = Math.ceil((STANDING_MAX - start[index.get(f)!]) / h - EPS)
-      // What the character holds goes first, as in the plan.
-      const onHand = a.items?.length === 1 && a.items[0].have ? Math.min(units, Math.floor(a.items[0].have / a.items[0].count)) : 0
-      options[f].push({
-        activity: a,
-        units,
-        seconds: onHand * unit.handSeconds + (units - onHand) * unit.seconds + travel,
-        unitSeconds: unit.seconds,
-        rateFrom: unit.from,
-        lowersOpen: lowered,
-        chosen: chosenFor.get(f) === a.id,
-        used: used.has(a.id)
-      })
-    }
+    for (const [f, h] of raised)
+      options[f].push({ ...wayFor(a, h, start[index.get(f)!], unit, travel), lowersOpen: lowered, chosen: chosenFor.get(f) === a.id, used: used.has(a.id) })
   }
   // Ways the planner may use first, quickest first; one-time and ruled-out ones after.
-  const later = (o: PlanOption) => (plannable(o.activity, choices) ? 0 : 1)
+  const later = (o: PlanOption) => (plannable(o.activity, choices, settings) ? 0 : 1)
   for (const list of Object.values(options)) list.sort((p, q) => later(p) - later(q) || p.seconds - q.seconds)
   return { steps, seconds, unplanned, options, staleLocks, maxedLost, belowZero: { now: belowNow, after: belowAfter }, shape, kept }
+}
+
+/** A way to raise a faction by `h` a unit from `standing` to 2000: what the character holds goes first, as in the plan. */
+function wayFor(a: PlanActivity, h: number, standing: number, unit: UnitTime, travel: number): Way {
+  const units = Math.max(0, Math.ceil((STANDING_MAX - standing) / h - EPS))
+  const onHand = a.items?.length === 1 && a.items[0].have ? Math.min(units, Math.floor(a.items[0].have / a.items[0].count)) : 0
+  return { activity: a, units, seconds: onHand * unit.handSeconds + (units - onHand) * unit.seconds + travel, unitSeconds: unit.seconds, rateFrom: unit.from }
+}
+
+/** Every way the catalog knows to raise a faction to 2000 from where it stands: the ones the planner may use first, quickest first. */
+export function waysToRaise(activities: PlanActivity[], faction: string, standing: number, settings: PlanSettings, choices: PlanChoices = NO_CHOICES): Way[] {
+  const ways = activities.flatMap((a) => {
+    const h = a.hits[faction]
+    return h > 0 ? [wayFor(a, h, standing, unitTime(a, settings, choices), settings.travelMin * 60)] : []
+  })
+  const later = (w: Way) => (plannable(w.activity, choices, settings) ? 0 : 1)
+  return ways.sort((p, q) => later(p) - later(q) || p.seconds - q.seconds)
 }

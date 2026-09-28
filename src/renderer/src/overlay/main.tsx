@@ -3,8 +3,9 @@ import { createRoot } from 'react-dom/client'
 import '../styles.css'
 import { api } from '../api'
 import { TimerBars } from '../components/TimerBars'
-import { MeterOverlay } from './regions'
+import { AchievementsRegion, MeterOverlay } from './regions'
 import type { CombatSnapshot, OverlayConfig, TimerView } from '../../../shared/types'
+import type { AchievementTrack } from '../../../shared/tracking'
 
 // One overlay in a window of its own: how the overlays are drawn while being arranged. While
 // playing they share a host window per monitor instead (host.tsx).
@@ -15,6 +16,7 @@ function Overlay() {
   const [arranging, setArranging] = useState(false)
   const [timers, setTimers] = useState<TimerView[]>([])
   const [combat, setCombat] = useState<CombatSnapshot | null>(null)
+  const [track, setTrack] = useState<AchievementTrack | null>(null)
 
   useEffect(() => {
     const offs = [
@@ -23,7 +25,8 @@ function Overlay() {
         setArranging(p.arranging)
       }),
       api.on('overlay:timers', (views: TimerView[]) => setTimers(views)),
-      api.on('overlay:combat', (snap: CombatSnapshot) => setCombat(snap))
+      api.on('overlay:combat', (snap: CombatSnapshot) => setCombat(snap)),
+      api.on('overlay:achievements', (t: AchievementTrack | null) => setTrack(t))
     ]
     return () => offs.forEach((off) => off())
   }, [])
@@ -36,6 +39,8 @@ function Overlay() {
         <TimerBars timers={mine} grouped={config.groupByTarget} fontSize={config.fontSize} />
       ) : config.kind === 'meter' ? (
         <MeterOverlay config={config} snap={combat} arranging={arranging} />
+      ) : config.kind === 'achievements' ? (
+        <AchievementsRegion config={config} track={track} arranging={arranging} />
       ) : null}
       {arranging && <div className="arrange-label">{config.name} — drag to move, drag edges to resize</div>}
     </div>

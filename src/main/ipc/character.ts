@@ -24,7 +24,11 @@ export function registerCharacterIpc(ctx: AppContext): void {
 
   handle('achievements:characters', async () => ({ current: ctx.characterKey(), available: (await checkGameFolder(ctx.installDir())).achievements }))
   handle('achievements:load', (character) => ctx.achievementFiles.load(character))
-  handle('achievements:marks', (character, marks) => ctx.achievementFiles.saveMarks(character, marks))
+  handle('achievements:marks', async (character, marks) => {
+    await ctx.achievementFiles.saveMarks(character, marks)
+    // What the player tracks goes on the achievements overlay at once.
+    ctx.liveAchievements.marksChanged(character)
+  })
 
   // Which characters have a given export, and which one is being played.
   handle('character:exports', async () => {

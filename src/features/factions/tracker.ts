@@ -1,0 +1,227 @@
+import { STANDING_MAX, STANDING_MIN } from './core'
+import { zoneKey, type FactionPlan, type PlanTarget } from './planner'
+import type { FactionTrackGoal, FactionTrackView, TrackKind } from '../../shared/tracking'
+
+// Following a faction plan while playing. The Optimize tab hands the plan it shows to the main
+// process, which keeps it per character and, as the log moves factions, works out which step is being
+// worked on, how many kills or hand-ins it still wants, and when a step or an achievement is done, for
+// the achievements overlay and its cues. It needs no planning of its own: a step is done when the
+// achievements it is there for are (and the factions it brings back are at 0), and the steps after
+// it are as the plan laid them out.
+
+/** One step of a followed plan, as the tracker needs it. */
+export interface FollowStep {
+  /** The activity's id. */
+  id: string
+  kind: TrackKind
+  title: string
+  zone: string
+  npc?: string
+  /** The achievements it finishes (by faction), and the factions it brings back to 0 or above. */
+  finish: string[]
+  lift: string[]
+  /** What one kill or hand-in does to each of those. */
+  per: Record<string, number>
+  /** As planned: kills or hand-ins, and seconds each (the trip there left out). */
+  units: number
+  unitSec: number
+}
+
+export interface FollowedPlan {
+  /** When the Optimize tab worked it out. */
+  at: number
+  steps: FollowStep[]
+  /** Achievement names by faction, where they differ. */
+  names: Record<string, string>
+}
+
+/** Where the player is in a followed plan, kept between reads. */
+export interface FollowState {
+  /** Steps done, by index. */
+  done: number[]
+  /** Achievements seen done since the plan was followed. */
+  reached: string[]
+  /** The step being worked on, and what it wanted when it became that step (for its progress). */
+  active: number | null
+  startUnits: Record<number, number>
+  /** False until the first read: what is done by then is where the player starts, not news. */
+  synced: boolean
+}
+
+export const freshFollow = (): FollowState => ({ done: [], reached: [], active: null, startUnits: {}, synced: false })
+
+/** What a read finds worth saying: an achievement done, a step done (with the one to go on to). */
+export type FollowEvent = { kind: 'achievement'; faction: string; name: string } | { kind: 'step'; index: number; step: FollowStep; next: FollowStep | null }
+
+/** A plan as the Optimize tab shows it, to follow. */
+export function followedPlan(plan: FactionPlan, targets: PlanTarget[], at = Date.now()): FollowedPlan {
+  const names: Record<string, string> = {}
+  for (const t of targets) if (t.achievement !== t.faction) names[t.faction] = t.achievement
+  return {
+    at,
+    names,
+    steps: plan.steps.map((s) => {
+      const a = s.activity
+      const per: Record<string, number> = {}
+      for (const f of [...s.finishes, ...s.lifts]) if (a.hits[f]) per[f] = a.hits[f]
+      return {
+        id: a.id,
+        kind: a.kind,
+        title: a.title,
+        zone: a.zone,
+        ...(a.npc ? { npc: a.npc } : {}),
+        finish: s.finishes,
+        lift: s.lifts,
+        per,
+        units: s.units,
+        unitSec: s.units > 0 ? Math.max(0, s.seconds - s.travel) / s.units : 0
+      }
+    })
+  }
+}
+
+const isStr = (v: unknown): v is string => typeof v === 'string'
+const strs = (v: unknown, max = 200): string[] => (Array.isArray(v) ? v.filter(isStr).slice(0, max) : [])
+const finite = (v: unknown, lo: number, hi: number) => (typeof v === 'number' && Number.isFinite(v) ? Math.max(lo, Math.min(hi, v)) : 0)
+
+/** A followed plan as a page sent it, checked field by field; null when it is not one. */
+export function sanitizeFollowedPlan(v: unknown): FollowedPlan | null {
+  if (!v || typeof v !== 'object') return null
+  const o = v as Record<string, unknown>
+  if (!Array.isArray(o.steps)) return null
+  const steps: FollowStep[] = []
+  for (const raw of o.steps.slice(0, 500)) {
+    if (!raw || typeof raw !== 'object') continue
+    const s = raw as Record<string, unknown>
+    const kind = s.kind === 'kill' || s.kind === 'turnin' || s.kind === 'quest' ? s.kind : null
+    if (!isStr(s.id) || !kind || !isStr(s.title)) continue
+    const per: Record<string, number> = {}
+    if (s.per && typeof s.per === 'object') for (const [f, h] of Object.entries(s.per as Record<string, unknown>)) if (typeof h === 'number' && Number.isFinite(h) && h) per[f] = h
+    steps.push({
+      id: s.id.slice(0, 300),
+      kind,
+      title: s.title.slice(0, 300),
+      zone: isStr(s.zone) ? s.zone.slice(0, 120) : '',
+      ...(isStr(s.npc) ? { npc: s.npc.slice(0, 120) } : {}),
+      finish: strs(s.finish),
+      lift: strs(s.lift),
+      per,
+      units: Math.round(finite(s.units, 0, 1e7)),
+      unitSec: finite(s.unitSec, 0, 86_400)
+    })
+  }
+  const names: Record<string, string> = {}
+  if (o.names && typeof o.names === 'object') for (const [f, n] of Object.entries(o.names as Record<string, unknown>)) if (isStr(n)) names[f] = n.slice(0, 200)
+  return { at: finite(o.at, 0, 1e15), steps, names }
+}
+
+/** What a read of the standings makes of a followed plan. */
+export interface FollowRead {
+  state: FollowState
+  view: FactionTrackView
+  events: FollowEvent[]
+}
+
+/**
+ * Where the player is in a followed plan. `standings` are where the factions stand now; `done` the
+ * achievements (by faction) known done whatever the standing (the achievements export, or the game
+ * saying so). `zone` is where the player is and `moved` what the last faction lines did, so the step
+ * worked on is the one the player is doing, not only the first one left.
+ */
+export function readFollow(
+  plan: FollowedPlan,
+  was: FollowState,
+  standings: Record<string, number>,
+  done: Set<string>,
+  opts: { zone?: string; moved?: Record<string, number> } = {}
+): FollowRead {
+  const state: FollowState = { done: [...was.done], reached: [...was.reached], active: was.active, startUnits: { ...was.startUnits }, synced: true }
+  const events: FollowEvent[] = []
+  const reached = new Set(state.reached)
+  const standing = (f: string) => Math.max(STANDING_MIN, Math.min(STANDING_MAX, standings[f] ?? 0))
+  const isDone = (f: string) => reached.has(f) || done.has(f) || standing(f) >= STANDING_MAX
+  for (const s of plan.steps)
+    for (const f of s.finish) {
+      if (reached.has(f) || !isDone(f)) continue
+      reached.add(f)
+      if (was.synced) events.push({ kind: 'achievement', faction: f, name: plan.names[f] ?? f })
+    }
+  state.reached = [...reached]
+
+  const doneSteps = new Set(state.done)
+  const complete = (s: FollowStep) => s.finish.every(isDone) && s.lift.every((f) => standing(f) >= 0)
+  plan.steps.forEach((s, i) => {
+    if (doneSteps.has(i) || !complete(s)) return
+    doneSteps.add(i)
+  })
+  const open = (i: number) => !doneSteps.has(i)
+  const unitsLeft = (s: FollowStep) => {
+    let n = 0
+    for (const f of s.finish) if (!isDone(f) && s.per[f] > 0) n = Math.max(n, Math.ceil((STANDING_MAX - standing(f)) / s.per[f] - 1e-9))
+    for (const f of s.lift) if (standing(f) < 0 && s.per[f] > 0) n = Math.max(n, Math.ceil(-standing(f) / s.per[f] - 1e-9))
+    return n
+  }
+
+  // The step being worked on: the one the last faction lines went the way of (in this zone if any
+  // is), else the one worked on before, else the first left here, else the first left.
+  const here = opts.zone ? zoneKey(opts.zone) : ''
+  const order = plan.steps.map((_, i) => i).filter(open)
+  const inZone = (i: number) => !!here && zoneKey(plan.steps[i].zone) === here
+  let active: number | null = null
+  const moved = opts.moved ?? {}
+  if (Object.keys(moved).length) {
+    const doing = order.filter((i) => {
+      const s = plan.steps[i]
+      return [...s.finish, ...s.lift].some((f) => moved[f] && s.per[f] && Math.sign(moved[f]) === Math.sign(s.per[f]))
+    })
+    active = doing.find(inZone) ?? doing[0] ?? null
+  }
+  if (active === null && state.active !== null && open(state.active)) active = state.active
+  if (active === null) active = order.find(inZone) ?? order[0] ?? null
+
+  // Steps done since the last read: said once, with the one to go on to.
+  const newlyDone = [...doneSteps].filter((i) => !was.done.includes(i)).sort((a, b) => a - b)
+  const nextOf = (i: number | null) => (i === null ? null : (order.find((j) => j > i) ?? order.find((j) => j !== i) ?? null))
+  if (was.synced) for (const i of newlyDone) events.push({ kind: 'step', index: i, step: plan.steps[i], next: active !== null ? plan.steps[active] : null })
+  state.done = [...doneSteps].sort((a, b) => a - b)
+
+  let current: FactionTrackView['current'] = null
+  let secondsLeft = 0
+  if (active !== null) {
+    const s = plan.steps[active]
+    const left = unitsLeft(s)
+    const start = Math.max(state.active === active ? (state.startUnits[active] ?? left) : left, left, 1)
+    state.startUnits = { [active]: start }
+    const goals: FactionTrackGoal[] = [
+      ...s.finish.map((f) => ({ faction: f, ...(plan.names[f] ? { achievement: plan.names[f] } : {}), standing: standing(f), to: STANDING_MAX, done: isDone(f) })),
+      ...s.lift.map((f) => ({ faction: f, standing: standing(f), to: 0, done: standing(f) >= 0 }))
+    ]
+    current = {
+      index: active,
+      id: s.id,
+      kind: s.kind,
+      title: s.title,
+      zone: s.zone,
+      ...(s.npc ? { npc: s.npc } : {}),
+      unitsLeft: left,
+      secondsLeft: left * s.unitSec,
+      progress: Math.max(0, Math.min(1, 1 - left / start)),
+      goals
+    }
+    secondsLeft += current.secondsLeft
+  } else state.startUnits = {}
+  state.active = active
+  for (const i of order) if (i !== active) secondsLeft += plan.steps[i].units * plan.steps[i].unitSec
+  const n = nextOf(active)
+  const next =
+    n === null ? null : { index: n, kind: plan.steps[n].kind, title: plan.steps[n].title, zone: plan.steps[n].zone, ...(plan.steps[n].npc ? { npc: plan.steps[n].npc } : {}) }
+  return { state, view: { steps: plan.steps.length, done: state.done.length, current, next, secondsLeft }, events }
+}
+
+/** A step said aloud: "the kill camp in West Freeport", "hand-ins to Mojax Hikspin in West Commonlands". */
+export function sayStep(s: Pick<FollowStep, 'kind' | 'title' | 'zone' | 'npc'>): string {
+  const where = s.zone ? ` in ${s.zone}` : ''
+  if (s.kind === 'kill') return `the kill camp${where}`
+  if (s.kind === 'turnin') return `hand-ins to ${s.npc ?? s.title}${where}`
+  return `${s.title}${where}`
+}

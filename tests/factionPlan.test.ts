@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { baseZone, emptySources, joinSources, sourceReader, usualAmount, type FactionSourceTallies } from '../src/features/factions/attribution'
+import { baseZone, emptySources, joinSources, shareSources, sourceReader, usualAmount, type FactionSourceTallies } from '../src/features/factions/attribution'
 import { parseFactionPageFull, type FactionRow } from '../src/features/factions/core'
 import { parseQuestPage, readHandIn } from '../src/features/factions/questPages'
 import {
@@ -13,6 +13,7 @@ import {
   planFactions,
   planFor,
   unitTime,
+  waysToRaise,
   zoneKey,
   type CatalogInput,
   type PlanActivity,
@@ -20,6 +21,7 @@ import {
   type PlanSettings
 } from '../src/features/factions/planner'
 import type { ItemInfo } from '../src/shared/types'
+import { lookUp, moversOf } from '../src/features/factions/lookup'
 
 const T0 = Date.UTC(2026, 8, 28, 12, 0, 0)
 const adjusted = (faction: string, n: number) => `Your faction standing with ${faction} has been adjusted by ${n}.`
@@ -351,6 +353,49 @@ describe('the catalog', () => {
     expect(howHad('Scalp', has)).toEqual({ how: 'drop', where: 'Highpass' })
     expect(howHad('Nothing Known', has).how).toBe('unknown')
   })
+
+  it("learns from the player's other characters' logs: their hand-ins and camps, but not their kill pace", () => {
+    const campLines = (zone: string, mob: string, n: number, gap: number): [number, string][] => {
+      const lines: [number, string][] = [[0, `You have entered ${zone}.`]]
+      for (let i = 0; i < n; i++) {
+        lines.push([10 + i * gap, adjusted('Steel Warriors', 5)])
+        lines.push([10 + i * gap, `You have slain ${mob}!`])
+      }
+      return lines
+    }
+    const own = settled(read(campLines('Blackburrow', 'a gnoll', 3, 60)))
+    const alt = joinSources([
+      handIns('Mojax Hikspin', 'West Commonlands', 4, [['Priests of Marr', 5]]),
+      settled(read(campLines('Blackburrow', 'a gnoll', 20, 10))),
+      settled(read(campLines('Everfrost Peaks', 'a kobold', 20, 10)))
+    ])
+    const shared = shareSources(own, [{ character: 'Kelwyn_neriak', sources: alt }])
+    // Their kills are counted; their runs are not this character's pace.
+    expect(shared.sources.acts['kill|blackburrow|a gnoll']).toMatchObject({ n: 23, runN: 2 })
+    expect(shared.from['kill|blackburrow|a gnoll']).toEqual({ others: ['Kelwyn_neriak'], own: true })
+    expect(shared.from['turnin|west commonlands|mojax hikspin']).toEqual({ others: ['Kelwyn_neriak'], own: false })
+    const { activities } = buildCatalog(catalogInput({ sources: shared.sources, shared: shared.from }))
+    const mojax = activities.find((a) => a.npc === 'Mojax Hikspin')!
+    expect(mojax).toMatchObject({ source: 'log', seen: 4, others: ['Kelwyn_neriak'], theirs: true })
+    const gnolls = activities.find((a) => a.zone === 'Blackburrow')!
+    expect(gnolls).toMatchObject({ seen: 23, others: ['Kelwyn_neriak'] })
+    expect(gnolls.theirs).toBeUndefined()
+    // Only the other character killed kobolds: no pace of this one's to go by.
+    const kobolds = activities.find((a) => a.zone === 'Everfrost Peaks')!
+    expect(kobolds.theirs).toBe(true)
+    expect(kobolds.measured).toBeUndefined()
+  })
+
+  it("marks a camp of a city's people, not its vermin", () => {
+    const lines: [number, string][] = [[0, 'You have entered West Freeport.']]
+    ;['Arem Ulosia', 'a Freeport guard', 'a sewer rat'].forEach((m, i) => {
+      lines.push([10 + i * 30, adjusted(m === 'a sewer rat' ? 'Steel Warriors' : 'Priests of Marr', 5)])
+      lines.push([10 + i * 30, `You have slain ${m}!`])
+    })
+    const { activities } = buildCatalog(catalogInput({ sources: settled(read(lines)) }))
+    expect(activities.find((a) => a.hits['Priests of Marr'])!.city).toBe(true)
+    expect(activities.find((a) => a.hits['Steel Warriors'])!.city).toBeUndefined()
+  })
 })
 
 // ---------- the plan ----------
@@ -619,5 +664,70 @@ describe('the two goals', () => {
     expect(plan.belowZero).toEqual({ now: 2, after: 1 })
     // Nothing is worth any time: no restores.
     expect(planFactions(input, { ...POSITIVE, positiveHours: 0 }).steps.map((s) => s.activity.id)).toEqual(['a'])
+  })
+})
+
+describe('the city camps switch', () => {
+  it('leaves city camps out when asked, unless one is locked in', () => {
+    const input: PlanInput = {
+      targets: [{ faction: 'A', achievement: 'A', standing: 1900 }],
+      maxed: [],
+      activities: [act('guards', { A: 10 }, 600, { city: true }), act('rats', { A: 10 }, 60)]
+    }
+    expect(planFactions(input, S).steps.map((s) => s.activity.id)).toEqual(['guards'])
+    expect(planFactions(input, { ...S, avoidCity: true }).steps.map((s) => s.activity.id)).toEqual(['rats'])
+    expect(planFactions(input, { ...S, avoidCity: true }, { ...NO_CHOICES, locks: { A: 'guards' } }).steps.map((s) => s.activity.id)).toEqual(['guards'])
+  })
+})
+
+describe('what moved a faction, and what a mob or NPC does', () => {
+  const lines: [number, string][] = [[0, 'You have entered Blackburrow.']]
+  for (let i = 0; i < 4; i++) {
+    lines.push([10 + i * 30, adjusted('Steel Warriors', 5)])
+    lines.push([10 + i * 30, adjusted('Sabertooths of Blackburrow', -5)])
+    lines.push([10 + i * 30, `You have slain ${i < 3 ? 'a gnoll' : 'a gnoll pup'}!`])
+  }
+  lines.push([200, 'You have entered Nowhere.'])
+  const sources = settled(read(lines))
+
+  it('lists what moved a faction in the logs, most points first', () => {
+    const shared = shareSources(sources, [{ character: 'Kelwyn_neriak', sources: handIns('Pedalo', 'Everfrost Peaks', 20, [['Steel Warriors', 1]]) }])
+    expect(moversOf('Steel Warriors', shared.sources, shared.from).map((m) => [m.name, m.n, m.total, m.amount, m.own, m.others])).toEqual([
+      ['Pedalo', 20, 20, 1, false, ['Kelwyn_neriak']],
+      ['A gnoll', 3, 15, 5, true, []],
+      ['A gnoll pup', 1, 5, 5, true, []]
+    ])
+    expect(moversOf('Nobody', sources)).toEqual([])
+  })
+
+  it("finds a mob by part of its name, the logs' amounts first, then the wiki's direction", () => {
+    const pages = [
+      parseFactionPageFull(
+        'Sabertooths of Blackburrow',
+        `{{Factionpage|\n| mobs_raise =\n* [[a gnoll]] <span class='fmz'>(Blackburrow)</span>\n* [[a gnoll scout]] <span class='fmz'>(Qeynos Hills)</span>\n}}`
+      )!
+    ]
+    const found = lookUp('gnoll', sources, {}, pages, (f) => f, { killUp: 5, killDown: -2, handUp: 5, handDown: -1 })
+    expect(found.map((r) => [r.name, r.from, r.zone])).toEqual([
+      ['A gnoll', 'log', 'Blackburrow'],
+      ['A gnoll pup', 'log', 'Blackburrow'],
+      ['a gnoll scout', 'wiki', 'Qeynos Hills']
+    ])
+    expect(found[0].hits).toEqual([
+      { faction: 'Sabertooths of Blackburrow', amount: -5 },
+      { faction: 'Steel Warriors', amount: 5 }
+    ])
+    expect(found[2].hits).toEqual([{ faction: 'Sabertooths of Blackburrow', amount: 5, guessed: true }])
+    expect(lookUp('gn', sources, {}, pages, (f) => f, { killUp: 5, killDown: -2, handUp: 5, handDown: -1 })).toEqual([])
+  })
+
+  it('reckons the quickest ways to take any faction to 2000, as the plan would', () => {
+    const acts = [act('slow', { A: 5 }, 60), act('quick', { A: 5 }, 600), act('other', { B: 5 }, 600)]
+    const ways = waysToRaise(acts, 'A', 1500, S)
+    expect(ways.map((w) => [w.activity.id, w.units])).toEqual([
+      ['quick', 100],
+      ['slow', 100]
+    ])
+    expect(ways[0].seconds).toBeCloseTo(600 + 100 * 6)
   })
 })

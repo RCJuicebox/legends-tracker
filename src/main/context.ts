@@ -24,6 +24,8 @@ import { PurchaseHistory, purchaseConsumer } from './purchases'
 import { FactionBook, FactionHistory, FactionSourceHistory, FactionWiki, factionConsumer, factionSourceConsumer } from '../features/factions/main'
 import { LogHistory, type HistoryWhere } from './sources/logHistory'
 import { TradeFavorites } from './tradeFavorites'
+import { LiveAchievements } from './liveAchievements'
+import { SkillHistory, skillConsumer } from './skillHistory'
 import { PetStore, PetWiki } from './pets'
 import { listLogs, logIsIn } from './game'
 import { Windows, loadPage } from './windows'
@@ -67,6 +69,10 @@ export interface AppContext {
   factionSources: FactionSourceHistory
   /** eqlwiki's faction pages and the quest pages they name, for the plan. */
   factionBook: FactionBook
+  /** The faction plan followed and the Slayer counts, for the achievements overlay. */
+  liveAchievements: LiveAchievements
+  /** Each skill's last value the log gave, for the skill achievements. */
+  skills: SkillHistory
   tradeFavorites: TradeFavorites
   petStore: PetStore
   petWiki: PetWiki
@@ -121,7 +127,8 @@ export function createContext(): AppContext {
     melee: dayConsumer(meleeCounter),
     purchases: purchaseConsumer,
     factions: factionConsumer,
-    factionSources: factionSourceConsumer
+    factionSources: factionSourceConsumer,
+    skills: skillConsumer
   })
 
   const ctx = {
@@ -145,6 +152,7 @@ export function createContext(): AppContext {
     factionWiki: new FactionWiki(),
     factionSources: new FactionSourceHistory(logHistory, 'factionSources'),
     factionBook: new FactionBook(),
+    skills: new SkillHistory(logHistory, 'skills'),
     tradeFavorites: new TradeFavorites(join(dataDir, 'tradeskills.json')),
     inventoryFiles: new InventoryFiles(dataDir, installDir, itemCatalog, (view) => toMain('state:inventory', view)),
     petStore: new PetStore(),
@@ -255,6 +263,9 @@ export function createContext(): AppContext {
 
   ctx.characterKey = () => ctx.engine.characterKey()
   ctx.historyOf = (character) => ({ logPath: logFileFor(installDir(), character), archiveDir: ctx.engine.archiveDir(), stem: logStem(character) })
+  // After everything the engine has of its own: it reads the standings and the log as they settle.
+  ctx.liveAchievements = new LiveAchievements(ctx)
+  ctx.engine.use(ctx.liveAchievements.feature)
 
   ctx.refreshOverlayVisibility = () =>
     ctx.overlays.setShown(

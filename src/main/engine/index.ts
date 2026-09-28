@@ -33,6 +33,7 @@ import type {
   FeedItem,
   KnownSpell,
   LogCheckRow,
+  Notification,
   Segment,
   SpellRule,
   WatchStatus,
@@ -90,7 +91,7 @@ export class Engine {
   /** Size and last-line time change with every write; they go out at most once a second. */
   private readonly statusOut: Throttled
   /** What follows the log, in the order each line, tick and change of character reaches it (see buildFeatures). */
-  private readonly features: readonly EngineFeature[]
+  private readonly features: EngineFeature[]
 
   private tail: Tail | null = null
   /** Bumped by every start and stop, so a start overtaken while it waited gives up. */
@@ -521,7 +522,20 @@ export class Engine {
     for (const f of this.features) f.tick?.(now)
   }
 
+  /**
+   * A feature module's own part in following the log (the achievements overlay's tracking), after
+   * every built-in one: it sees each line once they all have.
+   */
+  use(feature: EngineFeature): void {
+    this.features.push(feature)
+  }
+
   // ---- output ----
+
+  /** Alerts, speech and sounds, as a trigger's would go: muting and the settings apply. */
+  notify(ns: Notification[]): void {
+    this.notifier.notify(ns)
+  }
 
   speak(text: string, interrupt = false): Promise<void> {
     return this.notifier.speak(text, interrupt)

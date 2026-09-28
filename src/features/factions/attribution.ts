@@ -384,6 +384,28 @@ export function joinSources(stretches: FactionSourceTallies[]): FactionSourceTal
   return all
 }
 
+/** What another character's log saw, shared: by tally key, the other characters that saw it and whether this one did too. */
+export type SharedFrom = Record<string, { others: string[]; own: boolean }>
+
+/**
+ * A character's tallies with what the player's other characters' logs saw added in. What a kill or a
+ * hand-in does to a faction is the game's, whoever does it, and so is how fast a stack goes in; how
+ * fast one character kills is its own, so their kill runs are left out (the zones stay this one's).
+ */
+export function shareSources(own: FactionSourceTallies, others: { character: string; sources: FactionSourceTallies }[]): { sources: FactionSourceTallies; from: SharedFrom } {
+  const acts: Record<string, SourceTally> = { ...own.acts }
+  const from: SharedFrom = {}
+  for (const o of others) {
+    for (const [k, t] of Object.entries(o.sources.acts)) {
+      const theirs = t.kind === 'kill' ? { ...t, runN: 0, runMs: 0 } : t
+      acts[k] = acts[k] ? joinTally(acts[k], theirs) : theirs
+      const f = (from[k] ??= { others: [], own: k in own.acts })
+      if (!f.others.includes(o.character)) f.others.push(o.character)
+    }
+  }
+  return { sources: { ...own, acts }, from }
+}
+
 /** The amount a tally saw most often for a faction; ties go to the larger. */
 export function usualAmount(amounts: Record<string, number>): number {
   let best = 0

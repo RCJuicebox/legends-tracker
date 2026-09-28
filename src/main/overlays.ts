@@ -1,5 +1,6 @@
 import { BrowserWindow, screen } from 'electron'
 import type { CombatSnapshot, OverlayConfig, TimerView } from '../shared/types'
+import type { AchievementTrack } from '../shared/tracking'
 import { push } from './push'
 
 /** The alerts overlay has a page of its own, without React or the meter; the rest share one. */
@@ -41,6 +42,7 @@ export class OverlayManager {
   private topmostTimer: NodeJS.Timeout | null = null
   private lastTimers: TimerView[] = []
   private lastCombat: CombatSnapshot | null = null
+  private lastAchievements: AchievementTrack | null = null
   private shown = true
 
   constructor(private readonly host: OverlayHost) {}
@@ -161,6 +163,7 @@ export class OverlayManager {
       push(win.webContents, 'overlay:host', { configs: this.configs.filter((c) => h.ids.includes(c.id)), origin: h.origin })
       push(win.webContents, 'overlay:timers', this.lastTimers)
       if (this.lastCombat) push(win.webContents, 'overlay:combat', this.lastCombat)
+      push(win.webContents, 'overlay:achievements', this.lastAchievements)
       if (this.shown) win.showInactive()
       else win.webContents.setBackgroundThrottling(true)
     })
@@ -176,7 +179,8 @@ export class OverlayManager {
       configs: this.configs.filter((c) => h.ids.includes(c.id)),
       origin: h.origin,
       timers: this.lastTimers,
-      combat: this.configs.some((c) => h.ids.includes(c.id) && c.kind === 'meter') ? this.lastCombat : null
+      combat: this.configs.some((c) => h.ids.includes(c.id) && c.kind === 'meter') ? this.lastCombat : null,
+      achievements: this.configs.some((c) => h.ids.includes(c.id) && c.kind === 'achievements') ? this.lastAchievements : null
     }
   }
 
@@ -222,6 +226,7 @@ export class OverlayManager {
       push(win.webContents, 'overlay:config', { config: cfg, arranging: this.arranging })
       push(win.webContents, 'overlay:timers', this.lastTimers)
       if (cfg.kind === 'meter' && this.lastCombat) push(win.webContents, 'overlay:combat', this.lastCombat)
+      if (cfg.kind === 'achievements') push(win.webContents, 'overlay:achievements', this.lastAchievements)
       if (this.shown) win.showInactive()
       else win.webContents.setBackgroundThrottling(true)
     })
@@ -246,6 +251,7 @@ export class OverlayManager {
         w.webContents.setBackgroundThrottling(false)
         push(w.webContents, 'overlay:timers', this.lastTimers)
         if (this.lastCombat && this.hostHas(w, 'meter')) push(w.webContents, 'overlay:combat', this.lastCombat)
+        if (this.hostHas(w, 'achievements')) push(w.webContents, 'overlay:achievements', this.lastAchievements)
         w.showInactive()
         w.setAlwaysOnTop(true, 'screen-saver')
       } else {
@@ -259,6 +265,7 @@ export class OverlayManager {
         w.webContents.setBackgroundThrottling(false)
         push(w.webContents, 'overlay:timers', this.lastTimers)
         if (this.lastCombat && this.configs.find((c) => c.id === id)?.kind === 'meter') push(w.webContents, 'overlay:combat', this.lastCombat)
+        if (this.configs.find((c) => c.id === id)?.kind === 'achievements') push(w.webContents, 'overlay:achievements', this.lastAchievements)
         w.showInactive()
         w.setAlwaysOnTop(true, 'screen-saver')
       } else {
@@ -321,6 +328,17 @@ export class OverlayManager {
     for (const [id, w] of this.windows) {
       const cfg = this.configs.find((c) => c.id === id)
       if (cfg?.kind === 'meter' && !w.isDestroyed()) push(w.webContents, 'overlay:combat', snapshot)
+    }
+  }
+
+  /** The faction plan's step and the Slayer counts, for the achievements overlays. */
+  achievements(track: AchievementTrack | null): void {
+    this.lastAchievements = track
+    if (!this.shown) return
+    for (const h of this.hosts.values()) if (!h.win.isDestroyed() && this.hostHas(h.win, 'achievements')) push(h.win.webContents, 'overlay:achievements', track)
+    for (const [id, w] of this.windows) {
+      const cfg = this.configs.find((c) => c.id === id)
+      if (cfg?.kind === 'achievements' && !w.isDestroyed()) push(w.webContents, 'overlay:achievements', track)
     }
   }
 

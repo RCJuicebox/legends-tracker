@@ -12,6 +12,9 @@ import type { BuffView } from '../core/buffs'
 import type { EffectSpell } from '../core/itemEffects'
 import type { FactionSources, FactionView } from '../features/factions/core'
 import type { FactionPlanData } from '../features/factions/planner'
+import type { FactionLookup, FactionMover } from '../features/factions/lookup'
+import type { FollowedPlan } from '../features/factions/tracker'
+import type { AchievementTrack } from './tracking'
 import type { FocusReport } from '../core/itemFocus'
 import type { LootSnapshot } from '../core/loot'
 import type { MeleeProfile } from '../core/meleeTally'
@@ -271,7 +274,9 @@ export interface Invokes {
   'combat:segment': (id: string) => Segment | null
   'combat:sessionTimeline': (id: string) => StitchedTimeline | null
   /** A host overlay window asks for its overlays and the newest timers and meter once its page is up. */
-  'overlay:hostState': (display: number) => { configs: OverlayConfig[]; origin: { x: number; y: number }; timers: TimerView[]; combat: CombatSnapshot | null } | null
+  'overlay:hostState': (
+    display: number
+  ) => { configs: OverlayConfig[]; origin: { x: number; y: number }; timers: TimerView[]; combat: CombatSnapshot | null; achievements: AchievementTrack | null } | null
   'combat:newSession': () => CombatSnapshot
   'combat:addMember': (name: string) => CombatSnapshot
   'combat:removeMember': (name: string) => CombatSnapshot
@@ -335,6 +340,14 @@ export interface Invokes {
   'factions:sources': (faction: string) => { sources: FactionSources | null }
   /** What the Plan tab plans the faction achievements still to do from; `refresh` reads eqlwiki's pages again, `wide` adds the ways to raise every other faction. */
   'factions:plan': (character: string, refresh?: boolean, wide?: boolean) => FactionPlanData
+  /** What moved a faction in the player's logs (this character's and the others'), most points first. */
+  'factions:moved': (character: string, faction: string) => { movers: FactionMover[] }
+  /** Mobs and NPCs whose name holds the query, with what each does to the factions: the logs' amounts, else eqlwiki's direction. */
+  'factions:lookup': (character: string, query: string) => { results: FactionLookup[] }
+  /** The plan the Optimize tab shows for a character, to follow while it is played (null stops following). */
+  'factions:follow': (character: string, plan: FollowedPlan | null) => void
+  /** Where the character being played is in its faction plan, and its Slayer counts since its achievements export. */
+  'achievements:track': () => AchievementTrack | null
 
   'character:exports': () => { current: string; achievements: string[]; inventory: string[]; factions: string[] }
   'character:sheet': (character: string) => CharacterSheet
@@ -399,11 +412,14 @@ export interface Pushes {
   'state:sources': (rows: SourceView[]) => void
   'state:jobs': (jobs: JobView[]) => void
   'state:recipes': (progress: WikiProgress) => void
+  /** The faction plan's step and the Slayer counts, as they change. */
+  'state:achievementTrack': (track: AchievementTrack) => void
 
   'overlay:config': (update: { config: OverlayConfig; arranging: boolean }) => void
   'overlay:timers': (timers: TimerView[]) => void
   'overlay:combat': (snapshot: CombatSnapshot) => void
   'overlay:alert': (alert: { text: string; color: string; durationSec: number }) => void
+  'overlay:achievements': (track: AchievementTrack | null) => void
   /** The overlays one host window draws, and where the window's top left is on the screen. */
   'overlay:host': (update: { configs: OverlayConfig[]; origin: { x: number; y: number } }) => void
 
@@ -502,6 +518,10 @@ const INVOKE_CHANNELS: Record<InvokeChannel, true> = {
   'factions:get': true,
   'factions:sources': true,
   'factions:plan': true,
+  'factions:moved': true,
+  'factions:lookup': true,
+  'factions:follow': true,
+  'achievements:track': true,
   'character:exports': true,
   'character:sheet': true,
   'character:saveSheet': true,
@@ -547,12 +567,14 @@ const PUSH_CHANNELS: Record<PushChannel, true> = {
   'state:inventory': true,
   'state:catalog': true,
   'state:recipes': true,
+  'state:achievementTrack': true,
   'state:sources': true,
   'state:jobs': true,
   'overlay:config': true,
   'overlay:timers': true,
   'overlay:combat': true,
   'overlay:alert': true,
+  'overlay:achievements': true,
   'overlay:host': true,
   'audio:config': true,
   'audio:play': true

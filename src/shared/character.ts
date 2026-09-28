@@ -28,6 +28,8 @@ export interface AchMarks {
   ticks: string[]
   /** Achievements marked Broken: achKey(). */
   broken: string[]
+  /** Achievements kept on the achievements overlay whatever moved lately: achKey(). */
+  tracked?: string[]
 }
 
 /** One line of the export: a location, the item there, and what sits inside it. */

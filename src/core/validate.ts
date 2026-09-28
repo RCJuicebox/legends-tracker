@@ -163,7 +163,7 @@ function overlay(v: unknown, fb: OverlayConfig | undefined): OverlayConfig | nul
     visible: true,
     groupByTarget: true
   }
-  const kind = oneOf(v.kind, ['timers', 'alerts', 'meter'] as const, base.kind)
+  const kind = oneOf(v.kind, ['timers', 'alerts', 'meter', 'achievements'] as const, base.kind)
   const meter = kind === 'meter' ? (meterOptions(v.meter, base.meter) ?? { ...DEFAULT_METER_OPTIONS }) : undefined
   return shape(v, base, {
     id: v.id,
@@ -275,6 +275,7 @@ export function sanitizeSettings(v: unknown, fb: AppSettings): AppSettings | nul
     uiScale: num(v.uiScale, fb.uiScale, 0.75, 2),
     theme: oneOf(v.theme, ['system', 'light', 'dark'] as const, fb.theme),
     hotkeys: bool(v.hotkeys, fb.hotkeys),
+    achievementCues: bool(v.achievementCues, fb.achievementCues),
     combat
   })
 }

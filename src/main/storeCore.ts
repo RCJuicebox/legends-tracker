@@ -39,6 +39,7 @@ export function defaultSettings(): AppSettings {
     uiScale: 1,
     theme: 'system',
     hotkeys: true,
+    achievementCues: true,
     combat: { fightGapSec: 10, historyMinutes: 60, newSessionOnZone: true, combinePet: true, charmPets: true }
   }
 }

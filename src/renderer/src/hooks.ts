@@ -3,6 +3,7 @@ import { api, errorMessage } from './api'
 import { showError } from './toast'
 import { itemKey } from '../../core/inventory'
 import type { ItemInfo } from '../../shared/types'
+import type { AchievementTrack } from '../../shared/tracking'
 import type { InvokeChannel, InvokeResult, Invokes } from '../../shared/ipc'
 
 export interface Invoked<T> {
@@ -50,6 +51,24 @@ export function useInvoke<K extends InvokeChannel>(channel: K | null, args?: Par
     setError('')
   }, [])
   return { data, error, reload, setData }
+}
+
+/** The faction plan's step and the Slayer counts for the character being played, as the achievements overlay has them. */
+export function useAchievementTrack(): AchievementTrack | null {
+  const [track, setTrack] = useState<AchievementTrack | null>(null)
+  useEffect(() => {
+    let live = true
+    api.invoke('achievements:track').then(
+      (t) => live && t && setTrack(t),
+      () => undefined
+    )
+    const off = api.on('state:achievementTrack', (t: AchievementTrack) => setTrack(t))
+    return () => {
+      live = false
+      off()
+    }
+  }, [])
+  return track
 }
 
 /** A ref that always holds the latest value, for callbacks that outlive a render. */

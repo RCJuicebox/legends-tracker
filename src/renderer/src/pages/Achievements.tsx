@@ -2,13 +2,30 @@ import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { api, ago } from '../api'
 import { useRemembered } from '../remember'
 import { usePickedCharacter } from '../character'
-import { useInvoke } from '../hooks'
+import { useAchievementTrack, useInvoke } from '../hooks'
 import { showError, showToast } from '../toast'
-import { GameCommand, Pending } from '../components/ui'
+import { GameCommand, Pending, Switch } from '../components/ui'
+import { useApp } from '../state'
 import { numExact as num, who } from '../../../core/format'
-import { AchievementBook, compareNames, norm, placeOf, secKey, type AchMarks, type AchObjective, type AchRef, type Achievement, type ObjRef } from '../../../core/achievements'
+import {
+  AchievementBook,
+  achKey,
+  compareNames,
+  norm,
+  placeOf,
+  secKey,
+  type AchMarks,
+  type AchObjective,
+  type AchRef,
+  type Achievement,
+  type ObjRef
+} from '../../../core/achievements'
 import { HUNT } from '../../../core/achievementHunt'
 import type { AchievementsView } from '../../../shared/types'
+import type { SkillRow } from '../../../shared/tracking'
+
+/** "Reach the maximum skill in Divination at level 50.": the skill. */
+const SKILL_OBJECTIVE = /^Reach the maximum skill in (.+?) at level \d+\.?$/
 
 const isKill = (sectionName: string) => /hunter|raids/i.test(sectionName)
 
@@ -53,6 +70,16 @@ export function Achievements() {
   const [flash, setFlash] = useState('')
 
   const book = useMemo(() => (view ? new AchievementBook(view.sections, { ticks: view.marks.ticks, broken: [] }) : null), [view])
+  // The Slayer counts move with every kill; the export only when it is written again.
+  const track = useAchievementTrack()
+  const since = useMemo(() => {
+    const rows = track && view && track.character.toLowerCase() === view.character.toLowerCase() && track.slayer?.exportAt === view.modified ? track.slayer.rows : []
+    return new Map(rows.filter((r) => r.since > 0 || r.done).map((r) => [r.name.toLowerCase(), { since: r.since, done: r.done }]))
+  }, [track, view])
+  const skills = useMemo(() => {
+    const rows = track && view && track.character.toLowerCase() === view.character.toLowerCase() ? (track.skills?.rows ?? []) : []
+    return new Map(rows.map((r) => [`${r.achievement}|${r.skill}`.toLowerCase(), r]))
+  }, [track, view])
   const cats = useMemo(() => book?.categories() ?? [], [book])
   const curCat = cats.includes(cat) ? cat : (cats[0] ?? '')
   const catSections = book ? book.sections.map((s, si) => ({ s, si })).filter((x) => x.s.cat === curCat) : []
@@ -81,7 +108,7 @@ export function Achievements() {
   const toast = (body: ReactNode) => showToast(body, { ms: 4200 })
 
   const saveMarks = (next: AchMarks) => {
-    const marks: AchMarks = { ticks: next.ticks, broken: [] }
+    const marks: AchMarks = { ticks: next.ticks, broken: [], tracked: next.tracked ?? view.marks.tracked ?? [] }
     const before = book!
     const after = new AchievementBook(view.sections, marks)
     const newlyDone: string[] = []
@@ -107,6 +134,15 @@ export function Achievements() {
         </>
       )
     saveMarks(book!.withTick(r, on, view.marks))
+  }
+
+  /** Keeps an achievement on the achievements overlay, or stops. */
+  const setTracked = (key: string, on: boolean) => {
+    const had = view.marks.tracked ?? []
+    const tracked = on ? [...had.filter((k) => k !== key), key] : had.filter((k) => k !== key)
+    const marks: AchMarks = { ...view.marks, broken: [], tracked }
+    setView({ ...view, marks })
+    api.invoke('achievements:marks', view.character, marks).catch((e) => showError('Could not save what you track', e))
   }
 
   const goTo = ([si, ai]: AchRef) => {
@@ -178,6 +214,7 @@ export function Achievements() {
 
   const t = book.totals()
   const pct = t.trackable ? Math.round((t.done / t.trackable) * 100) : 0
+  const tracked = new Set(view.marks.tracked ?? [])
   const query = norm(q)
 
   return (
@@ -275,10 +312,18 @@ export function Achievements() {
         </button>
       </div>
 
+      <TrackedBar book={book} tracked={view.marks.tracked ?? []} onUntrack={(k) => setTracked(k, false)} goTo={goTo} />
+
       {query.length >= 2 ? (
-        <SearchResults book={book} query={query} ctx={{ remaining, hideOpt, sort, open, setOpen, touched, flash, tick, goTo }} />
+        <SearchResults book={book} query={query} ctx={{ remaining, hideOpt, sort, open, setOpen, touched, flash, tick, goTo, since, skills, tracked, setTracked }} />
       ) : cur ? (
-        <SectionView si={cur.si} book={book} ctx={{ remaining, hideOpt, sort, open, setOpen, touched, flash, tick, goTo }} setHideOpt={setHideOpt} setSort={setSort} />
+        <SectionView
+          si={cur.si}
+          book={book}
+          ctx={{ remaining, hideOpt, sort, open, setOpen, touched, flash, tick, goTo, since, skills, tracked, setTracked }}
+          setHideOpt={setHideOpt}
+          setSort={setSort}
+        />
       ) : (
         <div className="empty">No sections in this export.</div>
       )}
@@ -301,6 +346,13 @@ interface Ctx {
   flash: string
   tick: (r: ObjRef, on: boolean) => void
   goTo: (r: AchRef) => void
+  /** Slayer kills the log has shown since the export, and whether the game has said it is done, by lower-cased achievement name (the character being played only). */
+  since: Map<string, { since: number; done: boolean }>
+  /** The skill a skill objective wants, as the log last gave it and the cap to reach, by "achievement|skill" lower-cased (the character being played only). */
+  skills: Map<string, SkillRow>
+  /** Achievements kept on the achievements overlay, by achKey(). */
+  tracked: Set<string>
+  setTracked: (key: string, on: boolean) => void
 }
 
 interface Entry {
@@ -521,6 +573,7 @@ function Block({ book, r, rows, query, ctx }: { book: AchievementBook; r: AchRef
         <span className="ach-bar">
           <i style={{ width: `${pct}%` }} />
         </span>
+        <TrackStar k={achKey(s, a)} name={a.n} ctx={ctx} />
       </div>
       {isOpen && (
         <div className={`ach-objs${book.hasZoneColumn(r) ? ' zoned' : ''}`}>
@@ -545,6 +598,7 @@ function SingleRow({ book, r, ctx }: { book: AchievementBook; r: AchRef; ctx: Ct
   return (
     <div id={`ach-${r[0]}-${r[1]}`} className={`ach-single ${state}${ctx.flash === `ach-${r[0]}-${r[1]}` ? ' flash' : ''}`}>
       <ObjectiveRow book={book} r={[...r, 0]} c={c} label={a.n} sub={sub} ctx={ctx} single />
+      <TrackStar k={achKey(book.sections[r[0]], a)} name={a.n} ctx={ctx} />
       {!done && hunt && (
         <div className="ach-hunt">
           <span>Try</span>{' '}
@@ -619,12 +673,44 @@ function ObjectiveRow({ book, r, c, label, sub, ctx, single }: { book: Achieveme
       </span>
     )
   }
+  // A Slayer count goes on with the kills since the export, as the log shows them; one the game said is done is done.
+  const live = c.p && !c.d ? ctx.since.get(book.ach([r[0], r[1]]).n.toLowerCase()) : undefined
+  const more = live?.since ?? 0
+  const count = c.p ? (live?.done ? c.p[1] : Math.min(c.p[1], c.p[0] + more)) : 0
+  const liveTitle = live?.done
+    ? 'The game said this was completed since your achievements export. Type /outputfile achievements in game to record it.'
+    : more && c.p
+      ? `${num(c.p[0])} at your achievements export, and ${num(more)} kills since that the log shows (yours, your pet's and your group's)`
+      : undefined
+  // A skill objective ("Reach the maximum skill in Divination at level 50.") shows the skill as the log last gave it, against the cap to reach.
+  const skillGoal = SKILL_OBJECTIVE.exec(c.t)
+  const skill = skillGoal ? ctx.skills.get(`${book.ach([r[0], r[1]]).n}|${skillGoal[1]}`.toLowerCase()) : undefined
+  const skillProg =
+    skill && skill.target > 0 ? (
+      skill.value === null ? (
+        <span className="chip" title={`No skill-up for ${skill.skill} in your logs: raise it once and it shows here. One raised at a guildmaster prints no line.`}>
+          not in your logs
+        </span>
+      ) : (
+        <span
+          className="ach-prog"
+          title={`${skill.skill} ${num(skill.value)} when the log last saw it go up; ${num(skill.target)} is the best cap of your classes at level ${skill.level}. One raised at a guildmaster prints no line, so it may be higher.`}
+        >
+          <span>
+            {num(skill.value)} / {num(skill.target)}
+            {skill.value >= skill.target && <b className="ach-more"> ✓</b>}
+          </span>
+          <i style={{ width: `${Math.min(100, Math.round((skill.value / skill.target) * 100))}%` }} />
+        </span>
+      )
+    ) : null
   const prog = c.p ? (
-    <span className="ach-prog">
+    <span className="ach-prog" title={liveTitle}>
       <span>
-        {num(c.p[0])} / {num(c.p[1])}
+        {num(count)} / {num(c.p[1])}
+        {live?.done ? <b className="ach-more"> ✓ done</b> : more > 0 && <b className="ach-more"> +{num(more)}</b>}
       </span>
-      <i style={{ width: `${Math.min(100, Math.round((c.p[0] / Math.max(1, c.p[1])) * 100))}%` }} />
+      <i style={{ width: `${Math.min(100, Math.round((count / Math.max(1, c.p[1])) * 100))}%` }} />
     </span>
   ) : null
   return (
@@ -633,8 +719,74 @@ function ObjectiveRow({ book, r, c, label, sub, ctx, single }: { book: Achieveme
       <span className="ach-box" />
       {name}
       {optional}
-      {prog}
+      {prog ?? skillProg}
       {zone}
     </label>
+  )
+}
+
+/** The star that keeps an achievement on the achievements overlay. */
+function TrackStar({ k, name, ctx }: { k: string; name: string; ctx: Ctx }) {
+  const on = ctx.tracked.has(k)
+  return (
+    <button
+      className={`ach-star${on ? ' on' : ''}`}
+      aria-pressed={on}
+      aria-label={on ? `Stop tracking ${name}` : `Track ${name}`}
+      title={on ? 'Tracked: on the achievements overlay with its progress. Click to stop.' : 'Track: keep it on the achievements overlay with its progress'}
+      onClick={() => ctx.setTracked(k, !on)}
+    >
+      {on ? '★' : '☆'}
+    </button>
+  )
+}
+
+/**
+ * What is tracked, at the top of the page: a click goes to one, ✕ stops tracking it. With the
+ * achievements overlay's switch, since what is tracked shows there.
+ */
+function TrackedBar({ book, tracked, onUntrack, goTo }: { book: AchievementBook; tracked: string[]; onUntrack: (k: string) => void; goTo: (r: AchRef) => void }) {
+  const { state, patchSettings } = useApp()
+  if (!tracked.length) return null
+  const where = new Map<string, AchRef>()
+  book.sections.forEach((s, si) => s.ach.forEach((a, ai) => where.set(achKey(s, a), [si, ai])))
+  const overlay = state.settings.overlays.find((o) => o.kind === 'achievements')
+  return (
+    <div className="card row ach-tracked">
+      <span className="faint small">Tracked</span>
+      {tracked.map((k) => {
+        const r = where.get(k)
+        const name = r ? book.ach(r).n : k.slice(k.indexOf(' > ') + 3)
+        return (
+          <span
+            key={k}
+            className={`chip ach-tracked-chip${r ? '' : ' gone'}`}
+            title={r ? `${k.slice(0, k.indexOf(' > '))}: click to go there` : 'Not in this export: done, or gone'}
+          >
+            {r ? (
+              <button className="link-button" onClick={() => goTo(r)}>
+                {name}
+              </button>
+            ) : (
+              <span>{name}</span>
+            )}
+            <button className="ach-untrack" aria-label={`Stop tracking ${name}`} title="Stop tracking" onClick={() => onUntrack(k)}>
+              ✕
+            </button>
+          </span>
+        )
+      })}
+      <span className="spacer" />
+      {overlay && (
+        <label className="row tight small faint" title="The achievements overlay, over the game: what you track, with its progress">
+          <Switch
+            on={overlay.visible}
+            label="Show the achievements overlay"
+            onChange={(on) => void patchSettings((s) => ({ ...s, overlays: s.overlays.map((o) => (o.kind === 'achievements' ? { ...o, visible: on } : o)) }))}
+          />
+          Show on the game
+        </label>
+      )}
+    </div>
   )
 }

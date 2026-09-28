@@ -20,6 +20,8 @@ import {
   type SkillRow
 } from '../../../core/combatView'
 import type { CombatSnapshot, MeterMode, MeterOverlayOptions, MeterSpan, OverlayConfig, Segment, SegmentSummary } from '../../../shared/types'
+import type { AchievementTrack, SkillRow as SkillGoalRow, TrackKind, TrackedAchievement } from '../../../shared/tracking'
+import { useNow } from '../components/TimerBars'
 import { DEFAULT_METER_OPTIONS } from '../../../shared/overlays'
 
 const MODE_NEXT: Record<MeterMode, MeterMode> = { damage: 'incoming', incoming: 'healing', healing: 'damage' }
@@ -227,6 +229,248 @@ export function MeterOverlay({ config, snap, arranging }: { config: OverlayConfi
       <div className="dm-ov-foot">
         {opts.scope} · {opts.span === 'fight' ? 'fight' : 'session'}
       </div>
+    </div>
+  )
+}
+
+/** How long a Slayer count stays on the achievements overlay after a kill moved it. */
+const SLAYER_RECENT_MS = 30 * 60_000
+/** Slayer counts, and skills, shown at most each. */
+const SLAYER_ROWS = 3
+/** Tracked achievements shown at most, and the objectives or skills of each. */
+const TRACKED_ROWS = 5
+const TRACKED_LINES = 3
+
+const STEP_VERB: Record<TrackKind, string> = { kill: 'Kill', turnin: 'Hand in to', quest: 'Quest' }
+const UNITS: Record<TrackKind, [string, string]> = { kill: ['kill', 'kills'], turnin: ['hand-in', 'hand-ins'], quest: ['hand-in', 'hand-ins'] }
+
+/** "2 h 22 min", "14 min". */
+function spanOf(seconds: number): string {
+  const m = Math.round(seconds / 60)
+  if (m < 1) return 'under a minute'
+  if (m < 90) return `${m} min`
+  const h = Math.floor(m / 60)
+  return m % 60 ? `${h} h ${m % 60} min` : `${h} h`
+}
+
+/**
+ * The achievements overlay: the achievements the player tracks (the star on the Achievements page),
+ * the step of the faction plan being followed, counting down as the factions move, the Slayer counts
+ * the kills of the last half hour moved, and the skills the skill achievements want that went up in
+ * that time. It draws nothing while there is nothing to show, so it costs no room over the game.
+ */
+export function AchievementsRegion({ config, track, arranging }: { config: OverlayConfig; track: AchievementTrack | null; arranging: boolean }) {
+  const now = useNow(15_000)
+  const style = { ['--fs' as string]: `${config.fontSize}px` }
+  const plan = track?.faction ?? null
+  const tracked = track?.tracked ?? []
+  const trackedNames = new Set(tracked.map((t) => t.name))
+  const trackedSkills = new Set(tracked.flatMap((t) => (t.done ? [] : (t.skills ?? []).map((k) => k.skill))))
+  // What is tracked shows in its own place, not again among what moved lately.
+  const slayer = (track?.slayer?.rows ?? []).filter((r) => r.since > 0 && now - r.last < SLAYER_RECENT_MS && !trackedNames.has(r.name)).sort((a, b) => b.last - a.last)
+  // Skills the open skill achievements want that went up lately, once each however many achievements want them.
+  const skills = [
+    ...(track?.skills?.rows ?? [])
+      .filter((r) => r.value !== null && r.target > 0 && now - r.last < SLAYER_RECENT_MS && !trackedNames.has(r.achievement) && !trackedSkills.has(r.skill))
+      .reduce((m, r) => {
+        const had = m.get(r.skill)
+        m.set(r.skill, { ...r, target: Math.max(r.target, had?.target ?? 0), wants: [...(had?.wants ?? []), r.achievement] })
+        return m
+      }, new Map<string, SkillGoalRow & { wants: string[] }>())
+      .values()
+  ].sort((a, b) => b.last - a.last)
+  const step = plan?.current ?? null
+  if (!tracked.length && !plan && !slayer.length && !skills.length)
+    return arranging ? (
+      <div className="ach-ov">
+        <div className="ach-ov-empty">The faction plan&apos;s step and the Slayer counts your kills move show here.</div>
+      </div>
+    ) : null
+  return (
+    <div className="ach-ov" style={style}>
+      {tracked.length > 0 && (
+        <section className="ach-ov-tracked">
+          <div className="ach-ov-head">
+            <span>Tracked</span>
+            {tracked.length > TRACKED_ROWS && <span className="ach-ov-faint">+{tracked.length - TRACKED_ROWS} more</span>}
+          </div>
+          {tracked.slice(0, TRACKED_ROWS).map((t) => (
+            <TrackedRow key={t.key} t={t} now={now} />
+          ))}
+        </section>
+      )}
+      {plan && (
+        <section className="ach-ov-plan">
+          <div className="ach-ov-head">
+            <span>Faction plan</span>
+            <span className="ach-ov-faint">{step ? `step ${step.index + 1} of ${plan.steps}` : 'done'}</span>
+          </div>
+          {step ? (
+            <>
+              <div className="ach-ov-title" title={step.title}>
+                {STEP_VERB[step.kind]} {step.kind === 'turnin' ? (step.npc ?? step.title) : step.title}
+              </div>
+              <div className="ach-ov-faint">{step.zone}</div>
+              <div className="ach-ov-bar">
+                <i style={{ width: `${Math.round(step.progress * 100)}%` }} />
+              </div>
+              <div className="ach-ov-line">
+                <b>{step.unitsLeft.toLocaleString()}</b> {UNITS[step.kind][step.unitsLeft === 1 ? 0 : 1]} left
+                {step.secondsLeft > 0 && <span className="ach-ov-faint"> · ≈ {spanOf(step.secondsLeft)}</span>}
+              </div>
+              {step.goals
+                .filter((g) => !g.done)
+                .slice(0, 3)
+                .map((g) => (
+                  <div key={g.faction} className="ach-ov-goal">
+                    <span>{g.achievement ?? g.faction}</span>
+                    <span className="ach-ov-num">
+                      {Math.round(g.standing).toLocaleString()} / {g.to.toLocaleString()}
+                    </span>
+                  </div>
+                ))}
+              {plan.next && (
+                <div className="ach-ov-next" title={plan.next.title}>
+                  Next: {plan.next.kind === 'turnin' ? (plan.next.npc ?? plan.next.title) : plan.next.title}
+                  {plan.next.zone ? ` · ${plan.next.zone}` : ''}
+                </div>
+              )}
+            </>
+          ) : (
+            <div className="ach-ov-line">Every step is done.</div>
+          )}
+        </section>
+      )}
+      {slayer.length > 0 && (
+        <section className="ach-ov-slayer">
+          <div className="ach-ov-head">
+            <span>Slayer</span>
+            <span className="ach-ov-faint">since your export</span>
+          </div>
+          {slayer.slice(0, SLAYER_ROWS).map((r) => {
+            const n = Math.min(r.max, r.count + r.since)
+            return (
+              <div key={r.name} className="ach-ov-count" title={`${r.races}: ${r.count.toLocaleString()} at your achievements export, +${r.since.toLocaleString()} since`}>
+                <div className="ach-ov-goal">
+                  <span>
+                    {r.done ? '✓ ' : ''}
+                    {r.name}
+                  </span>
+                  <span className="ach-ov-num">
+                    {n.toLocaleString()} / {r.max.toLocaleString()} <span className="ach-ov-plus">+{r.since.toLocaleString()}</span>
+                  </span>
+                </div>
+                <div className="ach-ov-bar thin">
+                  <i style={{ width: `${Math.round((n / r.max) * 100)}%` }} />
+                </div>
+              </div>
+            )
+          })}
+        </section>
+      )}
+      {skills.length > 0 && (
+        <section className="ach-ov-skills">
+          <div className="ach-ov-head">
+            <span>Skills</span>
+            <span className="ach-ov-faint">to the cap at {skills[0].level}</span>
+          </div>
+          {skills.slice(0, SLAYER_ROWS).map((r) => {
+            const v = Math.min(r.value ?? 0, r.target)
+            return (
+              <div key={r.skill} className="ach-ov-count" title={r.wants.join('\n')}>
+                <div className="ach-ov-goal">
+                  <span>
+                    {v >= r.target ? '✓ ' : ''}
+                    {r.skill}
+                  </span>
+                  <span className="ach-ov-num">
+                    {(r.value ?? 0).toLocaleString()} / {r.target.toLocaleString()}
+                  </span>
+                </div>
+                <div className="ach-ov-bar thin">
+                  <i style={{ width: `${Math.round((v / r.target) * 100)}%` }} />
+                </div>
+              </div>
+            )
+          })}
+        </section>
+      )}
+    </div>
+  )
+}
+
+/** One tracked achievement on the overlay, with its progress in whatever way it has one. */
+function TrackedRow({ t, now }: { t: TrackedAchievement; now: number }) {
+  if (t.done)
+    return (
+      <div className="ach-ov-goal ach-ov-done">
+        <span>✓ {t.name}</span>
+        <span className="ach-ov-faint">done</span>
+      </div>
+    )
+  if (t.count) {
+    const c = t.count
+    const pct = c.faction ? (c.value + 2000) / 4000 : c.value / Math.max(1, c.max)
+    return (
+      <div className="ach-ov-count" title={c.faction ? `${c.faction}: done at 2000` : t.section}>
+        <div className="ach-ov-goal">
+          <span>{t.name}</span>
+          <span className="ach-ov-num">
+            {c.value.toLocaleString()} / {c.max.toLocaleString()}
+            {!!c.since && <span className="ach-ov-plus"> +{c.since.toLocaleString()}</span>}
+          </span>
+        </div>
+        <div className="ach-ov-bar thin">
+          <i style={{ width: `${Math.max(0, Math.min(100, Math.round(pct * 100)))}%` }} />
+        </div>
+      </div>
+    )
+  }
+  if (t.skills) {
+    const open = t.skills.filter((k) => k.value === null || k.value < k.target)
+    return (
+      <div className="ach-ov-count" title={t.section}>
+        <div className="ach-ov-goal">
+          <span>{t.name}</span>
+          <span className="ach-ov-faint">
+            {t.skills.length - open.length} / {t.skills.length}
+          </span>
+        </div>
+        {open.slice(0, TRACKED_LINES).map((k) => (
+          <div key={k.skill} className="ach-ov-sub">
+            <div className="ach-ov-goal">
+              <span>{k.skill}</span>
+              <span className="ach-ov-num">{k.value === null ? 'not in your logs' : `${k.value.toLocaleString()} / ${k.target.toLocaleString()}`}</span>
+            </div>
+            {k.value !== null && (
+              <div className="ach-ov-bar thin skill">
+                <i style={{ width: `${Math.min(100, Math.round((k.value / Math.max(1, k.target)) * 100))}%` }} />
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+    )
+  }
+  const left = t.left ?? []
+  const fresh = (t.justDone ?? []).filter((x) => now - x.at < SLAYER_RECENT_MS)
+  return (
+    <div className="ach-ov-count" title={left.join('\n')}>
+      <div className="ach-ov-goal">
+        <span>{t.name}</span>
+        <span className="ach-ov-faint">{t.total ? `${left.length} of ${t.total} left` : ''}</span>
+      </div>
+      {fresh.slice(0, 2).map((x) => (
+        <div key={x.name} className="ach-ov-sub ach-ov-plus">
+          ✓ {x.name}
+        </div>
+      ))}
+      {left.length > 0 && (
+        <div className="ach-ov-sub ach-ov-left">
+          {left.slice(0, TRACKED_LINES).join(', ')}
+          {left.length > TRACKED_LINES ? ` +${left.length - TRACKED_LINES}` : ''}
+        </div>
+      )}
     </div>
   )
 }

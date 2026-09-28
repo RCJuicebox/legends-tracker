@@ -108,7 +108,7 @@ export interface ArchiveSettings {
   archiveDir: string
 }
 
-export type OverlayKind = 'timers' | 'alerts' | 'meter'
+export type OverlayKind = 'timers' | 'alerts' | 'meter' | 'achievements'
 
 /** What a damage meter (page or overlay) lists. */
 export type MeterMode = 'damage' | 'incoming' | 'healing'
@@ -181,5 +181,7 @@ export interface AppSettings {
   theme: 'system' | 'light' | 'dark'
   /** Ctrl+Shift+F9 mutes, F10 starts a new meter session, F11 arranges the overlays, from anywhere. */
   hotkeys: boolean
+  /** Say when a step of the faction plan being followed is done, and flash each achievement it finishes. */
+  achievementCues: boolean
   combat: CombatSettings
 }

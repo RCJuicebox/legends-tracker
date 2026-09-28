@@ -116,7 +116,8 @@ export function Overlays() {
         {overlays.map((o) => (
           <div className="card" key={o.id}>
             <h2>
-              {o.name} <span className="chip">{o.kind === 'timers' ? 'Timer bars' : o.kind === 'meter' ? 'Damage meter' : 'Alert text'}</span>
+              {o.name}{' '}
+              <span className="chip">{o.kind === 'timers' ? 'Timer bars' : o.kind === 'meter' ? 'Damage meter' : o.kind === 'achievements' ? 'Achievements' : 'Alert text'}</span>
               <span className="spacer" />
               <Switch on={o.visible} onChange={(v) => update(o.id, { visible: v })} title="Show this overlay" label={`Show ${o.name}`} />
             </h2>
@@ -139,6 +140,19 @@ export function Overlays() {
                 </label>
               )}
               {o.kind === 'meter' && <MeterOptions o={o} onChange={(m) => update(o.id, { meter: { ...DEFAULT_METER_OPTIONS, ...o.meter, ...m } })} />}
+              {o.kind === 'achievements' && (
+                <>
+                  <label className="check">
+                    <input type="checkbox" checked={state.settings.achievementCues} onChange={(e) => patchSettings((s) => ({ ...s, achievementCues: e.target.checked }))} />
+                    Say when a faction plan step is done, and flash each achievement it finishes
+                  </label>
+                  <p className="faint small m-0">
+                    The step of the faction plan you follow (Factions › Optimize), counting down as your factions move; the Slayer achievements your last half hour of kills counted
+                    toward, on top of your achievements export; and the skills your skill achievements want that went up in that time. It shows nothing when there is nothing to
+                    show.
+                  </p>
+                </>
+              )}
               <div className="row tight">
                 <span className="faint small mono grow">
                   {o.width}×{o.height} at {o.x}, {o.y}

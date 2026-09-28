@@ -365,6 +365,13 @@ process) for the foreground window's process four times a second, and watches fo
 game closes, every timer is cleared. Overlays hidden with the game are sent nothing and slowed until they
 show again.
 
+The **Achievements** overlay (hidden until you switch it on, here, on Factions › Optimize or on the
+Achievements page) shows the achievements you track (the star on the Achievements page), then the step of the faction plan you follow, counting down as your factions move (what it still wants,
+about how long, and the next step), the Slayer achievements your kills of the last half hour
+counted toward, and the skills your skill achievements want that went up in that time. A step done is said aloud with the next, and each achievement it finishes flashes on
+the alerts overlay (**Say when a faction plan step is done**). It draws nothing when there is nothing
+to show.
+
 ## Motes
 
 Every mote you loot is counted from its loot line (`You looted 4 Mote of Major Potential from Reward Chest
@@ -438,6 +445,31 @@ follows that one, and a click jumps there. An open Slayer race achievement sugge
 that race in, with their level ranges, from eqlwiki's NPC pages; their race fields are entered by
 hand, so treat them as leads.
 
+The star on an achievement **tracks** it: it stays on the achievements overlay with its progress,
+whatever moved lately, until you click the star again (or ✕ in **Tracked** at the top of the page).
+A Slayer achievement shows its count, a skill achievement each skill against its cap, a faction
+achievement the standing toward 2000, and anything else its objectives still to do: for a Hunter or
+Conqueror achievement the named left, each ticked off the moment your log shows it killed. What you
+track is kept per character with your ticks.
+
+Slayer counts go on as you play: the export gives each open Slayer achievement's count when it was
+written, and every kill since that the log shows (yours, your pet's and your group's) is added to the
+achievements whose races it is, shown as `+N` beside the count and on the achievements overlay. The
+log names the mob, never its race, so a kill is placed by its name (`a kobold runt`, `an orc
+centurion`, `a fire giant warrior`, `a rattlesnake`) or, where the name does not say, by the race
+eqlwiki's page for the mob gives (`A Forsaken Revenant`: Elf Vampire), looked up in the background
+and kept. A mob that dies of your damage over time with no killer named (`A bixie died.`) counts
+too. Checked against the game's own `You have completed achievement:` lines over a day of play, the
+counts ran 0 to 4 kills short of the game's; the next export puts them right. One the game says is
+completed shows done.
+
+A skill objective (General › Skills: "Reach the maximum skill in Divination at level 50.") shows
+the skill as the log last gave it (`You have become better at Divination! (190)`) against the cap
+to reach, from the game's `skillcaps.txt`: the best of your classes at that level, as the Skills
+window shows it, or the achievement's own class's when your classes are not known (type `/who`).
+The log never prints a skill raised at a guildmaster, so one it has never seen go up says so, and a
+value can be higher than the log last said.
+
 ## Factions
 
 Where the character picked (the same pick as Achievements, Stats and Gear) stands with each
@@ -470,9 +502,16 @@ better` (or `worse`). So **Net change** is the sum of the changes the log saw, w
 were and when the last was: what happened before your oldest log, or with logging off, is not in it.
 Without an export that is all the page has. A faction is marked **maxed** or **bottomed** when the
 game says so (until a change the other way) or its standing is at 2000 or -2000. Click a row for how
-its standing was reached and its last 20 changes. The log is read with casts, melee and purchases,
-in the same one pass, and read on, with the export looked at again, every ten seconds while the page
-is open.
+its standing was reached and its last 20 changes, what moved it in your logs (each mob or NPC, how
+often and by how much, yours and your other characters'), and the quickest ways to take it to 2000
+as the Optimize tab reckons them. The log is read with casts, melee and purchases, in the same one
+pass, and read on, with the export looked at again, every ten seconds while the page is open.
+
+**What does a mob or NPC do?** looks a name up: every mob or NPC in your logs (any of your
+characters') whose name holds what you type, with what each did to every faction, and the mobs
+eqlwiki's faction pages list, with the way each moves a faction (their amounts are your logs' usual
+ones). Each faction is coloured by what it means to you: green helps an achievement still to do,
+amber sets one back, red takes a faction further below zero.
 
 Wherever the app asks you to type an `/outputfile` command, the copy icon beside it puts it on the
 clipboard, to paste into the game's chat box.
@@ -517,7 +556,9 @@ repeatable when it wants one kind of item that can be had and that nobody in the
 you; chain steps, rewards of 50 points or more and hand-ins the walkthrough does not make plain are
 listed, not planned. Hand-ins take the stack at once, so what counts is getting the items: coin and
 bought items are quick, gathered ones take the time set, and what you hold (bags, bank, shared bank
-and depot, at your last `/outputfile inventory`) goes first.
+and depot, at your last `/outputfile inventory`) goes first. What a kill or hand-in does to a
+faction is the game's, whoever does it, so your other characters' logs count too: an alt's plan
+starts from what your main has measured (their kill pace stays their own).
 
 The plan is found by building it greedily (at each point, whatever does the most for the
 achievements still open per hour, points it takes off another open one counted as work to do again),
@@ -528,6 +569,16 @@ and is built around it (a lock also tells the planner a one-time quest repeats);
 and the plan leaves it alone; or type your own kills or hand-ins an hour. **Assumptions** holds the
 rest: getting to a new zone, kills an hour, a named mob's respawn, a hand-in, gathering one item, and
 what a faction kept at 0 or above is worth to Most factions positive. Locks are kept per character.
+
+Steps and ways carry what could make them slower or rougher than planned: **city NPCs** (a camp of
+a city's guards, merchants or guildmasters, where the guards may join in), **amounts guessed** (the
+wiki's word only), **item source unknown**, **named only** (one kill per respawn). **No city NPC
+kills** leaves every city camp out of the plan, unless locked in.
+
+The plan shown is the one followed while you play that character: **Now** at the top of the tab
+(and the achievements overlay) says which step you are on (the one your kills and hand-ins go the
+way of, or the first left in your zone), what it still wants and about how long, with the next. It
+moves on by itself as achievements are done, and follows the order the tab showed last, open or not.
 
 ## Stats
 

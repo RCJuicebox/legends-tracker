@@ -4,8 +4,9 @@ import '../styles.css'
 import '../alerts/alerts.css'
 import { api } from '../api'
 import { TimerBars } from '../components/TimerBars'
-import { AlertsRegion, MeterOverlay } from './regions'
+import { AchievementsRegion, AlertsRegion, MeterOverlay } from './regions'
 import type { CombatSnapshot, OverlayConfig, TimerView } from '../../../shared/types'
+import type { AchievementTrack } from '../../../shared/tracking'
 
 // The overlays on one monitor, each a region of one transparent window over the game: one
 // renderer instead of one per overlay. The window covers just their area; `origin` is where its
@@ -16,6 +17,7 @@ function Host() {
   const [origin, setOrigin] = useState({ x: 0, y: 0 })
   const [timers, setTimers] = useState<TimerView[]>([])
   const [combat, setCombat] = useState<CombatSnapshot | null>(null)
+  const [track, setTrack] = useState<AchievementTrack | null>(null)
 
   useEffect(() => {
     // What to draw, asked for once the page listens (a push sent while it loaded may be gone).
@@ -26,6 +28,7 @@ function Host() {
       setOrigin(s.origin)
       setTimers(s.timers)
       if (s.combat) setCombat(s.combat)
+      if (s.achievements) setTrack(s.achievements)
     })
     const offs = [
       api.on('overlay:host', (p: { configs: OverlayConfig[]; origin: { x: number; y: number } }) => {
@@ -33,7 +36,8 @@ function Host() {
         setOrigin(p.origin)
       }),
       api.on('overlay:timers', (views: TimerView[]) => setTimers(views)),
-      api.on('overlay:combat', (snap: CombatSnapshot) => setCombat(snap))
+      api.on('overlay:combat', (snap: CombatSnapshot) => setCombat(snap)),
+      api.on('overlay:achievements', (t: AchievementTrack | null) => setTrack(t))
     ]
     return () => offs.forEach((off) => off())
   }, [])
@@ -51,6 +55,8 @@ function Host() {
               <TimerBars timers={timers.filter((t) => t.overlay === c.id)} grouped={c.groupByTarget} fontSize={c.fontSize} />
             ) : c.kind === 'meter' ? (
               <MeterOverlay config={c} snap={combat} arranging={false} />
+            ) : c.kind === 'achievements' ? (
+              <AchievementsRegion config={c} track={track} arranging={false} />
             ) : (
               <AlertsRegion config={c} />
             )}

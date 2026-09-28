@@ -38,7 +38,8 @@ export class AchievementFiles {
     const path = join(this.marksDir, `${character}.json`)
     try {
       const m = JSON.parse(await fs.readFile(path, 'utf8')) as Partial<AchMarks>
-      return { ticks: Array.isArray(m.ticks) ? m.ticks : [], broken: Array.isArray(m.broken) ? m.broken : [] }
+      const strings = (a: unknown) => (Array.isArray(a) ? a.filter((x): x is string => typeof x === 'string') : [])
+      return { ticks: strings(m.ticks), broken: strings(m.broken), tracked: strings(m.tracked) }
     } catch (e) {
       // None saved yet is the usual case; anything else is worth knowing.
       if ((e as NodeJS.ErrnoException).code !== 'ENOENT') log.warn(`Could not read achievement marks ${path}`, e)
@@ -49,7 +50,7 @@ export class AchievementFiles {
   async saveMarks(character: string, marks: AchMarks): Promise<void> {
     if (!isCharacterKey(character)) return
     const ok = (a: unknown) => Array.isArray(a) && a.every((x) => typeof x === 'string')
-    if (!marks || !ok(marks.ticks) || !ok(marks.broken)) throw new Error('Achievement marks are not in the expected form.')
+    if (!marks || !ok(marks.ticks) || !ok(marks.broken) || (marks.tracked !== undefined && !ok(marks.tracked))) throw new Error('Achievement marks are not in the expected form.')
     await fs.mkdir(this.marksDir, { recursive: true })
     const path = join(this.marksDir, `${character}.json`)
     await fs.writeFile(path + '.tmp', JSON.stringify(marks, null, 2), 'utf8')

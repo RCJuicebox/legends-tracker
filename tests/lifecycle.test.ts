@@ -65,6 +65,7 @@ function fakeContext(o: { engine?: Engine; flushAll?: () => Promise<unknown>; up
     inventoryFiles: { stop: note('stop inventory poller') },
     speech: { stop: note('stop speech') },
     store: { flushAll: o.flushAll ?? (async () => note('save stores')()) },
+    liveAchievements: { flush: async () => note('save followed plans')() },
     installUpdate: async () => {}
   }
   return ctx as unknown as typeof ctx & AppContext
@@ -97,8 +98,8 @@ describe('Quitting', () => {
     expect(ctx.windows.quitting).toBe(true)
     await waitFor(() => h.calls.includes('quit'))
     expect(h.calls.slice(0, STOPS.length)).toEqual(STOPS)
-    // The two saves run side by side after the stops; quitting waits for both.
-    expect(h.calls.slice(STOPS.length, -1).sort()).toEqual(['flush windows', 'save stores'])
+    // The saves run side by side after the stops; quitting waits for them all.
+    expect(h.calls.slice(STOPS.length, -1).sort()).toEqual(['flush windows', 'save followed plans', 'save stores'])
     expect(h.calls.at(-1)).toBe('quit')
   })
 

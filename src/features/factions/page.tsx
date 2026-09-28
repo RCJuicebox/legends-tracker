@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useMemo, useState } from 'react'
+import { Fragment, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { ago } from '../../renderer/src/api'
 import { useApp } from '../../renderer/src/state'
 import { useInvoke } from '../../renderer/src/hooks'
@@ -9,7 +9,9 @@ import { FilterBox, GameCommand, Info, Pending, Segmented, SortTh, Tabs, ToggleC
 import { wikiUrl } from '../../core/format'
 import { who } from '../../core/format'
 import { STANDING_MAX, standingBand, type FactionMob, type FactionRow, type FactionRowAchievement, type FactionStandingNow } from './core'
-import { PlanTab } from './planPage'
+import { Doing, Flags, PlanTab, sourceNote, span, useChoices, usePlanSettings } from './planPage'
+import { waysToRaise, type PlanActivity } from './planner'
+import type { FactionLookup, LookupHit } from './lookup'
 
 // Where the character stands with each faction, from the game's factions export, and the faction
 // changes the log recorded, from the character's log and its archives. The log never prints a
@@ -105,6 +107,20 @@ export function Factions() {
   const [sort, setSort] = useRemembered<Sort<SortKey>>('factions.sort', { key: 'last', dir: -1 })
   const [open, setOpen] = useState<string | null>(null)
   const [tab, setTab] = useRemembered<View>('factions.view', 'standings')
+  const [look, setLook] = useState('')
+  const [query, setQuery] = useState('')
+  // A lookup is asked for once typing stops.
+  useEffect(() => {
+    const t = setTimeout(() => setQuery(look.trim()), 250)
+    return () => clearTimeout(t)
+  }, [look])
+  const lookupQ = useInvoke(character && query.length >= 3 ? 'factions:lookup' : null, [character, query])
+  // The ways to raise each faction (the Optimize tab's catalog, every faction's) are read once a row is first opened.
+  const [wantWays, setWantWays] = useState(false)
+  useEffect(() => {
+    if (open) setWantWays(true)
+  }, [open])
+  const waysQ = useInvoke(wantWays && character ? 'factions:plan' : null, [character, false, true])
   const viewing: View = tab === 'plan' ? 'plan' : 'standings'
   const now = useNow(30_000)
 
@@ -204,9 +220,12 @@ export function Factions() {
                 Unnamed ({unnamed})
               </ToggleChip>
             )}
+            <FilterBox placeholder="What does a mob or NPC do?" label="Look up a mob or NPC" value={look} onChange={setLook} width={250} />
             <span className="spacer" />
             <span className="faint small">{view ? `${view.factions.length} faction${view.factions.length === 1 ? '' : 's'} on record` : ''}</span>
           </div>
+
+          {query.length >= 3 && !!character && <LookupResults query={query} results={lookupQ.data?.results ?? null} error={lookupQ.error} view={view ?? null} />}
 
           {!chars.ready ? (
             <Pending error={chars.error} retry={chars.reload} what="your characters" />
@@ -304,7 +323,11 @@ export function Factions() {
                         {isOpen && (
                           <tr>
                             <td colSpan={cols} style={{ background: 'var(--bg-2)' }}>
-                              <History r={r} />
+                              <History
+                                r={r}
+                                character={character}
+                                ways={waysQ.data ? { activities: waysQ.data.catalog.activities, logPace: waysQ.data.catalog.killsPerHour } : null}
+                              />
                             </td>
                           </tr>
                         )}
@@ -445,7 +468,7 @@ function Sources({ name }: { name: string }) {
   )
 }
 
-function History({ r }: { r: FactionRow }) {
+function History({ r, character, ways }: { r: FactionRow; character: string; ways: Catalog | null }) {
   return (
     <div className="stack gap-6 small" style={{ padding: '6px 4px' }}>
       {r.achievement && (
@@ -454,6 +477,8 @@ function History({ r }: { r: FactionRow }) {
         </span>
       )}
       {r.standing && <span>{standingNote(r.standing)}</span>}
+      <Moved name={r.name} character={character} />
+      {(r.standing?.value ?? 0) < STANDING_MAX && <Ways r={r} character={character} ways={ways} />}
       <Sources name={r.name} />
       <span className="faint">
         {r.first ? `First seen in the log ${stamp(r.first)}. ` : ''}
@@ -474,6 +499,133 @@ function History({ r }: { r: FactionRow }) {
           ))}
         </div>
       )}
+    </div>
+  )
+}
+
+/** The Optimize tab's ways to raise a faction, with the log's kill pace. */
+type Catalog = { activities: PlanActivity[]; logPace: number | null }
+
+/** Other characters' names for a sentence: "Kelwyn's", "Kelwyn's and Aldric's". */
+const theirs = (keys: string[]) => keys.map((k) => `${k.split('_')[0]}'s`).join(' and ')
+
+/** What moved the faction in the logs: this character's, and the player's other characters'. */
+function Moved({ name, character }: { name: string; character: string }) {
+  const q = useInvoke('factions:moved', [character, name])
+  if (!q.data) return q.error ? <span className="faint">Could not read what moved it: {q.error}</span> : null
+  const movers = q.data.movers
+  if (!movers.length) return null
+  return (
+    <div>
+      <b>What moved it in your logs</b>
+      <ul className="faction-sources">
+        {movers.map((m) => (
+          <li key={`${m.kind}|${m.zone}|${m.name}`}>
+            <span className={`mono ${tone(m.amount)}`}>{signed(m.amount)}</span> each ×{m.n.toLocaleString()} = <span className={`mono ${tone(m.total)}`}>{signed(m.total)}</span>{' '}
+            {m.kind === 'kill' ? 'killing' : 'hand-ins to'} <b>{m.name}</b> <span className="faint">({m.zone || 'somewhere'})</span>
+            {m.others.length > 0 && <span className="faint"> · {m.own ? `and in ${theirs(m.others)} log` : `from ${theirs(m.others)} log`}</span>}
+          </li>
+        ))}
+      </ul>
+    </div>
+  )
+}
+
+/** The quickest ways to take the faction to 2000, as the Optimize tab reckons them. */
+function Ways({ r, character, ways }: { r: FactionRow; character: string; ways: Catalog | null }) {
+  const settings = usePlanSettings(ways?.logPace ?? null)
+  const [choices] = useChoices(character)
+  const list = useMemo(
+    () => (ways ? waysToRaise(ways.activities, r.name, r.standing?.value ?? 0, settings, choices).slice(0, 3) : null),
+    [ways, r.name, r.standing, settings, choices]
+  )
+  if (!list) return <span className="faint">Working out the quickest ways to raise it…</span>
+  if (!list.length) return null
+  return (
+    <div>
+      <b>Quickest ways to {STANDING_MAX}</b> <span className="faint">(as the Optimize tab reckons them, each on its own)</span>
+      <ul className="faction-sources">
+        {list.map((w) => (
+          <li key={w.activity.id}>
+            <span className="mono">×{w.units.toLocaleString()}</span> ≈ <span className="mono">{span(w.seconds)}</span> · <Doing a={w.activity} />{' '}
+            <span className="faint">
+              · {w.activity.zone || 'somewhere'} · {sourceNote(w.activity)}
+            </span>{' '}
+            <Flags a={w.activity} />
+          </li>
+        ))}
+      </ul>
+    </div>
+  )
+}
+
+/** How a hit bears on the character: helps an achievement, sets one back, or takes a faction further below zero. */
+function hitTone(h: LookupHit, row: FactionRow | undefined): string {
+  if (h.capped || !h.amount) return ''
+  const open = !!row?.achievement && row.achievement.done !== true
+  const v = row?.standing?.value
+  if (h.amount > 0) return open ? 'ok' : ''
+  if (open) return 'warn'
+  if (v !== undefined && v < 0) return 'bad'
+  return ''
+}
+
+/** Mobs and NPCs whose name holds what was typed, with what each does to the factions. */
+function LookupResults({ query, results, error, view }: { query: string; results: FactionLookup[] | null; error: string; view: { factions: FactionRow[] } | null }) {
+  const byName = useMemo(() => new Map((view?.factions ?? []).map((r) => [r.name.toLowerCase(), r])), [view])
+  let body: ReactNode
+  if (!results) body = error ? <span className="bad-text">Could not look it up: {error}</span> : <span className="faint">Looking…</span>
+  else if (!results.length)
+    body = (
+      <span className="faint">
+        No kill or hand-in in your logs that moved a faction, and no eqlwiki faction page, names a mob or NPC with “{query}” in it: most likely it moves no faction.
+      </span>
+    )
+  else
+    body = (
+      <div className="stack gap-10">
+        {results.map((x) => (
+          <div key={`${x.from}|${x.kind}|${x.zone}|${x.name}`} className="stack gap-4">
+            <div className="row tight">
+              <span className={`chip fp-kind ${x.kind}`}>{x.kind === 'kill' ? 'Kill' : 'Hand-in'}</span>
+              <b>{x.name}</b>
+              <span className="faint small">{x.zone || 'somewhere'}</span>
+              {x.note && <span className="faint small">· {x.note}</span>}
+              <span className="spacer" />
+              <span className="faint small">
+                {x.from === 'wiki'
+                  ? 'eqlwiki: which way only, amounts guessed'
+                  : `${x.own === false && x.others?.length ? `${theirs(x.others)} log` : x.others?.length ? `your log and ${theirs(x.others)}` : 'your log'} (${(x.n ?? 0).toLocaleString()} ${x.kind === 'kill' ? 'kills' : 'hand-ins'})`}
+              </span>
+            </div>
+            <div className="row tight fp-effects">
+              {x.hits.map((h) => {
+                const row = byName.get(h.faction.toLowerCase())
+                const v = row?.standing?.value
+                const open = !!row?.achievement && row.achievement.done !== true
+                const where = v === undefined ? 'standing not known' : `at ${plain(v)}`
+                const ach = open ? ', achievement still to do' : row?.achievement?.done ? ', achievement done' : ''
+                const guess = h.guessed ? '. The wiki says which way; the amount is your logs’ usual one.' : ''
+                return (
+                  <span key={h.faction} className={`chip ${hitTone(h, row)}`.trim()} title={`${h.faction}: ${where}${ach}${guess}`}>
+                    {h.capped ? (h.capped === 'top' ? 'maxed' : 'bottomed') : `${signed(h.amount)}${h.guessed ? '?' : ''}`} {h.faction}
+                  </span>
+                )
+              })}
+            </div>
+          </div>
+        ))}
+      </div>
+    )
+  return (
+    <div className="card mb-16">
+      <h2>
+        What it does <span className="faint small">“{query}”</span>
+      </h2>
+      <p className="faint small">
+        Green helps an achievement still to do, amber sets one back, red takes a faction further below zero. Hover a faction for where you stand with it.
+      </p>
+      {body}
     </div>
   )
 }

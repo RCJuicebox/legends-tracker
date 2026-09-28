@@ -14,6 +14,7 @@ import { registerAudioIpc } from './ipc/audio'
 import { registerCharacterIpc } from './ipc/character'
 import { registerDemoIpc } from './demo'
 import { registerFactionIpc } from '../features/factions/main'
+import { registerLiveAchievementsIpc } from './liveAchievements'
 import { appUserModelId, ensureSourceShortcut } from './appIdentity'
 import { appIcon } from './bootstrap'
 import { isOwnPage } from './push'
@@ -60,6 +61,7 @@ async function start(ctx: AppContext): Promise<void> {
     registerAudioIpc,
     registerCharacterIpc,
     registerFactionIpc,
+    registerLiveAchievementsIpc,
     registerDemoIpc
   ]) {
     register(ctx)
@@ -111,7 +113,9 @@ function placeOverlaysForNewInstall(ctx: AppContext): void {
     targets: { x: a.x + a.width - 370, y: a.y + Math.round(a.height * 0.3), width: 340, height: 420 },
     meter: { x: a.x + 40, y: a.y + a.height - 360, width: 380, height: 300 },
     // Under the buffs, kept above the bottom edge on a short screen.
-    respawns: { x: a.x + a.width - 720, y: Math.min(a.y + Math.round(a.height * 0.3) + 440, a.y + a.height - 270), width: 340, height: 260 }
+    respawns: { x: a.x + a.width - 720, y: Math.min(a.y + Math.round(a.height * 0.3) + 440, a.y + a.height - 270), width: 340, height: 260 },
+    // Upper left, clear of the meter below it.
+    achievements: { x: a.x + 40, y: a.y + Math.round(a.height * 0.18), width: 360, height: 400 }
   }
   ctx.store.settings.set({ ...s, overlays: s.overlays.map((o) => (place[o.id] ? { ...o, ...place[o.id] } : o)) })
 }

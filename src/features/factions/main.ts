@@ -18,9 +18,12 @@ import {
   type FactionTallies,
   type FactionView
 } from './core'
-import { emptySources, joinSources, sourceReader, type FactionSourceTallies } from './attribution'
+import { emptySources, joinSources, shareSources, sourceReader, type FactionSourceTallies } from './attribution'
 import { parseQuestPage, type QuestPage } from './questPages'
-import { buildCatalog, itemsToLookUp, planFor, type FactionPlanData } from './planner'
+import { buildCatalog, factionNamer, guessesFrom, itemsToLookUp, planFor, type CatalogInput, type FactionPlanData } from './planner'
+import { lookUp, moversOf } from './lookup'
+import { listLogs } from '../../main/game'
+import type { Purchases } from '../../shared/ipc'
 import { parseAchievements } from '../../core/achievements'
 import { itemKey, parseInventory } from '../../core/inventory'
 import { unitPrice } from '../../core/tradeskills'
@@ -316,12 +319,26 @@ async function planData(ctx: AppContext, character: string, refresh: boolean, wi
   }
   const view = await ctx.factions.view(where, exported, await factionAchievements(dir, character))
   const { targets, maxed, achievementsExport, standings } = planFor(view)
-  const [tallies, book, purchases, held] = await Promise.all([ctx.factionSources.view(where), ctx.factionBook.get(refresh), ctx.purchases.latest(where), holdings(dir, character)])
-  const bought = Object.fromEntries(Object.entries(purchases).map(([k, p]) => [k, { merchant: p.merchant, each: unitPrice(p) }]))
+  const [tallies, book, purchases, held, others] = await Promise.all([
+    ctx.factionSources.view(where),
+    ctx.factionBook.get(refresh),
+    ctx.purchases.latest(where),
+    holdings(dir, character),
+    otherCharacters(ctx, character)
+  ])
+  // What a kill or a hand-in does is the game's, whoever does it: the player's other characters' logs count too.
+  const shared = shareSources(
+    tallies,
+    others.map((o) => ({ character: o.character, sources: o.tallies }))
+  )
+  const bought: CatalogInput['bought'] = {}
+  // This character's own purchases first; an item only another character has bought is still bought somewhere.
+  for (const p of [purchases, ...others.map((o) => o.purchases)]) for (const [k, v] of Object.entries(p)) bought[k] ??= { merchant: v.merchant, each: unitPrice(v) }
   const input = {
     factions: view.factions.map((r) => r.name),
     targets: targets.map((t) => t.faction),
-    sources: tallies,
+    sources: shared.sources,
+    shared: shared.from,
     pages: book.book.pages,
     quests: book.book.quests,
     bought,
@@ -332,6 +349,7 @@ async function planData(ctx: AppContext, character: string, refresh: boolean, wi
   const items = await ctx.inventoryFiles.lookup(itemsToLookUp(input))
   const catalog = buildCatalog({ ...input, items })
   const acts = Object.values(tallies.acts)
+  const theirs = others.flatMap((o) => Object.values(o.tallies.acts))
   return {
     targets,
     maxed,
@@ -345,8 +363,55 @@ async function planData(ctx: AppContext, character: string, refresh: boolean, wi
       kills: acts.filter((t) => t.kind === 'kill').reduce((n, t) => n + t.n, 0),
       handIns: acts.filter((t) => t.kind === 'turnin').reduce((n, t) => n + t.n, 0),
       unexplained: tallies.unexplained
+    },
+    shared: {
+      characters: others.filter((o) => Object.keys(o.tallies.acts).length).map((o) => o.character),
+      kills: theirs.filter((t) => t.kind === 'kill').reduce((n, t) => n + t.n, 0),
+      handIns: theirs.filter((t) => t.kind === 'turnin').reduce((n, t) => n + t.n, 0)
     }
   }
+}
+
+/**
+ * Where a character stands with each faction now, and the faction achievements it has done: the
+ * Standings tab's view. `byAchievement` finds a faction by its achievement's name (lower-cased).
+ */
+export async function standingsNow(
+  ctx: AppContext,
+  character: string
+): Promise<{ standings: Record<string, number>; done: Set<string>; byAchievement: Record<string, { faction: string; standing: number | null }> }> {
+  const dir = ctx.installDir()
+  const exported = await readFactionExport(dir, character).catch(() => null)
+  const view = await ctx.factions.view(ctx.historyOf(character), exported, await factionAchievements(dir, character))
+  const byAchievement: Record<string, { faction: string; standing: number | null }> = {}
+  for (const r of view.factions) if (r.achievement) byAchievement[r.achievement.name.toLowerCase()] = { faction: r.name, standing: r.standing?.value ?? null }
+  return { standings: planFor(view).standings, done: new Set(view.factions.filter((r) => r.achievement?.done === true).map((r) => r.name)), byAchievement }
+}
+
+/** A character's kills and hand-ins that moved a faction, with the player's other characters' added in (shareSources). */
+async function sharedTallies(ctx: AppContext, character: string) {
+  const [own, others] = await Promise.all([ctx.factionSources.view(ctx.historyOf(character)), otherCharacters(ctx, character)])
+  return shareSources(
+    own,
+    others.map((o) => ({ character: o.character, sources: o.tallies }))
+  )
+}
+
+/** The player's other characters with a log in the game folder: what their logs saw of factions, and what they bought. */
+async function otherCharacters(ctx: AppContext, character: string): Promise<{ character: string; tallies: FactionSourceTallies; purchases: Purchases }[]> {
+  const logs = await listLogs(ctx.installDir())
+  const keys = [...new Set(logs.map((l) => l.character))].filter((c) => c.toLowerCase() !== character.toLowerCase())
+  const out = []
+  // One at a time: LogHistory reads one log at a time anyway, and a failed one is left out rather than failing the plan.
+  for (const c of keys) {
+    try {
+      const where = ctx.historyOf(c)
+      out.push({ character: c, tallies: await ctx.factionSources.view(where), purchases: await ctx.purchases.latest(where) })
+    } catch (e) {
+      log.warn(`${c}'s log could not be read for the faction plan:`, e)
+    }
+  }
+  return out
 }
 
 export function registerFactionIpc(ctx: AppContext): void {
@@ -382,5 +447,23 @@ export function registerFactionIpc(ctx: AppContext): void {
     if (!isCharacterKey(character)) throw new Error('Not a character.')
     if (!ctx.installDir()) throw new Error('Choose the game folder on the Settings page first.')
     return planData(ctx, character, refresh === true, wide === true)
+  })
+  // What moved a faction in the player's logs: this character's and the others'.
+  handle('factions:moved', async (character, faction) => {
+    if (!isCharacterKey(character)) throw new Error('Not a character.')
+    if (typeof faction !== 'string' || !faction.trim() || faction.length > 100) throw new Error('Not a faction.')
+    const shared = await sharedTallies(ctx, character)
+    return { movers: moversOf(faction.trim(), shared.sources, shared.from) }
+  })
+  // What a mob or NPC does to the factions, from the logs and eqlwiki's faction pages.
+  handle('factions:lookup', async (character, query) => {
+    if (!isCharacterKey(character)) throw new Error('Not a character.')
+    if (typeof query !== 'string' || query.length > 80) throw new Error('Not a name to look up.')
+    if (query.trim().length < 3) return { results: [] }
+    const where = ctx.historyOf(character)
+    const exported = await readFactionExport(ctx.installDir(), character).catch(() => null)
+    const [shared, book, view] = await Promise.all([sharedTallies(ctx, character), ctx.factionBook.get(false), ctx.factions.view(where, exported)])
+    const name = factionNamer(view.factions.map((r) => r.name))
+    return { results: lookUp(query, shared.sources, shared.from, book.book.pages, name, guessesFrom(shared.sources)) }
   })
 }
