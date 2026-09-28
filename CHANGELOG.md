@@ -2,7 +2,7 @@
 
 What changed in each version. The release workflow publishes a version's section as its release notes, and installed copies show them when an update arrives.
 
-## Unreleased
+## 2.0.0 (2026-09-27)
 
 ### A look of its own, light or dark
 
