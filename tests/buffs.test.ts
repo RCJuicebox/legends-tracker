@@ -16,10 +16,13 @@ describe('who is who', () => {
       classes: ['shd', 'brd', 'wiz'],
       level: 50,
       race: 'Erudite',
-      at: 7
+      at: 7,
+      zone: 'The Plane of Hate 10025'
     })
     expect(parseWho('[24 WAR/BRD/WIZ] Corvin (Dark Elf) <Other Guild> ZONE: The Estate of Unrest (unrest)', 0)?.classes).toEqual(['war', 'brd', 'wiz'])
     expect(parseWho('[50 CLR] Brenna (Human)', 0)?.classes).toEqual(['clr'])
+    // No zone on the line, no zone read.
+    expect(parseWho('[50 CLR] Brenna (Human)', 0)?.zone).toBeUndefined()
     expect(parseWho('[ANONYMOUS] Brenna', 0)).toBeNull()
     expect(parseWho('Players in EverQuest Legends:', 0)).toBeNull()
   })

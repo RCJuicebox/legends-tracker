@@ -144,7 +144,17 @@ export class Engine {
       fighting: () => this.combat.meter.fighting,
       readingHistory: () => this.combat.backlog.active,
       live: () => !this.simulating && this.status.watching,
-      send: (view) => out.buffs(view)
+      send: (view) => out.buffs(view),
+      self: () => this.status.character,
+      // Your own /who: the zone when the watch does not know it yet, and your race for the record.
+      onSelf: (p) => {
+        if (p.zone && !this.status.zone) {
+          this.status.zone = p.zone
+          this.tracker?.setZone(p.zone)
+          this.emitStatus()
+        }
+        out.selfSeen?.({ race: p.race })
+      }
     })
     this.combat = new CombatFeed(store, out, this.notifier, this.buffs, {
       book: () => this.book,

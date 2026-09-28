@@ -26,6 +26,10 @@ export interface BuffHooks {
   /** The log is being watched live (not pasted lines): reminders may be given. */
   live: () => boolean
   send: (view: BuffView) => void
+  /** The character being played, as the log names them. */
+  self?: () => string
+  /** A /who line about the character being played. */
+  onSelf?: (p: Person) => void
 }
 
 /** Buffs on the character from others, who is who, and what to ask the group for. */
@@ -199,6 +203,8 @@ export class BuffCoordinator {
   }
 
   private learnPerson(p: Person): void {
+    const self = this.hooks.self?.()
+    if (self && p.name.toLowerCase() === self.toLowerCase()) this.hooks.onSelf?.(p)
     const f = this.store.buffs.get()
     const k = p.name.toLowerCase()
     if (f.people[k] && f.people[k].at >= p.at) return

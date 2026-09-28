@@ -12,6 +12,8 @@ import type { AudioCommand, LootView, MoteScan, MoteView } from '../../shared/ip
 // included.
 
 export interface EngineOutputs {
+  /** A /who line about the character being played: its race, for the character record. */
+  selfSeen?: (who: { race: string }) => void
   timers: (views: TimerView[]) => void
   alert: (payload: { text: string; color: string; durationSec: number }) => void
   audio: (payload: AudioCommand) => void

@@ -34,9 +34,11 @@ export interface Person {
   race: string
   /** When the /who line was printed. */
   at: number
+  /** The zone the line names ("ZONE: The Western Plains of Karana (qey2hh1)"), when it does. */
+  zone?: string
 }
 
-const RE_WHO = /^\[(\d+) ([A-Z]{3}(?:\/[A-Z]{3}){0,2})\] (\S+) \(([^)]+)\)/
+const RE_WHO = /^\[(\d+) ([A-Z]{3}(?:\/[A-Z]{3}){0,2})\] (\S+) \(([^)]+)\)(?:.*? ZONE: (.+?) \([^)]*\))?/
 
 /** A /who line, or null. Anonymous and roleplaying players show no classes and are passed over. */
 export function parseWho(text: string, at: number): Person | null {
@@ -47,7 +49,7 @@ export function parseWho(text: string, at: number): Person | null {
     .map((c) => c.toLowerCase())
     .filter((c) => c in CLASS_NUMBER)
   if (!classes.length) return null
-  return { name: m[3], classes, level: Number(m[1]), race: m[4], at }
+  return { name: m[3], classes, level: Number(m[1]), race: m[4], at, ...(m[5] ? { zone: m[5] } : {}) }
 }
 
 // ---- what a buff does ----

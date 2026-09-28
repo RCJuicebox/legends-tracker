@@ -230,7 +230,18 @@ export function createContext(): AppContext {
         if (!character) return
         void ctx.petStore.merge(character, update).then(async (changed) => changed && toMain('state:pet', { character, ...(await ctx.petStore.get(character)) }))
       },
-      buffs: (view) => toMain('state:buffs', view)
+      buffs: (view) => toMain('state:buffs', view),
+      // A /who of yourself names your race: kept on the character record when it has none yet.
+      selfSeen: (who) => {
+        const key = ctx.characterKey()
+        const rec = key ? store.characterByKey(key) : null
+        if (!rec || rec.race || !who.race) return
+        const next = { ...rec, race: who.race }
+        const s = store.settings.get()
+        store.settings.set({ ...s, characters: { ...s.characters, [key]: next } })
+        ctx.engine.reconfigure()
+        toMain('state:character', next)
+      }
     },
     appEngineEnv({
       dataDir,
