@@ -770,6 +770,51 @@ describe('the catalog', () => {
     expect(buildCatalog(input(150)).activities.some((a) => a.mobs?.includes('a wood sprite'))).toBe(false)
   })
 
+  it('takes a hand-in the log saw once as repeatable when the walkthrough makes it so, with what its NPC wants', () => {
+    const silks = {
+      page: 'Spiderling Silks',
+      givers: ['Sylia Windlehands'],
+      zones: ['Kelethin'],
+      level: 1,
+      steps: [
+        {
+          hits: { Songweavers: 5 },
+          guessed: [],
+          handIn: [{ item: 'Spiderling Silk', count: 4 }],
+          npc: 'Sylia Windlehands',
+          line: 'Hand Sylia Windlehands 4 Spiderling Silks, unstacked.'
+        }
+      ]
+    }
+    const input = (cons: Record<string, number>) =>
+      catalogInput({
+        factions: ['Song Weavers'],
+        targets: ['Song Weavers'],
+        sources: handIns('Sylia Windlehands', 'Greater Faydark', 1, [['Song Weavers', 5]], 'Spiderling Silk'),
+        pages: [{ page: 'Songweavers', raise: { mobs: [], quests: ['Spiderling Silks'], zones: [] }, lower: { mobs: [], quests: [], zones: [] } }],
+        quests: { 'Spiderling Silks': silks },
+        cons
+      })
+    // Once in the log: a one-time reward, as far as the log alone can tell.
+    const alone = buildCatalog({ ...input({}), pages: [], quests: {} }).activities
+    expect(alone.map((a) => [a.id, a.once])).toEqual([['turnin:greaterfaydark:sylia windlehands', 'done once in your logs']])
+    // The walkthrough says it repeats, and Sylia wants Amiable (from play): the log's hand-in, with both.
+    const [sylia, ...rest] = buildCatalog(input({ 'Song Weavers': 105 })).activities
+    expect(rest).toEqual([])
+    expect(sylia).toMatchObject({
+      id: 'turnin:greaterfaydark:sylia windlehands',
+      source: 'log',
+      hits: { 'Song Weavers': 5 },
+      needs: 'Amiable',
+      gate: [{ faction: 'Song Weavers', band: 'Amiable', min: 100 }]
+    })
+    expect(sylia.once).toBeUndefined()
+    expect(sylia.blocked).toBeUndefined()
+    expect(plannable(sylia, NO_CHOICES)).toBe(true)
+    // At Indifferent she takes nothing.
+    expect(buildCatalog(input({ 'Song Weavers': 55 })).activities[0].blocked).toMatch(/^needs Amiable with Song Weavers/)
+  })
+
   it("takes Jeet's Scrap Metal as Cleaner VII's, one a kill, and Mater's 300 gold with each Ogre Head", () => {
     const quest = (page: string, npc: string, item: string) => ({
       page,

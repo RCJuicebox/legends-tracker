@@ -351,7 +351,11 @@ const ONCE_IN_PLAY: Record<string, string> = {
 
 /** Quests whose NPC takes the hand-in only at or above a con, by page (lower-cased). A con can be faked as far as Indifferent, not past it (from play). */
 const NEEDS: Record<string, Need> = {
-  'tunare scouts dagger': { faction: "Tunare's Scouts", band: 'Amiable', min: 100 }
+  'tunare scouts dagger': { faction: "Tunare's Scouts", band: 'Amiable', min: 100 },
+  // Sylia Windlehands took nothing from a Wood Elf Monk/Shadowknight/Shaman at Indifferent (55: "You need to
+  // prove your dedication"), and took the silk from the same Wood Elf as a Monk/Enchanter/Bard at Amiable
+  // (105), five minutes later (2026-09-29).
+  'spiderling silks': { faction: 'Song Weavers', band: 'Amiable', min: 100 }
 }
 
 /** Amounts a quest page leaves out, by page (lower-cased), then faction. */
@@ -960,11 +964,36 @@ export function buildCatalog(input: CatalogInput): FactionCatalog {
           }
         if (!raisesAny(hits, open)) return
         const npc = [s.npc, ...q.givers].find((n) => n && !isZone(n)) ?? ''
+        // The cons its NPC wants: known from play, and as Allakhazam lists them. The first not met holds it back.
+        const needs = [NEEDS[q.page.toLowerCase()], ...(allaNeed.get(questKey(q.page)) ?? [])]
+          .filter((n): n is Need => !!n)
+          .map((n) => ({ ...n, faction: name(n.faction) }))
+          // Play and Allakhazam can say the same.
+          .filter((n, i, all) => all.findIndex((m) => m.faction === n.faction && m.min === n.min && m.max === n.max) === i)
+        const unmet = needs.find((n) => blockedBy(n, input.cons))
+        const blocked = unmet ? blockedBy(unmet, input.cons) : ''
+        const need = unmet ?? needs[0]
+        const swap = unmet ? swapRaces(needs, unmet.faction, input.swapCons) : []
+        const gate = needs.filter(holdsBack)
+        const wants: Pick<PlanActivity, 'needs' | 'blocked' | 'swap' | 'gate'> = {
+          ...(need ? { needs: need.band } : {}),
+          ...(blocked ? { blocked } : {}),
+          ...(swap.length ? { swap } : {}),
+          ...(gate.length ? { gate } : {})
+        }
         // The log's own hand-ins of the same things to this NPC, moving the same factions, say this
         // already, and exactly; one of other things (Metal Bits where the log saw ore) is another way.
+        // What the walkthrough knows besides stands: that it repeats, though the log saw it only once or
+        // twice (Sylia Windlehands' Spiderling Silks), and what its NPC wants.
         const sameUp = positives(hits).join('+')
         const handed = s.handIn.map((h) => itemName(h.item).toLowerCase())
-        if ((loggedNpcs.get(npc.toLowerCase()) ?? []).some((l) => positives(l.a.hits).join('+') === sameUp && handed.every((it) => l.offered.has(it)))) return
+        const logged = (loggedNpcs.get(npc.toLowerCase()) ?? []).find((l) => positives(l.a.hits).join('+') === sameUp && handed.every((it) => l.offered.has(it)))
+        if (logged) {
+          const repeats = !ONCE_IN_PLAY[q.page.toLowerCase()] && Math.max(...Object.values(hits)) < ONCE_POINTS && s.handIn.length === 1 && !s.handIn[0].given
+          if (repeats) delete logged.a.once
+          if (!logged.a.needs) Object.assign(logged.a, wants)
+          return
+        }
         // Each item once, at the largest count the line gives it (a walkthrough can name it twice).
         const counts = new Map<string, QuestHandIn>()
         for (const h of s.handIn) {
@@ -1000,13 +1029,6 @@ export function buildCatalog(input: CatalogInput): FactionCatalog {
         if (sameSteps.has(same)) return
         sameSteps.add(same)
         const top = Math.max(...Object.values(hits))
-        // The cons its NPC wants: known from play, and as Allakhazam lists them. The first not met holds it back.
-        const needs = [NEEDS[q.page.toLowerCase()], ...(allaNeed.get(questKey(q.page)) ?? [])].filter((n): n is Need => !!n).map((n) => ({ ...n, faction: name(n.faction) }))
-        const unmet = needs.find((n) => blockedBy(n, input.cons))
-        const blocked = unmet ? blockedBy(unmet, input.cons) : ''
-        const need = unmet ?? needs[0]
-        const swap = unmet ? swapRaces(needs, unmet.faction, input.swapCons) : []
-        const gate = needs.filter(holdsBack)
         const once =
           ONCE_IN_PLAY[q.page.toLowerCase()] ??
           (top >= ONCE_POINTS
@@ -1029,10 +1051,7 @@ export function buildCatalog(input: CatalogInput): FactionCatalog {
           hits,
           ...(guessed.length ? { guessed } : {}),
           ...(loop ? { handIns: 2, back: loop.back } : {}),
-          ...(need ? { needs: need.band } : {}),
-          ...(blocked ? { blocked } : {}),
-          ...(swap.length ? { swap } : {}),
-          ...(gate.length ? { gate } : {}),
+          ...wants,
           source: 'wiki',
           items,
           ...(once ? { once } : {}),
