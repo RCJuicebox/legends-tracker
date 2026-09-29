@@ -1,29 +1,35 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { api, errorMessage } from '../api'
 import { useRemembered } from '../remember'
 import { useInvoke } from '../hooks'
 import { Pending, Tabs } from '../components/ui'
 import { who } from '../../../core/format'
+import { parseLogLine } from '../../../core/logLine'
 import { readSheet, type StatsSheet } from '../../../core/statsSheet'
 import { useExportCharacter, useInventory } from '../gear/model'
 import { wornSummary } from '../../../core/wornGear'
 import { autoValues, classTrio, primaryClass, valOf } from '../../../core/statsModel'
 import { CLASSES, className, type ClassName } from '../../../shared/game/classes'
+import { PLAYABLE_RACES, playableRace } from '../../../shared/game/races'
 import { useCharacterRecord, withClasses, withRecord, recordLevel } from '../character'
 import { LEVEL_CAP } from '../../../core/buffs'
-import { AA_USES, type AaEffect, type AaSummary } from '../../../core/aa'
 import type { CharacterSheet } from '../../../shared/types'
 import type { SetSheet } from './statsBits'
 import { CharacterTab } from './StatsCharacter'
 import { AcTab } from './StatsAc'
 import { CombatTab } from './StatsCombat'
+import { AasTab } from './StatsAas'
 
-type Tab = 'character' | 'ac' | 'combat'
+type Tab = 'character' | 'ac' | 'combat' | 'aas'
 const TABS: [Tab, string][] = [
   ['character', 'Character'],
   ['ac', 'AC'],
-  ['combat', 'Combat']
+  ['combat', 'Combat'],
+  ['aas', 'AAs']
 ]
+
+/** While Stats › AAs is open, how often the log is looked at again for new purchases. */
+const AA_RELOAD_MS = 30_000
 
 export function Stats() {
   const exp = useExportCharacter('inventory')
@@ -59,26 +65,52 @@ export function Stats() {
       return { overrides: o }
     })
 
-  const readAas = async (quiet: boolean) => {
-    setAaStatus('Reading your log…')
-    try {
-      const aa = await api.invoke('stats:readAAs')
-      if (aa) {
-        set({ aa })
-        setAaStatus('')
-      } else setAaStatus(quiet ? '' : 'No /alternateadv list in your current log yet.')
-    } catch (e) {
-      setAaStatus(quiet ? '' : `Could not read your log: ${errorMessage(e)}`)
-    }
-  }
-  // First visit for a character: look for AAs without being asked.
-  // Once per character and sheet arrival, not on every edit: readAas writes through updateSheet,
-  // which always works on the latest sheet, so nothing it reads can be stale.
-  const hasSheet = !!charSheet
+  // The picked character's own log, whichever character is being played. The sheet written is the
+  // one picked when the read ends, so a read the pick has moved on from is dropped.
+  const picked = useRef(character)
+  picked.current = character
+  const readAas = useCallback(
+    async (quiet: boolean) => {
+      setAaStatus('Reading your log…')
+      try {
+        const aa = await api.invoke('stats:readAAs', character)
+        if (picked.current !== character) return
+        if (aa) {
+          set({ aa })
+          setAaStatus('')
+        } else setAaStatus(quiet ? '' : `No /alternateadv list in ${who(character) || 'this character'}'s log yet.`)
+      } catch (e) {
+        if (picked.current === character) setAaStatus(quiet ? '' : `Could not read your log: ${errorMessage(e)}`)
+      }
+    },
+    [character, set]
+  )
+
+  // What the log and its archives saw bought, for the AAs tab, and when the newest list was typed.
+  // Answers for another character (the pick just changed) are not this one's.
+  const aaQ = useInvoke(character ? 'stats:aaHistory' : null, [character])
+  const aaHistory = aaQ.data?.character === character ? aaQ.data.view : null
+  const reloadAaHistory = aaQ.reload
   useEffect(() => {
-    if (hasSheet && !s.aa) void readAas(true)
-    // oxlint-disable-next-line react-hooks/exhaustive-deps -- deliberately keyed on character and sheet arrival
-  }, [character, hasSheet])
+    if (tab !== 'aas') return
+    const t = setInterval(reloadAaHistory, AA_RELOAD_MS)
+    return () => clearInterval(t)
+  }, [tab, reloadAaHistory])
+
+  // Looks for AAs without being asked: on a character's first visit, and when the log holds a newer
+  // /alternateadv list than the one kept (typed again after buying some). Once for each: readAas
+  // writes through updateSheet, which always works on the latest sheet, so nothing it reads is stale.
+  const hasSheet = !!charSheet
+  const listAt = aaHistory?.listAt ?? 0
+  const keptAt = s.aa ? (parseLogLine(`[${s.aa.when}] `)?.time ?? 0) : 0
+  const looked = useRef('')
+  useEffect(() => {
+    if (!hasSheet || !character) return
+    const k = !s.aa || listAt > keptAt ? `${character}@${listAt}` : ''
+    if (!k || looked.current === k) return
+    looked.current = k
+    void readAas(true)
+  }, [character, hasSheet, s.aa, listAt, keptAt, readAas])
 
   if (!exports || !view || !charSheet || !caps)
     return (
@@ -106,8 +138,8 @@ export function Stats() {
         <div>
           <h1>Stats</h1>
           <p>
-            AC and melee for {who(character) || 'your character'}, worked out the way the server does. Worn gear comes from the Inventory page, skill caps and soft caps from the
-            game's own tables, and AAs from your log.
+            AC, melee and AAs for {who(character) || 'your character'}. AC and melee are worked out the way the server does: worn gear comes from the Inventory page, skill caps and
+            soft caps from the game's own tables, and AAs from your log.
           </p>
         </div>
         {available.length > 1 && (
@@ -126,7 +158,7 @@ export function Stats() {
       <div className="card stack gap-12 mb-14">
         <p className="hint">
           {who(character) || 'This character'}&apos;s classes, levels and race, for every page: spell durations, AC and melee, gear and the upgrade finder, spell upgrades and
-          buffs.
+          buffs. A /who of yourself while the tracker runs keeps the classes and race up to date: it shows your lowest class level, so no class is put below it.
         </p>
         <div className="stats-fields">
           {[0, 1, 2].map((i) => {
@@ -169,13 +201,16 @@ export function Stats() {
           })}
           <label className="field">
             <span>Race</span>
-            <select value={s.race} onChange={(e) => void rec.save((c) => ({ ...c, race: e.target.value === 'iksar' ? 'Iksar' : '' }))}>
-              <option value="other">Any other race</option>
-              <option value="iksar">Iksar</option>
+            <select value={playableRace(record?.race ?? '') || (s.race === 'iksar' ? 'Iksar' : '')} onChange={(e) => void rec.save((c) => ({ ...c, race: e.target.value }))}>
+              <option value="">not known</option>
+              {PLAYABLE_RACES.map((r) => (
+                <option key={r} value={r}>
+                  {r}
+                </option>
+              ))}
             </select>
           </label>
         </div>
-        <AaLine aa={s.aa} status={aaStatus} onRead={() => void readAas(false)} />
       </div>
 
       <Tabs className="mb-12" label="Stats view" value={tab} onChange={setTab} tabs={TABS} />
@@ -184,57 +219,11 @@ export function Stats() {
         <CharacterTab s={s} set={set} val={val} trio={trio} primary={primary} skill={skill} gear={gear?.totals ?? null} />
       ) : tab === 'ac' ? (
         <AcTab s={s} set={set} setOverride={setOverride} auto={auto} val={val} trio={trio} primary={primary} tableCap={tableCap} skill={skill} hasInventory={!!gear} />
-      ) : (
+      ) : tab === 'combat' ? (
         <CombatTab s={s} set={set} setOverride={setOverride} auto={auto} val={val} trio={trio} primary={primary} caps={caps} skill={skill} />
+      ) : (
+        <AasTab aa={s.aa} status={aaStatus} onRead={() => void readAas(false)} history={aaHistory} error={aaQ.error} retry={aaQ.reload} />
       )}
     </>
-  )
-}
-
-function AaLine({ aa, status, onRead }: { aa: AaSummary | null; status: string; onRead: () => void }) {
-  const [open, setOpen] = useState(false)
-  const applied = (Object.keys(AA_USES) as AaEffect[]).filter((k) => aa?.totals[k])
-  return (
-    <div className="stack gap-8">
-      <div className="row small gap-10">
-        <b>Alternate Advancement</b>
-        <span className="muted">
-          {aa ? `${aa.count} abilities from your /alternateadv list of ${aa.when}.` : 'Type /alternateadv list in game; the tracker reads the result from your log.'}
-        </span>
-        {status && <span className="faint">{status}</span>}
-        <span className="grow" />
-        {aa && (
-          <button className="btn ghost small" onClick={() => setOpen(!open)}>
-            {open ? 'Hide' : 'Show'} details
-          </button>
-        )}
-        <button className="btn small" onClick={onRead}>
-          Read from my log
-        </button>
-      </div>
-      {aa && (
-        <div className="row tight" style={{ flexWrap: 'wrap', gap: 6 }}>
-          {applied.map((k) => (
-            <span key={k} className={`chip${AA_USES[k].applied ? ' ok' : ''}`} title={`${AA_USES[k].feeds}. From ${aa.totals[k]!.from.map(([n, v]) => `${n} ${v}`).join(', ')}`}>
-              {AA_USES[k].label} +{aa.totals[k]!.sum}
-              {AA_USES[k].unit}
-            </span>
-          ))}
-        </div>
-      )}
-      {open && aa && (
-        <div className="small stats-aalist">
-          {aa.abilities.map((a) => (
-            <div key={`${a.id}-${a.name}`}>
-              <b>{a.name}</b>
-              {a.cost !== null && <span className="faint"> · cost {a.cost}</span>}
-              {Object.keys(a.effects).length > 0 && (
-                <span className="muted"> · {(Object.entries(a.effects) as [AaEffect, number][]).map(([k, v]) => `${AA_USES[k].label} ${v}${AA_USES[k].unit}`).join(', ')}</span>
-              )}
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
   )
 }

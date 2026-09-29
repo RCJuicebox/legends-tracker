@@ -7,6 +7,7 @@
 // builds. Core never imports it.
 
 import type { AaSummary } from '../core/aa'
+import type { AaHistoryView } from '../core/aaHistory'
 import type { ArchiveOutcome } from '../core/archiver'
 import type { BuffView } from '../core/buffs'
 import type { EffectSpell } from '../core/itemEffects'
@@ -362,7 +363,10 @@ export interface Invokes {
   'gear:effects': (names: string[], character: string, days: number) => GearEffects
 
   'stats:caps': (classes: string[], level: number) => Caps
-  'stats:readAAs': () => AaSummary | null
+  /** The newest /alternateadv list in the character's own log. */
+  'stats:readAAs': (character: string) => AaSummary | null
+  /** The AAs the character's log and archives saw bought and refunded, and its ability points. */
+  'stats:aaHistory': (character: string) => { character: string; view: AaHistoryView }
   'stats:readScreen': () => StatsScreenRead
 
   'game:check': (dir?: string) => GameFolderCheck
@@ -533,6 +537,7 @@ const INVOKE_CHANNELS: Record<InvokeChannel, true> = {
   'gear:effects': true,
   'stats:caps': true,
   'stats:readAAs': true,
+  'stats:aaHistory': true,
   'stats:readScreen': true,
   'game:check': true,
   'game:find': true,

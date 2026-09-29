@@ -52,9 +52,18 @@ const PLAYABLE = [
   'vah shir',
   'wood elf'
 ]
+/** Stands for "one of the playable races, which one not known": only "The playable races." counts it. */
+const PLAYABLE_MARK = '(playable)'
 
-/** Words that name a race in other words: the elves' own names, and an adjective or two. */
+/**
+ * Words that name a race in other words: the elves' own names, an adjective or two, and names that
+ * only look like a race. The Dervish Cutthroats of Ro and the Commonlands are humanoid bandits of the
+ * playable races ("A Dervish Cutthroat", race Various), not Dervishes, and a Dervish Thug is an Ogre.
+ */
 const WORD_ALIASES: Record<string, string> = {
+  'dervish cutthroat': PLAYABLE_MARK,
+  'cutthroat dervish': PLAYABLE_MARK,
+  'dervish thug': 'ogre',
   "teir'dal": 'dark elf',
   "koada'dal": 'high elf',
   "feir'dal": 'wood elf',
@@ -118,7 +127,7 @@ function singulars(word: string): string[] {
 /** The words each race an achievement lists could appear as in a name or a race, singular or plural. */
 export function raceWords(text: string): string[] {
   const t = text.trim().replace(/\.$/, '').toLowerCase()
-  if (/^the playable races$/.test(t)) return [...PLAYABLE]
+  if (/^the playable races$/.test(t)) return [...PLAYABLE, PLAYABLE_MARK]
   if (t.startsWith('clockwork:')) return ['clockwork']
   const out = new Set<string>()
   for (const raw of t.split(/,\s*(?:and\s+)?|\s+and\s+/)) {
@@ -157,11 +166,14 @@ export class RaceIndex {
       let took = 0
       for (let len = Math.min(this.longest, tokens.length - i); len >= 1 && !took; len--) {
         const phrase = tokens.slice(i, i + len).join(' ')
-        const hit = this.words.get(WORD_ALIASES[phrase] ?? phrase)
-        if (!hit) continue
+        const alias = WORD_ALIASES[phrase]
+        const hit = this.words.get(alias ?? phrase)
+        // An alias is taken even when no open achievement counts what it stands for: "dervish
+        // cutthroat" must not fall back to "dervish".
+        if (!hit && !alias) continue
         // "a giant spider" is a spider; "a hill giant" and "a fire giant warrior" are giants.
         if (name && phrase === 'giant' && i === 0 && tokens.length > 1) continue
-        hit.forEach((c) => found.add(c))
+        hit?.forEach((c) => found.add(c))
         took = len
       }
       if (!took && name) {

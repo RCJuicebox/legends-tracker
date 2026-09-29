@@ -12,6 +12,7 @@ import {
   NO_CHOICES,
   planFactions,
   planFor,
+  plannable,
   unitTime,
   waysToRaise,
   zoneKey,
@@ -22,6 +23,7 @@ import {
 } from '../src/features/factions/planner'
 import type { ItemInfo } from '../src/shared/types'
 import { lookUp, moversOf } from '../src/features/factions/lookup'
+import { allaNeeds, allaQuestAmounts, bandMax, bandMin, parseAllaFaction, parseAllaIndex, questKey, type AllaFaction } from '../src/features/factions/allakhazam'
 
 const T0 = Date.UTC(2026, 8, 28, 12, 0, 0)
 const adjusted = (faction: string, n: number) => `Your faction standing with ${faction} has been adjusted by ${n}.`
@@ -140,6 +142,55 @@ describe('what caused a faction change', () => {
   })
 })
 
+// Trimmed from eqlwiki's Supplies for the New Sebilisian Expedition: its first block is never closed.
+// Trimmed from eqlwiki's Rat Ear Pie Quest: Rephas gives Grilled Rat Ears for Rat Ears, and takes them back for as much again.
+const RAT_EAR_PIE = `{| class="questTopTable"
+! ''' Quest Giver: '''
+| [[Rephas]]
+|}
+He doesn't have much to say about rat ears, but if you give him the regular [[Rat Ears]] (common drop from rats) he'll give you an item called [[Grilled Rat Ears]] (edible and stackable).
+<div class='facblock'>
+* Your faction standing with [[Arcane Scientists]] has been adjusted by 5.
+* Your faction standing with [[Freeport Militia ]] has been adjusted by -1.
+</div>
+'''If you give the [[Grilled Rat Ears]] back to him, you receive a [[Fish Scales]], faction, and experience.'''
+<div class='facblock'>
+* Your faction standing with [[Arcane Scientists]] has been adjusted by 5.
+* Your faction standing with [[Freeport Militia ]] has been adjusted by -1.
+</div>`
+
+const SUPPLIES = `{| class="questTopTable"
+! ''' Start Zone: '''
+| [[The Northern Desert of Ro]]
+|-
+! ''' Quest Giver: '''
+| [[Crusader Iktra]]
+|}
+Upon handing Crusader Iktra (4) [[Metal Bits]] (made via [[Blacksmithing]] 2 [[Small Pieces of Ore]] & 1 [[Water Flask]] - both available from [[Klok Rento]] in the [[New Sebilis Expedition]].
+
+[[Crusader Iktra]] says 'Thank you, [Race]. This will go a ways towards rebuilding our ships.'
+
+Your faction standing with New Sebilisian Expedition has been adjusted by 5.
+
+---
+
+'''[[Small Piece of High Quality Ore]]''' can drop from goblins in zones like [[Permafrost]] and [[High Keep]].
+
+Upon handing Crusader Iktra (1) [[Small Piece of High Quality Ore]]:
+
+<div class="facblock">
+* Your faction standing with [[New Sebilisian Expedition]] has been adjusted by 10.
+
+Upon handing Crusader Iktra (1) [[Small Brick of High Quality Ore]]:
+
+: Crusader Iktra says 'Thank you, [Player].'
+
+<div class="facblock">
+* Your faction standing with [[New Sebilisian Expedition]] has been adjusted by 15.
+
+</div>
+{{exp}}`
+
 describe('eqlwiki quest pages', () => {
   const page = `{| class="questTopTable"
 ! ''' Start Zone: '''
@@ -200,6 +251,45 @@ You will have to kill Nillipuss multiple times to get four [[Jumjum Stalk]]s.
     )!
     expect(q.steps[0].handIn[0]).toMatchObject({ item: 'Box of Beetle Eyes', madeOf: { item: 'Fire Beetle Eye', count: 10 } })
     expect(q.steps[1].handIn[0]).toMatchObject({ item: 'Jumjum Stalk', count: 4, from: 'Nillipuss' })
+  })
+
+  it('ends a block left open at the next hand-in, and reads faction lines written with no block', () => {
+    const q = parseQuestPage('Supplies for the New Sebilisian Expedition', SUPPLIES)!
+    expect(q.steps.map((s) => [s.handIn.map((h) => `${h.count} ${h.item}`).join(' + '), s.hits['New Sebilisian Expedition']])).toEqual([
+      ['4 Metal Bits', 5],
+      ['1 Small Piece of High Quality Ore', 10],
+      ['1 Small Brick of High Quality Ore', 15]
+    ])
+  })
+
+  it('leaves out what the NPC gives back and how the item is made, and keeps what is given back', () => {
+    expect(readHandIn("if you give him the regular [[Rat Ears]] (common drop from rats) he'll give you an item called [[Grilled Rat Ears]] (edible). More text.")).toEqual({
+      handIn: [{ item: 'Rat Ears', count: 1 }],
+      npc: '',
+      gives: ['Grilled Rat Ears']
+    })
+    expect(readHandIn("'''If you give him 3 [[Giant Rat Ear]]s, you receive a recipe for [[Rat Ear Pie]] ([[Giant Rat Ear]] + [[Baking Spirits]]).'''").handIn).toEqual([
+      { item: 'Giant Rat Ear', count: 3 }
+    ])
+    expect(readHandIn('Upon handing Crusader Iktra (4) [[Metal Bits]] (made via [[Blacksmithing]] 2 [[Small Pieces of Ore]] & 1 [[Water Flask]]').handIn).toEqual([
+      { item: 'Metal Bits', count: 4 }
+    ])
+  })
+
+  it("reads P99's way of writing an amount, and a faction line without 'standing'", () => {
+    const q = parseQuestPage(
+      'Pie',
+      `'''Give [[Rat Ears]] to [[Rephas]].'''
+<div class='facblock'>
+* Your faction standing with [[Arcane Scientists]] has gotten better.<span class='oppfac'>(+5)</span>
+* Your faction standing with [[Freeport Militia ]] '''has gotten worse'''.<span class='profac'>(-1)</span>
+</div>
+Killing him results in these faction adjustments:
+<div class='facblock'>
+* Your faction with [[Dismal Rage]] got worse. (-5)
+</div>`
+    )!
+    expect(q.steps.map((s) => s.hits)).toEqual([{ 'Arcane Scientists': 5, 'Freeport Militia': -1 }, { 'Dismal Rage': -5 }])
   })
 })
 
@@ -274,6 +364,140 @@ function handIns(npc: string, zone: string, n: number, hits: [string, number][],
   return settled(read(lines))
 }
 
+// A faction page and the faction list, made up in the shape of Allakhazam's.
+const ALLA_PAGE = `<html><head><title>Test Rangers :: Factions :: EverQuest :: ZAM</title></head><body><h1>Test Rangers</h1>
+<table class="db-page"><tbody>
+<tr><td colspan="2"><h2>The following quests require Test Rangers faction</h2></td></tr>
+<tr><td colspan="2"><table class="datatable"><thead><tr><th>Quest Name</th><th>Minimum Faction Required</th><th>Maximum Faction Allowed</th></tr></thead><tbody>
+<tr><td class="dr"><a href="q1">Ranger Summons</a></td><td class="dr"></td><td class="dr"></td></tr>
+<tr><td class="lr"><a href="q2">Acorn Delivery</a></td><td class="lr">Amiable</td><td class="lr"></td></tr>
+<tr><td class="dr"><a href="q3">Bandit Bounty</a></td><td class="dr"></td><td class="dr">Dubious</td></tr>
+</tbody></table></td></tr>
+<tr><td><h2>Zones in which you can <em>raise</em> the faction</h2></td><td><h2>Zones in which you can <em>lower</em> the faction</h2></td></tr>
+<tr><td valign="top"><ul><li><a href="z1">Test Woods</a></li></ul></td><td valign="top"><ul></ul></td></tr>
+<tr><td><h2>NPCs you can kill to <em>raise</em> the faction</h2></td><td><h2>Quests you can do to <em>raise</em> the faction</h2></td></tr>
+<tr><td valign="top"><ul><li><a href="n1">a thorn wolf</a> (<a href="z1">Test Woods</a>) +2</li></ul></td>
+<td valign="top"><ul><li><a href="q2">Acorn Delivery</a> +15</li><li><a href="q2">Acorn Delivery</a> +20</li><li><a href="q3">Bandit Bounty</a> +5</li></ul></td></tr>
+<tr><td><h2>NPCs you kill to <em>lower</em> the faction</h2></td><td><h2>Quests you do to <em>lower</em> the faction</h2></td></tr>
+<tr><td valign="top"><ul><li><a href="n2">Ranger Holt</a> (<a href="z1">Test Woods</a>) -50</li><li><a href="n3">Ranger Vell</a> (<a href="z1">Test Woods</a>)</li></ul></td><td valign="top"><ul> </ul></td></tr>
+</tbody></table></body></html>`
+const ALLA_LIST = `<ul><li><a href="https://everquest.allakhazam.com/db/faction.html?faction=7">Test Rangers</a></li>
+<li><a href="https://everquest.allakhazam.com/db/faction.html?faction=9">King Ak&#39;Anon</a></li><li><a href="https://everquest.allakhazam.com/db/zone.html?z=1">Test Woods</a></li></ul>`
+
+describe("Allakhazam's faction pages", () => {
+  it('reads a faction page: the quests that want a con, and what kills and quests do to it', () => {
+    expect(parseAllaFaction(7, ALLA_PAGE)).toEqual({
+      id: 7,
+      name: 'Test Rangers',
+      needs: [
+        { quest: 'Ranger Summons', min: '', max: '' },
+        { quest: 'Acorn Delivery', min: 'Amiable', max: '' },
+        { quest: 'Bandit Bounty', min: '', max: 'Dubious' }
+      ],
+      mobs: [
+        { name: 'a thorn wolf', zone: 'Test Woods', amount: 2 },
+        { name: 'Ranger Holt', zone: 'Test Woods', amount: -50 },
+        { name: 'Ranger Vell', zone: 'Test Woods', amount: null }
+      ],
+      quests: [
+        { name: 'Acorn Delivery', amount: 15 },
+        { name: 'Acorn Delivery', amount: 20 },
+        { name: 'Bandit Bounty', amount: 5 }
+      ]
+    })
+    expect(parseAllaFaction(7, '<html><body>Not found</body></html>')).toBeNull()
+  })
+
+  it('reads the faction list into the site numbers, by faction name however it is spelled', () => {
+    expect(parseAllaIndex(ALLA_LIST)).toEqual({ testrangers: 7, kingakanon: 9 })
+  })
+
+  it('takes a quest amount only when the page gives the quest one, and a need no better than a band', () => {
+    const page = parseAllaFaction(7, ALLA_PAGE)!
+    const id = (f: string) => f
+    expect(Object.fromEntries(allaQuestAmounts([page], id))).toEqual({ banditbounty: { 'Test Rangers': 5 } })
+    expect(allaNeeds([page], id).get('banditbounty')).toEqual([{ faction: 'Test Rangers', band: 'Dubious', max: -101 }])
+    expect(allaNeeds([page], id).has('rangersummons')).toBe(false)
+  })
+
+  it('knows the cons by their words, and a quest by its name however it is written', () => {
+    expect([bandMin('Amiable'), bandMin('Kindly'), bandMin('Dubious'), bandMin(''), bandMin('Friendly?')]).toEqual([100, 500, -500, undefined, undefined])
+    // No better than Dubious: just under Apprehensive.
+    expect([bandMax('Dubious'), bandMax('Ally'), bandMax('')]).toEqual([-101, undefined, undefined])
+    expect(questKey('Rat Ear Pie Quest')).toBe(questKey('rat ear pie'))
+    expect(questKey('Tunare Scouts Dagger')).toBe('tunarescoutsdagger')
+  })
+
+  // Two factions' pages, made up in Allakhazam's shape.
+  const scouts: AllaFaction = {
+    id: 66,
+    name: "Tunare's Scouts",
+    needs: [
+      { quest: 'Pixie Dust', min: 'Amiable', max: '' },
+      { quest: 'Tunarean Scout Tunic', min: 'Dubious', max: '' }
+    ],
+    mobs: [
+      { name: 'a mature arborean', zone: 'Greater Faydark', amount: 1 },
+      { name: 'an arborean sapling', zone: 'Greater Faydark', amount: 1 },
+      { name: 'Expin', zone: 'Greater Faydark', amount: -800 }
+    ],
+    quests: [
+      { name: 'Pixie Dust', amount: 15 },
+      { name: 'Kelethin Scouts - #1 - Cape', amount: 10 },
+      { name: 'Kelethin Scouts - #1 - Cape', amount: 20 }
+    ]
+  }
+  const arboreans: AllaFaction = {
+    id: 400,
+    name: 'Arboreans of the Faydark',
+    needs: [],
+    mobs: [{ name: 'a mature arborean', zone: 'Greater Faydark', amount: -5 }],
+    quests: []
+  }
+  const pixie = {
+    page: 'Pixie Dust',
+    givers: ['Tylfon'],
+    zones: ['Kelethin'],
+    level: 1,
+    steps: [{ hits: { "Tunare's Scouts": 1 }, guessed: ["Tunare's Scouts"], handIn: [{ item: 'Pixie Dust', count: 1 }], npc: 'Tylfon', line: '' }]
+  }
+  const input = (over: Partial<CatalogInput> = {}) =>
+    catalogInput({
+      factions: ["Tunare's Scouts", 'Arboreans of the Faydark'],
+      targets: ["Tunare's Scouts"],
+      pages: [
+        {
+          page: "Tunare's Scouts",
+          raise: { mobs: [{ name: 'an arborean sapling', zone: 'Greater Faydark', note: '' }], quests: ['Pixie Dust'], zones: [] },
+          lower: { mobs: [], quests: [], zones: [] }
+        }
+      ],
+      quests: { 'Pixie Dust': pixie },
+      items: { 'pixie dust': item({ vendors: [{ zone: 'Kelethin', npc: 'Merchant', note: '' }] }) },
+      alla: [scouts, arboreans],
+      ...over
+    })
+
+  it("puts each mob's kill together from every page naming it, with the pages' amounts", () => {
+    const camps = buildCatalog(input()).activities.filter((a) => a.kind === 'kill')
+    // The sapling is eqlwiki's too, with no amount: Allakhazam's camp has it, with one.
+    expect(camps).toHaveLength(1)
+    expect(camps[0]).toMatchObject({ zone: 'Greater Faydark', site: 'Allakhazam', mobs: ['a mature arborean', 'an arborean sapling'], common: 2 })
+    // The mature arborean lowers the Arboreans by 5 and the sapling not at all: -2.5 a kill.
+    expect(camps[0].hits).toEqual({ "Tunare's Scouts": 1, 'Arboreans of the Faydark': -2.5 })
+    expect(camps[0].guessed).toBeUndefined()
+  })
+
+  it('holds a quest back until the con Allakhazam says its NPC wants, and takes its amount where the walkthrough gives none', () => {
+    const low = buildCatalog(input({ cons: { "Tunare's Scouts": -200 } })).activities.find((a) => a.kind === 'quest')!
+    expect(low).toMatchObject({ hits: { "Tunare's Scouts": 15 }, needs: 'Amiable', blocked: "needs Amiable with Tunare's Scouts; you con Dubious (-200), 300 short" })
+    expect(low.guessed).toBeUndefined()
+    expect(buildCatalog(input({ cons: { "Tunare's Scouts": 150 } })).activities.find((a) => a.kind === 'quest')!.blocked).toBeUndefined()
+    // Without a con to go by (no race on the record), nothing is held back.
+    expect(buildCatalog(input()).activities.find((a) => a.kind === 'quest')!.blocked).toBeUndefined()
+  })
+})
+
 describe('the catalog', () => {
   it('takes hand-ins the log saw three times or more as repeatable, and fewer as done', () => {
     const sources = joinSources([
@@ -335,6 +559,114 @@ describe('the catalog', () => {
     ])
     expect(steps[0].items).toEqual([{ name: 'Kobold Hide', count: 4, how: 'drop', where: 'Toxxulia Forest' }])
     expect(itemsToLookUp(input)).toEqual(['Kobold Hide', 'Mystery'])
+  })
+
+  it('takes what play has shown over the wikis: a quest that does not repeat, an item only one mob drops', () => {
+    const input = catalogInput({
+      factions: ['Arcane Scientists', 'New Sebilisian Expedition'],
+      targets: ['Arcane Scientists', 'New Sebilisian Expedition'],
+      pages: [
+        { page: 'Arcane Scientists', raise: { mobs: [], quests: ['Illegible Cantrip Quest'], zones: [] }, lower: { mobs: [], quests: [], zones: [] } },
+        { page: 'New Sebilisian Expedition', raise: { mobs: [], quests: ['Supplies for the New Sebilisian Expedition'], zones: [] }, lower: { mobs: [], quests: [], zones: [] } }
+      ],
+      quests: {
+        'Illegible Cantrip Quest': {
+          page: 'Illegible Cantrip Quest',
+          givers: ['Tara Neklene'],
+          zones: ['West Freeport'],
+          level: 5,
+          steps: [{ hits: { 'Arcane Scientists': 10 }, guessed: [], handIn: [{ item: 'Illegible Cantrip', count: 1, from: 'orc apprentice' }], npc: 'Tara', line: '' }]
+        },
+        'Supplies for the New Sebilisian Expedition': parseQuestPage('Supplies for the New Sebilisian Expedition', SUPPLIES)!
+      }
+    })
+    const steps = buildCatalog(input).activities
+    expect(steps.find((a) => a.title === 'Illegible Cantrip Quest')?.once).toBe('cannot be done over and over')
+    const ore = steps.find((a) => a.items?.[0]?.name === 'Small Piece of High Quality Ore')
+    expect(ore?.items?.[0]).toMatchObject({ how: 'drop', where: 'the Goblin Janitor (Runnyeye)', named: 1 })
+    expect(ore?.once).toBeUndefined()
+    // Bought is bought, whatever the walkthrough says drops it.
+    const bought = buildCatalog({ ...input, bought: { 'small piece of high quality ore': { merchant: 'Klok Lagnoz', each: 169 } } }).activities
+    expect(bought.find((a) => a.items?.[0]?.name === 'Small Piece of High Quality Ore')?.items?.[0]).toMatchObject({ how: 'bought', where: 'Klok Lagnoz' })
+  })
+
+  it("holds back a quest until the character cons high enough for its NPC, with Allakhazam's amount and camp", () => {
+    const dagger = {
+      page: 'Tunare Scouts Dagger',
+      givers: ['Tylfon'],
+      zones: ['Kelethin'],
+      level: 1,
+      steps: [{ hits: { "Tunare's Scouts": 1 }, guessed: ["Tunare's Scouts"], handIn: [{ item: 'Rusty Dagger', count: 2 }], npc: 'Tylfon', line: '' }]
+    }
+    const input = (con: number) =>
+      catalogInput({
+        factions: ["Tunare's Scouts", 'Emerald Warriors'],
+        targets: ["Tunare's Scouts"],
+        pages: [{ page: "Tunare's Scouts", raise: { mobs: [], quests: ['Tunare Scouts Dagger'], zones: [] }, lower: { mobs: [], quests: [], zones: [] } }],
+        quests: { 'Tunare Scouts Dagger': dagger },
+        items: { 'rusty dagger': item({ vendors: [{ zone: 'Greater Faydark', npc: 'Merchant', note: '' }] }) },
+        cons: { "Tunare's Scouts": con }
+      })
+    // An Iksar at 0: Threatening, and a faked Indifferent is not enough for Amiable.
+    const [camp, quest] = buildCatalog(input(-750)).activities
+    expect(quest).toMatchObject({ title: 'Tunare Scouts Dagger', hits: { "Tunare's Scouts": 1 }, needs: 'Amiable' })
+    expect(quest.guessed).toBeUndefined()
+    expect(quest.blocked).toBe("needs Amiable with Tunare's Scouts; you con Threatening (-750), 850 short")
+    expect(plannable(quest, NO_CHOICES)).toBe(false)
+    expect(plannable(quest, { ...NO_CHOICES, locks: { "Tunare's Scouts": quest.id } })).toBe(true)
+    // The arboreans of Greater Faydark, which eqlwiki does not list, raise it meanwhile.
+    expect(camp).toMatchObject({ kind: 'kill', zone: 'Greater Faydark', site: 'Allakhazam', hits: { "Tunare's Scouts": 1, 'Emerald Warriors': 1 } })
+    expect(plannable(camp, NO_CHOICES)).toBe(true)
+    // At Amiable the NPC takes it.
+    expect(buildCatalog(input(100)).activities[1].blocked).toBeUndefined()
+  })
+
+  it('makes what the NPC gives back, handed back for as much again, one unit with the hand-in before it', () => {
+    const rephas = parseQuestPage('Rat Ear Pie Quest', RAT_EAR_PIE)!
+    expect(rephas.steps[0].gives).toEqual(['Grilled Rat Ears'])
+    const input = catalogInput({
+      factions: ['Arcane Scientists', 'Freeport Militia'],
+      targets: ['Arcane Scientists'],
+      pages: [{ page: 'Arcane Scientists', raise: { mobs: [], quests: ['Rat Ear Pie Quest'], zones: [] }, lower: { mobs: [], quests: [], zones: [] } }],
+      quests: { 'Rat Ear Pie Quest': rephas }
+    })
+    const [pie, ...rest] = buildCatalog(input).activities
+    expect(rest).toEqual([])
+    expect(pie).toMatchObject({ npc: 'Rephas', hits: { 'Arcane Scientists': 10, 'Freeport Militia': -2 }, handIns: 2, back: 'Grilled Rat Ears' })
+    expect(pie.once).toBeUndefined()
+    // Rat Ears as found in play: about four minutes each from rats; two hand-ins a unit.
+    expect(pie.items).toEqual([{ name: 'Rat Ears', count: 1, how: 'drop', where: 'rats, such as in Misty Thicket', sec: 240 }])
+    expect(unitTime(pie, DEFAULT_SETTINGS).seconds).toBe(240 + 2 * DEFAULT_SETTINGS.handInSec)
+
+    // Done in the log: the hand-ins of both are that one unit too, at the log's amounts.
+    const log = joinSources([
+      handIns('Rephas', 'Qeynos Hills', 3, [['Arcane Scientists', 5]], 'Rat Ears'),
+      handIns('Rephas', 'Qeynos Hills', 3, [['Arcane Scientists', 5]], 'Grilled Rat Ears')
+    ])
+    const logged = buildCatalog({ ...input, sources: log }).activities
+    expect(logged.map((a) => [a.source, a.items?.[0]?.name, a.hits['Arcane Scientists'], a.handIns, a.back])).toEqual([['log', 'Rat Ears', 10, 2, 'Grilled Rat Ears']])
+  })
+
+  it("keeps a quest's hand-in of other things than the log saw go to that NPC, and one written on two pages once", () => {
+    const supplied = parseQuestPage('Supplies for the New Sebilisian Expedition', SUPPLIES)!
+    const input = catalogInput({
+      factions: ['New Sebilisian Expedition'],
+      targets: ['New Sebilisian Expedition'],
+      sources: handIns('Crusader Iktra', 'The Northern Desert of Ro', 3, [['New Sebilisian Expedition', 15]], 'Small Brick of High Quality Ore'),
+      pages: [
+        {
+          page: 'New Sebilisian Expedition',
+          raise: { mobs: [], quests: ['Supplies for the New Sebilisian Expedition', 'Metal Bits for the New Sebilisian Expedition'], zones: [] },
+          lower: { mobs: [], quests: [], zones: [] }
+        }
+      ],
+      quests: {
+        'Supplies for the New Sebilisian Expedition': supplied,
+        'Metal Bits for the New Sebilisian Expedition': { ...supplied, page: 'Metal Bits for the New Sebilisian Expedition', steps: [supplied.steps[0]] }
+      }
+    })
+    const ways = buildCatalog(input).activities.map((a) => `${a.source} ${a.items?.map((it) => `${it.count} ${it.name}`).join(' + ')}`)
+    expect(ways).toEqual(['log 1 Small Brick of High Quality Ore', 'wiki 4 Metal Bits', 'wiki 1 Small Piece of High Quality Ore'])
   })
 
   it('says how an item is come by: coin, bought before, a merchant, crafted, a drop from common or named mobs', () => {
@@ -664,19 +996,6 @@ describe('the two goals', () => {
     expect(plan.belowZero).toEqual({ now: 2, after: 1 })
     // Nothing is worth any time: no restores.
     expect(planFactions(input, { ...POSITIVE, positiveHours: 0 }).steps.map((s) => s.activity.id)).toEqual(['a'])
-  })
-})
-
-describe('the city camps switch', () => {
-  it('leaves city camps out when asked, unless one is locked in', () => {
-    const input: PlanInput = {
-      targets: [{ faction: 'A', achievement: 'A', standing: 1900 }],
-      maxed: [],
-      activities: [act('guards', { A: 10 }, 600, { city: true }), act('rats', { A: 10 }, 60)]
-    }
-    expect(planFactions(input, S).steps.map((s) => s.activity.id)).toEqual(['guards'])
-    expect(planFactions(input, { ...S, avoidCity: true }).steps.map((s) => s.activity.id)).toEqual(['rats'])
-    expect(planFactions(input, { ...S, avoidCity: true }, { ...NO_CHOICES, locks: { A: 'guards' } }).steps.map((s) => s.activity.id)).toEqual(['guards'])
   })
 })
 

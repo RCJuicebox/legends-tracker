@@ -5,7 +5,7 @@ import { useAchievementTrack, useInvoke, useLatest } from '../../renderer/src/ho
 import { useApp } from '../../renderer/src/state'
 import { useRemembered } from '../../renderer/src/remember'
 import { useNow } from '../../renderer/src/components/TimerBars'
-import { GameCommand, Info, NumberInput, Pending, Segmented, Switch, ToggleChip } from '../../renderer/src/components/ui'
+import { GameCommand, Info, NumberInput, Pending, Segmented, Switch } from '../../renderer/src/components/ui'
 import { who, wikiUrl } from '../../core/format'
 import { fmtCoin } from '../../core/loot'
 import { STANDING_MAX, type FactionView } from './core'
@@ -87,20 +87,25 @@ function itemSource(it: HandInItem): string {
     case 'crafted':
       return 'crafted'
     case 'drop':
-      return it.named ? `from${where || ' a named mob'} (named: one a respawn)` : `drops${it.where ? ` from ${it.where}` : ''}`
+      return it.named ? `from${where || ' a named mob'} (named: one a respawn)` : `drops${it.where ? ` from ${it.where}` : ''}${it.sec ? `, about ${span(it.sec)} each` : ''}`
     default:
       return 'the wiki does not say where it comes from'
   }
 }
 
-function ItemsLine({ items, units }: { items: HandInItem[]; units?: number }) {
+/**
+ * What a step's hand-ins take: all of it for `units` of them, with each one's share when it is more
+ * than one, and what the NPC gives back to be handed back (`back`).
+ */
+function ItemsLine({ items, units, back }: { items: HandInItem[]; units?: number; back?: string }) {
   if (!items.length) return <span className="faint">The walkthrough does not say what goes in.</span>
   return (
     <>
       {items.map((it, i) => (
         <Fragment key={it.name + i}>
           {i > 0 && ', '}
-          <span className="mono">{it.count}</span> {it.name}
+          <span className="mono">{(units ? units * it.count : it.count).toLocaleString()}</span> {it.name}
+          {!!units && it.count > 1 && <span className="faint"> ({it.count} a hand-in)</span>}
           {it.makes && <span className="faint"> (combined into {it.makes})</span>}
           <span className="faint"> — {itemSource(it)}</span>
           {!!it.have && (
@@ -112,6 +117,7 @@ function ItemsLine({ items, units }: { items: HandInItem[]; units?: number }) {
           )}
         </Fragment>
       ))}
+      {back && <span className="faint"> · then hand back the {back} you get for each, for as much again</span>}
     </>
   )
 }
@@ -154,7 +160,8 @@ export function sourceNote(a: PlanActivity): string {
     if (a.others?.length) return `from your log and ${theirLogs(a.others)} (${n})`
     return `from your log (${n})`
   }
-  return a.guessed?.length ? 'from eqlwiki, amounts guessed' : 'from eqlwiki'
+  const site = a.site ?? 'eqlwiki'
+  return a.guessed?.length ? `from ${site}, amounts guessed` : `from ${site}`
 }
 
 /** What could make a step slower or rougher than planned: said on the step and on each way to raise an achievement. */
@@ -164,8 +171,9 @@ export function Flags({ a }: { a: PlanActivity }) {
     flags.push({
       tone: 'warn',
       label: 'city NPCs',
-      why: "A city's people: its guards may join in, and the city's own factions drop. Rule it out, or switch on No city NPC kills at the top."
+      why: "A city's people: its guards may join in, and the city's own factions drop."
     })
+  if (a.blocked) flags.push({ tone: 'warn', label: `needs ${a.needs ?? 'better faction'}`, why: `Not planned until you are there, unless you lock it in: it ${a.blocked}.` })
   if (a.source === 'wiki' && a.guessed?.length)
     flags.push({ tone: '', label: 'amounts guessed', why: 'eqlwiki names the factions but not the amounts: a typical amount stands in until your log measures it.' })
   if (a.items?.some((it) => it.how === 'unknown'))
@@ -313,7 +321,6 @@ export function PlanTab({ character, view }: { character: string; view: FactionV
   }
   const chose = Object.keys(choices.locks).length + choices.excluded.length + Object.keys(choices.perHour).length
   const byId = new Map(data.catalog.activities.map((a) => [a.id, a]))
-  const cityCamps = data.catalog.activities.filter((a) => a.city).length
   const stepOf = new Map<string, number>()
   plan?.steps.forEach((st, i) => st.finishes.forEach((f) => stepOf.set(f, i + 1)))
 
@@ -334,6 +341,11 @@ export function PlanTab({ character, view }: { character: string; view: FactionV
       {data.wiki.error && (
         <div className="notice bad mb-16">
           Could not read eqlwiki again ({data.wiki.error}); the pages read {ago(data.wiki.fetchedAt, now)} serve meanwhile.
+        </div>
+      )}
+      {data.alla.error && (
+        <div className="notice bad mb-16">
+          Could not read Allakhazam ({data.alla.error}); it is tried again in ten minutes, and the plan goes on without the pages not yet read.
         </div>
       )}
 
@@ -363,15 +375,6 @@ export function PlanTab({ character, view }: { character: string; view: FactionV
               : 'Every achievement in the least time'}
           </span>
           <span className="spacer" />
-          {cityCamps > 0 && (
-            <ToggleChip
-              on={settings.avoidCity}
-              onChange={(on) => setSettings({ ...stored, avoidCity: on || undefined })}
-              title={`Leave out the ${cityCamps} kill camps of a city's people (guards, merchants, guildmasters): the guards may join in, and the city's own factions drop. One you lock in is still used.`}
-            >
-              No city NPC kills
-            </ToggleChip>
-          )}
         </div>
         <div className="fp-stats">
           <div className="stat">
@@ -425,8 +428,11 @@ export function PlanTab({ character, view }: { character: string; view: FactionV
           {data.shared.characters.length > 0 &&
             `, ${theirLogs(data.shared.characters)} ${data.shared.characters.length === 1 ? 'log' : 'logs'} (${data.shared.handIns.toLocaleString()} hand-ins and ${data.shared.kills.toLocaleString()} kills: what a kill or hand-in gives is the same for every character; kill pace stays this one's)`}
           {data.export ? `, ${data.export.file} (written ${ago(data.export.modified, now)})` : ''}
-          {data.inventory ? `, what you hold at ${data.inventory.file} (written ${ago(data.inventory.modified, now)})` : ''} and eqlwiki ({data.wiki.pages} faction pages,{' '}
-          {data.wiki.quests} quests, read {ago(data.wiki.fetchedAt, now)}). <Info label="How the plan is made" text={HOW} />
+          {data.inventory ? `, what you hold at ${data.inventory.file} (written ${ago(data.inventory.modified, now)})` : ''}, eqlwiki ({data.wiki.pages} faction pages,{' '}
+          {data.wiki.quests} quests, read {ago(data.wiki.fetchedAt, now)})
+          {data.alla.wanted > 0 &&
+            ` and Allakhazam (${data.alla.read} of ${data.alla.wanted} faction pages${data.alla.read < data.alla.wanted ? ', the rest coming a page every twenty seconds as the site asks' : ''})`}
+          . <Info label="How the plan is made" text={HOW} />
         </p>
         <Assumptions settings={settings} stored={stored} logPace={logPace} onChange={setSettings} />
       </div>
@@ -501,15 +507,7 @@ export function PlanTab({ character, view }: { character: string; view: FactionV
                     {isOpen && !done && plan && (
                       <tr>
                         <td colSpan={4} style={{ background: 'var(--bg-2)' }}>
-                          <Options
-                            faction={t.faction}
-                            options={plan.options[t.faction] ?? []}
-                            choices={choices}
-                            avoidCity={settings.avoidCity}
-                            onLock={lock}
-                            onExclude={exclude}
-                            onPace={pace}
-                          />
+                          <Options faction={t.faction} options={plan.options[t.faction] ?? []} choices={choices} onLock={lock} onExclude={exclude} onPace={pace} />
                         </td>
                       </tr>
                     )}
@@ -568,9 +566,9 @@ function Assumptions({
     else next[k] = v
     onChange(next)
   }
-  // The goal and the city switch are set at the top of the tab, not here.
-  const kept = (s: Partial<PlanSettings>): Partial<PlanSettings> => ({ ...(s.goal ? { goal: s.goal } : {}), ...(s.avoidCity ? { avoidCity: true } : {}) })
-  const changed = Object.keys(stored).some((k) => k !== 'goal' && k !== 'avoidCity')
+  // The goal is set at the top of the tab, not here.
+  const kept = (s: Partial<PlanSettings>): Partial<PlanSettings> => (s.goal ? { goal: s.goal } : {})
+  const changed = Object.keys(stored).some((k) => k !== 'goal')
   return (
     <details className="fp-assume">
       <summary>Assumptions</summary>
@@ -722,7 +720,7 @@ function Steps({
                 </div>
                 {a.items && a.items.length > 0 && (
                   <div className="small">
-                    <ItemsLine items={a.items} units={st.units} />
+                    <ItemsLine items={a.items} units={st.units} back={a.back} />
                     {st.copper > 0 && <span className="faint"> · about {fmtCoin(Math.round(st.copper))} to buy</span>}
                   </div>
                 )}
@@ -759,8 +757,7 @@ function Options({
   choices,
   onLock,
   onExclude,
-  onPace,
-  avoidCity
+  onPace
 }: {
   faction: string
   options: PlanOption[]
@@ -768,7 +765,6 @@ function Options({
   onLock: (factions: string[], id: string | null) => void
   onExclude: (id: string, out: boolean) => void
   onPace: (id: string, perHour: number | undefined) => void
-  avoidCity: boolean
 }) {
   const [all, setAll] = useState(false)
   if (!options.length)
@@ -787,7 +783,7 @@ function Options({
         const a = o.activity
         const locked = choices.locks[faction] === a.id
         const out = choices.excluded.includes(a.id)
-        const usable = plannable(a, choices, { avoidCity })
+        const usable = plannable(a, choices)
         const h = a.hits[faction]
         return (
           <div key={a.id} className={`fp-opt${locked ? ' locked' : ''}${usable ? '' : ' unusable'}`}>
@@ -803,11 +799,6 @@ function Options({
                 </span>
               )}
               <Flags a={a} />
-              {a.city && avoidCity && !locked && (
-                <span className="chip" title="Left out while No city NPC kills is on; lock it in to use it anyway">
-                  left out
-                </span>
-              )}
               <span className="spacer" />
               <span
                 className="mono small"
@@ -822,7 +813,7 @@ function Options({
             </div>
             {a.items && a.items.length > 0 && (
               <div className="small">
-                <ItemsLine items={a.items} units={o.units} />
+                <ItemsLine items={a.items} units={o.units} back={a.back} />
               </div>
             )}
             {a.line && a.kind === 'quest' && <div className="faint small">“{a.line}”</div>}
@@ -831,6 +822,7 @@ function Options({
                 {sourceNote(a)}; {o.rateFrom === 'yours' ? 'your pace' : o.rateFrom === 'log' ? 'the pace from your log' : 'an estimated pace'}, {span(o.unitSeconds)} a{' '}
                 {a.kind === 'kill' ? 'kill' : 'hand-in'}
                 {a.once ? `; once only? ${a.once}` : ''}
+                {a.blocked ? `; ${a.blocked}` : ''}
                 {a.note ? `; ${a.note}` : ''}
               </span>
               {o.lowersOpen.length > 0 && <span className="warn-text small">lowers {o.lowersOpen.join(', ')}</span>}

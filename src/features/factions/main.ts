@@ -2,7 +2,13 @@ import { promises as fs } from 'node:fs'
 import { join } from 'node:path'
 import {
   addFactionLine,
+  CLASS_KEYS,
+  EXPORT_LINE_MS,
+  exportClass,
   FACTIONS_FILE,
+  modifierOf,
+  parseFactionModifiers,
+  RACE_KEYS,
   factionView,
   joinFactions,
   parseFactionAchievements,
@@ -10,13 +16,16 @@ import {
   parseFactionPageFull,
   parseFactionsExport,
   progressionStatus,
+  SinceExports,
+  type ExportMark,
   type FactionAchievement,
   type FactionAchievements,
   type FactionExport,
   type FactionPageData,
   type FactionSources,
   type FactionTallies,
-  type FactionView
+  type FactionView,
+  type SinceView
 } from './core'
 import { emptySources, joinSources, shareSources, sourceReader, type FactionSourceTallies } from './attribution'
 import { parseQuestPage, type QuestPage } from './questPages'
@@ -33,7 +42,7 @@ import { sources } from '../../main/sources/registry'
 import { wiki } from '../../main/sources/wiki'
 import { cacheDir } from '../../main/paths'
 import { log } from '../../main/log'
-import type { HistoryConsumer, HistoryWhere, LogHistory } from '../../main/sources/logHistory'
+import { offsetBefore, readForward, type HistoryConsumer, type HistoryWhere, type LogHistory } from '../../main/sources/logHistory'
 import type { AppContext } from '../../main/context'
 
 // A character's faction changes, from "Your faction standing with X has been adjusted by N." and
@@ -54,7 +63,21 @@ export const factionConsumer: HistoryConsumer<FactionTallies> = {
   reader: () => (line, into) => addFactionLine(into, line)
 }
 
+/** A live log read after the exports, and how far. */
+interface SinceRead {
+  /** The exports it was read after. */
+  key: string
+  readTo: number
+  /** Whether the log reaches back past the factions export; else an archive holds some of the changes since. */
+  whole: boolean
+  tally: SinceExports
+}
+
 export class FactionHistory {
+  /** Per live log: what it saw after the exports, read on from where it ended the time before. */
+  private readonly since = new Map<string, SinceRead>()
+  private readonly reading = new Map<string, Promise<unknown>>()
+
   constructor(
     private readonly history: LogHistory,
     private readonly key: string
@@ -63,9 +86,52 @@ export class FactionHistory {
   /** Every faction the log saw change, over the live log and every archive of it, with the export's standings. */
   async view(where: HistoryWhere, exported: FactionExport | null = null, achievements: FactionAchievements | null = null): Promise<FactionView> {
     const slice = await this.history.get<FactionTallies>(this.key, where)
+    const since = await this.sinceExports(where.logPath, exported, achievements?.exported ?? null).catch((e) => {
+      log.warn('Could not read the log since the exports:', e)
+      return null
+    })
     // Archives oldest first, then the live log.
-    return factionView(joinFactions([...slice.archives.map((a) => a.value), slice.live]), exported, achievements)
+    return factionView(joinFactions([...slice.archives.map((a) => a.value), slice.live]), exported, achievements, since)
   }
+
+  /** What the live log saw after the exports; one read at a time per log, since two at once would count its lines twice. */
+  private sinceExports(logPath: string, factions: ExportMark | null, achievements: ExportMark | null): Promise<SinceView | null> {
+    if (!factions && !achievements) return Promise.resolve(null)
+    const run = (this.reading.get(logPath) ?? Promise.resolve()).then(() => this.readSince(logPath, factions, achievements))
+    this.reading.set(
+      logPath,
+      run.catch(() => undefined)
+    )
+    return run
+  }
+
+  private async readSince(logPath: string, factions: ExportMark | null, achievements: ExportMark | null): Promise<SinceView | null> {
+    const size = (await fs.stat(logPath).catch(() => null))?.size ?? 0
+    if (!size) return null
+    const key = [factions, achievements].map((m) => (m ? `${m.file}@${m.modified}` : '')).join('|')
+    let s = this.since.get(logPath)
+    // New exports, or a log started afresh: read again from the line before the earlier export.
+    if (!s || s.key !== key || size < s.readTo) {
+      const readTo = await offsetBefore(logPath, Math.min(factions?.modified ?? Infinity, achievements?.modified ?? Infinity), { slackMs: EXPORT_LINE_MS })
+      const whole = !factions || readTo > 0 || (await firstStamp(logPath, size)) < factions.modified - EXPORT_LINE_MS
+      s = { key, readTo, whole, tally: new SinceExports(factions, achievements) }
+      this.since.set(logPath, s)
+    }
+    if (size > s.readTo) {
+      const tally = s.tally
+      s.readTo += await readForward(logPath, s.readTo, size, (line) => tally.add(line), { flushLast: false })
+    }
+    return { changes: s.whole ? s.tally.factionChanges : null, completed: s.tally.completed }
+  }
+}
+
+/** When a log's first line was written; Infinity for a log without one near its start. */
+async function firstStamp(logPath: string, size: number): Promise<number> {
+  let first = Infinity
+  await readForward(logPath, 0, Math.min(size, 64 << 10), (line) => {
+    if (first === Infinity) first = line.time
+  })
+  return first
 }
 
 /** What caused each faction change, kill or hand-in, as a LogHistory consumer. */
@@ -114,6 +180,37 @@ export async function readFactionExport(dir: string, character: string): Promise
   return { ...newest, standings: parseFactionsExport(text) }
 }
 
+/** The client's faction modifiers, read again only when the file changes. */
+let clientMods: { path: string; mtime: number; mods: Map<number, Map<number, number>> } | null = null
+
+async function factionModifiers(dir: string): Promise<Map<number, Map<number, number>>> {
+  const path = join(dir, 'Resources', 'Faction', 'FactionAssociations.txt')
+  try {
+    const st = await fs.stat(path)
+    if (clientMods?.path !== path || clientMods.mtime !== st.mtimeMs) clientMods = { path, mtime: st.mtimeMs, mods: parseFactionModifiers(await fs.readFile(path, 'utf8')) }
+    return clientMods.mods
+  } catch (e) {
+    if ((e as NodeJS.ErrnoException).code !== 'ENOENT') log.warn(`Could not read ${path}:`, e)
+    return new Map()
+  }
+}
+
+/**
+ * What each faction cons at for a character, by name: its standing with its race's and its class's
+ * modifiers (the class the factions export is named for); the deity's is not known. Empty without a
+ * race on the character's record, since then the con would be anyone's guess.
+ */
+async function consFor(ctx: AppContext, dir: string, character: string, exported: FactionExport | null, view: FactionView): Promise<Record<string, number>> {
+  const race = RACE_KEYS[(ctx.store.characterByKey(character).race ?? '').trim().toLowerCase()]
+  if (!race) return {}
+  const cls = CLASS_KEYS[exported ? exportClass(exported.file) : '']
+  const keys = cls ? [race, cls] : [race]
+  const mods = await factionModifiers(dir)
+  const cons: Record<string, number> = {}
+  for (const r of view.factions) if (r.standing) cons[r.name] = r.standing.value + modifierOf(mods, r.standing.id, keys)
+  return cons
+}
+
 /** The client's faction achievements, read again only when the file changes. */
 let clientAch: { path: string; mtime: number; list: FactionAchievement[] } | null = null
 
@@ -133,14 +230,18 @@ async function factionAchievementList(dir: string): Promise<FactionAchievement[]
 async function factionAchievements(dir: string, character: string): Promise<FactionAchievements | null> {
   const list = await factionAchievementList(dir)
   if (!list.length) return null
+  const file = `${character}-Achievements.txt`
   let sections = null
+  let exported: ExportMark | null = null
   try {
-    sections = parseAchievements(await fs.readFile(join(dir, `${character}-Achievements.txt`), 'utf8')).sections
+    const modified = (await fs.stat(join(dir, file))).mtimeMs
+    sections = parseAchievements(await fs.readFile(join(dir, file), 'utf8')).sections
+    exported = { file, modified }
   } catch (e) {
     // None yet is the usual case: then the standing says which are done.
     if ((e as NodeJS.ErrnoException).code !== 'ENOENT') log.warn(`Could not read ${character}'s achievements export:`, e)
   }
-  return { list, status: progressionStatus(sections) }
+  return { list, status: progressionStatus(sections), exported }
 }
 
 const FRESH_MS = 7 * 24 * 3600_000
@@ -220,7 +321,7 @@ interface FactionBookFile {
 }
 
 /** Bumped when what the book keeps of a page changes, so an older one is read again. */
-const BOOK_VERSION = 1
+const BOOK_VERSION = 2
 
 /**
  * Every eqlwiki faction page, and every quest page one names as raising a faction, read into what
@@ -347,7 +448,9 @@ async function planData(ctx: AppContext, character: string, refresh: boolean, wi
   }
   // What the wiki says of the items hand-ins want: a merchant, a drop, a recipe. Kept a week, like the Gear page's.
   const items = await ctx.inventoryFiles.lookup(itemsToLookUp(input))
-  const catalog = buildCatalog({ ...input, items })
+  // Allakhazam's pages, as far as they are read: the achievements' factions first, then the character's others.
+  const alla = await ctx.factionAlla.factions([...new Set([...targets.map((t) => t.faction), ...view.factions.map((r) => r.name)])])
+  const catalog = buildCatalog({ ...input, items, alla, cons: await consFor(ctx, dir, character, exported, view) })
   const acts = Object.values(tallies.acts)
   const theirs = others.flatMap((o) => Object.values(o.tallies.acts))
   return {
@@ -368,7 +471,8 @@ async function planData(ctx: AppContext, character: string, refresh: boolean, wi
       characters: others.filter((o) => Object.keys(o.tallies.acts).length).map((o) => o.character),
       kills: theirs.filter((t) => t.kind === 'kill').reduce((n, t) => n + t.n, 0),
       handIns: theirs.filter((t) => t.kind === 'turnin').reduce((n, t) => n + t.n, 0)
-    }
+    },
+    alla: ctx.factionAlla.status()
   }
 }
 

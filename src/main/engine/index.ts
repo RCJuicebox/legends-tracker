@@ -147,14 +147,15 @@ export class Engine {
       live: () => !this.simulating && this.status.watching,
       send: (view) => out.buffs(view),
       self: () => this.status.character,
-      // Your own /who: the zone when the watch does not know it yet, and your race for the record.
+      // Your own /who: the zone when the watch does not know it yet, and your race and classes for the
+      // record. Those only from a /who typed now: one read back from the log may be from before a change.
       onSelf: (p) => {
         if (p.zone && !this.status.zone) {
           this.status.zone = p.zone
           this.tracker?.setZone(p.zone)
           this.emitStatus()
         }
-        out.selfSeen?.({ race: p.race })
+        if (!this.combat.backlog.active) out.selfSeen?.({ race: p.race, classes: p.classes, level: p.level })
       }
     })
     this.combat = new CombatFeed(store, out, this.notifier, this.buffs, {

@@ -181,6 +181,69 @@ export function standingBand(value: number): { word: string; tone: StandingTone;
   return { word: band.word, tone: band.tone, next: up ? { word: up.word, points: up.min - value } : null }
 }
 
+// ---------- what a faction cons at ----------
+// NPCs con a faction on the standing with the race, class and deity modifiers added: the client's
+// Resources/Faction/FactionAssociations.txt holds them, one faction^key^modifier a line, the key a
+// class id (1–16), a race id + 50 (51–62, Iksar 178, Vah Shir 180) or a deity (201–216). The tracker
+// knows a character's race and the class the factions export is named for, not its deity.
+
+/** The modifier keys of the playable races, by name as the character record writes it (lower-cased). */
+export const RACE_KEYS: Record<string, number> = {
+  human: 51,
+  barbarian: 52,
+  erudite: 53,
+  'wood elf': 54,
+  'high elf': 55,
+  'dark elf': 56,
+  'half elf': 57,
+  dwarf: 58,
+  troll: 59,
+  ogre: 60,
+  halfling: 61,
+  gnome: 62,
+  iksar: 178,
+  'vah shir': 180
+}
+
+/** Class ids, by the three letters a factions export's name carries (Kelwyn_neriak-MNK-Factions.txt). */
+export const CLASS_KEYS: Record<string, number> = {
+  WAR: 1,
+  CLR: 2,
+  PAL: 3,
+  RNG: 4,
+  SHD: 5,
+  DRU: 6,
+  MNK: 7,
+  BRD: 8,
+  ROG: 9,
+  SHM: 10,
+  NEC: 11,
+  WIZ: 12,
+  MAG: 13,
+  ENC: 14,
+  BST: 15,
+  BER: 16
+}
+
+/** FactionAssociations.txt: each faction's modifiers, by faction id, then key. */
+export function parseFactionModifiers(text: string): Map<number, Map<number, number>> {
+  const out = new Map<number, Map<number, number>>()
+  for (const line of String(text).split(/\r?\n/)) {
+    const [f, k, m] = line.split('^').map((c) => c.trim())
+    if (!INT.test(f ?? '') || !INT.test(k ?? '') || !INT.test(m ?? '')) continue
+    const byKey = out.get(parseInt(f, 10)) ?? new Map<number, number>()
+    byKey.set(parseInt(k, 10), parseInt(m, 10))
+    out.set(parseInt(f, 10), byKey)
+  }
+  return out
+}
+
+/** What the keys a character has (its race's, its class's) add to one faction's con. */
+export const modifierOf = (mods: Map<number, Map<number, number>>, factionId: number, keys: number[]) => keys.reduce((n, k) => n + (mods.get(factionId)?.get(k) ?? 0), 0)
+
+/** The class the factions export is named for (Kelwyn_neriak-MNK-Factions.txt → MNK); '' without one. */
+export const exportClass = (file: string) => /-([A-Z]{3})-Factions\.txt$/i.exec(file)?.[1].toUpperCase() ?? ''
+
 /** A faction's standing now: the export's, plus what the log saw since. */
 export interface FactionStandingNow {
   id: number
@@ -190,7 +253,10 @@ export interface FactionStandingNow {
   atExport: number
   /** The net of the changes the log saw after the export was written. */
   since: number
-  /** False when the log saw more changes since the export than a faction keeps, so `since` is only part of it. */
+  /**
+   * False when `since` may be only part of it: the live log starts after the export, so the changes
+   * since come from the tallies, and they saw more than a faction keeps.
+   */
   sinceAll: boolean
 }
 
@@ -216,8 +282,8 @@ export interface FactionRowAchievement {
   name: string
   /** Done or not; null when neither export says (no achievements export, no standing). */
   done: boolean | null
-  /** Where `done` comes from: the achievements export, or the standing (2000 is done). */
-  from: 'achievements' | 'standing' | null
+  /** Where `done` comes from: the achievements export, the game saying so in the log since, or the standing (2000 is done). */
+  from: 'achievements' | 'log' | 'standing' | null
 }
 
 export interface FactionView {
@@ -277,20 +343,107 @@ export function progressionStatus(sections: AchSection[] | null): Map<string, bo
 export interface FactionAchievements {
   list: FactionAchievement[]
   status: Map<string, boolean> | null
+  /** The achievements export read, when there is one: what the game says was completed after it is done too. */
+  exported?: ExportMark | null
+}
+
+// ---------- since the exports ----------
+// A faction's tally keeps only its last few changes, and one evening at a camp or one stack of
+// hand-ins makes far more, so where a faction stands now is read from the log itself: every change
+// after the factions export. The game writes "Outputfile Complete: <file>" as it writes an export,
+// and that line is where the export ends, a change in the same second on either side of it included;
+// a log without the line counts the lines stamped after the file's time. An achievement the game says
+// was completed after the achievements export is done, though that export still lists it open.
+
+/** How far apart an export's file time and its "Outputfile Complete" line may be. */
+export const EXPORT_LINE_MS = 3000
+
+/** An export: its file name, and when the game wrote it. */
+export interface ExportMark {
+  file: string
+  modified: number
+}
+
+const OUTPUT_DONE = 'Outputfile Complete: '
+const COMPLETED = /^You have completed achievement: (.+?)\.?$/
+
+const isExportLine = (mark: ExportMark | null, file: string, at: number) => !!mark && mark.file.toLowerCase() === file && Math.abs(at - mark.modified) <= EXPORT_LINE_MS
+
+/** What the log saw after the exports, fed its lines in order from a line before the earlier of them. */
+export class SinceExports {
+  // Each counted twice: from the export's line, and by time for a log without that line.
+  private readonly changes = { byLine: new Map<string, number>(), byTime: new Map<string, number>(), line: false }
+  private readonly done = { byLine: new Set<string>(), byTime: new Set<string>(), line: false }
+
+  constructor(
+    readonly factions: ExportMark | null,
+    readonly achievements: ExportMark | null
+  ) {}
+
+  add(line: LogLine): void {
+    const text = line.text
+    if (text.startsWith(OUTPUT_DONE)) {
+      const file = text.slice(OUTPUT_DONE.length).trim().toLowerCase()
+      if (isExportLine(this.factions, file, line.time)) {
+        this.changes.byLine.clear()
+        this.changes.line = true
+      }
+      if (isExportLine(this.achievements, file, line.time)) {
+        this.done.byLine.clear()
+        this.done.line = true
+      }
+      return
+    }
+    if (this.factions && text.startsWith('Your faction standing with ')) {
+      const f = parseFactionLine(text)
+      if (!f || !('amount' in f)) return
+      const k = f.faction.toLowerCase()
+      this.changes.byLine.set(k, (this.changes.byLine.get(k) ?? 0) + f.amount)
+      if (line.time > this.factions.modified) this.changes.byTime.set(k, (this.changes.byTime.get(k) ?? 0) + f.amount)
+      return
+    }
+    const ach = this.achievements
+    const m = ach ? COMPLETED.exec(text) : null
+    if (!ach || !m) return
+    const k = m[1].trim().toLowerCase()
+    this.done.byLine.add(k)
+    if (line.time > ach.modified) this.done.byTime.add(k)
+  }
+
+  /** Each faction's net since the factions export, by lower-cased name. */
+  get factionChanges(): ReadonlyMap<string, number> {
+    return this.changes.line ? this.changes.byLine : this.changes.byTime
+  }
+
+  /** The achievements the game said were completed since the achievements export, by lower-cased name. */
+  get completed(): ReadonlySet<string> {
+    return this.done.line ? this.done.byLine : this.done.byTime
+  }
+}
+
+/** What the log saw after the exports (SinceExports). `changes` is null when the log does not reach back to the factions export. */
+export interface SinceView {
+  changes: ReadonlyMap<string, number> | null
+  completed: ReadonlySet<string>
 }
 
 const blankRow = (name: string): FactionRow => ({ name, net: 0, changes: 0, first: 0, last: 0, cap: null, recent: [], standing: null, achievement: null })
 
-/** A standing brought up to date with the log's changes after the export was written. */
-function standingNow(s: FactionStanding, t: FactionTally | undefined, since: number): FactionStandingNow {
-  const sum = t ? t.recent.filter((c) => c.at > since).reduce((n, c) => n + c.amount, 0) : 0
+/** A standing brought up to date with the log's changes after the export was written: every one when read from the log itself (`read`). */
+function standingNow(s: FactionStanding, t: FactionTally | undefined, since: number, read: ReadonlyMap<string, number> | null): FactionStandingNow {
+  const sum = read ? (read.get(s.name.toLowerCase()) ?? 0) : t ? t.recent.filter((c) => c.at > since).reduce((n, c) => n + c.amount, 0) : 0
   // The kept changes hold everything since the export if they are every change, or reach back past it.
-  const sinceAll = !t || t.changes <= t.recent.length || t.recent[0].at <= since
+  const sinceAll = !!read || !t || t.changes <= t.recent.length || t.recent[0].at <= since
   const value = Math.max(STANDING_MIN, Math.min(STANDING_MAX, s.value + sum))
   return { id: s.id, value, atExport: s.value, since: sum, sinceAll }
 }
 
-export function factionView(tallies: FactionTallies, exported: FactionExport | null = null, achievements: FactionAchievements | null = null): FactionView {
+export function factionView(
+  tallies: FactionTallies,
+  exported: FactionExport | null = null,
+  achievements: FactionAchievements | null = null,
+  since: SinceView | null = null
+): FactionView {
   const row = (t: FactionTally): FactionRow => ({
     name: t.name,
     net: t.net,
@@ -307,7 +460,7 @@ export function factionView(tallies: FactionTallies, exported: FactionExport | n
     for (const s of exported.standings) {
       const key = s.name.toLowerCase()
       const t = tallies[key]
-      const standing = standingNow(s, t, exported.modified)
+      const standing = standingNow(s, t, exported.modified, since?.changes ?? null)
       const r = rows.get(key) ?? blankRow(s.name)
       r.standing = standing
       // A cap line since the export says where it is stuck; otherwise the standing does.
@@ -322,11 +475,16 @@ export function factionView(tallies: FactionTallies, exported: FactionExport | n
       let r = byId.get(a.factionId) ?? rows.get(key)
       if (!r) rows.set(key, (r = blankRow(a.faction)))
       const status = achievements.status
-      r.achievement = status
-        ? { id: a.id, name: a.name, done: status.get(a.name.toLowerCase()) ?? true, from: 'achievements' }
-        : r.standing
-          ? { id: a.id, name: a.name, done: r.standing.value >= STANDING_MAX, from: 'standing' }
-          : { id: a.id, name: a.name, done: null, from: null }
+      const exportDone = status ? (status.get(a.name.toLowerCase()) ?? true) : null
+      r.achievement = exportDone
+        ? { id: a.id, name: a.name, done: true, from: 'achievements' }
+        : since?.completed.has(a.name.toLowerCase())
+          ? { id: a.id, name: a.name, done: true, from: 'log' }
+          : status
+            ? { id: a.id, name: a.name, done: false, from: 'achievements' }
+            : r.standing
+              ? { id: a.id, name: a.name, done: r.standing.value >= STANDING_MAX, from: 'standing' }
+              : { id: a.id, name: a.name, done: null, from: null }
     }
   }
   const factions = [...rows.values()].sort((a, b) => b.last - a.last || a.name.localeCompare(b.name))

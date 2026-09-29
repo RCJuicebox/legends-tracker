@@ -12,7 +12,13 @@ import {
   parseFactionPage,
   parseFactionsExport,
   progressionStatus,
+  CLASS_KEYS,
+  exportClass,
+  modifierOf,
+  parseFactionModifiers,
+  RACE_KEYS,
   RECENT_KEPT,
+  SinceExports,
   standingBand,
   type FactionTallies
 } from '../src/features/factions/core'
@@ -218,6 +224,17 @@ describe('FACTIONS_FILE', () => {
   })
 })
 
+describe('what a faction cons at', () => {
+  it("reads the client's modifiers and adds up a character's race and class", () => {
+    const mods = parseFactionModifiers(['316^7^0^', '316^178^-750^', '316^54^100^', 'not a line', '220^178^-500^'].join(String.fromCharCode(13, 10)))
+    expect(modifierOf(mods, 316, [RACE_KEYS.iksar, CLASS_KEYS.MNK])).toBe(-750)
+    expect(modifierOf(mods, 316, [RACE_KEYS['wood elf']])).toBe(100)
+    expect(modifierOf(mods, 999, [RACE_KEYS.iksar])).toBe(0)
+    expect(exportClass('Kelwyn_neriak-MNK-Factions.txt')).toBe('MNK')
+    expect(exportClass('Kelwyn_neriak-Factions.txt')).toBe('')
+  })
+})
+
 describe('standingBand', () => {
   it('cons a standing and says what is left to the next band', () => {
     expect(standingBand(2000)).toEqual({ word: 'Ally', tone: 'ok', next: null })
@@ -259,6 +276,53 @@ describe('factionView with an export', () => {
     const lines = [...Array(11).fill(''), ...Array(RECENT_KEPT + 5).fill(adjusted('Brownies of Faydwer', 1))]
     const s = factionView(tally(lines), exported).factions.find((f) => f.name === 'Brownies of Faydwer')?.standing
     expect(s).toMatchObject({ since: RECENT_KEPT, sinceAll: false })
+  })
+
+  it('adds every change since the export when the log itself was read for them, however many', () => {
+    const lines = [...Array(11).fill(''), ...Array(RECENT_KEPT + 5).fill(adjusted('Brownies of Faydwer', 1))]
+    const since = { changes: new Map([['brownies of faydwer', RECENT_KEPT + 5]]), completed: new Set<string>() }
+    const s = factionView(tally(lines), exported, null, since).factions.find((f) => f.name === 'Brownies of Faydwer')?.standing
+    expect(s).toMatchObject({ value: -6 + RECENT_KEPT + 5, since: RECENT_KEPT + 5, sinceAll: true })
+  })
+})
+
+describe('SinceExports', () => {
+  // The game wrote both exports 0.4 s into the second of their "Outputfile Complete" lines.
+  const factions = { file: 'Tester_neriak-MNK-Factions.txt', modified: T0 + 10_400 }
+  const achievements = { file: 'Tester_neriak-Achievements.txt', modified: T0 + 10_400 }
+  const at = (sec: number, text: string) => ({ time: T0 + sec * 1000, text })
+
+  it("counts every change after the factions export's line, those in its second included, and none before it", () => {
+    const s = new SinceExports(factions, null)
+    const lines = [
+      at(9, adjusted('Brownies of Faydwer', -5)),
+      // In the export's second: before its line, in the export; after it, not.
+      at(10, adjusted('Brownies of Faydwer', -1)),
+      at(10, 'Outputfile Complete: Tester_neriak-MNK-Factions.txt'),
+      at(10, adjusted('Brownies of Faydwer', 2)),
+      ...Array.from({ length: RECENT_KEPT + 5 }, (_, i) => at(11 + i, adjusted('Brownies of Faydwer', 1)))
+    ]
+    for (const l of lines) s.add(l)
+    expect(Object.fromEntries(s.factionChanges)).toEqual({ 'brownies of faydwer': 2 + RECENT_KEPT + 5 })
+  })
+
+  it('goes by the time the export was written in a log without its line', () => {
+    const s = new SinceExports(factions, null)
+    for (const l of [at(10, adjusted('Brownies of Faydwer', -1)), at(11, adjusted('Brownies of Faydwer', 3)), at(12, 'Outputfile Complete: Tester_neriak-Inventory.txt')]) s.add(l)
+    expect(Object.fromEntries(s.factionChanges)).toEqual({ 'brownies of faydwer': 3 })
+  })
+
+  it('takes the achievements the game completed after the achievements export', () => {
+    const s = new SinceExports(null, achievements)
+    for (const l of [
+      at(5, 'You have completed achievement: Antonius Bayle'),
+      at(10, 'Outputfile Complete: Tester_neriak-Achievements.txt'),
+      at(20, 'You have completed achievement: Crimson Hands'),
+      at(21, adjusted('Crimson Hands', 5))
+    ])
+      s.add(l)
+    expect([...s.completed]).toEqual(['crimson hands'])
+    expect(s.factionChanges.size).toBe(0)
   })
 })
 
@@ -316,6 +380,34 @@ describe('FactionHistory over a real log', () => {
     expect((await fh.view(where)).factions).toMatchObject([{ name: 'Gem Choppers', net: 5, changes: 2 }])
   })
 
+  it('counts every change the live log saw after the export, and what the game said was completed since', async () => {
+    const logPath = join(dir, 'eqlog_Tester_neriak.txt')
+    const stamp = (sec: number) => `Sun Sep 27 12:${String(Math.floor(sec / 60)).padStart(2, '0')}:${String(sec % 60).padStart(2, '0')} 2026`
+    // An evening's kills: more changes than a faction keeps, 1415 + 45 × 13 = 2000.
+    await fs.writeFile(
+      logPath,
+      line(stamp(0), adjusted('Crimson Hands', 10)) +
+        line(stamp(10), 'Outputfile Complete: Tester_neriak-Achievements.txt') +
+        line(stamp(10), 'Outputfile Complete: Tester_neriak-MNK-Factions.txt') +
+        Array.from({ length: 45 }, (_, i) => line(stamp(11 + i), adjusted('Crimson Hands', 13))).join('') +
+        line(stamp(57), 'You have completed achievement: Crimson Hands')
+    )
+    const written = new Date(2026, 8, 27, 12, 0, 10).getTime() + 400
+    const exported = { file: 'Tester_neriak-MNK-Factions.txt', modified: written, standings: parseFactionsExport('233\tCrimson Hands\t1415\t585') }
+    const achievements = {
+      list: parseFactionAchievements(CLIENT),
+      status: progressionStatus(parseAchievements('EverQuest: Progression\nI\tCrimson Hands\nI\t\tCrimson Hands\n').sections),
+      exported: { file: 'Tester_neriak-Achievements.txt', modified: written }
+    }
+    const fh = new FactionHistory(new LogHistory(join(dir, 'log-history.json'), { factions: factionConsumer }), 'factions')
+    const where = { logPath, archiveDir: join(dir, 'archive'), stem: 'eqlog_Tester_neriak' }
+    const row = async () => (await fh.view(where, exported, achievements)).factions.find((f) => f.name === 'Crimson Hands')
+
+    expect(await row()).toMatchObject({ standing: { value: 2000, atExport: 1415, since: 585, sinceAll: true }, achievement: { done: true, from: 'log' } })
+    await fs.appendFile(logPath, line(stamp(58), adjusted('Crimson Hands', -20)))
+    expect((await row())?.standing).toMatchObject({ value: 1980, since: 565, sinceAll: true })
+  })
+
   it('is empty for a log with no faction lines', async () => {
     const logPath = join(dir, 'eqlog_Tester_neriak.txt')
     await fs.writeFile(logPath, line('Sun Sep 27 12:00:00 2026', 'You have entered Neriak Commons.'))
@@ -370,6 +462,14 @@ describe('faction achievements on the Factions page', () => {
     expect(by('Antonius Bayle')).toMatchObject({ done: true, from: 'standing' })
     expect(by('Crimson Hands')).toMatchObject({ done: false, from: 'standing' })
     expect(by('Guktan Suppliers')).toMatchObject({ done: null, from: null })
+  })
+
+  it('takes an achievement the game said was completed after the achievements export as done', () => {
+    const since = { changes: null, completed: new Set(['crimson hands']) }
+    const v = factionView({}, exported, { list, status: progressionStatus(parseAchievements(achExport).sections) }, since)
+    const by = (n: string) => v.factions.find((f) => f.name === n)?.achievement
+    expect(by('Crimson Hands')).toMatchObject({ done: true, from: 'log' })
+    expect(by('New Sebilisian Expedition')).toMatchObject({ done: false, from: 'achievements' })
   })
 
   it('matches by name when there is no factions export', () => {

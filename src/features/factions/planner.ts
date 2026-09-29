@@ -1,8 +1,9 @@
 import { itemKey } from '../../core/inventory'
 import type { ItemInfo } from '../../shared/types'
 import { baseZone, usualAmount, type FactionSourceTallies, type SharedFrom, type SourceTally } from './attribution'
-import { NO_MOB, STANDING_MAX, STANDING_MIN, type FactionMob, type FactionPageData, type FactionView } from './core'
+import { NO_MOB, STANDING_MAX, STANDING_MIN, standingBand, type FactionMob, type FactionPageData, type FactionView } from './core'
 import type { QuestHandIn, QuestPage } from './questPages'
+import { allaKills, allaNeeds, allaQuestAmounts, questKey, type AllaFaction, type AllaKill, type Need } from './allakhazam'
 
 // A plan for the faction achievements still to do: what to kill or hand in, how many, and in what
 // order, for the least time. Each achievement is done the moment its raw standing reaches 2000, and
@@ -54,6 +55,8 @@ export interface HandInItem {
   named?: number
   /** What the walkthrough combines these into before handing it in ("Box of Beetle Eyes"). */
   makes?: string
+  /** Seconds to come by one, as found in play, where that is known better than any estimate. */
+  sec?: number
 }
 
 export interface PlanActivity {
@@ -94,6 +97,16 @@ export interface PlanActivity {
   theirs?: boolean
   /** A kill camp of a city's people (guards, merchants, guildmasters): the guards may join in. */
   city?: boolean
+  /** Hand-ins one unit takes: 2 where what the NPC gives back is handed back for as much again. */
+  handIns?: number
+  /** What the NPC gives back, handed back as the second of them ("Grilled Rat Ears"). */
+  back?: string
+  /** Why it cannot be done yet: its NPC takes it only above a con the character is not at. Planned only when locked in. */
+  blocked?: string
+  /** The con it needs, for a flag: "Amiable". */
+  needs?: string
+  /** Where the facts come from when not eqlwiki or the log: "Allakhazam". */
+  site?: string
 }
 
 // ---------- names ----------
@@ -234,6 +247,10 @@ export interface CatalogInput {
   wide?: boolean
   /** What the player's other characters' logs saw, by tally key: `sources` has it added in (shareSources). */
   shared?: SharedFrom
+  /** Allakhazam's faction pages read so far: the cons quests want, kill and quest amounts, mobs eqlwiki lacks. */
+  alla?: AllaFaction[]
+  /** What each faction cons at now, by the game's names: the standing with the race's and class's modifiers. */
+  cons?: Record<string, number>
 }
 
 export interface FactionCatalog {
@@ -259,6 +276,8 @@ export interface FactionPlanData extends PlanFor {
   log: { kills: number; handIns: number; unexplained: number }
   /** The player's other characters whose logs the plan also learns from, and what those saw. */
   shared: { characters: string[]; kills: number; handIns: number }
+  /** Allakhazam's faction pages: how many of the factions wanted are read (they come a page every twenty seconds), and why reading stopped. */
+  alla: { read: number; wanted: number; error: string }
 }
 
 const median = (xs: number[]) => {
@@ -295,6 +314,59 @@ const COIN = /^(?:platinum|gold|silver|copper)(?: pieces?)?$/i
 const clamp = (x: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, x))
 /** "Leatherfoot Raider Skullcap (drop)" → "Leatherfoot Raider Skullcap": the page's disambiguation off. */
 const itemName = (page: string) => page.replace(/\s*\((?:drop|quest|item|ground spawn|quest item)\)\s*$/i, '').trim()
+
+// Where the wikis mislead for Legends, as players have found it in play.
+
+/** Quests that cannot be done over and over, by page (lower-cased), and why: planned at most once unless locked in. */
+const ONCE_IN_PLAY: Record<string, string> = {
+  'illegible cantrip quest': 'cannot be done over and over'
+}
+
+// What Allakhazam's faction pages (everquest.allakhazam.com/db/faction.html) add: the con a quest's
+// NPC wants before taking it, amounts eqlwiki leaves out, and mobs it does not list.
+
+/** Quests whose NPC takes the hand-in only at or above a con, by page (lower-cased). A con can be faked as far as Indifferent, not past it (from play). */
+const NEEDS: Record<string, Need> = {
+  'tunare scouts dagger': { faction: "Tunare's Scouts", band: 'Amiable', min: 100 }
+}
+
+/** Amounts a quest page leaves out, by page (lower-cased), then faction. */
+const AMOUNTS: Record<string, Record<string, number>> = {
+  'tunare scouts dagger': { "Tunare's Scouts": 1 }
+}
+
+/** Kill camps eqlwiki does not list: the faction's own amount as given, the others' guessed. */
+const CAMPS: { zone: string; mobs: string[]; hits: Record<string, number>; guessed: string[] }[] = [
+  {
+    zone: 'Greater Faydark',
+    mobs: ['a mature arborean', 'an arborean sapling'],
+    hits: { "Tunare's Scouts": 1, 'Emerald Warriors': 1, 'Soldiers of Tunare': 1, 'Faydarks Champions': 1, 'Arboreans of the Faydark': -1 },
+    guessed: ['Emerald Warriors', 'Soldiers of Tunare', 'Faydarks Champions', 'Arboreans of the Faydark']
+  }
+]
+
+/**
+ * Why a quest cannot be done yet: its NPC wants a con the character is not at. A con can be faked as
+ * far as Indifferent (0), not past it, so a need at or below that never stops one; one that wants a con
+ * no better than some band stops one above it.
+ */
+function blockedBy(need: Need, cons: Record<string, number> | undefined): string {
+  const con = cons?.[need.faction]
+  if (con === undefined) return ''
+  if (need.min !== undefined && need.min > 0 && con < need.min)
+    return `needs ${need.band} with ${need.faction}; you con ${standingBand(con).word} (${con}), ${need.min - con} short`
+  if (need.max !== undefined && con > need.max) return `wants no better than ${need.band} with ${need.faction}; you con ${standingBand(con).word} (${con})`
+  return ''
+}
+
+/** Hand-in items that come from elsewhere than the wikis say, by lower-cased name. */
+const ITEMS_IN_PLAY: Record<string, Pick<HandInItem, 'how' | 'where' | 'named' | 'sec'>> = {
+  // The walkthrough says goblins in several zones.
+  'small piece of high quality ore': { how: 'drop', where: 'the Goblin Janitor (Runnyeye)', named: 1 },
+  // For Rephas's Rat Ear Pie Quest, the one way to raise Arcane Scientists that repeats: five came
+  // from eighteen rats in Misty Thicket in about twenty minutes.
+  'rat ears': { how: 'drop', where: 'rats, such as in Misty Thicket', sec: 240 }
+}
 /** "a gnoll", "an orc pawn", "clockwork scrubber": one of many alike. The wiki's notes mark single NPCs. */
 const isCommon = (name: string, note = '') => (/^(?:a|an)\s/i.test(name) || /^[a-z]/.test(name)) && !/quest|merchant|guildmaster|npc|banker|named/i.test(note)
 
@@ -308,6 +380,8 @@ export function howHad(
   if (COIN.test(plain)) return { how: 'coin', where: '' }
   const bought = input.bought[plain.toLowerCase()]
   if (bought) return { how: 'bought', where: bought.merchant, ...(bought.each > 0 ? { each: bought.each } : {}) }
+  const known = ITEMS_IN_PLAY[plain.toLowerCase()]
+  if (known) return { ...known }
   const use = (input.items[itemKey(name)] ?? input.items[itemKey(plain)])?.use
   const vendor = use?.vendors?.[0]
   if (vendor) return { how: 'vendor', where: vendor.zone ? `${vendor.npc} (${vendor.zone})` : vendor.npc }
@@ -405,6 +479,12 @@ export function buildCatalog(input: CatalogInput): FactionCatalog {
   const open = wanted(input)
   const guesses = guessesFrom(input.sources)
   const { isThing, isZone } = notItems(input)
+  // What Allakhazam's pages add: the cons quests want, quest amounts, and every mob they name with its amounts.
+  const alla = input.alla ?? []
+  const allaNeed = allaNeeds(alla, name)
+  const allaAmount = allaQuestAmounts(alla, name)
+  const allaKill = allaKills(alla, name)
+  const allaMobs = new Set(allaKill.map((m) => `${m.name.toLowerCase()}|${zoneKey(m.zone)}`))
   const activities: PlanActivity[] = []
   const entries = Object.entries(input.sources.acts)
   const acts = entries.map(([, t]) => t)
@@ -429,15 +509,35 @@ export function buildCatalog(input: CatalogInput): FactionCatalog {
   const common = (mob: string) => isCommon(mob) || loggedCommon.has(mob.toLowerCase().replace(/^an?\s+/, ''))
   const had = (item: string) => howHad(item, input, common)
 
+  // What an NPC gives back to be handed straight back for as much again, from the quest pages
+  // (Rephas's Grilled Rat Ears, for Rat Ears), by NPC and what goes in first: one unit is both hand-ins.
+  const loopOf = (q: QuestPage, i: number): { item: string; back: string } | null => {
+    const [step, next] = [q.steps[i], q.steps[i + 1]]
+    if (!next || !step.gives?.length || step.handIn.length !== 1 || next.handIn.length !== 1 || (next.npc && step.npc && next.npc !== step.npc)) return null
+    const back = itemName(next.handIn[0].item)
+    return step.gives.some((g) => itemName(g).toLowerCase() === back.toLowerCase()) ? { item: itemName(step.handIn[0].item), back } : null
+  }
+  const loops = new Map<string, { item: string; back: string }>()
+  for (const q of Object.values(input.quests)) {
+    q?.steps.forEach((step, i) => {
+      const loop = loopOf(q, i)
+      const npc = [step.npc, ...q.givers].find((n) => n && !isZone(n))
+      if (loop && npc) loops.set(`${npc.toLowerCase()}|${loop.item.toLowerCase()}`, loop)
+    })
+  }
+  const doubled = (hits: Record<string, number>) => Object.fromEntries(Object.entries(hits).map(([f, v]) => [f, v * 2]))
+
   // ---- hand-ins from the log ----
-  const loggedNpcs = new Map<string, PlanActivity[]>()
+  // By NPC: each hand-in activity, with every item offered for it.
+  const loggedNpcs = new Map<string, { a: PlanActivity; offered: Set<string> }[]>()
   for (const t of acts) {
     if (t.kind !== 'turnin') continue
     const { hits, guessed } = tallyHits(t, name, guesses.handUp, guesses.handDown)
     if (!raisesAny(hits, open)) continue
-    const main = Object.entries(t.items ?? {})
-      .filter(([, v]) => v.done > 0)
-      .sort((a, b) => b[1].done - a[1].done)[0]
+    const offered = Object.entries(t.items ?? {}).filter(([, v]) => v.done > 0)
+    // What goes in first, when what the NPC gives for it is handed back too; else what went in most.
+    const loop = offered.map(([it]) => loops.get(`${t.name.toLowerCase()}|${itemName(it).toLowerCase()}`)).find((l) => l !== undefined)
+    const main = loop ? offered.find(([it]) => itemName(it).toLowerCase() === loop.item.toLowerCase()) : offered.sort((a, b) => b[1].done - a[1].done)[0]
     const items: HandInItem[] = main ? [withStock({ name: main[0], count: Math.max(1, Math.round(main[1].count / main[1].done)), ...had(main[0]) })] : []
     // Done once or twice is most likely a quest's one-time reward, and done.
     const repeatable = t.n >= 3
@@ -447,8 +547,9 @@ export function buildCatalog(input: CatalogInput): FactionCatalog {
       title: t.name,
       zone: t.zone,
       npc: t.name,
-      hits,
+      hits: loop ? doubled(hits) : hits,
       ...(guessed.length ? { guessed } : {}),
+      ...(loop ? { handIns: 2, back: loop.back } : {}),
       source: 'log',
       seen: t.n,
       ...(t.runN >= 5 && t.runMs > 0 ? { measured: clamp(t.runN / (t.runMs / 3_600_000), 1, 72_000) } : {}),
@@ -458,7 +559,7 @@ export function buildCatalog(input: CatalogInput): FactionCatalog {
     }
     activities.push(a)
     const k = t.name.toLowerCase()
-    loggedNpcs.set(k, [...(loggedNpcs.get(k) ?? []), a])
+    loggedNpcs.set(k, [...(loggedNpcs.get(k) ?? []), { a, offered: new Set(Object.keys(t.items ?? {}).map((it) => itemName(it).toLowerCase())) }])
   }
 
   // ---- kill camps from the log: the mobs of a zone that move the same factions ----
@@ -535,7 +636,8 @@ export function buildCatalog(input: CatalogInput): FactionCatalog {
   }
   const wikiCamps = new Map<string, WikiMob[]>()
   for (const [k, e] of wikiMobs) {
-    if (logged.has(k) || ![...e.raise].some((f) => open.has(f))) continue
+    // A mob Allakhazam gives amounts for is its camp's, below.
+    if (logged.has(k) || allaMobs.has(k) || ![...e.raise].some((f) => open.has(f))) continue
     const ck = `${zoneKey(e.mob.zone)}|${[...e.raise].sort().join('+')}`
     wikiCamps.set(ck, [...(wikiCamps.get(ck) ?? []), e])
   }
@@ -564,8 +666,60 @@ export function buildCatalog(input: CatalogInput): FactionCatalog {
     })
   }
 
+  // ---- kill camps from Allakhazam: the mobs its pages give amounts for, that the log has not seen killed ----
+  const allaCamps = new Map<string, AllaKill[]>()
+  for (const m of allaKill) {
+    if (logged.has(`${m.name.toLowerCase()}|${zoneKey(m.zone)}`) || !raisesAny(m.hits, open)) continue
+    const ck = `${zoneKey(m.zone)}|${positives(m.hits).join('+')}`
+    allaCamps.set(ck, [...(allaCamps.get(ck) ?? []), m])
+  }
+  for (const [k, members] of allaCamps) {
+    // A kill in the camp does, on average, what its mobs do.
+    const sum: Record<string, number> = {}
+    for (const m of members) for (const [f, v] of Object.entries(m.hits)) sum[f] = (sum[f] ?? 0) + v
+    const hits = Object.fromEntries(Object.entries(sum).map(([f, v]) => [f, Math.round((v / members.length) * 10) / 10]))
+    const zone = members[0].zone
+    activities.push({
+      id: `alla:${k}`,
+      kind: 'kill',
+      title: shortList(members.map((m) => m.name)),
+      zone,
+      mobs: members.slice(0, MOBS_KEPT).map((m) => m.name),
+      hits,
+      source: 'wiki',
+      site: 'Allakhazam',
+      common: members.filter((m) => isCommon(m.name)).length,
+      named: members.filter((m) => !isCommon(m.name)).length,
+      ...(isCity(zone) && members.some((m) => !isCommon(m.name) || CITY_PEOPLE.test(m.name)) ? { city: true } : {})
+    })
+  }
+
+  // ---- kill camps known from play or read off Allakhazam by hand, for mobs nothing above has ----
+  for (const c of CAMPS) {
+    const hits = Object.fromEntries(Object.entries(c.hits).map(([f, v]) => [name(f), v]))
+    const known = c.mobs.some((m) => {
+      const k = `${m.toLowerCase()}|${zoneKey(c.zone)}`
+      return logged.has(k) || wikiMobs.has(k) || allaMobs.has(k)
+    })
+    if (known || !raisesAny(hits, open)) continue
+    activities.push({
+      id: `camp:${zoneKey(c.zone)}|${positives(hits).join('+')}`,
+      kind: 'kill',
+      title: shortList(c.mobs),
+      zone: c.zone,
+      mobs: c.mobs,
+      hits,
+      guessed: c.guessed.map(name),
+      source: 'wiki',
+      site: 'Allakhazam',
+      common: c.mobs.length,
+      named: 0
+    })
+  }
+
   // ---- quests from the wiki, for the achievements still open ----
   const seenSteps = new Set<string>()
+  const sameSteps = new Set<string>()
   for (const p of input.pages) {
     if (!open.has(name(p.page))) continue
     for (const title of p.raise.quests) {
@@ -575,20 +729,29 @@ export function buildCatalog(input: CatalogInput): FactionCatalog {
         const id = `quest:${q.page.toLowerCase()}#${i}`
         if (seenSteps.has(id)) return
         seenSteps.add(id)
+        // What the NPC gives for it, handed straight back for as much again, is the same unit.
+        const loop = loopOf(q, i)
+        if (loop) seenSteps.add(`quest:${q.page.toLowerCase()}#${i + 1}`)
         const hits: Record<string, number> = {}
         const guessed: string[] = []
-        for (const [f, v] of Object.entries(s.hits)) {
-          const g = name(f)
-          if (s.guessed.includes(f)) {
-            hits[g] = v > 0 ? guesses.handUp : guesses.handDown
-            guessed.push(g)
-          } else hits[g] = v
-        }
+        for (const step of loop ? [s, q.steps[i + 1]] : [s])
+          for (const [f, v] of Object.entries(step.hits)) {
+            const g = name(f)
+            // What a page left as "got better", Allakhazam may give an amount for.
+            const given = AMOUNTS[q.page.toLowerCase()]?.[g] ?? (step.guessed.includes(f) ? allaAmount.get(questKey(q.page))?.[g] : undefined)
+            if (given !== undefined) hits[g] = (hits[g] ?? 0) + given
+            else if (step.guessed.includes(f)) {
+              hits[g] = (hits[g] ?? 0) + (v > 0 ? guesses.handUp : guesses.handDown)
+              if (!guessed.includes(g)) guessed.push(g)
+            } else hits[g] = (hits[g] ?? 0) + v
+          }
         if (!raisesAny(hits, open)) return
         const npc = [s.npc, ...q.givers].find((n) => n && !isZone(n)) ?? ''
-        // The log's own hand-ins to this NPC that move the same factions say this already, and exactly.
+        // The log's own hand-ins of the same things to this NPC, moving the same factions, say this
+        // already, and exactly; one of other things (Metal Bits where the log saw ore) is another way.
         const sameUp = positives(hits).join('+')
-        if ((loggedNpcs.get(npc.toLowerCase()) ?? []).some((a) => positives(a.hits).join('+') === sameUp)) return
+        const handed = s.handIn.map((h) => itemName(h.item).toLowerCase())
+        if ((loggedNpcs.get(npc.toLowerCase()) ?? []).some((l) => positives(l.a.hits).join('+') === sameUp && handed.every((it) => l.offered.has(it)))) return
         // Each item once, at the largest count the line gives it (a walkthrough can name it twice).
         const counts = new Map<string, QuestHandIn>()
         for (const h of s.handIn) {
@@ -602,14 +765,32 @@ export function buildCatalog(input: CatalogInput): FactionCatalog {
         if (handIn.length === 1 && handIn[0].count === 1 && s.count) handIn[0] = { ...handIn[0], count: s.count }
         const items = handIn.map((h): HandInItem => {
           // What goes in: the item, or what the walkthrough combines into it; from the mob the
-          // walkthrough says to kill for it, which outranks a merchant (Nillipuss's Jumjum, not the shop's).
+          // walkthrough says to kill for it, which outranks a merchant (Nillipuss's Jumjum, not the
+          // shop's), though not what the player bought or found in play.
           const raw = h.madeOf ? h.madeOf.item : h.item
-          const source = h.from ? { how: 'drop' as const, where: h.from, ...(common(h.from) ? {} : { named: 1 }) } : had(raw)
+          const plain = itemName(raw).toLowerCase()
+          const source = h.from && !input.bought[plain] && !ITEMS_IN_PLAY[plain] ? { how: 'drop' as const, where: h.from, ...(common(h.from) ? {} : { named: 1 }) } : had(raw)
           return withStock({ name: itemName(raw), count: h.count * (h.madeOf?.count ?? 1), ...source, ...(h.madeOf ? { makes: itemName(h.item) } : {}) })
         })
+        // The same hand-in written on two pages (Metal Bits on the quest's own and on another) is one way.
+        const same = [
+          npc.toLowerCase(),
+          items.map((it) => `${it.count} ${it.name.toLowerCase()}`).sort(),
+          Object.entries(hits)
+            .map(([f, v]) => `${f}:${v}`)
+            .sort()
+        ].join('|')
+        if (sameSteps.has(same)) return
+        sameSteps.add(same)
         const top = Math.max(...Object.values(hits))
+        // The cons its NPC wants: known from play, and as Allakhazam lists them. The first not met holds it back.
+        const needs = [NEEDS[q.page.toLowerCase()], ...(allaNeed.get(questKey(q.page)) ?? [])].filter((n): n is Need => !!n).map((n) => ({ ...n, faction: name(n.faction) }))
+        const unmet = needs.find((n) => blockedBy(n, input.cons))
+        const blocked = unmet ? blockedBy(unmet, input.cons) : ''
+        const need = unmet ?? needs[0]
         const once =
-          top >= ONCE_POINTS
+          ONCE_IN_PLAY[q.page.toLowerCase()] ??
+          (top >= ONCE_POINTS
             ? `worth ${top} at once`
             : handIn.some((h) => h.given)
               ? 'a step of a chain'
@@ -619,7 +800,7 @@ export function buildCatalog(input: CatalogInput): FactionCatalog {
                   ? 'wants several different items'
                   : items.every((it) => it.how === 'unknown')
                     ? 'nothing says where its item comes from'
-                    : ''
+                    : '')
         activities.push({
           id,
           kind: 'quest',
@@ -628,6 +809,9 @@ export function buildCatalog(input: CatalogInput): FactionCatalog {
           ...(npc ? { npc } : {}),
           hits,
           ...(guessed.length ? { guessed } : {}),
+          ...(loop ? { handIns: 2, back: loop.back } : {}),
+          ...(need ? { needs: need.band } : {}),
+          ...(blocked ? { blocked } : {}),
           source: 'wiki',
           items,
           ...(once ? { once } : {}),
@@ -671,8 +855,6 @@ export interface PlanSettings {
   goal: PlanGoal
   /** For the 'positive' goal: what one faction ending at 0 or above is worth, in hours of play. */
   positiveHours: number
-  /** Leave out kill camps of a city's people (guards, merchants, guildmasters), unless locked in. */
-  avoidCity: boolean
 }
 
 /** 'fastest': every achievement in the least time. 'positive': every achievement, ending with as many factions at 0 or above as is worth the time. */
@@ -689,8 +871,7 @@ export const DEFAULT_SETTINGS: PlanSettings = {
   unknownSec: 60,
   keepMaxed: KEEP_MAXED.light,
   goal: 'fastest',
-  positiveHours: 3,
-  avoidCity: false
+  positiveHours: 3
 }
 
 /** Buying one item from a merchant, in stacks. */
@@ -724,13 +905,14 @@ export function unitTime(a: PlanActivity, s: PlanSettings, choices: PlanChoices 
     const sec = 3600 / Math.max(0.1, perHour)
     return { seconds: sec, handSeconds: sec, from: a.measured ? 'log' : 'estimate' }
   }
-  const hand = a.measured ? Math.max(0.05, 3600 / a.measured) : s.handInSec
+  const hand = (a.measured ? Math.max(0.05, 3600 / a.measured) : s.handInSec) * (a.handIns ?? 1)
   const from = a.measured ? 'log' : 'estimate'
   const items = a.items ?? []
   if (!items.length) return { seconds: Math.max(hand, s.unknownSec), handSeconds: hand, from }
   let get = 0
   for (const it of items) {
-    if (it.how === 'bought' || it.how === 'vendor') get += BUY_ITEM_SEC * it.count
+    if (it.sec) get += it.sec * it.count
+    else if (it.how === 'bought' || it.how === 'vendor') get += BUY_ITEM_SEC * it.count
     else if (it.how === 'drop') get += (it.named ? (s.namedRespawnMin * 60) / it.named : s.gatherSec) * it.count
     else if (it.how === 'crafted') get += s.gatherSec * it.count
     else if (it.how === 'unknown') get += s.unknownSec
@@ -920,10 +1102,10 @@ function riskOf(a: PlanActivity, choices: PlanChoices, locked: boolean): number 
   return a.guessed?.length ? 1.35 : 1.2
 }
 
-/** Whether the planner may use an activity: not ruled out, not once only, and not a city camp left out, unless locked in. */
-export const plannable = (a: PlanActivity, choices: PlanChoices, settings?: Pick<PlanSettings, 'avoidCity'>) => {
+/** Whether the planner may use an activity: not ruled out, not once only, and not one its NPC will not take yet, unless locked in. */
+export const plannable = (a: PlanActivity, choices: PlanChoices) => {
   const locked = Object.values(choices.locks).includes(a.id)
-  return locked || (!a.once && !choices.excluded.includes(a.id) && !(settings?.avoidCity && a.city))
+  return locked || (!a.once && !a.blocked && !choices.excluded.includes(a.id))
 }
 
 /**
@@ -970,7 +1152,7 @@ export function planFactions(input: PlanInput, settings: PlanSettings, choices: 
     return t
   }
   for (const a of activities) {
-    if (!plannable(a, choices, settings)) continue
+    if (!plannable(a, choices)) continue
     const touch: { i: number; h: number }[] = []
     let raisesTarget = false
     let raisesAny = false
@@ -1424,7 +1606,7 @@ export function planFactions(input: PlanInput, settings: PlanSettings, choices: 
       options[f].push({ ...wayFor(a, h, start[index.get(f)!], unit, travel), lowersOpen: lowered, chosen: chosenFor.get(f) === a.id, used: used.has(a.id) })
   }
   // Ways the planner may use first, quickest first; one-time and ruled-out ones after.
-  const later = (o: PlanOption) => (plannable(o.activity, choices, settings) ? 0 : 1)
+  const later = (o: PlanOption) => (plannable(o.activity, choices) ? 0 : 1)
   for (const list of Object.values(options)) list.sort((p, q) => later(p) - later(q) || p.seconds - q.seconds)
   return { steps, seconds, unplanned, options, staleLocks, maxedLost, belowZero: { now: belowNow, after: belowAfter }, shape, kept }
 }
@@ -1442,6 +1624,6 @@ export function waysToRaise(activities: PlanActivity[], faction: string, standin
     const h = a.hits[faction]
     return h > 0 ? [wayFor(a, h, standing, unitTime(a, settings, choices), settings.travelMin * 60)] : []
   })
-  const later = (w: Way) => (plannable(w.activity, choices, settings) ? 0 : 1)
+  const later = (w: Way) => (plannable(w.activity, choices) ? 0 : 1)
   return ways.sort((p, q) => later(p) - later(q) || p.seconds - q.seconds)
 }

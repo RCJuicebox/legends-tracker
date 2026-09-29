@@ -347,7 +347,14 @@ export function Factions() {
 /** A faction's achievement: done, or the points still to go to 2000. */
 function AchievementCell({ a, s }: { a: FactionRowAchievement | null; s: FactionStandingNow | null }) {
   if (!a) return <span className="faint">—</span>
-  const why = a.from === 'achievements' ? 'from your achievements export' : a.from === 'standing' ? 'from your standing' : ''
+  const why =
+    a.from === 'achievements'
+      ? 'from your achievements export'
+      : a.from === 'log'
+        ? 'as the game said after your achievements export'
+        : a.from === 'standing'
+          ? 'from your standing'
+          : ''
   if (a.done) {
     return (
       <span className="chip ok" title={`${a.name}: done, ${why}`}>

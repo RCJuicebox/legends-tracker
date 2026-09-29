@@ -22,15 +22,18 @@ import { meleeCounter } from '../core/meleeTally'
 import { RecipeBook } from './recipes'
 import { PurchaseHistory, purchaseConsumer } from './purchases'
 import { FactionBook, FactionHistory, FactionSourceHistory, FactionWiki, factionConsumer, factionSourceConsumer } from '../features/factions/main'
+import { FactionAlla } from '../features/factions/allaSource'
 import { LogHistory, type HistoryWhere } from './sources/logHistory'
 import { TradeFavorites } from './tradeFavorites'
 import { LiveAchievements } from './liveAchievements'
 import { SkillHistory, skillConsumer } from './skillHistory'
+import { AaHistory, aaConsumer } from './aaHistory'
 import { PetStore, PetWiki } from './pets'
 import { listLogs, logIsIn } from './game'
 import { Windows, loadPage } from './windows'
 import { appIcon, preloadPath, resources } from './bootstrap'
 import { log } from './log'
+import { describeClasses, recordFromWho } from '../core/selfWho'
 import { sources } from './sources/registry'
 import { jobs } from './sources/jobs'
 import { settingsSummary } from './diagnostics'
@@ -69,10 +72,13 @@ export interface AppContext {
   factionSources: FactionSourceHistory
   /** eqlwiki's faction pages and the quest pages they name, for the plan. */
   factionBook: FactionBook
+  factionAlla: FactionAlla
   /** The faction plan followed and the Slayer counts, for the achievements overlay. */
   liveAchievements: LiveAchievements
   /** Each skill's last value the log gave, for the skill achievements. */
   skills: SkillHistory
+  /** The AAs bought and the ability points the log recorded, for Stats › AAs. */
+  aaHistory: AaHistory
   tradeFavorites: TradeFavorites
   petStore: PetStore
   petWiki: PetWiki
@@ -128,7 +134,8 @@ export function createContext(): AppContext {
     purchases: purchaseConsumer,
     factions: factionConsumer,
     factionSources: factionSourceConsumer,
-    skills: skillConsumer
+    skills: skillConsumer,
+    aas: aaConsumer
   })
 
   const ctx = {
@@ -152,7 +159,9 @@ export function createContext(): AppContext {
     factionWiki: new FactionWiki(),
     factionSources: new FactionSourceHistory(logHistory, 'factionSources'),
     factionBook: new FactionBook(),
+    factionAlla: new FactionAlla(),
     skills: new SkillHistory(logHistory, 'skills'),
+    aaHistory: new AaHistory(logHistory, 'aas'),
     tradeFavorites: new TradeFavorites(join(dataDir, 'tradeskills.json')),
     inventoryFiles: new InventoryFiles(dataDir, installDir, itemCatalog, (view) => toMain('state:inventory', view)),
     petStore: new PetStore(),
@@ -243,12 +252,16 @@ export function createContext(): AppContext {
         void ctx.petStore.merge(character, update).then(async (changed) => changed && toMain('state:pet', { character, ...(await ctx.petStore.get(character)) }))
       },
       buffs: (view) => toMain('state:buffs', view),
-      // A /who of yourself names your race: kept on the character record when it has none yet.
+      // A /who of yourself names your race and classes: the character record follows them, so a change
+      // of either reaches the faction cons, the AC sums, spell durations and the gear you can wear.
       selfSeen: (who) => {
         const key = ctx.characterKey()
         const rec = key ? store.characterByKey(key) : null
-        if (!rec || rec.race || !who.race) return
-        const next = { ...rec, race: who.race }
+        const next = rec ? recordFromWho(rec, who) : null
+        if (!key || !rec || !next) return
+        if (next.race !== rec.race) log.info(`Race for ${key}: ${rec.race || 'none'} → ${next.race} (from /who).`)
+        const [was, now] = [describeClasses(rec.classLevels), describeClasses(next.classLevels)]
+        if (was !== now) log.info(`Classes for ${key}: ${was} → ${now} (from /who).`)
         const s = store.settings.get()
         store.settings.set({ ...s, characters: { ...s.characters, [key]: next } })
         ctx.engine.reconfigure()
@@ -431,6 +444,11 @@ function registerSources(ctx: AppContext): void {
     kind: 'wiki',
     what: "eqlwiki's faction pages and the quest pages they name, for what raises a faction and the Factions page's plan. Kept a week.",
     refresh: () => ctx.factionBook.get(true)
+  })
+  sources.add('allakhazam', {
+    label: 'Allakhazam',
+    kind: 'wiki',
+    what: "Allakhazam's faction pages, for the con a quest wants, kill amounts and mobs eqlwiki lacks: a page every twenty seconds, as the site asks, each kept a month."
   })
   sources.add('petWiki', { label: 'Pet pages', kind: 'wiki', what: "eqlwiki's Pet Guide and each pet's summon page, for the pet gear planner." })
   sources.add('speech', {

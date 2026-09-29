@@ -199,12 +199,9 @@ export const HUNT: Record<string, [string, number, number?, number?][]> = {
     ['Gorge of King Xorbb', 3, 15, 19],
     ["Ak'Anon", 1, 9, 9]
   ],
-  'spin me right round': [
-    ['Gorge of King Xorbb', 1, 12, 12],
-    ['Northern Desert of Ro', 1, 11, 11],
-    ['Southern Desert of Ro', 1, 11, 11],
-    ['Commonlands', 1, 11, 11]
-  ],
+  // From play, not the wiki's race fields: the Dervish Cutthroats of Ro and the Commonlands are
+  // humanoid bandits, not Dervishes. The blade storms of the Plane of Sky's island 1.5 are.
+  'spin me right round': [['Plane of Sky, island 1.5', 1, 59, 61]],
   'terrorible tentacles': [
     ['Estate of Unrest', 2, 29, 30],
     ['Plane of Fear', 1, 48, 48],

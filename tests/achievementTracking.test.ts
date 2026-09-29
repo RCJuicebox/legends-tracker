@@ -29,6 +29,8 @@ const EXPORT = [
   'Slayer: Skill',
   'I\tStop Dragon This Out',
   'I\t\tDracoliches, Water Dragons, and Witherans.\t67/100',
+  'I\tSpin Me Right Round',
+  'I\t\tDervishes\t41/100',
   'EverQuest: General',
   'I\tNorrathian Slayer',
   'I\t\tHunter of Faydwer'
@@ -49,7 +51,8 @@ describe('Slayer counts', () => {
       'I Hate Snakes!',
       "Doesn't Play Well With Others",
       'Domo Arigato',
-      'Stop Dragon This Out'
+      'Stop Dragon This Out',
+      'Spin Me Right Round'
     ])
     expect(counters[0]).toEqual({ section: 'Slayer: Conquest', name: "Puttin' On The Dog", races: 'Kobolds', count: 2645, max: 5000 })
   })
@@ -79,6 +82,16 @@ describe('Slayer counts', () => {
     // A clockwork is a clockwork, whatever it is made to look like.
     expect(names(index.byName('a clockwork spider'))).toEqual(['Domo Arigato'])
     expect(index.byName('Terror')).toEqual([])
+  })
+
+  it("does not take the Dervish Cutthroats for Dervishes: they are the playable races' bandits", () => {
+    expect(names(index.byName('a dervish cutthroat'))).toEqual(["Doesn't Play Well With Others"])
+    expect(names(index.byName('a cutthroat dervish'))).toEqual(["Doesn't Play Well With Others"])
+    // An Ogre: one of the playable races, not a Dervish.
+    expect(names(index.byName('a dervish thug'))).toEqual(["Doesn't Play Well With Others"])
+    // The Plane of Sky's blade storms are Dervishes, as eqlwiki gives their race.
+    expect(index.byName('a blade storm')).toEqual([])
+    expect(names(index.byRace('Dervish'))).toEqual(['Spin Me Right Round'])
   })
 
   it("places a kill by eqlwiki's race when the name does not say", () => {

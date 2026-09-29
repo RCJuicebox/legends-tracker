@@ -209,6 +209,14 @@ export function logFileFor(installDir: string, key: string): string {
   return join(installDir, 'Logs', `${logStem(key)}.txt`)
 }
 
+/**
+ * A character's live log: for the character being played, the log being watched (which may have been
+ * chosen from anywhere); for any other, its file in the game's Logs folder.
+ */
+export function characterLogFile(key: string, played: string, watched: string, installDir: string): string {
+  return key === played && watched ? watched : logFileFor(installDir, key)
+}
+
 /** The name a character's log and its archives start with: `eqlog_Kelwyn_neriak`. */
 export function logStem(key: string): string {
   return `eqlog_${key}`

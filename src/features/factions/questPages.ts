@@ -17,7 +17,11 @@ import { linkTexts, plainText } from '../../core/wikiItem'
 //   </div>
 //
 // Each faction block is one step: what it does to each faction, and what is handed in for it, read
-// from the walkthrough line before it. Many pages come from classic EverQuest's logs, which said
+// from the walkthrough line before it. Some pages leave a block unclosed, running into the next
+// hand-in, and some write the faction lines with no block at all; a block ends at the first line that
+// is not a faction line, and a run of faction lines outside one is a block too. A line's links after
+// what the NPC gives back ("he'll give you an item called [[Grilled Rat Ears]]") or how the item is
+// made ("(made via [[Blacksmithing]] 2 [[Small Pieces of Ore]] …") are not what is handed in. Many pages come from classic EverQuest's logs, which said
 // only "got better" or "got worse"; where no one has added the amount in brackets, it is left for
 // the planner to guess. What the walkthrough says about the item before it is handed in is kept
 // too: that it is combined from ten of something ("Combine 10 x [[Fire Beetle Eye]]s"), or taken
@@ -47,6 +51,8 @@ export interface QuestStep {
   line: string
   /** A count the line gives apart from any item ("Hand 4 of them"), for the one item left once places and people are set aside. */
   count?: number
+  /** What the NPC gives back for it, as the line says ("he'll give you an item called [[Grilled Rat Ears]]"). */
+  gives?: string[]
 }
 
 export interface QuestPage {
@@ -70,9 +76,55 @@ const cellNames = (cell: string): string[] => {
   return plain ? plain.split(/\s*[,/]\s*|\s+and\s+/).filter(Boolean) : []
 }
 
-const FACBLOCK = /<div\s+class\s*=\s*["']facblock["']\s*>([\s\S]*?)<\/div>/gi
+const FACBLOCK_OPEN = /<div\s+class\s*=\s*["']facblock["']\s*>/i
+const HAS_FACTION = /Your faction (?:standing )?with\b/i
+/** What a faction block holds besides its faction lines: blank lines, a template ({{exp}}), its own tags. */
+const BLOCK_FILLER = /^\s*(?:\{\{[^}]*\}\}|<\/?div[^>]*>|\*)?\s*$/i
+// "has been adjusted by 5", "got better. (+5)", and P99's "'''has gotten worse'''.<span class='profac'>(-1)</span>".
 const FACTION_LINE =
-  /Your faction standing with\s+(?:\[\[([^\]|#]+)(?:#[^\]|]*)?(?:\|[^\]]*)?\]\]|([^.\n[]+?))\s+(?:has been adjusted by\s+(-?\d+)|(?:got|could not possibly get any)\s+(better|worse)\.?\s*(?:\(\s*([+-]?\d+)\s*\))?)/gi
+  /Your faction (?:standing )?with\s+(?:\[\[([^\]|#]+)(?:#[^\]|]*)?(?:\|[^\]]*)?\]\]|([^.\n[]+?))\s+(?:has been adjusted by\s+(-?\d+)|(?:'{2,3})?(?:got|has gotten|could not possibly get any)\s+(better|worse)\.?(?:'{2,3})?\.?\s*(?:<span[^>]*>\s*)?(?:\(\s*([+-]?\d+)\s*\))?)/gi
+
+interface Block {
+  start: number
+  end: number
+  lines: string[]
+  div: boolean
+}
+const blockOf = (b: Block) => ({ start: b.start, end: b.end, body: b.lines.join('\n') })
+/** A walkthrough line that hands something over, where a step's lead ends; not a faction line ("Circle of Unseen Hands", "Tradefolk"). */
+const isHandInLine = (line: string) => !HAS_FACTION.test(line) && /\[\[/.test(line) && HANDING.test(line) && !DIALOGUE.test(line)
+
+/**
+ * A page's faction blocks, where each starts and ends: each <div class="facblock">, up to its </div>,
+ * the next block or the next step's hand-in line (some pages never close one, and that hand-in would
+ * be read into it), and each run of faction lines written outside any, up to its first other line.
+ */
+function factionBlocks(text: string): { start: number; end: number; body: string }[] {
+  const blocks: { start: number; end: number; body: string }[] = []
+  let cur: Block | null = null
+  let at = 0
+  for (const line of text.split('\n')) {
+    const next = at + line.length + 1
+    const open = FACBLOCK_OPEN.test(line)
+    const faction = HAS_FACTION.test(line)
+    if (cur && (open || (cur.div ? isHandInLine(line) : !(faction || BLOCK_FILLER.test(line))))) {
+      blocks.push(blockOf(cur))
+      cur = null
+    }
+    if (!cur && (open || faction)) cur = { start: at, end: next, lines: [], div: open }
+    if (cur) {
+      cur.lines.push(line)
+      cur.end = next
+      if (cur.div && /<\/div>/i.test(line)) {
+        blocks.push(blockOf(cur))
+        cur = null
+      }
+    }
+    at = next
+  }
+  if (cur) blocks.push(blockOf(cur))
+  return blocks.filter((b) => HAS_FACTION.test(b.body))
+}
 
 /** A faction block's lines. */
 function factionHits(block: string): { hits: Record<string, number>; guessed: string[] } {
@@ -123,9 +175,29 @@ const LINK = /\[\[([^\]|#]+)(?:#[^\]|]*)?(?:\|([^\]]*))?\]\]/g
 const TO_NAMED = /\bto\s+((?:[A-Z][\w`']*)(?:\s+(?:[A-Z][\w`']*|of|the))*)\s*[.:'!]*\s*$/
 /** "Hand 4 of them", "bring four": a count said apart from the item. */
 const LOOSE_COUNT = /\b(?:hand|give|bring|turn in|return)\w*\s+(?:him\s+|her\s+|them\s+)?(\d+|two|three|four|five|six|seven|eight|nine|ten|twelve|twenty)\b/i
+// Where a line goes on to what the NPC gives back, or how the item is made: what it links after that is not handed in.
+const GIVEN_BACK = /\b(?:(?:he|she|they|it)(?:'ll|\s+will)?\s+(?:give|hand)s?\s+you|gives?\s+you|you(?:'ll|\s+will)?\s+(?:receive|get)|in return|rewards?\s+you)\b/i
+const MADE = /\bmade\s+(?:via|from|with|by)\b|\(\s*made\b/i
 
-/** What a walkthrough line hands in and to whom. */
-export function readHandIn(line: string, givers: string[] = []): { handIn: QuestHandIn[]; npc: string; count?: number } {
+/** What a walkthrough line hands in and to whom, and what the NPC gives back for it. */
+export function readHandIn(whole: string, givers: string[] = []): { handIn: QuestHandIn[]; npc: string; count?: number; gives?: string[] } {
+  // Cut off after the first link: a line that opens with what is received ("You receive a
+  // [[Moonstone]]. Give to …") goes on to hand that in.
+  const first = whole.indexOf('[[')
+  const rest = first < 0 ? '' : whole.slice(first)
+  const back = rest.search(GIVEN_BACK)
+  const cut = Math.min(...[back, rest.search(MADE)].filter((i) => i > 0), Infinity)
+  const line = cut < Infinity ? whole.slice(0, first + cut) : whole
+  // What the NPC gives back: the links of the sentence that says so.
+  const gives =
+    back > 0 && back === cut
+      ? [
+          ...rest
+            .slice(back)
+            .split(/\.(?=\s|'|$)/)[0]
+            .matchAll(LINK)
+        ].map((m) => m[1].replace(/_/g, ' ').trim())
+      : []
   const handIn: QuestHandIn[] = []
   let npc = ''
   const isGiver = (name: string) => givers.some((g) => g.toLowerCase() === name.toLowerCase())
@@ -149,7 +221,7 @@ export function readHandIn(line: string, givers: string[] = []): { handIn: Quest
   const loose = LOOSE_COUNT.exec(plain)
   const count = loose ? countOf(loose[1]) : undefined
   if (count && handIn.length === 1 && handIn[0].count === 1) handIn[0].count = count
-  return { handIn, npc, ...(count ? { count } : {}) }
+  return { handIn, npc, ...(count ? { count } : {}), ...(gives.length ? { gives } : {}) }
 }
 
 const escape = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
@@ -190,17 +262,17 @@ export function parseQuestPage(page: string, text: string): QuestPage | null {
   const level = /\d+/.exec(topCell(text, 'Minimum Level'))
   const steps: QuestStep[] = []
   let from = 0
-  for (const m of text.matchAll(FACBLOCK)) {
-    const { hits, guessed } = factionHits(m[1])
-    const lead = text.slice(from, m.index)
-    from = m.index + m[0].length
+  for (const b of factionBlocks(text)) {
+    const { hits, guessed } = factionHits(b.body)
+    const lead = text.slice(from, b.start)
+    from = b.end
     if (!Object.keys(hits).length) continue
     // The last line before the block that hands something over, not counting what NPCs say.
     const lines = lead.split('\n').filter((l) => /\[\[/.test(l) && HANDING.test(l) && !DIALOGUE.test(l))
     const raw = lines.length ? lines[lines.length - 1] : ''
-    const { handIn, npc, count } = raw ? readHandIn(raw, givers) : { handIn: [], npc: '', count: undefined }
+    const { handIn, npc, count, gives } = raw ? readHandIn(raw, givers) : { handIn: [], npc: '', count: undefined, gives: undefined }
     // What the walkthrough says of each item before it is handed in.
-    const earlier = text.slice(0, m.index)
+    const earlier = text.slice(0, b.start)
     const combine = COMBINE.exec(lead)
     for (const h of handIn) {
       if (givenBefore(earlier, h.item)) h.given = true
@@ -208,7 +280,7 @@ export function parseQuestPage(page: string, text: string): QuestPage | null {
       const mob = killedFor(lead, h.madeOf?.item ?? h.item)
       if (mob) h.from = mob
     }
-    steps.push({ hits, guessed, handIn, npc, line: plainText(raw).slice(0, 200), ...(count ? { count } : {}) })
+    steps.push({ hits, guessed, handIn, npc, line: plainText(raw).slice(0, 200), ...(count ? { count } : {}), ...(gives?.length ? { gives } : {}) })
   }
   if (!steps.length) return null
   return { page, givers, zones, level: level ? parseInt(level[0], 10) : null, steps }

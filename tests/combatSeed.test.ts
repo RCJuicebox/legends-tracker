@@ -8,6 +8,7 @@ import { defaultSettings } from '../src/main/storeCore'
 import { jobs } from '../src/main/sources/jobs'
 import type { MoteState } from '../src/core/motes'
 import type { FeedItem, MoteStock } from '../src/shared/types'
+import type { SelfWho } from '../src/core/selfWho'
 
 // The meter's read of recent fights (Engine.seedCombat, and rebuildCombat as a cancellable job). The
 // log is written with stamps relative to now, since the read goes back a number of minutes from now.
@@ -77,6 +78,7 @@ afterEach(async () => {
 
 function makeEngine(historyMinutes: number) {
   const feed: FeedItem[] = []
+  const seen: SelfWho[] = []
   const settings = defaultSettings()
   const store = {
     settings: cell({ ...settings, installDir: join(dir, 'game'), logFile, combat: { ...settings.combat, historyMinutes } }),
@@ -116,12 +118,13 @@ function makeEngine(historyMinutes: number) {
       loot: noop,
       respawns: noop,
       pet: noop,
-      buffs: noop
+      buffs: noop,
+      selfSeen: (who) => seen.push(who)
     },
     env
   )
   engines.push(engine)
-  return { engine, feed }
+  return { engine, feed, seen, store }
 }
 
 /** The fights on the meter, oldest first, by the mob fought (the meter capitalises the name). */
@@ -231,5 +234,20 @@ describe('Rebuilding the meter', () => {
     engine.stopWatching()
     await engine.rebuildCombat(60)
     expect(fights(engine)).toEqual([])
+  })
+})
+
+describe('Your race and classes from your own /who', () => {
+  const who = (classes: string, race: string) => `[50 ${classes}] Kelwyn (${race}) <Test Guild> ZONE: Misty Thicket (misty)`
+
+  it('takes them from a /who typed while watching, never from one read back at the start', async () => {
+    await fs.appendFile(logFile, line(2, who('SHD/MNK/SHM', 'Iksar')))
+    const { seen, store } = await watching(10)
+    // The read-back saw the /who (Kelwyn is known), but it may be from before a race or class change.
+    expect(store.buffs.get().people).toHaveProperty('kelwyn.race', 'Iksar')
+    expect(seen).toEqual([])
+    await fs.appendFile(logFile, line(0, who('MNK/BRD/ENC', 'Wood Elf')))
+    await waitFor(() => seen.length > 0)
+    expect(seen).toEqual([{ race: 'Wood Elf', classes: ['mnk', 'brd', 'enc'], level: 50 }])
   })
 })

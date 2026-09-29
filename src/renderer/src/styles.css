@@ -1614,6 +1614,27 @@ table.table {
   max-height: 260px;
   overflow: auto;
 }
+/* Stats › AAs: the tags after an ability's name, and its ranks newest first when opened. */
+.aa-name .link-button {
+  display: inline;
+}
+.aa-name > span {
+  margin-left: 6px;
+}
+.aa-ranks {
+  display: grid;
+  grid-template-columns: max-content max-content 1fr;
+  column-gap: 18px;
+  row-gap: 2px;
+  padding: 2px 4px;
+}
+.aa-ranks > div {
+  display: contents;
+}
+.aa-ranks > .refunded > span {
+  color: var(--text-3);
+  text-decoration: line-through;
+}
 .stats-skills {
   display: grid;
   gap: 2px;

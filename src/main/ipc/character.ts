@@ -2,6 +2,7 @@ import { handle } from './handle'
 import { log } from '../log'
 import { checkGameFolder } from '../game'
 import { readAasFromLog } from '../stats'
+import { aaHistoryView, emptyAaTally } from '../../core/aaHistory'
 import { readMotesFromScreen, readStatsFromScreen } from '../screenRead'
 import { castableSpells, focusReport, focusSpec } from '../../core/itemFocus'
 import { meleeProfile } from '../../core/meleeTally'
@@ -9,18 +10,20 @@ import { craftEras } from '../../core/tradeskills'
 import { petSpells, petSummonName } from '../../core/pets'
 import type { EffectSpell } from '../../core/itemEffects'
 import { isCharacterKey, sanitizeSheet } from '../../core/validate'
-import { logFileFor } from '../storeCore'
+import { characterLogFile } from '../storeCore'
 import type { AppContext } from '../context'
 import type { CatalogFile } from '../../shared/ipc'
 
 // A character's files and what is looked up for them: achievements, inventory, the sheet, gear (catalog,
-// focus, worn effects), the pet, tradeskills and the Stats page's tables and screen reads. Factions
+// focus, worn effects), the pet, tradeskills and the Stats page's tables, screen reads and AAs. Factions
 // answers from its feature folder (src/features).
 
 export function registerCharacterIpc(ctx: AppContext): void {
   const { store, engine } = ctx
   /** A character's log, with its archives: where cast and melee history are read from. */
   const history = (character: string) => ctx.historyOf(character)
+  /** A character's live log alone. */
+  const liveLog = (character: string) => characterLogFile(character, ctx.characterKey(), store.settings.get().logFile, ctx.installDir())
 
   handle('achievements:characters', async () => ({ current: ctx.characterKey(), available: (await checkGameFolder(ctx.installDir())).achievements }))
   handle('achievements:load', (character) => ctx.achievementFiles.load(character))
@@ -96,7 +99,16 @@ export function registerCharacterIpc(ctx: AppContext): void {
     ac: await ctx.gameTables.acCaps(classes, level),
     factors: await ctx.gameTables.classFactors(classes, level)
   }))
-  handle('stats:readAAs', () => readAasFromLog(store.settings.get().logFile))
+  // The picked character's own /alternateadv list, whichever character is being played.
+  handle('stats:readAAs', (character) => {
+    if (!isCharacterKey(character)) throw new Error('Not a character.')
+    return readAasFromLog(liveLog(character))
+  })
+  // The AAs its log and archives saw bought, for Stats › AAs.
+  handle('stats:aaHistory', async (character) => {
+    if (!isCharacterKey(character)) throw new Error('Not a character.')
+    return { character, view: ctx.installDir() ? await ctx.aaHistory.view(history(character)) : aaHistoryView(emptyAaTally()) }
+  })
   handle('stats:readScreen', () => readStatsFromScreen(ctx.windows))
   handle('stock:readScreen', () => readMotesFromScreen(ctx.windows))
 
@@ -133,9 +145,7 @@ export function registerCharacterIpc(ctx: AppContext): void {
     const book = engine.book
     if (!ctx.petScanned.has(character) && book) {
       ctx.petScanned.add(character)
-      // The watched log is the character's own; another character's is in the game's Logs folder.
-      const path = ctx.characterKey() === character ? store.settings.get().logFile : logFileFor(ctx.installDir(), character)
-      await ctx.petStore.scan(character, path, (name) => petSummonName(book, name))
+      await ctx.petStore.scan(character, liveLog(character), (name) => petSummonName(book, name))
     }
     return { character, ...(await ctx.petStore.get(character)), spells: book ? petSpells(book, ids, lvl) : [], spellsLoaded: !!book }
   })

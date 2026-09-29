@@ -583,9 +583,15 @@ moves on by itself as achievements are done, and follows the order the tab showe
 
 ## Stats
 
-Your character's record: up to three classes, the level of each, and race (Iksar or any other, which
-is all the sums need). Every page uses it: spell durations, AC and melee, gear and the upgrade
-finder, spell upgrades and buffs. It is kept per character in `settings.json`. Three tabs:
+Your character's record: up to three classes, the level of each, and race (one of the sixteen
+playable races: the AC sums tell Iksar apart, and faction cons add the race's modifiers). A /who of
+yourself while the tracker runs keeps the classes and race up to date, changes included. /who shows
+one level, the lowest of the three: a class already on the record keeps its level unless it is below
+that, a new class comes in at it, and at the level cap every class is at the cap. Classes that stay
+keep your order (the first is your main class); /who lists them in class-number order, which says
+nothing about that. Every page uses the record: spell
+durations, AC and melee, gear and the upgrade finder, spell upgrades and buffs. It is kept per
+character in `settings.json`. Four tabs:
 
 - **Character** reads the game's Inventory window, on its Stats tab, off the screen with Windows OCR
   (**Read from screen**; this window steps aside for a moment while it looks), and shows each figure
@@ -597,11 +603,21 @@ finder, spell upgrades and buffs. It is kept per character in `settings.json`. T
 - **Combat** works out attack, chance to hit, crit and swings a round with EQEmu's formulas, and
   skill caps from `Resources\skillcaps.txt`, the best of your classes for each skill. The attack,
   hit and swing sums are confirmed against the stats window and parses; the crit model is not.
+- **AAs** lists every ability the character's log and its archives saw bought ("You have gained the
+  ability …", "You have improved … 3 at a cost of 6 ability points"): the rank it last reached, the
+  points it cost and when. Open one for each rank, and any refund where it gave the points back.
+  Abilities whose every rank cost nothing (a class's own come that way) are behind **Granted**. Above
+  it: the points left to spend (the last "You now have N ability points" less what was bought since),
+  the points spent, and a warning while the game says the pool of points is full. Nothing from before
+  the oldest log, or with logging off, is known, so a rank can be higher and points spent more than
+  shown; abilities the `/alternateadv list` holds that the log never saw bought are listed as _list
+  only_.
 
-AAs come from your log: type `/alternateadv list` in game and press **Read from my log** (the page
-also looks on its first visit for a character). The ones that change a sum fill it in. Anything
-filled in from a file, a game table or the AAs can be typed over. The page's inputs are kept per
-character in `characters\<name>_<server>.json`.
+The AA figures the sums use come from the newest `/alternateadv list` in the picked character's own
+log: type it in game after buying, and the page reads it on a character's first visit and whenever
+the log holds a newer list than the one kept (**Read from my log** on the AAs tab reads it again).
+The ones that change a sum fill it in. Anything filled in from a file, a game table or the AAs can be
+typed over. The page's inputs are kept per character in `characters\<name>_<server>.json`.
 
 ## Gear
 
@@ -748,7 +764,7 @@ roaming profile:
 | `item-cache.json` | eqlwiki pages for the items you wear and look at (Gear, Loot, Tradeskills), kept a week |
 | `tradeskill-recipes.json` | Every player-crafted recipe on eqlwiki, with the era of each product and ingredient; refreshed at most weekly |
 | `pet-wiki.json` | eqlwiki's pet summon pages and Pet Guide, for the Pet tab |
-| `log-history.json` | Casts, melee and purchases counted over each character's log and archives, for Gear, Spell upgrades and Tradeskills; only what a log gains is read again |
+| `log-history.json` | Casts, melee, purchases and AAs bought counted over each character's log and archives, for Gear, Spell upgrades, Tradeskills and Stats › AAs; only what a log gains is read again |
 | `speech-cache\` | Azure phrases as WAV files, the newest 4,000 |
 
 It also holds `ocr.ps1`, the OCR script, written each run; the screen captures an OCR read takes are
