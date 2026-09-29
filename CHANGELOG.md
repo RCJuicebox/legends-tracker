@@ -2,7 +2,7 @@
 
 What changed in each version. The release workflow publishes a version's section as its release notes, and installed copies show them when an update arrives.
 
-## Unreleased
+## 2.4.0 (2026-09-29)
 
 - **Slayer: Dervishes.** The Dervish Cutthroats of the Deserts of Ro and the Commonlands are humanoid bandits, not Dervishes: their kills now count toward the playable races only, and a Dervish Thug as an Ogre. **Spin Me Right Round** now suggests the blade storms of the Plane of Sky's island 1.5 (levels 59 to 61).
 - **Fixed: a faction's standing fell short after a busy stretch.** Only the last 20 changes the log saw since your factions export were added to it, so an evening's kills could leave it hundreds short: two achievements the game gave at 2000 showed 1750. Every change since the export now counts, read from the log itself. And a faction achievement the game says you completed is done at once on the Factions page, the plan and the overlay, without waiting for a new achievements export.
