@@ -39,8 +39,10 @@ export interface CharacterSettings {
    * player's own order: the first is the class they think of as their main one.
    */
   classLevels: Partial<Record<ClassName, number>>
-  /** As /who prints it ("Iksar"); '' or absent when not set. Iksar changes the AC sums. */
+  /** As /who prints it ("Iksar"); '' or absent when not set. Iksar changes the AC sums; every race, faction cons. */
   race?: string
+  /** As Loadouts names it ("Agnostic", "Cazic Thule"); '' or absent when not set. /who does not show it: set on the Stats page, for faction cons. */
+  deity?: string
   focusSources: FocusSource[]
   /** Replaced by focusSources; read once to carry an old single figure over. */
   beneficialFocusPct?: number

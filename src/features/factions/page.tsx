@@ -8,7 +8,7 @@ import { useNow } from '../../renderer/src/components/TimerBars'
 import { FilterBox, GameCommand, Info, Pending, Segmented, SortTh, Tabs, ToggleChip, type Sort } from '../../renderer/src/components/ui'
 import { wikiUrl } from '../../core/format'
 import { who } from '../../core/format'
-import { STANDING_MAX, standingBand, type FactionMob, type FactionRow, type FactionRowAchievement, type FactionStandingNow } from './core'
+import { STANDING_MAX, standingBand, type ConBasis, type FactionCon, type FactionMob, type FactionRow, type FactionRowAchievement, type FactionStandingNow } from './core'
 import { Doing, Flags, PlanTab, sourceNote, span, useChoices, usePlanSettings } from './planPage'
 import { waysToRaise, type PlanActivity } from './planner'
 import type { FactionLookup, LookupHit } from './lookup'
@@ -26,11 +26,14 @@ const VIEWS: [View, string][] = [
 
 const HOW =
   'Standing is from the factions export the game writes when you type /outputfile faction, plus every change the log ' +
-  'recorded after it was written, so it keeps up as you play. The con words are EQEmu’s bands (Ally from 1100, ' +
-  'Warmly 750, Kindly 500, Amiably 100, Indifferent 0, Apprehensive −100, Dubious −500, Threatening −750, Scowling ' +
-  'below); that EverQuest Legends uses the same ones is not confirmed. Net change adds up each "Your faction standing ' +
-  'with … has been adjusted by N" line in the log and its archives. When the game says a faction "could not possibly ' +
-  'get any better" (or worse), or the standing is at 2000 (or −2000), it is marked maxed (or bottomed).'
+  'recorded after it was written, so it keeps up as you play; it is what the achievements count. The con word is what ' +
+  'NPCs see: the standing with your race’s, your deity’s and the best of your classes’ modifiers from the game’s own ' +
+  'table added (all three from the Stats page, which /who keeps up to date but for the deity; no deity set counts as ' +
+  'Agnostic, which has none). The bands are EQEmu’s (Ally from 1100, Warmly 750, Kindly 500, Amiably 100, Indifferent ' +
+  '0, Apprehensive −100, Dubious −500, Threatening −750, Scowling below), and cons seen in play land on them to the ' +
+  'point. Net change adds up each "Your faction standing with … has been adjusted by N" line in the log and its ' +
+  'archives. When the game says a faction "could not possibly get any better" (or worse), or the standing is at 2000 ' +
+  '(or −2000), it is marked maxed (or bottomed).'
 
 type SortKey = 'name' | 'standing' | 'ach' | 'net' | 'changes' | 'cap' | 'last'
 
@@ -76,13 +79,26 @@ const plain = (n: number) => (n < 0 ? `−${-n}` : String(n))
 const tone = (n: number) => (n > 0 ? 'ok-text' : n < 0 ? 'bad-text' : 'faint')
 const stamp = (t: number) => new Date(t).toLocaleString([], { weekday: 'short', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
 
-/** How a standing was reached: the export's value, and what the log added since. */
-function standingNote(s: FactionStandingNow): string {
-  const band = standingBand(s.value)
+/** The class in a con's sum: the best of the character's classes ("Bard +50, the best of Monk, Bard and Enchanter"). */
+function classPart(basis: ConBasis, c: FactionCon): string {
+  const best = basis.classes[c.clsIndex]
+  if (!best) return 'no class'
+  const all = basis.classes
+  return all.length > 1 ? `${best} ${signed(c.cls)}, the best of ${all.slice(0, -1).join(', ')} and ${all[all.length - 1]}` : `${best} ${signed(c.cls)}`
+}
+
+/** How a standing was reached (the export's value, and what the log added since), and what NPCs con from it. */
+function standingNote(s: FactionStandingNow, basis: ConBasis | null): string {
+  const c = s.con
+  const band = standingBand(c?.value ?? s.value)
   const next = band.next ? ` ${band.next.points} more to ${band.next.word}.` : ''
-  if (!s.since && s.sinceAll) return `${plain(s.value)} in the factions export.${next}`
+  const from = !s.since && s.sinceAll ? `${plain(s.value)} in the factions export.` : `${plain(s.atExport)} in the factions export, ${signed(s.since)} from the log since.`
   const part = s.sinceAll ? '' : ' The log saw more changes since than it keeps, so it may be further off: type /outputfile faction to refresh it.'
-  return `${plain(s.atExport)} in the factions export, ${signed(s.since)} from the log since.${next}${part}`
+  const con =
+    c && basis
+      ? ` NPCs con ${plain(c.value)}, ${band.word}: ${basis.race} ${signed(c.race)}, ${classPart(basis, c)}, ${basis.deity || 'Agnostic (no deity set)'} ${signed(c.deity)}.`
+      : ' The con word is the standing alone: set your race on the Stats page to add your modifiers.'
+  return `${from}${con}${next}${part}`
 }
 
 /** Characters with a log in the game's Logs folder or a factions export, and the one picked on the character pages. */
@@ -201,6 +217,12 @@ export function Factions() {
               Could not read the factions export: {view.exportError}. Showing the log’s changes only.
             </div>
           )}
+          {hasExport && !view?.conBasis && (
+            <div className="notice mb-16">
+              The con words are the standing alone: {who(character)}’s race is not known yet. Type <GameCommand cmd="/who" /> in game, or set it on the Stats page, for what NPCs
+              really see.
+            </div>
+          )}
 
           <div className="card row mb-16">
             <FilterBox placeholder="Filter by faction…" label="Filter factions" value={filter} onChange={setFilter} width={260} />
@@ -293,7 +315,7 @@ export function Factions() {
                           </td>
                           {hasExport && (
                             <td className="nowrap">
-                              <Standing s={r.standing} />
+                              <Standing s={r.standing} basis={view?.conBasis ?? null} />
                             </td>
                           )}
                           {withAchColumn && (
@@ -326,6 +348,7 @@ export function Factions() {
                               <History
                                 r={r}
                                 character={character}
+                                basis={view?.conBasis ?? null}
                                 ways={waysQ.data ? { activities: waysQ.data.catalog.activities, logPace: waysQ.data.catalog.killsPerHour } : null}
                               />
                             </td>
@@ -377,8 +400,8 @@ function AchievementCell({ a, s }: { a: FactionRowAchievement | null; s: Faction
   )
 }
 
-/** The standing, its con word and what is left to the next one. */
-function Standing({ s }: { s: FactionStandingNow | null }) {
+/** The standing, what NPCs con from it and what is left to the next con. */
+function Standing({ s, basis }: { s: FactionStandingNow | null; basis: ConBasis | null }) {
   if (!s) {
     return (
       <span className="faint" title="The factions export does not list it">
@@ -386,9 +409,9 @@ function Standing({ s }: { s: FactionStandingNow | null }) {
       </span>
     )
   }
-  const band = standingBand(s.value)
+  const band = standingBand(s.con?.value ?? s.value)
   return (
-    <span className="row tight" title={standingNote(s)}>
+    <span className="row tight" title={standingNote(s, basis)}>
       <span className="mono" style={{ minWidth: '4.5ch', textAlign: 'right' }}>
         {s.sinceAll ? '' : '≈'}
         {plain(s.value)}
@@ -475,7 +498,7 @@ function Sources({ name }: { name: string }) {
   )
 }
 
-function History({ r, character, ways }: { r: FactionRow; character: string; ways: Catalog | null }) {
+function History({ r, character, basis, ways }: { r: FactionRow; character: string; basis: ConBasis | null; ways: Catalog | null }) {
   return (
     <div className="stack gap-6 small" style={{ padding: '6px 4px' }}>
       {r.achievement && (
@@ -483,7 +506,7 @@ function History({ r, character, ways }: { r: FactionRow; character: string; way
           Achievement: <b>{r.achievement.name}</b>, done at the maximum standing ({STANDING_MAX}).
         </span>
       )}
-      {r.standing && <span>{standingNote(r.standing)}</span>}
+      {r.standing && <span>{standingNote(r.standing, basis)}</span>}
       <Moved name={r.name} character={character} />
       {(r.standing?.value ?? 0) < STANDING_MAX && <Ways r={r} character={character} ways={ways} />}
       <Sources name={r.name} />

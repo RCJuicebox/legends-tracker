@@ -11,6 +11,7 @@ import { wornSummary } from '../../../core/wornGear'
 import { autoValues, classTrio, primaryClass, valOf } from '../../../core/statsModel'
 import { CLASSES, className, type ClassName } from '../../../shared/game/classes'
 import { PLAYABLE_RACES, playableRace } from '../../../shared/game/races'
+import { DEITIES, deityName } from '../../../shared/game/deities'
 import { useCharacterRecord, withClasses, withRecord, recordLevel } from '../character'
 import { LEVEL_CAP } from '../../../core/buffs'
 import type { CharacterSheet } from '../../../shared/types'
@@ -157,8 +158,9 @@ export function Stats() {
 
       <div className="card stack gap-12 mb-14">
         <p className="hint">
-          {who(character) || 'This character'}&apos;s classes, levels and race, for every page: spell durations, AC and melee, gear and the upgrade finder, spell upgrades and
-          buffs. A /who of yourself while the tracker runs keeps the classes and race up to date: it shows your lowest class level, so no class is put below it.
+          {who(character) || 'This character'}&apos;s classes, levels, race and deity, for every page: spell durations, AC and melee, gear and the upgrade finder, spell upgrades,
+          buffs and faction cons. A /who of yourself while the tracker runs keeps the classes and race up to date: it shows your lowest class level, so no class is put below it.
+          /who does not show your deity: set it here.
         </p>
         <div className="stats-fields">
           {[0, 1, 2].map((i) => {
@@ -206,6 +208,17 @@ export function Stats() {
               {PLAYABLE_RACES.map((r) => (
                 <option key={r} value={r}>
                   {r}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="field">
+            <span>Deity</span>
+            <select value={deityName(record?.deity ?? '')} onChange={(e) => void rec.save((c) => ({ ...c, deity: e.target.value }))}>
+              <option value="">not known</option>
+              {DEITIES.map((d) => (
+                <option key={d} value={d}>
+                  {d}
                 </option>
               ))}
             </select>

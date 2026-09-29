@@ -225,7 +225,8 @@ export class LiveAchievements {
     if (!plan) delete next[character]
     else {
       // The same steps keep their progress; another plan starts afresh.
-      const same = had && JSON.stringify(had.plan.steps.map((s) => [s.id, s.finish, s.lift])) === JSON.stringify(plan.steps.map((s) => [s.id, s.finish, s.lift]))
+      const key = (p: FollowedPlan) => JSON.stringify(p.steps.map((s) => [s.id, s.finish, s.lift, s.reach ?? []]))
+      const same = had && key(had.plan) === key(plan)
       next[character] = { plan, state: same ? had.state : freshFollow() }
     }
     this.follows.set(next)

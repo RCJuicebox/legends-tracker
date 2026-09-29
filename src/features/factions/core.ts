@@ -1,5 +1,7 @@
 import type { LogLine } from '../../core/logLine'
 import type { AchSection } from '../../shared/character'
+import { deityKey, deityName } from '../../shared/game/deities'
+import { CLASS_TABLE } from '../../shared/game/classes'
 
 // Faction changes, from the only lines the game writes about them:
 //   Your faction standing with King Ak`Anon has been adjusted by -1.
@@ -184,8 +186,15 @@ export function standingBand(value: number): { word: string; tone: StandingTone;
 // ---------- what a faction cons at ----------
 // NPCs con a faction on the standing with the race, class and deity modifiers added: the client's
 // Resources/Faction/FactionAssociations.txt holds them, one faction^key^modifier a line, the key a
-// class id (1–16), a race id + 50 (51–62, Iksar 178, Vah Shir 180) or a deity (201–216). The tracker
-// knows a character's race and the class the factions export is named for, not its deity.
+// class id (1–16), a race's (51–62 for the classic twelve, Iksar 178, Kerran 180, Froglok 661, Drakkin
+// 1106) or a deity's (201–216). Seen in play: Tunare's Scouts at 0 conned −950 Scowling for an Iksar of
+// Cazic Thule, −750 Threatening for an Agnostic Iksar, −100 Apprehensive for a Wood Elf of Cazic Thule
+// and 100 Amiably for an Agnostic Wood Elf. Of a character's three classes, the best modifier counts,
+// whichever class it is: an Agnostic Wood Elf Monk/Bard/Enchanter conned Neriak's Dreadguard Inner at
+// 2000 as an Ally (1125), where the Monk's −300 would have made it Warmly, and the bards' Song Weavers at
+// 0 as Amiably (Bard +50), where with Shadow Knight and Shaman beside the Monk it was Indifferent. The
+// race and the classes are the character record's (/who keeps them), and so is the deity (set on the
+// Stats page: /who does not show it).
 
 /** The modifier keys of the playable races, by name as the character record writes it (lower-cased). */
 export const RACE_KEYS: Record<string, number> = {
@@ -202,7 +211,12 @@ export const RACE_KEYS: Record<string, number> = {
   halfling: 61,
   gnome: 62,
   iksar: 178,
-  'vah shir': 180
+  // Legends' Kerran have classic EQ's Vah Shir key (180 favours Kerra Isle); 661 favours Gukta's
+  // factions, and 1106 is the one left: one key for each of the sixteen playable races.
+  kerran: 180,
+  'vah shir': 180,
+  froglok: 661,
+  drakkin: 1106
 }
 
 /** Class ids, by the three letters a factions export's name carries (Kelwyn_neriak-MNK-Factions.txt). */
@@ -244,6 +258,74 @@ export const modifierOf = (mods: Map<number, Map<number, number>>, factionId: nu
 /** The class the factions export is named for (Kelwyn_neriak-MNK-Factions.txt → MNK); '' without one. */
 export const exportClass = (file: string) => /-([A-Z]{3})-Factions\.txt$/i.exec(file)?.[1].toUpperCase() ?? ''
 
+/** Whose modifiers a con adds: the character's race and deity (its record's) and the class its factions export is named for. */
+export interface ConBasis {
+  race: string
+  /** The classes whose best modifier counts, in the record's order (the first is the player's main one); the one the factions export is named for when the record has none. */
+  classes: string[]
+  /** As Loadouts names it; '' when the record has none, counted as Agnostic, which has no modifiers. */
+  deity: string
+}
+
+/** The modifier keys of a con's basis; null where there is none to add. */
+export interface ConKeys {
+  race: number
+  /** The classes' keys, in the basis's order. */
+  classes: number[]
+  deity: number | null
+}
+
+/** What a faction cons at: the standing with the race's, the best class's and the deity's modifiers added. */
+export interface FactionCon {
+  value: number
+  race: number
+  /** The best of the classes' modifiers (a class the table has none for counts 0), and which of the basis's classes it is; -1 with none. */
+  cls: number
+  clsIndex: number
+  deity: number
+}
+
+/**
+ * A character's con basis and keys, from its record's race, classes (by name) and deity; without
+ * classes, the one the factions export is named for. Null without a race the table knows, since then
+ * the con would be anyone's guess.
+ */
+export function conBasis(race: string | undefined, classes: string[], exportFile: string | null, deity: string | undefined): { basis: ConBasis; keys: ConKeys } | null {
+  const r = (race ?? '').trim()
+  const raceKey = RACE_KEYS[r.toLowerCase()]
+  if (!raceKey) return null
+  const named = CLASS_TABLE.filter((t) => classes.includes(t.name)).sort((a, b) => classes.indexOf(a.name) - classes.indexOf(b.name))
+  const code = exportFile ? exportClass(exportFile) : ''
+  const list = named.length ? named : CLASS_TABLE.filter((t) => t.code === code)
+  return {
+    basis: { race: r, classes: list.map((t) => t.name), deity: deityName(deity ?? '') },
+    keys: { race: raceKey, classes: list.map((t) => t.number), deity: deityKey(deity ?? '') }
+  }
+}
+
+/** One faction's con: its standing with the race's, the best class's and the deity's modifiers. */
+export function conOf(mods: Map<number, Map<number, number>>, factionId: number, standing: number, keys: ConKeys): FactionCon {
+  const of = (k: number | null) => (k === null ? 0 : (mods.get(factionId)?.get(k) ?? 0))
+  let cls = 0
+  let clsIndex = -1
+  // The first class wins a tie: the player's main one.
+  keys.classes.forEach((k, i) => {
+    const v = of(k)
+    if (clsIndex < 0 || v > cls) [cls, clsIndex] = [v, i]
+  })
+  const [race, deity] = [of(keys.race), of(keys.deity)]
+  return { value: standing + race + cls + deity, race, cls, clsIndex, deity }
+}
+
+/** The view with each standing's con, and the basis they were worked out on. */
+export function withCons(view: FactionView, mods: Map<number, Map<number, number>>, c: { basis: ConBasis; keys: ConKeys }): FactionView {
+  return {
+    ...view,
+    conBasis: c.basis,
+    factions: view.factions.map((r) => (r.standing ? { ...r, standing: { ...r.standing, con: conOf(mods, r.standing.id, r.standing.value, c.keys) } } : r))
+  }
+}
+
 /** A faction's standing now: the export's, plus what the log saw since. */
 export interface FactionStandingNow {
   id: number
@@ -258,6 +340,8 @@ export interface FactionStandingNow {
    * since come from the tallies, and they saw more than a faction keeps.
    */
   sinceAll: boolean
+  /** What NPCs con: the value with the character's race, class and deity modifiers; absent without a race on its record. */
+  con?: FactionCon
 }
 
 /** One faction as the Factions page shows it. */
@@ -293,6 +377,8 @@ export interface FactionView {
   export: { file: string; modified: number } | null
   /** Why the factions export could not be read; '' when it was, or there is none. */
   exportError: string
+  /** Whose modifiers the standings' cons add; absent without a race on the character's record. */
+  conBasis?: ConBasis
 }
 
 // ---------- faction achievements ----------

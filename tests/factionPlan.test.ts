@@ -523,7 +523,8 @@ describe('the catalog', () => {
       lines.push([10 + i * 30, adjusted('Knights of Truth', 5)])
       lines.push([10 + i * 30, `You have slain ${m}!`])
     })
-    const { activities } = buildCatalog(catalogInput({ sources: settled(read(lines)) }))
+    // The quest rounds known from play (Message Intercept raises Steel Warriors) are not kills.
+    const activities = buildCatalog(catalogInput({ sources: settled(read(lines)) })).activities.filter((a) => a.kind === 'kill')
     expect(activities).toHaveLength(1)
     expect(activities[0]).toMatchObject({ kind: 'kill', zone: 'Blackburrow', mobs: ['A gnoll', 'A gnoll guardsman'], seen: 3, common: 2, named: 0, hits: { 'Steel Warriors': 5 } })
   })
@@ -612,13 +613,263 @@ describe('the catalog', () => {
     expect(quest).toMatchObject({ title: 'Tunare Scouts Dagger', hits: { "Tunare's Scouts": 1 }, needs: 'Amiable' })
     expect(quest.guessed).toBeUndefined()
     expect(quest.blocked).toBe("needs Amiable with Tunare's Scouts; you con Threatening (-750), 850 short")
-    expect(plannable(quest, NO_CHOICES)).toBe(false)
-    expect(plannable(quest, { ...NO_CHOICES, locks: { "Tunare's Scouts": quest.id } })).toBe(true)
+    // Closed now, but the plan may raise Tunare's Scouts to where Tylfon takes it: what he wants goes with it.
+    expect(quest.gate).toEqual([{ faction: "Tunare's Scouts", band: 'Amiable', min: 100 }])
+    expect(plannable(quest, NO_CHOICES)).toBe(true)
+    expect(plannable({ ...quest, gate: undefined }, NO_CHOICES)).toBe(false)
+    expect(plannable({ ...quest, gate: undefined }, { ...NO_CHOICES, locks: { "Tunare's Scouts": quest.id } })).toBe(true)
     // The arboreans of Greater Faydark, which eqlwiki does not list, raise it meanwhile.
     expect(camp).toMatchObject({ kind: 'kill', zone: 'Greater Faydark', site: 'Allakhazam', hits: { "Tunare's Scouts": 1, 'Emerald Warriors': 1 } })
     expect(plannable(camp, NO_CHOICES)).toBe(true)
     // At Amiable the NPC takes it.
     expect(buildCatalog(input(100)).activities[1].blocked).toBeUndefined()
+  })
+
+  it('plans the quest rounds known from play, with their amounts and pace', () => {
+    const input = (con: number) =>
+      catalogInput({
+        factions: [
+          'Dismal Rage',
+          'Opal Darkbriar',
+          'Knights of Truth',
+          'Priests of Marr',
+          'Steel Warriors',
+          'The Freeport Militia',
+          'Coalition of Tradefolk Underground',
+          'The Spurned',
+          'The Dead'
+        ],
+        targets: ['Dismal Rage', 'The Spurned'],
+        cons: { 'Dismal Rage': con }
+      })
+    const acts = buildCatalog(input(869)).activities
+    // Message Intercept the evil way: milk to Mojax, *Duggin's note, the note to Raltur; the log's pace.
+    const note = acts.find((a) => a.id === 'cycle:message intercept')!
+    expect(note).toMatchObject({ kind: 'turnin', npc: 'Raltur Caliskon', source: 'log', seen: 112, measured: 180, needs: 'Amiable', guessed: ['Opal Darkbriar'] })
+    expect(note.hits).toEqual({
+      'Dismal Rage': 19,
+      'Opal Darkbriar': 5,
+      'Knights of Truth': 7,
+      'Priests of Marr': 10,
+      'Steel Warriors': 5,
+      'The Freeport Militia': -3,
+      'Coalition of Tradefolk Underground': -1
+    })
+    expect(note.items?.[0].name).toBe('Bottle of Milk')
+    expect(note.blocked).toBeUndefined()
+    // Raltur takes the note only at Amiable.
+    expect(buildCatalog(input(50)).activities.find((a) => a.id === 'cycle:message intercept')!.blocked).toMatch(/^needs Amiable with Dismal Rage/)
+    // The Spurned: a lore note from Wallin Slyfoot to Draxiz N`Ryt, one a round trip.
+    const spurned = acts.find((a) => a.id === 'cycle:innoruuk disciple')!
+    expect(spurned).toMatchObject({ hits: { 'The Spurned': 10, 'The Dead': -1 }, source: 'wiki', site: 'Allakhazam' })
+    expect(spurned.items?.[0]).toMatchObject({ name: 'Note', how: 'drop', sec: 180 })
+    expect(unitTime(spurned, DEFAULT_SETTINGS).seconds).toBeGreaterThanOrEqual(180)
+    // Draxiz eats the note below Dubious with The Spurned, faking or not: a Wood Elf (-550) swaps race for it.
+    const low = buildCatalog({
+      ...input(869),
+      cons: { 'Dismal Rage': 869, 'The Spurned': -550 },
+      swapCons: { Human: { 'The Spurned': -200 }, 'Dark Elf': { 'The Spurned': 100 }, 'High Elf': { 'The Spurned': -650 } }
+    }).activities.find((a) => a.id === 'cycle:innoruuk disciple')!
+    expect(low.blocked).toBe('needs Dubious with The Spurned; you con Threatening (-550), 50 short')
+    // The race at the best con first: Dark Elf (Amiable) before Human (Dubious).
+    expect(low.swap).toEqual(['Dark Elf', 'Human'])
+    // Merchants of Erudin: lanterns to Jyle Windshot for Wooden Shards, one a hand-in to Emil Parsini: his +5s from the log, the rest guessed.
+    const erudin = buildCatalog(
+      catalogInput({ factions: ['Merchants of Erudin', 'Faydarks Champions'], targets: ['Merchants of Erudin'], cons: { 'Faydarks Champions': 2000 } })
+    ).activities.find((a) => a.id === 'cycle:peacekeeper staff quest')!
+    expect(erudin).toMatchObject({ npc: 'Emil Parsini', zone: 'Toxxulia Forest', source: 'wiki', needs: 'Indifferent' })
+    expect(erudin.hits['Merchants of Erudin']).toBe(5)
+    expect(erudin.hits['High Council of Erudin']).toBe(5)
+    expect(erudin.guessed).not.toContain('Merchants of Erudin')
+    expect(erudin.guessed).toContain('High Guard of Erudin')
+    expect(erudin.items?.[0]).toMatchObject({ name: 'Small Lantern', count: 1 })
+    expect(erudin.blocked).toBeUndefined()
+    // Jyle gives nothing below Indifferent with Faydarks Champions, faking or not.
+    const hostile = buildCatalog(
+      catalogInput({ factions: ['Merchants of Erudin', 'Faydarks Champions'], targets: ['Merchants of Erudin'], cons: { 'Faydarks Champions': -200 } })
+    ).activities.find((a) => a.id === 'cycle:peacekeeper staff quest')!
+    expect(hostile.blocked).toMatch(/^needs Indifferent with Faydarks Champions/)
+    // From Dismal Rage 1044, 51 rounds of 19.
+    const plan = planFactions({ targets: [{ faction: 'Dismal Rage', achievement: 'Dismal Rage', standing: 1044 }], maxed: [], activities: acts }, DEFAULT_SETTINGS)
+    expect(plan.steps.map((st) => [st.activity.id, st.units])).toEqual([['cycle:message intercept', 51]])
+  })
+
+  it("takes Message Intercept's two ways as rounds, and the log's *Duggin kills and Sir Lucan's notes as parts of them", () => {
+    const lucan = handIns(
+      'Sir Lucan D`Lere',
+      'West Freeport',
+      5,
+      [
+        ['The Freeport Militia', 25],
+        ['Coalition of Tradefolk Underground', 5],
+        ['Knights of Truth', -2]
+      ],
+      'Note'
+    )
+    const duggin = settled(
+      read([
+        [0, 'You have entered West Commonlands.'],
+        [5, adjusted('Knights of Truth', 5)],
+        [5, adjusted('Priests of Marr', 5)],
+        [5, 'You have slain Duggin Scumber!'],
+        [9, adjusted('Knights of Truth', 5)],
+        [9, adjusted('Priests of Marr', 5)],
+        [9, 'You have slain Duggin Scumber!'],
+        [99, 'You have entered Nowhere.']
+      ])
+    )
+    const acts = buildCatalog(
+      catalogInput({
+        factions: ['The Freeport Militia', 'Knights of Truth', 'Priests of Marr', 'Steel Warriors', 'Coalition of Tradefolk Underground', 'Dismal Rage'],
+        targets: ['The Freeport Militia', 'Knights of Truth'],
+        sources: joinSources([lucan, duggin])
+      })
+    ).activities
+    expect(acts.map((a) => a.id).sort()).toEqual(['cycle:message intercept', 'cycle:message intercept#lucan'])
+    expect(acts.find((a) => a.id === 'cycle:message intercept#lucan')).toMatchObject({
+      npc: 'Sir Lucan D`Lere',
+      source: 'log',
+      hits: { 'The Freeport Militia': 22, 'Knights of Truth': 8, 'Priests of Marr': 8, 'Steel Warriors': 5, 'Coalition of Tradefolk Underground': 4, 'Dismal Rage': -1 }
+    })
+    // The good way asks no con of the player; Raltur wants Dismal Rage at Amiable.
+    expect(acts.find((a) => a.id === 'cycle:message intercept#lucan')!.gate).toBeUndefined()
+    expect(acts.find((a) => a.id === 'cycle:message intercept')!.gate).toEqual([{ faction: 'Dismal Rage', band: 'Amiable', min: 100 }])
+  })
+
+  it('also finds ways to raise a faction a quest wants more of than the character cons, where that quest raises an achievement', () => {
+    const page = (name: string, quests: string[], mobs: FactionRow['name'][] = []) => ({
+      page: name,
+      raise: { mobs: mobs.map((m) => ({ name: m, zone: 'Test Woods', note: '' })), quests, zones: [] },
+      lower: { mobs: [], quests: [], zones: [] }
+    })
+    const acorn = {
+      page: 'Acorn Delivery',
+      givers: ['Ranger Holt'],
+      zones: ['Test Woods'],
+      level: 1,
+      steps: [{ hits: { 'Test Rangers': 15 }, guessed: [], handIn: [{ item: 'Acorn', count: 1 }], npc: 'Ranger Holt', line: '' }]
+    }
+    const input = (con: number) =>
+      catalogInput({
+        factions: ['Test Rangers', 'Wood Folk'],
+        targets: ['Test Rangers'],
+        pages: [page('Test Rangers', ['Acorn Delivery']), page('Wood Folk', [], ['a wood sprite'])],
+        quests: { 'Acorn Delivery': acorn },
+        items: { acorn: item({ vendors: [{ zone: 'Test Woods', npc: 'Merchant', note: '' }] }) },
+        alla: [parseAllaFaction(7, ALLA_PAGE.replaceAll('Test Rangers', 'Wood Folk'))!],
+        cons: { 'Wood Folk': con }
+      })
+    // Holt wants Amiable with Wood Folk: short of it, the sprites that raise Wood Folk are a way to open his quest.
+    const short = buildCatalog(input(-50)).activities
+    expect(short.find((a) => a.title === 'Acorn Delivery')).toMatchObject({
+      blocked: expect.stringMatching(/^needs Amiable with Wood Folk/),
+      gate: [{ faction: 'Wood Folk', band: 'Amiable', min: 100 }]
+    })
+    expect(short.some((a) => a.mobs?.includes('a wood sprite'))).toBe(true)
+    // At Amiable already, nothing needs raising.
+    expect(buildCatalog(input(150)).activities.some((a) => a.mobs?.includes('a wood sprite'))).toBe(false)
+  })
+
+  it("takes Jeet's Scrap Metal as Cleaner VII's, one a kill, and Mater's 300 gold with each Ogre Head", () => {
+    const quest = (page: string, npc: string, item: string) => ({
+      page,
+      givers: [npc],
+      zones: ['North Kaladim'],
+      level: 1,
+      steps: [{ hits: { 'Miners Guild 628': 15 }, guessed: [], handIn: [{ item, count: 1 }], npc, line: '' }]
+    })
+    const acts = buildCatalog(
+      catalogInput({
+        factions: ['Miners Guild 628'],
+        targets: ['Miners Guild 628'],
+        pages: [{ page: 'Miners Guild 628', raise: { mobs: [], quests: ["Miner's Cap", 'Miners Pick'], zones: [] }, lower: { mobs: [], quests: [], zones: [] } }],
+        quests: { "Miner's Cap": quest("Miner's Cap", 'Jeet', 'Scrap Metal'), 'Miners Pick': quest('Miners Pick', 'Mater', 'Ogre Head') },
+        items: { 'scrap metal': item({ sources: { drops: [{ zone: 'Steamfont Mountains', mobs: ['rogue clockwork'] }], foraged: [], crafted: false } }) }
+      })
+    ).activities
+    expect(acts.find((a) => a.title === "Miner's Cap")!.items).toEqual([
+      { name: 'Scrap Metal', count: 1, how: 'drop', where: 'Cleaner VII (North Kaladim), lore: one at a time', named: 1 }
+    ])
+    expect(acts.find((a) => a.title === 'Miners Pick')!.items?.map((it) => [it.name, it.count, it.how])).toEqual([
+      ['Ogre Head', 1, 'unknown'],
+      ['Gold', 300, 'coin']
+    ])
+  })
+
+  it('leaves out a quest whose items do not drop in classic', () => {
+    const eye = {
+      page: "Xelha's Cyclops Eye",
+      givers: ['Xelha Nevagon'],
+      zones: ['East Freeport'],
+      level: 1,
+      steps: [
+        { hits: { 'Dismal Rage': 1, 'Knights of Truth': -1, 'Opal Dark Briar': 1 }, guessed: [], handIn: [{ item: 'cyclops eye', count: 1 }], npc: 'Xelha Nevagon', line: '' }
+      ]
+    }
+    const quest = buildCatalog(
+      catalogInput({
+        factions: ['Dismal Rage', 'Knights of Truth', 'Opal Darkbriar'],
+        targets: ['Dismal Rage'],
+        pages: [{ page: 'Dismal Rage', raise: { mobs: [], quests: ["Xelha's Cyclops Eye"], zones: [] }, lower: { mobs: [], quests: [], zones: [] } }],
+        quests: { "Xelha's Cyclops Eye": eye }
+      })
+    ).activities.find((a) => a.title === "Xelha's Cyclops Eye")!
+    expect(quest.once).toBe('cyclops eyes do not drop in classic')
+    expect(plannable(quest, NO_CHOICES)).toBe(false)
+  })
+
+  it('offers a race swap for a quest another race opens, and plans it when that beats the other ways', () => {
+    const dagger = {
+      page: 'Tunare Scouts Dagger',
+      givers: ['Tylfon'],
+      zones: ['Kelethin'],
+      level: 1,
+      steps: [{ hits: { "Tunare's Scouts": 1 }, guessed: ["Tunare's Scouts"], handIn: [{ item: 'Rusty Dagger', count: 2 }], npc: 'Tylfon', line: '' }]
+    }
+    // An Iksar at 0 cons Threatening; as a Wood Elf (+100) the NPC would take it, as a Human (-1) not.
+    const catalog = buildCatalog(
+      catalogInput({
+        factions: ["Tunare's Scouts", 'Emerald Warriors'],
+        targets: ["Tunare's Scouts"],
+        pages: [{ page: "Tunare's Scouts", raise: { mobs: [], quests: ['Tunare Scouts Dagger'], zones: [] }, lower: { mobs: [], quests: [], zones: [] } }],
+        quests: { 'Tunare Scouts Dagger': dagger },
+        items: { 'rusty dagger': item({ vendors: [{ zone: 'Greater Faydark', npc: 'Merchant', note: '' }] }) },
+        cons: { "Tunare's Scouts": -750 },
+        swapCons: { 'Wood Elf': { "Tunare's Scouts": 100 }, Human: { "Tunare's Scouts": -1 } }
+      })
+    )
+    const quest = catalog.activities.find((a) => a.kind === 'quest')!
+    expect(quest.swap).toEqual(['Wood Elf'])
+    // Without what it wants to go by, as before: open to the races in `swap`, when swaps are planned.
+    const bare = { ...quest, gate: undefined }
+    expect(plannable(bare, NO_CHOICES)).toBe(false)
+    expect(plannable(bare, NO_CHOICES, true)).toBe(true)
+    // Without the races' modifiers, the plan goes by what the catalog found.
+    const input: PlanInput = { targets: [{ faction: "Tunare's Scouts", achievement: "Tunare's Scouts", standing: 0 }], maxed: [], activities: catalog.activities }
+    // A hand-in of two bought daggers is seconds; 2000 arborean kills are a day: the plan swaps race for it, once.
+    const swapped = planFactions(input, DEFAULT_SETTINGS)
+    expect(swapped.steps.map((st) => st.activity.title)).toEqual(['Tunare Scouts Dagger'])
+    expect(swapped.steps[0].swap).toBe(DEFAULT_SETTINGS.swapMin * 60)
+    expect(swapped.steps[0].seconds).toBeGreaterThan(DEFAULT_SETTINGS.swapMin * 60)
+    // With swaps off, the arboreans it is.
+    const own = planFactions(input, { ...DEFAULT_SETTINGS, raceSwaps: false })
+    expect(own.steps.map((st) => st.activity.kind)).toEqual(['kill'])
+    expect(own.steps[0].swap).toBe(0)
+    expect(own.seconds).toBeGreaterThan(swapped.seconds)
+    // A quest no race opens stays out.
+    const none = buildCatalog(
+      catalogInput({
+        factions: ["Tunare's Scouts"],
+        targets: ["Tunare's Scouts"],
+        pages: [{ page: "Tunare's Scouts", raise: { mobs: [], quests: ['Tunare Scouts Dagger'], zones: [] }, lower: { mobs: [], quests: [], zones: [] } }],
+        quests: { 'Tunare Scouts Dagger': dagger },
+        cons: { "Tunare's Scouts": -750 },
+        swapCons: { Human: { "Tunare's Scouts": -1 } }
+      })
+    ).activities.find((a) => a.kind === 'quest')!
+    expect(none.swap).toBeUndefined()
+    expect(plannable({ ...none, gate: undefined }, NO_CHOICES, true)).toBe(false)
+    expect(planFactions({ ...input, activities: [none] }, DEFAULT_SETTINGS).steps).toEqual([])
   })
 
   it('makes what the NPC gives back, handed back for as much again, one unit with the hand-in before it', () => {
@@ -849,6 +1100,137 @@ describe('planFactions', () => {
     expect(two.steps.map((s) => [s.activity.id, s.units])).toEqual(one.steps.map((s) => [s.activity.id, s.units]))
     expect(one.unplanned).toEqual([])
     for (const t of input.targets) expect(one.steps.some((s) => s.finishes.includes(t.faction))).toBe(true)
+  })
+})
+
+describe('what quests want, race unlocks, and steps that open a way', () => {
+  const TS = "Tunare's Scouts"
+  // An Iksar cons Tunare's Scouts 750 under its standing, a Wood Elf 100 over; Tylfon's dagger wants Amiable (100).
+  const mods = { Iksar: { [TS]: -750 }, 'Wood Elf': { [TS]: 100 }, Human: {} }
+  const camp = act('arboreans', { [TS]: 1 }, 80, { zone: 'Greater Faydark' })
+  const dagger: PlanActivity = {
+    id: 'dagger',
+    kind: 'quest',
+    title: 'Tunare Scouts Dagger',
+    zone: 'Kelethin',
+    npc: 'Tylfon',
+    hits: { [TS]: 1 },
+    source: 'log',
+    seen: 100,
+    measured: 1800,
+    items: [{ name: 'Rusty Dagger', count: 2, how: 'bought', where: 'Harg Tonicka', each: 10 }],
+    gate: [{ faction: TS, band: 'Amiable', min: 100 }]
+  }
+  const target = [{ faction: TS, achievement: TS, standing: 0 }]
+
+  it("raises a faction to what a quicker quest's NPC wants first, then does the quest", () => {
+    const races = { own: 'Iksar', unlocked: [], mods }
+    const plan = planFactions({ targets: target, maxed: [], activities: [camp, dagger], races }, S)
+    expect(plan.steps.map((st) => [st.activity.id, st.units])).toEqual([
+      ['arboreans', 850],
+      ['dagger', 1150]
+    ])
+    expect(plan.steps[0]).toMatchObject({ finishes: [], restores: false, reaches: [{ faction: TS, to: 850, band: 'Amiable', opens: 'Tunare Scouts Dagger' }] })
+    expect(plan.steps[1]).toMatchObject({ finishes: [TS], reaches: [] })
+    expect(plan.steps.every((st) => !st.race)).toBe(true)
+    // 850 kills and quick hand-ins, where 2000 kills are a day.
+    const kills = planFactions({ targets: target, maxed: [], activities: [camp], races }, S)
+    expect(plan.seconds).toBeLessThan(kills.seconds * 0.6)
+    // The order kept while the standing moves: the step there to open the way, then the quest.
+    const kept = planFactions({ targets: [{ ...target[0], standing: 400 }], maxed: [], activities: [camp, dagger], races }, S, NO_CHOICES, plan.shape)
+    expect(kept.kept).toBe(true)
+    expect(kept.steps.map((st) => [st.activity.id, st.units])).toEqual([
+      ['arboreans', 450],
+      ['dagger', 1150]
+    ])
+  })
+
+  it('swaps to a race it has unlocked whose con its NPC takes, and says what its own would con', () => {
+    const plan = planFactions({ targets: target, maxed: [], activities: [camp, dagger], races: { own: 'Iksar', unlocked: ['Wood Elf'], mods } }, S)
+    expect(plan.steps.map((st) => [st.activity.id, st.units])).toEqual([['dagger', 2000]])
+    expect(plan.steps[0]).toMatchObject({ race: 'Wood Elf', swap: S.swapMin * 60, why: { faction: TS, band: 'Amiable', con: -750 } })
+    // With swaps off, its own race: the kills first.
+    const own = planFactions({ targets: target, maxed: [], activities: [camp, dagger], races: { own: 'Iksar', unlocked: ['Wood Elf'], mods } }, { ...S, raceSwaps: false })
+    expect(own.steps.map((st) => st.activity.id)).toEqual(['arboreans', 'dagger'])
+    expect(own.steps.every((st) => !st.race)).toBe(true)
+  })
+
+  it('counts a race unlock: its factions are to do too, and once it is done the plan may swap to that race', () => {
+    const EW = 'Emerald Warriors'
+    const input: PlanInput = {
+      targets: target,
+      standings: { [EW]: 0 },
+      maxed: [],
+      activities: [camp, dagger, act('bows', { [EW]: 20 }, 3600, { zone: 'Kelethin' })],
+      unlocks: [{ achievement: 'Race Unlock - Wood Elf', race: 'Wood Elf', factions: [EW] }],
+      races: { own: 'Iksar', unlocked: [], mods }
+    }
+    const plan = planFactions(input, S)
+    // Emerald Warriors is no achievement to do here, but the race unlock wants it maxed.
+    expect(plan.targets.map((t) => [t.faction, t.achievement])).toEqual([
+      [TS, TS],
+      [EW, 'Race Unlock - Wood Elf']
+    ])
+    expect(plan.steps.map((st) => st.activity.id)).toEqual(['bows', 'dagger'])
+    expect(plan.steps[0]).toMatchObject({ finishes: [EW], unlocks: ['Race Unlock - Wood Elf'] })
+    expect(plan.steps[1]).toMatchObject({ race: 'Wood Elf', finishes: [TS] })
+    expect(plan.unplanned).toEqual([])
+    // Half Elf's comes with Wood Elf's.
+    const half = planFactions(
+      { ...input, unlocks: [...input.unlocks!, { achievement: 'Race Unlock - Half Elf', race: 'Half Elf', factions: [], anyOf: ['Race Unlock - Wood Elf'] }] },
+      S
+    )
+    expect(half.steps[0].unlocks).toEqual(['Race Unlock - Wood Elf', 'Race Unlock - Half Elf'])
+  })
+
+  it('with race unlocks first, does them before the rest', () => {
+    const input: PlanInput = {
+      targets: [
+        { faction: 'Quick', achievement: 'Quick', standing: 1900 },
+        { faction: 'U', achievement: 'U', standing: 0 }
+      ],
+      maxed: [],
+      activities: [act('quick', { Quick: 10 }, 600), act('slow', { U: 10 }, 60)],
+      unlocks: [{ achievement: 'Race Unlock - Troll', race: 'Troll', factions: ['U'] }]
+    }
+    // As quick either way, so the quick achievement first: stopping part way leaves the most done.
+    expect(planFactions(input, S).steps.map((st) => st.activity.id)).toEqual(['quick', 'slow'])
+    const first = planFactions(input, { ...S, unlocksFirst: true })
+    expect(first.steps.map((st) => st.activity.id)).toEqual(['slow', 'quick'])
+    expect(first.steps[0].unlocks).toEqual(['Race Unlock - Troll'])
+  })
+
+  it("with race unlocks first, still does what is quick on the way: Raltur's notes for Dismal Rage before Sir Lucan's", () => {
+    const [FM, KoT, DR] = ['The Freeport Militia', 'Knights of Truth', 'Dismal Rage']
+    const round: Omit<PlanActivity, 'id' | 'npc' | 'hits'> = {
+      kind: 'turnin',
+      title: 'Message Intercept',
+      zone: 'West Commonlands',
+      source: 'log',
+      seen: 100,
+      measured: 180,
+      items: [{ name: 'Bottle of Milk', count: 1, how: 'bought', where: 'Pincia Brownloe', each: 5 }]
+    }
+    const lucan: PlanActivity = { ...round, id: 'lucan', npc: 'Sir Lucan D`Lere', hits: { [FM]: 22, [KoT]: 8, [DR]: -1 } }
+    const raltur: PlanActivity = { ...round, id: 'raltur', npc: 'Raltur Caliskon', hits: { [DR]: 19, [KoT]: 7, [FM]: -3 }, gate: [{ faction: DR, band: 'Amiable', min: 100 }] }
+    const input: PlanInput = {
+      targets: [{ faction: DR, achievement: DR, standing: 0 }],
+      standings: { [FM]: 0, [KoT]: 0 },
+      maxed: [],
+      activities: [lucan, raltur, act('guards', { [DR]: 5 }, 300, { zone: 'West Freeport' })],
+      unlocks: [{ achievement: 'Race Unlock - Human (Freeport)', race: 'Human', factions: [FM, KoT] }],
+      races: { own: 'Wood Elf', unlocked: [], mods: { 'Wood Elf': {}, Human: {} } }
+    }
+    const plan = planFactions(input, { ...S, unlocksFirst: true })
+    // Dismal Rage raised to Amiable, then maxed by Raltur's notes (Knights of Truth +7 each too), then Sir Lucan's for the unlock:
+    // not 250 of Sir Lucan's first, with Dismal Rage taken to -250 and raised back after.
+    expect(plan.steps.map((st) => [st.activity.id, st.units])).toEqual([
+      ['guards', 20],
+      ['raltur', 100],
+      ['lucan', 163]
+    ])
+    expect(plan.steps[1].finishes).toEqual([DR])
+    expect(plan.steps[2].unlocks).toEqual(['Race Unlock - Human (Freeport)'])
   })
 })
 

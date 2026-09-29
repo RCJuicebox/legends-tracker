@@ -169,6 +169,8 @@ export interface Need {
   band: string
   min?: number
   max?: number
+  /** Seen to hold below Indifferent too: the NPC eats the hand-in under it, so faking a con does not help. */
+  real?: boolean
 }
 
 /** What every page says of the quests that want a con: by questKey, each faction's need. `name` puts a faction the game's way. */

@@ -9,7 +9,7 @@ export interface FactionTrackGoal {
   /** The achievement's name, when it is one. */
   achievement?: string
   standing: number
-  /** 2000 for an achievement, 0 for a faction brought back. */
+  /** 2000 for an achievement, 0 for a faction brought back, else the standing a later step's NPC wants. */
   to: number
   done: boolean
 }

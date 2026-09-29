@@ -215,6 +215,38 @@ describe('following a faction plan', () => {
     expect(readFollow(f, first.state, { A: 1900, B: 1950 }, new Set(['B'])).view.current).toMatchObject({ index: 1 })
   })
 
+  it('follows a step there to open a way: done when the faction gets to what the next step wants', () => {
+    const TS = "Tunare's Scouts"
+    const dagger: PlanActivity = {
+      ...act('dagger', { [TS]: 1 }, 1800, 'Kelethin', 'quest'),
+      title: 'Tunare Scouts Dagger',
+      items: [{ name: 'Rusty Dagger', count: 2, how: 'bought', where: 'Harg Tonicka', each: 10 }],
+      gate: [{ faction: TS, band: 'Amiable', min: 100 }]
+    }
+    const target = [{ faction: TS, achievement: TS, standing: 0 }]
+    const plan = planFactions(
+      {
+        targets: target,
+        maxed: [],
+        activities: [act('arboreans', { [TS]: 1 }, 80, 'Greater Faydark'), dagger],
+        races: { own: 'Iksar', unlocked: [], mods: { Iksar: { [TS]: -750 } } }
+      },
+      S
+    )
+    const f = followedPlan(plan, target)
+    expect(f.steps.map((s) => [s.id, s.finish, s.reach])).toEqual([
+      ['arboreans', [], [{ faction: TS, to: 850, label: `${TS} for Tunare Scouts Dagger` }]],
+      ['dagger', [TS], undefined]
+    ])
+    let r = readFollow(f, freshFollow(), { [TS]: 800 }, new Set())
+    expect(r.view.current).toMatchObject({ index: 0, unitsLeft: 50, goals: [{ faction: TS, achievement: `${TS} for Tunare Scouts Dagger`, standing: 800, to: 850, done: false }] })
+    r = readFollow(f, r.state, { [TS]: 850 }, new Set())
+    expect(r.events).toEqual([{ kind: 'step', index: 0, step: f.steps[0], next: f.steps[1] }])
+    expect(r.view.current).toMatchObject({ index: 1, unitsLeft: 1150 })
+    // What a page sends is checked too.
+    expect(sanitizeFollowedPlan(JSON.parse(JSON.stringify(f)))).toEqual(f)
+  })
+
   it('checks a plan sent by a page', () => {
     expect(sanitizeFollowedPlan(null)).toBeNull()
     expect(sanitizeFollowedPlan({ steps: 'no' })).toBeNull()

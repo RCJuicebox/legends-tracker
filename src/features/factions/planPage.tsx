@@ -1,14 +1,17 @@
-import { Fragment, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react'
+import { Fragment, useDeferredValue, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { ago, api } from '../../renderer/src/api'
 import { showError } from '../../renderer/src/toast'
 import { useAchievementTrack, useInvoke, useLatest } from '../../renderer/src/hooks'
 import { useApp } from '../../renderer/src/state'
 import { useRemembered } from '../../renderer/src/remember'
+import { useCharacterRecord } from '../../renderer/src/character'
 import { useNow } from '../../renderer/src/components/TimerBars'
 import { GameCommand, Info, NumberInput, Pending, Segmented, Switch } from '../../renderer/src/components/ui'
 import { who, wikiUrl } from '../../core/format'
 import { fmtCoin } from '../../core/loot'
-import { STANDING_MAX, type FactionView } from './core'
+import { STANDING_MAX, standingBand, type FactionView } from './core'
+import { deityName } from '../../shared/game/deities'
+import { playableRace } from '../../shared/game/races'
 import {
   DEFAULT_SETTINGS,
   NO_CHOICES,
@@ -16,8 +19,10 @@ import {
   planFor,
   plannable,
   type FactionPlan,
+  type FactionPlanData,
   type PlanFor,
   type PlanGoal,
+  type PlanInput,
   type PlanShape,
   type HandInItem,
   type PlanActivity,
@@ -26,6 +31,7 @@ import {
   type PlanSettings,
   type PlanStep
 } from './planner'
+import { unlockGoals, type RaceUnlock } from './unlocks'
 import { followedPlan } from './tracker'
 import type { FactionTrackView } from '../../shared/tracking'
 
@@ -51,6 +57,11 @@ const HOW =
   'what counts is getting the items: bought ones are quick, gathered ones take the time you set, and what you already hold is free. ' +
   'A quest step counts as repeatable when it wants one kind of item nobody in the walkthrough hands you; chain steps, big one-off ' +
   'rewards and hand-ins your log saw fewer than three times are listed but not planned, unless you lock one in. ' +
+  'A quest whose NPC wants a con (Allakhazam lists them) opens as your standing gets there, with your race’s and classes’ modifiers ' +
+  'as an Agnostic, and the plan may add a step that raises a faction just far enough to open a quicker quest, or swap race in ' +
+  'Loadouts for it. The race unlocks count as well: each wants three of a race’s factions maxed, and once one is done the plan may ' +
+  'swap to that race in the steps after. With Race unlocks first, it does them before the rest, and still does what is quick to do ' +
+  'on the way (more hand-ins to an NPC it is at, say, for another achievement). ' +
   'Two goals: Fastest takes every achievement in the least time. Most factions positive also counts every faction that ends at 0 or ' +
   'above, each worth the hours you set, so it may take a slower way that keeps a faction up, or add steps at the end that bring ' +
   'factions back from below zero. Either way, where a faction ends is what counts: points an early step takes and a later one gives ' +
@@ -67,6 +78,8 @@ export function span(seconds: number): string {
 }
 
 const signed = (n: number) => (n > 0 ? `+${fmt(n)}` : n < 0 ? `−${fmt(-n)}` : '0')
+/** The con's word for a standing with the modifiers added: "Indifferent", "Amiable". */
+const standingWord = (con: number) => standingBand(con).word
 const fmt = (n: number) => (Number.isInteger(n) ? n.toLocaleString() : n.toFixed(1))
 const plain = (n: number) => (n < 0 ? `−${-n}` : String(n))
 /** A standing with thousands separators and a true minus: "1,415", "−702". */
@@ -173,7 +186,14 @@ export function Flags({ a }: { a: PlanActivity }) {
       label: 'city NPCs',
       why: "A city's people: its guards may join in, and the city's own factions drop."
     })
-  if (a.blocked) flags.push({ tone: 'warn', label: `needs ${a.needs ?? 'better faction'}`, why: `Not planned until you are there, unless you lock it in: it ${a.blocked}.` })
+  if (a.blocked)
+    flags.push({
+      tone: 'warn',
+      label: `needs ${a.needs ?? 'better faction'}`,
+      why: a.swap?.length
+        ? `Your race's con keeps it closed now: it ${a.blocked}. As ${listed(a.swap)} it is open, so the plan may swap race for it (Assumptions), or raise the faction first; or lock it in.`
+        : `Closed now: it ${a.blocked}. The plan may raise the faction first, where that is quicker than the other ways, or swap to a race it unlocks; or lock it in.`
+    })
   if (a.source === 'wiki' && a.guessed?.length)
     flags.push({ tone: '', label: 'amounts guessed', why: 'eqlwiki names the factions but not the amounts: a typical amount stands in until your log measures it.' })
   if (a.items?.some((it) => it.how === 'unknown'))
@@ -230,6 +250,10 @@ export function PlanTab({ character, view }: { character: string; view: FactionV
   const now = useNow(30_000)
   const [choices, setChoices] = useChoices(character)
   const [open, setOpen] = useState<string | null>(null)
+  // The plan counts everyone as Agnostic; the character's own deity says whether it has a step to take first.
+  const record = useCharacterRecord(character).record
+  const deity = deityName(record?.deity ?? '')
+  const ownRace = playableRace(record?.race ?? '')
 
   // New kills and hand-ins show up as the log grows; the catalog comes from caches after the first read.
   const reload = q.reload
@@ -251,20 +275,35 @@ export function PlanTab({ character, view }: { character: string; view: FactionV
   // achievement done, a change of choices or assumptions, or Plan afresh searches for the order again.
   const [afresh, setAfresh] = useState(0)
   const openSet = todo ? todo.targets.flatMap((t) => (t.standing < STANDING_MAX ? [t.faction] : [])).join('|') : ''
-  // A catalog with other ways in it (the wider one Most factions positive reads, or a hand-in newly seen three times) plans afresh too.
-  const structure = JSON.stringify([openSet, deferredSettings, deferredChoices, afresh, data?.catalog.activities.length ?? 0])
+  // The race unlocks still to do, and what each race adds to the cons, as the catalog came with them.
+  const extras = useMemo(() => planExtras(data), [data])
+  // A catalog with other ways in it (the wider one Most factions positive reads, or a hand-in newly seen three times) plans afresh
+  // too, and so does a change of con: a race or class change, a race unlocked. The plan sees a quest open as a standing reaches
+  // what its NPC wants; without the races' modifiers, the quests open now are what it goes by.
+  const cons = data?.raceMods
+    ? `${data.raceMods.own}|${(data.races ?? ['every race']).join(',')}|${Object.values(data.raceMods.mods[data.raceMods.own] ?? {}).reduce((n, v) => n + v, 0)}`
+    : data
+      ? data.catalog.activities.flatMap((a) => (a.blocked ? [a.id] : [])).join('|')
+      : ''
+  const unlocksKey = extras.unlocks.map((g) => `${g.achievement}:${g.factions.join(',')}`).join('|')
+  const structure = JSON.stringify([openSet, deferredSettings, deferredChoices, afresh, data?.catalog.activities.length ?? 0, cons, unlocksKey])
   const keptShape = useRef<{ key: string; shape: PlanShape } | null>(null)
   const plan = useMemo(() => {
     if (!data || !todo) return null
     const keep = keptShape.current?.key === structure ? keptShape.current.shape : undefined
-    const p = planFactions({ targets: todo.targets, maxed: todo.maxed, standings: todo.standings, activities: data.catalog.activities }, deferredSettings, deferredChoices, keep)
+    const p = planFactions(
+      { targets: todo.targets, maxed: todo.maxed, standings: todo.standings, activities: data.catalog.activities, ...extras },
+      deferredSettings,
+      deferredChoices,
+      keep
+    )
     keptShape.current = { key: structure, shape: p.shape }
     return p
-  }, [data, todo, deferredSettings, deferredChoices, structure])
+  }, [data, todo, extras, deferredSettings, deferredChoices, structure])
 
   // The plan shown is the one followed while this character is played: it goes to the main process
   // whenever its steps change, for the achievements overlay and its cues.
-  const followKey = plan ? JSON.stringify(plan.steps.map((st) => [st.activity.id, st.finishes, st.lifts])) : ''
+  const followKey = plan ? JSON.stringify(plan.steps.map((st) => [st.activity.id, st.finishes, st.lifts, st.reaches])) : ''
   const following = useLatest({ plan, todo })
   useEffect(() => {
     const { plan: p, todo: t } = following.current
@@ -280,6 +319,41 @@ export function PlanTab({ character, view }: { character: string; view: FactionV
   const { state: app, patchSettings } = useApp()
   const overlay = app.settings.overlays.find((o) => o.kind === 'achievements')
 
+  // Race swaps: what they save against the same plan without them, worked out once the plan shows.
+  const swapSteps = plan ? plan.steps.filter((st) => st.race).length : 0
+  const swapKey = swapSteps ? structure : ''
+  const [noSwap, setNoSwap] = useState<{ key: string; seconds: number; unplanned: number } | null>(null)
+  useEffect(() => {
+    if (!swapKey || !data || !todo || noSwap?.key === swapKey) return
+    const timer = setTimeout(() => {
+      // Without swaps: every quest as the character's own race, when its standing gets there. A lock on one only another race opens now is dropped.
+      const needSwap = new Set(data.catalog.activities.flatMap((a) => (a.blocked && a.swap?.length ? [a.id] : [])))
+      const p = planFactions(
+        { targets: todo.targets, maxed: todo.maxed, standings: todo.standings, activities: data.catalog.activities, ...extras },
+        { ...deferredSettings, raceSwaps: false },
+        {
+          ...deferredChoices,
+          locks: Object.fromEntries(Object.entries(deferredChoices.locks).filter(([, id]) => !needSwap.has(id))),
+          excluded: extras.races ? deferredChoices.excluded : [...deferredChoices.excluded, ...needSwap]
+        }
+      )
+      setNoSwap({ key: swapKey, seconds: p.seconds, unplanned: p.unplanned.length })
+    }, 100)
+    return () => clearTimeout(timer)
+  }, [swapKey, data, todo, extras, deferredSettings, deferredChoices, noSwap?.key])
+  const swapSaves = plan && noSwap && noSwap.key === swapKey ? savedBySwaps(plan, noSwap) : null
+  // The step each race is unlocked at, for a swap to a race the plan unlocks first.
+  const unlockedAt = useMemo(() => {
+    const at = new Map<string, number>()
+    const raceOf = new Map((data?.unlocks ?? []).map((u) => [u.achievement, u.race]))
+    plan?.steps.forEach((st, i) => st.unlocks.forEach((u) => !at.has(raceOf.get(u) ?? '') && at.set(raceOf.get(u) ?? '', i + 1)))
+    return at
+  }, [plan, data])
+  /** Under a step done as another race: the race, and why the character's own will not do there. */
+  const swapHint = (st: PlanStep): ReactNode =>
+    st.race ? <SwapHint step={st} own={ownRace} unlocksKnown={!!data && data.races !== null} unlockedAt={unlockedAt.get(st.race)} /> : null
+  const nowStep = plan && tracked?.current && plan.steps[tracked.current.index]?.activity.id === tracked.current.id ? plan.steps[tracked.current.index] : null
+
   if (!data)
     return (
       <Pending
@@ -292,6 +366,10 @@ export function PlanTab({ character, view }: { character: string; view: FactionV
 
   const { targets, achievementsExport } = todo ?? data
   const toDo = targets.filter((t) => t.standing < STANDING_MAX)
+  const openUnlocks = (data.unlocks ?? []).filter((u) => u.done !== true)
+  // The step that does each race unlock.
+  const unlockStep = new Map<string, number>()
+  plan?.steps.forEach((st, i) => st.unlocks.forEach((u) => unlockStep.set(u, i + 1)))
   if (!targets.length)
     return (
       <div className="card empty">
@@ -326,6 +404,24 @@ export function PlanTab({ character, view }: { character: string; view: FactionV
 
   return (
     <>
+      {deity !== 'Agnostic' && (
+        <div className="notice mb-16">
+          This plan counts {who(character)} as Agnostic, the deity with no faction modifiers: renouncing your faith is the first step.{' '}
+          {deity ? `${who(character)} worships ${deity}. ` : 'No deity is set on the Stats page. '}
+          {data.agnostic ? (
+            'Agnostic is unlocked: pick it in Loadouts.'
+          ) : (
+            <>
+              {data.agnostic === false ? 'Unlock Agnostic' : 'If Agnostic is not unlocked yet, unlock it'} with{' '}
+              <a href={wikiUrl('Renouncing Your Faith')} target="_blank" rel="noreferrer">
+                Renouncing Your Faith
+              </a>{' '}
+              (level 46 and up: the Emissary of Zebuxoruk in the Oasis of Marr, then defeat Cazic Thule in the Plane of Fear and Innoruuk in the Plane of Hate), then pick it in
+              Loadouts.
+            </>
+          )}
+        </div>
+      )}
       {!(view?.export ?? data.export) && (
         <div className="notice mb-16">
           No factions export for {who(character)} yet, so every standing counts from 0. Type <GameCommand cmd="/outputfile faction" /> in game for a plan from where you really
@@ -352,6 +448,7 @@ export function PlanTab({ character, view }: { character: string; view: FactionV
       <NowCard
         character={character}
         track={tracked}
+        hint={nowStep ? swapHint(nowStep) : null}
         overlayShown={!!overlay?.visible}
         cues={app.settings.achievementCues}
         onOverlay={(on) => void patchSettings((s) => ({ ...s, overlays: s.overlays.map((o) => (o.kind === 'achievements' ? { ...o, visible: on } : o)) }))}
@@ -375,6 +472,23 @@ export function PlanTab({ character, view }: { character: string; view: FactionV
               : 'Every achievement in the least time'}
           </span>
           <span className="spacer" />
+          <label
+            className="row tight small"
+            title="Do the race unlocks before the rest, and what is quick to do on the way: each one done lets you pick that race in Loadouts, and the plan may swap to it in the steps after"
+          >
+            <Switch
+              on={settings.unlocksFirst}
+              label="Race unlocks first"
+              onChange={(on) => {
+                const next = { ...stored }
+                if (on === DEFAULT_SETTINGS.unlocksFirst) delete next.unlocksFirst
+                else next.unlocksFirst = on
+                setSettings(next)
+              }}
+            />{' '}
+            Race unlocks first
+            <span className="faint"> ({openUnlocks.length ? `${openUnlocks.length} to do` : data.unlocks?.length ? 'every one done' : 'none known'})</span>
+          </label>
         </div>
         <div className="fp-stats">
           <div className="stat">
@@ -401,6 +515,20 @@ export function PlanTab({ character, view }: { character: string; view: FactionV
             <span className="value">{plan ? Math.round(plan.maxedLost).toLocaleString() : '…'}</span>
             <span className="sub">points by the end; achievements kept</span>
           </div>
+          {openUnlocks.length > 0 && (
+            <div className="stat" title="Race unlocks still to do: each wants three of a race's factions maxed">
+              <span className="label">Race unlocks</span>
+              <span className="value">{openUnlocks.length}</span>
+              <span className="sub">{unlocksNote(openUnlocks, unlockStep)}</span>
+            </div>
+          )}
+          {swapSteps > 0 && (
+            <div className="stat" title="Steps done as another race, swapped to in Loadouts and back: a quest your race's con keeps closed and another race's opens">
+              <span className="label">Race swaps</span>
+              <span className="value">{swapSteps}</span>
+              <span className="sub">{swapSaves ?? 'working out what they save…'}</span>
+            </div>
+          )}
           <span className="spacer" />
           <div className="stack gap-6" style={{ alignItems: 'flex-end' }}>
             {plan?.kept && (
@@ -447,7 +575,54 @@ export function PlanTab({ character, view }: { character: string; view: FactionV
         </div>
       )}
 
-      {plan && <Steps plan={plan} choices={choices} onLock={lock} onExclude={exclude} now={tracked?.current ?? null} />}
+      {plan && <Steps plan={plan} choices={choices} onLock={lock} onExclude={exclude} now={tracked?.current ?? null} hint={swapHint} />}
+
+      {openUnlocks.length > 0 && (
+        <div className="card mb-16" style={{ padding: 0 }}>
+          <h2 style={{ padding: '14px 16px 0' }}>Race unlocks to do</h2>
+          <p className="faint small" style={{ padding: '0 16px' }}>
+            Each one done lets {who(character)} pick that race in Loadouts, and the plan may swap to it for a quest its own race&apos;s con keeps closed. Each wants three of the
+            race&apos;s factions maxed, one at a time: a faction that falls back after reaching 2000 stays done for it.{' '}
+            {settings.unlocksFirst ? 'The plan does them first.' : 'Switch on Race unlocks first to do them before the rest.'}
+          </p>
+          <table className="table">
+            <thead>
+              <tr>
+                <th>Race unlock</th>
+                <th>What it wants</th>
+                <th>In the plan</th>
+              </tr>
+            </thead>
+            <tbody>
+              {openUnlocks.map((u) => {
+                const step = unlockStep.get(u.achievement)
+                return (
+                  <tr key={u.achievement}>
+                    <td>{u.achievement.replace(/^Race Unlock - /, '')}</td>
+                    <td className="small">
+                      <UnlockParts u={u} standings={todo?.standings ?? {}} />
+                    </td>
+                    <td>
+                      {step ? (
+                        <span>
+                          <span className="fp-num-inline">{step}</span> done there
+                        </span>
+                      ) : (
+                        <span
+                          className="chip warn"
+                          title={u.other ? 'Done some other way than factions: not the plan’s to do' : 'Nothing the planner may use raises one of its factions to 2000'}
+                        >
+                          not planned
+                        </span>
+                      )}
+                    </td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
 
       <div className="card mb-16" style={{ padding: 0 }}>
         <h2 style={{ padding: '14px 16px 0' }}>Achievements to do</h2>
@@ -507,7 +682,15 @@ export function PlanTab({ character, view }: { character: string; view: FactionV
                     {isOpen && !done && plan && (
                       <tr>
                         <td colSpan={4} style={{ background: 'var(--bg-2)' }}>
-                          <Options faction={t.faction} options={plan.options[t.faction] ?? []} choices={choices} onLock={lock} onExclude={exclude} onPace={pace} />
+                          <Options
+                            faction={t.faction}
+                            options={plan.options[t.faction] ?? []}
+                            choices={choices}
+                            swaps={settings.raceSwaps}
+                            onLock={lock}
+                            onExclude={exclude}
+                            onPace={pace}
+                          />
                         </td>
                       </tr>
                     )}
@@ -566,9 +749,10 @@ function Assumptions({
     else next[k] = v
     onChange(next)
   }
-  // The goal is set at the top of the tab, not here.
-  const kept = (s: Partial<PlanSettings>): Partial<PlanSettings> => (s.goal ? { goal: s.goal } : {})
-  const changed = Object.keys(stored).some((k) => k !== 'goal')
+  // The goal and race unlocks first are set at the top of the tab, not here.
+  const top = new Set<keyof PlanSettings>(['goal', 'unlocksFirst'])
+  const kept = (s: Partial<PlanSettings>): Partial<PlanSettings> => Object.fromEntries(Object.entries(s).filter(([k]) => top.has(k as keyof PlanSettings)))
+  const changed = Object.keys(stored).some((k) => !top.has(k as keyof PlanSettings))
   return (
     <details className="fp-assume">
       <summary>Assumptions</summary>
@@ -601,6 +785,24 @@ function Assumptions({
           <NumberInput value={stored.unknownSec} placeholder={String(DEFAULT_SETTINGS.unknownSec)} min={0} max={3600} width={80} onChange={set('unknownSec')} />
         </label>
         <label>
+          <span>Swap race for a quest</span>
+          <Switch
+            on={settings.raceSwaps}
+            label="Plan race swaps"
+            onChange={(on) => {
+              const next = { ...stored }
+              if (on === DEFAULT_SETTINGS.raceSwaps) delete next.raceSwaps
+              else next.raceSwaps = on
+              onChange(next)
+            }}
+          />
+          <span className="faint small">in Loadouts, for a quest your race's con keeps closed and another race's opens</span>
+        </label>
+        <label>
+          <span>A race swap, there and back (min)</span>
+          <NumberInput value={stored.swapMin} placeholder={String(DEFAULT_SETTINGS.swapMin)} min={0} max={120} width={80} onChange={set('swapMin')} />
+        </label>
+        <label>
           <span>A faction kept at 0 or above is worth (h)</span>
           <NumberInput value={stored.positiveHours} placeholder={String(settings.positiveHours)} min={0} max={100} step={0.5} width={80} onChange={set('positiveHours')} />
           <span className="faint small">Most factions positive: the most extra time it spends on one</span>
@@ -617,15 +819,29 @@ function Assumptions({
 
 /** What a step does to the achievements: done here, raised on the way, lowered, and what it takes off maxed factions. */
 function Effects({ step }: { step: PlanStep }) {
-  const also = Object.entries(step.raises).filter(([f]) => !step.finishes.includes(f))
+  const also = Object.entries(step.raises).filter(([f]) => !step.finishes.includes(f) && !step.reaches.some((r) => r.faction === f))
   const lowers = Object.entries(step.lowers)
   const maxed = Object.entries(step.maxedLowered)
   return (
     <>
+      {step.unlocks.map((u) => (
+        <span key={u} className="chip ok fp-unlock" title={`${u}: done here, so you can pick the race in Loadouts, and the plan may swap to it after`}>
+          {u.replace(/^Race Unlock - /, '')} unlocked
+        </span>
+      ))}
       {step.finishes.map((f) => (
         <span key={f} className="chip ok" title={step.locked.includes(f) ? 'Done here, as you locked in' : 'Done here'}>
           {f}
           {step.locked.includes(f) ? ' (locked)' : ''}
+        </span>
+      ))}
+      {step.reaches.map((r) => (
+        <span
+          key={`reach ${r.faction} ${r.opens}`}
+          className="chip fp-reach"
+          title={`Raised to ${r.to.toLocaleString()}, where ${r.opens}'s NPC takes it (${r.band}): a quicker way than going on with this`}
+        >
+          {r.faction} to {plain(r.to)} → opens {r.opens}
         </span>
       ))}
       {also.map(([f, v]) => (
@@ -670,7 +886,8 @@ function Steps({
   choices,
   onLock,
   onExclude,
-  now
+  now,
+  hint
 }: {
   plan: FactionPlan
   choices: PlanChoices
@@ -678,6 +895,8 @@ function Steps({
   onExclude: (id: string, out: boolean) => void
   /** The step the character being played is on, as the achievements overlay follows it. */
   now: FactionTrackView['current']
+  /** Anything to do first for a step, such as a race swap. */
+  hint: (st: PlanStep) => ReactNode
 }) {
   if (!plan.steps.length) return <div className="card empty mb-16">Nothing the planner knows raises the achievements left. Open each one below for what there is.</div>
   return (
@@ -703,6 +922,11 @@ function Steps({
                       restore
                     </span>
                   )}
+                  {st.reaches.length > 0 && !st.finishes.length && (
+                    <span className="chip fp-restore" title="It finishes no achievement itself: it raises a faction to where a quicker quest's NPC takes it">
+                      opens a way
+                    </span>
+                  )}
                   {isNow && (
                     <span className="chip fp-now-chip" title="The step you are on: the achievements overlay follows it">
                       now
@@ -714,10 +938,11 @@ function Steps({
                   <span className="mono" title={`${st.units.toLocaleString()} ${a.kind === 'kill' ? 'kills' : 'hand-ins'}`}>
                     ×{st.units.toLocaleString()}
                   </span>
-                  <span className="mono fp-time" title={st.travel ? `Including ${span(st.travel)} to get there` : undefined}>
+                  <span className="mono fp-time" title={timeNote(st)}>
                     {span(st.seconds)}
                   </span>
                 </div>
+                {hint(st)}
                 {a.items && a.items.length > 0 && (
                   <div className="small">
                     <ItemsLine items={a.items} units={st.units} back={a.back} />
@@ -755,6 +980,7 @@ function Options({
   faction,
   options,
   choices,
+  swaps,
   onLock,
   onExclude,
   onPace
@@ -762,6 +988,8 @@ function Options({
   faction: string
   options: PlanOption[]
   choices: PlanChoices
+  /** Whether the plan swaps race for a quest another race opens. */
+  swaps: boolean
   onLock: (factions: string[], id: string | null) => void
   onExclude: (id: string, out: boolean) => void
   onPace: (id: string, perHour: number | undefined) => void
@@ -783,7 +1011,7 @@ function Options({
         const a = o.activity
         const locked = choices.locks[faction] === a.id
         const out = choices.excluded.includes(a.id)
-        const usable = plannable(a, choices)
+        const usable = plannable(a, choices, swaps)
         const h = a.hits[faction]
         return (
           <div key={a.id} className={`fp-opt${locked ? ' locked' : ''}${usable ? '' : ' unusable'}`}>
@@ -865,9 +1093,103 @@ const UNIT_WORDS: Record<PlanActivity['kind'], [string, string]> = { kill: ['kil
  * it is on, counting down as the factions move, and the next. With the switches for the overlay and
  * its cues. For a character not being played it says what it will do.
  */
+/** "Human", "Human or Erudite", "Human, Erudite or Gnome". */
+const listed = (xs: string[]) => (xs.length < 2 ? (xs[0] ?? '') : `${xs.slice(0, -1).join(', ')} or ${xs[xs.length - 1]}`)
+
+/** "a Wood Elf", "an Iksar". */
+const withArticle = (w: string) => `${/^[aeiou]/i.test(w) ? 'an' : 'a'} ${w}`
+
+/** What a step's time holds besides the kills or hand-ins. */
+function timeNote(st: PlanStep): string | undefined {
+  const parts = [st.travel ? `${span(st.travel)} to get there` : '', st.swap ? `${span(st.swap)} to swap race and back` : ''].filter(Boolean)
+  return parts.length ? `Including ${parts.join(' and ')}` : undefined
+}
+
+/** How the race unlocks still to do fare in the plan: all done by some step, or how many it does not get to. */
+function unlocksNote(open: RaceUnlock[], at: Map<string, number>): string {
+  const planned = open.filter((u) => at.has(u.achievement))
+  const left = open.length - planned.length
+  if (!planned.length) return 'not planned'
+  const last = Math.max(...planned.map((u) => at.get(u.achievement) ?? 0))
+  return `${left ? planned.length : 'all'} done by step ${last}${left ? `; ${left} not planned` : ''}`
+}
+
+/** What a race unlock wants: its factions, each done or where it stands; another race's unlock; or a task. */
+function UnlockParts({ u, standings }: { u: RaceUnlock; standings: Record<string, number> }) {
+  if (u.other) return <span className="faint">{u.other}</span>
+  if (u.withRaces) return <span className="faint">Comes with {listed(u.withRaces.map((r) => `${r}’s`))} unlock</span>
+  return (
+    <>
+      {u.factions.map((f, i) => (
+        <Fragment key={f.faction}>
+          {i > 0 && ' · '}
+          {f.faction}{' '}
+          {f.done ? (
+            <span className="ok-text" title="Done for it">
+              ✓
+            </span>
+          ) : (
+            <span className="mono faint">{signedPlain(Math.round(standings[f.faction] ?? 0))}</span>
+          )}
+        </Fragment>
+      ))}
+    </>
+  )
+}
+
+/** What the plan takes from its catalog besides the ways: the race unlocks still to do, and what each race adds to the cons. */
+function planExtras(data: FactionPlanData | null): Pick<PlanInput, 'races'> & { unlocks: NonNullable<PlanInput['unlocks']> } {
+  if (!data) return { unlocks: [] }
+  return {
+    unlocks: unlockGoals(data.unlocks ?? []),
+    ...(data.raceMods ? { races: { own: data.raceMods.own, unlocked: data.races, mods: data.raceMods.mods } } : {})
+  }
+}
+
+/** What the race swaps do against the same plan without them: achievements only they open, or the time they save. */
+function savedBySwaps(plan: FactionPlan, without: { seconds: number; unplanned: number }): string {
+  const opened = without.unplanned - plan.unplanned.length
+  if (opened > 0) return `open ${opened} achievement${opened === 1 ? '' : 's'} nothing else plans`
+  const saved = without.seconds - plan.seconds
+  // One locked in can cost time.
+  return saved >= 60 ? `save ≈ ${span(saved)}` : saved <= -60 ? `cost ≈ ${span(-saved)} more` : 'no time saved'
+}
+
+/**
+ * Under a step done as another race: the race to swap to in Loadouts (or stay, swapped to for the step
+ * before), and why the character's own will not do there. `unlockedAt` is the step that unlocks the race,
+ * when the plan does.
+ */
+function SwapHint({ step, own, unlocksKnown, unlockedAt }: { step: PlanStep; own: string; unlocksKnown: boolean; unlockedAt?: number }) {
+  const race = step.race ?? ''
+  const as = withArticle(own || 'your race')
+  const why = step.why
+    ? `as ${as} you would con ${standingWord(step.why.con)} (${plain(step.why.con)}) with ${step.why.faction} by then, and ${step.activity.npc ?? 'its NPC'} wants ${step.why.band}`
+    : step.activity.blocked
+      ? `as ${as}, it ${step.activity.blocked}`
+      : ''
+  const unlocked = unlockedAt ? `; the plan unlocks ${race} at step ${unlockedAt}` : unlocksKnown ? '' : '; if you have it unlocked'
+  return (
+    <div className="small fp-swap">
+      <span className="chip warn">race swap</span>{' '}
+      {step.swap > 0 ? (
+        <>
+          Swap to <b>{race}</b> in Loadouts for this step, then back (≈ {span(step.swap)} in all{unlocked})
+        </>
+      ) : (
+        <>
+          Still <b>{withArticle(race)}</b>, as for the step before{unlocked}
+        </>
+      )}
+      {why ? `: ${why}.` : '.'}
+    </div>
+  )
+}
+
 function NowCard({
   character,
   track,
+  hint,
   overlayShown,
   cues,
   onOverlay,
@@ -875,6 +1197,8 @@ function NowCard({
 }: {
   character: string
   track: FactionTrackView | null
+  /** Anything to do first for the step, such as a race swap. */
+  hint?: ReactNode
   overlayShown: boolean
   cues: boolean
   onOverlay: (on: boolean) => void
@@ -914,12 +1238,17 @@ function NowCard({
             </span>
             <span className="mono fp-time">{span(step.secondsLeft)}</span>
           </div>
+          {hint}
           <div className="fp-now-bar" title={`${Math.round(step.progress * 100)}% of the way since you started this step`}>
             <i style={{ width: `${Math.round(step.progress * 100)}%` }} />
           </div>
           <div className="row tight fp-effects">
             {step.goals.map((g) => (
-              <span key={g.faction} className={`chip ${g.done ? 'ok' : ''}`.trim()} title={g.to ? 'An achievement, done at 2000' : 'Brought back to 0 or above'}>
+              <span
+                key={g.faction}
+                className={`chip ${g.done ? 'ok' : ''}`.trim()}
+                title={g.to === STANDING_MAX ? 'An achievement, done at 2000' : g.to === 0 ? 'Brought back to 0 or above' : 'Raised to where a later step’s NPC takes it'}
+              >
                 {g.achievement ?? g.faction} {signedPlain(Math.round(g.standing))} / {g.to.toLocaleString()}
               </span>
             ))}

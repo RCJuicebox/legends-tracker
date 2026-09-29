@@ -125,6 +125,7 @@ export function sanitizeCharacter(v: unknown, fb: CharacterSettings): CharacterS
     level: num(v.level, fb.level, 1, LEVEL_MAX),
     classLevels: isObj(v.classLevels) ? classLevels : fb.classLevels,
     race: typeof v.race === 'string' ? v.race.slice(0, 40) : fb.race,
+    deity: typeof v.deity === 'string' ? v.deity.slice(0, 40) : fb.deity,
     focusSources: Array.isArray(v.focusSources) ? v.focusSources.map(focusSource).filter((f) => f !== null) : fb.focusSources
   })
   // The old flat figures are read once and then dropped; keep them only as numbers.

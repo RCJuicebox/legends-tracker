@@ -477,12 +477,21 @@ Where the character picked (the same pick as Achievements, Stats and Gear) stand
 faction, and the faction changes its log and archives recorded. Type `/outputfile faction` (or `factions`) in game
 and the game writes `Name_server-CLS-Factions.txt` (the class is in the name) into its folder: a
 line per faction with its ID, name, standing (-2000 to 2000) and points to max. The page reads the
-newest one for the character, shows each standing with its con (Ally, Warmly, Kindly, Amiably,
-Indifferent, Apprehensive, Dubious, Threatening, Scowling) and the points to the next con up, and
-adds on every change the log recorded after the export was written, so the standing keeps up as you
-play. The con bands are EQEmu's (Ally from 1100, Warmly 750, Kindly 500, Amiably 100, Indifferent 0,
-Apprehensive -100, Dubious -500, Threatening -750); that EverQuest Legends uses the same ones is not
-confirmed. A faction keeps only its last 20 changes, so after more than that since the export the
+newest one for the character, shows each standing with what NPCs con you at (Ally, Warmly, Kindly,
+Amiably, Indifferent, Apprehensive, Dubious, Threatening, Scowling) and the points to the next con
+up, and adds on every change the log recorded after the export was written, so the standing keeps up
+as you play. The standing is the raw one the achievements count; NPCs con you on it with your race's,
+your deity's and the best of your three classes' modifiers added, from the game's own table
+(`Resources\Faction\FactionAssociations.txt`): the race, classes and deity from the Stats page (/who
+keeps the first two). The best class counts whichever it is: a Monk/Bard/Enchanter cons the bards'
+Song Weavers at 0 as Amiable (Bard +50), and Neriak's Dreadguard Inner at 2000 as an Ally, where the
+Monk's -300 alone would be Warmly. Without classes on the record, the class the export is named for
+counts. Hover a standing for the sum. Without a race the con is the standing alone, and no deity set
+counts as Agnostic, which has no modifiers. The con bands are
+EQEmu's (Ally from 1100, Warmly 750, Kindly 500, Amiably 100, Indifferent 0, Apprehensive -100,
+Dubious -500, Threatening -750), and cons seen in play land on them to the point: Tunare's Scouts at
+0 conned -950 Scowling for an Iksar of Cazic Thule, -750 Threatening for an Agnostic Iksar, -100
+Apprehensive for a Wood Elf of Cazic Thule and 100 Amiably for an Agnostic Wood Elf. A faction keeps only its last 20 changes, so after more than that since the export the
 standing is marked `≈`: type the command again to refresh it. Factions the game has no name for
 (`Faction723`) are hidden behind the **Unnamed** chip.
 
@@ -524,8 +533,45 @@ it is and however many it has done: the steps, each a zone and what to kill or h
 many and about how long, in the order that finishes them all soonest. What is still to do, and where
 each faction stands, is the Standings tab's own view, read every ten seconds, so the plan follows
 play: the counts go down as you kill and hand in, and the order is kept while only the standings
-move, so nothing is reshuffled mid-grind. An achievement done, or a change of locks or assumptions,
-plans the order afresh; so does **Plan afresh**. Without that character's factions export every
+move, so nothing is reshuffled mid-grind. An achievement done, a change of locks or assumptions, or a
+change of con (a race or class change, a race unlocked) plans the order afresh; so does **Plan
+afresh**. The plan counts everyone as **Agnostic**, the
+deity with no faction modifiers: renouncing your faith is the first step for anyone planning
+factions (eqlwiki's Renouncing Your Faith: level 46 and up, the Emissary of Zebuxoruk in the Oasis of
+Marr, then Cazic Thule in the Plane of Fear and Innoruuk in the Plane of Hate; then pick Agnostic in
+Loadouts). A character with another deity on the Stats page, or none, is told so at the top, with
+whether its achievements export has Agnostic unlocked.
+
+**Quests that want a con.** Many quests' NPCs take a hand-in only at some con (Allakhazam lists
+them): Amiable, say, where a faked con reaches only Indifferent. The plan checks each as it goes, on
+the standing it will have by then, so a quest opens once earlier steps raise that faction far
+enough. And it may add a step for just that: raise a faction to where a quicker quest's NPC takes it,
+then do the quest. Such a step says **opens a way** and what it opens ("Miners Guild 628 to 60 →
+opens Miners Pick"), and the Now card and the overlay count it down to that standing. The catalog
+also finds ways to raise a faction a quest wants more of than you con, where that quest raises an
+achievement, so the step can be planned when the faction is no achievement of its own.
+
+**Race swaps.** A quest whose NPC will not take the hand-in at your race's con, where another race
+you have unlocked (the achievements export's Race Unlock achievements; every race without one), or
+one the plan unlocks first, would be at the con it wants, as an Agnostic, can be planned with a race
+swap: swap in Loadouts, do the step, swap back. The plan uses one only where it beats the other ways,
+counting the swap as 5 minutes (**Assumptions**, where swaps can be switched off). Such a step, and
+the **Now** card while you are on it, says which race and why ("Swap to Dwarf in Loadouts for this
+step, then back: as a Wood Elf you would con Indifferent (0) with Miners Guild 628 by then, and Jeet
+wants Amiable"); it names the race the NPC likes best, or the one you are swapped to already for the
+step before ("Still a Dwarf"). The summary says what the swaps save against the same plan without
+them.
+
+**Race unlocks.** Each race unlock (Loadouts' "Race Unlock - Barbarian" and the rest) wants three of
+the race's factions maxed, as the game's own achievement files list them; the achievements export
+says which you have done, faction by faction, and a faction done for one stays done if it falls back.
+Half Elf's comes with Human's or Wood Elf's; Kerran's is a task, so it is not planned. The plan counts
+the race unlocks still to do as achievements too, lists them with the step that does each, and from
+that step on may swap to the race. Switch on **Race unlocks first** (at the top of the tab) to do them
+before the rest: each unlock done sooner counts as time saved, so the plan still does what is quick
+to do on the way. Raltur's notes for Dismal Rage between Sir Lucan's for Human's Freeport unlock, for
+one: the milk and \*Duggin Scumber are the same, and only where the note goes differs. Without that
+character's factions export every
 standing counts from 0, and without its achievements export an achievement counts as done only
 while it is at 2000; the tab says so.
 An achievement is done the moment the raw standing reaches 2000 and stays done whatever happens to
@@ -563,8 +609,9 @@ starts from what your main has measured (their kill pace stays their own).
 
 The plan is found by building it greedily (at each point, whatever does the most for the
 achievements still open per hour, points it takes off another open one counted as work to do again),
-several times with a little noise, then moving steps and trying other ways for each achievement and
-keeping whatever saves time. The same choices always give the same plan. Open an achievement for
+several times with a little noise, then moving steps (a quest together with the step that opens it)
+and trying other ways for each achievement, and keeping whatever saves time. The same choices always
+give the same plan. Open an achievement for
 every way to raise it, quickest first: **Lock in** one and the plan finishes that achievement with it
 and is built around it (a lock also tells the planner a one-time quest repeats); **Rule out** one
 and the plan leaves it alone; or type your own kills or hand-ins an hour. **Assumptions** holds the
@@ -583,15 +630,16 @@ moves on by itself as achievements are done, and follows the order the tab showe
 
 ## Stats
 
-Your character's record: up to three classes, the level of each, and race (one of the sixteen
-playable races: the AC sums tell Iksar apart, and faction cons add the race's modifiers). A /who of
+Your character's record: up to three classes, the level of each, race (one of the sixteen playable
+races: the AC sums tell Iksar apart, and faction cons add the race's modifiers) and deity (Agnostic
+or one of the sixteen gods, as Loadouts names them; faction cons add its modifiers). A /who of
 yourself while the tracker runs keeps the classes and race up to date, changes included. /who shows
 one level, the lowest of the three: a class already on the record keeps its level unless it is below
 that, a new class comes in at it, and at the level cap every class is at the cap. Classes that stay
 keep your order (the first is your main class); /who lists them in class-number order, which says
-nothing about that. Every page uses the record: spell
-durations, AC and melee, gear and the upgrade finder, spell upgrades and buffs. It is kept per
-character in `settings.json`. Four tabs:
+nothing about that. /who does not show your deity, so set it here. Every page uses the record: spell
+durations, AC and melee, gear and the upgrade finder, spell upgrades, buffs and faction cons. It is
+kept per character in `settings.json`. Four tabs:
 
 - **Character** reads the game's Inventory window, on its Stats tab, off the screen with Windows OCR
   (**Read from screen**; this window steps aside for a moment while it looks), and shows each figure
