@@ -441,7 +441,7 @@ const CYCLES: Cycle[] = [
     line: 'A Bottle of Milk to Mojax Hikspin (Commonlands), kill *Duggin Scumber for the Note, and hand the Note to Sir Lucan D`Lere in West Freeport.'
   },
   {
-    // The hail-and-deliver step of Innoruuk Disciple, for The Spurned (a comment on Allakhazam, from Dan
+    // The hail-and-deliver step of Innoruuk Disciple, for The Spurned (a comment on Allakhazam, taken up
     // 2026-09-29): /say "I will assist you" to Wallin Slyfoot in West Commonlands (the north-west, between
     // the lake and the Kithicor zone line) for a note, and hand it to Draxiz N`Ryt in Neriak Commons; The
     // Spurned +10, The Dead -1. The note is lore and no drop, so one a round trip, some 3 minutes (a guess;
@@ -459,7 +459,7 @@ const CYCLES: Cycle[] = [
     line: 'Say "I will assist you" to Wallin Slyfoot in West Commonlands for a note, and hand it to Draxiz N`Ryt in Neriak Commons, who eats it below Dubious with The Spurned; the note is lore, so one a trip.'
   },
   {
-    // Merchants of Erudin without Peace Keepers (a comment on Allakhazam's Peacekeeper Staff, from Dan
+    // Merchants of Erudin without Peace Keepers (a comment on Allakhazam's Peacekeeper Staff, taken up
     // 2026-09-29): Small Lanterns to Jyle Windshot in West Freeport (the Hogcallers' Inn, upstairs;
     // Faydarks Champions, who gives only at Indifferent or better) give Wooden Shards back (Allakhazam's
     // Treant Wood), a Wooden Heart now and then (4 in 35 lanterns in play); Wooden Shards to Emil
