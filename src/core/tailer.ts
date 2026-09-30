@@ -124,9 +124,16 @@ export class LogTailer {
     if (overtaken()) return
     if (!this.handle) {
       const h = await fs.open(this.path, 'r')
+      let hs
+      try {
+        hs = await h.stat({ bigint: true })
+      } catch (e) {
+        // Not kept, so closed here: left to the garbage collector it would stay open until then.
+        await h.close().catch(() => undefined)
+        throw e
+      }
       // The file could be swapped between the stat and the open; only keep a handle to the one stat
       // saw, and none at all if the tailer was stopped meanwhile.
-      const hs = await h.stat({ bigint: true })
       if (fileIdentity(hs) !== this.identity || overtaken() || this.handle) {
         await h.close()
         return

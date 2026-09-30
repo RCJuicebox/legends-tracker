@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import yauzl from 'yauzl'
 import { decodeCp1252, parseLogLine } from '../../src/core/logLine'
+import type { FileHandle } from 'node:fs/promises'
 import { LogTailer } from '../../src/core/tailer'
 import { archiveLog, compressLoose, findStaging, finishStaged, stagingOriginalName } from '../../src/core/archiver'
 
@@ -93,6 +94,7 @@ describe('LogTailer', () => {
     await t.readOnce()
     expect(resets).toEqual(['truncated', 'replaced'])
     expect(got.at(-1)).toBe('fresh file')
+    await t.release()
   })
 })
 
@@ -184,6 +186,27 @@ describe('LogTailer, more', () => {
     await t.readOnce()
     await t.release()
     expect(got).toEqual([long, 'next'])
+  })
+
+  it('closes a handle it opened but could not look at, and opens the file again next time', async () => {
+    const path = join(dir, 'eqlog_Stat_x.txt')
+    await fs.writeFile(path, 'one\r\n')
+    const close = vi.fn(async () => undefined)
+    const stat = async () => {
+      throw Object.assign(new Error('busy'), { code: 'EBUSY' })
+    }
+    const open = vi.spyOn(fs, 'open').mockResolvedValueOnce({ stat, close } as unknown as FileHandle)
+    try {
+      const got: string[] = []
+      const t = new LogTailer(path, { startAtEnd: false, onLines: (l) => got.push(...l) })
+      await expect(t.readOnce()).rejects.toThrow('busy')
+      expect(close).toHaveBeenCalledOnce()
+      await t.readOnce()
+      expect(got).toEqual(['one'])
+      await t.release()
+    } finally {
+      open.mockRestore()
+    }
   })
 
   it('runs one poll loop after stop and start while a read is in flight', async () => {
