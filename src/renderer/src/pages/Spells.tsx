@@ -21,7 +21,10 @@ import type { PageId } from '../main'
 export function Spells({ go }: { go?: (page: PageId) => void }) {
   const { state } = useApp()
   const spellsLoaded = useLive((l) => l.status.spellsLoaded)
-  const q = useInvoke('spells:known', [], [state.character, state.settings.tracking, spellsLoaded])
+  // Each settings push is a fresh object: the list is asked for again only when what it depends on
+  // reads differently, not on every save or overlay move.
+  const deps = JSON.stringify([state.character, state.settings.tracking])
+  const q = useInvoke('spells:known', [], [deps, spellsLoaded])
   const known = q.data ?? []
   const setKnown = q.setData
   const [open, setOpen] = useState<string | null>(null)

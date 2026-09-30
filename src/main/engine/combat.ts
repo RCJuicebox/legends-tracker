@@ -201,7 +201,7 @@ export class CombatFeed {
   }
 
   lootView(): LootView {
-    return { ...this.loot.snapshot(), sessions: [...this.meter.sessions].reverse().map(summarizeFight) }
+    return { ...this.loot.snapshot(), sessions: [...this.meter.sessions].reverse().map((s) => this.meter.summaryOf(s)) }
   }
 
   snapshot(): CombatSnapshot {

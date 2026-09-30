@@ -32,6 +32,16 @@ describe('parseLogLine', () => {
     expect(l.text).toBe('You have entered Neriak.')
   })
 
+  it('reads lines of the same second as the one before the same way, and nothing that only starts like one', () => {
+    const a = parseLogLine('[Fri Sep 25 21:00:39 2026] You begin casting Harm Touch X.')!
+    const b = parseLogLine('[Fri Sep 25 21:00:39 2026] Innoruuk, the Prince of Hate staggers.')!
+    expect(b).toEqual({ time: a.time, text: 'Innoruuk, the Prince of Hate staggers.' })
+    expect(parseLogLine('[Fri Sep 25 21:00:39 2026]')).toBeNull()
+    expect(parseLogLine('[Fri Sep 25 21:00:39 2026]x')).toBeNull()
+    expect(parseLogLine('[Fri Sep 25 21:00:39 2026] ')).toEqual({ time: a.time, text: '' })
+    expect(parseLogLine('[Fri Sep 25 21:00:40 2026] Next second.')!.time).toBe(a.time + 1000)
+  })
+
   it('decodes Windows-1252, not UTF-8', () => {
     expect(decodeCp1252(Uint8Array.from([0x49, 0x6b, 0x73, 0x61, 0x72, 0x92, 0x73]))).toBe('Iksar’s')
   })

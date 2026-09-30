@@ -189,6 +189,8 @@ export function createContext(): AppContext {
     if (previous.gameRunning && !state.gameRunning) ctx.engine.gameClosed()
     if (!previous.gameRunning && state.gameRunning) ctx.engine.gameStarted()
     ctx.refreshOverlayVisibility()
+    // Another window to the front: the game may have put itself above the overlays as it came back.
+    if (state.foregroundPid !== previous.foregroundPid) ctx.overlays.reassertTop()
   })
 
   let lastUpdate = 'idle'
@@ -326,7 +328,8 @@ export function createContext(): AppContext {
       windows.applyTheme()
     }
     if (next.hotkeys !== prev.hotkeys) ctx.applyHotkeys()
-    ctx.overlays.apply(next.overlays)
+    // A mute, a meter header click or a theme change leaves the overlays as they were: no regrouping.
+    if (JSON.stringify(next.overlays) !== JSON.stringify(prev.overlays)) ctx.overlays.apply(next.overlays)
     ctx.refreshOverlayVisibility()
     windows.audioConfig()
     ctx.engine.reconfigure()

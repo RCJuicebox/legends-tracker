@@ -21,6 +21,16 @@ export interface Invoked<T> {
  * the newest call's answer is kept: a slow reply to an older call never overwrites a newer one. A
  * failed call keeps what was there and says why. A null channel asks nothing (not ready yet).
  */
+/** Whether two answers hold the same data (as they would cross the IPC boundary). */
+function sameData(a: unknown, b: unknown): boolean {
+  if (a === b) return true
+  try {
+    return JSON.stringify(a) === JSON.stringify(b)
+  } catch {
+    return false
+  }
+}
+
 export function useInvoke<K extends InvokeChannel>(channel: K | null, args?: Parameters<Invokes[K]>, deps: unknown[] = []): Invoked<InvokeResult<K>> {
   type T = InvokeResult<K>
   const [data, setDataState] = useState<T | null>(null)
@@ -35,7 +45,9 @@ export function useInvoke<K extends InvokeChannel>(channel: K | null, args?: Par
     api.invoke(channel, ...((argsRef.current ?? []) as Parameters<Invokes[K]>)).then(
       (v) => {
         if (!live) return
-        setDataState(v)
+        // A reload that brings back what is shown keeps the old value, so a page polled every few
+        // seconds draws nothing again until something changes.
+        setDataState((prev) => (prev !== null && sameData(prev, v) ? prev : v))
         setError('')
       },
       (e) => live && setError(errorMessage(e))

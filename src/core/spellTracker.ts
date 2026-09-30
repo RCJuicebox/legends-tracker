@@ -146,16 +146,23 @@ export class SpellTracker {
 
     if (this.tryLand(text, now)) return
 
-    if ((m = RE_DOT_TICK.exec(text))) return this.onDotTick(m[1], m[2], now)
-    if ((m = RE_WORN_OFF.exec(text))) return this.onWornOff(m[1], m[2])
-    if ((m = RE_PET_WORN_OFF.exec(text))) return this.onPetWornOff(m[1])
+    // Each "^(.+) …" pattern backtracks over the whole line, so a cheap look for its fixed words goes first.
+    if (text.includes(' damage from your ') && (m = RE_DOT_TICK.exec(text))) return this.onDotTick(m[1], m[2], now)
+    if (text.startsWith('Your ')) {
+      if ((m = RE_WORN_OFF.exec(text))) return this.onWornOff(m[1], m[2])
+      if ((m = RE_PET_WORN_OFF.exec(text))) return this.onPetWornOff(m[1])
+    }
 
     // Your own death first: "You died." would otherwise be read as a target called "You" dying.
-    if (youDied(text)) {
+    if (text.startsWith('You ') && youDied(text)) {
       this.board.endWhere((t) => t.source === 'spell' && t.target === SELF, 'died')
       return
     }
-    if ((m = RE_SLAIN_BY.exec(text)) || (m = RE_YOU_SLEW.exec(text)) || (m = RE_DIED.exec(text))) {
+    if (
+      (text.includes(' has been slain by ') && (m = RE_SLAIN_BY.exec(text))) ||
+      (text.startsWith('You have slain ') && (m = RE_YOU_SLEW.exec(text))) ||
+      (text.endsWith(' died.') && (m = RE_DIED.exec(text)))
+    ) {
       const k = targetKey(m[1])
       this.board.endWhere((t) => t.source === 'spell' && targetKey(t.target) === k, 'died')
       return

@@ -24,12 +24,22 @@ const MONTHS: Record<string, number> = {
 
 const LINE = /^\[\w{3} (\w{3}) ([ \d]\d) (\d\d):(\d\d):(\d\d) (\d{4})\] (.*)$/
 
+/** The last stamp read ("[Wed Sep 23 13:29:05 2026]") and its time: a raid writes dozens of lines a second. */
+let lastStamp = ''
+let lastTime = 0
+
 export function parseLogLine(raw: string): LogLine | null {
+  // The same second as the line before: its time is known, no Date to build.
+  if (lastStamp && raw.charCodeAt(26) === 32 && raw.startsWith(lastStamp)) return { time: lastTime, text: raw.slice(27) }
   const m = LINE.exec(raw)
   if (!m) return null
   const month = MONTHS[m[1]]
   if (month === undefined) return null
   const time = new Date(+m[6], month, +m[2], +m[3], +m[4], +m[5]).getTime()
+  if (raw.charCodeAt(25) === 93) {
+    lastStamp = raw.slice(0, 26)
+    lastTime = time
+  }
   return { time, text: m[7] }
 }
 
@@ -76,6 +86,8 @@ export const RE_NOT_ZONE = /^(?:an? (?:area|Arena)|the Drunken)/i
 
 /** The zone a line says you entered, or null when it is not a zone change. */
 export function zoneEntered(text: string): string | null {
+  // Every reader asks of every line; nearly none is a zone line, and this says so before the regex.
+  if (!text.startsWith('You have entered ')) return null
   const m = RE_ZONE.exec(text)
   return m && !RE_NOT_ZONE.test(m[1]) ? m[1] : null
 }

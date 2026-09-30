@@ -302,7 +302,8 @@ export function PlanTab({ character, view }: { character: string; view: FactionV
       (p) => {
         if (!current) return
         keptShape.current = { key: structure, shape: p.shape }
-        setPlan(p)
+        // The order kept and the counts the same: the plan shown stays, and its hundred rows are not drawn again.
+        setPlan((old) => (old && JSON.stringify(old) === JSON.stringify(p) ? old : p))
       },
       (e: unknown) => current && showError('Could not work out the faction plan', e)
     )

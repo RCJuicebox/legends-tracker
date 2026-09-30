@@ -262,15 +262,21 @@ export class OverlayManager {
     return win
   }
 
-  /**
-   * Shows or hides every overlay without closing it. A hidden page is throttled (its timers slow, its
-   * clock stops) and sent nothing; it is brought up to date as it shows again.
-   */
   /** The overlays are up (not hidden with the game in the background, or gone). */
   get isShown(): boolean {
     return this.shown
   }
 
+  /** Puts every overlay window back on top at once: the game came to the front, or they just showed. */
+  reassertTop(): void {
+    if (!this.shown) return
+    for (const w of this.allWindows) w.setAlwaysOnTop(true, 'screen-saver')
+  }
+
+  /**
+   * Shows or hides every overlay without closing it. A hidden page is throttled (its timers slow, its
+   * clock stops) and sent nothing; it is brought up to date as it shows again.
+   */
   setShown(show: boolean): void {
     if (show === this.shown) return
     this.shown = show

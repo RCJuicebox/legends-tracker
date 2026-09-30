@@ -301,6 +301,15 @@ describe('CombatMeter', () => {
     expect(fightName(f)).toBe('A fetid fiend')
   })
 
+  it('works out a closed fight’s summary once; an open one each time', () => {
+    const { m, feed } = meter()
+    feed(FIGHT)
+    expect(m.snapshot().fights[0]).toBe(m.snapshot().fights[0])
+    expect(m.snapshot().fights[0]).toMatchObject({ name: 'A fetid fiend', kills: 1 })
+    // The session is still open: summed afresh, so it keeps up.
+    expect(m.snapshot().sessions[0]).not.toBe(m.snapshot().sessions[0])
+  })
+
   it('a quiet spell ends the fight; the next blow opens another', () => {
     const { m, feed } = meter({ fightGapSec: 10 })
     feed(`

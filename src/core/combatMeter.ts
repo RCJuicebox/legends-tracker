@@ -197,6 +197,8 @@ export class CombatMeter {
   private held = new Map<string, { last: number; blows: { ev: Extract<CombatEvent, { kind: 'damage' | 'miss' }>; at: number }[] }>()
   private replaying = false
   private seq = 0
+  /** Summaries of closed fights and sessions, which do not change again: worked out once, not every push. */
+  private readonly summaries = new WeakMap<Segment, SegmentSummary>()
   /** A note shown while the log's history is being read. */
   reading = ''
 
@@ -488,7 +490,7 @@ export class CombatMeter {
       return null
     }
     if (this.charmCasts.length && this.charmLanded(text, time)) return null
-    const charm = RE_CHARMED.exec(text)
+    const charm = text.endsWith(' has been charmed.') ? RE_CHARMED.exec(text) : null
     if (charm) {
       const cast = this.lastFriendCast
       if (cast && time - cast.at <= CHARM_CAST_MS && time >= cast.at) this.onCharm(charm[1], cast.who, time)
@@ -937,6 +939,14 @@ export class CombatMeter {
     return out
   }
 
+  /** A fight's or session's summary; a closed one's is kept, since nothing changes it after it closes. */
+  summaryOf(seg: Segment): SegmentSummary {
+    if (seg.open) return summarize(seg)
+    let s = this.summaries.get(seg)
+    if (!s) this.summaries.set(seg, (s = summarize(seg)))
+    return s
+  }
+
   get liveFight(): Segment | null {
     return this.live
   }
@@ -954,8 +964,8 @@ export class CombatMeter {
       else otherPets[name] = owner
     }
     return {
-      fights: [...this.fights].reverse().map(summarize),
-      sessions: [...this.sessions].reverse().map(summarize),
+      fights: [...this.fights].reverse().map((s) => this.summaryOf(s)),
+      sessions: [...this.sessions].reverse().map((s) => this.summaryOf(s)),
       liveFight: this.live,
       liveSession: this.session,
       self: this.self,
