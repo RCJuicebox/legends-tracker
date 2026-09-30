@@ -362,7 +362,8 @@ const NEEDS: Record<string, Need> = {
 
 /** Amounts a quest page leaves out, by page (lower-cased), then faction. */
 const AMOUNTS: Record<string, Record<string, number>> = {
-  'tunare scouts dagger': { "Tunare's Scouts": 1 }
+  // Allakhazam's +1, which play makes +5 (138 hand-ins to Tylfon, 2026-09-29).
+  'tunare scouts dagger': { "Tunare's Scouts": 5 }
 }
 
 /**
@@ -571,7 +572,9 @@ const QUEST_ITEMS_IN_PLAY: Record<string, Record<string, Pick<HandInItem, 'how' 
 /** Coin a quest's hand-in wants with its item, where the walkthrough says it in words the quest reader passes over, by quest page (lower-cased). */
 const QUEST_COIN: Record<string, { name: string; count: number }> = {
   // "hand him the Ogre Head and 300 Gold"
-  'miners pick': { name: 'Gold', count: 300 }
+  'miners pick': { name: 'Gold', count: 300 },
+  // Two Rusty Daggers and two Gold a hand-in to Tylfon, in play.
+  'tunare scouts dagger': { name: 'Gold', count: 2 }
 }
 
 /** "a gnoll", "an orc pawn", "clockwork scrubber": one of many alike. The wiki's notes mark single NPCs. */
@@ -777,10 +780,14 @@ export function buildCatalog(input: CatalogInput): FactionCatalog {
     const { hits, guessed } = tallyHits(t, name, guesses.handUp, guesses.handDown)
     if (!raisesAny(hits, open)) continue
     const offered = Object.entries(t.items ?? {}).filter(([, v]) => v.done > 0)
-    // What goes in first, when what the NPC gives for it is handed back too; else what went in most.
+    // What goes in first, when what the NPC gives for it is handed back too; else what went into most
+    // of the trades (Tylfon's two Rusty Daggers and two Gold), the coin last.
     const loop = offered.map(([it]) => loops.get(`${t.name.toLowerCase()}|${itemName(it).toLowerCase()}`)).find((l) => l !== undefined)
-    const main = loop ? offered.find(([it]) => itemName(it).toLowerCase() === loop.item.toLowerCase()) : offered.sort((a, b) => b[1].done - a[1].done)[0]
-    const items: HandInItem[] = main ? [withStock({ name: main[0], count: Math.max(1, Math.round(main[1].count / main[1].done)), ...had(main[0]) })] : []
+    const most = Math.max(0, ...offered.map(([, v]) => v.done))
+    const each = loop
+      ? offered.filter(([it]) => itemName(it).toLowerCase() === loop.item.toLowerCase())
+      : offered.filter(([, v]) => v.done * 2 >= most).sort((a, b) => (had(a[0]).how === 'coin' ? 1 : 0) - (had(b[0]).how === 'coin' ? 1 : 0) || b[1].done - a[1].done)
+    const items: HandInItem[] = each.map(([it, v]) => withStock({ name: it, count: Math.max(1, Math.round(v.count / v.done)), ...had(it) }))
     // Done once or twice is most likely a quest's one-time reward, and done.
     const repeatable = t.n >= 3
     const a: PlanActivity = {

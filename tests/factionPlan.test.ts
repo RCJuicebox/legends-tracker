@@ -90,6 +90,41 @@ describe('what caused a faction change', () => {
     expect(t.runN).toBe(2)
   })
 
+  it('counts what went into one trade window together: two daggers put in one at a time and the gold', () => {
+    const lines: [number, string][] = [[0, 'You have entered The Greater Faydark.']]
+    let t0 = 10
+    // A trade Tylfon gives nothing for (one dagger, no gold), then three that each give +5.
+    lines.push([t0, 'You offered 1 Rusty Dagger to Tylfon.'], [t0 + 2, "Tylfon says, 'Nice, where's the rest?'"], [t0 + 2, 'You complete the trade with Tylfon.'])
+    // Each next trade starts a second after Tylfon answers the one before, as quick clicking does.
+    for (let i = 0; i < 3; i++) {
+      t0 += i ? 4 : 8
+      lines.push(
+        [t0, 'You offered 1 Rusty Dagger to Tylfon.'],
+        [t0 + 1, 'You offered 1 Rusty Dagger to Tylfon.'],
+        [t0 + 2, 'You offered 2 Gold to Tylfon.'],
+        [t0 + 3, "Tylfon says, 'Well, well, I didn't think you could do it.'"],
+        [t0 + 3, adjusted("Tunare's Scouts", 5)],
+        [t0 + 3, 'You complete the trade with Tylfon.']
+      )
+    }
+    lines.push([t0 + 60, 'You have entered Kelethin.'])
+    const t = settled(read(lines)).acts['turnin|the greater faydark|tylfon']
+    expect(t).toMatchObject({ n: 3, items: { 'Rusty Dagger': { count: 6, done: 3 }, Gold: { count: 6, done: 3 } } })
+    // So each of Tylfon's hand-ins takes two daggers and two gold, the coin last.
+    const tylfon = buildCatalog(
+      catalogInput({
+        factions: ["Tunare's Scouts"],
+        targets: ["Tunare's Scouts"],
+        sources: settled(read(lines)),
+        bought: { 'rusty dagger': { merchant: 'Harg Tonicka', each: 20 } }
+      })
+    ).activities.find((a) => a.npc === 'Tylfon')!
+    expect(tylfon.items?.map((it) => [it.name, it.count, it.how])).toEqual([
+      ['Rusty Dagger', 2, 'bought'],
+      ['Gold', 2, 'coin']
+    ])
+  })
+
   it('takes an NPC talking in the same second as the hand-in when the log wrote no offer', () => {
     const s = settled(
       read([
@@ -611,7 +646,12 @@ describe('the catalog', () => {
       })
     // An Iksar at 0: Threatening, and a faked Indifferent is not enough for Amiable.
     const [camp, quest] = buildCatalog(input(-750)).activities
-    expect(quest).toMatchObject({ title: 'Tunare Scouts Dagger', hits: { "Tunare's Scouts": 1 }, needs: 'Amiable' })
+    // Allakhazam's +1 is +5 in play, and each hand-in takes two Gold with the two daggers.
+    expect(quest).toMatchObject({ title: 'Tunare Scouts Dagger', hits: { "Tunare's Scouts": 5 }, needs: 'Amiable' })
+    expect(quest.items?.map((it) => [it.name, it.count, it.how])).toEqual([
+      ['Rusty Dagger', 2, 'vendor'],
+      ['Gold', 2, 'coin']
+    ])
     expect(quest.guessed).toBeUndefined()
     expect(quest.blocked).toBe("needs Amiable with Tunare's Scouts; you con Threatening (-750), 850 short")
     // Closed now, but the plan may raise Tunare's Scouts to where Tylfon takes it: what he wants goes with it.

@@ -50,13 +50,18 @@ export interface ZoneKills {
   last: number
 }
 
-/** An offer whose completions are still being counted. */
+/**
+ * A trade whose completions are still being counted: what went in, a stack in one line or one item at
+ * a time into the trade window (Tylfon's two Rusty Daggers and two Gold are three lines), until the NPC
+ * has answered or the trade is over.
+ */
 interface Offer {
   npc: string
-  item: string
-  count: number
+  items: Record<string, number>
   at: number
   done: number
+  /** The trade is over ("You complete the trade with …"): what is offered next is another. */
+  closed?: boolean
 }
 
 /** One change being put together: its faction lines, and the lines around them. */
@@ -111,6 +116,8 @@ export function baseZone(zone: string): string {
 }
 
 const OFFERED = /^You offered (\d+) (.+) to (.+)\.$/
+/** Items put into one trade window come this close together. */
+const TRADE_MS = 60_000
 const TRADED = /^You complete the trade with (.+)\.$/
 const SAYS = /^(.+?) says,? '/
 const CORPSE = /^(.+?)'s corpse (?:says|falls)/
@@ -187,14 +194,16 @@ function count(into: FactionSourceTallies, c: OpenChange, kind: SourceKind, name
   }
 }
 
-/** An offer's completions, added to its NPC's tally once it is over. */
+/** A trade's completions, added to its NPC's tally once it is over: each item's count, and the completions it went into. */
 function closeOffer(into: FactionSourceTallies, o: Offer, zone: string): void {
   if (!o.done) return
   const t = into.acts[key('turnin', baseZone(zone), o.npc)]
   if (!t) return
-  const it = ((t.items ??= {})[o.item] ??= { count: 0, done: 0 })
-  it.count += o.count
-  it.done += o.done
+  for (const [item, count] of Object.entries(o.items)) {
+    const it = ((t.items ??= {})[item] ??= { count: 0, done: 0 })
+    it.count += count
+    it.done += o.done
+  }
 }
 
 /** Why a change happened: a kill of a mob, a hand-in to an NPC, or nothing that can be told. */
@@ -319,11 +328,21 @@ export function sourceReader(): (line: LogLine, into: FactionSourceTallies) => v
     if (text.startsWith('You offered ')) {
       const m = OFFERED.exec(text)
       if (m) {
+        // A change still waiting for its cause is over now that something else is offered: put it down
+        // first, so the completion goes to the trade it came from, not to this next one.
+        if (into.open) settle(into)
         const offers = (into.offers ??= [])
         const i = offers.findIndex((o) => o.npc === m[3])
-        if (i >= 0) closeOffer(into, offers.splice(i, 1)[0], into.zone ?? '')
-        offers.push({ npc: m[3], item: m[2], count: Number(m[1]), at: line.time, done: 0 })
+        // Another item into the same trade window, until the NPC has answered or the trade is over.
+        if (i >= 0 && (offers[i].done > 0 || offers[i].closed || line.time - offers[i].at > TRADE_MS)) closeOffer(into, offers.splice(i, 1)[0], into.zone ?? '')
+        const o = offers.find((x) => x.npc === m[3])
+        if (o) o.items[m[2]] = (o.items[m[2]] ?? 0) + Number(m[1])
+        else offers.push({ npc: m[3], items: { [m[2]]: Number(m[1]) }, at: line.time, done: 0 })
       }
+    } else if (text.startsWith('You complete the trade with ')) {
+      const m = TRADED.exec(text)
+      const o = m ? into.offers?.find((x) => x.npc === m[1]) : undefined
+      if (o) o.closed = true
     }
     recent.push([text, line.time])
     if (recent.length > BEFORE_KEPT) recent.shift()
