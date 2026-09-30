@@ -7,6 +7,7 @@ import { RespawnLog, respawnView, type RespawnView } from '../../core/respawns'
 import { durationSec } from '../../core/combatView'
 import { readLines } from '../../core/logReading'
 import { offsetBefore } from '../sources/logHistory'
+import { lastZoneLine } from '../game'
 import { log } from '../log'
 import { Backlog, Throttled } from './throttle'
 import type { SpellBook } from '../../core/spells'
@@ -155,9 +156,11 @@ export class CombatFeed {
       const end = attachedAt()
       if (end > 0 && current()) {
         const since = Date.now() - minutes * 60_000
-        // The read starts up to a megabyte early (offsetBefore goes by chunks), so a line from before
-        // the window only tells the meter which zone it is in.
+        // The read starts a few kilobytes early, so a line from before the window only tells the meter
+        // which zone it is in; the zone it began in is the last zone line before the read.
         const from = await offsetBefore(logFile, since)
+        const entered = from > 0 ? await lastZoneLine(logFile, { end: from }) : null
+        if (entered && current()) this.meter.handle(entered)
         if (end > from && current()) {
           const take = (line: LogLine) => {
             if (!current()) return

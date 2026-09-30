@@ -5,7 +5,7 @@ import { join } from 'node:path'
 import { Readable } from 'node:stream'
 import { readLines } from '../src/main/moteHistory'
 import { offsetBefore } from '../src/main/sources/logHistory'
-import { lastZone } from '../src/main/game'
+import { lastZone, lastZoneLine } from '../src/main/game'
 import { readAasFromLog } from '../src/main/stats'
 import type { LogLine } from '../src/core/logLine'
 
@@ -48,6 +48,41 @@ describe('offsetBefore', () => {
     expect(first).toBeGreaterThan(100)
     expect(await offsetBefore(path, 0, { step: 256 })).toBe(0)
   })
+
+  it('finds it within a look of the first newer line in a big log, and never after one', async () => {
+    const path = join(dir, 'eqlog_A_b.txt')
+    // Three hours a line a second, some 150 KB; looks of 1 KB.
+    const at = (i: number) => new Date(2026, 8, 24, 13, 0, i)
+    const stamp = (d: Date) =>
+      d
+        .toString()
+        .slice(0, 24)
+        .replace(/^(\w+) (\w+) (\d+) (\d+) ([\d:]+)$/, '$1 $2 $3 $5 $4')
+    const lines = Array.from({ length: 3 * 3600 }, (_, i) => `[${stamp(at(i))}] You feel better. ${i}\r\n`)
+    const text = lines.join('')
+    await fs.writeFile(path, text)
+    for (const i of [1, 500, 5000, 10_799]) {
+      const off = await offsetBefore(path, at(i).getTime(), { step: 1024 })
+      const first = Number(/better\. (\d+)/.exec(text.slice(off))![1])
+      expect(first, `line ${i}`).toBeLessThan(i)
+      expect(i - first, `line ${i}`).toBeLessThanOrEqual(1024 / 40 + 2)
+    }
+    // Slack reaches back as asked.
+    const withSlack = await offsetBefore(path, at(7200).getTime(), { step: 1024, slackMs: 3600_000 })
+    expect(Number(/better\. (\d+)/.exec(text.slice(withSlack))![1])).toBeLessThan(3600)
+    // A time after every line: the start of a line near the end.
+    const end = await offsetBefore(path, at(20_000).getTime(), { step: 1024 })
+    expect(text.length - end).toBeLessThan(1024 + 60)
+  })
+
+  it('reads on past a look that holds no whole line, going earlier rather than missing one', async () => {
+    const path = join(dir, 'eqlog_A_b.txt')
+    const long = 'x'.repeat(600)
+    const lines = Array.from({ length: 60 }, (_, i) => `[Thu Sep 24 16:00:${String(i).padStart(2, '0')} 2026] ${long} ${i}\r\n`)
+    await fs.writeFile(path, lines.join(''))
+    // Looks of 256 bytes are shorter than a line: none is ever read whole, so the search ends at 0.
+    expect(await offsetBefore(path, new Date(2026, 8, 24, 16, 0, 40).getTime(), { step: 256 })).toBe(0)
+  })
 })
 
 describe('lastZone', () => {
@@ -58,6 +93,12 @@ describe('lastZone', () => {
     // Small chunks, so the zone line is cut across several of them.
     expect(await lastZone(path, 16)).toBe('The Plane of Fear 4 (Refined)')
     expect(await lastZone(path)).toBe('The Plane of Fear 4 (Refined)')
+    // Before an offset: the zone as it was there.
+    const later = '[Thu Sep 24 16:00:02 2026] You have entered Neriak - Commons.\r\n'
+    await fs.appendFile(path, later)
+    const size = (await fs.stat(path)).size
+    expect(await lastZone(path)).toBe('Neriak - Commons')
+    expect((await lastZoneLine(path, { step: 16, end: size - later.length }))?.text).toBe('You have entered The Plane of Fear 4 (Refined).')
   })
 
   it('passes over arenas', async () => {

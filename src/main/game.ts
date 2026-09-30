@@ -2,7 +2,7 @@ import { HKEY_CURRENT_USER, HKEY_LOCAL_MACHINE, isFixedDrive, isProcessRunning, 
 import { existsSync, promises as fs } from 'node:fs'
 import { dirname, join } from 'node:path'
 import type { ArchiveInfo, GameFolderCheck, LogFileInfo } from '../shared/types'
-import { parseLogLine, zoneEntered } from '../core/logLine'
+import { parseLogLine, zoneEntered, type LogLine } from '../core/logLine'
 import { readBackward } from './sources/logHistory'
 import { log } from './log'
 import { isCharacterKey } from '../core/validate'
@@ -169,20 +169,28 @@ export async function isGameRunning(): Promise<boolean> {
  * backwards from the end of the log to find it, up to 64 chunks.
  */
 export async function lastZone(logPath: string, step = 1 << 20): Promise<string> {
-  let zone = ''
+  const line = await lastZoneLine(logPath, { step })
+  return (line && zoneEntered(line.text)) || ''
+}
+
+/** The last "You have entered …" line before `end` (a line's start; the end of the log when not given), up to 64 chunks back. */
+export async function lastZoneLine(logPath: string, opts: { step?: number; end?: number } = {}): Promise<LogLine | null> {
+  const step = opts.step ?? 1 << 20
+  let found: LogLine | null = null
   try {
     await readBackward(
       logPath,
       (raw) => {
         if (!raw.includes('] You have entered ')) return
         const line = parseLogLine(raw)
-        zone = (line && zoneEntered(line.text)) || ''
-        return !!zone
+        if (!line || !zoneEntered(line.text)) return
+        found = line
+        return true
       },
-      { step, maxBytes: 64 * step }
+      { step, maxBytes: 64 * step, end: opts.end }
     )
   } catch (e) {
     if ((e as NodeJS.ErrnoException).code !== 'ENOENT') log.warn(`Could not read ${logPath} to find the zone:`, e)
   }
-  return zone
+  return found
 }

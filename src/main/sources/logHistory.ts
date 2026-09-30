@@ -17,20 +17,21 @@ export function identityOf(st: { dev: bigint; ino: bigint }): string {
 }
 
 /**
- * Reads a file back from the end a chunk at a time. `onChunk` gets each chunk's text and where it
- * starts, and returns true to stop. Stops at the start of the file or after `maxBytes`.
+ * Reads a file back from the end (or from `end`) a chunk at a time. `onChunk` gets each chunk's text
+ * and where it starts, and returns true to stop. Stops at the start of the file or after `maxBytes`.
  */
 export async function readChunksBackward(
   path: string,
   onChunk: (text: string, start: number) => boolean | void,
-  opts: { step?: number; maxBytes?: number; stopAt?: number } = {}
+  opts: { step?: number; maxBytes?: number; stopAt?: number; end?: number } = {}
 ): Promise<void> {
   const step = opts.step ?? 1 << 20
   const handle = await fs.open(path, 'r')
   try {
     const size = (await handle.stat()).size
-    const floor = Math.max(opts.stopAt ?? 0, opts.maxBytes ? size - opts.maxBytes : 0, 0)
-    for (let end = size; end > floor; end -= step) {
+    const top = Math.min(opts.end ?? size, size)
+    const floor = Math.max(opts.stopAt ?? 0, opts.maxBytes ? top - opts.maxBytes : 0, 0)
+    for (let end = top; end > floor; end -= step) {
       const start = Math.max(floor, end - step)
       const buf = Buffer.alloc(end - start)
       await handle.read(buf, 0, buf.length, start)
@@ -44,12 +45,13 @@ export async function readChunksBackward(
 /**
  * A log's lines newest first, each with the offset it starts at. `visit` returns true to stop. The
  * first piece of each chunk may be the end of a line begun in the chunk before; it is carried back and
- * joined to that chunk's last piece. With `stopAt`, lines that start before it are not visited.
+ * joined to that chunk's last piece. With `stopAt`, lines that start before it are not visited; with
+ * `end` (a line's start), the read begins there rather than at the end of the file.
  */
 export async function readBackward(
   path: string,
   visit: (raw: string, offset: number) => boolean | void,
-  opts: { step?: number; maxBytes?: number; stopAt?: number } = {}
+  opts: { step?: number; maxBytes?: number; stopAt?: number; end?: number } = {}
 ): Promise<void> {
   let carry = ''
   await readChunksBackward(
@@ -77,36 +79,53 @@ export function readForward(path: string, from: number, end: number | undefined,
 
 /**
  * Where to start reading a log to see every line stamped at or after `time`: the start of a line
- * stamped earlier, found a chunk at a time from the end. Lines are written in time order, so what
- * follows it is newer. 0 when the whole log is newer. `slackMs` looks further back than asked: in the
- * hour clocks go back, stamps repeat, and a read that must miss nothing allows for it.
+ * stamped earlier, within a few kilobytes of the first one that is not. Lines are written in time
+ * order, so a binary search over the file's bytes finds it in a few dozen small reads however big the
+ * log (a live log runs to the archiver's 300 MB). 0 when the whole log is newer. `slackMs` looks further
+ * back than asked: in the hour clocks go back, stamps repeat, and a read that must miss nothing allows
+ * for it. `step` is how much is read at each look, enough for a whole line.
  */
 export async function offsetBefore(path: string, time: number, opts: { step?: number; slackMs?: number } = {}): Promise<number> {
   const before = time - (opts.slackMs ?? 0)
-  let found = 0
-  await readChunksBackward(
-    path,
-    (text, start) => {
-      // The chunk's first piece may be the tail of a line that began in the chunk before.
-      let at = start === 0 ? 0 : text.indexOf('\n') + 1
-      if (at === 0 && start > 0) return
+  const step = opts.step ?? 1 << 12
+  const handle = await fs.open(path, 'r')
+  try {
+    const size = (await handle.stat()).size
+    const buf = Buffer.alloc(step)
+    /** The first whole stamped line at or after `pos`: where it starts and its time; null when the look holds none. */
+    const lineAt = async (pos: number): Promise<{ at: number; time: number } | null> => {
+      const { bytesRead } = await handle.read(buf, 0, step, pos)
+      const text = decodeCp1252(buf.subarray(0, bytesRead))
+      // The first piece may be the tail of a line that began before `pos`.
+      let at = pos === 0 ? 0 : text.indexOf('\n') + 1
+      if (at === 0 && pos > 0) return null
       while (at < text.length) {
         const nl = text.indexOf('\n', at)
+        // A line the look cuts off is not read, unless the file ends there.
+        if (nl < 0 && pos + bytesRead < size) return null
         const line = parseLogLine(text.slice(at, nl < 0 ? undefined : nl).replace(/\r$/, ''))
-        if (line) {
-          if (line.time < before) {
-            found = start + at
-            return true
-          }
-          return
-        }
-        if (nl < 0) return
+        if (line) return { at: pos + at, time: line.time }
+        if (nl < 0) return null
         at = nl + 1
       }
-    },
-    { step: opts.step }
-  )
-  return found
+      return null
+    }
+    let found = 0
+    let lo = 0
+    let hi = size
+    while (hi - lo > step) {
+      const mid = lo + Math.floor((hi - lo) / 2)
+      const hit = await lineAt(mid)
+      // A look with no stamped line in it counts as too late: the search goes earlier, which reads more but misses nothing.
+      if (hit && hit.time < before) {
+        found = hit.at
+        lo = mid
+      } else hi = mid
+    }
+    return found
+  } finally {
+    await handle.close()
+  }
 }
 
 // ---- Whole history, counted once ----

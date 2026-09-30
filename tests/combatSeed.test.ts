@@ -63,8 +63,9 @@ beforeEach(async () => {
   logs = join(dir, 'game', 'Logs')
   await fs.mkdir(logs, { recursive: true })
   logFile = join(logs, 'eqlog_Kelwyn_neriak.txt')
-  // An old fight half an hour ago and a recent one three minutes ago, over a megabyte apart: the
-  // start of the window is found a megabyte chunk at a time (offsetBefore), so a small log is read whole.
+  // An old fight half an hour ago and a recent one three minutes ago, over a megabyte apart, and the
+  // zone entered before both: the read starts a few kilobytes before the window (offsetBefore), and the
+  // zone line before it is looked for on its own.
   const filler = line(20, 'You feel better.').repeat(Math.ceil((1.2 * 1048576) / line(20, 'You feel better.').length))
   await fs.writeFile(logFile, line(40, 'You have entered Neriak.') + fight(30, 'an old ratman') + filler + fight(3, 'a young ratman') + line(1, 'You feel better.'))
   engines = []
@@ -142,6 +143,8 @@ describe('Reading recent fights into the meter', () => {
   it('fills the meter from the last N minutes of the log when watching starts, and nothing older', async () => {
     const { engine } = await watching(10)
     expect(fights(engine)).toEqual(['a young ratman'])
+    // The zone came a megabyte and more before the window, and still names the fight's zone.
+    expect(engine.meter.fights[0].zone).toBe('Neriak')
   })
 
   it('fills it with every fight in the window when the window is wide enough', async () => {
