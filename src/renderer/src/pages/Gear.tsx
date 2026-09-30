@@ -3,7 +3,7 @@ import { CharacterPicker } from '../components/CharacterPicker'
 import { api } from '../api'
 import { remember, useRemembered } from '../remember'
 import { showError } from '../toast'
-import { Ago, FilterBox, GameCommand, Pending, Tabs } from '../components/ui'
+import { Ago, FilterBox, GameCommand, Pending, Segmented, Tabs } from '../components/ui'
 import { numExact as num, who, wikiUrl } from '../../../core/format'
 import { itemKey, mergeLevel, parseStatsBlock, placeLabel, slotLabel, storageTab, wornTotals, SAVE_KEYS, STAT_KEYS, type InvItem } from '../../../core/inventory'
 import type { CharacterSheet, InventoryView, ItemInfo } from '../../../shared/types'
@@ -438,14 +438,15 @@ function GearTotals({
       <div className="card">
         <div className="lt-card-head">
           <b>Attributes from gear</b>
-          <span className="lt-seg" role="group" aria-label="Attributes shown">
-            <button className={scaled ? 'on' : ''} aria-pressed={scaled} onClick={() => setScaled(true)}>
-              With merges
-            </button>
-            <button className={scaled ? '' : 'on'} aria-pressed={!scaled} onClick={() => setScaled(false)}>
-              Base
-            </button>
-          </span>
+          <Segmented
+            label="Attributes shown"
+            value={scaled ? 'merged' : 'base'}
+            onChange={(v) => setScaled(v === 'merged')}
+            options={[
+              ['merged', 'With merges'],
+              ['base', 'Base']
+            ]}
+          />
         </div>
         {STAT_KEYS.map((k) => bar(statName[k], t.stats[k] ?? 0, maxStat))}
       </div>
@@ -660,13 +661,17 @@ function Carried({ view }: { view: InventoryView }) {
       <div className="row mb-12">
         <h2 style={{ margin: 0 }}>Where everything is</h2>
         <span className="grow" />
-        <span className="lt-seg" role="group" aria-label="Show">
-          {(Object.keys(label) as Filter[]).map((f) => (
-            <button key={f} className={filter === f ? 'on' : ''} aria-pressed={filter === f} onClick={() => setFilter(f)}>
+        <Segmented
+          label="Show"
+          value={filter}
+          onChange={setFilter}
+          options={(Object.keys(label) as Filter[]).map((f) => [
+            f,
+            <>
               {label[f]} <small>{counts[f]}</small>
-            </button>
-          ))}
-        </span>
+            </>
+          ])}
+        />
         <FilterBox className="inv-search" placeholder="Find an item" label="Find an item" value={q} onChange={setQ} width={200} />
       </div>
       <div className="lt-list">

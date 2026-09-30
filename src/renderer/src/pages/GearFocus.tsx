@@ -7,7 +7,7 @@ import { focusValue, KIND_LABELS, KIND_ORDER, KIND_WORTH, type FocusInfo, type F
 import { optimizeGear, pieceName, SLOT_LAYOUT, type GearLock, type Piece, type PieceSource, type Plan } from '../../../core/gearOptimizer'
 import { type FocusCandidate, type GearModel, type OwnedFocus } from '../gear/useGearModel'
 import { CATALOG_PER_SLOT } from '../../../core/gearCatalog'
-import { Info, Pending } from '../components/ui'
+import { DAY_WINDOWS, Info, Pending, Segmented } from '../components/ui'
 import { num, pct as pctOf, wikiUrl } from '../../../core/format'
 
 /** A focus figure, given as a percentage already (10.5), to one place. */
@@ -98,20 +98,7 @@ export function FocusTab({ m }: { m: GearModel }) {
         </div>
         <div className="row small">
           <b>Judged on what you cast</b>
-          <span className="lt-seg" role="group" aria-label="Judged on what you cast">
-            {(
-              [
-                [7, '7 days'],
-                [14, '14 days'],
-                [30, '30 days'],
-                [0, 'All logs']
-              ] as const
-            ).map(([d, label]) => (
-              <button key={d} className={m.days === d ? 'on' : ''} aria-pressed={m.days === d} onClick={() => m.setDays(d)}>
-                {label}
-              </button>
-            ))}
-          </span>
+          <Segmented label="Judged on what you cast" value={m.days} onChange={m.setDays} options={DAY_WINDOWS} />
           <span className="muted">
             {r.basis === 'casts' && r.window
               ? `${num(r.window.total)} casts from ${r.window.from} to ${r.window.to}: ${top.join(' · ')}${r.uses.length > 6 ? '…' : ''}`
@@ -369,18 +356,15 @@ export function OptimizeTab({ m }: { m: GearModel }) {
         <div className="row">
           <h2 style={{ margin: 0 }}>{all ? 'Best set from all gear' : 'Best use of what you own'}</h2>
           <span className="grow" />
-          <span className="lt-seg" role="group" aria-label="Choose from">
-            {(
-              [
-                ['owned', 'Gear you own'],
-                ['all', 'All gear']
-              ] as const
-            ).map(([k, label]) => (
-              <button key={k} className={scope === k ? 'on' : ''} aria-pressed={scope === k} onClick={() => setScope(k)}>
-                {label}
-              </button>
-            ))}
-          </span>
+          <Segmented
+            label="Choose from"
+            value={scope}
+            onChange={setScope}
+            options={[
+              ['owned', 'Gear you own'],
+              ['all', 'All gear']
+            ]}
+          />
         </div>
         {all && (
           <p className="small" style={{ margin: 0 }}>

@@ -6,7 +6,7 @@ import type { GearModel } from '../gear/useGearModel'
 import { useRemembered } from '../remember'
 import { num, wikiUrl } from '../../../core/format'
 import { ItemIcon, source, whereText } from './gearBits'
-import { Pending } from '../components/ui'
+import { DAY_WINDOWS, Pending, Segmented } from '../components/ui'
 
 // The Gear page's worn effects and procs tabs: what each one on gear the character owns or could get
 // does, what it is worth to them (melee from their own log, stats by their weights), and where to
@@ -125,20 +125,7 @@ export function EffectsTab({ m, kind }: { m: GearModel; kind: EffectKind }) {
         <h2 style={{ margin: 0 }}>{kind === 'worn' ? 'Worn effects' : 'Procs'}</h2>
         <div className="row small">
           <b>Judged on your melee</b>
-          <span className="lt-seg" role="group" aria-label="Judged on your melee">
-            {(
-              [
-                [7, '7 days'],
-                [14, '14 days'],
-                [30, '30 days'],
-                [0, 'All logs']
-              ] as const
-            ).map(([d, label]) => (
-              <button key={d} className={m.days === d ? 'on' : ''} aria-pressed={m.days === d} onClick={() => m.setDays(d)}>
-                {label}
-              </button>
-            ))}
-          </span>
+          <Segmented label="Judged on your melee" value={m.days} onChange={m.setDays} options={DAY_WINDOWS} />
           <span className="muted">
             {fx.loading ? (
               <Pending inline doing="Reading your log" />
@@ -151,18 +138,15 @@ export function EffectsTab({ m, kind }: { m: GearModel; kind: EffectKind }) {
         </div>
         <div className="row small">
           <b>Gear for</b>
-          <span className="lt-seg" role="group" aria-label="Gear for">
-            {(
-              [
-                ['yours', `Your classes (${m.classes.map((c) => c.toUpperCase()).join(' ')})`],
-                ['all', 'All classes']
-              ] as const
-            ).map(([k, label]) => (
-              <button key={k} className={who === k ? 'on' : ''} aria-pressed={who === k} onClick={() => setWho(k)}>
-                {label}
-              </button>
-            ))}
-          </span>
+          <Segmented
+            label="Gear for"
+            value={who}
+            onChange={setWho}
+            options={[
+              ['yours', `Your classes (${m.classes.map((c) => c.toUpperCase()).join(' ')})`],
+              ['all', 'All classes']
+            ]}
+          />
         </div>
         <p className="small muted" style={{ margin: 0 }}>
           {kind === 'worn'

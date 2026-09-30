@@ -6,7 +6,7 @@ import { DEFAULT_HIDDEN_ERAS, OTHER_ERA, OTHER_OUT_ERA } from '../../../core/upg
 import { ROLE_LABELS, ROLE_PRESETS, type RoleKey } from '../../../core/statValue'
 import type { CharacterSheet, InventoryView } from '../../../shared/types'
 import { className } from '../../../shared/game/classes'
-import { Ago, ErrorText, Info, Pending, ToggleChip } from '../components/ui'
+import { Ago, ErrorText, Info, Pending, Segmented, ToggleChip } from '../components/ui'
 import { num, wikiUrl } from '../../../core/format'
 import { AC_OVER_CAP, useGearModel, type CatalogState, type GearMode } from '../gear/useGearModel'
 import { ItemIcon, source } from './gearBits'
@@ -102,13 +102,7 @@ export function GearFinder({ view, sheet, mode, onPlan }: { view: InventoryView;
         {scoring && (
           <div className="row">
             <b>Weigh stats for</b>
-            <span className="lt-seg" role="group" aria-label="Weigh stats for">
-              {[...Object.keys(ROLE_PRESETS), 'Custom'].map((name) => (
-                <button key={name} className={preset === name ? 'on' : ''} aria-pressed={preset === name} onClick={() => setPreset(name)}>
-                  {name}
-                </button>
-              ))}
-            </span>
+            <Segmented label="Weigh stats for" value={preset} onChange={setPreset} options={[...Object.keys(ROLE_PRESETS), 'Custom'].map((name) => [name, name] as const)} />
             <label
               className="row tight small"
               title="In Primary and Secondary, a better weapon ratio wins over any stats, focus or effects: the weights only choose between weapons of about the same ratio. Change the other weights freely; the hands keep the best-ratio weapons. Worn effects, procs and merges are weighed as before."
@@ -131,24 +125,15 @@ export function GearFinder({ view, sheet, mode, onPlan }: { view: InventoryView;
             {(mode === 'finder' || mode === 'optimize') && (
               <>
                 <b>Compare</b>
-                <span className="lt-seg" role="group" aria-label="Compare">
-                  <button
-                    className={compare === 'drop' ? 'on' : ''}
-                    aria-pressed={compare === 'drop'}
-                    onClick={() => setCompare('drop')}
-                    title="Candidates as they drop, at +0, against your gear at its merge level"
-                  >
-                    As they drop
-                  </button>
-                  <button
-                    className={compare === 'level' ? 'on' : ''}
-                    aria-pressed={compare === 'level'}
-                    onClick={() => setCompare('level')}
-                    title="Candidates merged to the same level as the item they would replace"
-                  >
-                    At your merge level
-                  </button>
-                </span>
+                <Segmented
+                  label="Compare"
+                  value={compare}
+                  onChange={setCompare}
+                  options={[
+                    ['drop', 'As they drop', 'Candidates as they drop, at +0, against your gear at its merge level'],
+                    ['level', 'At your merge level', 'Candidates merged to the same level as the item they would replace']
+                  ]}
+                />
                 <Info
                   label="About Compare"
                   text="As they drop: candidates at +0, against your gear at its merge level. At your merge level: candidates merged to the same level as the item they would replace. The Gear optimiser's All gear mode compares them the same way."
@@ -158,24 +143,15 @@ export function GearFinder({ view, sheet, mode, onPlan }: { view: InventoryView;
             {mode === 'finder' && (
               <>
                 <b>Judge</b>
-                <span className="lt-seg" role="group" aria-label="Judge">
-                  <button
-                    className={judge === 'round' ? 'on' : ''}
-                    aria-pressed={judge === 'round'}
-                    onClick={() => setJudge('round')}
-                    title="Everything you own rearranged around the candidate: the item it pushes out may go to an Any slot and keep its focus"
-                  >
-                    In the round
-                  </button>
-                  <button
-                    className={judge === 'slot' ? 'on' : ''}
-                    aria-pressed={judge === 'slot'}
-                    onClick={() => setJudge('slot')}
-                    title="One slot, one item out: quicker, and blind to where the displaced item could go"
-                  >
-                    This slot only
-                  </button>
-                </span>
+                <Segmented
+                  label="Judge"
+                  value={judge}
+                  onChange={setJudge}
+                  options={[
+                    ['round', 'In the round', 'Everything you own rearranged around the candidate: the item it pushes out may go to an Any slot and keep its focus'],
+                    ['slot', 'This slot only', 'One slot, one item out: quicker, and blind to where the displaced item could go']
+                  ]}
+                />
                 <Info
                   label="About Judge"
                   text="In the round: each candidate is added to everything you own and the optimiser wears the lot as well as it can; the gain is what the whole set gains, so an item that pushes a focus belt into a free Any slot loses no focus, and a lore twin or a two-hander is caught. This slot only: the candidate against the one item it replaces, focus lost and all."
@@ -233,19 +209,16 @@ export function GearFinder({ view, sheet, mode, onPlan }: { view: InventoryView;
               <>
                 <div className="row small">
                   <b>AC soft cap</b>
-                  <span className="lt-seg" role="group" aria-label="AC soft cap">
-                    {(
-                      [
-                        ['auto', acState ? `Auto: ${acState.over ? 'over' : 'under'}` : 'Auto'],
-                        ['over', 'Over'],
-                        ['under', 'Under']
-                      ] as const
-                    ).map(([m, label]) => (
-                      <button key={m} className={capMode === m ? 'on' : ''} aria-pressed={capMode === m} onClick={() => setCapMode(m)}>
-                        {label}
-                      </button>
-                    ))}
-                  </span>
+                  <Segmented
+                    label="AC soft cap"
+                    value={capMode}
+                    onChange={setCapMode}
+                    options={[
+                      ['auto', acState ? `Auto: ${acState.over ? 'over' : 'under'}` : 'Auto'],
+                      ['over', 'Over'],
+                      ['under', 'Under']
+                    ]}
+                  />
                   <span className="muted">
                     {overCap ? `AC counts at ${AC_OVER_CAP * 100}% of its weight: past the soft cap most of it is lost.` : 'AC counts in full: you are under the soft cap.'}
                     {acState && capMode === 'auto' && ` Mitigation ${num(acState.mitigation)} against a soft cap of ${num(acState.cap)}, from ${acState.from}.`}
@@ -253,19 +226,16 @@ export function GearFinder({ view, sheet, mode, onPlan }: { view: InventoryView;
                 </div>
                 <div className="row small">
                   <b>Primary</b>
-                  <span className="lt-seg" role="group" aria-label="Primary">
-                    {(
-                      [
-                        ['auto', `Auto: ${secondaryInUse ? 'one-handed' : 'any'}`],
-                        ['one', 'One-handed'],
-                        ['any', 'Include two-handed']
-                      ] as const
-                    ).map(([m, label]) => (
-                      <button key={m} className={twoHandMode === m ? 'on' : ''} aria-pressed={twoHandMode === m} onClick={() => setTwoHandMode(m)}>
-                        {label}
-                      </button>
-                    ))}
-                  </span>
+                  <Segmented
+                    label="Primary"
+                    value={twoHandMode}
+                    onChange={setTwoHandMode}
+                    options={[
+                      ['auto', `Auto: ${secondaryInUse ? 'one-handed' : 'any'}`],
+                      ['one', 'One-handed'],
+                      ['any', 'Include two-handed']
+                    ]}
+                  />
                   <span className="muted">{twoHanders ? 'Two-handed weapons are suggested for Primary.' : 'Two-handed weapons are left out: your secondary hand is in use.'}</span>
                 </div>
                 <FocusPoints points={points} setPoints={setPoints} wanted={wanted.size} lines={lines.length} />

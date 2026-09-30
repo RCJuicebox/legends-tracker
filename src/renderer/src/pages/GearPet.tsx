@@ -2,7 +2,7 @@ import { useMemo } from 'react'
 import { ago } from '../api'
 import { useInvoke } from '../hooks'
 import { useRemembered } from '../remember'
-import { ErrorText, Info, Pending, Switch } from '../components/ui'
+import { ErrorText, Info, Pending, Segmented, Switch } from '../components/ui'
 import { num, wikiUrl } from '../../../core/format'
 import { className } from '../../../shared/game/classes'
 import { itemKey, mergeLevel, parseStatsBlock, scaledStats, slotLabel, type InvItem } from '../../../core/inventory'
@@ -126,13 +126,7 @@ export function PetTab({ m }: { m: GearModel }) {
           )}
           <span className="spacer" />
           <b>Weigh stats for</b>
-          <span className="lt-seg" role="group" aria-label="Weigh the pet's stats for">
-            {Object.keys(PET_ROLE_PRESETS).map((name) => (
-              <button key={name} className={preset === name ? 'on' : ''} aria-pressed={preset === name} onClick={() => setPreset(name)}>
-                {name}
-              </button>
-            ))}
-          </span>
+          <Segmented label="Weigh the pet's stats for" value={preset} onChange={setPreset} options={Object.keys(PET_ROLE_PRESETS).map((name) => [name, name] as const)} />
         </div>
 
         {!spell ? (

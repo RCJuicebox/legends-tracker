@@ -4,7 +4,7 @@ import { api } from '../api'
 import { useInvoke } from '../hooks'
 import { remember, useRemembered } from '../remember'
 import { showError, showToast } from '../toast'
-import { Ago, GameCommand, Info, Tip } from '../components/ui'
+import { Ago, GameCommand, Info, Segmented, Tip } from '../components/ui'
 import { num } from '../../../core/format'
 import { useStock } from './MotePlanner'
 import { itemKey, parseStatsBlock, slotLabel, type InvItem } from '../../../core/inventory'
@@ -115,24 +115,19 @@ export function MergeTab({
       <div className="card stack gap-12">
         <div className="row">
           <b>Weigh stats for</b>
-          <span className="lt-seg" role="group" aria-label="Weigh stats for">
-            {[...Object.keys(ROLE_PRESETS), 'Custom'].map((name) => (
-              <button key={name} className={preset === name ? 'on' : ''} aria-pressed={preset === name} onClick={() => setPreset(name)}>
-                {name}
-              </button>
-            ))}
-          </span>
+          <Segmented label="Weigh stats for" value={preset} onChange={setPreset} options={[...Object.keys(ROLE_PRESETS), 'Custom'].map((name) => [name, name] as const)} />
           <Info label="How the best merge is worked out" text={HOW} />
           <span className="grow" />
           <b>Order by</b>
-          <span className="lt-seg" role="group" aria-label="Order by">
-            <button className={sortBy === 'rate' ? 'on' : ''} aria-pressed={sortBy === 'rate'} onClick={() => setSortBy('rate')} title="Stat gain per mote value spent">
-              Gain per mote value
-            </button>
-            <button className={sortBy === 'gain' ? 'on' : ''} aria-pressed={sortBy === 'gain'} onClick={() => setSortBy('gain')} title="The biggest boost, whatever it costs">
-              Gain
-            </button>
-          </span>
+          <Segmented
+            label="Order by"
+            value={sortBy}
+            onChange={setSortBy}
+            options={[
+              ['rate', 'Gain per mote value', 'Stat gain per mote value spent'],
+              ['gain', 'Gain', 'The biggest boost, whatever it costs']
+            ]}
+          />
           <label className="row tight">
             <input type="checkbox" checked={onlyAffordable} onChange={(e) => setOnlyAffordable(e.target.checked)} />
             Only what your motes cover

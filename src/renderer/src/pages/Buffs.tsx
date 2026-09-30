@@ -5,7 +5,7 @@ import { useInvoke } from '../hooks'
 import { useRemembered } from '../remember'
 import { act } from '../toast'
 import { useNow } from '../components/TimerBars'
-import { ConfirmButton, FilterBox, Info, Pending, Switch, Tip } from '../components/ui'
+import { ConfirmButton, FilterBox, Info, Pending, Segmented, Switch, Tip } from '../components/ui'
 import { useApp } from '../state'
 import { wikiUrl } from '../../../core/format'
 import { CLASSES, className } from '../../../shared/game/classes'
@@ -319,14 +319,15 @@ function BestCombination({ view, unpick }: { view: BuffView; unpick: (spell: str
     <div className="card stack gap-10 mb-16">
       <div className="row" style={{ flexWrap: 'wrap' }}>
         <h2 style={{ margin: 0 }}>Best combination</h2>
-        <span className="lt-seg" role="group" aria-label="Whose buffs">
-          <button className={scope === 'group' ? 'on' : ''} aria-pressed={scope === 'group'} onClick={() => setScope('group')}>
-            With your group
-          </button>
-          <button className={scope === 'anyone' ? 'on' : ''} aria-pressed={scope === 'anyone'} onClick={() => setScope('anyone')}>
-            With anyone
-          </button>
-        </span>
+        <Segmented
+          label="Whose buffs"
+          value={scope}
+          onChange={setScope}
+          options={[
+            ['group', 'With your group'],
+            ['anyone', 'With anyone']
+          ]}
+        />
         <span className="small muted">
           {scope === 'group' ? 'From what your group and you can cast, and what is on you.' : 'From every class at level 50, and your own self-only buffs, to plan with.'} Worth{' '}
           {total.toLocaleString()} in all.

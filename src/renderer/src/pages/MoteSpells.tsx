@@ -4,7 +4,7 @@ import { roman } from '../api'
 import { useInvoke } from '../hooks'
 import type { PageId } from '../main'
 import { useRemembered } from '../remember'
-import { CategoryChip, Info, NumberInput, Pending, SpellIcon } from '../components/ui'
+import { CategoryChip, DAY_WINDOWS, Info, NumberInput, Pending, Segmented, SpellIcon } from '../components/ui'
 import { num, num1, pct } from '../../../core/format'
 import { useStock } from './MotePlanner'
 import { classCode, classIdOf } from '../../../shared/game/classes'
@@ -135,34 +135,20 @@ export function MoteSpells({ go }: { go?: (page: PageId) => void }) {
       <div className="card stack gap-10">
         <div className="row">
           <b>Judged on what you cast</b>
-          <span className="lt-seg" role="group" aria-label="Judged on what you cast">
-            {(
-              [
-                [7, '7 days'],
-                [14, '14 days'],
-                [30, '30 days'],
-                [0, 'All logs']
-              ] as const
-            ).map(([d, label]) => (
-              <button key={d} className={days === d ? 'on' : ''} aria-pressed={days === d} onClick={() => setDays(d)}>
-                {label}
-              </button>
-            ))}
-          </span>
+          <Segmented label="Judged on what you cast" value={days} onChange={setDays} options={DAY_WINDOWS} />
           <Info label="How spell upgrades are judged" text={HOW} />
           <span className="grow" />
           <b>Order by</b>
-          <span className="lt-seg" role="group" aria-label="Order by">
-            <button className={sortBy === 'rate' ? 'on' : ''} aria-pressed={sortBy === 'rate'} onClick={() => setSortBy('rate')} title="The most gained per xp spent">
-              Worth per xp
-            </button>
-            <button className={sortBy === 'worth' ? 'on' : ''} aria-pressed={sortBy === 'worth'} onClick={() => setSortBy('worth')} title="The biggest gain, whatever it costs">
-              Worth
-            </button>
-            <button className={sortBy === 'casts' ? 'on' : ''} aria-pressed={sortBy === 'casts'} onClick={() => setSortBy('casts')} title="Most cast first">
-              Casts
-            </button>
-          </span>
+          <Segmented
+            label="Order by"
+            value={sortBy}
+            onChange={setSortBy}
+            options={[
+              ['rate', 'Worth per xp', 'The most gained per xp spent'],
+              ['worth', 'Worth', 'The biggest gain, whatever it costs'],
+              ['casts', 'Casts', 'Most cast first']
+            ]}
+          />
         </div>
         <div className="row small">
           <b>A cast is worth more when it gets</b>
@@ -207,23 +193,20 @@ export function MoteSpells({ go }: { go?: (page: PageId) => void }) {
         </p>
         <div className="row">
           <b>Spells of</b>
-          <span
-            className="lt-seg"
-            role="group"
-            aria-label="Spells of"
+          <Segmented
+            label="Spells of"
+            value={whose}
+            onChange={setWhose}
             title={
               mine.length
                 ? `Your trio: ${mine.map((m) => `${m.name} ${m.level}`).join(', ')}. A spell counts when one of them has it at their level.`
                 : 'Your classes are not known yet: type /who in game, or set your classes and levels on the Stats page'
             }
-          >
-            <button className={whose === 'mine' ? 'on' : ''} aria-pressed={whose === 'mine'} onClick={() => setWhose('mine')} disabled={!mine.length}>
-              Your trio{mine.length > 0 && <small>{mine.map((m) => whoCode(m.name)).join('/')}</small>}
-            </button>
-            <button className={whose === 'all' ? 'on' : ''} aria-pressed={whose === 'all'} onClick={() => setWhose('all')}>
-              Every class you have cast as
-            </button>
-          </span>
+            options={[
+              { value: 'mine', label: <>Your trio{mine.length > 0 && <small>{mine.map((m) => whoCode(m.name)).join('/')}</small>}</>, disabled: !mine.length },
+              ['all', 'Every class you have cast as']
+            ]}
+          />
           <span className="muted small">
             {whose === 'mine' && mine.length
               ? 'Only spells one of your classes has at its level now: a spell a Necromancer gets at 39 is not the Shadow Knight’s until 49.'
@@ -231,16 +214,28 @@ export function MoteSpells({ go }: { go?: (page: PageId) => void }) {
           </span>
         </div>
         <div className="row">
-          <span className="lt-seg" role="group" aria-label="Section">
-            <button className={section === 'all' ? 'on' : ''} aria-pressed={section === 'all'} onClick={() => setSection('all')}>
-              All <small>{kept.length}</small>
-            </button>
-            {sections.map((s) => (
-              <button key={s.key} className={section === s.key ? 'on' : ''} aria-pressed={section === s.key} onClick={() => setSection(s.key)}>
-                {s.label} <small>{counts.get(s.key)}</small>
-              </button>
-            ))}
-          </span>
+          <Segmented<SectionKey | 'all'>
+            label="Section"
+            value={section}
+            onChange={setSection}
+            options={[
+              [
+                'all',
+                <>
+                  All <small>{kept.length}</small>
+                </>
+              ],
+              ...sections.map(
+                (s) =>
+                  [
+                    s.key,
+                    <>
+                      {s.label} <small>{counts.get(s.key)}</small>
+                    </>
+                  ] as const
+              )
+            ]}
+          />
           <span className="grow" />
           <label className="row tight">
             <input type="checkbox" checked={onlyAffordable} onChange={(e) => setOnlyAffordable(e.target.checked)} />

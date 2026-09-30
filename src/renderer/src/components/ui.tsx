@@ -466,25 +466,49 @@ export function Tabs<T extends string>({
   )
 }
 
+/** A Segmented's choice: `[value, label]`, with a tooltip as a third, or in full when it can be off. */
+export type SegmentOption<T> = readonly [T, ReactNode] | readonly [T, ReactNode, string] | { value: T; label: ReactNode; title?: string; disabled?: boolean }
+
+/** A choice given as a tuple, in full. */
+function fullOption<T>(o: SegmentOption<T>): { value: T; label: ReactNode; title?: string; disabled?: boolean } {
+  if (!Array.isArray(o)) return o as { value: T; label: ReactNode; title?: string; disabled?: boolean }
+  const [value, label, title] = o as readonly [T, ReactNode, string?]
+  return { value, label, title }
+}
+
+/** How far back a count of casts or swings looks: the same four choices wherever one is asked. */
+export const DAY_WINDOWS = [
+  [7, '7 days'],
+  [14, '14 days'],
+  [30, '30 days'],
+  [0, 'All logs']
+] as const satisfies readonly SegmentOption<number>[]
+
 /** One of a few choices, side by side: a view's mode, an order, a scope. */
-export function Segmented<T extends string>({
+export function Segmented<T extends string | number>({
   value,
   options,
   onChange,
-  label
+  label,
+  title
 }: {
   value: T
-  options: readonly (readonly [T, string])[]
+  options: readonly SegmentOption<T>[]
   onChange: (v: T) => void
   label: string
+  /** What the choice as a whole means, on hover. */
+  title?: string
 }) {
   return (
-    <span className="lt-seg" role="group" aria-label={label}>
-      {options.map(([v, text]) => (
-        <button key={v} className={v === value ? 'on' : ''} aria-pressed={v === value} onClick={() => onChange(v)}>
-          {text}
-        </button>
-      ))}
+    <span className="lt-seg" role="group" aria-label={label} title={title}>
+      {options.map((o) => {
+        const { value: v, label: text, title: tip, disabled } = fullOption(o)
+        return (
+          <button key={v} className={v === value ? 'on' : ''} aria-pressed={v === value} title={tip} disabled={disabled} onClick={() => onChange(v)}>
+            {text}
+          </button>
+        )
+      })}
     </span>
   )
 }
