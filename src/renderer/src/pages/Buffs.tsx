@@ -5,7 +5,7 @@ import { useInvoke } from '../hooks'
 import { useRemembered } from '../remember'
 import { act } from '../toast'
 import { useNow } from '../components/TimerBars'
-import { ConfirmButton, FilterBox, Info, Pending, Switch } from '../components/ui'
+import { ConfirmButton, FilterBox, Info, Pending, Switch, Tip } from '../components/ui'
 import { useApp } from '../state'
 import { wikiUrl } from '../../../core/format'
 import { CLASSES, className } from '../../../shared/game/classes'
@@ -221,9 +221,9 @@ export function Buffs() {
                     {b.caster ? ` · from ${b.caster}` : ''}
                   </span>
                   <span className="spacer" />
-                  <span className="mono small" title="The earliest it can fade; its fade line ends it">
+                  <Tip className="mono small" text="The earliest it can fade; its fade line ends it">
                     {b.endsAt === null ? 'until it fades' : b.endsAt > now ? `~${clock((b.endsAt - now) / 1000)}` : 'fading…'}
-                  </span>
+                  </Tip>
                 </div>
               ))
           )}
@@ -283,9 +283,9 @@ export function Buffs() {
                               </span>
                             )}
                             {o.self && (
-                              <span className="lt-chip" style={{ marginLeft: 6 }} title="Only the caster can have it: yours to cast when your classes can">
+                              <Tip className="lt-chip" style={{ marginLeft: 6 }} text="Only the caster can have it: yours to cast when your classes can">
                                 self
-                              </span>
+                              </Tip>
                             )}
                           </td>
                           <td className="small muted nowrap">{LINE_LABELS[o.line]}</td>
@@ -352,9 +352,15 @@ function BestCombination({ view, unpick }: { view: BuffView; unpick: (spell: str
                 const o = byName.get(c.spell)
                 return (
                   <div key={c.spell} className="row gap-8 small">
-                    <span style={{ minWidth: 200 }} title={o ? `Cast by ${casters(o)}` : undefined}>
-                      <b>{c.spell}</b>
-                    </span>
+                    {o ? (
+                      <Tip style={{ minWidth: 200 }} text={`Cast by ${casters(o)}`}>
+                        <b>{c.spell}</b>
+                      </Tip>
+                    ) : (
+                      <span style={{ minWidth: 200 }}>
+                        <b>{c.spell}</b>
+                      </span>
+                    )}
                     <span className="muted" style={{ minWidth: 200 }}>
                       {o ? effectText(o) : ''}
                     </span>

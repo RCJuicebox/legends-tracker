@@ -2562,6 +2562,26 @@ button.tree-item {
   border-color: var(--accent);
   color: var(--accent-2);
 }
+/* A Tip's words, shown while it has the keyboard's focus; placed by Tip, fixed to the window. */
+.tip-pop {
+  position: fixed;
+  z-index: 30;
+  width: max-content;
+  max-width: 320px;
+  padding: 6px 9px;
+  border-radius: var(--radius-sm);
+  background: var(--panel-2);
+  border: 1px solid var(--line-2);
+  box-shadow: var(--shadow);
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 1.4;
+  letter-spacing: normal;
+  text-transform: none;
+  white-space: pre-line;
+  text-align: left;
+}
 /* Placed by Info, fixed to the window, so a scrolling table cannot clip it. */
 .info-pop {
   position: fixed;

@@ -5,7 +5,7 @@ import { useRemembered } from '../remember'
 import { usePickedCharacter } from '../character'
 import { useAchievementTrack, useInvoke } from '../hooks'
 import { showError, showToast } from '../toast'
-import { Ago, FilterBox, GameCommand, Pending, Switch } from '../components/ui'
+import { Ago, FilterBox, GameCommand, Pending, Switch, Tip } from '../components/ui'
 import { useApp } from '../state'
 import { numExact as num, who } from '../../../core/format'
 import {
@@ -685,30 +685,39 @@ function ObjectiveRow({ book, r, c, label, sub, ctx, single }: { book: Achieveme
   const skillProg =
     skill && skill.target > 0 ? (
       skill.value === null ? (
-        <span className="chip" title={`No skill-up for ${skill.skill} in your logs: raise it once and it shows here. One raised at a guildmaster prints no line.`}>
+        <Tip className="chip" text={`No skill-up for ${skill.skill} in your logs: raise it once and it shows here. One raised at a guildmaster prints no line.`}>
           not in your logs
-        </span>
+        </Tip>
       ) : (
-        <span
+        <Tip
           className="ach-prog"
-          title={`${skill.skill} ${num(skill.value)} when the log last saw it go up; ${num(skill.target)} is the best cap of your classes at level ${skill.level}. One raised at a guildmaster prints no line, so it may be higher.`}
+          text={`${skill.skill} ${num(skill.value)} when the log last saw it go up; ${num(skill.target)} is the best cap of your classes at level ${skill.level}. One raised at a guildmaster prints no line, so it may be higher.`}
         >
           <span>
             {num(skill.value)} / {num(skill.target)}
             {skill.value >= skill.target && <b className="ach-more"> ✓</b>}
           </span>
           <i style={{ width: `${Math.min(100, Math.round((skill.value / skill.target) * 100))}%` }} />
-        </span>
+        </Tip>
       )
     ) : null
-  const prog = c.p ? (
-    <span className="ach-prog" title={liveTitle}>
+  const bar = (
+    <>
       <span>
-        {num(count)} / {num(c.p[1])}
+        {num(count)} / {num(c.p?.[1] ?? 0)}
         {live?.done ? <b className="ach-more"> ✓ done</b> : more > 0 && <b className="ach-more"> +{num(more)}</b>}
       </span>
-      <i style={{ width: `${Math.min(100, Math.round((count / Math.max(1, c.p[1])) * 100))}%` }} />
-    </span>
+      <i style={{ width: `${Math.min(100, Math.round((count / Math.max(1, c.p?.[1] ?? 1)) * 100))}%` }} />
+    </>
+  )
+  const prog = c.p ? (
+    liveTitle ? (
+      <Tip className="ach-prog" text={liveTitle}>
+        {bar}
+      </Tip>
+    ) : (
+      <span className="ach-prog">{bar}</span>
+    )
   ) : null
   return (
     <label className={`ach-obj${done ? ' done' : ''}${single ? ' single' : ''}${fromGame ? ' recorded' : ''}`} title={fromGame ? 'The game has recorded this one.' : undefined}>

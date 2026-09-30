@@ -310,6 +310,7 @@ function SlotTile({ slot, item, view, wide, selected, onSelect }: { slot: string
               {item.augs.map((a) => (
                 <AugDot key={a.location} name={a.name} view={view} />
               ))}
+              <span className="sr-only">, augmented with {item.augs.map((a) => augName(a.name)).join(', ')}</span>
             </span>
           )}
         </span>

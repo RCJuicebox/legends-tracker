@@ -6,7 +6,7 @@ import { useInvoke } from '../../renderer/src/hooks'
 import { useRemembered } from '../../renderer/src/remember'
 import { usePickedCharacter } from '../../renderer/src/character'
 import { useNow } from '../../renderer/src/components/TimerBars'
-import { ErrorText, FilterBox, GameCommand, Info, Pending, Segmented, SortTh, Tabs, ToggleChip, type Sort } from '../../renderer/src/components/ui'
+import { ErrorText, FilterBox, GameCommand, Info, Pending, Segmented, SortTh, Tabs, Tip, ToggleChip, type Sort } from '../../renderer/src/components/ui'
 import { duration, num, when, who, wikiUrl } from '../../core/format'
 import {
   STANDING_MAX,
@@ -396,23 +396,23 @@ function AchievementCell({ a, s }: { a: FactionRowAchievement | null; s: Faction
           : ''
   if (a.done) {
     return (
-      <span className="chip ok" title={`${a.name}: done, ${why}`}>
+      <Tip className="chip ok" text={`${a.name}: done, ${why}`}>
         done
-      </span>
+      </Tip>
     )
   }
   if (a.done === null || !s) {
     return (
-      <span className="chip" title={`${a.name}. Type /outputfile faction in game to see how far there is to go.`}>
+      <Tip className="chip" text={`${a.name}. Type /outputfile faction in game to see how far there is to go.`}>
         open
-      </span>
+      </Tip>
     )
   }
   return (
-    <span className="row tight" title={`${a.name}: open, ${why}. Done at ${STANDING_MAX}.`}>
+    <Tip className="row tight" text={`${a.name}: open, ${why}. Done at ${STANDING_MAX}.`}>
       <span className="chip warn">open</span>
       <span className="faint small">{STANDING_MAX - s.value} to go</span>
-    </span>
+    </Tip>
   )
 }
 
@@ -420,14 +420,14 @@ function AchievementCell({ a, s }: { a: FactionRowAchievement | null; s: Faction
 function Standing({ s, basis }: { s: FactionStandingNow | null; basis: ConBasis | null }) {
   if (!s) {
     return (
-      <span className="faint" title="The factions export does not list it">
+      <Tip className="faint" text="The factions export does not list it">
         —
-      </span>
+      </Tip>
     )
   }
   const band = standingBand(s.con?.value ?? s.value)
   return (
-    <span className="row tight" title={standingNote(s, basis)}>
+    <Tip className="row tight" text={standingNote(s, basis)}>
       <span className="mono" style={{ minWidth: '4.5ch', textAlign: 'right' }}>
         {s.sinceAll ? '' : '≈'}
         {plain(s.value)}
@@ -438,7 +438,7 @@ function Standing({ s, basis }: { s: FactionStandingNow | null; basis: ConBasis 
           {band.next.points} to {band.next.word}
         </span>
       )}
-    </span>
+    </Tip>
   )
 }
 

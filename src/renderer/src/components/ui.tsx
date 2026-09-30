@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore, type CSSProperties, type ReactNode } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore, type CSSProperties, type HTMLAttributes, type ReactNode } from 'react'
 import type { SpellCategory } from '../../../shared/types'
 import { CATEGORY_LABELS } from '../../../shared/types'
 import { ago, iconUrl } from '../api'
@@ -304,6 +304,50 @@ export function ConfirmButton({
     </span>
   )
 }
+
+/**
+ * Something with an explanation behind it: the explanation is its hover title, and it can be reached
+ * by Tab, where the same words show beside it (a title alone reaches only the mouse). The words are
+ * drawn fixed to the window, so a table that scrolls cannot clip them; they go on a scroll.
+ */
+export function Tip({
+  text,
+  className = '',
+  children,
+  ...rest
+}: { text: string; className?: string; children: ReactNode } & Omit<HTMLAttributes<HTMLSpanElement>, 'title' | 'className' | 'children'>) {
+  const [at, setAt] = useState<CSSProperties | null>(null)
+  useEffect(() => {
+    if (!at) return
+    const hide = () => setAt(null)
+    window.addEventListener('scroll', hide, true)
+    return () => window.removeEventListener('scroll', hide, true)
+  }, [at])
+  return (
+    <span
+      {...rest}
+      className={`tip ${className}`.trim()}
+      tabIndex={0}
+      title={text}
+      onFocus={(e) => {
+        if (!e.currentTarget.matches(':focus-visible')) return
+        const r = e.currentTarget.getBoundingClientRect()
+        setAt({ top: r.bottom + 6, left: Math.max(8, Math.min(r.left, window.innerWidth - TIP_WIDTH - 8)) })
+      }}
+      onBlur={() => setAt(null)}
+    >
+      {children}
+      {at && (
+        <span className="tip-pop" role="tooltip" style={at}>
+          {text}
+        </span>
+      )}
+    </span>
+  )
+}
+
+/** The widest a Tip's words are drawn. */
+const TIP_WIDTH = 320
 
 /** Room the popover needs to the right before it opens leftwards instead. */
 const INFO_WIDTH = 350

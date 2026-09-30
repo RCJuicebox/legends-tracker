@@ -4,7 +4,7 @@ import { api } from '../api'
 import { useInvoke } from '../hooks'
 import { remember, useRemembered } from '../remember'
 import { showError, showToast } from '../toast'
-import { Ago, GameCommand, Info } from '../components/ui'
+import { Ago, GameCommand, Info, Tip } from '../components/ui'
 import { num } from '../../../core/format'
 import { useStock } from './MotePlanner'
 import { itemKey, parseStatsBlock, slotLabel, type InvItem } from '../../../core/inventory'
@@ -198,9 +198,9 @@ export function MergeTab({
                   </td>
                   <td className="mono num">{num1(o.gain)}</td>
                   <td className="small">
-                    <span className={`chip ${o.affordable ? 'ok' : 'warn'}`} title={`${o.motes} ${moteName(o.mote, o.motes)}: ${o.need} xp; you could make ${num(o.canMake)}`}>
+                    <Tip className={`chip ${o.affordable ? 'ok' : 'warn'}`} text={`${o.motes} ${moteName(o.mote, o.motes)}: ${o.need} xp; you could make ${num(o.canMake)}`}>
                       {o.motes} × {rankName(o.mote)}
-                    </span>
+                    </Tip>
                     <div className="faint">have {num(o.canMake)}</div>
                   </td>
                   <td className="mono num">{num(o.cost)}</td>
