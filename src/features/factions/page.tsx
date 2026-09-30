@@ -19,7 +19,8 @@ import {
   type FactionRowAchievement,
   type FactionStandingNow
 } from './core'
-import { Doing, Flags, PlanTab, sourceNote, useChoices, usePlanSettings } from './planPage'
+import { PlanTab, useChoices, usePlanSettings } from './planPage'
+import { Doing, Flags, sourceNote } from './plan/parts'
 import type { PlanActivity } from './catalog'
 import { waysToRaise } from './ways'
 import type { FactionLookup, LookupHit } from './lookup'

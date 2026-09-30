@@ -121,6 +121,26 @@
       }
     },
     {
+      // A page's parts, in a folder under its feature (features/factions/plan/): the renderer's rules, a folder down.
+      "files": ["src/features/*/*/*.tsx"],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "paths": [{ "name": "electron", "message": "The renderer reaches Electron through the preload bridge (api.ts)." }],
+            "patterns": [
+              { "group": ["node:*", "fs", "path", "os", "child_process"], "allowTypeImports": true, "message": "The renderer is a browser page: ask the main process." },
+              {
+                "group": ["../../../main/**", "../../../preload/**", "../main", "../*Source", "../../*/main"],
+                "allowTypeImports": true,
+                "message": "The renderer may not import the main process or the preload."
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
       "files": ["src/main/**", "src/preload/**"],
       "rules": {
         "no-restricted-imports": [
