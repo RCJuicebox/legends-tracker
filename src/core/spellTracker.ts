@@ -55,7 +55,9 @@ const MAX_PENDING = 6
 const RE_CAST = CAST_BY_YOU
 const RE_FAIL_NAMED = /^Your (.+?) spell (?:is interrupted|fizzles)[.!]$/
 const RE_FAIL = /^Your spell (?:is interrupted|fizzles)[.!]$/
+// Older clients: "Your target resisted the X spell." Legends: "a ratman warrior resisted your Envenomed Bolt X!"
 const RE_RESIST = /^Your target resisted the (.+) spell\.$/
+const RE_RESISTED_YOUR = /^(.+?) resisted your (.+)!$/
 const FAIL_PREFIXES = [
   'Your spell did not take hold',
   'Your spell would not have taken hold',
@@ -67,7 +69,8 @@ const FAIL_PREFIXES = [
   'Your target is immune',
   'Your target cannot be'
 ]
-const RE_DOT_TICK = /^(.+) has taken \d+ damage from your (.+)\.$/
+// A tick that crits ends "(Critical)", as combatLines reads it.
+const RE_DOT_TICK = /^(.+?) has taken [\d,]+ damage from your (.+?)\.(?: \((.+)\))?$/
 const RE_WORN_OFF = /^Your (.+) spell has worn off of (.+)\.$/
 const RE_PET_WORN_OFF = /^Your pet's (.+) spell has worn off\.$/
 const RE_SLAIN_BY = SLAIN_BY
@@ -125,9 +128,10 @@ export class SpellTracker {
 
     if ((m = RE_FAIL_NAMED.exec(text))) return this.dropPending(m[1])
     if (RE_FAIL.test(text)) return void this.pending.pop()
-    if ((m = RE_RESIST.exec(text))) {
-      this.dropPending(m[1])
-      this.hooks.feed('warn', `${m[1]} resisted`)
+    const resisted = RE_RESIST.exec(text)?.[1] ?? (text.includes(' resisted your ') ? RE_RESISTED_YOUR.exec(text)?.[2] : undefined)
+    if (resisted) {
+      this.dropPending(resisted)
+      this.hooks.feed('warn', `${resisted} resisted`)
       return
     }
     if (FAIL_PREFIXES.some((p) => text.startsWith(p))) return void this.pending.pop()

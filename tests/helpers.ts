@@ -61,6 +61,7 @@ export function harness(opts: { character?: CharacterSettings; rules?: Record<st
   const book = fixtureBook()
   const character: CharacterSettings = opts.character ?? { level: 50, classLevels: {}, focusSources: [] }
   const spoken: string[] = []
+  const feedItems: [string, string][] = []
   const board = new TimerBoard({
     onChange: () => {},
     onNotify: (ns: Notification[]) => ns.forEach((n) => n.kind === 'speak' && spoken.push(n.text))
@@ -82,7 +83,7 @@ export function harness(opts: { character?: CharacterSettings; rules?: Record<st
     },
     {
       notify: (ns) => ns.forEach((n) => n.kind === 'speak' && spoken.push(n.text)),
-      feed: () => {}
+      feed: (kind, text) => void feedItems.push([kind, text])
     }
   )
   const feed = (text: string) => {
@@ -93,7 +94,7 @@ export function harness(opts: { character?: CharacterSettings; rules?: Record<st
       board.tick(line.time)
     }
   }
-  return { book, board, tracker, spoken, feed }
+  return { book, board, tracker, spoken, feed, feedItems }
 }
 
 export function at(stamp: string): number {

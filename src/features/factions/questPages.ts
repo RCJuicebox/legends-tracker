@@ -171,6 +171,10 @@ const DIALOGUE = /^\s*:|\bsays,?\s*'|\btells you,?\s*'/i
 /** A link right after these words is who it goes to, not what. */
 const TO_WHOM = /(?:\bhand|\bgive|\bto|\bfor|\breturn(?:ed)?(?: to)?|\bbring(?: it)? to)\s*'*$/i
 const LINK = /\[\[([^\]|#]+)(?:#[^\]|]*)?(?:\|([^\]]*))?\]\]/g
+/** "Give [[Kobold Hide]] to [[Tabure Ahendle]]": a link followed by a "to" link is what is handed in. */
+const BEFORE_TO_LINK = /^s?\s*'*\s*to\s+'*\[\[/i
+/** "… to [[Gunlok Jure]] in [[Kaladim]]": a link after the NPC's, behind these words, is where, not what. */
+const WHERE = /\b(?:in|at|near|inside|outside)\s+(?:the\s+)?'*$/i
 /** "… to Mojax Hikspin." at the end of a line: who it goes to, when the name is not linked. */
 const TO_NAMED = /\bto\s+((?:[A-Z][\w`']*)(?:\s+(?:[A-Z][\w`']*|of|the))*)\s*[.:'!]*\s*$/
 /** "Hand 4 of them", "bring four": a count said apart from the item. */
@@ -209,10 +213,12 @@ export function readHandIn(whole: string, givers: string[] = []): { handIn: Ques
     const counted = /(?:^|[\s('])(\d+|[a-z]+)\)?\s*(?:x\s*)?'*$/i.exec(before)
     const times = /^s?\s*(?:x|×)\s*(\d+)/i.exec(after)
     const n = times ? parseInt(times[1], 10) : counted ? countOf(counted[1]) : undefined
-    if (isGiver(label) || isGiver(target) || (!npc && n === undefined && TO_WHOM.test(before))) {
+    const givenTo = BEFORE_TO_LINK.test(after)
+    if (isGiver(label) || isGiver(target) || (!npc && !givenTo && n === undefined && TO_WHOM.test(before))) {
       npc ||= label.replace(/\s*\(NPC\)$/i, '')
       continue
     }
+    if (npc && WHERE.test(before)) continue
     handIn.push({ item: target, count: n && n > 0 ? n : 1 })
   }
   const plain = plainText(line)

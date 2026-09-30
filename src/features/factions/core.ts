@@ -416,12 +416,32 @@ export function parseFactionAchievements(text: string): FactionAchievement[] {
 }
 
 /**
+ * Whether an achievement of a kind the export leaves out is done. The achievements window can hide
+ * completed ones, and an export made that way lists only what is open: one it leaves out is done, and
+ * a kind it leaves out entirely is all done. An export that lists completed ones too, but none of this
+ * kind, says nothing about it (a changed layout, a section the game did not write).
+ */
+export function leftOutIsDone(sections: AchSection[], ofKind: (section: AchSection, a: AchSection['ach'][number]) => boolean): boolean {
+  let listsDone = false
+  for (const s of sections) {
+    for (const a of s.ach) {
+      if (ofKind(s, a)) return true
+      if (a.d === true) listsDone = true
+    }
+  }
+  return !listsDone
+}
+
+const isProgression = (s: AchSection) => s.cat === 'EverQuest' && s.name === 'Progression'
+
+/**
  * Which faction achievements an achievements export lists, by lower-cased name, and whether each is
- * done. Null without an export; an export with no Progression section lists none, so all are done.
+ * done. Null without an export, or when it cannot say (see leftOutIsDone); an export of open
+ * achievements only with no Progression section lists none, so all are done.
  */
 export function progressionStatus(sections: AchSection[] | null): Map<string, boolean> | null {
-  if (!sections?.length) return null
-  const sec = sections.find((s) => s.cat === 'EverQuest' && s.name === 'Progression')
+  if (!sections?.length || !leftOutIsDone(sections, isProgression)) return null
+  const sec = sections.find(isProgression)
   return new Map((sec?.ach ?? []).map((a) => [a.n.toLowerCase(), !!a.d]))
 }
 

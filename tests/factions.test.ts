@@ -483,6 +483,14 @@ describe('progressionStatus', () => {
     expect(progressionStatus(null)).toBeNull()
     expect(progressionStatus(parseAchievements('EverQuest: Hunter\nI\tHunter of Befallen\nI\t\ta skeleton\n').sections)).toEqual(new Map())
   })
+
+  it('cannot say when the export lists completed achievements but no Progression section', () => {
+    // Completed ones shown, so the window was not hiding them: a missing section is not "all done".
+    expect(progressionStatus(parseAchievements('EverQuest: Hunter\nC\tHunter of Befallen\nC\t\ta skeleton\n').sections)).toBeNull()
+    // With the section there, one it leaves out is still done.
+    const both = 'EverQuest: Hunter\nC\tHunter of Befallen\nC\t\ta skeleton\nEverQuest: Progression\nI\tCrimson Hands\nI\t\tCrimson Hands\n'
+    expect(progressionStatus(parseAchievements(both).sections)).toEqual(new Map([['crimson hands', false]]))
+  })
 })
 
 // Trimmed from eqlwiki's Crimson Hands page.

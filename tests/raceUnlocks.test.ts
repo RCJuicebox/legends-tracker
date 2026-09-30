@@ -122,6 +122,16 @@ describe('race unlocks', () => {
     expect(unlockedRaces(unlocks)).toEqual(['Human', 'Barbarian', 'Half Elf', 'Kerran'])
   })
 
+  it('cannot say from an export that lists completed achievements but no race unlock at all', () => {
+    const shown = ['EverQuest: Hunter', 'C\tHunter of Befallen', 'C\t\ta skeleton'].join('\n')
+    const unlocks = raceUnlocks(parseRaceUnlocks(CLIENT, COMPONENTS), parseAchievements(shown).sections, nameOf, () => null)
+    expect(unlocks.every((u) => u.done === null)).toBe(true)
+    expect(unlockedRaces(unlocks)).toBeNull()
+    // Only open ones listed and no race unlock among them: every one is done.
+    const open = ['EverQuest: Hunter', 'I\tHunter of Befallen', 'I\t\ta skeleton'].join('\n')
+    expect(raceUnlocks(parseRaceUnlocks(CLIENT, COMPONENTS), parseAchievements(open).sections, nameOf, () => null).every((u) => u.done === true)).toBe(true)
+  })
+
   it('without an achievements export, goes by the standings, and knows no race to be unlocked', () => {
     const unlocks = raceUnlocks(parseRaceUnlocks(CLIENT, COMPONENTS), null, nameOf, (f) => (f === 'Emerald Warriors' ? 2000 : f === 'Soldiers of Tunare' ? 150 : null))
     expect(unlocks.find((u) => u.race === 'Wood Elf')).toEqual({

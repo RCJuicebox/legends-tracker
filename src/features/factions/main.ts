@@ -11,6 +11,7 @@ import {
   withCons,
   factionView,
   joinFactions,
+  leftOutIsDone,
   parseFactionAchievements,
   parseFactionPage,
   parseFactionPageFull,
@@ -267,7 +268,7 @@ async function achievementSections(dir: string, character: string): Promise<AchS
  * without an export. An export may list only what is still open, so one that leaves it out has it done.
  */
 function agnosticOf(sections: AchSection[] | null): boolean | null {
-  if (!sections) return null
+  if (!sections || !leftOutIsDone(sections, (_s, a) => /^deity unlock - /i.test(a.n))) return null
   const a = sections.flatMap((s) => s.ach).find((x) => x.n.toLowerCase() === 'deity unlock - agnostic')
   return !a || a.d === true
 }
@@ -441,8 +442,12 @@ interface FactionBookFile {
   quests: Record<string, QuestPage | null>
 }
 
-/** Bumped when what the book keeps of a page changes, so an older one is read again. */
-const BOOK_VERSION = 2
+const bookDetail = (book: FactionBookFile) => `${book.pages.length} faction pages and ${Object.values(book.quests).filter(Boolean).length} quests with faction`
+
+/** Bumped when what the book keeps of a page changes, so an older one is read again. 3: the hand-in reader's "Give [[Item]] to [[NPC]]" fix. */
+const BOOK_VERSION = 3
+/** Books from this version on have today's shape: an older one of them is read again, but serves while the wiki cannot be reached. */
+const BOOK_SHAPE_SINCE = 2
 
 /**
  * Every eqlwiki faction page, and every quest page one names as raising a faction, read into what
@@ -461,7 +466,9 @@ export class FactionBook {
     if (this.book) return this.book
     try {
       const b = JSON.parse(await fs.readFile(this.path, 'utf8')) as FactionBookFile
-      if (b.version === BOOK_VERSION && Array.isArray(b.pages) && b.quests) this.book = b
+      if (b.version >= BOOK_SHAPE_SINCE && b.version <= BOOK_VERSION && Array.isArray(b.pages) && b.quests) this.book = b.version === BOOK_VERSION ? b : { ...b, fetchedAt: 0 }
+      // Kept from an earlier read is as good as fetched, for the Data Sources row.
+      if (this.book?.fetchedAt) sources.ok('factionWiki', bookDetail(this.book))
     } catch (e) {
       if ((e as NodeJS.ErrnoException).code !== 'ENOENT') log.warn('Could not read faction-book.json; reading eqlwiki again', e)
     }
@@ -502,7 +509,7 @@ export class FactionBook {
       const tmp = this.path + '.tmp'
       await fs.writeFile(tmp, JSON.stringify(book))
       await fs.rename(tmp, this.path)
-      sources.ok('factionWiki', `${book.pages.length} faction pages and ${Object.values(book.quests).filter(Boolean).length} quests with faction`)
+      sources.ok('factionWiki', bookDetail(book))
       return { book, error: '' }
     } catch (e) {
       sources.fail('factionWiki', e, "Could not read eqlwiki's faction and quest pages")

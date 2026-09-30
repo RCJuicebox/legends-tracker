@@ -6,27 +6,33 @@ import type { EntityKind, ProcOrigin } from '../../../shared/types'
 // showing its share of the top row, and the figures on the right. The overlay gives them a
 // smaller, darker skin through its own class on the list.
 
+// Theme tokens throughout (styles.css), so each reads in light and dark: the plain ones fill bars and
+// dots, the -text ones are for words.
 export const KIND_COLOR: Record<EntityKind, string> = {
   you: 'var(--accent)',
   pet: 'var(--violet)',
   group: 'var(--teal)',
-  player: '#6f8fd6',
+  player: 'var(--blue)',
   npc: 'var(--red)',
-  npcpet: '#d67f6f',
+  npcpet: 'var(--salmon)',
   unknown: 'var(--text-3)'
 }
 
+export const KIND_TEXT: Partial<Record<EntityKind, string>> = { pet: 'var(--violet-text)', group: 'var(--teal-text)' }
+
 export const HOW_COLOR: Record<SkillRow['how'], string> = {
   melee: 'var(--accent)',
-  spell: '#e07a4a',
+  spell: 'var(--orange)',
   dot: 'var(--violet)',
-  ds: '#8fb5e0',
+  ds: 'var(--ice)',
   pet: 'var(--violet)'
 }
 
 export const HEAL_COLOR = 'var(--green)'
+export const HEAL_TEXT = 'var(--green-text)'
 
-export const PROC_COLOR: Record<ProcOrigin, string> = { spell: '#c46fd2', ability: '#6fb3d2', aa: 'var(--accent)' }
+export const PROC_COLOR: Record<ProcOrigin, string> = { spell: 'var(--magenta)', ability: 'var(--sky)', aa: 'var(--accent)' }
+export const PROC_TEXT: Record<ProcOrigin, string> = { spell: 'var(--magenta-text)', ability: 'var(--sky-text)', aa: 'var(--accent-2)' }
 
 export const PROC_HINT: Record<ProcOrigin, string> = {
   spell: 'Landed with no cast line behind it, so something fired it: a weapon, a buff, an item. The log never says which.',
@@ -140,7 +146,7 @@ export function SkillBar({ s, rank, onClick, per }: { s: SkillRow; rank?: number
         proc ? (
           <>
             {s.name}
-            <em className="dm-proc" style={{ color: PROC_COLOR[proc.origin] }} title={PROC_HINT[proc.origin]}>
+            <em className="dm-proc" style={{ color: PROC_TEXT[proc.origin] }} title={PROC_HINT[proc.origin]}>
               {PROC_WORD[proc.origin]}
               {proc.ppm !== null ? ` · ${proc.ppm.toFixed(1)}/min` : ''}
             </em>

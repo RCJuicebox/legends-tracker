@@ -1,5 +1,6 @@
 import { playableRace } from '../../shared/game/races'
 import type { AchSection, Achievement } from '../../core/achievements'
+import { leftOutIsDone } from './core'
 import type { UnlockGoal } from './planner'
 
 // The race unlocks: Legends' "Untapped Potential: Races" achievements, one a race, each done by
@@ -80,7 +81,8 @@ export interface RaceUnlock {
 /**
  * The race unlocks for a character, from the client's definitions and the character's achievements
  * export (null without one). An export may list only what is still open (the achievements window's
- * filter decides), so one it leaves out is done, as with the Progression achievements. `nameOf` puts a
+ * filter decides), so one it leaves out is done, as with the Progression achievements; one that lists
+ * completed achievements but no race unlock at all says nothing of them (done null). `nameOf` puts a
  * faction the game's way by its id, and `standingOf` says where one stands now (null when not known).
  */
 export function raceUnlocks(
@@ -91,10 +93,11 @@ export function raceUnlocks(
 ): RaceUnlock[] {
   const listed = new Map<string, Achievement>()
   for (const s of sections ?? []) for (const a of s.ach) if (RACE_UNLOCK.test(a.n)) listed.set(a.n.trim().toLowerCase(), a)
+  const known = !!sections && leftOutIsDone(sections, (_s, a) => RACE_UNLOCK.test(a.n))
   return defs.map((d) => {
     const a = listed.get(d.achievement.toLowerCase())
-    // Left out of an export: done.
-    const done = sections ? !a || a.d === true : null
+    // Left out of an export that can say: done.
+    const done = known ? !a || a.d === true : null
     const part = (name: string) => a?.c.find((c) => MAX_FACTION.exec(c.t)?.[1].trim().toLowerCase() === name.toLowerCase())
     const factions = d.factions.map((f) => {
       const faction = nameOf(f.id, f.name)

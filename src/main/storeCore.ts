@@ -75,22 +75,44 @@ export function mergeDefaults<T>(base: T, saved: unknown, addDefault: (id: strin
   return (saved === undefined ? base : saved) as T
 }
 
-export type ReadResult = { state: 'missing' } | { state: 'ok'; value: unknown } | { state: 'corrupt'; movedTo: string }
+/**
+ * `unreadable`: the file is there but could not be opened (a virus scanner or backup tool holding it).
+ * Its contents may be fine, so it is left where it is and must not be written over this run.
+ */
+export type ReadResult = { state: 'missing' } | { state: 'ok'; value: unknown } | { state: 'corrupt'; movedTo: string } | { state: 'unreadable' }
+
+/**
+ * Waits before trying a file again when another program (a virus scanner, a backup tool) holds it.
+ * Reads happen at start-up only, so their waits block. Tests shorten both.
+ */
+export const retrySchedule = { readMs: [100, 300, 800], writeMs: [250, 750, 2000] }
+
+const sleepSync = (ms: number): void => void Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms)
 
 /**
  * Reads a JSON file. A file that is there but will not parse is moved aside to
  * `<name>.corrupt-<time>.json`, so it is neither lost nor overwritten by defaults. A file the app
- * ships (setAside: false) is only reported.
+ * ships (setAside: false) is only reported. A file that cannot be opened is tried a few times, then
+ * reported unreadable and left alone: only a parse failure proves it is bad.
  */
 export function readJsonFile(path: string, opts: { setAside?: boolean; now?: Date } = {}): ReadResult {
   const aside = (): ReadResult => (opts.setAside === false ? { state: 'corrupt', movedTo: '' } : setAside(path, opts.now ?? new Date()))
+  const retries = retrySchedule.readMs
   let text: string
-  try {
-    text = readFileSync(path, 'utf8')
-  } catch (e) {
-    if ((e as NodeJS.ErrnoException).code === 'ENOENT') return { state: 'missing' }
-    log.error(`Could not read ${path}`, e)
-    return aside()
+  for (let attempt = 0; ; attempt++) {
+    try {
+      text = readFileSync(path, 'utf8')
+      break
+    } catch (e) {
+      if ((e as NodeJS.ErrnoException).code === 'ENOENT') return { state: 'missing' }
+      if (attempt < retries.length) {
+        log.warn(`Could not read ${path}; trying again`, e)
+        sleepSync(retries[attempt])
+        continue
+      }
+      log.error(`Could not read ${path}; it is left as it is and not written this run`, e)
+      return { state: 'unreadable' }
+    }
   }
   try {
     return { state: 'ok', value: JSON.parse(text) }
@@ -120,9 +142,6 @@ export interface JsonFileOptions {
   /** Indented for a person to read; files only the app reads are written compact. */
   pretty?: boolean
 }
-
-/** A write that fails (a virus scanner or backup tool holding the file) is tried again after these waits. */
-const RETRY_MS = [250, 750, 2000]
 
 /** A JSON file held in memory. Changes are written a little after the last one, or at flush(). */
 export class JsonFile<T> {
@@ -184,9 +203,9 @@ export class JsonFile<T> {
         await fs.rename(tmp, this.path)
         return
       } catch (e) {
-        if (attempt < RETRY_MS.length) {
+        if (attempt < retrySchedule.writeMs.length) {
           log.warn(`Could not save ${this.path}; trying again`, e)
-          await pause(RETRY_MS[attempt])
+          await pause(retrySchedule.writeMs[attempt])
           continue
         }
         log.error(`Could not save ${this.path}`, e)

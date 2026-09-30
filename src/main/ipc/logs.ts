@@ -1,5 +1,5 @@
 import { shell } from 'electron'
-import { existsSync } from 'node:fs'
+import { existsSync, statSync } from 'node:fs'
 import { isAbsolute, join, relative, resolve, sep } from 'node:path'
 import { handle } from './handle'
 import { listLogs } from '../game'
@@ -27,6 +27,8 @@ export function registerLogIpc(ctx: AppContext): void {
     const archive = engine.archiveDir()
     const allowed = typeof path === 'string' && !!path && ((!!installDir && isInside(join(installDir, 'Logs'), path)) || isInside(archive, path))
     if (allowed && existsSync(path)) return shell.showItemInFolder(path)
+    // openPath runs a file: only ever a folder.
+    if (!statSync(archive, { throwIfNoEntry: false })?.isDirectory()) throw new Error(`The archive folder ${archive} is not there yet: it is made when the first log is archived.`)
     void shell.openPath(archive)
   })
 }

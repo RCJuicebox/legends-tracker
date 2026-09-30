@@ -91,6 +91,7 @@ export class LiveAchievements {
     const read = readJsonFile(path)
     const value = read.state === 'ok' && read.value && typeof read.value === 'object' && !Array.isArray(read.value) ? (read.value as Record<string, Followed>) : {}
     this.follows = new JsonFile(path, value, { delayMs: 3000, pretty: false })
+    if (read.state === 'unreadable') this.follows.freeze('could not be read at start')
     void this.races.ready()
   }
 

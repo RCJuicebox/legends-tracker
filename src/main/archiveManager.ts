@@ -3,6 +3,7 @@ import { basename, dirname, join, resolve } from 'node:path'
 import { archiveLog, compressLoose, findStaging, finishStaged, stagingOriginalName, type ArchiveOutcome } from '../core/archiver'
 import { listArchives, listLogs, logIsIn } from './game'
 import { log } from './log'
+import { isFullPath } from '../core/validate'
 import type { AppSettings, ArchiveStatus, FeedItem } from '../shared/types'
 
 export interface ArchiveManagerDeps {
@@ -26,7 +27,8 @@ export class ArchiveManager {
 
   archiveDir(): string {
     const s = this.deps.settings()
-    return s.archive.archiveDir || join(s.installDir, 'Logs', 'archive')
+    // A folder still being typed on the Log Files page ("E:" so far) is not one yet: the default serves.
+    return isFullPath(s.archive.archiveDir) ? s.archive.archiveDir : join(s.installDir, 'Logs', 'archive')
   }
 
   private archiverDeps() {

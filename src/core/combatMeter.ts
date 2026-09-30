@@ -174,8 +174,10 @@ export class CombatMeter {
   private sides = new Map<string, Side>()
   /** When each entity last began casting each spell: "kelwyn|envenomed bolt" → time. */
   private lastCast = new Map<string, number>()
-  /** When each entity's proc last did damage, by name, so its heal line a moment later is the same firing. */
+  /** When each entity's proc last did damage, by base name, so its heal line a moment later is the same firing. */
   private lastProc = new Map<string, number>()
+  /** A proc's heal line counted as its firing before its damage line came (same second): the damage line pairs with it. */
+  private healFiring = new Map<string, number>()
   /**
    * Charmed mobs, by the mob's name key. A charm pet has the mob's name, and other mobs may share it,
    * so its blows are told apart by where they land: on an enemy they are the pet's (mobs do not fight
@@ -241,6 +243,7 @@ export class CombatMeter {
     this.sides.clear()
     this.lastCast.clear()
     this.lastProc.clear()
+    this.healFiring.clear()
     this.charmed.clear()
     this.lastFriendCast = null
     this.charmCasts = []
@@ -617,8 +620,20 @@ export class CombatMeter {
     return ACTIVATED.has(base) ? 'ability' : 'spell'
   }
 
+  /**
+   * Books one proc line. A lifetap's damage line carries the rank ("Lifebite III") and its heal line
+   * may not ("Lifebite"): one proc, found by its base name and named as the damage line has it.
+   */
   private static proc(e: Entity, name: string, origin: ProcOrigin, damage: number, healed: number, firing: boolean): void {
-    const p = (e.procs[name] ??= { name, origin, count: 0, damage: 0, healed: 0 })
+    const base = spellBase(name)
+    const had = e.procs[name] ? name : Object.keys(e.procs).find((k) => spellBase(k) === base)
+    let p = had ? e.procs[had] : undefined
+    if (p && had !== name && damage > 0) {
+      delete e.procs[had!]
+      p.name = name
+      e.procs[name] = p
+    }
+    p ??= e.procs[name] = { name, origin, count: 0, damage: 0, healed: 0 }
     if (firing) p.count++
     p.damage += damage
     p.healed += healed
@@ -641,13 +656,17 @@ export class CombatMeter {
     if (!this.admit(ev, at, ss === 'friend' ? source : target, ss === 'enemy' ? source : target)) return
     const crit = ev.mods.includes('critical')
     const proc = ss === 'friend' && ev.how === 'spell' ? this.procOrigin(source, ev.skill, at) : null
-    if (proc) this.lastProc.set(`${nameKey(source)}|${ev.skill}`, at)
+    const procKey = `${nameKey(source)}|${spellBase(ev.skill)}`
+    // A lifetap whose heal line came first already counted this firing.
+    const paired = !!proc && Math.abs(at - (this.healFiring.get(procKey) ?? -Infinity)) <= 1000
+    if (paired) this.healFiring.delete(procKey)
+    if (proc) this.lastProc.set(procKey, at)
     const finishing = ev.how === 'melee' && ev.mods.includes('finishing blow')
     for (const seg of this.liveSegments(at, true)) {
       const src = this.ent(seg, source, at)
       const tgt = this.ent(seg, target, at)
       add(src.out, ev.amount, crit)
-      if (proc) CombatMeter.proc(src, ev.skill, proc, ev.amount, 0, true)
+      if (proc) CombatMeter.proc(src, ev.skill, proc, ev.amount, 0, !paired)
       if (finishing) CombatMeter.proc(src, 'Finishing Blow', 'aa', ev.amount, 0, true)
       const skill = (src.skills[ev.skill] ??= skillStat(ev.skill, ev.how))
       add(skill, ev.amount, crit)
@@ -712,7 +731,9 @@ export class CombatMeter {
     // A heal over time ticks long after its cast; only a direct heal can be a proc. A lifetap's heal
     // line follows its damage line: the same firing, not another.
     const proc = ss === 'friend' && !ev.hot ? this.procOrigin(source, ev.spell, at) : null
-    const firing = !!proc && Math.abs(at - (this.lastProc.get(`${nameKey(source)}|${ev.spell}`) ?? -Infinity)) > 1000
+    const procKey = `${nameKey(source)}|${spellBase(ev.spell)}`
+    const firing = !!proc && Math.abs(at - (this.lastProc.get(procKey) ?? -Infinity)) > 1000
+    if (firing) this.healFiring.set(procKey, at)
     const ours = this.ours(source) || this.ours(target)
     for (const seg of this.liveSegments(at, false)) {
       // A heal between strangers is no more yours than their fight: it counts once either is in the segment.

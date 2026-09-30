@@ -1,4 +1,6 @@
 import { describe, expect, it } from 'vitest'
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import { baseZone, emptySources, joinSources, shareSources, sourceReader, usualAmount, type FactionSourceTallies } from '../src/features/factions/attribution'
 import { parseFactionPageFull, type FactionRow } from '../src/features/factions/core'
 import { parseQuestPage, readHandIn } from '../src/features/factions/questPages'
@@ -23,7 +25,17 @@ import {
 } from '../src/features/factions/planner'
 import type { ItemInfo } from '../src/shared/types'
 import { lookUp, moversOf } from '../src/features/factions/lookup'
-import { allaNeeds, allaQuestAmounts, bandMax, bandMin, parseAllaFaction, parseAllaIndex, questKey, type AllaFaction } from '../src/features/factions/allakhazam'
+import {
+  allaFactionLaidOut,
+  allaNeeds,
+  allaQuestAmounts,
+  bandMax,
+  bandMin,
+  parseAllaFaction,
+  parseAllaIndex,
+  questKey,
+  type AllaFaction
+} from '../src/features/factions/allakhazam'
 
 const T0 = Date.UTC(2026, 8, 28, 12, 0, 0)
 const adjusted = (faction: string, n: number) => `Your faction standing with ${faction} has been adjusted by ${n}.`
@@ -270,6 +282,14 @@ You receive a [[Sealed Letter]].
     expect(readHandIn('[[Lizard Tail|Lizard Tails]] drop from any lizardman. Hand 4 of them to Horgus.')).toMatchObject({ handIn: [{ item: 'Lizard Tail', count: 4 }], count: 4 })
   })
 
+  it('reads "Give [[Item]] to [[NPC]]" with no article or count, and leaves out where the NPC is', () => {
+    expect(readHandIn('Give [[Kobold Hide]] to [[Tabure Ahendle]].')).toEqual({ handIn: [{ item: 'Kobold Hide', count: 1 }], npc: 'Tabure Ahendle' })
+    expect(readHandIn('Give [[Kobold Hide]] to [[Tabure Ahendle]].', ['Tabure Ahendle'])).toEqual({ handIn: [{ item: 'Kobold Hide', count: 1 }], npc: 'Tabure Ahendle' })
+    expect(readHandIn('Bring 4 [[Bone Chips]] to [[Gunlok Jure]] in [[Kaladim]].')).toMatchObject({ handIn: [{ item: 'Bone Chips', count: 4 }], npc: 'Gunlok Jure' })
+    // The NPC first: still the NPC.
+    expect(readHandIn('Give [[Tabure Ahendle]] a [[Kobold Hide]].')).toEqual({ handIn: [{ item: 'Kobold Hide', count: 1 }], npc: 'Tabure Ahendle' })
+  })
+
   it('keeps what the item is combined from, and the mob the walkthrough has you kill for it', () => {
     const q = parseQuestPage(
       'Beetles',
@@ -441,6 +461,34 @@ describe("Allakhazam's faction pages", () => {
       ]
     })
     expect(parseAllaFaction(7, '<html><body>Not found</body></html>')).toBeNull()
+  })
+
+  it("reads the site's own markup (a page saved from it, trimmed)", () => {
+    const html = readFileSync(join(__dirname, 'fixtures', 'alla-faction-66.html'), 'utf8')
+    expect(allaFactionLaidOut(html)).toBe(true)
+    const page = parseAllaFaction(66, html)!
+    expect(page.name).toBe("Tunare's Scouts")
+    expect(page.needs).toEqual([
+      { quest: 'Kelethin Guild Summons: Rogue', min: '', max: '' },
+      { quest: 'Kelethin Scouts - #1 - Cape', min: 'Amiable', max: '' },
+      { quest: 'Kelethin Scouts - #2 - Blade', min: 'Kindly', max: '' },
+      { quest: 'Tunarean Scout Tunic', min: 'Dubious', max: '' }
+    ])
+    expect(page.mobs).toContainEqual({ name: 'a mature arborean', zone: 'Greater Faydark', amount: 1 })
+    expect(page.mobs).toContainEqual({ name: 'Expin', zone: 'Greater Faydark', amount: -800 })
+    expect(page.mobs).toContainEqual({ name: 'Geeda', zone: 'Greater Faydark', amount: null })
+    expect(page.quests).toContainEqual({ name: 'Pixie Dust', amount: 15 })
+    expect(page.quests.filter((q) => q.name === 'Kelethin Scouts - #1 - Cape').map((q) => q.amount)).toEqual([10, 20])
+  })
+
+  it('tells a page in a shape it does not know from a faction with nothing listed', () => {
+    // Titled, but none of the headings the site prints on every faction page: not to be kept.
+    const odd = '<html><head><title>Test Rangers :: Factions :: EverQuest :: ZAM</title></head><body><div class="new-layout">…</div></body></html>'
+    expect(allaFactionLaidOut(odd)).toBe(false)
+    // Every heading there and every list empty: a faction the site knows nothing more of.
+    const empty = ALLA_PAGE.replace(/<li>[\s\S]*?<\/li>/g, '').replace(/<tr><td class="[dl]r">[\s\S]*?<\/tr>/g, '')
+    expect(allaFactionLaidOut(empty)).toBe(true)
+    expect(parseAllaFaction(7, empty)).toMatchObject({ needs: [], mobs: [], quests: [] })
   })
 
   it('reads the faction list into the site numbers, by faction name however it is spelled', () => {

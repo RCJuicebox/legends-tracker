@@ -4,7 +4,7 @@ import type { RespawnRecords } from '../core/respawns'
 import type { BuffsFile } from '../core/buffs'
 import { join } from 'node:path'
 import { DEFAULT_CHARACTER, type AppSettings, type CharacterSettings, type FocusSource, type MoteStock, type SpellRule, type Trigger } from '../shared/types'
-import { sanitizeBuffs, sanitizeRespawns, sanitizeSettings } from '../core/validate'
+import { sanitizeBuffs, sanitizeCasts, sanitizeMoteStock, sanitizeMotes, sanitizeRespawns, sanitizeSettings } from '../core/validate'
 import { SCHEMAS, upgrade } from './schema'
 import { DEFAULT_OVERLAYS, JsonFile, characterKey, defaultSettings, mergeDefaults, readJsonFile, type ReadResult } from './storeCore'
 
@@ -34,6 +34,8 @@ export class Store {
   readonly recovered: string[] = []
   /** Files a newer build wrote: read, but not written this run. */
   readonly newer: string[] = []
+  /** Files that were there but could not be opened (held by another program): defaults in use, not written this run. */
+  readonly unreadable: string[] = []
   /** Each file's schema, as schema.json records it (see schema.ts). */
   private readonly schema: JsonFile<Record<string, number>>
 
@@ -48,6 +50,7 @@ export class Store {
     const readResult = (f: string): ReadResult => {
       const r = readJsonFile(p(f))
       if (r.state === 'corrupt') this.recovered.push(r.movedTo)
+      if (r.state === 'unreadable') this.unreadable.push(f)
       if (r.state !== 'ok') return r
       const up = upgrade(p(f), r.value, typeof recorded[f] === 'number' ? recorded[f] : 1)
       if (up.state.state === 'newer') {
@@ -88,14 +91,14 @@ export class Store {
     // Files the log changes every few seconds wait a while and go compact: a crash loses at most that
     // long, and mote catch-up reads it back from the log anyway.
     const often = { delayMs: 15_000, pretty: false }
-    this.casts = new JsonFile(p('casts.json'), (read('casts.json') as Record<string, KnownCast>) ?? {}, often)
-    // Mote history is rebuilt from the logs when its file is missing or unreadable.
-    const motes = read('motes.json') as MoteState | undefined
+    // Each file the log keeps changing is checked on the way in, like the settings: a hand edit or a
+    // half-written file must not throw in the engine's tick on every start.
+    this.casts = new JsonFile<Record<string, KnownCast>>(p('casts.json'), sanitizeCasts(read('casts.json')), often)
+    // Mote history is rebuilt from the logs when its file is missing, unreadable or the wrong shape.
+    const motes = sanitizeMotes(read('motes.json'))
     this.motesFresh = !motes
-    this.motes = new JsonFile(p('motes.json'), motes ?? { active: null, sessions: [], daily: {} }, often)
-    this.stock = new JsonFile(p('mote-stock.json'), mergeDefaults<MoteStock>({ counts: {}, item: { name: '', lvl: 0, xp: 0, to: 1 }, autoAdd: true }, read('mote-stock.json')), {
-      delayMs: 3000
-    })
+    this.motes = new JsonFile<MoteState>(p('motes.json'), motes ?? { active: null, sessions: [], daily: {} }, often)
+    this.stock = new JsonFile<MoteStock>(p('mote-stock.json'), sanitizeMoteStock(read('mote-stock.json')), { delayMs: 3000 })
     this.respawns = new JsonFile(p('respawns.json'), sanitizeRespawns(read('respawns.json')), often)
     this.buffs = new JsonFile(p('buffs.json'), sanitizeBuffs(read('buffs.json')), often)
 
@@ -110,6 +113,8 @@ export class Store {
       'buffs.json': this.buffs
     }
     for (const f of this.newer) byName[f]?.freeze('written by a newer version')
+    // Its contents are unknown, not bad: writing defaults over it would lose them.
+    for (const f of this.unreadable) byName[f]?.freeze('could not be read at start')
     // Brought forward: written in the new shape at the next save or at quit.
     for (const f of migrated) byName[f]?.markDirty()
     this.schema = new JsonFile(p('schema.json'), versions)

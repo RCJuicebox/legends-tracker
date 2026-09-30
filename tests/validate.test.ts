@@ -1,9 +1,14 @@
 import { describe, expect, it } from 'vitest'
 import {
+  isFullPath,
   meterOptions,
   sanitizeBuffs,
+  sanitizeCasts,
+  sanitizeMoteStock,
+  sanitizeMotes,
   sanitizeRespawns,
   sanitizeRespawnTimer,
+  sanitizeSettings,
   sanitizeSheet,
   sanitizeSpellRule,
   sanitizeStockCounts,
@@ -11,6 +16,7 @@ import {
   sanitizeTrigger
 } from '../src/core/validate'
 import { DEFAULT_METER_OPTIONS } from '../src/shared/overlays'
+import { defaultSettings } from '../src/main/storeCore'
 import type { BuffsFile } from '../src/core/buffs'
 import type { RespawnRecords } from '../src/core/respawns'
 
@@ -191,6 +197,86 @@ describe('motes on hand from the planner', () => {
 
   it('keep known ranks only, as whole numbers from zero', () => {
     expect(sanitizeStockCounts({ major: -4, minor: 2.6, lesser: '5', greater: Number.NaN, grand: 1e12, huge: 3 })).toEqual({ major: 0, minor: 3, grand: 1e9 })
+  })
+})
+
+describe('paths in the settings', () => {
+  const fb = defaultSettings()
+  const withLog = (logFile: unknown) => sanitizeSettings({ ...fb, logFile }, { ...fb, logFile: 'E:\\EQ\\Logs\\eqlog_Kelwyn_neriak.txt' })?.logFile
+
+  it('keep only a character log as the watched file', () => {
+    expect(withLog('D:\\Games\\EQL\\Logs\\eqlog_Aldric_neriak.txt')).toBe('D:\\Games\\EQL\\Logs\\eqlog_Aldric_neriak.txt')
+    expect(withLog('\\\\nas\\eq\\Logs\\eqlog_Aldric_neriak.txt')).toBe('\\\\nas\\eq\\Logs\\eqlog_Aldric_neriak.txt')
+    expect(withLog('')).toBe('')
+    for (const bad of ['C:\\Windows\\win.ini', 'eqlog_Aldric_neriak.txt', 'E:eqlog_Aldric_neriak.txt', 'C:\\x\\eqlog_.txt', 42]) {
+      expect(withLog(bad)).toBe('E:\\EQ\\Logs\\eqlog_Kelwyn_neriak.txt')
+    }
+  })
+
+  it('know a full path from one that depends on the current folder', () => {
+    expect(['C:\\x', 'c:/x', '\\\\server\\share'].map(isFullPath)).toEqual([true, true, true])
+    expect(['', 'C:', 'C:x', 'x\\y', '\\\\', 7].map(isFullPath)).toEqual([false, false, false, false, false, false])
+  })
+})
+
+describe('mote history read back from disk', () => {
+  const run = {
+    id: 'r1',
+    kind: 'crawl',
+    name: 'The Plane of Fear 4 (Refined)',
+    startedAt: 1000,
+    endedAt: 5000,
+    outcome: 'completed',
+    motes: { major: 3 },
+    outsideSince: null,
+    outsideMs: 0
+  }
+
+  it('keeps a good file as it is', () => {
+    const v = { active: null, sessions: [run], daily: { '2026-09-24': { major: 3 } }, seenUntil: 5000, marks: { 'x@1000': 'crawl' } }
+    expect(sanitizeMotes(v)).toEqual(v)
+  })
+
+  it('is rebuilt (null) when its outline is wrong, so the engine never ticks over a missing list', () => {
+    for (const v of NOT_OBJECTS) expect(sanitizeMotes(v)).toBeNull()
+    expect(sanitizeMotes({ sessions: null, daily: {} })).toBeNull()
+    expect(sanitizeMotes({ sessions: [], daily: [] })).toBeNull()
+  })
+
+  it('drops broken runs, days and marks and keeps the rest', () => {
+    const v = sanitizeMotes({
+      active: { id: 5 },
+      sessions: [run, null, { id: 'r2' }, { ...run, id: 'r3', kind: 'raid', outcome: 'won', motes: 'lots', endedAt: 'soon' }],
+      daily: { '2026-09-24': { major: 3 }, yesterday: { major: 1 }, '2026-09-25': 7 },
+      marks: { a: 'crawl', b: 'boss' }
+    })
+    expect(v?.active).toBeNull()
+    expect(v?.sessions.map((s) => s.id)).toEqual(['r1', 'r3'])
+    expect(v?.sessions[1]).toMatchObject({ kind: 'instance', outcome: 'stopped', motes: {}, endedAt: null })
+    expect(v?.daily).toEqual({ '2026-09-24': { major: 3 } })
+    expect(v?.marks).toEqual({ a: 'crawl' })
+  })
+})
+
+describe('known casts read back from disk', () => {
+  it('keeps good entries and drops the rest', () => {
+    expect(sanitizeCasts({ Puma: { rankedName: 'Puma X', lastCast: 10, count: 4 }, Bad: { count: 2 }, Worse: null })).toEqual({
+      Puma: { rankedName: 'Puma X', lastCast: 10, count: 4 }
+    })
+    for (const v of NOT_OBJECTS) expect(sanitizeCasts(v)).toEqual({})
+  })
+})
+
+describe('the mote stock read back from disk', () => {
+  it('fills what is missing and keeps the loot mark', () => {
+    expect(sanitizeMoteStock({ counts: { major: 2 }, seenUntil: 99, seenAtSecond: 2 })).toEqual({
+      counts: { major: 2 },
+      item: { name: '', lvl: 0, xp: 0, to: 1 },
+      autoAdd: true,
+      seenUntil: 99,
+      seenAtSecond: 2
+    })
+    for (const v of NOT_OBJECTS) expect(sanitizeMoteStock(v)).toEqual({ counts: {}, item: { name: '', lvl: 0, xp: 0, to: 1 }, autoAdd: true })
   })
 })
 

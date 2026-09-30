@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import type { AppSettings, Trigger } from '../src/shared/types'
@@ -19,7 +19,7 @@ vi.mock('electron', () => ({
 }))
 
 const { Store } = await import('../src/main/store')
-const { DEFAULT_OVERLAYS, defaultSettings } = await import('../src/main/storeCore')
+const { DEFAULT_OVERLAYS, defaultSettings, retrySchedule } = await import('../src/main/storeCore')
 const { SCHEMAS } = await import('../src/main/schema')
 
 const DEFAULT_TRIGGER: Trigger = {
@@ -245,6 +245,27 @@ describe('a character looked up in the store', () => {
   })
 })
 
+describe('a file another program holds at start', () => {
+  it('is left where it is, not counted a first run, and never written this run', async () => {
+    const realRetries = { ...retrySchedule }
+    Object.assign(retrySchedule, { readMs: [1], writeMs: [1] })
+    try {
+      // A folder stands in for a held file: opening it fails with something other than ENOENT.
+      mkdirSync(file('settings.json'))
+      const store = new Store(defaultTriggers)
+      expect(store.unreadable).toEqual(['settings.json'])
+      expect(store.recovered).toEqual([])
+      expect(store.settingsFresh).toBe(false)
+      store.settings.set({ ...store.settings.get(), autoStart: false })
+      await store.flushAll()
+      expect(statSync(file('settings.json')).isDirectory()).toBe(true)
+      expect(readdirSync(profile.dir).filter((f) => f.startsWith('settings'))).toEqual(['settings.json'])
+    } finally {
+      Object.assign(retrySchedule, realRetries)
+    }
+  })
+})
+
 describe('a file that will not parse', () => {
   it('is set aside, reported, and the defaults used in its place', () => {
     writeFileSync(file('settings.json'), '{"installDir": "C:\\\\EQ", trunc')
@@ -257,6 +278,17 @@ describe('a file that will not parse', () => {
     expect(store.settings.get()).toEqual(defaultSettings())
     // An unreadable file is not a first run.
     expect(store.settingsFresh).toBe(false)
+  })
+
+  it('in mote history of the wrong shape means the history is rebuilt, not a throw on every tick', () => {
+    writeFileSync(file('motes.json'), JSON.stringify({ sessions: null }))
+    writeFileSync(file('casts.json'), JSON.stringify({ Puma: null }))
+    writeFileSync(file('mote-stock.json'), JSON.stringify({ counts: null, item: 'x' }))
+    const store = new Store(defaultTriggers)
+    expect(store.motesFresh).toBe(true)
+    expect(store.motes.get()).toEqual({ active: null, sessions: [], daily: {} })
+    expect(store.casts.get()).toEqual({})
+    expect(store.stock.get()).toMatchObject({ counts: {}, item: { name: '', lvl: 0, xp: 0, to: 1 }, autoAdd: true })
   })
 
   it('in mote history means the history is rebuilt from the logs', () => {

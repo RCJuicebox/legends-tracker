@@ -29,6 +29,15 @@ export function parseAllaIndex(html: string): Record<string, number> {
 }
 
 /**
+ * Whether a page is laid out the way parseAllaFaction reads: the site prints these headings on every
+ * faction page, its lists empty or not. A page with its title but none of them has changed shape, and
+ * what it would parse to (nothing) must not be kept as the faction's page.
+ */
+export function allaFactionLaidOut(html: string): boolean {
+  return /NPCs you (?:can )?kill to|Zones in which you can|Minimum Faction Required/i.test(html)
+}
+
+/**
  * A faction page: its title, the table of quests that want a con with the faction (Quest Name,
  * Minimum Faction Required, Maximum Faction Allowed), then pairs of rows, a heading row and a row of
  * lists under it: "NPCs you can kill to raise the faction" beside "Quests you can do to raise the

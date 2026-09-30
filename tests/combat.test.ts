@@ -503,6 +503,17 @@ describe('CombatMeter', () => {
     expect(m.sessions[0].timeline).toBeUndefined()
   })
 
+  it('books a ranked lifetap proc once: the heal line without the rank is the same firing', () => {
+    const { m, feed } = meter()
+    feed(`
+      [Thu Sep 24 20:00:05 2026] You hit a fetid fiend for 42 points of magic damage by Lifebite III.
+      [Thu Sep 24 20:00:05 2026] You healed Kelwyn for 42 hit points by Lifebite.
+      [Thu Sep 24 20:00:09 2026] You healed Kelwyn for 40 hit points by Lifebite.
+      [Thu Sep 24 20:00:09 2026] You hit a fetid fiend for 40 points of magic damage by Lifebite III.`)
+    const procs = m.liveFight!.entities['you'].procs
+    expect(procs).toEqual({ 'Lifebite III': { name: 'Lifebite III', origin: 'spell', count: 2, damage: 82, healed: 82 } })
+  })
+
   it('an effect with no cast line behind it is a proc; a cast one is not; a HoT tick is neither', () => {
     const { m, feed } = meter()
     feed(`

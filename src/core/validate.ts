@@ -14,7 +14,7 @@ import {
 } from '../shared/types'
 import { DEFAULT_METER_OPTIONS } from '../shared/overlays'
 import type { RespawnRecords, RespawnTimerSpec } from './respawns'
-import { MOTE_RANKS } from './motes'
+import { MOTE_RANKS, type MoteSession, type MoteState } from './motes'
 import type { ActiveBuff, BuffsFile, Person } from './buffs'
 import type { TradeFavorite, TradeSaved } from '../shared/ipc'
 
@@ -36,6 +36,19 @@ export function isCharacterKey(v: unknown): v is string {
   if (typeof v !== 'string' || !v.length || v.length > 64 || /[\\/:*?"<>|]/.test(v) || /^\.+$/.test(v)) return false
   // No control characters either: a file name cannot hold them.
   return ![...v].some((c) => c.charCodeAt(0) < 32)
+}
+
+/** A full Windows path: a drive ("E:\…") or a share ("\\server\…"). Not "E:folder", which depends on the drive's current folder. */
+export function isFullPath(v: unknown): v is string {
+  return typeof v === 'string' && /^(?:[A-Za-z]:[\\/]|\\\\[^\\/])/.test(v)
+}
+
+/** A character log as the game writes it, by its full path; '' is none chosen. Anything else keeps what was set. */
+function logFilePath(v: unknown, fb: string): string {
+  if (v === '') return ''
+  if (!isFullPath(v)) return fb
+  const m = /[\\/]eqlog_([^\\/]+)\.txt$/i.exec(v)
+  return m && isCharacterKey(m[1]) ? v : fb
 }
 
 function str(v: unknown, fb: string): string {
@@ -264,7 +277,8 @@ export function sanitizeSettings(v: unknown, fb: AppSettings): AppSettings | nul
 
   return shape(v, fb, {
     installDir: str(v.installDir, fb.installDir),
-    logFile: str(v.logFile, fb.logFile),
+    // The tailer reads whatever this names: only a character log.
+    logFile: logFilePath(v.logFile, fb.logFile),
     autoStart: bool(v.autoStart, fb.autoStart),
     characters,
     tracking,
@@ -449,6 +463,77 @@ export function sanitizeStockCounts(v: unknown): MoteStock['counts'] {
 export function sanitizeStockItem(v: unknown): MoteStock['item'] | null {
   if (!isObj(v)) return null
   return { name: str(v.name, '').slice(0, 200), lvl: Math.round(num(v.lvl, 0, 0, 100)), xp: num(v.xp, 0, 0, 1e9), to: Math.round(num(v.to, 1, 0, 100)) }
+}
+
+/** mote-stock.json as read back: the planner's counts and item, with the loot-line mark it counts from. */
+export function sanitizeMoteStock(v: unknown): MoteStock {
+  const o = isObj(v) ? v : {}
+  const out: MoteStock = {
+    counts: sanitizeStockCounts(o.counts),
+    item: sanitizeStockItem(o.item) ?? { name: '', lvl: 0, xp: 0, to: 1 },
+    autoAdd: bool(o.autoAdd, true)
+  }
+  if (typeof o.seenUntil === 'number' && Number.isFinite(o.seenUntil)) out.seenUntil = o.seenUntil
+  if (typeof o.seenAtSecond === 'number' && Number.isFinite(o.seenAtSecond)) out.seenAtSecond = Math.max(0, Math.round(o.seenAtSecond))
+  return out
+}
+
+const SESSION_KINDS = ['instance', 'crawl', 'manual'] as const
+const SESSION_OUTCOMES = ['active', 'completed', 'abandoned', 'stopped', 'game closed'] as const
+const time = (v: unknown): number | null => (typeof v === 'number' && Number.isFinite(v) ? v : null)
+
+function moteSession(v: unknown): MoteSession | null {
+  if (!isObj(v) || typeof v.id !== 'string' || time(v.startedAt) === null) return null
+  const s: MoteSession = {
+    id: v.id,
+    kind: oneOf(v.kind, SESSION_KINDS, 'instance'),
+    name: str(v.name, ''),
+    startedAt: v.startedAt as number,
+    endedAt: time(v.endedAt),
+    outcome: oneOf(v.outcome, SESSION_OUTCOMES, 'stopped'),
+    motes: sanitizeStockCounts(v.motes),
+    outsideSince: time(v.outsideSince),
+    outsideMs: num(v.outsideMs, 0, 0, 1e12)
+  }
+  if (v.byHand === true) s.byHand = true
+  if ('pausedSince' in v) s.pausedSince = time(v.pausedSince)
+  if ('pausedMs' in v) s.pausedMs = num(v.pausedMs, 0, 0, 1e12)
+  return s
+}
+
+/**
+ * motes.json as read back. Null when its outline is wrong (no session list, no daily counts): the
+ * history is then rebuilt from the logs, which hold all of it. Otherwise broken runs and days are
+ * dropped and the rest kept.
+ */
+export function sanitizeMotes(v: unknown): MoteState | null {
+  if (!isObj(v) || !Array.isArray(v.sessions) || !isObj(v.daily)) return null
+  const daily: MoteState['daily'] = {}
+  for (const [day, counts] of Object.entries(v.daily)) if (/^\d{4}-\d{2}-\d{2}$/.test(day) && isObj(counts)) daily[day] = sanitizeStockCounts(counts)
+  const out: MoteState = {
+    active: v.active === null ? null : moteSession(v.active),
+    sessions: v.sessions.map(moteSession).filter((s): s is MoteSession => !!s),
+    daily
+  }
+  const seen = time(v.seenUntil)
+  if (seen !== null) out.seenUntil = seen
+  if (isObj(v.marks)) {
+    const marks: NonNullable<MoteState['marks']> = {}
+    for (const [k, kind] of Object.entries(v.marks)) if (kind === 'crawl' || kind === 'instance') marks[k] = kind
+    out.marks = marks
+  }
+  return out
+}
+
+/** casts.json as read back: each spell's ranked name, last cast and count. Entries of another shape are dropped. */
+export function sanitizeCasts(v: unknown): Record<string, { rankedName: string; lastCast: number; count: number }> {
+  const out: Record<string, { rankedName: string; lastCast: number; count: number }> = {}
+  if (!isObj(v)) return out
+  for (const [name, c] of Object.entries(v)) {
+    if (!isObj(c) || typeof c.rankedName !== 'string') continue
+    out[name] = { rankedName: c.rankedName, lastCast: num(c.lastCast, 0, 0, 1e15), count: Math.round(num(c.count, 0, 0, 1e9)) }
+  }
+  return out
 }
 
 /** The largest Stats page input the sheet keeps, as JSON: far above any real one. */

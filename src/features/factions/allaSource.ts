@@ -4,7 +4,7 @@ import { app } from 'electron'
 import { cacheDir } from '../../main/paths'
 import { log } from '../../main/log'
 import { sources } from '../../main/sources/registry'
-import { ALLA_INDEX_URL, ALLA_READY, allaPageUrl, parseAllaFaction, parseAllaIndex, type AllaFaction } from './allakhazam'
+import { ALLA_INDEX_URL, ALLA_READY, allaFactionLaidOut, allaPageUrl, parseAllaFaction, parseAllaIndex, type AllaFaction } from './allakhazam'
 import { factionKey } from './planner'
 
 // Allakhazam's faction pages, read for the plan (what they hold: allakhazam.ts). The site's
@@ -17,6 +17,8 @@ const GAP_MS = 20_000
 const FRESH_MS = 30 * 24 * 3600_000
 /** After a failed read, how long before trying the site again. */
 const RETRY_MS = 10 * 60_000
+/** A page not laid out as the reader knows is not kept, and not asked for again for this long. */
+const ODD_PAGE_MS = 24 * 3600_000
 /** Bumped when what is kept of a page changes, so pages read by an older build are read again. */
 const VERSION = 1
 
@@ -38,6 +40,8 @@ export class FactionAlla {
   private last = 0
   private failedAt = 0
   private error = ''
+  /** Pages that came back in a shape the reader does not know, by the site's number: when. */
+  private odd = new Map<number, number>()
 
   private get path(): string {
     return join(cacheDir(), 'faction-alla.json')
@@ -87,16 +91,35 @@ export class FactionAlla {
         f.index = { fetchedAt: Date.now(), ids }
         await this.save()
       }
+      const oddNames: string[] = []
       for (const [key, name] of this.wanted) {
         const id = f.index?.ids[key]
         if (id === undefined || this.fresh(f.pages[id]?.fetchedAt)) continue
+        if (Date.now() - (this.odd.get(id) ?? -Infinity) < ODD_PAGE_MS) {
+          oddNames.push(name)
+          continue
+        }
         sources.reading('allakhazam', `Reading ${name} (${this.status().read + 1} of ${this.wanted.size}), a page every ${GAP_MS / 1000} seconds as the site asks`)
-        f.pages[id] = { fetchedAt: Date.now(), faction: parseAllaFaction(id, await this.fetchPage(allaPageUrl(id))) }
+        const html = await this.fetchPage(allaPageUrl(id))
+        const faction = parseAllaFaction(id, html)
+        // Titled but not laid out as known: the site changed, and an empty page kept a month would hide it.
+        if (faction && !allaFactionLaidOut(html)) {
+          log.warn(`Allakhazam's page for ${name} (${allaPageUrl(id)}) is not laid out as expected; not kept`)
+          this.odd.set(id, Date.now())
+          oddNames.push(name)
+          continue
+        }
+        f.pages[id] = { fetchedAt: Date.now(), faction }
         await this.save()
       }
-      this.error = ''
       const s = this.status()
-      sources.ok('allakhazam', `${s.read} of ${s.wanted} factions read`)
+      if (oddNames.length) {
+        this.error = `${oddNames.length === 1 ? 'A page' : `${oddNames.length} pages`} (${oddNames.slice(0, 3).join(', ')}${oddNames.length > 3 ? ', …' : ''}) did not look like Allakhazam's faction pages: the site may have changed`
+        sources.fail('allakhazam', new Error(this.error), `${s.read} of ${s.wanted} factions read; the others are tried again tomorrow`)
+      } else {
+        this.error = ''
+        sources.ok('allakhazam', `${s.read} of ${s.wanted} factions read`)
+      }
     } catch (e) {
       this.failedAt = Date.now()
       this.error = e instanceof Error ? e.message : String(e)

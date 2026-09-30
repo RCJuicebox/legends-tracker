@@ -31,6 +31,11 @@
   --pink: #e05ab4;
   --orange: #e07a4a;
   --blue: #6f8fd6;
+  /* The damage meter's other lanes: another's pet, damage shields, procs by kind. */
+  --salmon: #d67f6f;
+  --ice: #8fb5e0;
+  --sky: #6fb3d2;
+  --magenta: #c46fd2;
   --teal-text: #7fded2;
   --violet-text: #d4a6f2;
   --amber-text: #f0c47c;
@@ -40,6 +45,8 @@
   --red-text: #f2a0a0;
   --pink-text: #f29ad4;
   --blue-text: #8fb2f0;
+  --sky-text: #8fcbe6;
+  --magenta-text: #d99ae4;
   --knob: #cfd5e1;
   /* White tints over dark surfaces; black ones in the light set. */
   --ink: 255 255 255;
@@ -69,8 +76,9 @@
     --text: #141a20;
     --text-2: #3c4751;
     --text-3: #55616c;
-    --accent: #9b6500;
-    --accent-2: #875800;
+    /* 4.6:1 or better on every light background, small text included. */
+    --accent: #8a5a00;
+    --accent-2: #7a4f00;
     --on-accent: #fbfcfd;
     --teal: #0e7c70;
     --violet: #6b43b8;
@@ -81,6 +89,10 @@
     --pink: #a8327f;
     --orange: #b04f1c;
     --blue: #2f5bb5;
+    --salmon: #a04636;
+    --ice: #3a64a0;
+    --sky: #1f6f94;
+    --magenta: #8a3a9a;
     --teal-text: #0b6a60;
     --violet-text: #5d3aa0;
     --amber-text: #7f4e00;
@@ -90,6 +102,8 @@
     --red-text: #a3281f;
     --pink-text: #8f2a6c;
     --blue-text: #274e9c;
+    --sky-text: #1a6384;
+    --magenta-text: #7d3290;
     --knob: #ffffff;
     --ink: 0 0 0;
     color-scheme: light;
@@ -185,6 +199,12 @@ textarea {
   padding: 12px 10px;
   gap: 2px;
   min-height: 0;
+  /* A large UI size on a short screen: the list scrolls, the watch footer stays in view. */
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+.sidebar > * {
+  flex-shrink: 0;
 }
 
 .nav-item {
@@ -240,6 +260,8 @@ textarea {
 
 .sidebar-foot {
   margin-top: auto;
+  position: sticky;
+  bottom: 0;
   padding: 12px;
   border-radius: var(--radius);
   background: var(--panel);
@@ -248,6 +270,16 @@ textarea {
   color: var(--text-2);
   display: grid;
   gap: 6px;
+}
+/* Scrolled, the list would show through the sidebar's bottom padding below the footer: cover it. */
+.sidebar-foot::after {
+  content: '';
+  position: absolute;
+  left: -11px;
+  right: -11px;
+  top: 100%;
+  height: 13px;
+  background: var(--bg-2);
 }
 .sidebar-foot .who {
   color: var(--text);
@@ -394,13 +426,13 @@ textarea {
   background: var(--panel-2);
 }
 
-/* One focus ring for everything reached by Tab. Inputs keep their own border glow. */
-button:focus-visible,
 /* Links read as the accent in either theme, visited or not. */
 a,
 a:visited {
   color: var(--accent-2);
 }
+/* One focus ring for everything reached by Tab. Inputs keep their own border glow. */
+button:focus-visible,
 a:focus-visible,
 summary:focus-visible,
 [tabindex]:focus-visible {

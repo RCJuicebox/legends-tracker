@@ -1,8 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { DEFAULT_OVERLAYS, JsonFile, characterKey, characterName, defaultSettings, mergeDefaults, readJsonFile } from '../src/main/storeCore'
+import { DEFAULT_OVERLAYS, JsonFile, characterKey, characterName, defaultSettings, mergeDefaults, readJsonFile, retrySchedule } from '../src/main/storeCore'
 import { upgrade } from '../src/main/schema'
 
 describe('merging saved settings over the defaults', () => {
@@ -83,12 +83,16 @@ describe('character names from a log file', () => {
 
 describe('the settings files on disk', () => {
   let dir = ''
+  const realRetries = { ...retrySchedule }
   beforeEach(() => {
+    // The real waits add up to seconds; the order of events is what is tested.
+    Object.assign(retrySchedule, { readMs: [1, 1], writeMs: [1, 1, 1] })
     dir = mkdtempSync(join(tmpdir(), 'lt-store-'))
     vi.spyOn(console, 'error').mockImplementation(() => {})
     vi.spyOn(console, 'log').mockImplementation(() => {})
   })
   afterEach(() => {
+    Object.assign(retrySchedule, realRetries)
     vi.restoreAllMocks()
     rmSync(dir, { recursive: true, force: true })
   })
@@ -106,6 +110,15 @@ describe('the settings files on disk', () => {
     expect(r).toEqual({ state: 'corrupt', movedTo: join(dir, 'settings.corrupt-2026-09-25T10-11-12-345Z.json') })
     expect(existsSync(path)).toBe(false)
     expect(readFileSync(join(dir, 'settings.corrupt-2026-09-25T10-11-12-345Z.json'), 'utf8')).toContain('trunc')
+  })
+
+  it('leaves a file it cannot open where it is, after trying again', () => {
+    // A folder stands in for a file another program holds: opening it fails with something other than ENOENT.
+    const path = join(dir, 'settings.json')
+    mkdirSync(path)
+    expect(readJsonFile(path)).toEqual({ state: 'unreadable' })
+    expect(existsSync(path)).toBe(true)
+    expect(readdirSync(dir)).toEqual(['settings.json'])
   })
 
   it('leaves a file the app ships where it is', () => {

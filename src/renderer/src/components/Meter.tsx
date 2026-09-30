@@ -5,7 +5,7 @@ import { useRemembered } from '../remember'
 import { LIVE, useCombat, useSegment } from '../combat'
 import { useInvoke } from '../hooks'
 import { ConfirmButton, Icon, Info, Segmented } from './ui'
-import { EntityBar, HealBar, HEAL_COLOR, KIND_COLOR, PROC_COLOR, PROC_HINT, PROC_WORD, SkillBar, kindTag } from './MeterBars'
+import { EntityBar, HealBar, HEAL_TEXT, KIND_TEXT, PROC_COLOR, PROC_HINT, PROC_TEXT, PROC_WORD, SkillBar, kindTag } from './MeterBars'
 import {
   attackerRows,
   attackerSkillRows,
@@ -246,7 +246,7 @@ function Headline({ seg, name, mode, head, active }: { seg: Segment; name: strin
         <span className="faint">{seg.zone && seg.kind === 'fight' ? ` · ${seg.zone}` : ''}</span>
       </div>
       <div className="dm-figures">
-        <span className="dm-big" style={{ color: mode === 'healing' ? HEAL_COLOR : mode === 'incoming' ? 'var(--red)' : 'var(--accent-2)' }}>
+        <span className="dm-big" style={{ color: mode === 'healing' ? HEAL_TEXT : mode === 'incoming' ? 'var(--red-text)' : 'var(--accent-2)' }}>
           {fmtNum(rate)} <small>{active && mode !== 'healing' ? `active ${per}` : per}</small>
         </span>
         <span className="dm-kv">
@@ -584,7 +584,7 @@ function ProcsCard({ seg, scope, name }: { seg: Segment; scope: MeterScope; name
           <span className="dm-name">
             {r.name}
             {r.sourceKind !== 'you' && <em className="dm-tag">{r.source}</em>}
-            <em className="dm-tag" style={{ color: PROC_COLOR[r.origin] }}>
+            <em className="dm-tag" style={{ color: PROC_TEXT[r.origin] }}>
               {PROC_WORD[r.origin]}
             </em>
           </span>
@@ -774,7 +774,7 @@ function Roster({ snap }: { snap: CombatSnapshot }) {
       <span className="faint small">Group:</span>
       {!snap.roster.length && <span className="faint small">nobody seen joining yet. The log names who joins after you; add anyone already there.</span>}
       {snap.roster.map((m) => (
-        <span key={m.name} className="chip" style={{ color: KIND_COLOR.group }} title={m.from === 'log' ? 'Seen joining in the log' : 'Added by you'}>
+        <span key={m.name} className="chip" style={{ color: KIND_TEXT.group }} title={m.from === 'log' ? 'Seen joining in the log' : 'Added by you'}>
           {m.name}
           <button className="btn ghost small x-btn" aria-label={`Remove ${m.name}`} onClick={() => void act('combat:removeMember', m.name)}>
             ×
@@ -782,7 +782,7 @@ function Roster({ snap }: { snap: CombatSnapshot }) {
         </span>
       ))}
       {pets.map(([pet, owner]) => (
-        <span key={pet} className="chip" style={{ color: KIND_COLOR.pet }}>
+        <span key={pet} className="chip" style={{ color: KIND_TEXT.pet }}>
           {pet} <small className="faint">{kindTag('pet', owner)}</small>
         </span>
       ))}

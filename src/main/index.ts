@@ -21,20 +21,35 @@ import { isOwnPage } from './push'
 import { log, logDir } from './log'
 
 if (primaryInstance) {
-  const ctx = createContext()
-  registerLifecycle(ctx)
-  void app.whenReady().then(async () => {
-    try {
-      await start(ctx)
-    } catch (e) {
-      log.error('Start failed:', e)
-      dialog.showErrorBox(
-        'Legends Tracker could not start',
-        `${e instanceof Error ? e.message : String(e)}\n\nThe details are in ${join(logDir(), 'main.log')}. Legends Tracker will close now.`
-      )
-      app.quit()
-    }
-  })
+  // Building the context reads every settings file; a throw there must end this copy, not leave a
+  // process with no window holding the single-instance lock. showErrorBox is safe before ready.
+  let ctx: AppContext | undefined
+  try {
+    ctx = createContext()
+    registerLifecycle(ctx)
+  } catch (e) {
+    cannotStart(e)
+    app.exit(1)
+  }
+  if (ctx) {
+    const built = ctx
+    void app.whenReady().then(async () => {
+      try {
+        await start(built)
+      } catch (e) {
+        cannotStart(e)
+        app.quit()
+      }
+    })
+  }
+}
+
+function cannotStart(e: unknown): void {
+  log.error('Start failed:', e)
+  dialog.showErrorBox(
+    'Legends Tracker could not start',
+    `${e instanceof Error ? e.message : String(e)}\n\nThe details are in ${join(logDir(), 'main.log')}. Legends Tracker will close now.`
+  )
 }
 
 async function start(ctx: AppContext): Promise<void> {
@@ -83,6 +98,12 @@ async function start(ctx: AppContext): Promise<void> {
   if (store.recovered.length) {
     const names = store.recovered.map((f) => basename(f)).join(', ')
     engine.pushFeed('warn', `Some saved settings could not be read and were set aside (${names}, in the app's data folder); defaults are in use for them.`)
+  }
+  if (store.unreadable.length) {
+    engine.pushFeed(
+      'warn',
+      `${store.unreadable.join(', ')} could not be opened (another program may be holding ${store.unreadable.length === 1 ? 'it' : 'them'}); defaults are in use and changes are not saved to ${store.unreadable.length === 1 ? 'it' : 'them'} this run. Restart Legends Tracker to read ${store.unreadable.length === 1 ? 'it' : 'them'} again.`
+    )
   }
   if (store.newer.length) {
     engine.pushFeed(

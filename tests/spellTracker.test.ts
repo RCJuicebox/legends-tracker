@@ -69,6 +69,25 @@ describe('DoT tracking', () => {
     expect(h.board.list()).toHaveLength(0)
   })
 
+  it('pins the end from a first tick that crits', () => {
+    const h = harness()
+    h.feed(lifecycle)
+    h.feed('[Tue Sep 01 12:15:14 2026] Bazzt Zzzt has taken 1,534 damage from your Envenomed Bolt X. (Critical)')
+    const t = h.board.get(timerKey('Envenomed Bolt', 'Bazzt Zzzt'))!
+    expect(t.exact).toBe(true)
+    expect(t.endsAt).toBe(at('Tue Sep 01 12:16:08 2026'))
+  })
+
+  it('drops a cast the target resisted, the way Legends prints it, and says so', () => {
+    const h = harness()
+    h.feed(`
+      [Fri Sep 25 21:00:02 2026] You begin casting Envenomed Bolt X.
+      [Fri Sep 25 21:00:03 2026] A ratman warrior resisted your Envenomed Bolt X!
+      [Fri Sep 25 21:00:04 2026] A ratman warrior has been poisoned.`)
+    expect(h.board.list()).toHaveLength(0)
+    expect(h.feedItems).toContainEqual(['warn', 'Envenomed Bolt X resisted'])
+  })
+
   it('drops a cast that is interrupted or resisted', () => {
     const h = harness()
     h.feed(`

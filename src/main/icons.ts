@@ -23,6 +23,8 @@ export class IconSource {
   private readonly pngs = new Map<number, Buffer>()
   private readonly itemSheets = new Map<number, Promise<Sheet | null>>()
   private readonly itemPngs = new Map<number, Buffer>()
+  /** Sheets read since the last clear, for the Data Sources row. */
+  private read = 0
 
   constructor(private readonly installDir: () => string) {}
 
@@ -32,6 +34,18 @@ export class IconSource {
     this.pngs.clear()
     this.itemSheets.clear()
     this.itemPngs.clear()
+    this.read = 0
+  }
+
+  /** A sheet as decoded: counted and reported when it reads, reported when it is not a sheet at all. */
+  private loaded(sheet: Sheet | null, file: string): Sheet | null {
+    if (!sheet) {
+      sources.fail('icons', new Error(`${file} is not in the format the game's icon sheets use`))
+      return null
+    }
+    this.read++
+    sources.ok('icons', `${this.read} icon sheet${this.read === 1 ? '' : 's'} read from the game folder`)
+    return sheet
   }
 
   async png(index: number): Promise<Buffer | null> {
@@ -69,9 +83,10 @@ export class IconSource {
     const sheetNo = Math.floor(index / PER_SHEET) + 1
     let p = this.itemSheets.get(sheetNo)
     if (!p) {
+      const file = `dragitem${sheetNo}.dds`
       p = fs
-        .readFile(join(this.installDir(), 'uifiles', 'default', `dragitem${sheetNo}.dds`))
-        .then(decodeDds)
+        .readFile(join(this.installDir(), 'uifiles', 'default', file))
+        .then((d) => this.loaded(decodeDds(d), file))
         .catch(sheetFailed)
       this.itemSheets.set(sheetNo, p)
     }
@@ -98,8 +113,8 @@ export class IconSource {
   }
 
   private async loadSheet(n: number): Promise<Sheet | null> {
-    const file = join(this.installDir(), 'uifiles', 'default', `Spells${String(n).padStart(2, '0')}.tga`)
-    return decodeTga(await fs.readFile(file))
+    const file = `Spells${String(n).padStart(2, '0')}.tga`
+    return this.loaded(decodeTga(await fs.readFile(join(this.installDir(), 'uifiles', 'default', file))), file)
   }
 }
 

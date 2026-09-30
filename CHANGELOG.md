@@ -25,6 +25,18 @@ What changed in each version. The release workflow publishes a version's section
 - **Song Weavers is planned.** A hand-in your log saw only once or twice counted as a quest's one-time reward, even where the walkthrough makes it a repeatable quest, and the walkthrough's own step was dropped for the log's. Now the walkthrough's word stands, and so does what its NPC wants: Sylia Windlehands' Spiderling Silks in Greater Faydark (4 Spiderling Silk for +5) repeats, and she takes them only at Amiable with Song Weavers (from play: nothing at Indifferent, then taken five minutes later at Amiable after a class change).
 - **Fixed:** Miner's Cap wants the lore Scrap Metal Cleaner VII drops in North Kaladim, one a kill, not the rogue clockworks' of Steamfont that eqlwiki's item page lists with it. Miners Pick shows the 300 Gold Mater wants with each Ogre Head.
 - The plan's search spends its time better: a quest is moved together with the step that opens it, and a new step is tried where it shares a zone with its neighbours. A plan of all 83 faction achievements takes about a third of a second.
+- **Fixed: no focus ring on buttons.** Tabbing to a button, tab or sidebar item showed no outline since 2.0.0; it does again.
+- **Fixed: a settings file another program held at start was set aside.** A virus scanner or backup tool holding `settings.json` for a moment made the app rename it and start on defaults. The read is now tried again, and a file that still cannot be opened is left as it is and not written over; the Live page says so.
+- **Fixed: a damaged mote file could stop the app starting.** `motes.json`, `casts.json` and `mote-stock.json` are checked as they are read: a mote history of the wrong shape is rebuilt from the logs and bad entries are dropped. A failure while starting now closes the app with a message, where it could leave it running with no window.
+- **Fixed: a DoT's recast cue came 6 seconds late when its first tick was a critical hit.** A resisted cast ("a ratman warrior resisted your Envenomed Bolt X!") now clears the cast and says so in the feed.
+- **Fixed: a lifetap proc showed as two procs**, one from its damage line (with the rank) and one from its heal line (without).
+- **Factions: "Give [[Item]] to [[NPC]]" is read the right way round.** Walkthroughs written that way (Kobold Killing) had the item and the NPC swapped and were never planned, and a zone after the NPC ("… in Kaladim") was taken for an item. Faction and quest pages are read from eqlwiki again once.
+- **Factions: an export that shows completed achievements but no Progression section is not "all done".** The standings decide instead; the same for race unlocks. An export of open achievements only still counts what it leaves out as done.
+- **Allakhazam: a page not laid out as the site's faction pages is not kept.** It was kept for a month as a faction with nothing on it; now Data Sources says so and it is tried again the next day.
+- **Data Sources: Icons and Faction pages turn OK** once they are read, the copy kept on disk included.
+- **The sidebar scrolls** at a large UI size on a short screen, the watch footer staying in view.
+- **Paths in the settings are checked.** The watched log must be a character log (`eqlog_…txt`) and the game folder must hold the game's spell data; Open archive folder opens only a folder.
+- **Light theme: accent text and the damage meter's colours are darker**, so small text reads at 4.5:1 or better on every background.
 
 ## 2.4.0 (2026-09-29)
 

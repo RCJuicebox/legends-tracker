@@ -80,6 +80,7 @@ export function diagnostics(ctx: AppContext): string {
   ]
   lines.push(...processMetrics())
   if (ctx.store.recovered.length) lines.push(`Set aside at start (unreadable): ${ctx.store.recovered.map((f) => basename(f)).join(', ')}`)
+  if (ctx.store.unreadable.length) lines.push(`Could not be opened at start (left as they are): ${ctx.store.unreadable.join(', ')}`)
   if (ctx.store.newer.length) lines.push(`Written by a newer version: ${ctx.store.newer.join(', ')}`)
   lines.push('', '--- main.log, last 300 lines ---', logTail(300))
   return redact(lines.join('\n'))

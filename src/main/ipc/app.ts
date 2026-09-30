@@ -5,7 +5,7 @@ import { logDir } from '../log'
 import { diagnostics } from '../diagnostics'
 import { sources } from '../sources/registry'
 import { jobs } from '../sources/jobs'
-import { checkGameFolder, findInstall, resolveGameFolder } from '../game'
+import { checkGameFolder, findInstall, isGameFolder, resolveGameFolder } from '../game'
 import { isCharacterKey, meterOptions, sanitizeCharacter, sanitizeSettings } from '../../core/validate'
 import { className } from '../../shared/game/classes'
 import type { CharacterSettings } from '../../shared/types'
@@ -38,8 +38,11 @@ export function registerAppIpc(ctx: AppContext): void {
   handle('jobs:list', () => jobs.list())
   handle('jobs:cancel', (id) => jobs.cancel(String(id)))
   handle('settings:save', (s) => {
-    const clean = sanitizeSettings(s, store.settings.get())
+    const prev = store.settings.get()
+    const clean = sanitizeSettings(s, prev)
     if (!clean) throw new Error('Settings were not saved: they were not in the expected form.')
+    // The game folder is chosen or found (game:choose, game:find), each checked; a page cannot set another.
+    if (clean.installDir !== prev.installDir && clean.installDir && !isGameFolder(clean.installDir)) clean.installDir = prev.installDir
     return ctx.saveSettings(clean)
   })
   handle('character:save', (input) => {
@@ -89,7 +92,8 @@ export function registerAppIpc(ctx: AppContext): void {
   handle('update:check', () => ctx.updater.check())
   handle('update:install', () => ctx.installUpdate())
 
-  handle('game:check', (dir) => checkGameFolder(dir ?? ctx.installDir()))
+  // Another folder is looked into only when it is a game folder.
+  handle('game:check', (dir) => checkGameFolder(dir === undefined ? ctx.installDir() : typeof dir === 'string' && isGameFolder(dir) ? dir : ''))
   handle('game:find', async () => {
     const dir = await findInstall()
     if (dir) ctx.saveSettings({ ...store.settings.get(), installDir: dir })
