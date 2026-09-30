@@ -85,6 +85,8 @@ export interface PlanActivity {
   /** Kill camps: kinds of common mob, and named or single ones. */
   common?: number
   named?: number
+  /** Kill camps: how many spawns there are of mobs play found only a few of; the camp goes at their respawn, whatever pace the log saw. */
+  few?: number
   /** Hand-ins: what goes in each. */
   items?: HandInItem[]
   /** Taken to be done once only: why. Planned at most once unless locked in. */
@@ -388,6 +390,8 @@ interface Cycle {
    * `item`.
    */
   parts?: { name: string; item?: string }[]
+  /** The page's own walkthrough reads wrong, so its steps are left out for this round. */
+  replaces?: boolean
   line: string
 }
 
@@ -467,8 +471,8 @@ const CYCLES: Cycle[] = [
     // (at any con, even from above ground over her at -93, -175) or to Savarixsa Zexus in Grobb's shaman
     // guild (at Dubious) for a note to her brother Perrir Zexus in Neriak Third Gate: Priests of Innoruuk
     // +200, and Primordial Malice -800. Perrir takes it only above Threatening, which a faked con does
-    // (sneak or invisibility for the trade). Whether she gives a second note while one is held is not
-    // known yet: planned as one a round trip, some 10 minutes (a guess; set your own pace on it).
+    // (sneak or invisibility for the trade). She gives a note for each /say, one held or not (found in
+    // play, 2026-09-30), so a trip takes them all: a few seconds a note, the trip to Neriak the step's.
     page: 'Innoruuk Recommendation',
     zone: 'East Freeport',
     npc: 'Perrir Zexus',
@@ -481,9 +485,31 @@ const CYCLES: Cycle[] = [
       'Primordial Malice': -800
     },
     guessed: [],
-    items: [{ name: 'Note', count: 1, how: 'drop', where: 'Saxarivza Zaxun (East Freeport tunnels), for /say I am devoted to Innoruuk; one a trip', sec: 600 }],
+    items: [{ name: 'Note', count: 1, how: 'drop', where: 'Saxarivza Zaxun (East Freeport tunnels), for /say I am devoted to Innoruuk, one a /say', sec: 5 }],
     needs: { faction: 'Priests of Innoruuk', band: 'Dubious', min: -500 },
-    line: 'Say "I am devoted to Innoruuk" to Saxarivza Zaxun in the tunnels under East Freeport (from above ground over her at -93, -175, at any con) for a note, and hand it to Perrir Zexus in Neriak Third Gate at 408, -781: he wants better than Threatening, so sneak or be invisible for the trade, or be a race he likes.'
+    line: 'Say "I am devoted to Innoruuk" to Saxarivza Zaxun in the tunnels under East Freeport (from above ground over her at -93, -175, at any con) for a note, once for every note needed, and hand them all to Perrir Zexus in Neriak Third Gate at 408, -781: he wants better than Threatening, so sneak or be invisible for the trade, or be a race he likes.'
+  },
+  {
+    // Track, Stalk, Hunt with Bone Chips (eqlwiki's walkthrough, taken up 2026-09-30): four Bone Chips to
+    // Vexia D`Ynth in Neriak Commons, each four its own task: Indigo Brotherhood, Dread Slayers, Dreadguard
+    // Outer and Dreadguard Inner +5, Guardians of the Vale and Wolves of the North -1. She wants
+    // Indifferent, which a faked con does. The page reads as one Giant Bat Fur handed to Guardians of the Vale, so its steps are left out.
+    page: 'Track, Stalk, Hunt',
+    key: 'bone chips',
+    zone: 'Neriak Commons',
+    npc: 'Vexia D`Ynth',
+    hits: {
+      'Indigo Brotherhood': 5,
+      'Dread Slayers': 5,
+      'Dreadguard Outer': 5,
+      'Dreadguard Inner': 5,
+      'Guardians of the Vale': -1,
+      'Wolves of the North': -1
+    },
+    guessed: [],
+    items: [{ name: 'Bone Chips', count: 4 }],
+    replaces: true,
+    line: 'Hand Bone Chips to Vexia D`Ynth in Neriak Commons, four a task (try a whole stack in one trade); she wants Indifferent, so sneak or be invisible for the trade if you con worse.'
   },
   {
     // Merchants of Erudin without Peace Keepers (a comment on Allakhazam's Peacekeeper Staff, taken up
@@ -533,7 +559,17 @@ const CAMPS: { zone: string; mobs: string[]; hits: Record<string, number>; guess
  * far as Indifferent (0), not past it, so a need at or below that never stops one; one that wants a con
  * no better than some band stops one above it.
  */
-/** The other races whose con meets every need, the best at the one not met first. */
+/**
+ * A Loadouts swap that keeps the race and puts one more class in the trio ("Wood Elf + Bard"): a con
+ * takes the best of the trio's class modifiers, so one class an NPC likes opens what the trio does not.
+ * The plan counts it as a race of its own, there from the start.
+ */
+export const classSwapName = (race: string, cls: string) => `${race} + ${cls}`
+
+/** The class a swap puts in the trio; null for a swap of race. */
+export const classSwapOf = (name: string) => / \+ (.+)$/.exec(name)?.[1] ?? null
+
+/** The other races (and trios) whose con meets every need, the best at the one not met first. */
 function swapRaces(needs: Need[], faction: string, swapCons: CatalogInput['swapCons']): string[] {
   return Object.entries(swapCons ?? {})
     .filter(([, cons]) => !needs.some((n) => blockedBy(n, cons)))
@@ -574,7 +610,34 @@ const QUEST_COIN: Record<string, { name: string; count: number }> = {
 }
 
 /** "a gnoll", "an orc pawn", "clockwork scrubber": one of many alike. The wiki's notes mark single NPCs. */
-const isCommon = (name: string, note = '') => (/^(?:a|an)\s/i.test(name) || /^[a-z]/.test(name)) && !/quest|merchant|guildmaster|npc|banker|named/i.test(note)
+/**
+ * Mobs with "a" or "an" before the name that are only a few spawns in their zone, as found in play, and how
+ * many, by the name without the article or what the wikis add after it ("an elven slave (male)" → "elven slave"):
+ * a camp of them goes at their respawn, not at a camp's pace.
+ */
+const FEW_IN_PLAY = new Map([
+  // Crushbone has three elven slaves (2026-09-30): Indigo Brotherhood +5 a kill. Its elven priest gave
+  // no Indigo Brotherhood in play, only Clerics of Tunare and King Tearis Thex -10
+  // (how many there are is a guess).
+  ['elven slave', 3],
+  ['elven priest', 1]
+])
+
+const bareMob = (name: string) =>
+  name
+    .toLowerCase()
+    .replace(/^(?:a|an)\s+/, '')
+    .replace(/\s*(?:\(.*\)|-\s.*)$/, '')
+    .trim()
+
+/** The spawns of a camp's few-spawn mobs, as a field: none when it has none. */
+const fewOf = (names: string[]): { few?: number } => {
+  const n = [...new Set(names.map(bareMob))].reduce((sum, m) => sum + (FEW_IN_PLAY.get(m) ?? 0), 0)
+  return n ? { few: n } : {}
+}
+
+const isCommon = (name: string, note = '') =>
+  (/^(?:a|an)\s/i.test(name) || /^[a-z]/.test(name)) && !/quest|merchant|guildmaster|npc|banker|named/i.test(note) && !FEW_IN_PLAY.has(bareMob(name))
 
 /** How a hand-in item is come by: coin, bought before, a merchant sells it, crafted, dropped, or not known. */
 export function howHad(
@@ -848,6 +911,7 @@ export function buildCatalog(input: CatalogInput): FactionCatalog {
       ...(rate ? { measured: clamp(rate * Math.max(0.5, share), 5, 600) } : {}),
       common: members.filter((m) => isCommon(m.name)).length,
       named: members.filter((m) => !isCommon(m.name)).length,
+      ...fewOf(members.map((m) => m.name)),
       ...sharedBy(members),
       ...(isCity(zone) && members.some((m) => !isCommon(m.name) || CITY_PEOPLE.test(m.name)) ? { city: true } : {})
     })
@@ -906,6 +970,7 @@ export function buildCatalog(input: CatalogInput): FactionCatalog {
       source: 'wiki',
       common: members.filter((m) => isCommon(m.mob.name, m.mob.note)).length,
       named: members.filter((m) => !isCommon(m.mob.name, m.mob.note)).length,
+      ...fewOf(members.map((m) => m.mob.name)),
       page: members[0].page,
       ...(notes.length ? { note: notes.join(', ') } : {}),
       ...(isCity(zone) && members.some((m) => !isCommon(m.mob.name, m.mob.note) || CITY_PEOPLE.test(m.mob.name)) ? { city: true } : {})
@@ -936,6 +1001,7 @@ export function buildCatalog(input: CatalogInput): FactionCatalog {
       site: 'Allakhazam',
       common: members.filter((m) => isCommon(m.name)).length,
       named: members.filter((m) => !isCommon(m.name)).length,
+      ...fewOf(members.map((m) => m.name)),
       ...(isCity(zone) && members.some((m) => !isCommon(m.name) || CITY_PEOPLE.test(m.name)) ? { city: true } : {})
     })
   }
@@ -964,13 +1030,14 @@ export function buildCatalog(input: CatalogInput): FactionCatalog {
   }
 
   // ---- quests from the wiki, for the achievements still open ----
+  const replaced = new Set(CYCLES.filter((c) => c.replaces).map((c) => c.page.toLowerCase()))
   const seenSteps = new Set<string>()
   const sameSteps = new Set<string>()
   for (const p of input.pages) {
     if (!open.has(name(p.page))) continue
     for (const title of p.raise.quests) {
       const q = input.quests[title]
-      if (!q) continue
+      if (!q || replaced.has(q.page.toLowerCase())) continue
       q.steps.forEach((s, i) => {
         const id = `quest:${q.page.toLowerCase()}#${i}`
         if (seenSteps.has(id)) return
@@ -1215,7 +1282,10 @@ export function unitTime(a: PlanActivity, s: PlanSettings, choices: PlanChoices 
   const own = choices.perHour[a.id]
   if (own > 0) return { seconds: 3600 / own, handSeconds: 3600 / own, from: 'yours' }
   if (a.kind === 'kill') {
-    const perHour = a.measured ?? (a.common ? s.killsPerHour : Math.min(s.killsPerHour, (a.named || 1) * (60 / Math.max(1, s.namedRespawnMin))))
+    const respawn = (n: number) => n * (60 / Math.max(1, s.namedRespawnMin))
+    const pace = a.measured ?? (a.common ? s.killsPerHour : Math.min(s.killsPerHour, respawn(a.named || 1)))
+    // A few spawns go at their respawn once killed, however quickly the log saw the first of them go.
+    const perHour = a.few ? Math.min(pace, respawn(a.few)) : pace
     const sec = 3600 / Math.max(0.1, perHour)
     return { seconds: sec, handSeconds: sec, from: a.measured ? 'log' : 'estimate' }
   }
@@ -1584,9 +1654,9 @@ export function planFactions(input: PlanInput, settings: PlanSettings, choices: 
     : []
   const RN = raceNames.length
   const modOf = (r: number, f: string) => races?.mods[raceNames[r]]?.[f] ?? 0
-  // The races it can be at the start: its own, and with swaps planned the ones it has unlocked.
+  // The races it can be at the start: its own, and with swaps planned the ones it has unlocked and its own with another class.
   let races0 = 1
-  if (races && settings.raceSwaps) for (let r = 1; r < RN; r++) if (races.unlocked === null || races.unlocked.includes(raceNames[r])) races0 |= 1 << r
+  if (races && settings.raceSwaps) for (let r = 1; r < RN; r++) if (races.unlocked === null || races.unlocked.includes(raceNames[r]) || classSwapOf(raceNames[r])) races0 |= 1 << r
   const swapSec = Math.max(0, settings.swapMin) * 60
 
   // What each activity does to the factions: one that raises an achievement still to do, one that

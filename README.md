@@ -583,6 +583,12 @@ wants Amiable"); it names the race the NPC likes best, or the one you are swappe
 step before ("Still a Dwarf"). The summary says what the swaps save against the same plan without
 them.
 
+A swap can be of a class, too: a con takes the best of your three classes' modifiers, so where a
+class the NPC likes would open the quest, the plan may put it in your classes in place of one the NPC
+likes no better ("Put Bard in your classes in Loadouts for this step": Sylia Windlehands wants
+Amiable with Song Weavers, which a Wood Elf Monk, Shadow Knight and Shaman con Indifferent, and a Bard
+adds 50).
+
 **Race unlocks.** Each race unlock (Loadouts' "Race Unlock - Barbarian" and the rest) wants three of
 the race's factions maxed, as the game's own achievement files list them; the achievements export
 says which you have done, faction by faction, and a faction done for one stays done if it falls back.

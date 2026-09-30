@@ -30,13 +30,14 @@ import {
 } from './core'
 import { emptySources, joinSources, shareSources, sourceReader, type FactionSourceTallies } from './attribution'
 import { parseQuestPage, type QuestPage } from './questPages'
-import { buildCatalog, factionNamer, guessesFrom, itemsToLookUp, planFor, type CatalogInput, type FactionPlanData } from './planner'
+import { buildCatalog, classSwapName, factionNamer, guessesFrom, itemsToLookUp, planFor, type CatalogInput, type FactionPlanData } from './planner'
 import { parseRaceUnlocks, raceUnlocks, unlockedRaces, type RaceUnlockDef } from './unlocks'
 import { lookUp, moversOf } from './lookup'
 import { listLogs } from '../../main/game'
 import type { Purchases } from '../../shared/ipc'
 import { parseAchievements, type AchSection } from '../../core/achievements'
 import { PLAYABLE_RACES, playableRace } from '../../shared/game/races'
+import { CLASS_NAMES } from '../../shared/game/classes'
 import { itemKey, parseInventory } from '../../core/inventory'
 import { unitPrice } from '../../core/tradeskills'
 import { handle } from '../../main/ipc/handle'
@@ -231,7 +232,7 @@ async function factionModifiers(dir: string): Promise<Map<number, Map<number, nu
 
 /**
  * The view with what each standing cons at for a character (its race's, its class's and its deity's
- * modifiers added), as the Standings tab shows it; `deity` and `race` stand in for the record's.
+ * modifiers added), as the Standings tab shows it; `deity`, `race` and `classes` stand in for the record's.
  * Unchanged without a race, since then the con would be anyone's guess.
  */
 async function withConsFor(
@@ -241,10 +242,11 @@ async function withConsFor(
   exported: FactionExport | null,
   view: FactionView,
   deity?: string,
-  race?: string
+  race?: string,
+  classes?: string[]
 ): Promise<FactionView> {
   const rec = ctx.store.characterByKey(character)
-  const c = conBasis(race ?? rec.race, Object.keys(rec.classLevels ?? {}), exported?.file ?? null, deity ?? rec.deity)
+  const c = conBasis(race ?? rec.race, classes ?? Object.keys(rec.classLevels ?? {}), exported?.file ?? null, deity ?? rec.deity)
   return c ? withCons(view, await factionModifiers(dir), c) : view
 }
 
@@ -265,8 +267,19 @@ async function consFor(ctx: AppContext, dir: string, character: string, exported
 }
 
 /**
+ * Its own race with one more class in the trio, for each class not in it: Loadouts has every class for
+ * one that has done its Primary Class Unlocks. A con takes the best of the classes' modifiers, so the
+ * trio with that class is as good as one where it stands in for a class the NPC likes no better.
+ */
+function classSwaps(classes: string[], race: string): { name: string; classes: string[] }[] {
+  if (!classes.length) return []
+  return CLASS_NAMES.filter((c) => !classes.includes(c)).map((c) => ({ name: classSwapName(race, c), classes: [...classes, c] }))
+}
+
+/**
  * The same for each other race the character can swap to in Loadouts (`races`, or every playable race
- * when no achievements export says), still as an Agnostic: which of them opens a quest its own race cannot.
+ * when no achievements export says), and its own with another class, still as an Agnostic: which of
+ * them opens a quest its own race and trio cannot.
  */
 async function swapConsFor(
   ctx: AppContext,
@@ -281,6 +294,8 @@ async function swapConsFor(
   if (!own) return out
   for (const race of PLAYABLE_RACES)
     if (race !== own && (!races || races.includes(race))) out[race] = consOf(await withConsFor(ctx, dir, character, exported, view, 'Agnostic', race))
+  for (const s of classSwaps(Object.keys(ctx.store.characterByKey(character).classLevels ?? {}), own))
+    out[s.name] = consOf(await withConsFor(ctx, dir, character, exported, view, 'Agnostic', own, s.classes))
   return out
 }
 
@@ -353,7 +368,9 @@ function factionIds(view: FactionView): Map<number, string> {
 /**
  * What each race a character could be adds to its cons, as an Agnostic of its classes, by the factions
  * whose id is known: for the plan to check what quests' NPCs want as the standings move. Every race with
- * an unlock (Drakkin has none yet) and its own; null without a race on its record.
+ * an unlock (Drakkin has none yet) and its own; and its own with another class in the trio, where that
+ * class does better than the trio with a faction some quest's NPC wants (`gates`). Null without a race
+ * on its record.
  */
 async function raceModsFor(
   ctx: AppContext,
@@ -361,7 +378,8 @@ async function raceModsFor(
   character: string,
   exported: FactionExport | null,
   view: FactionView,
-  defs: RaceUnlockDef[]
+  defs: RaceUnlockDef[],
+  gates: Set<string>
 ): Promise<FactionPlanData['raceMods']> {
   const rec = ctx.store.characterByKey(character)
   const own = playableRace(rec.race ?? '')
@@ -369,15 +387,25 @@ async function raceModsFor(
   const table = await factionModifiers(dir)
   const ids = factionIds(view)
   const mods: Record<string, Record<string, number>> = {}
-  for (const race of new Set([own, ...defs.map((d) => d.race)])) {
-    const c = conBasis(race, Object.keys(rec.classLevels ?? {}), exported?.file ?? null, 'Agnostic')
-    if (!c) continue
+  const trio = Object.keys(rec.classLevels ?? {})
+  const modsOf = (race: string, classes: string[]) => {
+    const c = conBasis(race, classes, exported?.file ?? null, 'Agnostic')
+    if (!c) return null
     const m: Record<string, number> = {}
     for (const [id, name] of ids) {
       const v = conOf(table, id, 0, c.keys).value
       if (v) m[name] = v
     }
-    mods[race] = m
+    return m
+  }
+  for (const race of new Set([own, ...defs.map((d) => d.race)])) {
+    const m = modsOf(race, trio)
+    if (m) mods[race] = m
+  }
+  const mine = mods[own] ?? {}
+  for (const s of classSwaps(trio, own)) {
+    const m = modsOf(own, s.classes)
+    if (m && [...gates].some((f) => (m[f] ?? 0) > (mine[f] ?? 0))) mods[s.name] = m
   }
   return { own, mods }
 }
@@ -653,7 +681,7 @@ async function planData(ctx: AppContext, character: string, refresh: boolean, wi
     agnostic: agnosticOf(sections),
     races,
     unlocks,
-    raceMods: await raceModsFor(ctx, dir, character, exported, view, defs),
+    raceMods: await raceModsFor(ctx, dir, character, exported, view, defs, new Set(catalog.activities.flatMap((a) => a.gate?.map((n) => n.faction) ?? []))),
     ...(achievements ? {} : { noAchievementList: true })
   }
 }

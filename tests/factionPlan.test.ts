@@ -6,6 +6,8 @@ import { parseFactionPageFull, type FactionRow } from '../src/features/factions/
 import { parseQuestPage, readHandIn } from '../src/features/factions/questPages'
 import {
   buildCatalog,
+  classSwapName,
+  classSwapOf,
   DEFAULT_SETTINGS,
   factionNamer,
   howHad,
@@ -788,12 +790,55 @@ describe('the catalog', () => {
     expect(low.blocked).toBe('needs Dubious with The Spurned; you con Threatening (-550), 50 short')
     // The race at the best con first: Dark Elf (Amiable) before Human (Dubious).
     expect(low.swap).toEqual(['Dark Elf', 'Human'])
-    // Priests of Innoruuk: Saxarivza Zaxun's note to Perrir Zexus, +200 a note, one a round trip; a faked con will do for Perrir.
+    // Priests of Innoruuk: Saxarivza Zaxun's note to Perrir Zexus, +200 a note, one a /say, all in one trip; a faked con will do for Perrir.
     const note200 = buildCatalog(
       catalogInput({ factions: ['Priests of Innoruuk', 'Primordial Malice'], targets: ['Priests of Innoruuk'], cons: { 'Priests of Innoruuk': -650 } })
     ).activities.find((a) => a.id === 'cycle:innoruuk recommendation')!
     expect(note200).toMatchObject({ kind: 'quest', npc: 'Perrir Zexus', zone: 'East Freeport', source: 'wiki', hits: { 'Priests of Innoruuk': 200, 'Primordial Malice': -800 } })
-    expect(note200.items?.[0]).toMatchObject({ name: 'Note', sec: 600 })
+    expect(note200.items?.[0]).toMatchObject({ name: 'Note', sec: 5 })
+    // Indigo Brotherhood: Bone Chips to Vexia D`Ynth, four a task, from the bags.
+    const chips = buildCatalog(catalogInput({ factions: ['Indigo Brotherhood'], targets: ['Indigo Brotherhood'], have: { 'bone chips': 574 } })).activities.find(
+      (a) => a.id === 'cycle:track, stalk, hunt#bone chips'
+    )!
+    expect(chips).toMatchObject({ npc: 'Vexia D`Ynth', zone: 'Neriak Commons', hits: { 'Indigo Brotherhood': 5 } })
+    expect(chips.items?.[0]).toMatchObject({ name: 'Bone Chips', count: 4, have: 574 })
+    expect(chips.blocked).toBeUndefined()
+    // The walkthrough's own step (one Giant Bat Fur to "Guardians of the Vale") is left out for it.
+    const misread = buildCatalog(
+      catalogInput({
+        factions: ['Indigo Brotherhood'],
+        targets: ['Indigo Brotherhood'],
+        pages: [{ page: 'Indigo Brotherhood', raise: { mobs: [], quests: ['Track, Stalk, Hunt'], zones: [] }, lower: { mobs: [], quests: [], zones: [] } }],
+        quests: {
+          'Track, Stalk, Hunt': {
+            page: 'Track, Stalk, Hunt',
+            givers: ['Vexia D`Ynth'],
+            zones: ['Neriak Commons'],
+            level: 1,
+            steps: [{ hits: { 'Indigo Brotherhood': 5 }, guessed: [], handIn: [{ item: 'Giant Bat Fur', count: 1 }], npc: 'Guardians of the Vale', line: '' }]
+          }
+        }
+      })
+    ).activities.filter((a) => a.title === 'Track, Stalk, Hunt')
+    expect(misread.map((a) => a.id)).toEqual(['cycle:track, stalk, hunt#bone chips'])
+    // Crushbone's elven slaves are three spawns: a camp of them goes at their respawn.
+    const slaves = buildCatalog(
+      catalogInput({
+        factions: ['Indigo Brotherhood'],
+        targets: ['Indigo Brotherhood'],
+        pages: [
+          {
+            page: 'Indigo Brotherhood',
+            raise: { mobs: [{ name: 'an elven slave (male)', zone: 'Crushbone', note: '' }], quests: [], zones: [] },
+            lower: { mobs: [], quests: [], zones: [] }
+          }
+        ]
+      })
+    ).activities.find((a) => a.kind === 'kill' && a.zone === 'Crushbone')!
+    expect(slaves).toMatchObject({ common: 0, named: 1 })
+    expect(slaves.few).toBe(3)
+    // Three a respawn, however fast the log saw the first three go.
+    expect(unitTime({ ...slaves, measured: 200 }, DEFAULT_SETTINGS).seconds).toBe((DEFAULT_SETTINGS.namedRespawnMin * 60) / 3)
     // Notes in the bags are other notes: the round's own comes from Saxarivza on the way.
     const held = buildCatalog(catalogInput({ factions: ['Priests of Innoruuk'], targets: ['Priests of Innoruuk'], have: { note: 41, 'bottle of milk': 30 } })).activities.find(
       (a) => a.id === 'cycle:innoruuk recommendation'
@@ -1358,6 +1403,34 @@ describe('what quests want, race unlocks, and steps that open a way', () => {
     const own = planFactions({ targets: target, maxed: [], activities: [camp, dagger], races: { own: 'Iksar', unlocked: ['Wood Elf'], mods } }, { ...S, raceSwaps: false })
     expect(own.steps.map((st) => st.activity.id)).toEqual(['arboreans', 'dagger'])
     expect(own.steps.every((st) => !st.race)).toBe(true)
+  })
+
+  it('puts a class the NPC likes in the trio where only the gated quest raises the faction, while it is short', () => {
+    const SW = 'Song Weavers'
+    // A Wood Elf cons Song Weavers +50 with Monk, Shadow Knight and Shaman, +100 with a Bard in the trio;
+    // Sylia wants Amiable, and her silks are the only way to raise it.
+    const silks: PlanActivity = {
+      ...dagger,
+      id: 'silks',
+      title: 'Spiderling Silks',
+      npc: 'Sylia Windlehands',
+      hits: { [SW]: 5 },
+      gate: [{ faction: SW, band: 'Amiable', min: 100 }]
+    }
+    const input: PlanInput = {
+      targets: [{ faction: SW, achievement: SW, standing: 5 }],
+      maxed: [],
+      activities: [silks],
+      races: { own: 'Wood Elf', unlocked: [], mods: { 'Wood Elf': { [SW]: 50 }, [classSwapName('Wood Elf', 'Bard')]: { [SW]: 100 } } }
+    }
+    const plan = planFactions(input, S)
+    expect(plan.unplanned).toEqual([])
+    expect(plan.steps.map((st) => st.activity.id)).toEqual(['silks'])
+    expect(plan.steps[0]).toMatchObject({ race: 'Wood Elf + Bard', swap: S.swapMin * 60, why: { faction: SW, band: 'Amiable', con: 55 } })
+    expect(classSwapOf(plan.steps[0].race!)).toBe('Bard')
+    expect(classSwapOf('Dark Elf')).toBeNull()
+    // Without the swap nothing opens it.
+    expect(planFactions(input, { ...S, raceSwaps: false }).unplanned).toEqual([SW])
   })
 
   it('counts a race unlock: its factions are to do too, and once it is done the plan may swap to that race', () => {

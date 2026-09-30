@@ -14,6 +14,7 @@ import { runPlan } from './planRunner'
 import { deityName } from '../../shared/game/deities'
 import { playableRace } from '../../shared/game/races'
 import {
+  classSwapOf,
   DEFAULT_SETTINGS,
   NO_CHOICES,
   planFor,
@@ -190,7 +191,7 @@ export function Flags({ a }: { a: PlanActivity }) {
       tone: 'warn',
       label: `needs ${a.needs ?? 'better faction'}`,
       why: a.swap?.length
-        ? `Your race's con keeps it closed now: it ${a.blocked}. As ${listed(a.swap)} it is open, so the plan may swap race for it (Assumptions), or raise the faction first; or lock it in.`
+        ? `Your race and classes' con keeps it closed now: it ${a.blocked}. As ${listed(a.swap)} it is open, so the plan may swap in Loadouts for it (Assumptions), or raise the faction first; or lock it in.`
         : `Closed now: it ${a.blocked}. The plan may raise the faction first, where that is quicker than the other ways, or swap to a race it unlocks; or lock it in.`
     })
   if (a.source === 'wiki' && a.guessed?.length)
@@ -556,8 +557,11 @@ export function PlanTab({ character, view }: { character: string; view: FactionV
             </div>
           )}
           {swapSteps > 0 && (
-            <div className="stat" title="Steps done as another race, swapped to in Loadouts and back: a quest your race's con keeps closed and another race's opens">
-              <span className="label">Race swaps</span>
+            <div
+              className="stat"
+              title="Steps done as another race, or with another class in the trio, swapped to in Loadouts and back: a quest your own con keeps closed and theirs opens"
+            >
+              <span className="label">Loadout swaps</span>
               <span className="value">{swapSteps}</span>
               <span className="sub">{swapSaves ?? 'working out what they save…'}</span>
             </div>
@@ -822,10 +826,10 @@ function Assumptions({
           <NumberInput value={stored.unknownSec} placeholder={String(DEFAULT_SETTINGS.unknownSec)} min={0} max={3600} width={80} onChange={set('unknownSec')} />
         </label>
         <label>
-          <span>Swap race for a quest</span>
+          <span>Swap race or class for a quest</span>
           <Switch
             on={settings.raceSwaps}
-            label="Plan race swaps"
+            label="Plan Loadout swaps"
             onChange={(on) => {
               const next = { ...stored }
               if (on === DEFAULT_SETTINGS.raceSwaps) delete next.raceSwaps
@@ -836,7 +840,7 @@ function Assumptions({
           <span className="faint small">in Loadouts, for a quest your race's con keeps closed and another race's opens</span>
         </label>
         <label>
-          <span>A race swap, there and back (min)</span>
+          <span>A swap, there and back (min)</span>
           <NumberInput value={stored.swapMin} placeholder={String(DEFAULT_SETTINGS.swapMin)} min={0} max={120} width={80} onChange={set('swapMin')} />
         </label>
         <label>
@@ -1212,17 +1216,28 @@ function savedBySwaps(plan: FactionPlan, without: { seconds: number; unplanned: 
  */
 function SwapHint({ step, own, unlocksKnown, unlockedAt }: { step: PlanStep; own: string; unlocksKnown: boolean; unlockedAt?: number }) {
   const race = step.race ?? ''
-  const as = withArticle(own || 'your race')
+  const cls = classSwapOf(race)
+  const as = cls ? 'with your classes' : `as ${withArticle(own || 'your race')}`
   const why = step.why
-    ? `as ${as} you would con ${standingWord(step.why.con)} (${plain(step.why.con)}) with ${step.why.faction} by then, and ${step.activity.npc ?? 'its NPC'} wants ${step.why.band}`
+    ? `${as} you would con ${standingWord(step.why.con)} (${plain(step.why.con)}) with ${step.why.faction} by then, and ${step.activity.npc ?? 'its NPC'} wants ${step.why.band}`
     : step.activity.blocked
-      ? `as ${as}, it ${step.activity.blocked}`
+      ? `${as}, it ${step.activity.blocked}`
       : ''
-  const unlocked = unlockedAt ? `; the plan unlocks ${race} at step ${unlockedAt}` : unlocksKnown ? '' : '; if you have it unlocked'
+  const unlocked = cls ? '' : unlockedAt ? `; the plan unlocks ${race} at step ${unlockedAt}` : unlocksKnown ? '' : '; if you have it unlocked'
   return (
     <div className="small fp-swap">
-      <span className="chip warn">race swap</span>{' '}
-      {step.swap > 0 ? (
+      <span className="chip warn">{cls ? 'class swap' : 'race swap'}</span>{' '}
+      {cls ? (
+        step.swap > 0 ? (
+          <>
+            Put <b>{cls}</b> in your classes in Loadouts for this step, in place of one {step.activity.npc ?? 'its NPC'} likes no better, then back (≈ {duration(step.swap)} in all)
+          </>
+        ) : (
+          <>
+            Still with <b>{cls}</b> in your classes, as for the step before
+          </>
+        )
+      ) : step.swap > 0 ? (
         <>
           Swap to <b>{race}</b> in Loadouts for this step, then back (≈ {duration(step.swap)} in all{unlocked})
         </>
