@@ -46,11 +46,16 @@ export interface FollowState {
   /** The step being worked on, and what it wanted when it became that step (for its progress). */
   active: number | null
   startUnits: Record<number, number>
+  /**
+   * What the log has moved factions the standings do not know (none in the export) since the plan was
+   * followed: their standing, counted from 0 as the plan counted them, so their steps count down too.
+   */
+  drift: Record<string, number>
   /** False until the first read: what is done by then is where the player starts, not news. */
   synced: boolean
 }
 
-export const freshFollow = (): FollowState => ({ done: [], reached: [], active: null, startUnits: {}, synced: false })
+export const freshFollow = (): FollowState => ({ done: [], reached: [], active: null, startUnits: {}, drift: {}, synced: false })
 
 /**
  * The state of a new plan, carried over from the one followed before. A plan searched again (a new
@@ -82,6 +87,7 @@ export function carryFollow(was: FollowedPlan, state: FollowState, next: Followe
     reached: [...state.reached],
     active: keep ? active : null,
     startUnits: keep && start !== undefined ? { [active]: start } : {},
+    drift: { ...state.drift },
     synced: state.synced
   }
 }
@@ -170,11 +176,16 @@ export function sanitizeFollowState(v: unknown, steps: number): FollowState {
   if (o.startUnits && typeof o.startUnits === 'object')
     for (const [k, n] of Object.entries(o.startUnits as Record<string, unknown>))
       if (step(Number(k)) && typeof n === 'number' && Number.isFinite(n) && n > 0) startUnits[Number(k)] = n
+  const drift: Record<string, number> = {}
+  if (o.drift && typeof o.drift === 'object')
+    for (const [f, n] of Object.entries(o.drift as Record<string, unknown>).slice(0, 500))
+      if (f && f.length <= 120 && typeof n === 'number' && Number.isFinite(n) && n) drift[f] = finite(n, 2 * STANDING_MIN, 2 * STANDING_MAX)
   return {
     done: [...new Set(Array.isArray(o.done) ? o.done.filter(step) : [])].sort((a, b) => a - b),
     reached: strs(o.reached, 500),
     active: step(o.active) ? o.active : null,
     startUnits,
+    drift,
     synced: o.synced === true
   }
 }
@@ -212,10 +223,15 @@ export function readFollow(
   done: Set<string>,
   opts: { zone?: string; moved?: Record<string, number> } = {}
 ): FollowRead {
-  const state: FollowState = { done: [...was.done], reached: [...was.reached], active: was.active, startUnits: { ...was.startUnits }, synced: true }
+  const moved = opts.moved ?? {}
+  // A faction with no standing known counts from what the log moved it since the plan was followed.
+  const drift = { ...was.drift }
+  for (const [f, n] of Object.entries(moved)) if (standings[f] === undefined && n) drift[f] = (drift[f] ?? 0) + n
+  for (const f of Object.keys(drift)) if (standings[f] !== undefined) delete drift[f]
+  const state: FollowState = { done: [...was.done], reached: [...was.reached], active: was.active, startUnits: { ...was.startUnits }, drift, synced: true }
   const events: FollowEvent[] = []
   const reached = new Set(state.reached)
-  const standing = (f: string) => Math.max(STANDING_MIN, Math.min(STANDING_MAX, standings[f] ?? 0))
+  const standing = (f: string) => Math.max(STANDING_MIN, Math.min(STANDING_MAX, standings[f] ?? drift[f] ?? 0))
   const isDone = (f: string) => reached.has(f) || done.has(f) || standing(f) >= STANDING_MAX
   for (const s of plan.steps)
     for (const f of s.finish) {
@@ -226,9 +242,15 @@ export function readFollow(
   state.reached = [...reached]
 
   const doneSteps = new Set(state.done)
-  const complete = (s: FollowStep) => s.finish.every(isDone) && s.lift.every((f) => standing(f) >= 0) && (s.reach ?? []).every((r) => standing(r.faction) >= r.to)
+  // A faction a step brings back to 0 is one the steps before it lower: at 0 or above before they are
+  // done, it has not been lowered yet, and the step is still to come.
+  const complete = (s: FollowStep, i: number) =>
+    s.finish.every(isDone) &&
+    (!s.lift.length || plan.steps.every((_, j) => j >= i || doneSteps.has(j))) &&
+    s.lift.every((f) => standing(f) >= 0) &&
+    (s.reach ?? []).every((r) => standing(r.faction) >= r.to)
   plan.steps.forEach((s, i) => {
-    if (doneSteps.has(i) || !complete(s)) return
+    if (doneSteps.has(i) || !complete(s, i)) return
     doneSteps.add(i)
   })
   const open = (i: number) => !doneSteps.has(i)
@@ -240,19 +262,37 @@ export function readFollow(
     return n
   }
 
-  // The step being worked on: the one the last faction lines went the way of (in this zone if any
-  // is), else the one worked on before, else the first left here, else the first left.
+  // The step being worked on: the one the last faction lines went the way of, else the one worked on
+  // before, else the first left here, else the first left. Where several steps' factions moved their
+  // way, the one whose own amounts the lines match goes first (a hand-in moving three factions is the
+  // step of that hand-in, not the first step wanting one of them), then the one worked on before, then
+  // one in this zone, then the earliest.
   const here = opts.zone ? zoneKey(opts.zone) : ''
   const order = plan.steps.map((_, i) => i).filter(open)
   const inZone = (i: number) => !!here && zoneKey(plan.steps[i].zone) === here
   let active: number | null = null
-  const moved = opts.moved ?? {}
   if (Object.keys(moved).length) {
-    const doing = order.filter((i) => {
-      const s = plan.steps[i]
-      return [...s.finish, ...s.lift, ...(s.reach ?? []).map((r) => r.faction)].some((f) => moved[f] && s.per[f] && Math.sign(moved[f]) === Math.sign(s.per[f]))
-    })
-    active = doing.find(inZone) ?? doing[0] ?? null
+    const fit = (s: FollowStep) => {
+      let n = 0
+      for (const [f, per] of Object.entries(s.per)) {
+        const m = moved[f]
+        if (!m || !per) continue
+        if (Math.sign(m) !== Math.sign(per)) {
+          n -= 2
+          continue
+        }
+        // Lines since the last read may be several of the step's units.
+        const units = m / per
+        n += Math.abs(units - Math.round(units)) < 0.05 ? 3 : 1
+      }
+      return n
+    }
+    const rank = (i: number) => (i === was.active ? 0 : inZone(i) ? 1 : 2)
+    const doing = order
+      .map((i) => ({ i, fit: fit(plan.steps[i]) }))
+      .filter((d) => d.fit > 0)
+      .sort((a, b) => b.fit - a.fit || rank(a.i) - rank(b.i) || a.i - b.i)
+    active = doing[0]?.i ?? null
   }
   if (active === null && state.active !== null && open(state.active)) active = state.active
   if (active === null) active = order.find(inZone) ?? order[0] ?? null
@@ -290,7 +330,12 @@ export function readFollow(
     secondsLeft += current.secondsLeft
   } else state.startUnits = {}
   state.active = active
-  for (const i of order) if (i !== active) secondsLeft += plan.steps[i].units * plan.steps[i].unitSec
+  // Each step still to do at what it still wants, never more than planned; a step that brings factions
+  // back from below 0 at what was planned, since the lowering comes first.
+  for (const i of order) {
+    const s = plan.steps[i]
+    if (i !== active) secondsLeft += (s.lift.length ? s.units : Math.min(s.units, unitsLeft(s))) * s.unitSec
+  }
   const n = nextOf(active)
   const next =
     n === null ? null : { index: n, kind: plan.steps[n].kind, title: plan.steps[n].title, zone: plan.steps[n].zone, ...(plan.steps[n].npc ? { npc: plan.steps[n].npc } : {}) }

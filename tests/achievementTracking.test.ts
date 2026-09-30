@@ -14,7 +14,8 @@ import {
   sanitizeFollowState,
   sanitizeFollows,
   sayStep,
-  type FollowedPlan
+  type FollowedPlan,
+  type FollowStep
 } from '../src/features/factions/tracker'
 
 const EXPORT = [
@@ -278,6 +279,71 @@ describe('following a faction plan', () => {
     expect(r.view.current).toMatchObject({ index: 0, unitsLeft: 4 })
   })
 
+  /** A followed step made by hand: `per` a unit's amounts, `units` as planned at `unitSec` each. */
+  const step = (id: string, goals: { finish?: string[]; lift?: string[] }, per: Record<string, number>, units: number, unitSec = 60, zone = 'Neriak'): FollowStep => ({
+    id,
+    kind: 'kill',
+    title: id,
+    zone,
+    finish: goals.finish ?? [],
+    lift: goals.lift ?? [],
+    per,
+    units,
+    unitSec
+  })
+  const plan = (...steps: FollowStep[]): FollowedPlan => ({ at: 0, steps, names: {} })
+
+  it('counts the time left by what each step still wants, not what was planned', () => {
+    const f = plan(step('hand-ins', { finish: ['B'] }, { B: 10 }, 5, 6), step('camp', { finish: ['A'] }, { A: 5 }, 20, 60))
+    // A has come on since the plan: the camp wants 10 kills, not 20.
+    const r = readFollow(f, freshFollow(), { A: 1950, B: 1950 }, new Set())
+    expect(r.view.current).toMatchObject({ index: 0, unitsLeft: 5 })
+    expect(r.view.secondsLeft).toBe(5 * 6 + 10 * 60)
+    // Never more than planned.
+    expect(readFollow(f, freshFollow(), { A: 1000, B: 1950 }, new Set()).view.secondsLeft).toBe(5 * 6 + 20 * 60)
+  })
+
+  it('works on the step whose own amounts the faction lines match, then the one worked on before', () => {
+    // Step 1's hand-in moves B and C by 20 and A by 2 on the side; step 0 is a camp for A at 5 a kill.
+    const f = plan(step('camp', { finish: ['A'] }, { A: 5 }, 20), step('hand-in', { finish: ['B', 'C'] }, { B: 20, C: 20 }, 5))
+    const first = readFollow(f, freshFollow(), { A: 1900, B: 1900, C: 1900 }, new Set())
+    expect(first.view.current).toMatchObject({ index: 0 })
+    expect(readFollow(f, first.state, { A: 1902, B: 1920, C: 1920 }, new Set(), { moved: { A: 2, B: 20, C: 20 } }).view.current).toMatchObject({ index: 1 })
+    // Two steps that fit as well: the one worked on before stays.
+    const g = plan(step('camp', { finish: ['A'] }, { A: 5 }, 20), step('camp too', { finish: ['A', 'E'] }, { A: 5, E: 5 }, 20))
+    const on = readFollow(g, pickStep(freshFollow(), 1), { A: 1900, E: 1900 }, new Set())
+    expect(readFollow(g, on.state, { A: 1905, E: 1900 }, new Set(), { moved: { A: 5 } }).view.current).toMatchObject({ index: 1 })
+    // Several kills since the last read still fit the camp's amount.
+    expect(readFollow(f, first.state, { A: 1915, B: 1900, C: 1900 }, new Set(), { moved: { A: 15, B: 1 } }).view.current).toMatchObject({ index: 0 })
+  })
+
+  it('counts down a faction the export does not list, from what the log moved it', () => {
+    const f = plan(step('camp', { finish: ['F'] }, { F: 10 }, 200))
+    let r = readFollow(f, freshFollow(), {}, new Set())
+    expect(r.view.current).toMatchObject({ unitsLeft: 200 })
+    r = readFollow(f, r.state, {}, new Set(), { moved: { F: 10 } })
+    expect(r.view.current).toMatchObject({ unitsLeft: 199 })
+    r = readFollow(f, r.state, {}, new Set(), { moved: { F: 20 } })
+    expect(r.view.current).toMatchObject({ unitsLeft: 197 })
+    expect(r.state.drift).toEqual({ F: 30 })
+    // Once an export gives its standing, that counts.
+    r = readFollow(f, r.state, { F: 100 }, new Set())
+    expect(r.view.current).toMatchObject({ unitsLeft: 190 })
+    expect(r.state.drift).toEqual({})
+  })
+
+  it('does not count a faction to bring back as done before the steps that lower it', () => {
+    const f = plan(step('camp', { finish: ['A'] }, { A: 5 }, 20), step('lift', { lift: ['L'] }, { L: 10 }, 30, 10))
+    // L is at 100: not lowered yet, so the step is still to come, at its planned 30.
+    let r = readFollow(f, freshFollow(), { A: 1900, L: 100 }, new Set())
+    expect(r.view).toMatchObject({ done: 0, current: { index: 0 } })
+    expect(r.view.secondsLeft).toBe(20 * 60 + 30 * 10)
+    r = readFollow(f, r.state, { A: 2000, L: -300 }, new Set())
+    expect(r.view).toMatchObject({ done: 1, current: { index: 1, unitsLeft: 30 } })
+    r = readFollow(f, r.state, { A: 2000, L: 0 }, new Set())
+    expect(r.view).toMatchObject({ done: 2, current: null })
+  })
+
   it('keeps the step worked on, its progress and what is done when the plan is searched again', () => {
     const f = twoSteps()
     let r = readFollow(f, pickStep(freshFollow(), 1), { A: 1900, B: 1950 }, new Set())
@@ -297,9 +363,9 @@ describe('following a faction plan', () => {
 
   it('checks the followed plans a file holds: an old or broken entry is dropped or mended, not thrown on', () => {
     const f = twoSteps()
-    const state = { done: [1, 1, 7, -1, 'x'], reached: ['A', 3], active: 5, startUnits: { 0: 20, 9: 4, 1: -2 }, synced: 'yes' }
+    const state = { done: [1, 1, 7, -1, 'x'], reached: ['A', 3], active: 5, startUnits: { 0: 20, 9: 4, 1: -2 }, drift: { F: 30, '': 5, G: 'x', H: 0 }, synced: 'yes' }
     expect(sanitizeFollows({ Kelwyn: { plan: f, state }, Aldric: { plan: null }, Brenna: 'nothing', '': { plan: f } })).toEqual({
-      Kelwyn: { plan: f, state: { done: [1], reached: ['A'], active: null, startUnits: { 0: 20 }, synced: false } }
+      Kelwyn: { plan: f, state: { done: [1], reached: ['A'], active: null, startUnits: { 0: 20 }, drift: { F: 30 }, synced: false } }
     })
     expect(sanitizeFollows([f])).toEqual({})
     expect(sanitizeFollowState(undefined, 2)).toEqual(freshFollow())
