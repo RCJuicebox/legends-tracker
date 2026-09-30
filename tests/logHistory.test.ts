@@ -121,4 +121,37 @@ describe('LogHistory', () => {
     expect(saved).toContain('"casts"')
     expect(saved).not.toContain('"purchases"')
   })
+
+  it('reads the live log again only for a consumer new or bumped, the others counting on', async () => {
+    const logPath = join(dir, 'eqlog_Kelwyn_neriak.txt')
+    const cacheFile = join(dir, 'log-history.json')
+    const where = { logPath, archiveDir: join(dir, 'archive'), stem: 'eqlog_Kelwyn_neriak' }
+    await fs.writeFile(
+      logPath,
+      line('Thu Sep 24 16:00:00 2026', 'You begin casting Odium.') + line('Thu Sep 24 16:01:00 2026', 'You purchased 5 Small Vial from Kizzie for 5 copper.')
+    )
+    const counted = (seen: { n: number }): HistoryConsumer<Days> => ({
+      ...dayConsumer(castCounter),
+      reader: () => {
+        const r = castCounter()
+        return (l, into) => {
+          seen.n++
+          r(l, into)
+        }
+      }
+    })
+    const castsSeen = { n: 0 }
+    const first = new LogHistory(cacheFile, { casts: counted(castsSeen), purchases: purchaseConsumer })
+    await first.get('casts', where)
+    await first.flush()
+    expect(castsSeen.n).toBe(2)
+
+    // Purchases bumped to a new version: it alone reads the log up to where the casts had got.
+    castsSeen.n = 0
+    const history = new LogHistory(cacheFile, { casts: counted(castsSeen), purchases: { ...purchaseConsumer, version: purchaseConsumer.version + 1 } })
+    await fs.appendFile(logPath, line('Thu Sep 24 16:02:00 2026', 'You begin casting Odium.'))
+    expect((await history.get<Days>('casts', where)).live).toEqual({ '2026-09-24': { Odium: 2 } })
+    expect(castsSeen.n).toBe(1)
+    expect(Object.keys(await new PurchaseHistory(history, 'purchases').latest(where))).toEqual(['small vial'])
+  })
 })

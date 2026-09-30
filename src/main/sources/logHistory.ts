@@ -342,10 +342,21 @@ export class LogHistory {
       const id = identityOf(st)
       const size = Number(st.size)
       let live = cache.live[pathKey]
-      // A new file at this path, the same file cut short, or a consumer that has not read it: from the top.
-      if (!live || !sameFile({ id: live.id, size: live.offset }, { id, size }) || this.stale(live.values).length) {
+      // A new file at this path, or the same file cut short: from the top, for every consumer.
+      if (!live || !sameFile({ id: live.id, size: live.offset }, { id, size })) {
         live = cache.live[pathKey] = { id, offset: 0, values: {} }
         changed = true
+      } else {
+        // A consumer new, or bumped to a new version, reads alone up to where the others have got; the
+        // others' counts stand, and all go on together from there.
+        const stale = this.stale(live.values)
+        if (stale.length && live.offset > 0) {
+          const values = structuredClone(live.values)
+          for (const k of stale) delete values[k]
+          bytes += await this.feed(createReadStream(where.logPath, { start: 0, end: live.offset - 1 }), stale, values, true)
+          live = cache.live[pathKey] = { id, offset: live.offset, values }
+          changed = true
+        }
       }
       if (size > live.offset) {
         // Read into a copy: a read that fails part way leaves the values and the offset as they were.
