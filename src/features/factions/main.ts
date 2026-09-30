@@ -262,10 +262,14 @@ async function achievementSections(dir: string, character: string): Promise<AchS
   }
 }
 
-/** Whether a character has unlocked Agnostic to pick in Loadouts ("Deity Unlock - Agnostic" done); null where no export says. */
+/**
+ * Whether a character has unlocked Agnostic to pick in Loadouts ("Deity Unlock - Agnostic" done); null
+ * without an export. An export may list only what is still open, so one that leaves it out has it done.
+ */
 function agnosticOf(sections: AchSection[] | null): boolean | null {
-  const a = sections?.flatMap((s) => s.ach).find((x) => x.n.toLowerCase() === 'deity unlock - agnostic')
-  return a ? a.d === true : null
+  if (!sections) return null
+  const a = sections.flatMap((s) => s.ach).find((x) => x.n.toLowerCase() === 'deity unlock - agnostic')
+  return !a || a.d === true
 }
 
 /** The client's race unlocks, read again only when either file changes. */

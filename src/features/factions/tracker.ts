@@ -52,6 +52,9 @@ export interface FollowState {
 
 export const freshFollow = (): FollowState => ({ done: [], reached: [], active: null, startUnits: {}, synced: false })
 
+/** A step the player picked to work on now: the one followed from here, its progress counted afresh, until the faction lines go toward another. */
+export const pickStep = (state: FollowState, index: number): FollowState => ({ ...state, active: index, startUnits: {} })
+
 /** What a read finds worth saying: an achievement done, a step done (with the one to go on to). */
 export type FollowEvent = { kind: 'achievement'; faction: string; name: string } | { kind: 'step'; index: number; step: FollowStep; next: FollowStep | null }
 

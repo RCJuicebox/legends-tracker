@@ -100,6 +100,28 @@ describe('race unlocks', () => {
     ])
   })
 
+  it('takes a race unlock an export leaves out as done: the achievements window can hide what is done', () => {
+    // Only what is open: here just Wood Elf's, part by part.
+    const open = [
+      'Untapped Potential: Races',
+      'I\tRace Unlock - Wood Elf',
+      'C\t\tGet maximum faction with Emerald Warriors.',
+      'I\t\tGet maximum faction with Soldiers of Tunare.'
+    ].join('\n')
+    // The Freeport Militia fell back after it was maxed: the part stays done, as the unlock does.
+    const unlocks = raceUnlocks(parseRaceUnlocks(CLIENT, COMPONENTS), parseAchievements(open).sections, nameOf, (f) => (f === 'The Freeport Militia' ? -226 : null))
+    expect(unlocks.map((u) => [u.race, u.done])).toEqual([
+      ['Human', true],
+      ['Barbarian', true],
+      ['Wood Elf', false],
+      ['Half Elf', true],
+      ['Kerran', true]
+    ])
+    expect(unlocks[0].factions.every((f) => f.done)).toBe(true)
+    expect(unlockGoals(unlocks)).toEqual([{ achievement: 'Race Unlock - Wood Elf', race: 'Wood Elf', factions: ['Soldiers of Tunare', 'Kelethin Merchants'] }])
+    expect(unlockedRaces(unlocks)).toEqual(['Human', 'Barbarian', 'Half Elf', 'Kerran'])
+  })
+
   it('without an achievements export, goes by the standings, and knows no race to be unlocked', () => {
     const unlocks = raceUnlocks(parseRaceUnlocks(CLIENT, COMPONENTS), null, nameOf, (f) => (f === 'Emerald Warriors' ? 2000 : f === 'Soldiers of Tunare' ? 150 : null))
     expect(unlocks.find((u) => u.race === 'Wood Elf')).toEqual({

@@ -241,8 +241,11 @@ const SLAYER_ROWS = 3
 const TRACKED_ROWS = 5
 const TRACKED_LINES = 3
 
-const STEP_VERB: Record<TrackKind, string> = { kill: 'Kill', turnin: 'Hand in to', quest: 'Quest' }
 const UNITS: Record<TrackKind, [string, string]> = { kill: ['kill', 'kills'], turnin: ['hand-in', 'hand-ins'], quest: ['hand-in', 'hand-ins'] }
+
+/** What a step has the player do, in a few words: "Kill a gnoll, …", "Hand in to Mojax Hikspin", "Message Intercept: hand in to Raltur Caliskon". */
+const doing = (s: { kind: TrackKind; title: string; npc?: string }) =>
+  s.kind === 'kill' ? `Kill ${s.title}` : s.kind === 'turnin' ? `Hand in to ${s.npc ?? s.title}` : s.npc ? `${s.title}: hand in to ${s.npc}` : s.title
 
 /** "2 h 22 min", "14 min". */
 function spanOf(seconds: number): string {
@@ -303,36 +306,48 @@ export function AchievementsRegion({ config, track, arranging }: { config: Overl
         <section className="ach-ov-plan">
           <div className="ach-ov-head">
             <span>Faction plan</span>
-            <span className="ach-ov-faint">{step ? `step ${step.index + 1} of ${plan.steps}` : 'done'}</span>
+            <span className="ach-ov-faint">
+              {plan.done} of {plan.steps} steps done
+            </span>
           </div>
           {step ? (
             <>
-              <div className="ach-ov-title" title={step.title}>
-                {STEP_VERB[step.kind]} {step.kind === 'turnin' ? (step.npc ?? step.title) : step.title}
+              <div className="ach-ov-step now">
+                <div className="ach-ov-tag">Now · step {step.index + 1}</div>
+                <div className="ach-ov-title" title={doing(step)}>
+                  {doing(step)}
+                </div>
+                <div className="ach-ov-faint">{step.zone}</div>
+                <div className="ach-ov-bar">
+                  <i style={{ width: `${Math.round(step.progress * 100)}%` }} />
+                </div>
+                <div className="ach-ov-line">
+                  <b>{step.unitsLeft.toLocaleString()}</b> {UNITS[step.kind][step.unitsLeft === 1 ? 0 : 1]} left
+                  {step.secondsLeft > 0 && <span className="ach-ov-faint"> · ≈ {spanOf(step.secondsLeft)}</span>}
+                </div>
+                {step.goals
+                  .filter((g) => !g.done)
+                  .slice(0, 3)
+                  .map((g) => (
+                    <div key={g.faction} className="ach-ov-goal">
+                      <span>{g.achievement ?? g.faction}</span>
+                      <span className="ach-ov-num">
+                        {Math.round(g.standing).toLocaleString()} / {g.to.toLocaleString()}
+                      </span>
+                    </div>
+                  ))}
               </div>
-              <div className="ach-ov-faint">{step.zone}</div>
-              <div className="ach-ov-bar">
-                <i style={{ width: `${Math.round(step.progress * 100)}%` }} />
-              </div>
-              <div className="ach-ov-line">
-                <b>{step.unitsLeft.toLocaleString()}</b> {UNITS[step.kind][step.unitsLeft === 1 ? 0 : 1]} left
-                {step.secondsLeft > 0 && <span className="ach-ov-faint"> · ≈ {spanOf(step.secondsLeft)}</span>}
-              </div>
-              {step.goals
-                .filter((g) => !g.done)
-                .slice(0, 3)
-                .map((g) => (
-                  <div key={g.faction} className="ach-ov-goal">
-                    <span>{g.achievement ?? g.faction}</span>
-                    <span className="ach-ov-num">
-                      {Math.round(g.standing).toLocaleString()} / {g.to.toLocaleString()}
-                    </span>
+              {plan.next ? (
+                <div className="ach-ov-step next">
+                  <div className="ach-ov-tag">Next · step {plan.next.index + 1}</div>
+                  <div className="ach-ov-title" title={doing(plan.next)}>
+                    {doing(plan.next)}
                   </div>
-                ))}
-              {plan.next && (
-                <div className="ach-ov-next" title={plan.next.title}>
-                  Next: {plan.next.kind === 'turnin' ? (plan.next.npc ?? plan.next.title) : plan.next.title}
-                  {plan.next.zone ? ` · ${plan.next.zone}` : ''}
+                  {plan.next.zone && <div className="ach-ov-faint">{plan.next.zone === step.zone ? `${plan.next.zone}, here too` : plan.next.zone}</div>}
+                </div>
+              ) : (
+                <div className="ach-ov-step next">
+                  <div className="ach-ov-tag">Last step of the plan</div>
                 </div>
               )}
             </>

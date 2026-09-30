@@ -550,7 +550,8 @@ describe('the catalog', () => {
       },
       items: { 'kobold hide': item({ sources: { drops: [{ zone: 'Toxxulia Forest', mobs: ['a kobold'] }], foraged: [], crafted: false } }) }
     })
-    const steps = buildCatalog(input).activities.filter((a) => a.kind === 'quest')
+    // The walkthrough's steps; the quest rounds known from play (Message Intercept raises Steel Warriors too) aside.
+    const steps = buildCatalog(input).activities.filter((a) => a.kind === 'quest' && a.page === 'Q')
     expect(steps.map((a) => a.once ?? '')).toEqual([
       '',
       'worth 75 at once',
@@ -645,7 +646,17 @@ describe('the catalog', () => {
     const acts = buildCatalog(input(869)).activities
     // Message Intercept the evil way: milk to Mojax, *Duggin's note, the note to Raltur; the log's pace.
     const note = acts.find((a) => a.id === 'cycle:message intercept')!
-    expect(note).toMatchObject({ kind: 'turnin', npc: 'Raltur Caliskon', source: 'log', seen: 112, measured: 180, needs: 'Amiable', guessed: ['Opal Darkbriar'] })
+    // A round of the quest, handed in at last to Raltur; the milk goes to Mojax.
+    expect(note).toMatchObject({
+      kind: 'quest',
+      title: 'Message Intercept',
+      npc: 'Raltur Caliskon',
+      source: 'log',
+      seen: 112,
+      measured: 180,
+      needs: 'Amiable',
+      guessed: ['Opal Darkbriar']
+    })
     expect(note.hits).toEqual({
       'Dismal Rage': 19,
       'Opal Darkbriar': 5,
@@ -655,7 +666,7 @@ describe('the catalog', () => {
       'The Freeport Militia': -3,
       'Coalition of Tradefolk Underground': -1
     })
-    expect(note.items?.[0].name).toBe('Bottle of Milk')
+    expect(note.items?.[0]).toMatchObject({ name: 'Bottle of Milk', count: 1, to: 'Mojax Hikspin' })
     expect(note.blocked).toBeUndefined()
     // Raltur takes the note only at Amiable.
     expect(buildCatalog(input(50)).activities.find((a) => a.id === 'cycle:message intercept')!.blocked).toMatch(/^needs Amiable with Dismal Rage/)
@@ -673,6 +684,19 @@ describe('the catalog', () => {
     expect(low.blocked).toBe('needs Dubious with The Spurned; you con Threatening (-550), 50 short')
     // The race at the best con first: Dark Elf (Amiable) before Human (Dubious).
     expect(low.swap).toEqual(['Dark Elf', 'Human'])
+    // Priests of Innoruuk: Saxarivza Zaxun's note to Perrir Zexus, +200 a note, one a round trip; a faked con will do for Perrir.
+    const note200 = buildCatalog(
+      catalogInput({ factions: ['Priests of Innoruuk', 'Primordial Malice'], targets: ['Priests of Innoruuk'], cons: { 'Priests of Innoruuk': -650 } })
+    ).activities.find((a) => a.id === 'cycle:innoruuk recommendation')!
+    expect(note200).toMatchObject({ kind: 'quest', npc: 'Perrir Zexus', zone: 'East Freeport', source: 'wiki', hits: { 'Priests of Innoruuk': 200, 'Primordial Malice': -800 } })
+    expect(note200.items?.[0]).toMatchObject({ name: 'Note', sec: 600 })
+    // Notes in the bags are other notes: the round's own comes from Saxarivza on the way.
+    const held = buildCatalog(catalogInput({ factions: ['Priests of Innoruuk'], targets: ['Priests of Innoruuk'], have: { note: 41, 'bottle of milk': 30 } })).activities.find(
+      (a) => a.id === 'cycle:innoruuk recommendation'
+    )!
+    expect(held.items?.[0].have).toBeUndefined()
+    expect(note200.blocked).toBeUndefined()
+    expect(note200.gate).toBeUndefined()
     // Merchants of Erudin: lanterns to Jyle Windshot for Wooden Shards, one a hand-in to Emil Parsini: his +5s from the log, the rest guessed.
     const erudin = buildCatalog(
       catalogInput({ factions: ['Merchants of Erudin', 'Faydarks Champions'], targets: ['Merchants of Erudin'], cons: { 'Faydarks Champions': 2000 } })
@@ -682,7 +706,7 @@ describe('the catalog', () => {
     expect(erudin.hits['High Council of Erudin']).toBe(5)
     expect(erudin.guessed).not.toContain('Merchants of Erudin')
     expect(erudin.guessed).toContain('High Guard of Erudin')
-    expect(erudin.items?.[0]).toMatchObject({ name: 'Small Lantern', count: 1 })
+    expect(erudin.items?.[0]).toMatchObject({ name: 'Small Lantern', count: 1, to: 'Jyle Windshot' })
     expect(erudin.blocked).toBeUndefined()
     // Jyle gives nothing below Indifferent with Faydarks Champions, faking or not.
     const hostile = buildCatalog(
@@ -813,6 +837,38 @@ describe('the catalog', () => {
     expect(plannable(sylia, NO_CHOICES)).toBe(true)
     // At Indifferent she takes nothing.
     expect(buildCatalog(input({ 'Song Weavers': 55 })).activities[0].blocked).toMatch(/^needs Amiable with Song Weavers/)
+  })
+
+  it("takes Allakhazam's amount for a quest only on a step going the same way", () => {
+    const recommendation = {
+      page: 'Innoruuk Recommendation',
+      givers: ['Savarixsa Zexus'],
+      zones: ['Grobb'],
+      level: 1,
+      steps: [
+        {
+          hits: { 'Priests of Innoruuk': 10, 'Primordial Malice': 1 },
+          guessed: ['Primordial Malice'],
+          handIn: [{ item: 'Leatherfoot Raider Skullcap', count: 1 }],
+          npc: 'Perrir',
+          line: ''
+        }
+      ]
+    }
+    const alla: AllaFaction = { id: 9, name: 'Primordial Malice', needs: [], mobs: [], quests: [{ name: 'Innoruuk Recommendation', amount: -840 }] }
+    const skullcap = buildCatalog(
+      catalogInput({
+        factions: ['Priests of Innoruuk', 'Primordial Malice'],
+        targets: ['Priests of Innoruuk'],
+        pages: [{ page: 'Priests of Innoruuk', raise: { mobs: [], quests: ['Innoruuk Recommendation'], zones: [] }, lower: { mobs: [], quests: [], zones: [] } }],
+        quests: { 'Innoruuk Recommendation': recommendation },
+        items: { 'leatherfoot raider skullcap': item({ sources: { drops: [{ zone: 'Nektulos Forest', mobs: ['a Leatherfoot raider'] }], foraged: [], crafted: false } }) },
+        alla: [alla]
+      })
+    ).activities.find((a) => a.title === 'Innoruuk Recommendation' && a.kind === 'quest' && a.id.startsWith('quest:'))!
+    // The skullcap "got better": Allakhazam's -840 is the note's, so the usual gain stands in.
+    expect(skullcap.hits['Primordial Malice']).toBe(5)
+    expect(skullcap.guessed).toEqual(['Primordial Malice'])
   })
 
   it("takes Jeet's Scrap Metal as Cleaner VII's, one a kill, and Mater's 300 gold with each Ogre Head", () => {

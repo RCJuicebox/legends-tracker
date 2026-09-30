@@ -58,6 +58,8 @@ export interface HandInItem {
   makes?: string
   /** Seconds to come by one, as found in play, where that is known better than any estimate. */
   sec?: number
+  /** Who takes it, where that is not the step's NPC: a quest round's first hand-in (the milk goes to Mojax Hikspin). */
+  to?: string
 }
 
 export interface PlanActivity {
@@ -377,7 +379,7 @@ interface Cycle {
   hits: Record<string, number>
   guessed: string[]
   /** What goes in each round: bought or held as the log and inventory say, or come by as given (`sec` a round). */
-  items: { name: string; count: number; how?: HandInHow; where?: string; sec?: number }[]
+  items: { name: string; count: number; how?: HandInHow; where?: string; sec?: number; to?: string }[]
   /** Where the log saw it done: how many rounds, and seconds a round. */
   log?: { seen: number; sec: number }
   /** Where the facts come from otherwise. */
@@ -414,7 +416,7 @@ const CYCLES: Cycle[] = [
       'Coalition of Tradefolk Underground': -1
     },
     guessed: ['Opal Darkbriar'],
-    items: [{ name: 'Bottle of Milk', count: 1 }],
+    items: [{ name: 'Bottle of Milk', count: 1, to: 'Mojax Hikspin' }],
     log: { seen: 112, sec: 20 },
     needs: { faction: 'Dismal Rage', band: 'Amiable', min: 100 },
     parts: [{ name: 'Duggin Scumber' }],
@@ -439,7 +441,7 @@ const CYCLES: Cycle[] = [
       'Dismal Rage': -1
     },
     guessed: [],
-    items: [{ name: 'Bottle of Milk', count: 1 }],
+    items: [{ name: 'Bottle of Milk', count: 1, to: 'Mojax Hikspin' }],
     log: { seen: 96, sec: 20 },
     parts: [{ name: 'Duggin Scumber' }, { name: 'Sir Lucan D`Lere', item: 'Note' }],
     line: 'A Bottle of Milk to Mojax Hikspin (Commonlands), kill *Duggin Scumber for the Note, and hand the Note to Sir Lucan D`Lere in West Freeport.'
@@ -461,6 +463,30 @@ const CYCLES: Cycle[] = [
     site: 'Allakhazam',
     needs: { faction: 'The Spurned', band: 'Dubious', min: -500, real: true },
     line: 'Say "I will assist you" to Wallin Slyfoot in West Commonlands for a note, and hand it to Draxiz N`Ryt in Neriak Commons, who eats it below Dubious with The Spurned; the note is lore, so one a trip.'
+  },
+  {
+    // The first step of Innoruuk Recommendation, over and over (eqlwiki's walkthrough, taken up
+    // 2026-09-29): /say "I am devoted to Innoruuk" to Saxarivza Zaxun in the tunnels under East Freeport
+    // (at any con, even from above ground over her at -93, -175) or to Savarixsa Zexus in Grobb's shaman
+    // guild (at Dubious) for a note to her brother Perrir Zexus in Neriak Third Gate: Priests of Innoruuk
+    // +200, and Primordial Malice -800. Perrir takes it only above Threatening, which a faked con does
+    // (sneak or invisibility for the trade). Whether she gives a second note while one is held is not
+    // known yet: planned as one a round trip, some 10 minutes (a guess; set your own pace on it).
+    page: 'Innoruuk Recommendation',
+    zone: 'East Freeport',
+    npc: 'Perrir Zexus',
+    hits: {
+      'Priests of Innoruuk': 200,
+      'King Naythox Thex': 30,
+      'Priests of Marr': -70,
+      'Clerics of Tunare': -50,
+      'Priests of Life': -30,
+      'Primordial Malice': -800
+    },
+    guessed: [],
+    items: [{ name: 'Note', count: 1, how: 'drop', where: 'Saxarivza Zaxun (East Freeport tunnels), for /say I am devoted to Innoruuk; one a trip', sec: 600 }],
+    needs: { faction: 'Priests of Innoruuk', band: 'Dubious', min: -500 },
+    line: 'Say "I am devoted to Innoruuk" to Saxarivza Zaxun in the tunnels under East Freeport (from above ground over her at -93, -175, at any con) for a note, and hand it to Perrir Zexus in Neriak Third Gate at 408, -781: he wants better than Threatening, so sneak or be invisible for the trade, or be a race he likes.'
   },
   {
     // Merchants of Erudin without Peace Keepers (a comment on Allakhazam's Peacekeeper Staff, taken up
@@ -487,7 +513,7 @@ const CYCLES: Cycle[] = [
       'Crushbone Orcs': -1
     },
     guessed: ['High Guard of Erudin', 'Faydarks Champions', 'King Tearis Thex', 'Clerics of Tunare', 'Soldiers of Tunare', 'Crushbone Orcs'],
-    items: [{ name: 'Small Lantern', count: 1 }],
+    items: [{ name: 'Small Lantern', count: 1, to: 'Jyle Windshot' }],
     site: 'Allakhazam',
     needs: { faction: 'Faydarks Champions', band: 'Indifferent', min: 0, real: true },
     parts: [{ name: 'Emil Parsini', item: 'Wooden Shards' }],
@@ -954,8 +980,11 @@ export function buildCatalog(input: CatalogInput): FactionCatalog {
         for (const step of loop ? [s, q.steps[i + 1]] : [s])
           for (const [f, v] of Object.entries(step.hits)) {
             const g = name(f)
-            // What a page left as "got better", Allakhazam may give an amount for.
-            const given = AMOUNTS[q.page.toLowerCase()]?.[g] ?? (step.guessed.includes(f) ? allaAmount.get(questKey(q.page))?.[g] : undefined)
+            // What a page left as "got better", Allakhazam may give an amount for: a whole quest's, so only
+            // where it goes the same way (Innoruuk Recommendation's -840 Primordial Malice is the note's, not
+            // the skullcap's, which "got better").
+            const alla = step.guessed.includes(f) ? allaAmount.get(questKey(q.page))?.[g] : undefined
+            const given = AMOUNTS[q.page.toLowerCase()]?.[g] ?? (alla !== undefined && Math.sign(alla) === Math.sign(v) ? alla : undefined)
             if (given !== undefined) hits[g] = (hits[g] ?? 0) + given
             else if (step.guessed.includes(f)) {
               hits[g] = (hits[g] ?? 0) + (v > 0 ? guesses.handUp : guesses.handDown)
@@ -1071,17 +1100,20 @@ export function buildCatalog(input: CatalogInput): FactionCatalog {
     const swap = need && blocked ? swapRaces([need], need.faction, input.swapCons) : []
     activities.push({
       id: `cycle:${c.page.toLowerCase()}${c.key ? `#${c.key}` : ''}`,
-      kind: 'turnin',
+      // A round of a quest: the step is the quest's, to its last NPC, and says what goes to whom.
+      kind: 'quest',
       title: c.page,
       zone: c.zone,
       npc: c.npc,
       hits,
       ...(c.guessed.length ? { guessed: c.guessed.map(name) } : {}),
       ...(c.log ? { source: 'log' as const, seen: c.log.seen, measured: 3600 / c.log.sec } : { source: 'wiki' as const, site: c.site }),
+      // What the round itself comes by (a note from an NPC on the way) is not what the character holds
+      // under that name (the bags' Notes are other notes); what it buys is.
       items: c.items.map((it) =>
-        withStock(
-          it.how ? { name: it.name, count: it.count, how: it.how, where: it.where ?? '', ...(it.sec ? { sec: it.sec } : {}) } : { name: it.name, count: it.count, ...had(it.name) }
-        )
+        it.how
+          ? { name: it.name, count: it.count, how: it.how, where: it.where ?? '', ...(it.sec ? { sec: it.sec } : {}), ...(it.to ? { to: it.to } : {}) }
+          : withStock({ name: it.name, count: it.count, ...had(it.name), ...(it.to ? { to: it.to } : {}) })
       ),
       ...(need ? { needs: need.band } : {}),
       ...(blocked ? { blocked } : {}),

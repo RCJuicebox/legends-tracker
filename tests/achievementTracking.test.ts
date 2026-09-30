@@ -4,7 +4,7 @@ import { trackedAchievements } from '../src/core/trackedAchievements'
 import { RaceIndex, raceWords, slayerCounters, slayerCounts, slayerLine, wikiRace, type SlayerKills } from '../src/core/slayer'
 import { joinSkillValues, skillGoals, skillId, skillUp, skillValue } from '../src/core/skillAchievements'
 import { DEFAULT_SETTINGS, planFactions, type PlanActivity, type PlanSettings } from '../src/features/factions/planner'
-import { followedPlan, freshFollow, readFollow, sanitizeFollowedPlan, sayStep, type FollowedPlan } from '../src/features/factions/tracker'
+import { followedPlan, freshFollow, pickStep, readFollow, sanitizeFollowedPlan, sayStep, type FollowedPlan } from '../src/features/factions/tracker'
 
 const EXPORT = [
   'Slayer: Conquest',
@@ -245,6 +245,19 @@ describe('following a faction plan', () => {
     expect(r.view.current).toMatchObject({ index: 1, unitsLeft: 1150 })
     // What a page sends is checked too.
     expect(sanitizeFollowedPlan(JSON.parse(JSON.stringify(f)))).toEqual(f)
+  })
+
+  it('follows a step the player picks, until the faction lines go toward another', () => {
+    const f = twoSteps()
+    // In West Commonlands, on the hand-ins there (step 1 of the plan is Mojax's).
+    let r = readFollow(f, freshFollow(), { A: 1900, B: 1950 }, new Set(), { zone: 'West Commonlands' })
+    expect(r.view.current).toMatchObject({ index: 0 })
+    // Picked: the camp, counted from here, wherever the player is.
+    r = readFollow(f, pickStep(r.state, 1), { A: 1900, B: 1950 }, new Set(), { zone: 'West Commonlands' })
+    expect(r.view.current).toMatchObject({ index: 1, unitsLeft: 20, progress: 0 })
+    // A hand-in to Mojax takes it back there.
+    r = readFollow(f, r.state, { A: 1900, B: 1960 }, new Set(), { zone: 'West Commonlands', moved: { B: 10 } })
+    expect(r.view.current).toMatchObject({ index: 0, unitsLeft: 4 })
   })
 
   it('checks a plan sent by a page', () => {

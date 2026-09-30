@@ -9,7 +9,7 @@ import { skillGoals, skillId, skillValue } from '../core/skillAchievements'
 import { classIdOf, type ClassId } from '../shared/game/classes'
 import { parseFactionLine } from '../features/factions/core'
 import { standingsNow } from '../features/factions/main'
-import { freshFollow, readFollow, sanitizeFollowedPlan, sayStep, type FollowEvent, type FollowedPlan, type FollowState } from '../features/factions/tracker'
+import { freshFollow, pickStep, readFollow, sanitizeFollowedPlan, sayStep, type FollowEvent, type FollowedPlan, type FollowState } from '../features/factions/tracker'
 import type { AchievementTrack, FactionTrackView, SkillRow, SkillTrackView, SlayerTrackView, TrackedAchievement } from '../shared/tracking'
 import type { AppContext } from './context'
 import type { EngineFeature } from './engine'
@@ -236,6 +236,20 @@ export class LiveAchievements {
     }
   }
 
+  /**
+   * The step to work on now, as the player picked it on the Optimize tab: it is the one followed, its
+   * progress counted from here, until kills or hand-ins go toward another step (or it is done).
+   */
+  async followStep(character: string, index: number): Promise<void> {
+    const f = this.follows.get()[character]
+    if (!f || index >= f.plan.steps.length) return
+    this.follows.set({ ...this.follows.get(), [character]: { plan: f.plan, state: pickStep(f.state, index) } })
+    if (character === this.character) {
+      await this.readFaction(character).catch((e: unknown) => log.warn('Could not read the faction plan after a step was picked:', e))
+      this.publish()
+    }
+  }
+
   // ---- Slayer ----
 
   /** Whether a kill counts for the character: its own, its pet's, or its group's. */
@@ -454,6 +468,11 @@ export function registerLiveAchievementsIpc(ctx: AppContext): void {
     const clean = plan === null ? null : sanitizeFollowedPlan(plan)
     if (plan !== null && !clean) throw new Error('Not a plan.')
     await ctx.liveAchievements.follow(character, clean)
+  })
+  handle('factions:follow-step', async (character, index) => {
+    if (!isCharacterKey(character)) throw new Error('Not a character.')
+    if (typeof index !== 'number' || !Number.isInteger(index) || index < 0) throw new Error('Not a step.')
+    await ctx.liveAchievements.followStep(character, index)
   })
   handle('achievements:track', () => ctx.liveAchievements.view)
 }

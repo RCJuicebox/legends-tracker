@@ -118,6 +118,7 @@ function ItemsLine({ items, units, back }: { items: HandInItem[]; units?: number
         <Fragment key={it.name + i}>
           {i > 0 && ', '}
           <span className="mono">{(units ? units * it.count : it.count).toLocaleString()}</span> {it.name}
+          {it.to && <span className="faint"> to {it.to}</span>}
           {!!units && it.count > 1 && <span className="faint"> ({it.count} a hand-in)</span>}
           {it.makes && <span className="faint"> (combined into {it.makes})</span>}
           <span className="faint"> — {itemSource(it)}</span>
@@ -397,6 +398,8 @@ export function PlanTab({ character, view }: { character: string; view: FactionV
     else delete next[id]
     setChoices({ ...choices, perHour: next })
   }
+  /** The step the Now card and the overlay follow, picked here: until the kills or hand-ins go toward another. */
+  const workOn = (index: number) => void api.invoke('factions:follow-step', character, index).catch((e: unknown) => showError('Could not pick that step', e))
   const chose = Object.keys(choices.locks).length + choices.excluded.length + Object.keys(choices.perHour).length
   const byId = new Map(data.catalog.activities.map((a) => [a.id, a]))
   const stepOf = new Map<string, number>()
@@ -453,6 +456,7 @@ export function PlanTab({ character, view }: { character: string; view: FactionV
         cues={app.settings.achievementCues}
         onOverlay={(on) => void patchSettings((s) => ({ ...s, overlays: s.overlays.map((o) => (o.kind === 'achievements' ? { ...o, visible: on } : o)) }))}
         onCues={(on) => void patchSettings((s) => ({ ...s, achievementCues: on }))}
+        onFirst={() => workOn(0)}
       />
 
       <div className="card mb-16">
@@ -575,7 +579,7 @@ export function PlanTab({ character, view }: { character: string; view: FactionV
         </div>
       )}
 
-      {plan && <Steps plan={plan} choices={choices} onLock={lock} onExclude={exclude} now={tracked?.current ?? null} hint={swapHint} />}
+      {plan && <Steps plan={plan} choices={choices} onLock={lock} onExclude={exclude} onWork={workOn} now={tracked?.current ?? null} hint={swapHint} />}
 
       {openUnlocks.length > 0 && (
         <div className="card mb-16" style={{ padding: 0 }}>
@@ -886,6 +890,7 @@ function Steps({
   choices,
   onLock,
   onExclude,
+  onWork,
   now,
   hint
 }: {
@@ -893,6 +898,8 @@ function Steps({
   choices: PlanChoices
   onLock: (factions: string[], id: string | null) => void
   onExclude: (id: string, out: boolean) => void
+  /** Makes a step the one the Now card and the overlay follow. */
+  onWork: (index: number) => void
   /** The step the character being played is on, as the achievements overlay follows it. */
   now: FactionTrackView['current']
   /** Anything to do first for a step, such as a race swap. */
@@ -943,6 +950,7 @@ function Steps({
                   </span>
                 </div>
                 {hint(st)}
+                {a.kind === 'quest' && a.line && <div className="faint small">“{a.line}”</div>}
                 {a.items && a.items.length > 0 && (
                   <div className="small">
                     <ItemsLine items={a.items} units={st.units} back={a.back} />
@@ -954,6 +962,15 @@ function Steps({
                   <Effects step={st} />
                   <span className="spacer" />
                   <span className="faint small">{sourceNote(a)}</span>
+                  {!isNow && (
+                    <button
+                      className="btn small ghost"
+                      onClick={() => onWork(i)}
+                      title="Follow this step now, on the Now card and the overlay, until your kills or hand-ins go toward another"
+                    >
+                      Work on this
+                    </button>
+                  )}
                   {lockable.length > 0 && (
                     <button className="btn small ghost" onClick={() => onLock(lockable, a.id)} title={`Keep this for ${lockable.join(', ')}: the plan is built around it`}>
                       Lock in
@@ -1193,7 +1210,8 @@ function NowCard({
   overlayShown,
   cues,
   onOverlay,
-  onCues
+  onCues,
+  onFirst
 }: {
   character: string
   track: FactionTrackView | null
@@ -1203,6 +1221,8 @@ function NowCard({
   cues: boolean
   onOverlay: (on: boolean) => void
   onCues: (on: boolean) => void
+  /** Makes the plan's first step the one followed. */
+  onFirst: () => void
 }) {
   const step = track?.current ?? null
   return (
@@ -1218,6 +1238,15 @@ function NowCard({
             </span>
           )}
         </h2>
+        {step && step.index > 0 && (
+          <button
+            className="btn small ghost"
+            onClick={onFirst}
+            title="Follow the plan's first step again, on this card and the overlay, until your kills or hand-ins go toward another (or pick any step with Work on this)"
+          >
+            Back to step 1
+          </button>
+        )}
         <span className="spacer" />
         <label className="row tight small" title="The achievements overlay: this step and your Slayer counts, over the game">
           <Switch on={overlayShown} onChange={onOverlay} label="Show the achievements overlay" /> Show on the game
@@ -1255,7 +1284,7 @@ function NowCard({
             <span className="spacer" />
             {track.next && (
               <span className="faint small">
-                Next: {track.next.kind === 'turnin' ? (track.next.npc ?? track.next.title) : track.next.title}
+                Next, step {track.next.index + 1}: {track.next.kind === 'turnin' ? (track.next.npc ?? track.next.title) : track.next.title}
                 {track.next.zone ? ` · ${track.next.zone}` : ''}
               </span>
             )}

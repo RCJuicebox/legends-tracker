@@ -347,6 +347,8 @@ export interface Invokes {
   'factions:lookup': (character: string, query: string) => { results: FactionLookup[] }
   /** The plan the Optimize tab shows for a character, to follow while it is played (null stops following). */
   'factions:follow': (character: string, plan: FollowedPlan | null) => void
+  /** The step of the followed plan to work on now, picked by the player: shown until kills or hand-ins go toward another. */
+  'factions:follow-step': (character: string, index: number) => void
   /** Where the character being played is in its faction plan, and its Slayer counts since its achievements export. */
   'achievements:track': () => AchievementTrack | null
 
@@ -525,6 +527,7 @@ const INVOKE_CHANNELS: Record<InvokeChannel, true> = {
   'factions:moved': true,
   'factions:lookup': true,
   'factions:follow': true,
+  'factions:follow-step': true,
   'achievements:track': true,
   'character:exports': true,
   'character:sheet': true,

@@ -3639,12 +3639,39 @@ input[aria-invalid='true'] {
 .ach-ov-plus {
   color: var(--teal-text);
 }
-.ach-ov-next {
-  font-size: calc(var(--fs) * 0.86);
-  color: rgb(var(--ink) / 0.7);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+/* The faction plan's step being worked on, and the one after it: each tagged, the first marked in the accent. */
+.ach-ov-step {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  padding-left: 8px;
+  border-left: 3px solid rgb(var(--ink) / 0.22);
+}
+.ach-ov-step.now {
+  border-left-color: var(--accent);
+}
+/* What to do now wraps rather than being cut short; what is next keeps to a line. */
+.ach-ov-step.now .ach-ov-title {
+  white-space: normal;
+}
+.ach-ov-step.next {
+  margin-top: 5px;
+  font-size: calc(var(--fs) * 0.9);
+  color: rgb(var(--ink) / 0.74);
+}
+.ach-ov-step.next .ach-ov-title {
+  font-weight: 500;
+}
+.ach-ov-tag {
+  font-family: var(--font-display);
+  font-size: calc(var(--fs) * 0.72);
+  font-weight: 650;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgb(var(--ink) / 0.55);
+}
+.ach-ov-step.now .ach-ov-tag {
+  color: var(--accent);
 }
 .ach-ov-empty {
   color: rgb(var(--ink) / 0.7);

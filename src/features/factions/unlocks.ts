@@ -79,8 +79,9 @@ export interface RaceUnlock {
 
 /**
  * The race unlocks for a character, from the client's definitions and the character's achievements
- * export (null without one). `nameOf` puts a faction the game's way by its id, and `standingOf` says
- * where one stands now (null when not known).
+ * export (null without one). An export may list only what is still open (the achievements window's
+ * filter decides), so one it leaves out is done, as with the Progression achievements. `nameOf` puts a
+ * faction the game's way by its id, and `standingOf` says where one stands now (null when not known).
  */
 export function raceUnlocks(
   defs: RaceUnlockDef[],
@@ -92,18 +93,19 @@ export function raceUnlocks(
   for (const s of sections ?? []) for (const a of s.ach) if (RACE_UNLOCK.test(a.n)) listed.set(a.n.trim().toLowerCase(), a)
   return defs.map((d) => {
     const a = listed.get(d.achievement.toLowerCase())
+    // Left out of an export: done.
+    const done = sections ? !a || a.d === true : null
     const part = (name: string) => a?.c.find((c) => MAX_FACTION.exec(c.t)?.[1].trim().toLowerCase() === name.toLowerCase())
     const factions = d.factions.map((f) => {
       const faction = nameOf(f.id, f.name)
       const standing = standingOf(faction)
       const said = part(f.name)
-      const done = a?.d || said?.d || (standing !== null && standing >= 2000) ? true : said || standing !== null ? false : null
-      return { faction, done }
+      return { faction, done: done || said?.d || (standing !== null && standing >= 2000) ? true : said || standing !== null ? false : null }
     })
     return {
       achievement: d.achievement,
       race: d.race,
-      done: a ? a.d === true : null,
+      done,
       factions,
       ...(d.withRaces ? { withRaces: d.withRaces } : {}),
       ...(d.other ? { other: d.other } : {})
