@@ -95,7 +95,7 @@ function WatchFoot() {
         <span className="who">{s.character || 'No character'}</span>
       </div>
       <div>{s.zone || 'Zone unknown'}</div>
-      <div className="faint">{s.watching ? `Last line ${ago(s.lastLineAt)}` : 'Not watching'}</div>
+      <div className="faint">{s.watching ? (s.lastLineAt ? `Last line ${ago(s.lastLineAt)}` : 'Watching; no line yet') : 'Not watching'}</div>
     </div>
   )
 }

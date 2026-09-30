@@ -24,7 +24,8 @@ import { AasTab } from './StatsAas'
 
 type Tab = 'character' | 'ac' | 'combat' | 'aas'
 const TABS: [Tab, string][] = [
-  ['character', 'Character'],
+  // The in-game Stats window, read off the screen; the character record is the card above the tabs.
+  ['character', 'Stats window'],
   ['ac', 'AC'],
   ['combat', 'Combat'],
   ['aas', 'AAs']
@@ -150,6 +151,7 @@ export function Stats() {
       </div>
 
       <div className="card stack gap-12 mb-14">
+        <h2 style={{ margin: 0 }}>Character</h2>
         <p className="hint">
           {who(character) || 'This character'}&apos;s classes, levels, race and deity, for every page: spell durations, AC and melee, gear and the upgrade finder, spell upgrades,
           buffs and faction cons. A /who of yourself while the tracker runs keeps the classes and race up to date: it shows your lowest class level, so no class is put below it.

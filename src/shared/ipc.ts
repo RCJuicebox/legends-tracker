@@ -345,7 +345,7 @@ export interface Invokes {
   'factions:moved': (character: string, faction: string) => { movers: FactionMover[] }
   /** Mobs and NPCs whose name holds the query, with what each does to the factions: the logs' amounts, else eqlwiki's direction. */
   'factions:lookup': (character: string, query: string) => { results: FactionLookup[] }
-  /** The plan the Optimize tab shows for a character, to follow while it is played (null stops following). */
+  /** The plan the Plan tab shows for a character, to follow while it is played (null stops following). */
   'factions:follow': (character: string, plan: FollowedPlan | null) => void
   /** The step of the followed plan to work on now, picked by the player: shown until kills or hand-ins go toward another. */
   'factions:follow-step': (character: string, index: number) => void

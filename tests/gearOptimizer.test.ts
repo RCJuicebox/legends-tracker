@@ -13,7 +13,7 @@ const page = (name: string, block: string) =>
 const item = (name: string, block: string) => parseItemPage(name, page(name, block))!
 const catalogItem = item
 
-describe('the optimizer and haste', () => {
+describe('the optimiser and haste', () => {
   // Worn: haste gloves with little else, a plain belt, and a charm in each Any slot. In the bags: far
   // better gloves, and a haste belt as quick as the gloves. Only one haste item counts, so the best set
   // is the haste belt at the waist and the big gloves on the hands. One move at a time never gets
@@ -116,7 +116,7 @@ describe('the optimizer and haste', () => {
   })
 })
 
-describe('the optimizer and weapon ratio', () => {
+describe('the optimiser and weapon ratio', () => {
   // A melee with two good one-handers, a fast bow and a range-slot item with stats. Weapon ratio is
   // the hands': it picks the blades for Primary and Secondary and says nothing about the Range slot,
   // which goes to stats unless ranged ratio is weighted too.
@@ -213,7 +213,7 @@ describe('weapon ratio against stats', () => {
 
 describe('gear in Storage', () => {
   // The export lists the game's Storage window as its key ring. Gear in Storage › Equipment can be
-  // taken out and worn, so the optimizer weighs it; the Exaltations and Activated Items tabs are not gear.
+  // taken out and worn, so the optimiser weighs it; the Exaltations and Activated Items tabs are not gear.
   const inv = parseInventory(
     [
       'Location\tName\tID\tCount\tSlots',

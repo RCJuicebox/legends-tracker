@@ -64,7 +64,7 @@ export function GearFinder({ view, sheet, mode, onPlan }: { view: InventoryView;
       <div className="card stack gap-12 lt-finder-intro">
         <h2 style={{ margin: 0 }}>Item catalog</h2>
         <p className="muted" style={{ margin: 0 }}>
-          The upgrade finder, the focus effects and the optimizer read every piece of equipment on eqlwiki.com: what your classes, race and level can use, and what focus effects it
+          The upgrade finder, the focus effects and the optimiser read every piece of equipment on eqlwiki.com: what your classes, race and level can use, and what focus effects it
           carries. That needs the wiki's item catalog first: about a minute to download, once a week, kept on this PC.
         </p>
         {p.busy ? (
@@ -140,7 +140,7 @@ export function GearFinder({ view, sheet, mode, onPlan }: { view: InventoryView;
                 </span>
                 <Info
                   label="About Compare"
-                  text="As they drop: candidates at +0, against your gear at its merge level. At your merge level: candidates merged to the same level as the item they would replace. The Gear optimizer's All gear mode compares them the same way."
+                  text="As they drop: candidates at +0, against your gear at its merge level. At your merge level: candidates merged to the same level as the item they would replace. The Gear optimiser's All gear mode compares them the same way."
                 />
               </>
             )}
@@ -167,7 +167,7 @@ export function GearFinder({ view, sheet, mode, onPlan }: { view: InventoryView;
                 </span>
                 <Info
                   label="About Judge"
-                  text="In the round: each candidate is added to everything you own and the optimizer wears the lot as well as it can; the gain is what the whole set gains, so an item that pushes a focus belt into a free Any slot loses no focus, and a lore twin or a two-hander is caught. This slot only: the candidate against the one item it replaces, focus lost and all."
+                  text="In the round: each candidate is added to everything you own and the optimiser wears the lot as well as it can; the gain is what the whole set gains, so an item that pushes a focus belt into a free Any slot loses no focus, and a lore twin or a two-hander is caught. This slot only: the candidate against the one item it replaces, focus lost and all."
                 />
               </>
             )}

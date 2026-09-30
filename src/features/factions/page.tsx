@@ -21,7 +21,7 @@ import type { FactionLookup, LookupHit } from './lookup'
 type View = 'standings' | 'plan'
 const VIEWS: [View, string][] = [
   ['standings', 'Standings'],
-  ['plan', 'Optimize']
+  ['plan', 'Plan']
 ]
 
 const HOW =
@@ -130,7 +130,7 @@ export function Factions() {
     return () => clearTimeout(t)
   }, [look])
   const lookupQ = useInvoke(character && query.length >= 3 ? 'factions:lookup' : null, [character, query])
-  // The ways to raise each faction (the Optimize tab's catalog, every faction's) are read once a row is first opened.
+  // The ways to raise each faction (the Plan tab's catalog, every faction's) are read once a row is first opened.
   const [wantWays, setWantWays] = useState(false)
   useEffect(() => {
     if (open) setWantWays(true)
@@ -524,7 +524,7 @@ function History({ r, character, basis, ways }: { r: FactionRow; character: stri
   )
 }
 
-/** The Optimize tab's ways to raise a faction, with the log's kill pace. */
+/** The Plan tab's ways to raise a faction, with the log's kill pace. */
 type Catalog = { activities: PlanActivity[]; logPace: number | null }
 
 /** Other characters' names for a sentence: "Kelwyn's", "Kelwyn's and Aldric's". */
@@ -552,7 +552,7 @@ function Moved({ name, character }: { name: string; character: string }) {
   )
 }
 
-/** The quickest ways to take the faction to 2000, as the Optimize tab reckons them. */
+/** The quickest ways to take the faction to 2000, as the Plan tab reckons them. */
 function Ways({ r, character, ways }: { r: FactionRow; character: string; ways: Catalog | null }) {
   const settings = usePlanSettings(ways?.logPace ?? null)
   const [choices] = useChoices(character)
@@ -564,7 +564,7 @@ function Ways({ r, character, ways }: { r: FactionRow; character: string; ways: 
   if (!list.length) return null
   return (
     <div>
-      <b>Quickest ways to {STANDING_MAX}</b> <span className="faint">(as the Optimize tab reckons them, each on its own)</span>
+      <b>Quickest ways to {STANDING_MAX}</b> <span className="faint">(as the Plan tab reckons them, each on its own)</span>
       <ul className="faction-sources">
         {list.map((w) => (
           <li key={w.activity.id}>

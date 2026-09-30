@@ -3,7 +3,7 @@ import { useState } from 'react'
 import { useApp, useLive } from '../state'
 import { api, clock, ago, errorMessage } from '../api'
 import { useInvoke, useSearch } from '../hooks'
-import { act, showError, showUndo } from '../toast'
+import { act, showError, showToast, showUndo } from '../toast'
 import { who } from '../../../core/format'
 import { CategoryChip, ConfirmButton, Field, FilterBox, Info, LoadError, NumberInput, SpellIcon, Switch } from '../components/ui'
 import {
@@ -404,6 +404,7 @@ function RuleEditor({ k, onSaved }: { k: KnownSpell; onSaved: (list: KnownSpell[
     setError('')
     try {
       onSaved(await api.invoke('spells:rule', k.name, r))
+      showToast(r ? `Saved ${k.name}'s settings.` : `Cleared ${k.name}'s settings.`)
     } catch (e) {
       setError(errorMessage(e))
     }

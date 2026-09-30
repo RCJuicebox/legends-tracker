@@ -67,6 +67,8 @@ export function Respawns() {
       .sort(bySort(sort))
   }, [view, filter, hereOnly, showShared, zone, sort])
   const hiddenShared = (view?.rows ?? []).filter((r) => r.shared && !r.timer).length
+  // What the zone switch hides: kills elsewhere, which after zoning is every one on record.
+  const elsewhere = hereOnly && zone ? (view?.rows ?? []).filter((r) => r.zone && r.zone !== zone && !r.timer).length : 0
 
   const saved = (v: RespawnView | undefined) => {
     if (v) q.setData(v)
@@ -116,8 +118,35 @@ export function Respawns() {
       {!view ? (
         <Pending error={q.error} retry={q.reload} what="the respawn times" />
       ) : !rows.length ? (
-        <div className="card empty">
-          {view.rows.length ? 'Nothing matches. Try the switches above.' : 'No kills yet. Kill something while watching and it appears here; the gap shows once it is back.'}
+        <div className="card empty stack gap-8" style={{ alignItems: 'center' }}>
+          {!view.rows.length ? (
+            'No kills yet. Kill something while watching and it appears here; the gap shows once it is back.'
+          ) : (
+            <>
+              <span>
+                Nothing here{filter.trim() ? ` matches "${filter.trim()}"` : ''}
+                {elsewhere ? `: ${elsewhere} mob${elsewhere === 1 ? ' was' : 's were'} killed in other zones than ${zone}` : ''}
+                {hiddenShared && !showShared ? `${elsewhere ? ', and' : ':'} ${hiddenShared} share${hiddenShared === 1 ? 's' : ''} a name with other mobs` : ''}.
+              </span>
+              <span className="row tight">
+                {elsewhere > 0 && (
+                  <button className="btn small" onClick={() => setHereOnly(false)}>
+                    Show every zone
+                  </button>
+                )}
+                {hiddenShared > 0 && !showShared && (
+                  <button className="btn small" onClick={() => setShowShared(true)}>
+                    Show shared names
+                  </button>
+                )}
+                {filter.trim() && (
+                  <button className="btn small" onClick={() => setFilter('')}>
+                    Clear the filter
+                  </button>
+                )}
+              </span>
+            </>
+          )}
         </div>
       ) : (
         <div className="card" style={{ padding: 0 }}>

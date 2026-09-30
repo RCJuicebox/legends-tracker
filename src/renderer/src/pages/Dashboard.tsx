@@ -97,7 +97,7 @@ export function Dashboard({ go }: { go: (p: PageId) => void }) {
             <span className={`status-dot${status.watching ? ' live' : ''}`} />
             {status.watching ? 'Watching' : 'Stopped'}
           </span>
-          <span className="sub">{status.watching ? `last line ${ago(status.lastLineAt)}` : 'Start watching to track'}</span>
+          <span className="sub">{status.watching ? (status.lastLineAt ? `last line ${ago(status.lastLineAt)}` : 'no line yet') : 'Start watching to track'}</span>
         </div>
         <div className="card stat">
           <span className="label">Character</span>

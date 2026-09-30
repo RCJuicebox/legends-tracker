@@ -187,7 +187,7 @@ export function MeterOverlay({ config, snap, arranging }: { config: OverlayConfi
               onClick={() => patch({ span: opts.span === 'fight' ? 'session' : 'fight' })}
               title={opts.span === 'fight' ? 'Showing the fight; click for the whole session' : 'Showing the session; click for the fight'}
             >
-              {opts.span === 'fight' ? 'Fight' : 'Overall'}
+              {opts.span === 'fight' ? 'Fight' : 'Session'}
             </button>
             <button className="dm-ov-btn" onClick={() => patch({ mode: MODE_NEXT[opts.mode] })} title="Damage → Incoming → Healing">
               {MODE_WORD[opts.mode]}

@@ -97,8 +97,8 @@ export function Buffs() {
           </p>
         </div>
         <label className="row" title="Timers for buffs others cast on you, and whom to ask for a missing one, on the overlays. Off, this page still shows both.">
-          <Switch on={groupBuffs} onChange={(v) => patchSettings((x) => ({ ...x, tracking: { ...x.tracking, groupBuffs: v } }))} label="Show on overlays" />
-          Show on overlays
+          <Switch on={groupBuffs} onChange={(v) => patchSettings((x) => ({ ...x, tracking: { ...x.tracking, groupBuffs: v } }))} label="Buffs from my group on the overlays" />
+          Buffs from my group on the overlays
         </label>
       </div>
 

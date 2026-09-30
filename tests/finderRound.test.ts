@@ -105,10 +105,10 @@ describe('a candidate judged in the round', () => {
   })
 })
 
-describe('an item the character owns, in the finder and the optimizer', () => {
+describe('an item the character owns, in the finder and the optimiser', () => {
   // Pauldrons +6 worn (16 AC), charms filling both Any slots. In the bank: Wraps +0 (12 AC, 19 at +6)
   // and a Mantle +0 (20 AC). The finder at "your merge level" used to judge the Wraps as a +6 copy and
-  // call them an upgrade the optimizer never makes; now it judges the copy owned, as the optimizer does.
+  // call them an upgrade the optimiser never makes; now it judges the copy owned, as the optimiser does.
   const catalog = [
     item('Pauldrons', 'Slot: SHOULDERS<br>\nAC: 10<br>\nClass: ALL<br>\nRace: ALL<br>'),
     item('Wraps', 'Slot: SHOULDERS<br>\nAC: 12<br>\nClass: ALL<br>\nRace: ALL<br>'),
@@ -165,7 +165,7 @@ describe('an item the character owns, in the finder and the optimizer', () => {
     expect(shoulders((key) => (key === 'wraps' ? statsOf('Wraps') : key === 'mantle' ? statsOf('Mantle') : null))).toEqual(['Mantle'])
   })
 
-  it('in the round, gives an owned item what the optimizer gains from it, and nothing when it leaves it off', () => {
+  it('in the round, gives an owned item what the optimiser gains from it, and nothing when it leaves it off', () => {
     const baseline = optimizeGear(opts)
     expect(baseline.after[baseline.slots.indexOf('Shoulders')]?.item.name).toBe('Mantle')
     // The mantle is worth what the optimizer's set loses without it: 20 AC over the Pauldrons' 16.
@@ -173,7 +173,7 @@ describe('an item the character owns, in the finder and the optimizer', () => {
     expect(mantle.placed).toBe('Shoulders')
     expect(mantle.delta).toBe(4)
     expect(mantle.moves.map((m) => [m.slot, m.out?.item.name, m.in?.item.name])).toEqual([['Shoulders', 'Pauldrons +6', 'Mantle']])
-    // The optimizer leaves the Wraps in the bank, so they gain nothing.
+    // The optimiser leaves the Wraps in the bank, so they gain nothing.
     expect(ownedInTheRound({ ...opts, key: itemKey('Wraps'), baseline })).toEqual({ delta: 0, moves: [], placed: null })
   })
 })

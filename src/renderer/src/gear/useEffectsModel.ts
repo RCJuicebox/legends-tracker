@@ -13,7 +13,7 @@ export interface GearEffects {
   /** The character's melee over the days looked at; null while it is read or when there is no log. */
   profile: MeleeProfile | null
   spells: Record<string, EffectSpell>
-  /** Worth in the weights' terms, for the finder and the optimizer; null until the spell file is read. */
+  /** Worth in the weights' terms, for the finder and the optimiser; null until the spell file is read. */
   value: EffectValue | null
   /** What each does and the damage a minute it adds (0 with no melee to weigh against), by spell name. */
   wornWorth: (name: string) => EffectWorth | null

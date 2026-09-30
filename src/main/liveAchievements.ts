@@ -32,7 +32,7 @@ import { offsetBefore, readForward } from './sources/logHistory'
 import { JsonFile, readJsonFile } from './storeCore'
 
 // What the achievements overlay follows as the game is played: the step of the faction plan the
-// player follows (the Optimize tab hands it over), the Slayer counts since the last achievements
+// player follows (the Plan tab hands it over), the Slayer counts since the last achievements
 // export, the skills the open skill achievements want, and the achievements the player tracks (the
 // star on the Achievements page). The log is watched for the lines that move any of them (faction
 // lines, kills, skill-ups, the game saying an achievement is done); a moment after a burst of them the
@@ -237,7 +237,7 @@ export class LiveAchievements {
     ])
   }
 
-  /** The Optimize tab's plan for a character, to follow; null stops following. The old plan is read one last time first, so a step done is still said. */
+  /** The Plan tab's plan for a character, to follow; null stops following. The old plan is read one last time first, so a step done is still said. */
   async follow(character: string, plan: FollowedPlan | null): Promise<void> {
     const had = this.follows.get()[character]
     if (had && character === this.character && this.ctx.engine.status.watching) await this.readFaction(character).catch(() => undefined)
@@ -257,7 +257,7 @@ export class LiveAchievements {
   }
 
   /**
-   * The step to work on now, as the player picked it on the Optimize tab: it is the one followed, its
+   * The step to work on now, as the player picked it on the Plan tab: it is the one followed, its
    * progress counted from here, until kills or hand-ins go toward another step (or it is done).
    */
   async followStep(character: string, index: number): Promise<void> {

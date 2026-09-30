@@ -338,7 +338,7 @@ export function petConversions(pet: PetProfile, factors: Record<string, ClassFac
   return { ...c, avoidancePerAgi: 0.5, notes: [...c.notes, 'AGI: +5 evasion per 10, from the Pet Guide'] }
 }
 
-// ---- the optimizer ----
+// ---- the optimiser ----
 
 export type PetSource = PieceSource | 'pet'
 

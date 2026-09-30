@@ -189,7 +189,7 @@ function twoSteps(): FollowedPlan {
 }
 
 describe('following a faction plan', () => {
-  it('takes the plan as the Optimize tab shows it', () => {
+  it('takes the plan as the Plan tab shows it', () => {
     const f = twoSteps()
     expect(f.steps.map((s) => [s.id, s.finish, s.per, s.units])).toEqual([
       ['Mojax', ['B'], { B: 10 }, 5],

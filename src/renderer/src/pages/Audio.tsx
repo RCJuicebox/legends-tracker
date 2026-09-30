@@ -120,6 +120,11 @@ export function Audio() {
               {usingAzure && !azure?.configured && <option value={a.voice}>{a.voice.slice(AZURE.length)} (no Azure key set)</option>}
             </select>
           </Field>
+          {usingAzure && azure && !azure.configured && (
+            <p className="notice small" style={{ margin: 0 }}>
+              The Windows default voice speaks meanwhile: {a.voice.slice(AZURE.length)} is an Azure voice, and no Azure key is set below. Set one, or pick a Windows voice.
+            </p>
+          )}
           {azure?.configured && (
             <label className="row small" style={{ gap: 8 }}>
               <Switch on={allLanguages} onChange={setAllLanguages} label="Show every language" />

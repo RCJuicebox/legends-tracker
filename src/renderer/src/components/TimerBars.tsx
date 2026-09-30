@@ -38,12 +38,35 @@ const RED = '#ef5a4f'
  * bar's colour (the track's `color`, which the fill and edge paint with) runs to amber and then red:
  * a colour animation that only starts then. An overdue bar is full, striped.
  */
-function useDrain(startedAt: number, endsAt: number, overdue: boolean, color: string) {
+/** The system's "show fewer animations": the bars then step with the clock instead of gliding. */
+function useReducedMotion(): boolean {
+  const [reduced, setReduced] = useState(() => matchMedia('(prefers-reduced-motion: reduce)').matches)
+  useEffect(() => {
+    const q = matchMedia('(prefers-reduced-motion: reduce)')
+    const on = () => setReduced(q.matches)
+    q.addEventListener('change', on)
+    return () => q.removeEventListener('change', on)
+  }, [])
+  return reduced
+}
+
+function useDrain(startedAt: number, endsAt: number, overdue: boolean, color: string, now: number) {
   const track = useRef<HTMLDivElement>(null)
   const fill = useRef<HTMLDivElement>(null)
   const edge = useRef<HTMLDivElement>(null)
+  const reduced = useReducedMotion()
+  // Fewer animations asked for: the fill is set where it stands at each tick of the clock, and the
+  // last twelve seconds turn amber and then red in two steps rather than by a fade.
   useEffect(() => {
-    if (overdue) return
+    if (!reduced || overdue) return
+    const left = Math.max(0, endsAt - now)
+    const part = Math.max(0, Math.min(1, left / Math.max(1, endsAt - startedAt)))
+    if (fill.current) fill.current.style.transform = `scaleX(${part})`
+    if (edge.current) edge.current.style.transform = `translateX(${(part - 1) * 100}%)`
+    if (track.current) track.current.style.color = left > SHIFT_MS ? color : left > SHIFT_MS / 2 ? AMBER : RED
+  }, [reduced, overdue, startedAt, endsAt, color, now])
+  useEffect(() => {
+    if (overdue || reduced) return
     const timing: KeyframeAnimationOptions = { duration: Math.max(1, endsAt - startedAt), easing: 'linear', fill: 'forwards' }
     const runs = [
       fill.current?.animate([{ transform: 'scaleX(1)' }, { transform: 'scaleX(0)' }], timing),
@@ -56,7 +79,7 @@ function useDrain(startedAt: number, endsAt: number, overdue: boolean, color: st
     const shift = track.current?.animate([{ color }, { color: AMBER }, { color: RED }], { duration: SHIFT_MS, easing: 'linear', fill: 'both' })
     if (shift) shift.currentTime = now - (endsAt - SHIFT_MS)
     return () => [...runs, shift].forEach((r) => r?.cancel())
-  }, [startedAt, endsAt, overdue, color])
+  }, [startedAt, endsAt, overdue, color, reduced])
   return { track, fill, edge }
 }
 
@@ -64,7 +87,7 @@ export function TimerBar({ t, now, showTarget }: { t: TimerView; now: number; sh
   const left = t.endsAt - now
   const overdue = left < 0
   const warning = !overdue && t.warnSec > 0 && left <= t.warnSec * 1000
-  const { track, fill, edge } = useDrain(t.startedAt, t.endsAt, overdue, t.color)
+  const { track, fill, edge } = useDrain(t.startedAt, t.endsAt, overdue, t.color, now)
   const [iconOk, setIconOk] = useState(true)
   return (
     <div className={`timer${warning ? ' warning' : ''}${overdue ? ' overdue' : ''}`} style={{ ['--c' as string]: t.color }}>

@@ -106,7 +106,7 @@ tells you little.
   thirds of it the damage meter).
 - **The log** also records, while fighting, the size of the damage meter's push every five minutes
   (`Meter push: 14 KB, 23 in the session…`), and any read or save of the log history cache that
-  takes over a quarter of a second, with its size. A source run's Optimize tab logs each faction
+  takes over a quarter of a second, with its size. A source run's Plan tab logs each faction
   plan's time to the window's console.
 
 ## Live
@@ -139,7 +139,7 @@ fighting near you, and everything hitting your side.
 - **Fights and sessions.** A fight opens on the first blow between your side and an enemy and
   closes when the last enemy it engaged dies, or after ten seconds without a blow (Settings). It is
   named after the mob that took the most ("a fetid fiend +2"). A session is everything since you
-  entered the zone, or pressed **New session**; the Overall figures read from it. Both are picked
+  entered the zone, or pressed **New session**; the Session figures read from it. Both are picked
   from the same list, newest first, and the meter keeps showing the last fight until the next
   begins.
 - **Damage, Incoming, Healing.** Damage lists who dealt what, with DPS over the fight, share, and
@@ -188,8 +188,8 @@ class can cast, and at what level, comes from `spells_us.txt`, up to the level c
 
 A buff counts as on you from its "you feel…" line, matched to the cast just before it, until its
 fade line or your death. Someone else's buff is timed at their `/who` level without their focus, so
-its real end can come later; the fade line is what counts. With **Show on overlays** on (Settings
-calls it **Buffs from my group**), it gets a bar on the buffs overlay and a spoken "… is fading, ask
+its real end can come later; the fade line is what counts. With **Buffs from my group on the overlays** on
+(here or in Settings), it gets a bar on the buffs overlay and a spoken "… is fading, ask
 <caster>" a minute before its earliest end. Songs and buffs under five minutes are left out.
 
 **Buffs you want** lists every class's buffs, the group's classes first, to pick from; by default
@@ -373,7 +373,7 @@ process) for the foreground window's process four times a second, and watches fo
 game closes, every timer is cleared. Overlays hidden with the game are sent nothing and slowed until they
 show again.
 
-The **Achievements** overlay (hidden until you switch it on, here, on Factions › Optimize or on the
+The **Achievements** overlay (hidden until you switch it on, here, on Factions › Plan or on the
 Achievements page) shows the achievements you track (the star on the Achievements page), then the step of the faction plan you follow, counting down as your factions move (what it still wants,
 about how long, and the next step), the Slayer achievements your kills of the last half hour
 counted toward, and the skills your skill achievements want that went up in that time. A step done is said aloud with the next, and each achievement it finishes flashes on
@@ -521,7 +521,7 @@ Without an export that is all the page has. A faction is marked **maxed** or **b
 game says so (until a change the other way) or its standing is at 2000 or -2000. Click a row for how
 its standing was reached and its last 20 changes, what moved it in your logs (each mob or NPC, how
 often and by how much, yours and your other characters'), and the quickest ways to take it to 2000
-as the Optimize tab reckons them. The log is read with casts, melee and purchases, in the same one
+as the Plan tab reckons them. The log is read with casts, melee and purchases, in the same one
 pass, and read on, with the export looked at again, every ten seconds while the page is open.
 
 **What does a mob or NPC do?** looks a name up: every mob or NPC in your logs (any of your
@@ -533,9 +533,9 @@ amber sets one back, red takes a faction further below zero.
 Wherever the app asks you to type an `/outputfile` command, the copy icon beside it puts it on the
 clipboard, to paste into the game's chat box.
 
-### Optimize: a plan for the achievements still to do
+### Plan: the achievements still to do
 
-The **Optimize** tab plans every faction achievement still open for the character picked, whoever
+The **Plan** tab plans every faction achievement still open for the character picked, whoever
 it is and however many it has done: the steps, each a zone and what to kill or hand in there, how
 many and about how long, in the order that finishes them all soonest. What is still to do, and where
 each faction stands, is the Standings tab's own view, read every ten seconds, so the plan follows
@@ -648,7 +648,7 @@ nothing about that. /who does not show your deity, so set it here. Every page us
 durations, AC and melee, gear and the upgrade finder, spell upgrades, buffs and faction cons. It is
 kept per character in `settings.json`. Four tabs:
 
-- **Character** reads the game's Inventory window, on its Stats tab, off the screen with Windows OCR
+- **Stats window** reads the game's Inventory window, on its Stats tab, off the screen with Windows OCR
   (**Read from screen**; this window steps aside for a moment while it looks), and shows each figure
   with the calculators' prediction beside it.
 - **AC** works out mitigation, the soft cap and avoidance the way the server does: worn AC from the
@@ -695,7 +695,7 @@ level slider scales them. Pages are kept a week; **Refresh item stats** fetches 
   comes from `spells_us.txt`, which items carry it from eqlwiki.
 - **Worn effects** and **Procs**: worth damage a minute against your own melee in the log; the stats
   a worn effect gives are priced by your weights.
-- **Gear optimizer**: the best way to wear what you own (worn, carried, banked, in Storage ›
+- **Gear optimiser**: the best way to wear what you own (worn, carried, banked, in Storage ›
   Equipment or on your pet), each piece tried in every slot it fits, both Any slots included, and
   the exaltations in Storage tried in pieces of their own kind. It moves one piece at a time into
   the slot where it adds most until no move adds anything. **All gear** adds the best pieces you
@@ -703,7 +703,7 @@ level slider scales them. Pages are kept a week; **Refresh item stats** fetches 
 - **Pet**: the best of what you own for your pet to wear, against what it wears now (the log's
   `/pet inventory check` list), with the pet's classes from its summon page on eqlwiki.
 
-The finder, the focus items and the optimizer need the wiki's item catalog: **Download the item
+The finder, the focus items and the optimiser need the wiki's item catalog: **Download the item
 catalog** reads every piece of equipment on eqlwiki (about a minute), and later refreshes, at most
 weekly, read only the pages edited since. Best merge is on the Upgrades page.
 

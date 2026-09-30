@@ -142,7 +142,7 @@ export function useFinderResults({
             value: d.effects.value
           }
         : undefined,
-      // In the round, the stat winners a focus loss would hide get their chance: the optimizer may keep the focus elsewhere.
+      // In the round, the stat winners a focus loss would hide get their chance: the optimiser may keep the focus elsewhere.
       perSlot: round ? 8 : 6,
       keepStatWinners: round
     })
@@ -160,7 +160,7 @@ export function useFinderResults({
     return { slots, round: round ? opts : null }
   }, [deferred, classes.length, mode])
 
-  // Judging in the round runs the optimizer once a candidate (some 150 ms in all), so it is done a
+  // Judging in the round runs the optimiser once a candidate (some 150 ms in all), so it is done a
   // slice at a time with the page free in between; the last results stay up, marked stale, meanwhile.
   const [judged, setJudged] = useState<{ of: NonNullable<typeof found>; slots: RoundSlot[] } | null>(null)
   useEffect(() => {

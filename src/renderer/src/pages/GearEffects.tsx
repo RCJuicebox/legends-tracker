@@ -10,7 +10,7 @@ import { Pending } from '../components/ui'
 
 // The Gear page's worn effects and procs tabs: what each one on gear the character owns or could get
 // does, what it is worth to them (melee from their own log, stats by their weights), and where to
-// find it. The finder and the optimizer count the same worth.
+// find it. The finder and the optimiser count the same worth.
 
 export type EffectKind = 'worn' | 'proc'
 
@@ -168,7 +168,7 @@ export function EffectsTab({ m, kind }: { m: GearModel; kind: EffectKind }) {
           {kind === 'worn'
             ? 'A worn effect works in any slot and counts once however many pieces carry it. What it adds to your melee is worth your role’s Weapon damage (1%) weight for each 1% of the melee damage you do now; the stats it gives count as they would on an item. A worn exaltation (slot 9) brings its item’s worn effect in place of the host’s.'
             : 'A proc fires only from a weapon in your hands. What it adds to your melee is worth your role’s Weapon damage (1%) weight for each 1% of the melee damage you do now. A proc exaltation (slot 10) brings its item’s proc in place of the host’s.'}{' '}
-          The finder and the optimizer count the same worth ({num(m.weights.ratio)} for each 1% of melee).
+          The finder and the optimiser count the same worth ({num(m.weights.ratio)} for each 1% of melee).
         </p>
       </div>
       {sections.map((s) => (

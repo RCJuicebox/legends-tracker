@@ -2,7 +2,7 @@ import { STANDING_MAX, STANDING_MIN } from './core'
 import { zoneKey, type FactionPlan, type PlanTarget } from './planner'
 import type { FactionTrackGoal, FactionTrackView, TrackKind } from '../../shared/tracking'
 
-// Following a faction plan while playing. The Optimize tab hands the plan it shows to the main
+// Following a faction plan while playing. The Plan tab hands the plan it shows to the main
 // process, which keeps it per character and, as the log moves factions, works out which step is being
 // worked on, how many kills or hand-ins it still wants, and when a step or an achievement is done, for
 // the achievements overlay and its cues. It needs no planning of its own: a step is done when the
@@ -30,7 +30,7 @@ export interface FollowStep {
 }
 
 export interface FollowedPlan {
-  /** When the Optimize tab worked it out. */
+  /** When the Plan tab worked it out. */
   at: number
   steps: FollowStep[]
   /** Achievement names by faction, where they differ. */
@@ -92,7 +92,7 @@ export const pickStep = (state: FollowState, index: number): FollowState => ({ .
 /** What a read finds worth saying: an achievement done, a step done (with the one to go on to). */
 export type FollowEvent = { kind: 'achievement'; faction: string; name: string } | { kind: 'step'; index: number; step: FollowStep; next: FollowStep | null }
 
-/** A plan as the Optimize tab shows it, to follow. */
+/** A plan as the Plan tab shows it, to follow. */
 export function followedPlan(plan: FactionPlan, targets: PlanTarget[], at = Date.now()): FollowedPlan {
   const names: Record<string, string> = {}
   for (const t of targets) if (t.achievement !== t.faction) names[t.faction] = t.achievement

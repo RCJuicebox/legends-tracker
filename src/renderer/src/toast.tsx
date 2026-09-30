@@ -14,6 +14,14 @@ interface Toast {
 
 let toasts: Toast[] = []
 let nextId = 0
+/** The pointer is on the toasts: none goes while someone may be reading it. */
+let hovering = false
+
+/** Takes a toast down when its time is up, or a moment later while the pointer rests on the toasts. */
+function expire(id: number): void {
+  if (hovering) setTimeout(() => expire(id), 1000)
+  else dismissToast(id)
+}
 const listeners = new Set<() => void>()
 
 function emit(): void {
@@ -22,6 +30,8 @@ function emit(): void {
 
 export function dismissToast(id: number): void {
   toasts = toasts.filter((t) => t.id !== id)
+  // The last one gone from under the pointer: no leave event comes, so the next toasts must not wait on it.
+  if (!toasts.length) hovering = false
   emit()
 }
 
@@ -29,7 +39,7 @@ export function showToast(text: ReactNode, opts: { tone?: Toast['tone']; action?
   const id = ++nextId
   toasts = [...toasts.slice(-3), { id, text, tone: opts.tone ?? 'info', action: opts.action }]
   emit()
-  setTimeout(() => dismissToast(id), opts.ms ?? (opts.action ? 8000 : 6000))
+  setTimeout(() => expire(id), opts.ms ?? (opts.action ? 8000 : 6000))
   return id
 }
 
@@ -83,7 +93,7 @@ function subscribe(l: () => void): () => void {
 export function Toasts() {
   const list = useSyncExternalStore(subscribe, () => toasts)
   return (
-    <div className="toasts" aria-live="polite">
+    <div className="toasts" aria-live="polite" onMouseEnter={() => (hovering = true)} onMouseLeave={() => (hovering = false)}>
       {list.map((t) => (
         <div key={t.id} className={`toast ${t.tone}`} role={t.tone === 'bad' ? 'alert' : undefined}>
           <span className="grow">{t.text}</span>

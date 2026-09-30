@@ -32,8 +32,8 @@ function MeterOptions({ o, onChange }: { o: OverlayConfig; onChange: (m: Partial
         </Field>
         <Field label="Of">
           <select value={m.span} onChange={(e) => onChange({ span: e.target.value as MeterOverlayOptions['span'] })}>
-            <option value="fight">The fight</option>
-            <option value="session">The session</option>
+            <option value="fight">Fight</option>
+            <option value="session">Session</option>
           </select>
         </Field>
       </div>
@@ -147,7 +147,7 @@ export function Overlays() {
                     Say when a faction plan step is done, and flash each achievement it finishes
                   </label>
                   <p className="faint small m-0">
-                    The step of the faction plan you follow (Factions › Optimize), counting down as your factions move; the Slayer achievements your last half hour of kills counted
+                    The step of the faction plan you follow (Factions › Plan), counting down as your factions move; the Slayer achievements your last half hour of kills counted
                     toward, on top of your achievements export; and the skills your skill achievements want that went up in that time. It shows nothing when there is nothing to
                     show.
                   </p>

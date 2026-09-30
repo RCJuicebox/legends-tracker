@@ -130,7 +130,7 @@ export function FocusTab({ m }: { m: GearModel }) {
             aria-label="Points for making every spell 10% better"
             onChange={(e) => m.setPoints(Math.max(0, Number(e.target.value) || 0))}
           />{' '}
-          points in the upgrade finder and the optimizer; spell range and reagents count a quarter as much. Tick the ones you want: {wantedCount} of {m.lines.length} are.
+          points in the upgrade finder and the optimiser; spell range and reagents count a quarter as much. Tick the ones you want: {wantedCount} of {m.lines.length} are.
         </p>
       </div>
 
@@ -177,7 +177,7 @@ function FocusRow({ m, l }: { m: GearModel; l: FocusLine }) {
   const castWord = m.report!.basis === 'casts'
   return (
     <div className={`lt-focus-row${on ? '' : ' off'}`}>
-      <label className="lt-focus-toggle" title={on ? 'Wanted: counts in the finder and the optimizer' : 'Not wanted'}>
+      <label className="lt-focus-toggle" title={on ? 'Wanted: counts in the finder and the optimiser' : 'Not wanted'}>
         <input type="checkbox" checked={on} aria-label={`Want ${l.label}`} onChange={() => m.setWanted([l.key], !on)} />
       </label>
       <div className="lt-focus-line">
@@ -192,7 +192,7 @@ function FocusRow({ m, l }: { m: GearModel; l: FocusLine }) {
           <label
             className="row tight small"
             style={{ marginTop: 4 }}
-            title="A rank that is enough for you: stronger ranks count for no more in the finder and the optimizer, so they stop chasing the best"
+            title="A rank that is enough for you: stronger ranks count for no more in the finder and the optimiser, so they stop chasing the best"
           >
             <span className="muted">Enough:</span>
             <select aria-label={`Enough for ${l.label}`} value={m.enough[l.key] ?? ''} onChange={(e) => m.setEnough(l.key, e.target.value || null)}>
@@ -647,10 +647,10 @@ function LockCard({
         </button>
         <Info
           label="About locking"
-          text="A piece locked into a slot stays there whatever the weights say, and the optimizer wears everything else around it; it may still put an exaltation from Storage in it. Lock what you wear below, or put any other piece you own in a slot. Locks are kept for this character until you unlock them, and a piece that moves between exports is found again by name. A lock goes unused when its piece cannot go there with the others: the same lore item twice, or a two-hander in Primary with Secondary locked."
+          text="A piece locked into a slot stays there whatever the weights say, and the optimiser wears everything else around it; it may still put an exaltation from Storage in it. Lock what you wear below, or put any other piece you own in a slot. Locks are kept for this character until you unlock them, and a piece that moves between exports is found again by name. A lock goes unused when its piece cannot go there with the others: the same lore item twice, or a two-hander in Primary with Secondary locked."
         />
         <span className="small muted">
-          {refs.length ? `${refs.length} locked${open ? '' : `: ${refs.map((r) => r.name).join(', ')}`}` : 'Lock a piece and the optimizer leaves it on and works around it.'}
+          {refs.length ? `${refs.length} locked${open ? '' : `: ${refs.map((r) => r.name).join(', ')}`}` : 'Lock a piece and the optimiser leaves it on and works around it.'}
         </span>
         <span className="grow" />
         {refs.length > 1 && (

@@ -17,7 +17,7 @@ import { useEffectsModel, type GearEffects } from './useEffectsModel'
 import { useCatalogPieces } from './useCatalogPieces'
 import { useFinderResults, type GearMode } from './useFinderResults'
 
-// Everything the upgrade finder, the focus effects tab and the optimizer work out, apart from how
+// Everything the upgrade finder, the focus effects tab and the optimiser work out, apart from how
 // they show it. Each concern is its own hook (the catalog, the character's weights, the catalog's
 // items, what is owned, focus effects, worn effects and procs, the optimizer's catalog pieces, the
 // finder's results); this puts them together.
@@ -26,7 +26,7 @@ export { AC_OVER_CAP } from './useCharacterWeights'
 
 export type { CatalogState, FocusData, FocusCandidate, GearEffects, GearMode, HandInfo, OwnedFocus }
 
-/** Everything the finder, the focus tab and the optimizer share. */
+/** Everything the finder, the focus tab and the optimiser share. */
 export interface GearModel {
   view: InventoryView
   classes: string[]
@@ -62,7 +62,7 @@ export interface GearModel {
   pieces: Piece[]
   /** How much each hand's weapon counts, from how often it swings; null when the log gives no Dual Wield skill. */
   hands: HandInfo | null
-  /** What the finder and the optimizer weigh the hands' weapon ratio by: `hands`, raised when weapons go by ratio first. */
+  /** What the finder and the optimiser weigh the hands' weapon ratio by: `hands`, raised when weapons go by ratio first. */
   weaponHands: HandWeights | null
   /** For the optimizer's all-gear mode: the best of what is not owned, slot by slot (empty on other tabs). */
   catalogPieces: Piece[]

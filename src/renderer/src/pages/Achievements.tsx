@@ -5,7 +5,7 @@ import { useRemembered } from '../remember'
 import { usePickedCharacter } from '../character'
 import { useAchievementTrack, useInvoke } from '../hooks'
 import { showError, showToast } from '../toast'
-import { Ago, GameCommand, Pending, Switch } from '../components/ui'
+import { Ago, FilterBox, GameCommand, Pending, Switch } from '../components/ui'
 import { useApp } from '../state'
 import { numExact as num, who } from '../../../core/format'
 import {
@@ -82,7 +82,9 @@ export function Achievements() {
     return new Map(rows.map((r) => [`${r.achievement}|${r.skill}`.toLowerCase(), r]))
   }, [track, view])
   const cats = useMemo(() => book?.categories() ?? [], [book])
-  const curCat = cats.includes(cat) ? cat : (cats[0] ?? '')
+  // Nothing picked yet: General, where the everyday ones are. The export lists Untapped Potential
+  // first, whose deity unlocks are the game's "Future Placeholder" rows.
+  const curCat = cats.includes(cat) ? cat : cats.includes('General') ? 'General' : (cats[0] ?? '')
   const catSections = book ? book.sections.map((s, si) => ({ s, si })).filter((x) => x.s.cat === curCat) : []
   const cur = catSections.find((x) => secKey(x.s) === sec) ?? catSections[0]
 
@@ -114,10 +116,19 @@ export function Achievements() {
     const after = new AchievementBook(view.sections, marks)
     const newlyDone: string[] = []
     after.sections.forEach((s, si) => s.ach.forEach((a, ai) => after.achDone([si, ai]) && !before.achDone([si, ai]) && newlyDone.push(a.n)))
-    for (const n of [...new Set(newlyDone)])
+    // One toast for a tick that finishes several (a section's last objective): the names in one.
+    const done = [...new Set(newlyDone)]
+    if (done.length === 1)
       toast(
         <>
-          You have completed the achievement: <b>{n}</b>
+          You have completed the achievement: <b>{done[0]}</b>
+        </>
+      )
+    else if (done.length > 1)
+      toast(
+        <>
+          You have completed {done.length} achievements: <b>{done.slice(0, 3).join(', ')}</b>
+          {done.length > 3 ? ` and ${done.length - 3} more` : ''}
         </>
       )
     setView({ ...view, marks })
@@ -286,14 +297,7 @@ export function Achievements() {
       </div>
 
       <div className="row ach-controls">
-        <input
-          className="grow"
-          type="search"
-          placeholder="Find an achievement or objective in any section"
-          aria-label="Find an achievement or objective"
-          value={q}
-          onChange={(e) => setQ(e.target.value)}
-        />
+        <FilterBox className="grow" placeholder="Find an achievement or objective in any section" label="Find an achievement or objective" value={q} onChange={setQ} />
         <button className={`btn${remaining ? ' on' : ' ghost'}`} aria-pressed={remaining} onClick={() => setRemaining(!remaining)}>
           Remaining only
         </button>

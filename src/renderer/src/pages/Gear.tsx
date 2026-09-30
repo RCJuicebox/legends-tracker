@@ -3,7 +3,7 @@ import { CharacterPicker } from '../components/CharacterPicker'
 import { api } from '../api'
 import { remember, useRemembered } from '../remember'
 import { showError } from '../toast'
-import { Ago, GameCommand, Pending, Tabs } from '../components/ui'
+import { Ago, FilterBox, GameCommand, Pending, Tabs } from '../components/ui'
 import { numExact as num, who, wikiUrl } from '../../../core/format'
 import { itemKey, mergeLevel, parseStatsBlock, placeLabel, slotLabel, storageTab, wornTotals, SAVE_KEYS, STAT_KEYS, type InvItem } from '../../../core/inventory'
 import type { CharacterSheet, InventoryView, ItemInfo } from '../../../shared/types'
@@ -66,7 +66,7 @@ const MODES: ['sheet' | GearMode, string][] = [
   ['focus', 'Focus items'],
   ['effects', 'Worn effects'],
   ['procs', 'Procs'],
-  ['optimize', 'Gear optimizer'],
+  ['optimize', 'Gear optimiser'],
   ['pet', 'Pet']
 ]
 
@@ -666,7 +666,7 @@ function Carried({ view }: { view: InventoryView }) {
             </button>
           ))}
         </span>
-        <input type="search" className="inv-search" placeholder="Find an item" aria-label="Find an item" value={q} onChange={(e) => setQ(e.target.value)} style={{ width: 200 }} />
+        <FilterBox className="inv-search" placeholder="Find an item" label="Find an item" value={q} onChange={setQ} width={200} />
       </div>
       <div className="lt-list">
         {shown.map((r, i) => (

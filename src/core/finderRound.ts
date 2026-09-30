@@ -23,11 +23,11 @@ export interface RoundResult {
   delta: number
   /** The slots that change, the candidate's own included. */
   moves: RoundMove[]
-  /** The slot the candidate lands in; null when the optimizer found no place worth putting it. */
+  /** The slot the candidate lands in; null when the optimiser found no place worth putting it. */
   placed: string | null
 }
 
-/** A catalog item as a piece the optimizer can place: it is carried, as if just looted. */
+/** A catalog item as a piece the optimiser can place: it is carried, as if just looted. */
 export function candidatePiece(item: CatalogItem, stats: ItemStats): Piece {
   const inv: InvItem = { location: 'Candidate', name: item.title, id: 0, count: 1, augs: [] }
   const worn = wornEffectOf(item.statsblock)
@@ -74,7 +74,7 @@ export function inTheRound(o: Omit<OptimizeOptions, 'pieces'> & { pieces: Piece[
 /**
  * An item the character owns, judged in the round. Its copies are already among what the baseline
  * weighs, so a fresh copy would count it twice; it is worth what the baseline loses without them.
- * That is nothing when the optimizer leaves it off, so the finder and the optimizer agree.
+ * That is nothing when the optimiser leaves it off, so the finder and the optimiser agree.
  */
 export function ownedInTheRound(o: Omit<OptimizeOptions, 'pieces' | 'from'> & { pieces: Piece[]; key: string; baseline: Plan }): RoundResult {
   const mine = (p: Piece | null) => !!p && p.key === o.key
@@ -90,7 +90,7 @@ export function ownedInTheRound(o: Omit<OptimizeOptions, 'pieces' | 'from'> & { 
   return { delta: Math.round(delta * 100) / 100, moves, placed: at >= 0 ? o.baseline.slots[at] : null }
 }
 
-/** The copy of an item the character owns at the highest merge level, among the pieces the optimizer weighs. */
+/** The copy of an item the character owns at the highest merge level, among the pieces the optimiser weighs. */
 export function bestOwned(pieces: Piece[], key: string): Piece | null {
   let best: Piece | null = null
   for (const p of pieces) if (p.key === key && p.stats && (!best || mergeLevel(p.item.name) > mergeLevel(best.item.name))) best = p
@@ -105,7 +105,7 @@ export type RoundSlot = Omit<SlotResult, 'candidates'> & { candidates: RoundCand
 
 /** One candidate among everything owned, worn as well as it can be: its worth is what the set gains. */
 export function judgeInTheRound(c: FinderCandidate, slot: string, opts: OptimizeOptions, baseline: Plan): RoundCandidate {
-  // One the character owns is already among the pieces: judged as their own copy, as the optimizer does.
+  // One the character owns is already among the pieces: judged as their own copy, as the optimiser does.
   const key = itemKey(c.item.title)
   const mine = !!bestOwned(opts.pieces, key)
   const r = mine ? ownedInTheRound({ ...opts, key, baseline }) : inTheRound({ ...opts, candidate: candidatePiece(c.item, c.stats), baseline })

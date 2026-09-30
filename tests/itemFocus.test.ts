@@ -133,7 +133,7 @@ describe('what worn foci are worth', () => {
   })
 })
 
-describe('Any slots and focus effects in the finder and the optimizer', () => {
+describe('Any slots and focus effects in the finder and the optimiser', () => {
   const page = (name: string, block: string, focus = '') =>
     `{{Classic Era}}\n<onlyinclude>{{Itempage\n|itemname    = ${name}\n|lucy_img_ID = 600\n|statsblock  = \n${block}\n${focus ? `|focus_effect = ${focus}\n` : ''}|dropsfrom = \n\n[[Nagafen's Lair]]\n\n}}</onlyinclude>`
   const item = (name: string, block: string, focus = '') => parseItemPage(name, page(name, block, focus))!

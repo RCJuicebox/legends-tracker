@@ -201,13 +201,13 @@ export function Flags({ a }: { a: PlanActivity }) {
   )
 }
 
-/** The plan's assumptions as the Optimize tab has them, for a page that only reads them. */
+/** The plan's assumptions as the Plan tab has them, for a page that only reads them. */
 export function usePlanSettings(logPace: number | null): PlanSettings {
   const [stored] = useRemembered<Partial<PlanSettings>>('factions.plan.settings', {})
   return useMemo(() => ({ ...DEFAULT_SETTINGS, killsPerHour: logPace ?? DEFAULT_SETTINGS.killsPerHour, ...stored }), [stored, logPace])
 }
 
-/** A character's locks, rule-outs and paces on the Optimize tab. */
+/** A character's locks, rule-outs and paces on the Plan tab. */
 export function useChoices(character: string): [PlanChoices, (c: PlanChoices) => void] {
   const [stored, set] = useRemembered<PlanChoices>(`factions.plan.${character}`, NO_CHOICES)
   const choices = useMemo<PlanChoices>(() => ({ locks: stored?.locks ?? {}, excluded: stored?.excluded ?? [], perHour: stored?.perHour ?? {} }), [stored])

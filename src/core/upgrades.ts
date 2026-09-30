@@ -367,7 +367,7 @@ export interface FinderOptions {
   /**
    * The stats of the best copy the character owns (at its merge level), by itemKey; null when none
    * is known. An owned candidate is judged as that copy, whatever `compare` says: it is the one they
-   * would put on, and the one the optimizer weighs.
+   * would put on, and the one the optimiser weighs.
    */
   ownedStats?: (key: string) => ItemStats | null
   focus?: FinderFocus

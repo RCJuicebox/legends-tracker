@@ -41,10 +41,10 @@ afterEach(() => {
 
 /**
  * Lets the faked clock run on, five seconds at a time, until `cond` holds. The disk is real, and slow
- * while other test files run: each step waits for it (event-loop turns, up to four real seconds in all).
+ * while other test files run: each step waits for it (event-loop turns, up to eight real seconds in all).
  */
 async function until(cond: () => boolean): Promise<void> {
-  const give = performance.now() + 4_000
+  const give = performance.now() + 8_000
   while (!cond() && performance.now() < give) {
     await vi.advanceTimersByTimeAsync(5_000)
     for (let j = 0; j < 20 && !cond(); j++) await new Promise<void>((r) => setImmediate(r))
@@ -64,7 +64,7 @@ describe('Allakhazam pages', () => {
     expect(fetched).toEqual([1, 3, 4, 2])
     // Written once reading stops.
     await until(() => kept() === 4)
-  })
+  }, 20_000)
 
   it('writes the pages read every ten, and the rest when reading stops', async () => {
     const onDisk: number[] = []
@@ -76,5 +76,5 @@ describe('Allakhazam pages', () => {
     expect(onDisk.slice(0, 10)).toEqual(Array(10).fill(0))
     expect(onDisk[10]).toBe(10)
     await until(() => kept() === 12)
-  })
+  }, 20_000)
 })

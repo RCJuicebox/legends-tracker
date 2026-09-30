@@ -63,7 +63,8 @@ export function CharacterTab({
   gear: WornTotals | null
 }) {
   const [busy, setBusy] = useState(false)
-  const [message, setMessage] = useState('')
+  // What the last read found, or why it failed: said plainly, not in the faintest text.
+  const [message, setMessage] = useState<{ text: string; bad: boolean } | null>(null)
   const w = s.window?.values ?? {}
   const has = !!s.window
   const ac = computeAc(acInputs(s, trio, primary, val, skill))
@@ -72,12 +73,15 @@ export function CharacterTab({
 
   const read = async () => {
     setBusy(true)
-    setMessage('')
+    setMessage(null)
     try {
       const r = await api.invoke('stats:readScreen')
       const found = Object.keys(r.values).length
       if (found < 5) {
-        setMessage(`Could not find the Stats window on ${r.screens} screen${r.screens === 1 ? '' : 's'}. Open your Inventory window on its Stats tab, uncovered, and try again.`)
+        setMessage({
+          bad: true,
+          text: `Could not find the Stats window on ${r.screens} screen${r.screens === 1 ? '' : 's'}. Open your Inventory window on its Stats tab, uncovered, and try again.`
+        })
         return
       }
       const v = r.values
@@ -88,9 +92,9 @@ export function CharacterTab({
         ...(v.Strength ? { strength: v.Strength[0] } : {}),
         ...(v.Dexterity ? { dexterity: v.Dexterity[0] } : {})
       })
-      setMessage(`Read ${found} lines. Strength, Agility and Dexterity on the AC and Combat tabs now follow it.`)
+      setMessage({ bad: false, text: `Read ${found} lines. Strength, Agility and Dexterity on the AC and Combat tabs now follow it.` })
     } catch (e) {
-      setMessage(`Could not read the screen: ${(e as Error).message}`)
+      setMessage({ bad: true, text: `Could not read the screen: ${(e as Error).message}` })
     } finally {
       setBusy(false)
     }
@@ -135,7 +139,11 @@ export function CharacterTab({
             'Open your Inventory window on its Stats tab in game, then read it. This window steps aside for a moment while it looks.'
           )}
         </span>
-        {message && <span className="small faint">{message}</span>}
+        {message && (
+          <div className={`notice small${message.bad ? ' bad' : ''}`} role={message.bad ? 'alert' : 'status'}>
+            {message.text}
+          </div>
+        )}
       </div>
 
       {!has ? (

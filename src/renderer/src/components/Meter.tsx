@@ -150,7 +150,7 @@ export function Meter({ standalone = false }: { standalone?: boolean }) {
           value={span}
           options={[
             ['fight', 'Fight'],
-            ['session', 'Overall']
+            ['session', 'Session']
           ]}
           onChange={setSpan}
           label="Fight or session"

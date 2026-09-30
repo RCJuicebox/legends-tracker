@@ -9,7 +9,7 @@ import type { InventoryView } from '../../../shared/types'
 import type { usePet } from './usePet'
 
 // What the character owns, the pet's gear included: item names for the finder's "owned" marks, the
-// pieces the optimizer arranges, and the exaltations kept in Storage.
+// pieces the optimiser arranges, and the exaltations kept in Storage.
 
 export function useOwnedGear({
   view,

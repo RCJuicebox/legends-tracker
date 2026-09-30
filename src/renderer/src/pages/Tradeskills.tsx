@@ -4,7 +4,7 @@ import { api, ago } from '../api'
 import { useInvoke, useItemInfo } from '../hooks'
 import { useRemembered } from '../remember'
 import { act, showError } from '../toast'
-import { Ago, ErrorText, GameCommand, Info, Pending } from '../components/ui'
+import { Ago, ErrorText, FilterBox, GameCommand, Info, Pending } from '../components/ui'
 import { wikiUrl } from '../../../core/format'
 import { fmtCoin } from '../../../core/loot'
 import { itemKey } from '../../../core/inventory'
@@ -190,13 +190,7 @@ export function Tradeskills() {
         ) : (
           <>
             <div className="row">
-              <input
-                placeholder="Find a recipe: distillate of clarity, elixir…"
-                aria-label="Find a recipe"
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                style={{ width: 360 }}
-              />
+              <FilterBox placeholder="Find a recipe: distillate of clarity, elixir…" label="Find a recipe" value={query} onChange={setQuery} width={360} />
               <span className="spacer" />
               <span className="faint small">
                 {book.length.toLocaleString()} recipes, <Ago t={rs.file.fetchedAt} />

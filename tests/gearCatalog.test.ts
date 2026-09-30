@@ -4,7 +4,7 @@ import { PRESETS } from './helpers'
 import { parseInventory } from '../src/core/inventory'
 import type { CatalogItem } from '../src/core/wikiItem'
 
-// The Gear optimizer's all-gear mode: what the character does not own that its classes may wear, the
+// The Gear optimiser's all-gear mode: what the character does not own that its classes may wear, the
 // best dozen per slot, as they drop or at the merge level of what is worn there.
 
 const item = (title: string, block: string, o: Partial<CatalogItem> = {}): CatalogItem => ({

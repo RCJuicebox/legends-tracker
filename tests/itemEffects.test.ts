@@ -203,7 +203,7 @@ describe('what an effect is worth', () => {
   })
 })
 
-describe('the optimizer and effects', () => {
+describe('the optimiser and effects', () => {
   const wearer = { classes: ['shd'], race: '', level: 50 }
   const weights: Weights = {
     ...PRESETS.Balanced,

@@ -1,3 +1,4 @@
+import { promises as fs } from 'node:fs'
 import { basename } from 'node:path'
 import { LogClock, parseLogLine, type LogLine } from '../../core/logLine'
 import { LogTailer } from '../../core/tailer'
@@ -394,6 +395,8 @@ export class Engine {
     this.tail = tail
     tail.tailer.start()
     this.status.watching = true
+    // Until a line comes, the last one is the file's last write: "Last line 5m ago", not "never".
+    this.status.lastLineAt = (await fs.stat(logFile).catch(() => null))?.mtimeMs ?? 0
     this.pushFeed('info', `Watching ${basename(logFile)}${zone ? ` in ${zone}` : ''}`)
     this.emitStatus()
     void this.seedCombat()

@@ -1,7 +1,7 @@
 import { planFactions, type FactionPlan, type PlanChoices, type PlanInput, type PlanSettings, type PlanShape } from './planner'
 
 // The faction planner, off the page's thread: a search can take a good part of a second, and the
-// Optimize tab would freeze while it ran. planRunner.ts on the page sends it the plan's inputs and
+// Plan tab would freeze while it ran. planRunner.ts on the page sends it the plan's inputs and
 // gets the plan back.
 
 export interface PlanRequest {

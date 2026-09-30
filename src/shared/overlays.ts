@@ -31,7 +31,7 @@ export const DEFAULT_OVERLAYS: OverlayConfig[] = [
     meter: { ...DEFAULT_METER_OPTIONS }
   },
   { id: OVERLAY_RESPAWNS, name: 'Respawns', kind: 'timers', x: 2040, y: 960, width: 340, height: 260, opacity: 1, fontSize: 15, visible: true, groupByTarget: false },
-  // The faction plan's step and the Slayer counts; hidden until asked for (the Optimize tab or the Overlays page).
+  // The faction plan's step and the Slayer counts; hidden until asked for (the Plan tab or the Overlays page).
   { id: OVERLAY_ACHIEVEMENTS, name: 'Achievements', kind: 'achievements', x: 40, y: 200, width: 360, height: 400, opacity: 1, fontSize: 14, visible: false, groupByTarget: false }
 ]
 
