@@ -3,6 +3,7 @@ import { day, timeOfDay } from '../../../core/format'
 import { api } from '../api'
 import { useInvoke, useItemInfo } from '../hooks'
 import { useRemembered } from '../remember'
+import { actDone } from '../toast'
 import { wikiUrl } from '../../../core/format'
 import { Ago, FilterBox, Icon, Info, Pending, ToggleChip } from '../components/ui'
 import { describeItem, fmtCoin, type LootEntry, type LootOutcome } from '../../../core/loot'
@@ -97,6 +98,13 @@ export function Loot() {
         <span className="spacer" />
         {view?.reading && <span className="chip warn">{view.reading}</span>}
         <span className="faint small">{view ? `${view.entries.length} item${view.entries.length === 1 ? '' : 's'} on record` : ''}</span>
+        <button
+          className="btn small"
+          onClick={() => void actDone('New session started.', 'combat:newSession')}
+          title="Close the current session and start a new one from now: loot from here on goes under it. Sessions are the damage meter's, so it starts one there too."
+        >
+          <Icon name="flag" /> New session
+        </button>
       </div>
 
       {!view ? (

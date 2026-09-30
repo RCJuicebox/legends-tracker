@@ -188,7 +188,7 @@ export function Factions() {
       </div>
 
       <div className="row mb-12">
-        <Tabs look="segmented" label="Factions view" value={viewing} onChange={setTab} tabs={VIEWS} />
+        <Tabs label="Factions view" value={viewing} onChange={setTab} tabs={VIEWS} />
       </div>
 
       {viewing === 'plan' ? (

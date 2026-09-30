@@ -212,7 +212,7 @@ export function Gear({ go, only, onPlan }: { go?: (page: PageId) => void; only?:
 
   const switcher = (
     <div className="row mb-12">
-      <Tabs look="segmented" label="Gear view" value={mode} onChange={setMode} tabs={MODES} />
+      <Tabs label="Gear view" value={mode} onChange={setMode} tabs={MODES} />
     </div>
   )
 

@@ -195,7 +195,7 @@ export function Settings({ go }: { go?: (page: PageId) => void }) {
             Entering a zone starts a new session
             <span className="faint small">
               the Overall figures then cover one zone or instance at a time; New session on the{' '}
-              <button className="link-button" onClick={() => go?.('meter')}>
+              <button className="link-button inline" onClick={() => go?.('meter')}>
                 Damage Meter
               </button>{' '}
               page splits by hand

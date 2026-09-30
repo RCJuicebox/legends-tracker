@@ -350,22 +350,20 @@ export function Info({ text, label = 'What this means' }: { text: ReactNode; lab
 
 /**
  * A row of tabs: one idiom for every page that has views. Keyboard as a tab list should be: the
- * arrow keys, Home and End move between tabs, and only the chosen one is in the Tab order. `look`
- * is buttons (a page's views) or segmented (a mode switch inside a page).
+ * arrow keys, Home and End move between tabs, and only the chosen one is in the Tab order. Always
+ * buttons, so a page's views never look like a choice inside it (`Segmented`).
  */
 export function Tabs<T extends string>({
   value,
   tabs,
   onChange,
   label,
-  look = 'buttons',
   className = ''
 }: {
   value: T
   tabs: readonly (readonly [T, string])[]
   onChange: (v: T) => void
   label: string
-  look?: 'buttons' | 'segmented'
   className?: string
 }) {
   const move = (e: React.KeyboardEvent, i: number) => {
@@ -378,7 +376,7 @@ export function Tabs<T extends string>({
     requestAnimationFrame(() => list?.querySelector<HTMLElement>(`[data-tab="${next}"]`)?.focus())
   }
   return (
-    <div role="tablist" aria-label={label} className={`${look === 'segmented' ? 'lt-seg' : 'row gap-6'} ${className}`.trim()}>
+    <div role="tablist" aria-label={label} className={`row gap-6 ${className}`.trim()}>
       {tabs.map(([id, text], i) => (
         <button
           key={id}
@@ -386,7 +384,7 @@ export function Tabs<T extends string>({
           data-tab={id}
           aria-selected={value === id}
           tabIndex={value === id ? 0 : -1}
-          className={look === 'segmented' ? (value === id ? 'on' : '') : `btn${value === id ? ' on' : ' ghost'}`}
+          className={`btn${value === id ? ' on' : ' ghost'}`}
           onClick={() => onChange(id)}
           onKeyDown={(e) => move(e, i)}
         >

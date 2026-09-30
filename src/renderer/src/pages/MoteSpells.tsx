@@ -2,6 +2,7 @@ import { useMemo } from 'react'
 import { useApp, useLive } from '../state'
 import { roman } from '../api'
 import { useInvoke } from '../hooks'
+import type { PageId } from '../main'
 import { useRemembered } from '../remember'
 import { CategoryChip, Info, NumberInput, Pending, SpellIcon } from '../components/ui'
 import { num, num1, pct } from '../../../core/format'
@@ -83,7 +84,7 @@ function PayWith({ o }: { o: SpellUpgradeOption }) {
   )
 }
 
-export function MoteSpells() {
+export function MoteSpells({ go }: { go?: (page: PageId) => void }) {
   const { state } = useApp()
   const spellsLoaded = useLive((l) => l.status.spellsLoaded)
   const [days, setDays] = useRemembered<number>('spellmotes.days', 14)
@@ -189,7 +190,15 @@ export function MoteSpells() {
             : 'No casts in your log for this window.'}{' '}
           {stock ? `Your motes are worth ${num(xp)} xp on spells.` : 'Motes on hand are not loaded yet, so nothing is marked affordable.'} Spend the low ranks here: on an item a
           mote only works at its own tier, but on a spell it always counts its xp. Every rank also takes −{UNIVERSAL.recovery}% recovery, −{UNIVERSAL.reuse}% reuse and −
-          {UNIVERSAL.resist} off the resist modifier of resistable spells.
+          {UNIVERSAL.resist} off the resist modifier of resistable spells. The duration a rank adds is{' '}
+          {go ? (
+            <button className="link-button inline" onClick={() => go('spells')}>
+              Spell Timers' Rank bonuses
+            </button>
+          ) : (
+            "Spell Timers' Rank bonuses"
+          )}
+          , which the timers go by too.
           {unknown.length > 0 &&
             ` Not spell-book spells (clickies, potions, abilities), so left out: ${unknown
               .slice(0, 5)

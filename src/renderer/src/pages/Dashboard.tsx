@@ -161,7 +161,7 @@ export function Dashboard({ go }: { go: (p: PageId) => void }) {
           <p className="muted small mt-0">
             Paste log lines to run them through the live tracker and triggers, with their times moved to now. To see which trigger a line matches and what it would say, without
             running it, use{' '}
-            <button className="link-button" onClick={() => go('triggers')}>
+            <button className="link-button inline" onClick={() => go('triggers')}>
               Test on the Triggers page
             </button>
             .

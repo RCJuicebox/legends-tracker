@@ -1,4 +1,5 @@
 import { remember } from '../remember'
+import { UPGRADES_TAB } from '../constants'
 import { useState } from 'react'
 import { useApp, useLive } from '../state'
 import { api, clock, ago, errorMessage } from '../api'
@@ -90,7 +91,7 @@ export function Spells({ go }: { go?: (page: PageId) => void }) {
         </div>
 
         <LogCheck known={known} onSaved={setKnown} />
-        <TierTable />
+        <TierTable go={go} />
       </div>
     </>
   )
@@ -691,7 +692,7 @@ function LogCheck({ known, onSaved }: { known: KnownSpell[]; onSaved: (k: KnownS
   )
 }
 
-function TierTable() {
+function TierTable({ go }: { go?: (page: PageId) => void }) {
   const { state, patchSettings } = useApp()
   const pct = state.settings.tracking.tierDurationPct
   const cats = ['dot', 'hot', 'buff', 'debuff', 'mez', 'charm'] as SpellCategory[]
@@ -705,7 +706,21 @@ function TierTable() {
       </h2>
       <p className="muted small mt-0">
         Duration bonus per rank, from the EQL spell upgrade guide: rank X is ten tiers, an unranked spell none. Confirmed in game for DoTs (Envenomed Bolt X 0:36 → 0:54) and buffs
-        (Spirit of the Puma X). Heal over time is fitted rather than from the guide: 7% matches Slugs Healing V's Spell window and log, where the guide's 5% does not.
+        (Spirit of the Puma X). Heal over time is fitted rather than from the guide: 7% matches Slugs Healing V's Spell window and log, where the guide's 5% does not.{' '}
+        {go ? (
+          <button
+            className="link-button inline"
+            onClick={() => {
+              remember(UPGRADES_TAB, 'spells')
+              go('upgrades')
+            }}
+          >
+            Upgrades › Spell upgrades
+          </button>
+        ) : (
+          'Upgrades › Spell upgrades'
+        )}{' '}
+        values a rank by these too.
       </p>
       <div className="grid three">
         {cats.map((c) => (

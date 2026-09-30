@@ -2393,6 +2393,16 @@ table.table {
   font-weight: 600;
   cursor: pointer;
 }
+/* The same within a sentence: a link to another page or tab. */
+.link-button.inline {
+  display: inline;
+  font: inherit;
+  font-weight: 600;
+  color: var(--accent-2);
+}
+.link-button.inline:hover {
+  text-decoration: underline;
+}
 /* A card heading that folds the card away. */
 .lt-collapse {
   display: inline-flex;

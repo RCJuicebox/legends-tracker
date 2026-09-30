@@ -30,11 +30,21 @@ export function Upgrades({ go }: { go?: (page: PageId) => void }) {
       <div className="page-head">
         <div>
           <h1>Upgrades</h1>
-          <p>{INTRO[tab]} Your motes on hand come from the Motes page and the Merge planner.</p>
+          <p>
+            {INTRO[tab]} Your motes on hand are kept in the{' '}
+            {tab === 'planner' ? (
+              'Merge planner'
+            ) : (
+              <button className="link-button inline" onClick={() => setTab('planner')}>
+                Merge planner
+              </button>
+            )}
+            : typed in, read from the screen, or added as you loot them.
+          </p>
         </div>
       </div>
       <Tabs className="mb-14" label="Upgrades view" value={tab} onChange={setTab} tabs={TABS} />
-      {tab === 'merge' ? <Gear only="merge" go={go} onPlan={() => setTab('planner')} /> : tab === 'planner' ? <MotePlanner /> : <MoteSpells />}
+      {tab === 'merge' ? <Gear only="merge" go={go} onPlan={() => setTab('planner')} /> : tab === 'planner' ? <MotePlanner /> : <MoteSpells go={go} />}
     </>
   )
 }
