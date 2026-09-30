@@ -90,6 +90,7 @@ What changed in each version. The release workflow publishes a version's section
 - **The faction plan's step on Live.** When you follow a faction plan, Live shows the step being worked on beside the fight and session cards. It gives the step and its zone, the kills or hand-ins left and about how long, what comes next and the time left in all. A click opens the Plan tab.
 - **The meter reads further back on request.** With nothing in the last hour of the log, the meter's empty page offers to read the last 3 hours.
 - **Merged gear counts its Void resist.** Merging gives an item with two or more of the seven stats and five resists a point of Void a level, as eqlwiki's merge slider has it. The tracker had counted none. Stats, the gear totals and the upgrade scores now include it: +107 Void on the test character's gear. A Stats window read the same day as an inventory export will show whether the game agrees.
+- **The title bar follows the theme, and the tray icon is sharp.** The window's minimise, maximise and close buttons stayed dark over the light theme. They now take the theme's colours and change with it. The tray icon is drawn for each display scale rather than blown up from 16 pixels.
 
 ## 2.4.0 (2026-09-29)
 

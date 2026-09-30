@@ -112,10 +112,19 @@ export class Windows {
       title: 'Legends Tracker',
       icon: this.opts.icon,
       titleBarStyle: 'hidden',
-      titleBarOverlay: { color: '#0f1117', symbolColor: '#9aa3b2', height: 38 },
+      titleBarOverlay: titleBarColours(),
       webPreferences: { preload: this.opts.preload, sandbox: true }
     })
     this.main = w
+    // The caption buttons follow the theme, as the page does: a light page under dark buttons looks broken.
+    const retint = () => {
+      if (!w.isDestroyed()) {
+        w.setTitleBarOverlay(titleBarColours())
+        w.setBackgroundColor(windowBackground())
+      }
+    }
+    nativeTheme.on('updated', retint)
+    w.on('closed', () => nativeTheme.off('updated', retint))
     w.on('ready-to-show', () => {
       if (place?.maximized) w.maximize()
       w.show()
@@ -186,7 +195,7 @@ export class Windows {
 
   /** The tray icon: click to open, right-click for the menu. */
   createTray(actions: TrayActions): void {
-    this.tray = new Tray(nativeImage.createFromPath(this.opts.icon).resize({ width: 16, height: 16 }))
+    this.tray = new Tray(trayImage(this.opts.icon))
     this.tray.setToolTip('Legends Tracker')
     const menu = () => {
       const update = actions.updateReady()
@@ -290,4 +299,23 @@ export class Windows {
 /** The main window's background before its page paints: the theme's --bg. */
 function windowBackground(): string {
   return nativeTheme.shouldUseDarkColors ? '#0d1115' : '#e8ebee'
+}
+
+/** The caption buttons' colours: the title bar's background and its quieter text, in the theme in use. */
+function titleBarColours(): { color: string; symbolColor: string; height: number } {
+  return nativeTheme.shouldUseDarkColors ? { color: '#0d1115', symbolColor: '#a9b4bf', height: 38 } : { color: '#e8ebee', symbolColor: '#3c4751', height: 38 }
+}
+
+/**
+ * The tray icon drawn from the large app icon at each scale Windows may ask for, so it is sharp at
+ * 125 to 200% rather than a 16-pixel picture blown up.
+ */
+function trayImage(path: string) {
+  const source = nativeImage.createFromPath(path)
+  const image = nativeImage.createEmpty()
+  for (const scaleFactor of [1, 1.25, 1.5, 2]) {
+    const size = Math.round(16 * scaleFactor)
+    image.addRepresentation({ scaleFactor, width: size, height: size, buffer: source.resize({ width: size, height: size, quality: 'best' }).toPNG() })
+  }
+  return image
 }
