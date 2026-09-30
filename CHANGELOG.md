@@ -89,6 +89,7 @@ What changed in each version. The release workflow publishes a version's section
 - **Small things that read better, again.** Stats window's ✓ and "calc" marks say in words what they compare ("The calculator gives 439 for the soft cap too"). Live says why Start watching is off, with a link to Settings. Changing the character log while watching says the watch moved ("Now watching …") in the feed and on Settings. Live's "Try it" card is **Try log lines** and Audio's is **Try the voice**. "Achievements to do" and the Hide optional button read the same whatever the section holds. Table headings, stat labels, sidebar groups, feed kinds and the meter's small print are 12 px, not 11.
 - **The faction plan's step on Live.** When you follow a faction plan, Live shows the step being worked on beside the fight and session cards. It gives the step and its zone, the kills or hand-ins left and about how long, what comes next and the time left in all. A click opens the Plan tab.
 - **The meter reads further back on request.** With nothing in the last hour of the log, the meter's empty page offers to read the last 3 hours.
+- **Merged gear counts its Void resist.** Merging gives an item with two or more of the seven stats and five resists a point of Void a level, as eqlwiki's merge slider has it. The tracker had counted none. Stats, the gear totals and the upgrade scores now include it: +107 Void on the test character's gear. A Stats window read the same day as an inventory export will show whether the game agrees.
 
 ## 2.4.0 (2026-09-29)
 

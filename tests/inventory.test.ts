@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { baseName, itemFoci, itemKey, mergeLevel, parseInventory, parseStatsBlock, scalePrimary, scaledStats, scaleWeight, wornTotals } from '../src/core/inventory'
+import { baseName, itemFoci, itemKey, mergeLevel, parseInventory, parseStatsBlock, scalePrimary, scaledStats, scaleWeight, voidFromMerge, wornTotals } from '../src/core/inventory'
 
 const EXPORT = [
   'Location\tName\tID\tCount\tSlots',
@@ -65,6 +65,16 @@ describe('item stats', () => {
     expect(c4).toMatchObject({ ac: 14, haste: 40, stats: { DEX: 13 }, pools: { HP: 70 }, saves: { FIRE: 21 } })
     expect(scaleWeight(4.5, 5)).toBe(2.5)
     expect(scaleWeight(0.1, 5)).toBe(0.1)
+  })
+
+  it('gives a merged item with two or more stats or resists a point of Void a level', () => {
+    // The cloak has DEX, AGI and Fire: +4 Void at +4, and none unmerged.
+    expect(scaledStats(cloak, 4).saves.VOID).toBe(4)
+    expect(scaledStats(cloak, 0).saves.VOID).toBeUndefined()
+    // HP and haste alone do not count: an item with one stat gains none.
+    const band = parseStatsBlock('Slot: WRIST<br>\nAC: 6<br>\nSTR: +3  HP: +40<br>\nHaste: +20%<br>\nWT: 1.0  Size: SMALL<br>')
+    expect(scaledStats(band, 6).saves.VOID).toBeUndefined()
+    expect(voidFromMerge(ring, 7)).toBe(7)
   })
 
   it('adds worn gear up, leaving ammo out of AC and taking the best haste', () => {

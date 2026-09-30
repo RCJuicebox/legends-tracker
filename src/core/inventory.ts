@@ -268,16 +268,32 @@ export function scaleWeight(base: number, n: number): number {
   return Math.max(0, Math.ceil(w * 10 - 1e-9) / 10)
 }
 
+/** The stats and saves that make a merged item gain Void resist, two or more of them (voidFromMerge). */
+const VOID_QUALIFIERS = { stats: ['STR', 'STA', 'INT', 'AGI', 'DEX', 'CHA', 'WIS'], saves: ['FIRE', 'COLD', 'POISON', 'MAGIC', 'DISEASE'] } as const
+
+/**
+ * Void resist a merge adds: +1 a merge level to an item with two or more of the seven stats and five
+ * resists, whether or not it has Void of its own (eqlwiki's slider, 2026-09-30).
+ */
+export function voidFromMerge(s: ItemStats, n: number): number {
+  if (n <= 0) return 0
+  const has = VOID_QUALIFIERS.stats.filter((k) => (s.stats[k] ?? 0) !== 0).length + VOID_QUALIFIERS.saves.filter((k) => (s.saves[k] ?? 0) !== 0).length
+  return has >= 2 ? n : 0
+}
+
 /** An item's stats at its merge level. */
 export function scaledStats(s: ItemStats, n: number): ItemStats {
   const map = <K extends string>(o: Partial<Record<K, number>>) =>
     Object.fromEntries(Object.entries(o).map(([k, v]) => [k, scalePrimary(v as number, n)])) as Partial<Record<K, number>>
+  const saves = map(s.saves)
+  const voidBonus = voidFromMerge(s, n)
+  if (voidBonus) saves.VOID = (saves.VOID ?? 0) + voidBonus
   return {
     ...s,
     ac: scalePrimary(s.ac, n),
     stats: map(s.stats),
     pools: map(s.pools),
-    saves: map(s.saves),
+    saves,
     haste: scaleFlat(s.haste, n),
     hpRegen: scaleFlat(s.hpRegen, n),
     manaRegen: scaleFlat(s.manaRegen, n),

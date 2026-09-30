@@ -56,8 +56,17 @@ Merge level N runs 0 to 10. `excelRound` rounds halves away from zero.
 | weapon damage | base + floor(base × N ÷ 10) |
 | haste, HP / mana / endurance regen | base + N |
 | weight | base × (1 − 0.09 × N), rounded up to 0.1; unchanged at 0.1 or less |
+| Void resist, on an item with two or more of the seven stats and five resists (Fire, Cold, Poison, Magic, Disease) | + N, whatever its own Void (added 2026-09-30) |
+| ATK | base: the slider leaves it unscaled (2026-09-30) |
 
-Implemented in `src/core/inventory.ts` `scaledStats`, using `scalePrimary`, `scaleDamage`, `scaleFlat` and `scaleWeight`.
+Implemented in `src/core/inventory.ts` `scaledStats`, using `scalePrimary`, `scaleDamage`, `scaleFlat`, `scaleWeight` and `voidFromMerge`.
+
+The Void and ATK rows are the slider's and not yet checked in play. Void is close to settled: the test
+character's worn gear (none of it with Void of its own) comes to +107 Void from merges on 2026-09-30,
+and a Stats window read on 2026-09-24, at lower merge levels, showed Void 124 where the other resists'
+bases were 23 to 44. *Settles it:* a Stats window read on the day of an inventory export, where Void
+should be the race's base plus the gear's merge levels on items that qualify. ATK: merge an item with
+ATK and read the Stats window's Attack before and after.
 
 ## AC: soft cap and mitigation
 
