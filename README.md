@@ -75,11 +75,17 @@ npm run build
 npm test
 ```
 
-`npm run check` runs the type-check, lint and tests together, as CI does. After `npm run build`,
-`npm run smoke` starts the app on a throwaway profile, checks its window answers, and quits it;
-`node scripts/smoke.mjs <path to the exe>` does the same for a packaged copy. `npm run dev` runs with
-hot reload. Settings live in `%APPDATA%\Legends Tracker`; [Your data](#your-data) lists every file.
+`npm run check` runs the type-check, lint, format check and tests together, as CI does. `npm run coverage`
+runs the tests with coverage and fails when a folder falls below its floor in `vitest.config.ts`
+(CI runs it too); `npm run bench` prints what each part of the engine costs a line. After
+`npm run build`, `npm run smoke` starts the app on a throwaway profile with a tiny game folder, checks
+its window answers and its mote worker reads a log, and quits it; `node scripts/smoke.mjs <path to the
+exe>` does the same for a packaged copy. `npm run dev` runs with hot reload. Settings live in `%APPDATA%\Legends Tracker`; [Your data](#your-data) lists every file.
 Setting `EQL_USER_DATA` to another folder runs against a separate profile.
+
+The game formulas the app relies on, each with the reading that settled it, are in
+[`docs/formulas.md`](docs/formulas.md); what changed in each version is in [`CHANGELOG.md`](CHANGELOG.md),
+whose Unreleased section becomes the next release's notes.
 
 ### Measuring
 
@@ -845,7 +851,9 @@ the sounds in `AudioTriggers`.
 | `src/main` | Electron main process: windows, tray, overlays, speech, icons, persistence, the engine that joins it all (`engine/`, with the contract its parts keep in `feature.ts`), the data sources and long jobs (`sources/`), IPC handlers by family (`ipc/`) |
 | `src/preload` | The IPC bridge, which lets a page use only the channels in the contract |
 | `src/renderer` | The React UI (`index.html`), timer and meter overlays (`overlay.html`), the alerts overlay without React (`alerts.html`), the hidden audio mixer (`audio.html`) |
-| `tests` | Vitest; fixtures are real rows from the client's spell files and real lines from the test character's log |
+| `tests` | Vitest; fixtures are real rows from the client's spell files and real lines from the test character's log. `*.bench.ts` are timing runs (`npm run bench`), not part of `npm test` |
+| `docs/formulas.md` | The game formulas, how each was measured or confirmed, and where the app implements it |
+| `scripts` | The release push, the release notes from the changelog, the smoke test, the icon renderer |
 | `defaults/triggers.json` | Triggers installed on first run |
 
 The lint (`npm run lint`; `npm run check` runs it with the type-check and tests) holds the layers
@@ -854,9 +862,9 @@ Electron nor another layer. Shared imports only types from core. The renderer im
 module, Electron, the main process or the preload. Main never imports the renderer. Type-only
 imports may cross, since they vanish at build.
 
-A feature module keeps one feature whole instead of spreading it over the layers: its three files
-each follow their own layer's rules (`core.ts` core's, `main.ts` main's, `page.tsx` the renderer's),
-so the page still cannot reach the main process. Its `main.ts` exports a `registerXxxIpc(ctx)` that
+A feature module keeps one feature whole instead of spreading it over the layers: its files each
+follow their own layer's rules by name (every `.tsx` the renderer's, `main.ts` and any `*Source.ts`
+main's, every other `.ts` core's), so a page still cannot reach the main process. Its `main.ts` exports a `registerXxxIpc(ctx)` that
 `src/main/index.ts` calls with the other IPC families, and its log-history consumer is added in
 `src/main/context.ts`; its page's entry in `src/features/index.ts` (id, group, label, icon and the
 page it follows) is where the sidebar puts it. Inside the engine the same idea runs the live log:

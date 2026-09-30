@@ -232,11 +232,11 @@ describe('Engine', () => {
     const notes = join(dir, 'notes.txt')
     await fs.writeFile(notes, 'keep me')
     const { engine } = makeEngine({ logFile: join(logs, 'eqlog_Kelwyn_neriak.txt') })
-    for (const r of [await engine.archiveNow(notes), await engine.archiveNow(join(dir, 'eqlog_Kelwyn_neriak.txt')), await engine.compressLoose(notes)]) {
+    for (const r of [await engine.archives.archiveNow(notes), await engine.archives.archiveNow(join(dir, 'eqlog_Kelwyn_neriak.txt')), await engine.archives.compressLoose(notes)]) {
       expect(r.status).toBe('failed')
     }
     // A character log, but not a loose one in the archive folder.
-    expect((await engine.compressLoose(join(logs, 'eqlog_Kelwyn_neriak.txt'))).status).toBe('failed')
+    expect((await engine.archives.compressLoose(join(logs, 'eqlog_Kelwyn_neriak.txt'))).status).toBe('failed')
     expect(await fs.readFile(notes, 'utf8')).toBe('keep me')
   })
 

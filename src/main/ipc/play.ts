@@ -7,32 +7,32 @@ import type { AppContext } from '../context'
 export function registerPlayIpc(ctx: AppContext): void {
   const { engine } = ctx
 
-  handle('combat:get', () => engine.combatSnapshot())
-  handle('combat:segment', (id) => (typeof id === 'string' ? engine.combatSegment(id) : null))
-  handle('combat:sessionTimeline', (id) => (typeof id === 'string' ? engine.sessionTimeline(id) : null))
-  handle('combat:newSession', () => engine.newCombatSession())
+  handle('combat:get', () => engine.combat.snapshot())
+  handle('combat:segment', (id) => (typeof id === 'string' ? engine.combat.segment(id) : null))
+  handle('combat:sessionTimeline', (id) => (typeof id === 'string' ? engine.combat.meter.sessionTimeline(id) : null))
+  handle('combat:newSession', () => engine.combat.newSession())
   handle('combat:addMember', (name) => {
     if (typeof name === 'string') engine.meter.addMember(name.slice(0, 64))
     engine.groupChanged()
-    return engine.combatSnapshot()
+    return engine.combat.snapshot()
   })
   handle('combat:removeMember', (name) => {
     if (typeof name === 'string') engine.meter.removeMember(name)
     engine.groupChanged()
-    return engine.combatSnapshot()
+    return engine.combat.snapshot()
   })
   handle('combat:clearGroup', () => {
     engine.meter.clearGroup()
     engine.groupChanged()
-    return engine.combatSnapshot()
+    return engine.combat.snapshot()
   })
   handle('combat:rebuild', (minutes) => engine.rebuildCombat(Math.max(1, Math.min(1440, Number(minutes) || 60))))
 
-  handle('loot:get', () => engine.lootView())
-  handle('respawns:get', () => engine.respawnView())
+  handle('loot:get', () => engine.combat.lootView())
+  handle('respawns:get', () => engine.combat.respawnView())
   handle('respawns:forget', (key) => {
     if (typeof key === 'string') engine.respawns.forget(key)
-    return engine.respawnView()
+    return engine.combat.respawnView()
   })
   handle('buffs:get', () => engine.buffView())
   handle('buffs:setWanted', (list) => engine.setWantedBuffs(Array.isArray(list) ? list.filter((x): x is string => typeof x === 'string').slice(0, 2000) : null))

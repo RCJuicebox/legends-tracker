@@ -75,7 +75,7 @@ describe('logs:reveal', () => {
   let installDir = game
   const ctx = {
     installDir: () => installDir,
-    engine: { archiveDir: () => archive }
+    engine: { archives: { archiveDir: () => archive } }
   } as unknown as AppContext
   registerLogIpc(ctx)
   // The app's main window, from its own renderer folder.

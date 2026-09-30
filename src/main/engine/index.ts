@@ -6,11 +6,9 @@ import { SpellBook, type Spell } from '../../core/spells'
 import { TimerBoard } from '../../core/timers'
 import { SpellTracker } from '../../core/spellTracker'
 import { TriggerEngine } from '../../core/triggers'
-import type { ArchiveOutcome } from '../../core/archiver'
 import { MoteTracker, moteName } from '../../core/motes'
 import { PetGearReader, petSummonName } from '../../core/pets'
 import type { BuffView } from '../../core/buffs'
-import type { RespawnView } from '../../core/respawns'
 import type { MyClass } from '../../core/spellMotes'
 import { CAST_BY_YOU } from '../../core/phrases'
 import { characterKey, characterName } from '../storeCore'
@@ -26,21 +24,8 @@ import { CombatFeed } from './combat'
 import { MoteCatchUp } from './moteCatchUp'
 import { Throttled } from './throttle'
 import type { EngineFeature } from './feature'
-import type {
-  AppSettings,
-  ArchiveStatus,
-  CharacterSettings,
-  CombatSnapshot,
-  FeedItem,
-  KnownSpell,
-  LogCheckRow,
-  Notification,
-  Segment,
-  SpellRule,
-  WatchStatus,
-  StitchedTimeline
-} from '../../shared/types'
-import type { EngineEnv, EngineOutputs, EngineStore, LootView, MoteView, Speaker } from './contracts'
+import type { AppSettings, ArchiveStatus, CharacterSettings, FeedItem, Notification, SpellRule, WatchStatus } from '../../shared/types'
+import type { EngineEnv, EngineOutputs, EngineStore, MoteView, Speaker } from './contracts'
 import { jobs } from '../sources/jobs'
 
 export type { AudioCommand, EngineEnv, EngineOutputs, EngineStore, LootView, MoteScanner, MoteView, Speaker } from './contracts'
@@ -82,9 +67,9 @@ export class Engine {
     logSize: 0
   }
   private readonly notifier: Notifier
-  private readonly queries: SpellQueries
+  readonly queries: SpellQueries
   private readonly buffs: BuffCoordinator
-  private readonly combat: CombatFeed
+  readonly combat: CombatFeed
   private readonly moteHistory: MoteCatchUp
   private readonly petReader: PetGearReader
   private readonly timersOut: Throttled
@@ -186,7 +171,7 @@ export class Engine {
         },
         settling: () => this.starting || (!!this.tail && this.tail.start < 0)
       },
-      archiveDir: () => this.archiveDir(),
+      archiveDir: () => this.archives.archiveDir(),
       gameRunning: () => this.archive.gameRunning,
       changed: () => this.motesOut.mark()
     })
@@ -586,58 +571,14 @@ export class Engine {
     this.buffs.groupChanged()
   }
 
-  respawnView(): RespawnView {
-    return this.combat.respawnView()
-  }
-
   /** The Respawns page shows which mobs have timers, so it hears when the triggers change. */
   triggersChanged(): void {
     this.combat.triggersChanged()
   }
 
-  lootView(): LootView {
-    return this.combat.lootView()
-  }
-
-  combatSnapshot(): CombatSnapshot {
-    return this.combat.snapshot()
-  }
-
-  combatSegment(id: string): Segment | null {
-    return this.combat.segment(id)
-  }
-
-  sessionTimeline(id: string): StitchedTimeline | null {
-    return this.combat.meter.sessionTimeline(id)
-  }
-
-  newCombatSession(): CombatSnapshot {
-    return this.combat.newSession()
-  }
-
   // ---- spells ----
 
-  knownSpells(): KnownSpell[] {
-    return this.queries.knownSpells()
-  }
-
-  checkLog(megabytes: number): Promise<LogCheckRow[]> {
-    return this.queries.checkLog(megabytes)
-  }
-
   // ---- log management (ArchiveManager) ----
-
-  archiveDir(): string {
-    return this.archives.archiveDir()
-  }
-
-  archiveNow(logPath: string): Promise<ArchiveOutcome> {
-    return this.archives.archiveNow(logPath)
-  }
-
-  compressLoose(path: string): Promise<ArchiveOutcome> {
-    return this.archives.compressLoose(path)
-  }
 
   /** Auto-archives any character log over the size threshold; never rejects. */
   async archiveCheck(): Promise<void> {
@@ -646,10 +587,6 @@ export class Engine {
     } catch (e) {
       log.error('The automatic archive check failed:', e)
     }
-  }
-
-  logsOverview() {
-    return this.archives.overview()
   }
 
   /**

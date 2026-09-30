@@ -63,12 +63,12 @@ export function registerTriggerIpc(ctx: AppContext): void {
     const existing = list.find((t) => t.id === id)
     const trigger = respawnTrigger(spec, existing)
     ctx.saveTriggers(existing ? list.map((t) => (t.id === id ? trigger : t)) : [...list, trigger])
-    return engine.respawnView()
+    return engine.combat.respawnView()
   })
   handle('respawns:removeTimer', (name) => {
     if (typeof name !== 'string') throw new Error('Not a name.')
     const id = respawnTriggerId(name)
     ctx.saveTriggers(store.triggers.get().filter((t) => t.id !== id))
-    return engine.respawnView()
+    return engine.combat.respawnView()
   })
 }

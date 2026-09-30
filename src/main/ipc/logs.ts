@@ -18,13 +18,13 @@ export function registerLogIpc(ctx: AppContext): void {
   const { engine } = ctx
 
   handle('logs:list', () => listLogs(ctx.installDir()))
-  handle('logs:overview', () => engine.logsOverview())
-  handle('logs:archive', (path) => engine.archiveNow(path))
-  handle('logs:compress', (path) => engine.compressLoose(path))
+  handle('logs:overview', () => engine.archives.overview())
+  handle('logs:archive', (path) => engine.archives.archiveNow(path))
+  handle('logs:compress', (path) => engine.archives.compressLoose(path))
   // Only a file in the game's Logs folder or the archive folder is shown; anything else opens the archive folder.
   handle('logs:reveal', (path) => {
     const installDir = ctx.installDir()
-    const archive = engine.archiveDir()
+    const archive = engine.archives.archiveDir()
     const allowed = typeof path === 'string' && !!path && ((!!installDir && isInside(join(installDir, 'Logs'), path)) || isInside(archive, path))
     if (allowed && existsSync(path)) return shell.showItemInFolder(path)
     // openPath runs a file: only ever a folder.

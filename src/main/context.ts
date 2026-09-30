@@ -285,7 +285,7 @@ export function createContext(): AppContext {
   // file in the game's Logs folder.
   ctx.historyOf = (character) => ({
     logPath: characterLogFile(character, ctx.characterKey(), store.settings.get().logFile, installDir()),
-    archiveDir: ctx.engine.archiveDir(),
+    archiveDir: ctx.engine.archives.archiveDir(),
     stem: logStem(character)
   })
   // After everything the engine has of its own: it reads the standings and the log as they settle.
@@ -378,7 +378,7 @@ export function createContext(): AppContext {
     if (!store.settings.get().hotkeys) return
     for (const [accel, run] of [
       [HOTKEYS.mute, () => ctx.toggleMute()],
-      [HOTKEYS.newSession, () => void ctx.engine.newCombatSession()],
+      [HOTKEYS.newSession, () => void ctx.engine.combat.newSession()],
       [HOTKEYS.arrange, () => ctx.setArranging(!ctx.overlays.isArranging)]
     ] as const) {
       if (!globalShortcut.register(accel, run)) ctx.hotkeysTaken.push(accel)

@@ -140,7 +140,7 @@ describe('twenty minutes of real play, read by the Engine', () => {
   })
 
   it('respawns: the mobs killed, and the gaps seen', () => {
-    const rows = engine.respawnView().rows.map((r) => `${r.zone} / ${r.name}: ${r.kills} kills, gaps ${r.gaps.join(' ') || '-'}${r.shared ? ', shared name' : ''}`)
+    const rows = engine.combat.respawnView().rows.map((r) => `${r.zone} / ${r.name}: ${r.kills} kills, gaps ${r.gaps.join(' ') || '-'}${r.shared ? ', shared name' : ''}`)
     expect(rows.sort()).toMatchSnapshot()
   })
 

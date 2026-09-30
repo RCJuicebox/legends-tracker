@@ -12,7 +12,7 @@ import type { AppContext } from '../context'
 export function registerSpellIpc(ctx: AppContext): void {
   const { store, engine } = ctx
 
-  handle('spells:known', () => engine.knownSpells())
+  handle('spells:known', () => engine.queries.knownSpells())
   handle('spells:search', (q) => engine.book?.search(textArg(q, 100)).map(summarize) ?? [])
   handle('spells:rule', (name, input) => {
     if (!isRecordKey(name, 100)) throw new Error('Not a spell.')
@@ -22,10 +22,10 @@ export function registerSpellIpc(ctx: AppContext): void {
     else delete rules[name]
     store.rules.set(rules)
     engine.reconfigure()
-    return engine.knownSpells()
+    return engine.queries.knownSpells()
   })
   // Megabytes of the log to read back: the page offers up to a few hundred.
-  handle('spells:checkLog', (mb) => engine.checkLog(intArg(mb, 1, 2048, 100)))
+  handle('spells:checkLog', (mb) => engine.queries.checkLog(intArg(mb, 1, 2048, 100)))
   // Duration focus effects from the spell book, e.g. "Extended Enhancement II", with their limits.
   handle('focus:search', (q) =>
     (engine.book?.search(textArg(q, 100), 200, true) ?? [])
@@ -43,7 +43,7 @@ export function registerSpellIpc(ctx: AppContext): void {
     if (!isCharacterKey(key)) return { rows: [], unknown: [], window: null, mine: [] }
     const recent = await ctx.castHistory.recent({
       logPath: logFileFor(ctx.installDir(), key),
-      archiveDir: engine.archiveDir(),
+      archiveDir: engine.archives.archiveDir(),
       stem: logStem(key),
       days: intArg(days, 0, 3650, 14)
     })
