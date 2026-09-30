@@ -97,7 +97,8 @@ export class OverlayManager {
       if (!c.visible) continue
       const win = this.windows.get(c.id) ?? this.create(c)
       if (!this.arranging) win.setBounds(onScreen(c))
-      win.setOpacity(c.opacity)
+      // The alerts' text fades as a whole; the others fade their panel alone, on the page (opacityStyle).
+      win.setOpacity(c.kind === 'alerts' ? c.opacity : 1)
       push(win.webContents, 'overlay:config', { config: c, arranging: this.arranging })
     }
     this.keepOnTop()

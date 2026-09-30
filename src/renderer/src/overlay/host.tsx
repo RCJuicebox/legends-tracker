@@ -7,6 +7,7 @@ import { TimerBars } from '../components/TimerBars'
 import { AchievementsRegion, AlertsRegion, MeterOverlay } from './regions'
 import type { CombatSnapshot, OverlayConfig, TimerView } from '../../../shared/types'
 import type { AchievementTrack } from '../../../shared/tracking'
+import { opacityStyle } from '../../../shared/overlays'
 
 // The overlays on one monitor, each a region of one transparent window over the game: one
 // renderer instead of one per overlay. The window covers just their area; `origin` is where its
@@ -24,7 +25,7 @@ const Region = memo(function Region(p: { c: OverlayConfig; origin: { x: number; 
   return (
     <div
       className="host-region"
-      style={{ left: Math.round(c.x) - origin.x, top: Math.round(c.y) - origin.y, width: Math.round(c.width), height: Math.round(c.height), opacity: c.opacity }}
+      style={{ left: Math.round(c.x) - origin.x, top: Math.round(c.y) - origin.y, width: Math.round(c.width), height: Math.round(c.height), ...opacityStyle(c) }}
     >
       <div className="overlay">
         {c.kind === 'timers' ? (

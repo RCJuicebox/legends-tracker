@@ -12,7 +12,7 @@ import {
   type Trigger,
   type TriggerAction
 } from '../shared/types'
-import { DEFAULT_METER_OPTIONS } from '../shared/overlays'
+import { DEFAULT_METER_OPTIONS, minOpacity } from '../shared/overlays'
 import type { RespawnRecords, RespawnTimerSpec } from './respawns'
 import { MOTE_RANKS, type MoteSession, type MoteState } from './motes'
 import type { ActiveBuff, BuffsFile, Person } from './buffs'
@@ -213,7 +213,7 @@ function overlay(v: unknown, fb: OverlayConfig | undefined): OverlayConfig | nul
     y: num(v.y, base.y, -100_000, 100_000),
     width: num(v.width, base.width, 40, 20_000),
     height: num(v.height, base.height, 40, 20_000),
-    opacity: num(v.opacity, base.opacity, 0.05, 1),
+    opacity: num(v.opacity, base.opacity, minOpacity(kind), 1),
     fontSize: num(v.fontSize, base.fontSize, 6, 200),
     visible: bool(v.visible, base.visible),
     groupByTarget: bool(v.groupByTarget, base.groupByTarget)

@@ -41,6 +41,18 @@ body,
   font-weight: 700;
   font-size: 12px;
 }
+/* Ends arranging from the overlay itself; a button in a draggable window must opt out of the drag. */
+.arrange-label button {
+  -webkit-app-region: no-drag;
+  margin-left: 8px;
+  padding: 1px 8px;
+  border: 1px solid currentColor;
+  border-radius: 4px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
 .alerts {
   display: flex;
   flex-direction: column;

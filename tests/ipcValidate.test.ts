@@ -66,7 +66,10 @@ describe('settings from a page', () => {
         installDir: 7,
         audio: { ...s.audio, masterVolume: 5, speechVolume: -1, soundVolume: Number.NaN, rate: 9 },
         tracking: { ...s.tracking, buffWarnSec: -3, tierDurationPct: { ...s.tracking.tierDurationPct, dot: 'lots' } },
-        overlays: [{ ...s.overlays[0], opacity: 0, fontSize: 1000, width: 'wide' }]
+        overlays: [
+          { ...s.overlays[0], opacity: -1, fontSize: 1000, width: 'wide' },
+          { ...s.overlays[2], opacity: 0 }
+        ]
       },
       current
     )!
@@ -78,7 +81,9 @@ describe('settings from a page', () => {
     expect(out.audio.rate).toBe(2)
     expect(out.tracking.buffWarnSec).toBe(0)
     expect(out.tracking.tierDurationPct.dot).toBe(current.tracking.tierDurationPct.dot)
-    expect(out.overlays[0].opacity).toBe(0.05)
+    // A panel may fade to nothing; the alerts are text alone and keep a fifth.
+    expect(out.overlays[0].opacity).toBe(0)
+    expect(out.overlays[1]).toMatchObject({ kind: 'alerts', opacity: 0.2 })
     expect(out.overlays[0].fontSize).toBe(200)
     expect(out.overlays[0].width).toBe(current.overlays[0].width)
   })

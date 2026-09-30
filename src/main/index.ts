@@ -19,6 +19,7 @@ import { appUserModelId, ensureSourceShortcut } from './appIdentity'
 import { appIcon } from './bootstrap'
 import { isOwnPage } from './push'
 import { log, logDir } from './log'
+import { defaultPlacement } from '../shared/overlays'
 
 if (primaryInstance) {
   // Building the context reads every settings file; a throw there must end this copy, not leave a
@@ -129,15 +130,6 @@ async function start(ctx: AppContext): Promise<void> {
 function placeOverlaysForNewInstall(ctx: AppContext): void {
   const a = screen.getPrimaryDisplay().workArea
   const s = ctx.store.settings.get()
-  const place: Record<string, { x: number; y: number; width: number; height: number }> = {
-    alerts: { x: a.x + Math.round(a.width / 2) - 400, y: a.y + Math.round(a.height * 0.18), width: 800, height: 180 },
-    buffs: { x: a.x + a.width - 720, y: a.y + Math.round(a.height * 0.3), width: 340, height: 420 },
-    targets: { x: a.x + a.width - 370, y: a.y + Math.round(a.height * 0.3), width: 340, height: 420 },
-    meter: { x: a.x + 40, y: a.y + a.height - 360, width: 380, height: 300 },
-    // Under the buffs, kept above the bottom edge on a short screen.
-    respawns: { x: a.x + a.width - 720, y: Math.min(a.y + Math.round(a.height * 0.3) + 440, a.y + a.height - 270), width: 340, height: 260 },
-    // Upper left, clear of the meter below it.
-    achievements: { x: a.x + 40, y: a.y + Math.round(a.height * 0.18), width: 360, height: 400 }
-  }
+  const place = defaultPlacement(a)
   ctx.store.settings.set({ ...s, overlays: s.overlays.map((o) => (place[o.id] ? { ...o, ...place[o.id] } : o)) })
 }

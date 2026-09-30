@@ -272,12 +272,17 @@ export function AchievementsRegion({ config, track, arranging }: { config: Overl
       .values()
   ].sort((a, b) => b.last - a.last)
   const step = plan?.current ?? null
+  // Shown on purpose and empty would look broken; one faint line says what it waits for.
   if (!tracked.length && !plan && !slayer.length && !skills.length)
-    return arranging ? (
-      <div className="ach-ov">
-        <div className="ach-ov-empty">The faction plan&apos;s step and the Slayer counts your kills move show here.</div>
+    return (
+      <div className="ach-ov" style={style}>
+        <div className="ach-ov-empty">
+          {arranging
+            ? 'Tracked achievements, the faction plan’s step, and the Slayer counts and skills your kills move show here.'
+            : 'Nothing tracked. Track an achievement, or show your faction plan here from Factions › Plan.'}
+        </div>
       </div>
-    ) : null
+    )
   return (
     <div className="ach-ov" style={style}>
       {tracked.length > 0 && (

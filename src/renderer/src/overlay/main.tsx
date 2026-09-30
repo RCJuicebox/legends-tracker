@@ -6,6 +6,7 @@ import { TimerBars } from '../components/TimerBars'
 import { AchievementsRegion, MeterOverlay } from './regions'
 import type { CombatSnapshot, OverlayConfig, TimerView } from '../../../shared/types'
 import type { AchievementTrack } from '../../../shared/tracking'
+import { opacityStyle } from '../../../shared/overlays'
 
 // One overlay in a window of its own: how the overlays are drawn while being arranged. While
 // playing they share a host window per monitor instead (host.tsx).
@@ -34,7 +35,7 @@ function Overlay() {
   if (!config) return null
   const mine = timers.filter((t) => t.overlay === config.id)
   return (
-    <div className={`overlay${arranging ? ' arranging' : ''}`}>
+    <div className={`overlay${arranging ? ' arranging' : ''}`} style={opacityStyle(config)}>
       {config.kind === 'timers' ? (
         <TimerBars timers={mine} grouped={config.groupByTarget} fontSize={config.fontSize} />
       ) : config.kind === 'meter' ? (
@@ -42,7 +43,12 @@ function Overlay() {
       ) : config.kind === 'achievements' ? (
         <AchievementsRegion config={config} track={track} arranging={arranging} />
       ) : null}
-      {arranging && <div className="arrange-label">{config.name} — drag to move, drag edges to resize</div>}
+      {arranging && (
+        <div className="arrange-label">
+          {config.name} — drag to move, drag edges to resize
+          <button onClick={() => void api.invoke('overlays:arrange', false)}>Done</button>
+        </div>
+      )}
     </div>
   )
 }

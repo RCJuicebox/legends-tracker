@@ -987,8 +987,8 @@ table.table {
   height: calc(var(--fs) * 1.95);
   padding-right: 8px;
   border-radius: 6px;
-  background: rgba(10, 12, 18, 0.72);
-  box-shadow: 0 0 0 1px rgb(var(--ink) / 0.06) inset;
+  background: rgb(10 12 18 / calc(0.72 * var(--ov-panel, 1)));
+  box-shadow: 0 0 0 1px rgb(var(--ink) / calc(0.06 * var(--ov-panel, 1))) inset;
 }
 /* The fill is scaled and its bright edge slid, never resized: a tick costs no layout. Both paint in
    the track's colour, the timer's own until its last seconds shift it to amber and red. */
@@ -1137,6 +1137,18 @@ table.table {
   color: var(--on-accent);
   font-weight: 700;
   font-size: 12px;
+}
+/* Ends arranging from the overlay itself; a button in a draggable window must opt out of the drag. */
+.overlay .arrange-label button {
+  -webkit-app-region: no-drag;
+  margin-left: 8px;
+  padding: 1px 8px;
+  border: 1px solid currentColor;
+  border-radius: 4px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
 }
 /* ---------- achievements ---------- */
 
@@ -3070,8 +3082,8 @@ button.tree-item {
   min-height: 0;
   font-size: var(--fs);
   border-radius: 8px;
-  background: rgba(10, 12, 18, 0.72);
-  box-shadow: 0 0 0 1px rgb(var(--ink) / 0.06) inset;
+  background: rgb(10 12 18 / calc(0.72 * var(--ov-panel, 1)));
+  box-shadow: 0 0 0 1px rgb(var(--ink) / calc(0.06 * var(--ov-panel, 1))) inset;
   color: #fff;
   overflow: hidden;
 }
@@ -3581,8 +3593,8 @@ input[aria-invalid='true'] {
   font-size: var(--fs);
   line-height: 1.3;
   border-radius: 8px;
-  background: rgba(10, 12, 18, 0.72);
-  box-shadow: 0 0 0 1px rgb(var(--ink) / 0.06) inset;
+  background: rgb(10 12 18 / calc(0.72 * var(--ov-panel, 1)));
+  box-shadow: 0 0 0 1px rgb(var(--ink) / calc(0.06 * var(--ov-panel, 1))) inset;
   color: #fff;
   overflow: hidden;
   text-shadow: 0 1px 1px rgba(0, 0, 0, 0.6);

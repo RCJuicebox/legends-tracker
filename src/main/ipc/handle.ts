@@ -13,7 +13,9 @@ const OVERLAY_PAGES: readonly PageName[] = ['index', 'overlay', 'overlays']
 const INVOKE_PAGES: Partial<Record<InvokeChannel, readonly PageName[]>> = {
   'overlay:hostState': OVERLAY_PAGES,
   'combat:newSession': OVERLAY_PAGES,
-  'combat:segment': OVERLAY_PAGES
+  'combat:segment': OVERLAY_PAGES,
+  // Done on an overlay being arranged: the overlay alone, or the alerts.
+  'overlays:arrange': ['index', 'overlay', 'alerts']
 }
 
 export function handle<K extends InvokeChannel>(channel: K, fn: (...args: Parameters<Invokes[K]>) => InvokeResult<K> | Promise<InvokeResult<K>>): void {

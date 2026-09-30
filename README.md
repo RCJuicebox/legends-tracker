@@ -368,7 +368,9 @@ instead, so no cue is lost.
 
 Transparent windows that let clicks through, never take focus (EverQuest drops keyboard input the
 moment it loses focus), stay out of Alt-Tab, and re-assert always-on-top every two seconds. The game
-must be windowed or borderless. **Arrange** lifts all of that so they can be dragged and resized.
+must be windowed or borderless. **Arrange** lifts all of that so they can be dragged and resized;
+**Done** on any of them, or Arrange again, puts them back. An overlay's **Background** slider fades
+the dark panel behind its text and bars, down to none; the alerts, text alone, fade as a whole.
 Timer bars sort soonest-first and can group under each target's name. A meter overlay is the damage
 meter's list; Windows keeps forwarding mouse moves to it while it ignores clicks, so hovering its
 header hands it the mouse for its controls and moving off hands it back.

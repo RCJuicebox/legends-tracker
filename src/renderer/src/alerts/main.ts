@@ -42,6 +42,10 @@ function draw(): void {
     const label = document.createElement('div')
     label.className = 'arrange-label'
     label.textContent = `${config.name} — drag to move, drag edges to resize`
+    const done = document.createElement('button')
+    done.textContent = 'Done'
+    done.onclick = () => void api.invoke('overlays:arrange', false)
+    label.append(done)
     frame.append(label)
   }
   root.replaceChildren(frame)

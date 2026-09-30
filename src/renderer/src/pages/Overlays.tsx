@@ -3,7 +3,7 @@ import { act } from '../toast'
 import { BUILTIN_OVERLAYS } from '../constants'
 import { ConfirmButton, Field, Icon, NumberInput, Switch } from '../components/ui'
 import type { MeterOverlayOptions, OverlayConfig } from '../../../shared/types'
-import { DEFAULT_METER_OPTIONS } from '../../../shared/overlays'
+import { DEFAULT_METER_OPTIONS, minOpacity, newOverlaySpot } from '../../../shared/overlays'
 
 /** The middle of the screen this window is on, sized to fit it. */
 function bringOnScreen(o: OverlayConfig): Partial<OverlayConfig> {
@@ -129,8 +129,16 @@ export function Overlays() {
                 <Field label={o.kind === 'timers' ? 'Bar text size' : 'Text size'}>
                   <NumberInput value={o.fontSize} min={9} max={72} onChange={(v) => update(o.id, { fontSize: v ?? 15 })} />
                 </Field>
-                <Field label={`Opacity ${Math.round(o.opacity * 100)}%`}>
-                  <input type="range" min={0.2} max={1} step={0.05} value={o.opacity} onChange={(e) => update(o.id, { opacity: Number(e.target.value) }, SLIDER_SAVE_MS)} />
+                <Field label={`${o.kind === 'alerts' ? 'Opacity' : 'Background'} ${Math.round(o.opacity * 100)}%`}>
+                  <input
+                    type="range"
+                    min={minOpacity(o.kind)}
+                    max={1}
+                    step={0.05}
+                    value={o.opacity}
+                    title={o.kind === 'alerts' ? 'Fades the alert text' : 'Fades the dark panel behind the text, down to none; the text stays as it is'}
+                    onChange={(e) => update(o.id, { opacity: Number(e.target.value) }, SLIDER_SAVE_MS)}
+                  />
                 </Field>
               </div>
               {o.kind === 'timers' && (
@@ -186,8 +194,7 @@ export function Overlays() {
                     id: `meter-${Date.now()}`,
                     name: 'Meter',
                     kind: 'meter',
-                    x: 440,
-                    y: 560,
+                    ...newOverlaySpot({ x: 440, y: 560 }, s.overlays),
                     width: 380,
                     height: 300,
                     opacity: 1,
@@ -216,8 +223,7 @@ export function Overlays() {
                     id: `timers-${Date.now()}`,
                     name: 'Extra timers',
                     kind: 'timers',
-                    x: 200,
-                    y: 200,
+                    ...newOverlaySpot({ x: 200, y: 200 }, s.overlays),
                     width: 320,
                     height: 300,
                     opacity: 1,
