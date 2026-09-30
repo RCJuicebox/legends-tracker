@@ -148,7 +148,9 @@ const FACTION_ALIASES: Record<string, string> = {
   neriaktrolls: 'neriaktroll',
   fairie: 'faerie',
   kingaythoxthex: 'kingnaythoxthex',
-  newsebilisexpedition: 'newsebilisianexpedition'
+  newsebilisexpedition: 'newsebilisianexpedition',
+  merchantsofogguk: 'merchantsofoggok',
+  oggukresidents: 'oggokresident'
 }
 
 /** Puts any faction name the way the game writes it, when the game has it; else leaves it be. */
@@ -158,6 +160,25 @@ export function factionNamer(gameNames: string[]): (name: string) => string {
     const k = factionKey(name)
     return byKey.get(FACTION_ALIASES[k] ?? k) ?? name.replace(/\s*\(Faction\)\s*$/i, '').trim()
   }
+}
+
+/**
+ * The names factionNamer cannot join: the wiki's faction pages that match none of the game's names,
+ * and the game's factions no page matches. A page left over is mostly a faction the character has not
+ * met; a faction and a page that are the same thing named two ways want a line in FACTION_ALIASES.
+ */
+export function unmatchedNames(pages: string[], gameNames: string[]): { pages: string[]; factions: string[] } {
+  const name = factionNamer(gameNames)
+  const game = new Set(gameNames)
+  const joined = new Set<string>()
+  const left: string[] = []
+  for (const p of pages) {
+    const n = name(p)
+    if (game.has(n)) joined.add(n)
+    else left.push(p)
+  }
+  const abc = (a: string, b: string) => a.localeCompare(b)
+  return { pages: left.sort(abc), factions: gameNames.filter((f) => !joined.has(f)).sort(abc) }
 }
 
 /** Zones the log and the wiki name differently. */
@@ -289,8 +310,11 @@ export interface FactionPlanData extends PlanFor {
   export: { file: string; modified: number } | null
   /** The inventory export items on hand are counted from; null without one. */
   inventory: { file: string; modified: number } | null
-  /** eqlwiki's faction and quest pages: when read, how many, and why a refresh failed (the pages kept serve meanwhile). */
-  wiki: { fetchedAt: number; pages: number; quests: number; error: string }
+  /**
+   * eqlwiki's faction and quest pages: when read, how many, and why a refresh failed (the pages kept
+   * serve meanwhile); `unmatched`, the names the wiki and the character's factions do not share.
+   */
+  wiki: { fetchedAt: number; pages: number; quests: number; error: string; unmatched: { pages: string[]; factions: string[] } }
   /** Kills and hand-ins in the log that moved a faction, and changes nothing around them explained. */
   log: { kills: number; handIns: number; unexplained: number }
   /** The player's other characters whose logs the plan also learns from, and what those saw. */

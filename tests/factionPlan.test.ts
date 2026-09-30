@@ -18,6 +18,7 @@ import {
   planFor,
   plannable,
   unitTime,
+  unmatchedNames,
   waysToRaise,
   zoneKey,
   type CatalogInput,
@@ -399,6 +400,14 @@ describe('names', () => {
     expect(name('Deep Muses')).toBe('Deepmuses')
     expect(name("Tunare's Scouts")).toBe("Tunare's Scouts")
     expect(name('Kromzek')).toBe('Kromzek')
+    expect(factionNamer(['Merchants of Oggok'])('Merchants of Ogguk')).toBe('Merchants of Oggok')
+  })
+
+  it('lists the names the wiki and the game do not share', () => {
+    const game = ['Ebon Mask', 'King Ak`Anon', 'Oggok Resident', 'Guktan Elders']
+    const pages = ['Hall of the Ebon Mask', "King Ak'Anon", 'Ogguk Residents', 'Kromzek', 'Brownie', 'Anti-Mage']
+    expect(unmatchedNames(pages, game)).toEqual({ pages: ['Anti-Mage', 'Brownie', 'Kromzek'], factions: ['Guktan Elders'] })
+    expect(unmatchedNames([], [])).toEqual({ pages: [], factions: [] })
   })
 
   it('knows a place by either name', () => {

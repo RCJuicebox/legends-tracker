@@ -28,7 +28,7 @@ import {
 } from './core'
 import { emptySources, joinSources, shareSources, sourceReader, type FactionSourceTallies } from './attribution'
 import { parseQuestPage, type QuestPage } from './questPages'
-import { buildCatalog, classSwapName, factionNamer, guessesFrom, itemsToLookUp, planFor, type CatalogInput, type FactionPlanData } from './planner'
+import { buildCatalog, classSwapName, factionNamer, guessesFrom, itemsToLookUp, planFor, unmatchedNames, type CatalogInput, type FactionPlanData } from './planner'
 import { parseRaceUnlocks, raceUnlocks, unlockedRaces, type RaceUnlockDef } from './unlocks'
 import { lookUp, moversOf, sourcesOf } from './lookup'
 import { listLogs } from '../../main/game'
@@ -600,7 +600,16 @@ async function planData(ctx: AppContext, character: string, refresh: boolean, wi
     catalog,
     export: exported ? { file: exported.file, modified: exported.modified } : null,
     inventory: held.file,
-    wiki: { fetchedAt: book.book.fetchedAt, pages: book.book.pages.length, quests: Object.values(book.book.quests).filter(Boolean).length, error: book.error },
+    wiki: {
+      fetchedAt: book.book.fetchedAt,
+      pages: book.book.pages.length,
+      quests: Object.values(book.book.quests).filter(Boolean).length,
+      error: book.error,
+      unmatched: unmatchedNames(
+        book.book.pages.map((p) => p.page),
+        input.factions
+      )
+    },
     log: {
       kills: acts.filter((t) => t.kind === 'kill').reduce((n, t) => n + t.n, 0),
       handIns: acts.filter((t) => t.kind === 'turnin').reduce((n, t) => n + t.n, 0),

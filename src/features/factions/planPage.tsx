@@ -607,6 +607,7 @@ export function PlanTab({ character, view }: { character: string; view: FactionV
           . <Info label="How the plan is made" text={HOW} />
         </p>
         <Assumptions settings={settings} stored={stored} logPace={logPace} onChange={setSettings} />
+        <Unmatched unmatched={data.wiki.unmatched} character={character} />
       </div>
 
       {plan && plan.staleLocks.length > 0 && (
@@ -786,6 +787,37 @@ export function PlanTab({ character, view }: { character: string; view: FactionV
 
 /** The settings that are numbers, typed into the Assumptions. */
 type NumberSetting = { [K in keyof PlanSettings]: PlanSettings[K] extends number ? K : never }[keyof PlanSettings]
+
+/**
+ * The names eqlwiki and the character's factions do not share: a faction here has nothing from the
+ * wiki in the plan, and a page here is not planned for. Mostly factions not met yet, sometimes one
+ * thing named two ways.
+ */
+function Unmatched({ unmatched, character }: { unmatched: FactionPlanData['wiki']['unmatched']; character: string }) {
+  if (!unmatched.pages.length && !unmatched.factions.length) return null
+  return (
+    <details className="fp-assume">
+      <summary>Names the wiki does not match</summary>
+      <p className="faint small">
+        The plan joins a faction to its eqlwiki page by name. Where a faction and a page below are one thing named two ways, the plan misses what the page says: that pair is worth
+        reporting.
+      </p>
+      {unmatched.factions.length > 0 && (
+        <p className="small">
+          <strong>
+            {unmatched.factions.length} of {who(character)}&apos;s factions with no wiki page:
+          </strong>{' '}
+          {unmatched.factions.join(', ')}
+        </p>
+      )}
+      {unmatched.pages.length > 0 && (
+        <p className="small mb-0">
+          <strong>{unmatched.pages.length} wiki pages that match none of them</strong> <span className="faint">(mostly factions not met yet)</span>: {unmatched.pages.join(', ')}
+        </p>
+      )}
+    </details>
+  )
+}
 
 function Assumptions({
   settings,
