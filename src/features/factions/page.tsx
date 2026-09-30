@@ -6,7 +6,7 @@ import { useInvoke } from '../../renderer/src/hooks'
 import { useRemembered } from '../../renderer/src/remember'
 import { usePickedCharacter } from '../../renderer/src/character'
 import { useNow } from '../../renderer/src/components/TimerBars'
-import { ErrorText, FilterBox, GameCommand, Info, Pending, Segmented, SortTh, Tabs, Tip, ToggleChip, type Sort } from '../../renderer/src/components/ui'
+import { Disclosure, ErrorText, FilterBox, GameCommand, Info, Pending, Segmented, SortTh, Tabs, Tip, ToggleChip, type Sort } from '../../renderer/src/components/ui'
 import { duration, num, when, who, wikiUrl } from '../../core/format'
 import {
   STANDING_MAX,
@@ -324,9 +324,9 @@ export function Factions() {
                         <Fragment key={key}>
                           <tr className={`clickable${isOpen ? ' selected' : ''}`} onClick={toggle}>
                             <td>
-                              <button className="link-button" aria-expanded={isOpen} onClick={(e) => (e.stopPropagation(), toggle())}>
+                              <Disclosure open={isOpen} onToggle={toggle} stop>
                                 {r.name}
-                              </button>
+                              </Disclosure>
                             </td>
                             {hasExport && (
                               <td className="nowrap">

@@ -4,7 +4,7 @@ import { api, ago } from '../api'
 import { useInvoke, useItemInfo } from '../hooks'
 import { useRemembered } from '../remember'
 import { act, showError } from '../toast'
-import { Ago, ErrorText, FilterBox, GameCommand, Info, Pending } from '../components/ui'
+import { Ago, Disclosure, ErrorText, FilterBox, GameCommand, Info, Pending } from '../components/ui'
 import { wikiUrl } from '../../../core/format'
 import { fmtCoin } from '../../../core/loot'
 import { itemKey } from '../../../core/inventory'
@@ -331,16 +331,7 @@ function RecipeCard({
   return (
     <div className="card stack gap-10 mb-16">
       <div className="row" style={{ flexWrap: 'wrap', gap: 14 }}>
-        <button
-          className="btn small ghost"
-          aria-expanded={open}
-          aria-label={open ? `Collapse ${r.product}` : `Expand ${r.product}`}
-          title={open ? 'Collapse' : 'Expand'}
-          onClick={toggleOpen}
-          style={{ width: 28 }}
-        >
-          {open ? '▾' : '▸'}
-        </button>
+        <Disclosure open={open} onToggle={toggleOpen} label={r.product} />
         <button className="btn small primary" aria-pressed title="Remove from favourites" onClick={unfavorite}>
           ★
         </button>

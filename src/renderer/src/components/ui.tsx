@@ -307,6 +307,49 @@ export function ConfirmButton({
 }
 
 /**
+ * The one way a row, a card or a list opens and folds: a caret that turns, before what it opens (a
+ * name, a heading), or alone with a `label` for a screen reader. In a table row that opens on a click
+ * anywhere, `stop` keeps its own click from toggling twice.
+ */
+export function Disclosure({
+  open,
+  onToggle,
+  children,
+  label,
+  className = '',
+  title,
+  disabled,
+  stop
+}: {
+  open: boolean
+  onToggle: () => void
+  children?: ReactNode
+  label?: string
+  className?: string
+  title?: string
+  disabled?: boolean
+  stop?: boolean
+}) {
+  return (
+    <button
+      type="button"
+      className={`disclosure ${className}`.trim()}
+      aria-expanded={open}
+      aria-label={children ? undefined : label}
+      title={title}
+      disabled={disabled}
+      onClick={(e) => {
+        if (stop) e.stopPropagation()
+        onToggle()
+      }}
+    >
+      <span className="caret" aria-hidden="true" />
+      {children}
+    </button>
+  )
+}
+
+/**
  * Something with an explanation behind it: the explanation is its hover title, and it can be reached
  * by Tab, where the same words show beside it (a title alone reaches only the mouse). The words are
  * drawn fixed to the window, so a table that scrolls cannot clip them; they go on a scroll.

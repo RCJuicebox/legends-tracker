@@ -5,7 +5,7 @@ import { useRemembered } from '../remember'
 import { usePickedCharacter } from '../character'
 import { useAchievementTrack, useInvoke } from '../hooks'
 import { showError, showToast } from '../toast'
-import { Ago, FilterBox, GameCommand, Pending, Switch, Tip } from '../components/ui'
+import { Ago, Disclosure, FilterBox, GameCommand, Pending, Switch, Tip } from '../components/ui'
 import { useApp } from '../state'
 import { numExact as num, who } from '../../../core/format'
 import {
@@ -551,8 +551,7 @@ function Block({ book, r, rows, query, ctx }: { book: AchievementBook; r: AchRef
   return (
     <div id={`ach-${si}-${ai}`} className={`ach-blk ${state}${isOpen ? ' open' : ''}${ctx.flash === `ach-${si}-${ai}` ? ' flash' : ''}`}>
       <div className="ach-blkhead">
-        <button className="ach-open" aria-expanded={isOpen} onClick={() => ctx.setOpen({ ...ctx.open, [key]: !isOpen })}>
-          <span className="caret" />
+        <Disclosure className="ach-open" open={isOpen} onToggle={() => ctx.setOpen({ ...ctx.open, [key]: !isOpen })}>
           <span className="ach-name">{a.n}</span>
           {twins && (
             <span
@@ -565,7 +564,7 @@ function Block({ book, r, rows, query, ctx }: { book: AchievementBook; r: AchRef
               twin
             </span>
           )}
-        </button>
+        </Disclosure>
         <span className="ach-count">{count}</span>
         <span className="ach-bar">
           <i style={{ width: `${pct}%` }} />

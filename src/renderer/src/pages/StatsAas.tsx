@@ -3,7 +3,7 @@ import { day, when } from '../../../core/format'
 import { ago } from '../api'
 import { useRemembered } from '../remember'
 import { useNow } from '../components/TimerBars'
-import { FilterBox, GameCommand, Info, LoadError, Pending, SortTh, ToggleChip, type Sort } from '../components/ui'
+import { Disclosure, FilterBox, GameCommand, Info, LoadError, Pending, SortTh, ToggleChip, type Sort } from '../components/ui'
 import { AA_USES, type AaEffect, type AaSummary } from '../../../core/aa'
 import { withAaList, type AaAbility, type AaHistoryView } from '../../../core/aaHistory'
 
@@ -152,9 +152,9 @@ function Bought({ view, list }: { view: AaHistoryView | null; list: AaSummary | 
                   <Fragment key={k}>
                     <tr className={`clickable${isOpen ? ' selected' : ''}`} onClick={toggle}>
                       <td className="aa-name">
-                        <button className="link-button" aria-expanded={isOpen} onClick={(e) => (e.stopPropagation(), toggle())}>
+                        <Disclosure open={isOpen} onToggle={toggle} stop>
                           {a.name}
-                        </button>
+                        </Disclosure>
                         {a.granted && <span className="chip">granted</span>}
                         {a.refundedAt > 0 && (
                           <span className="chip warn" title={`Refunded ${when(a.refundedAt)}, and not bought again since`}>

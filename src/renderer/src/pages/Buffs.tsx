@@ -5,7 +5,7 @@ import { useInvoke } from '../hooks'
 import { useRemembered } from '../remember'
 import { act } from '../toast'
 import { useNow } from '../components/TimerBars'
-import { ConfirmButton, FilterBox, Info, Pending, Segmented, Switch, Tip } from '../components/ui'
+import { ConfirmButton, Disclosure, FilterBox, Info, Pending, Segmented, Switch, Tip } from '../components/ui'
 import { useApp } from '../state'
 import { wikiUrl } from '../../../core/format'
 import { CLASSES, className } from '../../../shared/game/classes'
@@ -255,10 +255,9 @@ export function Buffs() {
           return (
             <div key={c} className="stack" style={{ gap: 4 }}>
               <div className="row gap-8">
-                <button className="btn small ghost" aria-expanded={open} aria-label={open ? `Collapse ${label}` : `Expand ${label}`} onClick={() => flip(c)} style={{ width: 28 }}>
-                  {open ? '▾' : '▸'}
-                </button>
-                <b>{label}</b>
+                <Disclosure open={open} onToggle={() => flip(c)}>
+                  {label}
+                </Disclosure>
                 <span className="small muted">
                   {list.length} buffs{picked ? `, ${picked} picked` : ''}
                 </span>
@@ -384,16 +383,9 @@ function BestCombination({ view, unpick }: { view: BuffView; unpick: (spell: str
       {stacked.length > 0 && (
         <div className="stack" style={{ gap: 2 }}>
           <div className="row gap-8">
-            <button
-              className="btn small ghost"
-              aria-expanded={leftOpen}
-              aria-label={leftOpen ? 'Collapse left out' : 'Expand left out'}
-              onClick={() => setLeftOpen(!leftOpen)}
-              style={{ width: 28 }}
-            >
-              {leftOpen ? '▾' : '▸'}
-            </button>
-            <b className="small">Left out: {stacked.length} that do not stack with the combination</b>
+            <Disclosure className="small" open={leftOpen} onToggle={() => setLeftOpen(!leftOpen)}>
+              Left out: {stacked.length} that do not stack with the combination
+            </Disclosure>
           </div>
           {leftOpen &&
             stacked.map((l) => (

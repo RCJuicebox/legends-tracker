@@ -7,7 +7,7 @@ import { focusValue, KIND_LABELS, KIND_ORDER, KIND_WORTH, type FocusInfo, type F
 import { optimizeGear, pieceName, SLOT_LAYOUT, type GearLock, type Piece, type PieceSource, type Plan } from '../../../core/gearOptimizer'
 import { type FocusCandidate, type GearModel, type OwnedFocus } from '../gear/useGearModel'
 import { CATALOG_PER_SLOT } from '../../../core/gearCatalog'
-import { DAY_WINDOWS, Info, Pending, Segmented } from '../components/ui'
+import { DAY_WINDOWS, Disclosure, Info, Pending, Segmented } from '../components/ui'
 import { num, pct as pctOf, wikiUrl } from '../../../core/format'
 
 /** A focus figure, given as a percentage already (10.5), to one place. */
@@ -626,9 +626,9 @@ function LockCard({
   return (
     <div className="card stack gap-8">
       <div className="row gap-8">
-        <button className="lt-collapse" aria-expanded={open} onClick={() => setOpen(!open)}>
-          <span aria-hidden="true">{open ? '▾' : '▸'}</span> Keep what you wear
-        </button>
+        <Disclosure open={open} onToggle={() => setOpen(!open)}>
+          Keep what you wear
+        </Disclosure>
         <Info
           label="About locking"
           text="A piece locked into a slot stays there whatever the weights say, and the optimiser wears everything else around it; it may still put an exaltation from Storage in it. Lock what you wear below, or put any other piece you own in a slot. Locks are kept for this character until you unlock them, and a piece that moves between exports is found again by name. A lock goes unused when its piece cannot go there with the others: the same lore item twice, or a two-hander in Primary with Secondary locked."

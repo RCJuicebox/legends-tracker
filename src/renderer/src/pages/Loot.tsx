@@ -5,7 +5,7 @@ import { useInvoke, useItemInfo } from '../hooks'
 import { useRemembered } from '../remember'
 import { actDone } from '../toast'
 import { wikiUrl } from '../../../core/format'
-import { Ago, FilterBox, Icon, Info, Pending, ToggleChip } from '../components/ui'
+import { Ago, Disclosure, FilterBox, Icon, Info, Pending, ToggleChip } from '../components/ui'
 import { describeItem, fmtCoin, type LootEntry, type LootOutcome } from '../../../core/loot'
 import { itemKey } from '../../../core/inventory'
 import type { ItemInfo } from '../../../shared/types'
@@ -122,17 +122,7 @@ export function Loot() {
           return (
             <div className={`card loot-session${open ? '' : ' folded'}`} key={`${g.id}-${last.id}`}>
               <div className="loot-session-head">
-                <button
-                  className="btn small ghost"
-                  aria-expanded={open}
-                  aria-label={open ? `Collapse ${name}` : `Expand ${name}`}
-                  title={filtering ? 'Open while filtering' : open ? 'Collapse' : 'Expand'}
-                  disabled={filtering}
-                  onClick={() => toggleOpen(g.id)}
-                  style={{ width: 28 }}
-                >
-                  {open ? '▾' : '▸'}
-                </button>
+                <Disclosure open={open} onToggle={() => toggleOpen(g.id)} label={name} title={filtering ? 'Open while filtering' : undefined} disabled={filtering} />
                 <h2>{name}</h2>
                 <span className="faint small">
                   {day(first.at)} · {timeOfDay(first.at)}

@@ -5,7 +5,7 @@ import { useInvoke } from '../hooks'
 import { useRemembered } from '../remember'
 import { useNow } from '../components/TimerBars'
 import { act } from '../toast'
-import { ConfirmButton, Field, FilterBox, Info, NumberInput, Pending, SortTh, Sparkline, Switch, type Sort } from '../components/ui'
+import { ConfirmButton, Disclosure, Field, FilterBox, Info, NumberInput, Pending, SortTh, Sparkline, Switch, type Sort } from '../components/ui'
 import { parseClock, SHARED_SEC, type RespawnRow, type RespawnTimerSpec, type RespawnView } from '../../../core/respawns'
 
 // How long mobs take to come back, measured from the log, and a timer on an overlay for any of them.
@@ -239,9 +239,9 @@ function Row({
   return (
     <tr className={`clickable${open ? ' selected' : ''}`} onClick={toggle}>
       <td>
-        <button className="link-button" aria-expanded={open} onClick={(e) => (e.stopPropagation(), toggle())}>
+        <Disclosure open={open} onToggle={toggle} stop>
           {r.name}
-        </button>
+        </Disclosure>
         {r.zone && r.zone !== zone && <div className="faint small">{r.zone}</div>}
         {r.shared && (
           <span className="chip warn" title={`A gap under ${SHARED_SEC} seconds: more than one mob has this name, so its gaps may be any of them.`}>

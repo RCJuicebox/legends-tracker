@@ -6,7 +6,7 @@ import { api, clock, ago, errorMessage } from '../api'
 import { useInvoke, useSearch } from '../hooks'
 import { act, showError, showToast, showUndo } from '../toast'
 import { who } from '../../../core/format'
-import { CategoryChip, ConfirmButton, Field, FilterBox, Info, LoadError, NumberInput, SortTh, sortRows, SpellIcon, Switch, type Sort } from '../components/ui'
+import { CategoryChip, ConfirmButton, Disclosure, Field, FilterBox, Info, LoadError, NumberInput, SortTh, sortRows, SpellIcon, Switch, type Sort } from '../components/ui'
 import {
   CATEGORY_LABELS,
   DEFAULT_TIER_DURATION_PCT,
@@ -344,16 +344,9 @@ function SpellRow({ k, open, toggle, onSaved }: { k: KnownSpell; open: boolean; 
         </td>
         <td>
           {/* The row opens on a click anywhere; this is the same for the keyboard. */}
-          <button
-            className="link-button"
-            aria-expanded={open}
-            onClick={(e) => {
-              e.stopPropagation()
-              toggle()
-            }}
-          >
+          <Disclosure open={open} onToggle={toggle} stop>
             {k.rule.alias ? `${k.rule.alias}` : k.rankedName}
-          </button>
+          </Disclosure>
           {k.rule.alias && <div className="faint small">{k.rankedName}</div>}
         </td>
         <td>

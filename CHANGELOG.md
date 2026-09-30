@@ -84,6 +84,7 @@ What changed in each version. The release workflow publishes a version's section
 - **The sidebar follows a session.** **Play** is what runs beside the game: Live, Damage Meter, Buffs, Respawns and Motes. **Plan** is what is worked out between sessions or looked back on: Achievements, Factions, Stats, Gear, Upgrades, Tradeskills and Loot. **Setup** is what is set once, and Spell Timers, mostly rules and focus effects, joins it. Upgrades has an icon of its own rather than the Motes one.
 - **Gear's settings take one line.** The eras, AC soft cap, Primary, focus value and the note on what a point is worth sat above every tab's results. They now fold to one line that says what they are set to, with **Change…** to open them; the page remembers which you had. **Show weights** opens them too.
 - **More tables sort.** Spell Timers' spells (by name, type, Spell window, when it wears off or when last cast), Motes' sessions (by when, where, type, time, motes, per hour or value) and Log Files' logs (by name, size or when last written) sort by any column header, as Factions, Respawns and AAs already did. Each page remembers its order.
+- **One way to open and fold.** Spells, AAs, respawns, factions, buff lists, loot sessions, recipes, achievements and the optimiser's locks all open with the same small caret, which turns as they open. They had used five different arrows and links. The "Show every step" and similar folds read the same way.
 
 ## 2.4.0 (2026-09-29)
 
