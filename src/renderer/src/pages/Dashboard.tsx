@@ -61,6 +61,15 @@ export function Dashboard({ go }: { go: (p: PageId) => void }) {
               <Icon name="play" /> Start watching
             </button>
           )}
+          {!status.watching && !settings.logFile && (
+            <span className="faint small">
+              Choose a character log in{' '}
+              <button className="link-button inline" onClick={() => go('settings')}>
+                Settings
+              </button>{' '}
+              first.
+            </span>
+          )}
           <button className={`btn${state.arranging ? ' on' : ''}`} aria-pressed={state.arranging} onClick={() => void act('overlays:arrange', !state.arranging)}>
             <Icon name="move" /> {state.arranging ? 'Lock overlays' : 'Arrange overlays'}
           </button>
@@ -157,7 +166,7 @@ export function Dashboard({ go }: { go: (p: PageId) => void }) {
         </div>
         <div className="card">
           <h2>
-            Try it <span className="spacer" />
+            Try log lines <span className="spacer" />
             <button className="btn small" onClick={() => void act('overlays:demo')}>
               <Icon name="sparkle" /> Show demo timers
             </button>

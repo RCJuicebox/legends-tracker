@@ -1,4 +1,4 @@
-import type { IconName } from '../renderer/src/components/ui'
+import type { IconName } from '../shared/icons'
 
 // The feature modules. Each folder here keeps one feature whole: its logic (core.ts), its
 // main-process side (main.ts: the log-history consumer, what the page asks for) and its page

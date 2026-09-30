@@ -353,7 +353,7 @@ export class Engine {
       // Another character: nothing the last one had running applies any more.
       const n = this.board.list().length
       for (const f of this.features) f.reset?.()
-      if (n) this.pushFeed('info', `Switched to ${basename(logFile)}; cleared ${n} timer${n === 1 ? '' : 's'}.`)
+      this.pushFeed('info', `Now watching ${basename(logFile)}${n ? `; cleared ${n} timer${n === 1 ? '' : 's'}` : ''}.`)
     }
     this.watchedLog = logFile
     this.buffs.follow(characterKey(logFile), Date.now())

@@ -134,7 +134,7 @@ export function Audio() {
           <Field label={`Speed ${a.rate.toFixed(1)}×`}>
             <input type="range" min={0.5} max={2} step={0.1} value={a.rate} onChange={(e) => slide({ rate: Number(e.target.value) })} />
           </Field>
-          <Field label="Try it">
+          <Field label="Try the voice">
             <div className="row">
               <input className="grow" value={text} onChange={(e) => setText(e.target.value)} />
               <button className="btn primary" onClick={() => void act('audio:test', text)}>

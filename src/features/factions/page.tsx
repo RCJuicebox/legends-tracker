@@ -247,7 +247,7 @@ export function Factions() {
                 onChange={setShow}
                 options={[
                   ['all', 'All'],
-                  ['open', `Achievements to Do (${achCount.open})`]
+                  ['open', `Achievements to do (${achCount.open})`]
                 ]}
               />
             )}

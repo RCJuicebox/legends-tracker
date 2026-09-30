@@ -137,7 +137,7 @@ Settings; **Arrange overlays** and **Mute** sit beside them. Below:
   damage meter.
 - Every buff, DoT and timer running, as the overlays show them, and **Activity**: timers started
   and faded, triggers fired, fights, loot, archives, notes and warnings, newest first.
-- **Try it**: paste log lines to run them through the live tracker and triggers, with their times
+- **Try log lines**: paste log lines to run them through the live tracker and triggers, with their times
   moved to now, or **Show demo timers** on the overlays.
 
 ## Damage meter

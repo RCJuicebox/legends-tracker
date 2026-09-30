@@ -146,10 +146,10 @@ export function SectionView({
           className={`btn small${ctx.hideOpt[k] ? ' on' : ' ghost'}`}
           aria-pressed={!!ctx.hideOpt[k]}
           disabled={!st.opt}
-          title={st.opt ? '' : 'No optional objectives in this section'}
+          title={st.opt ? undefined : 'No optional objectives in this section'}
           onClick={() => setHideOpt({ ...ctx.hideOpt, [k]: !ctx.hideOpt[k] })}
         >
-          {st.opt ? 'Hide optional' : 'No optional'}
+          Hide optional
         </button>
       </div>
       {body.entries.length ? (

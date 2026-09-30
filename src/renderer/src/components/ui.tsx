@@ -1,5 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore, type CSSProperties, type HTMLAttributes, type ReactNode } from 'react'
 import type { SpellCategory } from '../../../shared/types'
+import type { IconName } from '../../../shared/icons'
 import { CATEGORY_LABELS } from '../../../shared/types'
 import { ago, iconUrl } from '../api'
 import { showToast } from '../toast'
@@ -94,7 +95,7 @@ export function SpellIcon({ icon, large }: { icon?: number; large?: boolean }) {
   return <img className={`spell-icon${large ? ' lg' : ''}`} src={iconUrl(icon)} alt="" onError={() => setOk(false)} />
 }
 
-const paths = {
+const paths: Record<IconName, ReactNode> = {
   dashboard: <path d="M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z" />,
   spells: <path d="M7 2v11h3v9l7-12h-4l4-8z" />,
   triggers: <path d="M12 22a2.5 2.5 0 0 0 2.5-2.5h-5A2.5 2.5 0 0 0 12 22zm7-6V11c0-3.1-1.6-5.6-4.5-6.3V4a2.5 2.5 0 0 0-5 0v.7C6.6 5.4 5 7.9 5 11v5l-2 2v1h18v-1l-2-2z" />,
@@ -135,7 +136,7 @@ const paths = {
   )
 } satisfies Record<string, ReactNode>
 
-export type IconName = keyof typeof paths
+export type { IconName }
 
 export function Icon({ name }: { name: IconName }) {
   return (

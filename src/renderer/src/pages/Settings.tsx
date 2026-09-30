@@ -102,7 +102,16 @@ export function Settings({ go }: { go?: (page: PageId) => void }) {
           <GameFolderCard />
           {logsQ.error && <LoadError what="the character logs" error={logsQ.error} retry={logsQ.reload} />}
           <Field label="Character log">
-            <select value={s.logFile} onChange={(e) => patchSettings((x) => ({ ...x, logFile: e.target.value }))}>
+            <select
+              value={s.logFile}
+              onChange={(e) => {
+                const path = e.target.value
+                patchSettings((x) => ({ ...x, logFile: path }))
+                // While watching, the watch follows the new log at once: said, since nothing else here shows it.
+                const l = logs.find((x) => x.path === path)
+                if (watching && l) showToast(`Now watching ${who(l.character)}'s log.`)
+              }}
+            >
               <option value="">Choose…</option>
               {logs.map((l) => (
                 <option key={l.path} value={l.path}>

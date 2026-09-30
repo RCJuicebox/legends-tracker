@@ -465,8 +465,9 @@ export interface FactionAchievements {
 // A faction's tally keeps only its last few changes, and one evening at a camp or one stack of
 // hand-ins makes far more, so where a faction stands now is read from the log itself: every change
 // after the factions export. The game writes "Outputfile Complete: <file>" as it writes an export,
-// and that line is where the export ends, a change in the same second on either side of it included;
-// a log without the line counts the lines stamped after the file's time. An achievement the game says
+// and that line is where the export ends: a change the log writes after it counts, in the same second
+// or not, and one before it does not. A log without the line counts the lines stamped after the file's
+// time. An achievement the game says
 // was completed after the achievements export is done, though that export still lists it open.
 
 /** How far apart an export's file time and its "Outputfile Complete" line may be. */

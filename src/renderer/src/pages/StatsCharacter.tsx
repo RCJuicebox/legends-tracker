@@ -7,7 +7,7 @@ import { computeAc } from '../../../core/acModel'
 import { baseAccuracy, OFFENSE, windowOffense } from '../../../core/combatModel'
 import type { WornTotals } from '../../../core/inventory'
 import type { SetSheet } from './statsBits'
-import { Ago } from '../components/ui'
+import { Ago, Tip } from '../components/ui'
 
 const HEROIC = [
   'Accuracy',
@@ -103,17 +103,21 @@ export function CharacterTab({
   const n = (label: string, i = 0) => w[label]?.[i]
   const show = (v: number | undefined) => (v === undefined ? '—' : num(v))
   const pair = (label: string) => (w[label] ? `${num(w[label][0])} / ${num(w[label][1] ?? w[label][0])}` : '—')
-  const check = (actual: number | undefined, predicted: number) =>
+  // Beside a figure the Stats window gave: ✓ when the calculator, from your gear, skills and AAs,
+  // gives exactly that; else what it gives.
+  const check = (actual: number | undefined, predicted: number, what: string) =>
     actual === undefined ? (
-      <span className="faint">calc {num(predicted)}</span>
-    ) : actual === predicted ? (
-      <span className="ok-text" title="The calculator gives the same">
-        ✓
-      </span>
-    ) : (
-      <span className="warn-text" title="What the calculator gives with your current inputs">
+      <Tip className="faint" text={`The calculator gives ${num(predicted)} for ${what}; read the Stats window to compare`}>
         calc {num(predicted)}
-      </span>
+      </Tip>
+    ) : actual === predicted ? (
+      <Tip className="ok-text" text={`The calculator gives ${num(predicted)} for ${what} too, the Stats window's figure exactly`}>
+        ✓
+      </Tip>
+    ) : (
+      <Tip className="warn-text" text={`The calculator gives ${num(predicted)} for ${what} with your inputs; the Stats window says ${num(actual)}`}>
+        calc {num(predicted)}
+      </Tip>
     )
   const gearNote = (g: number | undefined) => (gear && g ? <span className="faint">gear +{num(g)}</span> : null)
   const row = (label: string, value: React.ReactNode, note?: React.ReactNode, color?: boolean) => (
@@ -161,14 +165,14 @@ export function CharacterTab({
               'AC',
               w.AC ? w.AC.map(num).join(' / ') : '—',
               <>
-                {check(n('AC', 0), ac.mitigation)} {check(n('AC', 1), ac.effCap)} {check(n('AC', 2), ac.avoidance)}
+                {check(n('AC', 0), ac.mitigation, 'mitigation AC')} {check(n('AC', 1), ac.effCap, 'the soft cap')} {check(n('AC', 2), ac.avoidance, 'avoidance AC')}
               </>
             )}
             {row(
               'Attack',
               pair('Attack'),
               <>
-                {check(n('Attack', 0), offense)}
+                {check(n('Attack', 0), offense, 'Offense')}
                 <span className="faint" title="Accuracy before any stance or buff">
                   {' '}
                   base accuracy {num(accuracy)}
