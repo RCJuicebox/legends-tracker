@@ -1,32 +1,18 @@
 import { parseCombatLine, looksLikeCombat, SELF, type CombatEvent } from './combatLines'
 import { zoneEntered, type LogLine } from './logLine'
-import type {
-  CombatSnapshot,
-  DamageHow,
-  Defense,
-  Entity,
-  EntityKind,
-  HealTally,
-  ProcOrigin,
-  RosterMember,
-  Segment,
-  SegmentSummary,
-  SkillStat,
-  Tally,
-  StitchedTimeline
-} from '../shared/types'
+import { ARTICLE, displayName, isFriend, nameKey, Roster } from './combatRoster'
+import { book, stitch } from './combatTimeline'
+import type { CombatSnapshot, DamageHow, Defense, Entity, EntityKind, HealTally, ProcOrigin, Segment, SegmentSummary, SkillStat, Tally, StitchedTimeline } from '../shared/types'
+
+export { displayName, isFriend, nameKey } from './combatRoster'
 
 // The damage meter: every combat line sorted into fights and sessions, per entity.
 //
 // A FIGHT opens on the first blow between your side and an enemy and closes when the last enemy it
 // engaged dies, or when nobody has struck for `fightGapSec`. A SESSION is everything since the
 // zone was entered (or "New session" was pressed); fights and sessions hold the same shape of
-// data, so one view reads either.
-//
-// SIDES. You, your pets and your group are yours; a name with an article ("a fetid fiend"), a
-// named mob ("Cleric of Innoruuk") and a mob's pet ("a scareling pet") are enemies. A single
-// capitalised word could be a player or a named mob (Phoboplasm); it is placed by whom it hits or
-// heals, and remembered. Nothing between two unknowns, or two names on the same side, is counted.
+// data, so one view reads either. Who is on which side is the Roster's (combatRoster.ts); a fight's
+// second-by-second damage, the timeline's (combatTimeline.ts).
 
 /** A gap between an entity's hits counts as combat time up to this long. */
 export const ACTIVE_GAP_MS = 3000
@@ -41,10 +27,6 @@ const FIGHTS_KEPT = 300
 /** Others' blows held at most on one enemy, while waiting to see whether your side joins in. */
 const HELD_MAX = 2000
 const SESSIONS_KEPT = 60
-/** A fight's per-second timeline stops growing past an hour. */
-const TIMELINE_MAX = 3600
-/** Quiet seconds between two fights in a session's chart. */
-const STITCH_GAP_SEC = 3
 /**
  * How long a fight closed by its last enemy's death may be taken up again by another of the same
  * name: the log does not tell two "a ratman warrior"s apart, so a blow from or to one a second or more
@@ -71,19 +53,6 @@ export interface MeterHooks {
   onFightEnd?: (fight: Segment) => void
 }
 
-type Side = 'friend' | 'enemy' | 'unknown'
-
-export const nameKey = (name: string): string => name.toLowerCase()
-
-/** "a fetid fiend" as the log prints it mid-sentence → "A fetid fiend", as it prints it first. */
-export function displayName(name: string): string {
-  return /^(?:a|an|the) /.test(name) ? name[0].toUpperCase() + name.slice(1) : name
-}
-
-const ARTICLE = /^(?:a|an|the) /i
-/** A player's pet named after them: "Doria`s warder", "Doria`s familiar". */
-const OWNED_PET = /^([A-Z][a-z]+)`s (?:warder|pet|familiar)$/
-const SINGLE_WORD = /^[A-Z][A-Za-z`']*$/
 /** "an ire ghast has been charmed." */
 const RE_CHARMED = /^(.+) has been charmed\.$/
 /** A charm lands within its cast time (Allure's is a few seconds) of the cast beginning. */
@@ -161,13 +130,7 @@ export function durationMs(seg: Pick<Segment, 'startedAt' | 'endedAt'>): number 
   return Math.max(1000, seg.endedAt - seg.startedAt + 1000)
 }
 
-export function isFriend(kind: EntityKind): boolean {
-  return kind === 'you' || kind === 'pet' || kind === 'group' || kind === 'player'
-}
-
 export class CombatMeter {
-  private self = ''
-  private selfKey = ''
   private zone = ''
   /** Oldest first. */
   fights: Segment[] = []
@@ -176,13 +139,10 @@ export class CombatMeter {
   /** The fight its last enemy's death closed, and when: another of those names may take it up again (SAME_NAME_MS). */
   private lastKilled: { fight: Segment; at: number } | null = null
   private session: Segment | null = null
-  /** Pet name key → owner's name (SELF for yours). */
-  private pets = new Map<string, string>()
-  private roster = new Map<string, RosterMember>()
+  /** Who is who: you, your pets, your group, and the side each other name is on. */
+  private readonly who = new Roster((k) => this.refreshKind(k))
   /** Who last invited you to a group, until you join one or the invite goes stale. */
   private invite: { who: string; at: number } | null = null
-  /** Which side a single-word name turned out to be on. */
-  private sides = new Map<string, Side>()
   /** When each entity last began casting each spell: "kelwyn|envenomed bolt" → time. */
   private lastCast = new Map<string, number>()
   /** When each entity's proc last did damage, by base name, so its heal line a moment later is the same firing. */
@@ -227,8 +187,7 @@ export class CombatMeter {
 
   /** The character's name as the log spells it, so lines naming them ("Aldric healed Kelwyn") read as You. */
   setSelf(name: string): void {
-    this.self = name
-    this.selfKey = nameKey(name)
+    this.who.setSelf(name)
   }
 
   get currentZone(): string {
@@ -237,7 +196,7 @@ export class CombatMeter {
 
   /** The group's other members, as the log and the player have given them. */
   get groupMembers(): string[] {
-    return [...this.roster.values()].map((m) => m.name)
+    return [...this.who.members.values()].map((m) => m.name)
   }
 
   /** A fight is on. */
@@ -252,9 +211,7 @@ export class CombatMeter {
     this.live = null
     this.lastKilled = null
     this.session = null
-    this.pets.clear()
-    this.roster.clear()
-    this.sides.clear()
+    this.who.clear()
     this.lastCast.clear()
     this.lastProc.clear()
     this.healFiring.clear()
@@ -272,34 +229,9 @@ export class CombatMeter {
 
   // ---- names and sides ----
 
-  private norm(name: string): string {
-    if (name === SELF) return SELF
-    if (this.selfKey && nameKey(name) === this.selfKey) return SELF
-    return displayName(name)
-  }
-
+  /** A name's kind as the meter has placed it: you, pet (and whose), group, player, mob. */
   kindOf(name: string): { kind: EntityKind; owner?: string } {
-    if (name === SELF) return { kind: 'you' }
-    const k = nameKey(name)
-    const owner = this.pets.get(k)
-    if (owner) return { kind: 'pet', owner }
-    if (this.roster.has(k)) return { kind: 'group' }
-    // A warder is its owner's from its first blow, before any "/pet who leader" says so; unless the
-    // owner is a mob.
-    const own = OWNED_PET.exec(name)
-    if (own && this.sides.get(nameKey(own[1])) !== 'enemy') return { kind: 'pet', owner: this.norm(own[1]) }
-    if (k.endsWith(' pet')) return { kind: 'npcpet' }
-    if (ARTICLE.test(name)) return { kind: 'npc' }
-    if (!SINGLE_WORD.test(name)) return { kind: 'npc' }
-    const side = this.sides.get(k)
-    return { kind: side === 'friend' ? 'player' : side === 'enemy' ? 'npc' : 'unknown' }
-  }
-
-  /** You, your pet, and your group and their pets (a pet two charmed is either's): the side the meter is about. */
-  private ours(name: string): boolean {
-    const { kind, owner } = this.kindOf(name)
-    if (kind === 'you' || kind === 'group') return true
-    return kind === 'pet' && !!owner && owner.split(' or ').some((o) => o === SELF || this.roster.has(nameKey(o)))
+    return this.who.kindOf(name)
   }
 
   /**
@@ -310,7 +242,7 @@ export class CombatMeter {
    * or keep yours from ever ending.
    */
   private counts(friend: string, enemy: string): boolean {
-    if (this.replaying || this.ours(friend) || this.ours(enemy)) return true
+    if (this.replaying || this.who.ours(friend) || this.who.ours(enemy)) return true
     const f = this.live
     return !!f && (nameKey(enemy) in f.enemies || !!f.entities[nameKey(friend)])
   }
@@ -348,48 +280,17 @@ export class CombatMeter {
     return true
   }
 
-  private sideOf(name: string): Side {
-    const { kind } = this.kindOf(name)
-    return isFriend(kind) ? 'friend' : kind === 'unknown' ? 'unknown' : 'enemy'
-  }
-
-  private learn(name: string, side: Side): void {
-    if (side === 'unknown') return
-    const k = nameKey(name)
-    if (this.sides.get(k) === side) return
-    this.sides.set(k, side)
-    this.refreshKind(k)
-  }
-
   /** A name's kind changed (a pet claimed, a stranger placed): every live entity of that name follows. */
   private refreshKind(k: string): void {
     for (const seg of [this.live, this.session]) {
       const e = seg?.entities[k]
       if (!e) continue
-      const { kind, owner } = this.kindOf(e.name)
+      const { kind, owner } = this.who.kindOf(e.name)
       e.kind = kind
       if (owner) e.owner = owner
       else delete e.owner
       if (seg && (kind === 'you' || (kind === 'pet' && owner === SELF))) seg.mine = true
     }
-  }
-
-  /**
-   * Places two names on opposite sides (a blow) or the same side (a heal) when one is known and the
-   * other is not. Returns the sides after learning.
-   */
-  private place(a: string, b: string, opposite: boolean): [Side, Side] {
-    let sa = this.sideOf(a)
-    let sb = this.sideOf(b)
-    const flip = (s: Side): Side => (s === 'friend' ? 'enemy' : s === 'enemy' ? 'friend' : 'unknown')
-    if (sa === 'unknown' && sb !== 'unknown') {
-      this.learn(a, opposite ? flip(sb) : sb)
-      sa = this.sideOf(a)
-    } else if (sb === 'unknown' && sa !== 'unknown') {
-      this.learn(b, opposite ? flip(sa) : sa)
-      sb = this.sideOf(b)
-    }
-    return [sa, sb]
   }
 
   // ---- segments ----
@@ -398,7 +299,7 @@ export class CombatMeter {
     const k = nameKey(name)
     let e = seg.entities[k]
     if (!e) {
-      const { kind, owner } = this.kindOf(name)
+      const { kind, owner } = this.who.kindOf(name)
       e = newEntity(name, kind, owner, at)
       seg.entities[k] = e
     }
@@ -542,7 +443,7 @@ export class CombatMeter {
     const had = this.charmed.get(nameKey(mob))
     const owners = had && !had.owners.includes(who) ? [...had.owners, who] : [who]
     this.charmed.set(nameKey(mob), { label, owners, since: at })
-    this.pets.set(nameKey(label), owners.join(' or '))
+    this.who.pets.set(nameKey(label), owners.join(' or '))
     this.refreshKind(nameKey(label))
     this.changed()
   }
@@ -559,7 +460,7 @@ export class CombatMeter {
     if (!src && !tgt) return ev
     let out = ev
     if (src && ev.kind !== 'heal') {
-      const side = nameKey(ev.source) === nameKey(ev.target) ? 'enemy' : this.sideOf(this.norm(ev.target))
+      const side = nameKey(ev.source) === nameKey(ev.target) ? 'enemy' : this.who.sideOf(this.who.norm(ev.target))
       if (side === 'friend') {
         this.charmed.delete(nameKey(ev.source))
         return ev
@@ -567,7 +468,7 @@ export class CombatMeter {
       if (side === 'enemy') out = { ...out, source: src.label }
     }
     if (tgt && out.source !== tgt.label) {
-      const side = out.source ? this.sideOf(this.norm(out.source)) : 'unknown'
+      const side = out.source ? this.who.sideOf(this.who.norm(out.source)) : 'unknown'
       const same = nameKey(out.source) === nameKey(ev.target)
       if (!same && (ev.kind === 'heal' ? side === 'friend' : side === 'enemy')) out = { ...out, target: tgt.label }
     }
@@ -578,7 +479,7 @@ export class CombatMeter {
   private charmDeath(ev: Extract<CombatEvent, { kind: 'kill' }>): Extract<CombatEvent, { kind: 'kill' }> {
     const c = this.charmed.get(nameKey(ev.target))
     if (!c) return ev
-    const killer = ev.killer ? this.sideOf(this.norm(ev.killer)) : 'enemy'
+    const killer = ev.killer ? this.who.sideOf(this.who.norm(ev.killer)) : 'enemy'
     if (killer === 'friend') return ev
     this.charmed.delete(nameKey(ev.target))
     return { ...ev, target: c.label }
@@ -594,7 +495,7 @@ export class CombatMeter {
       case 'heal':
         return this.onHeal(ev, at)
       case 'rune': {
-        const target = this.norm(ev.target)
+        const target = this.who.norm(ev.target)
         for (const seg of this.liveSegments(at, false)) this.ent(seg, target, at).runes += ev.amount
         return this.changed()
       }
@@ -606,25 +507,25 @@ export class CombatMeter {
         // "a gnoll told you, 'Attacking … Master.'" is a charmed mob: claiming its name would make
         // every gnoll a pet. Charms are followed from the charm spell's landing line instead.
         if (ARTICLE.test(ev.pet)) return
-        const owner = this.norm(ev.owner)
-        this.pets.set(nameKey(ev.pet), owner)
-        this.sides.delete(nameKey(ev.pet))
+        const owner = this.who.norm(ev.owner)
+        this.who.pets.set(nameKey(ev.pet), owner)
+        this.who.sides.delete(nameKey(ev.pet))
         this.refreshKind(nameKey(ev.pet))
         return this.changed()
       }
       case 'group':
         return this.onGroup(ev, at)
       case 'cast': {
-        const source = this.norm(ev.source)
+        const source = this.who.norm(ev.source)
         this.lastCast.set(`${nameKey(source)}|${spellBase(ev.spell)}`, at)
         if (this.lastCast.size > 4000) this.lastCast.delete(this.lastCast.keys().next().value!)
         // Anyone not an enemy may be the one a charm that lands next belongs to.
-        if (this.sideOf(source) !== 'enemy') {
+        if (this.who.sideOf(source) !== 'enemy') {
           this.lastFriendCast = { who: source, at }
           const land = this.config.charmPets ? this.config.charmLand?.(ev.spell) : undefined
           if (land) this.charmCasts.push({ who: source, at, land })
         }
-        if (this.sideOf(source) !== 'friend') return
+        if (this.who.sideOf(source) !== 'friend') return
         for (const seg of this.liveSegments(at, false)) this.ent(seg, source, at).casts++
         return
       }
@@ -675,9 +576,9 @@ export class CombatMeter {
 
   private onDamage(ev: Extract<CombatEvent, { kind: 'damage' }>, at: number): void {
     if (!ev.source) return this.onUncredited(ev, at)
-    const target = this.norm(ev.target)
-    const source = this.norm(ev.source)
-    const [ss, ts] = this.place(source, target, true)
+    const target = this.who.norm(ev.target)
+    const source = this.who.norm(ev.source)
+    const [ss, ts] = this.who.place(source, target, true)
     if (ss === 'unknown' || ts === 'unknown' || ss === ts) return
     if (!this.admit(ev, at, ss === 'friend' ? source : target, ss === 'enemy' ? source : target)) return
     const closed = this.afterKill(at, ss === 'enemy' ? source : target)
@@ -712,16 +613,10 @@ export class CombatMeter {
       if (seg !== closed) seg.enemies[nameKey(enemy)] = true
       if (src.kind === 'you' || tgt.kind === 'you' || (src.kind === 'pet' && src.owner === SELF)) seg.mine = true
       seg.endedAt = Math.max(seg.endedAt, at)
-      if (seg.timeline) {
-        const b = Math.floor((at - seg.startedAt) / 1000)
-        if (b >= 0 && b < TIMELINE_MAX) {
-          const tl = seg.timeline
-          if (src.kind === 'you') tl.you[b] = (tl.you[b] ?? 0) + ev.amount
-          else if (src.kind === 'pet' && src.owner === SELF) tl.pet[b] = (tl.pet[b] ?? 0) + ev.amount
-          else if (ss === 'friend') tl.group[b] = (tl.group[b] ?? 0) + ev.amount
-          if (tgt.kind === 'you') tl.inc[b] = (tl.inc[b] ?? 0) + ev.amount
-        }
-      }
+      if (src.kind === 'you') book(seg, at, 'you', ev.amount)
+      else if (src.kind === 'pet' && src.owner === SELF) book(seg, at, 'pet', ev.amount)
+      else if (ss === 'friend') book(seg, at, 'group', ev.amount)
+      if (tgt.kind === 'you') book(seg, at, 'inc', ev.amount)
     }
     this.changed()
   }
@@ -732,30 +627,27 @@ export class CombatMeter {
    * an enemy it engaged). It opens no fight and names none.
    */
   private onUncredited(ev: Extract<CombatEvent, { kind: 'damage' }>, at: number): void {
-    const target = this.norm(ev.target)
-    const side = this.sideOf(target)
+    const target = this.who.norm(ev.target)
+    const side = this.who.sideOf(target)
     if (side === 'unknown') return
     const k = nameKey(target)
     const crit = ev.mods.includes('critical')
     let booked = false
     for (const seg of this.liveSegments(at, false)) {
-      if (side === 'enemy' ? !(k in seg.enemies) : !this.ours(target) && !seg.entities[k]) continue
+      if (side === 'enemy' ? !(k in seg.enemies) : !this.who.ours(target) && !seg.entities[k]) continue
       const tgt = this.ent(seg, target, at)
       add(tgt.in, ev.amount, crit)
       add((tgt.takenBy[ev.skill] ??= skillStat(ev.skill, ev.how)), ev.amount, crit)
-      if (seg.timeline && tgt.kind === 'you') {
-        const b = Math.floor((at - seg.startedAt) / 1000)
-        if (b >= 0 && b < TIMELINE_MAX) seg.timeline.inc[b] = (seg.timeline.inc[b] ?? 0) + ev.amount
-      }
+      if (tgt.kind === 'you') book(seg, at, 'inc', ev.amount)
       booked = true
     }
     if (booked) this.changed()
   }
 
   private onMiss(ev: Extract<CombatEvent, { kind: 'miss' }>, at: number): void {
-    const source = this.norm(ev.source)
-    const target = this.norm(ev.target)
-    const [ss, ts] = this.place(source, target, true)
+    const source = this.who.norm(ev.source)
+    const target = this.who.norm(ev.target)
+    const [ss, ts] = this.who.place(source, target, true)
     if (ss === 'unknown' || ts === 'unknown' || ss === ts) return
     if (!this.admit(ev, at, ss === 'friend' ? source : target, ss === 'enemy' ? source : target)) return
     const closed = this.afterKill(at, ss === 'enemy' ? source : target)
@@ -777,9 +669,9 @@ export class CombatMeter {
   }
 
   private onHeal(ev: Extract<CombatEvent, { kind: 'heal' }>, at: number): void {
-    let source = this.norm(ev.source)
-    const target = this.norm(ev.target)
-    let [ss, ts] = this.place(source, target, false)
+    let source = this.who.norm(ev.source)
+    const target = this.who.norm(ev.target)
+    let [ss, ts] = this.who.place(source, target, false)
     // A lifetap ticking on an enemy heals its caster, and the log names the enemy as the healer:
     // "Innoruuk, the Prince of Hate healed you for 451 hit points by Leech Touch I." Enemies do not
     // heal your side, so the heal is the target's own, a tick of the ability that started it.
@@ -796,7 +688,7 @@ export class CombatMeter {
     const procKey = `${nameKey(source)}|${spellBase(ev.spell)}`
     const firing = !!proc && Math.abs(at - (this.lastProc.get(procKey) ?? -Infinity)) > 1000
     if (firing) this.healFiring.set(procKey, at)
-    const ours = this.ours(source) || this.ours(target)
+    const ours = this.who.ours(source) || this.who.ours(target)
     for (const seg of this.liveSegments(at, false)) {
       // A heal between strangers is no more yours than their fight: it counts once either is in the segment.
       if (!ours && !seg.entities[nameKey(source)] && !seg.entities[nameKey(target)]) continue
@@ -820,22 +712,22 @@ export class CombatMeter {
   }
 
   private onKill(ev: Extract<CombatEvent, { kind: 'kill' }>, at: number): void {
-    const target = this.norm(ev.target)
-    const killer = ev.killer ? this.norm(ev.killer) : null
-    if (killer) this.place(killer, target, true)
-    const side = this.sideOf(target)
+    const target = this.who.norm(ev.target)
+    const killer = ev.killer ? this.who.norm(ev.killer) : null
+    if (killer) this.who.place(killer, target, true)
+    const side = this.who.sideOf(target)
     if (side === 'unknown') return
     const k = nameKey(target)
     for (const seg of this.liveSegments(at, false)) {
       if (side === 'enemy') {
         if (!(k in seg.enemies)) continue
         seg.kills++
-        if (killer && this.sideOf(killer) === 'friend') this.ent(seg, killer, at).kills++
+        if (killer && this.who.sideOf(killer) === 'friend') this.ent(seg, killer, at).kills++
         if (k in seg.enemies) seg.enemies[k] = false
       } else {
         // Your side's deaths, and those of anyone who fought in the segment; not every player who
         // dies somewhere in the zone.
-        if (!this.ours(target) && !seg.entities[k]) continue
+        if (!this.who.ours(target) && !seg.entities[k]) continue
         seg.deaths++
         if (seg.entities[k]) seg.entities[k].deaths++
         else if (seg.kind === 'session' || target === SELF) this.ent(seg, target, at).deaths++
@@ -880,9 +772,9 @@ export class CombatMeter {
   }
 
   private onResist(ev: Extract<CombatEvent, { kind: 'resist' }>, at: number): void {
-    const source = this.norm(ev.source)
-    const target = this.norm(ev.target)
-    const [ss, ts] = this.place(source, target, true)
+    const source = this.who.norm(ev.source)
+    const target = this.who.norm(ev.target)
+    const [ss, ts] = this.who.place(source, target, true)
     if (ss !== 'friend' || ts !== 'enemy') return
     for (const seg of this.liveSegments(at, false)) {
       const src = this.ent(seg, source, at)
@@ -895,8 +787,8 @@ export class CombatMeter {
   private onGroup(ev: Extract<CombatEvent, { kind: 'group' }>, at: number): void {
     const k = nameKey(ev.who)
     if (ev.action === 'joined') {
-      this.roster.set(k, { name: ev.who, from: 'log' })
-      this.sides.delete(k)
+      this.who.members.set(k, { name: ev.who, from: 'log' })
+      this.who.sides.delete(k)
       this.refreshKind(k)
     } else if (ev.action === 'invited') {
       this.invite = { who: ev.who, at }
@@ -905,22 +797,22 @@ export class CombatMeter {
       // Forming your own group prints the same line, with no invite before it.
       if (this.invite && at - this.invite.at <= INVITE_MS) {
         const ik = nameKey(this.invite.who)
-        this.roster.set(ik, { name: this.invite.who, from: 'log' })
-        this.sides.delete(ik)
+        this.who.members.set(ik, { name: this.invite.who, from: 'log' })
+        this.who.sides.delete(ik)
         this.refreshKind(ik)
       }
       this.invite = null
     } else if (ev.action === 'left') {
       // Out of the group, but still a person.
-      if (this.roster.get(k)?.from === 'log') this.roster.delete(k)
-      if (!this.roster.has(k)) this.sides.set(k, 'friend')
+      if (this.who.members.get(k)?.from === 'log') this.who.members.delete(k)
+      if (!this.who.members.has(k)) this.who.sides.set(k, 'friend')
       this.refreshKind(k)
     } else if (ev.action === 'youLeft') {
       this.invite = null
-      for (const [key, m] of [...this.roster]) {
+      for (const [key, m] of [...this.who.members]) {
         if (m.from !== 'log') continue
-        this.roster.delete(key)
-        this.sides.set(key, 'friend')
+        this.who.members.delete(key)
+        this.who.sides.set(key, 'friend')
         this.refreshKind(key)
       }
     }
@@ -932,13 +824,13 @@ export class CombatMeter {
   addMember(name: string): void {
     const clean = name.trim()
     if (!clean) return
-    this.roster.set(nameKey(clean), { name: clean, from: 'you' })
+    this.who.members.set(nameKey(clean), { name: clean, from: 'you' })
     this.refreshKind(nameKey(clean))
     this.changed()
   }
 
   removeMember(name: string): void {
-    this.roster.delete(nameKey(name))
+    this.who.members.delete(nameKey(name))
     this.refreshKind(nameKey(name))
     this.changed()
   }
@@ -946,9 +838,9 @@ export class CombatMeter {
   /** Everyone out, the log's members and the hand-added alike: the group has changed and the log missed it. */
   clearGroup(): void {
     this.invite = null
-    for (const [key] of [...this.roster]) {
-      this.roster.delete(key)
-      this.sides.set(key, 'friend')
+    for (const [key] of [...this.who.members]) {
+      this.who.members.delete(key)
+      this.who.sides.set(key, 'friend')
       this.refreshKind(key)
     }
     this.changed()
@@ -960,26 +852,12 @@ export class CombatMeter {
     return this.fights.find((f) => f.id === id) ?? this.sessions.find((s) => s.id === id) ?? null
   }
 
-  /**
-   * A session's DPS over time: its fights' timelines end to end with a few quiet seconds between
-   * them, so the chart shows the fighting and not the minutes between pulls.
-   */
+  /** A session's DPS over time: its fights' timelines end to end (stitch). */
   sessionTimeline(id: string): StitchedTimeline | null {
     const s = this.sessions.find((x) => x.id === id) ?? (this.session?.id === id ? this.session : null)
     if (!s) return null
     const end = s.open ? Infinity : s.endedAt
-    const fights = this.fights.filter((f) => f.timeline && f.startedAt >= s.startedAt && f.startedAt <= end).sort((a, b) => a.startedAt - b.startedAt)
-    const out: StitchedTimeline = { you: [], pet: [], group: [], inc: [], marks: [] }
-    const keys = ['you', 'pet', 'group', 'inc'] as const
-    for (const f of fights) {
-      const tl = f.timeline!
-      if (out.you.length) for (const k of keys) out[k].push(...new Array<number>(STITCH_GAP_SEC).fill(0))
-      out.marks.push({ at: out.you.length, name: f.name })
-      // A fight's timeline has holes for its quiet seconds.
-      const len = Math.max(...keys.map((k) => tl[k].length))
-      for (const k of keys) for (let i = 0; i < len; i++) out[k].push(tl[k][i] ?? 0)
-    }
-    return out
+    return stitch(this.fights.filter((f) => f.startedAt >= s.startedAt && f.startedAt <= end))
   }
 
   /** A fight's or session's summary; a closed one's is kept, since nothing changes it after it closes. */
@@ -1001,7 +879,7 @@ export class CombatMeter {
   snapshot(): CombatSnapshot {
     const pets: string[] = []
     const otherPets: Record<string, string> = {}
-    for (const [k, owner] of this.pets) {
+    for (const [k, owner] of this.who.pets) {
       const name = this.session?.entities[k]?.name ?? this.live?.entities[k]?.name ?? k
       if (owner === SELF) pets.push(name)
       else otherPets[name] = owner
@@ -1011,8 +889,8 @@ export class CombatMeter {
       sessions: [...this.sessions].reverse().map((s) => this.summaryOf(s)),
       liveFight: this.live,
       liveSession: this.session ? this.summaryOf(this.session) : null,
-      self: this.self,
-      roster: [...this.roster.values()],
+      self: this.who.selfName,
+      roster: [...this.who.members.values()],
       pets,
       otherPets,
       reading: this.reading
