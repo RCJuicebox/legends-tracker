@@ -9,7 +9,7 @@ import { meleeProfile } from '../../core/meleeTally'
 import { craftEras } from '../../core/tradeskills'
 import { petSpells, petSummonName } from '../../core/pets'
 import type { EffectSpell } from '../../core/itemEffects'
-import { isCharacterKey, sanitizeSheet } from '../../core/validate'
+import { intArg, isCharacterKey, sanitizeSheet, stringsArg } from '../../core/validate'
 import { characterLogFile } from '../storeCore'
 import type { AppContext } from '../context'
 import type { CatalogFile } from '../../shared/ipc'
@@ -58,9 +58,13 @@ export function registerCharacterIpc(ctx: AppContext): void {
   // Focus effects on gear, read from the game's spell file: each one's line and strength for these
   // classes at this level, and which of their spells each line improves. Judged on what the character
   // casts: their casts over the last `days` days of play, from the log and its archives.
-  handle('gear:foci', async (names, classes, level, character, days) => {
+  handle('gear:foci', async (rawNames, rawClasses, rawLevel, character, rawDays) => {
     const book = engine.book
     if (!book) return null
+    const names = stringsArg(rawNames, 1000)
+    const classes = stringsArg(rawClasses, 16, 40)
+    const level = intArg(rawLevel, 1, 100, 50)
+    const days = intArg(rawDays, 0, 3650, 14)
     const specs = [...new Set(names)]
       .map((n) => book.named(n))
       .flatMap((s) => (s ? [focusSpec(s)] : []))
@@ -87,18 +91,22 @@ export function registerCharacterIpc(ctx: AppContext): void {
       if (s) spells[n] = { name: s.name, effects: s.effects, formula: s.formula, cap: s.cap, beneficial: s.beneficial, targetType: s.targetType }
     }
     if (!isCharacterKey(character)) return { spells, profile: null, loaded: !!book }
-    const recent = await ctx.meleeHistory.recent({ ...history(character), days: typeof days === 'number' ? days : 14 }).catch((e) => {
+    const recent = await ctx.meleeHistory.recent({ ...history(character), days: intArg(days, 0, 3650, 14) }).catch((e) => {
       log.warn('Could not read the melee history:', e)
       return null
     })
     return { spells, profile: recent ? meleeProfile(recent.counts, recent) : null, loaded: !!book }
   })
 
-  handle('stats:caps', async (classes, level) => ({
-    skills: await ctx.gameTables.skillCaps(classes, level),
-    ac: await ctx.gameTables.acCaps(classes, level),
-    factors: await ctx.gameTables.classFactors(classes, level)
-  }))
+  handle('stats:caps', async (rawClasses, rawLevel) => {
+    const classes = stringsArg(rawClasses, 16, 40)
+    const level = intArg(rawLevel, 1, 100, 50)
+    return {
+      skills: await ctx.gameTables.skillCaps(classes, level),
+      ac: await ctx.gameTables.acCaps(classes, level),
+      factors: await ctx.gameTables.classFactors(classes, level)
+    }
+  })
   // The picked character's own /alternateadv list, whichever character is being played.
   handle('stats:readAAs', (character) => {
     if (!isCharacterKey(character)) throw new Error('Not a character.')
@@ -140,8 +148,8 @@ export function registerCharacterIpc(ctx: AppContext): void {
   // character, then followed live), and every pet the character's classes can summon.
   handle('pet:state', async (character, classes, level) => {
     if (!isCharacterKey(character)) throw new Error('Not a character.')
-    const ids = Array.isArray(classes) ? classes.filter((c): c is string => typeof c === 'string') : []
-    const lvl = typeof level === 'number' ? level : 50
+    const ids = stringsArg(classes, 16, 40)
+    const lvl = intArg(level, 1, 100, 50)
     const book = engine.book
     if (!ctx.petScanned.has(character) && book) {
       ctx.petScanned.add(character)
@@ -150,7 +158,7 @@ export function registerCharacterIpc(ctx: AppContext): void {
     return { character, ...(await ctx.petStore.get(character)), spells: book ? petSpells(book, ids, lvl) : [], spellsLoaded: !!book }
   })
   handle('pet:profile', (spell, force) => {
-    if (typeof spell !== 'string' || !spell.trim()) throw new Error('Not a spell.')
+    if (typeof spell !== 'string' || !spell.trim() || spell.length > 100) throw new Error('Not a spell.')
     return ctx.petWiki.profile(spell.trim(), force === true).then((profile) => ({ spell: spell.trim(), profile }))
   })
 }

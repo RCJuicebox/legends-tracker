@@ -45,6 +45,10 @@ What changed in each version. The release workflow publishes a version's section
 - **Factions: a plan searched again keeps the step you are on.** New ways read from Allakhazam (a page every twenty seconds) reshuffled the plan and reset the Now card's progress; the plan is searched again only when the ways themselves change or you change the kill pace, and the step worked on keeps its place and progress wherever it lands in the new order.
 - **Factions: a second character's Allakhazam pages come first** once it is picked, rather than after hours of the first character's; the pages read are written every ten, not after each.
 - **Factions: a groupmate talking as a faction changes is not taken for the NPC** of a hand-in; a one-word NPC counts once you have offered it something in the zone.
+- **Overlays follow your monitors.** Plugging a monitor in or out, or changing its resolution or scaling, places the overlays again; before, they stayed where the old layout put them until the next settings change.
+- **A window that keeps crashing is left closed** after three tries in five minutes, with a word in the Live feed, instead of being made again every second. A page that cannot be loaded at all (a damaged install) is logged, and the main window's says so on screen.
+- **An unexpected error's message no longer stops the app** while it waits to be closed: timers, speech and overlays carry on behind it.
+- **Copy diagnostics says more**: each data source's state and last error, every monitor and its scaling, speech and Azure, hotkeys another program holds, the character record, triggers that would not compile, the spell file's date and the settings schema.
 
 ## 2.4.0 (2026-09-29)
 

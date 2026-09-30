@@ -115,10 +115,19 @@ export class Store {
     for (const f of this.newer) byName[f]?.freeze('written by a newer version')
     // Its contents are unknown, not bad: writing defaults over it would lose them.
     for (const f of this.unreadable) byName[f]?.freeze('could not be read at start')
-    // Brought forward: written in the new shape at the next save or at quit.
-    for (const f of migrated) byName[f]?.markDirty()
     this.schema = new JsonFile(p('schema.json'), versions)
     if (Object.keys(versions).some((f) => recorded[f] !== versions[f])) this.schema.markDirty()
+    // Brought forward: written in the new shape at once, then schema.json. Left to quit, a crash on
+    // this first run would leave schema.json at the old number and migrate the files again next time.
+    const brought = migrated.flatMap((f) => (byName[f] ? [byName[f]] : []))
+    for (const file of brought) file.markDirty()
+    if (brought.length) void this.writeMigrated(brought)
+  }
+
+  /** Migrated files first, and schema.json only once every one of them is on disk. */
+  private async writeMigrated(files: JsonFile<unknown>[]): Promise<void> {
+    await Promise.all(files.map((f) => f.flush()))
+    if (!files.some((f) => f.pending)) await this.schema.flush()
   }
 
   characterOf(logFile: string): CharacterSettings {
@@ -156,7 +165,9 @@ export class Store {
 
   /** Writes whatever changed. Never rejects: a file that cannot be written is logged. */
   async flushAll(): Promise<void> {
-    const files = [this.settings, this.triggers, this.rules, this.casts, this.motes, this.stock, this.respawns, this.buffs, this.schema]
+    const files = [this.settings, this.triggers, this.rules, this.casts, this.motes, this.stock, this.respawns, this.buffs]
     await Promise.allSettled(files.map((f) => f.flush()))
+    // Last, so it never names a schema the files on disk are not yet at.
+    await this.schema.flush()
   }
 }

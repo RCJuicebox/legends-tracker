@@ -15,7 +15,8 @@ app.setPath('userData', process.env['EQL_USER_DATA'] || join(app.getPath('appDat
 initLog(join(app.getPath('userData'), 'logs'))
 log.info(`Legends Tracker ${app.getVersion()}${app.isPackaged ? '' : ' (development)'} on Windows ${release()} ${process.arch}, Electron ${process.versions.electron}`)
 // Something unexpected: logged, and shown once with where the log is, since the app may now be in a
-// state nobody meant. A second one ends it rather than carry on further.
+// state nobody meant. A second one ends it rather than carry on further. The box does not wait to be
+// closed: timers, the log and the overlays carry on behind it.
 let uncaught = 0
 process.on('uncaughtException', (e) => {
   log.error('Uncaught exception:', e)
@@ -23,14 +24,16 @@ process.on('uncaughtException', (e) => {
     app.exit(1)
     return
   }
-  try {
-    dialog.showErrorBox(
-      'Legends Tracker hit an unexpected error',
-      `${e instanceof Error ? e.message : String(e)}\n\nIt keeps running, but if it misbehaves, restart it. The details are in ${join(app.getPath('userData'), 'logs', 'main.log')}.`
-    )
-  } catch {
-    // Too early for a dialog; the log has it.
-  }
+  const title = 'Legends Tracker hit an unexpected error'
+  const detail = `${e instanceof Error ? e.message : String(e)}\n\nIt keeps running, but if it misbehaves, restart it. The details are in ${join(app.getPath('userData'), 'logs', 'main.log')}.`
+  if (app.isReady()) void dialog.showMessageBox({ type: 'error', title: 'Legends Tracker', message: title, detail }).catch(() => undefined)
+  else
+    try {
+      // Before the app is ready only the plain box can be shown; nothing is running yet for it to hold up.
+      dialog.showErrorBox(title, detail)
+    } catch {
+      // Too early for any dialog; the log has it.
+    }
 })
 process.on('unhandledRejection', (e) => log.error('Unhandled rejection:', e))
 

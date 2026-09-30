@@ -7,6 +7,7 @@ import type { OverlayConfig } from '../src/shared/types'
 type Rect = { x: number; y: number; width: number; height: number }
 const displays: { workArea: Rect }[] = []
 const created: { opts: Rect; bounds: Rect[] }[] = []
+const screenEvents = new Map<string, () => void>()
 
 vi.mock('electron', () => {
   class BrowserWindow {
@@ -34,7 +35,12 @@ vi.mock('electron', () => {
   return {
     BrowserWindow,
     // One display id for all: while playing, the overlays of one display share a host window.
-    screen: { getAllDisplays: () => displays, getPrimaryDisplay: () => displays[0], getDisplayMatching: () => ({ id: 1 }) }
+    screen: {
+      getAllDisplays: () => displays,
+      getPrimaryDisplay: () => displays[0],
+      getDisplayMatching: () => ({ id: 1 }),
+      on: (event: string, fn: () => void) => void screenEvents.set(event, fn)
+    }
   }
 })
 
@@ -141,5 +147,29 @@ describe('host windows', () => {
     expect(created).toHaveLength(3)
     manager.setArranging(false)
     expect(created).toHaveLength(4)
+  })
+})
+
+describe('monitors changing', () => {
+  it('places the overlays again, once, when a monitor is unplugged', async () => {
+    vi.useFakeTimers()
+    try {
+      displays.push({ workArea: PRIMARY }, { workArea: RIGHT })
+      manager.followDisplays()
+      manager.apply([overlay({ x: 2400, y: 300 })])
+      expect(created).toHaveLength(1)
+      expect(created[0].bounds.at(-1)).toMatchObject({ x: 2400, y: 300 })
+      // The right-hand monitor goes; Windows reports it more than once.
+      displays.splice(1, 1)
+      screenEvents.get('display-removed')!()
+      screenEvents.get('display-metrics-changed')!()
+      await vi.advanceTimersByTimeAsync(1000)
+      // A new host window, brought onto the primary monitor.
+      expect(created).toHaveLength(2)
+      const b = created[1].bounds.at(-1)!
+      expect(b.x + b.width).toBeLessThanOrEqual(PRIMARY.width)
+    } finally {
+      vi.useRealTimers()
+    }
   })
 })

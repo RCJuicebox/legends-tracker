@@ -5,6 +5,10 @@ import type { AppContext } from './context'
 
 // How the app ends, and what it does about second copies, stray navigation and crashed pages.
 
+/** A crashed page is made again this many times in CRASH_WINDOW_MS; after that it is left closed. */
+const CRASHES_RECOVERED = 3
+const CRASH_WINDOW_MS = 5 * 60_000
+
 export function registerLifecycle(ctx: AppContext): void {
   // A second copy started with --quit is a request to shut this one down properly (settings written,
   // overlays closed), from a script or a launcher about to start a fresh one; any other second copy
@@ -34,10 +38,25 @@ export function registerLifecycle(ctx: AppContext): void {
     })
   })
   // A page that crashed is loaded again: the main window reloads, an overlay or the audio window is
-  // made afresh. Not while quitting, and not for a page that closed normally.
+  // made afresh. Not while quitting, and not for a page that closed normally. One that keeps crashing
+  // (as it loads, say) is left closed after a few, rather than made again every second all evening.
+  const crashes = new Map<string, number[]>()
   app.on('render-process-gone', (_e, wc, d) => {
-    log.error(`A page stopped (${d.reason}, exit ${d.exitCode}): ${wc.getURL()}`)
+    const url = wc.getURL()
+    log.error(`A page stopped (${d.reason}, exit ${d.exitCode}): ${url}`)
     if (ctx.windows.quitting || d.reason === 'clean-exit') return
+    const now = Date.now()
+    const recent = (crashes.get(url) ?? []).filter((t) => now - t < CRASH_WINDOW_MS)
+    recent.push(now)
+    crashes.set(url, recent)
+    if (recent.length > CRASHES_RECOVERED) {
+      if (recent.length === CRASHES_RECOVERED + 1) {
+        const page = url.split('/').pop()?.split('?')[0] ?? url
+        log.error(`${page} crashed ${recent.length} times in five minutes; left closed until the app is restarted`)
+        ctx.engine.pushFeed('warn', `A window (${page}) kept crashing and was left closed. Restart the app to bring it back; main.log has the details.`)
+      }
+      return
+    }
     setTimeout(() => {
       if (ctx.windows.quitting) return
       if (ctx.windows.recover(wc)) return

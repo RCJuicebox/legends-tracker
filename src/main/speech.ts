@@ -89,6 +89,10 @@ export class SpeechWorker {
   private readonly cache = new Map<string, Buffer>()
   voices: string[] = []
   failed = ''
+  /** The PowerShell process is up (it starts on first need and stops when idle). */
+  get running(): boolean {
+    return !!this.proc
+  }
   private ready: Promise<void> | null = null
   private idle: NodeJS.Timeout | null = null
 

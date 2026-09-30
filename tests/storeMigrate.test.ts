@@ -72,6 +72,15 @@ describe('a profile saved at an older schema', () => {
     expect((readJson('schema.json') as Record<string, number>)['settings.json']).toBe(2)
   })
 
+  it('is written at once, and schema.json after it, so a crash before quitting does not migrate it again', async () => {
+    writeFileSync(file('settings.json'), JSON.stringify({ zoom: 1.5 }))
+    writeFileSync(file('schema.json'), JSON.stringify({ 'settings.json': 1 }))
+    const store = new Store(defaultTriggers)
+    await vi.waitFor(() => expect((readJson('schema.json') as Record<string, number>)['settings.json']).toBe(2))
+    expect((readJson('settings.json') as Record<string, unknown>).uiScale).toBe(1.5)
+    expect(store.settings.pending).toBe(false)
+  })
+
   it('is not migrated again once it is at the new schema', () => {
     const run = vi.spyOn(migrate, 'run')
     writeFileSync(file('settings.json'), JSON.stringify({ ...defaultSettings(), uiScale: 1.5 }))

@@ -2,7 +2,7 @@ import { app, BrowserWindow, dialog, Menu, nativeImage, nativeTheme, Notificatio
 import { join } from 'node:path'
 import { JsonFile, readJsonFile } from './storeCore'
 import { push } from './push'
-import { log } from './log'
+import { log, logDir } from './log'
 import type { AudioSettings } from '../shared/types'
 import type { AudioCommand, PushChannel, Pushes } from '../shared/ipc'
 
@@ -11,8 +11,24 @@ import type { AudioCommand, PushChannel, Pushes } from '../shared/ipc'
 
 export type Page = 'index' | 'overlay' | 'overlays' | 'alerts' | 'audio'
 
-/** Loads one of the app's pages into a window: from the dev server in development, the built file otherwise. */
+/**
+ * Loads one of the app's pages into a window: from the dev server in development, the built file otherwise.
+ * A page that cannot be loaded (a damaged install) is logged; the main window's says so on screen, since
+ * without it nothing would ever appear.
+ */
 export function loadPage(win: BrowserWindow, page: Page, query: Record<string, string> = {}): void {
+  win.webContents.on('did-fail-load', (_e, code, description, url, mainFrame) => {
+    // -3 is a load cut short by another (a reload), not a failure.
+    if (!mainFrame || code === -3) return
+    log.error(`The ${page} page could not be loaded (${description}, ${code}): ${url}`)
+    if (page !== 'index') return
+    void dialog.showMessageBox({
+      type: 'error',
+      title: 'Legends Tracker',
+      message: 'Legends Tracker could not open its window',
+      detail: `${description} (${code}) loading ${url}.\n\nReinstalling it should mend this. The details are in ${join(logDir(), 'main.log')}.`
+    })
+  })
   const dev = process.env['ELECTRON_RENDERER_URL']
   if (dev) {
     const qs = new URLSearchParams(query).toString()

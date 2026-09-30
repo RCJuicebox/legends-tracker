@@ -113,6 +113,7 @@ async function start(ctx: AppContext): Promise<void> {
   }
   if (store.settingsFresh) placeOverlaysForNewInstall(ctx)
   ctx.overlays.apply(store.settings.get().overlays)
+  ctx.overlays.followDisplays()
   ctx.watcher.start()
   ctx.updater.start()
   ctx.applyHotkeys()

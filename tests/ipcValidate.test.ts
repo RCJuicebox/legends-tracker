@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { defaultSettings } from '../src/main/storeCore'
-import { isCharacterKey, sanitizeCharacter, sanitizeSettings, sanitizeTriggers } from '../src/core/validate'
+import { intArg, isCharacterKey, isRecordKey, sanitizeCharacter, sanitizeSettings, sanitizeTriggers, stringsArg, textArg } from '../src/core/validate'
 import { channelAllowed } from '../src/preload/channels'
 
 describe('character keys from a page', () => {
@@ -18,6 +18,29 @@ describe('character keys from a page', () => {
   it('takes any name the game can put in a file name', () => {
     expect(isCharacterKey('Jean-Luc_neriak')).toBe(true)
     expect(isCharacterKey('Björn_neriak')).toBe(true)
+  })
+
+  it("takes no name Windows keeps for a device, and none that is an object's own", () => {
+    for (const k of ['CON', 'con', 'NUL.json', 'com1', 'LPT9', 'aux', 'PRN', '__proto__', 'constructor', 'prototype']) expect(isCharacterKey(k)).toBe(false)
+    expect(isCharacterKey('Conan_neriak')).toBe(true)
+    expect(isCharacterKey('Nul_tunare')).toBe(true)
+  })
+})
+
+describe('other arguments from a page', () => {
+  it('keys, text, numbers and lists are checked and cut to size', () => {
+    expect(isRecordKey('Envenomed Bolt')).toBe(true)
+    expect(isRecordKey('__proto__')).toBe(false)
+    expect(isRecordKey('x'.repeat(121))).toBe(false)
+    expect(isRecordKey(7)).toBe(false)
+    expect(textArg('x'.repeat(500), 300)).toHaveLength(300)
+    expect(textArg({ toString: () => 'boo' }, 300)).toBe('')
+    expect(intArg(1e9, 1, 2048, 100)).toBe(2048)
+    expect(intArg(-5, 1, 2048, 100)).toBe(1)
+    expect(intArg(NaN, 1, 2048, 100)).toBe(100)
+    expect(intArg('64', 1, 2048, 100)).toBe(100)
+    expect(stringsArg(['SHD', 3, '', 'x'.repeat(50), 'MNK'], 16, 40)).toEqual(['SHD', 'MNK'])
+    expect(stringsArg('SHD', 16)).toEqual([])
   })
 })
 

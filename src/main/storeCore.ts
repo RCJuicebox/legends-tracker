@@ -177,6 +177,11 @@ export class JsonFile<T> {
     this.dirty = true
   }
 
+  /** Changed since the last write that reached the disk. */
+  get pending(): boolean {
+    return this.dirty
+  }
+
   /** Never writes the file again this run: it holds what a newer build saved, which this one must not overwrite. */
   freeze(reason: string): void {
     this.frozen = reason

@@ -1,5 +1,6 @@
 import { isAbsolute } from 'node:path'
 import { handle } from './handle'
+import { textArg } from '../../core/validate'
 import { onSend } from '../push'
 import type { AppContext } from '../context'
 
@@ -8,7 +9,7 @@ import type { AppContext } from '../context'
 export function registerAudioIpc(ctx: AppContext): void {
   const { store, engine, speech, azure } = ctx
 
-  handle('audio:test', (text) => engine.speak(String(text), true))
+  handle('audio:test', (text) => engine.speak(textArg(text, 300), true))
   handle('audio:azure', async () => {
     await azure.load()
     return azure.status()

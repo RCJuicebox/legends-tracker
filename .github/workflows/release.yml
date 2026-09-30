@@ -58,9 +58,8 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci
-      - run: npm run typecheck
-      - run: npm run lint
-      - run: npm test
+      # What CI runs: typecheck, lint, the format check and the tests.
+      - run: npm run check
 
       - name: Check the tag matches package.json
         if: env.PUBLISH == 'true'
@@ -83,9 +82,16 @@ jobs:
             --notes-file release-notes.md
 
       - run: npx electron-vite build
+      # The built app starts on a throwaway profile and quits when asked, before anything is uploaded.
+      - run: npm run smoke
 
       - name: Build the installer
         run: npx electron-builder --win --publish ${{ env.PUBLISH == 'true' && 'always' || 'never' }}
+
+      # The packaged app too (its file list is what tests and the source run never see; 1.2.0 shipped
+      # without koffi's JavaScript). The release is still a draft here: a failure leaves it one.
+      - name: Start the packaged app
+        run: node scripts/smoke.mjs "dist/win-unpacked/Legends Tracker.exe"
 
       # The release for this tag that has every file, by its id: a stray draft for the same tag (one an
       # earlier run left) is passed over rather than looked at by tag name.

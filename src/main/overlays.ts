@@ -44,8 +44,33 @@ export class OverlayManager {
   private lastCombat: CombatSnapshot | null = null
   private lastAchievements: AchievementTrack | null = null
   private shown = true
+  private displayTimer: NodeJS.Timeout | null = null
+  private followingDisplays = false
 
   constructor(private readonly host: OverlayHost) {}
+
+  /**
+   * Places the overlays again when a monitor is plugged in or out, or its resolution or scaling
+   * changes: each host covers its overlays on one display, worked out when it was made. Once the app
+   * is ready (`screen` is not usable before); changes a moment apart are taken as one.
+   */
+  followDisplays(): void {
+    if (this.followingDisplays) return
+    this.followingDisplays = true
+    const changed = () => {
+      if (this.displayTimer) clearTimeout(this.displayTimer)
+      this.displayTimer = setTimeout(() => {
+        this.displayTimer = null
+        // Arranging, each overlay has its own window where the player is dragging it: left be.
+        if (this.arranging) return
+        this.closeHosts()
+        this.apply(this.configs)
+      }, 750)
+    }
+    screen.on('display-added', changed)
+    screen.on('display-removed', changed)
+    screen.on('display-metrics-changed', changed)
+  }
 
   get isArranging(): boolean {
     return this.arranging
@@ -361,6 +386,8 @@ export class OverlayManager {
   destroy(): void {
     if (this.topmostTimer) clearInterval(this.topmostTimer)
     this.topmostTimer = null
+    if (this.displayTimer) clearTimeout(this.displayTimer)
+    this.displayTimer = null
     this.closeWindows()
     this.closeHosts()
   }

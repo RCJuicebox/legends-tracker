@@ -246,3 +246,33 @@ describe('Quitting with the real engine', () => {
     }
   })
 })
+
+describe('Crashed pages', () => {
+  it('makes a crashed page again three times in five minutes, then leaves it closed and says so once', async () => {
+    vi.useFakeTimers()
+    const ctx = fakeContext()
+    const recovered: string[] = []
+    const feed: string[] = []
+    ctx.windows.recover = () => false
+    ctx.overlays.recover = () => {
+      recovered.push('overlay')
+      return true
+    }
+    ctx.engine.pushFeed = (_kind: string, text: string) => void feed.push(text)
+    registerLifecycle(ctx)
+    const wc = { getURL: () => 'file:///app/out/renderer/overlay.html?host=1' }
+    const crash = () => h.handlers.get('render-process-gone')!({}, wc, { reason: 'crashed', exitCode: 1 })
+    for (let i = 0; i < 5; i++) {
+      crash()
+      await vi.advanceTimersByTimeAsync(1500)
+    }
+    expect(recovered).toHaveLength(3)
+    expect(feed).toHaveLength(1)
+    expect(feed[0]).toContain('overlay.html')
+    // Five minutes on, it is made again.
+    await vi.advanceTimersByTimeAsync(5 * 60_000)
+    crash()
+    await vi.advanceTimersByTimeAsync(1500)
+    expect(recovered).toHaveLength(4)
+  })
+})
