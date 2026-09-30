@@ -60,6 +60,9 @@ What changed in each version. The release workflow publishes a version's section
 - **Slayer counts a skeletal wolf as a wolf**, once, not as a skeleton too (a word that describes gives way to the one that names), and never counts a player your side killed.
 - **Buffs reads /who lines of players away, linkdead or with a surname.**
 - **Factions: a log archived and begun afresh is read from its start** for the changes since your export, even once it has grown past where the old one ended; and a game folder with no achievement list says so instead of "every faction achievement is done".
+- **The app's log (main.log) reads in your own time**, with its offset from UTC, so its lines match the game's log by eye; a line repeated many times is written once with a count, and two old logs are kept. A speech engine that stops working shows on Data Sources.
+- **Fixed: when the log you watch is not in the game's Logs folder**, the pages that read your history (Gear, Spell upgrades, Tradeskills, Factions) now read that log too.
+- **Reading the screen leaves nothing behind**: the enlarged picture it reads goes in the app's own cache folder and is removed whatever happens.
 
 ## 2.4.0 (2026-09-29)
 

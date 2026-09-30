@@ -11,7 +11,7 @@ import { cacheDir } from './paths'
 // player reads a window; it never touches the game's process or memory. The capture is enlarged 3×
 // and inverted to dark-on-light first: the game's small light-on-dark font reads far better that way.
 const SCRIPT = `
-param([string]$Path, [int]$Scale, [string]$Compose = '')
+param([string]$Path, [int]$Scale, [string]$Out, [string]$Compose = '')
 $ErrorActionPreference = 'Stop'
 Add-Type -AssemblyName System.Runtime.WindowsRuntime
 Add-Type -AssemblyName System.Drawing
@@ -43,7 +43,7 @@ $m = [float[][]]@(@(-0.3,-0.3,-0.3,0,0), @(-0.59,-0.59,-0.59,0,0), @(-0.11,-0.11
 $ia = New-Object System.Drawing.Imaging.ImageAttributes
 $ia.SetColorMatrix((New-Object System.Drawing.Imaging.ColorMatrix(,$m)))
 $g.DrawImage($src, (New-Object System.Drawing.Rectangle 0, 0, $w, $h), 0, 0, $src.Width, $src.Height, [System.Drawing.GraphicsUnit]::Pixel, $ia)
-$prepared = [System.IO.Path]::Combine([System.IO.Path]::GetTempPath(), [Guid]::NewGuid().ToString() + '.png')
+$prepared = [System.IO.Path]::GetFullPath($Out)
 $bmp.Save($prepared, [System.Drawing.Imaging.ImageFormat]::Png); $g.Dispose(); $bmp.Dispose(); $src.Dispose()
 $file = Await ([Windows.Storage.StorageFile]::GetFileFromPathAsync($prepared)) ([Windows.Storage.StorageFile])
 $stream = Await ($file.OpenAsync([Windows.Storage.FileAccessMode]::Read)) ([Windows.Storage.Streams.IRandomAccessStream])
@@ -73,6 +73,9 @@ function scriptFile(): Promise<string> {
 /** OCR of an image file: every word with its box, in the image's own pixel coordinates. */
 export async function ocrImage(path: string, scale = 3, layout?: Composite): Promise<OcrWord[]> {
   const script = await scriptFile()
+  // The enlarged picture the OCR reads, in the app's own cache folder: removed here whatever the
+  // script got to, since it is a picture of the screen.
+  const prepared = join(cacheDir(), `ocr-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}.png`)
   const out = await new Promise<string>((resolve, reject) => {
     const p = spawn(
       'powershell.exe',
@@ -88,6 +91,8 @@ export async function ocrImage(path: string, scale = 3, layout?: Composite): Pro
         path,
         '-Scale',
         String(scale),
+        '-Out',
+        prepared,
         ...(layout ? ['-Compose', composeArg(layout)] : [])
       ],
       {
@@ -110,7 +115,7 @@ export async function ocrImage(path: string, scale = 3, layout?: Composite): Pro
       if (code === 0) resolve(stdout)
       else reject(new Error(stderr.split('\n').find((l) => l.trim()) || `OCR exited ${code}`))
     })
-  })
+  }).finally(() => fs.rm(prepared, { force: true }).catch((e: unknown) => log.warn(`Could not delete ${prepared}`, e)))
   type Raw = { t: string; x: number; y: number; w: number; h: number }
   // PowerShell writes a single-element array as a bare object.
   const parsed = JSON.parse(out || '[]') as Raw[] | Raw

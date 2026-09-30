@@ -29,7 +29,10 @@ export class Updater {
     autoUpdater.autoDownload = true
     autoUpdater.autoInstallOnAppQuit = true
     autoUpdater.on('checking-for-update', () => this.set({ state: 'checking' }))
-    autoUpdater.on('update-not-available', () => this.set({ state: 'idle', checkedAt: Date.now() }))
+    autoUpdater.on('update-not-available', () => {
+      this.lastFailure = ''
+      this.set({ state: 'idle', checkedAt: Date.now() })
+    })
     autoUpdater.on('update-available', (info) => this.set({ state: 'downloading', version: info.version, percent: 0, notes: notesText(info.releaseNotes) }))
     autoUpdater.on('download-progress', (p) => {
       const s = this.status.state === 'downloading' ? this.status : { version: '', notes: undefined }
@@ -37,7 +40,7 @@ export class Updater {
     })
     autoUpdater.on('update-downloaded', (info) => this.set({ state: 'ready', version: info.version, notes: notesText(info.releaseNotes) }))
     autoUpdater.on('error', (e) => {
-      log.warn('Update failed:', e)
+      this.failed('Update failed:', e)
       this.set({ state: 'error', message: friendly(e) })
     })
     // Give the app a moment to settle before the first check.
@@ -50,9 +53,20 @@ export class Updater {
     try {
       await electronUpdater.autoUpdater.checkForUpdates()
     } catch (e) {
-      log.warn('Update check failed:', e)
+      this.failed('Update check failed:', e)
       this.set({ state: 'error', message: friendly(e) })
     }
+  }
+
+  /** The last failure written to the log: offline, the hourly check fails the same way every time. */
+  private lastFailure = ''
+
+  /** Logs a failure once, until another failure or a good check. */
+  private failed(what: string, e: unknown): void {
+    const why = friendly(e)
+    if (why === this.lastFailure) return
+    this.lastFailure = why
+    log.warn(what, e)
   }
 
   /** Restarts into the downloaded version. */

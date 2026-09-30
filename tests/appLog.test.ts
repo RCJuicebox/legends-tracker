@@ -1,5 +1,5 @@
 import { afterAll, afterEach, describe, expect, it, vi } from 'vitest'
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { initLog, log, logDir } from '../src/main/log'
@@ -26,48 +26,65 @@ describe('the diagnostic log', () => {
     expect(String(err.mock.calls[0][0])).toMatch(/ WARN  a warning$/)
   })
 
-  it('makes its folder and appends timestamped lines to main.log', () => {
+  it('makes its folder and appends lines stamped in local time with its offset', () => {
     const dir = freshDir()
     initLog(dir)
     expect(logDir()).toBe(dir)
     log.info('one', 2, { three: 3 })
     log.error(new Error('broke'))
     const lines = readFileSync(join(dir, 'main.log'), 'utf8').split('\n')
-    expect(lines[0]).toMatch(/^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d{3}Z INFO  one 2 \{"three":3\}$/)
+    // Local time, as the game's own log is: a line here and one there can be matched by eye.
+    expect(lines[0]).toMatch(/^\d{4}-\d\d-\d\d \d\d:\d\d:\d\d\.\d{3} [+-]\d\d:\d\d INFO  one 2 \{"three":3\}$/)
     expect(lines[1]).toMatch(/ ERROR Error: broke$/)
   })
 
-  it('does not roll over at exactly 2 MB', () => {
+  it('does not roll over short of 2 MB', () => {
     const dir = freshDir()
+    mkdirSync(dir, { recursive: true })
+    writeFileSync(join(dir, 'main.log'), 'x'.repeat(TWO_MB - 100))
     initLog(dir)
-    writeFileSync(join(dir, 'main.log'), 'x'.repeat(TWO_MB))
     log.info('still the same file')
     expect(existsSync(join(dir, 'main.old.log'))).toBe(false)
     expect(readFileSync(join(dir, 'main.log'), 'utf8')).toMatch(/still the same file\n$/)
   })
 
-  it('rolls main.log over to main.old.log once it is past 2 MB', () => {
+  it('rolls main.log over to main.old.log once a line would take it past 2 MB', () => {
     const dir = freshDir()
-    initLog(dir)
+    mkdirSync(dir, { recursive: true })
     const big = 'x'.repeat(TWO_MB + 1)
     writeFileSync(join(dir, 'main.log'), big)
+    initLog(dir)
     log.warn('after the roll')
     expect(readFileSync(join(dir, 'main.old.log'), 'utf8')).toBe(big)
-    const now = readFileSync(join(dir, 'main.log'), 'utf8')
-    expect(now).toMatch(/^\S+ WARN  after the roll\n$/)
+    expect(readFileSync(join(dir, 'main.log'), 'utf8')).toMatch(/^\S+ \S+ \S+ WARN  after the roll\n$/)
   })
 
-  it('keeps only one old log: a second roll replaces the first', () => {
+  it('keeps two old logs: a third roll drops the oldest', () => {
+    const dir = freshDir()
+    mkdirSync(dir, { recursive: true })
+    const roll = (fill: string, line: string) => {
+      writeFileSync(join(dir, 'main.log'), fill.repeat(TWO_MB + 1))
+      initLog(dir)
+      log.info(line)
+    }
+    roll('a', 'first roll')
+    roll('b', 'second roll')
+    roll('c', 'third roll')
+    expect(readFileSync(join(dir, 'main.old.log'), 'utf8').startsWith('c')).toBe(true)
+    expect(readFileSync(join(dir, 'main.old2.log'), 'utf8').startsWith('b')).toBe(true)
+    expect(readFileSync(join(dir, 'main.log'), 'utf8')).toMatch(/third roll\n$/)
+  })
+
+  it('writes a line that comes again and again once, then how many more times', () => {
     const dir = freshDir()
     initLog(dir)
-    writeFileSync(join(dir, 'main.log'), 'a'.repeat(TWO_MB + 1))
-    log.info('first roll')
-    writeFileSync(join(dir, 'main.log'), 'b'.repeat(TWO_MB + 1))
-    log.info('second roll')
-    const old = readFileSync(join(dir, 'main.old.log'), 'utf8')
-    expect(old.startsWith('b')).toBe(true)
-    expect(old).not.toContain('a')
-    expect(readFileSync(join(dir, 'main.log'), 'utf8')).toMatch(/second roll\n$/)
+    for (let i = 0; i < 5; i++) log.warn('Page overlay.html: the same warning')
+    log.info('something else')
+    const lines = readFileSync(join(dir, 'main.log'), 'utf8').trimEnd().split('\n')
+    expect(lines).toHaveLength(3)
+    expect(lines[0]).toMatch(/WARN  Page overlay\.html: the same warning$/)
+    expect(lines[1]).toMatch(/WARN  \(the line above 4 more times\)$/)
+    expect(lines[2]).toMatch(/INFO  something else$/)
   })
 
   it('falls back to the console when its folder cannot be made', () => {

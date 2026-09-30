@@ -7,7 +7,7 @@
 // Exits 0 when the app started, answered app:state and quit by itself; 1 otherwise.
 
 import { spawn } from 'node:child_process'
-import { mkdtempSync, rmSync } from 'node:fs'
+import { copyFileSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { setTimeout as sleep } from 'node:timers/promises'
@@ -18,6 +18,19 @@ const appArgs = process.argv[2] ? [] : [root]
 const port = 9400 + Math.floor(Math.random() * 400)
 const profile = mkdtempSync(join(tmpdir(), 'lt-smoke-'))
 const env = { ...process.env, EQL_USER_DATA: profile }
+
+// A tiny game folder beside the profile: the test spell files and one character log with a mote in
+// it. A first start with no mote history reads it on the mote worker thread, which only a packaged
+// build lays out the way an installed copy does.
+const game = join(profile, 'game')
+mkdirSync(join(game, 'Logs'), { recursive: true })
+for (const f of ['spells_us.txt', 'spells_us_str.txt']) copyFileSync(join(root, 'tests', 'fixtures', f), join(game, f))
+writeFileSync(
+  join(game, 'Logs', 'eqlog_Smoke_test.txt'),
+  '[Thu Sep 24 16:00:00 2026] You have entered The Plane of Fear 4 (Refined).\r\n' +
+    '[Thu Sep 24 16:23:16 2026] You looted 4 Mote of Major Potential from Reward Chest and stored it in your currency.\r\n'
+)
+writeFileSync(join(profile, 'settings.json'), JSON.stringify({ installDir: game, logFile: '', autoStart: false, hotkeys: false, audio: { muted: true } }))
 
 function fail(message) {
   console.error(`smoke: ${message}`)
@@ -66,6 +79,13 @@ try {
   for (const key of ['settings', 'status', 'timers', 'feed', 'character']) if (!state.keys.includes(key)) fail(`app:state has no ${key}`)
   if (!state.overlays) fail('app:state has no overlays')
   console.log(`smoke: the window came up; app:state has ${state.keys.length} fields and ${state.overlays} overlays`)
+
+  // The mote worker read the fake log: its mote is in the history.
+  const motes = await until('the mote history', 30_000, () =>
+    evaluate(page.webSocketDebuggerUrl, "window.eql.invoke('motes:get').then((m) => (m.scanning ? null : m.daily['2026-09-24'] ?? { none: true }))")
+  )
+  if (motes.major !== 4) fail(`the mote history did not come from the worker: ${JSON.stringify(motes)}`)
+  else console.log('smoke: the mote worker read the log (4 Major on 2026-09-24)')
 
   // A second copy with --quit asks the first to save and close, and exits itself.
   const quitter = spawn(exe, [...appArgs, '--quit'], { env, stdio: 'ignore' })

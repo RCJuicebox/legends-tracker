@@ -1,6 +1,7 @@
 import { existsSync, promises as fs } from 'node:fs'
 import { basename, isAbsolute, join } from 'node:path'
 import { log } from '../log'
+import { sources } from '../sources/registry'
 import type { AppSettings, FeedItem, Notification } from '../../shared/types'
 import type { EngineOutputs, Speaker } from './contracts'
 
@@ -49,9 +50,17 @@ export class Notifier {
     try {
       const wav = await this.speech.synthesize(text, a.voice, a.rate)
       this.out.audio({ kind: 'speech', wav: new Uint8Array(wav), interrupt })
+      if (this.speechFailed) {
+        this.speechFailed = false
+        sources.ok('speech', 'Speaking again')
+      }
     } catch (e) {
-      // The audio window speaks it itself instead. Said once, not for every line spoken.
-      if (!this.speechFailed) log.warn('Speech synthesis failed; falling back to the audio window’s own voice:', e)
+      // The audio window speaks it itself instead. Said once in the log, and shown on Data Sources
+      // until the engine speaks again.
+      if (!this.speechFailed) {
+        log.warn('Speech synthesis failed; falling back to the audio window’s own voice:', e)
+        sources.fail('speech', e, 'The audio window speaks with its own voice meanwhile')
+      }
       this.speechFailed = true
       this.out.audio({ kind: 'speech-fallback', text, interrupt })
     }

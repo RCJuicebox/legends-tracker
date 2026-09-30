@@ -41,7 +41,7 @@ import { settingsSummary } from './diagnostics'
 import type { AppSettings, Trigger, WatchStatus } from '../shared/types'
 import type { AudioDevice } from '../shared/ipc'
 import { cacheDir } from './paths'
-import { logFileFor, logStem } from './storeCore'
+import { characterLogFile, logStem } from './storeCore'
 
 /**
  * Everything the main process runs, built once. The IPC handlers, the lifecycle and the start-up all
@@ -281,7 +281,13 @@ export function createContext(): AppContext {
   )
 
   ctx.characterKey = () => ctx.engine.characterKey()
-  ctx.historyOf = (character) => ({ logPath: logFileFor(installDir(), character), archiveDir: ctx.engine.archiveDir(), stem: logStem(character) })
+  // The character being played reads the log chosen in Settings, wherever it is; any other its own
+  // file in the game's Logs folder.
+  ctx.historyOf = (character) => ({
+    logPath: characterLogFile(character, ctx.characterKey(), store.settings.get().logFile, installDir()),
+    archiveDir: ctx.engine.archiveDir(),
+    stem: logStem(character)
+  })
   // After everything the engine has of its own: it reads the standings and the log as they settle.
   ctx.liveAchievements = new LiveAchievements(ctx)
   ctx.engine.use(ctx.liveAchievements.feature)
