@@ -8,7 +8,6 @@
 
 import type { AaSummary } from '../core/aa'
 import type { AaHistoryView } from '../core/aaHistory'
-import type { ArchiveOutcome } from '../core/archiver'
 import type { BuffView } from '../core/buffs'
 import type { EffectSpell } from '../core/itemEffects'
 import type { FactionSources, FactionView } from '../features/factions/core'
@@ -29,7 +28,20 @@ import type { AchMarks, AchievementsView, CharacterSheet, GameFolderCheck, Inven
 import type { CombatSnapshot, Segment, SegmentSummary, StitchedTimeline } from './combat'
 import type { AppSettings, AudioSettings, CharacterSettings, FocusSource, MeterOverlayOptions, OverlayConfig, SpellRule } from './settings'
 import type { Trigger, TriggerTestResult } from './triggers'
-import type { ArchiveInfo, ArchiveStatus, AzureStatus, FeedItem, KnownSpell, LogCheckRow, LogFileInfo, SpellSummary, TimerView, UpdateState, WatchStatus } from './runtime'
+import type {
+  ArchiveInfo,
+  ArchiveOutcome,
+  ArchiveStatus,
+  AzureStatus,
+  FeedItem,
+  KnownSpell,
+  LogCheckRow,
+  LogFileInfo,
+  SpellSummary,
+  TimerView,
+  UpdateState,
+  WatchStatus
+} from './runtime'
 
 // ---- Views main hands the pages ----
 

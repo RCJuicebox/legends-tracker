@@ -1,0 +1,9 @@
+// The main process, the preload and core, checked without the DOM's types: `window` or `document`
+// here is an error, as it would be outside a page. `npm run typecheck` runs it after tsconfig.json.
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "lib": ["ES2023"]
+  },
+  "include": ["src/main", "src/preload", "src/core", "src/features/*/main.ts", "src/features/*/*Source.ts"]
+}

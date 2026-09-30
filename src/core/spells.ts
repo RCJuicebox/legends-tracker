@@ -1,6 +1,3 @@
-import { promises as fs } from 'node:fs'
-import { join } from 'node:path'
-import { decodeCp1252 } from './logLine'
 import { LEVEL_CAP } from '../shared/game/levels'
 import { SPA } from '../shared/game/spa'
 import { CLASS_NAMES, type ResistType, type SpellCategory, type SpellSummary } from '../shared/types'
@@ -139,11 +136,6 @@ export function categorize(beneficial: boolean, hasDuration: boolean, effects: S
 export class SpellBook {
   private readonly byId = new Map<number, Spell>()
   private readonly byName = new Map<string, Spell>()
-
-  static async load(installDir: string): Promise<SpellBook> {
-    const [spells, strings] = await Promise.all([fs.readFile(join(installDir, 'spells_us.txt')), fs.readFile(join(installDir, 'spells_us_str.txt'))])
-    return SpellBook.parse(decodeCp1252(spells), decodeCp1252(strings))
-  }
 
   static parse(spellsText: string, stringsText: string): SpellBook {
     const book = new SpellBook()

@@ -1,6 +1,7 @@
 import { existsSync } from 'node:fs'
 import { basename, dirname, join, resolve } from 'node:path'
-import { archiveLog, compressLoose, findStaging, finishStaged, stagingOriginalName, type ArchiveOutcome } from '../core/archiver'
+import { archiveLog, compressLoose, findStaging, finishStaged, stagingOriginalName } from '../core/archiver'
+import type { ArchiveOutcome } from '../shared/runtime'
 import { listArchives, listLogs, logIsIn } from './game'
 import { log } from './log'
 import { isFullPath } from '../core/validate'

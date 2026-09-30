@@ -68,6 +68,12 @@ export interface ArchiveStatus {
   liveRotation: 'unknown' | 'supported' | 'unsupported'
 }
 
+/** How archiving or compressing one log went. */
+export type ArchiveOutcome =
+  | { status: 'archived'; zipPath: string; originalBytes: number; zipBytes: number; liveHandoff: boolean }
+  | { status: 'deferred'; reason: 'locked' | 'held-open'; message: string }
+  | { status: 'failed'; message: string }
+
 /** What a spell is resisted with, from the spell file. */
 export type ResistType = 'none' | 'magic' | 'fire' | 'cold' | 'poison' | 'disease' | 'chromatic' | 'prismatic' | 'physical' | 'corruption'
 

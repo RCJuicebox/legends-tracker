@@ -6,11 +6,7 @@ import yazl from 'yazl'
 import yauzl from 'yauzl'
 import { decodeCp1252, parseLogLine } from './logLine'
 import { localDay } from './dates'
-
-export type ArchiveOutcome =
-  | { status: 'archived'; zipPath: string; originalBytes: number; zipBytes: number; liveHandoff: boolean }
-  | { status: 'deferred'; reason: 'locked' | 'held-open'; message: string }
-  | { status: 'failed'; message: string }
+import type { ArchiveOutcome } from '../shared/runtime'
 
 export interface ArchiverDeps {
   isGameRunning: () => Promise<boolean>

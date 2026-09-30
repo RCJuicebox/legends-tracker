@@ -881,7 +881,10 @@ The lint (`npm run lint`; `npm run check` runs it with the type-check and tests)
 apart. Core imports neither
 Electron nor another layer. Shared imports only types from core. The renderer imports no Node
 module, Electron, the main process or the preload. Main never imports the renderer. Type-only
-imports may cross, since they vanish at build.
+imports may cross, since they vanish at build. The type-check holds the globals apart the same way:
+`tsconfig.renderer.json` checks the pages without Node's types, so `process` or `Buffer` there is an
+error, and `tsconfig.node.json` checks the main process, the preload and core without the DOM's, so
+`window` or `document` there is one.
 
 A feature module keeps one feature whole instead of spreading it over the layers: its files each
 follow their own layer's rules by name (every `.tsx` the renderer's, `main.ts` and any `*Source.ts`

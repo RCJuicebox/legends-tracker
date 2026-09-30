@@ -2,7 +2,8 @@ import { HKEY_CURRENT_USER, HKEY_LOCAL_MACHINE, isFixedDrive, isProcessRunning, 
 import { existsSync, promises as fs } from 'node:fs'
 import { dirname, join } from 'node:path'
 import type { ArchiveInfo, GameFolderCheck, LogFileInfo } from '../shared/types'
-import { parseLogLine, zoneEntered, type LogLine } from '../core/logLine'
+import { decodeCp1252, parseLogLine, zoneEntered, type LogLine } from '../core/logLine'
+import { SpellBook } from '../core/spells'
 import { readBackward } from './sources/logHistory'
 import { log } from './log'
 import { isCharacterKey } from '../core/validate'
@@ -15,6 +16,12 @@ const INSTALL_SUFFIXES = [
   '\\Program Files\\Daybreak Game Company\\Installed Games\\EverQuest Legends',
   '\\EverQuest Legends'
 ]
+
+/** The game's spell data, read from its folder. */
+export async function loadSpellBook(installDir: string): Promise<SpellBook> {
+  const [spells, strings] = await Promise.all([fs.readFile(join(installDir, 'spells_us.txt')), fs.readFile(join(installDir, 'spells_us_str.txt'))])
+  return SpellBook.parse(decodeCp1252(spells), decodeCp1252(strings))
+}
 
 /** A game folder has the spell data the tracker reads; that is the one file it cannot work without. */
 export function isGameFolder(dir: string): boolean {

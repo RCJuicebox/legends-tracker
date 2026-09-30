@@ -2,7 +2,8 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { checkGameFolder, isGameFolder, logIsIn, resolveGameFolder } from '../src/main/game'
+import { checkGameFolder, isGameFolder, loadSpellBook, logIsIn, resolveGameFolder } from '../src/main/game'
+import { fixtureBook } from './helpers'
 
 describe('finding the game folder from what the player picked', () => {
   let root: string
@@ -52,5 +53,20 @@ describe('finding the game folder from what the player picked', () => {
   it('knows when the chosen log belongs to a different folder', () => {
     expect(logIsIn(join(game, 'Logs', 'eqlog_Kelwyn_neriak.txt'), game)).toBe(true)
     expect(logIsIn('D:\\Old\\EverQuest Legends\\Logs\\eqlog_Kelwyn_neriak.txt', game)).toBe(false)
+  })
+})
+
+describe('reading the spell data from the game folder', () => {
+  it('reads both spell files, as the client writes them', async () => {
+    const book = await loadSpellBook(join(__dirname, 'fixtures'))
+    const want = fixtureBook()
+    expect(book.size).toBe(want.size)
+    expect(book.named('Spirit of the Puma')).toEqual(want.named('Spirit of the Puma'))
+  })
+
+  it('fails when the folder has no spell data', async () => {
+    const empty = mkdtempSync(join(tmpdir(), 'lt-nospells-'))
+    await expect(loadSpellBook(empty)).rejects.toThrow()
+    rmSync(empty, { recursive: true, force: true })
   })
 })

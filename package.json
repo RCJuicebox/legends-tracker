@@ -16,7 +16,7 @@
     "build": "electron-vite build",
     "start": "electron .",
     "test": "vitest run",
-    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.renderer.json && tsc --noEmit -p tsconfig.node.json",
     "lint": "oxlint",
     "format": "prettier --write .",
     "format:check": "prettier --check .",

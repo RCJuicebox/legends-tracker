@@ -12,7 +12,7 @@ import type { BuffView } from '../../core/buffs'
 import type { MyClass } from '../../core/spellMotes'
 import { CAST_BY_YOU } from '../../core/phrases'
 import { characterKey, characterName } from '../storeCore'
-import { isGameFolder, lastZone, listLogs } from '../game'
+import { isGameFolder, lastZone, listLogs, loadSpellBook } from '../game'
 import { ArchiveManager } from '../archiveManager'
 import { MoteStockKeeper } from '../../core/moteStock'
 import { samePath } from '../../core/moteMerge'
@@ -274,7 +274,7 @@ export class Engine {
     try {
       const heapBefore = process.memoryUsage().heapUsed
       const started = performance.now()
-      this.book = await SpellBook.load(this.settings.installDir)
+      this.book = await loadSpellBook(this.settings.installDir)
       // The largest thing the app reads; its cost is logged so a change to it shows (see README, Measuring).
       log.info(
         `Spell data: ${this.book.size} spells in ${Math.round(performance.now() - started)} ms; the heap grew ${Math.round((process.memoryUsage().heapUsed - heapBefore) / 1048576)} MB reading it`

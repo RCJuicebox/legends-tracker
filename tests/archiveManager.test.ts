@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { existsSync, mkdtempSync, promises as fs } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import type { ArchiveOutcome } from '../src/core/archiver'
+import type { ArchiveOutcome } from '../src/shared/runtime'
 import type { ArchiveStatus, FeedItem } from '../src/shared/types'
 
 // The archiver itself runs for real on a scratch game folder while the game counts as closed; where
