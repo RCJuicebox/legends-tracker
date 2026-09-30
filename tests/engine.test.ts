@@ -1,10 +1,11 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { existsSync, promises as fs } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { Engine, type EngineEnv, type EngineStore } from '../src/main/engine'
 import { scanMoteHistory } from '../src/main/moteHistory'
 import { defaultSettings } from '../src/main/storeCore'
+import { log } from '../src/main/log'
 import type { BoardTimer } from '../src/core/timers'
 import type { MoteSession, MoteState } from '../src/core/motes'
 import type { FeedItem, MoteStock } from '../src/shared/types'
@@ -136,6 +137,44 @@ describe('Engine', () => {
     await sleep(400)
     expect(engine.motes.state.daily['2026-09-24']).toEqual({ major: 4 })
     expect(feed.filter((f) => f.text.startsWith('Watching')).length).toBe(1)
+  })
+
+  it('logs the size of the meter push while fighting (README, Measuring)', async () => {
+    const logFile = join(logs, 'eqlog_Kelwyn_neriak.txt')
+    await fs.writeFile(logFile, '')
+    const info = vi.spyOn(log, 'info')
+    const { engine } = makeEngine({ logFile })
+    await engine.startWatching()
+    await sleep(250)
+    const d = new Date()
+    const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+    const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+    const two = (n: number) => String(n).padStart(2, '0')
+    const now = `${DAYS[d.getDay()]} ${MONTHS[d.getMonth()]} ${two(d.getDate())} ${two(d.getHours())}:${two(d.getMinutes())}:${two(d.getSeconds())} ${d.getFullYear()}`
+    await fs.appendFile(
+      logFile,
+      `[${now}] You punch a fetid fiend for 100 points of damage.
+`
+    )
+    await waitFor(() => engine.meter.fighting)
+    // The engine's own clock starts in init(), which these tests leave out: its lap, by hand.
+    const lap = () => (engine as unknown as { tick(): void }).tick()
+    await sleep(600)
+    lap()
+    expect(info.mock.calls.some((c) => String(c[0]).startsWith('Meter push:'))).toBe(true)
+    // Once in five minutes, not every push.
+    const logged = info.mock.calls.length
+    await sleep(600)
+    await fs.appendFile(
+      logFile,
+      `[${now}] You punch a fetid fiend for 50 points of damage.
+`
+    )
+    await sleep(600)
+    lap()
+    expect(info.mock.calls.length).toBe(logged)
+    expect(engine.meter.fighting).toBe(true)
+    info.mockRestore()
   })
 
   it('a stop during a start wins', async () => {
