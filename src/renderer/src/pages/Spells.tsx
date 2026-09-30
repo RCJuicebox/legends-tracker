@@ -126,7 +126,7 @@ function CharacterCard({ go }: { go?: (page: PageId) => void }) {
   const c = state.character
   const classes = Object.entries(c.classLevels) as [ClassName, number][]
   if (!state.characterKey) {
-    return <div className="notice">Choose a character log under Settings to set up focus and levels.</div>
+    return <div className="notice">Choose a character log on Log Files to set up focus and levels.</div>
   }
   return (
     <div className="card">

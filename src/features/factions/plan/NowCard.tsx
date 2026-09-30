@@ -10,16 +10,14 @@ const UNIT_WORDS: Record<PlanActivity['kind'], [string, string]> = { kill: ['kil
 
 /**
  * Where the character being played is in this plan, as the achievements overlay follows it: the step
- * it is on, counting down as the factions move, and the next. With the switches for the overlay and
- * its cues. For a character not being played it says what it will do.
+ * it is on, counting down as the factions move, and the next. With the switch for its cues; the
+ * overlay's own switch is on Overlays. For a character not being played it says what it will do.
  */
 export function NowCard({
   character,
   track,
   hint,
-  overlayShown,
   cues,
-  onOverlay,
   onCues,
   onFirst
 }: {
@@ -27,9 +25,7 @@ export function NowCard({
   track: FactionTrackView | null
   /** Anything to do first for the step, such as a race swap. */
   hint?: ReactNode
-  overlayShown: boolean
   cues: boolean
-  onOverlay: (on: boolean) => void
   onCues: (on: boolean) => void
   /** Makes the plan's first step the one followed. */
   onFirst: () => void
@@ -58,9 +54,6 @@ export function NowCard({
           </button>
         )}
         <span className="spacer" />
-        <label className="row tight small" title="The achievements overlay: this step and your Slayer counts, over the game">
-          <Switch on={overlayShown} onChange={onOverlay} label="Show the achievements overlay" /> Show on the game
-        </label>
         <label className="row tight small" title="Said aloud when a step is done, with the next; each achievement it finishes flashes on the alerts overlay">
           <Switch on={cues} onChange={onCues} label="Say when a step is done" /> Say when a step is done
         </label>

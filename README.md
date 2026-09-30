@@ -121,8 +121,8 @@ tells you little.
 
 ## Live
 
-The first page. **Start watching** and **Stop watching** follow the character log chosen in
-Settings; **Arrange overlays** and **Mute** sit beside them. Below:
+The first page. **Start watching** and **Stop watching** follow the character log chosen on
+Log Files; **Arrange overlays** and **Mute** sit beside them. Below:
 
 - **Getting set up**, a checklist shown until every step is done or it is hidden: the game folder
   (so spells can be timed), the character log, your classes and levels (Stats), where sound plays
@@ -745,6 +745,10 @@ Where motes go, in three tabs that spend the same stock:
 
 ## Log files
 
+**Follow** on a character log's row picks the log the app watches: the timers, the meter, the overlays
+and the character pages are for that character. A switch under the list starts watching it as the
+app opens.
+
 A character log past the size limit (off by default; one switch on the Log Files page) is archived:
 moved aside, zipped as `eqlog_<char>_<first date>_to_<last date>.zip`, read back and checked by CRC
 and length, and only then deleted. **Archive now** does the same on demand.
@@ -781,10 +785,10 @@ dark one.
   diagnostics**: the version, your PC, the settings that matter, each process's memory and CPU (see
   [Measuring](#measuring)) and the end of the app's log, ready to paste into a bug report, with no
   keys and no Windows user name.
-- **Game**: the game folder, the character log, whether to start watching as the app opens, and
-  **Yield CPU to EverQuest** (the app runs below normal priority, so the game wins every tie; sound
-  stays normal). **UI size** scales this window from 90% to 150%; overlays have their own text
-  sizes, on the Overlays page.
+- **Game**: the game folder (the character log is chosen on Log Files) and **Yield CPU to
+  EverQuest** (the app runs below normal priority, so the game wins every tie; sound stays normal).
+  **UI size** scales this window from 90% to 150%; overlays have their own text sizes, on the
+  Overlays page.
 - **Hotkeys**, which work with the game in front: `Ctrl+Shift+F9` mutes or unmutes,
   `Ctrl+Shift+F10` starts a new damage meter session, and `Ctrl+Shift+F11` arranges or locks the
   overlays. A key another program already holds is flagged.

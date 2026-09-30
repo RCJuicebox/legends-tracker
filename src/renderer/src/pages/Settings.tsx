@@ -1,10 +1,8 @@
 import { useApp, useLive } from '../state'
-import { api, mb, ago } from '../api'
-import { useInvoke } from '../hooks'
+import { api, ago } from '../api'
 import { act, showError, showToast, actDone } from '../toast'
-import { who } from '../../../core/format'
 import { useUpdate, type UpdateState } from '../update'
-import { Ago, Field, LoadError, NumberInput, Segmented, Switch } from '../components/ui'
+import { Field, NumberInput, Segmented, Switch } from '../components/ui'
 import { GameFolderCard } from '../components/GameFolder'
 import type { TrackingSettings } from '../../../shared/types'
 import type { PageId } from '../main'
@@ -42,8 +40,6 @@ export function Settings({ go }: { go?: (page: PageId) => void }) {
   const watching = useLive((l) => l.status.watching)
   const s = state.settings
   const t = s.tracking
-  const logsQ = useInvoke('logs:list', [], [s.installDir, s.logFile])
-  const logs = logsQ.data ?? []
   const setT = (patch: Partial<TrackingSettings>) => patchSettings((x) => ({ ...x, tracking: { ...x.tracking, ...patch } }))
   const update = useUpdate()
   const u = update.status
@@ -54,7 +50,7 @@ export function Settings({ go }: { go?: (page: PageId) => void }) {
       <div className="page-head">
         <div>
           <h1>Settings</h1>
-          <p>Where the game is, which character to follow, and what the spell tracker does by default.</p>
+          <p>Where the game is, how this window looks, and what the spell tracker does by default.</p>
         </div>
       </div>
 
@@ -100,30 +96,13 @@ export function Settings({ go }: { go?: (page: PageId) => void }) {
         <div className="card stack gap-14">
           <h2>Game</h2>
           <GameFolderCard />
-          {logsQ.error && <LoadError what="the character logs" error={logsQ.error} retry={logsQ.reload} />}
-          <Field label="Character log">
-            <select
-              value={s.logFile}
-              onChange={(e) => {
-                const path = e.target.value
-                patchSettings((x) => ({ ...x, logFile: path }))
-                // While watching, the watch follows the new log at once: said, since nothing else here shows it.
-                const l = logs.find((x) => x.path === path)
-                if (watching && l) showToast(`Now watching ${who(l.character)}'s log.`)
-              }}
-            >
-              <option value="">Choose…</option>
-              {logs.map((l) => (
-                <option key={l.path} value={l.path}>
-                  {who(l.character)} — {mb(l.size)}, written <Ago t={l.modified} />
-                </option>
-              ))}
-            </select>
-          </Field>
-          <label className="row">
-            <Switch on={s.autoStart} onChange={(v) => patchSettings((x) => ({ ...x, autoStart: v }))} />
-            Start watching as soon as the app opens
-          </label>
+          <p className="hint">
+            Which character&apos;s log is followed is chosen on{' '}
+            <button className="link-button inline" onClick={() => go?.('logs')}>
+              Log Files
+            </button>
+            .
+          </p>
           <p className="hint">
             Closing this window keeps Legends Tracker running in the tray, so timers, overlays and speech carry on. To end it, use Quit on the tray icon&apos;s menu.
           </p>

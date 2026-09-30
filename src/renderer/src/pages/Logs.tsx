@@ -3,7 +3,7 @@ import { day } from '../../../core/format'
 import { useApp, useLive } from '../state'
 import { api, mb, errorMessage } from '../api'
 import { useInvoke } from '../hooks'
-import { act, showError } from '../toast'
+import { act, showError, showToast } from '../toast'
 import { who } from '../../../core/format'
 import { Ago, ConfirmButton, Field, LoadError, NumberInput, SortTh, sortRows, Switch, Pending, type Sort } from '../components/ui'
 import { useRemembered } from '../remember'
@@ -12,7 +12,8 @@ export function Logs() {
   const [sort, setSort] = useRemembered<Sort<'log' | 'size' | 'written'>>('logs.sort', { key: 'written', dir: -1 })
   const { state, patchSettings } = useApp()
   const status = useLive((l) => l.archive)
-  const q = useInvoke('logs:overview', [], [status.busy, state.settings.archive.archiveDir])
+  const watching = useLive((l) => l.status.watching)
+  const q = useInvoke('logs:overview', [], [status.busy, state.settings.archive.archiveDir, state.settings.installDir])
   const view = q.data
   const refresh = q.reload
   const [zipping, setZipping] = useState(false)
@@ -22,6 +23,12 @@ export function Logs() {
   const setA = (patch: Partial<typeof a>) => patchSettings((s) => ({ ...s, archive: { ...s.archive, ...patch } }))
   const totalZip = view?.archives.filter((x) => !x.loose).reduce((n, x) => n + x.size, 0) ?? 0
   const loose = view?.archives.filter((x) => x.loose) ?? []
+  const followed = state.settings.logFile
+  const follow = (path: string, character: string) => {
+    void patchSettings((x) => ({ ...x, logFile: path }))
+    // While watching, the watch follows the new log at once: said, since nothing else here shows it.
+    if (watching) showToast(`Now watching ${who(character)}'s log.`)
+  }
 
   return (
     <>
@@ -29,8 +36,8 @@ export function Logs() {
         <div>
           <h1>Log Files</h1>
           <p>
-            Keeps character logs small. An archived log is zipped, named by the dates it covers, read back and checked byte-for-byte, and only then removed. The game starts a fresh
-            log on its next line.
+            Which character&apos;s log is followed, and keeping the logs small. An archived log is zipped, named by the dates it covers, read back and checked byte-for-byte, and
+            only then removed. The game starts a fresh log on its next line.
           </p>
         </div>
         <div className="actions">
@@ -98,6 +105,10 @@ export function Logs() {
 
       <div className="card mb-16">
         <h2>Character logs</h2>
+        {view && view.logs.length > 0 && !followed && <div className="notice mb-10">No log is followed yet: pick the character you play with Follow.</div>}
+        {view && followed && !view.logs.some((l) => l.path === followed) && (
+          <div className="notice mb-10">The log being followed ({followed.split('\\').pop()}) is not in the game&apos;s Logs folder any more: pick another with Follow.</div>
+        )}
         {!view ? (
           <Pending what="the character logs" />
         ) : view.logs.length === 0 ? (
@@ -138,7 +149,20 @@ export function Logs() {
                     <td className="muted small">
                       <Ago t={l.modified} />
                     </td>
-                    <td style={{ textAlign: 'right' }}>
+                    <td className="nowrap" style={{ textAlign: 'right' }}>
+                      {l.path === followed ? (
+                        <span className="chip good" title="Timers, the meter, the overlays and the character pages follow this log">
+                          Followed
+                        </span>
+                      ) : (
+                        <button
+                          className="btn small"
+                          title={`Follow ${who(l.character)}: timers, the meter, the overlays and the character pages`}
+                          onClick={() => follow(l.path, l.character)}
+                        >
+                          Follow
+                        </button>
+                      )}{' '}
                       <ConfirmButton
                         className="btn small"
                         disabled={status.busy || l.size === 0}
@@ -160,6 +184,10 @@ export function Logs() {
             </table>
           </div>
         )}
+        <label className="row mt-10">
+          <Switch on={state.settings.autoStart} onChange={(v) => patchSettings((x) => ({ ...x, autoStart: v }))} />
+          Start watching the followed log as soon as the app opens
+        </label>
       </div>
 
       <div className="card">

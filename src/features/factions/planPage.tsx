@@ -220,7 +220,6 @@ export function PlanTab({ character, view }: { character: string; view: FactionV
   }, [followKey, character, following])
   const track = useAchievementTrack()
   const tracked = track && track.character.toLowerCase() === character.toLowerCase() ? track.faction : null
-  const overlay = app.settings.overlays.find((o) => o.kind === 'achievements')
 
   // Race swaps: what they save against the same plan without them, worked out once the plan shows.
   const swapSteps = plan ? plan.steps.filter((st) => st.race).length : 0
@@ -364,9 +363,7 @@ export function PlanTab({ character, view }: { character: string; view: FactionV
         character={character}
         track={tracked}
         hint={nowStep ? swapHint(nowStep) : null}
-        overlayShown={!!overlay?.visible}
         cues={app.settings.achievementCues}
-        onOverlay={(on) => void patchSettings((s) => ({ ...s, overlays: s.overlays.map((o) => (o.kind === 'achievements' ? { ...o, visible: on } : o)) }))}
         onCues={(on) => void patchSettings((s) => ({ ...s, achievementCues: on }))}
         onFirst={() => workOn(0)}
       />

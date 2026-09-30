@@ -39,7 +39,7 @@ export function SetupChecklist({ go }: { go: Go }) {
   const setSetup = (patch: Partial<SetupFlags>) => void patchSettings((x) => ({ ...x, setup: { ...x.setup, ...patch } }))
   const steps: Step[] = [
     { id: 'folder', done: !!s.installDir && spellsLoaded > 0, text: 'Find the game folder, so spells can be timed', page: 'settings', button: 'Settings' },
-    { id: 'log', done: !!s.logFile, text: 'Choose your character log (type /log on in game if there is none)', page: 'settings', button: 'Settings' },
+    { id: 'log', done: !!s.logFile, text: 'Choose your character log (type /log on in game if there is none)', page: 'logs', button: 'Log Files' },
     {
       id: 'classes',
       done: Object.keys(state.character.classLevels).length > 0,

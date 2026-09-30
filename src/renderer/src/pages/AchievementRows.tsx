@@ -1,5 +1,4 @@
-import { Disclosure, Switch, Tip } from '../components/ui'
-import { useApp } from '../state'
+import { Disclosure, Tip } from '../components/ui'
 import { numExact as num } from '../../../core/format'
 import { AchievementBook, achKey, compareNames, norm, placeOf, secKey, type AchObjective, type AchRef, type Achievement, type ObjRef } from '../../../core/achievements'
 import { HUNT } from '../../../shared/game/hunt'
@@ -440,15 +439,13 @@ export function TrackStar({ k, name, ctx }: { k: string; name: string; ctx: Ctx 
 }
 
 /**
- * What is tracked, at the top of the page: a click goes to one, ✕ stops tracking it. With the
- * achievements overlay's switch, since what is tracked shows there.
+ * What is tracked, at the top of the page: a click goes to one, ✕ stops tracking it. The achievements
+ * overlay shows it over the game; that overlay's switch is on Overlays, with the rest.
  */
 export function TrackedBar({ book, tracked, onUntrack, goTo }: { book: AchievementBook; tracked: string[]; onUntrack: (k: string) => void; goTo: (r: AchRef) => void }) {
-  const { state, patchSettings } = useApp()
   if (!tracked.length) return null
   const where = new Map<string, AchRef>()
   book.sections.forEach((s, si) => s.ach.forEach((a, ai) => where.set(achKey(s, a), [si, ai])))
-  const overlay = state.settings.overlays.find((o) => o.kind === 'achievements')
   return (
     <div className="card row ach-tracked">
       <span className="faint small">Tracked</span>
@@ -474,17 +471,6 @@ export function TrackedBar({ book, tracked, onUntrack, goTo }: { book: Achieveme
           </span>
         )
       })}
-      <span className="spacer" />
-      {overlay && (
-        <label className="row tight small faint" title="The achievements overlay, over the game: what you track, with its progress">
-          <Switch
-            on={overlay.visible}
-            label="Show the achievements overlay"
-            onChange={(on) => void patchSettings((s) => ({ ...s, overlays: s.overlays.map((o) => (o.kind === 'achievements' ? { ...o, visible: on } : o)) }))}
-          />
-          Show on the game
-        </label>
-      )}
     </div>
   )
 }

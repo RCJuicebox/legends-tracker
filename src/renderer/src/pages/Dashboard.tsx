@@ -56,16 +56,16 @@ export function Dashboard({ go }: { go: (p: PageId) => void }) {
               className="btn primary"
               onClick={() => void act('watch:start')}
               disabled={!settings.logFile}
-              title={settings.logFile ? undefined : 'Choose a character log in Settings first'}
+              title={settings.logFile ? undefined : 'Choose a character log on Log Files first'}
             >
               <Icon name="play" /> Start watching
             </button>
           )}
           {!status.watching && !settings.logFile && (
             <span className="faint small">
-              Choose a character log in{' '}
-              <button className="link-button inline" onClick={() => go('settings')}>
-                Settings
+              Choose a character log on{' '}
+              <button className="link-button inline" onClick={() => go('logs')}>
+                Log Files
               </button>{' '}
               first.
             </span>
@@ -97,7 +97,7 @@ export function Dashboard({ go }: { go: (p: PageId) => void }) {
       {settings.installDir && !status.spellError && !settings.logFile && (
         <div className="notice mb-16">
           No character log selected.{' '}
-          <button className="btn small" onClick={() => go('settings')}>
+          <button className="btn small" onClick={() => go('logs')}>
             Choose one
           </button>
         </div>
