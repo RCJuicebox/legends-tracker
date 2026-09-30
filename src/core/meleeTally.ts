@@ -20,6 +20,9 @@ export function meleeCounter(): (line: LogLine, into: Days) => void {
   let lastSwing = 0
   const casts = new Map<string, number>()
   return (line, into) => {
+    // Everything counted here is the player's own, and the log starts each such line "You ": the
+    // rest (most of a raid's lines) never reach the parser.
+    if (!line.text.startsWith('You ')) return
     const ev = parseCombatLine(line.text)
     if (!ev) return
     const t = line.time

@@ -225,6 +225,11 @@ export class Windows {
     this.held.set(key, () => this.main && !this.main.isDestroyed() && push(this.main.webContents, channel, ...args))
   }
 
+  /** The main window is open, not in the tray or minimised. */
+  get mainShown(): boolean {
+    return !!this.main && !this.main.isDestroyed() && !this.mainHidden
+  }
+
   private setMainHidden(hidden: boolean): void {
     this.mainHidden = hidden
     const w = this.main

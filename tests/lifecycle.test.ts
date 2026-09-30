@@ -67,6 +67,7 @@ function fakeContext(o: { engine?: Engine; flushAll?: () => Promise<unknown>; up
     store: { flushAll: o.flushAll ?? (async () => note('save stores')()) },
     liveAchievements: { flush: async () => note('save followed plans')() },
     factionAlla: { flush: async () => note('save allakhazam pages')() },
+    logHistory: { flush: async () => note('save log history')() },
     installUpdate: async () => {}
   }
   return ctx as unknown as typeof ctx & AppContext
@@ -100,7 +101,7 @@ describe('Quitting', () => {
     await waitFor(() => h.calls.includes('quit'))
     expect(h.calls.slice(0, STOPS.length)).toEqual(STOPS)
     // The saves run side by side after the stops; quitting waits for them all.
-    expect(h.calls.slice(STOPS.length, -1).sort()).toEqual(['flush windows', 'save allakhazam pages', 'save followed plans', 'save stores'])
+    expect(h.calls.slice(STOPS.length, -1).sort()).toEqual(['flush windows', 'save allakhazam pages', 'save followed plans', 'save log history', 'save stores'])
     expect(h.calls.at(-1)).toBe('quit')
   })
 

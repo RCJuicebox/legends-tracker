@@ -139,7 +139,10 @@
     {
       "files": ["src/features/*/main.ts", "src/features/*/*Source.ts"],
       "rules": {
-        "no-restricted-imports": ["error", { "patterns": [{ "group": ["../../renderer/**", "./page", "./*Page", "../*/page"], "message": "The main process may not import the renderer." }] }]
+        "no-restricted-imports": [
+          "error",
+          { "patterns": [{ "group": ["../../renderer/**", "./page", "./*Page", "../*/page"], "message": "The main process may not import the renderer." }] }
+        ]
       }
     }
   ],

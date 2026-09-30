@@ -15,6 +15,8 @@ import type { Notifier } from './notifier'
 import type { BuffCoordinator } from './buffs'
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
+/** How often the size of the meter's push is logged while fighting. */
+const MEASURE_MS = 5 * 60_000
 
 export interface CombatHooks {
   book: () => SpellBook | null
@@ -44,7 +46,11 @@ export class CombatFeed {
     private readonly buffs: BuffCoordinator,
     private readonly hooks: CombatHooks
   ) {
-    this.combatOut = new Throttled(500, () => this.out.combat(this.meter.snapshot()))
+    this.combatOut = new Throttled(500, () => {
+      const snap = this.meter.snapshot()
+      this.out.combat(snap)
+      this.measure(snap)
+    })
     this.lootOut = new Throttled(500, () => this.out.loot(this.lootView()))
     this.respawnsOut = new Throttled(1000, () => this.out.respawns(this.respawnView()))
     this.loot = new LootLedger({
@@ -72,6 +78,22 @@ export class CombatFeed {
       },
       kindOf: (name) => this.meter.kindOf(name).kind
     })
+  }
+
+  private measuredAt = 0
+
+  /**
+   * Every five minutes of fighting, how big the meter's push is and how many are in the session:
+   * the cost of sending the whole session twice a second, which grows with a raid (README, Measuring).
+   */
+  private measure(snap: CombatSnapshot): void {
+    const now = Date.now()
+    if (!this.meter.fighting || this.backlog.active || now - this.measuredAt < MEASURE_MS) return
+    this.measuredAt = now
+    const started = performance.now()
+    const kb = JSON.stringify(snap).length / 1024
+    const entities = Object.keys(snap.liveSession?.entities ?? {}).length
+    log.info(`Meter push: ${kb.toFixed(0)} KB, ${entities} in the session, ${snap.fights.length} fights kept (${Math.round(performance.now() - started)} ms to measure)`)
   }
 
   meterConfig() {

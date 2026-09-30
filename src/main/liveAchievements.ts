@@ -68,6 +68,8 @@ const FACTION_SECTION = 'EverQuest: Progression'
 const SETTLE_MS = 800
 /** Everything is read again this often while watching: a new export, and anything the lines did not show. */
 const SWEEP_MS = 30_000
+/** A page that shows the track says so at least this often while it is open (useAchievementTrack). */
+const PAGE_MS = 90_000
 /** A mob the player went for this recently that dies with no killer named ("A bixie died.") died of the player's damage over time. */
 const ENGAGED_MS = 60_000
 
@@ -96,6 +98,8 @@ export class LiveAchievements {
   private byAchievement: Record<string, { faction: string; standing: number | null }> | null = null
   private last: AchievementTrack | null = null
   private lastKey = ''
+  /** When a page showing the track last said it was open; 0 once it closed. */
+  private pageAt = 0
 
   constructor(private readonly ctx: AppContext) {
     const path = join(ctx.store.dir, 'faction-follow.json')
@@ -162,7 +166,9 @@ export class LiveAchievements {
     }
     if (this.reading || !character || !this.ctx.engine.status.watching) return
     const due = (at: number) => at > 0 && now - at >= SETTLE_MS
-    const sweep = now - this.sweptAt >= SWEEP_MS
+    // The sweep catches what no log line announces (a new export, a mark on the Achievements page):
+    // only worth its reads while something shows the result. Lines that move a count are read anyway.
+    const sweep = now - this.sweptAt >= SWEEP_MS && this.shown(character, now)
     if (!sweep && !due(this.factionAt) && !due(this.slayerAt) && !due(this.skillsAt)) return
     const faction = sweep || due(this.factionAt)
     const slayer = sweep || due(this.slayerAt)
@@ -441,6 +447,19 @@ export class LiveAchievements {
     this.sweptAt = 0
   }
 
+  /** Whether anything shows the track now: the achievements overlay up, a plan followed (its cues are spoken), or a page open on it. */
+  private shown(character: string, now: number): boolean {
+    if (this.follows.get()[character]) return true
+    if (this.ctx.overlays.isShown && this.ctx.store.settings.get().overlays.some((o) => o.kind === 'achievements' && o.visible)) return true
+    return now - this.pageAt < PAGE_MS && this.ctx.windows.mainShown
+  }
+
+  /** A page showing the track opened (and says so again while open), or closed. Opening reads everything at once. */
+  watch(open: boolean): void {
+    if (open && !this.pageAt) this.sweptAt = 0
+    this.pageAt = open ? Date.now() : 0
+  }
+
   /** Each tracked achievement with its progress (trackedAchievements), from what the other parts read. */
   private trackedAchievements(): TrackedAchievement[] {
     const exp = this.exported
@@ -487,5 +506,8 @@ export function registerLiveAchievementsIpc(ctx: AppContext): void {
     if (typeof index !== 'number' || !Number.isInteger(index) || index < 0) throw new Error('Not a step.')
     await ctx.liveAchievements.followStep(character, index)
   })
-  handle('achievements:track', () => ctx.liveAchievements.view)
+  handle('achievements:track', (watching) => {
+    if (typeof watching === 'boolean') ctx.liveAchievements.watch(watching)
+    return ctx.liveAchievements.view
+  })
 }

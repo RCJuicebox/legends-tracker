@@ -58,14 +58,21 @@ export function useAchievementTrack(): AchievementTrack | null {
   const [track, setTrack] = useState<AchievementTrack | null>(null)
   useEffect(() => {
     let live = true
-    api.invoke('achievements:track').then(
-      (t) => live && t && setTrack(t),
-      () => undefined
-    )
+    // The main process reads the counts every half minute only while something shows them: this page
+    // says it is open, and again each minute, and that it closed.
+    const ask = () =>
+      api.invoke('achievements:track', true).then(
+        (t) => live && t && setTrack(t),
+        () => undefined
+      )
+    void ask()
+    const again = setInterval(() => void ask(), 60_000)
     const off = api.on('state:achievementTrack', (t: AchievementTrack) => setTrack(t))
     return () => {
       live = false
+      clearInterval(again)
       off()
+      void api.invoke('achievements:track', false).catch(() => undefined)
     }
   }, [])
   return track

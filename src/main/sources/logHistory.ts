@@ -125,8 +125,14 @@ type LineReader<T> = { read(line: LogLine, into: T): void }['read']
 
 type Values = Record<string, { version: number; value: unknown }>
 
-/** A live log read this far past what is on disk is written even if it counted nothing. */
-const RESAVE_BYTES = 8 << 20
+/**
+ * The cache is written this long after its first unsaved change, and at quit, not after every read:
+ * pages and the achievements sweep read every few seconds while playing, and the file is the whole
+ * history (half a megabyte and growing). A crash loses at most this much, which the next read makes up.
+ */
+const SAVE_AFTER_MS = 90_000
+/** A read or a save slower than this is logged, with its size: the cost to watch (README, Measuring). */
+const SLOW_MS = 250
 
 interface CacheFile {
   version: 1
@@ -158,8 +164,10 @@ export class LogHistory {
   private cache: CacheFile | null = null
   /** One read at a time, so two asking at once never read the same tail twice. */
   private queue: Promise<unknown> = Promise.resolve()
-  /** How far into each live log the file on disk goes. */
-  private readonly savedOffsets = new Map<string, number>()
+  /** Changed since the file was last written; written when the timer runs out or at flush(). */
+  private dirty = false
+  private saveTimer: NodeJS.Timeout | null = null
+  private saving: Promise<void> = Promise.resolve()
 
   constructor(
     private readonly cacheFile: string,
@@ -196,7 +204,6 @@ export class LogHistory {
         for (const entry of [...Object.values(p.archives), ...Object.values(p.live)])
           for (const k of Object.keys(entry.values ?? {})) if (!(k in this.consumers)) delete entry.values[k]
         this.cache = p
-        for (const [k, v] of Object.entries(p.live)) this.savedOffsets.set(k, v.offset)
       }
     } catch (e) {
       if ((e as NodeJS.ErrnoException).code !== 'ENOENT') log.warn(`Log history cache ${this.cacheFile} unreadable; reading again:`, e)
@@ -205,14 +212,39 @@ export class LogHistory {
     return this.cache
   }
 
+  /** Something changed: written within SAVE_AFTER_MS, however many reads change it meanwhile. */
+  private changed(): void {
+    this.dirty = true
+    if (this.saveTimer) return
+    this.saveTimer = setTimeout(() => {
+      this.saveTimer = null
+      void this.flush()
+    }, SAVE_AFTER_MS)
+    this.saveTimer.unref?.()
+  }
+
+  /** Writes what is unsaved now: at quit, and when the timer runs out. */
+  flush(): Promise<void> {
+    if (this.saveTimer) clearTimeout(this.saveTimer)
+    this.saveTimer = null
+    this.saving = this.saving.then(() => (this.dirty ? this.save() : undefined))
+    return this.saving
+  }
+
   private async save(): Promise<void> {
+    this.dirty = false
+    const started = performance.now()
+    const text = JSON.stringify(this.cache)
     const tmp = this.cacheFile + '.tmp'
     try {
-      await fs.writeFile(tmp, JSON.stringify(this.cache), 'utf8')
+      await fs.writeFile(tmp, text, 'utf8')
       await fs.rename(tmp, this.cacheFile)
     } catch (e) {
+      this.dirty = true
       log.warn(`Could not save the log history cache ${this.cacheFile}:`, e)
     }
+    const ms = performance.now() - started
+    if (ms > SLOW_MS) log.info(`Log history: saved ${(text.length / 1048576).toFixed(1)} MB in ${Math.round(ms)} ms`)
   }
 
   /** The consumers whose values in `values` are missing or from an older version. */
@@ -233,6 +265,8 @@ export class LogHistory {
 
   private async read<T>(key: string, where: HistoryWhere, wantArchive: (name: string, end: string) => boolean): Promise<HistorySlice<T>> {
     const cache = await this.load()
+    const started = performance.now()
+    let bytes = 0
     let changed = false
     const out: HistorySlice<T> = { archives: [], live: this.consumers[key].empty() as T }
 
@@ -249,8 +283,8 @@ export class LogHistory {
         const values: Values = { ...entry.values }
         for (const k of stale) delete values[k]
         try {
-          if (name.toLowerCase().endsWith('.zip')) await feedZip(path, (s) => this.feed(s, stale, values, true))
-          else await this.feed(createReadStream(path), stale, values, true)
+          if (name.toLowerCase().endsWith('.zip')) await feedZip(path, async (s) => (bytes += await this.feed(s, stale, values, true)))
+          else bytes += await this.feed(createReadStream(path), stale, values, true)
         } catch (e) {
           log.warn(`Log history: could not read ${path}; leaving it out:`, e)
           delete cache.archives[name]
@@ -279,24 +313,21 @@ export class LogHistory {
         changed = true
       }
       if (size > live.offset) {
-        const before = JSON.stringify(live.values)
+        // Read into a copy: a read that fails part way leaves the values and the offset as they were.
         const values = structuredClone(live.values)
         const read = await this.feed(createReadStream(where.logPath, { start: live.offset }), Object.keys(this.consumers), values, false)
+        bytes += read
         if (read > 0) {
           cache.live[pathKey] = { id, offset: live.offset + read, values }
-          // Lines that counted nothing move only the offset: that is written with the next real
-          // change, or once it is far behind. Losing it costs a re-read of those lines, no more.
-          const saved = this.savedOffsets.get(pathKey) ?? 0
-          if (JSON.stringify(values) !== before || live.offset + read - saved > RESAVE_BYTES) changed = true
+          changed = true
         }
       }
       const v = cache.live[pathKey].values[key]
       if (v) out.live = v.value as T
     }
-    if (changed) {
-      await this.save()
-      for (const [k, v] of Object.entries(cache.live)) this.savedOffsets.set(k, v.offset)
-    }
+    if (changed) this.changed()
+    const ms = performance.now() - started
+    if (ms > SLOW_MS) log.info(`Log history: read ${(bytes / 1048576).toFixed(1)} MB of ${where.stem} in ${Math.round(ms)} ms`)
     return out
   }
 }

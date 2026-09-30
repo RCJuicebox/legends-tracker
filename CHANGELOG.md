@@ -49,6 +49,7 @@ What changed in each version. The release workflow publishes a version's section
 - **A window that keeps crashing is left closed** after three tries in five minutes, with a word in the Live feed, instead of being made again every second. A page that cannot be loaded at all (a damaged install) is logged, and the main window's says so on screen.
 - **An unexpected error's message no longer stops the app** while it waits to be closed: timers, speech and overlays carry on behind it.
 - **Copy diagnostics says more**: each data source's state and last error, every monitor and its scaling, speech and Azure, hotkeys another program holds, the character record, triggers that would not compile, the spell file's date and the settings schema.
+- **Less work while you play.** The log history cache (half a megabyte) was compared and written after nearly every read, every few seconds with the Factions or Tradeskills page open; it is now written a minute and a half after a change and at quit. The achievements counts are read every half minute only while the overlay, a followed plan or a page shows them. The melee counts skip every line that is not yours without parsing it.
 
 ## 2.4.0 (2026-09-29)
 

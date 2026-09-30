@@ -60,6 +60,8 @@ export interface AppContext {
   inventoryFiles: InventoryFiles
   gameTables: GameTables
   wikiCatalog: WikiCatalog
+  /** Every consumer's counts over each character's log history, in one cache file (log-history.json). */
+  logHistory: LogHistory
   castHistory: CastHistory
   /** The character's own melee day by day, read the way casts are: what worn effects and procs are weighed against. */
   meleeHistory: CastHistory
@@ -151,6 +153,7 @@ export function createContext(): AppContext {
       (p) => toMain('state:catalog', p),
       (pages) => void itemCatalog.refreshFrom(pages)
     ),
+    logHistory,
     castHistory: new CastHistory(logHistory, 'casts'),
     meleeHistory: new CastHistory(logHistory, 'melee'),
     recipeBook: new RecipeBook((p) => toMain('state:recipes', p)),

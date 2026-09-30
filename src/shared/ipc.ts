@@ -350,7 +350,7 @@ export interface Invokes {
   /** The step of the followed plan to work on now, picked by the player: shown until kills or hand-ins go toward another. */
   'factions:follow-step': (character: string, index: number) => void
   /** Where the character being played is in its faction plan, and its Slayer counts since its achievements export. */
-  'achievements:track': () => AchievementTrack | null
+  'achievements:track': (watching?: boolean) => AchievementTrack | null
 
   'character:exports': () => { current: string; achievements: string[]; inventory: string[]; factions: string[] }
   'character:sheet': (character: string) => CharacterSheet

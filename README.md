@@ -101,6 +101,13 @@ tells you little.
 - **A trace**: run from source with `--remote-debugging-port=9222`, open `chrome://inspect` in
   Chrome, and record a Performance profile of a window (the main one, or an overlay), or take a
   heap snapshot. For the main process, add `--inspect` and use the same page's Node target.
+- **`npm run bench`** prints what each part of the engine costs a line, over the twenty minutes of
+  real play in `tests/fixtures/golden-session.txt` (about 3 µs a line in all on 2026-09-30, two
+  thirds of it the damage meter).
+- **The log** also records, while fighting, the size of the damage meter's push every five minutes
+  (`Meter push: 14 KB, 23 in the session…`), and any read or save of the log history cache that
+  takes over a quarter of a second, with its size. A source run's Optimize tab logs each faction
+  plan's time to the window's console.
 
 ## Live
 

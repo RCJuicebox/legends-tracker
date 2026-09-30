@@ -266,6 +266,11 @@ export class OverlayManager {
    * Shows or hides every overlay without closing it. A hidden page is throttled (its timers slow, its
    * clock stops) and sent nothing; it is brought up to date as it shows again.
    */
+  /** The overlays are up (not hidden with the game in the background, or gone). */
+  get isShown(): boolean {
+    return this.shown
+  }
+
   setShown(show: boolean): void {
     if (show === this.shown) return
     this.shown = show

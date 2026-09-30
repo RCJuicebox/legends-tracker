@@ -305,6 +305,7 @@ export function PlanTab({ character, view }: { character: string; view: FactionV
   const plan = useMemo(() => {
     if (!data || !todo) return null
     const keep = keptShape.current?.key === structure ? keptShape.current.shape : undefined
+    const started = performance.now()
     const p = planFactions(
       { targets: todo.targets, maxed: todo.maxed, standings: todo.standings, activities: data.catalog.activities, ...extras },
       deferredSettings,
@@ -312,6 +313,8 @@ export function PlanTab({ character, view }: { character: string; view: FactionV
       keep
     )
     keptShape.current = { key: structure, shape: p.shape }
+    // What a plan costs this page, where it runs (README, Measuring); the console of a source run only.
+    if (import.meta.env.DEV) console.info(`Faction plan: ${Math.round(performance.now() - started)} ms, ${p.steps.length} steps, ${p.kept ? 'order kept' : 'searched'}`)
     return p
   }, [data, todo, extras, deferredSettings, deferredChoices, structure])
 
