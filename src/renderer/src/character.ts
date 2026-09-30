@@ -51,7 +51,11 @@ export function recordClasses(c: CharacterSettings | null | undefined): string[]
   })
 }
 
-/** The character's level: its highest class level, else the record's own. */
+/**
+ * The character's level: its highest class level, else the record's own. Unsettled for the AC sums
+ * (Iksar bonus, Monk weight caps, anti-twink cap): `/who` shows the lowest, and no reading with a class
+ * below 50 has told which the game uses there.
+ */
 export function recordLevel(c: CharacterSettings | null | undefined): number {
   const levels = Object.values(c?.classLevels ?? {}).filter((l): l is number => typeof l === 'number')
   return levels.length ? Math.max(...levels) : (c?.level ?? 50)

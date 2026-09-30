@@ -58,6 +58,13 @@ describe('AC', () => {
     expect([r.mitigation, r.effCap, r.avoidance]).toEqual(reading.ring_off.vitals.ac)
   })
 
+  it("lifts the soft cap by a shield's AC after the Combat Stability %, and counts it as gear too (read 2026-09-30)", () => {
+    const bare = computeAc(baseline)
+    const shield = computeAc({ ...baseline, itemAC: baseline.itemAC + 39, shieldAC: 39 })
+    expect([bare.effCap, shield.effCap]).toEqual([439, 478])
+    expect(shield.srv.total - bare.srv.total).toBe(52)
+  })
+
   it("gives Dzarn's worked example: displayed 10,480 and mitigation 3,413", () => {
     const r = computeAc({
       trio: ['shd'],

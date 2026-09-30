@@ -91,6 +91,18 @@ Over the soft cap, a point of gear AC is worth 0.43 mitigation and a point of bu
 
 Implemented in `src/core/acModel.ts` `computeAc`, with `acSum` and `raceClassBonus`. `tests/core/stats.test.ts` reproduces the 12 September and ring-off readings.
 
+Not settled: which level the AC sums use when a character's classes stand at different levels. The tracker takes the highest class level; `/who` shows the lowest. It moves the Iksar bonus, the Monk weight caps and the anti-twink cap, and needs a reading on a character with a class below 50.
+
+## A shield lifts the soft cap
+
+Settled 2026-09-30. Putting on a 39 AC shield took the window from 471 / 439 / 506 to 514 / 478 / 506.
+
+- The soft cap rose by the shield's AC, added after the SPA 259 %: 392 + 47 + 39 = 478. Taking the 12% of the shield as well would give 482.
+- The shield's AC counts in the AC sum as gear too: 39 × 4 ÷ 3 = 52. Only sums of 536 to 538 give 471 over a 439 cap, and only 588 to 590 give 514 over 478, so the sum rose by 50 to 54.
+- Avoidance did not move.
+
+EQEmu adds heroic strength ÷ 10 to the shield's part of the cap; that part has no reading yet. `tests/core/stats.test.ts` checks the cap and the sum against the 12 September baseline with the shield added.
+
 ## AC buffs count a quarter
 
 Settled 2026-09-13. The Guardian buff (`spells_us.txt`: 35 + level, max 80, so 80 at level 50) took mitigation from 467 to 474 twice, with soft cap and avoidance unchanged. 80 ÷ 4 = 20 gives AC sum 546 and mitigation 474 exactly. Dividing by 3 would give 476; 79 AC would give 473.

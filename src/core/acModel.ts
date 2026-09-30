@@ -148,7 +148,7 @@ export function computeAc(i: AcInputs) {
   const disp = acSum(i, false)
   const srv = acSum(i, true)
   // A shield's AC already sits in the gear total; this second tally, with heroic strength riding
-  // along, lifts the soft cap.
+  // along, lifts the soft cap, after the Combat Stability % (read 2026-09-30: 439 to 478 with 39 AC).
   const shield = i.shieldAC > 0 ? i.shieldAC + idiv(i.heroicStrength, 10) : 0
   const displayed = idiv(1000 * (disp.total + d.total), 350 + 497)
   const stability = idiv(i.softCap * i.combatStability, 100)
