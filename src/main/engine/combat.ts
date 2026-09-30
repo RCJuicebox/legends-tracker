@@ -97,7 +97,8 @@ export class CombatFeed {
 
   /**
    * Every five minutes of fighting, how big the meter's push is and how many are in the session:
-   * the cost of sending the whole session twice a second, which grows with a raid (README, Measuring).
+   * the cost of sending the live fight and every summary twice a second (the session goes as a summary;
+   * a page showing it fetches it), which grows with a raid (README, Measuring).
    */
   private measure(snap: CombatSnapshot): void {
     const now = Date.now()
@@ -105,7 +106,7 @@ export class CombatFeed {
     this.measuredAt = now
     const started = performance.now()
     const kb = JSON.stringify(snap).length / 1024
-    const entities = Object.keys(snap.liveSession?.entities ?? {}).length
+    const entities = Object.keys(this.meter.liveSession?.entities ?? {}).length
     log.info(`Meter push: ${kb.toFixed(0)} KB, ${entities} in the session, ${snap.fights.length} fights kept (${Math.round(performance.now() - started)} ms to measure)`)
   }
 

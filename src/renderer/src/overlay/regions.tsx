@@ -42,7 +42,7 @@ function SegmentMenu({
   list: SegmentSummary[]
   span: MeterSpan
   selection: string
-  live: Segment | null | undefined
+  live: Segment | SegmentSummary | null | undefined
   onPick: (id: string) => void
   onOpen: (open: boolean) => void
 }) {

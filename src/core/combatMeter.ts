@@ -1010,7 +1010,7 @@ export class CombatMeter {
       fights: [...this.fights].reverse().map((s) => this.summaryOf(s)),
       sessions: [...this.sessions].reverse().map((s) => this.summaryOf(s)),
       liveFight: this.live,
-      liveSession: this.session,
+      liveSession: this.session ? this.summaryOf(this.session) : null,
       self: this.self,
       roster: [...this.roster.values()],
       pets,
@@ -1050,6 +1050,7 @@ export function summarize(seg: Segment): SegmentSummary {
     dps: total / (durationMs(seg) / 1000),
     yours,
     kills: seg.kills,
+    deaths: seg.deaths,
     mine: seg.mine
   }
 }

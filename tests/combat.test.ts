@@ -343,6 +343,18 @@ describe('CombatMeter', () => {
     expect(m.fights[0].name).toBe('A scareling +1')
   })
 
+  it('pushes the open session summed up, and gives the whole of it when asked for by id', () => {
+    const { m, feed } = meter()
+    feed(FIGHT)
+    const snap = m.snapshot()
+    expect(snap.liveSession).toMatchObject({ id: m.liveSession!.id, kind: 'session', kills: m.liveSession!.kills, deaths: 0, open: true })
+    expect(snap.liveSession).not.toHaveProperty('entities')
+    expect(m.segment(snap.liveSession!.id)).toBe(m.liveSession)
+    // The live fight still goes whole: the overlay draws it twice a second.
+    feed('[Thu Sep 24 20:01:00 2026] You punch a scareling for 10 points of damage.')
+    expect(m.snapshot().liveFight?.entities['a scareling']).toBeDefined()
+  })
+
   it('takes a fight up again when another of the same name fights on after the first dies', () => {
     const { m, feed } = meter()
     // Two ratman warriors: the log names them alike, so the first death closes the fight...
@@ -456,8 +468,8 @@ describe('CombatMeter', () => {
       [Thu Sep 24 20:00:03 2026] A swirlspine seahorse has been slain by Dorran!`)
     expect(m.fights).toHaveLength(0)
     expect(m.liveFight).toBeNull()
-    expect(damageRows(m.snapshot().liveSession!, 'everyone', true)).toHaveLength(0)
-    expect(m.snapshot().liveSession!.kills).toBe(0)
+    expect(damageRows(m.liveSession!, 'everyone', true)).toHaveLength(0)
+    expect(m.liveSession!.kills).toBe(0)
   })
 
   it("does not let a stranger's fight nearby keep yours going", () => {
@@ -738,7 +750,7 @@ describe('charm pets', () => {
   it('books a charmed mob’s blows on enemies to a pet of its charmer, apart from mobs of its name', () => {
     const { m, feed } = meter({ charmPets: true })
     feed(CHARM)
-    const ents = m.snapshot().liveSession!.entities
+    const ents = m.liveSession!.entities
     const pet = ents['an ire ghast (charmed)']
     expect(pet).toMatchObject({ name: 'An ire ghast (charmed)', kind: 'pet', owner: 'Dorran' })
     expect(pet.out.total).toBe(64 + 84)
@@ -753,7 +765,7 @@ describe('charm pets', () => {
     feed(`${CHARM}
       [Sat Aug 08 20:40:30 2026] An ire ghast hits Dorran for 50 points of damage.
       [Sat Aug 08 20:40:31 2026] An ire ghast hits a haunted chest for 70 points of damage.`)
-    const ents = m.snapshot().liveSession!.entities
+    const ents = m.liveSession!.entities
     expect(ents['an ire ghast'].out.total).toBe(43 + 50)
     // Charm over: a mob hitting a mob is nobody's, and is dropped.
     expect(ents['an ire ghast (charmed)'].out.total).toBe(64 + 84)
@@ -765,7 +777,7 @@ describe('charm pets', () => {
       [Sat Aug 08 20:37:00 2026] You have entered The Plane of Hate 4 (Refined).
       [Sat Aug 08 20:37:42 2026] an ire ghast has been charmed.
       [Sat Aug 08 20:39:50 2026] An ire ghast hits a haunted chest for 64 points of damage.`)
-    expect(m.snapshot().liveSession?.entities['an ire ghast (charmed)']).toBeUndefined()
+    expect(m.liveSession?.entities['an ire ghast (charmed)']).toBeUndefined()
   })
 
   // Real lines (a groupmate's Cajole Undead VII on a kiraikuei, 2026-09-25), names swapped: undead
@@ -784,7 +796,7 @@ describe('charm pets', () => {
   it('follows an undead charm, which lands as "moans.", to the one who cast it', () => {
     const { m, feed } = meter({ charmPets: true, spellData: true })
     feed(CAJOLE)
-    const pet = m.snapshot().liveSession!.entities['a kiraikuei (charmed)']
+    const pet = m.liveSession!.entities['a kiraikuei (charmed)']
     expect(pet).toMatchObject({ kind: 'pet', owner: 'Dorran' })
     expect(pet.out.total).toBe(89 + 120)
   })
@@ -792,7 +804,7 @@ describe('charm pets', () => {
   it('reads no "moans." as a charm without the spell data to say so', () => {
     const { m, feed } = meter({ charmPets: true })
     feed(CAJOLE)
-    expect(m.snapshot().liveSession!.entities['a kiraikuei (charmed)']).toBeUndefined()
+    expect(m.liveSession!.entities['a kiraikuei (charmed)']).toBeUndefined()
   })
 })
 
@@ -808,7 +820,7 @@ describe('charm pets, when they go wrong', () => {
       [Sat Aug 08 20:37:41 2026] Dorran begins casting Allure V.
       [Sat Aug 08 20:37:42 2026] an ire ghast has been charmed.
       [Sat Aug 08 20:39:50 2026] An ire ghast hits a haunted chest for 64 points of damage.`)
-    const ents = m.snapshot().liveSession?.entities ?? {}
+    const ents = m.liveSession?.entities ?? {}
     expect(ents['an ire ghast (charmed)']).toBeUndefined()
   })
 
@@ -822,7 +834,7 @@ describe('charm pets, when they go wrong', () => {
       [Sat Aug 08 20:40:01 2026] a gorgon has been charmed.
       [Sat Aug 08 20:40:10 2026] An ire ghast hits a haunted chest for 70 points of damage.
       [Sat Aug 08 20:40:11 2026] A gorgon hits a haunted chest for 90 points of damage.`)
-    const ents = m.snapshot().liveSession!.entities
+    const ents = m.liveSession!.entities
     // The ghast's second blow comes after the switch: nobody's pet, a mob hitting a mob, dropped.
     expect(ents['an ire ghast (charmed)'].out.total).toBe(64)
     expect(ents['a gorgon (charmed)']).toMatchObject({ kind: 'pet', owner: 'Dorran' })
@@ -838,7 +850,7 @@ describe('charm pets, when they go wrong', () => {
       [Sat Aug 08 20:37:51 2026] an ire ghast has been charmed.
       [Sat Aug 08 20:38:00 2026] An ire ghast hits a haunted chest for 64 points of damage.
       [Sat Aug 08 20:38:01 2026] Dorran slashes a haunted chest for 10 points of damage.`)
-    const seg = m.snapshot().liveSession!
+    const seg = m.liveSession!
     expect(seg.entities['an ire ghast (charmed)']).toMatchObject({ kind: 'pet', owner: 'Dorran or Aldric' })
     const rows = damageRows(seg, 'everyone', true)
     expect(rows.find((r) => r.name === 'Dorran')?.total).toBe(10)
@@ -850,7 +862,7 @@ describe('charm pets, when they go wrong', () => {
     feed(`${START}
       [Sat Aug 08 20:38:00 2026] an ire ghast told you, 'Attacking a haunted chest Master.'
       [Sat Aug 08 20:38:01 2026] An ire ghast hits YOU for 50 points of damage.`)
-    const e = m.snapshot().liveSession!.entities['an ire ghast']
+    const e = m.liveSession!.entities['an ire ghast']
     expect(e.kind).toBe('npc')
     expect(e.out.total).toBe(50)
   })

@@ -3,6 +3,9 @@ import { api } from './api'
 import { useInvoke } from './hooks'
 import type { CombatSnapshot, MeterSpan, Segment } from '../../shared/types'
 
+/** How often a page showing the open session fetches it again while it changes. */
+const SESSION_REFRESH_MS = 2000
+
 // The damage meter's data in a window: the snapshot the main process pushes, and any older
 // segment picked from it, fetched once (a closed fight never changes).
 
@@ -18,9 +21,10 @@ export function useCombat(): CombatSnapshot | null {
 export const LIVE = 'live'
 
 /**
- * The segment to show for a selection. A live segment comes straight from the snapshot; a closed one
- * is fetched and kept. With nothing live, `live` falls back to the newest closed one, so a meter
- * keeps showing the fight that just ended until the next begins.
+ * The segment to show for a selection. The live fight comes straight from the snapshot; the open
+ * session, which the snapshot only sums up, is fetched, and again every SESSION_REFRESH_MS while it
+ * changes; a closed one is fetched once and kept. With nothing live, `live` falls back to the newest
+ * closed one, so a meter keeps showing the fight that just ended until the next begins.
  */
 export function useSegment(snap: CombatSnapshot | null, span: MeterSpan, selection: string): Segment | null {
   const cache = useRef(new Map<string, Segment>())
@@ -28,14 +32,32 @@ export function useSegment(snap: CombatSnapshot | null, span: MeterSpan, selecti
   const live = span === 'fight' ? snap?.liveFight : snap?.liveSession
   const newest = span === 'fight' ? snap?.fights[0] : snap?.sessions[0]
   const wanted = selection === LIVE ? (live ? live.id : (newest?.id ?? '')) : selection
-  const fromSnapshot = useMemo(() => {
-    if (!snap) return null
-    if (snap.liveFight?.id === wanted) return snap.liveFight
-    if (snap.liveSession?.id === wanted) return snap.liveSession
-    return null
-  }, [snap, wanted])
+  const fromSnapshot = useMemo(() => (snap?.liveFight?.id === wanted ? snap.liveFight : null), [snap, wanted])
+  const openSession = snap?.liveSession?.id === wanted ? snap.liveSession : null
+  const [session, setSession] = useState<Segment | null>(null)
+  const fetchedAt = useRef(0)
+  const wantedNow = useRef(wanted)
+  wantedNow.current = wanted
+  // A new summary pushed means the session changed: fetched again once SESSION_REFRESH_MS has gone by.
   useEffect(() => {
-    if (!wanted || fromSnapshot || cache.current.has(wanted)) return
+    if (!openSession) return
+    const had = session?.id === openSession.id
+    const t = setTimeout(
+      () => {
+        fetchedAt.current = Date.now()
+        api.invoke('combat:segment', openSession.id).then(
+          (seg) => {
+            if (seg && seg.id === wantedNow.current) setSession(seg)
+          },
+          () => {}
+        )
+      },
+      had ? Math.max(0, SESSION_REFRESH_MS - (Date.now() - fetchedAt.current)) : 0
+    )
+    return () => clearTimeout(t)
+  }, [openSession, session?.id])
+  useEffect(() => {
+    if (!wanted || fromSnapshot || openSession || cache.current.has(wanted)) return
     let on = true
     api.invoke('combat:segment', wanted).then(
       (seg) => {
@@ -49,6 +71,6 @@ export function useSegment(snap: CombatSnapshot | null, span: MeterSpan, selecti
     return () => {
       on = false
     }
-  }, [wanted, fromSnapshot])
-  return fromSnapshot ?? cache.current.get(wanted) ?? null
+  }, [wanted, fromSnapshot, openSession])
+  return fromSnapshot ?? (openSession && session?.id === openSession.id ? session : null) ?? cache.current.get(wanted) ?? null
 }

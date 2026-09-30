@@ -63,7 +63,7 @@ function SegmentPicker({
   span: MeterSpan
   selection: string
   onChange: (id: string) => void
-  live: Segment | null
+  live: Segment | SegmentSummary | null
 }) {
   const liveLabel = span === 'fight' ? (live ? 'Live fight' : list[0] ? 'Last fight' : 'No fights yet') : 'Current session'
   return (

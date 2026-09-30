@@ -76,7 +76,7 @@ export interface ScopeInfo {
   otherPets?: Record<string, string>
 }
 
-export const durationSec = (seg: Segment): number => durationMs(seg) / 1000
+export const durationSec = (seg: Pick<Segment, 'startedAt' | 'endedAt'>): number => durationMs(seg) / 1000
 
 /** Whether an entity's rows belong under the scope. */
 export function inScope(e: Entity, scope: MeterScope): boolean {

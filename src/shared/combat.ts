@@ -163,6 +163,8 @@ export interface SegmentSummary {
   /** Your own damage, pets folded in. */
   yours: number
   kills: number
+  /** Deaths on your side. */
+  deaths: number
   mine: boolean
 }
 
@@ -177,7 +179,11 @@ export interface CombatSnapshot {
   fights: SegmentSummary[]
   sessions: SegmentSummary[]
   liveFight: Segment | null
-  liveSession: Segment | null
+  /**
+   * The open session, summed up: in a raid the whole of it runs to megabytes, too much to push twice
+   * a second. A page showing it fetches it (combat:segment), every few seconds while it changes.
+   */
+  liveSession: SegmentSummary | null
   /** Your character's name, as the log spells it; '' until known. */
   self: string
   roster: RosterMember[]
