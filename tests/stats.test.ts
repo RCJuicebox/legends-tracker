@@ -3,6 +3,7 @@ import { computeAc, type AcInputs } from '../src/core/acModel'
 import {
   avoidanceFromHitRate,
   baseAccuracy,
+  damageBonusPct,
   doubleAttackChance,
   dualWieldChance,
   hitChance,
@@ -173,5 +174,20 @@ describe('AA effects', () => {
     expect(aaEffects('This passive ability grants a 10% increase in your current and maximum haste.')).toEqual({ haste_pct: 10 })
     expect(aaEffects('This passive ability increases your armor class by 24 points.')).toEqual({ ac: 24 })
     expect(aaEffects('This ability reduces the damage your opponent deals by 5%.')).toEqual({})
+  })
+})
+
+describe('the melee damage table (EQEmu, below level 51)', () => {
+  it('adds nothing under 115 Offense', () => {
+    expect(damageBonusPct(false, 114)).toBe(100)
+    expect(damageBonusPct(true, 0)).toBe(100)
+  })
+
+  it('averages its rows over the skipped share, a monk on its own table', () => {
+    // At 115: ten rows, 100 to 109, averaging 104.5; 49% skipped (monks 45%).
+    expect(damageBonusPct(false, 115)).toBeCloseTo(49 + 0.51 * 104.5, 6)
+    expect(damageBonusPct(true, 115)).toBeCloseTo(45 + 0.55 * 104.5, 6)
+    // At 400: 147 rows, the first 111 from 100 to 210 and 36 held at the 210 cap.
+    expect(damageBonusPct(false, 400)).toBeCloseTo(49 + 0.51 * ((17205 + 36 * 210) / 147), 6)
   })
 })
