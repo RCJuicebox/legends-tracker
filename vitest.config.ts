@@ -11,7 +11,7 @@ export default defineConfig({
     // npm run coverage: what the tests reach, for the code that is not the pages.
     coverage: {
       provider: 'v8',
-      include: ['src/core/**', 'src/main/**', 'src/shared/**', 'src/features/*/core.ts', 'src/features/*/main.ts'],
+      include: ['src/core/**', 'src/main/**', 'src/shared/**', 'src/features/**/*.ts'],
       reporter: ['text-summary', 'html'],
       reportsDirectory: 'coverage',
       // Where coverage stood when these were last set (2026-09-30, after the untested core files got tests), a point under: a change that drops a
@@ -21,7 +21,7 @@ export default defineConfig({
         'src/shared/**': { lines: 95, statements: 94, functions: 95, branches: 89 },
         'src/main/engine/**': { lines: 74, statements: 71, functions: 67, branches: 61 },
         'src/main/**': { lines: 43, statements: 40, functions: 39, branches: 32 },
-        'src/features/**': { lines: 96, statements: 92, functions: 92, branches: 85 }
+        'src/features/**': { lines: 95, statements: 92, functions: 94, branches: 85 }
       }
     },
     // Anything that finds its folders from the environment (the cache folder) gets a scratch one,
