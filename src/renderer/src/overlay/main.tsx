@@ -2,8 +2,7 @@ import { useEffect, useState } from 'react'
 import { createRoot } from 'react-dom/client'
 import '../styles.css'
 import { api } from '../api'
-import { TimerBars } from '../components/TimerBars'
-import { AchievementsRegion, MeterOverlay } from './regions'
+import { OverlayRegion } from './regions'
 import type { CombatSnapshot, OverlayConfig, TimerView } from '../../../shared/types'
 import type { AchievementTrack } from '../../../shared/tracking'
 import { opacityStyle } from '../../../shared/overlays'
@@ -36,13 +35,7 @@ function Overlay() {
   const mine = timers.filter((t) => t.overlay === config.id)
   return (
     <div className={`overlay${arranging ? ' arranging' : ''}`} style={opacityStyle(config)}>
-      {config.kind === 'timers' ? (
-        <TimerBars timers={mine} grouped={config.groupByTarget} fontSize={config.fontSize} />
-      ) : config.kind === 'meter' ? (
-        <MeterOverlay config={config} snap={combat} arranging={arranging} />
-      ) : config.kind === 'achievements' ? (
-        <AchievementsRegion config={config} track={track} arranging={arranging} />
-      ) : null}
+      <OverlayRegion config={config} timers={mine} combat={combat} track={track} arranging={arranging} />
       {arranging && (
         <div className="arrange-label">
           {config.name} — drag to move, drag edges to resize

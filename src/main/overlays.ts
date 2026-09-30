@@ -1,11 +1,31 @@
-import { BrowserWindow, screen } from 'electron'
+import { BrowserWindow, screen, type WebContents } from 'electron'
 import type { CombatSnapshot, OverlayConfig, TimerView } from '../shared/types'
 import type { AchievementTrack } from '../shared/tracking'
+import type { PushChannel } from '../shared/ipc'
 import { push } from './push'
+
+type Kind = OverlayConfig['kind']
+
+/** What the overlays are sent, stream by stream, each kept for a page that loads or shows later. */
+interface Streams {
+  timers: TimerView[]
+  combat: CombatSnapshot | null
+  achievements: AchievementTrack | null
+}
+
+/**
+ * Which kind of overlay draws each stream, and the channel it goes on: a new kind with data of its
+ * own is a row here, a field in Streams, and its region on the page.
+ */
+const STREAMS = {
+  timers: { channel: 'overlay:timers', kind: 'timers' },
+  combat: { channel: 'overlay:combat', kind: 'meter' },
+  achievements: { channel: 'overlay:achievements', kind: 'achievements' }
+} as const satisfies Record<keyof Streams, { channel: PushChannel; kind: Kind }>
 
 /** The alerts overlay has a page of its own, without React or the meter; the rest share one. */
 type OverlayPage = 'overlay' | 'alerts' | 'overlays'
-const pageFor = (kind: OverlayConfig['kind']): OverlayPage => (kind === 'alerts' ? 'alerts' : 'overlay')
+const pageFor = (kind: Kind): OverlayPage => (kind === 'alerts' ? 'alerts' : 'overlay')
 
 export interface OverlayHost {
   load: (win: BrowserWindow, page: OverlayPage, query: Record<string, string>) => void
@@ -40,9 +60,7 @@ export class OverlayManager {
   private configs: OverlayConfig[] = []
   private arranging = false
   private topmostTimer: NodeJS.Timeout | null = null
-  private lastTimers: TimerView[] = []
-  private lastCombat: CombatSnapshot | null = null
-  private lastAchievements: AchievementTrack | null = null
+  private readonly last: Streams = { timers: [], combat: null, achievements: null }
   private shown = true
   private displayTimer: NodeJS.Timeout | null = null
   private followingDisplays = false
@@ -187,9 +205,7 @@ export class OverlayManager {
       const h = this.hosts.get(displayId)
       if (!h) return
       push(win.webContents, 'overlay:host', { configs: this.configs.filter((c) => h.ids.includes(c.id)), origin: h.origin })
-      push(win.webContents, 'overlay:timers', this.lastTimers)
-      if (this.lastCombat) push(win.webContents, 'overlay:combat', this.lastCombat)
-      push(win.webContents, 'overlay:achievements', this.lastAchievements)
+      this.catchUp(win.webContents, this.kindsOf(win))
       if (this.shown) win.showInactive()
       else win.webContents.setBackgroundThrottling(true)
     })
@@ -204,9 +220,9 @@ export class OverlayManager {
     return {
       configs: this.configs.filter((c) => h.ids.includes(c.id)),
       origin: h.origin,
-      timers: this.lastTimers,
-      combat: this.configs.some((c) => h.ids.includes(c.id) && c.kind === 'meter') ? this.lastCombat : null,
-      achievements: this.configs.some((c) => h.ids.includes(c.id) && c.kind === 'achievements') ? this.lastAchievements : null
+      timers: this.hostHas(h.win, 'timers') ? this.last.timers : [],
+      combat: this.hostHas(h.win, 'meter') ? this.last.combat : null,
+      achievements: this.hostHas(h.win, 'achievements') ? this.last.achievements : null
     }
   }
 
@@ -215,9 +231,38 @@ export class OverlayManager {
     return null
   }
 
-  private hostHas(win: BrowserWindow, kind: OverlayConfig['kind']): boolean {
-    for (const h of this.hosts.values()) if (h.win === win) return this.configs.some((c) => h.ids.includes(c.id) && c.kind === kind)
-    return false
+  private hostHas(win: BrowserWindow, kind: Kind): boolean {
+    return this.kindsOf(win).has(kind)
+  }
+
+  /** The kinds a window draws: a host's overlays', or the one overlay an arranging window is. */
+  private kindsOf(win: BrowserWindow): Set<Kind> {
+    for (const h of this.hosts.values()) if (h.win === win) return new Set(this.configs.filter((c) => h.ids.includes(c.id)).map((c) => c.kind))
+    for (const [id, w] of this.windows) if (w === win) return new Set(this.configs.filter((c) => c.id === id).map((c) => c.kind))
+    return new Set()
+  }
+
+  /** The latest of every stream a page draws: as it loads, and as it shows again. */
+  private catchUp(wc: WebContents, kinds: Set<Kind>): void {
+    for (const key of Object.keys(STREAMS) as (keyof Streams)[]) {
+      const { channel, kind } = STREAMS[key]
+      const value = this.last[key]
+      if (kinds.has(kind) && value !== null) push(wc, channel, value as never)
+    }
+  }
+
+  /** Every shown page that draws `kind`: hosts with such an overlay, and such an overlay's own window while arranging. */
+  private toPages(kind: Kind, send: (wc: WebContents) => void): void {
+    if (!this.shown) return
+    for (const h of this.hosts.values()) if (!h.win.isDestroyed() && this.hostHas(h.win, kind)) send(h.win.webContents)
+    for (const [id, w] of this.windows) if (!w.isDestroyed() && this.configs.find((c) => c.id === id)?.kind === kind) send(w.webContents)
+  }
+
+  /** A stream's newest: kept, and sent to the pages that draw it. */
+  private send<K extends keyof Streams>(key: K, value: Streams[K]): void {
+    this.last[key] = value
+    const { channel, kind } = STREAMS[key]
+    this.toPages(kind, (wc) => push(wc, channel, value as never))
   }
 
   private create(c: OverlayConfig): BrowserWindow {
@@ -250,9 +295,7 @@ export class OverlayManager {
     win.webContents.on('did-finish-load', () => {
       const cfg = this.configs.find((x) => x.id === c.id) ?? c
       push(win.webContents, 'overlay:config', { config: cfg, arranging: this.arranging })
-      push(win.webContents, 'overlay:timers', this.lastTimers)
-      if (cfg.kind === 'meter' && this.lastCombat) push(win.webContents, 'overlay:combat', this.lastCombat)
-      if (cfg.kind === 'achievements') push(win.webContents, 'overlay:achievements', this.lastAchievements)
+      this.catchUp(win.webContents, new Set([cfg.kind]))
       if (this.shown) win.showInactive()
       else win.webContents.setBackgroundThrottling(true)
     })
@@ -286,9 +329,7 @@ export class OverlayManager {
       if (w.isDestroyed()) continue
       if (show) {
         w.webContents.setBackgroundThrottling(false)
-        push(w.webContents, 'overlay:timers', this.lastTimers)
-        if (this.lastCombat && this.hostHas(w, 'meter')) push(w.webContents, 'overlay:combat', this.lastCombat)
-        if (this.hostHas(w, 'achievements')) push(w.webContents, 'overlay:achievements', this.lastAchievements)
+        this.catchUp(w.webContents, this.kindsOf(w))
         w.showInactive()
         w.setAlwaysOnTop(true, 'screen-saver')
       } else {
@@ -296,13 +337,11 @@ export class OverlayManager {
         w.webContents.setBackgroundThrottling(true)
       }
     }
-    for (const [id, w] of this.windows) {
+    for (const w of this.windows.values()) {
       if (w.isDestroyed()) continue
       if (show) {
         w.webContents.setBackgroundThrottling(false)
-        push(w.webContents, 'overlay:timers', this.lastTimers)
-        if (this.lastCombat && this.configs.find((c) => c.id === id)?.kind === 'meter') push(w.webContents, 'overlay:combat', this.lastCombat)
-        if (this.configs.find((c) => c.id === id)?.kind === 'achievements') push(w.webContents, 'overlay:achievements', this.lastAchievements)
+        this.catchUp(w.webContents, this.kindsOf(w))
         w.showInactive()
         w.setAlwaysOnTop(true, 'screen-saver')
       } else {
@@ -359,45 +398,22 @@ export class OverlayManager {
   }
 
   combat(snapshot: CombatSnapshot): void {
-    this.lastCombat = snapshot
-    if (!this.shown) return
-    for (const h of this.hosts.values()) if (!h.win.isDestroyed() && this.hostHas(h.win, 'meter')) push(h.win.webContents, 'overlay:combat', snapshot)
-    for (const [id, w] of this.windows) {
-      const cfg = this.configs.find((c) => c.id === id)
-      if (cfg?.kind === 'meter' && !w.isDestroyed()) push(w.webContents, 'overlay:combat', snapshot)
-    }
+    this.send('combat', snapshot)
   }
 
   /** The faction plan's step and the Slayer counts, for the achievements overlays. */
   achievements(track: AchievementTrack | null): void {
-    this.lastAchievements = track
-    if (!this.shown) return
-    for (const h of this.hosts.values()) if (!h.win.isDestroyed() && this.hostHas(h.win, 'achievements')) push(h.win.webContents, 'overlay:achievements', track)
-    for (const [id, w] of this.windows) {
-      const cfg = this.configs.find((c) => c.id === id)
-      if (cfg?.kind === 'achievements' && !w.isDestroyed()) push(w.webContents, 'overlay:achievements', track)
-    }
+    this.send('achievements', track)
   }
 
+  /** Only to pages that draw timers: an alerts-only or meter-only host has no use for five a second. */
   timers(views: TimerView[]): void {
-    this.lastTimers = views
-    if (!this.shown) return
-    // Only to pages that draw timers: an alerts-only or meter-only host has no use for five a second.
-    for (const h of this.hosts.values()) if (!h.win.isDestroyed() && this.hostHas(h.win, 'timers')) push(h.win.webContents, 'overlay:timers', views)
-    for (const [id, w] of this.windows) {
-      const cfg = this.configs.find((c) => c.id === id)
-      if (cfg?.kind === 'timers' && !w.isDestroyed()) push(w.webContents, 'overlay:timers', views)
-    }
+    this.send('timers', views)
   }
 
+  /** An alert is for now: not kept, so one raised while the overlays are hidden is not shown later. */
   alert(payload: { text: string; color: string; durationSec: number }): void {
-    // An alert is for now; one raised while the overlays are hidden is not shown later.
-    if (!this.shown) return
-    for (const h of this.hosts.values()) if (!h.win.isDestroyed() && this.hostHas(h.win, 'alerts')) push(h.win.webContents, 'overlay:alert', payload)
-    for (const [id, w] of this.windows) {
-      const cfg = this.configs.find((c) => c.id === id)
-      if (cfg?.kind === 'alerts' && !w.isDestroyed()) push(w.webContents, 'overlay:alert', payload)
-    }
+    this.toPages('alerts', (wc) => push(wc, 'overlay:alert', payload))
   }
 
   destroy(): void {
@@ -411,7 +427,7 @@ export class OverlayManager {
 }
 
 /** Click-through, with mouse moves still forwarded to a meter so its page knows when the pointer is on it. */
-function ignoreMouse(win: BrowserWindow, kind: OverlayConfig['kind'], ignore: boolean): void {
+function ignoreMouse(win: BrowserWindow, kind: Kind, ignore: boolean): void {
   if (ignore && kind === 'meter') win.setIgnoreMouseEvents(true, { forward: true })
   else win.setIgnoreMouseEvents(ignore)
 }

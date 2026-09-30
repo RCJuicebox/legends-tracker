@@ -18,9 +18,9 @@ import {
   type Row,
   type SkillRow
 } from '../../../core/combatView'
-import type { CombatSnapshot, MeterMode, MeterOverlayOptions, MeterSpan, OverlayConfig, Segment, SegmentSummary } from '../../../shared/types'
+import type { CombatSnapshot, MeterMode, MeterOverlayOptions, MeterSpan, OverlayConfig, Segment, SegmentSummary, TimerView } from '../../../shared/types'
 import type { AchievementTrack, SkillRow as SkillGoalRow, TrackKind, TrackedAchievement } from '../../../shared/tracking'
-import { useNow } from '../components/TimerBars'
+import { TimerBars, useNow } from '../components/TimerBars'
 import { DEFAULT_METER_OPTIONS } from '../../../shared/overlays'
 
 const MODE_NEXT: Record<MeterMode, MeterMode> = { damage: 'incoming', incoming: 'healing', healing: 'damage' }
@@ -509,4 +509,33 @@ export function AlertsRegion({ config }: { config: OverlayConfig }) {
       ))}
     </div>
   )
+}
+
+/**
+ * What an overlay draws, by its kind: the one place a kind is matched to its region, for a host and
+ * for an overlay's own window while arranging. `timers` are the overlay's own already.
+ */
+export function OverlayRegion({
+  config,
+  timers,
+  combat,
+  track,
+  arranging
+}: {
+  config: OverlayConfig
+  timers: TimerView[]
+  combat: CombatSnapshot | null
+  track: AchievementTrack | null
+  arranging: boolean
+}) {
+  switch (config.kind) {
+    case 'timers':
+      return <TimerBars timers={timers} grouped={config.groupByTarget} fontSize={config.fontSize} />
+    case 'meter':
+      return <MeterOverlay config={config} snap={combat} arranging={arranging} />
+    case 'achievements':
+      return <AchievementsRegion config={config} track={track} arranging={arranging} />
+    case 'alerts':
+      return <AlertsRegion config={config} />
+  }
 }

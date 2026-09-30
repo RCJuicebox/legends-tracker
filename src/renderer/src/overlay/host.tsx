@@ -3,8 +3,7 @@ import { createRoot } from 'react-dom/client'
 import '../styles.css'
 import '../alerts/alerts.css'
 import { api } from '../api'
-import { TimerBars } from '../components/TimerBars'
-import { AchievementsRegion, AlertsRegion, MeterOverlay } from './regions'
+import { OverlayRegion } from './regions'
 import type { CombatSnapshot, OverlayConfig, TimerView } from '../../../shared/types'
 import type { AchievementTrack } from '../../../shared/tracking'
 import { opacityStyle } from '../../../shared/overlays'
@@ -28,15 +27,7 @@ const Region = memo(function Region(p: { c: OverlayConfig; origin: { x: number; 
       style={{ left: Math.round(c.x) - origin.x, top: Math.round(c.y) - origin.y, width: Math.round(c.width), height: Math.round(c.height), ...opacityStyle(c) }}
     >
       <div className="overlay">
-        {c.kind === 'timers' ? (
-          <TimerBars timers={mine} grouped={c.groupByTarget} fontSize={c.fontSize} />
-        ) : c.kind === 'meter' ? (
-          <MeterOverlay config={c} snap={p.combat} arranging={false} />
-        ) : c.kind === 'achievements' ? (
-          <AchievementsRegion config={c} track={p.track} arranging={false} />
-        ) : (
-          <AlertsRegion config={c} />
-        )}
+        <OverlayRegion config={c} timers={mine} combat={p.combat} track={p.track} arranging={false} />
       </div>
     </div>
   )
