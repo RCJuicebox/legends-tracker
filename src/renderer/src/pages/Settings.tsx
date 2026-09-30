@@ -210,6 +210,17 @@ export function Settings({ go }: { go?: (page: PageId) => void }) {
               page splits by hand
             </span>
           </label>
+          <p className="faint small m-0">
+            Pets with owners, charm pets and active DPS are set on the{' '}
+            <button className="link-button inline" onClick={() => go?.('meter')}>
+              Damage Meter
+            </button>{' '}
+            page; each meter overlay has its own on{' '}
+            <button className="link-button inline" onClick={() => go?.('overlays')}>
+              Overlays
+            </button>
+            .
+          </p>
         </div>
 
         <div className="card stack gap-14">

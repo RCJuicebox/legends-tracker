@@ -52,6 +52,7 @@ function MeterOptions({ o, onChange }: { o: OverlayConfig; onChange: (m: Partial
       <label className="check">
         <input type="checkbox" checked={m.combinePet} onChange={(e) => onChange({ combinePet: e.target.checked })} />
         Pets with their owners
+        <span className="faint small">this overlay's own; the Damage Meter page has its own</span>
       </label>
       <label className="check">
         <input type="checkbox" checked={m.header} onChange={(e) => onChange({ header: e.target.checked })} />
