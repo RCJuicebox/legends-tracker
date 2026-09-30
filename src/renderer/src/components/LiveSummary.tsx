@@ -1,9 +1,9 @@
-import { clock, num } from '../../../core/format'
+import { clock, duration, num } from '../../../core/format'
 import { useEffect } from 'react'
 import { api, ago } from '../api'
 import { useApp, useLive } from '../state'
-import { useInvoke } from '../hooks'
-import { useRemembered } from '../remember'
+import { useAchievementTrack, useInvoke } from '../hooks'
+import { remember, useRemembered } from '../remember'
 import { useCombat } from '../combat'
 import { useNow } from './TimerBars'
 import { durationSec } from '../../../core/combatView'
@@ -156,5 +156,38 @@ export function FightSummary({ go }: { go: Go }) {
         </span>
       </button>
     </div>
+  )
+}
+
+/**
+ * The faction plan's step being worked on, as the achievements overlay shows it: what to do, where,
+ * how much is left, and what comes next, with the Plan tab a click away. Nothing when no plan is
+ * followed.
+ */
+export function FactionNowCard({ go }: { go: Go }) {
+  const plan = useAchievementTrack()?.faction
+  const step = plan?.current
+  if (!plan || !step) return null
+  const units = step.kind === 'kill' ? 'kills' : 'hand-ins'
+  return (
+    <button
+      className="card stat card-button mb-16"
+      onClick={() => {
+        remember('factions.view', 'plan')
+        go('factions')
+      }}
+    >
+      <span className="label">
+        Faction plan · step {step.index + 1} of {plan.steps}
+        {step.zone ? ` · ${step.zone}` : ''}
+      </span>
+      <span className="value">{step.title}</span>
+      <span className="sub">
+        {step.unitsLeft > 0 ? `${num(step.unitsLeft)} ${units} left, about ${duration(step.secondsLeft)}` : 'Done as soon as the log says so'}
+        {' · '}
+        {plan.next ? `next: ${plan.next.title}${plan.next.zone && plan.next.zone !== step.zone ? ` (${plan.next.zone})` : ''}` : 'the last step'}
+        {` · about ${duration(plan.secondsLeft)} in all`}
+      </span>
+    </button>
   )
 }

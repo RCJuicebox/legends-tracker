@@ -1,6 +1,6 @@
 import { clock, num, pct, timeOfDay } from '../../../core/format'
 import { useEffect, useMemo, useState } from 'react'
-import { useApp } from '../state'
+import { useApp, useLive } from '../state'
 import { act, showToast, actDone, showUndo } from '../toast'
 import { useRemembered } from '../remember'
 import { LIVE, useCombat, useSegment } from '../combat'
@@ -81,6 +81,8 @@ function SegmentPicker({
 
 export function Meter({ standalone = false }: { standalone?: boolean }) {
   const { state, patchSettings } = useApp()
+  const watching = useLive((l) => l.status.watching)
+  const minutes = state.settings.combat.historyMinutes || 60
   const snap = useCombat()
   const [span, setSpan] = useRemembered<MeterSpan>('meter.span', 'fight')
   const [mode, setMode] = useRemembered<MeterMode>('meter.mode', 'damage')
@@ -196,9 +198,19 @@ export function Meter({ standalone = false }: { standalone?: boolean }) {
 
       {!seg ? (
         <div className="empty">
-          {snap?.reading
-            ? 'Reading recent fights from the log…'
-            : 'No fights yet. Hit something while watching and it appears here, with the last hour read from the log at start.'}
+          {snap?.reading ? (
+            'Reading recent fights from the log…'
+          ) : watching ? (
+            <>
+              No fights in the last {minutes} minutes of the log. Hit something and it appears here, or{' '}
+              <button className="link-button inline" onClick={() => void actDone('Reading the last 3 hours of the log.', 'combat:rebuild', 180)}>
+                read the last 3 hours
+              </button>{' '}
+              for older ones.
+            </>
+          ) : (
+            `No fights yet. Hit something while watching and it appears here, with the last ${minutes} minutes read from the log at start.`
+          )}
         </div>
       ) : (
         <>

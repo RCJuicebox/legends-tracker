@@ -8,7 +8,7 @@ import { OVERLAY_BUFFS, TRY_LINES } from '../constants'
 import { TimerBars, useNow } from '../components/TimerBars'
 import { Icon } from '../components/ui'
 import { GameFolderPrompt } from '../components/GameFolder'
-import { FightSummary, QuietLogNotice, SetupChecklist } from '../components/LiveSummary'
+import { FactionNowCard, FightSummary, QuietLogNotice, SetupChecklist } from '../components/LiveSummary'
 import type { PageId } from '../main'
 import { perHour, useMotes } from './Motes'
 import { localDay, sessionHours, totalMotes } from '../../../core/motes'
@@ -132,6 +132,7 @@ export function Dashboard({ go }: { go: (p: PageId) => void }) {
       </div>
 
       <FightSummary go={go} />
+      <FactionNowCard go={go} />
 
       <div className="grid two mb-16">
         <div className="card">
