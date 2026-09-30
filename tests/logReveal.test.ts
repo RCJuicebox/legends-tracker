@@ -20,6 +20,7 @@ vi.mock('electron', () => ({
 }))
 
 const { isInside, registerLogIpc } = await import('../src/main/ipc/logs')
+const { rendererUrl } = await import('../src/main/push')
 
 const root = mkdtempSync(join(tmpdir(), 'lt-reveal-'))
 afterAll(() => rmSync(root, { recursive: true, force: true }))
@@ -77,8 +78,8 @@ describe('logs:reveal', () => {
     engine: { archiveDir: () => archive }
   } as unknown as AppContext
   registerLogIpc(ctx)
-  // One of the app's own pages.
-  const event = { senderFrame: { url: 'file:///app/index.html' } }
+  // The app's main window, from its own renderer folder.
+  const event = { senderFrame: { url: rendererUrl() + 'index.html' } }
   const reveal = (path: unknown) => handlers.get('logs:reveal')!(event, path)
 
   beforeEach(() => {

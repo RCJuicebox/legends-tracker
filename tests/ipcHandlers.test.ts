@@ -44,7 +44,8 @@ vi.mock('electron', () => {
   }
 })
 
-const OWN = { senderFrame: { url: 'file:///app/out/renderer/index.html' } }
+/** Set once push.ts is loaded: the main window, from the app's own renderer folder. */
+let OWN = { senderFrame: { url: '' } }
 const STRANGER = { senderFrame: { url: 'https://example.com/' } }
 
 /** What a page should never send, a few of each kind (the same as ipcValidate.test.ts checks). */
@@ -80,6 +81,8 @@ const HUNG = Symbol('hung')
 beforeAll(async () => {
   h.dir = mkdtempSync(join(tmpdir(), 'lt-ipc-'))
   process.env['EQL_USER_DATA'] = h.dir
+  const { rendererUrl } = await import('../src/main/push')
+  OWN = { senderFrame: { url: rendererUrl() + 'index.html' } }
   const ctx = stub()
   const modules = await Promise.all([
     import('../src/main/ipc/app'),
@@ -105,10 +108,26 @@ describe('the invoke handlers', () => {
     expect(registered.filter((c) => !isInvokeChannel(c))).toEqual([])
   })
 
-  it('refuses a call from a page that is not one of ours', async () => {
+  it('refuses a call from a page that is not one of ours, and an overlay’s call on a channel for the main window', async () => {
     const [channel, fn] = [...h.handlers][0]
     await expect(Promise.resolve(fn(STRANGER))).rejects.toThrow('Not allowed.')
     expect(channel).toBeTruthy()
+    const { rendererUrl } = await import('../src/main/push')
+    const overlay = { senderFrame: { url: rendererUrl() + 'overlays.html?display=1' } }
+    await expect(Promise.resolve(h.handlers.get('settings:save')!(overlay, {}))).rejects.toThrow('Not allowed.')
+    await expect(Promise.resolve(h.handlers.get('update:install')!(overlay))).rejects.toThrow('Not allowed.')
+    // What the overlays need, they get.
+    await expect(Promise.resolve(h.handlers.get('combat:segment')!(overlay, 'live'))).resolves.toBeDefined()
+  })
+
+  it('knows its own pages from any other local file', async () => {
+    const { pageOf, rendererUrl } = await import('../src/main/push')
+    expect(pageOf(rendererUrl() + 'index.html')).toBe('index')
+    expect(pageOf(rendererUrl().toUpperCase().replace('FILE:', 'file:') + 'overlay.html?id=meter')).toBe('overlay')
+    expect(pageOf(rendererUrl() + 'evil.html')).toBeNull()
+    expect(pageOf('file:///C:/Users/someone/Downloads/index.html')).toBeNull()
+    expect(pageOf(rendererUrl() + '../elsewhere/index.html')).toBeNull()
+    expect(pageOf('https://example.com/index.html')).toBeNull()
   })
 
   it('answers every channel, whatever it is sent: refusing is fine, hanging or crashing is not', async () => {
