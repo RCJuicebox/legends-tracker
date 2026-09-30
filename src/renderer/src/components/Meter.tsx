@@ -4,8 +4,7 @@ import { useApp } from '../state'
 import { act, showToast, actDone, showUndo } from '../toast'
 import { useRemembered } from '../remember'
 import { LIVE, useCombat, useSegment } from '../combat'
-import { useInvoke } from '../hooks'
-import { ConfirmButton, Icon, Info, Pending, Segmented } from './ui'
+import { ConfirmButton, Icon, Info, Segmented } from './ui'
 import { EntityBar, HealBar, HEAL_TEXT, KIND_TEXT, PROC_COLOR, PROC_HINT, PROC_TEXT, PROC_WORD, SkillBar, kindTag } from './MeterBars'
 import {
   attackerRows,
@@ -25,7 +24,6 @@ import {
   procRows,
   procSummary,
   procText,
-  rolling,
   skillRows,
   sourcesFor,
   takenRows,
@@ -35,6 +33,8 @@ import {
   type Row
 } from '../../../core/combatView'
 import type { CombatSnapshot, Defense, MeterMode, MeterScope, MeterSpan, Segment, SegmentSummary } from '../../../shared/types'
+import { DpsChart } from './MeterChart'
+import { ComparePane } from './MeterCompare'
 
 // The damage meter on the Damage Meter page: one segment (the fight or the session) read three ways
 // (damage out, damage in, healing), the rows clickable down into skills, targets and attackers.
@@ -274,93 +274,6 @@ function Headline({ seg, name, mode, head, active }: { seg: Segment; name: strin
             <b>+{num(seg.enemyHeal)}</b> enemy healed
           </span>
         )}
-      </div>
-    </div>
-  )
-}
-
-/** The rows a mode lists, in one shape for comparing: a name, its rate and its total. */
-function comparable(seg: Segment, mode: MeterMode, scope: MeterScope, combinePet: boolean, active: boolean) {
-  if (mode === 'healing') return healerRows(seg, scope).map((h) => ({ key: h.key, name: h.name, rate: h.hps, total: h.total }))
-  const rows = mode === 'incoming' ? attackerRows(seg, scope) : damageRows(seg, scope, combinePet)
-  return rows.map((r) => ({ key: r.key, name: r.name, rate: active ? r.activeDps : r.dps, total: r.total }))
-}
-
-/** Two fights side by side: everyone in either, their rate and total in each, and the change. */
-function ComparePane({
-  seg,
-  name,
-  otherId,
-  mode,
-  scope,
-  combinePet,
-  active,
-  close
-}: {
-  seg: Segment
-  name: string
-  otherId: string
-  mode: MeterMode
-  scope: MeterScope
-  combinePet: boolean
-  active: boolean
-  close: () => void
-}) {
-  const other = useInvoke('combat:segment', [otherId], [otherId]).data
-  const rows = useMemo(() => {
-    if (!other) return []
-    const a = comparable(seg, mode, scope, combinePet, active)
-    const b = new Map(comparable(other, mode, scope, combinePet, active).map((r) => [r.key, r]))
-    const keys = [...new Set([...a.map((r) => r.key), ...b.keys()])]
-    const byKey = new Map(a.map((r) => [r.key, r]))
-    return keys
-      .map((k) => ({ key: k, name: byKey.get(k)?.name ?? b.get(k)!.name, now: byKey.get(k), then: b.get(k) }))
-      .sort((x, y) => (y.now?.total ?? 0) + (y.then?.total ?? 0) - ((x.now?.total ?? 0) + (x.then?.total ?? 0)))
-      .slice(0, 20)
-  }, [seg, other, mode, scope, combinePet, active])
-  const unit = mode === 'healing' ? 'HPS' : 'DPS'
-  const change = (now?: { rate: number }, then?: { rate: number }) => {
-    if (!now || !then || !then.rate) return now && !then ? 'new' : then && !now ? 'gone' : '—'
-    const change = (now.rate - then.rate) / then.rate
-    return `${change >= 0 ? '+' : '−'}${pct(Math.abs(change))}`
-  }
-  if (!other) return <Pending doing="Reading the other fight" />
-  return (
-    <div className="dm-compare">
-      <div className="row">
-        <span className="small muted">
-          <b>{name}</b> ({clock(durationSec(seg))}, {seg.kills} kill{seg.kills === 1 ? '' : 's'}) against <b>{other.name}</b> ({clock(durationSec(other))}, {other.kills} kill
-          {other.kills === 1 ? '' : 's'}), {mode === 'incoming' ? 'damage taken' : mode === 'healing' ? 'healing' : 'damage dealt'}
-          {active && mode !== 'healing' ? ', active' : ''}
-        </span>
-        <span className="spacer" />
-        <button className="btn ghost small" onClick={close}>
-          Stop comparing
-        </button>
-      </div>
-      <div className="table-scroll">
-        <table className="table">
-          <thead>
-            <tr>
-              <th>Who</th>
-              <th className="num">This fight</th>
-              <th className="num">The other</th>
-              <th className="num" title={`The change in ${unit} from the other fight to this one`}>
-                Change
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((r) => (
-              <tr key={r.key}>
-                <td>{r.name}</td>
-                <td className="num mono">{r.now ? `${fmtRate(r.now.rate)} ${unit} · ${num(r.now.total)}` : '—'}</td>
-                <td className="num mono">{r.then ? `${fmtRate(r.then.rate)} ${unit} · ${num(r.then.total)}` : '—'}</td>
-                <td className="num mono">{change(r.now, r.then)}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
       </div>
     </div>
   )
@@ -655,104 +568,6 @@ function HealedCard({ seg, scope }: { seg: Segment; scope: MeterScope }) {
       ))}
       {runes > 0 && <div className="faint small mt-10">Runes absorbed {num(runes)} on top.</div>}
       {seg.enemyHeal > 0 && <div className="faint small">Enemies healed themselves for {num(seg.enemyHeal)}.</div>}
-    </div>
-  )
-}
-
-const LINES: { key: keyof NonNullable<Segment['timeline']>; label: string; color: string }[] = [
-  { key: 'you', label: 'you', color: 'var(--accent)' },
-  { key: 'pet', label: 'pet', color: 'var(--violet)' },
-  { key: 'group', label: 'others', color: 'var(--teal)' },
-  { key: 'inc', label: 'incoming', color: 'var(--red)' }
-]
-const WINDOW_SEC = 6
-
-function DpsChart({ seg }: { seg: Segment }) {
-  const [hidden, setHidden] = useRemembered<string[]>('meter.chartHidden', [])
-  const session = seg.kind === 'session'
-  // A session's chart is its fights end to end, from the main process; asked again at most every
-  // ten seconds while the session runs.
-  const stitched = useInvoke(session ? 'combat:sessionTimeline' : null, [seg.id], [session && seg.open ? Math.floor(seg.endedAt / 10_000) : 0]).data
-  const tl = session ? stitched : seg.timeline
-  const seconds = Math.max(1, session ? (stitched?.you.length ?? 0) : Math.ceil(durationSec(seg)))
-  const marks = session ? (stitched?.marks ?? []) : []
-  const series = useMemo(() => {
-    if (!tl) return null
-    return LINES.map((l) => ({ ...l, values: rolling(tl[l.key], seconds, WINDOW_SEC), any: tl[l.key].some((v) => v > 0) }))
-  }, [tl, seconds])
-  if (!series || (session && !marks.length)) {
-    return (
-      <div className="dm-aux">
-        <div className="dm-aux-head">DPS over time</div>
-        <div className="faint small">{session ? 'No fights in this session yet.' : 'Nothing to chart yet.'}</div>
-      </div>
-    )
-  }
-  const shown = series.filter((s) => s.any && !hidden.includes(s.key))
-  const max = Math.max(1, ...shown.flatMap((s) => s.values))
-  const W = 520
-  const H = 140
-  const L = 36
-  const B = 18
-  const x = (i: number) => L + (i / Math.max(1, seconds - 1)) * (W - L - 6)
-  const y = (v: number) => 6 + (1 - v / max) * (H - B - 6)
-  const path = (vals: number[]) => vals.map((v, i) => `${i ? 'L' : 'M'}${x(i).toFixed(1)},${y(v).toFixed(1)}`).join(' ')
-  const step = seconds > 600 ? 120 : seconds > 240 ? 60 : seconds > 90 ? 30 : seconds > 30 ? 10 : 5
-  const ticks: number[] = []
-  for (let t = 0; t < seconds; t += step) ticks.push(t)
-  return (
-    <div className="dm-aux">
-      <div className="dm-aux-head">
-        DPS over time{' '}
-        <span className="faint small">
-          {session ? `${marks.length} fight${marks.length === 1 ? '' : 's'} end to end · ` : ''}
-          {WINDOW_SEC}s rolling
-        </span>
-      </div>
-      <svg
-        viewBox={`0 0 ${W} ${H}`}
-        className="stats-chart dm-chart"
-        role="img"
-        aria-label={session ? 'Damage per second over the fights of this session, end to end' : 'Damage per second over the fight'}
-      >
-        {[0.5, 1].map((f) => (
-          <g key={f}>
-            <line className="grid" x1={L} x2={W - 6} y1={y(max * f)} y2={y(max * f)} />
-            <text x={L - 4} y={y(max * f) + 4} textAnchor="end">
-              {fmtRate(max * f)}
-            </text>
-          </g>
-        ))}
-        <line className="grid" x1={L} x2={W - 6} y1={y(0)} y2={y(0)} />
-        {ticks.map((t) => (
-          <text key={t} x={x(t)} y={H - 4} textAnchor="middle">
-            {clock(t)}
-          </text>
-        ))}
-        {marks.slice(1).map((m) => (
-          <line key={m.at} className="dm-chart-mark" x1={x(m.at)} x2={x(m.at)} y1={6} y2={H - B}>
-            <title>{m.name}</title>
-          </line>
-        ))}
-        {shown.map((s) => (
-          <path key={s.key} d={path(s.values)} fill="none" stroke={s.color} strokeWidth={s.key === 'inc' ? 1.2 : 1.8} opacity={s.key === 'inc' ? 0.8 : 1} />
-        ))}
-      </svg>
-      <div className="row tight small">
-        {series
-          .filter((s) => s.any)
-          .map((s) => (
-            <button
-              key={s.key}
-              className={`dm-legend${hidden.includes(s.key) ? ' off' : ''}`}
-              aria-pressed={!hidden.includes(s.key)}
-              onClick={() => setHidden(hidden.includes(s.key) ? hidden.filter((k) => k !== s.key) : [...hidden, s.key])}
-              title={hidden.includes(s.key) ? 'Show this line' : 'Hide this line'}
-            >
-              <i style={{ background: s.color }} /> {s.label}
-            </button>
-          ))}
-      </div>
     </div>
   )
 }
