@@ -40,7 +40,7 @@
       }
     },
     {
-      "files": ["src/features/*/core.ts"],
+      "files": ["src/features/*/*.ts"],
       "rules": {
         "no-restricted-imports": [
           "error",
@@ -48,7 +48,7 @@
             "paths": [{ "name": "electron", "message": "core runs outside Electron too (tests, workers): pass what it needs in." }],
             "patterns": [
               {
-                "group": ["../../main", "../../main/**", "../../renderer/**", "../../preload/**", "./main", "./page", "../*/main", "../*/page"],
+                "group": ["../../main", "../../main/**", "../../renderer/**", "../../preload/**", "./main", "./*Source", "./page", "./*Page", "../*/main", "../*/page"],
                 "message": "core may not import main, the renderer or the preload."
               }
             ]
@@ -102,7 +102,7 @@
       }
     },
     {
-      "files": ["src/features/*/page.tsx", "src/features/index.ts"],
+      "files": ["src/features/*/*.tsx", "src/features/index.ts"],
       "rules": {
         "no-restricted-imports": [
           "error",
@@ -111,7 +111,7 @@
             "patterns": [
               { "group": ["node:*", "fs", "path", "os", "child_process"], "allowTypeImports": true, "message": "The renderer is a browser page: ask the main process." },
               {
-                "group": ["../main/**", "../../main/**", "../preload/**", "../../preload/**", "./main", "../*/main", "./*/main"],
+                "group": ["../main/**", "../../main/**", "../preload/**", "../../preload/**", "./main", "./*Source", "../*/main", "./*/main"],
                 "allowTypeImports": true,
                 "message": "The renderer may not import the main process or the preload."
               }
@@ -137,9 +137,9 @@
       }
     },
     {
-      "files": ["src/features/*/main.ts"],
+      "files": ["src/features/*/main.ts", "src/features/*/*Source.ts"],
       "rules": {
-        "no-restricted-imports": ["error", { "patterns": [{ "group": ["../../renderer/**", "./page", "../*/page"], "message": "The main process may not import the renderer." }] }]
+        "no-restricted-imports": ["error", { "patterns": [{ "group": ["../../renderer/**", "./page", "./*Page", "../*/page"], "message": "The main process may not import the renderer." }] }]
       }
     }
   ],

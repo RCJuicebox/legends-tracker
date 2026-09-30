@@ -248,3 +248,28 @@ Settled 2026-09-15 on Test Sixty.
 - A pet uses its weapon even while the log says "Your pet's will is not sufficient to command its weapon". That message is the weapon proc's level gate; the weapon's damage still applies. Removing a 2H weapon (Khyldorn: DMG 36, delay 43, proc Siphon level 50) dropped the average slash from 108 to a bare "sting" of 43, cleave from 111 to 43 and bash from 42 to 14, and the message stopped.
 
 Pet melee with a weapon is modelled in `src/core/pets.ts` `petSwing` and `weaponDamageBonus`; it assumes a worn weapon is used, as found here.
+
+## Faction standing and con
+
+Settled 2026-09-28 (the export and the achievements) and 2026-09-29 (the con), in play on the test character after it changed from Iksar of Cazic Thule to an Agnostic Wood Elf, Monk / Bard / Enchanter.
+
+- `/outputfile faction` writes `Name_server-CLASS-Factions.txt`: the **raw** personal standing, -2000 to 2000, with no race, class or deity modifier. The log's lifetime net of "Your faction standing with X has been adjusted by N." lines equals the export's value. A race or deity change leaves the raw standings as they were: two exports either side of one were byte for byte the same.
+- The 83 faction achievements (EverQuest › Progression, id 80000 + faction id) complete at raw 2000, and stay complete if the standing drops again. "Could not possibly get any better" is the line at 2000.
+- What an NPC cons is **raw + race modifier + deity modifier + the best (highest) of the three classes' modifiers**, from the client's `Resources/Faction/FactionAssociations.txt` (`faction^key^modifier`; keys 1-16 classes, 51-62 the classic twelve races, Iksar 178, Kerran 180, Froglok 661, Drakkin 1106, deities 201-216). Agnostic has no key and adds nothing; a class with no row adds 0; the primary class has no special part.
+- The con bands are EQEmu's: Ally 1100, Warmly 750, Kindly 500, Amiably 100, Indifferent 0, Apprehensive -100, Dubious -500, Threatening -750, Scowling below.
+
+The readings that settled it:
+
+| Character | Faction, raw | Sum | Con |
+|---|---|---|---|
+| Iksar, Cazic Thule | Tunare's Scouts, 0 | -750 - 200 = -950 | Scowls |
+| Iksar, Agnostic | Tunare's Scouts, 0 | -750 | Threatening (so -750 is Threatening, not Scowling) |
+| Wood Elf, Cazic Thule | Tunare's Scouts, 0 | 100 - 200 = -100 | Apprehensive (so -100 is Apprehensive) |
+| Wood Elf, Agnostic | Tunare's Scouts, 0 | 100 | Amiable (so Amiably starts at 100) |
+| Wood Elf, Agnostic, MNK/BRD/ENC | Song Weavers, 0 | 50 + best of MNK 0, BRD 50, ENC 0 = 100 | Amiable (a sum of all three would be the same; the Monk's alone would be Indifferent) |
+| Wood Elf, Agnostic, MNK/SHD/SHM | Song Weavers, 0 | 50 + best of MNK 0, SHD -300, SHM 0 = 50 | Indifferent (a sum would be -250 Dubious) |
+| Wood Elf, Agnostic, MNK/BRD/ENC | Dreadguard Inner, 2000 (Divn L\`Crit) | 2000 - 875 + best of MNK -300, BRD 0, ENC 0 = 1125 | Ally (the Monk's -300 would be 825 Warmly) |
+
+A /con while invisible reads "regards you indifferently" whatever the standing: it proves nothing.
+
+Implemented in `src/features/factions/core.ts`: `STANDINGS` and `standingBand` (the bands), `RACE_KEYS`, `conBasis` and `conOf` (the sum, best class by `clsIndex`), `withCons` for the Standings tab; the Optimize tab plans every character as Agnostic (`consFor` in `main.ts`). Standings since an export are the export plus every change the log wrote after its "Outputfile Complete" line (`SinceExports`).

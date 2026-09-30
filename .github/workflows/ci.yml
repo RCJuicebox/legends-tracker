@@ -21,6 +21,8 @@ jobs:
       - run: npm ci
       # Typecheck, lint (with the layer rules) and the tests.
       - run: npm run check
+      # The tests again with coverage: a folder falling below its floor in vitest.config.ts fails.
+      - run: npm run coverage
       # The app starts on a throwaway profile, answers app:state and quits when asked: built from
       # source, then packaged as the installer would lay it out.
       - run: npm run build

@@ -72,8 +72,11 @@
     "files": [
       "out/**",
       "package.json",
-      "!node_modules/koffi/build/koffi/!(win32_x64)/**",
-      "!node_modules/koffi/{vendor,doc}/**"
+      "!node_modules/koffi/{vendor,doc,lib}/**",
+      "!node_modules/koffi/cnoke.cjs",
+      "!node_modules/koffi/src/koffi/CMakeLists.txt",
+      "!node_modules/koffi/src/koffi/src/abi/**",
+      "!node_modules/koffi/src/**/*.{cc,hh,inc,S,asm}"
     ],
     "extraResources": [
       {
