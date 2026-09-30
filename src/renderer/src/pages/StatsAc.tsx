@@ -114,18 +114,27 @@ export function AcTab({
         <div className="card stack gap-10">
           <h2>Buffs and AAs</h2>
           <div className="stats-fields two">
-            <NumField label="AC from buffs" hint="SPA 1 + 416" value={s.acBuffs} onChange={(v) => set({ acBuffs: v ?? 0 })} />
+            <NumField label="AC from buffs" hint="spells and songs on you" title="Spell effects 1 and 416 (AC)" value={s.acBuffs} onChange={(v) => set({ acBuffs: v ?? 0 })} />
             <NumField label="Armor of Wisdom AC" value={s.armorOfWisdom} onChange={(v) => set({ armorOfWisdom: v ?? 0 })} />
             <NumField label="Hero's Fortitude AC" value={s.herosFortitude} onChange={(v) => set({ herosFortitude: v ?? 0 })} />
             <NumField
               label="Combat Stability"
-              hint="SPA 259, %"
+              hint="%"
+              title="Spell effect 259"
               value={s.overrides.combatStability}
               auto={auto.combatStability}
               autoFrom="AAs"
               onChange={(v) => setOverride('combatStability', v)}
             />
-            <NumField label="Melee avoidance AAs" hint="SPA 172, %" value={s.overrides.evasion} auto={auto.evasion} autoFrom="AAs" onChange={(v) => setOverride('evasion', v)} />
+            <NumField
+              label="Melee avoidance AAs"
+              hint="%"
+              title="Spell effect 172"
+              value={s.overrides.evasion}
+              auto={auto.evasion}
+              autoFrom="AAs"
+              onChange={(v) => setOverride('evasion', v)}
+            />
           </div>
         </div>
         <div className="card stack gap-10">

@@ -45,27 +45,36 @@ import type { FactionTrackView } from '../../shared/tracking'
 // it is. The catalog of ways (the log's kills and hand-ins, eqlwiki) changes slowly and is read once a
 // minute, or at once when an achievement it was not built for turns up.
 
-const HOW =
-  'Each achievement is done the moment its standing reaches 2000, and stays done whatever the standing does after. So the plan orders the ' +
-  'work: something that lowers an achievement still to do comes after that achievement is done, where it costs nothing. At each step it ' +
-  'takes whatever does the most for the achievements still to do per hour, counting points it would take off another one as work to do ' +
-  'again; then it tries other orders and other ways for each achievement and keeps any that save time. ' +
-  'What raises a faction comes from your own log first (every kill and hand-in that moved a faction, with the amounts Legends gives and ' +
-  'how fast you got through them), and from eqlwiki (faction pages, quest pages, item pages) where your log has nothing; the wiki often ' +
-  'says only "got better", and then your log’s usual amount stands in (or typical Legends amounts when your log has too few to say). Mobs the wiki names are grouped into camps by zone: common mobs go at ' +
-  'your kill pace, named ones at one per respawn, so a camp of one or two named mobs loses to a quest. Hand-ins take the stack at once, so ' +
-  'what counts is getting the items: bought ones are quick, gathered ones take the time you set, and what you already hold is free. ' +
-  'A quest step counts as repeatable when it wants one kind of item nobody in the walkthrough hands you; chain steps, big one-off ' +
-  'rewards and hand-ins your log saw fewer than three times are listed but not planned, unless you lock one in. ' +
-  'A quest whose NPC wants a con (Allakhazam lists them) opens as your standing gets there, with your race’s and classes’ modifiers ' +
-  'as an Agnostic, and the plan may add a step that raises a faction just far enough to open a quicker quest, or swap race in ' +
-  'Loadouts for it. The race unlocks count as well: each wants three of a race’s factions maxed, and once one is done the plan may ' +
-  'swap to that race in the steps after. With Race unlocks first, it does them before the rest, and still does what is quick to do ' +
-  'on the way (more hand-ins to an NPC it is at, say, for another achievement). ' +
-  'Two goals: Fastest takes every achievement in the least time. Most factions positive also counts every faction that ends at 0 or ' +
-  'above, each worth the hours you set, so it may take a slower way that keeps a faction up, or add steps at the end that bring ' +
-  'factions back from below zero. Either way, where a faction ends is what counts: points an early step takes and a later one gives ' +
-  'back cost nothing.'
+const HOW = (
+  <>
+    <div>
+      <b>Order.</b> An achievement is done the moment its standing reaches 2000, and stays done whatever the standing does after. So anything that lowers one still to do comes
+      after it is done, where it costs nothing. Each step takes what does the most for the achievements left per hour, counting points it takes off another as work to do again;
+      then other orders and other ways are tried, and any that save time are kept.
+    </div>
+    <div>
+      <b>Ways.</b> From your own log first: every kill and hand-in that moved a faction, with the amounts Legends gives and your pace. Then eqlwiki (faction, quest and item pages)
+      where your log has nothing; where the wiki says only “got better”, your log’s usual amount stands in, or typical Legends amounts when your log has too few.
+    </div>
+    <div>
+      <b>Time.</b> Mobs are grouped into camps by zone: common ones at your kill pace, named ones at one a respawn, so a camp of one or two named mobs loses to a quest. A hand-in
+      takes the stack at once, so what counts is getting the items: bought is quick, gathered takes the time you set, and what you hold is free.
+    </div>
+    <div>
+      <b>Quests.</b> A step is repeatable when it wants one kind of item nobody in the walkthrough hands you; chain steps, big one-off rewards and hand-ins your log saw fewer than
+      three times are listed but not planned, unless you lock one in. A quest whose NPC wants a con (Allakhazam lists them) opens as your standing gets there, as an Agnostic of
+      your race and classes; the plan may add a step that raises a faction just far enough to open a quicker quest, or swap race in Loadouts for it.
+    </div>
+    <div>
+      <b>Race unlocks</b> count too: each wants three of a race’s factions maxed, and once one is done the plan may swap to that race in the steps after. With Race unlocks first,
+      they come before the rest, with what is quick to do on the way.
+    </div>
+    <div>
+      <b>Goals.</b> Fastest takes every achievement in the least time. Most factions positive also counts each faction that ends at 0 or above, worth the hours you set, so it may
+      take a slower way that keeps a faction up, or end with steps that bring factions back from below zero. Either way, only where a faction ends counts.
+    </div>
+  </>
+)
 
 const signed = (n: number) => (n > 0 ? `+${num1(n)}` : n < 0 ? `−${num1(-n)}` : '0')
 /** The con's word for a standing with the modifiers added: "Indifferent", "Amiable". */

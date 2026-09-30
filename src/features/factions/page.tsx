@@ -7,8 +7,18 @@ import { useRemembered } from '../../renderer/src/remember'
 import { usePickedCharacter } from '../../renderer/src/character'
 import { useNow } from '../../renderer/src/components/TimerBars'
 import { ErrorText, FilterBox, GameCommand, Info, Pending, Segmented, SortTh, Tabs, ToggleChip, type Sort } from '../../renderer/src/components/ui'
-import { duration, when, who, wikiUrl } from '../../core/format'
-import { STANDING_MAX, standingBand, type ConBasis, type FactionCon, type FactionMob, type FactionRow, type FactionRowAchievement, type FactionStandingNow } from './core'
+import { duration, num, when, who, wikiUrl } from '../../core/format'
+import {
+  STANDING_MAX,
+  STANDINGS,
+  standingBand,
+  type ConBasis,
+  type FactionCon,
+  type FactionMob,
+  type FactionRow,
+  type FactionRowAchievement,
+  type FactionStandingNow
+} from './core'
 import { Doing, Flags, PlanTab, sourceNote, useChoices, usePlanSettings } from './planPage'
 import { waysToRaise, type PlanActivity } from './planner'
 import type { FactionLookup, LookupHit } from './lookup'
@@ -24,16 +34,29 @@ const VIEWS: [View, string][] = [
   ['plan', 'Plan']
 ]
 
-const HOW =
-  'Standing is from the factions export the game writes when you type /outputfile faction, plus every change the log ' +
-  'recorded after it was written, so it keeps up as you play; it is what the achievements count. The con word is what ' +
-  'NPCs see: the standing with your race’s, your deity’s and the best of your classes’ modifiers from the game’s own ' +
-  'table added (all three from the Stats page, which /who keeps up to date but for the deity; no deity set counts as ' +
-  'Agnostic, which has none). The bands are EQEmu’s (Ally from 1100, Warmly 750, Kindly 500, Amiably 100, Indifferent ' +
-  '0, Apprehensive −100, Dubious −500, Threatening −750, Scowling below), and cons seen in play land on them to the ' +
-  'point. Net change adds up each "Your faction standing with … has been adjusted by N" line in the log and its ' +
-  'archives. When the game says a faction "could not possibly get any better" (or worse), or the standing is at 2000 ' +
-  '(or −2000), it is marked maxed (or bottomed).'
+const HOW = (
+  <>
+    <div>
+      <b>Standing</b> is the factions export (<code>/outputfile faction</code>) plus every change the log recorded since, so it keeps up as you play. It is what the achievements
+      count.
+    </div>
+    <div>
+      <b>Con</b> is what NPCs see: the standing plus your race’s, your deity’s and the best of your three classes’ modifiers, from the game’s own table. Race and classes are the
+      Stats page’s, kept up by /who; set your deity there (none set counts as Agnostic, which has no modifiers). The bands, from:
+    </div>
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, auto)', gap: '0 14px', whiteSpace: 'normal' }}>
+      {STANDINGS.map((b) => (
+        <span key={b.word}>
+          {b.word} <span className="mono">{Number.isFinite(b.min) ? num(b.min).replace('-', '−') : 'below'}</span>
+        </span>
+      ))}
+    </div>
+    <div>
+      <b>Net change</b> adds up the log’s “Your faction standing with … has been adjusted by N” lines. <b>Maxed</b> (or bottomed): the game said it “could not possibly get any
+      better” (or worse), or it is at 2000 (or −2000).
+    </div>
+  </>
+)
 
 type SortKey = 'name' | 'standing' | 'ach' | 'net' | 'changes' | 'cap' | 'last'
 

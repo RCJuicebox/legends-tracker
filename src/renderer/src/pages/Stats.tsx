@@ -141,8 +141,8 @@ export function Stats() {
         <div>
           <h1>Stats</h1>
           <p>
-            AC, melee and AAs for {who(character) || 'your character'}. AC and melee are worked out the way the server does: worn gear comes from the Inventory page, skill caps and
-            soft caps from the game's own tables, and AAs from your log.
+            AC, melee and AAs for {who(character) || 'your character'}. AC and melee are worked out the way the server does: worn gear comes from the Gear page, skill caps and soft
+            caps from the game's own tables, and AAs from your log.
           </p>
         </div>
         <div className="actions">

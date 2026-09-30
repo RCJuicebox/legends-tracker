@@ -561,7 +561,7 @@ function ItemPanel({
           </div>
         </div>
         {lvl < MAX_MERGE && (
-          <button className="btn primary small" onClick={onPlan} title="Open the Motes upgrade planner with this item">
+          <button className="btn primary small" onClick={onPlan} title="Open Upgrades › Merge planner with this item">
             Plan this upgrade
           </button>
         )}

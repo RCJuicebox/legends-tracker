@@ -81,8 +81,23 @@ export function CombatTab({ s, set, setOverride, auto, val, trio, primary, caps,
             <h2>Crit</h2>
             <div className="stats-fields two">
               <NumField label="Measured crit rate" hint="%, from a parse" step={0.1} max={100} value={s.measuredCrit} onChange={(v) => set({ measuredCrit: v ?? 0 })} />
-              <NumField label="Crit chance AAs" hint="SPA 169, %" value={s.overrides.spa169} auto={auto.spa169} autoFrom="AAs" onChange={(v) => setOverride('spa169', v)} />
-              <NumField label="Crit difficulty" hint="classic 8900" value={s.critDifficulty} min={1} onChange={(v) => set({ critDifficulty: v || 1 })} />
+              <NumField
+                label="Crit chance AAs"
+                hint="%"
+                title="Spell effect 169"
+                value={s.overrides.spa169}
+                auto={auto.spa169}
+                autoFrom="AAs"
+                onChange={(v) => setOverride('spa169', v)}
+              />
+              <NumField
+                label="Crit difficulty"
+                hint="8900 as a rule"
+                title="The server's crit difficulty: 8900 in classic EverQuest's rules"
+                value={s.critDifficulty}
+                min={1}
+                onChange={(v) => set({ critDifficulty: v || 1 })}
+              />
               <NumField label="Heroic dexterity" hint="0 on Legends" value={s.heroicDex} onChange={(v) => set({ heroicDex: v ?? 0 })} />
             </div>
           </div>
@@ -91,7 +106,8 @@ export function CombatTab({ s, set, setOverride, auto, val, trio, primary, caps,
       </div>
       <p className="faint small">
         Skill caps from the game's own Resources/skillcaps.txt, best of your {trio.length > 1 ? 'three classes' : 'class'} per skill (classic EverQuest numbering). Attack, hit and
-        swing formulas are EQEmu's zone/attack.cpp, confirmed against the stats window and parses; the crit model is not. Primary class for class rules: {className(primary)}.
+        swing formulas are the EverQuest server's own (as EQEmu has them), confirmed against the stats window and parses; the crit model is not. Primary class for class rules:{' '}
+        {className(primary)}.
       </p>
     </div>
   )

@@ -63,7 +63,7 @@ function useSinceExport(view: InventoryView) {
   }, [q.data, view.modified, me])
 }
 
-/** The Gear page's Best merge tab: which worn item's next +1 gives the most for its motes. */
+/** Upgrades' Best merge tab: which worn item's next +1 gives the most for its motes. */
 export function MergeTab({
   view,
   weights,

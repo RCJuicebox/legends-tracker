@@ -172,7 +172,7 @@ function MoteTracking() {
               <span className="label">Today</span>
               <span className="value">{totalMotes(today)}</span>
               <span className="sub" title={VALUE_HINT}>
-                {moteValue(today)} Infinitesimal-equivalent
+                worth {moteValue(today)} Infinitesimal motes
               </span>
             </div>
             <div className="stat">
@@ -184,7 +184,7 @@ function MoteTracking() {
               <span className="label">Crawl average</span>
               <span className="value">{perHour(crawlMotes, crawlHours)}/h</span>
               <span className="sub" title={VALUE_HINT}>
-                {perHour(crawlValue, crawlHours)} Infinitesimal-equivalent / hour
+                worth {perHour(crawlValue, crawlHours)} Infinitesimal motes an hour
               </span>
             </div>
           </div>
@@ -228,14 +228,14 @@ function ActiveSession({ a }: { a: MoteSession | null | undefined }) {
               <span className="label">Motes</span>
               <span className="value">{totalMotes(a.motes)}</span>
               <span className="sub" title={VALUE_HINT}>
-                {moteValue(a.motes)} Infinitesimal-equivalent
+                worth {moteValue(a.motes)} Infinitesimal motes
               </span>
             </div>
             <div className="stat">
               <span className="label">Per hour</span>
               <span className="value">{perHour(totalMotes(a.motes), sessionHours(a, now))}</span>
               <span className="sub" title={VALUE_HINT}>
-                {perHour(moteValue(a.motes), sessionHours(a, now))} Infinitesimal-equivalent / hour
+                worth {perHour(moteValue(a.motes), sessionHours(a, now))} Infinitesimal motes an hour
               </span>
             </div>
           </div>

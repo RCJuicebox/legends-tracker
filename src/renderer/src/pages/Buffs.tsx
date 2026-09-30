@@ -45,17 +45,26 @@ const casters = (o: BuffOffer) =>
     .map(([c, l]) => `${className(c)} ${l}`)
     .join(', ')
 
-const HOW =
-  'Classes come from /who: type /who <name> for anyone in the group the tracker does not know yet, and /who <your name> for your own. Self-only ' +
-  'buffs are listed too (marked self), as are permanent procs and utility buffs (combat innates, poisons, Breath of the Dead; not vision): whatever ' +
-  'your own classes can cast is yours to keep up, group or no group, and the reminder says "Cast …" for it. A buff counts as on you from its ' +
-  `"you feel…" line, matched to the cast just before it, until its fade line (or death). Songs and buffs under ${MIN_BUFF_SEC / 60} minutes are left ` +
-  'out. What to ask for is the best combination that stacks, by the game’s own stacking rules: two buffs with the same effect in the same ' +
-  'slot do not stack and the stronger holds; some block or overwrite others below a set strength, worked out at the caster’s level, so the order ' +
-  'they land in can matter (a level-50 Strength stays on under Harnessing of Spirit, but not the other way round), and the combination says ' +
-  'when it does. Of the buffs you pick that your group can cast, and what is on you already, it is the set worth the most. A buff is worth its ' +
-  `HP plus 2 a point of AC, 1.5 of STA, 1 of other stats, nothing for CHA; buffs worth under ${MIN_ASK_VALUE} are not asked for. Durations of ` +
-  'other people’s buffs are worked out at their /who level without their focus, so the real end can come later; the fade line is what counts.'
+const HOW = (
+  <>
+    <div>
+      <b>Who can cast what</b> comes from /who: <code>/who &lt;name&gt;</code> for anyone in the group the tracker does not know yet, <code>/who &lt;your name&gt;</code> for
+      yourself. Whatever your own classes can cast is yours to keep up, group or no group: its reminder says “Cast …”. Self-only buffs, permanent procs and utility buffs (combat
+      innates, poisons, Breath of the Dead; not vision) are listed too. Songs and buffs under {MIN_BUFF_SEC / 60} minutes are left out.
+    </div>
+    <div>
+      <b>On you</b> from its “you feel…” line, matched to the cast just before it, until its fade line or your death. Someone else’s buff is timed at their /who level without their
+      focus, so it can last longer than shown; the fade line is what counts.
+    </div>
+    <div>
+      <b>What to ask for</b> is the set worth the most that stacks, by the game’s own rules, among the buffs you pick that your group can cast and what is on you already. The order
+      can matter (a level-50 Strength stays on under Harnessing of Spirit, not the other way round), and the set says when it does.
+    </div>
+    <div>
+      <b>Worth</b>: its HP, plus 2 a point of AC, 1.5 of STA, 1 of other stats, nothing for CHA. Buffs worth under {MIN_ASK_VALUE} are not asked for.
+    </div>
+  </>
+)
 
 export function Buffs() {
   const q = useBuffs()

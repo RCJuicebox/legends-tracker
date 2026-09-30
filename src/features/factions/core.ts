@@ -160,8 +160,8 @@ export interface FactionExport {
 export type StandingTone = 'ok' | 'plain' | 'warn' | 'bad'
 
 /**
- * How a standing cons, highest first. These are EQEmu's bands (Ally from 1100, Scowling at -751 and
- * below); that EverQuest Legends uses the same ones is not confirmed.
+ * How a standing cons, highest first: EQEmu's bands (Ally from 1100, Scowling at -751 and below),
+ * which cons seen in play land on to the point (docs/formulas.md).
  */
 export const STANDINGS: readonly { min: number; word: string; tone: StandingTone }[] = [
   { min: 1100, word: 'Ally', tone: 'ok' },

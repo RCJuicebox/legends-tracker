@@ -272,4 +272,4 @@ The readings that settled it:
 
 A /con while invisible reads "regards you indifferently" whatever the standing: it proves nothing.
 
-Implemented in `src/features/factions/core.ts`: `STANDINGS` and `standingBand` (the bands), `RACE_KEYS`, `conBasis` and `conOf` (the sum, best class by `clsIndex`), `withCons` for the Standings tab; the Optimize tab plans every character as Agnostic (`consFor` in `main.ts`). Standings since an export are the export plus every change the log wrote after its "Outputfile Complete" line (`SinceExports`).
+Implemented in `src/features/factions/core.ts`: `STANDINGS` and `standingBand` (the bands), `RACE_KEYS`, `conBasis` and `conOf` (the sum, best class by `clsIndex`), `withCons` for the Standings tab; the Plan tab plans every character as Agnostic (`consFor` in `main.ts`). Standings since an export are the export plus every change the log wrote after its "Outputfile Complete" line (`SinceExports`).

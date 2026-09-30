@@ -17,10 +17,13 @@ export function NumField({
   max,
   step = 1,
   auto,
-  autoFrom
+  autoFrom,
+  title
 }: {
   label: string
   hint?: string
+  /** The detail for those who want it (a spell effect's number), on hover. */
+  title?: string
   value: number | undefined
   onChange: (v: number | undefined) => void
   min?: number
@@ -31,7 +34,7 @@ export function NumField({
 }) {
   const overridden = auto !== undefined && value !== undefined
   return (
-    <label className="field">
+    <label className="field" title={title}>
       <span>
         {label}
         {hint && <em className="faint"> {hint}</em>}

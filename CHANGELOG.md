@@ -71,6 +71,7 @@ What changed in each version. The release workflow publishes a version's section
 - **Overlays: the background slider fades the panel, not the text.** An overlay's opacity used to fade its text and bars along with the dark panel behind them, and stopped at 20%. It now fades the panel alone, all the way to none, and the text and bars stay as they are. The alerts, which are text alone, still fade as a whole.
 - **Overlays: the achievements overlay says it is on.** Shown with nothing tracked, it drew nothing and looked broken. It now says, in one faint line, what it is waiting for.
 - **Overlays: laid out without overlapping.** A first install lays the overlays out on your main monitor with none over another, down to a 1280 × 720 screen: the alerts had sat over the buffs on a 1080p screen. The shipped positions fit a 1080p screen (they sat off its right edge), and an overlay added on the Overlays page steps clear of one already there instead of landing on it.
+- **Plainer words.** Stats' fields say "%" and "spells and songs on you" rather than spell-effect numbers (still there on hover), and "8900 as a rule" for crit difficulty. Motes says "worth 1,234 Infinitesimal motes" rather than "Infinitesimal-equivalent". The long explanations on Factions, the Plan tab and Buffs are split into short parts with a bold lead each, and Factions lists the con bands as a table rather than a sentence. Pages that still named the old Inventory page, Motes upgrade planner and Focus effects tab name Gear, Upgrades › Merge planner and Focus items.
 
 ## 2.4.0 (2026-09-29)
 
