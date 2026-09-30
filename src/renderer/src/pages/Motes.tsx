@@ -4,7 +4,8 @@ import { api, clock } from '../api'
 import { useInvoke } from '../hooks'
 import { act } from '../toast'
 import { useNow } from '../components/TimerBars'
-import { ConfirmButton, Icon, Info, Pending } from '../components/ui'
+import { ConfirmButton, Icon, Info, Pending, SortTh, sortRows, type Sort } from '../components/ui'
+import { useRemembered } from '../remember'
 import { MOTE_RANKS, localDay, moteValue, moteWorth, pausedHours, sessionHours, timeOnDay, totalMotes, type MoteCounts, type MoteSession } from '../../../core/motes'
 import type { MoteScan, MoteView } from '../../../shared/ipc'
 
@@ -249,7 +250,20 @@ function ActiveSession({ a }: { a: MoteSession | null | undefined }) {
   )
 }
 
+type SessionKey = 'when' | 'where' | 'type' | 'time' | 'motes' | 'perHour' | 'value'
+
 function SessionTable({ sessions, now }: { sessions: MoteSession[]; now: number }) {
+  const [sort, setSort] = useRemembered<Sort<SessionKey>>('motes.sessions.sort', { key: 'when', dir: -1 })
+  const hours = (s: MoteSession) => sessionHours(s, now)
+  const rows = sortRows(sessions, sort, {
+    when: (s) => s.startedAt,
+    where: (s) => s.name,
+    type: (s) => s.kind,
+    time: hours,
+    motes: (s) => totalMotes(s.motes),
+    perHour: (s) => totalMotes(s.motes) / Math.max(hours(s), 1 / 60),
+    value: (s) => moteValue(s.motes) / Math.max(hours(s), 1 / 60)
+  })
   return (
     <div className="card">
       <h2>
@@ -262,18 +276,32 @@ function SessionTable({ sessions, now }: { sessions: MoteSession[]; now: number 
           <table className="table">
             <thead>
               <tr>
-                <th>When</th>
-                <th>Where</th>
-                <th>Type</th>
-                <th>Time</th>
-                <th>Motes</th>
-                <th>Per hour</th>
-                <th title={VALUE_HINT}>Value / hour (Infinitesimal)</th>
+                <SortTh k="when" sort={sort} onSort={setSort}>
+                  When
+                </SortTh>
+                <SortTh k="where" sort={sort} onSort={setSort}>
+                  Where
+                </SortTh>
+                <SortTh k="type" sort={sort} onSort={setSort}>
+                  Type
+                </SortTh>
+                <SortTh k="time" sort={sort} onSort={setSort}>
+                  Time
+                </SortTh>
+                <SortTh k="motes" sort={sort} onSort={setSort}>
+                  Motes
+                </SortTh>
+                <SortTh k="perHour" sort={sort} onSort={setSort}>
+                  Per hour
+                </SortTh>
+                <SortTh k="value" sort={sort} onSort={setSort} title={VALUE_HINT}>
+                  Value / hour (Infinitesimal)
+                </SortTh>
                 <th />
               </tr>
             </thead>
             <tbody>
-              {sessions.slice(0, 100).map((s) => {
+              {rows.slice(0, 100).map((s) => {
                 const h = sessionHours(s, now)
                 return (
                   <tr key={s.id}>

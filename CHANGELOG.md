@@ -83,6 +83,7 @@ What changed in each version. The release workflow publishes a version's section
 - **Explanations reach the keyboard.** A standing's con sum, an achievement's standing, skill and Slayer progress, a merge's motes and a buff's casters were in hover titles only. They can now be reached with Tab, and the same words show beside them. The gear tiles name their augments to a screen reader.
 - **The sidebar follows a session.** **Play** is what runs beside the game: Live, Damage Meter, Buffs, Respawns and Motes. **Plan** is what is worked out between sessions or looked back on: Achievements, Factions, Stats, Gear, Upgrades, Tradeskills and Loot. **Setup** is what is set once, and Spell Timers, mostly rules and focus effects, joins it. Upgrades has an icon of its own rather than the Motes one.
 - **Gear's settings take one line.** The eras, AC soft cap, Primary, focus value and the note on what a point is worth sat above every tab's results. They now fold to one line that says what they are set to, with **Change…** to open them; the page remembers which you had. **Show weights** opens them too.
+- **More tables sort.** Spell Timers' spells (by name, type, Spell window, when it wears off or when last cast), Motes' sessions (by when, where, type, time, motes, per hour or value) and Log Files' logs (by name, size or when last written) sort by any column header, as Factions, Respawns and AAs already did. Each page remembers its order.
 
 ## 2.4.0 (2026-09-29)
 

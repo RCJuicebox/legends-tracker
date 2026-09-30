@@ -564,7 +564,8 @@ export function FilterBox({
   )
 }
 
-export type Sort<K extends string> = { key: K; dir: 1 | -1 }
+export { sortRows, type Sort } from '../../../core/sort'
+import type { Sort } from '../../../core/sort'
 
 /** A column header that sorts its table: a click sorts by it, another click reverses. */
 export function SortTh<K extends string>({
@@ -573,7 +574,8 @@ export function SortTh<K extends string>({
   onSort,
   children,
   num,
-  title
+  title,
+  after
 }: {
   k: K
   sort: Sort<K>
@@ -581,6 +583,8 @@ export function SortTh<K extends string>({
   children: ReactNode
   num?: boolean
   title?: string
+  /** Beside the sorting button, not in it: an Info, which cannot sit inside a button. */
+  after?: ReactNode
 }) {
   const active = sort.key === k
   return (
@@ -589,6 +593,7 @@ export function SortTh<K extends string>({
         {children}
         <span aria-hidden="true">{active ? (sort.dir === 1 ? ' ▲' : ' ▼') : ''}</span>
       </button>
+      {after && <> {after}</>}
     </th>
   )
 }

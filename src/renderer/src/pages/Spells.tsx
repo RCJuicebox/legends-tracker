@@ -1,4 +1,4 @@
-import { remember } from '../remember'
+import { remember, useRemembered } from '../remember'
 import { UPGRADES_TAB } from '../constants'
 import { useState } from 'react'
 import { useApp, useLive } from '../state'
@@ -6,7 +6,7 @@ import { api, clock, ago, errorMessage } from '../api'
 import { useInvoke, useSearch } from '../hooks'
 import { act, showError, showToast, showUndo } from '../toast'
 import { who } from '../../../core/format'
-import { CategoryChip, ConfirmButton, Field, FilterBox, Info, LoadError, NumberInput, SpellIcon, Switch } from '../components/ui'
+import { CategoryChip, ConfirmButton, Field, FilterBox, Info, LoadError, NumberInput, SortTh, sortRows, SpellIcon, Switch, type Sort } from '../components/ui'
 import {
   CATEGORY_LABELS,
   DEFAULT_TIER_DURATION_PCT,
@@ -18,6 +18,8 @@ import {
   type SpellRule
 } from '../../../shared/types'
 import type { PageId } from '../main'
+
+type SpellKey = 'name' | 'type' | 'window' | 'wears' | 'last'
 
 export function Spells({ go }: { go?: (page: PageId) => void }) {
   const { state } = useApp()
@@ -31,7 +33,18 @@ export function Spells({ go }: { go?: (page: PageId) => void }) {
   const [open, setOpen] = useState<string | null>(null)
   const [filter, setFilter] = useState('')
 
-  const shown = known.filter((k) => !filter || k.rankedName.toLowerCase().includes(filter.toLowerCase()))
+  const [sort, setSort] = useRemembered<Sort<SpellKey>>('spells.sort', { key: 'last', dir: -1 })
+  const shown = sortRows(
+    known.filter((k) => !filter || k.rankedName.toLowerCase().includes(filter.toLowerCase())),
+    sort,
+    {
+      name: (k) => k.rankedName,
+      type: (k) => k.category,
+      window: (k) => (k.duration.permanent ? Infinity : k.duration.spellWindowSec),
+      wears: (k) => (k.duration.permanent ? Infinity : k.duration.seconds),
+      last: (k) => k.lastCast || null
+    }
+  )
 
   return (
     <>
@@ -63,14 +76,23 @@ export function Spells({ go }: { go?: (page: PageId) => void }) {
                 <thead>
                   <tr>
                     <th />
-                    <th>Spell</th>
-                    <th>Type</th>
-                    <th>
-                      Spell window <Info label="About Spell window" text="As the in-game Spell window shows it: base (with rank and focus)" />
-                    </th>
-                    <th>
-                      Wears off <Info label="About Wears off" text="Including the partial tick it lands in" />
-                    </th>
+                    <SortTh k="name" sort={sort} onSort={setSort}>
+                      Spell
+                    </SortTh>
+                    <SortTh k="type" sort={sort} onSort={setSort}>
+                      Type
+                    </SortTh>
+                    <SortTh
+                      k="window"
+                      sort={sort}
+                      onSort={setSort}
+                      after={<Info label="About Spell window" text="As the in-game Spell window shows it: base (with rank and focus)" />}
+                    >
+                      Spell window
+                    </SortTh>
+                    <SortTh k="wears" sort={sort} onSort={setSort} after={<Info label="About Wears off" text="Including the partial tick it lands in" />}>
+                      Wears off
+                    </SortTh>
                     <th>Tracking</th>
                     <th>
                       Recast cue <Info label="About Recast cue" text="The spoken “Recast …” warning before it ends" />
@@ -78,7 +100,9 @@ export function Spells({ go }: { go?: (page: PageId) => void }) {
                     <th>
                       Fade cue <Info label="About Fade cue" text="The spoken announcement when it wears off" />
                     </th>
-                    <th>Last cast</th>
+                    <SortTh k="last" sort={sort} onSort={setSort}>
+                      Last cast
+                    </SortTh>
                   </tr>
                 </thead>
                 <tbody>

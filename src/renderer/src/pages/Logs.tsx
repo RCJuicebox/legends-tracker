@@ -5,9 +5,11 @@ import { api, mb, errorMessage } from '../api'
 import { useInvoke } from '../hooks'
 import { act, showError } from '../toast'
 import { who } from '../../../core/format'
-import { Ago, ConfirmButton, Field, LoadError, NumberInput, Switch, Pending } from '../components/ui'
+import { Ago, ConfirmButton, Field, LoadError, NumberInput, SortTh, sortRows, Switch, Pending, type Sort } from '../components/ui'
+import { useRemembered } from '../remember'
 
 export function Logs() {
+  const [sort, setSort] = useRemembered<Sort<'log' | 'size' | 'written'>>('logs.sort', { key: 'written', dir: -1 })
   const { state, patchSettings } = useApp()
   const status = useLive((l) => l.archive)
   const q = useInvoke('logs:overview', [], [status.busy, state.settings.archive.archiveDir])
@@ -105,14 +107,20 @@ export function Logs() {
             <table className="table">
               <thead>
                 <tr>
-                  <th>Log</th>
-                  <th style={{ width: '32%' }}>Size</th>
-                  <th>Last written</th>
+                  <SortTh k="log" sort={sort} onSort={setSort}>
+                    Log
+                  </SortTh>
+                  <SortTh k="size" sort={sort} onSort={setSort}>
+                    Size
+                  </SortTh>
+                  <SortTh k="written" sort={sort} onSort={setSort}>
+                    Last written
+                  </SortTh>
                   <th />
                 </tr>
               </thead>
               <tbody>
-                {view.logs.map((l) => (
+                {sortRows(view.logs, sort, { log: (l) => who(l.character), size: (l) => l.size, written: (l) => l.modified }).map((l) => (
                   <tr key={l.path}>
                     <td>
                       <div style={{ fontWeight: 600 }}>{who(l.character)}</div>
