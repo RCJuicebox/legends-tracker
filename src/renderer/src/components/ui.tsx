@@ -112,6 +112,7 @@ const paths = {
   ),
   plus: <path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6z" />,
   motes: <path d="M12 2 4 7v10l8 5 8-5V7l-8-5zm0 2.3 5.6 3.5L12 11.3 6.4 7.8 12 4.3zM6 9.6l5 3.1v6.1l-5-3.1V9.6zm7 9.2v-6.1l5-3.1v6.1l-5 3.1z" />,
+  upgrade: <path d="M16 18v2H8v-2h8zM11 7.99V16h2V7.99h3L12 4 8 7.99h3z" />,
   trophy: (
     <path d="M19 4h-2V2H7v2H5a2 2 0 0 0-2 2v1a5 5 0 0 0 4.4 5A5 5 0 0 0 11 15v3H7v2h10v-2h-4v-3a5 5 0 0 0 3.6-3A5 5 0 0 0 21 7V6a2 2 0 0 0-2-2zM5 7V6h2v4a3 3 0 0 1-2-3zm14 0a3 3 0 0 1-2 3V6h2z" />
   ),

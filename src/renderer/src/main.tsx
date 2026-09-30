@@ -32,20 +32,24 @@ import { DataSources } from './pages/DataSources'
 import { FEATURE_PAGES, type FeaturePageId } from '../../features'
 import { Factions } from '../../features/factions/page'
 
-/** The pages that are not feature modules, in sidebar order. */
+/**
+ * The pages that are not feature modules, in sidebar order, grouped by the player's day: Play for
+ * what runs beside the game, Plan for what is worked out between sessions (and looked back on), Setup
+ * for what is set once.
+ */
 const SHELL_PAGES = [
   { id: 'dashboard', group: 'Play', label: 'Live', icon: 'dashboard', el: Dashboard },
   { id: 'meter', group: 'Play', label: 'Damage Meter', icon: 'meter', el: DamageMeter },
   { id: 'buffs', group: 'Play', label: 'Buffs', icon: 'sparkle', el: Buffs },
-  { id: 'spells', group: 'Play', label: 'Spell Timers', icon: 'spells', el: Spells },
-  { id: 'motes', group: 'Play', label: 'Motes', icon: 'motes', el: Motes },
-  { id: 'loot', group: 'Play', label: 'Loot', icon: 'loot', el: Loot },
   { id: 'respawns', group: 'Play', label: 'Respawns', icon: 'respawn', el: Respawns },
-  { id: 'tradeskills', group: 'Play', label: 'Tradeskills', icon: 'flask', el: Tradeskills },
-  { id: 'achievements', group: 'Character', label: 'Achievements', icon: 'trophy', el: Achievements },
-  { id: 'stats', group: 'Character', label: 'Stats', icon: 'stats', el: Stats },
-  { id: 'gear', group: 'Character', label: 'Gear', icon: 'bag', el: Gear },
-  { id: 'upgrades', group: 'Character', label: 'Upgrades', icon: 'motes', el: Upgrades },
+  { id: 'motes', group: 'Play', label: 'Motes', icon: 'motes', el: Motes },
+  { id: 'achievements', group: 'Plan', label: 'Achievements', icon: 'trophy', el: Achievements },
+  { id: 'stats', group: 'Plan', label: 'Stats', icon: 'stats', el: Stats },
+  { id: 'gear', group: 'Plan', label: 'Gear', icon: 'bag', el: Gear },
+  { id: 'upgrades', group: 'Plan', label: 'Upgrades', icon: 'upgrade', el: Upgrades },
+  { id: 'tradeskills', group: 'Plan', label: 'Tradeskills', icon: 'flask', el: Tradeskills },
+  { id: 'loot', group: 'Plan', label: 'Loot', icon: 'loot', el: Loot },
+  { id: 'spells', group: 'Setup', label: 'Spell Timers', icon: 'spells', el: Spells },
   { id: 'triggers', group: 'Setup', label: 'Triggers', icon: 'triggers', el: Triggers },
   { id: 'overlays', group: 'Setup', label: 'Overlays', icon: 'overlays', el: Overlays },
   { id: 'audio', group: 'Setup', label: 'Audio', icon: 'audio', el: Audio },

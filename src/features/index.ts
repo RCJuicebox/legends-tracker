@@ -8,13 +8,13 @@ import type { IconName } from '../renderer/src/components/ui'
 export interface FeaturePage {
   /** The page's id, as the sidebar and `go` name it. */
   readonly id: string
-  readonly group: 'Play' | 'Character' | 'Setup'
+  readonly group: 'Play' | 'Plan' | 'Setup'
   readonly label: string
   readonly icon: IconName
   /** The page it comes after in the sidebar. */
   readonly after: string
 }
 
-export const FEATURE_PAGES = [{ id: 'factions', group: 'Character', label: 'Factions', icon: 'flag', after: 'achievements' }] as const satisfies readonly FeaturePage[]
+export const FEATURE_PAGES = [{ id: 'factions', group: 'Plan', label: 'Factions', icon: 'flag', after: 'achievements' }] as const satisfies readonly FeaturePage[]
 
 export type FeaturePageId = (typeof FEATURE_PAGES)[number]['id']
