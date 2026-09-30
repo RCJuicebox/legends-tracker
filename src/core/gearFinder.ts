@@ -1,4 +1,4 @@
-// The upgrade finder: for each worn slot, the catalog items this character could wear there, scored
+// The upgrade finder (Gear › Upgrade finder; the Upgrades page is where motes go): for each worn slot, the catalog items this character could wear there, scored
 // with the player's own stat weights against what they wear now.
 
 import { itemKey, mergeLevel, parseStatsBlock, scaledStats, type InvItem, type ItemStats } from './inventory'

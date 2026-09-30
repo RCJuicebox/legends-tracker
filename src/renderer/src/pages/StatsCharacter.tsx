@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { api } from '../api'
 import { num } from '../../../core/format'
-import type { StatsSheet } from '../../../core/statsSheet'
+import type { StatsInputs } from '../../../core/statsInputs'
 import { acInputs, type Val } from '../../../core/statsModel'
 import { computeAc } from '../../../core/acModel'
 import { baseAccuracy, OFFENSE, windowOffense } from '../../../core/combatModel'
@@ -54,7 +54,7 @@ export function CharacterTab({
   skill,
   gear
 }: {
-  s: StatsSheet
+  s: StatsInputs
   set: SetSheet
   val: Val
   trio: string[]

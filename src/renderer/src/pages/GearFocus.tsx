@@ -1,5 +1,5 @@
 import { baseName } from '../../../core/inventory'
-import { restrictions } from '../../../core/upgrades'
+import { restrictions } from '../../../core/gearFinder'
 import { focusValue, KIND_LABELS, KIND_ORDER, KIND_WORTH, type FocusInfo, type FocusLine } from '../../../core/itemFocus'
 import { type FocusCandidate, type GearModel, type OwnedFocus } from '../gear/useGearModel'
 import { DAY_WINDOWS, Info, Pending, Segmented } from '../components/ui'

@@ -1,5 +1,5 @@
 import { useMemo } from 'react'
-import type { HandWeights, Wearer, Weights } from '../../../core/upgrades'
+import type { HandWeights, Wearer, Weights } from '../../../core/gearFinder'
 import type { Piece } from '../../../core/gearOptimizer'
 import { catalogPieces as catalogPiecesOf } from '../../../core/gearCatalog'
 import type { InventoryView } from '../../../shared/types'

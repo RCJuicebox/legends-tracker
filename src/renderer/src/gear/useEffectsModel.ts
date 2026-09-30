@@ -1,7 +1,7 @@
 import { useMemo } from 'react'
 import { useInvoke } from '../hooks'
-import type { StatsSheet } from '../../../core/statsSheet'
-import { score, type Weights } from '../../../core/upgrades'
+import type { StatsInputs } from '../../../core/statsInputs'
+import { score, type Weights } from '../../../core/gearFinder'
 import type { EffectValue, Piece } from '../../../core/gearOptimizer'
 import { effectScore, procWorth, wornStats, wornWorth, type EffectSpell, type EffectWorth } from '../../../core/itemEffects'
 import { meleeProfile, type MeleeProfile } from '../../../core/meleeTally'
@@ -44,7 +44,7 @@ export function useEffectsModel({
   items: CatalogItem[] | undefined
   effectsOfItem: (name: string) => { worn: string; proc: string } | undefined
   days: number
-  sheetStats: StatsSheet
+  sheetStats: StatsInputs
   pieces: Piece[]
   level: number
   weights: Weights

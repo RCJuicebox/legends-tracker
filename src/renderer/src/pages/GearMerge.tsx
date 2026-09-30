@@ -13,7 +13,7 @@ import { mergeOptions, type MergeOption } from '../../../core/mergeValue'
 import { MAX_LEVEL } from '../../../core/moteCalc'
 import { MOTE_RANKS } from '../../../core/motes'
 import { ROLE_PRESETS } from '../../../core/statValue'
-import { WEIGHT_LABELS, type HandWeights, type WeightKey, type Weights } from '../../../core/upgrades'
+import { WEIGHT_LABELS, type HandWeights, type WeightKey, type Weights } from '../../../core/gearFinder'
 import type { InventoryView } from '../../../shared/types'
 import { UPGRADES_TAB } from '../constants'
 

@@ -6,7 +6,7 @@ import { useInvoke } from '../hooks'
 import { Pending, Tabs } from '../components/ui'
 import { who } from '../../../core/format'
 import { parseLogLine } from '../../../core/logLine'
-import { readSheet, type StatsSheet } from '../../../core/statsSheet'
+import { readStatsInputs, type StatsInputs } from '../../../core/statsInputs'
 import { useExportCharacter, useInventory } from '../gear/model'
 import { wornSummary } from '../../../core/wornGear'
 import { autoValues, classTrio, primaryClass, valOf } from '../../../core/statsModel'
@@ -44,7 +44,7 @@ export function Stats() {
 
   const rec = useCharacterRecord(character)
   const record = rec.record
-  const s = useMemo(() => withRecord(readSheet(charSheet?.stats), record), [charSheet, record])
+  const s = useMemo(() => withRecord(readStatsInputs(charSheet?.stats), record), [charSheet, record])
   const trio = useMemo(() => classTrio(s), [s])
   const capsQ = useInvoke('stats:caps', [trio, s.level])
   const caps = capsQ.data
@@ -54,13 +54,13 @@ export function Stats() {
   const set = useCallback<SetSheet>(
     (patch) =>
       updateSheet((cs) => {
-        const cur = readSheet(cs.stats)
+        const cur = readStatsInputs(cs.stats)
         const p = typeof patch === 'function' ? patch(cur) : patch
         return { ...cs, stats: { ...cur, ...p } as unknown as CharacterSheet['stats'] }
       }),
     [updateSheet]
   )
-  const setOverride = (key: keyof StatsSheet['overrides'], v: number | undefined) =>
+  const setOverride = (key: keyof StatsInputs['overrides'], v: number | undefined) =>
     set((cur) => {
       const o = { ...cur.overrides }
       if (v === undefined) delete o[key]

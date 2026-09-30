@@ -5,7 +5,7 @@ import { recall, useRemembered } from './remember'
 import { showError } from './toast'
 import { classIdOf, className, type ClassName } from '../../shared/game/classes'
 import type { CharacterSettings } from '../../shared/types'
-import type { StatsSheet } from '../../core/statsSheet'
+import type { StatsInputs } from '../../core/statsInputs'
 
 // One character record (classes with their levels, race, focus) per character, kept by main in the
 // settings and read by every page: Spell Timers, Stats, Gear, Spell upgrades, Buffs.
@@ -73,7 +73,7 @@ export function withClasses(c: CharacterSettings, ids: string[], levelFor: (id: 
 }
 
 /** A Stats sheet with the record's classes, level and race in place of its own, once the record has classes. */
-export function withRecord(s: StatsSheet, c: CharacterSettings | null | undefined): StatsSheet {
+export function withRecord(s: StatsInputs, c: CharacterSettings | null | undefined): StatsInputs {
   const ids = recordClasses(c)
   if (!ids.length) return s
   return { ...s, classes: [ids[0], ids[1] ?? '', ids[2] ?? ''], level: recordLevel(c), race: recordIksar(c) ? 'iksar' : 'other' }

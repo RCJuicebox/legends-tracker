@@ -1,10 +1,10 @@
 import { useCallback, useMemo } from 'react'
 import { useInvoke } from '../hooks'
 import { useRemembered } from '../remember'
-import { readSheet } from '../../../core/statsSheet'
+import { readStatsInputs } from '../../../core/statsInputs'
 import { characterAc } from '../../../core/statsModel'
 import { wornSummary } from '../../../core/wornGear'
-import { handWeights, type HandWeights, type Wearer } from '../../../core/upgrades'
+import { handWeights, type HandWeights, type Wearer } from '../../../core/gearFinder'
 import { conversions, rawWeights, ROLE_PRESETS, type RoleWeights } from '../../../core/statValue'
 import { aaTotal } from '../../../core/aa'
 import { DOUBLE_ATTACK, DUAL_WIELD, TRIPLE_ATTACK, TRIPLE_CLASSES, doubleAttackChance, dualWieldChance, handSwings, tripleAttackChance } from '../../../core/combatModel'
@@ -43,7 +43,7 @@ export function useCharacterWeights(view: InventoryView, sheet: CharacterSheet |
   const [twoHandMode, setTwoHandMode] = useRemembered<'auto' | 'one' | 'any'>('finder.twoHand', 'auto')
   const [capMode, setCapMode] = useRemembered<'auto' | 'over' | 'under'>('finder.acCap', 'auto')
   const { record } = useCharacterRecord(view.character)
-  const sheetStats = useMemo(() => withRecord(readSheet(sheet?.stats), record), [sheet, record])
+  const sheetStats = useMemo(() => withRecord(readStatsInputs(sheet?.stats), record), [sheet, record])
   const trio = sheetStats.classes.filter(Boolean)
   const capsQ = useInvoke(trio.length ? 'stats:caps' : null, [trio, sheetStats.level])
   const acCaps = capsQ.data?.ac ?? null

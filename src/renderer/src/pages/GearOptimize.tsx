@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { useRemembered } from '../remember'
 import { baseName, slotLabel } from '../../../core/inventory'
-import { canWear, score, weightsForSlot } from '../../../core/upgrades'
+import { canWear, score, weightsForSlot } from '../../../core/gearFinder'
 import { optimizeGear, pieceName, SLOT_LAYOUT, type GearLock, type Piece, type PieceSource, type Plan } from '../../../core/gearOptimizer'
 import type { CatalogItem } from '../../../core/wikiItem'
 import type { GearModel } from '../gear/useGearModel'

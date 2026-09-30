@@ -1,7 +1,7 @@
 import { useDeferredValue, useEffect, useMemo, useState } from 'react'
 import { statsFor } from '../../../core/wornGear'
 import type { InvItem } from '../../../core/inventory'
-import { findUpgrades, type HandWeights, type Wearer, type Weights } from '../../../core/upgrades'
+import { findUpgrades, type HandWeights, type Wearer, type Weights } from '../../../core/gearFinder'
 import type { FocusWorth } from '../../../core/itemFocus'
 import { optimizeGear, type Exaltation, type Piece } from '../../../core/gearOptimizer'
 import { itemEffects } from '../../../core/itemEffects'

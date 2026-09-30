@@ -1,11 +1,11 @@
 import { num } from '../../../core/format'
-import type { StatsSheet } from '../../../core/statsSheet'
+import type { StatsInputs } from '../../../core/statsInputs'
 import type { Auto, Note, Row, Val } from '../../../core/statsModel'
 
 // Small pieces the Stats tabs share: the sheet's setter, number fields, notes and the step-by-step trace.
 
 /** A change to the sheet: fields, or a function of the latest sheet giving them. */
-export type SetSheet = (patch: Partial<StatsSheet> | ((s: StatsSheet) => Partial<StatsSheet>)) => void
+export type SetSheet = (patch: Partial<StatsInputs> | ((s: StatsInputs) => Partial<StatsInputs>)) => void
 
 /** A number input. With `auto`, the value comes from a file unless typed over; clearing it goes back. */
 export function NumField({
@@ -71,9 +71,9 @@ export function NumField({
 }
 
 export interface TabProps {
-  s: StatsSheet
+  s: StatsInputs
   set: SetSheet
-  setOverride: (k: keyof StatsSheet['overrides'], v: number | undefined) => void
+  setOverride: (k: keyof StatsInputs['overrides'], v: number | undefined) => void
   auto: Auto
   val: Val
   trio: string[]

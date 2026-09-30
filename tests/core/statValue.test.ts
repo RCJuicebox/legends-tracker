@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { conversions, rawWeights, ROLE_PRESETS, statSlope } from '../../src/core/statValue'
-import { isTwoHanded, restrictions } from '../../src/core/upgrades'
+import { isTwoHanded, restrictions } from '../../src/core/gearFinder'
 
 // Shadowknight / Monk / Shaman at 50, as basedata.txt has them.
 const factors = { shd: { hp: 4.8, mana: 4.5, end: 3.25 }, mnk: { hp: 4.25, mana: 0, end: 4.5 }, shm: { hp: 4.25, mana: 4.5, end: 3.25 } }

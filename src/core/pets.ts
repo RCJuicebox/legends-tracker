@@ -16,7 +16,7 @@
 
 import { summonsPet } from './spellKinds'
 import type { InvItem, ItemStats } from './inventory'
-import { canWear, isTwoHanded, score, type Restrictions, type Wearer, type Weights } from './upgrades'
+import { canWear, isTwoHanded, score, type Restrictions, type Wearer, type Weights } from './gearFinder'
 import type { ClassFactors, Conversions, RoleWeights } from './statValue'
 import { conversions } from './statValue'
 import type { PieceSource } from './gearOptimizer'

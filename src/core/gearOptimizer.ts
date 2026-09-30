@@ -20,7 +20,7 @@
 // no other slot takes it, and the rest of the set is worn around it.
 
 import { itemKey, storedEquipment, type Inventory, type InvItem, type ItemStats } from './inventory'
-import { ANY_SLOT, canWear, isTwoHanded, score, weightsForSlot, type HandWeights, type Restrictions, type Wearer, type Weights } from './upgrades'
+import { ANY_SLOT, canWear, isTwoHanded, score, weightsForSlot, type HandWeights, type Restrictions, type Wearer, type Weights } from './gearFinder'
 
 /** Every slot gear is worn in, one entry per slot: two ears, two wrists, two rings, two Any slots. */
 export const SLOT_LAYOUT = [

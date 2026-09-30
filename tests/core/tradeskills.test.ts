@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { eraOf } from '../../src/core/upgrades'
+import { eraOf } from '../../src/core/gearFinder'
 import {
   craftEras,
   parseCrafted,

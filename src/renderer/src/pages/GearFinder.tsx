@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useRemembered } from '../remember'
 
 import { slotLabel } from '../../../core/inventory'
-import { DEFAULT_HIDDEN_ERAS, OTHER_ERA, OTHER_OUT_ERA } from '../../../core/upgrades'
+import { DEFAULT_HIDDEN_ERAS, OTHER_ERA, OTHER_OUT_ERA } from '../../../core/gearFinder'
 import { ROLE_LABELS, ROLE_PRESETS, type RoleKey } from '../../../core/statValue'
 import type { CharacterSheet, InventoryView } from '../../../shared/types'
 import { className } from '../../../shared/game/classes'

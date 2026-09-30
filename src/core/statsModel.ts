@@ -24,7 +24,7 @@ import { pct as pctOf, num } from './format'
 
 /** A chance, to one place. */
 const pct = (x: number) => pctOf(x, 1)
-import type { StatsSheet } from './statsSheet'
+import type { StatsInputs } from './statsInputs'
 
 // The Stats page's sums, apart from how they are shown: what the AC and Combat tabs compute, the
 // notes they make and the step-by-step trace. Also the AC result for other pages.
@@ -39,7 +39,7 @@ export type Row = [label: string, value?: string | number, note?: string]
 export type Note = [kind: '' | 'good' | 'warn' | 'tip', title: string, text: string]
 
 /** The inputs a file, the game's tables or the AAs fill in unless the player types over them. */
-export type AutoKey = keyof StatsSheet['overrides']
+export type AutoKey = keyof StatsInputs['overrides']
 export type Auto = Record<AutoKey, number | undefined>
 export type Val = (k: AutoKey) => number
 export type Skill = (id: number) => number
@@ -52,7 +52,7 @@ export interface GearAc {
 }
 
 /** The character's classes, once each; a warrior when none is set. */
-export function classTrio(s: StatsSheet): string[] {
+export function classTrio(s: StatsInputs): string[] {
   const set = [...new Set(s.classes.filter(Boolean))]
   return set.length ? set : ['war']
 }
@@ -65,7 +65,7 @@ export function primaryClass(trio: string[], acCaps: AcCaps): string {
   return trio.reduce((best, c) => ((acCaps[c]?.cap ?? 0) > (acCaps[best]?.cap ?? 0) ? c : best), trio[0])
 }
 
-export function autoValues(s: StatsSheet, acCaps: AcCaps, primary: string, gear: GearAc | null): Auto {
+export function autoValues(s: StatsInputs, acCaps: AcCaps, primary: string, gear: GearAc | null): Auto {
   return {
     itemAC: gear ? gear.totals.ac : undefined,
     shieldAC: gear ? (gear.shield ? gear.shieldAC : 0) : undefined,
@@ -81,11 +81,11 @@ export function autoValues(s: StatsSheet, acCaps: AcCaps, primary: string, gear:
 
 /** A typed-over figure, else the filled-in one, else 0. */
 export const valOf =
-  (s: StatsSheet, auto: Auto): Val =>
+  (s: StatsInputs, auto: Auto): Val =>
   (k) =>
     s.overrides[k] ?? auto[k] ?? 0
 
-export function acInputs(s: StatsSheet, trio: string[], primary: string, val: Val, skill: Skill): AcInputs {
+export function acInputs(s: StatsInputs, trio: string[], primary: string, val: Val, skill: Skill): AcInputs {
   return {
     trio,
     cls: primary,
@@ -116,7 +116,7 @@ export function acInputs(s: StatsSheet, trio: string[], primary: string, val: Va
  * The AC calculator's result for a character from what the tracker knows: the sheet, worn gear, the
  * game's soft cap table for its classes, and its AAs. For pages other than Stats.
  */
-export function characterAc(s: StatsSheet, acCaps: AcCaps, gear: GearAc | null) {
+export function characterAc(s: StatsInputs, acCaps: AcCaps, gear: GearAc | null) {
   const trio = classTrio(s)
   const primary = primaryClass(trio, acCaps)
   const val = valOf(s, autoValues(s, acCaps, primary, gear))
@@ -200,7 +200,7 @@ export function acReport(i: AcInputs, primary: string) {
 }
 
 /** The Combat tab: attack line, swings and crit, what they mean for this character, and every step. */
-export function combatReport(s: StatsSheet, val: Val, trio: string[], caps: Caps, skill: Skill) {
+export function combatReport(s: StatsInputs, val: Val, trio: string[], caps: Caps, skill: Skill) {
   const lvl = s.level
   const capOf = (id: number) => caps.skills.find((x) => x.id === id)?.cap ?? 0
   const weaponName = WEAPON_SKILLS.find(([id]) => id === s.weapon)?.[1] ?? 'Hand to Hand'

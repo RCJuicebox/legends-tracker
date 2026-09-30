@@ -1,6 +1,6 @@
 import { useMemo } from 'react'
 import { slotLabel } from '../../../core/inventory'
-import { canWear, restrictions, type Restrictions } from '../../../core/upgrades'
+import { canWear, restrictions, type Restrictions } from '../../../core/gearFinder'
 import type { EffectWorth } from '../../../core/itemEffects'
 import type { GearModel } from '../gear/useGearModel'
 import { useRemembered } from '../remember'

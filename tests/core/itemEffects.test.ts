@@ -3,7 +3,7 @@ import { effectScore, itemEffects, procDamage, procOf, procsPerMinute, procWorth
 import { meleeCounter, meleeProfile } from '../../src/core/meleeTally'
 import { optimizeGear, type Piece } from '../../src/core/gearOptimizer'
 import { parseInventory, parseStatsBlock } from '../../src/core/inventory'
-import { restrictions, type Weights } from '../../src/core/upgrades'
+import { restrictions, type Weights } from '../../src/core/gearFinder'
 import { parseLogLine } from '../../src/core/logLine'
 import { PRESETS } from '../helpers'
 

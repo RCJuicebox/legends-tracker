@@ -1,7 +1,7 @@
 import { useDeferredValue } from 'react'
 import { useRemembered } from '../remember'
 import type { InvItem } from '../../../core/inventory'
-import { DEFAULT_HIDDEN_ERAS, type HandWeights, type Wearer, type Weights } from '../../../core/upgrades'
+import { DEFAULT_HIDDEN_ERAS, type HandWeights, type Wearer, type Weights } from '../../../core/gearFinder'
 import type { FocusLine, FocusWorth } from '../../../core/itemFocus'
 import type { Exaltation, Piece } from '../../../core/gearOptimizer'
 import { usePet } from './usePet'

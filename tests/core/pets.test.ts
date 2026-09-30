@@ -18,7 +18,7 @@ import {
 import { parseLogLine } from '../../src/core/logLine'
 import { parseWikiTables } from '../../src/core/wikiTable'
 import { parseStatsBlock, type ItemStats } from '../../src/core/inventory'
-import { restrictions } from '../../src/core/upgrades'
+import { restrictions } from '../../src/core/gearFinder'
 import { scanPetLog } from '../../src/main/pets'
 
 // The gear list is the log's own (Kelwyn's, 2026-09-25). The wiki snippets are made up, in the

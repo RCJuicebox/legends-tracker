@@ -1,7 +1,7 @@
 import { useMemo } from 'react'
 import { statsFor } from '../../../core/wornGear'
 import { itemKey, mergeLevel, parseStatsBlock, scaledStats, storedEquipment, type InvItem } from '../../../core/inventory'
-import { ANY_SLOT, canWear, isLore, restrictions, type Wearer } from '../../../core/upgrades'
+import { ANY_SLOT, canWear, isLore, restrictions, type Wearer } from '../../../core/gearFinder'
 import { ownedPieces, type Exaltation } from '../../../core/gearOptimizer'
 import { itemEffects } from '../../../core/itemEffects'
 import type { CatalogItem } from '../../../core/wikiItem'

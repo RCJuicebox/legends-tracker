@@ -129,7 +129,7 @@ export interface CharacterSheet {
   acOverrides: Record<string, number>
   /** Whether the secondary item counts as a shield; null = go by its name. */
   shield: boolean | null
-  /** The Stats page's inputs. */
+  /** The Stats page's inputs, a StatsInputs as readStatsInputs (core/statsInputs.ts) reads it. */
   stats: Record<string, unknown>
 }
 

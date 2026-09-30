@@ -10,7 +10,7 @@
 //   offense per STR   ⅔ above 75
 //   avoidance per AGI 8000/36000, raised by melee-avoidance AAs; and AC sum +1 per 20 AGI
 
-import type { Weights } from './upgrades'
+import type { Weights } from './gearFinder'
 
 /** Per class, from the game's Resources/basedata.txt at the character's level. */
 export interface ClassFactors {

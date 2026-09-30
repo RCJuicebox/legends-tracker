@@ -7,7 +7,7 @@ import { TimerBoard } from '../src/core/timers'
 import { SpellTracker } from '../src/core/spellTracker'
 import { parseLogLine } from '../src/core/logLine'
 import { DEFAULT_TIER_DURATION_PCT, type CharacterSettings, type FocusSource, type Notification, type SpellRule, type TrackingSettings } from '../src/shared/types'
-import type { Weights } from '../src/core/upgrades'
+import type { Weights } from '../src/core/gearFinder'
 
 /** Real rows from the EQL client's spell files: Plague, Envenomed Bolt, Odium, Spirit of the Puma, Slugs Healing. */
 export function fixtureBook(): SpellBook {

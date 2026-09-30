@@ -14,7 +14,7 @@ import { wornSummary, statsFor, type WornSummary } from '../../../core/wornGear'
 import { ItemIcon } from './gearBits'
 import { GearFinder, type GearMode } from './GearFinder'
 import { useCharacterRecord, withRecord } from '../character'
-import { readSheet } from '../../../core/statsSheet'
+import { readStatsInputs } from '../../../core/statsInputs'
 import type { PageId } from '../main'
 import { UPGRADES_TAB } from '../constants'
 
@@ -101,7 +101,7 @@ export function Gear({ go, only, onPlan }: { go?: (page: PageId) => void; only?:
       />
     )
 
-  const stats = withRecord(readSheet(sheet?.stats), record)
+  const stats = withRecord(readStatsInputs(sheet?.stats), record)
   const classes = stats.classes.filter(Boolean)
   const [name, server] = (view.character || character).split('_')
 

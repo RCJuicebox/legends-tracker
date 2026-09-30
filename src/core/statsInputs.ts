@@ -1,8 +1,8 @@
 import { DEFAULT_STANCES } from './combatModel'
 import type { AaSummary } from './aa'
 
-/** Everything the Stats page keeps for a character. Anything a file provides is not stored here. */
-export interface StatsSheet {
+/** Everything the Stats page keeps for a character, stored as its sheet's `stats` (CharacterSheet). Anything a file provides is not stored here. */
+export interface StatsInputs {
   classes: [string, string, string]
   level: number
   race: 'iksar' | 'other'
@@ -43,7 +43,7 @@ export interface StatsSheet {
   window: { at: number; values: Record<string, number[]> } | null
 }
 
-export function defaultSheet(): StatsSheet {
+export function defaultStatsInputs(): StatsInputs {
   return {
     classes: ['war', '', ''],
     level: 50,
@@ -80,10 +80,10 @@ export function defaultSheet(): StatsSheet {
 }
 
 /** A saved sheet over the defaults, so one saved by an older build gains new fields. */
-export function readSheet(saved: unknown): StatsSheet {
-  const d = defaultSheet()
+export function readStatsInputs(saved: unknown): StatsInputs {
+  const d = defaultStatsInputs()
   if (!saved || typeof saved !== 'object') return d
-  const s = { ...d, ...(saved as Partial<StatsSheet>) }
+  const s = { ...d, ...(saved as Partial<StatsInputs>) }
   s.overrides = { ...(s.overrides ?? {}) }
   s.skills = { ...(s.skills ?? {}) }
   if (!Array.isArray(s.stances) || !s.stances.length) s.stances = d.stances

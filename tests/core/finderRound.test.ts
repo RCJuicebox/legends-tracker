@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { candidatePiece, inTheRound, ownedInTheRound, planTotal } from '../../src/core/finderRound'
 import { optimizeGear, ownedPieces } from '../../src/core/gearOptimizer'
 import { itemKey, mergeLevel, parseInventory, parseStatsBlock, scaledStats } from '../../src/core/inventory'
-import { findUpgrades, isLore, restrictions, type Weights } from '../../src/core/upgrades'
+import { findUpgrades, isLore, restrictions, type Weights } from '../../src/core/gearFinder'
 import { parseItemPage } from '../../src/core/wikiItem'
 import { PRESETS } from '../helpers'
 

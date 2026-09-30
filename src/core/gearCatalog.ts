@@ -1,5 +1,5 @@
 import { itemKey, mergeLevel, parseStatsBlock, scaledStats, type InvItem } from './inventory'
-import { canWear, eraOf, isLore, isTwoHanded, restrictions, score, weightsForSlot, type HandWeights, type Wearer, type Weights } from './upgrades'
+import { canWear, eraOf, isLore, isTwoHanded, restrictions, score, weightsForSlot, type HandWeights, type Wearer, type Weights } from './gearFinder'
 import { SLOT_LAYOUT, type EffectValue, type Piece } from './gearOptimizer'
 import type { CatalogItem } from './wikiItem'
 

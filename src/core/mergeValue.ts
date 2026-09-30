@@ -11,7 +11,7 @@ import { mergeLevel, scaledStats, type InvItem, type ItemStats } from './invento
 import { round } from './format'
 import { countsToArray, makeable, MAX_LEVEL, moteForLevel } from './moteCalc'
 import { MOTE_RANKS, moteWorth, type MoteCounts } from './motes'
-import { score, statValues, weightsForSlot, type HandWeights, type WeightKey, type Weights } from './upgrades'
+import { score, statValues, weightsForSlot, type HandWeights, type WeightKey, type Weights } from './gearFinder'
 
 export interface MergeOption {
   item: InvItem

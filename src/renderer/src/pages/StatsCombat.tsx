@@ -4,7 +4,7 @@ import { pct as pctOf, num } from '../../../core/format'
 
 /** A chance, to one place. */
 const pct = (x: number) => pctOf(x, 1)
-import type { StatsSheet } from '../../../core/statsSheet'
+import type { StatsInputs } from '../../../core/statsInputs'
 import { combatReport, type Caps } from '../../../core/statsModel'
 import { className } from '../../../shared/game/classes'
 import { avoidanceFromHitRate, hitChance, skillName, stanceAccuracy, WEAPON_SKILLS } from '../../../core/combatModel'
@@ -113,7 +113,7 @@ export function CombatTab({ s, set, setOverride, auto, val, trio, primary, caps,
   )
 }
 
-function SkillsCard({ s, set, caps, trio }: { s: StatsSheet; set: SetSheet; caps: Caps; trio: string[] }) {
+function SkillsCard({ s, set, caps, trio }: { s: StatsInputs; set: SetSheet; caps: Caps; trio: string[] }) {
   return (
     <div className="card stack gap-10">
       <h2>
@@ -181,7 +181,7 @@ function SkillsCard({ s, set, caps, trio }: { s: StatsSheet; set: SetSheet; caps
   )
 }
 
-function StanceCard({ s, set, baseAcc, weaponName }: { s: StatsSheet; set: SetSheet; baseAcc: number; weaponName: string }) {
+function StanceCard({ s, set, baseAcc, weaponName }: { s: StatsInputs; set: SetSheet; baseAcc: number; weaponName: string }) {
   const D = Math.max(1, Math.floor(s.targetAvoidance || 1))
   const [solveNote, setSolveNote] = useState('')
   const stances = s.stances.map((st) => ({ ...st, acc: stanceAccuracy(baseAcc, st.pct) }))

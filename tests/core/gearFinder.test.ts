@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { parseItemPage, withRaceFix, type CatalogItem } from '../../src/core/wikiItem'
-import { canWear, findUpgrades, restrictions } from '../../src/core/upgrades'
+import { canWear, findUpgrades, restrictions } from '../../src/core/gearFinder'
 import { parseInventory, parseStatsBlock } from '../../src/core/inventory'
 import { PRESETS } from '../helpers'
 
@@ -68,7 +68,7 @@ describe('finding upgrades', () => {
 
 describe('eras', () => {
   it("groups tags the way the wiki's in/out list says", async () => {
-    const { normalizeEra, parseEraStatus } = await import('../../src/core/upgrades')
+    const { normalizeEra, parseEraStatus } = await import('../../src/core/gearFinder')
     const one = (t: string) => normalizeEra(t)
     expect(['Classic', 'Fear', 'Hate', 'Hole', 'Temple', 'Sky', 'Paineel', 'Warrens', 'Stonebrunt'].map(one)).toEqual(Array(9).fill('Classic'))
     expect(['Epics', 'EpicQuests', 'Chardok', 'kunark'].map(one)).toEqual(Array(4).fill('Kunark'))
