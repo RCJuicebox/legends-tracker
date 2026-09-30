@@ -13,7 +13,6 @@ import {
   joinFactions,
   leftOutIsDone,
   parseFactionAchievements,
-  parseFactionPage,
   parseFactionPageFull,
   parseFactionsExport,
   progressionStatus,
@@ -23,7 +22,6 @@ import {
   type FactionAchievements,
   type FactionExport,
   type FactionPageData,
-  type FactionSources,
   type FactionTallies,
   type FactionView,
   type SinceView
@@ -32,7 +30,7 @@ import { emptySources, joinSources, shareSources, sourceReader, type FactionSour
 import { parseQuestPage, type QuestPage } from './questPages'
 import { buildCatalog, classSwapName, factionNamer, guessesFrom, itemsToLookUp, planFor, type CatalogInput, type FactionPlanData } from './planner'
 import { parseRaceUnlocks, raceUnlocks, unlockedRaces, type RaceUnlockDef } from './unlocks'
-import { lookUp, moversOf } from './lookup'
+import { lookUp, moversOf, sourcesOf } from './lookup'
 import { listLogs } from '../../main/game'
 import type { Purchases } from '../../shared/ipc'
 import { parseAchievements, type AchSection } from '../../core/achievements'
@@ -436,70 +434,6 @@ async function factionAchievements(dir: string, character: string): Promise<Fact
 
 const FRESH_MS = 7 * 24 * 3600_000
 
-interface FactionWikiCache {
-  pages: Record<string, { fetchedAt: number; sources: FactionSources | null }>
-}
-
-/** What raises each faction, from its eqlwiki page, kept a week and kept on when the wiki is down. */
-export class FactionWiki {
-  private cache: FactionWikiCache | null = null
-
-  private get path(): string {
-    return join(cacheDir(), 'faction-wiki.json')
-  }
-
-  private async load(): Promise<FactionWikiCache> {
-    if (this.cache) return this.cache
-    try {
-      this.cache = JSON.parse(await fs.readFile(this.path, 'utf8')) as FactionWikiCache
-      if (!this.cache.pages) this.cache.pages = {}
-    } catch {
-      this.cache = { pages: {} }
-    }
-    return this.cache
-  }
-
-  private async save(): Promise<void> {
-    try {
-      await writeFileAtomic(this.path, JSON.stringify(this.cache))
-    } catch (e) {
-      log.warn('Could not save faction-wiki.json:', e)
-    }
-  }
-
-  /**
-   * The first of the page names a faction can have that is a faction page. The wiki writes King
-   * Ak'Anon where the game writes King Ak`Anon, and adds " (Faction)" where the name is taken, by a
-   * zone (New Sebilis Expedition) or an NPC (Phinigel Autropos).
-   */
-  private async fetch(faction: string): Promise<FactionSources | null> {
-    const names = [...new Set([faction, faction.replace(/`/g, "'")])]
-    for (const title of [...names, ...names.map((n) => `${n} (Faction)`)]) {
-      const text = await wiki.wikitext(title)
-      const found = text && parseFactionPage(title, text)
-      if (found) return found
-    }
-    return null
-  }
-
-  /** A faction's sources; null when the wiki has no faction page for it. */
-  async sources(faction: string): Promise<FactionSources | null> {
-    const c = await this.load()
-    const key = faction.toLowerCase()
-    const had = c.pages[key]
-    if (had && Date.now() - had.fetchedAt < FRESH_MS) return had.sources
-    try {
-      c.pages[key] = { fetchedAt: Date.now(), sources: await this.fetch(faction) }
-      await this.save()
-      sources.ok('factionWiki', `${Object.keys(c.pages).length} faction page${Object.keys(c.pages).length === 1 ? '' : 's'} kept`)
-    } catch (e) {
-      sources.fail('factionWiki', e, `Could not fetch the page for ${faction}`)
-      if (!had) throw e
-    }
-    return c.pages[key].sources
-  }
-}
-
 interface FactionBookFile {
   version: number
   fetchedAt: number
@@ -751,10 +685,10 @@ export function registerFactionIpc(ctx: AppContext): void {
     const view = await ctx.factions.view(ctx.historyOf(character), exported, await factionAchievements(dir, character))
     return { ...(await withConsFor(ctx, dir, character, exported, view)), exportError }
   })
-  // What raises a faction, from eqlwiki.
+  // What raises a faction, from its page in the book of eqlwiki's faction pages the Plan tab reads.
   handle('factions:sources', async (faction) => {
     if (typeof faction !== 'string' || !faction.trim() || faction.length > 100) throw new Error('Not a faction.')
-    return { sources: await ctx.factionWiki.sources(faction.trim()) }
+    return { sources: sourcesOf(faction.trim(), (await ctx.factionBook.get()).book.pages) }
   })
   // Everything the Plan tab needs to plan the achievements still to do; `refresh` reads eqlwiki again,
   // `wide` adds the ways to raise every other faction (the Most factions positive goal).

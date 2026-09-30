@@ -9,10 +9,9 @@ import {
   joinFactions,
   parseFactionAchievements,
   parseFactionLine,
-  parseFactionPage,
+  parseFactionPageFull,
   parseFactionsExport,
   progressionStatus,
-  CLASS_KEYS,
   exportClass,
   modifierOf,
   parseFactionModifiers,
@@ -22,6 +21,7 @@ import {
   standingBand,
   type FactionTallies
 } from '../src/features/factions/core'
+import { CLASS_NUMBER } from '../src/shared/game/classes'
 import { parseAchievements } from '../src/core/achievements'
 import { factionConsumer, FactionHistory } from '../src/features/factions/main'
 import { purchaseConsumer } from '../src/main/purchases'
@@ -227,7 +227,7 @@ describe('FACTIONS_FILE', () => {
 describe('what a faction cons at', () => {
   it("reads the client's modifiers and adds up a character's race and class", () => {
     const mods = parseFactionModifiers(['316^7^0^', '316^178^-750^', '316^54^100^', 'not a line', '220^178^-500^'].join(String.fromCharCode(13, 10)))
-    expect(modifierOf(mods, 316, [RACE_KEYS.iksar, CLASS_KEYS.MNK])).toBe(-750)
+    expect(modifierOf(mods, 316, [RACE_KEYS.iksar, CLASS_NUMBER.mnk])).toBe(-750)
     expect(modifierOf(mods, 316, [RACE_KEYS['wood elf']])).toBe(100)
     expect(modifierOf(mods, 999, [RACE_KEYS.iksar])).toBe(0)
     expect(exportClass('Kelwyn_neriak-MNK-Factions.txt')).toBe('MNK')
@@ -533,26 +533,30 @@ const PAGE = `{{Factionpage|
 * [[Ghanlin Skyphire]] <span class='fmz'>(Erudin Palace - Wizard Guildmaster)</span>
 }}`
 
-describe('parseFactionPage', () => {
-  it('reads what raises the faction, and leaves what lowers it', () => {
-    expect(parseFactionPage('Crimson Hands', PAGE)).toEqual({
+describe('parseFactionPageFull', () => {
+  it('reads what raises the faction and what lowers it', () => {
+    expect(parseFactionPageFull('Crimson Hands', PAGE)).toEqual({
       page: 'Crimson Hands',
-      mobs: [
-        { name: 'Aglthin Dasmore', zone: 'Toxxulia Forest', note: '' },
-        { name: 'Azzar Habbib', zone: 'Paineel', note: 'Quest NPC' },
-        { name: 'Keeper of the Tombs', zone: 'Ruins of Old Paineel (The Hole)', note: 'Undead' },
-        { name: 'A kerran `amir', zone: 'Kerra Island', note: '' }
-      ],
-      quests: ['Heretic Battle', "Ilanic's Scroll"],
-      zones: ['Lavastorm Mountains', 'Ruins of Old Paineel']
+      raise: {
+        mobs: [
+          { name: 'Aglthin Dasmore', zone: 'Toxxulia Forest', note: '' },
+          { name: 'Azzar Habbib', zone: 'Paineel', note: 'Quest NPC' },
+          { name: 'Keeper of the Tombs', zone: 'Ruins of Old Paineel (The Hole)', note: 'Undead' },
+          { name: 'A kerran `amir', zone: 'Kerra Island', note: '' }
+        ],
+        quests: ['Heretic Battle', "Ilanic's Scroll"],
+        zones: ['Lavastorm Mountains', 'Ruins of Old Paineel']
+      },
+      lower: { mobs: [{ name: 'Ghanlin Skyphire', zone: 'Erudin Palace', note: 'Wizard Guildmaster' }], quests: [], zones: ['Erudin Palace'] }
     })
   })
 
   it('is null for a page that is not a faction page, such as a zone of the same name', () => {
-    expect(parseFactionPage('New Sebilis Expedition', '{{Classic Era}}\n\nNew Sebilis Expedition looks to be little more than a door.')).toBeNull()
+    expect(parseFactionPageFull('New Sebilis Expedition', '{{Classic Era}}\n\nNew Sebilis Expedition looks to be little more than a door.')).toBeNull()
   })
 
   it('has empty lists for a faction page that lists nothing yet', () => {
-    expect(parseFactionPage('Clurg', '{{Factionpage|\n| description = Clurg.\n}}')).toEqual({ page: 'Clurg', mobs: [], quests: [], zones: [] })
+    const none = { mobs: [], quests: [], zones: [] }
+    expect(parseFactionPageFull('Clurg', '{{Factionpage|\n| description = Clurg.\n}}')).toEqual({ page: 'Clurg', raise: none, lower: none })
   })
 })

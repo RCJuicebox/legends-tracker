@@ -23,7 +23,7 @@ import { CastHistory, castCounter, dayConsumer } from './castHistory'
 import { meleeCounter } from '../core/meleeTally'
 import { RecipeBook } from './recipes'
 import { PurchaseHistory, purchaseConsumer } from './purchases'
-import { FactionBook, FactionHistory, FactionSourceHistory, FactionWiki, factionConsumer, factionSourceConsumer } from '../features/factions/main'
+import { FactionBook, FactionHistory, FactionSourceHistory, factionConsumer, factionSourceConsumer } from '../features/factions/main'
 import { FactionAlla } from '../features/factions/allaSource'
 import { LogHistory, type HistoryWhere } from './sources/logHistory'
 import { TradeFavorites } from './tradeFavorites'
@@ -72,7 +72,6 @@ export interface AppContext {
   purchases: PurchaseHistory
   /** Faction changes over the character's log and archives, for the Factions page. */
   factions: FactionHistory
-  factionWiki: FactionWiki
   /** What caused each faction change, kill or hand-in, for the Factions page's plan. */
   factionSources: FactionSourceHistory
   /** eqlwiki's faction pages and the quest pages they name, for the plan. */
@@ -167,7 +166,6 @@ export function createContext(): AppContext {
     recipeBook: new RecipeBook((p) => toMain('state:recipes', p)),
     purchases: new PurchaseHistory(logHistory, 'purchases'),
     factions: new FactionHistory(logHistory, 'factions'),
-    factionWiki: new FactionWiki(),
     factionSources: new FactionSourceHistory(logHistory, 'factionSources'),
     factionBook: new FactionBook(),
     factionAlla: new FactionAlla(),

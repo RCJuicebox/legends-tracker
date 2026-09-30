@@ -227,26 +227,6 @@ export const RACE_KEYS: Record<string, number> = {
   drakkin: 1106
 }
 
-/** Class ids, by the three letters a factions export's name carries (Kelwyn_neriak-MNK-Factions.txt). */
-export const CLASS_KEYS: Record<string, number> = {
-  WAR: 1,
-  CLR: 2,
-  PAL: 3,
-  RNG: 4,
-  SHD: 5,
-  DRU: 6,
-  MNK: 7,
-  BRD: 8,
-  ROG: 9,
-  SHM: 10,
-  NEC: 11,
-  WIZ: 12,
-  MAG: 13,
-  ENC: 14,
-  BST: 15,
-  BER: 16
-}
-
 /** FactionAssociations.txt: each faction's modifiers, by faction id, then key. */
 export function parseFactionModifiers(text: string): Map<number, Map<number, number>> {
   const out = new Map<number, Map<number, number>>()
@@ -711,19 +691,4 @@ export function parseFactionPageFull(page: string, text: string): FactionPageDat
       .filter(Boolean)
   })
   return { page, raise: side('raise'), lower: side('lower') }
-}
-
-/** What raises a faction, from its eqlwiki page; null when the page is not a faction page. */
-export function parseFactionPage(page: string, text: string): FactionSources | null {
-  if (!/\{\{\s*Factionpage/i.test(text)) return null
-  const p = templateParams(text)
-  const list = (key: string) => bullets(p.get(key)).map(named).filter(Boolean)
-  return {
-    page,
-    mobs: bullets(p.get('mobs_raise'))
-      .map(mob)
-      .filter((m): m is FactionMob => !!m),
-    quests: list('quests_raise'),
-    zones: list('zones_raise')
-  }
 }

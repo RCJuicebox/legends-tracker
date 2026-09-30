@@ -26,7 +26,7 @@ import {
   type PlanSettings
 } from '../src/features/factions/planner'
 import type { ItemInfo } from '../src/shared/types'
-import { lookUp, moversOf } from '../src/features/factions/lookup'
+import { lookUp, moversOf, sourcesOf } from '../src/features/factions/lookup'
 import {
   allaFactionLaidOut,
   allaNeeds,
@@ -1693,6 +1693,20 @@ describe('the two goals', () => {
 })
 
 describe('what moved a faction, and what a mob or NPC does', () => {
+  it("finds a faction's wiki page the way the planner does, whatever the page is called", () => {
+    const side = (quest: string) => ({ mobs: [], quests: [quest], zones: [] })
+    const none = { mobs: [], quests: [], zones: [] }
+    const pages = [
+      { page: "King Ak'Anon", raise: side('Gnome Gears'), lower: none },
+      { page: 'New Sebilis Expedition (Faction)', raise: side('Supplies'), lower: none },
+      { page: 'Hall of the Ebon Mask', raise: side('Ebon Mask Initiation'), lower: none }
+    ]
+    expect(sourcesOf('King Ak`Anon', pages)).toEqual({ page: "King Ak'Anon", mobs: [], quests: ['Gnome Gears'], zones: [] })
+    expect(sourcesOf('New Sebilisian Expedition', pages)?.page).toBe('New Sebilis Expedition (Faction)')
+    expect(sourcesOf('Ebon Mask', pages)?.quests).toEqual(['Ebon Mask Initiation'])
+    expect(sourcesOf('Clurg', pages)).toBeNull()
+  })
+
   const lines: [number, string][] = [[0, 'You have entered Blackburrow.']]
   for (let i = 0; i < 4; i++) {
     lines.push([10 + i * 30, adjusted('Steel Warriors', 5)])

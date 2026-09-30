@@ -452,7 +452,7 @@ function byZone(mobs: FactionMob[]): [string, FactionMob[]][] {
   return [...zones]
 }
 
-/** What raises a faction, from its eqlwiki page: fetched when the row is opened, and kept a week. */
+/** What raises a faction, from its eqlwiki page, in the book of faction pages the Plan tab reads too (kept a week). */
 function Sources({ name }: { name: string }) {
   const q = useInvoke('factions:sources', [name])
   if (!q.data) return <Pending error={q.error} retry={q.reload} what="what raises it, from eqlwiki" />

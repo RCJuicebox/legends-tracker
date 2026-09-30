@@ -1,6 +1,6 @@
 import { usualAmount, type FactionSourceTallies, type SharedFrom, type SourceKind } from './attribution'
-import { NO_MOB, type FactionPageData } from './core'
-import { zoneKey, type Guesses } from './planner'
+import { NO_MOB, type FactionPageData, type FactionSources } from './core'
+import { factionNamer, zoneKey, type Guesses } from './planner'
 
 // Two questions the Standings tab answers from what the logs and eqlwiki say: what moved this
 // faction, and what does this mob or NPC do to my factions. The logs' answers are the game's own
@@ -19,6 +19,17 @@ export interface FactionMover {
   /** The player's other characters whose logs saw it; `own` when this character's did too. */
   others: string[]
   own: boolean
+}
+
+/**
+ * What raises a faction, from its eqlwiki page among `pages`, found as the planner finds them: King
+ * Ak'Anon for King Ak`Anon, a name with " (Faction)", and the pages named otherwise than the game.
+ * Null when there is no page for it.
+ */
+export function sourcesOf(faction: string, pages: FactionPageData[]): FactionSources | null {
+  const name = factionNamer([faction])
+  const p = pages.find((pg) => name(pg.page) === faction)
+  return p ? { page: p.page, ...p.raise } : null
 }
 
 /** What moved a faction in the logs, most points first (either way). */
