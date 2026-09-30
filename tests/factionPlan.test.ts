@@ -241,6 +241,32 @@ Upon handing Crusader Iktra (1) [[Small Brick of High Quality Ore]]:
 </div>
 {{exp}}`
 
+// Made up, as eqlwiki writes a page of several quests (Innoruuk Symbol Quests): a heading each, for another of its givers.
+const CHARMS = `{| class="questTopTable"
+! ''' Quest Giver: '''
+| [[Vilan Orsk]], [[Mara Tealeaf]]
+|}
+== Rewards ==
+* [[Lesser Charm]], [[Greater Charm]]
+== Lesser Charm ==
+'''Hand [[Vilan Orsk]] 4 [[Bone Chips]] and he'll give you an item called [[Lesser Charm]].'''
+[[Vilan Orsk]] glowers at you dubiously -- he will eat the turn in if you hand it in from too far.
+<div class="facblock">
+* Your faction standing with [[Temple of Dust]] has been adjusted by 10.
+</div>
+== Greater Charm ==
+[[Mara Tealeaf]] wants proof of your faith.
+'''Give the [[Lesser Charm]] back to her.'''
+<div class="facblock">
+* Your faction standing with [[Temple of Dust]] has been adjusted by 25.
+</div>
+Hand [[Orun Pell]] the [[Greater Charm]] later.
+== Final Charm ==
+Speak with [[Mara Tealeaf]] once more.
+<div class="facblock">
+* Your faction standing with [[Temple of Dust]] has been adjusted by 50.
+</div>`
+
 describe('eqlwiki quest pages', () => {
   const page = `{| class="questTopTable"
 ! ''' Start Zone: '''
@@ -274,6 +300,31 @@ You receive a [[Sealed Letter]].
     expect(q.steps[0].hits).toEqual({ 'Steel Warriors': 20, 'Guards of Qeynos': 5, 'The Freeport Militia': -1 })
     // Handed over by an NPC earlier in the walkthrough: a step of a chain.
     expect(q.steps[1].handIn).toEqual([{ item: 'Sealed Letter', count: 1, given: true }])
+    // One quest, under the headings every page has.
+    expect(q.steps.map((s) => [s.quest, s.giver])).toEqual([
+      [undefined, undefined],
+      [undefined, undefined]
+    ])
+  })
+
+  it('reads a page of several quests quest by quest: its heading, its own lines, and the giver it names', () => {
+    const q = parseQuestPage('Charms of Dust', CHARMS)!
+    expect(q.givers).toEqual(['Vilan Orsk', 'Mara Tealeaf'])
+    expect(q.steps.map((s) => [s.quest, s.giver, s.npc, s.handIn.map((h) => `${h.count} ${h.item}`).join(' + ')])).toEqual([
+      // How the NPC cons, after the hand-in line, is not it.
+      ['Lesser Charm', 'Vilan Orsk', 'Vilan Orsk', '4 Bone Chips'],
+      ['Greater Charm', 'Mara Tealeaf', '', '1 Lesser Charm'],
+      // The line after the quest before's block is that quest's, not this one's.
+      ['Final Charm', 'Mara Tealeaf', '', '']
+    ])
+    expect(q.steps[0].gives).toEqual(['Lesser Charm'])
+  })
+
+  it('reads who it is handed to past where it is taken', () => {
+    expect(readHandIn('Loot his head and take it to [[Dustwater]] where you will hand it to [[Orun Pell]]. He waits upstairs.')).toEqual({ handIn: [], npc: 'Orun Pell' })
+    expect(readHandIn('Return to [[Dustwater]] and give the vial to [[Orun Pell]].')).toEqual({ handIn: [], npc: 'Orun Pell' })
+    // Where, after whom: still where.
+    expect(readHandIn('Hand the [[Lesser Charm]] to [[Orun Pell]] in [[Dustwater]].')).toEqual({ handIn: [{ item: 'Lesser Charm', count: 1 }], npc: 'Orun Pell' })
   })
 
   it('has no steps without a faction block', () => {
@@ -1147,6 +1198,21 @@ describe('the catalog', () => {
     ])
     const logged = buildCatalog({ ...input, sources: log }).activities
     expect(logged.map((a) => [a.source, a.items?.[0]?.name, a.hits['Arcane Scientists'], a.handIns, a.back])).toEqual([['log', 'Rat Ears', 10, 2, 'Grilled Rat Ears']])
+  })
+
+  it('names a quest of a page of several by its heading, gives it to the giver its quest names, and makes no unit across two quests', () => {
+    const input = catalogInput({
+      factions: ['Temple of Dust'],
+      targets: ['Temple of Dust'],
+      pages: [{ page: 'Temple of Dust', raise: { mobs: [], quests: ['Charms of Dust'], zones: [] }, lower: { mobs: [], quests: [], zones: [] } }],
+      quests: { 'Charms of Dust': parseQuestPage('Charms of Dust', CHARMS)! }
+    })
+    // The Lesser Charm Vilan Orsk gives is the next quest's hand-in, not his to take back for as much again.
+    expect(buildCatalog(input).activities.map((a) => [a.title, a.npc, a.hits['Temple of Dust'], a.handIns])).toEqual([
+      ['Charms of Dust: Lesser Charm', 'Vilan Orsk', 10, undefined],
+      ['Charms of Dust: Greater Charm', 'Mara Tealeaf', 25, undefined],
+      ['Charms of Dust: Final Charm', 'Mara Tealeaf', 50, undefined]
+    ])
   })
 
   it("keeps a quest's hand-in of other things than the log saw go to that NPC, and one written on two pages once", () => {

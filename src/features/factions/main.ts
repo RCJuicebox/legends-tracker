@@ -369,8 +369,8 @@ interface FactionBookFile {
 
 const bookDetail = (book: FactionBookFile) => `${book.pages.length} faction pages and ${Object.values(book.quests).filter(Boolean).length} quests with faction`
 
-/** Bumped when what the book keeps of a page changes, so an older one is read again. 3: the hand-in reader's "Give [[Item]] to [[NPC]]" fix. */
-const BOOK_VERSION = 3
+/** Bumped when what the book keeps of a page changes, so an older one is read again. 3: the hand-in reader's "Give [[Item]] to [[NPC]]" fix. 4: a page of several quests read quest by quest. */
+const BOOK_VERSION = 4
 /** Books from this version on have today's shape: an older one of them is read again, but serves while the wiki cannot be reached. */
 const BOOK_SHAPE_SINCE = 2
 

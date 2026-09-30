@@ -26,6 +26,10 @@ import { linkTexts, plainText } from '../../core/wikiItem'
 // the planner to guess. What the walkthrough says about the item before it is handed in is kept
 // too: that it is combined from ten of something ("Combine 10 x [[Fire Beetle Eye]]s"), or taken
 // from a mob ("kill Nillipuss multiple times to get four [[Jumjum Stalk]]s").
+//
+// Some pages hold several quests, each under a heading of its own ("== Initiate Symbol of Innoruuk ==",
+// "== Disciple Symbol of Innoruuk =="), often for another NPC. There each step is its quest's: it reads
+// its hand-in from that quest's own lines, and names the quest and the page's giver the quest names first.
 
 export interface QuestHandIn {
   /** The item's page, as linked. */
@@ -53,6 +57,10 @@ export interface QuestStep {
   count?: number
   /** What the NPC gives back for it, as the line says ("he'll give you an item called [[Grilled Rat Ears]]"). */
   gives?: string[]
+  /** On a page of several quests, the heading of the one it is part of: "Disciple Symbol of Innoruuk". */
+  quest?: string
+  /** On a page of several quests, the page's giver its quest names first: who it goes to when its line does not say. */
+  giver?: string
 }
 
 export interface QuestPage {
@@ -78,6 +86,11 @@ const cellNames = (cell: string): string[] => {
 
 const FACBLOCK_OPEN = /<div\s+class\s*=\s*["']facblock["']\s*>/i
 const HAS_FACTION = /Your faction (?:standing )?with\b/i
+/** A page's own section, not a heading within one: "== Disciple Symbol of Innoruuk ==". */
+const SECTION = /^==(?!=)\s*(.*?)\s*(?<!=)==\s*$/
+/** Sections every quest page has, not a quest of its own: "Walkthrough", "Long Walkthrough with Dialogue", "Rewards". */
+const NOT_A_QUEST =
+  /^(?:(?:short|long|quick|full|detailed)\s+)?(?:walk-?throughs?|dialogue|notes?|rewards?|checklist|overview|factions?|quick list|see also|related quests?|general information|requirements?(?: summary)?|tips|sections|legacy\b.*)(?:\s+with dialogue)?$/i
 /** What a faction block holds besides its faction lines: blank lines, a template ({{exp}}), its own tags. */
 const BLOCK_FILLER = /^\s*(?:\{\{[^}]*\}\}|<\/?div[^>]*>|\*)?\s*$/i
 // "has been adjusted by 5", "got better. (+5)", and P99's "'''has gotten worse'''.<span class='profac'>(-1)</span>".
@@ -166,13 +179,16 @@ const WORD_COUNTS: Record<string, number> = {
 }
 const countOf = (w: string) => (/^\d+$/.test(w) ? parseInt(w, 10) : WORD_COUNTS[w.toLowerCase()])
 const HANDING = /\b(?:hand|give|turn(?:ed|ing|s)? in|return|bring|deliver|offer|trade)\w*\b/i
-/** What an NPC says, quoted under a walkthrough step (": Marda says, '…'"), is not an instruction. */
-const DIALOGUE = /^\s*:|\bsays,?\s*'|\btells you,?\s*'/i
+/** What an NPC says, quoted under a walkthrough step (": Marda says, '…'"), and how it cons ("glowers at you dubiously"), is not an instruction. */
+const DIALOGUE =
+  /^\s*:|\bsays,?\s*'|\btells you,?\s*'|\b(?:regards you|looks upon you|kindly considers you|judges you|looks your way|glowers at you|glares at you|scowls at you)\b/i
 /** A link right after these words is who it goes to, not what. */
 const TO_WHOM = /(?:\bhand|\bgive|\bto|\bfor|\breturn(?:ed)?(?: to)?|\bbring(?: it)? to)\s*'*$/i
 const LINK = /\[\[([^\]|#]+)(?:#[^\]|]*)?(?:\|([^\]]*))?\]\]/g
 /** "Give [[Kobold Hide]] to [[Tabure Ahendle]]": a link followed by a "to" link is what is handed in. */
 const BEFORE_TO_LINK = /^s?\s*'*\s*to\s+'*\[\[/i
+/** "… where you will hand it to [[Draxiz N'Ryt]]", "give the vial to [[Evah Xokez]]": who it goes to, past any bare "to" before it ("take it to [[Neriak Commons]]"). */
+const HANDED_TO = /\b(?:hand|give|turn)\w*\b(?:(?!\bto\b)[^.;:!?,[\]\n]){0,40}?\bto\s*'*$/i
 /** "… to [[Gunlok Jure]] in [[Kaladim]]": a link after the NPC's, behind these words, is where, not what. */
 const WHERE = /\b(?:in|at|near|inside|outside)\s+(?:the\s+)?'*$/i
 /** "… to Mojax Hikspin." at the end of a line: who it goes to, when the name is not linked. */
@@ -205,16 +221,20 @@ export function readHandIn(whole: string, givers: string[] = []): { handIn: Ques
   const handIn: QuestHandIn[] = []
   let npc = ''
   const isGiver = (name: string) => givers.some((g) => g.toLowerCase() === name.toLowerCase())
-  for (const m of line.matchAll(LINK)) {
+  const links = [...line.matchAll(LINK)]
+  const handedTo = links.find((m) => HANDED_TO.test(line.slice(0, m.index)))
+  for (const m of links) {
     const target = m[1].replace(/_/g, ' ').trim()
     const label = (m[2] ?? m[1]).replace(/_/g, ' ').trim()
     const before = line.slice(0, m.index)
     const after = line.slice(m.index + m[0].length)
+    // Somewhere it is taken on the way, or someone met there.
+    if (handedTo && m !== handedTo && /\bto\s*'*$/i.test(before)) continue
     const counted = /(?:^|[\s('])(\d+|[a-z]+)\)?\s*(?:x\s*)?'*$/i.exec(before)
     const times = /^s?\s*(?:x|×)\s*(\d+)/i.exec(after)
     const n = times ? parseInt(times[1], 10) : counted ? countOf(counted[1]) : undefined
     const givenTo = BEFORE_TO_LINK.test(after)
-    if (isGiver(label) || isGiver(target) || (!npc && !givenTo && n === undefined && TO_WHOM.test(before))) {
+    if (isGiver(label) || isGiver(target) || m === handedTo || (!npc && !givenTo && n === undefined && TO_WHOM.test(before))) {
       npc ||= label.replace(/\s*\(NPC\)$/i, '')
       continue
     }
@@ -261,22 +281,52 @@ function killedFor(lead: string, item: string): string | undefined {
   return undefined
 }
 
+/** A page's sections, where each starts, with its heading as plain text. */
+function sectionsOf(text: string): { name: string; start: number }[] {
+  const out: { name: string; start: number }[] = []
+  let at = 0
+  for (const line of text.split('\n')) {
+    const m = SECTION.exec(line)
+    if (m) out.push({ name: plainText(m[1]).trim(), start: at })
+    at += line.length + 1
+  }
+  return out
+}
+
+/** The page's giver a quest's lines name first, up to where it is read. */
+function giverIn(text: string, givers: string[]): string | undefined {
+  const lower = text.toLowerCase()
+  const at = givers.map((g) => ({ g, i: lower.indexOf(g.toLowerCase()) })).filter((x) => x.i >= 0)
+  return at.sort((a, b) => a.i - b.i)[0]?.g
+}
+
 /** A quest page's steps; null when it has no faction blocks. */
 export function parseQuestPage(page: string, text: string): QuestPage | null {
   const givers = cellNames(topCell(text, 'Quest Giver'))
   const zones = cellNames(topCell(text, 'Start Zone'))
   const level = /\d+/.exec(topCell(text, 'Minimum Level'))
+  const blocks = factionBlocks(text)
+  // Each block's quest, on a page of several: the section it is in, when that is not one every page has.
+  const sections = sectionsOf(text)
+  const questOf = (at: number) => {
+    const s = sections.filter((x) => x.start <= at).pop()
+    return s && s.name && !NOT_A_QUEST.test(s.name) ? s : undefined
+  }
+  const several = new Set(blocks.map((b) => questOf(b.start)?.name).filter(Boolean)).size > 1
   const steps: QuestStep[] = []
   let from = 0
-  for (const b of factionBlocks(text)) {
+  for (const b of blocks) {
     const { hits, guessed } = factionHits(b.body)
-    const lead = text.slice(from, b.start)
+    const quest = several ? questOf(b.start) : undefined
+    // A quest's step reads its own lines, not the one before's.
+    const lead = text.slice(Math.max(from, quest?.start ?? 0), b.start)
     from = b.end
     if (!Object.keys(hits).length) continue
     // The last line before the block that hands something over, not counting what NPCs say.
-    const lines = lead.split('\n').filter((l) => /\[\[/.test(l) && HANDING.test(l) && !DIALOGUE.test(l))
+    const lines = lead.split('\n').filter(isHandInLine)
     const raw = lines.length ? lines[lines.length - 1] : ''
     const { handIn, npc, count, gives } = raw ? readHandIn(raw, givers) : { handIn: [], npc: '', count: undefined, gives: undefined }
+    const giver = quest ? giverIn(text.slice(quest.start, b.start), givers) : undefined
     // What the walkthrough says of each item before it is handed in.
     const earlier = text.slice(0, b.start)
     const combine = COMBINE.exec(lead)
@@ -286,7 +336,17 @@ export function parseQuestPage(page: string, text: string): QuestPage | null {
       const mob = killedFor(lead, h.madeOf?.item ?? h.item)
       if (mob) h.from = mob
     }
-    steps.push({ hits, guessed, handIn, npc, line: plainText(raw).slice(0, 200), ...(count ? { count } : {}), ...(gives?.length ? { gives } : {}) })
+    steps.push({
+      hits,
+      guessed,
+      handIn,
+      npc,
+      line: plainText(raw).slice(0, 200),
+      ...(count ? { count } : {}),
+      ...(gives?.length ? { gives } : {}),
+      ...(quest ? { quest: quest.name } : {}),
+      ...(giver ? { giver } : {})
+    })
   }
   if (!steps.length) return null
   return { page, givers, zones, level: level ? parseInt(level[0], 10) : null, steps }

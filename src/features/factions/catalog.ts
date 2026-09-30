@@ -422,9 +422,11 @@ export function buildCatalog(input: CatalogInput): FactionCatalog {
 
   // What an NPC gives back to be handed straight back for as much again, from the quest pages
   // (Rephas's Grilled Rat Ears, for Rat Ears), by NPC and what goes in first: one unit is both hand-ins.
+  // Only within one quest: on a page of several, the next step can be another quest's.
   const loopOf = (q: QuestPage, i: number): { item: string; back: string } | null => {
     const [step, next] = [q.steps[i], q.steps[i + 1]]
-    if (!next || !step.gives?.length || step.handIn.length !== 1 || next.handIn.length !== 1 || (next.npc && step.npc && next.npc !== step.npc)) return null
+    if (!next || !step.gives?.length || step.handIn.length !== 1 || next.handIn.length !== 1 || (next.npc && step.npc && next.npc !== step.npc) || next.quest !== step.quest)
+      return null
     const back = itemName(next.handIn[0].item)
     return step.gives.some((g) => itemName(g).toLowerCase() === back.toLowerCase()) ? { item: itemName(step.handIn[0].item), back } : null
   }
@@ -432,7 +434,7 @@ export function buildCatalog(input: CatalogInput): FactionCatalog {
   for (const q of Object.values(input.quests)) {
     q?.steps.forEach((step, i) => {
       const loop = loopOf(q, i)
-      const npc = [step.npc, ...q.givers].find((n) => n && !isZone(n))
+      const npc = [step.npc, step.giver, ...q.givers].find((n) => n && !isZone(n))
       if (loop && npc) loops.set(`${npc.toLowerCase()}|${loop.item.toLowerCase()}`, loop)
     })
   }
@@ -677,7 +679,8 @@ export function buildCatalog(input: CatalogInput): FactionCatalog {
             } else hits[g] = (hits[g] ?? 0) + v
           }
         if (!raisesAny(hits, open)) return
-        const npc = [s.npc, ...q.givers].find((n) => n && !isZone(n)) ?? ''
+        // Whom its line names, else the giver its quest names on a page of several, else the page's.
+        const npc = [s.npc, s.giver, ...q.givers].find((n) => n && !isZone(n)) ?? ''
         // The cons its NPC wants: known from play, and as Allakhazam lists them. The first not met holds it back.
         const needs = [NEEDS[q.page.toLowerCase()], ...(allaNeed.get(questKey(q.page)) ?? [])]
           .filter((n): n is Need => !!n)
@@ -761,7 +764,7 @@ export function buildCatalog(input: CatalogInput): FactionCatalog {
         activities.push({
           id,
           kind: 'quest',
-          title: q.page,
+          title: s.quest ? `${q.page}: ${s.quest}` : q.page,
           zone: q.zones[0] ?? '',
           ...(npc ? { npc } : {}),
           hits,
