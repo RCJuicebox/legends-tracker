@@ -51,6 +51,8 @@ What changed in each version. The release workflow publishes a version's section
 - **Copy diagnostics says more**: each data source's state and last error, every monitor and its scaling, speech and Azure, hotkeys another program holds, the character record, triggers that would not compile, the spell file's date and the settings schema.
 - **Less work while you play.** The log history cache (half a megabyte) was compared and written after nearly every read, every few seconds with the Factions or Tradeskills page open; it is now written a minute and a half after a change and at quit. The achievements counts are read every half minute only while the overlay, a followed plan or a page shows them. The melee counts skip every line that is not yours without parsing it.
 - **The Optimize tab no longer freezes while it plans.** The plan is worked out in the background and shows when it is ready. The Factions page finds your exports without listing the whole game folder every ten seconds, and overlays redraw only what changed.
+- **Times, days and percentages read the same on every page.** A timer is `4:05`, a length of time "3 h 20 min", a day "Fri, Sep 25", and ages ("3m ago") keep up while a page stays open. Waits and errors look the same everywhere and are read out by screen readers; web data is **Refreshed** and a log is **Read again** (Motes' "Rebuild from logs" is now "Read the logs again").
+- **Fixed: Data Sources said "No character log chosen"** before watching started, when one was.
 
 ## 2.4.0 (2026-09-29)
 

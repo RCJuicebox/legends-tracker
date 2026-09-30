@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { timeOfDay, when } from '../../../core/format'
 import { api, clock } from '../api'
 import { useInvoke } from '../hooks'
 import { act } from '../toast'
@@ -57,14 +58,9 @@ function RankChips({ counts }: { counts: MoteCounts }) {
   )
 }
 
-function hhmm(t: number): string {
-  const d = new Date(t)
-  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}:${String(d.getSeconds()).padStart(2, '0')}`
-}
-
 function PauseControl({ s, now }: { s: MoteSession; now: number }) {
   const [since, setSince] = useState('')
-  useEffect(() => setSince(s.pausedSince ? hhmm(s.pausedSince) : ''), [s.pausedSince])
+  useEffect(() => setSince(s.pausedSince ? timeOfDay(s.pausedSince, true) : ''), [s.pausedSince])
   const apply = () => {
     const t = timeOnDay(s.startedAt, since)
     if (t !== null) void act('motes:pause', t)
@@ -145,7 +141,7 @@ function MoteTracking() {
             </button>
           )}
           <button className="btn" disabled={!!view.scanning} onClick={() => void act('motes:rescan')}>
-            {view.scanning ? 'Reading logs…' : 'Rebuild from logs'}
+            {view.scanning ? 'Reading the logs…' : 'Read the logs again'}
           </button>
         </div>
       </div>
@@ -280,7 +276,7 @@ function SessionTable({ sessions, now }: { sessions: MoteSession[]; now: number 
               const h = sessionHours(s, now)
               return (
                 <tr key={s.id}>
-                  <td className="nowrap small">{new Date(s.startedAt).toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}</td>
+                  <td className="nowrap small">{when(s.startedAt)}</td>
                   <td>
                     <div style={{ fontWeight: 600 }}>{s.name}</div>
                     <div className="small">

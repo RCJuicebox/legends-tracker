@@ -20,7 +20,10 @@ import {
   windowOffense
 } from './combatModel'
 import { aaTotal } from './aa'
-import { fractionPct as pct, num } from './format'
+import { pct as pctOf, num } from './format'
+
+/** A chance, to one place. */
+const pct = (x: number) => pctOf(x, 1)
 import type { StatsSheet } from './statsSheet'
 
 // The Stats page's sums, apart from how they are shown: what the AC and Combat tabs compute, the

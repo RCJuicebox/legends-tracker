@@ -17,6 +17,7 @@
 // percent points weighed the way you choose: a point is one cast made one percent better.
 
 import { MOTE_RANKS, moteWorth, type MoteCounts } from './motes'
+import { round } from './format'
 import { countsToArray } from './moteCalc'
 import { casterLevel, formulaTicks } from './durations'
 import { isItemEffect } from './focus'
@@ -276,8 +277,6 @@ export interface SpellUpgradeInput {
   weights?: SpellWeights
   stock?: MoteCounts
 }
-
-const round = (v: number, places: number) => Math.round(v * 10 ** places) / 10 ** places
 
 /** What one more rank gives one cast of the spell, in weighed points, part by part. */
 export function rankGain(row: SpellCastRow, tierPct: Record<SpellCategory, number>, w: SpellWeights): GainPart[] {

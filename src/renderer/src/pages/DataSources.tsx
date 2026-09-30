@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react'
-import { api, ago } from '../api'
+import { api } from '../api'
 import { useInvoke } from '../hooks'
 import { act, showError } from '../toast'
-import { Pending, WithCommands } from '../components/ui'
+import { Ago, ErrorText, Pending, WithCommands } from '../components/ui'
 import type { SourceView } from '../../../shared/ipc'
 
 // Where everything the app shows comes from, and how each source last fared: the place to look when a
@@ -96,9 +96,9 @@ export function DataSources() {
                             <WithCommands text={r.detail} />
                           </div>
                         )}
-                        {r.error && <div className="small bad-text">{r.error}</div>}
+                        {r.error && <ErrorText block>{r.error}</ErrorText>}
                       </td>
-                      <td className="small">{r.lastOk ? ago(r.lastOk) : '—'}</td>
+                      <td className="small">{r.lastOk ? <Ago t={r.lastOk} /> : '—'}</td>
                       <td>
                         {r.refreshable && (
                           <button className="btn small" disabled={busy === r.id || r.status === 'reading'} onClick={() => void refresh(r.id)}>

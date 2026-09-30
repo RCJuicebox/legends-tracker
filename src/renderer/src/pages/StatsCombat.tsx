@@ -1,6 +1,9 @@
 import { useState } from 'react'
 import { showUndo } from '../toast'
-import { fractionPct as pct, num } from '../../../core/format'
+import { pct as pctOf, num } from '../../../core/format'
+
+/** A chance, to one place. */
+const pct = (x: number) => pctOf(x, 1)
 import type { StatsSheet } from '../../../core/statsSheet'
 import { combatReport, type Caps } from '../../../core/statsModel'
 import { className } from '../../../shared/game/classes'

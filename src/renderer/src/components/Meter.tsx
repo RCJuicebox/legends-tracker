@@ -1,10 +1,11 @@
+import { clock, num, pct, timeOfDay } from '../../../core/format'
 import { useEffect, useMemo, useState } from 'react'
 import { useApp } from '../state'
 import { act, showToast, actDone } from '../toast'
 import { useRemembered } from '../remember'
 import { LIVE, useCombat, useSegment } from '../combat'
 import { useInvoke } from '../hooks'
-import { ConfirmButton, Icon, Info, Segmented } from './ui'
+import { ConfirmButton, Icon, Info, Pending, Segmented } from './ui'
 import { EntityBar, HealBar, HEAL_TEXT, KIND_TEXT, PROC_COLOR, PROC_HINT, PROC_TEXT, PROC_WORD, SkillBar, kindTag } from './MeterBars'
 import {
   attackerRows,
@@ -13,9 +14,6 @@ import {
   damageRows,
   defenseOf,
   durationSec,
-  fmtClock,
-  fmtNum,
-  fmtPct,
   fmtRate,
   healSpellRows,
   healTargetRows,
@@ -54,10 +52,6 @@ const SCOPES: [MeterScope, string][] = [
   ['you', 'You']
 ]
 
-function when(t: number): string {
-  return new Date(t).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-}
-
 function SegmentPicker({
   list,
   span,
@@ -77,7 +71,7 @@ function SegmentPicker({
       <option value={LIVE}>{liveLabel}</option>
       {list.map((s) => (
         <option key={s.id} value={s.id}>
-          {when(s.startedAt)} · {s.name} · {fmtClock((s.endedAt - s.startedAt) / 1000 + 1)} · {fmtRate(s.dps)} DPS
+          {timeOfDay(s.startedAt)} · {s.name} · {clock((s.endedAt - s.startedAt) / 1000 + 1)} · {fmtRate(s.dps)} DPS
           {s.mine ? '' : ' · not yours'}
         </option>
       ))}
@@ -169,7 +163,7 @@ export function Meter({ standalone = false }: { standalone?: boolean }) {
               .filter((s) => s.id !== seg?.id)
               .map((s) => (
                 <option key={s.id} value={s.id}>
-                  {when(s.startedAt)} · {s.name} · {fmtRate(s.dps)} DPS
+                  {timeOfDay(s.startedAt)} · {s.name} · {fmtRate(s.dps)} DPS
                 </option>
               ))}
           </select>
@@ -247,22 +241,22 @@ function Headline({ seg, name, mode, head, active }: { seg: Segment; name: strin
       </div>
       <div className="dm-figures">
         <span className="dm-big" style={{ color: mode === 'healing' ? HEAL_TEXT : mode === 'incoming' ? 'var(--red-text)' : 'var(--accent-2)' }}>
-          {fmtNum(rate)} <small>{active && mode !== 'healing' ? `active ${per}` : per}</small>
+          {num(rate)} <small>{active && mode !== 'healing' ? `active ${per}` : per}</small>
         </span>
         <span className="dm-kv">
-          <b>{fmtNum(head.total)}</b> {mode === 'healing' ? 'healed' : mode === 'incoming' ? 'taken' : 'damage'}
+          <b>{num(head.total)}</b> {mode === 'healing' ? 'healed' : mode === 'incoming' ? 'taken' : 'damage'}
         </span>
         {mode === 'healing' && head.raw !== undefined && head.raw > head.total && (
           <span className="dm-kv">
-            <b>{fmtPct((head.raw - head.total) / head.raw)}</b> overhealed
+            <b>{pct((head.raw - head.total) / head.raw)}</b> overhealed
           </span>
         )}
         <span className="dm-kv">
-          <b>{fmtClock(dur)}</b> {seg.open ? 'so far' : 'long'}
+          <b>{clock(dur)}</b> {seg.open ? 'so far' : 'long'}
         </span>
         {mode === 'damage' && !active && seg.activeMs > 0 && seg.activeMs < dur * 1000 && (
           <span className="dm-kv" title="Damage over the time spent striking: gaps between hits capped at 3 s">
-            <b>{fmtNum(head.activeDps)}</b> active DPS
+            <b>{num(head.activeDps)}</b> active DPS
           </span>
         )}
         {seg.kills > 0 && (
@@ -277,7 +271,7 @@ function Headline({ seg, name, mode, head, active }: { seg: Segment; name: strin
         )}
         {seg.enemyHeal > 0 && mode === 'damage' && (
           <span className="dm-kv" title="Hit points enemies healed during this fight: damage undone">
-            <b>+{fmtNum(seg.enemyHeal)}</b> enemy healed
+            <b>+{num(seg.enemyHeal)}</b> enemy healed
           </span>
         )}
       </div>
@@ -327,15 +321,15 @@ function ComparePane({
   const unit = mode === 'healing' ? 'HPS' : 'DPS'
   const change = (now?: { rate: number }, then?: { rate: number }) => {
     if (!now || !then || !then.rate) return now && !then ? 'new' : then && !now ? 'gone' : '—'
-    const pct = (now.rate - then.rate) / then.rate
-    return `${pct >= 0 ? '+' : '−'}${fmtPct(Math.abs(pct))}`
+    const change = (now.rate - then.rate) / then.rate
+    return `${change >= 0 ? '+' : '−'}${pct(Math.abs(change))}`
   }
-  if (!other) return <div className="empty">Reading the other fight…</div>
+  if (!other) return <Pending doing="Reading the other fight" />
   return (
     <div className="dm-compare">
       <div className="row">
         <span className="small muted">
-          <b>{name}</b> ({fmtClock(durationSec(seg))}, {seg.kills} kill{seg.kills === 1 ? '' : 's'}) against <b>{other.name}</b> ({fmtClock(durationSec(other))}, {other.kills} kill
+          <b>{name}</b> ({clock(durationSec(seg))}, {seg.kills} kill{seg.kills === 1 ? '' : 's'}) against <b>{other.name}</b> ({clock(durationSec(other))}, {other.kills} kill
           {other.kills === 1 ? '' : 's'}), {mode === 'incoming' ? 'damage taken' : mode === 'healing' ? 'healing' : 'damage dealt'}
           {active && mode !== 'healing' ? ', active' : ''}
         </span>
@@ -359,8 +353,8 @@ function ComparePane({
           {rows.map((r) => (
             <tr key={r.key}>
               <td>{r.name}</td>
-              <td className="num mono">{r.now ? `${fmtRate(r.now.rate)} ${unit} · ${fmtNum(r.now.total)}` : '—'}</td>
-              <td className="num mono">{r.then ? `${fmtRate(r.then.rate)} ${unit} · ${fmtNum(r.then.total)}` : '—'}</td>
+              <td className="num mono">{r.now ? `${fmtRate(r.now.rate)} ${unit} · ${num(r.now.total)}` : '—'}</td>
+              <td className="num mono">{r.then ? `${fmtRate(r.then.rate)} ${unit} · ${num(r.then.total)}` : '—'}</td>
               <td className="num mono">{change(r.now, r.then)}</td>
             </tr>
           ))}
@@ -384,7 +378,7 @@ function EntityStats({ row }: { row: Row }) {
   return (
     <div className="row gap-12 dm-entity-stats">
       <span className="dm-kv">
-        <b>{fmtNum(row.total)}</b> damage
+        <b>{num(row.total)}</b> damage
       </span>
       <span className="dm-kv">
         <b>{fmtRate(row.dps)}</b> DPS
@@ -399,21 +393,21 @@ function EntityStats({ row }: { row: Row }) {
       </span>
       {row.hits > 0 && (
         <span className="dm-kv">
-          <b>{fmtPct(row.crits / row.hits)}</b> crit
+          <b>{pct(row.crits / row.hits)}</b> crit
         </span>
       )}
       {row.misses > 0 && (
         <span className="dm-kv" title={`${row.misses} of ${swings} swings missed`}>
-          <b>{fmtPct(row.hits / swings)}</b> landed
+          <b>{pct(row.hits / swings)}</b> landed
         </span>
       )}
       {row.max > 0 && (
         <span className="dm-kv">
-          <b>{fmtNum(row.max)}</b> best
+          <b>{num(row.max)}</b> best
         </span>
       )}
       <span className="dm-kv">
-        <b>{fmtPct(row.share)}</b> of the damage
+        <b>{pct(row.share)}</b> of the damage
       </span>
     </div>
   )
@@ -613,7 +607,7 @@ function DefenseCard({ d, scope }: { d: Defense; scope: MeterScope }) {
     <div className="dm-aux">
       <div className="dm-aux-head">
         {scope === 'you' ? 'Your defence' : 'Defence'}
-        <span className="faint small">{d.swings ? `${d.swings} swings · ${fmtPct(avoided / d.swings)} avoided` : ''}</span>
+        <span className="faint small">{d.swings ? `${d.swings} swings · ${pct(avoided / d.swings)} avoided` : ''}</span>
       </div>
       {!d.swings && <div className="faint small">Nothing has swung at {scope === 'you' ? 'you' : 'your side'} yet.</div>}
       {d.swings > 0 &&
@@ -626,7 +620,7 @@ function DefenseCard({ d, scope }: { d: Defense; scope: MeterScope }) {
                 <i style={{ width: `${(n / d.swings) * 100}%`, background: label === 'Hit' ? 'var(--red)' : undefined }} />
               </span>
               <b>
-                {n} <small className="faint">{fmtPct(n / d.swings)}</small>
+                {n} <small className="faint">{pct(n / d.swings)}</small>
               </b>
             </div>
           ))}
@@ -657,8 +651,8 @@ function HealedCard({ seg, scope }: { seg: Segment; scope: MeterScope }) {
       {rows.slice(0, 10).map((h, i) => (
         <HealBar key={h.key} h={h} rank={i + 1} />
       ))}
-      {runes > 0 && <div className="faint small mt-10">Runes absorbed {fmtNum(runes)} on top.</div>}
-      {seg.enemyHeal > 0 && <div className="faint small">Enemies healed themselves for {fmtNum(seg.enemyHeal)}.</div>}
+      {runes > 0 && <div className="faint small mt-10">Runes absorbed {num(runes)} on top.</div>}
+      {seg.enemyHeal > 0 && <div className="faint small">Enemies healed themselves for {num(seg.enemyHeal)}.</div>}
     </div>
   )
 }
@@ -730,7 +724,7 @@ function DpsChart({ seg }: { seg: Segment }) {
         <line className="grid" x1={L} x2={W - 6} y1={y(0)} y2={y(0)} />
         {ticks.map((t) => (
           <text key={t} x={x(t)} y={H - 4} textAnchor="middle">
-            {fmtClock(t)}
+            {clock(t)}
           </text>
         ))}
         {marks.slice(1).map((m) => (

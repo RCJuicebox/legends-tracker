@@ -8,6 +8,7 @@
 // HP, a Caster mana and wisdom.
 
 import { mergeLevel, scaledStats, type InvItem, type ItemStats } from './inventory'
+import { round } from './format'
 import { countsToArray, makeable, MAX_LEVEL, moteForLevel } from './moteCalc'
 import { MOTE_RANKS, moteWorth, type MoteCounts } from './motes'
 import { score, statValues, weightsForSlot, type HandWeights, type WeightKey, type Weights } from './upgrades'
@@ -48,8 +49,6 @@ export interface MergeInput {
   /** The planner's item, whose xp bar is partly filled. */
   planned?: { name: string; lvl: number; xp: number } | null
 }
-
-const round = (v: number, places: number) => Math.round(v * 10 ** places) / 10 ** places
 
 /** The next merge of every worn item the wiki knows, best boost per mote first. Items at +10 have none. */
 export function mergeOptions(o: MergeInput): MergeOption[] {

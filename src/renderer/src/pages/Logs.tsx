@@ -1,10 +1,11 @@
 import { useState } from 'react'
+import { day } from '../../../core/format'
 import { useApp, useLive } from '../state'
-import { api, mb, ago, errorMessage } from '../api'
+import { api, mb, errorMessage } from '../api'
 import { useInvoke } from '../hooks'
 import { act, showError } from '../toast'
 import { who } from '../../../core/format'
-import { Field, LoadError, NumberInput, Switch, Pending } from '../components/ui'
+import { Ago, Field, LoadError, NumberInput, Switch, Pending } from '../components/ui'
 
 export function Logs() {
   const { state, patchSettings } = useApp()
@@ -125,7 +126,9 @@ export function Logs() {
                       <div style={{ width: `${Math.min(100, (l.size / threshold) * 100)}%` }} />
                     </div>
                   </td>
-                  <td className="muted small">{ago(l.modified)}</td>
+                  <td className="muted small">
+                    <Ago t={l.modified} />
+                  </td>
                   <td style={{ textAlign: 'right' }}>
                     <button
                       className="btn small"
@@ -205,7 +208,7 @@ export function Logs() {
                     <span className="mono">{x.name}</span> {x.loose && <span className="chip warn">not zipped</span>}
                   </td>
                   <td className="muted nowrap">{mb(x.size)}</td>
-                  <td className="faint small nowrap">{new Date(x.modified).toLocaleDateString()}</td>
+                  <td className="faint small nowrap">{day(x.modified)}</td>
                   <td style={{ textAlign: 'right' }}>
                     <button className="btn ghost small" onClick={() => void act('logs:reveal', x.path)}>
                       Show

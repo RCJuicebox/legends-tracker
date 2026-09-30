@@ -145,7 +145,7 @@ export function Triggers() {
     return [...map.entries()].sort(([a], [b]) => a.localeCompare(b))
   }, [list, query])
 
-  if (!draft) return loadError ? <LoadError what="your triggers" error={loadError} retry={() => setAttempt((n) => n + 1)} /> : <Pending />
+  if (!draft) return loadError ? <LoadError what="your triggers" error={loadError} retry={() => setAttempt((n) => n + 1)} /> : <Pending what="your triggers" />
 
   return (
     <>

@@ -1,8 +1,38 @@
-import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react'
+import { useEffect, useRef, useState, useSyncExternalStore, type CSSProperties, type ReactNode } from 'react'
 import type { SpellCategory } from '../../../shared/types'
 import { CATEGORY_LABELS } from '../../../shared/types'
-import { iconUrl } from '../api'
+import { ago, iconUrl } from '../api'
 import { showToast } from '../toast'
+
+// One clock for every "3m ago" on screen: it ticks each half minute while any is shown, so an age
+// keeps up with time on a page left open, and stops when none is.
+const ageListeners = new Set<() => void>()
+let ageNow = Date.now()
+let ageTimer: ReturnType<typeof setInterval> | null = null
+
+function subscribeAge(listener: () => void): () => void {
+  ageListeners.add(listener)
+  if (!ageTimer) {
+    ageNow = Date.now()
+    ageTimer = setInterval(() => {
+      ageNow = Date.now()
+      for (const l of ageListeners) l()
+    }, 30_000)
+  }
+  return () => {
+    ageListeners.delete(listener)
+    if (!ageListeners.size && ageTimer) {
+      clearInterval(ageTimer)
+      ageTimer = null
+    }
+  }
+}
+
+/** How long ago `t` was ("3m ago", "just now"), kept up to date while it shows; `never` for no time. */
+export function Ago({ t, never = 'never' }: { t: number; never?: string }) {
+  const now = useSyncExternalStore(subscribeAge, () => ageNow)
+  return <>{t ? ago(t, Math.max(now, t)) : never}</>
+}
 
 /** An on/off switch. Give it a `label` unless a wrapping <label> already names it. */
 export function Switch({ on, onChange, title, label }: { on: boolean; onChange: (v: boolean) => void; title?: string; label?: string }) {
@@ -160,16 +190,54 @@ export function WithCommands({ text }: { text: string }) {
  * What a page or card shows before its data arrives: "Loading your motes…", or why it could not load,
  * with a retry. `hint` says what to check if it takes long.
  */
-export function Pending({ error, retry, what = 'this', hint }: { error?: string; retry?: () => void; what?: string; hint?: string }) {
-  if (!error) {
+export function Pending({
+  error,
+  retry,
+  what = 'this',
+  doing,
+  hint,
+  inline
+}: {
+  error?: string
+  retry?: () => void
+  what?: string
+  /** The whole phrase, where "Loading …" is not what is happening: "Reading your log". */
+  doing?: string
+  hint?: string
+  /** Within a line of text or a table cell, rather than a block of its own. */
+  inline?: boolean
+}) {
+  if (error) return <LoadError error={error} retry={retry} what={what} />
+  const text = `${doing ?? (what === 'this' ? 'Loading' : `Loading ${what}`)}…`
+  // A status, so a screen reader says it once without taking the focus.
+  if (inline)
     return (
-      <div className="empty">
-        {what === 'this' ? 'Loading…' : `Loading ${what}…`}
-        {hint && <div className="faint small">{hint}</div>}
-      </div>
+      <span className="faint" role="status">
+        {text}
+      </span>
     )
-  }
-  return <LoadError error={error} retry={retry} what={what} />
+  return (
+    <div className="empty" role="status">
+      {text}
+      {hint && <div className="faint small">{hint}</div>}
+    </div>
+  )
+}
+
+/**
+ * Something that went wrong, in a line of text or under a control: red, small, and announced as it
+ * appears. A load that failed outright is a LoadError instead, with its retry.
+ */
+export function ErrorText({ children, block }: { children: ReactNode; block?: boolean }) {
+  return block ? (
+    <div className="small bad-text" role="alert">
+      {children}
+    </div>
+  ) : (
+    <span className="small bad-text" role="alert">
+      {children}
+    </span>
+  )
 }
 
 /** A failed load, said plainly, with a retry. */

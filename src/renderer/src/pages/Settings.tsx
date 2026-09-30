@@ -4,7 +4,7 @@ import { useInvoke } from '../hooks'
 import { act, showError, showToast, actDone } from '../toast'
 import { who } from '../../../core/format'
 import { useUpdate, type UpdateState } from '../update'
-import { Field, LoadError, NumberInput, Segmented, Switch } from '../components/ui'
+import { Ago, Field, LoadError, NumberInput, Segmented, Switch } from '../components/ui'
 import { GameFolderCard } from '../components/GameFolder'
 import type { TrackingSettings } from '../../../shared/types'
 import type { PageId } from '../main'
@@ -106,7 +106,7 @@ export function Settings({ go }: { go?: (page: PageId) => void }) {
               <option value="">Choose…</option>
               {logs.map((l) => (
                 <option key={l.path} value={l.path}>
-                  {who(l.character)} — {mb(l.size)}, written {ago(l.modified)}
+                  {who(l.character)} — {mb(l.size)}, written <Ago t={l.modified} />
                 </option>
               ))}
             </select>

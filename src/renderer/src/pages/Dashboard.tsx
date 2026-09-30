@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import { timeOfDay } from '../../../core/format'
 import { useRemembered } from '../remember'
 import { useApp, useLive } from '../state'
 import { ago, mb } from '../api'
@@ -143,7 +144,7 @@ export function Dashboard({ go }: { go: (p: PageId) => void }) {
             {feed.length === 0 && <div className="empty">Nothing yet.</div>}
             {recent.map((f) => (
               <div className="feed-item" key={f.id}>
-                <span className="t">{new Date(f.at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</span>
+                <span className="t">{timeOfDay(f.at, true)}</span>
                 <span className={`k k-${f.kind}`}>{f.kind}</span>
                 <span>{f.text}</span>
               </div>

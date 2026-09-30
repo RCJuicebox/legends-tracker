@@ -3,7 +3,7 @@ import { api, ago } from '../api'
 import { useInvoke, useItemInfo } from '../hooks'
 import { useRemembered } from '../remember'
 import { act, showError } from '../toast'
-import { GameCommand, Info, Pending } from '../components/ui'
+import { Ago, ErrorText, GameCommand, Info, Pending } from '../components/ui'
 import { wikiUrl } from '../../../core/format'
 import { fmtCoin } from '../../../core/loot'
 import { itemKey } from '../../../core/inventory'
@@ -133,7 +133,6 @@ export function Tradeskills() {
     void save({ ...saved, favorites: favs })
   }
 
-  const exportAge = inv.view?.modified ? ago(inv.view.modified) : ''
   const rs = recipes.data
   const p = rs?.progress
 
@@ -144,7 +143,13 @@ export function Tradeskills() {
           <h1>Tradeskills</h1>
           <p>
             Recipes you make, what goes in, what you have, where to buy the rest and what a batch costs. Counts are from your last <GameCommand cmd="/outputfile inventory" />
-            {exportAge ? ` (${exportAge})` : ''}: bags, bank and tradeskill depot.{' '}
+            {inv.view?.modified ? (
+              <>
+                {' '}
+                (<Ago t={inv.view.modified} />)
+              </>
+            ) : null}
+            : bags, bank and tradeskill depot.{' '}
             <Info
               label="Where the numbers come from"
               text={
@@ -176,11 +181,7 @@ export function Tradeskills() {
                 Download the recipes
               </button>
             )}
-            {p?.error && (
-              <span className="small" style={{ color: 'var(--red)' }}>
-                Could not download them: {p.error}
-              </span>
-            )}
+            {p?.error && <ErrorText>Could not download them: {p.error}</ErrorText>}
           </div>
         ) : (
           <>
@@ -194,7 +195,7 @@ export function Tradeskills() {
               />
               <span className="spacer" />
               <span className="faint small">
-                {book.length.toLocaleString()} recipes, {ago(rs.file.fetchedAt)}
+                {book.length.toLocaleString()} recipes, <Ago t={rs.file.fetchedAt} />
               </span>
               {p?.busy ? (
                 <span className="small">
@@ -463,7 +464,7 @@ function RecipeDetail({
                   ) : it ? (
                     <Sources info={it} craftedBy={madeBy.get(l.name.toLowerCase())} />
                   ) : (
-                    <span className="faint">looking it up…</span>
+                    <Pending inline doing="Looking it up" />
                   )}
                 </td>
               </tr>

@@ -3,6 +3,7 @@
 // moves the faction, and mobs eqlwiki does not list. Each page speaks of one faction; a kill's whole
 // effect is put together from every page that names the mob. The site asks crawlers to wait twenty
 // seconds between pages, and the main process does (FactionAlla).
+import { factionKey } from './core'
 
 const SITE = 'https://everquest.allakhazam.com'
 
@@ -23,7 +24,7 @@ export function parseAllaIndex(html: string): Record<string, number> {
   const out: Record<string, number> = {}
   for (const m of html.matchAll(/<a\b[^>]*href=["'][^"']*faction\.html\?faction=(\d+)[^"']*["'][^>]*>([\s\S]*?)<\/a>/gi)) {
     const name = textOf(m[2])
-    if (name) out[factionKeyOf(name)] ??= parseInt(m[1], 10)
+    if (name) out[factionKey(name)] ??= parseInt(m[1], 10)
   }
   return out
 }
@@ -107,14 +108,6 @@ function tableRows(html: string): string[][][] {
     )
   )
 }
-
-/** A faction name reduced for matching, as the planner's factionKey does (kept here so this file stands alone). */
-const factionKeyOf = (name: string) =>
-  name
-    .toLowerCase()
-    .replace(/\s*\(faction\)\s*$/, '')
-    .replace(/^the\s+/, '')
-    .replace(/[^a-z0-9]/g, '')
 
 /** One faction as its Allakhazam page gives it. */
 export interface AllaFaction {

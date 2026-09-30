@@ -1,11 +1,11 @@
 import { useState } from 'react'
-import { ago } from '../api'
+
 import { slotLabel } from '../../../core/inventory'
 import { DEFAULT_HIDDEN_ERAS, OTHER_ERA, OTHER_OUT_ERA } from '../../../core/upgrades'
 import { ROLE_LABELS, ROLE_PRESETS, type RoleKey } from '../../../core/statValue'
 import type { CharacterSheet, InventoryView } from '../../../shared/types'
 import { className } from '../../../shared/game/classes'
-import { Info, Pending, ToggleChip } from '../components/ui'
+import { Ago, ErrorText, Info, Pending, ToggleChip } from '../components/ui'
 import { num, wikiUrl } from '../../../core/format'
 import { AC_OVER_CAP, useGearModel, type CatalogState, type GearMode } from '../gear/useGearModel'
 import { ItemIcon, source } from './gearBits'
@@ -74,11 +74,7 @@ export function GearFinder({ view, sheet, mode, onPlan }: { view: InventoryView;
             <button className="btn primary" onClick={() => void refresh()}>
               Download the item catalog
             </button>
-            {p.error && (
-              <span className="small" role="status" style={{ color: 'var(--red)' }}>
-                Could not download it: {p.error}
-              </span>
-            )}
+            {p.error && <ErrorText>Could not download it: {p.error}</ErrorText>}
           </div>
         )}
       </div>
@@ -312,7 +308,7 @@ export function GearFinder({ view, sheet, mode, onPlan }: { view: InventoryView;
           )}
           <span className="grow" />
           <span className="faint">
-            {num(state.file.items.length)} pieces from eqlwiki, fetched {ago(state.file.fetchedAt)}
+            {num(state.file.items.length)} pieces from eqlwiki, fetched <Ago t={state.file.fetchedAt} />
           </span>
           {p.busy ? (
             <Progress p={p} small />

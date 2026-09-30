@@ -4,7 +4,7 @@ import { useInvoke } from '../hooks'
 import { useRemembered } from '../remember'
 import { act } from '../toast'
 import { errorMessage, api } from '../api'
-import { Field, Info, LoadError, Switch, ConfirmButton } from '../components/ui'
+import { ErrorText, Field, Info, LoadError, Switch, ConfirmButton } from '../components/ui'
 import type { AudioSettings, AzureStatus } from '../../../shared/types'
 
 /** A voice setting naming one of Microsoft's neural voices through Azure (see azureSpeech.ts). */
@@ -199,11 +199,7 @@ function AzureCard({ status, error, onSaved }: { status: AzureStatus | null; err
           <span className="small">
             Region <b>{status.region}</b>, {status.voices.length} voices. Pick one in the Voice list above.
           </span>
-          {status.error && (
-            <span className="small" style={{ color: 'var(--red)' }}>
-              Last phrase: {status.error}
-            </span>
-          )}
+          {status.error && <ErrorText>Last phrase: {status.error}</ErrorText>}
           <span className="spacer" />
           <ConfirmButton className="btn small" question="Remove the Azure key? The Windows voice speaks instead." disabled={busy} onConfirm={() => void save('', '')}>
             Remove the key

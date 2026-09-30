@@ -4,7 +4,7 @@ import { roman } from '../api'
 import { useInvoke } from '../hooks'
 import { useRemembered } from '../remember'
 import { CategoryChip, Info, NumberInput, Pending, SpellIcon } from '../components/ui'
-import { num, roundPct } from '../../../core/format'
+import { num, num1, pct } from '../../../core/format'
 import { useStock } from './MotePlanner'
 import { classCode, classIdOf } from '../../../shared/game/classes'
 import { MOTE_RANKS } from '../../../core/motes'
@@ -31,7 +31,6 @@ const whoCode = (name: string) => {
   const id = classIdOf(name)
   return id ? classCode(id) : name.slice(0, 3)
 }
-const fmt = (v: number) => (Number.isInteger(v) ? String(v) : v.toFixed(1))
 
 const HOW =
   'Every spell and song you cast in the window, with what its next rank would give each cast, from the EQL spell upgrade (mote) guide: the per-rank ' +
@@ -301,18 +300,18 @@ export function MoteSpells() {
                           <span className="faint">{o.row.classes}</span>
                         </div>
                       </td>
-                      <td className="mono num" title={`${roundPct(o.share * 100)} of your casts`}>
+                      <td className="mono num" title={`${pct(o.share, 1)} of your casts`}>
                         {num(o.row.casts)}
-                        <div className="faint small">{roundPct(o.share * 100)}</div>
+                        <div className="faint small">{pct(o.share, 1)}</div>
                       </td>
                       <td className="mono nowrap">{o.maxed ? 'X' : `${o.rank} → ${o.next}`}</td>
                       <td>
                         <Parts o={o} />
-                        <div className="faint small">{fmt(o.benefit)} points per cast</div>
+                        <div className="faint small">{num1(o.benefit)} points per cast</div>
                       </td>
                       <td className="mono num">{num(o.worth)}</td>
                       <td className="mono num">{o.maxed ? '—' : num(o.need)}</td>
-                      <td className="mono num">{o.maxed ? '—' : fmt(o.rate)}</td>
+                      <td className="mono num">{o.maxed ? '—' : num1(o.rate)}</td>
                       <td className="small">
                         <PayWith o={o} />
                       </td>

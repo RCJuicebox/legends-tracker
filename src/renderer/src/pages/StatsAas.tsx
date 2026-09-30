@@ -1,8 +1,9 @@
 import { Fragment, useMemo, useState } from 'react'
+import { day, when } from '../../../core/format'
 import { ago } from '../api'
 import { useRemembered } from '../remember'
 import { useNow } from '../components/TimerBars'
-import { FilterBox, GameCommand, Info, LoadError, SortTh, ToggleChip, type Sort } from '../components/ui'
+import { FilterBox, GameCommand, Info, LoadError, Pending, SortTh, ToggleChip, type Sort } from '../components/ui'
 import { AA_USES, type AaEffect, type AaSummary } from '../../../core/aa'
 import { withAaList, type AaAbility, type AaHistoryView } from '../../../core/aaHistory'
 
@@ -18,8 +19,6 @@ const ORDER: Record<Key, (a: AaAbility, b: AaAbility) => number> = {
   last: (a, b) => a.last - b.last
 }
 
-const day = (t: number) => new Date(t).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' })
-const stamp = (t: number) => new Date(t).toLocaleString([], { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' })
 const plural = (n: number, one: string, many = `${one}s`) => `${n.toLocaleString()} ${n === 1 ? one : many}`
 
 const UNSPENT_HOW =
@@ -71,7 +70,7 @@ function Summary({ view, now }: { view: AaHistoryView; now: number }) {
         <span className="value" title={p?.refundSince ? 'A refund since then gave points back that no line counts' : undefined}>
           {p ? `${p.unspent}${p.refundSince ? '+' : ''}` : '—'}
         </span>
-        <span className="sub" title={p ? `The game said ${p.total} on ${stamp(p.at)}` : undefined}>
+        <span className="sub" title={p ? `The game said ${p.total} on ${when(p.at)}` : undefined}>
           {!p ? 'not reported in your log yet' : p.spentSince ? `${p.total} reported ${ago(p.at, now)}, ${p.spentSince} spent since` : `as of ${ago(p.at, now)}`}
         </span>
       </div>
@@ -120,7 +119,7 @@ function Bought({ view, list }: { view: AaHistoryView | null; list: AaSummary | 
         <FilterBox placeholder="Filter by ability…" label="Filter abilities" value={filter} onChange={setFilter} width={200} />
       </div>
       {!view ? (
-        <div className="empty">Reading your log and its archives…</div>
+        <Pending doing="Reading your log and its archives" />
       ) : !view.bought.length && !(granted && view.granted.length) ? (
         <div className="empty">No AA bought on record yet. Play with logging on (/log on) and every rank you buy shows up here.</div>
       ) : !rows.length ? (
@@ -157,7 +156,7 @@ function Bought({ view, list }: { view: AaHistoryView | null; list: AaSummary | 
                       </button>
                       {a.granted && <span className="chip">granted</span>}
                       {a.refundedAt > 0 && (
-                        <span className="chip warn" title={`Refunded ${stamp(a.refundedAt)}, and not bought again since`}>
+                        <span className="chip warn" title={`Refunded ${when(a.refundedAt)}, and not bought again since`}>
                           refunded
                         </span>
                       )}
@@ -169,7 +168,7 @@ function Bought({ view, list }: { view: AaHistoryView | null; list: AaSummary | 
                     </td>
                     <td className="num mono">{a.rank || '—'}</td>
                     <td className="num mono">{a.listOnly ? '—' : a.spent}</td>
-                    <td className="faint small nowrap" title={a.last ? stamp(a.last) : undefined}>
+                    <td className="faint small nowrap" title={a.last ? when(a.last) : undefined}>
                       {a.last ? day(a.last) : '—'}
                     </td>
                   </tr>
@@ -214,7 +213,7 @@ function Ranks({ a, list, from }: { a: AaAbility; list: AaSummary | null; from: 
         <div key={i} className={l.refunded ? 'refunded' : undefined}>
           <span title={l.refunded ? 'Given back by a refund since' : undefined}>{l.text}</span>
           <span className="mono">{l.cost}</span>
-          <span className="faint">{stamp(l.at)}</span>
+          <span className="faint">{when(l.at)}</span>
         </div>
       ))}
     </div>
@@ -238,7 +237,7 @@ function AbilityList({ aa, status, onRead }: { aa: AaSummary | null; status: str
           </button>
         )}
         <button className="btn small" onClick={onRead}>
-          Read from my log
+          Read the log again
         </button>
       </div>
       <p className="faint small" style={{ margin: 0 }}>

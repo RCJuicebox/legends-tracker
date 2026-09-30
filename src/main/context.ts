@@ -1,3 +1,4 @@
+import { timeOfDay } from '../core/format'
 import { app, globalShortcut, nativeTheme, Notification } from 'electron'
 import { HOTKEYS } from '../shared/hotkeys'
 import { promises as fs, rmSync } from 'node:fs'
@@ -236,7 +237,7 @@ export function createContext(): AppContext {
       audio: (cmd) => windows.toAudio(cmd),
       status: (s) => {
         toMain('state:status', s)
-        reportStatus(s)
+        reportStatus(s, store.settings.get().logFile)
       },
       feed: (item) => toMain('state:feed', item),
       archive: (a) => toMain('state:archive', a),
@@ -381,9 +382,21 @@ export function createContext(): AppContext {
 }
 
 /** The chat log's and the spell data's rows follow the engine's status. */
-function reportStatus(s: WatchStatus): void {
-  if (s.watching) sources.ok('log', `${basename(s.logFile)}${s.lastLineAt ? `, last line ${new Date(s.lastLineAt).toLocaleTimeString()}` : ''}`)
-  else if (s.logFile) sources.missing('log', `${basename(s.logFile)} is not being watched. Start watching on the Live page.`)
+/** What the chat log's and spell data's rows last said, so a status push that changes neither sends no rows. */
+let lastReported = ''
+
+/**
+ * The chat log's and spell data's rows on Data Sources, from the watch status. Status goes out every
+ * half second while lines come in; the log's row names the last line's minute, so the rows change (and
+ * go to the page) at most once a minute.
+ */
+function reportStatus(s: WatchStatus, chosenLog: string): void {
+  const report = JSON.stringify([s.watching, s.logFile, chosenLog, s.lastLineAt ? timeOfDay(s.lastLineAt) : '', s.spellError, s.spellsLoaded])
+  if (report === lastReported) return
+  lastReported = report
+  const log = s.logFile || chosenLog
+  if (s.watching) sources.ok('log', `${basename(s.logFile)}${s.lastLineAt ? `, last line at ${timeOfDay(s.lastLineAt)}` : ''}`)
+  else if (log) sources.missing('log', `${basename(log)} is not being watched. Start watching on the Live page.`)
   else sources.missing('log', 'No character log chosen (Settings).')
   if (s.spellError) sources.fail('spells', new Error(s.spellError))
   else if (s.spellsLoaded) sources.ok('spells', `${s.spellsLoaded.toLocaleString()} spells`)

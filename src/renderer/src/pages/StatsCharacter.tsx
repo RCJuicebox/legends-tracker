@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { api, ago } from '../api'
+import { api } from '../api'
 import { num } from '../../../core/format'
 import type { StatsSheet } from '../../../core/statsSheet'
 import { acInputs, type Val } from '../../../core/statsModel'
@@ -7,6 +7,7 @@ import { computeAc } from '../../../core/acModel'
 import { baseAccuracy, OFFENSE, windowOffense } from '../../../core/combatModel'
 import type { WornTotals } from '../../../core/inventory'
 import type { SetSheet } from './statsBits'
+import { Ago } from '../components/ui'
 
 const HEROIC = [
   'Accuracy',
@@ -126,9 +127,13 @@ export function CharacterTab({
           {busy ? 'Reading the screen…' : 'Read from screen'}
         </button>
         <span className="small muted grow">
-          {has
-            ? `Read ${ago(s.window!.at)}. Open your Inventory window on its Stats tab and read again whenever your gear or buffs change.`
-            : 'Open your Inventory window on its Stats tab in game, then read it. This window steps aside for a moment while it looks.'}
+          {has ? (
+            <>
+              Read <Ago t={s.window!.at} />. Open your Inventory window on its Stats tab and read again whenever your gear or buffs change.
+            </>
+          ) : (
+            'Open your Inventory window on its Stats tab in game, then read it. This window steps aside for a moment while it looks.'
+          )}
         </span>
         {message && <span className="small faint">{message}</span>}
       </div>

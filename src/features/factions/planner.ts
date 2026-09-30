@@ -1,7 +1,7 @@
 import { itemKey } from '../../core/inventory'
 import type { ItemInfo } from '../../shared/types'
 import { baseZone, usualAmount, type FactionSourceTallies, type SharedFrom, type SourceTally } from './attribution'
-import { NO_MOB, STANDING_MAX, STANDING_MIN, standingBand, type FactionMob, type FactionPageData, type FactionView } from './core'
+import { factionKey, NO_MOB, STANDING_MAX, STANDING_MIN, standingBand, type FactionMob, type FactionPageData, type FactionView } from './core'
 import type { QuestHandIn, QuestPage } from './questPages'
 import { allaKills, allaNeeds, allaQuestAmounts, questKey, type AllaFaction, type AllaKill, type Need } from './allakhazam'
 import type { RaceUnlock } from './unlocks'
@@ -125,13 +125,7 @@ export interface PlanActivity {
 
 // ---------- names ----------
 
-/** A faction name reduced for matching: the wiki writes "Opal Dark Briar", the game "Opal Darkbriar". */
-export const factionKey = (name: string) =>
-  name
-    .toLowerCase()
-    .replace(/\s*\(faction\)\s*$/, '')
-    .replace(/^the\s+/, '')
-    .replace(/[^a-z0-9]/g, '')
+export { factionKey }
 
 /** Wiki names that reduce to something else than the game's. */
 const FACTION_ALIASES: Record<string, string> = {

@@ -670,7 +670,7 @@ kept per character in `settings.json`. Four tabs:
 
 The AA figures the sums use come from the newest `/alternateadv list` in the picked character's own
 log: type it in game after buying, and the page reads it on a character's first visit and whenever
-the log holds a newer list than the one kept (**Read from my log** on the AAs tab reads it again).
+the log holds a newer list than the one kept (**Read the log again** on the AAs tab reads it now).
 The ones that change a sum fill it in. Anything filled in from a file, a game table or the AAs can be
 typed over. The page's inputs are kept per character in `characters\<name>_<server>.json`.
 

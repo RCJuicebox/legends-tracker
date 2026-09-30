@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState } from 'react'
-import { ago, api } from '../api'
+import { day, timeOfDay } from '../../../core/format'
+import { api } from '../api'
 import { useInvoke, useItemInfo } from '../hooks'
 import { useRemembered } from '../remember'
 import { wikiUrl } from '../../../core/format'
-import { FilterBox, Icon, Info, Pending, ToggleChip } from '../components/ui'
+import { Ago, FilterBox, Icon, Info, Pending, ToggleChip } from '../components/ui'
 import { describeItem, fmtCoin, type LootEntry, type LootOutcome } from '../../../core/loot'
 import { itemKey } from '../../../core/inventory'
 import type { ItemInfo } from '../../../shared/types'
@@ -23,9 +24,6 @@ const OUTCOMES: { key: LootOutcome; label: string; hint: string }[] = [
 ]
 
 const ALLA = (name: string) => `https://everquest.allakhazam.com/search.html?q=${encodeURIComponent(name)}`
-
-const when = (t: number) => new Date(t).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-const day = (t: number) => new Date(t).toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' })
 
 /** Items shown at most; older loot stays in the ledger. */
 const SHOWN = 400
@@ -129,8 +127,8 @@ export function Loot() {
                 </button>
                 <h2>{name}</h2>
                 <span className="faint small">
-                  {day(first.at)} · {when(first.at)}
-                  {last.at - first.at > 60_000 ? ` – ${when(last.at)}` : ''}
+                  {day(first.at)} · {timeOfDay(first.at)}
+                  {last.at - first.at > 60_000 ? ` – ${timeOfDay(last.at)}` : ''}
                 </span>
                 <span className="chip">
                   {g.entries.length} item{g.entries.length === 1 ? '' : 's'}
@@ -179,7 +177,7 @@ function Row({ e, info, refresh }: { e: LootEntry; info: ItemInfo | undefined; r
       </div>
       <div className="loot-side">
         <span>
-          {e.source} · {when(e.at)}
+          {e.source} · {timeOfDay(e.at)}
         </span>
         <span className="loot-links">
           <a href={wikiUrl(title)} target="_blank" rel="noreferrer" title="This item on eqlwiki, the EverQuest Legends wiki">
@@ -192,7 +190,7 @@ function Row({ e, info, refresh }: { e: LootEntry; info: ItemInfo | undefined; r
       </div>
       <div className="loot-what">
         {!info ? (
-          <span className="faint">Loading…</span>
+          <Pending inline doing="Looking it up on eqlwiki" />
         ) : (
           <>
             {d.head && <b>{d.head}</b>}
@@ -208,7 +206,7 @@ function Row({ e, info, refresh }: { e: LootEntry; info: ItemInfo | undefined; r
             )}
             {info.fetchedAt ? (
               <div className="faint small">
-                From eqlwiki, looked up {ago(info.fetchedAt)}.{' '}
+                From eqlwiki, looked up <Ago t={info.fetchedAt} />.{' '}
                 <button
                   className="link-button"
                   disabled={refreshing}
@@ -217,7 +215,7 @@ function Row({ e, info, refresh }: { e: LootEntry; info: ItemInfo | undefined; r
                     void refresh(e.base).finally(() => setRefreshing(false))
                   }}
                 >
-                  {refreshing ? 'Looking up…' : 'Look up again'}
+                  {refreshing ? 'Refreshing…' : 'Refresh'}
                 </button>
               </div>
             ) : null}

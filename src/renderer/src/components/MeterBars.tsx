@@ -1,5 +1,6 @@
+import { num, pct } from '../../../core/format'
 import type { CSSProperties, ReactNode } from 'react'
-import { fmtNum, fmtPct, fmtRate, type HealRow, type Row, type SkillRow } from '../../../core/combatView'
+import { fmtRate, type HealRow, type Row, type SkillRow } from '../../../core/combatView'
 import type { EntityKind, ProcOrigin } from '../../../shared/types'
 
 // The bars a damage meter is made of, in the Live page and in the overlay alike: a name, a fill
@@ -110,15 +111,15 @@ export function EntityBar({ r, rank, onClick, selected, activeDps }: { r: Row; r
       rank={rank}
       name={r.name}
       tag={kindTag(r.kind, r.owner) + pets}
-      stat={r.hits ? `${fmtPct(r.share)}` : r.misses ? `${r.misses} swing${r.misses === 1 ? '' : 's'}, all missed` : undefined}
+      stat={r.hits ? `${pct(r.share)}` : r.misses ? `${r.misses} swing${r.misses === 1 ? '' : 's'}, all missed` : undefined}
       right={
         <>
-          <b>{fmtRate(activeDps ? r.activeDps : r.dps)}</b> · {fmtNum(r.total)}
+          <b>{fmtRate(activeDps ? r.activeDps : r.dps)}</b> · {num(r.total)}
         </>
       }
       onClick={onClick}
       selected={selected}
-      title={`${fmtNum(r.total)} damage, ${fmtNum(r.dps)} per second over the whole ${r.activeDps ? 'time; ' + fmtNum(r.activeDps) + ' while striking' : 'time'}; ${r.hits} hit${r.hits === 1 ? '' : 's'}, ${r.crits} critical, ${r.misses} missed, best ${fmtNum(r.max)}`}
+      title={`${num(r.total)} damage, ${num(r.dps)} per second over the whole ${r.activeDps ? 'time; ' + num(r.activeDps) + ' while striking' : 'time'}; ${r.hits} hit${r.hits === 1 ? '' : 's'}, ${r.crits} critical, ${r.misses} missed, best ${num(r.max)}`}
     />
   )
 }
@@ -131,7 +132,7 @@ export function SkillBar({ s, rank, onClick, per }: { s: SkillRow; rank?: number
   if (s.crits) bits.push(`${Math.round((s.crits / Math.max(1, s.hits)) * 100)}% crit`)
   if (s.misses) bits.push(`${Math.round((s.hits / Math.max(1, swings)) * 100)}% landed`)
   if (s.resists) bits.push(`${s.resists} resisted`)
-  if (s.hits) bits.push(`avg ${fmtNum(s.avg)} · max ${fmtNum(s.max)}`)
+  if (s.hits) bits.push(`avg ${num(s.avg)} · max ${num(s.max)}`)
   const extras = Object.entries(s.mods)
     .filter(([m]) => m !== 'critical')
     .map(([m, n]) => `${n} ${m}`)
@@ -159,7 +160,7 @@ export function SkillBar({ s, rank, onClick, per }: { s: SkillRow; rank?: number
       stat={bits.join(' · ')}
       right={
         <>
-          <b>{fmtRate(s.dps)}</b> · {fmtNum(s.total)}
+          <b>{fmtRate(s.dps)}</b> · {num(s.total)}
           {per ? ` ${per}` : ''}
         </>
       }
@@ -177,15 +178,15 @@ export function HealBar({ h, rank, onClick, selected }: { h: HealRow; rank?: num
       rank={rank}
       name={h.name}
       tag={kindTag(h.kind)}
-      stat={`${h.count} heal${h.count === 1 ? '' : 's'}${h.overheal > 0 ? ` · ${fmtPct(h.overheal)} over` : ''}${h.crits ? ` · ${h.crits} crit` : ''}`}
+      stat={`${h.count} heal${h.count === 1 ? '' : 's'}${h.overheal > 0 ? ` · ${pct(h.overheal)} over` : ''}${h.crits ? ` · ${h.crits} crit` : ''}`}
       right={
         <>
-          <b>{fmtRate(h.hps)}</b> · {fmtNum(h.total)}
+          <b>{fmtRate(h.hps)}</b> · {num(h.total)}
         </>
       }
       onClick={onClick}
       selected={selected}
-      title={`${fmtNum(h.total)} healed of ${fmtNum(h.raw)} cast; biggest ${fmtNum(h.max)}`}
+      title={`${num(h.total)} healed of ${num(h.raw)} cast; biggest ${num(h.max)}`}
     />
   )
 }

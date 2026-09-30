@@ -1,3 +1,4 @@
+import { clock, num } from '../../../core/format'
 import { useEffect } from 'react'
 import { api, ago } from '../api'
 import { useApp, useLive } from '../state'
@@ -5,7 +6,7 @@ import { useInvoke } from '../hooks'
 import { useRemembered } from '../remember'
 import { useCombat } from '../combat'
 import { useNow } from './TimerBars'
-import { durationSec, fmtClock, fmtNum } from '../../../core/combatView'
+import { durationSec } from '../../../core/combatView'
 import { fmtCoin } from '../../../core/loot'
 import type { PageId } from '../main'
 
@@ -137,9 +138,9 @@ export function FightSummary({ go }: { go: Go }) {
         <span className="value">{fight ? fight.name || 'Fight' : (last?.name ?? '—')}</span>
         <span className="sub">
           {fight
-            ? `${fmtClock(durationSec(fight))} · ${fmtNum(fight.kills)} killed`
+            ? `${clock(durationSec(fight))} · ${num(fight.kills)} killed`
             : last
-              ? `${fmtClock((last.endedAt - last.startedAt) / 1000)} · ${fmtNum(last.dps)} DPS, yours ${fmtNum(last.yours / Math.max(1, (last.endedAt - last.startedAt) / 1000))}`
+              ? `${clock((last.endedAt - last.startedAt) / 1000)} · ${num(last.dps)} DPS, yours ${num(last.yours / Math.max(1, (last.endedAt - last.startedAt) / 1000))}`
               : ''}
         </span>
       </button>
@@ -150,7 +151,7 @@ export function FightSummary({ go }: { go: Go }) {
         </span>
         <span className="sub">
           {session
-            ? `${fmtClock(durationSec(session))} · coin ${fmtCoin((coin?.corpse ?? 0) + (coin?.sales ?? 0))} · ${Math.round((session.kills ?? 0) / sessionHours)} kills/hour`
+            ? `${clock(durationSec(session))} · coin ${fmtCoin((coin?.corpse ?? 0) + (coin?.sales ?? 0))} · ${Math.round((session.kills ?? 0) / sessionHours)} kills/hour`
             : 'no session yet'}
         </span>
       </button>

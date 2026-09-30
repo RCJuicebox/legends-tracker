@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
-import { api, ago } from '../api'
+import { api } from '../api'
 import { useRemembered } from '../remember'
 import { usePickedCharacter } from '../character'
 import { useAchievementTrack, useInvoke } from '../hooks'
 import { showError, showToast } from '../toast'
-import { GameCommand, Pending, Switch } from '../components/ui'
+import { Ago, GameCommand, Pending, Switch } from '../components/ui'
 import { useApp } from '../state'
 import { numExact as num, who } from '../../../core/format'
 import {
@@ -169,8 +169,8 @@ export function Achievements() {
         <p>
           {view.modified ? (
             <>
-              {who(view.character)} · from {view.file}, written by the game {ago(view.modified)}. Type <GameCommand cmd="/outputfile achievements" /> in game to refresh it; this
-              page updates on its own.
+              {who(view.character)} · from {view.file}, written by the game <Ago t={view.modified} />. Type <GameCommand cmd="/outputfile achievements" /> in game to refresh it;
+              this page updates on its own.
             </>
           ) : (
             'Read from the achievements export the game writes into its folder.'

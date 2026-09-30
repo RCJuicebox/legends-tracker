@@ -1,8 +1,8 @@
 import { useMemo, useState } from 'react'
-import { api, ago } from '../api'
+import { api } from '../api'
 import { remember, useRemembered } from '../remember'
 import { showError } from '../toast'
-import { GameCommand, Pending, Tabs } from '../components/ui'
+import { Ago, GameCommand, Pending, Tabs } from '../components/ui'
 import { numExact as num, who, wikiUrl } from '../../../core/format'
 import { itemKey, mergeLevel, parseStatsBlock, placeLabel, slotLabel, storageTab, wornTotals, SAVE_KEYS, STAT_KEYS, type InvItem } from '../../../core/inventory'
 import type { CharacterSheet, InventoryView, ItemInfo } from '../../../shared/types'
@@ -111,7 +111,13 @@ export function Gear({ go, only, onPlan }: { go?: (page: PageId) => void; only?:
         <p>
           What {name || 'your character'} is wearing, from the game's inventory export: every item at its merge level, with the stats the wiki gives it. Type{' '}
           <GameCommand cmd="/outputfile inventory" /> in game after a change; this page follows the file
-          {view.modified > 0 ? ` (last written ${ago(view.modified)})` : ''}.
+          {view.modified > 0 && (
+            <>
+              {' '}
+              (last written <Ago t={view.modified} />)
+            </>
+          )}
+          .
         </p>
       </div>
       <div className="actions">
@@ -140,7 +146,7 @@ export function Gear({ go, only, onPlan }: { go?: (page: PageId) => void; only?:
               }
             }}
           >
-            {refreshing ? 'Fetching…' : 'Refresh item stats'}
+            {refreshing ? 'Refreshing…' : 'Refresh item stats'}
           </button>
         )}
       </div>
@@ -558,7 +564,11 @@ function ItemPanel({
             <>
               <div className="small faint mb-4">The wiki's stats, base values{lvl ? `; at +${lvl}: AC ${s?.ac ?? 0}` : ''}</div>
               <pre className="inv-block">{statsText(info)}</pre>
-              {info.fetchedAt ? <p className="faint small">From eqlwiki, looked up {ago(info.fetchedAt)}; Refresh item stats reads every worn item's page again.</p> : null}
+              {info.fetchedAt ? (
+                <p className="faint small">
+                  From eqlwiki, looked up <Ago t={info.fetchedAt} />; Refresh item stats reads every worn item's page again.
+                </p>
+              ) : null}
             </>
           ) : (
             <p className="small muted">eqlwiki has no page for this item, so it adds nothing to the totals unless you type its AC below.</p>

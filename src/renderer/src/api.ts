@@ -1,4 +1,5 @@
 import type { FeedItem } from '../../shared/types'
+import { day } from '../../core/format'
 import type { AppState as WireState, InvokeChannel, InvokeResult, Invokes, PushChannel, Pushes, SendChannel, Sends } from '../../shared/ipc'
 
 /** The preload's bridge, typed by the channel contract in shared/ipc.ts. */
@@ -33,14 +34,8 @@ export const iconUrl = (n?: number) => (n === undefined || n < 0 ? '' : `eqicon:
 const ROMAN = ['', 'I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X', 'XI', 'XII', 'XIII', 'XIV', 'XV']
 export const roman = (n?: number) => (n ? (ROMAN[n] ?? String(n)) : '')
 
-export function clock(sec: number): string {
-  if (!Number.isFinite(sec)) return '∞'
-  const s = Math.max(0, Math.round(sec))
-  const m = Math.floor(s / 60)
-  const h = Math.floor(m / 60)
-  const ss = String(s % 60).padStart(2, '0')
-  return h ? `${h}:${String(m % 60).padStart(2, '0')}:${ss}` : `${m}:${ss}`
-}
+/** Timers' m:ss, from core/format, for the pages that take it from here. */
+export { clock } from '../../core/format'
 
 export function mb(bytes: number): string {
   if (bytes < 1048576) return `${(bytes / 1024).toFixed(0)} KB`
@@ -54,5 +49,5 @@ export function ago(t: number, now = Date.now()): string {
   if (s < 60) return `${s}s ago`
   if (s < 3600) return `${Math.floor(s / 60)}m ago`
   if (s < 86400) return `${Math.floor(s / 3600)}h ago`
-  return new Date(t).toLocaleDateString()
+  return day(t, now)
 }

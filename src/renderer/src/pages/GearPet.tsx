@@ -2,7 +2,7 @@ import { useMemo } from 'react'
 import { ago } from '../api'
 import { useInvoke } from '../hooks'
 import { useRemembered } from '../remember'
-import { Info, Pending, Switch } from '../components/ui'
+import { ErrorText, Info, Pending, Switch } from '../components/ui'
 import { num, wikiUrl } from '../../../core/format'
 import { className } from '../../../shared/game/classes'
 import { itemKey, mergeLevel, parseStatsBlock, scaledStats, slotLabel, type InvItem } from '../../../core/inventory'
@@ -140,13 +140,11 @@ export function PetTab({ m }: { m: GearModel }) {
             {state.spellsLoaded ? 'None of your classes summons a pet by this level.' : 'The spell file is not loaded yet; set the game folder in Settings.'}
           </p>
         ) : profileQ.error && loading ? (
-          <p className="small" style={{ margin: 0, color: 'var(--red)' }}>
+          <ErrorText block>
             Could not read {spell} from eqlwiki: {profileQ.error}
-          </p>
+          </ErrorText>
         ) : loading ? (
-          <p className="muted small" style={{ margin: 0 }}>
-            Reading {spell} from eqlwiki…
-          </p>
+          <Pending inline doing={`Reading ${spell} from eqlwiki`} />
         ) : !profile ? (
           <p className="muted small" style={{ margin: 0 }}>
             eqlwiki has no page for the pet {spell} summons, so its classes are not known. Pick another pet.

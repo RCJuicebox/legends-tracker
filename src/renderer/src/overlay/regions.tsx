@@ -1,3 +1,4 @@
+import { clock, duration, num, timeOfDay } from '../../../core/format'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { api } from '../api'
 import { LIVE, useSegment } from '../combat'
@@ -7,8 +8,6 @@ import {
   attackerSkillRows,
   damageRows,
   durationSec,
-  fmtClock,
-  fmtNum,
   fmtRate,
   healSpellRows,
   healTotals,
@@ -58,7 +57,6 @@ function SegmentMenu({
   }
   const liveLabel = live ? (span === 'fight' ? 'Live' : 'Now') : 'Last'
   const current = selection === LIVE ? liveLabel : (list.find((s) => s.id === selection)?.name ?? liveLabel)
-  const time = (t: number) => new Date(t).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
   return (
     <>
       <button
@@ -80,7 +78,7 @@ function SegmentMenu({
             </button>
             {list.slice(0, 20).map((s) => (
               <button key={s.id} className={s.id === selection ? 'on' : ''} role="option" aria-selected={s.id === selection} onClick={() => pick(s.id)}>
-                <span className="dm-ov-menu-time">{time(s.startedAt)}</span>
+                <span className="dm-ov-menu-time">{timeOfDay(s.startedAt)}</span>
                 <span className="dm-ov-menu-name">{s.name}</span>
                 <span className="dm-ov-menu-dps">{fmtRate(s.dps)}</span>
               </button>
@@ -177,7 +175,7 @@ export function MeterOverlay({ config, snap, arranging }: { config: OverlayConfi
           <span className="dm-ov-total">
             {head ? (
               <>
-                <b>{fmtRate(head.dps)}</b> {opts.mode === 'healing' ? 'HPS' : 'DPS'} · {fmtNum(head.total)} · {fmtClock(durationSec(seg!))}
+                <b>{fmtRate(head.dps)}</b> {opts.mode === 'healing' ? 'HPS' : 'DPS'} · {num(head.total)} · {clock(durationSec(seg!))}
               </>
             ) : (
               '—'
@@ -247,15 +245,6 @@ const UNITS: Record<TrackKind, [string, string]> = { kill: ['kill', 'kills'], tu
 const doing = (s: { kind: TrackKind; title: string; npc?: string }) =>
   s.kind === 'kill' ? `Kill ${s.title}` : s.kind === 'turnin' ? `Hand in to ${s.npc ?? s.title}` : s.npc ? `${s.title}: hand in to ${s.npc}` : s.title
 
-/** "2 h 22 min", "14 min". */
-function spanOf(seconds: number): string {
-  const m = Math.round(seconds / 60)
-  if (m < 1) return 'under a minute'
-  if (m < 90) return `${m} min`
-  const h = Math.floor(m / 60)
-  return m % 60 ? `${h} h ${m % 60} min` : `${h} h`
-}
-
 /**
  * The achievements overlay: the achievements the player tracks (the star on the Achievements page),
  * the step of the faction plan being followed, counting down as the factions move, the Slayer counts
@@ -323,7 +312,7 @@ export function AchievementsRegion({ config, track, arranging }: { config: Overl
                 </div>
                 <div className="ach-ov-line">
                   <b>{step.unitsLeft.toLocaleString()}</b> {UNITS[step.kind][step.unitsLeft === 1 ? 0 : 1]} left
-                  {step.secondsLeft > 0 && <span className="ach-ov-faint"> · ≈ {spanOf(step.secondsLeft)}</span>}
+                  {step.secondsLeft > 0 && <span className="ach-ov-faint"> · ≈ {duration(step.secondsLeft)}</span>}
                 </div>
                 {step.goals
                   .filter((g) => !g.done)
@@ -425,7 +414,7 @@ function TrackedRow({ t, now }: { t: TrackedAchievement; now: number }) {
     )
   if (t.count) {
     const c = t.count
-    const pct = c.faction ? (c.value + 2000) / 4000 : c.value / Math.max(1, c.max)
+    const filled = c.faction ? (c.value + 2000) / 4000 : c.value / Math.max(1, c.max)
     return (
       <div className="ach-ov-count" title={c.faction ? `${c.faction}: done at 2000` : t.section}>
         <div className="ach-ov-goal">
@@ -436,7 +425,7 @@ function TrackedRow({ t, now }: { t: TrackedAchievement; now: number }) {
           </span>
         </div>
         <div className="ach-ov-bar thin">
-          <i style={{ width: `${Math.max(0, Math.min(100, Math.round(pct * 100)))}%` }} />
+          <i style={{ width: `${Math.max(0, Math.min(100, Math.round(filled * 100)))}%` }} />
         </div>
       </div>
     )

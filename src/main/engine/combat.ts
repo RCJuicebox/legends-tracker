@@ -1,9 +1,10 @@
+import { clock, num } from '../../core/format'
 import { createReadStream } from 'node:fs'
 import { zoneEntered, type LogLine } from '../../core/logLine'
 import { CombatMeter, summarize as summarizeFight } from '../../core/combatMeter'
 import { LootLedger } from '../../core/loot'
 import { RespawnLog, respawnView, type RespawnView } from '../../core/respawns'
-import { durationSec, fmtClock, fmtNum } from '../../core/combatView'
+import { durationSec } from '../../core/combatView'
 import { readLines } from '../../core/logReading'
 import { offsetBefore } from '../sources/logHistory'
 import { log } from '../log'
@@ -68,7 +69,7 @@ export class CombatFeed {
         // Fights read from history are not news.
         if (this.backlog.active || !f.mine) return
         const sum = summarizeFight(f)
-        this.notifier.pushFeed('fight', `${sum.name} · ${fmtClock(durationSec(f))} · ${fmtNum(sum.dps)} DPS (yours ${fmtNum(sum.yours / durationSec(f))})`)
+        this.notifier.pushFeed('fight', `${sum.name} · ${clock(durationSec(f))} · ${num(sum.dps)} DPS (yours ${num(sum.yours / durationSec(f))})`)
       }
     })
     this.respawns = new RespawnLog(store.respawns.get(), {

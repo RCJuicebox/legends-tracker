@@ -6,6 +6,7 @@ import type { GearModel } from '../gear/useGearModel'
 import { useRemembered } from '../remember'
 import { num, wikiUrl } from '../../../core/format'
 import { ItemIcon, source, whereText } from './gearBits'
+import { Pending } from '../components/ui'
 
 // The Gear page's worn effects and procs tabs: what each one on gear the character owns or could get
 // does, what it is worth to them (melee from their own log, stats by their weights), and where to
@@ -139,11 +140,13 @@ export function EffectsTab({ m, kind }: { m: GearModel; kind: EffectKind }) {
             ))}
           </span>
           <span className="muted">
-            {fx.loading
-              ? 'Reading your log…'
-              : profile && profile.dpm > 0
-                ? `${num(Math.round(profile.dpm))} melee damage a minute over ${num(Math.round(profile.activeMin))} minutes swinging, ${profile.from} to ${profile.to}: ${topSkills.join(' · ')}`
-                : 'No melee of yours in the log for these days, so nothing counts for your melee.'}
+            {fx.loading ? (
+              <Pending inline doing="Reading your log" />
+            ) : profile && profile.dpm > 0 ? (
+              `${num(Math.round(profile.dpm))} melee damage a minute over ${num(Math.round(profile.activeMin))} minutes swinging, ${profile.from} to ${profile.to}: ${topSkills.join(' · ')}`
+            ) : (
+              'No melee of yours in the log for these days, so nothing counts for your melee.'
+            )}
           </span>
         </div>
         <div className="row small">

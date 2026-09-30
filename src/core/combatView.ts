@@ -1,3 +1,4 @@
+import { clock, num, pct } from './format'
 import { SELF } from './combatLines'
 import { durationMs, isFriend, nameKey } from './combatMeter'
 import type { Defense, Entity, EntityKind, HealTally, MeterMode, MeterScope, ProcOrigin, Segment, SkillStat } from '../shared/types'
@@ -448,7 +449,7 @@ export const PROC_ORIGIN_LABEL: Record<ProcOrigin, string> = { spell: 'proc', ab
 
 /** "400", "42 + 42 healed", "300 healed". */
 export function procAmount(r: { damage: number; healed: number }): string {
-  return [r.damage > 0 ? fmtNum(r.damage) : null, r.healed > 0 ? `${fmtNum(r.healed)} healed` : null].filter(Boolean).join(' + ') || '0'
+  return [r.damage > 0 ? num(r.damage) : null, r.healed > 0 ? `${num(r.healed)} healed` : null].filter(Boolean).join(' + ') || '0'
 }
 
 export function procText(seg: Segment, scope: MeterScope, name: string): string {
@@ -493,30 +494,21 @@ export function rolling(series: number[], seconds: number, windowSec: number): n
   return out
 }
 
-export const fmtNum = (n: number): string => Math.round(n).toLocaleString()
 export const fmtRate = (n: number): string => (n >= 1000 ? `${(n / 1000).toFixed(n >= 10_000 ? 0 : 1)}k` : n >= 100 ? String(Math.round(n)) : n.toFixed(n >= 10 ? 0 : 1))
-export const fmtPct = (x: number): string => `${Math.round(x * 100)}%`
-
-export function fmtClock(sec: number): string {
-  const s = Math.max(0, Math.round(sec))
-  const m = Math.floor(s / 60)
-  const h = Math.floor(m / 60)
-  return h ? `${h}:${String(m % 60).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}` : `${m}:${String(s % 60).padStart(2, '0')}`
-}
 
 export const KIND_LABEL: Record<EntityKind, string> = { you: '', pet: 'pet', group: 'group', player: '', npc: '', npcpet: 'pet', unknown: '?' }
 
 /** A plain-text table of a meter, for pasting into chat or a note. */
 export function copyText(seg: Segment, mode: MeterMode, scope: MeterScope, rows: Row[] | HealRow[], name: string): string {
-  const dur = fmtClock(durationSec(seg))
+  const dur = clock(durationSec(seg))
   const head = mode === 'healing' ? healTotals(seg, rows as HealRow[]) : totalsOf(seg, rows)
   const what = mode === 'damage' ? 'Damage' : mode === 'incoming' ? 'Incoming' : 'Healing'
   const per = mode === 'healing' ? 'HPS' : 'DPS'
-  const lines = [`${name} · ${dur} · ${what} ${fmtNum(head.total)} · ${fmtNum(head.dps)} ${per} · ${scope}`]
+  const lines = [`${name} · ${dur} · ${what} ${num(head.total)} · ${num(head.dps)} ${per} · ${scope}`]
   rows.slice(0, 15).forEach((r, i) => {
     const tag = KIND_LABEL[r.kind] ? ` (${KIND_LABEL[r.kind]})` : ''
     const rateOf = 'hps' in r ? r.hps : r.dps
-    lines.push(`${i + 1}. ${r.name}${tag}  ${fmtNum(r.total)} (${fmtPct(r.share)})  ${fmtNum(rateOf)} ${per}`)
+    lines.push(`${i + 1}. ${r.name}${tag}  ${num(r.total)} (${pct(r.share)})  ${num(rateOf)} ${per}`)
   })
   return lines.join('\n')
 }

@@ -8,7 +8,10 @@ import { optimizeGear, pieceName, SLOT_LAYOUT, type GearLock, type Piece, type P
 import { type FocusCandidate, type GearModel, type OwnedFocus } from '../gear/useGearModel'
 import { CATALOG_PER_SLOT } from '../../../core/gearCatalog'
 import { Info, Pending } from '../components/ui'
-import { num, roundPct as pct, wikiUrl } from '../../../core/format'
+import { num, pct as pctOf, wikiUrl } from '../../../core/format'
+
+/** A focus figure, given as a percentage already (10.5), to one place. */
+const pct = (n: number) => pctOf(n / 100, 1)
 import { ItemIcon, source, whereText } from './gearBits'
 
 // The Gear page's focus effects tab and its optimizer for what the character already owns.

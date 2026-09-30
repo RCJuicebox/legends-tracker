@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { duration } from '../../../core/format'
 import { api, clock } from '../api'
 import { useInvoke } from '../hooks'
 import { useRemembered } from '../remember'
@@ -23,7 +24,6 @@ function useBuffs() {
 }
 
 const code = (c: string) => c.toUpperCase()
-const minutes = (sec: number) => (Number.isFinite(sec) ? (sec >= 3600 ? `${Math.floor(sec / 3600)}h ${Math.round((sec % 3600) / 60)}m` : `${Math.round(sec / 60)}m`) : 'permanent')
 const effectText = (o: BuffOffer) => o.effects.map((e) => `${e.label}${e.value ? ` ${e.value}` : ''}`).join(', ')
 
 const casters = (o: BuffOffer) =>
@@ -268,7 +268,7 @@ export function Buffs() {
                         <td className="small muted nowrap">{LINE_LABELS[o.line]}</td>
                         <td className="small">{effectText(o)}</td>
                         <td className="small mono nowrap">level {o.classes[c]}</td>
-                        <td className="small mono nowrap">{minutes(o.seconds)}</td>
+                        <td className="small mono nowrap">{duration(o.seconds)}</td>
                       </tr>
                     ))}
                   </tbody>

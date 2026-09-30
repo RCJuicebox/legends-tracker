@@ -1,4 +1,5 @@
 import type { Spell } from './spells'
+import { clock } from './format'
 import { CATEGORY_LABELS, CLASS_NAMES, type CharacterSettings, type DurationBreakdown, type SpellCategory } from '../shared/types'
 
 export const TICK_MS = 6000
@@ -176,14 +177,6 @@ export function focusForObserved(tiered: number, observedSec: number): [number, 
   const wholeTicks = Math.floor(observedSec / 6) // ticks before the partial one
   if (wholeTicks < 1) return null
   return [Math.round(((wholeTicks - 0.5) / tiered - 1) * 100), Math.round(((wholeTicks + 0.5) / tiered - 1) * 100)]
-}
-
-/** m:ss, the way the Spell window shows durations. */
-export function clock(sec: number): string {
-  const m = Math.floor(sec / 60)
-  const h = Math.floor(m / 60)
-  const ss = String(Math.round(sec % 60)).padStart(2, '0')
-  return h ? `${h}:${String(m % 60).padStart(2, '0')}:${ss}` : `${m}:${ss}`
 }
 
 /** Rounded to two decimal places, for the breakdown's figures. */

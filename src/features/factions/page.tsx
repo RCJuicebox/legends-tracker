@@ -5,11 +5,10 @@ import { useInvoke } from '../../renderer/src/hooks'
 import { useRemembered } from '../../renderer/src/remember'
 import { usePickedCharacter } from '../../renderer/src/character'
 import { useNow } from '../../renderer/src/components/TimerBars'
-import { FilterBox, GameCommand, Info, Pending, Segmented, SortTh, Tabs, ToggleChip, type Sort } from '../../renderer/src/components/ui'
-import { wikiUrl } from '../../core/format'
-import { who } from '../../core/format'
+import { ErrorText, FilterBox, GameCommand, Info, Pending, Segmented, SortTh, Tabs, ToggleChip, type Sort } from '../../renderer/src/components/ui'
+import { duration, when, who, wikiUrl } from '../../core/format'
 import { STANDING_MAX, standingBand, type ConBasis, type FactionCon, type FactionMob, type FactionRow, type FactionRowAchievement, type FactionStandingNow } from './core'
-import { Doing, Flags, PlanTab, sourceNote, span, useChoices, usePlanSettings } from './planPage'
+import { Doing, Flags, PlanTab, sourceNote, useChoices, usePlanSettings } from './planPage'
 import { waysToRaise, type PlanActivity } from './planner'
 import type { FactionLookup, LookupHit } from './lookup'
 
@@ -77,7 +76,6 @@ const signed = (n: number) => (n > 0 ? `+${n}` : n < 0 ? `−${-n}` : '0')
 /** A standing, with a true minus. */
 const plain = (n: number) => (n < 0 ? `−${-n}` : String(n))
 const tone = (n: number) => (n > 0 ? 'ok-text' : n < 0 ? 'bad-text' : 'faint')
-const stamp = (t: number) => new Date(t).toLocaleString([], { weekday: 'short', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
 
 /** The class in a con's sum: the best of the character's classes ("Bard +50, the best of Monk, Bard and Enchanter"). */
 function classPart(basis: ConBasis, c: FactionCon): string {
@@ -338,7 +336,7 @@ export function Factions() {
                               <span className="faint">—</span>
                             )}
                           </td>
-                          <td className="faint small nowrap" title={r.last ? stamp(r.last) : 'The log has no changes for it'}>
+                          <td className="faint small nowrap" title={r.last ? when(r.last) : 'The log has no changes for it'}>
                             {r.last ? ago(r.last, now) : '—'}
                           </td>
                         </tr>
@@ -511,7 +509,7 @@ function History({ r, character, basis, ways }: { r: FactionRow; character: stri
       {(r.standing?.value ?? 0) < STANDING_MAX && <Ways r={r} character={character} ways={ways} />}
       <Sources name={r.name} />
       <span className="faint">
-        {r.first ? `First seen in the log ${stamp(r.first)}. ` : ''}
+        {r.first ? `First seen in the log ${when(r.first)}. ` : ''}
         {r.recent.length
           ? r.changes > r.recent.length
             ? `The last ${r.recent.length} of ${r.changes} changes, newest first:`
@@ -523,8 +521,8 @@ function History({ r, character, basis, ways }: { r: FactionRow; character: stri
       {r.recent.length > 0 && (
         <div className="row tight">
           {r.recent.map((c, i) => (
-            <span key={i} className="chip" title={stamp(c.at)}>
-              <span className={`mono ${tone(c.amount)}`}>{signed(c.amount)}</span> <span className="faint">{stamp(c.at)}</span>
+            <span key={i} className="chip" title={when(c.at)}>
+              <span className={`mono ${tone(c.amount)}`}>{signed(c.amount)}</span> <span className="faint">{when(c.at)}</span>
             </span>
           ))}
         </div>
@@ -569,7 +567,7 @@ function Ways({ r, character, ways }: { r: FactionRow; character: string; ways: 
     () => (ways ? waysToRaise(ways.activities, r.name, r.standing?.value ?? 0, settings, choices).slice(0, 3) : null),
     [ways, r.name, r.standing, settings, choices]
   )
-  if (!list) return <span className="faint">Working out the quickest ways to raise it…</span>
+  if (!list) return <Pending inline doing="Working out the quickest ways to raise it" />
   if (!list.length) return null
   return (
     <div>
@@ -577,7 +575,7 @@ function Ways({ r, character, ways }: { r: FactionRow; character: string; ways: 
       <ul className="faction-sources">
         {list.map((w) => (
           <li key={w.activity.id}>
-            <span className="mono">×{w.units.toLocaleString()}</span> ≈ <span className="mono">{span(w.seconds)}</span> · <Doing a={w.activity} />{' '}
+            <span className="mono">×{w.units.toLocaleString()}</span> ≈ <span className="mono">{duration(w.seconds)}</span> · <Doing a={w.activity} />{' '}
             <span className="faint">
               · {w.activity.zone || 'somewhere'} · {sourceNote(w.activity)}
             </span>{' '}
@@ -604,7 +602,7 @@ function hitTone(h: LookupHit, row: FactionRow | undefined): string {
 function LookupResults({ query, results, error, view }: { query: string; results: FactionLookup[] | null; error: string; view: { factions: FactionRow[] } | null }) {
   const byName = useMemo(() => new Map((view?.factions ?? []).map((r) => [r.name.toLowerCase(), r])), [view])
   let body: ReactNode
-  if (!results) body = error ? <span className="bad-text">Could not look it up: {error}</span> : <span className="faint">Looking…</span>
+  if (!results) body = error ? <ErrorText>Could not look it up: {error}</ErrorText> : <Pending inline doing="Looking it up" />
   else if (!results.length)
     body = (
       <span className="faint">

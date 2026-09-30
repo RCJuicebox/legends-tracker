@@ -7,7 +7,7 @@ import { useRemembered } from '../../renderer/src/remember'
 import { useCharacterRecord } from '../../renderer/src/character'
 import { useNow } from '../../renderer/src/components/TimerBars'
 import { GameCommand, Info, NumberInput, Pending, Segmented, Switch } from '../../renderer/src/components/ui'
-import { who, wikiUrl } from '../../core/format'
+import { duration, num1, who, wikiUrl } from '../../core/format'
 import { fmtCoin } from '../../core/loot'
 import { STANDING_MAX, standingBand, type FactionView } from './core'
 import { runPlan } from './planRunner'
@@ -67,20 +67,9 @@ const HOW =
   'factions back from below zero. Either way, where a faction ends is what counts: points an early step takes and a later one gives ' +
   'back cost nothing.'
 
-/** "3 h 20 min", "12 min", "40 s". */
-export function span(seconds: number): string {
-  const s = Math.round(seconds)
-  if (s < 90) return `${s} s`
-  const m = Math.round(s / 60)
-  if (m < 90) return `${m} min`
-  const h = Math.floor(m / 60)
-  return m % 60 ? `${h} h ${m % 60} min` : `${h} h`
-}
-
-const signed = (n: number) => (n > 0 ? `+${fmt(n)}` : n < 0 ? `−${fmt(-n)}` : '0')
+const signed = (n: number) => (n > 0 ? `+${num1(n)}` : n < 0 ? `−${num1(-n)}` : '0')
 /** The con's word for a standing with the modifiers added: "Indifferent", "Amiable". */
 const standingWord = (con: number) => standingBand(con).word
-const fmt = (n: number) => (Number.isInteger(n) ? n.toLocaleString() : n.toFixed(1))
 const plain = (n: number) => (n < 0 ? `−${-n}` : String(n))
 /** A standing with thousands separators and a true minus: "1,415", "−702". */
 const signedPlain = (n: number) => (n < 0 ? `−${(-n).toLocaleString()}` : n.toLocaleString())
@@ -100,7 +89,7 @@ function itemSource(it: HandInItem): string {
     case 'crafted':
       return 'crafted'
     case 'drop':
-      return it.named ? `from${where || ' a named mob'} (named: one a respawn)` : `drops${it.where ? ` from ${it.where}` : ''}${it.sec ? `, about ${span(it.sec)} each` : ''}`
+      return it.named ? `from${where || ' a named mob'} (named: one a respawn)` : `drops${it.where ? ` from ${it.where}` : ''}${it.sec ? `, about ${duration(it.sec)} each` : ''}`
     default:
       return 'the wiki does not say where it comes from'
   }
@@ -524,7 +513,7 @@ export function PlanTab({ character, view }: { character: string; view: FactionV
           </div>
           <div className="stat">
             <span className="label">Plan</span>
-            <span className="value">{plan ? `≈ ${span(plan.seconds)}` : '…'}</span>
+            <span className="value">{plan ? `≈ ${duration(plan.seconds)}` : '…'}</span>
             <span className="sub">{plan ? `${plan.steps.length} step${plan.steps.length === 1 ? '' : 's'}` : ''}</span>
           </div>
           <div className="stat">
@@ -933,7 +922,7 @@ function Steps({
     <div className="card mb-16">
       <h2>
         The plan, step by step<span className="spacer"></span>
-        <span className="faint small mono">≈ {span(plan.seconds)}</span>
+        <span className="faint small mono">≈ {duration(plan.seconds)}</span>
       </h2>
       <ol className="fp-steps">
         {plan.steps.map((st, i) => {
@@ -969,7 +958,7 @@ function Steps({
                     ×{st.units.toLocaleString()}
                   </span>
                   <span className="mono fp-time" title={timeNote(st)}>
-                    {span(st.seconds)}
+                    {duration(st.seconds)}
                   </span>
                 </div>
                 {hint(st)}
@@ -1076,7 +1065,7 @@ function Options({
                 {a.guessed?.includes(faction) ? '?' : ''} each
               </span>
               <span className="mono small">
-                ×{o.units.toLocaleString()} ≈ {span(o.seconds)}
+                ×{o.units.toLocaleString()} ≈ {duration(o.seconds)}
               </span>
             </div>
             {a.items && a.items.length > 0 && (
@@ -1087,7 +1076,7 @@ function Options({
             {a.line && a.kind === 'quest' && <div className="faint small">“{a.line}”</div>}
             <div className="row tight">
               <span className="faint small">
-                {sourceNote(a)}; {o.rateFrom === 'yours' ? 'your pace' : o.rateFrom === 'log' ? 'the pace from your log' : 'an estimated pace'}, {span(o.unitSeconds)} a{' '}
+                {sourceNote(a)}; {o.rateFrom === 'yours' ? 'your pace' : o.rateFrom === 'log' ? 'the pace from your log' : 'an estimated pace'}, {duration(o.unitSeconds)} a{' '}
                 {a.kind === 'kill' ? 'kill' : 'hand-in'}
                 {a.once ? `; once only? ${a.once}` : ''}
                 {a.blocked ? `; ${a.blocked}` : ''}
@@ -1141,7 +1130,7 @@ const withArticle = (w: string) => `${/^[aeiou]/i.test(w) ? 'an' : 'a'} ${w}`
 
 /** What a step's time holds besides the kills or hand-ins. */
 function timeNote(st: PlanStep): string | undefined {
-  const parts = [st.travel ? `${span(st.travel)} to get there` : '', st.swap ? `${span(st.swap)} to swap race and back` : ''].filter(Boolean)
+  const parts = [st.travel ? `${duration(st.travel)} to get there` : '', st.swap ? `${duration(st.swap)} to swap race and back` : ''].filter(Boolean)
   return parts.length ? `Including ${parts.join(' and ')}` : undefined
 }
 
@@ -1192,7 +1181,7 @@ function savedBySwaps(plan: FactionPlan, without: { seconds: number; unplanned: 
   if (opened > 0) return `open ${opened} achievement${opened === 1 ? '' : 's'} nothing else plans`
   const saved = without.seconds - plan.seconds
   // One locked in can cost time.
-  return saved >= 60 ? `save ≈ ${span(saved)}` : saved <= -60 ? `cost ≈ ${span(-saved)} more` : 'no time saved'
+  return saved >= 60 ? `save ≈ ${duration(saved)}` : saved <= -60 ? `cost ≈ ${duration(-saved)} more` : 'no time saved'
 }
 
 /**
@@ -1214,7 +1203,7 @@ function SwapHint({ step, own, unlocksKnown, unlockedAt }: { step: PlanStep; own
       <span className="chip warn">race swap</span>{' '}
       {step.swap > 0 ? (
         <>
-          Swap to <b>{race}</b> in Loadouts for this step, then back (≈ {span(step.swap)} in all{unlocked})
+          Swap to <b>{race}</b> in Loadouts for this step, then back (≈ {duration(step.swap)} in all{unlocked})
         </>
       ) : (
         <>
@@ -1288,7 +1277,7 @@ function NowCard({
             <span className="mono">
               {step.unitsLeft.toLocaleString()} {UNIT_WORDS[step.kind][step.unitsLeft === 1 ? 0 : 1]} left
             </span>
-            <span className="mono fp-time">{span(step.secondsLeft)}</span>
+            <span className="mono fp-time">{duration(step.secondsLeft)}</span>
           </div>
           {hint}
           <div className="fp-now-bar" title={`${Math.round(step.progress * 100)}% of the way since you started this step`}>
@@ -1312,7 +1301,7 @@ function NowCard({
               </span>
             )}
           </div>
-          <span className="faint small">About {span(track.secondsLeft)} of steps left, as planned.</span>
+          <span className="faint small">About {duration(track.secondsLeft)} of steps left, as planned.</span>
         </div>
       ) : !track ? (
         <p className="faint small mb-0 mt-10">

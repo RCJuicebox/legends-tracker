@@ -1,9 +1,10 @@
 import { useEffect, useMemo } from 'react'
-import { ago, api } from '../api'
+import { num1 } from '../../../core/format'
+import { api } from '../api'
 import { useInvoke } from '../hooks'
 import { remember, useRemembered } from '../remember'
 import { showError, showToast } from '../toast'
-import { GameCommand, Info } from '../components/ui'
+import { Ago, GameCommand, Info } from '../components/ui'
 import { num } from '../../../core/format'
 import { useStock } from './MotePlanner'
 import { itemKey, parseStatsBlock, slotLabel, type InvItem } from '../../../core/inventory'
@@ -17,7 +18,6 @@ import type { InventoryView } from '../../../shared/types'
 import { UPGRADES_TAB } from '../constants'
 
 const moteName = (i: number, n: number) => `${n === 1 ? 'Mote' : 'Motes'} of ${MOTE_RANKS[i].name ? MOTE_RANKS[i].name + ' ' : ''}Potential`
-const fmt = (v: number) => (Number.isInteger(v) ? String(v) : v.toFixed(1))
 
 const HOW =
   'Every worn item the wiki knows, with what its next merge level would add to your stats, weighed the way the upgrade finder weighs them for the role picked ' +
@@ -34,7 +34,7 @@ function Deltas({ d }: { d: Partial<Record<WeightKey, number>> }) {
         <span key={k} className="nowrap">
           {i > 0 && ', '}
           {WEIGHT_LABELS[k]} {v > 0 ? '+' : ''}
-          {fmt(v)}
+          {num1(v)}
         </span>
       ))}
     </>
@@ -135,7 +135,13 @@ export function MergeTab({
         </div>
         <p className="muted small m-0">
           The next +1 of each item you wear, best stat boost per mote first. What you wear comes from the inventory export
-          {view.modified > 0 ? ` written ${ago(view.modified)}` : ''}; motes on hand from the Merge planner{stock ? '' : ' (not loaded yet)'}.
+          {view.modified > 0 && (
+            <>
+              {' '}
+              written <Ago t={view.modified} />
+            </>
+          )}
+          ; motes on hand from the Merge planner{stock ? '' : ' (not loaded yet)'}.
           {unknown > 0 && ` ${unknown} worn item${unknown === 1 ? ' is' : 's are'} not on the wiki, so ${unknown === 1 ? 'it is' : 'they are'} left out.`}
           {maxed > 0 && ` ${maxed} ${maxed === 1 ? 'is' : 'are'} at +10 already.`}
         </p>
@@ -185,7 +191,7 @@ export function MergeTab({
                   <td className="small">
                     <Deltas d={o.deltas} />
                   </td>
-                  <td className="mono num">{fmt(o.gain)}</td>
+                  <td className="mono num">{num1(o.gain)}</td>
                   <td className="small">
                     <span className={`chip ${o.affordable ? 'ok' : 'warn'}`} title={`${o.need} xp; you could make ${num(o.canMake)}`}>
                       {o.motes} × {moteName(o.mote, o.motes)}
@@ -193,7 +199,7 @@ export function MergeTab({
                     <div className="faint">have {num(o.canMake)}</div>
                   </td>
                   <td className="mono num">{num(o.cost)}</td>
-                  <td className="mono num">{fmt(o.rate)}</td>
+                  <td className="mono num">{num1(o.rate)}</td>
                   <td>
                     <button className="btn ghost small" onClick={() => void plan(o)} title="Put this item in the Merge planner">
                       Plan

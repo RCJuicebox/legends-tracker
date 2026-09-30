@@ -183,6 +183,14 @@ export function standingBand(value: number): { word: string; tone: StandingTone;
   return { word: band.word, tone: band.tone, next: up ? { word: up.word, points: up.min - value } : null }
 }
 
+/** A faction name reduced for matching: the wiki writes "Opal Dark Briar", the game "Opal Darkbriar". */
+export const factionKey = (name: string) =>
+  name
+    .toLowerCase()
+    .replace(/\s*\(faction\)\s*$/, '')
+    .replace(/^the\s+/, '')
+    .replace(/[^a-z0-9]/g, '')
+
 // ---------- what a faction cons at ----------
 // NPCs con a faction on the standing with the race, class and deity modifiers added: the client's
 // Resources/Faction/FactionAssociations.txt holds them, one faction^key^modifier a line, the key a
