@@ -15,6 +15,7 @@ import { Backlog } from '../../core/throttle'
 import { sources } from '../sources/registry'
 import type { EngineEnv, EngineOutputs, EngineStore, MoteScanner } from './contracts'
 import type { Notifier } from './notifier'
+import type { EngineFeature } from './feature'
 import { jobs, type Job } from '../sources/jobs'
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
@@ -59,7 +60,8 @@ export interface MoteHooks {
  * the whole history from every log and archive. While either reads, live lines wait so none is lost
  * or counted twice; where they begin in the log is where reading must stop.
  */
-export class MoteCatchUp {
+export class MoteCatchUp implements EngineFeature {
+  readonly id = 'moteHistory'
   readonly backlog = new Backlog<LogLine>()
   /** Where in `backlogLog` the waiting lines begin: history reads up to there. -1 until known. */
   private backlogFrom = -1
@@ -87,7 +89,7 @@ export class MoteCatchUp {
   }
 
   /** A live line: held while history is read, else counted now. */
-  live(line: LogLine): void {
+  line(line: LogLine): void {
     if (!this.backlog.hold(line)) this.motes.handle(line)
   }
 

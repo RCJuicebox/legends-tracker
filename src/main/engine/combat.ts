@@ -13,6 +13,7 @@ import { Backlog, Throttled } from '../../core/throttle'
 import type { SpellBook } from '../../core/spells'
 import type { CombatSnapshot, Segment } from '../../shared/types'
 import type { EngineOutputs, EngineStore, LootView } from './contracts'
+import type { EngineFeature } from './feature'
 import type { Notifier } from './notifier'
 import type { BuffCoordinator } from './buffs'
 
@@ -33,7 +34,8 @@ export interface CombatHooks {
  * they find under the meter's fights and sessions. Recent fights are read back from the log when
  * watching starts, with live lines held until that is done so everything is seen in order.
  */
-export class CombatFeed {
+export class CombatFeed implements EngineFeature {
+  readonly id = 'combat'
   /** SEED_MAX_BYTES, which a test may lower. */
   static seedMaxBytes = SEED_MAX_BYTES
   readonly meter: CombatMeter
@@ -124,22 +126,22 @@ export class CombatFeed {
   }
 
   /** New settings; true when charm pets were switched, which changes whose every past blow was. */
-  reconfigure(): boolean {
+  applySettings(): boolean {
     const charmWas = this.meter.charmPets
     this.meter.configure(this.meterConfig())
     return charmWas !== this.meter.charmPets
   }
 
   /** A live line: held while history is read, else through the meter and the rest. */
-  live(line: LogLine): void {
-    if (!this.backlog.hold(line)) this.line(line)
+  line(line: LogLine): void {
+    if (!this.backlog.hold(line)) this.read(line)
   }
 
   /**
    * A line through the damage meter, then the loot ledger, which files loot under the meter's
    * session, and the respawn log, which goes by the meter's idea of who is a mob.
    */
-  private line(line: LogLine): void {
+  private read(line: LogLine): void {
     const ev = this.meter.handle(line)
     this.buffs.handle(line.text, line.time)
     this.respawns.handle(line, this.meter.currentZone || this.hooks.zone(), ev)
@@ -182,7 +184,7 @@ export class CombatFeed {
         if (end > from && current()) {
           const take = (line: LogLine) => {
             if (!current()) return
-            if (line.time >= since) this.line(line)
+            if (line.time >= since) this.read(line)
             else if (zoneEntered(line.text)) this.meter.handle(line)
           }
           // A chunk at a time between yields, so the timers and overlays keep going while it reads; and
@@ -195,7 +197,7 @@ export class CombatFeed {
     } catch (e) {
       if ((e as NodeJS.ErrnoException).code !== 'ENOENT') log.warn(`Reading recent fights from ${logFile} failed:`, e)
     } finally {
-      for (const line of this.backlog.end()) this.line(line)
+      for (const line of this.backlog.end()) this.read(line)
       this.meter.reading = ''
       this.loot.reading = ''
       this.combatOut.mark()

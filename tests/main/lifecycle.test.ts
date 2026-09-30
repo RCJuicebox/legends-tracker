@@ -224,7 +224,7 @@ describe('Quitting with the real engine', () => {
         loot: noop,
         respawns: noop,
         pet: noop,
-        buffs: noop
+        push: noop
       },
       env
     )

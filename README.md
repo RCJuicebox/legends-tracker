@@ -897,10 +897,14 @@ the lifecycle knows what it does. The live achievements (`src/main/liveAchieveme
 too. Its page's entry in `src/features/index.ts` (id, group, label, icon and the
 page it follows) is where the sidebar puts it. Inside the engine the same idea runs the live log:
 each part (the spell tracker, triggers, pet, motes, the combat feed, buffs, the status line and the
-views that go out) is an `EngineFeature` with optional `line`, `tick`, `reset` and `linesRead`
-hooks, and the engine hands every line, tick and change of character down one ordered list. The
-order is behaviour (the tracker sees a line before the triggers; the meter files a fight before the
-loot ledger looks for its session), so a new part goes in where it must run. Views pushed to the
+views that go out) is an `EngineFeature` with optional `line`, `tick`, `reset`, `linesRead`,
+`watching`, `spellsLoaded` and `reconfigure` hooks, and the engine hands every line, tick and change
+of character, spell book and settings down one ordered list. The engine's own parts (the mote
+history, the combat feed, buffs) are listed as themselves; the core parts, which may not import the
+engine's contract, are listed through small entries. The order is behaviour (the tracker sees a line
+before the triggers; the meter files a fight before the loot ledger looks for its session), so a new
+part goes in where it must run. A part that only the windows listen to pushes its view itself
+through `EngineOutputs.push`, on its own channel (buffs on `state:buffs`). Views pushed to the
 windows go through one `Throttled` (`engine/throttle.ts`): sent when changed, at most so often, with
 an optional heartbeat for work that must run on a beat anyway.
 

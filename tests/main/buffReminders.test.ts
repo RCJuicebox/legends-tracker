@@ -8,7 +8,7 @@ import type { EngineStore } from '../../src/main/engine/contracts'
 import { defaultSettings } from '../../src/main/storeCore'
 import { SpellBook } from '../../src/core/spells'
 import { TimerBoard } from '../../src/core/timers'
-import type { BuffsFile, BuffView, Person } from '../../src/core/buffs'
+import type { BuffsFile, Person } from '../../src/core/buffs'
 import type { MoteState } from '../../src/core/motes'
 import type { FeedItem, MoteStock } from '../../src/shared/types'
 import { at } from '../helpers'
@@ -61,7 +61,7 @@ function setup(o: { groupBuffs?: boolean; group?: string[] } = {}) {
   const feed: FeedItem[] = []
   const alerts: { text: string; color: string; durationSec: number }[] = []
   const spoken: string[] = []
-  const views: BuffView[] = []
+  const pushed: { channel: string; view: unknown }[] = []
   const notifier = new Notifier(
     {
       synthesize: async (text: string) => {
@@ -75,18 +75,18 @@ function setup(o: { groupBuffs?: boolean; group?: string[] } = {}) {
   )
   const board = new TimerBoard({ onChange: () => {}, onNotify: (ns) => notifier.notify(ns) })
   const state = { group: o.group ?? ['Brenna'], fighting: false, readingHistory: false, live: true }
-  const buffs = new BuffCoordinator(store, board, new SpellQueries(store, () => book), notifier, {
+  const out = { push: (channel: string, view: unknown) => void pushed.push({ channel, view }) }
+  const buffs = new BuffCoordinator(store, out, board, new SpellQueries(store, () => book), notifier, {
     book: () => book,
     group: () => state.group,
     fighting: () => state.fighting,
     readingHistory: () => state.readingHistory,
-    live: () => state.live,
-    send: (v) => views.push(v)
+    live: () => state.live
   })
-  buffs.setBook(book)
-  buffs.follow(KEY, T0)
+  buffs.spellsLoaded(book)
+  buffs.watching(store.settings.get().logFile, T0)
   const asks = () => feed.filter((f) => f.text.startsWith('Buffs: ')).map((f) => f.text)
-  return { store, buffs, board, feed, alerts, spoken, views, state, asks }
+  return { store, buffs, board, feed, alerts, spoken, pushed, state, asks }
 }
 
 let s: ReturnType<typeof setup>
@@ -94,6 +94,11 @@ let s: ReturnType<typeof setup>
 describe('Asking for a wanted buff that is missing', () => {
   beforeEach(() => {
     s = setup()
+  })
+
+  it('pushes its view to the pages on its own channel', () => {
+    s.buffs.tick(T0 + 6000)
+    expect(s.pushed.at(-1)).toMatchObject({ channel: 'state:buffs', view: { wanted: [SYMBOL], plan: { needs: [{ spell: SYMBOL }] } } })
   })
 
   it('names who to ask, in the feed and as a six-second alert', () => {

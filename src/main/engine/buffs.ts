@@ -19,7 +19,8 @@ import { CLASS_NAMES, CLASS_NUMBER, type ClassId } from '../../shared/game/class
 import type { Spell, SpellBook } from '../../core/spells'
 import type { TimerBoard } from '../../core/timers'
 import type { MyClass } from '../../core/spellMotes'
-import type { EngineStore } from './contracts'
+import type { EngineOutputs, EngineStore } from './contracts'
+import type { EngineFeature } from './feature'
 import type { Notifier } from './notifier'
 import type { SpellQueries } from './spellQueries'
 import { Throttled } from '../../core/throttle'
@@ -38,19 +39,23 @@ export interface BuffHooks {
   readingHistory: () => boolean
   /** The log is being watched live (not pasted lines): reminders may be given. */
   live: () => boolean
-  send: (view: BuffView) => void
   /** The character being played, as the log names them. */
   self?: () => string
   /** A /who line about the character being played. */
   onSelf?: (p: Person) => void
 }
 
-/** Buffs on the character from others, who is who, and what to ask the group for. */
-export class BuffCoordinator {
+/**
+ * Buffs on the character from others, who is who, and what to ask the group for: an engine part of
+ * its own, keeping buffs.json and pushing `state:buffs`. Its lines come through the combat feed
+ * (`handle`), which reads the recent history into it with the meter.
+ */
+export class BuffCoordinator implements EngineFeature {
+  readonly id = 'buffs'
   readonly watch: BuffWatch
   private offers: BuffOffer[] = []
   /** Prunes and reminds every five seconds; the page hears within a second of a change. */
-  private readonly out: Throttled
+  private readonly viewOut: Throttled
   /** The last "ask for" told, and when, so it is not said again every few seconds. */
   private lastAsk = { text: '', at: 0 }
   /** Groupmates the player has been told to /who, once each. */
@@ -59,13 +64,14 @@ export class BuffCoordinator {
   private readonly selfSaid = new Set<string>()
 
   constructor(
-    private readonly store: EngineStore,
+    private readonly store: Pick<EngineStore, 'settings' | 'buffs'>,
+    private readonly out: Pick<EngineOutputs, 'push'>,
     private readonly board: TimerBoard,
     private readonly queries: SpellQueries,
     private readonly notifier: Notifier,
     private readonly hooks: BuffHooks
   ) {
-    this.out = new Throttled(1000, () => this.hooks.send(this.view()), {
+    this.viewOut = new Throttled(1000, () => this.out.push('state:buffs', this.view()), {
       everyMs: 5000,
       beat: (now) => {
         this.watch.prune(now)
@@ -90,19 +96,20 @@ export class BuffCoordinator {
   }
 
   /** A new spell book: the buffs on offer are read from it. */
-  setBook(book: SpellBook): void {
+  spellsLoaded(book: SpellBook): void {
     this.offers = buffOffers(book, this.settings.tracking.tierDurationPct)
     this.watch.setBook(book, this.offers)
-    this.out.mark()
+    this.viewOut.mark()
   }
 
   /** Watching a character's log: their own buffs, the ones the last run saw on them, still running. */
-  follow(key: string, now: number): void {
-    this.watch.active = this.store.buffs.get().active[key] ?? []
+  watching(logFile: string, now: number): void {
+    this.watch.active = this.store.buffs.get().active[characterKey(logFile)] ?? []
     this.watch.prune(now)
-    this.out.mark()
+    this.viewOut.mark()
   }
 
+  /** A line, from the combat feed: live, or read back from the log's recent history. */
   handle(text: string, time: number): void {
     const book = this.hooks.book()
     this.watch.handle(text, time, (name) => book?.resolve(name))
@@ -116,13 +123,13 @@ export class BuffCoordinator {
 
   /** The group roster was changed by hand: the buff plan is built on it, so the page hears at once. */
   groupChanged(): void {
-    this.out.mark()
+    this.viewOut.mark()
     this.lastAsk = { text: '', at: 0 }
   }
 
   /** Prunes and reminds every five seconds; the page hears within a second of a change. */
   tick(now: number): void {
-    this.out.tick(now)
+    this.viewOut.tick(now)
   }
 
   private get wanted(): string[] {
@@ -217,7 +224,7 @@ export class BuffCoordinator {
     else delete wanted[key]
     this.store.buffs.set({ ...f, wanted })
     this.lastAsk = { text: '', at: 0 }
-    this.out.mark()
+    this.viewOut.mark()
     return this.view()
   }
 
@@ -236,7 +243,7 @@ export class BuffCoordinator {
     const f = this.store.buffs.get()
     const key = this.characterKey()
     if (key) this.store.buffs.set({ ...f, active: { ...f.active, [key]: this.watch.active } })
-    this.out.mark()
+    this.viewOut.mark()
   }
 
   private learnPerson(p: Person): void {
@@ -246,7 +253,7 @@ export class BuffCoordinator {
     const k = p.name.toLowerCase()
     if (f.people[k] && f.people[k].at >= p.at) return
     this.store.buffs.set({ ...f, people: { ...f.people, [k]: p } })
-    this.out.mark()
+    this.viewOut.mark()
   }
 
   /** Someone else's buff on you: a timer on the buffs overlay, with a word before it fades. Only when group buffs are turned on. */

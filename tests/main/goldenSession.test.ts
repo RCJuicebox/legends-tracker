@@ -104,7 +104,7 @@ beforeAll(async () => {
       loot: noop,
       respawns: noop,
       pet: noop,
-      buffs: noop
+      push: noop
     },
     env
   )

@@ -138,7 +138,7 @@ describe('Saving where mote tracking got to, with a backlog', () => {
     // It waits for the tailer to say where it attached.
     await waitFor(() => r.tail.asked)
     expect(existsSync(markFile)).toBe(false)
-    r.catchUp.live(parsed(LOOT('Thu Sep 24 16:30:00 2026', 1, 'Greater')))
+    r.catchUp.line(parsed(LOOT('Thu Sep 24 16:30:00 2026', 1, 'Greater')))
     r.catchUp.linesRead(logFile, 99_999)
     r.catchUp.saveMark()
     // Mid-read, what is on disk is not caught up: the next start goes by times.
@@ -156,7 +156,7 @@ describe('Saving where mote tracking got to, with a backlog', () => {
     await waitFor(() => r.tail.asked)
     // The tailer attaches where the catch-up must stop, then hands over the line after it.
     r.catchUp.attached(logFile, before.length)
-    r.catchUp.live(parsed(live))
+    r.catchUp.line(parsed(live))
     Object.assign(r.tail, { logFile, position: before.length + live.length, settling: false })
     await running
     expect(r.catchUp.backlog.active).toBe(false)
@@ -205,7 +205,7 @@ describe('A tail reset in the middle of the backlog', () => {
     // The tailer attached before `after`: the catch-up is to stop there.
     r.catchUp.attached(logFile, stopAt)
     if (reset) r.catchUp.tailReset(resetLog, reset)
-    r.catchUp.live(parsed(fresh))
+    r.catchUp.line(parsed(fresh))
     Object.assign(r.tail, { logFile, position: fresh.length, settling: false })
     await running
     return r
@@ -266,7 +266,7 @@ describe('The engine when the watched log is truncated', () => {
         loot: noop,
         respawns: noop,
         pet: noop,
-        buffs: noop
+        push: noop
       },
       env()
     )

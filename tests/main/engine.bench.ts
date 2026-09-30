@@ -89,7 +89,7 @@ beforeAll(async () => {
     loot: noop,
     respawns: noop,
     pet: noop,
-    buffs: noop
+    push: noop
   }
   engine = new Engine(store, { synthesize: async () => Buffer.alloc(0) }, out, env)
   await engine.loadSpells()

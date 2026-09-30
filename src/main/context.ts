@@ -261,7 +261,7 @@ export function createContext(): AppContext {
         if (!character) return
         void ctx.petStore.merge(character, update).then(async (changed) => changed && toMain('state:pet', { character, ...(await ctx.petStore.get(character)) }))
       },
-      buffs: (view) => toMain('state:buffs', view),
+      push: toMain,
       // A /who of yourself names your race and classes: the character record follows them, so a change
       // of either reaches the faction cons, the AC sums, spell durations and the gear you can wear.
       selfSeen: (who) => {

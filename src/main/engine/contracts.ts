@@ -2,12 +2,12 @@ import type { MoteState } from '../../core/motes'
 import type { RespawnRecords, RespawnView } from '../../core/respawns'
 import type { PetGearReading } from '../../core/pets'
 import type { SelfWho } from '../../core/selfWho'
-import type { BuffsFile, BuffView } from '../../core/buffs'
+import type { BuffsFile } from '../../core/buffs'
 import type { Cell } from '../../core/moteStock'
 import type { MoteScanJob, MoteScanResult } from '../moteHistory'
 import type { SpeechWorker } from '../speech'
 import type { AppSettings, ArchiveStatus, CharacterSettings, CombatSnapshot, FeedItem, MoteStock, SpellRule, TimerView, Trigger, WatchStatus } from '../../shared/types'
-import type { AudioCommand, LootView, MoteScan, MoteView } from '../../shared/ipc'
+import type { AudioCommand, LootView, MoteScan, MoteView, PushChannel, Pushes } from '../../shared/ipc'
 
 // What the engine is given and what it gives back: passed in, so the engine runs anywhere, tests
 // included.
@@ -30,7 +30,11 @@ export interface EngineOutputs {
   respawns: (view: RespawnView) => void
   /** A `/pet inventory check` list, or a pet summoned, as the log reports it. */
   pet: (update: { gear?: PetGearReading; summon?: { spell: string; at: number } }) => void
-  buffs: (view: BuffView) => void
+  /**
+   * A view for the windows alone, on the part's own channel: a part that nothing else listens to
+   * pushes this way (buffs, `state:buffs`), with no callback of its own here.
+   */
+  push: <K extends PushChannel>(channel: K, ...args: Parameters<Pushes[K]>) => void
 }
 
 /** Reads mote history somewhere (a worker thread in the app); `stop` abandons it. */

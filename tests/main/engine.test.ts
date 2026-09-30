@@ -95,7 +95,7 @@ function makeEngine(o: { logFile: string; motes?: MoteState; stock?: MoteStock }
       loot: noop,
       respawns: noop,
       pet: noop,
-      buffs: noop
+      push: noop
     },
     env
   )

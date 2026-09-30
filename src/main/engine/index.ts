@@ -125,13 +125,12 @@ export class Engine {
       (s) => out.stock(s),
       (kind, text) => this.pushFeed(kind, text)
     )
-    this.buffs = new BuffCoordinator(store, this.board, this.queries, this.notifier, {
+    this.buffs = new BuffCoordinator(store, out, this.board, this.queries, this.notifier, {
       book: () => this.book,
       group: () => this.combat.meter.groupMembers,
       fighting: () => this.combat.meter.fighting,
       readingHistory: () => this.combat.backlog.active,
       live: () => !this.simulating && this.status.watching,
-      send: (view) => out.buffs(view),
       self: () => this.status.character,
       // Your own /who: the zone when the watch does not know it yet, and your race and classes for the
       // record. Those only from a /who typed now: one read back from the log may be from before a change.
@@ -180,9 +179,12 @@ export class Engine {
 
   /**
    * The parts that follow the log, in order. A line goes to the spell tracker, the triggers, the pet
-   * reader, mote history, the combat feed and then the status line; a tick to the timer board, the pet
-   * reader, motes, the combat feed and buffs, and then the views that go out; a change of character
-   * clears the timers and then the fights. The order matters, so it is kept as it was written by hand.
+   * reader, mote history, the combat feed (and through it buffs) and then the status line; a tick to
+   * the timer board, the pet reader, motes, the combat feed and buffs, and then the views that go out;
+   * a change of character clears the timers and then the fights. The order matters, so it is kept as
+   * it was written by hand. A part of the engine's own (mote history, the combat feed, buffs) is listed
+   * as itself; one from core, which cannot know the contract, or the engine's own state, through an
+   * entry here.
    */
   private buildFeatures(): EngineFeature[] {
     const output = (id: string, out: Throttled): EngineFeature => ({ id, tick: (now) => out.tick(now) })
@@ -193,9 +195,9 @@ export class Engine {
       { id: 'triggers', line: (line) => this.triggers.handle(line) },
       { id: 'pet', line: (line) => this.petLine(line), tick: (now) => this.petReader.tick(now) },
       { id: 'motes', tick: (now) => this.motes.tick(now) },
-      { id: 'moteHistory', line: (line) => this.moteHistory.live(line), linesRead: (logFile, end) => this.moteHistory.linesRead(logFile, end) },
-      { id: 'combat', line: (line) => this.combat.live(line), tick: (now) => this.combat.tick(now), reset: () => this.combat.reset() },
-      { id: 'buffs', tick: (now) => this.buffs.tick(now) },
+      this.moteHistory,
+      this.combat,
+      this.buffs,
       output('motes:out', this.motesOut),
       {
         id: 'status',
@@ -280,7 +282,7 @@ export class Engine {
         `Spell data: ${this.book.size} spells in ${Math.round(performance.now() - started)} ms; the heap grew ${Math.round((process.memoryUsage().heapUsed - heapBefore) / 1048576)} MB reading it`
       )
       this.status.spellsLoaded = this.book.size
-      this.buffs.setBook(this.book)
+      for (const f of this.features) f.spellsLoaded?.(this.book)
       this.status.spellError = ''
       this.tracker = new SpellTracker(this.book, this.board, this.trackerConfig(), {
         notify: (ns) => this.notifier.notify(ns),
@@ -331,9 +333,9 @@ export class Engine {
   reconfigure(): void {
     this.tracker?.configure(this.trackerConfig())
     // Charm pets on or off changes whose every past blow was: the fights on record are read again.
-    if (this.combat.reconfigure() && this.status.watching) void this.rebuildCombat(this.settings.combat.historyMinutes)
+    if (this.combat.applySettings() && this.status.watching) void this.rebuildCombat(this.settings.combat.historyMinutes)
     this.triggers.load(this.store.triggers.get(), characterName(this.settings.logFile))
-    this.buffs.reconfigure()
+    for (const f of this.features) f.reconfigure?.()
     this.emitStatus()
   }
 
@@ -356,7 +358,7 @@ export class Engine {
       this.pushFeed('info', `Now watching ${basename(logFile)}${n ? `; cleared ${n} timer${n === 1 ? '' : 's'}` : ''}.`)
     }
     this.watchedLog = logFile
-    this.buffs.follow(characterKey(logFile), Date.now())
+    for (const f of this.features) f.watching?.(logFile, Date.now())
     this.status.logFile = logFile
     this.status.character = characterName(logFile)
     this.combat.meter.setSelf(this.status.character)

@@ -120,7 +120,7 @@ function makeEngine(historyMinutes: number) {
       loot: noop,
       respawns: noop,
       pet: noop,
-      buffs: noop,
+      push: noop,
       selfSeen: (who) => seen.push(who)
     },
     env
