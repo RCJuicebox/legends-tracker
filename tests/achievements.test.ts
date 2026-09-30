@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { AchievementBook, parseAchievements, sourceFromName, type AchMarks } from '../src/core/achievements'
-import { HUNT } from '../src/core/achievementHunt'
+import { HUNT } from '../src/shared/game/hunt'
 
 const EXPORT = [
   'EverQuest: Hunter',

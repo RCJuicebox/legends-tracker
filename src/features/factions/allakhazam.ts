@@ -4,6 +4,7 @@
 // effect is put together from every page that names the mob. The site asks crawlers to wait twenty
 // seconds between pages, and the main process does (FactionAlla).
 import { factionKey } from './core'
+import type { Need } from '../../shared/game/factions'
 
 const SITE = 'https://everquest.allakhazam.com'
 
@@ -165,15 +166,7 @@ export const questKey = (name: string) =>
     .replace(/\bquest$/, '')
     .replace(/[^a-z0-9]/g, '')
 
-/** A con a quest wants: of which faction, the band's word, and the lowest and highest con allowed. */
-export interface Need {
-  faction: string
-  band: string
-  min?: number
-  max?: number
-  /** Seen to hold below Indifferent too: the NPC eats the hand-in under it, so faking a con does not help. */
-  real?: boolean
-}
+export type { Need }
 
 /** What every page says of the quests that want a con: by questKey, each faction's need. `name` puts a faction the game's way. */
 export function allaNeeds(factions: AllaFaction[], name: (f: string) => string): Map<string, Need[]> {

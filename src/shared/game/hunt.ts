@@ -1,6 +1,7 @@
 // Where to hunt each race for Slayer > General > Progressive: the zones with the most NPCs of that race,
 // with their level range, kept to zones live on EverQuest Legends. Built from the NPC pages on
-// eqlwiki.com (community-maintained; race fields are hand-entered, so treat these as leads).
+// eqlwiki.com on 2026-09-24 (community-maintained; race fields are hand-entered, so treat these as leads),
+// with what play has found since, dated.
 //   [zone, npcs of that race, lowest level, highest level]
 export const HUNT: Record<string, [string, number, number?, number?][]> = {
   barbarous: [
@@ -199,7 +200,7 @@ export const HUNT: Record<string, [string, number, number?, number?][]> = {
     ['Gorge of King Xorbb', 3, 15, 19],
     ["Ak'Anon", 1, 9, 9]
   ],
-  // From play, not the wiki's race fields: the Dervish Cutthroats of Ro and the Commonlands are
+  // From play (2026-09-29), not the wiki's race fields: the Dervish Cutthroats of Ro and the Commonlands are
   // humanoid bandits, not Dervishes. The blade storms of the Plane of Sky's island 1.5 are.
   'spin me right round': [['Plane of Sky, island 1.5', 1, 59, 61]],
   'terrorible tentacles': [

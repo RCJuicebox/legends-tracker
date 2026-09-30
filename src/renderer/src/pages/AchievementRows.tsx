@@ -2,7 +2,7 @@ import { Disclosure, Switch, Tip } from '../components/ui'
 import { useApp } from '../state'
 import { numExact as num } from '../../../core/format'
 import { AchievementBook, achKey, compareNames, norm, placeOf, secKey, type AchObjective, type AchRef, type Achievement, type ObjRef } from '../../../core/achievements'
-import { HUNT } from '../../../core/achievementHunt'
+import { HUNT } from '../../../shared/game/hunt'
 import type { SkillRow } from '../../../shared/tracking'
 
 // The Achievements page's sections and rows: each achievement, its objectives and progress, the tracked bar and search results.
