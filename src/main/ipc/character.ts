@@ -1,7 +1,7 @@
 import { handle } from './handle'
 import { log } from '../log'
 import { checkGameFolder } from '../game'
-import { readAasFromLog } from '../stats'
+import { readAasFromLog } from '../../core/aaLog'
 import { aaHistoryView, emptyAaTally } from '../../core/aaHistory'
 import { readMotesFromScreen, readStatsFromScreen } from '../screenRead'
 import { castableSpells, focusReport, focusSpec } from '../../core/itemFocus'
@@ -110,7 +110,7 @@ export function registerCharacterIpc(ctx: AppContext): void {
   // The picked character's own /alternateadv list, whichever character is being played.
   handle('stats:readAAs', (character) => {
     if (!isCharacterKey(character)) throw new Error('Not a character.')
-    return readAasFromLog(liveLog(character))
+    return readAasFromLog(liveLog(character), { warn: (m, e) => log.warn(m, e) })
   })
   // The AAs its log and archives saw bought, for Stats › AAs.
   handle('stats:aaHistory', async (character) => {

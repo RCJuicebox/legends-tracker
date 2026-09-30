@@ -19,7 +19,8 @@ vi.mock('electron', () => ({
   }
 }))
 
-const { isInside, registerLogIpc } = await import('../src/main/ipc/logs')
+const { registerLogIpc } = await import('../src/main/ipc/logs')
+const { isInside } = await import('../src/core/paths')
 const { rendererUrl } = await import('../src/main/push')
 
 const root = mkdtempSync(join(tmpdir(), 'lt-reveal-'))

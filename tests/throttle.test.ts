@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { Backlog, Throttled } from '../src/main/engine/throttle'
+import { Backlog, Throttled } from '../src/core/throttle'
 
 describe('Backlog', () => {
   it('holds lines while active, in order, and says when it holds as many as it will', () => {

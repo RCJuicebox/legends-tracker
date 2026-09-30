@@ -1,18 +1,12 @@
 import { shell } from 'electron'
 import { existsSync, statSync } from 'node:fs'
-import { isAbsolute, join, relative, resolve, sep } from 'node:path'
+import { join } from 'node:path'
+import { isInside } from '../../core/paths'
 import { handle } from './handle'
 import { listLogs } from '../game'
 import type { AppContext } from '../context'
 
 // The Log Files page: the character logs, their archives, and archiving.
-
-/** Whether `path` is `dir` or somewhere inside it. */
-export function isInside(dir: string, path: string): boolean {
-  const r = relative(resolve(dir), resolve(path))
-  // A step up is ".." itself or "..\…"; a file named "..notes.txt" is inside.
-  return r === '' || (r !== '..' && !r.startsWith('..' + sep) && !isAbsolute(r))
-}
 
 export function registerLogIpc(ctx: AppContext): void {
   const { engine } = ctx

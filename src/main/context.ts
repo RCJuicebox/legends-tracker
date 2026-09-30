@@ -10,7 +10,8 @@ import { SpeechWorker } from './speech'
 import { AzureSpeech, VoiceRouter } from './azureSpeech'
 import { IconSource } from './icons'
 import { OverlayManager } from './overlays'
-import { GameWatcher, overlaysVisible } from './gameWatcher'
+import { GameWatcher } from './gameWatcher'
+import { overlaysVisible } from '../core/overlayVisibility'
 import { Updater } from './updater'
 import { yieldPriority } from './priority'
 import { AchievementFiles } from './achievements'
@@ -37,7 +38,8 @@ import { log } from './log'
 import { describeClasses, recordFromWho } from '../core/selfWho'
 import { sources } from './sources/registry'
 import { jobs } from './sources/jobs'
-import { settingsSummary } from './diagnostics'
+import { settingsSummary } from '../core/diagnosticsText'
+import { homedir } from 'node:os'
 import type { AppSettings, Trigger, WatchStatus } from '../shared/types'
 import type { AudioDevice } from '../shared/ipc'
 import { cacheDir } from './paths'
@@ -352,7 +354,7 @@ export function createContext(): AppContext {
 
   let loggedSummary = ''
   ctx.logSettings = () => {
-    const summary = settingsSummary(store.settings.get(), store.triggers.get().length)
+    const summary = settingsSummary(store.settings.get(), store.triggers.get().length, homedir())
     if (summary === loggedSummary) return
     loggedSummary = summary
     log.info(`Settings: ${summary}`)

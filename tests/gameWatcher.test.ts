@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { overlaysVisible } from '../src/main/gameWatcher'
+import { overlaysVisible } from '../src/core/overlayVisibility'
 
 const state = (name: string, pid = 100) => ({ foregroundName: name, foregroundPid: pid, gameRunning: true })
 

@@ -2,6 +2,7 @@ import { app } from 'electron'
 import electronUpdater from 'electron-updater'
 import { log } from './log'
 import type { UpdateState } from '../shared/runtime'
+import { notesText } from '../core/releaseNotes'
 
 // electron-updater checks the GitHub Releases named in the build's `publish` settings, downloads a
 // newer installer in the background, and runs it when the app restarts. Settings live in
@@ -86,23 +87,6 @@ export class Updater {
     this.status = s
     this.onStatus(s)
   }
-}
-
-/** A release's notes as plain text: GitHub hands them over as HTML, or as a list per version. */
-export function notesText(notes: string | { version: string; note: string | null }[] | null | undefined): string | undefined {
-  const text = Array.isArray(notes) ? notes.map((n) => n.note ?? '').join('\n\n') : (notes ?? '')
-  const plain = text
-    .replace(/<\/(p|li|h\d)>/gi, '\n')
-    .replace(/<li>/gi, '- ')
-    .replace(/<[^>]+>/g, '')
-    .replace(/&amp;/g, '&')
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-    .replace(/&quot;/g, '"')
-    .replace(/&#39;/g, "'")
-    .replace(/\n{3,}/g, '\n\n')
-    .trim()
-  return plain || undefined
 }
 
 /** electron-updater's errors carry whole HTTP responses; keep what a player can act on. */

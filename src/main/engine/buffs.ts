@@ -9,7 +9,7 @@ import type { MyClass } from '../../core/spellMotes'
 import type { EngineStore } from './contracts'
 import type { Notifier } from './notifier'
 import type { SpellQueries } from './spellQueries'
-import { Throttled } from './throttle'
+import { Throttled } from '../../core/throttle'
 
 /** Warned this long before someone else's buff on you is due to fade: time to ask for it again. */
 const BUFF_WARN_SEC = 60

@@ -7,36 +7,11 @@ import { cacheDir } from './paths'
 import { sources } from './sources/registry'
 import { win32Available } from './win32'
 import { characterKey } from './storeCore'
-import type { AppSettings } from '../shared/types'
 import type { AppContext } from './context'
+import { redact, settingsSummary } from '../core/diagnosticsText'
 
 // What a bug report needs, in one block of text the player can copy: the version, the machine, the
 // settings that matter (no key, no Windows user name), what went wrong at start, and the end of the log.
-
-/** Paths with the Windows user's folder replaced, so a pasted report does not carry their name. */
-export function redact(text: string): string {
-  const home = homedir()
-  return home ? text.split(home).join('%USERPROFILE%') : text
-}
-
-/** The settings a support question turns on, on one line. */
-export function settingsSummary(s: AppSettings, triggers: number): string {
-  const voice = !s.audio.voice ? 'Windows default' : s.audio.voice.startsWith('azure:') ? `Azure ${s.audio.voice.slice(6)}` : s.audio.voice
-  const overlays = s.overlays.map((o) => `${o.id}${o.visible ? '' : ' (hidden)'}`).join(', ')
-  return redact(
-    [
-      `game folder ${s.installDir || 'not set'}`,
-      `log ${s.logFile ? basename(s.logFile) : 'none'}`,
-      `watch at start ${s.autoStart ? 'on' : 'off'}`,
-      `overlays ${overlays || 'none'}${s.overlaysOnlyWithGame ? ', only with the game' : ''}`,
-      `voice ${voice}${s.audio.muted ? ', muted' : ''}`,
-      `tracking ${s.tracking.enabled ? 'on' : 'off'} (self buffs ${s.tracking.selfBuffs ? 'on' : 'off'}, dots ${s.tracking.dots ? 'on' : 'off'}, group buffs ${s.tracking.groupBuffs ? 'on' : 'off'})`,
-      `${triggers} trigger${triggers === 1 ? '' : 's'}`,
-      `archive ${s.archive.autoEnabled ? `auto at ${s.archive.thresholdMB} MB` : 'by hand'}`,
-      `yield to game ${s.yieldToGame ? 'on' : 'off'}`
-    ].join('; ')
-  )
-}
 
 /**
  * Memory and CPU by process: the main process, each window's renderer, the GPU. Working set is
@@ -101,7 +76,7 @@ export function diagnostics(ctx: AppContext): string {
   const lines = [
     `Legends Tracker ${app.getVersion()}${app.isPackaged ? '' : ' (development)'}, Electron ${process.versions.electron}, Windows ${release()} ${process.arch}`,
     `Settings: ${app.getPath('userData')}   Caches: ${cacheDir()}`,
-    `Settings summary: ${settingsSummary(s, ctx.store.triggers.get().length)}`,
+    `Settings summary: ${settingsSummary(s, ctx.store.triggers.get().length, homedir())}`,
     `Watching: ${ctx.engine.status.watching ? 'yes' : 'no'}; spells loaded ${ctx.engine.status.spellsLoaded}${ctx.engine.status.spellError ? ` (${ctx.engine.status.spellError})` : ''}; game ${ctx.watcher.state.gameRunning ? 'running' : 'not running'}`,
     `Update: ${u.state}${'version' in u ? ` ${u.version}` : ''}${u.state === 'error' ? ` (${u.message})` : ''}`
   ]
@@ -137,5 +112,5 @@ export function diagnostics(ctx: AppContext): string {
   if (ctx.store.unreadable.length) lines.push(`Could not be opened at start (left as they are): ${ctx.store.unreadable.join(', ')}`)
   if (ctx.store.newer.length) lines.push(`Written by a newer version: ${ctx.store.newer.join(', ')}`)
   lines.push('', '--- main.log, last 300 lines ---', logTail(300))
-  return redact(lines.join('\n'))
+  return redact(lines.join('\n'), homedir())
 }

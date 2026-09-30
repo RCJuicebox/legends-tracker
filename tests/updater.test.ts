@@ -1,9 +1,5 @@
-import { describe, expect, it, vi } from 'vitest'
-
-vi.mock('electron', () => ({ app: { isPackaged: false, getVersion: () => '0.0.0' } }))
-vi.mock('electron-updater', () => ({ default: { autoUpdater: {} } }))
-
-const { notesText } = await import('../src/main/updater')
+import { describe, expect, it } from 'vitest'
+import { notesText } from '../src/core/releaseNotes'
 
 describe('release notes from GitHub', () => {
   it('come out as plain text, lists and all', () => {

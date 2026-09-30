@@ -6,7 +6,7 @@ import { Readable } from 'node:stream'
 import { readLines } from '../src/main/moteHistory'
 import { lineStartAfter, offsetBefore } from '../src/main/sources/logHistory'
 import { lastZone, lastZoneLine } from '../src/main/game'
-import { readAasFromLog } from '../src/main/stats'
+import { readAasFromLog } from '../src/core/aaLog'
 import type { LogLine } from '../src/core/logLine'
 
 let dir: string

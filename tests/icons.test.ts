@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { crc32, inflateSync } from 'node:zlib'
-import { decodeDds, decodeTga, encodePng } from '../src/main/icons'
+import { decodeDds, decodeTga, encodePng } from '../src/core/imageCodecs'
 
 function tgaHeader(type: number, width: number, height: number, bits: number, descriptor = 0): Buffer {
   const h = Buffer.alloc(18)
