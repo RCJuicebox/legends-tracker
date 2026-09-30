@@ -1,4 +1,5 @@
 import { Fragment, useEffect, useMemo, useState, type ReactNode } from 'react'
+import { CharacterPicker } from '../../renderer/src/components/CharacterPicker'
 import { ago } from '../../renderer/src/api'
 import { useApp } from '../../renderer/src/state'
 import { useInvoke } from '../../renderer/src/hooks'
@@ -181,17 +182,9 @@ export function Factions() {
             <Info label="How it is counted" text={HOW} />
           </p>
         </div>
-        {chars.available.length > 1 && (
-          <div className="actions">
-            <select aria-label="Character" value={character} onChange={(e) => chars.setCharacter(e.target.value)}>
-              {chars.available.map((c) => (
-                <option key={c} value={c}>
-                  {who(c)}
-                </option>
-              ))}
-            </select>
-          </div>
-        )}
+        <div className="actions">
+          <CharacterPicker character={character} available={chars.available} onPick={chars.setCharacter} />
+        </div>
       </div>
 
       <div className="row mb-12">

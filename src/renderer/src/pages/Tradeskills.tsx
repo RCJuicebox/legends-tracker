@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { CharacterPicker } from '../components/CharacterPicker'
 import { api, ago } from '../api'
 import { useInvoke, useItemInfo } from '../hooks'
 import { useRemembered } from '../remember'
@@ -163,6 +164,9 @@ export function Tradeskills() {
               }
             />
           </p>
+        </div>
+        <div className="actions">
+          <CharacterPicker character={character} available={exp.available} onPick={exp.setCharacter} />
         </div>
       </div>
 

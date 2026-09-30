@@ -1,3 +1,4 @@
+import { remember } from '../remember'
 import { useState } from 'react'
 import { useApp, useLive } from '../state'
 import { api, clock, ago, errorMessage } from '../api'
@@ -107,7 +108,14 @@ function CharacterCard({ go }: { go?: (page: PageId) => void }) {
     <div className="card">
       <h2>
         {who(state.characterKey)} <span className="spacer" />
-        <button className="btn small" onClick={() => go?.('stats')}>
+        <button
+          className="btn small"
+          onClick={() => {
+            // Stats shows the character picked there: this one, the one being played.
+            remember('character', state.characterKey)
+            go?.('stats')
+          }}
+        >
           Edit classes and levels
         </button>
       </h2>

@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import { CharacterPicker } from '../components/CharacterPicker'
 import { api } from '../api'
 import { remember, useRemembered } from '../remember'
 import { showError } from '../toast'
@@ -104,6 +105,26 @@ export function Gear({ go, only, onPlan }: { go?: (page: PageId) => void; only?:
   const classes = stats.classes.filter(Boolean)
   const [name, server] = (view.character || character).split('_')
 
+  const picker = <CharacterPicker character={character} available={available} onPick={setCharacter} />
+  const refresh = view.inventory && (
+    <button
+      className="btn"
+      disabled={refreshing}
+      title="Fetch every worn item from eqlwiki.com again"
+      onClick={async () => {
+        setRefreshing(true)
+        try {
+          setView(await api.invoke('inventory:load', character, true))
+        } catch (e) {
+          showError('Could not fetch the item stats', e)
+        } finally {
+          setRefreshing(false)
+        }
+      }}
+    >
+      {refreshing ? 'Refreshing…' : 'Refresh item stats'}
+    </button>
+  )
   const head = (
     <div className="page-head">
       <div>
@@ -121,42 +142,26 @@ export function Gear({ go, only, onPlan }: { go?: (page: PageId) => void; only?:
         </p>
       </div>
       <div className="actions">
-        {available.length > 1 && (
-          <select aria-label="Character" value={character} onChange={(e) => setCharacter(e.target.value)}>
-            {available.map((c) => (
-              <option key={c} value={c}>
-                {who(c)}
-              </option>
-            ))}
-          </select>
-        )}
-        {view.inventory && (
-          <button
-            className="btn"
-            disabled={refreshing}
-            title="Fetch every worn item from eqlwiki.com again"
-            onClick={async () => {
-              setRefreshing(true)
-              try {
-                setView(await api.invoke('inventory:load', character, true))
-              } catch (e) {
-                showError('Could not fetch the item stats', e)
-              } finally {
-                setRefreshing(false)
-              }
-            }}
-          >
-            {refreshing ? 'Refreshing…' : 'Refresh item stats'}
-          </button>
-        )}
+        {picker}
+        {refresh}
       </div>
     </div>
+  )
+  // On another page (Upgrades), no second title: whose gear it is, with the same picker and refresh.
+  const top = only ? (
+    <div className="row mb-12" style={{ flexWrap: 'wrap' }}>
+      <span className="small muted grow">The gear of the character picked here, from its inventory export.</span>
+      {picker}
+      {refresh}
+    </div>
+  ) : (
+    head
   )
 
   if (!view.inventory || !summary) {
     return (
       <>
-        {head}
+        {top}
         <div className="card empty">
           {view.error === 'missing' || !character ? (
             <>
@@ -211,7 +216,13 @@ export function Gear({ go, only, onPlan }: { go?: (page: PageId) => void; only?:
     </div>
   )
 
-  if (only) return <GearFinder view={view} sheet={sheet} mode={only} onPlan={onPlan} />
+  if (only)
+    return (
+      <>
+        {top}
+        <GearFinder view={view} sheet={sheet} mode={only} onPlan={onPlan} />
+      </>
+    )
   if (mode !== 'sheet')
     return (
       <>

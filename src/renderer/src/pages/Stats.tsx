@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { CharacterPicker } from '../components/CharacterPicker'
 import { api, errorMessage } from '../api'
 import { useRemembered } from '../remember'
 import { useInvoke } from '../hooks'
@@ -143,17 +144,9 @@ export function Stats() {
             soft caps from the game's own tables, and AAs from your log.
           </p>
         </div>
-        {available.length > 1 && (
-          <div className="actions">
-            <select aria-label="Character" value={character} onChange={(e) => setCharacter(e.target.value)}>
-              {available.map((c) => (
-                <option key={c} value={c}>
-                  {who(c)}
-                </option>
-              ))}
-            </select>
-          </div>
-        )}
+        <div className="actions">
+          <CharacterPicker character={character} available={available} onPick={setCharacter} />
+        </div>
       </div>
 
       <div className="card stack gap-12 mb-14">

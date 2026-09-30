@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
+import { CharacterPicker } from '../components/CharacterPicker'
 import { api } from '../api'
 import { useRemembered } from '../remember'
 import { usePickedCharacter } from '../character'
@@ -177,17 +178,9 @@ export function Achievements() {
           )}
         </p>
       </div>
-      {chars.available.length > 1 && (
-        <div className="actions">
-          <select aria-label="Character" value={character} onChange={(e) => setCharacter(e.target.value)}>
-            {chars.available.map((c) => (
-              <option key={c} value={c}>
-                {who(c)}
-              </option>
-            ))}
-          </select>
-        </div>
-      )}
+      <div className="actions">
+        <CharacterPicker character={character} available={chars.available} onPick={setCharacter} />
+      </div>
     </div>
   )
 

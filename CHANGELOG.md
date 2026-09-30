@@ -56,6 +56,7 @@ What changed in each version. The release workflow publishes a version's section
 - **Buffs says the cast order once**, above the best combination ("Strength, then Harnessing of Spirit"), instead of "after …" on every row and in every ask; your classes read in your own order, as on every other page.
 - **Upgrades' tables fit.** Best merge keeps item names to a line or two and names motes by rank ("4 × Major"); Spell upgrades scrolls within its card instead of pushing the page sideways.
 - **Asks before it cannot be undone**: removing a respawn timer and archiving a log now ask first; removing a stance or a group member and "All capped" on Skills can be undone.
+- **Which character a page shows.** Stats, Gear, Achievements, Factions, Tradeskills and Upgrades show the character picked there, which may not be the one you are playing: each names it, says "not the one playing" when so, and has **Back to** the one you play. Spell Timers' **Edit classes and levels** opens Stats on the character being played. Best merge on Upgrades has the character picker and Refresh item stats again.
 
 ## 2.4.0 (2026-09-29)
 
