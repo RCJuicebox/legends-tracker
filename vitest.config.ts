@@ -21,7 +21,7 @@ export default defineConfig({
         'src/shared/**': { lines: 95, statements: 94, functions: 95, branches: 89 },
         'src/main/engine/**': { lines: 74, statements: 71, functions: 67, branches: 61 },
         'src/main/**': { lines: 43, statements: 40, functions: 39, branches: 32 },
-        'src/features/**': { lines: 50, statements: 48, functions: 47, branches: 55 }
+        'src/features/**': { lines: 96, statements: 92, functions: 92, branches: 85 }
       }
     },
     // Anything that finds its folders from the environment (the cache folder) gets a scratch one,
