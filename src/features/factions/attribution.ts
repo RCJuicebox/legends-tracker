@@ -245,16 +245,19 @@ function causeOf(c: OpenChange, into: FactionSourceTallies): { kind: SourceKind;
   }
   if (fought.size) return { kind: 'kill', name: [...fought].sort((a, b) => b[1] - a[1])[0][0] }
   // An NPC talking in the same second: a completion of a stack, or a hand-in the log wrote no offer for.
+  // Players talk the same way, so a lone name ("Aldric says, 'inc'") is an NPC only once it has been
+  // offered something in this zone.
+  const npc = (name: string) => !name.includes("'s corpse") && (!LONE_NAME.test(name) || !!into.offers?.some((o) => o.npc === name))
   for (let i = c.before.length - 1; i >= 0; i--) {
     const [text, at] = c.before[i]
     if (!near(at, NEAR_MS)) break
     const m = SAYS.exec(text)
-    if (m && !m[1].includes("'s corpse")) return { kind: 'turnin', name: m[1] }
+    if (m && npc(m[1])) return { kind: 'turnin', name: m[1] }
   }
   for (const [text, at] of c.after) {
     if (!near(at, NEAR_MS)) break
     const m = SAYS.exec(text)
-    if (m && !m[1].includes("'s corpse")) return { kind: 'turnin', name: m[1] }
+    if (m && npc(m[1])) return { kind: 'turnin', name: m[1] }
   }
   // Straight after hand-ins to one NPC, in the same zone: another of those.
   const last = into.lastTurnin

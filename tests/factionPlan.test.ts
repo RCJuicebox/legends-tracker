@@ -148,6 +148,22 @@ describe('what caused a faction change', () => {
     expect(s.acts['turnin|north qeynos|lashun novashine'].n).toBe(1)
   })
 
+  it('does not take a groupmate talking in the same second for an NPC; a lone-named NPC once it was offered something', () => {
+    const s = settled(
+      read([
+        [0, 'You have entered Blackburrow.'],
+        [4, "Aldric says, 'inc'"],
+        [4, adjusted('Silent Fist Clan', 5)],
+        [10, 'You offered 1 Rusty Dagger to Tylfon.'],
+        // Long enough after the offer that only Tylfon's words say who it was.
+        [25, "Tylfon says, 'Well, well, I didn't think you could do it.'"],
+        [25, adjusted("Tunare's Scouts", 5)]
+      ])
+    )
+    expect(Object.keys(s.acts)).toEqual(['turnin|blackburrow|tylfon'])
+    expect(s.unexplained).toBe(1)
+  })
+
   it('counts a change nothing explains, and puts it down to nothing', () => {
     const s = settled(read([[2, adjusted('Priests of Life', 5)]]))
     expect(s.acts).toEqual({})

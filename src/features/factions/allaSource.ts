@@ -4,6 +4,7 @@ import { app } from 'electron'
 import { cacheDir } from '../../main/paths'
 import { log } from '../../main/log'
 import { sources } from '../../main/sources/registry'
+import { JsonFile } from '../../main/storeCore'
 import { ALLA_INDEX_URL, ALLA_READY, allaFactionLaidOut, allaPageUrl, parseAllaFaction, parseAllaIndex, type AllaFaction } from './allakhazam'
 import { factionKey } from './planner'
 
@@ -19,6 +20,9 @@ const FRESH_MS = 30 * 24 * 3600_000
 const RETRY_MS = 10 * 60_000
 /** A page not laid out as the reader knows is not kept, and not asked for again for this long. */
 const ODD_PAGE_MS = 24 * 3600_000
+/** Pages read are written to disk every so many, or this long after the first unsaved one, and when reading stops. */
+const SAVE_EVERY = 10
+const SAVE_AFTER_MS = 5 * 60_000
 /** Bumped when what is kept of a page changes, so pages read by an older build are read again. */
 const VERSION = 1
 
@@ -34,8 +38,12 @@ const userAgent = () => `LegendsTracker/${app?.getVersion?.() ?? 'dev'} (https:/
 
 export class FactionAlla {
   private file: AllaFile | null = null
-  /** The factions wanted, by factionKey, in the order asked: the plan's first. */
+  private disk: JsonFile<AllaFile> | null = null
+  /** The factions wanted, by factionKey, in the order asked: the latest caller's plan first. */
   private wanted = new Map<string, string>()
+  /** Pages read since the file was last written, and when the first of them was. */
+  private unsaved = 0
+  private unsavedSince = 0
   private running: Promise<void> | null = null
   private last = 0
   private failedAt = 0
@@ -55,17 +63,41 @@ export class FactionAlla {
     } catch (e) {
       if ((e as NodeJS.ErrnoException).code !== 'ENOENT') log.warn('Could not read faction-alla.json; reading Allakhazam again', e)
     }
-    return (this.file ??= { version: VERSION, index: null, pages: {} })
+    this.file ??= { version: VERSION, index: null, pages: {} }
+    // Written as the settings are: through a .tmp file, tried again while another program holds it.
+    this.disk = new JsonFile(this.path, this.file, { pretty: false })
+    return this.file
   }
 
   private async save(): Promise<void> {
-    const tmp = this.path + '.tmp'
-    try {
-      await fs.writeFile(tmp, JSON.stringify(this.file))
-      await fs.rename(tmp, this.path)
-    } catch (e) {
-      log.warn('Could not save faction-alla.json:', e)
+    this.unsaved = 0
+    this.disk?.markDirty()
+    await this.disk?.flush()
+  }
+
+  /** A page read: written with the next few, not each on its own (the file is the whole cache). */
+  private async pageRead(): Promise<void> {
+    if (!this.unsaved++) this.unsavedSince = Date.now()
+    if (this.unsaved >= SAVE_EVERY || Date.now() - this.unsavedSince >= SAVE_AFTER_MS) await this.save()
+  }
+
+  /** Writes pages read and not yet saved; at quit. */
+  async flush(): Promise<void> {
+    if (this.unsaved && this.file) await this.save()
+  }
+
+  /** The first faction wanted that is neither kept nor lately found odd; odd ones on the way are named in `odd`. */
+  private next(f: AllaFile, odd: string[]): { id: number; name: string } | null {
+    for (const [key, name] of this.wanted) {
+      const id = f.index?.ids[key]
+      if (id === undefined || this.fresh(f.pages[id]?.fetchedAt)) continue
+      if (Date.now() - (this.odd.get(id) ?? -Infinity) < ODD_PAGE_MS) {
+        if (!odd.includes(name)) odd.push(name)
+        continue
+      }
+      return { id, name }
     }
+    return null
   }
 
   /** One page, twenty seconds after the one before. */
@@ -92,13 +124,9 @@ export class FactionAlla {
         await this.save()
       }
       const oddNames: string[] = []
-      for (const [key, name] of this.wanted) {
-        const id = f.index?.ids[key]
-        if (id === undefined || this.fresh(f.pages[id]?.fetchedAt)) continue
-        if (Date.now() - (this.odd.get(id) ?? -Infinity) < ODD_PAGE_MS) {
-          oddNames.push(name)
-          continue
-        }
+      // The next page is picked afresh each time, so a character picked while reading goes first.
+      for (let n = this.next(f, oddNames); n; n = this.next(f, oddNames)) {
+        const { id, name } = n
         sources.reading('allakhazam', `Reading ${name} (${this.status().read + 1} of ${this.wanted.size}), a page every ${GAP_MS / 1000} seconds as the site asks`)
         const html = await this.fetchPage(allaPageUrl(id))
         const faction = parseAllaFaction(id, html)
@@ -106,11 +134,10 @@ export class FactionAlla {
         if (faction && !allaFactionLaidOut(html)) {
           log.warn(`Allakhazam's page for ${name} (${allaPageUrl(id)}) is not laid out as expected; not kept`)
           this.odd.set(id, Date.now())
-          oddNames.push(name)
           continue
         }
         f.pages[id] = { fetchedAt: Date.now(), faction }
-        await this.save()
+        await this.pageRead()
       }
       const s = this.status()
       if (oddNames.length) {
@@ -124,6 +151,8 @@ export class FactionAlla {
       this.failedAt = Date.now()
       this.error = e instanceof Error ? e.message : String(e)
       sources.fail('allakhazam', e, 'Tried again in ten minutes')
+    } finally {
+      await this.flush()
     }
   }
 
@@ -145,7 +174,11 @@ export class FactionAlla {
   async factions(names: string[]): Promise<AllaFaction[]> {
     if (!ALLA_READY) return []
     const f = await this.load()
-    for (const n of names) if (!this.wanted.has(factionKey(n))) this.wanted.set(factionKey(n), n)
+    // The latest caller's factions first: a second character picked would otherwise wait hours
+    // behind the first's, at a page every twenty seconds.
+    const wanted = new Map(names.map((n) => [factionKey(n), n]))
+    for (const [k, n] of this.wanted) if (!wanted.has(k)) wanted.set(k, n)
+    this.wanted = wanted
     const retry = !this.failedAt || Date.now() - this.failedAt > RETRY_MS
     if (!this.running && retry) this.running = this.pump().finally(() => (this.running = null))
     const out: AllaFaction[] = []

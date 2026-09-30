@@ -52,6 +52,40 @@ export interface FollowState {
 
 export const freshFollow = (): FollowState => ({ done: [], reached: [], active: null, startUnits: {}, synced: false })
 
+/**
+ * The state of a new plan, carried over from the one followed before. A plan searched again (a new
+ * way read, a choice changed) keeps the step being worked on and its progress where that activity is
+ * still in it, and what was done or said stays so. Steps are matched by activity, the n-th step of
+ * an activity to its n-th step in the new plan.
+ */
+export function carryFollow(was: FollowedPlan, state: FollowState, next: FollowedPlan): FollowState {
+  const keys = (p: FollowedPlan) => {
+    const seen = new Map<string, number>()
+    return p.steps.map((s) => {
+      const n = seen.get(s.id) ?? 0
+      seen.set(s.id, n + 1)
+      return `${s.id}#${n}`
+    })
+  }
+  const old = keys(was)
+  const at = new Map(keys(next).map((k, i) => [k, i]))
+  const moved = (i: number) => (old[i] === undefined ? undefined : at.get(old[i]))
+  const done = state.done.flatMap((i) => {
+    const j = moved(i)
+    return j === undefined ? [] : [j]
+  })
+  const active = state.active === null ? undefined : moved(state.active)
+  const keep = active !== undefined && !done.includes(active)
+  const start = state.active === null ? undefined : state.startUnits[state.active]
+  return {
+    done: done.sort((a, b) => a - b),
+    reached: [...state.reached],
+    active: keep ? active : null,
+    startUnits: keep && start !== undefined ? { [active]: start } : {},
+    synced: state.synced
+  }
+}
+
 /** A step the player picked to work on now: the one followed from here, its progress counted afresh, until the faction lines go toward another. */
 export const pickStep = (state: FollowState, index: number): FollowState => ({ ...state, active: index, startUnits: {} })
 
@@ -126,6 +160,36 @@ export function sanitizeFollowedPlan(v: unknown): FollowedPlan | null {
   const names: Record<string, string> = {}
   if (o.names && typeof o.names === 'object') for (const [f, n] of Object.entries(o.names as Record<string, unknown>)) if (isStr(n)) names[f] = n.slice(0, 200)
   return { at: finite(o.at, 0, 1e15), steps, names }
+}
+
+/** Where the player is in a plan of `steps` steps, as a file kept it, checked field by field. */
+export function sanitizeFollowState(v: unknown, steps: number): FollowState {
+  const o = v && typeof v === 'object' ? (v as Record<string, unknown>) : {}
+  const step = (n: unknown): n is number => typeof n === 'number' && Number.isInteger(n) && n >= 0 && n < steps
+  const startUnits: Record<number, number> = {}
+  if (o.startUnits && typeof o.startUnits === 'object')
+    for (const [k, n] of Object.entries(o.startUnits as Record<string, unknown>))
+      if (step(Number(k)) && typeof n === 'number' && Number.isFinite(n) && n > 0) startUnits[Number(k)] = n
+  return {
+    done: [...new Set(Array.isArray(o.done) ? o.done.filter(step) : [])].sort((a, b) => a - b),
+    reached: strs(o.reached, 500),
+    active: step(o.active) ? o.active : null,
+    startUnits,
+    synced: o.synced === true
+  }
+}
+
+/** A file of followed plans by character, each checked; what does not hold a plan is dropped. */
+export function sanitizeFollows(v: unknown): Record<string, { plan: FollowedPlan; state: FollowState }> {
+  const out: Record<string, { plan: FollowedPlan; state: FollowState }> = {}
+  if (!v || typeof v !== 'object' || Array.isArray(v)) return out
+  for (const [character, raw] of Object.entries(v as Record<string, unknown>)) {
+    if (!character || character.length > 64 || !raw || typeof raw !== 'object') continue
+    const r = raw as Record<string, unknown>
+    const plan = sanitizeFollowedPlan(r.plan)
+    if (plan) out[character] = { plan, state: sanitizeFollowState(r.state, plan.steps.length) }
+  }
+  return out
 }
 
 /** What a read of the standings makes of a followed plan. */

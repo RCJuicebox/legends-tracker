@@ -42,6 +42,9 @@ What changed in each version. The release workflow publishes a version's section
 - **Meter: a beastlord's warder is its owner's pet from its first blow**, not an enemy until `/pet who leader`; its damage counts and its death opens no respawn timer.
 - **Meter: deaths are your side's and the fight's**, not every player who dies somewhere in the zone. A pet folded into its owner's row folds into Active DPS too.
 - **Spell timers: a spell another overwrote ends its timer** ("Your Envenomed Bolt spell on X has been overwritten."), with no recast cue for a spell that is gone; a detrimental spell that "did not take hold" on its target stops waiting to land.
+- **Factions: a plan searched again keeps the step you are on.** New ways read from Allakhazam (a page every twenty seconds) reshuffled the plan and reset the Now card's progress; the plan is searched again only when the ways themselves change or you change the kill pace, and the step worked on keeps its place and progress wherever it lands in the new order.
+- **Factions: a second character's Allakhazam pages come first** once it is picked, rather than after hours of the first character's; the pages read are written every ten, not after each.
+- **Factions: a groupmate talking as a faction changes is not taken for the NPC** of a hand-in; a one-word NPC counts once you have offered it something in the zone.
 
 ## 2.4.0 (2026-09-29)
 

@@ -4,7 +4,18 @@ import { trackedAchievements } from '../src/core/trackedAchievements'
 import { RaceIndex, raceWords, slayerCounters, slayerCounts, slayerLine, wikiRace, type SlayerKills } from '../src/core/slayer'
 import { joinSkillValues, skillGoals, skillId, skillUp, skillValue } from '../src/core/skillAchievements'
 import { DEFAULT_SETTINGS, planFactions, type PlanActivity, type PlanSettings } from '../src/features/factions/planner'
-import { followedPlan, freshFollow, pickStep, readFollow, sanitizeFollowedPlan, sayStep, type FollowedPlan } from '../src/features/factions/tracker'
+import {
+  carryFollow,
+  followedPlan,
+  freshFollow,
+  pickStep,
+  readFollow,
+  sanitizeFollowedPlan,
+  sanitizeFollowState,
+  sanitizeFollows,
+  sayStep,
+  type FollowedPlan
+} from '../src/features/factions/tracker'
 
 const EXPORT = [
   'Slayer: Conquest',
@@ -258,6 +269,33 @@ describe('following a faction plan', () => {
     // A hand-in to Mojax takes it back there.
     r = readFollow(f, r.state, { A: 1900, B: 1960 }, new Set(), { zone: 'West Commonlands', moved: { B: 10 } })
     expect(r.view.current).toMatchObject({ index: 0, unitsLeft: 4 })
+  })
+
+  it('keeps the step worked on, its progress and what is done when the plan is searched again', () => {
+    const f = twoSteps()
+    let r = readFollow(f, pickStep(freshFollow(), 1), { A: 1900, B: 1950 }, new Set())
+    r = readFollow(f, r.state, { A: 1950, B: 1950 }, new Set(), { moved: { A: 5 } })
+    expect(r.view.current).toMatchObject({ index: 1, unitsLeft: 10, progress: 0.5 })
+    // A re-plan puts a new way first and the camp second.
+    const extra = { ...f.steps[0], id: 'new way', title: 'new way' }
+    const g: FollowedPlan = { ...f, steps: [extra, f.steps[1], f.steps[0]] }
+    const carried = carryFollow(f, r.state, g)
+    expect(carried).toMatchObject({ active: 1, startUnits: { 1: 20 }, synced: true })
+    const again = readFollow(g, carried, { A: 1950, B: 1950 }, new Set())
+    expect(again.view.current).toMatchObject({ index: 1, unitsLeft: 10, progress: 0.5 })
+    expect(again.events).toEqual([])
+    // A step no longer in the plan is not carried.
+    expect(carryFollow(f, r.state, { ...f, steps: [f.steps[0]] })).toMatchObject({ active: null, startUnits: {} })
+  })
+
+  it('checks the followed plans a file holds: an old or broken entry is dropped or mended, not thrown on', () => {
+    const f = twoSteps()
+    const state = { done: [1, 1, 7, -1, 'x'], reached: ['A', 3], active: 5, startUnits: { 0: 20, 9: 4, 1: -2 }, synced: 'yes' }
+    expect(sanitizeFollows({ Kelwyn: { plan: f, state }, Aldric: { plan: null }, Brenna: 'nothing', '': { plan: f } })).toEqual({
+      Kelwyn: { plan: f, state: { done: [1], reached: ['A'], active: null, startUnits: { 0: 20 }, synced: false } }
+    })
+    expect(sanitizeFollows([f])).toEqual({})
+    expect(sanitizeFollowState(undefined, 2)).toEqual(freshFollow())
   })
 
   it('checks a plan sent by a page', () => {

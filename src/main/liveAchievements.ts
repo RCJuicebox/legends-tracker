@@ -9,7 +9,18 @@ import { skillGoals, skillId, skillValue } from '../core/skillAchievements'
 import { classIdOf, type ClassId } from '../shared/game/classes'
 import { parseFactionLine } from '../features/factions/core'
 import { standingsNow } from '../features/factions/main'
-import { freshFollow, pickStep, readFollow, sanitizeFollowedPlan, sayStep, type FollowEvent, type FollowedPlan, type FollowState } from '../features/factions/tracker'
+import {
+  carryFollow,
+  freshFollow,
+  pickStep,
+  readFollow,
+  sanitizeFollowedPlan,
+  sanitizeFollows,
+  sayStep,
+  type FollowEvent,
+  type FollowedPlan,
+  type FollowState
+} from '../features/factions/tracker'
 import type { AchievementTrack, FactionTrackView, SkillRow, SkillTrackView, SlayerTrackView, TrackedAchievement } from '../shared/tracking'
 import type { AppContext } from './context'
 import type { EngineFeature } from './engine'
@@ -89,7 +100,8 @@ export class LiveAchievements {
   constructor(private readonly ctx: AppContext) {
     const path = join(ctx.store.dir, 'faction-follow.json')
     const read = readJsonFile(path)
-    const value = read.state === 'ok' && read.value && typeof read.value === 'object' && !Array.isArray(read.value) ? (read.value as Record<string, Followed>) : {}
+    // Checked as it is read: a plan kept in an older shape would otherwise throw on every faction line.
+    const value: Record<string, Followed> = read.state === 'ok' ? sanitizeFollows(read.value) : {}
     this.follows = new JsonFile(path, value, { delayMs: 3000, pretty: false })
     if (read.state === 'unreadable') this.follows.freeze('could not be read at start')
     void this.races.ready()
@@ -225,10 +237,10 @@ export class LiveAchievements {
     const next = { ...this.follows.get() }
     if (!plan) delete next[character]
     else {
-      // The same steps keep their progress; another plan starts afresh.
+      // The same steps keep their progress; another plan keeps the step worked on where it is still in it.
       const key = (p: FollowedPlan) => JSON.stringify(p.steps.map((s) => [s.id, s.finish, s.lift, s.reach ?? []]))
       const same = had && key(had.plan) === key(plan)
-      next[character] = { plan, state: same ? had.state : freshFollow() }
+      next[character] = { plan, state: !had ? freshFollow() : same ? had.state : carryFollow(had.plan, had.state, plan) }
     }
     this.follows.set(next)
     if (character === this.character) {

@@ -282,12 +282,25 @@ export function PlanTab({ character, view }: { character: string; view: FactionV
   // too, and so does a change of con: a race or class change, a race unlocked. The plan sees a quest open as a standing reaches
   // what its NPC wants; without the races' modifiers, the quests open now are what it goes by.
   const cons = data?.raceMods
-    ? `${data.raceMods.own}|${(data.races ?? ['every race']).join(',')}|${Object.values(data.raceMods.mods[data.raceMods.own] ?? {}).reduce((n, v) => n + v, 0)}`
+    ? `${data.raceMods.own}|${(data.races ?? ['every race']).join(',')}|${JSON.stringify(data.raceMods.mods[data.raceMods.own] ?? {})}`
     : data
       ? data.catalog.activities.flatMap((a) => (a.blocked ? [a.id] : [])).join('|')
       : ''
   const unlocksKey = extras.unlocks.map((g) => `${g.achievement}:${g.factions.join(',')}`).join('|')
-  const structure = JSON.stringify([openSet, deferredSettings, deferredChoices, afresh, data?.catalog.activities.length ?? 0, cons, unlocksKey])
+  // Which ways there are, not how many: one page read may add a camp as another drops one. The kill
+  // pace read from the log moves with every kill, so only a pace the player set searches again.
+  const ways = useMemo(
+    () =>
+      data
+        ? data.catalog.activities
+            .map((a) => a.id)
+            .sort()
+            .join('|')
+        : '',
+    [data]
+  )
+  const keySettings = stored.killsPerHour === undefined ? { ...deferredSettings, killsPerHour: 0 } : deferredSettings
+  const structure = JSON.stringify([openSet, keySettings, deferredChoices, afresh, ways, cons, unlocksKey])
   const keptShape = useRef<{ key: string; shape: PlanShape } | null>(null)
   const plan = useMemo(() => {
     if (!data || !todo) return null
