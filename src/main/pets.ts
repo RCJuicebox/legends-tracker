@@ -1,4 +1,5 @@
 import { app } from 'electron'
+import { writeFileAtomic } from './storeCore'
 import { promises as fs } from 'node:fs'
 import { join } from 'node:path'
 import { parseLogLine } from '../core/logLine'
@@ -125,10 +126,8 @@ export class PetStore {
     const summon = next.summon && (!cur.summon || next.summon.at >= cur.summon.at) ? next.summon : cur.summon
     if (gear === cur.gear && summon === cur.summon && !save) return false
     d[character] = { ...cur, gear, summon }
-    const tmp = this.path + '.tmp'
     try {
-      await fs.writeFile(tmp, JSON.stringify(d, null, 2))
-      await fs.rename(tmp, this.path)
+      await writeFileAtomic(this.path, JSON.stringify(d, null, 2))
     } catch (e) {
       log.warn('Could not save pets.json:', e)
     }
@@ -161,10 +160,8 @@ export class PetWiki {
   }
 
   private async save(): Promise<void> {
-    const tmp = this.path + '.tmp'
     try {
-      await fs.writeFile(tmp, JSON.stringify(this.cache))
-      await fs.rename(tmp, this.path)
+      await writeFileAtomic(this.path, JSON.stringify(this.cache))
     } catch (e) {
       log.warn('Could not save pet-wiki.json:', e)
     }

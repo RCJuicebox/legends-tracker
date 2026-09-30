@@ -1,4 +1,5 @@
 import { createReadStream, promises as fs } from 'node:fs'
+import { writeFileAtomic } from '../storeCore'
 import { join } from 'node:path'
 import type { Readable } from 'node:stream'
 import { decodeCp1252, parseLogLine, type LogLine } from '../../core/logLine'
@@ -271,10 +272,8 @@ export class LogHistory {
     this.dirty = false
     const started = performance.now()
     const text = JSON.stringify(this.cache)
-    const tmp = this.cacheFile + '.tmp'
     try {
-      await fs.writeFile(tmp, text, 'utf8')
-      await fs.rename(tmp, this.cacheFile)
+      await writeFileAtomic(this.cacheFile, text)
     } catch (e) {
       this.dirty = true
       log.warn(`Could not save the log history cache ${this.cacheFile}:`, e)

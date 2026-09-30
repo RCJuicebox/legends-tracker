@@ -1,4 +1,5 @@
 import { app, safeStorage } from 'electron'
+import { writeFileAtomic } from './storeCore'
 import { createHash } from 'node:crypto'
 import { promises as fs } from 'node:fs'
 import { join } from 'node:path'
@@ -82,9 +83,7 @@ export class AzureSpeech {
       voices: this.voices,
       voicesAt: this.voicesAt
     }
-    const tmp = this.file + '.tmp'
-    await fs.writeFile(tmp, JSON.stringify(stored), 'utf8')
-    await fs.rename(tmp, this.file)
+    await writeFileAtomic(this.file, JSON.stringify(stored))
   }
 
   /** A new key and region, checked by asking for the voice list; '' as the key forgets them. */

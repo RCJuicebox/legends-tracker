@@ -1,4 +1,5 @@
 import { promises as fs } from 'node:fs'
+import { writeFileAtomic } from './storeCore'
 import { join } from 'node:path'
 import { parseCrafted, parseSkillPage, recipeIndex } from '../core/tradeskills'
 import { field } from '../core/wikiItem'
@@ -127,8 +128,7 @@ export class RecipeBook {
       const recipes = recipeIndex([fromPages, fromTable]) as BookRecipe[]
       await this.ingredientEras(recipes, eras)
       const file: RecipeFile = { fetchedAt: Date.now(), format: FORMAT, recipes, eras }
-      await fs.writeFile(this.path + '.tmp', JSON.stringify(file), 'utf8')
-      await fs.rename(this.path + '.tmp', this.path)
+      await writeFileAtomic(this.path, JSON.stringify(file))
       this.file = file
       this.report({ busy: false })
       return file

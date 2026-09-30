@@ -1,4 +1,5 @@
 import { promises as fs } from 'node:fs'
+import { writeFileAtomic } from './storeCore'
 import { join } from 'node:path'
 import { baseName, itemKey } from '../core/inventory'
 import { parseItemUse, statsblockOf } from '../core/wikiItem'
@@ -40,7 +41,7 @@ export class ItemCatalog {
 
   private async save(): Promise<void> {
     await this.saving
-    this.saving = fs.writeFile(this.path + '.tmp', JSON.stringify(this.cache), 'utf8').then(() => fs.rename(this.path + '.tmp', this.path))
+    this.saving = writeFileAtomic(this.path, JSON.stringify(this.cache))
     await this.saving
   }
 

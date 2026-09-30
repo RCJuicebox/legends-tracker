@@ -1,4 +1,5 @@
 import { promises as fs } from 'node:fs'
+import { writeFileAtomic } from './storeCore'
 import { join } from 'node:path'
 import { CATALOG_FORMAT, parseItemPage, type CatalogItem } from '../core/wikiItem'
 import { parseEraStatus } from '../core/upgrades'
@@ -106,8 +107,7 @@ export class WikiCatalog {
       const old = await this.stored()
       const file = (old?.revs && (old.format ?? 1) >= FORMAT ? await this.update(old, job.signal) : null) ?? (await this.whole(job.signal))
       file.eraStatus = (await this.eraStatus()) ?? old?.eraStatus
-      await fs.writeFile(this.path + '.tmp', JSON.stringify(file), 'utf8')
-      await fs.rename(this.path + '.tmp', this.path)
+      await writeFileAtomic(this.path, JSON.stringify(file))
       this.hold(file)
       this.forgetLater()
       this.report({ busy: false })

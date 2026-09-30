@@ -1,4 +1,5 @@
 import { promises as fs } from 'node:fs'
+import { writeFileAtomic } from './storeCore'
 import { join } from 'node:path'
 import { parseInventory, type Inventory } from '../core/inventory'
 import type { ItemCatalog } from './items'
@@ -111,8 +112,7 @@ export class InventoryFiles {
     if (!sheet || typeof sheet !== 'object' || Array.isArray(sheet)) throw new Error('The character sheet is not in the expected form.')
     const path = this.sheetPath(character)
     await fs.mkdir(join(path, '..'), { recursive: true })
-    await fs.writeFile(path + '.tmp', JSON.stringify(sheet, null, 2), 'utf8')
-    await fs.rename(path + '.tmp', path)
+    await writeFileAtomic(path, JSON.stringify(sheet, null, 2))
   }
 
   stop(): void {

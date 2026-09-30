@@ -1,4 +1,5 @@
 import { promises as fs } from 'node:fs'
+import { writeFileAtomic } from './storeCore'
 import { log } from './log'
 import { sanitizeTradeSaved } from '../core/validate'
 import type { TradeFavorite, TradeSaved } from '../shared/ipc'
@@ -30,9 +31,7 @@ export class TradeFavorites {
     const clean = sanitizeTradeSaved(input)
     if (!clean) throw new Error('The favourites were not saved: they were not in the expected form.')
     this.data = clean
-    const tmp = this.path + '.tmp'
-    await fs.writeFile(tmp, JSON.stringify(clean, null, 2), 'utf8')
-    await fs.rename(tmp, this.path)
+    await writeFileAtomic(this.path, JSON.stringify(clean, null, 2))
     return clean
   }
 }

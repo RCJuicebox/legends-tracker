@@ -1,4 +1,5 @@
 import { promises as fs } from 'node:fs'
+import { writeFileAtomic } from './storeCore'
 import { join } from 'node:path'
 import { wikiRace } from '../core/slayer'
 import { wiki } from './sources/wiki'
@@ -78,9 +79,7 @@ export class NpcRaces {
           const page = pages.get(pageTitle(byKey.get(k) ?? k))
           file.races[k] = { race: page ? wikiRace(page.content) : null, at: now }
         }
-        const tmp = this.path + '.tmp'
-        await fs.writeFile(tmp, JSON.stringify(file))
-        await fs.rename(tmp, this.path)
+        await writeFileAtomic(this.path, JSON.stringify(file))
         return true
       } catch (e) {
         this.failedAt = now

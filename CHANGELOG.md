@@ -78,6 +78,7 @@ What changed in each version. The release workflow publishes a version's section
 - **Starting to watch after a raid no longer stutters.** The recent fights read back at start (Settings' history minutes) went a half megabyte of log at a time between breaks, up to 75 ms each, over as much as 150 MB for a raid's hour. They now go 64 KB at a time. A read that would take more than 24 MB takes only the last 24 MB of it, a raid's last ten minutes or so. Live lines held back meanwhile are capped, and the read stops rather than holding more.
 - **The meter sends less while you fight.** Every window got the whole session twice a second, which in a raid is megabytes a push. Now it gets the fight in hand and the totals. A page showing the session fetches it every two seconds while it changes.
 - **The spell data loads faster and takes half the memory.** The game's spell file carries live EverQuest's spells up to level 130. The 32,000 that no class gets by level 50 are now left out when it is read, since nobody in Legends can cast them: about 250 ms at start rather than 340, and 23 MB kept rather than 42.
+- **Every file the app keeps is saved the careful way.** Pets, tradeskill favourites, achievement ticks, character sheets, the Azure settings and every wiki cache were saved without trying again, so a virus scanner or backup tool holding one lost the save. They are now tried again for a few seconds, as the settings always were. "Your data" in the README lists the five files it had left out.
 
 ## 2.4.0 (2026-09-29)
 

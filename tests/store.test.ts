@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { DEFAULT_OVERLAYS, JsonFile, characterKey, characterName, defaultSettings, mergeDefaults, readJsonFile, retrySchedule } from '../src/main/storeCore'
+import { DEFAULT_OVERLAYS, JsonFile, characterKey, characterName, defaultSettings, mergeDefaults, readJsonFile, retrySchedule, writeFileAtomic } from '../src/main/storeCore'
 import { upgrade } from '../src/main/schema'
 
 describe('merging saved settings over the defaults', () => {
@@ -155,6 +155,19 @@ describe('the settings files on disk', () => {
     mkdirSync(join(dir, 'missing-folder'))
     await f.flush()
     expect(JSON.parse(readFileSync(path, 'utf8'))).toEqual({ n: 2 })
+  })
+
+  it('writes a side file whole, trying again while it cannot, then says why', async () => {
+    const path = join(dir, 'later', 'side.json')
+    const { mkdirSync } = await import('node:fs')
+    // The folder turns up during the tries: as when a scanner lets go of the file.
+    setTimeout(() => mkdirSync(join(dir, 'later')), 0)
+    Object.assign(retrySchedule, { writeMs: [20, 20, 20] })
+    await writeFileAtomic(path, '{"n":3}')
+    expect(readFileSync(path, 'utf8')).toBe('{"n":3}')
+    expect(existsSync(path + '.tmp')).toBe(false)
+    // Never there: the last error, once the tries run out.
+    await expect(writeFileAtomic(join(dir, 'never', 'side.json'), '{}')).rejects.toThrow(/ENOENT/)
   })
 })
 

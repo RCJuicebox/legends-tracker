@@ -200,24 +200,32 @@ export class JsonFile<T> {
     if (!this.dirty) return
     this.dirty = false
     if (this.frozen) return
-    const text = this.pretty ? JSON.stringify(this.value, null, 2) : JSON.stringify(this.value)
-    const tmp = this.path + '.tmp'
-    for (let attempt = 0; ; attempt++) {
-      try {
-        await fs.writeFile(tmp, text, 'utf8')
-        await fs.rename(tmp, this.path)
-        return
-      } catch (e) {
-        if (attempt < retrySchedule.writeMs.length) {
-          log.warn(`Could not save ${this.path}; trying again`, e)
-          await pause(retrySchedule.writeMs[attempt])
-          continue
-        }
-        log.error(`Could not save ${this.path}`, e)
-        // Try again at the next change or flush.
-        this.dirty = true
-        return
-      }
+    try {
+      await writeFileAtomic(this.path, this.pretty ? JSON.stringify(this.value, null, 2) : JSON.stringify(this.value))
+    } catch (e) {
+      log.error(`Could not save ${this.path}`, e)
+      // Try again at the next change or flush.
+      this.dirty = true
+    }
+  }
+}
+
+/**
+ * Writes a file whole or not at all: to `<path>.tmp`, then renamed over it, tried again on the
+ * retry schedule while another program (a virus scanner, a backup tool) holds either. Throws the last
+ * error once the tries run out. Every file the app keeps is written this way, through JsonFile or not.
+ */
+export async function writeFileAtomic(path: string, text: string): Promise<void> {
+  const tmp = path + '.tmp'
+  for (let attempt = 0; ; attempt++) {
+    try {
+      await fs.writeFile(tmp, text, 'utf8')
+      await fs.rename(tmp, path)
+      return
+    } catch (e) {
+      if (attempt >= retrySchedule.writeMs.length) throw e
+      log.warn(`Could not save ${path}; trying again`, e)
+      await pause(retrySchedule.writeMs[attempt])
     }
   }
 }

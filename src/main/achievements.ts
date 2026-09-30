@@ -1,4 +1,5 @@
 import { promises as fs } from 'node:fs'
+import { writeFileAtomic } from './storeCore'
 import { join } from 'node:path'
 import { parseAchievements, type AchMarks } from '../core/achievements'
 import type { AchievementsView } from '../shared/types'
@@ -53,8 +54,7 @@ export class AchievementFiles {
     if (!marks || !ok(marks.ticks) || !ok(marks.broken) || (marks.tracked !== undefined && !ok(marks.tracked))) throw new Error('Achievement marks are not in the expected form.')
     await fs.mkdir(this.marksDir, { recursive: true })
     const path = join(this.marksDir, `${character}.json`)
-    await fs.writeFile(path + '.tmp', JSON.stringify(marks, null, 2), 'utf8')
-    await fs.rename(path + '.tmp', path)
+    await writeFileAtomic(path, JSON.stringify(marks, null, 2))
   }
 
   /** The export and marks for a character, and starts watching that export for a new one. */

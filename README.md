@@ -812,6 +812,7 @@ The settings folder, `%APPDATA%\Legends Tracker` (or the `EQL_USER_DATA` folder)
 | `window.json` | Where the main window was, whether it was maximised, and whether the tray notice was shown |
 | `pets.json` | Per character, the newest pet gear list (`/pet inventory check`) and summoning cast the log showed, and how far back it was read |
 | `tradeskills.json` | Starred recipes, the combines planned of each, and prices typed in |
+| `faction-follow.json` | Per character, the faction plan the achievements overlay follows: its steps, the step you are on, and what is done |
 | `azure-speech.json` | The Azure region, the key encrypted with Windows' data protection, and the voice list |
 | `app-icon.ico` | Running from source only: the icon for the "Legends Tracker (source)" Start menu shortcut |
 | `catchup.json` | How far into which log mote tracking had read when the app closed, so the next start carries on from there |
@@ -822,7 +823,9 @@ The settings folder, `%APPDATA%\Legends Tracker` (or the `EQL_USER_DATA` folder)
 
 `casts.json`, `motes.json`, `respawns.json` and `buffs.json` change with nearly every line, so they
 are written at most every 15 seconds; `mote-stock.json` waits 3 seconds. A file that will not parse
-is moved aside as `<file>.corrupt-<time>.json` and started afresh.
+is moved aside as `<file>.corrupt-<time>.json` and started afresh. Every file is written whole or not
+at all (to a `.tmp` file, then renamed over it), and tried again for a few seconds while another
+program, a virus scanner or a backup tool, holds it.
 
 The cache folder, `%LOCALAPPDATA%\Legends Tracker` (or `<EQL_USER_DATA>\local`), kept out of the
 roaming profile:
@@ -833,6 +836,10 @@ roaming profile:
 | `item-cache.json` | eqlwiki pages for the items you wear and look at (Gear, Loot, Tradeskills), kept a week |
 | `tradeskill-recipes.json` | Every player-crafted recipe on eqlwiki, with the era of each product and ingredient; refreshed at most weekly |
 | `pet-wiki.json` | eqlwiki's pet summon pages and Pet Guide, for the Pet tab |
+| `npc-races.json` | The race each mob's eqlwiki page gives, for the Slayer counts of mobs whose names do not say; kept, and a name with no page asked again after a day |
+| `faction-wiki.json` | What raises each faction, from its eqlwiki page, for the Factions page; kept a week |
+| `faction-book.json` | Every eqlwiki faction page and the quest pages they name, read into ways to raise each faction, for the Plan tab; kept a week |
+| `faction-alla.json` | Allakhazam's faction pages (the cons quests want, kill amounts), read one every 20 seconds; kept a month |
 | `log-history.json` | Casts, melee, purchases and AAs bought counted over each character's log and archives, for Gear, Spell upgrades, Tradeskills and Stats › AAs; only what a log gains is read again |
 | `speech-cache\` | Azure phrases as WAV files, the newest 4,000 |
 

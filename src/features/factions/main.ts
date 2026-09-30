@@ -40,6 +40,7 @@ import { PLAYABLE_RACES, playableRace } from '../../shared/game/races'
 import { itemKey, parseInventory } from '../../core/inventory'
 import { unitPrice } from '../../core/tradeskills'
 import { handle } from '../../main/ipc/handle'
+import { writeFileAtomic } from '../../main/storeCore'
 import { isCharacterKey } from '../../core/validate'
 import { sources } from '../../main/sources/registry'
 import { wiki } from '../../main/sources/wiki'
@@ -431,10 +432,8 @@ export class FactionWiki {
   }
 
   private async save(): Promise<void> {
-    const tmp = this.path + '.tmp'
     try {
-      await fs.writeFile(tmp, JSON.stringify(this.cache))
-      await fs.rename(tmp, this.path)
+      await writeFileAtomic(this.path, JSON.stringify(this.cache))
     } catch (e) {
       log.warn('Could not save faction-wiki.json:', e)
     }
@@ -545,9 +544,7 @@ export class FactionBook {
       this.reading ??= this.read().finally(() => (this.reading = null))
       const book = await this.reading
       this.book = book
-      const tmp = this.path + '.tmp'
-      await fs.writeFile(tmp, JSON.stringify(book))
-      await fs.rename(tmp, this.path)
+      await writeFileAtomic(this.path, JSON.stringify(book))
       sources.ok('factionWiki', bookDetail(book))
       return { book, error: '' }
     } catch (e) {
