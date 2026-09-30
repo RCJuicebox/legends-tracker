@@ -6,7 +6,7 @@ import { useApp } from '../../renderer/src/state'
 import { useRemembered } from '../../renderer/src/remember'
 import { useCharacterRecord } from '../../renderer/src/character'
 import { useNow } from '../../renderer/src/components/TimerBars'
-import { GameCommand, Info, NumberInput, Pending, Segmented, Switch } from '../../renderer/src/components/ui'
+import { Disclosure, GameCommand, Info, NumberInput, Pending, Segmented, Switch } from '../../renderer/src/components/ui'
 import { duration, num1, who, wikiUrl } from '../../core/format'
 import { fmtCoin } from '../../core/loot'
 import { STANDING_MAX, standingBand, type FactionView } from './core'
@@ -699,9 +699,9 @@ export function PlanTab({ character, view }: { character: string; view: FactionV
                     <Fragment key={t.faction}>
                       <tr className={`clickable${isOpen ? ' selected' : ''}`} onClick={toggle}>
                         <td>
-                          <button className="link-button" aria-expanded={isOpen} onClick={(e) => (e.stopPropagation(), toggle())}>
+                          <Disclosure open={isOpen} onToggle={toggle} stop>
                             {t.achievement}
-                          </button>
+                          </Disclosure>
                           {t.achievement !== t.faction && <span className="faint small"> ({t.faction})</span>}
                           {lockedTo && (
                             <span
@@ -1188,9 +1188,9 @@ function Options({
         )
       })}
       {options.length > SHOWN && (
-        <button className="link-button small" onClick={() => setAll(!all)}>
+        <Disclosure className="small" open={all} onToggle={() => setAll(!all)}>
           {all ? 'Show fewer' : `Show all ${options.length}`}
-        </button>
+        </Disclosure>
       )}
     </div>
   )
