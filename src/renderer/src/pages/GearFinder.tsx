@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useRemembered } from '../remember'
 
 import { slotLabel } from '../../../core/inventory'
 import { DEFAULT_HIDDEN_ERAS, OTHER_ERA, OTHER_OUT_ERA } from '../../../core/upgrades'
@@ -50,6 +51,8 @@ export function GearFinder({ view, sheet, mode, onPlan }: { view: InventoryView;
     setJudge
   } = g.controls
   const [showWeights, setShowWeights] = useState(false)
+  // The settings under the first row fold to one line: they are set once and read past on every tab.
+  const [unfolded, setUnfolded] = useRemembered<boolean>('gear.settings', false)
   const state = catalog.state
   const refresh = catalog.refresh
 
@@ -113,8 +116,16 @@ export function GearFinder({ view, sheet, mode, onPlan }: { view: InventoryView;
               <input type="checkbox" checked={ratioFirst} onChange={(e) => setRatioFirst(e.target.checked)} />
               Weapons: best ratio first
             </label>
-            <button className="btn ghost small" aria-expanded={showWeights} onClick={() => setShowWeights(!showWeights)}>
-              {showWeights ? 'Hide weights' : 'Show weights'}
+            <button
+              className="btn ghost small"
+              aria-expanded={showWeights && unfolded}
+              onClick={() => {
+                // The weights are among the settings that fold away: showing them unfolds them.
+                setShowWeights(!(showWeights && unfolded))
+                if (!(showWeights && unfolded)) setUnfolded(true)
+              }}
+            >
+              {showWeights && unfolded ? 'Hide weights' : 'Show weights'}
             </button>
             <span className="grow" />
             {(mode === 'finder' || mode === 'optimize') && (
@@ -173,119 +184,152 @@ export function GearFinder({ view, sheet, mode, onPlan }: { view: InventoryView;
             )}
           </div>
         )}
-        {mode !== 'optimize' && (
-          <div className="row gap-8">
-            <b>Eras</b>
-            <Info
-              label="About the eras"
-              text={
-                <>
-                  <div>Each button shows or hides that era's items. Classic: {eraTip('Classic').replace(/^Everything/, 'everything')}.</div>
-                  <div>
-                    {OTHER_ERA}: {eraTip(OTHER_ERA)}.
-                  </div>
-                  <div>
-                    {OTHER_OUT_ERA}: {eraTip(OTHER_OUT_ERA)}.
-                  </div>
-                  <div>Every other era is out of era on EverQuest Legends.</div>
-                </>
-              }
-            />
-            {eraCounts.map(([era, n]) => {
-              const on = !hiddenEras.includes(era)
-              return (
-                <ToggleChip
-                  key={era}
-                  className="accent"
-                  on={on}
-                  title={eraTip(era)}
-                  onChange={() => setHiddenEras(on ? [...hiddenEras, era] : hiddenEras.filter((e) => e !== era))}
-                >
-                  {era} <small>{num(n)}</small>
-                </ToggleChip>
-              )
-            })}
-            <button className="btn ghost small" onClick={() => setHiddenEras(DEFAULT_HIDDEN_ERAS)}>
-              Live eras only
-            </button>
-          </div>
-        )}
-        {scoring && (
+        {unfolded ? (
           <>
             <div className="row small">
-              <b>AC soft cap</b>
-              <span className="lt-seg" role="group" aria-label="AC soft cap">
-                {(
-                  [
-                    ['auto', acState ? `Auto: ${acState.over ? 'over' : 'under'}` : 'Auto'],
-                    ['over', 'Over'],
-                    ['under', 'Under']
-                  ] as const
-                ).map(([m, label]) => (
-                  <button key={m} className={capMode === m ? 'on' : ''} aria-pressed={capMode === m} onClick={() => setCapMode(m)}>
-                    {label}
-                  </button>
-                ))}
-              </span>
-              <span className="muted">
-                {overCap ? `AC counts at ${AC_OVER_CAP * 100}% of its weight: past the soft cap most of it is lost.` : 'AC counts in full: you are under the soft cap.'}
-                {acState && capMode === 'auto' && ` Mitigation ${num(acState.mitigation)} against a soft cap of ${num(acState.cap)}, from ${acState.from}.`}
-              </span>
+              <span className="grow" />
+              <button className="btn ghost small" aria-expanded onClick={() => setUnfolded(false)}>
+                Fold these away
+              </button>
             </div>
-            <div className="row small">
-              <b>Primary</b>
-              <span className="lt-seg" role="group" aria-label="Primary">
-                {(
-                  [
-                    ['auto', `Auto: ${secondaryInUse ? 'one-handed' : 'any'}`],
-                    ['one', 'One-handed'],
-                    ['any', 'Include two-handed']
-                  ] as const
-                ).map(([m, label]) => (
-                  <button key={m} className={twoHandMode === m ? 'on' : ''} aria-pressed={twoHandMode === m} onClick={() => setTwoHandMode(m)}>
-                    {label}
-                  </button>
-                ))}
-              </span>
-              <span className="muted">{twoHanders ? 'Two-handed weapons are suggested for Primary.' : 'Two-handed weapons are left out: your secondary hand is in use.'}</span>
-            </div>
-            <FocusPoints points={points} setPoints={setPoints} wanted={wanted.size} lines={lines.length} />
-            <div className="small muted lt-worth">
-              <b>What a point is worth to you:</b> {conv.notes.join(' · ')}
-              {conv.offensePerStr ? ' · STR adds ⅔ Offense' : ''} · AGI adds {conv.avoidancePerAgi.toFixed(2)} avoidance · DEX only helps procs (it does not move crit on Legends)
-              {g.hands ? (
-                <span
-                  title={`Swings a round: ${g.hands.swings.main.toFixed(2)} main hand, ${g.hands.swings.off.toFixed(2)} off hand. Dual wield ${Math.round(g.hands.dual * 100)}% = (Dual Wield ${g.hands.dualWield} + level ${g.level}${g.hands.ambidexterity ? ` + Ambidexterity ${g.hands.ambidexterity}` : ''}) ÷ 375; the off hand doubles with Double Attack ${g.hands.doubleAttack}${g.hands.doubleAttack < 150 ? ' only from 150' : ''}. EQEmu's attack rounds, as on the Stats page, with your skills from the log.`}
-                >
-                  {' '}
-                  · the off hand swings {Math.round((g.hands.swings.off / g.hands.swings.main) * 100)}% as often as the main hand, so a weapon counts {g.hands.main.toFixed(2)}× in
-                  Primary and {g.hands.off.toFixed(2)}× in Secondary
-                </span>
-              ) : (
-                ' · weapons count alike in both hands (no Dual Wield skill in your log yet)'
-              )}
-            </div>
-            {showWeights && (
-              <div className="lt-weights">
-                {(Object.keys(ROLE_LABELS) as RoleKey[]).map((k) => (
-                  <label key={k} className="lt-weight">
-                    <span>{ROLE_LABELS[k]}</span>
-                    <input
-                      type="number"
-                      step={0.1}
-                      min={0}
-                      value={role[k]}
-                      title={k === 'ac' && overCap ? `Counts as ${Math.round(role.ac * AC_OVER_CAP * 100) / 100} while over the soft cap` : undefined}
-                      onChange={(e) => {
-                        setCustom({ ...role, [k]: Math.max(0, Number(e.target.value) || 0) })
-                        setPreset('Custom')
-                      }}
-                    />
-                  </label>
-                ))}
+            {mode !== 'optimize' && (
+              <div className="row gap-8">
+                <b>Eras</b>
+                <Info
+                  label="About the eras"
+                  text={
+                    <>
+                      <div>Each button shows or hides that era's items. Classic: {eraTip('Classic').replace(/^Everything/, 'everything')}.</div>
+                      <div>
+                        {OTHER_ERA}: {eraTip(OTHER_ERA)}.
+                      </div>
+                      <div>
+                        {OTHER_OUT_ERA}: {eraTip(OTHER_OUT_ERA)}.
+                      </div>
+                      <div>Every other era is out of era on EverQuest Legends.</div>
+                    </>
+                  }
+                />
+                {eraCounts.map(([era, n]) => {
+                  const on = !hiddenEras.includes(era)
+                  return (
+                    <ToggleChip
+                      key={era}
+                      className="accent"
+                      on={on}
+                      title={eraTip(era)}
+                      onChange={() => setHiddenEras(on ? [...hiddenEras, era] : hiddenEras.filter((e) => e !== era))}
+                    >
+                      {era} <small>{num(n)}</small>
+                    </ToggleChip>
+                  )
+                })}
+                <button className="btn ghost small" onClick={() => setHiddenEras(DEFAULT_HIDDEN_ERAS)}>
+                  Live eras only
+                </button>
               </div>
             )}
+            {scoring && (
+              <>
+                <div className="row small">
+                  <b>AC soft cap</b>
+                  <span className="lt-seg" role="group" aria-label="AC soft cap">
+                    {(
+                      [
+                        ['auto', acState ? `Auto: ${acState.over ? 'over' : 'under'}` : 'Auto'],
+                        ['over', 'Over'],
+                        ['under', 'Under']
+                      ] as const
+                    ).map(([m, label]) => (
+                      <button key={m} className={capMode === m ? 'on' : ''} aria-pressed={capMode === m} onClick={() => setCapMode(m)}>
+                        {label}
+                      </button>
+                    ))}
+                  </span>
+                  <span className="muted">
+                    {overCap ? `AC counts at ${AC_OVER_CAP * 100}% of its weight: past the soft cap most of it is lost.` : 'AC counts in full: you are under the soft cap.'}
+                    {acState && capMode === 'auto' && ` Mitigation ${num(acState.mitigation)} against a soft cap of ${num(acState.cap)}, from ${acState.from}.`}
+                  </span>
+                </div>
+                <div className="row small">
+                  <b>Primary</b>
+                  <span className="lt-seg" role="group" aria-label="Primary">
+                    {(
+                      [
+                        ['auto', `Auto: ${secondaryInUse ? 'one-handed' : 'any'}`],
+                        ['one', 'One-handed'],
+                        ['any', 'Include two-handed']
+                      ] as const
+                    ).map(([m, label]) => (
+                      <button key={m} className={twoHandMode === m ? 'on' : ''} aria-pressed={twoHandMode === m} onClick={() => setTwoHandMode(m)}>
+                        {label}
+                      </button>
+                    ))}
+                  </span>
+                  <span className="muted">{twoHanders ? 'Two-handed weapons are suggested for Primary.' : 'Two-handed weapons are left out: your secondary hand is in use.'}</span>
+                </div>
+                <FocusPoints points={points} setPoints={setPoints} wanted={wanted.size} lines={lines.length} />
+                <div className="small muted lt-worth">
+                  <b>What a point is worth to you:</b> {conv.notes.join(' · ')}
+                  {conv.offensePerStr ? ' · STR adds ⅔ Offense' : ''} · AGI adds {conv.avoidancePerAgi.toFixed(2)} avoidance · DEX only helps procs (it does not move crit on
+                  Legends)
+                  {g.hands ? (
+                    <span
+                      title={`Swings a round: ${g.hands.swings.main.toFixed(2)} main hand, ${g.hands.swings.off.toFixed(2)} off hand. Dual wield ${Math.round(g.hands.dual * 100)}% = (Dual Wield ${g.hands.dualWield} + level ${g.level}${g.hands.ambidexterity ? ` + Ambidexterity ${g.hands.ambidexterity}` : ''}) ÷ 375; the off hand doubles with Double Attack ${g.hands.doubleAttack}${g.hands.doubleAttack < 150 ? ' only from 150' : ''}. EQEmu's attack rounds, as on the Stats page, with your skills from the log.`}
+                    >
+                      {' '}
+                      · the off hand swings {Math.round((g.hands.swings.off / g.hands.swings.main) * 100)}% as often as the main hand, so a weapon counts {g.hands.main.toFixed(2)}×
+                      in Primary and {g.hands.off.toFixed(2)}× in Secondary
+                    </span>
+                  ) : (
+                    ' · weapons count alike in both hands (no Dual Wield skill in your log yet)'
+                  )}
+                </div>
+                {showWeights && (
+                  <div className="lt-weights">
+                    {(Object.keys(ROLE_LABELS) as RoleKey[]).map((k) => (
+                      <label key={k} className="lt-weight">
+                        <span>{ROLE_LABELS[k]}</span>
+                        <input
+                          type="number"
+                          step={0.1}
+                          min={0}
+                          value={role[k]}
+                          title={k === 'ac' && overCap ? `Counts as ${Math.round(role.ac * AC_OVER_CAP * 100) / 100} while over the soft cap` : undefined}
+                          onChange={(e) => {
+                            setCustom({ ...role, [k]: Math.max(0, Number(e.target.value) || 0) })
+                            setPreset('Custom')
+                          }}
+                        />
+                      </label>
+                    ))}
+                  </div>
+                )}
+              </>
+            )}
           </>
+        ) : (
+          <div className="row small muted">
+            <span>
+              {[
+                mode !== 'optimize' &&
+                  `Eras: ${
+                    eraCounts
+                      .filter(([e]) => !hiddenEras.includes(e))
+                      .map(([e]) => e)
+                      .join(', ') || 'none'
+                  }`,
+                scoring && (overCap ? `AC at ${AC_OVER_CAP * 100}%, over the soft cap` : 'AC in full, under the soft cap'),
+                scoring && (twoHanders ? 'two-handers in Primary' : 'one-handed Primary'),
+                scoring && `a 10% focus on every spell worth ${num(points)} points, ${wanted.size} of ${lines.length} focus lines wanted`
+              ]
+                .filter(Boolean)
+                .join(' · ')}
+            </span>
+            <button className="btn ghost small" aria-expanded={false} onClick={() => setUnfolded(true)}>
+              Change…
+            </button>
+          </div>
         )}
         <div className="row small muted gap-14">
           <span>
