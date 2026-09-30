@@ -88,6 +88,16 @@ describe('DoT tracking', () => {
     expect(h.feedItems).toContainEqual(['warn', 'Envenomed Bolt X resisted'])
   })
 
+  it('says nothing of a resist of a spell you did not cast: a proc', () => {
+    const h = harness()
+    h.feed(`
+      [Fri Sep 25 21:00:02 2026] Lord of Ire resisted your Blade Dance II!
+      [Fri Sep 25 21:00:10 2026] You begin casting Envenomed Bolt X.
+      [Fri Sep 25 21:00:30 2026] A ratman warrior resisted your Envenomed Bolt X!`)
+    // The second: the cast was twenty seconds before, long since landed or not.
+    expect(h.feedItems.filter(([k]) => k === 'warn')).toEqual([])
+  })
+
   it('drops a cast that is interrupted or resisted', () => {
     const h = harness()
     h.feed(`

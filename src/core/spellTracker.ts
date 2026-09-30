@@ -106,6 +106,8 @@ export function renderSpeech(template: string, spell: string, target: string): s
  */
 export class SpellTracker {
   private pending: PendingCast[] = []
+  /** The last spell you began casting, by both its names, and until when a resist can be of that cast. */
+  private lastCast: { names: string[]; until: number } | null = null
   private zone = ''
 
   constructor(
@@ -130,7 +132,7 @@ export class SpellTracker {
     let m = RE_CAST.exec(text)
     if (m) return this.onCast(m[1], now)
 
-    if ((m = RE_FAIL_NAMED.exec(text))) return this.dropPending(m[1])
+    if ((m = RE_FAIL_NAMED.exec(text))) return void this.dropPending(m[1])
     if (RE_FAIL.test(text)) return void this.pending.pop()
     if (text.startsWith('Your ')) {
       if ((m = RE_NO_HOLD_NAMED.exec(text))) return this.onNoHold(m[1])
@@ -138,8 +140,9 @@ export class SpellTracker {
     }
     const resisted = RE_RESIST.exec(text)?.[1] ?? (text.includes(' resisted your ') ? RE_RESISTED_YOUR.exec(text)?.[2] : undefined)
     if (resisted) {
-      this.dropPending(resisted)
-      this.hooks.feed('warn', `${resisted} resisted`)
+      // Said only of a spell you cast: a weapon's proc resisted is not worth a warning.
+      const cast = this.lastCast && now <= this.lastCast.until && this.lastCast.names.includes(resisted)
+      if (this.dropPending(resisted) || cast) this.hooks.feed('warn', `${resisted} resisted`)
       return
     }
     if (FAIL_PREFIXES.some((p) => text.startsWith(p))) return void this.pending.pop()
@@ -187,20 +190,23 @@ export class SpellTracker {
     const r = this.book.resolve(name)
     if (!r) return
     this.hooks.onCast?.(r, now)
+    this.lastCast = { names: [r.spell.name, r.rankedName], until: now + r.spell.castMs + CAST_SLACK_MS }
     const d = this.config.durationFor(r.spell, r.rank)
     if (d.ticks === 0 || d.permanent) return
     this.pending.push({ r, at: now, expires: now + r.spell.castMs + CAST_SLACK_MS, targets: new Set() })
     if (this.pending.length > MAX_PENDING) this.pending.shift()
   }
 
-  private dropPending(name: string): void {
+  /** Drops the latest pending cast of `name`; whether there was one. */
+  private dropPending(name: string): boolean {
     for (let i = this.pending.length - 1; i >= 0; i--) {
       const p = this.pending[i]
       if (p.r.spell.name === name || p.r.rankedName === name) {
         this.pending.splice(i, 1)
-        return
+        return true
       }
     }
+    return false
   }
 
   /**

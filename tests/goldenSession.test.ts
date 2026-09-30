@@ -62,6 +62,8 @@ beforeAll(async () => {
   await fs.mkdir(logs, { recursive: true })
   const logFile = join(logs, 'eqlog_Kelwyn_neriak.txt')
   await fs.writeFile(logFile, shifted(), 'latin1')
+  // The test spell files, so the spell tracker knows the spells cast.
+  for (const f of ['spells_us.txt', 'spells_us_str.txt']) await fs.copyFile(join(__dirname, 'fixtures', f), join(dir, 'game', f))
   const settings = defaultSettings()
   const store = {
     settings: cell({ ...settings, installDir: join(dir, 'game'), logFile, combat: { ...settings.combat, historyMinutes: 30 } }),
@@ -106,6 +108,7 @@ beforeAll(async () => {
     },
     env
   )
+  await engine.loadSpells()
   await engine.startWatching()
   await waitFor(() => engine.meter.reading === '')
   await engine.rebuildMoteHistory()
@@ -142,6 +145,16 @@ describe('twenty minutes of real play, read by the Engine', () => {
   it('respawns: the mobs killed, and the gaps seen', () => {
     const rows = engine.combat.respawnView().rows.map((r) => `${r.zone} / ${r.name}: ${r.kills} kills, gaps ${r.gaps.join(' ') || '-'}${r.shared ? ', shared name' : ''}`)
     expect(rows.sort()).toMatchSnapshot()
+  })
+
+  it('spell timers: what the tracker made of the twenty minutes, timer by timer', () => {
+    const before = engine.feed.length
+    engine.simulate(readFileSync(join(__dirname, 'fixtures', 'golden-session.txt'), 'utf8'))
+    // Each timer started (with its window), faded, overwritten or resisted, counted.
+    const said = new Map<string, number>()
+    for (const f of engine.feed.slice(before))
+      if (f.kind === 'timer' || f.kind === 'fade' || f.kind === 'warn') said.set(`${f.kind}: ${f.text}`, (said.get(`${f.kind}: ${f.text}`) ?? 0) + 1)
+    expect([...said].map(([t, n]) => (n > 1 ? `${t} ×${n}` : t)).sort()).toMatchSnapshot()
   })
 
   it('motes: the run and what it gave', () => {

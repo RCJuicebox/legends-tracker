@@ -77,6 +77,7 @@ async function outcome(fn: () => unknown, ms = 2000): Promise<'ok' | 'error' | '
   }
 }
 const HUNG = Symbol('hung')
+const SCREEN_READS = new Set(['stats:readScreen', 'stock:readScreen'])
 
 beforeAll(async () => {
   h.dir = mkdtempSync(join(tmpdir(), 'lt-ipc-'))
@@ -131,9 +132,13 @@ describe('the invoke handlers', () => {
   })
 
   it('answers every channel, whatever it is sent: refusing is fine, hanging or crashing is not', async () => {
+    // Each refusal is logged with its stack; hundreds of them written out would be most of the time taken.
+    const quiet = [vi.spyOn(console, 'error').mockImplementation(() => {}), vi.spyOn(console, 'log').mockImplementation(() => {})]
     const bad: string[] = []
     let refused = 0
     for (const [channel, fn] of h.handlers) {
+      // These two read the screen with Windows OCR in a PowerShell of their own, and take no arguments.
+      if (SCREEN_READS.has(channel)) continue
       for (const args of BAD_ARGS) {
         const r = await outcome(() => fn(OWN, ...args))
         if (r === 'error') refused++
@@ -145,5 +150,6 @@ describe('the invoke handlers', () => {
     expect(refused).toBeGreaterThan(h.handlers.size)
     // Nothing a page sent got onto every object.
     expect(({} as { polluted?: boolean }).polluted).toBeUndefined()
+    quiet.forEach((q) => q.mockRestore())
   }, 120_000)
 })
