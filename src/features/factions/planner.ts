@@ -1458,6 +1458,13 @@ export interface PlanOption extends Way {
 }
 
 /**
+ * Why the plan leaves an achievement undone: nothing known raises it; only quests done once do (a lock
+ * plans one); every way is ruled out; every way's NPC wants a con the plan cannot get to, as the
+ * character's race or one it can swap to; or the ways it may use do not get it to 2000.
+ */
+export type Unplanned = 'nothing known' | 'once only' | 'ruled out' | 'gated' | 'not reached'
+
+/**
  * A plan's order: each block's activity, the achievements it is there to finish, the factions it is
  * there to bring back to 0 or above, and those it is there to raise to what another activity's NPC wants.
  */
@@ -1470,6 +1477,8 @@ export interface FactionPlan {
   targets: PlanTarget[]
   /** Of those, what the plan does not get done: nothing it may use raises them (with the choices made), or opens a way that does. */
   unplanned: string[]
+  /** Why, for each of them. */
+  unplannedWhy: Record<string, Unplanned>
   /** Every way to raise each achievement still open, quickest first. */
   options: Record<string, PlanOption[]>
   /** Locks whose activity no longer raises the achievement, or is gone. */
@@ -2455,6 +2464,22 @@ export function planFactions(input: PlanInput, settings: PlanSettings, choices: 
   const seconds = steps.reduce((n, step) => n + step.seconds, 0)
   // What nothing the planner may use gets done, as the plan stands.
   const unplanned = targets.filter((_, i) => start[i] < STANDING_MAX && !st.done[i]).map((t) => t.faction)
+  const unplannedWhy: Record<string, Unplanned> = {}
+  targets.forEach((t, i) => {
+    if (start[i] >= STANDING_MAX || st.done[i]) return
+    const ways = activities.filter((a) => (a.hits[t.faction] ?? 0) > 0)
+    const usable = ways.filter((a) => lockedIds.has(a.id) || (!a.once && !choices.excluded.includes(a.id)))
+    const opens = acts.some((x, k) => mayOpen[k] && credits(k, i) && x.touch.some((u) => u.i === i && u.h > 0))
+    unplannedWhy[t.faction] = !ways.length
+      ? 'nothing known'
+      : !usable.length
+        ? ways.some((a) => choices.excluded.includes(a.id))
+          ? 'ruled out'
+          : 'once only'
+        : opens
+          ? 'not reached'
+          : 'gated'
+  })
   let maxedLost = 0
   let belowNow = 0
   let belowAfter = 0
@@ -2496,7 +2521,7 @@ export function planFactions(input: PlanInput, settings: PlanSettings, choices: 
   // Ways the planner may use first, quickest first; one-time and ruled-out ones after.
   const later = (o: PlanOption) => (plannable(o.activity, choices, settings.raceSwaps) ? 0 : 1)
   for (const list of Object.values(options)) list.sort((p, q) => later(p) - later(q) || p.seconds - q.seconds)
-  return { steps, seconds, targets, unplanned, options, staleLocks, maxedLost, belowZero: { now: belowNow, after: belowAfter }, shape, kept }
+  return { steps, seconds, targets, unplanned, unplannedWhy, options, staleLocks, maxedLost, belowZero: { now: belowNow, after: belowAfter }, shape, kept }
 }
 
 /** A way to raise a faction by `h` a unit from `standing` to 2000: what the character holds goes first, as in the plan. */

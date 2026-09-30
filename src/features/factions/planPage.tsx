@@ -30,7 +30,8 @@ import {
   type PlanChoices,
   type PlanOption,
   type PlanSettings,
-  type PlanStep
+  type PlanStep,
+  type Unplanned
 } from './planner'
 import { unlockGoals, type RaceUnlock } from './unlocks'
 import { followedPlan } from './tracker'
@@ -543,7 +544,7 @@ export function PlanTab({ character, view }: { character: string; view: FactionV
           <div className="stat">
             <span className="label">Not planned</span>
             <span className="value">{plan?.unplanned.length ?? 0}</span>
-            <span className="sub">{plan?.unplanned.length ? 'nothing repeatable known' : 'every one has a way'}</span>
+            <span className="sub">{plan?.unplanned.length ? unplannedSummary(plan) : 'every one has a way'}</span>
           </div>
           <div className="stat">
             <span className="label">Below zero at the end</span>
@@ -719,8 +720,8 @@ export function PlanTab({ character, view }: { character: string; view: FactionV
                               <span className="fp-num-inline">{step}</span> <Doing a={plan!.steps[step - 1].activity} />
                             </span>
                           ) : (
-                            <span className="chip warn" title="Nothing the planner may use raises it: open it for what there is">
-                              not planned
+                            <span className="chip warn" title={`${UNPLANNED[plan?.unplannedWhy[t.faction] ?? 'nothing known']}: open it for what there is`}>
+                              not planned{plan?.unplannedWhy[t.faction] ? ` · ${plan.unplannedWhy[t.faction]}` : ''}
                             </span>
                           )}
                         </td>
@@ -1207,6 +1208,25 @@ function planExtras(data: FactionPlanData | null): Pick<PlanInput, 'races'> & { 
 }
 
 /** What the race swaps do against the same plan without them: achievements only they open, or the time they save. */
+/** Why the plan leaves an achievement undone, said in full. */
+const UNPLANNED: Record<Unplanned, string> = {
+  'nothing known': 'Nothing known raises it: no kill or hand-in in your log, eqlwiki or Allakhazam',
+  'once only': 'Only quests done once raise it: lock one in to plan it',
+  'ruled out': 'Every way that raises it is ruled out, or done once: allow one again, or lock one in',
+  gated: 'Every way that raises it has an NPC wanting a con the plan cannot get you to, as your race or one you can swap to: lock one in to plan it anyway',
+  'not reached': 'The ways the plan may use do not get it to 2000'
+}
+
+/** The reasons the plan leaves achievements undone, counted: "2 gated, 1 nothing known". */
+function unplannedSummary(plan: FactionPlan): string {
+  const n = new Map<Unplanned, number>()
+  for (const f of plan.unplanned) {
+    const why = plan.unplannedWhy[f] ?? 'nothing known'
+    n.set(why, (n.get(why) ?? 0) + 1)
+  }
+  return [...n].map(([why, count]) => `${count} ${why}`).join(', ')
+}
+
 function savedBySwaps(plan: FactionPlan, without: { seconds: number; unplanned: number }): string {
   const opened = without.unplanned - plan.unplanned.length
   if (opened > 0) return `open ${opened} achievement${opened === 1 ? '' : 's'} nothing else plans`

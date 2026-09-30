@@ -1315,9 +1315,14 @@ describe('planFactions', () => {
     const plan = planFactions(input, S)
     expect(plan.steps).toEqual([])
     expect(plan.unplanned.sort()).toEqual(['A', 'B'])
+    expect(plan.unplannedWhy).toEqual({ A: 'once only', B: 'nothing known' })
     const locked = planFactions(input, S, { ...NO_CHOICES, locks: { A: 'boost' } })
     expect(locked.steps[0]).toMatchObject({ units: 1, finishes: ['A'] })
     expect(locked.unplanned).toEqual(['B'])
+    expect(locked.unplannedWhy).toEqual({ B: 'nothing known' })
+    // Ruled out: said so, not "nothing known".
+    const again = { ...input, activities: [...input.activities, act('camp', { A: 5 }, 60)] }
+    expect(planFactions(again, S, { ...NO_CHOICES, excluded: ['camp'] }).unplannedWhy.A).toBe('ruled out')
   })
 
   it('hands in what the character holds first, at the hand-in pace', () => {
@@ -1438,7 +1443,9 @@ describe('what quests want, race unlocks, and steps that open a way', () => {
     expect(classSwapOf(plan.steps[0].race!)).toBe('Bard')
     expect(classSwapOf('Dark Elf')).toBeNull()
     // Without the swap nothing opens it.
-    expect(planFactions(input, { ...S, raceSwaps: false }).unplanned).toEqual([SW])
+    const closed = planFactions(input, { ...S, raceSwaps: false })
+    expect(closed.unplanned).toEqual([SW])
+    expect(closed.unplannedWhy).toEqual({ [SW]: 'gated' })
   })
 
   it('counts a race unlock: its factions are to do too, and once it is done the plan may swap to that race', () => {
