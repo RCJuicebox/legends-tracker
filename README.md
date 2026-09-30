@@ -143,7 +143,9 @@ read into it: your melee, spells, DoT ticks and damage shields, your pet's, your
 fighting near you, and everything hitting your side.
 
 - **Fights and sessions.** A fight opens on the first blow between your side and an enemy and
-  closes when the last enemy it engaged dies, or after ten seconds without a blow (Settings). It is
+  closes when the last enemy it engaged dies, or after ten seconds without a blow (Settings). The log
+  names two of a kind alike, so a blow from or to another of that name in the next four seconds takes
+  the fight up again: two haunted chests fought at once are one fight with two kills. It is
   named after the mob that took the most ("a fetid fiend +2"). A session is everything since you
   entered the zone, or pressed **New session**; the Session figures read from it. Both are picked
   from the same list, newest first, and the meter keeps showing the last fight until the next
@@ -385,8 +387,8 @@ The **Achievements** overlay (hidden until you switch it on, here, on Factions â
 Achievements page) shows the achievements you track (the star on the Achievements page), then the step of the faction plan you follow, counting down as your factions move (what it still wants,
 about how long, and the next step), the Slayer achievements your kills of the last half hour
 counted toward, and the skills your skill achievements want that went up in that time. A step done is said aloud with the next, and each achievement it finishes flashes on
-the alerts overlay (**Say when a faction plan step is done**). It draws nothing when there is nothing
-to show.
+the alerts overlay (**Say when a faction plan step is done**). With nothing to show, it says so in
+one faint line.
 
 ## Motes
 

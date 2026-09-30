@@ -343,6 +343,46 @@ describe('CombatMeter', () => {
     expect(m.fights[0].name).toBe('A scareling +1')
   })
 
+  it('takes a fight up again when another of the same name fights on after the first dies', () => {
+    const { m, feed } = meter()
+    // Two ratman warriors: the log names them alike, so the first death closes the fight...
+    feed(`
+      [Thu Sep 24 20:00:05 2026] You punch a ratman warrior for 100 points of damage.
+      [Thu Sep 24 20:00:06 2026] A ratman warrior hits YOU for 40 points of damage.
+      [Thu Sep 24 20:00:07 2026] You have slain a ratman warrior!
+      [Thu Sep 24 20:00:07 2026] You punch a ratman warrior for 20 points of damage.`)
+    // ...a line in the death's own second may be printed after it, and is not taken for the second...
+    expect(m.liveFight).toBeNull()
+    expect(m.fights).toHaveLength(1)
+    // ...but the second one hitting you after it is, and the fight goes on to its death.
+    feed(`
+      [Thu Sep 24 20:00:09 2026] A ratman warrior hits YOU for 35 points of damage.
+      [Thu Sep 24 20:00:10 2026] You punch a ratman warrior for 90 points of damage.
+      [Thu Sep 24 20:00:12 2026] You have slain a ratman warrior!`)
+    expect(m.fights).toHaveLength(1)
+    expect(m.liveFight).toBeNull()
+    expect(m.fights[0]).toMatchObject({ kills: 2, open: false, endedAt: at('Thu Sep 24 20:00:12 2026') })
+    expect(m.fights[0].entities['you'].out.total).toBe(210)
+  })
+
+  it('leaves a fight closed for a new pull of the same name, or another name, or after a few seconds', () => {
+    const kill = `
+      [Thu Sep 24 20:00:05 2026] You punch a ratman warrior for 100 points of damage.
+      [Thu Sep 24 20:00:07 2026] You have slain a ratman warrior!`
+    // Too late: a new pull.
+    let { m, feed } = meter()
+    feed(`${kill}
+      [Thu Sep 24 20:00:12 2026] You punch a ratman warrior for 100 points of damage.`)
+    expect(m.fights).toHaveLength(2)
+    // Another name first: the fight is over for good, and the same name after is another fight.
+    ;({ m, feed } = meter())
+    feed(`${kill}
+      [Thu Sep 24 20:00:08 2026] You punch a scareling for 50 points of damage.
+      [Thu Sep 24 20:00:09 2026] You punch a ratman warrior for 100 points of damage.`)
+    expect(m.fights.map((f) => f.name || 'live')).toEqual(['A ratman warrior', 'live'])
+    expect(m.fights[1].enemies).toEqual({ 'a scareling': true, 'a ratman warrior': true })
+  })
+
   it('places a stranger by whom they hit, and a named mob by whom it hits', () => {
     const { m, feed } = meter()
     feed(`

@@ -1,7 +1,7 @@
 import { clock, num } from '../../core/format'
 import { createReadStream } from 'node:fs'
 import { zoneEntered, type LogLine } from '../../core/logLine'
-import { CombatMeter, summarize as summarizeFight } from '../../core/combatMeter'
+import { CombatMeter, SAME_NAME_MS, summarize as summarizeFight } from '../../core/combatMeter'
 import { LootLedger } from '../../core/loot'
 import { RespawnLog, respawnView, type RespawnView } from '../../core/respawns'
 import { durationSec } from '../../core/combatView'
@@ -67,10 +67,15 @@ export class CombatFeed {
     this.meter = new CombatMeter(this.meterConfig(), {
       onChange: () => this.combatOut.mark(),
       onFightEnd: (f) => {
-        // Fights read from history are not news.
+        // Fights read from history are not news. Said once it is over for good: another of the same
+        // name may take it up again for a few seconds (SAME_NAME_MS), and it is said at its real end.
         if (this.backlog.active || !f.mine) return
-        const sum = summarizeFight(f)
-        this.notifier.pushFeed('fight', `${sum.name} · ${clock(durationSec(f))} · ${num(sum.dps)} DPS (yours ${num(sum.yours / durationSec(f))})`)
+        setTimeout(() => {
+          if (f.open || this.said.has(f)) return
+          this.said.add(f)
+          const sum = summarizeFight(f)
+          this.notifier.pushFeed('fight', `${sum.name} · ${clock(durationSec(f))} · ${num(sum.dps)} DPS (yours ${num(sum.yours / durationSec(f))})`)
+        }, SAME_NAME_MS + 250).unref?.()
       }
     })
     this.respawns = new RespawnLog(store.respawns.get(), {
@@ -82,6 +87,8 @@ export class CombatFeed {
     })
   }
 
+  /** Fights said in the feed, so one taken up again is said once. */
+  private said = new WeakSet<Segment>()
   private measuredAt = 0
 
   /**

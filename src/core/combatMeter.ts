@@ -45,6 +45,13 @@ const SESSIONS_KEPT = 60
 const TIMELINE_MAX = 3600
 /** Quiet seconds between two fights in a session's chart. */
 const STITCH_GAP_SEC = 3
+/**
+ * How long a fight closed by its last enemy's death may be taken up again by another of the same
+ * name: the log does not tell two "a ratman warrior"s apart, so a blow from or to one a second or more
+ * after the first died is the second, still fighting, not a new pull. A line in the death's own second
+ * may only be printed after it.
+ */
+export const SAME_NAME_MS = 4000
 
 export interface MeterConfig {
   fightGapSec: number
@@ -166,6 +173,8 @@ export class CombatMeter {
   fights: Segment[] = []
   sessions: Segment[] = []
   private live: Segment | null = null
+  /** The fight its last enemy's death closed, and when: another of those names may take it up again (SAME_NAME_MS). */
+  private lastKilled: { fight: Segment; at: number } | null = null
   private session: Segment | null = null
   /** Pet name key → owner's name (SELF for yours). */
   private pets = new Map<string, string>()
@@ -241,6 +250,7 @@ export class CombatMeter {
     this.fights = []
     this.sessions = []
     this.live = null
+    this.lastKilled = null
     this.session = null
     this.pets.clear()
     this.roster.clear()
@@ -473,6 +483,7 @@ export class CombatMeter {
 
   onZone(zone: string, at: number): void {
     if (this.live) this.closeFight()
+    this.lastKilled = null
     // Charm does not survive a zone line.
     this.charmed.clear()
     this.zone = zone
@@ -669,6 +680,7 @@ export class CombatMeter {
     const [ss, ts] = this.place(source, target, true)
     if (ss === 'unknown' || ts === 'unknown' || ss === ts) return
     if (!this.admit(ev, at, ss === 'friend' ? source : target, ss === 'enemy' ? source : target)) return
+    const closed = this.afterKill(at, ss === 'enemy' ? source : target)
     const crit = ev.mods.includes('critical')
     const proc = ss === 'friend' && ev.how === 'spell' ? this.procOrigin(source, ev.skill, at) : null
     const procKey = `${nameKey(source)}|${spellBase(ev.skill)}`
@@ -677,7 +689,7 @@ export class CombatMeter {
     if (paired) this.healFiring.delete(procKey)
     if (proc) this.lastProc.set(procKey, at)
     const finishing = ev.how === 'melee' && ev.mods.includes('finishing blow')
-    for (const seg of this.liveSegments(at, true)) {
+    for (const seg of closed ? [this.ensureSession(at), closed] : this.liveSegments(at, true)) {
       const src = this.ent(seg, source, at)
       const tgt = this.ent(seg, target, at)
       add(src.out, ev.amount, crit)
@@ -697,7 +709,7 @@ export class CombatMeter {
       active(src, at)
       active(seg, at)
       const enemy = ss === 'enemy' ? source : target
-      seg.enemies[nameKey(enemy)] = true
+      if (seg !== closed) seg.enemies[nameKey(enemy)] = true
       if (src.kind === 'you' || tgt.kind === 'you' || (src.kind === 'pet' && src.owner === SELF)) seg.mine = true
       seg.endedAt = Math.max(seg.endedAt, at)
       if (seg.timeline) {
@@ -746,7 +758,8 @@ export class CombatMeter {
     const [ss, ts] = this.place(source, target, true)
     if (ss === 'unknown' || ts === 'unknown' || ss === ts) return
     if (!this.admit(ev, at, ss === 'friend' ? source : target, ss === 'enemy' ? source : target)) return
-    for (const seg of this.liveSegments(at, true)) {
+    const closed = this.afterKill(at, ss === 'enemy' ? source : target)
+    for (const seg of closed ? [this.ensureSession(at), closed] : this.liveSegments(at, true)) {
       const src = this.ent(seg, source, at)
       const tgt = this.ent(seg, target, at)
       const skill = (src.skills[ev.skill] ??= skillStat(ev.skill, 'melee'))
@@ -756,7 +769,7 @@ export class CombatMeter {
       tgt.defense[ev.outcome]++
       active(src, at)
       active(seg, at)
-      seg.enemies[nameKey(ss === 'enemy' ? source : target)] = true
+      if (seg !== closed) seg.enemies[nameKey(ss === 'enemy' ? source : target)] = true
       if (src.kind === 'you' || tgt.kind === 'you' || (src.kind === 'pet' && src.owner === SELF)) seg.mine = true
       seg.endedAt = Math.max(seg.endedAt, at)
     }
@@ -828,12 +841,42 @@ export class CombatMeter {
         else if (seg.kind === 'session' || target === SELF) this.ent(seg, target, at).deaths++
       }
     }
-    // The fight is over when nothing it engaged still stands.
+    // The fight is over when nothing it engaged still stands, unless another of a name it engaged
+    // strikes or is struck soon after (sameName).
     if (side === 'enemy' && this.live && k in this.live.enemies && !Object.values(this.live.enemies).some(Boolean)) {
       this.live.endedAt = Math.max(this.live.endedAt, at)
+      const fight = this.live
       this.closeFight()
+      this.lastKilled = { fight, at }
     }
     this.changed()
+  }
+
+  /**
+   * A blow from or to `enemy` after a fight closed on its last enemy's death. In the death's own second
+   * and of a name it engaged, it is that fight's, printed after the death: returned, to be booked there
+   * with the fight left closed. From the next second to SAME_NAME_MS, of a name it engaged, it is
+   * another of that name still fighting: the fight is taken up again. Any other blow, or one later,
+   * leaves it closed for good.
+   */
+  private afterKill(at: number, enemy: string): Segment | null {
+    const last = this.lastKilled
+    if (!last) return null
+    if (this.live) {
+      this.lastKilled = null
+      return null
+    }
+    const k = nameKey(enemy)
+    const engaged = k in last.fight.enemies
+    if (at <= last.at) return engaged ? last.fight : null
+    this.lastKilled = null
+    if (!engaged || at - last.at > Math.min(SAME_NAME_MS, this.config.fightGapSec * 1000)) return null
+    const f = last.fight
+    f.open = true
+    f.enemies[k] = true
+    this.live = f
+    this.changed()
+    return null
   }
 
   private onResist(ev: Extract<CombatEvent, { kind: 'resist' }>, at: number): void {
