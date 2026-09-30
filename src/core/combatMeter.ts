@@ -74,6 +74,8 @@ export function displayName(name: string): string {
 }
 
 const ARTICLE = /^(?:a|an|the) /i
+/** A player's pet named after them: "Doria`s warder", "Doria`s familiar". */
+const OWNED_PET = /^([A-Z][a-z]+)`s (?:warder|pet|familiar)$/
 const SINGLE_WORD = /^[A-Z][A-Za-z`']*$/
 /** "an ire ghast has been charmed." */
 const RE_CHARMED = /^(.+) has been charmed\.$/
@@ -270,6 +272,10 @@ export class CombatMeter {
     const owner = this.pets.get(k)
     if (owner) return { kind: 'pet', owner }
     if (this.roster.has(k)) return { kind: 'group' }
+    // A warder is its owner's from its first blow, before any "/pet who leader" says so; unless the
+    // owner is a mob.
+    const own = OWNED_PET.exec(name)
+    if (own && this.sides.get(nameKey(own[1])) !== 'enemy') return { kind: 'pet', owner: this.norm(own[1]) }
     if (k.endsWith(' pet')) return { kind: 'npcpet' }
     if (ARTICLE.test(name)) return { kind: 'npc' }
     if (!SINGLE_WORD.test(name)) return { kind: 'npc' }
@@ -639,6 +645,13 @@ export class CombatMeter {
     p.healed += healed
   }
 
+  /** A lifetap's later tick heals into the proc row its first firing opened, without counting another firing. */
+  private static tapTick(e: Entity, spell: string, healed: number): void {
+    const base = spellBase(spell)
+    const had = Object.keys(e.procs).find((k) => spellBase(k) === base)
+    if (had) e.procs[had].healed += healed
+  }
+
   /** The segments an event lands in: the session, and the fight (opened if `combat` says the event is one). */
   private liveSegments(at: number, combat: boolean): Segment[] {
     const out = [this.ensureSession(at)]
@@ -648,9 +661,9 @@ export class CombatMeter {
   }
 
   private onDamage(ev: Extract<CombatEvent, { kind: 'damage' }>, at: number): void {
+    if (!ev.source) return this.onUncredited(ev, at)
     const target = this.norm(ev.target)
-    // A tick with no caster named ("Jobarab has taken 30 damage by Deadly Poison.") is booked to the spell.
-    const source = ev.source ? this.norm(ev.source) : ev.skill
+    const source = this.norm(ev.source)
     const [ss, ts] = this.place(source, target, true)
     if (ss === 'unknown' || ts === 'unknown' || ss === ts) return
     if (!this.admit(ev, at, ss === 'friend' ? source : target, ss === 'enemy' ? source : target)) return
@@ -699,6 +712,32 @@ export class CombatMeter {
     this.changed()
   }
 
+  /**
+   * A DoT tick whose caster has died or left: "Jobarab has taken 30 damage by Deadly Poison." It is
+   * damage its target took, with nobody to credit, on a target the segment already knows (yours, or
+   * an enemy it engaged). It opens no fight and names none.
+   */
+  private onUncredited(ev: Extract<CombatEvent, { kind: 'damage' }>, at: number): void {
+    const target = this.norm(ev.target)
+    const side = this.sideOf(target)
+    if (side === 'unknown') return
+    const k = nameKey(target)
+    const crit = ev.mods.includes('critical')
+    let booked = false
+    for (const seg of this.liveSegments(at, false)) {
+      if (side === 'enemy' ? !(k in seg.enemies) : !this.ours(target) && !seg.entities[k]) continue
+      const tgt = this.ent(seg, target, at)
+      add(tgt.in, ev.amount, crit)
+      add((tgt.takenBy[ev.skill] ??= skillStat(ev.skill, ev.how)), ev.amount, crit)
+      if (seg.timeline && tgt.kind === 'you') {
+        const b = Math.floor((at - seg.startedAt) / 1000)
+        if (b >= 0 && b < TIMELINE_MAX) seg.timeline.inc[b] = (seg.timeline.inc[b] ?? 0) + ev.amount
+      }
+      booked = true
+    }
+    if (booked) this.changed()
+  }
+
   private onMiss(ev: Extract<CombatEvent, { kind: 'miss' }>, at: number): void {
     const source = this.norm(ev.source)
     const target = this.norm(ev.target)
@@ -723,14 +762,22 @@ export class CombatMeter {
   }
 
   private onHeal(ev: Extract<CombatEvent, { kind: 'heal' }>, at: number): void {
-    const source = this.norm(ev.source)
+    let source = this.norm(ev.source)
     const target = this.norm(ev.target)
-    const [ss, ts] = this.place(source, target, false)
+    let [ss, ts] = this.place(source, target, false)
+    // A lifetap ticking on an enemy heals its caster, and the log names the enemy as the healer:
+    // "Innoruuk, the Prince of Hate healed you for 451 hit points by Leech Touch I." Enemies do not
+    // heal your side, so the heal is the target's own, a tick of the ability that started it.
+    const tap = ss === 'enemy' && ts === 'friend'
+    if (tap) {
+      source = target
+      ss = ts
+    }
     if (ss === 'unknown' || ts === 'unknown' || ss !== ts) return
     const crit = ev.mods.includes('critical')
     // A heal over time ticks long after its cast; only a direct heal can be a proc. A lifetap's heal
     // line follows its damage line: the same firing, not another.
-    const proc = ss === 'friend' && !ev.hot ? this.procOrigin(source, ev.spell, at) : null
+    const proc = ss === 'friend' && !ev.hot && !tap ? this.procOrigin(source, ev.spell, at) : null
     const procKey = `${nameKey(source)}|${spellBase(ev.spell)}`
     const firing = !!proc && Math.abs(at - (this.lastProc.get(procKey) ?? -Infinity)) > 1000
     if (firing) this.healFiring.set(procKey, at)
@@ -746,6 +793,7 @@ export class CombatMeter {
       const src = this.ent(seg, source, at)
       const tgt = this.ent(seg, target, at)
       if (proc) CombatMeter.proc(src, ev.spell, proc, 0, ev.amount, firing)
+      if (tap) CombatMeter.tapTick(src, ev.spell, ev.amount)
       addHeal(src.healOut, ev.amount, ev.raw, crit)
       addHeal((src.healSpells[ev.spell] ??= healTally()), ev.amount, ev.raw, crit)
       addHeal((src.healTargets[target] ??= healTally()), ev.amount, ev.raw, crit)
@@ -770,6 +818,9 @@ export class CombatMeter {
         if (killer && this.sideOf(killer) === 'friend') this.ent(seg, killer, at).kills++
         if (k in seg.enemies) seg.enemies[k] = false
       } else {
+        // Your side's deaths, and those of anyone who fought in the segment; not every player who
+        // dies somewhere in the zone.
+        if (!this.ours(target) && !seg.entities[k]) continue
         seg.deaths++
         if (seg.entities[k]) seg.entities[k].deaths++
         else if (seg.kind === 'session' || target === SELF) this.ent(seg, target, at).deaths++

@@ -55,6 +55,10 @@ const MAX_PENDING = 6
 const RE_CAST = CAST_BY_YOU
 const RE_FAIL_NAMED = /^Your (.+?) spell (?:is interrupted|fizzles)[.!]$/
 const RE_FAIL = /^Your spell (?:is interrupted|fizzles)[.!]$/
+/** "Your Infusion of Spirit spell did not take hold on Elund." */
+const RE_NO_HOLD_NAMED = /^Your (.+?) spell did not take hold on (.+)\.$/
+/** "Your Blade Dance spell on Innoruuk, the Prince of Hate has been overwritten." */
+const RE_OVERWRITTEN = /^Your (.+?) spell on (.+) has been overwritten\.$/
 // Older clients: "Your target resisted the X spell." Legends: "a ratman warrior resisted your Envenomed Bolt X!"
 const RE_RESIST = /^Your target resisted the (.+) spell\.$/
 const RE_RESISTED_YOUR = /^(.+?) resisted your (.+)!$/
@@ -128,6 +132,10 @@ export class SpellTracker {
 
     if ((m = RE_FAIL_NAMED.exec(text))) return this.dropPending(m[1])
     if (RE_FAIL.test(text)) return void this.pending.pop()
+    if (text.startsWith('Your ')) {
+      if ((m = RE_NO_HOLD_NAMED.exec(text))) return this.onNoHold(m[1])
+      if ((m = RE_OVERWRITTEN.exec(text))) return this.onOverwritten(m[1], m[2], now)
+    }
     const resisted = RE_RESIST.exec(text)?.[1] ?? (text.includes(' resisted your ') ? RE_RESISTED_YOUR.exec(text)?.[2] : undefined)
     if (resisted) {
       this.dropPending(resisted)
@@ -186,6 +194,29 @@ export class SpellTracker {
         return
       }
     }
+  }
+
+  /**
+   * A spell that did not take hold on one target. A detrimental spell has one target, so the cast is
+   * over; a beneficial one may be a group spell still landing on the others, and is left to expire.
+   */
+  private onNoHold(name: string): void {
+    const p = this.pending.findLast((x) => x.r.spell.name === name || x.r.rankedName === name)
+    if (p && !p.r.spell.beneficial) this.dropPending(name)
+  }
+
+  /**
+   * Another spell took this one's place on its target: the timer ends now rather than running to its
+   * estimate with a recast cue for a spell that is gone. A timer started this very second is the
+   * spell that did the overwriting (your own recast), and stays.
+   */
+  private onOverwritten(name: string, target: string, now: number): void {
+    const r = this.book.resolve(name)
+    const key = timerKey(r?.spell.name ?? name, target)
+    const t = this.board.get(key)
+    if (!t || t.startedAt >= now) return
+    this.board.end(key, 'replaced')
+    this.hooks.feed('fade', `${t.label} on ${target} was overwritten`)
   }
 
   private tryLand(text: string, now: number): boolean {

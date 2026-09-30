@@ -127,11 +127,19 @@ export function damageRows(seg: Segment, scope: MeterScope, combinePet: boolean)
   const ents = scoped(seg, scope).filter((e) => e.out.total > 0 || Object.values(e.skills).some((s) => s.misses > 0))
   if (!combinePet) return finish(ents.map((e) => entityRow(e, ms)))
   const rows = new Map<string, Row>()
+  // Owner and pet fight side by side: the longer of their combat times stands for the pair's, since
+  // the union of the two is not kept.
+  const activeMs = new Map<string, number>()
   const orphans: Row[] = []
-  for (const e of ents) if (e.kind !== 'pet') rows.set(nameKey(e.name), entityRow(e, ms))
+  for (const e of ents) {
+    if (e.kind === 'pet') continue
+    rows.set(nameKey(e.name), entityRow(e, ms))
+    activeMs.set(nameKey(e.name), e.activeMs)
+  }
   for (const e of ents) {
     if (e.kind !== 'pet') continue
-    const owner = e.owner ? rows.get(nameKey(e.owner)) : undefined
+    const ownerKey = e.owner ? nameKey(e.owner) : ''
+    const owner = rows.get(ownerKey)
     const pet = entityRow(e, ms)
     if (!owner) {
       orphans.push(pet)
@@ -139,6 +147,8 @@ export function damageRows(seg: Segment, scope: MeterScope, combinePet: boolean)
     }
     owner.total += pet.total
     owner.dps = rate(owner.total, ms)
+    activeMs.set(ownerKey, Math.max(activeMs.get(ownerKey) ?? 0, e.activeMs))
+    owner.activeDps = rate(owner.total, activeMs.get(ownerKey)!)
     owner.hits += pet.hits
     owner.crits += pet.crits
     owner.misses += pet.misses

@@ -15,6 +15,7 @@ import type { ItemInfo } from '../shared/types'
 //   You looted an Indicolite Bracer +4 from Reward Chest to create an Indicolite Bracer +6
 //   You receive 4 platinum, 2 gold, 9 silver and 8 copper from the corpse.
 //   You receive 6 gold from Zok Zribb.                                      (a sale)
+//   You receive 2 gold and 3 silver as your split.     (EQEmu's group split; none in months of EQL group play)
 
 export type LootOutcome = 'kept' | 'sold' | 'depot' | 'currency' | 'merged'
 
@@ -49,6 +50,7 @@ const RE_KEPT = /^--(You have|(.+?) has) looted (a|an|\d+) (.+?) from (.+?)\.--$
 const RE_COIN_CORPSE = /^You receive (.+?) from the corpse\.$/
 const RE_COIN_BAG = /^You receive\s+(.+?) from (.+?) for the contents of your bag\.$/
 const RE_COIN_SALE = /^You receive (.+?) from (.+?)\.$/
+const RE_COIN_SPLIT = /^You receive (.+?) as your split\.$/
 
 /** "4 platinum, 2 gold, 9 silver and 8 copper" (or the bag sale's "52 platinum 2 gold") → copper. */
 export function parseCoin(text: string): number {
@@ -97,7 +99,7 @@ export function parseLootLine(text: string): LootEvent | CoinEvent | null {
     return null
   }
   if (text.startsWith('You receive ')) {
-    if ((m = RE_COIN_CORPSE.exec(text))) return { kind: 'coin', copper: parseCoin(m[1]), from: 'corpse', bag: false }
+    if ((m = RE_COIN_CORPSE.exec(text)) || (m = RE_COIN_SPLIT.exec(text))) return { kind: 'coin', copper: parseCoin(m[1]), from: 'corpse', bag: false }
     if ((m = RE_COIN_BAG.exec(text))) return { kind: 'coin', copper: parseCoin(m[1]), from: m[2], bag: true }
     if ((m = RE_COIN_SALE.exec(text)) && /\d+ (?:platinum|gold|silver|copper)/.test(m[1])) return { kind: 'coin', copper: parseCoin(m[1]), from: m[2], bag: false }
   }

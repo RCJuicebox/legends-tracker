@@ -60,6 +60,7 @@ describe('loot lines', () => {
   it('reads coin from corpses and from sales', () => {
     expect(p('You receive 4 platinum, 2 gold, 9 silver and 8 copper from the corpse.')).toEqual({ kind: 'coin', copper: 4298, from: 'corpse', bag: false })
     expect(p('You receive 3 copper from the corpse.')).toMatchObject({ copper: 3 })
+    expect(p('You receive 2 gold and 3 silver as your split.')).toEqual({ kind: 'coin', copper: 230, from: 'corpse', bag: false })
     expect(p('You receive 6 gold from Zok Zribb.')).toEqual({ kind: 'coin', copper: 600, from: 'Zok Zribb', bag: false })
     expect(p('You receive  52 platinum 2 gold 8 silver 5 copper from Melixis for the contents of your bag.')).toEqual({ kind: 'coin', copper: 52_285, from: 'Melixis', bag: true })
     expect(p('You receive no experience for defeating this creature as you are in a raid.')).toBeNull()

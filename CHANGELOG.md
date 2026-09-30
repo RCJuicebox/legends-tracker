@@ -37,6 +37,11 @@ What changed in each version. The release workflow publishes a version's section
 - **The sidebar scrolls** at a large UI size on a short screen, the watch footer staying in view.
 - **Paths in the settings are checked.** The watched log must be a character log (`eqlog_…txt`) and the game folder must hold the game's spell data; Open archive folder opens only a folder.
 - **Light theme: accent text and the damage meter's colours are darker**, so small text reads at 4.5:1 or better on every background.
+- **Meter: a lifetap's ticks heal you.** Harm Touch's ticks print as the enemy healing you ("Innoruuk, the Prince of Hate healed you for 451 hit points by Leech Touch I.") and were dropped; they now count as your own heals, in the Healing tab and on the ability's row.
+- **Meter: a DoT whose caster is gone no longer makes an enemy of its spell.** "Jobarab has taken 30 damage by Deadly Poison." booked an enemy called Deadly Poison that never died and could name the fight; the damage now goes to whoever took it, and "You have taken 30 damage by Deadly Poison." counts in Incoming.
+- **Meter: a beastlord's warder is its owner's pet from its first blow**, not an enemy until `/pet who leader`; its damage counts and its death opens no respawn timer.
+- **Meter: deaths are your side's and the fight's**, not every player who dies somewhere in the zone. A pet folded into its owner's row folds into Active DPS too.
+- **Spell timers: a spell another overwrote ends its timer** ("Your Envenomed Bolt spell on X has been overwritten."), with no recast cue for a spell that is gone; a detrimental spell that "did not take hold" on its target stops waiting to land.
 
 ## 2.4.0 (2026-09-29)
 

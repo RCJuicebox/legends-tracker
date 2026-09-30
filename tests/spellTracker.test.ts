@@ -96,6 +96,40 @@ describe('DoT tracking', () => {
       [Sat Sep 12 23:11:05 2026] A ratman warrior has been poisoned.`)
     expect(h.board.list()).toHaveLength(0)
   })
+
+  it('drops a detrimental cast that did not take hold on its target, named', () => {
+    const h = harness()
+    h.feed(`
+      [Sat Sep 12 23:11:04 2026] You begin casting Envenomed Bolt X.
+      [Sat Sep 12 23:11:05 2026] Your Envenomed Bolt X spell did not take hold on a ratman warrior.
+      [Sat Sep 12 23:11:05 2026] A ratman warrior has been poisoned.`)
+    expect(h.board.list()).toHaveLength(0)
+  })
+
+  it('ends a timer when the log says the spell was overwritten, and does not cue its recast', () => {
+    const h = harness()
+    h.feed(`
+      [Tue Sep 01 12:15:08 2026] You begin casting Envenomed Bolt X.
+      [Tue Sep 01 12:15:09 2026] Bazzt Zzzt has been poisoned.
+      [Tue Sep 01 12:15:30 2026] Your Envenomed Bolt spell on Bazzt Zzzt has been overwritten.`)
+    expect(h.board.get(timerKey('Envenomed Bolt', 'Bazzt Zzzt'))).toBeUndefined()
+    expect(h.feedItems).toContainEqual(['fade', 'Envenomed Bolt on Bazzt Zzzt was overwritten'])
+    h.feed('[Tue Sep 01 12:16:00 2026] Kelwyn hits Bazzt Zzzt for 200 points of damage.')
+    expect(h.spoken).toEqual([])
+  })
+
+  it('keeps a timer your own recast started in the second its old one was overwritten', () => {
+    const h = harness()
+    h.feed(`
+      [Tue Sep 01 12:15:08 2026] You begin casting Envenomed Bolt X.
+      [Tue Sep 01 12:15:09 2026] Bazzt Zzzt has been poisoned.
+      [Tue Sep 01 12:15:40 2026] You begin casting Envenomed Bolt X.
+      [Tue Sep 01 12:15:41 2026] Bazzt Zzzt has been poisoned.
+      [Tue Sep 01 12:15:41 2026] Your Envenomed Bolt spell on Bazzt Zzzt has been overwritten.`)
+    const t = h.board.get(timerKey('Envenomed Bolt', 'Bazzt Zzzt'))!
+    expect(t).toBeDefined()
+    expect(t.startedAt).toBe(at('Tue Sep 01 12:15:41 2026'))
+  })
 })
 
 describe('self buff tracking', () => {

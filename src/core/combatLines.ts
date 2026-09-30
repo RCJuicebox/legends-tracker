@@ -62,6 +62,8 @@ const RE_SPELL_YOU = /^You hit (.+?) for ([\d,]+) points? of (\w+) damage by (.+
 const RE_SPELL = /^(.+?) hit (.+?) for ([\d,]+) points? of (\w+) damage by (.+?)\.(?: \((.+)\))?$/
 const RE_DOT_YOU = /^(.+?) has taken ([\d,]+) damage from your (.+?)\.(?: \((.+)\))?$/
 const RE_DOT_ON_YOU = /^You have taken ([\d,]+) damage from (.+?) by (.+?)\.(?: \((.+)\))?$/
+/** A DoT on you whose caster has died or gone: "You have taken 30 damage by Deadly Poison." */
+const RE_DOT_ON_YOU_NO_CASTER = /^You have taken ([\d,]+) damage by (.+?)\.(?: \((.+)\))?$/
 const RE_DOT = /^(.+?) has taken ([\d,]+) damage from (.+?) by (.+?)\.(?: \((.+)\))?$/
 const RE_DOT_NO_CASTER = /^(.+?) has taken ([\d,]+) damage by (.+?)\.(?: \((.+)\))?$/
 const RE_DS_YOU = /^(.+?) is \w+ by YOUR (\w+) for ([\d,]+) points? of non-melee damage\.$/
@@ -143,6 +145,7 @@ export function parseCombatLine(text: string): CombatEvent | null {
     }
     if ((m = RE_SPELL_YOU.exec(text))) return { kind: 'damage', source: SELF, target: self(m[1]), amount: num(m[2]), how: 'spell', skill: spell(m[4]), mods: parseMods(m[5]) }
     if ((m = RE_DOT_ON_YOU.exec(text))) return { kind: 'damage', source: m[3], target: SELF, amount: num(m[1]), how: 'dot', skill: spell(m[2]), mods: parseMods(m[4]) }
+    if ((m = RE_DOT_ON_YOU_NO_CASTER.exec(text))) return { kind: 'damage', source: '', target: SELF, amount: num(m[1]), how: 'dot', skill: spell(m[2]), mods: parseMods(m[3]) }
     if ((m = RE_DS_ON_YOU.exec(text))) return { kind: 'damage', source: m[1], target: SELF, amount: num(m[3]), how: 'ds', skill: `Damage shield (${m[2]})`, mods: [] }
     if ((m = RE_SLAIN_YOU.exec(text))) return { kind: 'kill', target: m[1], killer: SELF }
     if (RE_YOU_DIED.test(text)) return { kind: 'kill', target: SELF, killer: null }

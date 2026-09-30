@@ -101,6 +101,7 @@ describe('combat lines', () => {
     })
     expect(p('You have taken 105 damage from Scorching Arrow by a fetid fiend.')).toMatchObject({ source: 'a fetid fiend', target: SELF, amount: 105, how: 'dot' })
     expect(p('Jobarab has taken 30 damage by Deadly Poison.')).toMatchObject({ source: '', target: 'Jobarab', amount: 30, skill: 'Deadly Poison' })
+    expect(p('You have taken 30 damage by Deadly Poison.')).toMatchObject({ source: '', target: SELF, amount: 30, how: 'dot', skill: 'Deadly Poison' })
   })
   it('reads damage shields both ways', () => {
     expect(p('A fetid fiend is pierced by YOUR thorns for 3 points of non-melee damage.')).toMatchObject({ source: SELF, target: 'A fetid fiend', amount: 3, how: 'ds' })
@@ -275,6 +276,9 @@ describe('CombatMeter', () => {
     expect(combined).toHaveLength(1)
     expect(combined[0].total).toBe(643)
     expect(combined[0].pets?.[0].name).toBe('Jobarab')
+    // Active DPS folds too: the pair's damage over the longer of their combat times.
+    const activeMs = Math.max(f.entities['you'].activeMs, f.entities['jobarab'].activeMs)
+    expect(combined[0].activeDps).toBeCloseTo(643 / (activeMs / 1000))
     const skills = skillRows(f, combined[0])
     expect(skills.map((s) => [s.name, s.total])).toEqual([
       ['punch', 300],
@@ -512,6 +516,84 @@ describe('CombatMeter', () => {
       [Thu Sep 24 20:00:09 2026] You hit a fetid fiend for 40 points of magic damage by Lifebite III.`)
     const procs = m.liveFight!.entities['you'].procs
     expect(procs).toEqual({ 'Lifebite III': { name: 'Lifebite III', origin: 'spell', count: 2, damage: 82, healed: 82 } })
+  })
+
+  it("books a lifetap's ticks, which the log prints with the enemy as healer, to the one they heal", () => {
+    const { m, feed } = meter()
+    feed(`
+      [Fri Sep 25 21:00:39 2026] You begin casting Harm Touch X.
+      [Fri Sep 25 21:00:39 2026] You hit Innoruuk, the Prince of Hate for 1001 points of unresistable damage by Harm Touch X.
+      [Fri Sep 25 21:00:39 2026] You healed Kelwyn for 1001 hit points by Leech Touch I.
+      [Fri Sep 25 21:00:40 2026] Innoruuk, the Prince of Hate has taken 451 damage from your Harm Touch X.
+      [Fri Sep 25 21:00:40 2026] Innoruuk, the Prince of Hate healed you for 451 hit points by Leech Touch I.
+      [Fri Sep 25 21:00:46 2026] Innoruuk, the Prince of Hate has taken 451 damage from your Harm Touch X.
+      [Fri Sep 25 21:00:46 2026] Innoruuk, the Prince of Hate healed you for 332 (451) hit points by Leech Touch I.`)
+    const f = m.liveFight!
+    const you = f.entities['you']
+    expect(you.healOut).toMatchObject({ total: 1784, raw: 1903, count: 3 })
+    expect(you.healSpells['Leech Touch I']).toMatchObject({ total: 1784, count: 3 })
+    expect(you.healIn.total).toBe(1784)
+    // One press of the ability, its ticks healing into the same row.
+    expect(you.procs['Leech Touch I']).toMatchObject({ origin: 'ability', count: 1, healed: 1784 })
+    // Nothing of the enemy's: a heal it never gave is not damage undone.
+    expect(f.enemyHeal).toBe(0)
+    expect(f.entities['innoruuk, the prince of hate'].healOut.total).toBe(0)
+  })
+
+  it('books a DoT tick with no caster to its target, with no enemy named after the spell', () => {
+    const { m, feed } = meter()
+    feed(`
+      [Thu Sep 24 20:00:04 2026] Jobarab told you, 'Attacking a fetid fiend Master.'
+      [Thu Sep 24 20:00:05 2026] A fetid fiend hits Jobarab for 50 points of damage.
+      [Thu Sep 24 20:00:06 2026] Jobarab has taken 30 damage by Deadly Poison.
+      [Thu Sep 24 20:00:07 2026] You have taken 20 damage by Deadly Poison.
+      [Thu Sep 24 20:00:08 2026] You have slain a fetid fiend!`)
+    const f = m.fights[0]
+    expect(f.open).toBe(false)
+    expect(f.name).toBe('A fetid fiend')
+    expect(Object.keys(f.enemies)).toEqual(['a fetid fiend'])
+    expect(f.entities['deadly poison']).toBeUndefined()
+    expect(f.entities['jobarab'].in.total).toBe(80)
+    expect(f.entities['jobarab'].takenBy['Deadly Poison'].total).toBe(30)
+    expect(f.entities['you'].in.total).toBe(20)
+    expect(f.timeline!.inc[2]).toBe(20)
+    // A lingering tick after the fight opens none of its own.
+    feed('[Thu Sep 24 20:00:30 2026] You have taken 20 damage by Deadly Poison.')
+    expect(m.fights).toHaveLength(1)
+    expect(m.liveSession!.entities['you'].in.total).toBe(40)
+  })
+
+  it("counts the deaths of your side and of those in the fight, not every player's in the zone", () => {
+    const { m, feed } = meter()
+    feed(`
+      [Thu Sep 24 20:00:01 2026] Aldric has joined the group.
+      [Thu Sep 24 20:00:05 2026] You punch a fetid fiend for 100 points of damage.
+      [Thu Sep 24 20:00:06 2026] Dorran has been slain by a scareling!
+      [Thu Sep 24 20:00:07 2026] Aldric has been slain by a fetid fiend!`)
+    expect(m.liveFight!.deaths).toBe(1)
+    expect(m.liveSession!.deaths).toBe(1)
+    expect(m.liveSession!.entities['dorran']).toBeUndefined()
+    expect(m.liveSession!.entities['aldric'].deaths).toBe(1)
+  })
+
+  it("a warder is its owner's pet from its first blow", () => {
+    const { m, feed } = meter()
+    feed(`
+      [Thu Sep 24 20:00:01 2026] Doria has joined the group.
+      [Thu Sep 24 20:00:05 2026] You punch Innoruuk, the Prince of Hate for 100 points of damage.
+      [Thu Sep 24 20:00:06 2026] Doria\`s warder slashes Innoruuk, the Prince of Hate for 68 points of damage.
+      [Thu Sep 24 20:00:06 2026] Doria\`s warder hit Innoruuk, the Prince of Hate for 281 points of cold damage by Frost Shard.
+      [Thu Sep 24 20:00:07 2026] Kelwyn\`s warder slashes Innoruuk, the Prince of Hate for 10 points of damage.`)
+    const f = m.liveFight!
+    expect(f.entities['doria`s warder']).toMatchObject({ kind: 'pet', owner: 'Doria' })
+    expect(f.entities['doria`s warder'].out.total).toBe(349)
+    expect(f.entities['kelwyn`s warder']).toMatchObject({ kind: 'pet', owner: SELF })
+    expect(f.entities['innoruuk, the prince of hate'].in.total).toBe(459)
+    // A mob's own warder stays the mob's.
+    feed(`
+      [Thu Sep 24 20:00:08 2026] Vex hits YOU for 5 points of damage.
+      [Thu Sep 24 20:00:09 2026] Vex\`s warder hits YOU for 5 points of damage.`)
+    expect(f.entities['vex`s warder'].kind).toBe('npc')
   })
 
   it('an effect with no cast line behind it is a proc; a cast one is not; a HoT tick is neither', () => {
