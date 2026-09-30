@@ -7,6 +7,16 @@ import type { SkillCapRow } from '../shared/ipc'
 //   basedata.txt      LEVEL^CLASS^hp^mana^end^?^?^hp_fac^mana_fac^end_fac^
 // Class numbers are classic EverQuest's (1 Warrior … 16 Berserker), skill numbers too.
 // The main process reads the files (GameTables in main/stats.ts); the parsing and the questions are here.
+//
+// Any of the folder's tables is read the same way: a GameTable names its files and how their text
+// becomes it, and GameTables reads it, again once a file changes, and says how the reading went on
+// the Data Sources page ("Game tables"). The factions' are theirs (features/factions/core.ts, unlocks.ts).
+
+/** A table in the game's Resources folder: its files (paths under Resources), and how their text becomes it, a file that could not be read coming as ''. */
+export interface GameTable<T> {
+  files: string[]
+  parse: (texts: string[]) => T
+}
 
 export interface GameTableData {
   /** class → skill → caps by level (index 0 = level 1). */
@@ -54,6 +64,12 @@ export function parseGameTables(files: GameTableFiles): GameTableData {
     row.mult[l - 1] = mult
   }
   return t
+}
+
+/** The skill caps, the AC soft caps and the stat values, for the Stats and Gear pages. */
+export const STAT_TABLES: GameTable<GameTableData> = {
+  files: ['skillcaps.txt', 'ACMitigation.txt', 'basedata.txt'],
+  parse: ([skillcaps, acMitigation, basedata]) => parseGameTables({ skillcaps, acMitigation, basedata })
 }
 
 /** Every skill any of the classes has at this level, each at the best cap among them. */

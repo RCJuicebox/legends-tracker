@@ -1,3 +1,4 @@
+import type { GameTable } from '../../core/gameTables'
 import { playableRace } from '../../shared/game/races'
 import type { AchSection, Achievement } from '../../core/achievements'
 import { leftOutIsDone } from './core'
@@ -64,6 +65,12 @@ export function parseRaceUnlocks(achievements: string, components: string): Race
     else def.other = t.replace(/\.$/, '')
   }
   return [...defs.values()].filter((d) => !placeholders.has(d.id))
+}
+
+/** The race unlocks, as GameTables reads them (main/stats.ts); none unless both files are there. */
+export const RACE_UNLOCK_DEFS: GameTable<RaceUnlockDef[]> = {
+  files: ['Achievements/AchievementsClient.txt', 'Achievements/AchievementComponentsClient.txt'],
+  parse: ([achievements, components]) => (achievements && components ? parseRaceUnlocks(achievements, components) : [])
 }
 
 /** A race unlock for one character: done or not, and each of its factions. */

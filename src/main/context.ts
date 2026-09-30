@@ -442,11 +442,8 @@ function registerSources(ctx: AppContext): void {
   sources.add('tables', {
     label: 'Game tables',
     kind: 'game file',
-    what: "The Resources folder's skill caps, AC soft caps and stat values, for the Stats and Gear pages.",
-    refresh: async () => {
-      ctx.gameTables.clear()
-      await ctx.gameTables.acCaps([], 1)
-    }
+    what: "The Resources folder's skill caps, AC soft caps and stat values, for the Stats and Gear pages, and its faction modifiers and achievement lists, for the Factions page.",
+    refresh: () => ctx.gameTables.refresh()
   })
   sources.add('icons', { label: 'Icons', kind: 'game file', what: "The game's spell and item icon sheets.", refresh: async () => ctx.icons.clear() })
   sources.add('exports', {

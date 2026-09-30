@@ -1,3 +1,4 @@
+import type { GameTable } from '../../core/gameTables'
 import type { LogLine } from '../../core/logLine'
 import type { AchSection } from '../../shared/character'
 import { deityKey, deityName } from '../../shared/game/deities'
@@ -240,6 +241,9 @@ export function parseFactionModifiers(text: string): Map<number, Map<number, num
   return out
 }
 
+/** The faction modifiers, as GameTables reads them (main/stats.ts). */
+export const FACTION_MODIFIERS: GameTable<Map<number, Map<number, number>>> = { files: ['Faction/FactionAssociations.txt'], parse: ([t]) => parseFactionModifiers(t) }
+
 /** What the keys a character has (its race's, its class's) add to one faction's con. */
 export const modifierOf = (mods: Map<number, Map<number, number>>, factionId: number, keys: number[]) => keys.reduce((n, k) => n + (mods.get(factionId)?.get(k) ?? 0), 0)
 
@@ -402,6 +406,9 @@ export function parseFactionAchievements(text: string): FactionAchievement[] {
   }
   return out
 }
+
+/** The faction achievements, as GameTables reads them (main/stats.ts). */
+export const FACTION_ACHIEVEMENT_LIST: GameTable<FactionAchievement[]> = { files: ['Achievements/AchievementsClient.txt'], parse: ([t]) => parseFactionAchievements(t) }
 
 /**
  * Whether an achievement of a kind the export leaves out is done. The achievements window can hide

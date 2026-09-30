@@ -6,19 +6,18 @@ import {
   conOf,
   EXPORT_LINE_MS,
   FACTION_ACH_BASE,
+  FACTION_ACHIEVEMENT_LIST,
+  FACTION_MODIFIERS,
   FACTIONS_FILE,
-  parseFactionModifiers,
   withCons,
   factionView,
   joinFactions,
   leftOutIsDone,
-  parseFactionAchievements,
   parseFactionPageFull,
   parseFactionsExport,
   progressionStatus,
   SinceExports,
   type ExportMark,
-  type FactionAchievement,
   type FactionAchievements,
   type FactionExport,
   type FactionPageData,
@@ -31,7 +30,7 @@ import { parseQuestPage, type QuestPage } from './questPages'
 import { classSwapName, factionNamer, unmatchedNames } from './names'
 import { buildCatalog, guessesFrom, itemsToLookUp, type CatalogInput } from './catalog'
 import { planFor, type FactionPlanData } from './planner'
-import { parseRaceUnlocks, raceUnlocks, unlockedRaces, type RaceUnlockDef } from './unlocks'
+import { RACE_UNLOCK_DEFS, raceUnlocks, unlockedRaces, type RaceUnlockDef } from './unlocks'
 import { lookUp, moversOf, sourcesOf } from './lookup'
 import { listLogs } from '../../main/game'
 import type { Purchases } from '../../shared/ipc'
@@ -215,21 +214,6 @@ export async function readFactionExport(dir: string, character: string): Promise
   return { ...newest, standings }
 }
 
-/** The client's faction modifiers, read again only when the file changes. */
-let clientMods: { path: string; mtime: number; mods: Map<number, Map<number, number>> } | null = null
-
-async function factionModifiers(dir: string): Promise<Map<number, Map<number, number>>> {
-  const path = join(dir, 'Resources', 'Faction', 'FactionAssociations.txt')
-  try {
-    const st = await fs.stat(path)
-    if (clientMods?.path !== path || clientMods.mtime !== st.mtimeMs) clientMods = { path, mtime: st.mtimeMs, mods: parseFactionModifiers(await fs.readFile(path, 'utf8')) }
-    return clientMods.mods
-  } catch (e) {
-    if ((e as NodeJS.ErrnoException).code !== 'ENOENT') log.warn(`Could not read ${path}:`, e)
-    return new Map()
-  }
-}
-
 /**
  * The view with what each standing cons at for a character (its race's, its class's and its deity's
  * modifiers added), as the Standings tab shows it; `deity`, `race` and `classes` stand in for the record's.
@@ -237,7 +221,6 @@ async function factionModifiers(dir: string): Promise<Map<number, Map<number, nu
  */
 async function withConsFor(
   ctx: AppContext,
-  dir: string,
   character: string,
   exported: FactionExport | null,
   view: FactionView,
@@ -247,7 +230,7 @@ async function withConsFor(
 ): Promise<FactionView> {
   const rec = ctx.store.characterByKey(character)
   const c = conBasis(race ?? rec.race, classes ?? Object.keys(rec.classLevels ?? {}), exported?.file ?? null, deity ?? rec.deity)
-  return c ? withCons(view, await factionModifiers(dir), c) : view
+  return c ? withCons(view, await ctx.gameTables.get(FACTION_MODIFIERS), c) : view
 }
 
 /** The cons of a view, by faction name. */
@@ -262,8 +245,8 @@ const consOf = (view: FactionView) => {
  * has no modifiers: renouncing your faith is quick, and the first step for anyone planning factions.
  * Empty without a race on the character's record.
  */
-async function consFor(ctx: AppContext, dir: string, character: string, exported: FactionExport | null, view: FactionView): Promise<Record<string, number>> {
-  return consOf(await withConsFor(ctx, dir, character, exported, view, 'Agnostic'))
+async function consFor(ctx: AppContext, character: string, exported: FactionExport | null, view: FactionView): Promise<Record<string, number>> {
+  return consOf(await withConsFor(ctx, character, exported, view, 'Agnostic'))
 }
 
 /**
@@ -283,7 +266,6 @@ function classSwaps(classes: string[], race: string): { name: string; classes: s
  */
 async function swapConsFor(
   ctx: AppContext,
-  dir: string,
   character: string,
   exported: FactionExport | null,
   view: FactionView,
@@ -292,10 +274,9 @@ async function swapConsFor(
   const own = playableRace(ctx.store.characterByKey(character).race ?? '')
   const out: Record<string, Record<string, number>> = {}
   if (!own) return out
-  for (const race of PLAYABLE_RACES)
-    if (race !== own && (!races || races.includes(race))) out[race] = consOf(await withConsFor(ctx, dir, character, exported, view, 'Agnostic', race))
+  for (const race of PLAYABLE_RACES) if (race !== own && (!races || races.includes(race))) out[race] = consOf(await withConsFor(ctx, character, exported, view, 'Agnostic', race))
   for (const s of classSwaps(Object.keys(ctx.store.characterByKey(character).classLevels ?? {}), own))
-    out[s.name] = consOf(await withConsFor(ctx, dir, character, exported, view, 'Agnostic', own, s.classes))
+    out[s.name] = consOf(await withConsFor(ctx, character, exported, view, 'Agnostic', own, s.classes))
   return out
 }
 
@@ -337,24 +318,6 @@ function agnosticOf(sections: AchSection[] | null): boolean | null {
   return !a || a.d === true
 }
 
-/** The client's race unlocks, read again only when either file changes. */
-let clientUnlocks: { key: string; defs: RaceUnlockDef[] } | null = null
-
-async function raceUnlockDefs(dir: string): Promise<RaceUnlockDef[]> {
-  const paths = ['AchievementsClient.txt', 'AchievementComponentsClient.txt'].map((f) => join(dir, 'Resources', 'Achievements', f))
-  try {
-    const key = (await Promise.all(paths.map((p) => fs.stat(p)))).map((st, i) => `${paths[i]}@${st.mtimeMs}`).join('|')
-    if (clientUnlocks?.key !== key) {
-      const [achievements, components] = await Promise.all(paths.map((p) => fs.readFile(p, 'utf8')))
-      clientUnlocks = { key, defs: parseRaceUnlocks(achievements, components) }
-    }
-    return clientUnlocks.defs
-  } catch (e) {
-    if ((e as NodeJS.ErrnoException).code !== 'ENOENT') log.warn("Could not read the client's race unlocks:", e)
-    return []
-  }
-}
-
 /** Each faction's name by its id, as the view has them: the factions export's, and the Progression achievements'. */
 function factionIds(view: FactionView): Map<number, string> {
   const ids = new Map<number, string>()
@@ -374,7 +337,6 @@ function factionIds(view: FactionView): Map<number, string> {
  */
 async function raceModsFor(
   ctx: AppContext,
-  dir: string,
   character: string,
   exported: FactionExport | null,
   view: FactionView,
@@ -384,7 +346,7 @@ async function raceModsFor(
   const rec = ctx.store.characterByKey(character)
   const own = playableRace(rec.race ?? '')
   if (!own) return null
-  const table = await factionModifiers(dir)
+  const table = await ctx.gameTables.get(FACTION_MODIFIERS)
   const ids = factionIds(view)
   const mods: Record<string, Record<string, number>> = {}
   const trio = Object.keys(rec.classLevels ?? {})
@@ -410,27 +372,12 @@ async function raceModsFor(
   return { own, mods }
 }
 
-/** The client's faction achievements, read again only when the file changes. */
-let clientAch: { path: string; mtime: number; list: FactionAchievement[] } | null = null
-
-async function factionAchievementList(dir: string): Promise<FactionAchievement[]> {
-  const path = join(dir, 'Resources', 'Achievements', 'AchievementsClient.txt')
-  try {
-    const st = await fs.stat(path)
-    if (clientAch?.path !== path || clientAch.mtime !== st.mtimeMs) clientAch = { path, mtime: st.mtimeMs, list: parseFactionAchievements(await fs.readFile(path, 'utf8')) }
-    return clientAch.list
-  } catch (e) {
-    if ((e as NodeJS.ErrnoException).code !== 'ENOENT') log.warn(`Could not read ${path}:`, e)
-    return []
-  }
-}
-
 /** The faction achievements, with what the character's achievements export says of them; null when the client lists none. */
-async function factionAchievements(dir: string, character: string): Promise<FactionAchievements | null> {
-  const list = await factionAchievementList(dir)
+async function factionAchievements(ctx: AppContext, character: string): Promise<FactionAchievements | null> {
+  const list = await ctx.gameTables.get(FACTION_ACHIEVEMENT_LIST)
   if (!list.length) return null
   // Without an export, the standing says which are done.
-  const exp = await achievementsExport(dir, character)
+  const exp = await achievementsExport(ctx.installDir(), character)
   return { list, status: progressionStatus(exp?.sections ?? null), exported: exp?.mark ?? null }
 }
 
@@ -546,7 +493,7 @@ async function planData(ctx: AppContext, character: string, refresh: boolean, wi
     // The Standings tab says what is wrong with it; planning goes on from the log's changes alone.
     log.warn(`${character}'s factions export could not be read for the plan:`, e)
   }
-  const achievements = await factionAchievements(dir, character)
+  const achievements = await factionAchievements(ctx, character)
   const view = await ctx.factions.view(where, exported, achievements)
   const { targets, maxed, achievementsExport, standings } = planFor(view)
   const [tallies, book, purchases, held, others] = await Promise.all([
@@ -576,12 +523,12 @@ async function planData(ctx: AppContext, character: string, refresh: boolean, wi
     wide,
     // Allakhazam's pages, as far as they are read: the achievements' factions first, then the character's others.
     alla: await ctx.factionAlla.factions([...new Set([...targets.map((t) => t.faction), ...view.factions.map((r) => r.name)])]),
-    cons: await consFor(ctx, dir, character, exported, view)
+    cons: await consFor(ctx, character, exported, view)
   }
   // What the wiki says of the items hand-ins want: a merchant, a drop, a recipe. Kept a week, like the Gear page's.
   const items = await ctx.inventoryFiles.lookup(itemsToLookUp(input))
   // The race unlocks, done or not, part by part; the races done are the ones to swap to.
-  const [sections, defs] = await Promise.all([achievementSections(dir, character), raceUnlockDefs(dir)])
+  const [sections, defs] = await Promise.all([achievementSections(dir, character), ctx.gameTables.get(RACE_UNLOCK_DEFS)])
   const ids = factionIds(view)
   const named = factionNamer(input.factions)
   const unlocks = raceUnlocks(
@@ -591,7 +538,7 @@ async function planData(ctx: AppContext, character: string, refresh: boolean, wi
     (f) => standings[f] ?? null
   )
   const races = unlockedRaces(unlocks)
-  const catalog = buildCatalog({ ...input, items, swapCons: await swapConsFor(ctx, dir, character, exported, view, races) })
+  const catalog = buildCatalog({ ...input, items, swapCons: await swapConsFor(ctx, character, exported, view, races) })
   const acts = Object.values(tallies.acts)
   const theirs = others.flatMap((o) => Object.values(o.tallies.acts))
   return {
@@ -626,7 +573,7 @@ async function planData(ctx: AppContext, character: string, refresh: boolean, wi
     agnostic: agnosticOf(sections),
     races,
     unlocks,
-    raceMods: await raceModsFor(ctx, dir, character, exported, view, defs, new Set(catalog.activities.flatMap((a) => a.gate?.map((n) => n.faction) ?? []))),
+    raceMods: await raceModsFor(ctx, character, exported, view, defs, new Set(catalog.activities.flatMap((a) => a.gate?.map((n) => n.faction) ?? []))),
     ...(achievements ? {} : { noAchievementList: true })
   }
 }
@@ -641,7 +588,7 @@ export async function standingsNow(
 ): Promise<{ standings: Record<string, number>; done: Set<string>; byAchievement: Record<string, { faction: string; standing: number | null }> }> {
   const dir = ctx.installDir()
   const exported = await readFactionExport(dir, character).catch(() => null)
-  const view = await ctx.factions.view(ctx.historyOf(character), exported, await factionAchievements(dir, character))
+  const view = await ctx.factions.view(ctx.historyOf(character), exported, await factionAchievements(ctx, character))
   const byAchievement: Record<string, { faction: string; standing: number | null }> = {}
   for (const r of view.factions) if (r.achievement) byAchievement[r.achievement.name.toLowerCase()] = { faction: r.name, standing: r.standing?.value ?? null }
   return { standings: planFor(view).standings, done: new Set(view.factions.filter((r) => r.achievement?.done === true).map((r) => r.name)), byAchievement }
@@ -693,8 +640,8 @@ export function registerFactionIpc(ctx: AppContext): void {
       sources.fail('exports', e, `${character}'s factions export`)
       exportError = e instanceof Error ? e.message : String(e)
     }
-    const view = await ctx.factions.view(ctx.historyOf(character), exported, await factionAchievements(dir, character))
-    return { ...(await withConsFor(ctx, dir, character, exported, view)), exportError }
+    const view = await ctx.factions.view(ctx.historyOf(character), exported, await factionAchievements(ctx, character))
+    return { ...(await withConsFor(ctx, character, exported, view)), exportError }
   })
   // What raises a faction, from its page in the book of eqlwiki's faction pages the Plan tab reads.
   handle('factions:sources', async (faction) => {
