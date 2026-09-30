@@ -28,7 +28,9 @@ export class InventoryFiles {
     private readonly dataDir: string,
     private readonly gameDir: () => string,
     private readonly catalog: ItemCatalog,
-    private readonly send: (view: InventoryView) => void
+    private readonly send: (view: InventoryView) => void,
+    /** Whether a page could be showing the export: the main window is open. Hidden, the file is not looked at. */
+    private readonly shown: () => boolean = () => true
   ) {}
 
   exportPath(character: string): string {
@@ -78,7 +80,7 @@ export class InventoryFiles {
   }
 
   private async poll(): Promise<void> {
-    if (!this.watched || !this.gameDir() || this.polling) return
+    if (!this.watched || !this.gameDir() || this.polling || !this.shown()) return
     this.polling = true
     try {
       const st = await fs.stat(this.exportPath(this.watched))

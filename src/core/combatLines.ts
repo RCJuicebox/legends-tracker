@@ -155,35 +155,44 @@ export function parseCombatLine(text: string): CombatEvent | null {
     if ((m = RE_YOU_REMOVE.exec(text))) return { kind: 'group', who: m[1], action: 'left' }
     if ((m = RE_CAST_YOU.exec(text))) return { kind: 'cast', source: SELF, spell: m[1] }
   }
-  if ((m = RE_MELEE.exec(text)))
+  // Each pattern below is looked for only when the line has its fixed words: the lazy prefixes
+  // backtrack over the whole line, and most lines that get this far are chat.
+  const damage = text.includes(' of damage')
+  if (damage && (m = RE_MELEE.exec(text)))
     return { kind: 'damage', source: self(m[1]), target: self(m[3]), amount: num(m[4]), how: 'melee', skill: BASE_VERB.get(m[2]) ?? m[2], mods: parseMods(m[5]) }
-  if ((m = RE_MISS.exec(text))) {
+  if (text.includes(', but ') && (m = RE_MISS.exec(text))) {
     // "tries to cast a spell on you, but you are protected." is a spell, not a swing.
     const outcome = outcomeOf(m[4])
     return outcome ? { kind: 'miss', source: self(m[1]), target: self(m[3]), skill: m[2], outcome, mods: parseMods(m[5]) } : null
   }
-  if ((m = RE_SPELL.exec(text))) return { kind: 'damage', source: self(m[1]), target: self(m[2]), amount: num(m[3]), how: 'spell', skill: spell(m[5]), mods: parseMods(m[6]) }
-  if ((m = RE_DOT_YOU.exec(text))) return { kind: 'damage', source: SELF, target: self(m[1]), amount: num(m[2]), how: 'dot', skill: spell(m[3]), mods: parseMods(m[4]) }
-  if ((m = RE_DOT.exec(text))) return { kind: 'damage', source: self(m[4]), target: self(m[1]), amount: num(m[2]), how: 'dot', skill: spell(m[3]), mods: parseMods(m[5]) }
-  if ((m = RE_DOT_NO_CASTER.exec(text))) return { kind: 'damage', source: '', target: self(m[1]), amount: num(m[2]), how: 'dot', skill: spell(m[3]), mods: parseMods(m[4]) }
-  if ((m = RE_DS_YOU.exec(text))) return { kind: 'damage', source: SELF, target: self(m[1]), amount: num(m[3]), how: 'ds', skill: `Damage shield (${m[2]})`, mods: [] }
-  if ((m = RE_DS.exec(text))) return { kind: 'damage', source: self(m[2]), target: self(m[1]), amount: num(m[4]), how: 'ds', skill: `Damage shield (${m[3]})`, mods: [] }
-  if ((m = RE_HEAL.exec(text))) {
+  if (text.includes(' damage by ') && (m = RE_SPELL.exec(text)))
+    return { kind: 'damage', source: self(m[1]), target: self(m[2]), amount: num(m[3]), how: 'spell', skill: spell(m[5]), mods: parseMods(m[6]) }
+  const taken = text.includes(' has taken ')
+  if (taken && (m = RE_DOT_YOU.exec(text))) return { kind: 'damage', source: SELF, target: self(m[1]), amount: num(m[2]), how: 'dot', skill: spell(m[3]), mods: parseMods(m[4]) }
+  if (taken && (m = RE_DOT.exec(text))) return { kind: 'damage', source: self(m[4]), target: self(m[1]), amount: num(m[2]), how: 'dot', skill: spell(m[3]), mods: parseMods(m[5]) }
+  if (taken && (m = RE_DOT_NO_CASTER.exec(text)))
+    return { kind: 'damage', source: '', target: self(m[1]), amount: num(m[2]), how: 'dot', skill: spell(m[3]), mods: parseMods(m[4]) }
+  const shield = text.includes(' non-melee damage')
+  if (shield && (m = RE_DS_YOU.exec(text))) return { kind: 'damage', source: SELF, target: self(m[1]), amount: num(m[3]), how: 'ds', skill: `Damage shield (${m[2]})`, mods: [] }
+  if (shield && (m = RE_DS.exec(text))) return { kind: 'damage', source: self(m[2]), target: self(m[1]), amount: num(m[4]), how: 'ds', skill: `Damage shield (${m[3]})`, mods: [] }
+  if (text.includes(' healed ') && (m = RE_HEAL.exec(text))) {
     const source = self(m[1])
     const target = reflexive(m[2]) ? source : self(m[2])
     const amount = num(m[4])
     return { kind: 'heal', source, target, amount, raw: m[5] ? num(m[5]) : amount, spell: m[6], hot: !!m[3], mods: parseMods(m[7]) }
   }
-  if ((m = RE_RUNE.exec(text))) return { kind: 'rune', target: self(m[1]), amount: num(m[2]) }
-  if ((m = RE_SLAIN_BY.exec(text))) return { kind: 'kill', target: self(m[1]), killer: self(m[2]) }
-  if ((m = RE_DIED.exec(text))) return { kind: 'kill', target: self(m[1]), killer: null }
-  if ((m = RE_RESIST_YOU.exec(text))) return { kind: 'resist', source: SELF, target: self(m[1]), spell: m[2] }
-  if ((m = RE_RESIST.exec(text))) return { kind: 'resist', source: self(m[2]), target: self(m[1]), spell: m[3] }
-  if ((m = RE_PET_ATTACK.exec(text))) return { kind: 'pet', pet: m[1], owner: SELF }
-  if ((m = RE_PET_LEADER.exec(text))) return { kind: 'pet', pet: m[1], owner: self(m[2]) }
-  if ((m = RE_JOINED.exec(text))) return { kind: 'group', who: m[1], action: 'joined' }
-  if ((m = RE_INVITED.exec(text))) return { kind: 'group', who: m[1], action: 'invited' }
-  if ((m = RE_LEFT.exec(text)) || (m = RE_REMOVED.exec(text))) return { kind: 'group', who: m[1], action: 'left' }
+  if (text.includes(' rune ') && (m = RE_RUNE.exec(text))) return { kind: 'rune', target: self(m[1]), amount: num(m[2]) }
+  if (text.endsWith('!') && text.includes(' has been slain by ') && (m = RE_SLAIN_BY.exec(text))) return { kind: 'kill', target: self(m[1]), killer: self(m[2]) }
+  if (text.endsWith(' died.') && (m = RE_DIED.exec(text))) return { kind: 'kill', target: self(m[1]), killer: null }
+  const resisted = text.includes(' resisted ')
+  if (resisted && (m = RE_RESIST_YOU.exec(text))) return { kind: 'resist', source: SELF, target: self(m[1]), spell: m[2] }
+  if (resisted && (m = RE_RESIST.exec(text))) return { kind: 'resist', source: self(m[2]), target: self(m[1]), spell: m[3] }
+  if (text.includes(' told you, ') && (m = RE_PET_ATTACK.exec(text))) return { kind: 'pet', pet: m[1], owner: SELF }
+  if (text.includes('My leader is') && (m = RE_PET_LEADER.exec(text))) return { kind: 'pet', pet: m[1], owner: self(m[2]) }
+  const group = text.endsWith(' the group.')
+  if (group && (m = RE_JOINED.exec(text))) return { kind: 'group', who: m[1], action: 'joined' }
+  if (text.endsWith(' invites you to join a group.') && (m = RE_INVITED.exec(text))) return { kind: 'group', who: m[1], action: 'invited' }
+  if (group && ((m = RE_LEFT.exec(text)) || (m = RE_REMOVED.exec(text)))) return { kind: 'group', who: m[1], action: 'left' }
   if ((m = RE_CAST.exec(text))) return { kind: 'cast', source: self(m[1]), spell: m[2] }
   return null
 }

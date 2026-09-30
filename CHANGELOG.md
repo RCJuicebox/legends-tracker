@@ -85,6 +85,7 @@ What changed in each version. The release workflow publishes a version's section
 - **Gear's settings take one line.** The eras, AC soft cap, Primary, focus value and the note on what a point is worth sat above every tab's results. They now fold to one line that says what they are set to, with **Change…** to open them; the page remembers which you had. **Show weights** opens them too.
 - **More tables sort.** Spell Timers' spells (by name, type, Spell window, when it wears off or when last cast), Motes' sessions (by when, where, type, time, motes, per hour or value) and Log Files' logs (by name, size or when last written) sort by any column header, as Factions, Respawns and AAs already did. Each page remembers its order.
 - **One way to open and fold.** Spells, AAs, respawns, factions, buff lists, loot sessions, recipes, achievements and the optimiser's locks all open with the same small caret, which turns as they open. They had used five different arrows and links. The "Show every step" and similar folds read the same way.
+- **Less work in the background.** Chat lines that mention damage or the group cost half what they did to rule out as combat. The Buffs plan is worked out again only when something it depends on changes, not every five seconds. The achievements and inventory exports are not checked while the window is hidden. The speech engine is not kept running while you are muted. A speech engine that never starts is stopped after a minute rather than left running.
 
 ## 2.4.0 (2026-09-29)
 

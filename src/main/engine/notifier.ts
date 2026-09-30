@@ -39,7 +39,8 @@ export class Notifier {
 
   /** The log is growing, so someone is playing: keeps the speech engine up so a cue is not held up while it starts. */
   playing(now: number): void {
-    if (now - this.warmedAt <= 60_000) return
+    // Muted, nothing will be said: the speech engine (some 60 MB) is left to go.
+    if (now - this.warmedAt <= 60_000 || this.settings().audio.muted) return
     this.warmedAt = now
     this.speech.warm?.(this.settings().audio.voice)
   }

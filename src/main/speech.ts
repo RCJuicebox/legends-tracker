@@ -127,10 +127,20 @@ export class SpeechWorker {
       this.proc = proc
       this.buffer = ''
       yieldPriority(proc.pid)
+      // Not up in 15 s: said to have failed, and whoever waits goes on. A cold first start (WinRT's
+      // Add-Type) can take longer and still come up, so it is given a minute before it is stopped and
+      // the next phrase starts another.
+      let slow: NodeJS.Timeout | null = null
       const timeout = setTimeout(() => {
         this.failed = 'Speech engine did not start'
         log.warn(this.failed)
         resolve()
+        slow = setTimeout(() => {
+          if (this.proc !== proc || !this.failed) return
+          log.warn('Speech engine still not started after a minute; stopping it')
+          this.restart(proc)
+        }, 45_000)
+        slow.unref()
       }, 15000)
       proc.stdout.setEncoding('utf8')
       proc.stdout.on('data', (chunk: string) => {
@@ -151,6 +161,7 @@ export class SpeechWorker {
             this.voices = Array.isArray(msg.voices) ? msg.voices : msg.voices ? [msg.voices] : []
             this.failed = ''
             clearTimeout(timeout)
+            if (slow) clearTimeout(slow)
             resolve()
           } else if (msg.id !== undefined) {
             const w = this.waiting.get(msg.id)
@@ -179,6 +190,7 @@ export class SpeechWorker {
       })
       proc.on('exit', (code) => {
         clearTimeout(timeout)
+        if (slow) clearTimeout(slow)
         resolve()
         if (this.proc !== proc) return
         this.failed = this.failed || 'Speech engine exited'

@@ -164,6 +164,8 @@ export class CombatMeter {
    * case your side joins in on it: a raid's tank pulls well before the rest of it swings.
    */
   private held = new Map<string, { last: number; blows: { ev: Extract<CombatEvent, { kind: 'damage' | 'miss' }>; at: number }[] }>()
+  /** When `held` was last cleared of fights gone quiet: once a second is enough, not every blow. */
+  private heldPrunedAt = 0
   private replaying = false
   private seq = 0
   /** Summaries of closed fights and sessions, which do not change again: worked out once, not every push. */
@@ -219,6 +221,7 @@ export class CombatMeter {
     this.lastFriendCast = null
     this.charmCasts = []
     this.held.clear()
+    this.heldPrunedAt = 0
     this.zone = ''
     this.changed()
   }
@@ -254,7 +257,10 @@ export class CombatMeter {
    */
   private admit(ev: Extract<CombatEvent, { kind: 'damage' | 'miss' }>, at: number, friend: string, enemy: string): boolean {
     const gapMs = this.config.fightGapSec * 1000
-    for (const [k, h] of this.held) if (at - h.last > gapMs) this.held.delete(k)
+    if (at - this.heldPrunedAt > 1000) {
+      this.heldPrunedAt = at
+      for (const [k, h] of this.held) if (at - h.last > gapMs) this.held.delete(k)
+    }
     const k = nameKey(enemy)
     if (!this.counts(friend, enemy)) {
       const h = this.held.get(k) ?? { last: at, blows: [] }

@@ -167,6 +167,15 @@ describe('Asking for a wanted buff that is missing', () => {
     s.buffs.tick(T0 + 12_000)
     expect(s.asks().length).toBe(2)
   })
+
+  it('works the plans out again only when what they are made from changes', () => {
+    const first = s.buffs.view()
+    // Nothing new: the same plans, not two more searches.
+    expect(s.buffs.view().plan).toBe(first.plan)
+    expect(s.buffs.view().planAnyone).toBe(first.planAnyone)
+    s.buffs.setWanted([])
+    expect(s.buffs.view().plan).not.toBe(first.plan)
+  })
 })
 
 describe("A groupmate's buff on you", () => {

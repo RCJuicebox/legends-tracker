@@ -23,7 +23,9 @@ export class AchievementFiles {
     /** The app's data folder (userData): the player's marks go in its achievements folder. */
     private readonly dataDir: string,
     private readonly gameDir: () => string,
-    private readonly send: (view: AchievementsView) => void
+    private readonly send: (view: AchievementsView) => void,
+    /** Whether a page could be showing the export: the main window is open. Hidden, the file is not looked at. */
+    private readonly shown: () => boolean = () => true
   ) {}
 
   private get marksDir(): string {
@@ -88,7 +90,7 @@ export class AchievementFiles {
   }
 
   private async poll(): Promise<void> {
-    if (!this.watched || !this.gameDir()) return
+    if (!this.watched || !this.gameDir() || !this.shown()) return
     try {
       const st = await fs.stat(this.exportPath(this.watched))
       // The game writes the file in one go, but give it a moment before reading a fresh one.

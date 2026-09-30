@@ -210,10 +210,13 @@ export interface FocusReport {
   basis: 'casts' | 'spellbook'
 }
 
-/** "Tavee's Charm of Diuturnity" → "Tavee's Diuturnity"; "Improved Damage III" → "Improved Damage". */
+/**
+ * "Tavee's Charm of Diuturnity" → "Tavee's Diuturnity"; "Improved Damage III" → "Improved Damage". Ranks
+ * run to XV, as the spell book reads them (RANK_SUFFIX).
+ */
 export function familyName(name: string): string {
   return name
-    .replace(/\s+(?:I|II|III|IV|V|VI)$/, '')
+    .replace(/\s+(?:I|II|III|IV|V|VI|VII|VIII|IX|X|XI|XII|XIII|XIV|XV)$/, '')
     .replace(/\s+\d+$/, '')
     .replace(/\b(?:Lesser|Greater|Superior|Major|Minor|Charm of)\s+/g, '')
     .trim()

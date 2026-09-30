@@ -59,6 +59,7 @@ describe('reading focus spells', () => {
     expect(dmg2.line).not.toBe(ee3.line)
     expect(familyName("Tavee's Charm of Diuturnity")).toBe("Tavee's Diuturnity")
     expect(familyName('Improved Damage III')).toBe('Improved Damage')
+    expect(familyName('Improved Healing XII')).toBe('Improved Healing')
   })
 
   it('fades past the level cap by its decay', () => {

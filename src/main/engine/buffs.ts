@@ -1,5 +1,18 @@
 import { computeDuration } from '../../core/durations'
-import { askText, BuffWatch, buffOffers, buffPlan, defaultWanted, LEVEL_CAP, YOU, type ActiveBuff, type BuffOffer, type BuffView, type Person } from '../../core/buffs'
+import {
+  askText,
+  BuffWatch,
+  buffOffers,
+  buffPlan,
+  defaultWanted,
+  LEVEL_CAP,
+  YOU,
+  type ActiveBuff,
+  type BuffOffer,
+  type BuffPlan,
+  type BuffView,
+  type Person
+} from '../../core/buffs'
 import { CATEGORY_COLORS } from '../../core/spellTracker'
 import { characterKey, characterName } from '../storeCore'
 import { CLASS_NAMES, CLASS_NUMBER, type ClassId } from '../../shared/game/classes'
@@ -158,12 +171,28 @@ export class BuffCoordinator {
     })
   }
 
+  /**
+   * The two plans last worked out, and what from: a view goes out every few seconds while group buffs
+   * are on, and each plan is a search of up to 200,000 steps, so it is done again only when an input
+   * changed (the offers, what is wanted, the group, what is on you, who you are).
+   */
+  private plans: { offers: BuffOffer[]; key: string; plan: BuffPlan; anyone: BuffPlan } | null = null
+
   view(): BuffView {
     const group = this.groupPeople()
     const active = this.watch.active
     const wanted = this.wanted
     const me = this.me()
-    const plan = buffPlan({ offers: this.offers, wanted, group: group.flatMap((g) => (g.person ? [g.person] : [])), active, me })
+    const people = group.flatMap((g) => (g.person ? [g.person] : []))
+    const key = JSON.stringify([wanted, people, active, me])
+    if (!this.plans || this.plans.offers !== this.offers || this.plans.key !== key)
+      this.plans = {
+        offers: this.offers,
+        key,
+        plan: buffPlan({ offers: this.offers, wanted, group: people, active, me }),
+        anyone: buffPlan({ offers: this.offers, wanted, group: 'anyone', active, me })
+      }
+    const { plan, anyone } = this.plans
     return {
       offers: this.offers,
       wanted,
@@ -173,7 +202,7 @@ export class BuffCoordinator {
       active,
       needs: plan.needs,
       plan,
-      planAnyone: buffPlan({ offers: this.offers, wanted, group: 'anyone', active, me }),
+      planAnyone: anyone,
       spellsLoaded: !!this.hooks.book()
     }
   }

@@ -18,6 +18,9 @@ const SAMPLE = `[Tue Sep 01 12:15:08 2026] You begin casting Envenomed Bolt X.
 [Tue Sep 01 12:15:10 2026] You begin casting Spirit of the Puma X.
 [Tue Sep 01 12:15:11 2026] You begin to snarl as your features become feline.`
 
+/** Feed items drawn on Live, newest first. */
+const FEED_SHOWN = 100
+
 export function Dashboard({ go }: { go: (p: PageId) => void }) {
   const { state, patchSettings } = useApp()
   const { settings } = state
@@ -33,7 +36,8 @@ export function Dashboard({ go }: { go: (p: PageId) => void }) {
   const now = Date.now()
   const buffs = useMemo(() => timers.filter((t) => t.overlay === OVERLAY_BUFFS), [timers])
   const others = useMemo(() => timers.filter((t) => t.overlay !== OVERLAY_BUFFS), [timers])
-  const recent = useMemo(() => [...feed].reverse(), [feed])
+  // Newest first, and no more than a page shows: the feed keeps 300.
+  const recent = useMemo(() => feed.slice(-FEED_SHOWN).reverse(), [feed])
 
   return (
     <>

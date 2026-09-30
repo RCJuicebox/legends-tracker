@@ -150,7 +150,12 @@ export function createContext(): AppContext {
     azure,
     installDir,
     icons: new IconSource(installDir),
-    achievementFiles: new AchievementFiles(dataDir, installDir, (view) => toMain('state:achievements', view)),
+    achievementFiles: new AchievementFiles(
+      dataDir,
+      installDir,
+      (view) => toMain('state:achievements', view),
+      () => windows.mainShown
+    ),
     gameTables: new GameTables(installDir),
     wikiCatalog: new WikiCatalog(
       (p) => toMain('state:catalog', p),
@@ -169,7 +174,13 @@ export function createContext(): AppContext {
     skills: new SkillHistory(logHistory, 'skills'),
     aaHistory: new AaHistory(logHistory, 'aas'),
     tradeFavorites: new TradeFavorites(join(dataDir, 'tradeskills.json')),
-    inventoryFiles: new InventoryFiles(dataDir, installDir, itemCatalog, (view) => toMain('state:inventory', view)),
+    inventoryFiles: new InventoryFiles(
+      dataDir,
+      installDir,
+      itemCatalog,
+      (view) => toMain('state:inventory', view),
+      () => windows.mainShown
+    ),
     petStore: new PetStore(),
     petWiki: new PetWiki(),
     petScanned: new Set<string>(),

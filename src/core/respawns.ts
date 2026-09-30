@@ -72,23 +72,33 @@ export class RespawnLog {
       return
     }
     // Speech, emotes and /consider all begin with the mob's name. "<name>'s corpse" does not count.
-    const pending = this.watching()
-    if (!pending.length) return
-    const here = zone.toLowerCase()
-    const lower = line.text.toLowerCase()
-    for (const w of pending) {
-      if (w.record.pendingSince && w.zone === here && lower.startsWith(w.prefix)) this.seen(zone, w.record.name, line.time)
+    const open = this.watching()
+    if (!open.size) return
+    const sp = line.text.indexOf(' ')
+    if (sp <= 0) return
+    const watches = open.get(`${zone.toLowerCase()}|${line.text.slice(0, sp).toLowerCase()}`)
+    if (!watches) return
+    for (const w of watches) {
+      if (w.record.pendingSince && line.text.slice(0, w.prefix.length).toLowerCase() === w.prefix) this.seen(zone, w.record.name, line.time)
     }
   }
 
-  // The watches open, with their names lowercased once: most lines are not combat, and each is
-  // checked against these. Worked out again after any change.
-  private open: { record: RespawnRecord; zone: string; prefix: string }[] | null = null
+  // The watches open, by zone and the first word of the name, lowercased once: most lines are not
+  // combat, and each is looked up here by its own first word. Worked out again after any change.
+  private open: Map<string, { record: RespawnRecord; prefix: string }[]> | null = null
 
   private watching() {
-    this.open ??= Object.values(this.records)
-      .filter((r) => r.pendingSince)
-      .map((record) => ({ record, zone: record.zone.toLowerCase(), prefix: record.name.toLowerCase() + ' ' }))
+    if (!this.open) {
+      this.open = new Map()
+      for (const record of Object.values(this.records)) {
+        if (!record.pendingSince) continue
+        const prefix = record.name.toLowerCase() + ' '
+        const key = `${record.zone.toLowerCase()}|${prefix.slice(0, prefix.indexOf(' '))}`
+        const list = this.open.get(key)
+        if (list) list.push({ record, prefix })
+        else this.open.set(key, [{ record, prefix }])
+      }
+    }
     return this.open
   }
 
