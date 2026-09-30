@@ -30,6 +30,14 @@ let defaultTriggers = ''
 const file = (f: string) => join(profile.dir, f)
 const readJson = (f: string): unknown => JSON.parse(readFileSync(file(f), 'utf8'))
 
+/** Stores opened by a test, so their start-up writes are done before its folder goes. */
+const opened: InstanceType<typeof Store>[] = []
+const open = () => {
+  const s = new Store(defaultTriggers)
+  opened.push(s)
+  return s
+}
+
 beforeEach(() => {
   profile.dir = mkdtempSync(join(tmpdir(), 'lt141b-migrate-'))
   defaultsDir = mkdtempSync(join(tmpdir(), 'lt141b-defaults-'))
@@ -39,7 +47,8 @@ beforeEach(() => {
   vi.spyOn(console, 'log').mockImplementation(() => {})
 })
 
-afterEach(() => {
+afterEach(async () => {
+  await Promise.all(opened.splice(0).map((s) => s.settled))
   vi.restoreAllMocks()
   rmSync(profile.dir, { recursive: true, force: true })
   rmSync(defaultsDir, { recursive: true, force: true })
@@ -49,7 +58,7 @@ describe('a profile saved at an older schema', () => {
   it('is brought forward as it is read, with a backup of the file as it was', () => {
     const old = JSON.stringify({ ...defaultSettings(), uiScale: undefined, zoom: 1.5 })
     writeFileSync(file('settings.json'), old)
-    const store = new Store(defaultTriggers)
+    const store = open()
     expect(store.settings.get().uiScale).toBe(1.5)
     expect(readFileSync(file('settings.pre-2.json'), 'utf8')).toBe(old)
     expect(store.newer).toEqual([])
@@ -57,13 +66,13 @@ describe('a profile saved at an older schema', () => {
 
   it('counts a profile with no schema record as schema 1', () => {
     writeFileSync(file('settings.json'), JSON.stringify({ zoom: 1.25 }))
-    expect(new Store(defaultTriggers).settings.get().uiScale).toBe(1.25)
+    expect(open().settings.get().uiScale).toBe(1.25)
   })
 
   it('is written in the new shape at the next flush, and the new schema recorded', async () => {
     writeFileSync(file('settings.json'), JSON.stringify({ zoom: 1.5 }))
     writeFileSync(file('schema.json'), JSON.stringify({ 'settings.json': 1 }))
-    const store = new Store(defaultTriggers)
+    const store = open()
     await store.flushAll()
     const written = readJson('settings.json') as Record<string, unknown>
     expect(written.uiScale).toBe(1.5)
@@ -75,7 +84,7 @@ describe('a profile saved at an older schema', () => {
   it('is written at once, and schema.json after it, so a crash before quitting does not migrate it again', async () => {
     writeFileSync(file('settings.json'), JSON.stringify({ zoom: 1.5 }))
     writeFileSync(file('schema.json'), JSON.stringify({ 'settings.json': 1 }))
-    const store = new Store(defaultTriggers)
+    const store = open()
     await vi.waitFor(() => expect((readJson('schema.json') as Record<string, number>)['settings.json']).toBe(2))
     expect((readJson('settings.json') as Record<string, unknown>).uiScale).toBe(1.5)
     expect(store.settings.pending).toBe(false)
@@ -85,7 +94,7 @@ describe('a profile saved at an older schema', () => {
     const run = vi.spyOn(migrate, 'run')
     writeFileSync(file('settings.json'), JSON.stringify({ ...defaultSettings(), uiScale: 1.5 }))
     writeFileSync(file('schema.json'), JSON.stringify(SCHEMAS))
-    const store = new Store(defaultTriggers)
+    const store = open()
     expect(run).not.toHaveBeenCalled()
     expect(store.settings.get().uiScale).toBe(1.5)
     expect(existsSync(file('settings.pre-2.json'))).toBe(false)
@@ -94,7 +103,7 @@ describe('a profile saved at an older schema', () => {
   it("leaves files already at this build's schema without a backup", () => {
     writeFileSync(file('settings.json'), JSON.stringify({ zoom: 1.5 }))
     writeFileSync(file('triggers.json'), '[]')
-    new Store(defaultTriggers)
+    open()
     expect(existsSync(file('settings.pre-2.json'))).toBe(true)
     expect(existsSync(file('triggers.pre-1.json'))).toBe(false)
   })

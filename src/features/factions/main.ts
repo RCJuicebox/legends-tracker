@@ -161,26 +161,50 @@ export class FactionSourceHistory {
 const SETTLE_MS = 1500
 
 /**
+ * The factions exports in the game folder by character (lower-cased), listed again only when the
+ * folder's entries change: the folder holds some three thousand files, and the Factions page asks
+ * every few seconds. A new export is a new entry; one written over keeps its name, and its own time
+ * says so below.
+ */
+let exportNames: { dir: string; mtime: number; byWho: Map<string, string[]> } | null = null
+/** Each export read, by path, kept while the file is unchanged. */
+const exportsRead = new Map<string, { modified: number; standings: FactionExport['standings'] }>()
+
+/**
  * A character's newest factions export in the game folder, read; null when there is none. The game
  * puts the class in the name (Kelwyn_neriak-MNK-Factions.txt), so a character can have one per class.
  */
 export async function readFactionExport(dir: string, character: string): Promise<FactionExport | null> {
-  let names: string[]
+  let folder
   try {
-    names = await fs.readdir(dir)
+    folder = await fs.stat(dir)
   } catch (e) {
     if ((e as NodeJS.ErrnoException).code === 'ENOENT') return null
     throw e
   }
-  const who = character.toLowerCase()
-  const mine = names.filter((n) => FACTIONS_FILE.exec(n)?.[1].toLowerCase() === who)
-  if (!mine.length) return null
-  const dated = await Promise.all(mine.map(async (file) => ({ file, modified: (await fs.stat(join(dir, file))).mtimeMs })))
+  if (!exportNames || exportNames.dir !== dir || exportNames.mtime !== folder.mtimeMs) {
+    const byWho = new Map<string, string[]>()
+    for (const n of await fs.readdir(dir)) {
+      const who = FACTIONS_FILE.exec(n)?.[1].toLowerCase()
+      if (who) byWho.set(who, [...(byWho.get(who) ?? []), n])
+    }
+    exportNames = { dir, mtime: folder.mtimeMs, byWho }
+  }
+  const mine = exportNames.byWho.get(character.toLowerCase()) ?? []
+  const dated = (await Promise.all(mine.map(async (file) => ({ file, modified: (await fs.stat(join(dir, file)).catch(() => null))?.mtimeMs })))).flatMap((d) =>
+    d.modified === undefined ? [] : [{ file: d.file, modified: d.modified }]
+  )
+  if (!dated.length) return null
   const newest = dated.sort((a, b) => b.modified - a.modified)[0]
+  const path = join(dir, newest.file)
+  const kept = exportsRead.get(path)
+  if (kept?.modified === newest.modified) return { ...newest, standings: kept.standings }
   const young = SETTLE_MS - (Date.now() - newest.modified)
   if (young > 0) await new Promise((r) => setTimeout(r, young))
-  const text = await fs.readFile(join(dir, newest.file), 'utf8')
-  return { ...newest, standings: parseFactionsExport(text) }
+  const standings = parseFactionsExport(await fs.readFile(path, 'utf8'))
+  if (exportsRead.size > 20) exportsRead.clear()
+  exportsRead.set(path, { modified: newest.modified, standings })
+  return { ...newest, standings }
 }
 
 /** The client's faction modifiers, read again only when the file changes. */
@@ -253,14 +277,32 @@ async function swapConsFor(
   return out
 }
 
-/** A character's achievements export, read; null without one. */
-async function achievementSections(dir: string, character: string): Promise<AchSection[] | null> {
+/** Each achievements export read, by path, kept while the file is unchanged. */
+const achievementsRead = new Map<string, { modified: number; sections: AchSection[] }>()
+
+/** A character's achievements export, read (again only once the game has written it again); null without one. */
+async function achievementsExport(dir: string, character: string): Promise<{ sections: AchSection[]; mark: ExportMark } | null> {
+  const file = `${character}-Achievements.txt`
+  const path = join(dir, file)
   try {
-    return parseAchievements(await fs.readFile(join(dir, `${character}-Achievements.txt`), 'utf8')).sections
+    const modified = (await fs.stat(path)).mtimeMs
+    let kept = achievementsRead.get(path)
+    if (kept?.modified !== modified) {
+      kept = { modified, sections: parseAchievements(await fs.readFile(path, 'utf8')).sections }
+      if (achievementsRead.size > 20) achievementsRead.clear()
+      achievementsRead.set(path, kept)
+    }
+    return { sections: kept.sections, mark: { file, modified } }
   } catch (e) {
+    // None yet is the usual case.
     if ((e as NodeJS.ErrnoException).code !== 'ENOENT') log.warn(`Could not read ${character}'s achievements export:`, e)
     return null
   }
+}
+
+/** A character's achievements export's sections; null without one. */
+async function achievementSections(dir: string, character: string): Promise<AchSection[] | null> {
+  return (await achievementsExport(dir, character))?.sections ?? null
 }
 
 /**
@@ -352,18 +394,9 @@ async function factionAchievementList(dir: string): Promise<FactionAchievement[]
 async function factionAchievements(dir: string, character: string): Promise<FactionAchievements | null> {
   const list = await factionAchievementList(dir)
   if (!list.length) return null
-  const file = `${character}-Achievements.txt`
-  let sections = null
-  let exported: ExportMark | null = null
-  try {
-    const modified = (await fs.stat(join(dir, file))).mtimeMs
-    sections = parseAchievements(await fs.readFile(join(dir, file), 'utf8')).sections
-    exported = { file, modified }
-  } catch (e) {
-    // None yet is the usual case: then the standing says which are done.
-    if ((e as NodeJS.ErrnoException).code !== 'ENOENT') log.warn(`Could not read ${character}'s achievements export:`, e)
-  }
-  return { list, status: progressionStatus(sections), exported }
+  // Without an export, the standing says which are done.
+  const exp = await achievementsExport(dir, character)
+  return { list, status: progressionStatus(exp?.sections ?? null), exported: exp?.mark ?? null }
 }
 
 const FRESH_MS = 7 * 24 * 3600_000

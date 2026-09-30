@@ -50,6 +50,7 @@ What changed in each version. The release workflow publishes a version's section
 - **An unexpected error's message no longer stops the app** while it waits to be closed: timers, speech and overlays carry on behind it.
 - **Copy diagnostics says more**: each data source's state and last error, every monitor and its scaling, speech and Azure, hotkeys another program holds, the character record, triggers that would not compile, the spell file's date and the settings schema.
 - **Less work while you play.** The log history cache (half a megabyte) was compared and written after nearly every read, every few seconds with the Factions or Tradeskills page open; it is now written a minute and a half after a change and at quit. The achievements counts are read every half minute only while the overlay, a followed plan or a page shows them. The melee counts skip every line that is not yours without parsing it.
+- **The Optimize tab no longer freezes while it plans.** The plan is worked out in the background and shows when it is ready. The Factions page finds your exports without listing the whole game folder every ten seconds, and overlays redraw only what changed.
 
 ## 2.4.0 (2026-09-29)
 

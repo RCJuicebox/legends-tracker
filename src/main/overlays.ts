@@ -375,7 +375,12 @@ export class OverlayManager {
   timers(views: TimerView[]): void {
     this.lastTimers = views
     if (!this.shown) return
-    for (const w of this.allWindows) push(w.webContents, 'overlay:timers', views)
+    // Only to pages that draw timers: an alerts-only or meter-only host has no use for five a second.
+    for (const h of this.hosts.values()) if (!h.win.isDestroyed() && this.hostHas(h.win, 'timers')) push(h.win.webContents, 'overlay:timers', views)
+    for (const [id, w] of this.windows) {
+      const cfg = this.configs.find((c) => c.id === id)
+      if (cfg?.kind === 'timers' && !w.isDestroyed()) push(w.webContents, 'overlay:timers', views)
+    }
   }
 
   alert(payload: { text: string; color: string; durationSec: number }): void {

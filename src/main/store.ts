@@ -38,6 +38,8 @@ export class Store {
   readonly unreadable: string[] = []
   /** Each file's schema, as schema.json records it (see schema.ts). */
   private readonly schema: JsonFile<Record<string, number>>
+  /** Settles once what start-up writes (files brought to a new schema) is on disk. */
+  readonly settled: Promise<void> = Promise.resolve()
 
   constructor(defaultTriggersPath: string) {
     const p = (f: string) => join(this.dir, f)
@@ -121,7 +123,7 @@ export class Store {
     // this first run would leave schema.json at the old number and migrate the files again next time.
     const brought = migrated.flatMap((f) => (byName[f] ? [byName[f]] : []))
     for (const file of brought) file.markDirty()
-    if (brought.length) void this.writeMigrated(brought)
+    if (brought.length) this.settled = this.writeMigrated(brought)
   }
 
   /** Migrated files first, and schema.json only once every one of them is on disk. */

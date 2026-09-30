@@ -10,12 +10,12 @@ import { GameCommand, Info, NumberInput, Pending, Segmented, Switch } from '../.
 import { who, wikiUrl } from '../../core/format'
 import { fmtCoin } from '../../core/loot'
 import { STANDING_MAX, standingBand, type FactionView } from './core'
+import { runPlan } from './planRunner'
 import { deityName } from '../../shared/game/deities'
 import { playableRace } from '../../shared/game/races'
 import {
   DEFAULT_SETTINGS,
   NO_CHOICES,
-  planFactions,
   planFor,
   plannable,
   type FactionPlan,
@@ -302,20 +302,24 @@ export function PlanTab({ character, view }: { character: string; view: FactionV
   const keySettings = stored.killsPerHour === undefined ? { ...deferredSettings, killsPerHour: 0 } : deferredSettings
   const structure = JSON.stringify([openSet, keySettings, deferredChoices, afresh, ways, cons, unlocksKey])
   const keptShape = useRef<{ key: string; shape: PlanShape } | null>(null)
-  const plan = useMemo(() => {
-    if (!data || !todo) return null
+  // Worked out in a worker (planRunner.ts), so a search does not freeze the page; the plan shown
+  // stays until the next one arrives, and a plan overtaken by newer inputs is dropped.
+  const [plan, setPlan] = useState<FactionPlan | null>(null)
+  useEffect(() => {
+    if (!data || !todo) return
+    let current = true
     const keep = keptShape.current?.key === structure ? keptShape.current.shape : undefined
-    const started = performance.now()
-    const p = planFactions(
-      { targets: todo.targets, maxed: todo.maxed, standings: todo.standings, activities: data.catalog.activities, ...extras },
-      deferredSettings,
-      deferredChoices,
-      keep
+    runPlan({ targets: todo.targets, maxed: todo.maxed, standings: todo.standings, activities: data.catalog.activities, ...extras }, deferredSettings, deferredChoices, keep).then(
+      (p) => {
+        if (!current) return
+        keptShape.current = { key: structure, shape: p.shape }
+        setPlan(p)
+      },
+      (e: unknown) => current && showError('Could not work out the faction plan', e)
     )
-    keptShape.current = { key: structure, shape: p.shape }
-    // What a plan costs this page, where it runs (README, Measuring); the console of a source run only.
-    if (import.meta.env.DEV) console.info(`Faction plan: ${Math.round(performance.now() - started)} ms, ${p.steps.length} steps, ${p.kept ? 'order kept' : 'searched'}`)
-    return p
+    return () => {
+      current = false
+    }
   }, [data, todo, extras, deferredSettings, deferredChoices, structure])
 
   // The plan shown is the one followed while this character is played: it goes to the main process
@@ -342,21 +346,24 @@ export function PlanTab({ character, view }: { character: string; view: FactionV
   const [noSwap, setNoSwap] = useState<{ key: string; seconds: number; unplanned: number } | null>(null)
   useEffect(() => {
     if (!swapKey || !data || !todo || noSwap?.key === swapKey) return
-    const timer = setTimeout(() => {
-      // Without swaps: every quest as the character's own race, when its standing gets there. A lock on one only another race opens now is dropped.
-      const needSwap = new Set(data.catalog.activities.flatMap((a) => (a.blocked && a.swap?.length ? [a.id] : [])))
-      const p = planFactions(
-        { targets: todo.targets, maxed: todo.maxed, standings: todo.standings, activities: data.catalog.activities, ...extras },
-        { ...deferredSettings, raceSwaps: false },
-        {
-          ...deferredChoices,
-          locks: Object.fromEntries(Object.entries(deferredChoices.locks).filter(([, id]) => !needSwap.has(id))),
-          excluded: extras.races ? deferredChoices.excluded : [...deferredChoices.excluded, ...needSwap]
-        }
-      )
-      setNoSwap({ key: swapKey, seconds: p.seconds, unplanned: p.unplanned.length })
-    }, 100)
-    return () => clearTimeout(timer)
+    let current = true
+    // Without swaps: every quest as the character's own race, when its standing gets there. A lock on one only another race opens now is dropped.
+    const needSwap = new Set(data.catalog.activities.flatMap((a) => (a.blocked && a.swap?.length ? [a.id] : [])))
+    runPlan(
+      { targets: todo.targets, maxed: todo.maxed, standings: todo.standings, activities: data.catalog.activities, ...extras },
+      { ...deferredSettings, raceSwaps: false },
+      {
+        ...deferredChoices,
+        locks: Object.fromEntries(Object.entries(deferredChoices.locks).filter(([, id]) => !needSwap.has(id))),
+        excluded: extras.races ? deferredChoices.excluded : [...deferredChoices.excluded, ...needSwap]
+      }
+    ).then(
+      (p) => current && setNoSwap({ key: swapKey, seconds: p.seconds, unplanned: p.unplanned.length }),
+      () => undefined
+    )
+    return () => {
+      current = false
+    }
   }, [swapKey, data, todo, extras, deferredSettings, deferredChoices, noSwap?.key])
   const swapSaves = plan && noSwap && noSwap.key === swapKey ? savedBySwaps(plan, noSwap) : null
   // The step each race is unlocked at, for a swap to a race the plan unlocks first.
