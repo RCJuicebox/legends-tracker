@@ -1,8 +1,10 @@
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { SpellBook } from '../src/core/spells'
+import { LEVEL_CAP, SpellBook } from '../src/core/spells'
 import { fixtureBook } from './helpers'
+
+const NL = String.fromCharCode(10)
 
 describe('SpellBook.search', () => {
   it('sorts every match before cutting to the limit', () => {
@@ -49,6 +51,26 @@ describe('SpellBook.parse', () => {
     expect(book.named('Spirit of the Puma')!.effects.length).toBeGreaterThan(0)
   })
 
+  it('leaves out a spell no class gets by the level cap, and keeps an NPC or item spell', () => {
+    // Puma as three spells: one a class gets at 50, one only at 51 and up, one with every class at 255.
+    const puma = spells()
+      .split(NL)
+      .find((l) => l.includes('^Spirit of the Puma^'))!
+      .replace(/\r$/, '')
+      .split('^')
+    const as = (id: number, name: string, levels: (i: number) => number) =>
+      puma.map((v, i) => (i === 0 ? String(id) : i === 1 ? name : i >= 36 && i < 52 ? String(levels(i - 36)) : v)).join('^')
+    const text = [
+      as(90001, 'At the Cap', (c) => (c === 3 ? LEVEL_CAP : 255)),
+      as(90002, 'Past the Cap', (c) => (c === 3 ? LEVEL_CAP + 1 : c === 5 ? 65 : 255)),
+      as(90003, 'Past the Cap Too', (c) => (c === 3 ? LEVEL_CAP + 1 : c === 5 ? 65 : 255)),
+      as(90004, 'An Item Effect', () => 255)
+    ].join(NL)
+    const book = SpellBook.parse(text, strings())
+    expect([...book.all()].map((s) => s.name)).toEqual(['At the Cap', 'An Item Effect'])
+    expect(book.get(90002)).toBeUndefined()
+  })
+
   it('holds identical class levels and effects once', () => {
     const book = SpellBook.parse(spells(), strings())
     const all = [...book.all()]
@@ -64,8 +86,6 @@ describe('what the spell file says about reach and resists', () => {
     expect(fixtureBook().named('Plague')!.resist).toBe('disease')
   })
 })
-
-const NL = String.fromCharCode(10)
 
 describe('a spell file laid out differently', () => {
   it('is refused rather than read from the wrong columns', () => {

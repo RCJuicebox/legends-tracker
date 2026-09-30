@@ -96,8 +96,9 @@ tells you little.
   Manager counts it) and CPU: the main process, each window and overlay by name, and the GPU
   process. It also gives the main process's JavaScript heap.
 - **The log** (`main.log` in the log folder) records the spell data's load on each start, for
-  example `Spell data: 73975 spells in 300 ms; the heap grew 60 MB reading it`. That is the
-  largest thing the app reads; about 42 MB of it stays once the garbage is collected. Every five
+  example `Spell data: 41472 spells in 250 ms; the heap grew 40 MB reading it`. That is the
+  largest thing the app reads; about 23 MB of it stays once the garbage is collected (the 32,000
+  spells no class gets by level 50 are left out). Every five
   minutes of fighting it also records the damage meter's push, what goes to the windows twice a
   second (`Meter push: 13 KB, 40 in the session, 10 fights kept`): the fight in hand and every
   fight's and session's totals. The open session goes whole only to a page showing it.

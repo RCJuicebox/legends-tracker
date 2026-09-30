@@ -15,6 +15,7 @@
 // Offers are keyed by the spell file's own names: Rune I to Rune IV are four enchanter spells, not
 // ranks of one (Legends prints its ranks after the name: "Rune I III").
 
+import { LEVEL_CAP } from '../shared/game/levels'
 import { CLASS_NUMBER, type ClassId } from '../shared/game/classes'
 import { isSong } from './spellKinds'
 import { RESIST_SPA, STAT_SPA } from '../shared/game/spa'
@@ -220,11 +221,7 @@ const PET_TARGETS = [14, 38]
 const SELF_TARGET = 6
 /** Buffs shorter than this are left out: the tracker is for the long ones worth asking for. */
 export const MIN_BUFF_SEC = 5 * 60
-/**
- * Legends' level cap. The spell file carries live EverQuest's later spells too (level 51 to 130);
- * nobody in Legends can cast those.
- */
-export const LEVEL_CAP = 50
+export { LEVEL_CAP }
 
 const GROUP_TARGETS = [3, 41, 42]
 

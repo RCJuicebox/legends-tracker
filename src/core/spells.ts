@@ -1,6 +1,7 @@
 import { promises as fs } from 'node:fs'
 import { join } from 'node:path'
 import { decodeCp1252 } from './logLine'
+import { LEVEL_CAP } from '../shared/game/levels'
 import { SPA } from '../shared/game/spa'
 import { CLASS_NAMES, type ResistType, type SpellCategory, type SpellSummary } from '../shared/types'
 
@@ -115,6 +116,13 @@ const ROMAN: Record<string, number> = {
 }
 const RANK_SUFFIX = /^(.*?) (?:Rk\. )?(I|II|III|IV|V|VI|VII|VIII|IX|X|XI|XII|XIII|XIV|XV)$/
 
+/**
+ * A spell no class gets by the level cap is not kept (32,172 of the 73,975 in the 2026-09 client):
+ * nobody in Legends casts it, and the book is read and held without it. An NPC's or an item's spell
+ * (every class at 255) is kept.
+ */
+export { LEVEL_CAP }
+
 export function categorize(beneficial: boolean, hasDuration: boolean, effects: SpellEffect[]): SpellCategory {
   const has = (spa: number, sign?: 1 | -1) => effects.some((e) => e.spa === spa && (sign === undefined || Math.sign(e.base) === sign))
   if (beneficial) {
@@ -139,14 +147,15 @@ export class SpellBook {
 
   static parse(spellsText: string, stringsText: string): SpellBook {
     const book = new SpellBook()
-    const messages = new Map<number, string[]>()
+    // Each id's line of messages, split only for a spell kept.
+    const messages = new Map<number, string>()
     for (const line of stringsText.split('\n')) {
       if (!line || line[0] === '#') continue
-      const f = line.replace(/\r$/, '').split('^')
-      messages.set(+f[0], f)
+      messages.set(+line.slice(0, line.indexOf('^')), line)
     }
-    // Most spells (an NPC's, an item's) have the same class levels, so each distinct set is held once.
-    const levelSets = new Map<string, number[]>()
+    // Most spells (an NPC's, an item's) have the same class levels, so each distinct set is held once,
+    // with whether any class gets the spell by the level cap (or it is an NPC's or an item's).
+    const levelSets = new Map<string, { levels: number[]; kept: boolean }>()
     const effectsOf = new EffectReader()
     let rows = 0
     let misread = 0
@@ -171,13 +180,26 @@ export class SpellBook {
       // after the icon and takes them from the end; the first line checks that the layout holds.
       const stopAt = effectsLast ? F.icon + 1 : Infinity
       let at = lineStart
+      let beyondCap = false
       for (; at <= lineEnd && count < stopAt; count++) {
         let end = text.indexOf('^', at)
         if (end < 0 || end > lineEnd) end = lineEnd
         if (WANTED[count]) f[count] = text.slice(at, end)
         if (count === F.cls) clsFrom = at
-        if (count === F.cls + 15) clsTo = end
+        if (count === F.cls + 15) {
+          clsTo = end
+          // Class levels seen before on a spell not kept (LEVEL_CAP): the rest of the row need not be read.
+          if (effectsLast !== null && levelSets.get(text.slice(clsFrom, clsTo))?.kept === false) {
+            beyondCap = true
+            break
+          }
+        }
         at = end + 1
+      }
+      if (beyondCap) {
+        rows++
+        lineStart = next
+        continue
       }
       if (effectsLast === null && count > F.effects) effectsLast = count === F.effects + 1
       else if (effectsLast && count === stopAt && at <= lineEnd) {
@@ -191,10 +213,14 @@ export class SpellBook {
       const formula = +f[F.formula]
       const cap = +f[F.cap]
       const beneficial = f[F.good] === '1'
-      const effects = effectsOf.read(f[F.effects])
       const levelKey = text.slice(clsFrom, clsTo)
-      let classLevels = levelSets.get(levelKey)
-      if (!classLevels) levelSets.set(levelKey, (classLevels = levelKey.split('^').map(Number)))
+      let set = levelSets.get(levelKey)
+      if (!set) {
+        const levels = levelKey.split('^').map(Number)
+        const lowest = Math.min(...levels)
+        levelSets.set(levelKey, (set = { levels, kept: lowest <= LEVEL_CAP || lowest >= 255 }))
+      }
+      const classLevels = set.levels
       // The row as this layout expects it: a whole id, a name, sixteen class levels 0-255, an icon.
       if (
         !Number.isInteger(id) ||
@@ -206,7 +232,9 @@ export class SpellBook {
         misread++
         continue
       }
-      const msg = messages.get(id) ?? []
+      if (!set.kept) continue
+      const effects = effectsOf.read(f[F.effects])
+      const msg = messages.get(id)?.replace(/\r$/, '').split('^') ?? []
       const spell: Spell = {
         id,
         name: f[F.name],
