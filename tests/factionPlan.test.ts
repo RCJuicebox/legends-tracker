@@ -1433,6 +1433,10 @@ describe('what quests want, race unlocks, and steps that open a way', () => {
       ['arboreans', 450],
       ['dagger', 1150]
     ])
+    // And with the most factions positive the goal.
+    const positive = planFactions({ targets: [{ ...target[0], standing: 400 }], maxed: [], activities: [camp, dagger], races }, { ...S, goal: 'positive' }, NO_CHOICES, plan.shape)
+    expect(positive.kept).toBe(true)
+    expect(positive.steps.map((st) => st.activity.id)).toEqual(['arboreans', 'dagger'])
   })
 
   it('swaps to a race it has unlocked whose con its NPC takes, and says what its own would con', () => {
@@ -1501,6 +1505,29 @@ describe('what quests want, race unlocks, and steps that open a way', () => {
       S
     )
     expect(half.steps[0].unlocks).toEqual(['Race Unlock - Wood Elf', 'Race Unlock - Half Elf'])
+  })
+
+  it("counts Half Elf's unlock with whichever of its others is done first, when both are still to do", () => {
+    const [EW, FM] = ['Emerald Warriors', 'The Freeport Militia']
+    const [wood, human, half] = ['Race Unlock - Wood Elf', 'Race Unlock - Human (Freeport)', 'Race Unlock - Half Elf']
+    const input: PlanInput = {
+      targets: [],
+      standings: { [EW]: 0, [FM]: 1900 },
+      maxed: [],
+      activities: [act('bows', { [EW]: 20 }, 3600, { zone: 'Kelethin' }), act('guards', { [FM]: 20 }, 600, { zone: 'West Freeport' })],
+      unlocks: [
+        { achievement: wood, race: 'Wood Elf', factions: [EW] },
+        { achievement: human, race: 'Human', factions: [FM] },
+        { achievement: half, race: 'Half Elf', factions: [], anyOf: [human, wood] }
+      ],
+      races: { own: 'Iksar', unlocked: [], mods }
+    }
+    const plan = planFactions(input, S)
+    expect(plan.steps.map((st) => [st.activity.id, st.unlocks])).toEqual([
+      ['guards', [human, half]],
+      ['bows', [wood]]
+    ])
+    expect(plan.unplanned).toEqual([])
   })
 
   it('with race unlocks first, does them before the rest', () => {
@@ -1683,6 +1710,30 @@ describe('the two goals', () => {
     ])
     expect(plan.steps[1].lifts).toEqual(['N'])
     expect(plan.belowZero.after).toBe(0)
+  })
+
+  it('keeps an order with a step that brings a faction back, and keeps that step once the achievements are done', () => {
+    const input = (a: number, n: number): PlanInput => ({
+      targets: a < 2000 ? [{ faction: 'A', achievement: 'A', standing: a }] : [],
+      maxed: a < 2000 ? [] : ['A'],
+      standings: { A: a, N: n },
+      activities: [act('only', { A: 10, N: -10 }, 600, { zone: 'za' }), act('mend', { N: 10 }, 600, { zone: 'zb' })]
+    })
+    const first = planFactions(input(0, 100), POSITIVE)
+    expect(first.shape).toEqual([
+      { act: 'only', finish: ['A'] },
+      { act: 'mend', finish: [], lift: ['N'] }
+    ])
+    const later = planFactions(input(1000, -900), POSITIVE, NO_CHOICES, first.shape)
+    expect(later.kept).toBe(true)
+    expect(later.steps.map((s) => [s.activity.id, s.units, s.restores])).toEqual([
+      ['only', 100, false],
+      ['mend', 190, true]
+    ])
+    // A done: all that is left is bringing N back, and that step is kept.
+    const last = planFactions(input(2000, -1900), POSITIVE, NO_CHOICES, first.shape)
+    expect(last.kept).toBe(true)
+    expect(last.steps.map((s) => [s.activity.id, s.units])).toEqual([['mend', 190]])
   })
 
   it('brings a faction that is below zero now up to 0 when it is cheap, and leaves one that would take too long', () => {

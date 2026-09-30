@@ -324,6 +324,46 @@ describe('SinceExports', () => {
     expect([...s.completed]).toEqual(['crimson hands'])
     expect(s.factionChanges.size).toBe(0)
   })
+
+  it("starts again only at its own export's line: not an earlier export of the same file, nor the other export's", () => {
+    const s = new SinceExports(factions, achievements)
+    for (const l of [
+      // Exported a minute before as well: that line is not this export's, and what follows it is in this one.
+      at(-50, 'Outputfile Complete: Tester_neriak-MNK-Factions.txt'),
+      at(-40, adjusted('Brownies of Faydwer', 4)),
+      at(10, 'Outputfile Complete: Tester_neriak-MNK-Factions.txt'),
+      at(11, adjusted('Brownies of Faydwer', 1)),
+      at(11, 'You have completed achievement: Brownies of Faydwer'),
+      // The achievements export's line starts the achievements again, not the factions.
+      at(12, 'Outputfile Complete: Tester_neriak-Achievements.txt'),
+      at(13, adjusted('Brownies of Faydwer', 2))
+    ])
+      s.add(l)
+    expect(Object.fromEntries(s.factionChanges)).toEqual({ 'brownies of faydwer': 3 })
+    expect(s.completed.size).toBe(0)
+  })
+
+  it('counts the changes from the factions export and the completions from the achievements export, when that one is newer', () => {
+    const lines = [
+      at(10, 'Outputfile Complete: Tester_neriak-MNK-Factions.txt'),
+      at(20, adjusted('Crimson Hands', 5)),
+      // Completed before the achievements export: in it already.
+      at(30, 'You have completed achievement: Crimson Hands'),
+      at(70, 'Outputfile Complete: Tester_neriak-Achievements.txt'),
+      at(80, adjusted('Antonius Bayle', 2)),
+      at(80, 'You have completed achievement: Antonius Bayle')
+    ]
+    const newer = { ...achievements, modified: T0 + 70_400 }
+    const byLine = new SinceExports(factions, newer)
+    for (const l of lines) byLine.add(l)
+    expect(Object.fromEntries(byLine.factionChanges)).toEqual({ 'crimson hands': 5, 'antonius bayle': 2 })
+    expect([...byLine.completed]).toEqual(['antonius bayle'])
+    // The same by the times the exports were written, in a log without their lines.
+    const byTime = new SinceExports(factions, newer)
+    for (const l of lines.filter((l) => !l.text.startsWith('Outputfile'))) byTime.add(l)
+    expect(Object.fromEntries(byTime.factionChanges)).toEqual({ 'crimson hands': 5, 'antonius bayle': 2 })
+    expect([...byTime.completed]).toEqual(['antonius bayle'])
+  })
 })
 
 describe('FactionHistory over a real log', () => {
@@ -415,6 +455,25 @@ describe('FactionHistory over a real log', () => {
       line(stamp(0), 'Outputfile Complete: Tester_neriak-MNK-Factions.txt') + Array.from({ length: 60 }, (_, i) => line(stamp(11 + i), adjusted('Crimson Hands', -1))).join('')
     )
     expect((await row())?.standing).toMatchObject({ value: 1355, since: -60 })
+  })
+
+  it('reads a log cut short in place from its start again', async () => {
+    const logPath = join(dir, 'eqlog_Tester_neriak.txt')
+    const exportLine = line('Sun Sep 27 12:00:10 2026', 'Outputfile Complete: Tester_neriak-MNK-Factions.txt')
+    await fs.writeFile(logPath, exportLine + Array.from({ length: 20 }, (_, i) => line(`Sun Sep 27 12:00:${11 + i} 2026`, adjusted('Crimson Hands', 5))).join(''))
+    const written = new Date(2026, 8, 27, 12, 0, 10).getTime() + 400
+    const exported = { file: 'Tester_neriak-MNK-Factions.txt', modified: written, standings: parseFactionsExport('233\tCrimson Hands\t1415\t585') }
+    const fh = new FactionHistory(new LogHistory(join(dir, 'log-history.json'), { factions: factionConsumer }), 'factions')
+    const where = { logPath, archiveDir: join(dir, 'archive'), stem: 'eqlog_Tester_neriak' }
+    const row = async () => (await fh.view(where, exported)).factions.find((f) => f.name === 'Crimson Hands')
+    expect((await row())?.standing).toMatchObject({ value: 1515, since: 100 })
+
+    // The same file emptied and begun again: shorter than where the last read ended, so read from its start.
+    const id = (await fs.stat(logPath)).ino
+    await fs.truncate(logPath, 0)
+    await fs.appendFile(logPath, exportLine + line('Sun Sep 27 12:00:40 2026', adjusted('Crimson Hands', -3)))
+    expect((await fs.stat(logPath)).ino).toBe(id)
+    expect((await row())?.standing).toMatchObject({ value: 1412, since: -3 })
   })
 
   it('is empty for a log with no faction lines', async () => {
