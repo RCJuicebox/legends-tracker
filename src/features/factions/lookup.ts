@@ -1,6 +1,7 @@
 import { usualAmount, type FactionSourceTallies, type SharedFrom, type SourceKind } from './attribution'
 import { NO_MOB, type FactionPageData, type FactionSources } from './core'
-import { factionNamer, zoneKey, type Guesses } from './planner'
+import { factionNamer, zoneKey } from './names'
+import type { Guesses } from './catalog'
 
 // Two questions the Standings tab answers from what the logs and eqlwiki say: what moved this
 // faction, and what does this mob or NPC do to my factions. The logs' answers are the game's own

@@ -10,7 +10,7 @@ process.env['EQL_USER_DATA'] = dir
 vi.mock('electron', () => ({ app: { getPath: () => dir, getVersion: () => 'test' } }))
 
 const { FactionAlla } = await import('../src/features/factions/allaSource')
-const { factionKey } = await import('../src/features/factions/planner')
+const { factionKey } = await import('../src/features/factions/core')
 const { ALLA_INDEX_URL, allaPageUrl } = await import('../src/features/factions/allakhazam')
 
 const PAGE = readFileSync(join(__dirname, 'fixtures', 'alla-faction-66.html'), 'utf8')

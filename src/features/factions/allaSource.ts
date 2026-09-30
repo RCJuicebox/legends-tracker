@@ -6,7 +6,7 @@ import { log } from '../../main/log'
 import { sources } from '../../main/sources/registry'
 import { JsonFile } from '../../main/storeCore'
 import { ALLA_INDEX_URL, ALLA_READY, allaFactionLaidOut, allaPageUrl, parseAllaFaction, parseAllaIndex, type AllaFaction } from './allakhazam'
-import { factionKey } from './planner'
+import { factionKey } from './core'
 
 // Allakhazam's faction pages, read for the plan (what they hold: allakhazam.ts). The site's
 // robots.txt asks every crawler to wait twenty seconds between pages, so the tracker reads one page

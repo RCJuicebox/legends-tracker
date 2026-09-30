@@ -20,7 +20,8 @@ import {
   type FactionStandingNow
 } from './core'
 import { Doing, Flags, PlanTab, sourceNote, useChoices, usePlanSettings } from './planPage'
-import { waysToRaise, type PlanActivity } from './planner'
+import type { PlanActivity } from './catalog'
+import { waysToRaise } from './ways'
 import type { FactionLookup, LookupHit } from './lookup'
 
 // Where the character stands with each faction, from the game's factions export, and the faction

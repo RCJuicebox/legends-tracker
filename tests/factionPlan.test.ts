@@ -4,28 +4,12 @@ import { join } from 'node:path'
 import { baseZone, emptySources, joinSources, shareSources, sourceReader, usualAmount, type FactionSourceTallies } from '../src/features/factions/attribution'
 import { parseFactionPageFull, type FactionRow } from '../src/features/factions/core'
 import { parseQuestPage, readHandIn } from '../src/features/factions/questPages'
-import {
-  buildCatalog,
-  classSwapName,
-  classSwapOf,
-  DEFAULT_SETTINGS,
-  factionNamer,
-  howHad,
-  itemsToLookUp,
-  KEEP_MAXED,
-  NO_CHOICES,
-  planFactions,
-  planFor,
-  plannable,
-  unitTime,
-  unmatchedNames,
-  waysToRaise,
-  zoneKey,
-  type CatalogInput,
-  type PlanActivity,
-  type PlanInput,
-  type PlanSettings
-} from '../src/features/factions/planner'
+import type { PlanSettings } from '../src/shared/settings'
+import { classSwapName, classSwapOf, factionNamer, unmatchedNames, zoneKey } from '../src/features/factions/names'
+import { buildCatalog, howHad, itemsToLookUp, type CatalogInput, type PlanActivity } from '../src/features/factions/catalog'
+import { DEFAULT_SETTINGS, KEEP_MAXED, NO_CHOICES, plannable, unitTime, waysToRaise } from '../src/features/factions/ways'
+import type { PlanInput } from '../src/features/factions/planTypes'
+import { planFactions, planFor } from '../src/features/factions/planner'
 import type { ItemInfo } from '../src/shared/types'
 import { lookUp, moversOf, sourcesOf } from '../src/features/factions/lookup'
 import {

@@ -28,7 +28,9 @@ import {
 } from './core'
 import { emptySources, joinSources, shareSources, sourceReader, type FactionSourceTallies } from './attribution'
 import { parseQuestPage, type QuestPage } from './questPages'
-import { buildCatalog, classSwapName, factionNamer, guessesFrom, itemsToLookUp, planFor, unmatchedNames, type CatalogInput, type FactionPlanData } from './planner'
+import { classSwapName, factionNamer, unmatchedNames } from './names'
+import { buildCatalog, guessesFrom, itemsToLookUp, type CatalogInput } from './catalog'
+import { planFor, type FactionPlanData } from './planner'
 import { parseRaceUnlocks, raceUnlocks, unlockedRaces, type RaceUnlockDef } from './unlocks'
 import { lookUp, moversOf, sourcesOf } from './lookup'
 import { listLogs } from '../../main/game'
@@ -55,10 +57,10 @@ import type { AppContext } from '../../main/context'
 // which have an achievement from the client's achievement list and the achievements export; what
 // raises one from its eqlwiki page, fetched when asked for and kept a week.
 //
-// The plan for the achievements still to do (planner.ts) is worked out in the page, from what this
-// gathers: what each kill and hand-in in the log did (attribution.ts), every eqlwiki faction page
-// and the quest pages they name (kept a week), what the character has bought and holds, and what
-// the wiki says of the items hand-ins want.
+// The plan for the achievements still to do (planner.ts) is worked out in the page, from the catalog
+// of ways this builds (catalog.ts) out of what it gathers: what each kill and hand-in in the log did
+// (attribution.ts), every eqlwiki faction page and the quest pages they name (kept a week), what the
+// character has bought and holds, and what the wiki says of the items hand-ins want.
 
 /** Each stretch of log's faction tallies, as a LogHistory consumer. */
 export const factionConsumer: HistoryConsumer<FactionTallies> = {

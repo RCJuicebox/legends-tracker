@@ -1,4 +1,5 @@
-import type { FactionPlan, PlanChoices, PlanInput, PlanSettings, PlanShape } from './planner'
+import type { PlanChoices, PlanSettings } from '../../shared/settings'
+import type { FactionPlan, PlanInput, PlanShape } from './planTypes'
 import type { PlanReply, PlanRequest } from './planWorker'
 
 // The page's side of the planner worker (planWorker.ts): one worker, made when first needed and kept,

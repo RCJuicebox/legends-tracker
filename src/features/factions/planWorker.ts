@@ -1,4 +1,6 @@
-import { planFactions, type FactionPlan, type PlanChoices, type PlanInput, type PlanSettings, type PlanShape } from './planner'
+import type { PlanChoices, PlanSettings } from '../../shared/settings'
+import type { FactionPlan, PlanInput, PlanShape } from './planTypes'
+import { planFactions } from './planner'
 
 // The faction planner, off the page's thread: a search can take a good part of a second, and the
 // Plan tab would freeze while it ran. planRunner.ts on the page sends it the plan's inputs and

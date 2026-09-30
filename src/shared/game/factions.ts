@@ -1,6 +1,6 @@
-// What the faction planner (features/factions/planner.ts) knows that neither the game's tables nor
-// the wikis tell it: names the wikis and the log write differently, and what players have found in
-// play and on Allakhazam (everquest.allakhazam.com) where eqlwiki misleads for Legends or says
+// What the faction planner (features/factions: names.ts and catalog.ts) knows that neither the game's
+// tables nor the wikis tell it: names the wikis and the log write differently, and what players have
+// found in play and on Allakhazam (everquest.allakhazam.com) where eqlwiki misleads for Legends or says
 // nothing. Pure data; each entry says where it comes from, and when, where that is known. A line
 // here is a finding: one that play turns out wrong is fixed here, and the planner follows.
 

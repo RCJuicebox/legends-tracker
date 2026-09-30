@@ -3,7 +3,10 @@ import { achKey, objKey, parseAchievements } from '../src/core/achievements'
 import { trackedAchievements } from '../src/core/trackedAchievements'
 import { RaceIndex, raceWords, slayerCounters, slayerCounts, slayerLine, wikiRace, type SlayerKills } from '../src/core/slayer'
 import { joinSkillValues, skillGoals, skillId, skillUp, skillValue } from '../src/core/skillAchievements'
-import { DEFAULT_SETTINGS, planFactions, type PlanActivity, type PlanSettings } from '../src/features/factions/planner'
+import type { PlanSettings } from '../src/shared/settings'
+import type { PlanActivity } from '../src/features/factions/catalog'
+import { DEFAULT_SETTINGS } from '../src/features/factions/ways'
+import { planFactions } from '../src/features/factions/planner'
 import {
   carryFollow,
   followedPlan,

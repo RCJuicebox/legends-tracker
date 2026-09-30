@@ -12,26 +12,12 @@ import { STANDING_MAX, standingBand, type FactionView } from './core'
 import { runPlan } from './planRunner'
 import { deityName } from '../../shared/game/deities'
 import { playableRace } from '../../shared/game/races'
-import {
-  classSwapOf,
-  DEFAULT_SETTINGS,
-  NO_CHOICES,
-  planFor,
-  plannable,
-  type FactionPlan,
-  type FactionPlanData,
-  type PlanFor,
-  type PlanGoal,
-  type PlanInput,
-  type PlanShape,
-  type HandInItem,
-  type PlanActivity,
-  type PlanChoices,
-  type PlanOption,
-  type PlanSettings,
-  type PlanStep,
-  type Unplanned
-} from './planner'
+import type { PlanChoices, PlanGoal, PlanSettings } from '../../shared/settings'
+import { classSwapOf } from './names'
+import type { HandInItem, PlanActivity } from './catalog'
+import { DEFAULT_SETTINGS, NO_CHOICES, plannable } from './ways'
+import type { FactionPlan, PlanInput, PlanOption, PlanShape, PlanStep, Unplanned } from './planTypes'
+import { planFor, type FactionPlanData, type PlanFor } from './planner'
 import { unlockGoals, type RaceUnlock } from './unlocks'
 import { followedPlan } from './tracker'
 import type { FactionTrackView } from '../../shared/tracking'

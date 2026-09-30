@@ -1,7 +1,7 @@
 import { playableRace } from '../../shared/game/races'
 import type { AchSection, Achievement } from '../../core/achievements'
 import { leftOutIsDone } from './core'
-import type { UnlockGoal } from './planner'
+import type { UnlockGoal } from './planTypes'
 
 // The race unlocks: Legends' "Untapped Potential: Races" achievements, one a race, each done by
 // maxing three of that race's home factions ("Get maximum faction with Merchants of Halas."). One

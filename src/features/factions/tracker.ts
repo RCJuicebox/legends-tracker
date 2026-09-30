@@ -1,5 +1,6 @@
 import { STANDING_MAX, STANDING_MIN } from './core'
-import { zoneKey, type FactionPlan, type PlanTarget } from './planner'
+import { zoneKey } from './names'
+import type { FactionPlan, PlanTarget } from './planTypes'
 import type { FactionTrackGoal, FactionTrackView, TrackKind } from '../../shared/tracking'
 
 // Following a faction plan while playing. The Plan tab hands the plan it shows to the main
