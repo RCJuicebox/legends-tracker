@@ -42,6 +42,11 @@ export function isCharacterKey(v: unknown): v is string {
   return ![...v].some((c) => c.charCodeAt(0) < 32)
 }
 
+/** Throws unless `v` is a character key (isCharacterKey): for a handler that is asked about a character. */
+export function assertCharacterKey(v: unknown): asserts v is string {
+  if (!isCharacterKey(v)) throw new Error('Not a character.')
+}
+
 /** CON, PRN, AUX, NUL, COM1-9 and LPT1-9, with or without an extension, in any case. */
 const DEVICE_NAME = /^(?:con|prn|aux|nul|com\d|lpt\d)(?:\..*)?$/i
 

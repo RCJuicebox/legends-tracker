@@ -40,6 +40,7 @@ const m = await import('../src/features/factions/main')
 const { LogHistory } = await import('../src/main/sources/logHistory')
 const { rendererUrl } = await import('../src/main/push')
 const { GameTables } = await import('../src/main/stats')
+const { AchievementFiles } = await import('../src/main/achievements')
 const OWN = { senderFrame: { url: rendererUrl() + 'index.html' } }
 const BOOK = join(h.dir, 'local', 'faction-book.json')
 const DAY = 24 * 3600_000
@@ -265,6 +266,11 @@ beforeAll(() => {
   const ctx = {
     installDir: () => setting.installDir,
     gameTables: new GameTables(() => setting.installDir),
+    achievementFiles: new AchievementFiles(
+      h.dir,
+      () => setting.installDir,
+      () => {}
+    ),
     historyOf: (c: string) => ({ logPath: join(game, 'Logs', `eqlog_${c}.txt`), archiveDir: join(game, 'Logs', 'Archive'), stem: `eqlog_${c}` }),
     factions: new m.FactionHistory(history, 'factions'),
     factionSources: new m.FactionSourceHistory(history, 'factionSources'),

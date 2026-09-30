@@ -1,11 +1,10 @@
 import { promises as fs } from 'node:fs'
 import { join } from 'node:path'
-import { parseAchievements, type AchSection } from '../core/achievements'
 import { trackedAchievements } from '../core/trackedAchievements'
 import { SELF } from '../core/combatLines'
 import { isFriend } from '../core/combatMeter'
 import { RaceIndex, slayerCounters, slayerCounts, slayerLine, type SlayerCounter, type SlayerKills } from '../core/slayer'
-import { isCharacterKey } from '../core/validate'
+import { assertCharacterKey } from '../core/validate'
 import { skillGoals, skillId, skillValue } from '../core/skillAchievements'
 import { classIdOf, type ClassId } from '../shared/game/classes'
 import { parseFactionLine } from '../features/factions/core'
@@ -23,6 +22,7 @@ import {
   type FollowState
 } from '../features/factions/tracker'
 import type { AchievementTrack, FactionTrackView, SkillRow, SkillTrackView, SlayerTrackView, TrackedAchievement } from '../shared/tracking'
+import type { AchievementsExport } from './achievements'
 import type { AppContext } from './context'
 import type { EngineFeature } from './engine'
 import { handle } from './ipc/handle'
@@ -92,7 +92,7 @@ export class LiveAchievements {
   private skillsAt = 0
   private skills: SkillTrackView | null = null
   /** The achievements export as last read, by character and when it was written. */
-  private exported: { character: string; mtime: number; file: string; sections: AchSection[] } | null = null
+  private exported: (AchievementsExport & { character: string }) | null = null
   /** The player's marks on the Achievements page: hand ticks, and the achievements tracked. */
   private marks: { character: string; ticks: string[]; tracked: string[] } | null = null
   /** Faction achievements' factions and standings, by achievement name (lower-cased), for tracked ones. */
@@ -288,19 +288,8 @@ export class LiveAchievements {
 
   /** The character's achievements export, read again only when the game has written it again; null without one. */
   private async achievementsExport(character: string): Promise<LiveAchievements['exported']> {
-    const file = `${character}-Achievements.txt`
-    const path = join(this.ctx.installDir(), file)
-    const st = await fs.stat(path).catch(() => null)
-    if (!st) return (this.exported = null)
-    const had = this.exported
-    if (had && had.character === character && had.mtime === st.mtimeMs) return had
-    try {
-      return (this.exported = { character, mtime: st.mtimeMs, file, sections: parseAchievements(await fs.readFile(path, 'utf8')).sections })
-    } catch (e) {
-      // Caught mid-write, or not an export: the next read tries again.
-      log.warn(`Could not read ${file} for the achievements overlay:`, e)
-      return null
-    }
+    const exp = await this.ctx.achievementFiles.exported(character)
+    return (this.exported = exp && { character, ...exp })
   }
 
   private async readSlayer(character: string): Promise<void> {
@@ -310,7 +299,7 @@ export class LiveAchievements {
       this.slayerView = null
       return
     }
-    const st = { mtimeMs: exp.mtime }
+    const st = { mtimeMs: exp.modified }
     const file = exp.file
     const logPath = this.ctx.historyOf(character).logPath
     let s = this.slayer
@@ -503,13 +492,13 @@ export class LiveAchievements {
 
 export function registerLiveAchievementsIpc(ctx: AppContext): void {
   handle('factions:follow', async (character, plan) => {
-    if (!isCharacterKey(character)) throw new Error('Not a character.')
+    assertCharacterKey(character)
     const clean = plan === null ? null : sanitizeFollowedPlan(plan)
     if (plan !== null && !clean) throw new Error('Not a plan.')
     await ctx.liveAchievements.follow(character, clean)
   })
   handle('factions:follow-step', async (character, index) => {
-    if (!isCharacterKey(character)) throw new Error('Not a character.')
+    assertCharacterKey(character)
     if (typeof index !== 'number' || !Number.isInteger(index) || index < 0) throw new Error('Not a step.')
     await ctx.liveAchievements.followStep(character, index)
   })

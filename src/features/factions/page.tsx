@@ -20,7 +20,7 @@ import {
   type FactionStandingNow
 } from './core'
 import { PlanTab, useChoices, usePlanSettings } from './planPage'
-import { Doing, Flags, sourceNote } from './plan/parts'
+import { Doing, Flags, plain, signed, sourceNote, theirLogs } from './plan/parts'
 import type { PlanActivity } from './catalog'
 import { waysToRaise } from './ways'
 import type { FactionLookup, LookupHit } from './lookup'
@@ -97,10 +97,6 @@ function bySort(sort: Sort<SortKey>) {
 /** "Faction723": a faction the game has no name for. */
 const UNNAMED = /^Faction\d+$/
 
-/** +3, −2 (a true minus), 0: the sign says the direction as well as the colour. */
-const signed = (n: number) => (n > 0 ? `+${n}` : n < 0 ? `−${-n}` : '0')
-/** A standing, with a true minus. */
-const plain = (n: number) => (n < 0 ? `−${-n}` : String(n))
 const tone = (n: number) => (n > 0 ? 'ok-text' : n < 0 ? 'bad-text' : 'faint')
 
 /** The class in a con's sum: the best of the character's classes ("Bard +50, the best of Monk, Bard and Enchanter"). */
@@ -554,9 +550,6 @@ function History({ r, character, basis, ways }: { r: FactionRow; character: stri
 /** The Plan tab's ways to raise a faction, with the log's kill pace. */
 type Catalog = { activities: PlanActivity[]; logPace: number | null }
 
-/** Other characters' names for a sentence: "Kelwyn's", "Kelwyn's and Aldric's". */
-const theirs = (keys: string[]) => keys.map((k) => `${k.split('_')[0]}'s`).join(' and ')
-
 /** What moved the faction in the logs: this character's, and the player's other characters'. */
 function Moved({ name, character }: { name: string; character: string }) {
   const q = useInvoke('factions:moved', [character, name])
@@ -571,7 +564,7 @@ function Moved({ name, character }: { name: string; character: string }) {
           <li key={`${m.kind}|${m.zone}|${m.name}`}>
             <span className={`mono ${tone(m.amount)}`}>{signed(m.amount)}</span> each ×{m.n.toLocaleString()} = <span className={`mono ${tone(m.total)}`}>{signed(m.total)}</span>{' '}
             {m.kind === 'kill' ? 'killing' : 'hand-ins to'} <b>{m.name}</b> <span className="faint">({m.zone || 'somewhere'})</span>
-            {m.others.length > 0 && <span className="faint"> · {m.own ? `and in ${theirs(m.others)} log` : `from ${theirs(m.others)} log`}</span>}
+            {m.others.length > 0 && <span className="faint"> · {m.own ? `and in ${theirLogs(m.others)} log` : `from ${theirLogs(m.others)} log`}</span>}
           </li>
         ))}
       </ul>
@@ -643,7 +636,7 @@ function LookupResults({ query, results, error, view }: { query: string; results
               <span className="faint small">
                 {x.from === 'wiki'
                   ? 'eqlwiki: which way only, amounts guessed'
-                  : `${x.own === false && x.others?.length ? `${theirs(x.others)} log` : x.others?.length ? `your log and ${theirs(x.others)}` : 'your log'} (${(x.n ?? 0).toLocaleString()} ${x.kind === 'kill' ? 'kills' : 'hand-ins'})`}
+                  : `${x.own === false && x.others?.length ? `${theirLogs(x.others)} log` : x.others?.length ? `your log and ${theirLogs(x.others)}` : 'your log'} (${(x.n ?? 0).toLocaleString()} ${x.kind === 'kill' ? 'kills' : 'hand-ins'})`}
               </span>
             </div>
             <div className="row tight fp-effects">

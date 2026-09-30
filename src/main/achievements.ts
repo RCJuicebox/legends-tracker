@@ -1,32 +1,49 @@
 import { promises as fs } from 'node:fs'
 import { writeFileAtomic } from './storeCore'
 import { join } from 'node:path'
-import { parseAchievements, type AchMarks } from '../core/achievements'
+import { parseAchievements, type AchMarks, type AchSection } from '../core/achievements'
 import type { AchievementsView } from '../shared/types'
 import { log } from './log'
 import { isCharacterKey } from '../core/validate'
 import { sources } from './sources/registry'
+import { ExportWatch } from './exportWatch'
 
 const EMPTY_MARKS: AchMarks = { ticks: [], broken: [] }
+
+/** A character's achievements export as read: its file name, when the game wrote it, and what it lists. */
+export interface AchievementsExport {
+  file: string
+  modified: number
+  sections: AchSection[]
+}
 
 /**
  * Reads a character's achievements export straight from the game folder, and keeps the player's own
  * marks (hand ticks, Broken) beside it in the app's data. Typing /outputfile achievements in game
- * rewrites the export; a short poll notices and sends the new list.
+ * rewrites the export; a short poll notices and sends the new list. The Achievements page, the
+ * achievements overlay and the Factions page all read the export here, so it is parsed once a write.
  */
 export class AchievementFiles {
-  private watched = ''
-  private watchedMtime = 0
-  private timer: NodeJS.Timeout | null = null
+  private readonly watch: ExportWatch
+  /** Each export read, by path, kept while the file is unchanged. */
+  private readonly read = new Map<string, { modified: number; sections: AchSection[] }>()
 
   constructor(
     /** The app's data folder (userData): the player's marks go in its achievements folder. */
     private readonly dataDir: string,
     private readonly gameDir: () => string,
-    private readonly send: (view: AchievementsView) => void,
+    send: (view: AchievementsView) => void,
     /** Whether a page could be showing the export: the main window is open. Hidden, the file is not looked at. */
-    private readonly shown: () => boolean = () => true
-  ) {}
+    shown: () => boolean = () => true
+  ) {
+    this.watch = new ExportWatch(
+      'Achievements',
+      (c) => this.exportPath(c),
+      gameDir,
+      shown,
+      async (c) => send(await this.load(c))
+    )
+  }
 
   private get marksDir(): string {
     return join(this.dataDir, 'achievements')
@@ -59,50 +76,66 @@ export class AchievementFiles {
     await writeFileAtomic(path, JSON.stringify(marks, null, 2))
   }
 
+  /**
+   * A character's achievements export, read again only once the game has written it again. Null when
+   * there is none (or no game folder); a file that cannot be read throws.
+   */
+  async readExport(character: string): Promise<AchievementsExport | null> {
+    if (!isCharacterKey(character) || !this.gameDir()) return null
+    const file = `${character}-Achievements.txt`
+    const path = this.exportPath(character)
+    let modified: number
+    try {
+      modified = (await fs.stat(path)).mtimeMs
+    } catch (e) {
+      if ((e as NodeJS.ErrnoException).code === 'ENOENT') return null
+      throw e
+    }
+    let kept = this.read.get(path)
+    if (kept?.modified !== modified) {
+      kept = { modified, sections: parseAchievements(await fs.readFile(path, 'utf8')).sections }
+      if (this.read.size > 20) this.read.clear()
+      this.read.set(path, kept)
+    }
+    return { file, modified, sections: kept.sections }
+  }
+
+  /** The export, for what only uses it (the overlay, the Factions page): one that cannot be read is logged, and null. */
+  async exported(character: string): Promise<AchievementsExport | null> {
+    try {
+      return await this.readExport(character)
+    } catch (e) {
+      // Caught mid-write, or not an export: the next read tries again.
+      log.warn(`Could not read ${character}'s achievements export:`, e)
+      return null
+    }
+  }
+
   /** The export and marks for a character, and starts watching that export for a new one. */
   async load(character: string): Promise<AchievementsView> {
-    this.watch(character)
-    const file = `${character}-Achievements.txt`
+    this.watch.follow(isCharacterKey(character) ? character : '')
     if (!isCharacterKey(character)) {
       const named = typeof character === 'string' ? character : ''
       return { character: named, file: '', modified: 0, sections: [], marks: { ...EMPTY_MARKS }, error: named ? 'Not a character name.' : 'No character chosen.' }
     }
+    const file = `${character}-Achievements.txt`
     const base: AchievementsView = { character, file, modified: 0, sections: [], marks: await this.marks(character), error: '' }
     try {
-      const path = this.exportPath(character)
-      const [text, st] = await Promise.all([fs.readFile(path, 'utf8'), fs.stat(path)])
-      this.watchedMtime = st.mtimeMs
-      sources.ok('exports', `${file}, written ${new Date(st.mtimeMs).toLocaleString()}`)
-      return { ...base, modified: st.mtimeMs, sections: parseAchievements(text).sections }
+      const exp = await this.readExport(character)
+      if (!exp) {
+        sources.missing('exports', `No ${file} yet: type /outputfile achievements in game.`)
+        return { ...base, error: 'missing' }
+      }
+      this.watch.seen(exp.modified)
+      sources.ok('exports', `${file}, written ${new Date(exp.modified).toLocaleString()}`)
+      return { ...base, modified: exp.modified, sections: exp.sections }
     } catch (e) {
-      const err = e as NodeJS.ErrnoException
-      if (err.code !== 'ENOENT') sources.fail('exports', e, file)
-      else sources.missing('exports', `No ${file} yet: type /outputfile achievements in game.`)
-      return { ...base, error: err.code === 'ENOENT' ? 'missing' : err.message }
-    }
-  }
-
-  private watch(character: string): void {
-    this.watched = isCharacterKey(character) ? character : ''
-    this.watchedMtime = 0
-    if (this.timer) return
-    this.timer = setInterval(() => void this.poll(), 4000)
-  }
-
-  private async poll(): Promise<void> {
-    if (!this.watched || !this.gameDir() || !this.shown()) return
-    try {
-      const st = await fs.stat(this.exportPath(this.watched))
-      // The game writes the file in one go, but give it a moment before reading a fresh one.
-      if (st.mtimeMs !== this.watchedMtime && Date.now() - st.mtimeMs > 1500) this.send(await this.load(this.watched))
-    } catch (e) {
-      // Not there (yet): nothing to send.
-      if ((e as NodeJS.ErrnoException).code !== 'ENOENT') log.warn('Achievements poll failed', e)
+      sources.fail('exports', e, file)
+      return { ...base, error: (e as Error).message }
     }
   }
 
   stop(): void {
-    if (this.timer) clearInterval(this.timer)
-    this.timer = null
+    this.watch.stop()
   }
 }

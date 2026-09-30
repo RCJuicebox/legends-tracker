@@ -9,12 +9,12 @@ import type { BookRecipe, RecipeFile, WikiProgress } from '../shared/ipc'
 import { cacheDir } from './paths'
 import { sources } from './sources/registry'
 import { jobs, type Job } from './sources/jobs'
+import { downloadStale, reportDownload } from './sources/freshness'
 
 // Every recipe on eqlwiki.com, for the Tradeskills page: each page in the Player Crafted category
 // carries its recipe and yield, fifty pages a request (about 45 requests), one at a time. Alchemy's
 // table adds the potions whose own pages give no recipe (Elixir of Greater Concentration). Kept in
 // the app's data and refreshed at most once a week, like the item catalog.
-const FRESH_MS = 7 * 24 * 3600_000
 // 2: the era tag of every page read (products and their ingredients), for crafted items' eras.
 const FORMAT = 2
 const ERA_TAG = /\{\{\s*([A-Za-z][A-Za-z ]*?)\s+Era\s*\}\}/
@@ -48,7 +48,7 @@ export class RecipeBook {
   }
 
   isStale(file: RecipeFile | null): boolean {
-    return !file || file.format < FORMAT || Date.now() - file.fetchedAt > FRESH_MS
+    return downloadStale(file, FORMAT)
   }
 
   refresh(): Promise<RecipeFile | null> {
@@ -59,16 +59,13 @@ export class RecipeBook {
   private report(p: Partial<RecipeProgress>): void {
     this.progress = { ...this.progress, ...p }
     this.onProgress(this.progress)
-    if (this.progress.busy)
-      this.job?.progress(this.progress.total ? this.progress.pages / this.progress.total : null, `${this.progress.pages} of ${this.progress.total || '?'} pages`)
     const file = this.file
-    if (this.progress.busy) sources.reading('recipes', `${this.progress.pages} of ${this.progress.total || '?'} pages`)
-    else if (this.progress.error) sources.fail('recipes', new Error(this.progress.error))
-    else if (file) {
-      const what = `${file.recipes.length.toLocaleString()} recipes, from ${new Date(file.fetchedAt).toLocaleDateString()}`
-      if (this.isStale(file)) sources.stale('recipes', what)
-      else sources.ok('recipes', what)
-    }
+    reportDownload(
+      'recipes',
+      this.progress,
+      this.job,
+      file && { what: `${file.recipes.length.toLocaleString()} recipes, from ${new Date(file.fetchedAt).toLocaleDateString()}`, stale: this.isStale(file) }
+    )
   }
 
   /**

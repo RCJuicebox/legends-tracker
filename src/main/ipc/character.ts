@@ -9,7 +9,7 @@ import { meleeProfile } from '../../core/meleeTally'
 import { craftEras } from '../../core/tradeskills'
 import { petSpells, petSummonName } from '../../core/pets'
 import type { EffectSpell } from '../../core/itemEffects'
-import { intArg, isCharacterKey, sanitizeSheet, stringsArg } from '../../core/validate'
+import { assertCharacterKey, intArg, isCharacterKey, sanitizeSheet, stringsArg } from '../../core/validate'
 import { characterLogFile } from '../storeCore'
 import type { AppContext } from '../context'
 import type { CatalogFile } from '../../shared/ipc'
@@ -109,12 +109,12 @@ export function registerCharacterIpc(ctx: AppContext): void {
   })
   // The picked character's own /alternateadv list, whichever character is being played.
   handle('stats:readAAs', (character) => {
-    if (!isCharacterKey(character)) throw new Error('Not a character.')
+    assertCharacterKey(character)
     return readAasFromLog(liveLog(character), { warn: (m, e) => log.warn(m, e) })
   })
   // The AAs its log and archives saw bought, for Stats › AAs.
   handle('stats:aaHistory', async (character) => {
-    if (!isCharacterKey(character)) throw new Error('Not a character.')
+    assertCharacterKey(character)
     return { character, view: ctx.installDir() ? await ctx.aaHistory.view(history(character)) : aaHistoryView(emptyAaTally()) }
   })
   handle('stats:readScreen', () => readStatsFromScreen(ctx.windows))
@@ -137,7 +137,7 @@ export function registerCharacterIpc(ctx: AppContext): void {
     return { file, stale: ctx.recipeBook.isStale(file), progress: ctx.recipeBook.progress }
   })
   handle('trade:purchases', async (character) => {
-    if (!isCharacterKey(character)) throw new Error('Not a character.')
+    assertCharacterKey(character)
     if (!ctx.installDir()) return {}
     return ctx.purchases.latest(history(character))
   })
@@ -147,7 +147,7 @@ export function registerCharacterIpc(ctx: AppContext): void {
   // The pet: what it wears and which one it is, from the log (read back once a session per
   // character, then followed live), and every pet the character's classes can summon.
   handle('pet:state', async (character, classes, level) => {
-    if (!isCharacterKey(character)) throw new Error('Not a character.')
+    assertCharacterKey(character)
     const ids = stringsArg(classes, 16, 40)
     const lvl = intArg(level, 1, 100, 50)
     const book = engine.book

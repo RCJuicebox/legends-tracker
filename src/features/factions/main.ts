@@ -34,15 +34,16 @@ import { RACE_UNLOCK_DEFS, raceUnlocks, unlockedRaces, type RaceUnlockDef } from
 import { lookUp, moversOf, sourcesOf } from './lookup'
 import { listLogs } from '../../main/game'
 import type { Purchases } from '../../shared/ipc'
-import { parseAchievements, type AchSection } from '../../core/achievements'
+import type { AchSection } from '../../core/achievements'
 import { PLAYABLE_RACES, playableRace } from '../../shared/game/races'
 import { CLASS_NAMES } from '../../shared/game/classes'
 import { itemKey, parseInventory } from '../../core/inventory'
 import { unitPrice } from '../../core/tradeskills'
 import { handle } from '../../main/ipc/handle'
 import { writeFileAtomic } from '../../main/storeCore'
-import { isCharacterKey } from '../../core/validate'
+import { assertCharacterKey } from '../../core/validate'
 import { sources } from '../../main/sources/registry'
+import { expired } from '../../main/sources/freshness'
 import { wiki } from '../../main/sources/wiki'
 import { cacheDir } from '../../main/paths'
 import { log } from '../../main/log'
@@ -280,32 +281,9 @@ async function swapConsFor(
   return out
 }
 
-/** Each achievements export read, by path, kept while the file is unchanged. */
-const achievementsRead = new Map<string, { modified: number; sections: AchSection[] }>()
-
-/** A character's achievements export, read (again only once the game has written it again); null without one. */
-async function achievementsExport(dir: string, character: string): Promise<{ sections: AchSection[]; mark: ExportMark } | null> {
-  const file = `${character}-Achievements.txt`
-  const path = join(dir, file)
-  try {
-    const modified = (await fs.stat(path)).mtimeMs
-    let kept = achievementsRead.get(path)
-    if (kept?.modified !== modified) {
-      kept = { modified, sections: parseAchievements(await fs.readFile(path, 'utf8')).sections }
-      if (achievementsRead.size > 20) achievementsRead.clear()
-      achievementsRead.set(path, kept)
-    }
-    return { sections: kept.sections, mark: { file, modified } }
-  } catch (e) {
-    // None yet is the usual case.
-    if ((e as NodeJS.ErrnoException).code !== 'ENOENT') log.warn(`Could not read ${character}'s achievements export:`, e)
-    return null
-  }
-}
-
 /** A character's achievements export's sections; null without one. */
-async function achievementSections(dir: string, character: string): Promise<AchSection[] | null> {
-  return (await achievementsExport(dir, character))?.sections ?? null
+async function achievementSections(ctx: AppContext, character: string): Promise<AchSection[] | null> {
+  return (await ctx.achievementFiles.exported(character))?.sections ?? null
 }
 
 /**
@@ -377,11 +355,9 @@ async function factionAchievements(ctx: AppContext, character: string): Promise<
   const list = await ctx.gameTables.get(FACTION_ACHIEVEMENT_LIST)
   if (!list.length) return null
   // Without an export, the standing says which are done.
-  const exp = await achievementsExport(ctx.installDir(), character)
-  return { list, status: progressionStatus(exp?.sections ?? null), exported: exp?.mark ?? null }
+  const exp = await ctx.achievementFiles.exported(character)
+  return { list, status: progressionStatus(exp?.sections ?? null), exported: exp && { file: exp.file, modified: exp.modified } }
 }
-
-const FRESH_MS = 7 * 24 * 3600_000
 
 interface FactionBookFile {
   version: number
@@ -450,7 +426,7 @@ export class FactionBook {
   /** The book, read again when over a week old or when asked; `error` says why a refresh failed and the old one serves. */
   async get(refresh = false): Promise<{ book: FactionBookFile; error: string }> {
     const had = await this.load()
-    if (had && !refresh && Date.now() - had.fetchedAt < FRESH_MS) return { book: had, error: '' }
+    if (had && !refresh && !expired(had.fetchedAt)) return { book: had, error: '' }
     try {
       this.reading ??= this.read().finally(() => (this.reading = null))
       const book = await this.reading
@@ -528,7 +504,7 @@ async function planData(ctx: AppContext, character: string, refresh: boolean, wi
   // What the wiki says of the items hand-ins want: a merchant, a drop, a recipe. Kept a week, like the Gear page's.
   const items = await ctx.inventoryFiles.lookup(itemsToLookUp(input))
   // The race unlocks, done or not, part by part; the races done are the ones to swap to.
-  const [sections, defs] = await Promise.all([achievementSections(dir, character), ctx.gameTables.get(RACE_UNLOCK_DEFS)])
+  const [sections, defs] = await Promise.all([achievementSections(ctx, character), ctx.gameTables.get(RACE_UNLOCK_DEFS)])
   const ids = factionIds(view)
   const named = factionNamer(input.factions)
   const unlocks = raceUnlocks(
@@ -625,7 +601,7 @@ export function registerFactionIpc(ctx: AppContext): void {
   let reported = ''
   // Faction changes, over the character's log and its archives, and the standings from its export.
   handle('factions:get', async (character) => {
-    if (!isCharacterKey(character)) throw new Error('Not a character.')
+    assertCharacterKey(character)
     const dir = ctx.installDir()
     if (!dir) return { factions: [], export: null, exportError: '' }
     let exported: FactionExport | null = null
@@ -651,20 +627,20 @@ export function registerFactionIpc(ctx: AppContext): void {
   // Everything the Plan tab needs to plan the achievements still to do; `refresh` reads eqlwiki again,
   // `wide` adds the ways to raise every other faction (the Most factions positive goal).
   handle('factions:plan', async (character, refresh, wide) => {
-    if (!isCharacterKey(character)) throw new Error('Not a character.')
+    assertCharacterKey(character)
     if (!ctx.installDir()) throw new Error('Choose the game folder on the Settings page first.')
     return planData(ctx, character, refresh === true, wide === true)
   })
   // What moved a faction in the player's logs: this character's and the others'.
   handle('factions:moved', async (character, faction) => {
-    if (!isCharacterKey(character)) throw new Error('Not a character.')
+    assertCharacterKey(character)
     if (typeof faction !== 'string' || !faction.trim() || faction.length > 100) throw new Error('Not a faction.')
     const shared = await sharedTallies(ctx, character)
     return { movers: moversOf(faction.trim(), shared.sources, shared.from) }
   })
   // What a mob or NPC does to the factions, from the logs and eqlwiki's faction pages.
   handle('factions:lookup', async (character, query) => {
-    if (!isCharacterKey(character)) throw new Error('Not a character.')
+    assertCharacterKey(character)
     if (typeof query !== 'string' || query.length > 80) throw new Error('Not a name to look up.')
     if (query.trim().length < 3) return { results: [] }
     const where = ctx.historyOf(character)

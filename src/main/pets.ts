@@ -12,12 +12,11 @@ import { wiki } from './sources/wiki'
 import type { PetState, PetSummon } from '../shared/ipc'
 import { cacheDir } from './paths'
 import { sources } from './sources/registry'
+import { expired, WIKI_FRESH_MS } from './sources/freshness'
 
 // The pet: what it wears (the log's `/pet inventory check` lists) and which pet it is (the last
 // summoning spell cast), both kept per character so an archived log loses neither; and the pet's
 // classes, level, stats and base melee from its eqlwiki pages, cached a week.
-
-const FRESH_MS = 7 * 24 * 3600_000
 
 export type { PetState, PetSummon }
 
@@ -178,13 +177,13 @@ export class PetWiki {
     const key = spell.toLowerCase()
     let changed = false
     try {
-      if (force || !c.guide || now - c.guide.fetchedAt > FRESH_MS) {
+      if (force || expired(c.guide?.fetchedAt, WIKI_FRESH_MS, now)) {
         const text = await this.wikitext('Pet Guide')
         if (text) c.guide = { fetchedAt: now, melee: Object.fromEntries(parsePetGuide(text)) }
         changed = true
       }
       const page = c.pages[key]
-      if (force || !page || now - page.fetchedAt > FRESH_MS) {
+      if (force || expired(page?.fetchedAt, WIKI_FRESH_MS, now)) {
         const text = await this.wikitext(`${spell} Summon`)
         c.pages[key] = { fetchedAt: now, profile: text ? parseSummonPage(spell, text) : null }
         changed = true

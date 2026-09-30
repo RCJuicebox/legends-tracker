@@ -6,7 +6,7 @@ import { diagnostics } from '../diagnostics'
 import { sources } from '../sources/registry'
 import { jobs } from '../sources/jobs'
 import { checkGameFolder, findInstall, isGameFolder, resolveGameFolder } from '../game'
-import { isCharacterKey, meterOptions, sanitizeCharacter, sanitizeSettings } from '../../core/validate'
+import { assertCharacterKey, meterOptions, sanitizeCharacter, sanitizeSettings } from '../../core/validate'
 import { className } from '../../shared/game/classes'
 import type { CharacterSettings } from '../../shared/types'
 import type { AppContext } from '../context'
@@ -61,7 +61,7 @@ export function registerAppIpc(ctx: AppContext): void {
     windows.toMain('state:character', c)
   })
   handle('character:get', async (key) => {
-    if (!isCharacterKey(key)) throw new Error('Not a character.')
+    assertCharacterKey(key)
     const c = store.characterByKey(key)
     if (Object.keys(c.classLevels).length || c.race) return c
     // Before one record held them, the Stats page kept a character's classes, level and race in its
@@ -74,7 +74,7 @@ export function registerAppIpc(ctx: AppContext): void {
     return seeded ? saveCharacterRecord(key, seeded) : c
   })
   handle('character:put', (key, input) => {
-    if (!isCharacterKey(key)) throw new Error('Not a character.')
+    assertCharacterKey(key)
     const c = sanitizeCharacter(input, store.characterByKey(key))
     if (!c) throw new Error('The character was not saved: it was not in the expected form.')
     return saveCharacterRecord(key, c)

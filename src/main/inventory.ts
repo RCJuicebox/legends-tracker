@@ -7,6 +7,7 @@ import type { CharacterSheet, InventoryView } from '../shared/types'
 import { log } from './log'
 import { isCharacterKey } from '../core/validate'
 import { sources } from './sources/registry'
+import { ExportWatch } from './exportWatch'
 
 const EMPTY_SHEET: CharacterSheet = { acOverrides: {}, shield: null, stats: {} }
 
@@ -16,22 +17,27 @@ const EMPTY_SHEET: CharacterSheet = { acOverrides: {}, shield: null, stats: {} }
  * Typing /outputfile inventory in game rewrites the export; a short poll notices and sends it again.
  */
 export class InventoryFiles {
-  private watched = ''
-  private watchedMtime = 0
-  private timer: NodeJS.Timeout | null = null
+  private readonly watch: ExportWatch
   /** The load under way, per character and refresh: a stalled wiki must not pile up calls from the poll. */
   private readonly loading = new Map<string, Promise<InventoryView>>()
-  private polling = false
 
   constructor(
     /** The app's data folder (userData): character sheets go in its characters folder. */
     private readonly dataDir: string,
     private readonly gameDir: () => string,
     private readonly catalog: ItemCatalog,
-    private readonly send: (view: InventoryView) => void,
+    send: (view: InventoryView) => void,
     /** Whether a page could be showing the export: the main window is open. Hidden, the file is not looked at. */
-    private readonly shown: () => boolean = () => true
-  ) {}
+    shown: () => boolean = () => true
+  ) {
+    this.watch = new ExportWatch(
+      'Inventory',
+      (c) => this.exportPath(c),
+      gameDir,
+      shown,
+      async (c) => send(await this.load(c))
+    )
+  }
 
   exportPath(character: string): string {
     return join(this.gameDir(), `${character}-Inventory.txt`)
@@ -49,18 +55,17 @@ export class InventoryFiles {
 
   private async read(character: string, refresh: boolean): Promise<InventoryView> {
     if (!isCharacterKey(character)) {
-      this.watched = ''
+      this.watch.follow('')
       const named = typeof character === 'string' ? character : ''
       return { character: named, file: '', modified: 0, inventory: null, items: {}, error: named ? 'Not a character name.' : 'No character chosen.' }
     }
-    this.watched = character
-    if (!this.timer) this.timer = setInterval(() => void this.poll(), 4000)
+    this.watch.follow(character)
     const base: InventoryView = { character, file: `${character}-Inventory.txt`, modified: 0, inventory: null, items: {}, error: '' }
     let inventory: Inventory
     try {
       const path = this.exportPath(character)
       const [text, st] = await Promise.all([fs.readFile(path, 'utf8'), fs.stat(path)])
-      this.watchedMtime = st.mtimeMs
+      this.watch.seen(st.mtimeMs)
       inventory = parseInventory(text)
       base.modified = st.mtimeMs
       sources.ok('exports', `${base.file}, written ${new Date(st.mtimeMs).toLocaleString()}`)
@@ -77,20 +82,6 @@ export class InventoryFiles {
   /** Looks up more items on demand (an item in a bag, opened to see what it is). */
   lookup(names: string[], force = false) {
     return this.catalog.lookup(names, force)
-  }
-
-  private async poll(): Promise<void> {
-    if (!this.watched || !this.gameDir() || this.polling || !this.shown()) return
-    this.polling = true
-    try {
-      const st = await fs.stat(this.exportPath(this.watched))
-      if (st.mtimeMs !== this.watchedMtime && Date.now() - st.mtimeMs > 1500) this.send(await this.load(this.watched))
-    } catch (e) {
-      // No export yet.
-      if ((e as NodeJS.ErrnoException).code !== 'ENOENT') log.warn('Inventory poll failed', e)
-    } finally {
-      this.polling = false
-    }
   }
 
   private sheetPath(character: string): string {
@@ -118,7 +109,6 @@ export class InventoryFiles {
   }
 
   stop(): void {
-    if (this.timer) clearInterval(this.timer)
-    this.timer = null
+    this.watch.stop()
   }
 }

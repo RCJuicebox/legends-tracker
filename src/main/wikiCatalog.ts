@@ -9,12 +9,12 @@ import type { CatalogFile, WikiProgress } from '../shared/ipc'
 import { cacheDir } from './paths'
 import { sources } from './sources/registry'
 import { jobs, type Job } from './sources/jobs'
+import { downloadStale, reportDownload } from './sources/freshness'
 
 // Every piece of equipment on eqlwiki.com, for the upgrade finder. The first download reads the wiki's
 // Items category fifty pages a request (about 225 requests); later ones list its revisions (about 22
 // requests) and read only the pages edited since. Only equipment is kept, in the app's own data,
 // refreshed at most once a week.
-const FRESH_MS = 7 * 24 * 3600_000
 
 /** Bumped when what a download keeps changes, so an older file is fetched again. */
 const FORMAT = CATALOG_FORMAT
@@ -76,7 +76,7 @@ export class WikiCatalog {
   }
 
   isStale(file: Pick<CatalogFile, 'fetchedAt' | 'format'> | null): boolean {
-    return !file || (file.format ?? 1) < FORMAT || Date.now() - file.fetchedAt > FRESH_MS
+    return downloadStale(file, FORMAT)
   }
 
   /** Downloads the catalog again. One download at a time; a second call waits for the first. */
@@ -88,16 +88,13 @@ export class WikiCatalog {
   private report(p: Partial<CatalogProgress>): void {
     this.progress = { ...this.progress, ...p }
     this.onProgress(this.progress)
-    if (this.progress.busy)
-      this.job?.progress(this.progress.total ? this.progress.pages / this.progress.total : null, `${this.progress.pages} of ${this.progress.total || '?'} pages`)
     const file = this.summary
-    if (this.progress.busy) sources.reading('catalog', `${this.progress.pages} of ${this.progress.total || '?'} pages`)
-    else if (this.progress.error) sources.fail('catalog', new Error(this.progress.error))
-    else if (file) {
-      const what = `${file.count.toLocaleString()} items, from ${new Date(file.fetchedAt).toLocaleDateString()}`
-      if (this.isStale(file)) sources.stale('catalog', what)
-      else sources.ok('catalog', what)
-    }
+    reportDownload(
+      'catalog',
+      this.progress,
+      this.job,
+      file && { what: `${file.count.toLocaleString()} items, from ${new Date(file.fetchedAt).toLocaleDateString()}`, stale: this.isStale(file) }
+    )
   }
 
   private async download(job: Job): Promise<CatalogFile | null> {

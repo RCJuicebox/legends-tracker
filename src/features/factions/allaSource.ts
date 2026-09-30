@@ -4,6 +4,7 @@ import { app } from 'electron'
 import { cacheDir } from '../../main/paths'
 import { log } from '../../main/log'
 import { sources } from '../../main/sources/registry'
+import { expired } from '../../main/sources/freshness'
 import { JsonFile } from '../../main/storeCore'
 import { ALLA_INDEX_URL, ALLA_READY, allaFactionLaidOut, allaPageUrl, parseAllaFaction, parseAllaIndex, type AllaFaction } from './allakhazam'
 import { factionKey } from './core'
@@ -110,7 +111,7 @@ export class FactionAlla {
     return res.text()
   }
 
-  private fresh = (at: number | undefined) => at !== undefined && Date.now() - at < FRESH_MS
+  private fresh = (at: number | undefined) => !expired(at, FRESH_MS)
 
   /** Reads what is wanted and not kept, one page at a time; stops when done or when the site cannot be reached. */
   private async pump(): Promise<void> {

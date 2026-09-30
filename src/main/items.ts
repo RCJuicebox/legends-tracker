@@ -7,11 +7,11 @@ import { wiki, type WikiPage } from './sources/wiki'
 import type { ItemInfo } from '../shared/types'
 import { log } from './log'
 import { sources } from './sources/registry'
+import { expired } from './sources/freshness'
 
 // Item stats come from eqlwiki.com, the community wiki for EverQuest Legends: each item page carries
 // the in-game stats block. Only the items the player asks about are looked up, a batch at a time,
 // and kept in the app's data so each is fetched once a week at most.
-const FRESH_MS = 7 * 24 * 3600_000
 
 interface Cached extends ItemInfo {
   fetchedAt: number
@@ -58,7 +58,7 @@ export class ItemCatalog {
       ([k]) =>
         force ||
         !cache[k] ||
-        Date.now() - cache[k].fetchedAt > FRESH_MS ||
+        expired(cache[k].fetchedAt) ||
         (cache[k].found && (cache[k].icon === undefined || cache[k].use === undefined || cache[k].use.vendors === undefined || cache[k].use.sources === undefined))
     )
     if (stale.length) {

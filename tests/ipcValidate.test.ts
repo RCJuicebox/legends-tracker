@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { defaultSettings } from '../src/main/storeCore'
-import { intArg, isCharacterKey, isRecordKey, sanitizeCharacter, sanitizeSettings, sanitizeTriggers, stringsArg, textArg } from '../src/core/validate'
+import { assertCharacterKey, intArg, isCharacterKey, isRecordKey, sanitizeCharacter, sanitizeSettings, sanitizeTriggers, stringsArg, textArg } from '../src/core/validate'
 import { channelAllowed } from '../src/preload/channels'
 
 describe('character keys from a page', () => {
@@ -13,6 +13,12 @@ describe('character keys from a page', () => {
     expect(isCharacterKey(42)).toBe(false)
     expect(isCharacterKey('..')).toBe(false)
     expect(isCharacterKey('a*b')).toBe(false)
+  })
+
+  it('stops a handler asked about anything else', () => {
+    expect(() => assertCharacterKey('Tester_neriak')).not.toThrow()
+    expect(() => assertCharacterKey('../x')).toThrow('Not a character.')
+    expect(() => assertCharacterKey(undefined)).toThrow('Not a character.')
   })
 
   it('takes any name the game can put in a file name', () => {
