@@ -126,13 +126,21 @@ export class BuffCoordinator {
   me(): Person | null {
     const name = characterName(this.settings.logFile)
     if (!name) return null
-    const seen = this.store.buffs.get().people[name.toLowerCase()]
-    if (seen) return seen
     const c = this.queries.character()
+    // In the character record's order (the player's own, main class first), as every other page
+    // shows them: /who and the class table go by class number.
+    const order = Object.keys(c.classLevels)
+    const rank = (id: ClassId) => {
+      const i = order.indexOf(CLASS_NAMES[(CLASS_NUMBER[id] ?? 0) - 1] ?? '')
+      return i < 0 ? order.length : i
+    }
+    const inOrder = (ids: string[]) => [...ids].sort((a, b) => rank(a as ClassId) - rank(b as ClassId))
+    const seen = this.store.buffs.get().people[name.toLowerCase()]
+    if (seen) return { ...seen, classes: inOrder(seen.classes) }
     // The sheet names classes the game's way (CLASS_NAMES, in class-number order); the tracker by id.
     const levels = (Object.entries(CLASS_NUMBER) as [ClassId, number][]).map(([id, n]) => [id, c.classLevels[CLASS_NAMES[n - 1]] ?? 0] as const).filter(([, l]) => l > 0)
     if (!levels.length) return null
-    return { name, classes: levels.map(([id]) => id), level: Math.max(...levels.map(([, l]) => l)), race: '', at: 0 }
+    return { name, classes: inOrder(levels.map(([id]) => id)), level: Math.max(...levels.map(([, l]) => l)), race: '', at: 0 }
   }
 
   /**

@@ -538,6 +538,25 @@ export function buffPlan(o: { offers: BuffOffer[]; wanted: string[]; group: Pers
   return { chosen, leftOut: leftOut.sort((a, b) => b.value - a.value), needs }
 }
 
+/**
+ * The buffs of a combination that stacking wants cast in an order, in that order: each after every
+ * buff it must land after. Empty when the order does not matter. Buffs with no such tie are left out.
+ */
+export function castOrder(chosen: { spell: string; after: string[] }[]): string[] {
+  const tied = new Set<string>()
+  for (const c of chosen) if (c.after.length) [c.spell, ...c.after].forEach((s) => tied.add(s))
+  const out: string[] = []
+  const seen = new Set<string>()
+  const visit = (spell: string) => {
+    if (seen.has(spell)) return
+    seen.add(spell)
+    for (const a of chosen.find((c) => c.spell === spell)?.after ?? []) visit(a)
+    out.push(spell)
+  }
+  for (const c of chosen) if (tied.has(c.spell)) visit(c.spell)
+  return out.filter((s) => tied.has(s))
+}
+
 /** What to ask the group for: the best combination's buffs that are not on you. */
 export function buffNeeds(o: { offers: BuffOffer[]; wanted: string[]; group: Person[]; active: ActiveBuff[]; me?: Person | null }): BuffNeed[] {
   return buffPlan(o).needs
@@ -545,14 +564,14 @@ export function buffNeeds(o: { offers: BuffOffer[]; wanted: string[]; group: Per
 
 /**
  * "Cast Yaulp; ask Kelwyn for Temperance and Clarity; ask Aldric for Swift Like the Wind." A buff
- * that must land after another, or needs one clicked off first, says so: "Harnessing of Spirit
- * (after Strength)".
+ * that needs one clicked off first says so, and one that must land after another too ("Harnessing of
+ * Spirit (after Strength)") unless `order` is false: a page that says the cast order once, above.
  */
-export function askText(needs: BuffNeed[]): string {
+export function askText(needs: BuffNeed[], order = true): string {
   const byWho = new Map<string, string[]>()
   const name = (n: BuffNeed) => {
     const notes = [
-      ...(n.after.length ? [`after ${list(n.after)}`] : []),
+      ...(order && n.after.length ? [`after ${list(n.after)}`] : []),
       ...(n.clickOff.length ? [`once ${list(n.clickOff)} ${n.clickOff.length > 1 ? 'are' : 'is'} clicked off`] : [])
     ]
     return notes.length ? `${n.spell} (${notes.join(', ')})` : n.spell

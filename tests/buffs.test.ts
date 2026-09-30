@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { askText, BuffWatch, buffNeeds, buffOffers, buffPlan, defaultWanted, parseWho, PROC_VALUE, type ActiveBuff, type BuffOffer, type Person } from '../src/core/buffs'
+import { askText, BuffWatch, castOrder, buffNeeds, buffOffers, buffPlan, defaultWanted, parseWho, PROC_VALUE, type ActiveBuff, type BuffOffer, type Person } from '../src/core/buffs'
 import { SpellBook, type Spell } from '../src/core/spells'
 import { effectValue } from '../src/core/effectValue'
 import { DEFAULT_TIER_DURATION_PCT } from '../src/shared/types'
@@ -219,6 +219,10 @@ describe('what to ask for', () => {
       ['Strength', []]
     ])
     expect(askText(plan.needs)).toBe('Ask Dorran for Harnessing of Spirit (after Strength) and Strength')
+    // A page that says the order once leaves it out of the ask, and says it as the order to cast in.
+    expect(askText(plan.needs, false)).toBe('Ask Dorran for Harnessing of Spirit and Strength')
+    expect(castOrder(plan.chosen)).toEqual(['Strength', 'Harnessing of Spirit'])
+    expect(castOrder([{ spell: 'Clarity', after: [] }])).toEqual([])
     // Strength on already: only Harnessing to ask for. Harnessing on: Strength cannot go on.
     expect(
       buffNeeds({ offers: [harnessing, strength], wanted: ['Harnessing of Spirit', 'Strength'], group: [shaman], active: [on('Strength', 'stats')] }).map((n) => n.spell)

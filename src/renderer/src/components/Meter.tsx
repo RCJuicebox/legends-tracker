@@ -1,7 +1,7 @@
 import { clock, num, pct, timeOfDay } from '../../../core/format'
 import { useEffect, useMemo, useState } from 'react'
 import { useApp } from '../state'
-import { act, showToast, actDone } from '../toast'
+import { act, showToast, actDone, showUndo } from '../toast'
 import { useRemembered } from '../remember'
 import { LIVE, useCombat, useSegment } from '../combat'
 import { useInvoke } from '../hooks'
@@ -770,7 +770,14 @@ function Roster({ snap }: { snap: CombatSnapshot }) {
       {snap.roster.map((m) => (
         <span key={m.name} className="chip" style={{ color: KIND_TEXT.group }} title={m.from === 'log' ? 'Seen joining in the log' : 'Added by you'}>
           {m.name}
-          <button className="btn ghost small x-btn" aria-label={`Remove ${m.name}`} onClick={() => void act('combat:removeMember', m.name)}>
+          <button
+            className="btn ghost small x-btn"
+            aria-label={`Remove ${m.name}`}
+            onClick={() => {
+              void act('combat:removeMember', m.name)
+              showUndo(`${m.name} taken off the group.`, () => void act('combat:addMember', m.name))
+            }}
+          >
             ×
           </button>
         </span>

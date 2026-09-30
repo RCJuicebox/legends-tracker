@@ -103,7 +103,14 @@ function SkillsCard({ s, set, caps, trio }: { s: StatsSheet; set: SetSheet; caps
       <h2>
         Your skills <span className="spacer" />
         <span className="row tight" style={{ textTransform: 'none', letterSpacing: 0, fontWeight: 500 }}>
-          <button className="btn ghost small" onClick={() => set({ skills: Object.fromEntries(caps.skills.map((x) => [x.id, x.cap])) })}>
+          <button
+            className="btn ghost small"
+            onClick={() => {
+              const before = s.skills
+              set({ skills: Object.fromEntries(caps.skills.map((x) => [x.id, x.cap])) })
+              showUndo('Every skill set to its cap.', () => set({ skills: before }))
+            }}
+          >
             All capped
           </button>
           <button
@@ -205,7 +212,11 @@ function StanceCard({ s, set, baseAcc, weaponName }: { s: StatsSheet; set: SetSh
                   className="btn ghost small x-btn"
                   aria-label={`Remove ${st.name}`}
                   disabled={s.stances.length < 2}
-                  onClick={() => set({ stances: s.stances.filter((_, j) => j !== i) })}
+                  onClick={() => {
+                    const before = s.stances
+                    set({ stances: s.stances.filter((_, j) => j !== i) })
+                    showUndo(`${st.name || 'Stance'} removed.`, () => set({ stances: before }))
+                  }}
                 >
                   ×
                 </button>

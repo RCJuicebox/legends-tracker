@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from 'react'
+import { Fragment, useEffect, useMemo } from 'react'
 import { num1 } from '../../../core/format'
 import { api } from '../api'
 import { useInvoke } from '../hooks'
@@ -18,6 +18,8 @@ import type { InventoryView } from '../../../shared/types'
 import { UPGRADES_TAB } from '../constants'
 
 const moteName = (i: number, n: number) => `${n === 1 ? 'Mote' : 'Motes'} of ${MOTE_RANKS[i].name ? MOTE_RANKS[i].name + ' ' : ''}Potential`
+/** A rank as the Motes page's chips name it: "Major", "Potential". */
+const rankName = (i: number) => MOTE_RANKS[i].name || 'Potential'
 
 const HOW =
   'Every worn item the wiki knows, with what its next merge level would add to your stats, weighed the way the upgrade finder weighs them for the role picked ' +
@@ -31,11 +33,14 @@ function Deltas({ d }: { d: Partial<Record<WeightKey, number>> }) {
   return (
     <>
       {parts.map(([k, v], i) => (
-        <span key={k} className="nowrap">
+        <Fragment key={k}>
+          {/* The comma outside, so a long list breaks between stats and never inside one. */}
           {i > 0 && ', '}
-          {WEIGHT_LABELS[k]} {v > 0 ? '+' : ''}
-          {num1(v)}
-        </span>
+          <span className="nowrap">
+            {WEIGHT_LABELS[k]} {v > 0 ? '+' : ''}
+            {num1(v)}
+          </span>
+        </Fragment>
       ))}
     </>
   )
@@ -181,20 +186,20 @@ export function MergeTab({
             <tbody>
               {shown.map((o, i) => (
                 <tr key={`${o.item.location}#${i}#${o.item.name}`} className={o.affordable ? '' : 'faint'}>
-                  <td>
+                  <td style={{ minWidth: 200 }}>
                     <div style={{ fontWeight: 600 }}>{o.item.name}</div>
                     <div className="small muted">{slotLabel(o.item.location)}</div>
                   </td>
                   <td className="mono nowrap">
                     +{o.level} → +{o.next}
                   </td>
-                  <td className="small">
+                  <td className="small" style={{ maxWidth: 320 }}>
                     <Deltas d={o.deltas} />
                   </td>
                   <td className="mono num">{num1(o.gain)}</td>
                   <td className="small">
-                    <span className={`chip ${o.affordable ? 'ok' : 'warn'}`} title={`${o.need} xp; you could make ${num(o.canMake)}`}>
-                      {o.motes} × {moteName(o.mote, o.motes)}
+                    <span className={`chip ${o.affordable ? 'ok' : 'warn'}`} title={`${o.motes} ${moteName(o.mote, o.motes)}: ${o.need} xp; you could make ${num(o.canMake)}`}>
+                      {o.motes} × {rankName(o.mote)}
                     </span>
                     <div className="faint">have {num(o.canMake)}</div>
                   </td>

@@ -259,77 +259,79 @@ export function MoteSpells() {
               {s.label} <span className="chip">{shown.filter((o) => o.section === s.key).length}</span>
             </h2>
             <p className="muted small mt-0">{sectionNote(s.key, tierPct)}</p>
-            <table className="table">
-              <thead>
-                <tr>
-                  <th />
-                  <th>Spell</th>
-                  <th className="num">Casts</th>
-                  <th>Rank</th>
-                  <th>Next rank gives</th>
-                  <th className="num" title="Points per cast × casts in the window">
-                    Worth
-                  </th>
-                  <th className="num" title="XP the next rank needs: 2^rank">
-                    XP
-                  </th>
-                  <th className="num" title="Worth per xp: the value of the upgrade">
-                    Per xp
-                  </th>
-                  <th title="The cheapest motes in your stock for it, lowest rank first">Pay with</th>
-                  <th />
-                </tr>
-              </thead>
-              <tbody>
-                {shown
-                  .filter((o) => o.section === s.key)
-                  .map((o) => (
-                    <tr key={o.row.name} className={o.maxed || isIgnored(o) || (!o.affordable && stock) ? 'faint' : ''}>
-                      <td>
-                        <SpellIcon icon={o.row.icon} />
-                      </td>
-                      <td>
-                        <div style={{ fontWeight: 600 }}>
-                          {o.row.name}
-                          {o.row.rank > 0 && <span className="muted"> {roman(o.row.rank)}</span>}
-                        </div>
-                        <div className="row tight small">
-                          <CategoryChip category={o.row.category} />
-                          {o.row.song && <span className="chip">song</span>}
-                          {o.row.pet && <span className="chip">pet</span>}
-                          <span className="faint">{o.row.classes}</span>
-                        </div>
-                      </td>
-                      <td className="mono num" title={`${pct(o.share, 1)} of your casts`}>
-                        {num(o.row.casts)}
-                        <div className="faint small">{pct(o.share, 1)}</div>
-                      </td>
-                      <td className="mono nowrap">{o.maxed ? 'X' : `${o.rank} → ${o.next}`}</td>
-                      <td>
-                        <Parts o={o} />
-                        <div className="faint small">{num1(o.benefit)} points per cast</div>
-                      </td>
-                      <td className="mono num">{num(o.worth)}</td>
-                      <td className="mono num">{o.maxed ? '—' : num(o.need)}</td>
-                      <td className="mono num">{o.maxed ? '—' : num1(o.rate)}</td>
-                      <td className="small">
-                        <PayWith o={o} />
-                      </td>
-                      <td>
-                        {isIgnored(o) ? (
-                          <button className="btn ghost small" onClick={() => ignore(o.row.name, false)} title="Put it back in the list">
-                            Restore
-                          </button>
-                        ) : (
-                          <button className="btn ghost small" onClick={() => ignore(o.row.name, true)} title="Leave this spell out: you will not put motes into it">
-                            Ignore
-                          </button>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
-              </tbody>
-            </table>
+            <div className="table-scroll">
+              <table className="table">
+                <thead>
+                  <tr>
+                    <th />
+                    <th>Spell</th>
+                    <th className="num">Casts</th>
+                    <th>Rank</th>
+                    <th>Next rank gives</th>
+                    <th className="num" title="Points per cast × casts in the window">
+                      Worth
+                    </th>
+                    <th className="num" title="XP the next rank needs: 2^rank">
+                      XP
+                    </th>
+                    <th className="num" title="Worth per xp: the value of the upgrade">
+                      Per xp
+                    </th>
+                    <th title="The cheapest motes in your stock for it, lowest rank first">Pay with</th>
+                    <th />
+                  </tr>
+                </thead>
+                <tbody>
+                  {shown
+                    .filter((o) => o.section === s.key)
+                    .map((o) => (
+                      <tr key={o.row.name} className={o.maxed || isIgnored(o) || (!o.affordable && stock) ? 'faint' : ''}>
+                        <td>
+                          <SpellIcon icon={o.row.icon} />
+                        </td>
+                        <td>
+                          <div style={{ fontWeight: 600 }}>
+                            {o.row.name}
+                            {o.row.rank > 0 && <span className="muted"> {roman(o.row.rank)}</span>}
+                          </div>
+                          <div className="row tight small">
+                            <CategoryChip category={o.row.category} />
+                            {o.row.song && <span className="chip">song</span>}
+                            {o.row.pet && <span className="chip">pet</span>}
+                            <span className="faint">{o.row.classes}</span>
+                          </div>
+                        </td>
+                        <td className="mono num" title={`${pct(o.share, 1)} of your casts`}>
+                          {num(o.row.casts)}
+                          <div className="faint small">{pct(o.share, 1)}</div>
+                        </td>
+                        <td className="mono nowrap">{o.maxed ? 'X' : `${o.rank} → ${o.next}`}</td>
+                        <td>
+                          <Parts o={o} />
+                          <div className="faint small">{num1(o.benefit)} points per cast</div>
+                        </td>
+                        <td className="mono num">{num(o.worth)}</td>
+                        <td className="mono num">{o.maxed ? '—' : num(o.need)}</td>
+                        <td className="mono num">{o.maxed ? '—' : num1(o.rate)}</td>
+                        <td className="small">
+                          <PayWith o={o} />
+                        </td>
+                        <td>
+                          {isIgnored(o) ? (
+                            <button className="btn ghost small" onClick={() => ignore(o.row.name, false)} title="Put it back in the list">
+                              Restore
+                            </button>
+                          ) : (
+                            <button className="btn ghost small" onClick={() => ignore(o.row.name, true)} title="Leave this spell out: you will not put motes into it">
+                              Ignore
+                            </button>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                </tbody>
+              </table>
+            </div>
           </div>
         ))
       )}

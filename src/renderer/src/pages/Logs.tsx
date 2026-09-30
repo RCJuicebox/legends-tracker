@@ -5,7 +5,7 @@ import { api, mb, errorMessage } from '../api'
 import { useInvoke } from '../hooks'
 import { act, showError } from '../toast'
 import { who } from '../../../core/format'
-import { Ago, Field, LoadError, NumberInput, Switch, Pending } from '../components/ui'
+import { Ago, ConfirmButton, Field, LoadError, NumberInput, Switch, Pending } from '../components/ui'
 
 export function Logs() {
   const { state, patchSettings } = useApp()
@@ -130,19 +130,20 @@ export function Logs() {
                     <Ago t={l.modified} />
                   </td>
                   <td style={{ textAlign: 'right' }}>
-                    <button
+                    <ConfirmButton
                       className="btn small"
                       disabled={status.busy || l.size === 0}
                       title={status.busy ? 'Waiting for the current job to finish' : l.size === 0 ? 'Nothing in it yet' : undefined}
-                      onClick={() =>
-                        api
+                      question={`Archive ${l.name} now? It is zipped, checked and then removed; the game starts a fresh log.`}
+                      onConfirm={() =>
+                        void api
                           .invoke('logs:archive', l.path)
                           .catch((e) => showError(`Could not archive ${l.name}`, e))
                           .finally(refresh)
                       }
                     >
                       Archive now
-                    </button>
+                    </ConfirmButton>
                   </td>
                 </tr>
               ))}

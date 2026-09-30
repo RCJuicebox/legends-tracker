@@ -53,6 +53,9 @@ What changed in each version. The release workflow publishes a version's section
 - **The Optimize tab no longer freezes while it plans.** The plan is worked out in the background and shows when it is ready. The Factions page finds your exports without listing the whole game folder every ten seconds, and overlays redraw only what changed.
 - **Times, days and percentages read the same on every page.** A timer is `4:05`, a length of time "3 h 20 min", a day "Fri, Sep 25", and ages ("3m ago") keep up while a page stays open. Waits and errors look the same everywhere and are read out by screen readers; web data is **Refreshed** and a log is **Read again** (Motes' "Rebuild from logs" is now "Read the logs again").
 - **Fixed: Data Sources said "No character log chosen"** before watching started, when one was.
+- **Buffs says the cast order once**, above the best combination ("Strength, then Harnessing of Spirit"), instead of "after …" on every row and in every ask; your classes read in your own order, as on every other page.
+- **Upgrades' tables fit.** Best merge keeps item names to a line or two and names motes by rank ("4 × Major"); Spell upgrades scrolls within its card instead of pushing the page sideways.
+- **Asks before it cannot be undone**: removing a respawn timer and archiving a log now ask first; removing a stance or a group member and "All capped" on Skills can be undone.
 
 ## 2.4.0 (2026-09-29)
 

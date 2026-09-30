@@ -9,7 +9,20 @@ import { ConfirmButton, FilterBox, Info, Pending, Switch } from '../components/u
 import { useApp } from '../state'
 import { wikiUrl } from '../../../core/format'
 import { CLASSES, className } from '../../../shared/game/classes'
-import { askText, canCast, LINE_LABELS, MIN_ASK_VALUE, MIN_BUFF_SEC, offersFor, YOU, type BuffLine, type BuffOffer, type BuffPlan, type BuffView } from '../../../core/buffs'
+import {
+  askText,
+  canCast,
+  castOrder,
+  LINE_LABELS,
+  MIN_ASK_VALUE,
+  MIN_BUFF_SEC,
+  offersFor,
+  YOU,
+  type BuffLine,
+  type BuffOffer,
+  type BuffPlan,
+  type BuffView
+} from '../../../core/buffs'
 
 // What the group can buff you with: who is in it (and their classes, from /who), what is on you
 // now, what to ask for, and the list of every class's buffs to pick the wanted ones from.
@@ -158,7 +171,7 @@ export function Buffs() {
           <div className="small" style={{ marginTop: 4 }}>
             {v.needs.length ? (
               <>
-                <b>To ask for:</b> {askText(v.needs)}.
+                <b>To ask for:</b> {askText(v.needs, false)}.{v.needs.some((n) => n.after.length > 0) && ' In the order under Best combination.'}
                 {v.needs.some((n) => n.replaces || n.clickOff.length) && (
                   <span className="muted">
                     {' '}
@@ -290,6 +303,7 @@ function BestCombination({ view, unpick }: { view: BuffView; unpick: (spell: str
   const total = plan.chosen.reduce((t, c) => t + c.value, 0)
   const byName = new Map(view.offers.map((o) => [o.spell, o]))
   const stacked = plan.leftOut.filter((l) => l.reason === 'stack')
+  const order = castOrder(plan.chosen)
   return (
     <div className="card stack gap-10 mb-16">
       <div className="row" style={{ flexWrap: 'wrap' }}>
@@ -307,6 +321,11 @@ function BestCombination({ view, unpick }: { view: BuffView; unpick: (spell: str
           {total.toLocaleString()} in all.
         </span>
       </div>
+      {order.length > 1 && (
+        <p className="small" style={{ margin: 0 }}>
+          <b>Cast order:</b> {order.join(', then ')}. By the stacking rules each holds only when it lands after the ones before it; the rest go in any order.
+        </p>
+      )}
       {!plan.chosen.length ? (
         <p className="muted" style={{ margin: 0 }}>
           {scope === 'group' ? 'Nothing: nobody in your group casts any of your picks, and nothing is on you.' : 'Nothing picked.'}
@@ -334,11 +353,6 @@ function BestCombination({ view, unpick }: { view: BuffView; unpick: (spell: str
                       <span className="lt-chip warn">cast it yourself</span>
                     ) : (
                       <span className="lt-chip warn">ask {c.from}</span>
-                    )}
-                    {c.after.length > 0 && (
-                      <span className="faint" title="By the stacking rules it holds only when it lands after these">
-                        after {c.after.join(', ')}
-                      </span>
                     )}
                     <span className="spacer" />
                     <span className="faint mono">{c.value.toLocaleString()}</span>

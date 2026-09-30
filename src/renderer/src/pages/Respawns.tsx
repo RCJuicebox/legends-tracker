@@ -330,9 +330,9 @@ function TimerEditor({
           {timer ? 'Save timer' : 'Add timer'}
         </button>
         {timer && (
-          <button className="btn" onClick={() => void remove()}>
+          <ConfirmButton className="btn" question="Remove this timer? Its trigger on the Triggers page goes too." onConfirm={() => void remove()}>
             Remove timer
-          </button>
+          </ConfirmButton>
         )}
         <button className="btn ghost" onClick={onCancel}>
           Cancel
