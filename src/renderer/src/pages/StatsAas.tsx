@@ -125,65 +125,67 @@ function Bought({ view, list }: { view: AaHistoryView | null; list: AaSummary | 
       ) : !rows.length ? (
         <div className="empty">Nothing matches the filter.</div>
       ) : (
-        <table className="table">
-          <thead>
-            <tr>
-              <SortTh k="name" sort={sort} onSort={setSort}>
-                Ability
-              </SortTh>
-              <SortTh k="rank" sort={sort} onSort={setSort} num title="The rank the log last gave it">
-                Rank
-              </SortTh>
-              <SortTh k="spent" sort={sort} onSort={setSort} num title="Points the log shows paid for it, less any refunded">
-                Points
-              </SortTh>
-              <SortTh k="last" sort={sort} onSort={setSort}>
-                Last bought
-              </SortTh>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((a) => {
-              const k = a.name.toLowerCase()
-              const isOpen = open === k
-              const toggle = () => setOpen(isOpen ? null : k)
-              return (
-                <Fragment key={k}>
-                  <tr className={`clickable${isOpen ? ' selected' : ''}`} onClick={toggle}>
-                    <td className="aa-name">
-                      <button className="link-button" aria-expanded={isOpen} onClick={(e) => (e.stopPropagation(), toggle())}>
-                        {a.name}
-                      </button>
-                      {a.granted && <span className="chip">granted</span>}
-                      {a.refundedAt > 0 && (
-                        <span className="chip warn" title={`Refunded ${when(a.refundedAt)}, and not bought again since`}>
-                          refunded
-                        </span>
-                      )}
-                      {a.listOnly && (
-                        <span className="faint small" title="In your /alternateadv list, with no purchase in the log">
-                          list only
-                        </span>
-                      )}
-                    </td>
-                    <td className="num mono">{a.rank || '—'}</td>
-                    <td className="num mono">{a.listOnly ? '—' : a.spent}</td>
-                    <td className="faint small nowrap" title={a.last ? when(a.last) : undefined}>
-                      {a.last ? day(a.last) : '—'}
-                    </td>
-                  </tr>
-                  {isOpen && (
-                    <tr>
-                      <td colSpan={4} style={{ background: 'var(--bg-2)' }}>
-                        <Ranks a={a} list={list} from={view.from} />
+        <div className="table-scroll">
+          <table className="table">
+            <thead>
+              <tr>
+                <SortTh k="name" sort={sort} onSort={setSort}>
+                  Ability
+                </SortTh>
+                <SortTh k="rank" sort={sort} onSort={setSort} num title="The rank the log last gave it">
+                  Rank
+                </SortTh>
+                <SortTh k="spent" sort={sort} onSort={setSort} num title="Points the log shows paid for it, less any refunded">
+                  Points
+                </SortTh>
+                <SortTh k="last" sort={sort} onSort={setSort}>
+                  Last bought
+                </SortTh>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((a) => {
+                const k = a.name.toLowerCase()
+                const isOpen = open === k
+                const toggle = () => setOpen(isOpen ? null : k)
+                return (
+                  <Fragment key={k}>
+                    <tr className={`clickable${isOpen ? ' selected' : ''}`} onClick={toggle}>
+                      <td className="aa-name">
+                        <button className="link-button" aria-expanded={isOpen} onClick={(e) => (e.stopPropagation(), toggle())}>
+                          {a.name}
+                        </button>
+                        {a.granted && <span className="chip">granted</span>}
+                        {a.refundedAt > 0 && (
+                          <span className="chip warn" title={`Refunded ${when(a.refundedAt)}, and not bought again since`}>
+                            refunded
+                          </span>
+                        )}
+                        {a.listOnly && (
+                          <span className="faint small" title="In your /alternateadv list, with no purchase in the log">
+                            list only
+                          </span>
+                        )}
+                      </td>
+                      <td className="num mono">{a.rank || '—'}</td>
+                      <td className="num mono">{a.listOnly ? '—' : a.spent}</td>
+                      <td className="faint small nowrap" title={a.last ? when(a.last) : undefined}>
+                        {a.last ? day(a.last) : '—'}
                       </td>
                     </tr>
-                  )}
-                </Fragment>
-              )
-            })}
-          </tbody>
-        </table>
+                    {isOpen && (
+                      <tr>
+                        <td colSpan={4} style={{ background: 'var(--bg-2)' }}>
+                          <Ranks a={a} list={list} from={view.from} />
+                        </td>
+                      </tr>
+                    )}
+                  </Fragment>
+                )
+              })}
+            </tbody>
+          </table>
+        </div>
       )}
       {view && view.from > 0 && (
         <p className="faint small" style={{ margin: 0, padding: '10px 14px 12px' }}>

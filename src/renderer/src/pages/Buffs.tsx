@@ -265,36 +265,38 @@ export function Buffs() {
                 {groupClasses.includes(c) && <span className="lt-chip good">in your group</span>}
               </div>
               {open && (
-                <table className="table">
-                  <tbody>
-                    {list.map((o) => (
-                      <tr key={o.spell}>
-                        <td style={{ width: 28 }}>
-                          <input type="checkbox" checked={wanted.has(o.spell)} aria-label={`Want ${o.spell}`} onChange={() => toggle(o.spell)} />
-                        </td>
-                        <td>
-                          <a href={wikiUrl(o.spell)} target="_blank" rel="noreferrer">
-                            {o.spell}
-                          </a>
-                          {o.group && (
-                            <span className="lt-chip" style={{ marginLeft: 6 }}>
-                              group
-                            </span>
-                          )}
-                          {o.self && (
-                            <span className="lt-chip" style={{ marginLeft: 6 }} title="Only the caster can have it: yours to cast when your classes can">
-                              self
-                            </span>
-                          )}
-                        </td>
-                        <td className="small muted nowrap">{LINE_LABELS[o.line]}</td>
-                        <td className="small">{effectText(o)}</td>
-                        <td className="small mono nowrap">level {o.classes[c]}</td>
-                        <td className="small mono nowrap">{duration(o.seconds)}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+                <div className="table-scroll">
+                  <table className="table">
+                    <tbody>
+                      {list.map((o) => (
+                        <tr key={o.spell}>
+                          <td style={{ width: 28 }}>
+                            <input type="checkbox" checked={wanted.has(o.spell)} aria-label={`Want ${o.spell}`} onChange={() => toggle(o.spell)} />
+                          </td>
+                          <td>
+                            <a href={wikiUrl(o.spell)} target="_blank" rel="noreferrer">
+                              {o.spell}
+                            </a>
+                            {o.group && (
+                              <span className="lt-chip" style={{ marginLeft: 6 }}>
+                                group
+                              </span>
+                            )}
+                            {o.self && (
+                              <span className="lt-chip" style={{ marginLeft: 6 }} title="Only the caster can have it: yours to cast when your classes can">
+                                self
+                              </span>
+                            )}
+                          </td>
+                          <td className="small muted nowrap">{LINE_LABELS[o.line]}</td>
+                          <td className="small">{effectText(o)}</td>
+                          <td className="small mono nowrap">level {o.classes[c]}</td>
+                          <td className="small mono nowrap">{duration(o.seconds)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               )}
             </div>
           )

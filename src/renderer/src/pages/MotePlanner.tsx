@@ -74,30 +74,32 @@ function ReadFromScreen({ stock, onApplied }: { stock: MoteStock; onApplied: (s:
       {read && found.length > 0 && (
         <div className="action-card">
           <b>Read from the screen</b>
-          <table className="table">
-            <thead>
-              <tr>
-                <th>Mote</th>
-                <th>On screen</th>
-                <th>Your stock</th>
-                <th />
-              </tr>
-            </thead>
-            <tbody>
-              {found.map((r) => {
-                const now = stock.counts[r.key] ?? 0
-                const seen = read.counts[r.key]
-                return (
-                  <tr key={r.key}>
-                    <td>{r.name || 'Potential'}</td>
-                    <td className="mono">{seen}</td>
-                    <td className="mono">{now}</td>
-                    <td>{seen === now ? <span className="chip ok">same</span> : <span className="chip warn">{seen > now ? `+${seen - now}` : seen - now}</span>}</td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
+          <div className="table-scroll">
+            <table className="table">
+              <thead>
+                <tr>
+                  <th>Mote</th>
+                  <th>On screen</th>
+                  <th>Your stock</th>
+                  <th />
+                </tr>
+              </thead>
+              <tbody>
+                {found.map((r) => {
+                  const now = stock.counts[r.key] ?? 0
+                  const seen = read.counts[r.key]
+                  return (
+                    <tr key={r.key}>
+                      <td>{r.name || 'Potential'}</td>
+                      <td className="mono">{seen}</td>
+                      <td className="mono">{now}</td>
+                      <td>{seen === now ? <span className="chip ok">same</span> : <span className="chip warn">{seen > now ? `+${seen - now}` : seen - now}</span>}</td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
           <div className="row">
             <button
               className="btn primary"
@@ -266,38 +268,40 @@ export function MotePlanner() {
           </span>
         </h2>
         <ReadFromScreen stock={stock} onApplied={setStock} />
-        <table className="table">
-          <thead>
-            <tr>
-              <th>Mote</th>
-              <th title="Item xp each mote gives">XP each</th>
-              <th title="The item level this mote works on">Works on</th>
-              <th>Have</th>
-              <th title="Counting what you could combine up from the ranks below">Can make</th>
-            </tr>
-          </thead>
-          <tbody>
-            {MOTE_RANKS.map((r, i) => (
-              <tr key={r.key}>
-                <td>{long(i, 2)}</td>
-                <td className="mono">{r.xp}</td>
-                <td className="mono">+{i}</td>
-                <td>
-                  <input
-                    type="number"
-                    min={0}
-                    style={{ width: 80 }}
-                    aria-label={`${long(i, 2)} you have`}
-                    value={draft[r.key] ?? String(stock.counts[r.key] ?? 0)}
-                    onChange={(e) => void setCount(r.key, e.target.value)}
-                    onBlur={() => setDraft((x) => ({ ...x, [r.key]: undefined as unknown as string }))}
-                  />
-                </td>
-                <td className="mono">{num(makeable(inv, i))}</td>
+        <div className="table-scroll">
+          <table className="table">
+            <thead>
+              <tr>
+                <th>Mote</th>
+                <th title="Item xp each mote gives">XP each</th>
+                <th title="The item level this mote works on">Works on</th>
+                <th>Have</th>
+                <th title="Counting what you could combine up from the ranks below">Can make</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {MOTE_RANKS.map((r, i) => (
+                <tr key={r.key}>
+                  <td>{long(i, 2)}</td>
+                  <td className="mono">{r.xp}</td>
+                  <td className="mono">+{i}</td>
+                  <td>
+                    <input
+                      type="number"
+                      min={0}
+                      style={{ width: 80 }}
+                      aria-label={`${long(i, 2)} you have`}
+                      value={draft[r.key] ?? String(stock.counts[r.key] ?? 0)}
+                      onChange={(e) => void setCount(r.key, e.target.value)}
+                      onBlur={() => setDraft((x) => ({ ...x, [r.key]: undefined as unknown as string }))}
+                    />
+                  </td>
+                  <td className="mono">{num(makeable(inv, i))}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
         <p className="faint small" style={{ marginBottom: 0 }}>
           {stock.autoAdd
             ? 'Every mote you loot is added here as it drops, including reward chests. Edit a count if it is off.'

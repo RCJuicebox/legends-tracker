@@ -101,54 +101,56 @@ export function Logs() {
         ) : view.logs.length === 0 ? (
           <div className="empty">No logs found. Turn logging on in game with /log on.</div>
         ) : (
-          <table className="table">
-            <thead>
-              <tr>
-                <th>Log</th>
-                <th style={{ width: '32%' }}>Size</th>
-                <th>Last written</th>
-                <th />
-              </tr>
-            </thead>
-            <tbody>
-              {view.logs.map((l) => (
-                <tr key={l.path}>
-                  <td>
-                    <div style={{ fontWeight: 600 }}>{who(l.character)}</div>
-                    <div className="faint small">{l.name}</div>
-                  </td>
-                  <td>
-                    <div className="row tight mb-4">
-                      <b>{mb(l.size)}</b>
-                      <span className="faint small">of {a.thresholdMB} MB</span>
-                    </div>
-                    <div className={`bar-meter${l.size >= threshold ? ' over' : ''}`}>
-                      <div style={{ width: `${Math.min(100, (l.size / threshold) * 100)}%` }} />
-                    </div>
-                  </td>
-                  <td className="muted small">
-                    <Ago t={l.modified} />
-                  </td>
-                  <td style={{ textAlign: 'right' }}>
-                    <ConfirmButton
-                      className="btn small"
-                      disabled={status.busy || l.size === 0}
-                      title={status.busy ? 'Waiting for the current job to finish' : l.size === 0 ? 'Nothing in it yet' : undefined}
-                      question={`Archive ${l.name} now? It is zipped, checked and then removed; the game starts a fresh log.`}
-                      onConfirm={() =>
-                        void api
-                          .invoke('logs:archive', l.path)
-                          .catch((e) => showError(`Could not archive ${l.name}`, e))
-                          .finally(refresh)
-                      }
-                    >
-                      Archive now
-                    </ConfirmButton>
-                  </td>
+          <div className="table-scroll">
+            <table className="table">
+              <thead>
+                <tr>
+                  <th>Log</th>
+                  <th style={{ width: '32%' }}>Size</th>
+                  <th>Last written</th>
+                  <th />
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {view.logs.map((l) => (
+                  <tr key={l.path}>
+                    <td>
+                      <div style={{ fontWeight: 600 }}>{who(l.character)}</div>
+                      <div className="faint small">{l.name}</div>
+                    </td>
+                    <td>
+                      <div className="row tight mb-4">
+                        <b>{mb(l.size)}</b>
+                        <span className="faint small">of {a.thresholdMB} MB</span>
+                      </div>
+                      <div className={`bar-meter${l.size >= threshold ? ' over' : ''}`}>
+                        <div style={{ width: `${Math.min(100, (l.size / threshold) * 100)}%` }} />
+                      </div>
+                    </td>
+                    <td className="muted small">
+                      <Ago t={l.modified} />
+                    </td>
+                    <td style={{ textAlign: 'right' }}>
+                      <ConfirmButton
+                        className="btn small"
+                        disabled={status.busy || l.size === 0}
+                        title={status.busy ? 'Waiting for the current job to finish' : l.size === 0 ? 'Nothing in it yet' : undefined}
+                        question={`Archive ${l.name} now? It is zipped, checked and then removed; the game starts a fresh log.`}
+                        onConfirm={() =>
+                          void api
+                            .invoke('logs:archive', l.path)
+                            .catch((e) => showError(`Could not archive ${l.name}`, e))
+                            .finally(refresh)
+                        }
+                      >
+                        Archive now
+                      </ConfirmButton>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
       </div>
 
@@ -201,24 +203,26 @@ export function Logs() {
         {view && view.archives.length === 0 ? (
           <div className="empty">No archives yet.</div>
         ) : (
-          <table className="table">
-            <tbody>
-              {view?.archives.map((x) => (
-                <tr key={x.path}>
-                  <td>
-                    <span className="mono">{x.name}</span> {x.loose && <span className="chip warn">not zipped</span>}
-                  </td>
-                  <td className="muted nowrap">{mb(x.size)}</td>
-                  <td className="faint small nowrap">{day(x.modified)}</td>
-                  <td style={{ textAlign: 'right' }}>
-                    <button className="btn ghost small" onClick={() => void act('logs:reveal', x.path)}>
-                      Show
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          <div className="table-scroll">
+            <table className="table">
+              <tbody>
+                {view?.archives.map((x) => (
+                  <tr key={x.path}>
+                    <td>
+                      <span className="mono">{x.name}</span> {x.loose && <span className="chip warn">not zipped</span>}
+                    </td>
+                    <td className="muted nowrap">{mb(x.size)}</td>
+                    <td className="faint small nowrap">{day(x.modified)}</td>
+                    <td style={{ textAlign: 'right' }}>
+                      <button className="btn ghost small" onClick={() => void act('logs:reveal', x.path)}>
+                        Show
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
       </div>
     </>

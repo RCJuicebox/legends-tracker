@@ -93,21 +93,23 @@ export function GameFolderCard() {
       )}
       {check && dir && !check.exists && <div className="notice bad small">That folder does not exist.</div>}
       {check?.exists && (
-        <table className="table small">
-          <tbody>
-            {rows.map(([ok, label, detail]) => (
-              <tr key={label}>
-                <td style={{ width: 24 }}>{ok ? <span className="chip ok">found</span> : <span className="chip warn">missing</span>}</td>
-                <td className="nowrap" style={{ fontWeight: 600, width: 170 }}>
-                  {label}
-                </td>
-                <td className={ok ? '' : 'muted'}>
-                  <WithCommands text={detail} />
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        <div className="table-scroll">
+          <table className="table small">
+            <tbody>
+              {rows.map(([ok, label, detail]) => (
+                <tr key={label}>
+                  <td style={{ width: 24 }}>{ok ? <span className="chip ok">found</span> : <span className="chip warn">missing</span>}</td>
+                  <td className="nowrap" style={{ fontWeight: 600, width: 170 }}>
+                    {label}
+                  </td>
+                  <td className={ok ? '' : 'muted'}>
+                    <WithCommands text={detail} />
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       )}
     </div>
   )

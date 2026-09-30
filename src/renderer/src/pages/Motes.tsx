@@ -258,76 +258,78 @@ function SessionTable({ sessions, now }: { sessions: MoteSession[]; now: number 
       {sessions.length === 0 ? (
         <div className="empty">None yet.</div>
       ) : (
-        <table className="table">
-          <thead>
-            <tr>
-              <th>When</th>
-              <th>Where</th>
-              <th>Type</th>
-              <th>Time</th>
-              <th>Motes</th>
-              <th>Per hour</th>
-              <th title={VALUE_HINT}>Value / hour (Infinitesimal)</th>
-              <th />
-            </tr>
-          </thead>
-          <tbody>
-            {sessions.slice(0, 100).map((s) => {
-              const h = sessionHours(s, now)
-              return (
-                <tr key={s.id}>
-                  <td className="nowrap small">{when(s.startedAt)}</td>
-                  <td>
-                    <div style={{ fontWeight: 600 }}>{s.name}</div>
-                    <div className="small">
-                      <RankChips counts={s.motes} />
-                    </div>
-                  </td>
-                  <td>
-                    {s.kind === 'manual' ? (
-                      <span className="chip">manual</span>
-                    ) : (
-                      <button
-                        className={`chip chip-btn ${s.kind === 'crawl' ? 'ok' : ''}`}
-                        onClick={() => void act('motes:setKind', s.id, s.kind === 'crawl' ? 'instance' : 'crawl')}
-                        title={
-                          s.kind === 'crawl'
-                            ? `${s.byHand ? 'Marked a crawl by you' : 'The game said this crawl was completed'}. Click to make it a normal instance.`
-                            : 'Click to mark this run as a dungeon crawl: the game only tells the instance owner when one is completed.'
-                        }
-                      >
-                        {s.kind === 'crawl' ? 'dungeon crawl' : 'normal'}
-                        {s.byHand && <span className="faint"> ✎</span>}
-                      </button>
-                    )}
-                  </td>
-                  <td
-                    className="mono nowrap"
-                    title={[s.pausedMs ? `${clock(s.pausedMs / 1000)} paused, not counted` : '', s.outsideMs ? `${clock(s.outsideMs / 1000)} outside the instance` : '']
-                      .filter(Boolean)
-                      .join('; ')}
-                  >
-                    {clock(h * 3600)}
-                  </td>
-                  <td className="mono">{totalMotes(s.motes)}</td>
-                  <td className="mono">{perHour(totalMotes(s.motes), h)}</td>
-                  <td className="mono">{perHour(moteValue(s.motes), h)}</td>
-                  <td>
-                    <ConfirmButton
-                      className="btn ghost small x-btn"
-                      title="Remove from the list"
-                      label={`Remove ${s.name} from the list`}
-                      question="Remove it?"
-                      onConfirm={() => void act('motes:forget', s.id)}
+        <div className="table-scroll">
+          <table className="table">
+            <thead>
+              <tr>
+                <th>When</th>
+                <th>Where</th>
+                <th>Type</th>
+                <th>Time</th>
+                <th>Motes</th>
+                <th>Per hour</th>
+                <th title={VALUE_HINT}>Value / hour (Infinitesimal)</th>
+                <th />
+              </tr>
+            </thead>
+            <tbody>
+              {sessions.slice(0, 100).map((s) => {
+                const h = sessionHours(s, now)
+                return (
+                  <tr key={s.id}>
+                    <td className="nowrap small">{when(s.startedAt)}</td>
+                    <td>
+                      <div style={{ fontWeight: 600 }}>{s.name}</div>
+                      <div className="small">
+                        <RankChips counts={s.motes} />
+                      </div>
+                    </td>
+                    <td>
+                      {s.kind === 'manual' ? (
+                        <span className="chip">manual</span>
+                      ) : (
+                        <button
+                          className={`chip chip-btn ${s.kind === 'crawl' ? 'ok' : ''}`}
+                          onClick={() => void act('motes:setKind', s.id, s.kind === 'crawl' ? 'instance' : 'crawl')}
+                          title={
+                            s.kind === 'crawl'
+                              ? `${s.byHand ? 'Marked a crawl by you' : 'The game said this crawl was completed'}. Click to make it a normal instance.`
+                              : 'Click to mark this run as a dungeon crawl: the game only tells the instance owner when one is completed.'
+                          }
+                        >
+                          {s.kind === 'crawl' ? 'dungeon crawl' : 'normal'}
+                          {s.byHand && <span className="faint"> ✎</span>}
+                        </button>
+                      )}
+                    </td>
+                    <td
+                      className="mono nowrap"
+                      title={[s.pausedMs ? `${clock(s.pausedMs / 1000)} paused, not counted` : '', s.outsideMs ? `${clock(s.outsideMs / 1000)} outside the instance` : '']
+                        .filter(Boolean)
+                        .join('; ')}
                     >
-                      ×
-                    </ConfirmButton>
-                  </td>
-                </tr>
-              )
-            })}
-          </tbody>
-        </table>
+                      {clock(h * 3600)}
+                    </td>
+                    <td className="mono">{totalMotes(s.motes)}</td>
+                    <td className="mono">{perHour(totalMotes(s.motes), h)}</td>
+                    <td className="mono">{perHour(moteValue(s.motes), h)}</td>
+                    <td>
+                      <ConfirmButton
+                        className="btn ghost small x-btn"
+                        title="Remove from the list"
+                        label={`Remove ${s.name} from the list`}
+                        question="Remove it?"
+                        onConfirm={() => void act('motes:forget', s.id)}
+                      >
+                        ×
+                      </ConfirmButton>
+                    </td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        </div>
       )}
     </div>
   )

@@ -284,95 +284,97 @@ export function Factions() {
             </div>
           ) : (
             <div className="card" style={{ padding: 0 }}>
-              <table className="table">
-                <thead>
-                  <tr>
-                    <SortTh k="name" sort={sort} onSort={setSort}>
-                      Faction
-                    </SortTh>
-                    {hasExport && (
-                      <SortTh k="standing" sort={sort} onSort={setSort} title="From the factions export, plus what the log recorded since">
-                        Standing
+              <div className="table-scroll">
+                <table className="table">
+                  <thead>
+                    <tr>
+                      <SortTh k="name" sort={sort} onSort={setSort}>
+                        Faction
                       </SortTh>
-                    )}
-                    {withAchColumn && (
-                      <SortTh k="ach" sort={sort} onSort={setSort} title="EverQuest › Progression: done at the maximum standing, 2000">
-                        Achievement
+                      {hasExport && (
+                        <SortTh k="standing" sort={sort} onSort={setSort} title="From the factions export, plus what the log recorded since">
+                          Standing
+                        </SortTh>
+                      )}
+                      {withAchColumn && (
+                        <SortTh k="ach" sort={sort} onSort={setSort} title="EverQuest › Progression: done at the maximum standing, 2000">
+                          Achievement
+                        </SortTh>
+                      )}
+                      <SortTh k="net" sort={sort} onSort={setSort} num title="Every change the log recorded, added up">
+                        Net change
                       </SortTh>
-                    )}
-                    <SortTh k="net" sort={sort} onSort={setSort} num title="Every change the log recorded, added up">
-                      Net change
-                    </SortTh>
-                    <SortTh k="changes" sort={sort} onSort={setSort} num title="How many changes the log recorded">
-                      Changes
-                    </SortTh>
-                    <SortTh k="cap" sort={sort} onSort={setSort} title="Whether it can get no better, or no worse">
-                      At the cap
-                    </SortTh>
-                    <SortTh k="last" sort={sort} onSort={setSort}>
-                      Last changed
-                    </SortTh>
-                  </tr>
-                </thead>
-                <tbody>
-                  {rows.map((r) => {
-                    const key = r.name.toLowerCase()
-                    const isOpen = open === key
-                    const toggle = () => setOpen(isOpen ? null : key)
-                    return (
-                      <Fragment key={key}>
-                        <tr className={`clickable${isOpen ? ' selected' : ''}`} onClick={toggle}>
-                          <td>
-                            <button className="link-button" aria-expanded={isOpen} onClick={(e) => (e.stopPropagation(), toggle())}>
-                              {r.name}
-                            </button>
-                          </td>
-                          {hasExport && (
-                            <td className="nowrap">
-                              <Standing s={r.standing} basis={view?.conBasis ?? null} />
+                      <SortTh k="changes" sort={sort} onSort={setSort} num title="How many changes the log recorded">
+                        Changes
+                      </SortTh>
+                      <SortTh k="cap" sort={sort} onSort={setSort} title="Whether it can get no better, or no worse">
+                        At the cap
+                      </SortTh>
+                      <SortTh k="last" sort={sort} onSort={setSort}>
+                        Last changed
+                      </SortTh>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {rows.map((r) => {
+                      const key = r.name.toLowerCase()
+                      const isOpen = open === key
+                      const toggle = () => setOpen(isOpen ? null : key)
+                      return (
+                        <Fragment key={key}>
+                          <tr className={`clickable${isOpen ? ' selected' : ''}`} onClick={toggle}>
+                            <td>
+                              <button className="link-button" aria-expanded={isOpen} onClick={(e) => (e.stopPropagation(), toggle())}>
+                                {r.name}
+                              </button>
                             </td>
-                          )}
-                          {withAchColumn && (
-                            <td className="nowrap">
-                              <AchievementCell a={r.achievement} s={r.standing} />
-                            </td>
-                          )}
-                          <td className={`num mono ${tone(r.net)}`}>{r.changes ? signed(r.net) : <span className="faint">—</span>}</td>
-                          <td className="num mono">{r.changes || '—'}</td>
-                          <td>
-                            {r.cap === 'top' ? (
-                              <span className="chip ok" title="It can get no better">
-                                maxed
-                              </span>
-                            ) : r.cap === 'bottom' ? (
-                              <span className="chip bad" title="It can get no worse">
-                                bottomed
-                              </span>
-                            ) : (
-                              <span className="faint">—</span>
+                            {hasExport && (
+                              <td className="nowrap">
+                                <Standing s={r.standing} basis={view?.conBasis ?? null} />
+                              </td>
                             )}
-                          </td>
-                          <td className="faint small nowrap" title={r.last ? when(r.last) : 'The log has no changes for it'}>
-                            {r.last ? ago(r.last, now) : '—'}
-                          </td>
-                        </tr>
-                        {isOpen && (
-                          <tr>
-                            <td colSpan={cols} style={{ background: 'var(--bg-2)' }}>
-                              <History
-                                r={r}
-                                character={character}
-                                basis={view?.conBasis ?? null}
-                                ways={waysQ.data ? { activities: waysQ.data.catalog.activities, logPace: waysQ.data.catalog.killsPerHour } : null}
-                              />
+                            {withAchColumn && (
+                              <td className="nowrap">
+                                <AchievementCell a={r.achievement} s={r.standing} />
+                              </td>
+                            )}
+                            <td className={`num mono ${tone(r.net)}`}>{r.changes ? signed(r.net) : <span className="faint">—</span>}</td>
+                            <td className="num mono">{r.changes || '—'}</td>
+                            <td>
+                              {r.cap === 'top' ? (
+                                <span className="chip ok" title="It can get no better">
+                                  maxed
+                                </span>
+                              ) : r.cap === 'bottom' ? (
+                                <span className="chip bad" title="It can get no worse">
+                                  bottomed
+                                </span>
+                              ) : (
+                                <span className="faint">—</span>
+                              )}
+                            </td>
+                            <td className="faint small nowrap" title={r.last ? when(r.last) : 'The log has no changes for it'}>
+                              {r.last ? ago(r.last, now) : '—'}
                             </td>
                           </tr>
-                        )}
-                      </Fragment>
-                    )
-                  })}
-                </tbody>
-              </table>
+                          {isOpen && (
+                            <tr>
+                              <td colSpan={cols} style={{ background: 'var(--bg-2)' }}>
+                                <History
+                                  r={r}
+                                  character={character}
+                                  basis={view?.conBasis ?? null}
+                                  ways={waysQ.data ? { activities: waysQ.data.catalog.activities, logPace: waysQ.data.catalog.killsPerHour } : null}
+                                />
+                              </td>
+                            </tr>
+                          )}
+                        </Fragment>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
             </div>
           )}
         </>

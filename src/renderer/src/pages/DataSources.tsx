@@ -63,53 +63,55 @@ export function DataSources() {
         KINDS.filter((k) => rows.some((r) => r.kind === k)).map((kind) => (
           <div className="card mb-16" key={kind}>
             <h2>{KIND_TITLE[kind]}</h2>
-            <table className="table sources-table">
-              <colgroup>
-                <col style={{ width: '48%' }} />
-                <col style={{ width: '28%' }} />
-                <col style={{ width: '13%' }} />
-                <col style={{ width: '11%' }} />
-              </colgroup>
-              <thead>
-                <tr>
-                  <th>Source</th>
-                  <th>State</th>
-                  <th>Last good read</th>
-                  <th />
-                </tr>
-              </thead>
-              <tbody>
-                {rows
-                  .filter((r) => r.kind === kind)
-                  .map((r) => (
-                    <tr key={r.id}>
-                      <td>
-                        <div style={{ fontWeight: 600 }}>{r.label}</div>
-                        <div className="faint small">
-                          <WithCommands text={r.what} />
-                        </div>
-                      </td>
-                      <td>
-                        <span className={`chip ${STATUS[r.status].chip}`}>{STATUS[r.status].word}</span>
-                        {r.detail && (
-                          <div className="small">
-                            <WithCommands text={r.detail} />
+            <div className="table-scroll">
+              <table className="table sources-table">
+                <colgroup>
+                  <col style={{ width: '48%' }} />
+                  <col style={{ width: '28%' }} />
+                  <col style={{ width: '13%' }} />
+                  <col style={{ width: '11%' }} />
+                </colgroup>
+                <thead>
+                  <tr>
+                    <th>Source</th>
+                    <th>State</th>
+                    <th>Last good read</th>
+                    <th />
+                  </tr>
+                </thead>
+                <tbody>
+                  {rows
+                    .filter((r) => r.kind === kind)
+                    .map((r) => (
+                      <tr key={r.id}>
+                        <td>
+                          <div style={{ fontWeight: 600 }}>{r.label}</div>
+                          <div className="faint small">
+                            <WithCommands text={r.what} />
                           </div>
-                        )}
-                        {r.error && <ErrorText block>{r.error}</ErrorText>}
-                      </td>
-                      <td className="small">{r.lastOk ? <Ago t={r.lastOk} /> : '—'}</td>
-                      <td>
-                        {r.refreshable && (
-                          <button className="btn small" disabled={busy === r.id || r.status === 'reading'} onClick={() => void refresh(r.id)}>
-                            {busy === r.id ? 'Refreshing…' : 'Refresh'}
-                          </button>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
-              </tbody>
-            </table>
+                        </td>
+                        <td>
+                          <span className={`chip ${STATUS[r.status].chip}`}>{STATUS[r.status].word}</span>
+                          {r.detail && (
+                            <div className="small">
+                              <WithCommands text={r.detail} />
+                            </div>
+                          )}
+                          {r.error && <ErrorText block>{r.error}</ErrorText>}
+                        </td>
+                        <td className="small">{r.lastOk ? <Ago t={r.lastOk} /> : '—'}</td>
+                        <td>
+                          {r.refreshable && (
+                            <button className="btn small" disabled={busy === r.id || r.status === 'reading'} onClick={() => void refresh(r.id)}>
+                              {busy === r.id ? 'Refreshing…' : 'Refresh'}
+                            </button>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                </tbody>
+              </table>
+            </div>
           </div>
         ))
       )}

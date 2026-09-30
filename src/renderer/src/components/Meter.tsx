@@ -338,28 +338,30 @@ function ComparePane({
           Stop comparing
         </button>
       </div>
-      <table className="table">
-        <thead>
-          <tr>
-            <th>Who</th>
-            <th className="num">This fight</th>
-            <th className="num">The other</th>
-            <th className="num" title={`The change in ${unit} from the other fight to this one`}>
-              Change
-            </th>
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((r) => (
-            <tr key={r.key}>
-              <td>{r.name}</td>
-              <td className="num mono">{r.now ? `${fmtRate(r.now.rate)} ${unit} · ${num(r.now.total)}` : '—'}</td>
-              <td className="num mono">{r.then ? `${fmtRate(r.then.rate)} ${unit} · ${num(r.then.total)}` : '—'}</td>
-              <td className="num mono">{change(r.now, r.then)}</td>
+      <div className="table-scroll">
+        <table className="table">
+          <thead>
+            <tr>
+              <th>Who</th>
+              <th className="num">This fight</th>
+              <th className="num">The other</th>
+              <th className="num" title={`The change in ${unit} from the other fight to this one`}>
+                Change
+              </th>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {rows.map((r) => (
+              <tr key={r.key}>
+                <td>{r.name}</td>
+                <td className="num mono">{r.now ? `${fmtRate(r.now.rate)} ${unit} · ${num(r.now.total)}` : '—'}</td>
+                <td className="num mono">{r.then ? `${fmtRate(r.then.rate)} ${unit} · ${num(r.then.total)}` : '—'}</td>
+                <td className="num mono">{change(r.now, r.then)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   )
 }

@@ -97,27 +97,29 @@ export function Trace({ rows }: { rows: Row[] }) {
   return (
     <details className="stats-trace">
       <summary>Show every step</summary>
-      <table className="table small">
-        <tbody>
-          {rows.map(([label, value, note], i) =>
-            label.startsWith('#') ? (
-              <tr key={i}>
-                <td colSpan={3} className="stats-trace-head">
-                  {label.slice(1)}
-                </td>
-              </tr>
-            ) : (
-              <tr key={i}>
-                <td>{label}</td>
-                <td className="mono" style={{ textAlign: 'right', fontWeight: 600 }}>
-                  {typeof value === 'number' ? num(value) : value}
-                </td>
-                <td className="faint">{note}</td>
-              </tr>
-            )
-          )}
-        </tbody>
-      </table>
+      <div className="table-scroll">
+        <table className="table small">
+          <tbody>
+            {rows.map(([label, value, note], i) =>
+              label.startsWith('#') ? (
+                <tr key={i}>
+                  <td colSpan={3} className="stats-trace-head">
+                    {label.slice(1)}
+                  </td>
+                </tr>
+              ) : (
+                <tr key={i}>
+                  <td>{label}</td>
+                  <td className="mono" style={{ textAlign: 'right', fontWeight: 600 }}>
+                    {typeof value === 'number' ? num(value) : value}
+                  </td>
+                  <td className="faint">{note}</td>
+                </tr>
+              )
+            )}
+          </tbody>
+        </table>
+      </div>
     </details>
   )
 }

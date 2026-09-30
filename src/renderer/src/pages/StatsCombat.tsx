@@ -194,53 +194,55 @@ function StanceCard({ s, set, baseAcc, weaponName }: { s: StatsSheet; set: SetSh
         Your Accuracy ({num(baseAcc)} with {weaponName}) is multiplied by the stance's hit bonus, then rolled against the target's avoidance. Each stance is a point on one curve.
       </p>
       <HitChart stances={stances} avoidance={D} />
-      <table className="table small">
-        <thead>
-          <tr>
-            <th>Stance</th>
-            <th>Hit bonus %</th>
-            <th>Accuracy</th>
-            <th>To hit</th>
-            <th />
-          </tr>
-        </thead>
-        <tbody>
-          {stances.map((st, i) => (
-            <tr key={i}>
-              <td>
-                <input value={st.name} maxLength={40} aria-label={`Stance ${i + 1} name`} onChange={(e) => setStance(i, { name: e.target.value })} />
-              </td>
-              <td>
-                <input
-                  type="number"
-                  min={0}
-                  max={200}
-                  style={{ width: 70 }}
-                  aria-label={`${st.name} hit bonus %`}
-                  value={st.pct}
-                  onChange={(e) => setStance(i, { pct: Math.max(0, Math.min(200, Math.floor(Number(e.target.value) || 0))) })}
-                />
-              </td>
-              <td className="mono">{num(st.acc)}</td>
-              <td className="mono">{pct(hitChance(st.acc, D))}</td>
-              <td>
-                <button
-                  className="btn ghost small x-btn"
-                  aria-label={`Remove ${st.name}`}
-                  disabled={s.stances.length < 2}
-                  onClick={() => {
-                    const before = s.stances
-                    set({ stances: s.stances.filter((_, j) => j !== i) })
-                    showUndo(`${st.name || 'Stance'} removed.`, () => set({ stances: before }))
-                  }}
-                >
-                  ×
-                </button>
-              </td>
+      <div className="table-scroll">
+        <table className="table small">
+          <thead>
+            <tr>
+              <th>Stance</th>
+              <th>Hit bonus %</th>
+              <th>Accuracy</th>
+              <th>To hit</th>
+              <th />
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {stances.map((st, i) => (
+              <tr key={i}>
+                <td>
+                  <input value={st.name} maxLength={40} aria-label={`Stance ${i + 1} name`} onChange={(e) => setStance(i, { name: e.target.value })} />
+                </td>
+                <td>
+                  <input
+                    type="number"
+                    min={0}
+                    max={200}
+                    style={{ width: 70 }}
+                    aria-label={`${st.name} hit bonus %`}
+                    value={st.pct}
+                    onChange={(e) => setStance(i, { pct: Math.max(0, Math.min(200, Math.floor(Number(e.target.value) || 0))) })}
+                  />
+                </td>
+                <td className="mono">{num(st.acc)}</td>
+                <td className="mono">{pct(hitChance(st.acc, D))}</td>
+                <td>
+                  <button
+                    className="btn ghost small x-btn"
+                    aria-label={`Remove ${st.name}`}
+                    disabled={s.stances.length < 2}
+                    onClick={() => {
+                      const before = s.stances
+                      set({ stances: s.stances.filter((_, j) => j !== i) })
+                      showUndo(`${st.name || 'Stance'} removed.`, () => set({ stances: before }))
+                    }}
+                  >
+                    ×
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
       <div className="row">
         <button className="btn ghost small" disabled={s.stances.length >= 10} onClick={() => set({ stances: [...s.stances, { name: `Stance ${s.stances.length + 1}`, pct: 0 }] })}>
           Add a stance

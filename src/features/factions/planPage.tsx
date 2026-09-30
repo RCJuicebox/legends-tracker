@@ -618,42 +618,44 @@ export function PlanTab({ character, view }: { character: string; view: FactionV
             race&apos;s factions maxed, one at a time: a faction that falls back after reaching 2000 stays done for it.{' '}
             {settings.unlocksFirst ? 'The plan does them first.' : 'Switch on Race unlocks first to do them before the rest.'}
           </p>
-          <table className="table">
-            <thead>
-              <tr>
-                <th>Race unlock</th>
-                <th>What it wants</th>
-                <th>In the plan</th>
-              </tr>
-            </thead>
-            <tbody>
-              {openUnlocks.map((u) => {
-                const step = unlockStep.get(u.achievement)
-                return (
-                  <tr key={u.achievement}>
-                    <td>{u.achievement.replace(/^Race Unlock - /, '')}</td>
-                    <td className="small">
-                      <UnlockParts u={u} standings={todo?.standings ?? {}} />
-                    </td>
-                    <td>
-                      {step ? (
-                        <span>
-                          <span className="fp-num-inline">{step}</span> done there
-                        </span>
-                      ) : (
-                        <span
-                          className="chip warn"
-                          title={u.other ? 'Done some other way than factions: not the plan’s to do' : 'Nothing the planner may use raises one of its factions to 2000'}
-                        >
-                          not planned
-                        </span>
-                      )}
-                    </td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
+          <div className="table-scroll">
+            <table className="table">
+              <thead>
+                <tr>
+                  <th>Race unlock</th>
+                  <th>What it wants</th>
+                  <th>In the plan</th>
+                </tr>
+              </thead>
+              <tbody>
+                {openUnlocks.map((u) => {
+                  const step = unlockStep.get(u.achievement)
+                  return (
+                    <tr key={u.achievement}>
+                      <td>{u.achievement.replace(/^Race Unlock - /, '')}</td>
+                      <td className="small">
+                        <UnlockParts u={u} standings={todo?.standings ?? {}} />
+                      </td>
+                      <td>
+                        {step ? (
+                          <span>
+                            <span className="fp-num-inline">{step}</span> done there
+                          </span>
+                        ) : (
+                          <span
+                            className="chip warn"
+                            title={u.other ? 'Done some other way than factions: not the plan’s to do' : 'Nothing the planner may use raises one of its factions to 2000'}
+                          >
+                            not planned
+                          </span>
+                        )}
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
 
@@ -662,76 +664,78 @@ export function PlanTab({ character, view }: { character: string; view: FactionV
         <p className="faint small" style={{ padding: '0 16px' }}>
           Open one for every way to raise it. Lock one in and the plan finishes that achievement with it, and is built around it; rule one out and the plan leaves it alone.
         </p>
-        <table className="table">
-          <thead>
-            <tr>
-              <th>Achievement</th>
-              <th className="num">Standing</th>
-              <th className="num">To go</th>
-              <th>In the plan</th>
-            </tr>
-          </thead>
-          <tbody>
-            {[...targets]
-              .sort((a, b) => (stepOf.get(a.faction) ?? 999) - (stepOf.get(b.faction) ?? 999) || a.faction.localeCompare(b.faction))
-              .map((t) => {
-                const isOpen = open === t.faction
-                const toggle = () => setOpen(isOpen ? null : t.faction)
-                const step = stepOf.get(t.faction)
-                const lockedTo = choices.locks[t.faction] ? byId.get(choices.locks[t.faction]) : undefined
-                const done = t.standing >= STANDING_MAX
-                return (
-                  <Fragment key={t.faction}>
-                    <tr className={`clickable${isOpen ? ' selected' : ''}`} onClick={toggle}>
-                      <td>
-                        <button className="link-button" aria-expanded={isOpen} onClick={(e) => (e.stopPropagation(), toggle())}>
-                          {t.achievement}
-                        </button>
-                        {t.achievement !== t.faction && <span className="faint small"> ({t.faction})</span>}
-                        {lockedTo && (
-                          <span className="chip fp-lock" title={`Locked in: ${lockedTo.title}`}>
-                            locked
-                          </span>
-                        )}
-                      </td>
-                      <td className="num mono">{plain(Math.round(t.standing))}</td>
-                      <td className="num mono">{done ? '—' : Math.round(STANDING_MAX - t.standing).toLocaleString()}</td>
-                      <td>
-                        {done ? (
-                          <span className="chip ok" title="At 2000 now: the achievement shows done at your next achievements export">
-                            at 2000
-                          </span>
-                        ) : step ? (
-                          <span>
-                            <span className="fp-num-inline">{step}</span> <Doing a={plan!.steps[step - 1].activity} />
-                          </span>
-                        ) : (
-                          <span className="chip warn" title="Nothing the planner may use raises it: open it for what there is">
-                            not planned
-                          </span>
-                        )}
-                      </td>
-                    </tr>
-                    {isOpen && !done && plan && (
-                      <tr>
-                        <td colSpan={4} style={{ background: 'var(--bg-2)' }}>
-                          <Options
-                            faction={t.faction}
-                            options={plan.options[t.faction] ?? []}
-                            choices={choices}
-                            swaps={settings.raceSwaps}
-                            onLock={lock}
-                            onExclude={exclude}
-                            onPace={pace}
-                          />
+        <div className="table-scroll">
+          <table className="table">
+            <thead>
+              <tr>
+                <th>Achievement</th>
+                <th className="num">Standing</th>
+                <th className="num">To go</th>
+                <th>In the plan</th>
+              </tr>
+            </thead>
+            <tbody>
+              {[...targets]
+                .sort((a, b) => (stepOf.get(a.faction) ?? 999) - (stepOf.get(b.faction) ?? 999) || a.faction.localeCompare(b.faction))
+                .map((t) => {
+                  const isOpen = open === t.faction
+                  const toggle = () => setOpen(isOpen ? null : t.faction)
+                  const step = stepOf.get(t.faction)
+                  const lockedTo = choices.locks[t.faction] ? byId.get(choices.locks[t.faction]) : undefined
+                  const done = t.standing >= STANDING_MAX
+                  return (
+                    <Fragment key={t.faction}>
+                      <tr className={`clickable${isOpen ? ' selected' : ''}`} onClick={toggle}>
+                        <td>
+                          <button className="link-button" aria-expanded={isOpen} onClick={(e) => (e.stopPropagation(), toggle())}>
+                            {t.achievement}
+                          </button>
+                          {t.achievement !== t.faction && <span className="faint small"> ({t.faction})</span>}
+                          {lockedTo && (
+                            <span className="chip fp-lock" title={`Locked in: ${lockedTo.title}`}>
+                              locked
+                            </span>
+                          )}
+                        </td>
+                        <td className="num mono">{plain(Math.round(t.standing))}</td>
+                        <td className="num mono">{done ? '—' : Math.round(STANDING_MAX - t.standing).toLocaleString()}</td>
+                        <td>
+                          {done ? (
+                            <span className="chip ok" title="At 2000 now: the achievement shows done at your next achievements export">
+                              at 2000
+                            </span>
+                          ) : step ? (
+                            <span>
+                              <span className="fp-num-inline">{step}</span> <Doing a={plan!.steps[step - 1].activity} />
+                            </span>
+                          ) : (
+                            <span className="chip warn" title="Nothing the planner may use raises it: open it for what there is">
+                              not planned
+                            </span>
+                          )}
                         </td>
                       </tr>
-                    )}
-                  </Fragment>
-                )
-              })}
-          </tbody>
-        </table>
+                      {isOpen && !done && plan && (
+                        <tr>
+                          <td colSpan={4} style={{ background: 'var(--bg-2)' }}>
+                            <Options
+                              faction={t.faction}
+                              options={plan.options[t.faction] ?? []}
+                              choices={choices}
+                              swaps={settings.raceSwaps}
+                              onLock={lock}
+                              onExclude={exclude}
+                              onPace={pace}
+                            />
+                          </td>
+                        </tr>
+                      )}
+                    </Fragment>
+                  )
+                })}
+            </tbody>
+          </table>
+        </div>
       </div>
 
       {choices.excluded.length > 0 && (

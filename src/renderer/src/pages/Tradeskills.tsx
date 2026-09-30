@@ -409,67 +409,69 @@ function RecipeDetail({
 }) {
   return (
     <>
-      <table className="table">
-        <thead>
-          <tr>
-            <th>Ingredient</th>
-            <th title="In one combine">Each</th>
-            <th title={`For ${combines} combine${combines === 1 ? '' : 's'}`}>Need</th>
-            <th title="Bags, bank, shared bank and tradeskill depot, at your last inventory export">Have</th>
-            <th>To buy</th>
-            <th>Price</th>
-            <th>Cost</th>
-            <th>Where to get it</th>
-          </tr>
-        </thead>
-        <tbody>
-          {s.lines.map((l) => {
-            const it = info[itemKey(l.name)]
-            const vendors = it?.use?.vendors ?? []
-            const last = bought[l.name.toLowerCase()]
-            return (
-              <tr key={l.name}>
-                <td>
-                  <span className="row gap-8">
-                    <ItemIcon icon={it?.icon} size={22} />
-                    <a href={wikiUrl(l.name)} target="_blank" rel="noreferrer">
-                      {l.name}
-                    </a>
-                    <a className="faint small" href={eqtraders(l.name)} target="_blank" rel="noreferrer" title="Look it up on EQ Traders Corner">
-                      EQTC
-                    </a>
-                  </span>
-                </td>
-                <td className="mono">{l.perCombine}</td>
-                <td className="mono">{l.need.toLocaleString()}</td>
-                <td className="mono">{l.have.toLocaleString()}</td>
-                <td className="mono">{l.toBuy ? <b>{l.toBuy.toLocaleString()}</b> : <span className="faint">0</span>}</td>
-                <td className="nowrap">
-                  <PriceCell unit={l.unit} from={l.priceFrom} last={last} onSet={(c) => setPrice(l.name, c)} />
-                </td>
-                <td className="mono nowrap">{l.toBuy ? coin(l.cost) : <span className="faint">—</span>}</td>
-                <td className="small">
-                  {last ? (
-                    <span title={`You last bought ${last.count} from ${last.merchant}, ${ago(last.at)}`}>
-                      <b>{last.merchant}</b>
-                      {vendorZone(vendors, last.merchant) ? `, ${vendorZone(vendors, last.merchant)}` : ''}
+      <div className="table-scroll">
+        <table className="table">
+          <thead>
+            <tr>
+              <th>Ingredient</th>
+              <th title="In one combine">Each</th>
+              <th title={`For ${combines} combine${combines === 1 ? '' : 's'}`}>Need</th>
+              <th title="Bags, bank, shared bank and tradeskill depot, at your last inventory export">Have</th>
+              <th>To buy</th>
+              <th>Price</th>
+              <th>Cost</th>
+              <th>Where to get it</th>
+            </tr>
+          </thead>
+          <tbody>
+            {s.lines.map((l) => {
+              const it = info[itemKey(l.name)]
+              const vendors = it?.use?.vendors ?? []
+              const last = bought[l.name.toLowerCase()]
+              return (
+                <tr key={l.name}>
+                  <td>
+                    <span className="row gap-8">
+                      <ItemIcon icon={it?.icon} size={22} />
+                      <a href={wikiUrl(l.name)} target="_blank" rel="noreferrer">
+                        {l.name}
+                      </a>
+                      <a className="faint small" href={eqtraders(l.name)} target="_blank" rel="noreferrer" title="Look it up on EQ Traders Corner">
+                        EQTC
+                      </a>
                     </span>
-                  ) : vendors.length ? (
-                    <span title={vendors.map((v) => `${v.npc}, ${v.zone}${v.note ? ` (${v.note})` : ''}`).join('\n')}>
-                      {vendors[0].npc}, {vendors[0].zone}
-                      {vendors.length > 1 && <span className="faint"> +{vendors.length - 1} more</span>}
-                    </span>
-                  ) : it ? (
-                    <Sources info={it} craftedBy={madeBy.get(l.name.toLowerCase())} />
-                  ) : (
-                    <Pending inline doing="Looking it up" />
-                  )}
-                </td>
-              </tr>
-            )
-          })}
-        </tbody>
-      </table>
+                  </td>
+                  <td className="mono">{l.perCombine}</td>
+                  <td className="mono">{l.need.toLocaleString()}</td>
+                  <td className="mono">{l.have.toLocaleString()}</td>
+                  <td className="mono">{l.toBuy ? <b>{l.toBuy.toLocaleString()}</b> : <span className="faint">0</span>}</td>
+                  <td className="nowrap">
+                    <PriceCell unit={l.unit} from={l.priceFrom} last={last} onSet={(c) => setPrice(l.name, c)} />
+                  </td>
+                  <td className="mono nowrap">{l.toBuy ? coin(l.cost) : <span className="faint">—</span>}</td>
+                  <td className="small">
+                    {last ? (
+                      <span title={`You last bought ${last.count} from ${last.merchant}, ${ago(last.at)}`}>
+                        <b>{last.merchant}</b>
+                        {vendorZone(vendors, last.merchant) ? `, ${vendorZone(vendors, last.merchant)}` : ''}
+                      </span>
+                    ) : vendors.length ? (
+                      <span title={vendors.map((v) => `${v.npc}, ${v.zone}${v.note ? ` (${v.note})` : ''}`).join('\n')}>
+                        {vendors[0].npc}, {vendors[0].zone}
+                        {vendors.length > 1 && <span className="faint"> +{vendors.length - 1} more</span>}
+                      </span>
+                    ) : it ? (
+                      <Sources info={it} craftedBy={madeBy.get(l.name.toLowerCase())} />
+                    ) : (
+                      <Pending inline doing="Looking it up" />
+                    )}
+                  </td>
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
+      </div>
 
       <div className="row" style={{ gap: 18, flexWrap: 'wrap' }}>
         <span>

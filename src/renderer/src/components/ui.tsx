@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useSyncExternalStore, type CSSProperties, type ReactNode } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore, type CSSProperties, type ReactNode } from 'react'
 import type { SpellCategory } from '../../../shared/types'
 import { CATEGORY_LABELS } from '../../../shared/types'
 import { ago, iconUrl } from '../api'
@@ -310,12 +310,14 @@ const INFO_WIDTH = 350
 
 /**
  * An explanation behind a small "i": opens on click or Enter, so it reaches the keyboard as well as the
- * mouse, and closes on Escape or a click anywhere else. Near the right edge it opens leftwards.
+ * mouse, and closes on Escape, a click anywhere else, or a scroll. It is drawn fixed to the window, so
+ * a table that scrolls sideways cannot clip it: leftwards near the right edge, upwards near the bottom.
  */
 export function Info({ text, label = 'What this means' }: { text: ReactNode; label?: string }) {
   const ref = useRef<HTMLDetailsElement>(null)
+  const pop = useRef<HTMLDivElement>(null)
   const [open, setOpen] = useState(false)
-  const [flip, setFlip] = useState(false)
+  const [at, setAt] = useState<CSSProperties>({})
   useEffect(() => {
     if (!open) return
     const close = () => {
@@ -323,27 +325,51 @@ export function Info({ text, label = 'What this means' }: { text: ReactNode; lab
     }
     const onKey = (e: KeyboardEvent) => e.key === 'Escape' && close()
     const onDown = (e: MouseEvent) => !ref.current?.contains(e.target as Node) && close()
+    // Fixed where it opened, it would stay put while the page moved under it: it closes instead.
+    const onScroll = (e: Event) => !pop.current?.contains(e.target as Node) && close()
     document.addEventListener('keydown', onKey)
     document.addEventListener('mousedown', onDown)
+    window.addEventListener('scroll', onScroll, true)
+    window.addEventListener('resize', close)
     return () => {
       document.removeEventListener('keydown', onKey)
       document.removeEventListener('mousedown', onDown)
+      window.removeEventListener('scroll', onScroll, true)
+      window.removeEventListener('resize', close)
     }
   }, [open])
+  // Once drawn, its height is known: one that would run off the bottom opens above the "i" instead.
+  useLayoutEffect(() => {
+    const p = pop.current
+    const s = ref.current?.querySelector('summary')
+    if (!open || !p || !s || at.bottom !== undefined) return
+    const r = s.getBoundingClientRect()
+    if (p.getBoundingClientRect().bottom > window.innerHeight - 8 && r.top - 6 > p.offsetHeight) setAt({ ...at, top: undefined, bottom: window.innerHeight - r.top + 6 })
+  }, [open, at])
   return (
     <details
       ref={ref}
-      className={`info${flip ? ' flip' : ''}`}
+      className="info"
       onToggle={(e) => {
         const d = e.currentTarget
-        if (d.open) setFlip(d.getBoundingClientRect().left + INFO_WIDTH > window.innerWidth)
+        const s = d.querySelector('summary')
+        if (d.open && s) {
+          const r = s.getBoundingClientRect()
+          setAt(
+            r.left + INFO_WIDTH > window.innerWidth
+              ? { top: r.bottom + 6, right: Math.max(8, window.innerWidth - r.right - 8) }
+              : { top: r.bottom + 6, left: Math.max(8, r.left - 8) }
+          )
+        }
         setOpen(d.open)
       }}
     >
       <summary aria-label={label} title={typeof text === 'string' ? text : undefined}>
         i
       </summary>
-      <div className="info-pop">{text}</div>
+      <div className="info-pop" ref={pop} style={at}>
+        {text}
+      </div>
     </details>
   )
 }

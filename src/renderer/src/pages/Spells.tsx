@@ -58,34 +58,36 @@ export function Spells({ go }: { go?: (page: PageId) => void }) {
           {known.length === 0 ? (
             <div className="empty">No spells yet. Cast something while watching, or add a spell below.</div>
           ) : (
-            <table className="table">
-              <thead>
-                <tr>
-                  <th />
-                  <th>Spell</th>
-                  <th>Type</th>
-                  <th>
-                    Spell window <Info label="About Spell window" text="As the in-game Spell window shows it: base (with rank and focus)" />
-                  </th>
-                  <th>
-                    Wears off <Info label="About Wears off" text="Including the partial tick it lands in" />
-                  </th>
-                  <th>Tracking</th>
-                  <th>
-                    Recast cue <Info label="About Recast cue" text="The spoken “Recast …” warning before it ends" />
-                  </th>
-                  <th>
-                    Fade cue <Info label="About Fade cue" text="The spoken announcement when it wears off" />
-                  </th>
-                  <th>Last cast</th>
-                </tr>
-              </thead>
-              <tbody>
-                {shown.map((k) => (
-                  <SpellRow key={k.name} k={k} open={open === k.name} toggle={() => setOpen(open === k.name ? null : k.name)} onSaved={setKnown} />
-                ))}
-              </tbody>
-            </table>
+            <div className="table-scroll">
+              <table className="table">
+                <thead>
+                  <tr>
+                    <th />
+                    <th>Spell</th>
+                    <th>Type</th>
+                    <th>
+                      Spell window <Info label="About Spell window" text="As the in-game Spell window shows it: base (with rank and focus)" />
+                    </th>
+                    <th>
+                      Wears off <Info label="About Wears off" text="Including the partial tick it lands in" />
+                    </th>
+                    <th>Tracking</th>
+                    <th>
+                      Recast cue <Info label="About Recast cue" text="The spoken “Recast …” warning before it ends" />
+                    </th>
+                    <th>
+                      Fade cue <Info label="About Fade cue" text="The spoken announcement when it wears off" />
+                    </th>
+                    <th>Last cast</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {shown.map((k) => (
+                    <SpellRow key={k.name} k={k} open={open === k.name} toggle={() => setOpen(open === k.name ? null : k.name)} onSaved={setKnown} />
+                  ))}
+                </tbody>
+              </table>
+            </div>
           )}
           <AddSpell onAdded={setKnown} />
         </div>
@@ -191,69 +193,71 @@ function FocusSources() {
         </div>
       </div>
       {c.focusSources.length > 0 && (
-        <table className="table mb-10">
-          <thead>
-            <tr>
-              <th>On</th>
-              <th>Focus</th>
-              <th>Type</th>
-              <th>From</th>
-              <th>Bonus</th>
-              <th>Spells</th>
-              <th title="Spells above this level get less; 0 = no cap">Level cap</th>
-              <th title="Percent of the focus lost per level over the cap">Decay / level</th>
-              <th />
-            </tr>
-          </thead>
-          <tbody>
-            {c.focusSources.map((f) => (
-              <tr key={f.id}>
-                <td>
-                  <Switch on={f.enabled} label={`Use ${f.name}`} onChange={(v) => update(f.id, { enabled: v })} />
-                </td>
-                <td>
-                  <input value={f.name} aria-label="Focus name" onChange={(e) => update(f.id, { name: e.target.value })} style={{ width: 210 }} />
-                </td>
-                <td>
-                  <select value={f.kind} aria-label={`${f.name} type`} onChange={(e) => update(f.id, { kind: e.target.value as FocusSource['kind'] })}>
-                    <option value="item">Item</option>
-                    <option value="aa">AA</option>
-                  </select>
-                </td>
-                <td>
-                  <input
-                    value={f.from}
-                    placeholder="Which item?"
-                    aria-label={`${f.name} comes from`}
-                    onChange={(e) => update(f.id, { from: e.target.value })}
-                    style={{ width: 150 }}
-                  />
-                </td>
-                <td className="nowrap">
-                  <NumberInput value={f.pct} width={64} label={`${f.name} bonus %`} onChange={(v) => update(f.id, { pct: v ?? 0 })} /> %
-                </td>
-                <td>
-                  <select value={f.appliesTo} aria-label={`${f.name} applies to`} onChange={(e) => update(f.id, { appliesTo: e.target.value as FocusSource['appliesTo'] })}>
-                    <option value="beneficial">Beneficial</option>
-                    <option value="detrimental">Detrimental</option>
-                    <option value="both">All</option>
-                  </select>
-                </td>
-                <td>
-                  <NumberInput value={f.maxLevel} width={64} min={0} label={`${f.name} level cap`} onChange={(v) => update(f.id, { maxLevel: v ?? 0 })} />
-                </td>
-                <td className="nowrap">
-                  <NumberInput value={f.decayPct} width={56} min={0} label={`${f.name} decay per level %`} onChange={(v) => update(f.id, { decayPct: v ?? 0 })} /> %
-                </td>
-                <td>
-                  <button className="btn ghost small" onClick={() => remove(f)}>
-                    Remove
-                  </button>
-                </td>
+        <div className="table-scroll">
+          <table className="table mb-10">
+            <thead>
+              <tr>
+                <th>On</th>
+                <th>Focus</th>
+                <th>Type</th>
+                <th>From</th>
+                <th>Bonus</th>
+                <th>Spells</th>
+                <th title="Spells above this level get less; 0 = no cap">Level cap</th>
+                <th title="Percent of the focus lost per level over the cap">Decay / level</th>
+                <th />
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {c.focusSources.map((f) => (
+                <tr key={f.id}>
+                  <td>
+                    <Switch on={f.enabled} label={`Use ${f.name}`} onChange={(v) => update(f.id, { enabled: v })} />
+                  </td>
+                  <td>
+                    <input value={f.name} aria-label="Focus name" onChange={(e) => update(f.id, { name: e.target.value })} style={{ width: 210 }} />
+                  </td>
+                  <td>
+                    <select value={f.kind} aria-label={`${f.name} type`} onChange={(e) => update(f.id, { kind: e.target.value as FocusSource['kind'] })}>
+                      <option value="item">Item</option>
+                      <option value="aa">AA</option>
+                    </select>
+                  </td>
+                  <td>
+                    <input
+                      value={f.from}
+                      placeholder="Which item?"
+                      aria-label={`${f.name} comes from`}
+                      onChange={(e) => update(f.id, { from: e.target.value })}
+                      style={{ width: 150 }}
+                    />
+                  </td>
+                  <td className="nowrap">
+                    <NumberInput value={f.pct} width={64} label={`${f.name} bonus %`} onChange={(v) => update(f.id, { pct: v ?? 0 })} /> %
+                  </td>
+                  <td>
+                    <select value={f.appliesTo} aria-label={`${f.name} applies to`} onChange={(e) => update(f.id, { appliesTo: e.target.value as FocusSource['appliesTo'] })}>
+                      <option value="beneficial">Beneficial</option>
+                      <option value="detrimental">Detrimental</option>
+                      <option value="both">All</option>
+                    </select>
+                  </td>
+                  <td>
+                    <NumberInput value={f.maxLevel} width={64} min={0} label={`${f.name} level cap`} onChange={(v) => update(f.id, { maxLevel: v ?? 0 })} />
+                  </td>
+                  <td className="nowrap">
+                    <NumberInput value={f.decayPct} width={56} min={0} label={`${f.name} decay per level %`} onChange={(v) => update(f.id, { decayPct: v ?? 0 })} /> %
+                  </td>
+                  <td>
+                    <button className="btn ghost small" onClick={() => remove(f)}>
+                      Remove
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       )}
       <div className="row">
         <input
@@ -634,59 +638,61 @@ function LogCheck({ known, onSaved }: { known: KnownSpell[]; onSaved: (k: KnownS
       )}
       {rows && rows.length === 0 && <div className="empty">No complete land-to-fade pairs found in that part of the log.</div>}
       {rows && rows.length > 0 && (
-        <table className="table">
-          <thead>
-            <tr>
-              <th>Spell</th>
-              <th>Type</th>
-              <th>Samples</th>
-              <th>Log median</th>
-              <th>Calculated</th>
-              <th />
-            </tr>
-          </thead>
-          <tbody>
-            {rows.slice(0, 40).map((r) => (
-              <tr key={r.rankedName}>
-                <td>{r.rankedName}</td>
-                <td>
-                  <CategoryChip category={r.category} />
-                </td>
-                <td className="muted">{r.samples}</td>
-                <td className="mono">{r.observedMedianSec}s</td>
-                <td className="mono">
-                  {r.calculatedEarliestSec}–{r.calculatedLatestSec}s
-                </td>
-                <td>
-                  {r.fits ? (
-                    <span className="chip ok">Fits</span>
-                  ) : (
-                    <span className="row tight">
-                      <span className="chip warn" title={r.impliedFocusRange ? `Fits with focus ${r.impliedFocusRange[0]}% to ${r.impliedFocusRange[1]}%` : ''}>
-                        Off{r.impliedFocusPct !== null ? ` — needs ≈ ${r.impliedFocusPct}% focus in total` : ''}
-                      </span>
-                      {r.impliedFocusPct !== null &&
-                        (added[r.rankedName] !== undefined ? (
-                          <span className="chip ok">
-                            Extra focus set: {added[r.rankedName] > 0 ? '+' : ''}
-                            {added[r.rankedName]}%
-                          </span>
-                        ) : (
-                          <button
-                            className="btn small"
-                            title={`Sets ${r.spell}'s extra focus so its focus comes to ${r.impliedFocusPct}% (it is ${r.focusPct}% now). Run the check again to see it fit.`}
-                            onClick={() => void addFocus(r)}
-                          >
-                            Add this focus
-                          </button>
-                        ))}
-                    </span>
-                  )}
-                </td>
+        <div className="table-scroll">
+          <table className="table">
+            <thead>
+              <tr>
+                <th>Spell</th>
+                <th>Type</th>
+                <th>Samples</th>
+                <th>Log median</th>
+                <th>Calculated</th>
+                <th />
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {rows.slice(0, 40).map((r) => (
+                <tr key={r.rankedName}>
+                  <td>{r.rankedName}</td>
+                  <td>
+                    <CategoryChip category={r.category} />
+                  </td>
+                  <td className="muted">{r.samples}</td>
+                  <td className="mono">{r.observedMedianSec}s</td>
+                  <td className="mono">
+                    {r.calculatedEarliestSec}–{r.calculatedLatestSec}s
+                  </td>
+                  <td>
+                    {r.fits ? (
+                      <span className="chip ok">Fits</span>
+                    ) : (
+                      <span className="row tight">
+                        <span className="chip warn" title={r.impliedFocusRange ? `Fits with focus ${r.impliedFocusRange[0]}% to ${r.impliedFocusRange[1]}%` : ''}>
+                          Off{r.impliedFocusPct !== null ? ` — needs ≈ ${r.impliedFocusPct}% focus in total` : ''}
+                        </span>
+                        {r.impliedFocusPct !== null &&
+                          (added[r.rankedName] !== undefined ? (
+                            <span className="chip ok">
+                              Extra focus set: {added[r.rankedName] > 0 ? '+' : ''}
+                              {added[r.rankedName]}%
+                            </span>
+                          ) : (
+                            <button
+                              className="btn small"
+                              title={`Sets ${r.spell}'s extra focus so its focus comes to ${r.impliedFocusPct}% (it is ${r.focusPct}% now). Run the check again to see it fit.`}
+                              onClick={() => void addFocus(r)}
+                            >
+                              Add this focus
+                            </button>
+                          ))}
+                      </span>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       )}
     </div>
   )

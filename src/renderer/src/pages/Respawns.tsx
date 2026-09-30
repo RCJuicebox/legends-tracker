@@ -150,55 +150,65 @@ export function Respawns() {
         </div>
       ) : (
         <div className="card" style={{ padding: 0 }}>
-          <table className="table">
-            <thead>
-              <tr>
-                <SortTh k="name" sort={sort} onSort={setSort}>
-                  Mob
-                </SortTh>
-                <SortTh k="kills" sort={sort} onSort={setSort} title="Kills on record">
-                  Kills
-                </SortTh>
-                <SortTh k="respawn" sort={sort} onSort={setSort} title="The shortest gap between a death and the mob being seen again: the respawn is this or less">
-                  Respawn
-                </SortTh>
-                <SortTh k="gap" sort={sort} onSort={setSort} title="The most recent gap">
-                  Last gap
-                </SortTh>
-                <SortTh k="last" sort={sort} onSort={setSort}>
-                  Last killed
-                </SortTh>
-                <th title="The timer's length, or the shortest gap, from the last kill">Back in</th>
-                <th>Timer</th>
-                <th />
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((r) => (
-                <Fragment key={r.key}>
-                  <Row r={r} now={now} zone={zone} open={open === r.key} toggle={() => setOpen(open === r.key ? null : r.key)} overlays={state.settings.overlays} onSaved={saved} />
-                  {open === r.key && (
-                    <tr>
-                      <td colSpan={8} style={{ background: 'var(--bg-2)' }}>
-                        <TimerEditor
-                          initialName={r.name}
-                          initialSeconds={r.timer?.seconds ?? r.estimate ?? r.gaps[r.gaps.length - 1] ?? null}
-                          measured={r.estimate ?? r.gaps[r.gaps.length - 1] ?? null}
-                          timer={r.timer}
-                          overlays={state.settings.overlays}
-                          onDone={(v) => {
-                            saved(v)
-                            if (v) setOpen(null)
-                          }}
-                          onCancel={() => setOpen(null)}
-                        />
-                      </td>
-                    </tr>
-                  )}
-                </Fragment>
-              ))}
-            </tbody>
-          </table>
+          <div className="table-scroll">
+            <table className="table">
+              <thead>
+                <tr>
+                  <SortTh k="name" sort={sort} onSort={setSort}>
+                    Mob
+                  </SortTh>
+                  <SortTh k="kills" sort={sort} onSort={setSort} title="Kills on record">
+                    Kills
+                  </SortTh>
+                  <SortTh k="respawn" sort={sort} onSort={setSort} title="The shortest gap between a death and the mob being seen again: the respawn is this or less">
+                    Respawn
+                  </SortTh>
+                  <SortTh k="gap" sort={sort} onSort={setSort} title="The most recent gap">
+                    Last gap
+                  </SortTh>
+                  <SortTh k="last" sort={sort} onSort={setSort}>
+                    Last killed
+                  </SortTh>
+                  <th title="The timer's length, or the shortest gap, from the last kill">Back in</th>
+                  <th>Timer</th>
+                  <th />
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((r) => (
+                  <Fragment key={r.key}>
+                    <Row
+                      r={r}
+                      now={now}
+                      zone={zone}
+                      open={open === r.key}
+                      toggle={() => setOpen(open === r.key ? null : r.key)}
+                      overlays={state.settings.overlays}
+                      onSaved={saved}
+                    />
+                    {open === r.key && (
+                      <tr>
+                        <td colSpan={8} style={{ background: 'var(--bg-2)' }}>
+                          <TimerEditor
+                            initialName={r.name}
+                            initialSeconds={r.timer?.seconds ?? r.estimate ?? r.gaps[r.gaps.length - 1] ?? null}
+                            measured={r.estimate ?? r.gaps[r.gaps.length - 1] ?? null}
+                            timer={r.timer}
+                            overlays={state.settings.overlays}
+                            onDone={(v) => {
+                              saved(v)
+                              if (v) setOpen(null)
+                            }}
+                            onCancel={() => setOpen(null)}
+                          />
+                        </td>
+                      </tr>
+                    )}
+                  </Fragment>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
     </>
