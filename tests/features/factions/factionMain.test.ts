@@ -262,7 +262,7 @@ beforeAll(() => {
     ].join('')
   )
 
-  const history = new LogHistory(join(h.dir, 'log-history.json'), { factions: m.factionConsumer, factionSources: m.factionSourceConsumer })
+  const history = new LogHistory(join(h.dir, 'log-history.json'), m.Factions.consumers)
   const ctx = {
     installDir: () => setting.installDir,
     gameTables: new GameTables(() => setting.installDir),
@@ -272,15 +272,13 @@ beforeAll(() => {
       () => {}
     ),
     historyOf: (c: string) => ({ logPath: join(game, 'Logs', `eqlog_${c}.txt`), archiveDir: join(game, 'Logs', 'Archive'), stem: `eqlog_${c}` }),
-    factions: new m.FactionHistory(history, 'factions'),
-    factionSources: new m.FactionSourceHistory(history, 'factionSources'),
-    factionBook: new m.FactionBook(),
+    // Allakhazam is not read here: it has its own tests.
+    factions: Object.assign(new m.Factions(history), { alla: { factions: async () => [], status: () => ({ read: 0, wanted: 0, error: '' }) } }),
     purchases: { latest: async () => ({}) },
     inventoryFiles: { lookup: async () => ({}) },
-    factionAlla: { factions: async () => [], status: () => ({ read: 0, wanted: 0, error: '' }) },
     store: { characterByKey: () => record }
   }
-  m.registerFactionIpc(ctx as unknown as AppContext)
+  ctx.factions.register(ctx as unknown as AppContext)
   context = ctx as unknown as AppContext
 })
 let context: AppContext

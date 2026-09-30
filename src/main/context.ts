@@ -23,11 +23,11 @@ import { CastHistory, castCounter, dayConsumer } from './castHistory'
 import { meleeCounter } from '../core/meleeTally'
 import { RecipeBook } from './recipes'
 import { PurchaseHistory, purchaseConsumer } from './purchases'
-import { FactionBook, FactionHistory, FactionSourceHistory, factionConsumer, factionSourceConsumer } from '../features/factions/main'
-import { FactionAlla } from '../features/factions/allaSource'
+import { Factions } from '../features/factions/main'
 import { LogHistory, type HistoryWhere } from './sources/logHistory'
 import { TradeFavorites } from './tradeFavorites'
 import { LiveAchievements } from './liveAchievements'
+import type { AppFeature } from './appFeature'
 import { SkillHistory, skillConsumer } from './skillHistory'
 import { AaHistory, aaConsumer } from './aaHistory'
 import { PetStore, PetWiki } from './pets'
@@ -70,15 +70,12 @@ export interface AppContext {
   meleeHistory: CastHistory
   recipeBook: RecipeBook
   purchases: PurchaseHistory
-  /** Faction changes over the character's log and archives, for the Factions page. */
-  factions: FactionHistory
-  /** What caused each faction change, kill or hand-in, for the Factions page's plan. */
-  factionSources: FactionSourceHistory
-  /** eqlwiki's faction pages and the quest pages they name, for the plan. */
-  factionBook: FactionBook
-  factionAlla: FactionAlla
+  /** The Factions page's side: faction changes and their causes over the logs, and the wiki pages behind the plan. */
+  factions: Factions
   /** The faction plan followed and the Slayer counts, for the achievements overlay. */
   liveAchievements: LiveAchievements
+  /** The parts that register, and flush, themselves (AppFeature): the two above. */
+  features: AppFeature[]
   /** Each skill's last value the log gave, for the skill achievements. */
   skills: SkillHistory
   /** The AAs bought and the ability points the log recorded, for Stats › AAs. */
@@ -136,10 +133,9 @@ export function createContext(): AppContext {
     casts: dayConsumer(castCounter),
     melee: dayConsumer(meleeCounter),
     purchases: purchaseConsumer,
-    factions: factionConsumer,
-    factionSources: factionSourceConsumer,
     skills: skillConsumer,
-    aas: aaConsumer
+    aas: aaConsumer,
+    ...Factions.consumers
   })
 
   const ctx = {
@@ -165,10 +161,7 @@ export function createContext(): AppContext {
     meleeHistory: new CastHistory(logHistory, 'melee'),
     recipeBook: new RecipeBook((p) => toMain('state:recipes', p)),
     purchases: new PurchaseHistory(logHistory, 'purchases'),
-    factions: new FactionHistory(logHistory, 'factions'),
-    factionSources: new FactionSourceHistory(logHistory, 'factionSources'),
-    factionBook: new FactionBook(),
-    factionAlla: new FactionAlla(),
+    factions: new Factions(logHistory),
     skills: new SkillHistory(logHistory, 'skills'),
     aaHistory: new AaHistory(logHistory, 'aas'),
     tradeFavorites: new TradeFavorites(join(dataDir, 'tradeskills.json')),
@@ -299,9 +292,10 @@ export function createContext(): AppContext {
     archiveDir: ctx.engine.archives.archiveDir(),
     stem: logStem(character)
   })
-  // After everything the engine has of its own: it reads the standings and the log as they settle.
+  // It reads the standings and the log as they settle, so its engine feature goes after everything the
+  // engine has of its own (registered with the features, below).
   ctx.liveAchievements = new LiveAchievements(ctx)
-  ctx.engine.use(ctx.liveAchievements.feature)
+  ctx.features = [ctx.factions, ctx.liveAchievements]
 
   ctx.refreshOverlayVisibility = () =>
     ctx.overlays.setShown(
@@ -401,6 +395,8 @@ export function createContext(): AppContext {
   }
 
   registerSources(ctx)
+  // Their channels, rows and engine features; after the app's own rows, so theirs follow on Data Sources.
+  for (const f of ctx.features) f.register(ctx)
   return ctx
 }
 
@@ -474,17 +470,6 @@ function registerSources(ctx: AppContext): void {
     kind: 'wiki',
     what: "Every player-crafted recipe on eqlwiki, for the Tradeskills page and crafted items' eras.",
     refresh: () => ctx.recipeBook.refresh()
-  })
-  sources.add('factionWiki', {
-    label: 'Faction pages',
-    kind: 'wiki',
-    what: "eqlwiki's faction pages and the quest pages they name, for what raises a faction and the Factions page's plan. Kept a week.",
-    refresh: () => ctx.factionBook.get(true)
-  })
-  sources.add('allakhazam', {
-    label: 'Allakhazam',
-    kind: 'wiki',
-    what: "Allakhazam's faction pages, for the con a quest wants, kill amounts and mobs eqlwiki lacks: a page every twenty seconds, as the site asks, each kept a month."
   })
   sources.add('petWiki', { label: 'Pet pages', kind: 'wiki', what: "eqlwiki's Pet Guide and each pet's summon page, for the pet gear planner." })
   sources.add('speech', {

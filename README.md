@@ -888,9 +888,13 @@ error, and `tsconfig.node.json` checks the main process, the preload and core wi
 
 A feature module keeps one feature whole instead of spreading it over the layers: its files each
 follow their own layer's rules by name (every `.tsx` the renderer's, `main.ts` and any `*Source.ts`
-main's, every other `.ts` core's), so a page still cannot reach the main process. Its `main.ts` exports a `registerXxxIpc(ctx)` that
-`src/main/index.ts` calls with the other IPC families, and its log-history consumer is added in
-`src/main/context.ts`; its page's entry in `src/features/index.ts` (id, group, label, icon and the
+main's, every other `.ts` core's), so a page still cannot reach the main process. Its `main.ts`
+exports a class that is an `AppFeature` (`src/main/appFeature.ts`): `register(ctx)` adds its
+channels, its Data Sources rows and its engine feature, `flush()` writes what it keeps, and a static
+`consumers` names what it counts over the logs. The context builds it and lists it in `ctx.features`,
+registers each once as the app starts and flushes each at quit, so neither `src/main/index.ts` nor
+the lifecycle knows what it does. The live achievements (`src/main/liveAchievements.ts`) are one
+too. Its page's entry in `src/features/index.ts` (id, group, label, icon and the
 page it follows) is where the sidebar puts it. Inside the engine the same idea runs the live log:
 each part (the spell tracker, triggers, pet, motes, the combat feed, buffs, the status line and the
 views that go out) is an `EngineFeature` with optional `line`, `tick`, `reset` and `linesRead`

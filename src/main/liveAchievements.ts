@@ -4,26 +4,15 @@ import { trackedAchievements } from '../core/trackedAchievements'
 import { SELF } from '../core/combatLines'
 import { isFriend } from '../core/combatMeter'
 import { RaceIndex, slayerCounters, slayerCounts, slayerLine, type SlayerCounter, type SlayerKills } from '../core/slayer'
-import { assertCharacterKey } from '../core/validate'
 import { skillGoals, skillId, skillValue } from '../core/skillAchievements'
 import { classIdOf, type ClassId } from '../shared/game/classes'
 import { parseFactionLine } from '../features/factions/core'
 import { standingsNow } from '../features/factions/main'
-import {
-  carryFollow,
-  freshFollow,
-  pickStep,
-  readFollow,
-  sanitizeFollowedPlan,
-  sanitizeFollows,
-  sayStep,
-  type FollowEvent,
-  type FollowedPlan,
-  type FollowState
-} from '../features/factions/tracker'
+import { carryFollow, freshFollow, pickStep, readFollow, sanitizeFollows, sayStep, type FollowEvent, type FollowedPlan, type FollowState } from '../features/factions/tracker'
 import type { AchievementTrack, FactionTrackView, SkillRow, SkillTrackView, SlayerTrackView, TrackedAchievement } from '../shared/tracking'
 import type { AchievementsExport } from './achievements'
 import type { AppContext } from './context'
+import type { AppFeature } from './appFeature'
 import type { EngineFeature } from './engine'
 import { handle } from './ipc/handle'
 import { log } from './log'
@@ -74,7 +63,8 @@ const PAGE_MS = 90_000
 /** A mob the player went for this recently that dies with no killer named ("A bixie died.") died of the player's damage over time. */
 const ENGAGED_MS = 60_000
 
-export class LiveAchievements {
+export class LiveAchievements implements AppFeature {
+  readonly id = 'achievements'
   private readonly follows: JsonFile<Record<string, Followed>>
   private readonly races = new NpcRaces()
   private character = ''
@@ -125,6 +115,15 @@ export class LiveAchievements {
   /** Writes where the player is in each followed plan. */
   flush(): Promise<void> {
     return this.follows.flush()
+  }
+
+  /** Its channel, and its part in following the log: registered after the engine's own, it sees each line last. */
+  register(ctx: AppContext): void {
+    handle('achievements:track', (watching) => {
+      if (typeof watching === 'boolean') ctx.liveAchievements.watch(watching)
+      return ctx.liveAchievements.view
+    })
+    ctx.engine.use(this.feature)
   }
 
   /** What the overlay and the pages were last told. */
@@ -488,22 +487,4 @@ export class LiveAchievements {
     this.ctx.overlays.achievements(track)
     this.ctx.windows.toMain('state:achievementTrack', track)
   }
-}
-
-export function registerLiveAchievementsIpc(ctx: AppContext): void {
-  handle('factions:follow', async (character, plan) => {
-    assertCharacterKey(character)
-    const clean = plan === null ? null : sanitizeFollowedPlan(plan)
-    if (plan !== null && !clean) throw new Error('Not a plan.')
-    await ctx.liveAchievements.follow(character, clean)
-  })
-  handle('factions:follow-step', async (character, index) => {
-    assertCharacterKey(character)
-    if (typeof index !== 'number' || !Number.isInteger(index) || index < 0) throw new Error('Not a step.')
-    await ctx.liveAchievements.followStep(character, index)
-  })
-  handle('achievements:track', (watching) => {
-    if (typeof watching === 'boolean') ctx.liveAchievements.watch(watching)
-    return ctx.liveAchievements.view
-  })
 }

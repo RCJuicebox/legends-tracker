@@ -3,7 +3,7 @@ import { mkdtempSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
-// Every invoke handler, registered as index.ts registers them, against a stand-in context in which
+// Every invoke handler, registered as index.ts and the context's features register them, against a stand-in context in which
 // every part answers anything with another stand-in. Each channel is then called with arguments a page
 // should never send (paths out of the app's folders, keys of an object's own, wrong types, huge text):
 // a handler may refuse them, but it must answer, and must not hang, crash or throw anything but an
@@ -93,11 +93,12 @@ beforeAll(async () => {
     import('../../src/main/ipc/play'),
     import('../../src/main/ipc/audio'),
     import('../../src/main/ipc/character'),
-    import('../../src/features/factions/main'),
-    import('../../src/main/liveAchievements'),
     import('../../src/main/demo')
   ])
   for (const m of modules) for (const [name, fn] of Object.entries(m)) if (/^register\w*Ipc$/.test(name)) (fn as (c: unknown) => void)(ctx)
+  const { Factions } = await import('../../src/features/factions/main')
+  const { LiveAchievements } = await import('../../src/main/liveAchievements')
+  for (const f of [new Factions(stub() as never), new LiveAchievements({ store: { dir: h.dir } } as never)]) f.register(ctx as never)
 }, 30_000)
 
 describe('the invoke handlers', () => {

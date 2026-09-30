@@ -65,8 +65,7 @@ function fakeContext(o: { engine?: Engine; flushAll?: () => Promise<unknown>; up
     inventoryFiles: { stop: note('stop inventory poller') },
     speech: { stop: note('stop speech') },
     store: { flushAll: o.flushAll ?? (async () => note('save stores')()) },
-    liveAchievements: { flush: async () => note('save followed plans')() },
-    factionAlla: { flush: async () => note('save allakhazam pages')() },
+    features: [{ flush: async () => note('save followed plans')() }, {}, { flush: async () => note('save allakhazam pages')() }],
     logHistory: { flush: async () => note('save log history')() },
     installUpdate: async () => {}
   }

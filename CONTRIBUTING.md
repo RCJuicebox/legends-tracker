@@ -37,8 +37,10 @@ takes what it needs as arguments rather than reaching for Electron or the disk.
 A new feature module:
 
 1. Its logic in `core.ts` (and more core files as it grows), tested directly.
-2. Its main side in `main.ts`: a `registerXxxIpc(ctx)` called from `src/main/index.ts`, log-history
-   consumers added in `src/main/context.ts`, anything it keeps listed in the README's "Your data".
+2. Its main side in `main.ts`: a class implementing `AppFeature` (`src/main/appFeature.ts`), with
+   `register(ctx)` for its channels, Data Sources rows and engine feature, `flush()` for what it keeps
+   and a static `consumers` for its log-history counts; built in `src/main/context.ts` and listed in
+   `ctx.features`. Anything it keeps is listed in the README's "Your data".
 3. Its page in `page.tsx`, listed in `src/features/index.ts` (id, group, label, icon).
 4. Its channels in `src/shared/ipc.ts`, each with its argument and result types; a handler checks
    every argument it stores or builds a path from (`src/core/validate.ts` has the helpers:

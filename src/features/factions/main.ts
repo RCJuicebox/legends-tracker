@@ -32,6 +32,8 @@ import { buildCatalog, guessesFrom, itemsToLookUp, type CatalogInput } from './c
 import { planFor, type FactionPlanData } from './planner'
 import { RACE_UNLOCK_DEFS, raceUnlocks, unlockedRaces, type RaceUnlockDef } from './unlocks'
 import { lookUp, moversOf, sourcesOf } from './lookup'
+import { sanitizeFollowedPlan } from './tracker'
+import { FactionAlla } from './allaSource'
 import { listLogs } from '../../main/game'
 import type { Purchases } from '../../shared/ipc'
 import type { AchSection } from '../../core/achievements'
@@ -50,6 +52,7 @@ import { log } from '../../main/log'
 import { identityOf, offsetBefore, readForward, type HistoryConsumer, type HistoryWhere, type LogHistory } from '../../main/sources/logHistory'
 import { sameFile } from '../../core/fileIdentity'
 import type { AppContext } from '../../main/context'
+import type { AppFeature } from '../../main/appFeature'
 
 // A character's faction changes, from "Your faction standing with X has been adjusted by N." and
 // the cap lines, over the log and its archives, for the Factions page. The reading is LogHistory's.
@@ -470,11 +473,11 @@ async function planData(ctx: AppContext, character: string, refresh: boolean, wi
     log.warn(`${character}'s factions export could not be read for the plan:`, e)
   }
   const achievements = await factionAchievements(ctx, character)
-  const view = await ctx.factions.view(where, exported, achievements)
+  const view = await ctx.factions.history.view(where, exported, achievements)
   const { targets, maxed, achievementsExport, standings } = planFor(view)
   const [tallies, book, purchases, held, others] = await Promise.all([
-    ctx.factionSources.view(where),
-    ctx.factionBook.get(refresh),
+    ctx.factions.causes.view(where),
+    ctx.factions.book.get(refresh),
     ctx.purchases.latest(where),
     holdings(dir, character),
     otherCharacters(ctx, character)
@@ -498,7 +501,7 @@ async function planData(ctx: AppContext, character: string, refresh: boolean, wi
     have: held.have,
     wide,
     // Allakhazam's pages, as far as they are read: the achievements' factions first, then the character's others.
-    alla: await ctx.factionAlla.factions([...new Set([...targets.map((t) => t.faction), ...view.factions.map((r) => r.name)])]),
+    alla: await ctx.factions.alla.factions([...new Set([...targets.map((t) => t.faction), ...view.factions.map((r) => r.name)])]),
     cons: await consFor(ctx, character, exported, view)
   }
   // What the wiki says of the items hand-ins want: a merchant, a drop, a recipe. Kept a week, like the Gear page's.
@@ -545,7 +548,7 @@ async function planData(ctx: AppContext, character: string, refresh: boolean, wi
       kills: theirs.filter((t) => t.kind === 'kill').reduce((n, t) => n + t.n, 0),
       handIns: theirs.filter((t) => t.kind === 'turnin').reduce((n, t) => n + t.n, 0)
     },
-    alla: ctx.factionAlla.status(),
+    alla: ctx.factions.alla.status(),
     agnostic: agnosticOf(sections),
     races,
     unlocks,
@@ -564,7 +567,7 @@ export async function standingsNow(
 ): Promise<{ standings: Record<string, number>; done: Set<string>; byAchievement: Record<string, { faction: string; standing: number | null }> }> {
   const dir = ctx.installDir()
   const exported = await readFactionExport(dir, character).catch(() => null)
-  const view = await ctx.factions.view(ctx.historyOf(character), exported, await factionAchievements(ctx, character))
+  const view = await ctx.factions.history.view(ctx.historyOf(character), exported, await factionAchievements(ctx, character))
   const byAchievement: Record<string, { faction: string; standing: number | null }> = {}
   for (const r of view.factions) if (r.achievement) byAchievement[r.achievement.name.toLowerCase()] = { faction: r.name, standing: r.standing?.value ?? null }
   return { standings: planFor(view).standings, done: new Set(view.factions.filter((r) => r.achievement?.done === true).map((r) => r.name)), byAchievement }
@@ -572,7 +575,7 @@ export async function standingsNow(
 
 /** A character's kills and hand-ins that moved a faction, with the player's other characters' added in (shareSources). */
 async function sharedTallies(ctx: AppContext, character: string) {
-  const [own, others] = await Promise.all([ctx.factionSources.view(ctx.historyOf(character)), otherCharacters(ctx, character)])
+  const [own, others] = await Promise.all([ctx.factions.causes.view(ctx.historyOf(character)), otherCharacters(ctx, character)])
   return shareSources(
     own,
     others.map((o) => ({ character: o.character, sources: o.tallies }))
@@ -588,7 +591,7 @@ async function otherCharacters(ctx: AppContext, character: string): Promise<{ ch
   for (const c of keys) {
     try {
       const where = ctx.historyOf(c)
-      out.push({ character: c, tallies: await ctx.factionSources.view(where), purchases: await ctx.purchases.latest(where) })
+      out.push({ character: c, tallies: await ctx.factions.causes.view(where), purchases: await ctx.purchases.latest(where) })
     } catch (e) {
       log.warn(`${c}'s log could not be read for the faction plan:`, e)
     }
@@ -596,57 +599,113 @@ async function otherCharacters(ctx: AppContext, character: string): Promise<{ ch
   return out
 }
 
-export function registerFactionIpc(ctx: AppContext): void {
-  // The export last reported to the Data sources page, so the half-minute reload does not report it again.
-  let reported = ''
-  // Faction changes, over the character's log and its archives, and the standings from its export.
-  handle('factions:get', async (character) => {
-    assertCharacterKey(character)
-    const dir = ctx.installDir()
-    if (!dir) return { factions: [], export: null, exportError: '' }
-    let exported: FactionExport | null = null
-    let exportError = ''
-    try {
-      exported = await readFactionExport(dir, character)
-      const seen = exported ? `${exported.file}@${exported.modified}` : ''
-      if (exported && seen !== reported) sources.ok('exports', `${exported.file}, written ${new Date(exported.modified).toLocaleString()}`)
-      reported = seen
-    } catch (e) {
-      // A bad export should not hide the log's changes: say so on Data sources and show those.
-      sources.fail('exports', e, `${character}'s factions export`)
-      exportError = e instanceof Error ? e.message : String(e)
-    }
-    const view = await ctx.factions.view(ctx.historyOf(character), exported, await factionAchievements(ctx, character))
-    return { ...(await withConsFor(ctx, character, exported, view)), exportError }
-  })
-  // What raises a faction, from its page in the book of eqlwiki's faction pages the Plan tab reads.
-  handle('factions:sources', async (faction) => {
-    if (typeof faction !== 'string' || !faction.trim() || faction.length > 100) throw new Error('Not a faction.')
-    return { sources: sourcesOf(faction.trim(), (await ctx.factionBook.get()).book.pages) }
-  })
-  // Everything the Plan tab needs to plan the achievements still to do; `refresh` reads eqlwiki again,
-  // `wide` adds the ways to raise every other faction (the Most factions positive goal).
-  handle('factions:plan', async (character, refresh, wide) => {
-    assertCharacterKey(character)
-    if (!ctx.installDir()) throw new Error('Choose the game folder on the Settings page first.')
-    return planData(ctx, character, refresh === true, wide === true)
-  })
-  // What moved a faction in the player's logs: this character's and the others'.
-  handle('factions:moved', async (character, faction) => {
-    assertCharacterKey(character)
-    if (typeof faction !== 'string' || !faction.trim() || faction.length > 100) throw new Error('Not a faction.')
-    const shared = await sharedTallies(ctx, character)
-    return { movers: moversOf(faction.trim(), shared.sources, shared.from) }
-  })
-  // What a mob or NPC does to the factions, from the logs and eqlwiki's faction pages.
-  handle('factions:lookup', async (character, query) => {
-    assertCharacterKey(character)
-    if (typeof query !== 'string' || query.length > 80) throw new Error('Not a name to look up.')
-    if (query.trim().length < 3) return { results: [] }
-    const where = ctx.historyOf(character)
-    const exported = await readFactionExport(ctx.installDir(), character).catch(() => null)
-    const [shared, book, view] = await Promise.all([sharedTallies(ctx, character), ctx.factionBook.get(false), ctx.factions.view(where, exported)])
-    const name = factionNamer(view.factions.map((r) => r.name))
-    return { results: lookUp(query, shared.sources, shared.from, book.book.pages, name, guessesFrom(shared.sources)) }
-  })
+/** The keys its consumers' values go under in log-history.json. */
+const HISTORY_KEY = 'factions'
+const CAUSES_KEY = 'factionSources'
+
+/**
+ * The Factions page's side of the app, whole: what it counts over the logs, the pages it reads, its
+ * Data Sources rows, its channels (following a plan's among them) and what it keeps.
+ */
+export class Factions implements AppFeature {
+  readonly id = 'factions'
+  /** What it counts over each character's log and archives, under these names in log-history.json. */
+  static readonly consumers: Readonly<Record<string, HistoryConsumer<unknown>>> = { [HISTORY_KEY]: factionConsumer, [CAUSES_KEY]: factionSourceConsumer }
+  /** Faction changes over the character's log and archives, for the Factions page. */
+  readonly history: FactionHistory
+  /** What caused each faction change, kill or hand-in, for the plan. */
+  readonly causes: FactionSourceHistory
+  /** eqlwiki's faction pages and the quest pages they name, for the plan. */
+  readonly book = new FactionBook()
+  /** Allakhazam's faction pages, for the con a quest wants and the kills eqlwiki lacks. */
+  readonly alla = new FactionAlla()
+
+  constructor(logHistory: LogHistory) {
+    this.history = new FactionHistory(logHistory, HISTORY_KEY)
+    this.causes = new FactionSourceHistory(logHistory, CAUSES_KEY)
+  }
+
+  /** Writes the Allakhazam pages read since the last write. */
+  flush(): Promise<void> {
+    return this.alla.flush()
+  }
+
+  // The handlers reach the feature through the context, as every other channel does.
+  register(ctx: AppContext): void {
+    sources.add('factionWiki', {
+      label: 'Faction pages',
+      kind: 'wiki',
+      what: "eqlwiki's faction pages and the quest pages they name, for what raises a faction and the Factions page's plan. Kept a week.",
+      refresh: () => ctx.factions.book.get(true)
+    })
+    sources.add('allakhazam', {
+      label: 'Allakhazam',
+      kind: 'wiki',
+      what: "Allakhazam's faction pages, for the con a quest wants, kill amounts and mobs eqlwiki lacks: a page every twenty seconds, as the site asks, each kept a month."
+    })
+    // The export last reported to the Data sources page, so the half-minute reload does not report it again.
+    let reported = ''
+    // Faction changes, over the character's log and its archives, and the standings from its export.
+    handle('factions:get', async (character) => {
+      assertCharacterKey(character)
+      const dir = ctx.installDir()
+      if (!dir) return { factions: [], export: null, exportError: '' }
+      let exported: FactionExport | null = null
+      let exportError = ''
+      try {
+        exported = await readFactionExport(dir, character)
+        const seen = exported ? `${exported.file}@${exported.modified}` : ''
+        if (exported && seen !== reported) sources.ok('exports', `${exported.file}, written ${new Date(exported.modified).toLocaleString()}`)
+        reported = seen
+      } catch (e) {
+        // A bad export should not hide the log's changes: say so on Data sources and show those.
+        sources.fail('exports', e, `${character}'s factions export`)
+        exportError = e instanceof Error ? e.message : String(e)
+      }
+      const view = await ctx.factions.history.view(ctx.historyOf(character), exported, await factionAchievements(ctx, character))
+      return { ...(await withConsFor(ctx, character, exported, view)), exportError }
+    })
+    // What raises a faction, from its page in the book of eqlwiki's faction pages the Plan tab reads.
+    handle('factions:sources', async (faction) => {
+      if (typeof faction !== 'string' || !faction.trim() || faction.length > 100) throw new Error('Not a faction.')
+      return { sources: sourcesOf(faction.trim(), (await ctx.factions.book.get()).book.pages) }
+    })
+    // Everything the Plan tab needs to plan the achievements still to do; `refresh` reads eqlwiki again,
+    // `wide` adds the ways to raise every other faction (the Most factions positive goal).
+    handle('factions:plan', async (character, refresh, wide) => {
+      assertCharacterKey(character)
+      if (!ctx.installDir()) throw new Error('Choose the game folder on the Settings page first.')
+      return planData(ctx, character, refresh === true, wide === true)
+    })
+    // What moved a faction in the player's logs: this character's and the others'.
+    handle('factions:moved', async (character, faction) => {
+      assertCharacterKey(character)
+      if (typeof faction !== 'string' || !faction.trim() || faction.length > 100) throw new Error('Not a faction.')
+      const shared = await sharedTallies(ctx, character)
+      return { movers: moversOf(faction.trim(), shared.sources, shared.from) }
+    })
+    // What a mob or NPC does to the factions, from the logs and eqlwiki's faction pages.
+    handle('factions:lookup', async (character, query) => {
+      assertCharacterKey(character)
+      if (typeof query !== 'string' || query.length > 80) throw new Error('Not a name to look up.')
+      if (query.trim().length < 3) return { results: [] }
+      const where = ctx.historyOf(character)
+      const exported = await readFactionExport(ctx.installDir(), character).catch(() => null)
+      const [shared, book, view] = await Promise.all([sharedTallies(ctx, character), ctx.factions.book.get(false), ctx.factions.history.view(where, exported)])
+      const name = factionNamer(view.factions.map((r) => r.name))
+      return { results: lookUp(query, shared.sources, shared.from, book.book.pages, name, guessesFrom(shared.sources)) }
+    })
+    // The plan the achievements overlay follows, and the step the player moved it to.
+    handle('factions:follow', async (character, plan) => {
+      assertCharacterKey(character)
+      const clean = plan === null ? null : sanitizeFollowedPlan(plan)
+      if (plan !== null && !clean) throw new Error('Not a plan.')
+      await ctx.liveAchievements.follow(character, clean)
+    })
+    handle('factions:follow-step', async (character, index) => {
+      assertCharacterKey(character)
+      if (typeof index !== 'number' || !Number.isInteger(index) || index < 0) throw new Error('Not a step.')
+      await ctx.liveAchievements.followStep(character, index)
+    })
+  }
 }
