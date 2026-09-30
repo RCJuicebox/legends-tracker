@@ -3,6 +3,7 @@ import { join } from 'node:path'
 import { parseAchievements, type AchSection } from '../core/achievements'
 import { trackedAchievements } from '../core/trackedAchievements'
 import { SELF } from '../core/combatLines'
+import { isFriend } from '../core/combatMeter'
 import { RaceIndex, slayerCounters, slayerCounts, slayerLine, type SlayerCounter, type SlayerKills } from '../core/slayer'
 import { isCharacterKey } from '../core/validate'
 import { skillGoals, skillId, skillValue } from '../core/skillAchievements'
@@ -280,6 +281,11 @@ export class LiveAchievements {
     return k.kind === 'pet' && !!k.owner && k.owner.split(' or ').some((o) => o === SELF || meter.kindOf(o).kind === 'group')
   }
 
+  /** A name the damage meter knows for a player, or a player's pet: never a Slayer kill. */
+  private friendly(name: string): boolean {
+    return isFriend(this.ctx.engine.meter.kindOf(name).kind)
+  }
+
   /** The character's achievements export, read again only when the game has written it again; null without one. */
   private async achievementsExport(character: string): Promise<LiveAchievements['exported']> {
     const file = `${character}-Achievements.txt`
@@ -353,7 +359,8 @@ export class LiveAchievements {
           if ('completed' in x) state.completed.add(x.completed.toLowerCase())
           else {
             let mob: string | null = null
-            if ('kill' in x) mob = this.credited(x.kill.by, state.pets) ? x.kill.mob : null
+            // A player your side killed (a duel, a charmed pet turned) is nobody's Slayer kill.
+            if ('kill' in x) mob = this.credited(x.kill.by, state.pets) && !this.friendly(x.kill.mob) ? x.kill.mob : null
             else if (line.time - (state.engaged.get(x.died.toLowerCase()) ?? -Infinity) <= ENGAGED_MS) mob = x.died
             if (!mob) return
             const k = mob.toLowerCase()

@@ -90,6 +90,13 @@ describe('Slayer counts', () => {
     expect(names(index.byName('a lizardman scout'))).toEqual(['I Hate Snakes!'])
     expect(names(index.byName('a Teir`Dal shadowknight'))).toEqual(["Doesn't Play Well With Others"])
     expect(names(index.byName('a werewolf'))).toEqual(['Strange Weather'])
+    // A word that describes gives way to the one that names: a skeletal wolf is a wolf, counted once,
+    // and a dwarven miner a dwarf.
+    const undead = new RaceIndex([{ races: 'Skeletons' }, { races: 'Wolves' }, { races: 'Dwarves' }])
+    expect(undead.byName('a skeletal wolf')).toEqual([1])
+    expect(undead.byName('a skeleton')).toEqual([0])
+    expect(undead.byName('a dwarven skeleton')).toEqual([0])
+    expect(undead.byName('a dwarven miner')).toEqual([2])
     // A clockwork is a clockwork, whatever it is made to look like.
     expect(names(index.byName('a clockwork spider'))).toEqual(['Domo Arigato'])
     expect(index.byName('Terror')).toEqual([])

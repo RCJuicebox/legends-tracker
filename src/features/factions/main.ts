@@ -45,7 +45,8 @@ import { sources } from '../../main/sources/registry'
 import { wiki } from '../../main/sources/wiki'
 import { cacheDir } from '../../main/paths'
 import { log } from '../../main/log'
-import { offsetBefore, readForward, type HistoryConsumer, type HistoryWhere, type LogHistory } from '../../main/sources/logHistory'
+import { identityOf, offsetBefore, readForward, type HistoryConsumer, type HistoryWhere, type LogHistory } from '../../main/sources/logHistory'
+import { sameFile } from '../../core/fileIdentity'
 import type { AppContext } from '../../main/context'
 
 // A character's faction changes, from "Your faction standing with X has been adjusted by N." and
@@ -70,6 +71,8 @@ export const factionConsumer: HistoryConsumer<FactionTallies> = {
 interface SinceRead {
   /** The exports it was read after. */
   key: string
+  /** The log file's identity, so another file at the same path starts afresh. */
+  id: string
   readTo: number
   /** Whether the log reaches back past the factions export; else an archive holds some of the changes since. */
   whole: boolean
@@ -109,15 +112,18 @@ export class FactionHistory {
   }
 
   private async readSince(logPath: string, factions: ExportMark | null, achievements: ExportMark | null): Promise<SinceView | null> {
-    const size = (await fs.stat(logPath).catch(() => null))?.size ?? 0
-    if (!size) return null
+    const st = await fs.stat(logPath, { bigint: true }).catch(() => null)
+    const size = Number(st?.size ?? 0)
+    if (!st || !size) return null
+    const id = identityOf(st)
     const key = [factions, achievements].map((m) => (m ? `${m.file}@${m.modified}` : '')).join('|')
     let s = this.since.get(logPath)
-    // New exports, or a log started afresh: read again from the line before the earlier export.
-    if (!s || s.key !== key || size < s.readTo) {
+    // New exports, or a log started afresh (another file at the path, or this one cut short even if it
+    // has since grown past where the last read ended): read again from the line before the earlier export.
+    if (!s || s.key !== key || !sameFile({ id: s.id, size: s.readTo }, { id, size })) {
       const readTo = await offsetBefore(logPath, Math.min(factions?.modified ?? Infinity, achievements?.modified ?? Infinity), { slackMs: EXPORT_LINE_MS })
       const whole = !factions || readTo > 0 || (await firstStamp(logPath, size)) < factions.modified - EXPORT_LINE_MS
-      s = { key, readTo, whole, tally: new SinceExports(factions, achievements) }
+      s = { key, id, readTo, whole, tally: new SinceExports(factions, achievements) }
       this.since.set(logPath, s)
     }
     if (size > s.readTo) {
@@ -579,7 +585,8 @@ async function planData(ctx: AppContext, character: string, refresh: boolean, wi
     // The Standings tab says what is wrong with it; planning goes on from the log's changes alone.
     log.warn(`${character}'s factions export could not be read for the plan:`, e)
   }
-  const view = await ctx.factions.view(where, exported, await factionAchievements(dir, character))
+  const achievements = await factionAchievements(dir, character)
+  const view = await ctx.factions.view(where, exported, achievements)
   const { targets, maxed, achievementsExport, standings } = planFor(view)
   const [tallies, book, purchases, held, others] = await Promise.all([
     ctx.factionSources.view(where),
@@ -649,7 +656,8 @@ async function planData(ctx: AppContext, character: string, refresh: boolean, wi
     agnostic: agnosticOf(sections),
     races,
     unlocks,
-    raceMods: await raceModsFor(ctx, dir, character, exported, view, defs)
+    raceMods: await raceModsFor(ctx, dir, character, exported, view, defs),
+    ...(achievements ? {} : { noAchievementList: true })
   }
 }
 

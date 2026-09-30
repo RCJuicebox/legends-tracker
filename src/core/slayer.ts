@@ -159,9 +159,14 @@ export class RaceIndex {
     this.longest = Math.max(1, ...[...this.words.keys()].map((w) => w.split(' ').length))
   }
 
-  /** The counters whose races the words name, longest phrases first; `name` holds to a mob's name's rules. */
+  /**
+   * The counters whose races the words name, longest phrases first; `name` holds to a mob's name's
+   * rules. In a name, a word that describes ("skeletal", "dwarven") beside one that names ("wolf") is
+   * the one named: "a skeletal wolf" is a wolf, counted once, not a skeleton too.
+   */
   private scan(tokens: string[], name: boolean): number[] {
     const found = new Set<number>()
+    const hits: { counters: number[]; alias: boolean }[] = []
     for (let i = 0; i < tokens.length;) {
       let took = 0
       for (let len = Math.min(this.longest, tokens.length - i); len >= 1 && !took; len--) {
@@ -174,6 +179,7 @@ export class RaceIndex {
         // "a giant spider" is a spider; "a hill giant" and "a fire giant warrior" are giants.
         if (name && phrase === 'giant' && i === 0 && tokens.length > 1) continue
         hit?.forEach((c) => found.add(c))
+        if (hit) hits.push({ counters: hit, alias: !!alias && alias !== PLAYABLE_MARK })
         took = len
       }
       if (!took && name) {
@@ -187,6 +193,11 @@ export class RaceIndex {
         }
       }
       i += took || 1
+    }
+    // The head noun comes last; an adjective's race before it gives way.
+    if (name && hits.length > 1 && hits.some((h) => h.alias)) {
+      const head = hits.findLast((h) => !h.alias) ?? hits[hits.length - 1]
+      return [...head.counters]
     }
     return [...found]
   }

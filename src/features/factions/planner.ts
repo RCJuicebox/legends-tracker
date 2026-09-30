@@ -296,6 +296,8 @@ export interface FactionPlanData extends PlanFor {
   unlocks: RaceUnlock[]
   /** The character's race and what each race it could be adds to its cons, as an Agnostic of its classes; null without a race on its record. */
   raceMods: { own: string; mods: Record<string, Record<string, number>> } | null
+  /** The game folder has no achievement list (Resources/Achievements/AchievementsClient.txt): a wrong folder, not everything done. */
+  noAchievementList?: boolean
 }
 
 const median = (xs: number[]) => {

@@ -383,6 +383,13 @@ export function PlanTab({ character, view }: { character: string; view: FactionV
   // The step that does each race unlock.
   const unlockStep = new Map<string, number>()
   plan?.steps.forEach((st, i) => st.unlocks.forEach((u) => unlockStep.set(u, i + 1)))
+  if (data.noAchievementList)
+    return (
+      <div className="card empty">
+        No faction achievements to plan: the game folder set on the Settings page has no achievement list (Resources/Achievements/AchievementsClient.txt). Check that it is the
+        EverQuest Legends folder.
+      </div>
+    )
   if (!targets.length)
     return (
       <div className="card empty">

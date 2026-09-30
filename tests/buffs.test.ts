@@ -34,6 +34,11 @@ describe('who is who', () => {
     })
     expect(parseWho('[24 WAR/BRD/WIZ] Corvin (Dark Elf) <Other Guild> ZONE: The Estate of Unrest (unrest)', 0)?.classes).toEqual(['war', 'brd', 'wiz'])
     expect(parseWho('[50 CLR] Brenna (Human)', 0)?.classes).toEqual(['clr'])
+    // Away, linkdead, and with a surname, as classic EverQuest prints them.
+    expect(parseWho(' AFK [50 SHD/MNK/SHM] Kelwyn (Iksar) <Test Guild>', 0)).toMatchObject({ name: 'Kelwyn', classes: ['shd', 'mnk', 'shm'], race: 'Iksar' })
+    expect(parseWho('<LINKDEAD>[50 CLR] Brenna (Human)', 0)).toMatchObject({ name: 'Brenna', race: 'Human' })
+    expect(parseWho('[50 WAR] Corvin Stonebrow (Dwarf) <Other Guild>', 0)).toMatchObject({ name: 'Corvin', race: 'Dwarf' })
+    expect(parseWho(' AFK <LINKDEAD>[50 WAR] Corvin Stone`brow (Dwarf)', 0)?.name).toBe('Corvin')
     // No zone on the line, no zone read.
     expect(parseWho('[50 CLR] Brenna (Human)', 0)?.zone).toBeUndefined()
     expect(parseWho('[ANONYMOUS] Brenna', 0)).toBeNull()

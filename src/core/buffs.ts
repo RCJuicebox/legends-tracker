@@ -38,7 +38,14 @@ export interface Person {
   zone?: string
 }
 
-const RE_WHO = /^\[(\d+) ([A-Z]{3}(?:\/[A-Z]{3}){0,2})\] (\S+) \(([^)]+)\)(?:.*? ZONE: (.+?) \([^)]*\))?/
+/**
+ * "[50 SHD/MNK/SHM] Kelwyn (Iksar) <Guild> ZONE: …". A player away or linkdead has a flag in front
+ * (" AFK [50 …", "<LINKDEAD>[50 …"), and one with a surname has it after the name ("Kelwyn Stonebrow
+ * (Iksar)"), as classic EverQuest prints them.
+ */
+const RE_WHO = /^(?:\s*(?:AFK|<LINKDEAD>|<LFG>)\s*)*\[(\d+) ([A-Z]{3}(?:\/[A-Z]{3}){0,2})\] (\S+)(?: [^\s(<]+)? \(([^)]+)\)(?:.*? ZONE: (.+?) \([^)]*\))?/
+/** A /who line that starts with a flag rather than its "[". */
+const WHO_FLAG = /^\s*(?:AFK|<LINKDEAD>|<LFG>)/
 
 /** A /who line, or null. Anonymous and roleplaying players show no classes and are passed over. */
 export function parseWho(text: string, at: number): Person | null {
@@ -339,7 +346,7 @@ export class BuffWatch {
   }
 
   handle(text: string, at: number, resolve: (ranked: string) => { spell: Spell; rank: number } | undefined): void {
-    const who = text.startsWith('[') ? parseWho(text, at) : null
+    const who = text.startsWith('[') || WHO_FLAG.test(text) ? parseWho(text, at) : null
     if (who) return this.hooks.onWho?.(who)
     // The regex tries every split of the line, so it runs only on lines that could match.
     const cast = text.includes(' begin') ? CAST_BEGINS.exec(text) : null

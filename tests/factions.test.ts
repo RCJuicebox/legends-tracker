@@ -406,6 +406,15 @@ describe('FactionHistory over a real log', () => {
     expect(await row()).toMatchObject({ standing: { value: 2000, atExport: 1415, since: 585, sinceAll: true }, achievement: { done: true, from: 'log' } })
     await fs.appendFile(logPath, line(stamp(58), adjusted('Crimson Hands', -20)))
     expect((await row())?.standing).toMatchObject({ value: 1980, since: 565, sinceAll: true })
+
+    // The log archived away and a new one begun that has grown past where the last read ended: it is
+    // read from its own start, not on from the old file's offset.
+    await fs.rm(logPath)
+    await fs.writeFile(
+      logPath,
+      line(stamp(0), 'Outputfile Complete: Tester_neriak-MNK-Factions.txt') + Array.from({ length: 60 }, (_, i) => line(stamp(11 + i), adjusted('Crimson Hands', -1))).join('')
+    )
+    expect((await row())?.standing).toMatchObject({ value: 1355, since: -60 })
   })
 
   it('is empty for a log with no faction lines', async () => {
