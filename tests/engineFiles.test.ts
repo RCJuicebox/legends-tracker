@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { Readable } from 'node:stream'
 import { readLines } from '../src/main/moteHistory'
-import { offsetBefore } from '../src/main/sources/logHistory'
+import { lineStartAfter, offsetBefore } from '../src/main/sources/logHistory'
 import { lastZone, lastZoneLine } from '../src/main/game'
 import { readAasFromLog } from '../src/main/stats'
 import type { LogLine } from '../src/core/logLine'
@@ -32,6 +32,27 @@ describe('readLines', () => {
     const end = await readLines(Readable.from([Buffer.from(text)]), (l) => got.push(l), { flushLast: false })
     expect(got.map((l) => l.text)).toEqual(['one'])
     expect(end).toBe(text.indexOf('\n') + 1)
+  })
+
+  it('stops before the next chunk when asked', async () => {
+    const got: LogLine[] = []
+    const chunks = [text.slice(0, 32), text.slice(32)].map((s) => Buffer.from(s))
+    await readLines(Readable.from(chunks), (l) => got.push(l), { yieldEvery: 1, stop: () => got.length > 0 })
+    expect(got.map((l) => l.text)).toEqual(['one'])
+  })
+})
+
+describe('lineStartAfter', () => {
+  it('finds the start of the next whole line, or stays on one', async () => {
+    const path = join(dir, 'eqlog_A_b.txt')
+    const text = '[Thu Sep 24 16:00:00 2026] one\r\n[Thu Sep 24 16:00:01 2026] two\r\n'
+    await fs.writeFile(path, text)
+    const second = text.indexOf('\n') + 1
+    expect(await lineStartAfter(path, 0)).toBe(0)
+    expect(await lineStartAfter(path, 5)).toBe(second)
+    // Already at a line's start: that line.
+    expect(await lineStartAfter(path, second)).toBe(second)
+    expect(await lineStartAfter(path, second + 1)).toBe(text.length)
   })
 })
 

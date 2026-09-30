@@ -72,6 +72,23 @@ export async function readBackward(
   )
 }
 
+/** The start of the first whole line at or after `pos`: just past the next newline (the end of the file when none). */
+export async function lineStartAfter(path: string, pos: number): Promise<number> {
+  if (pos <= 0) return 0
+  const handle = await fs.open(path, 'r')
+  try {
+    const buf = Buffer.alloc(1 << 16)
+    for (let at = pos - 1; ; at += buf.length) {
+      const { bytesRead } = await handle.read(buf, 0, buf.length, at)
+      if (!bytesRead) return at
+      const nl = buf.subarray(0, bytesRead).indexOf(10)
+      if (nl >= 0) return at + nl + 1
+    }
+  } finally {
+    await handle.close()
+  }
+}
+
 /** Streams a stretch of a log forwards (see readLines); `end` is exclusive. */
 export function readForward(path: string, from: number, end: number | undefined, onLine: (line: LogLine) => void, opts: { flushLast?: boolean } = {}): Promise<number> {
   return readLines(createReadStream(path, { start: from, ...(end !== undefined ? { end: end - 1 } : {}) }), onLine, opts)

@@ -6,7 +6,7 @@ import { LootLedger } from '../../core/loot'
 import { RespawnLog, respawnView, type RespawnView } from '../../core/respawns'
 import { durationSec } from '../../core/combatView'
 import { readLines } from '../../core/logReading'
-import { offsetBefore } from '../sources/logHistory'
+import { lineStartAfter, offsetBefore } from '../sources/logHistory'
 import { lastZoneLine } from '../game'
 import { log } from '../log'
 import { Backlog, Throttled } from './throttle'
@@ -19,6 +19,8 @@ import type { BuffCoordinator } from './buffs'
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
 /** How often the size of the meter's push is logged while fighting. */
 const MEASURE_MS = 5 * 60_000
+/** The most of the log read back for recent fights: a raid's last ten minutes or so, a second or two of reading. */
+const SEED_MAX_BYTES = 24 * 2 ** 20
 
 export interface CombatHooks {
   book: () => SpellBook | null
@@ -32,6 +34,8 @@ export interface CombatHooks {
  * watching starts, with live lines held until that is done so everything is seen in order.
  */
 export class CombatFeed {
+  /** SEED_MAX_BYTES, which a test may lower. */
+  static seedMaxBytes = SEED_MAX_BYTES
   readonly meter: CombatMeter
   readonly loot: LootLedger
   /** How long mobs take to respawn, from kills and sightings. */
@@ -164,8 +168,14 @@ export class CombatFeed {
       if (end > 0 && current()) {
         const since = Date.now() - minutes * 60_000
         // The read starts a few kilobytes early, so a line from before the window only tells the meter
-        // which zone it is in; the zone it began in is the last zone line before the read.
-        const from = await offsetBefore(logFile, since)
+        // which zone it is in; the zone it began in is the last zone line before the read. A raid's hour
+        // can be 150 MB: past SEED_MAX_BYTES, only the last of it is read.
+        let from = await offsetBefore(logFile, since)
+        const cap = CombatFeed.seedMaxBytes
+        if (end - from > cap) {
+          log.info(`Recent fights: the last ${minutes} minutes are ${Math.round((end - from) / 2 ** 20)} MB of log; reading the last ${Math.round(cap / 2 ** 20)} MB of them.`)
+          from = await lineStartAfter(logFile, end - cap)
+        }
         const entered = from > 0 ? await lastZoneLine(logFile, { end: from }) : null
         if (entered && current()) this.meter.handle(entered)
         if (end > from && current()) {
@@ -174,7 +184,11 @@ export class CombatFeed {
             if (line.time >= since) this.line(line)
             else if (zoneEntered(line.text)) this.meter.handle(line)
           }
-          await readLines(createReadStream(logFile, { start: from, end: end - 1 }), take, { flushLast: false })
+          // A chunk at a time between yields, so the timers and overlays keep going while it reads; and
+          // it gives up once the live lines held back while it reads grow too many.
+          const stop = () => !current() || this.backlog.full
+          await readLines(createReadStream(logFile, { start: from, end: end - 1 }), take, { flushLast: false, yieldEvery: 1, stop })
+          if (this.backlog.full) log.warn(`Recent fights: the log grew faster than it could be read back; stopped reading history at ${this.backlog.size} live lines held.`)
         }
       }
     } catch (e) {

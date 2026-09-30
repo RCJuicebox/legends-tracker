@@ -47,12 +47,26 @@ export class Throttled {
   }
 }
 
-/** Live lines held while history is read, so a reader sees every line once and in order. */
+/**
+ * Live lines held while history is read, so a reader sees every line once and in order. It holds at
+ * most `max`; past that it is `full`, and the history read should stop and let them through.
+ */
 export class Backlog<T> {
   private lines: T[] | null = null
 
+  constructor(private readonly max = 200_000) {}
+
   get active(): boolean {
     return this.lines !== null
+  }
+
+  get full(): boolean {
+    return this.size >= this.max
+  }
+
+  /** Lines held now. */
+  get size(): number {
+    return this.lines?.length ?? 0
   }
 
   begin(): void {

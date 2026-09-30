@@ -15,13 +15,24 @@ export type Warn = (message: string, error: unknown) => void
  * Streams a log's lines, yielding to the event loop now and then so the live tailer and overlays keep
  * running. Returns how many bytes were read up to the end of the last line handed over. A last line
  * with no newline yet is handed over too unless `flushLast` is false: a live log may be mid-write.
+ * `yieldEvery` is how many chunks go between yields (8: a read that should finish; 1: one that runs
+ * while the player plays, a few milliseconds at a time). `stop` is asked before each chunk.
  */
-export async function readLines(stream: Readable, onLine: (line: LogLine) => void, opts: { onBytes?: (bytes: number) => void; flushLast?: boolean } = {}): Promise<number> {
+export async function readLines(
+  stream: Readable,
+  onLine: (line: LogLine) => void,
+  opts: { onBytes?: (bytes: number) => void; flushLast?: boolean; yieldEvery?: number; stop?: () => boolean } = {}
+): Promise<number> {
   let partial = ''
   let pos = 0
   let n = 0
+  const every = Math.max(1, opts.yieldEvery ?? 8)
   const clock = new LogClock()
   for await (const chunk of stream) {
+    if (opts.stop?.()) {
+      stream.destroy()
+      return pos
+    }
     opts.onBytes?.((chunk as Buffer).length)
     const lines = (partial + decodeCp1252(chunk as Buffer)).split('\n')
     partial = lines.pop() ?? ''
@@ -30,7 +41,7 @@ export async function readLines(stream: Readable, onLine: (line: LogLine) => voi
       const line = clock.parse(raw.replace(/\r$/, ''))
       if (line) onLine(line)
     }
-    if (++n % 8 === 0) await new Promise((r) => setImmediate(r))
+    if (++n % every === 0) await new Promise((r) => setImmediate(r))
   }
   if (partial && opts.flushLast !== false) {
     pos += partial.length

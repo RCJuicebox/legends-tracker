@@ -3,6 +3,7 @@ import { promises as fs } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { Engine, type EngineEnv, type EngineStore } from '../src/main/engine'
+import { CombatFeed } from '../src/main/engine/combat'
 import { scanMoteHistory } from '../src/main/moteHistory'
 import { defaultSettings } from '../src/main/storeCore'
 import { jobs } from '../src/main/sources/jobs'
@@ -158,6 +159,17 @@ describe('Reading recent fights into the meter', () => {
     expect(engine.meter.reading).toBe('Reading the last 10 minutes of the log…')
     await waitFor(() => engine.meter.reading === '')
     expect(engine.loot.reading).toBe('')
+  })
+
+  it('reads only the last of a window bigger than it will read, and says so in its log', async () => {
+    CombatFeed.seedMaxBytes = 64 * 1024
+    try {
+      // Sixty minutes take in both fights, but a megabyte of filler lies between them.
+      const { engine } = await watching(60)
+      expect(fights(engine)).toEqual(['a young ratman'])
+    } finally {
+      CombatFeed.seedMaxBytes = 24 * 2 ** 20
+    }
   })
 
   it('leaves out a fight older than the window in a log under a megabyte', async () => {
