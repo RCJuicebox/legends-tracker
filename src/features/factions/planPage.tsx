@@ -703,8 +703,15 @@ export function PlanTab({ character, view }: { character: string; view: FactionV
                           </button>
                           {t.achievement !== t.faction && <span className="faint small"> ({t.faction})</span>}
                           {lockedTo && (
-                            <span className="chip fp-lock" title={`Locked in: ${lockedTo.title}`}>
-                              locked
+                            <span
+                              className="chip fp-lock"
+                              title={
+                                step && plan!.steps[step - 1].onTheWay[t.faction]
+                                  ? `Locked in: ${lockedTo.title}, but step ${step} gets it to 2000 first`
+                                  : `Locked in: ${lockedTo.title}`
+                              }
+                            >
+                              {step && plan!.steps[step - 1].onTheWay[t.faction] ? 'locked · done on the way' : 'locked'}
                             </span>
                           )}
                         </td>
@@ -878,9 +885,19 @@ function Effects({ step }: { step: PlanStep }) {
         </span>
       ))}
       {step.finishes.map((f) => (
-        <span key={f} className="chip ok" title={step.locked.includes(f) ? 'Done here, as you locked in' : 'Done here'}>
+        <span
+          key={f}
+          className="chip ok"
+          title={
+            step.onTheWay[f]
+              ? `Done here on the way: you locked it in to ${step.onTheWay[f]}, but this step gets it to 2000 first, so that is not needed for it`
+              : step.locked.includes(f)
+                ? 'Done here, as you locked in'
+                : 'Done here'
+          }
+        >
           {f}
-          {step.locked.includes(f) ? ' (locked)' : ''}
+          {step.onTheWay[f] ? ' (on the way)' : step.locked.includes(f) ? ' (locked)' : ''}
         </span>
       ))}
       {step.reaches.map((r) => (

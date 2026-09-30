@@ -1303,6 +1303,24 @@ describe('planFactions', () => {
     expect(planFactions(input, S, { ...NO_CHOICES, excluded: ['fast'] }).steps[0].activity.id).toBe('slow')
   })
 
+  it('says when another step gets a locked achievement to 2000 first', () => {
+    const input: PlanInput = {
+      targets: [
+        { faction: 'A', achievement: 'A', standing: 1900 },
+        { faction: 'B', achievement: 'B', standing: 1900 }
+      ],
+      maxed: [],
+      activities: [act('both', { A: 10, B: 10 }, 600), act('slow', { A: 1 }, 60)]
+    }
+    const plan = planFactions(input, S, { ...NO_CHOICES, locks: { A: 'slow' } })
+    const both = plan.steps.find((s) => s.activity.id === 'both')!
+    expect(both.finishes.sort()).toEqual(['A', 'B'])
+    expect(both).toMatchObject({ locked: [], onTheWay: { A: 'slow' } })
+    // Locked to the step that does it: not on the way.
+    const own = planFactions(input, S, { ...NO_CHOICES, locks: { A: 'both' } })
+    expect(own.steps[0]).toMatchObject({ locked: ['A'], onTheWay: {} })
+  })
+
   it('leaves a once-only way out unless it is locked in, and says what nothing raises', () => {
     const input: PlanInput = {
       targets: [

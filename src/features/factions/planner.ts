@@ -1437,6 +1437,11 @@ export interface PlanStep {
   restores: boolean
   /** Locked achievements among those it finishes. */
   locked: string[]
+  /**
+   * Achievements locked in to another activity that this step gets to 2000 first, with that activity's
+   * title: standing rises with whatever raises it, so the lock is not needed for them any more.
+   */
+  onTheWay: Record<string, string>
 }
 
 /** One way to raise a faction to 2000 from where it stands, with this alone: how many, and how long with the trip there. */
@@ -2454,12 +2459,21 @@ export function planFactions(input: PlanInput, settings: PlanSettings, choices: 
           sinks,
           restores: !b.finish.length && !b.reach.length,
           locked: [],
+          onTheWay: {},
           ...(race ? { race } : {}),
           ...(why ? { why } : {})
         })
       }
     }
-    for (const step of steps) step.locked = step.finishes.filter((f) => choices.locks[f] === step.activity.id)
+    const at = new Map(targets.map((t, i) => [t.faction, i]))
+    for (const step of steps) {
+      step.locked = step.finishes.filter((f) => choices.locks[f] === step.activity.id)
+      for (const f of step.finishes) {
+        const i = at.get(f)
+        const k = i === undefined ? -1 : lockOf[i]
+        if (k >= 0 && acts[k].a.id !== step.activity.id) step.onTheWay[f] = acts[k].a.title
+      }
+    }
   }
   const seconds = steps.reduce((n, step) => n + step.seconds, 0)
   // What nothing the planner may use gets done, as the plan stands.
