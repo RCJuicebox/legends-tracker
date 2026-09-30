@@ -121,6 +121,13 @@ export interface PlanActivity {
    * them as the standings move, and may raise a faction to get there.
    */
   gate?: Need[]
+  /**
+   * The factions of `gate` there is no con for: the faction is in neither the factions export nor the
+   * achievements list (so its race and class modifiers cannot be looked up), or the character has no
+   * race on record. The plan counts the standing alone there (0 where none is known), or takes the NPC
+   * as open without a race.
+   */
+  conUnknown?: string[]
   /** Where the facts come from when not eqlwiki or the log: "Allakhazam". */
   site?: string
 }
@@ -575,6 +582,11 @@ function swapRaces(needs: Need[], faction: string, swapCons: CatalogInput['swapC
     .filter(([, cons]) => !needs.some((n) => blockedBy(n, cons)))
     .sort(([, a], [, b]) => (b[faction] ?? 0) - (a[faction] ?? 0))
     .map(([race]) => race)
+}
+
+/** The factions of a gate with no con known, each once. */
+function conUnknown(gate: Need[], cons: Record<string, number> | undefined): string[] {
+  return [...new Set(gate.filter((n) => cons?.[n.faction] === undefined).map((n) => n.faction))]
 }
 
 function blockedBy(need: Need, cons: Record<string, number> | undefined): string {
@@ -1074,11 +1086,13 @@ export function buildCatalog(input: CatalogInput): FactionCatalog {
         const need = unmet ?? needs[0]
         const swap = unmet ? swapRaces(needs, unmet.faction, input.swapCons) : []
         const gate = needs.filter(holdsBack)
-        const wants: Pick<PlanActivity, 'needs' | 'blocked' | 'swap' | 'gate'> = {
+        const unknown = conUnknown(gate, input.cons)
+        const wants: Pick<PlanActivity, 'needs' | 'blocked' | 'swap' | 'gate' | 'conUnknown'> = {
           ...(need ? { needs: need.band } : {}),
           ...(blocked ? { blocked } : {}),
           ...(swap.length ? { swap } : {}),
-          ...(gate.length ? { gate } : {})
+          ...(gate.length ? { gate } : {}),
+          ...(unknown.length ? { conUnknown: unknown } : {})
         }
         // The log's own hand-ins of the same things to this NPC, moving the same factions, say this
         // already, and exactly; one of other things (Metal Bits where the log saw ore) is another way.
@@ -1168,6 +1182,8 @@ export function buildCatalog(input: CatalogInput): FactionCatalog {
     const need = c.needs ? { ...c.needs, faction: name(c.needs.faction) } : null
     const blocked = need ? blockedBy(need, input.cons) : ''
     const swap = need && blocked ? swapRaces([need], need.faction, input.swapCons) : []
+    const gate = need && holdsBack(need) ? [need] : []
+    const unknown = conUnknown(gate, input.cons)
     activities.push({
       id: `cycle:${c.page.toLowerCase()}${c.key ? `#${c.key}` : ''}`,
       // A round of a quest: the step is the quest's, to its last NPC, and says what goes to whom.
@@ -1188,7 +1204,8 @@ export function buildCatalog(input: CatalogInput): FactionCatalog {
       ...(need ? { needs: need.band } : {}),
       ...(blocked ? { blocked } : {}),
       ...(swap.length ? { swap } : {}),
-      ...(need && holdsBack(need) ? { gate: [need] } : {}),
+      ...(gate.length ? { gate } : {}),
+      ...(unknown.length ? { conUnknown: unknown } : {}),
       line: c.line,
       page: c.page
     })

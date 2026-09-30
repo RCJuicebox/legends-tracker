@@ -597,6 +597,14 @@ describe("Allakhazam's faction pages", () => {
     // Without a con to go by (no race on the record), nothing is held back.
     expect(buildCatalog(input()).activities.find((a) => a.kind === 'quest')!.blocked).toBeUndefined()
   })
+
+  it('says which gate factions it has no con for, rather than taking them as met in silence', () => {
+    // A con for another faction but none for the Scouts: not in the export or the achievements list.
+    const unknown = buildCatalog(input({ cons: { 'Arboreans of the Faydark': 0 } })).activities.find((a) => a.kind === 'quest')!
+    expect(unknown.blocked).toBeUndefined()
+    expect(unknown.conUnknown).toEqual(["Tunare's Scouts"])
+    expect(buildCatalog(input({ cons: { "Tunare's Scouts": -200 } })).activities.find((a) => a.kind === 'quest')!.conUnknown).toBeUndefined()
+  })
 })
 
 describe('the catalog', () => {

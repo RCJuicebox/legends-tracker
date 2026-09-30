@@ -194,6 +194,12 @@ export function Flags({ a }: { a: PlanActivity }) {
         ? `Your race and classes' con keeps it closed now: it ${a.blocked}. As ${listed(a.swap)} it is open, so the plan may swap in Loadouts for it (Assumptions), or raise the faction first; or lock it in.`
         : `Closed now: it ${a.blocked}. The plan may raise the faction first, where that is quicker than the other ways, or swap to a race it unlocks; or lock it in.`
     })
+  if (a.conUnknown?.length)
+    flags.push({
+      tone: 'warn',
+      label: 'con unknown',
+      why: `Its NPC wants ${a.needs ?? 'a con'} with ${a.conUnknown.join(' and ')}, and the plan cannot tell yours: the faction is in neither the factions export nor the achievements list, so its race and class modifiers are unknown, or the character has no race on record. The plan counts the standing alone (0 where the export has none), or takes it as open without a race; /con its NPC in game to be sure.`
+    })
   if (a.source === 'wiki' && a.guessed?.length)
     flags.push({ tone: '', label: 'amounts guessed', why: 'eqlwiki names the factions but not the amounts: a typical amount stands in until your log measures it.' })
   if (a.items?.some((it) => it.how === 'unknown'))
