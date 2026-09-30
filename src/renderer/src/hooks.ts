@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { api, errorMessage } from './api'
 import { showError } from './toast'
 import { itemKey } from '../../core/inventory'
@@ -91,6 +91,12 @@ export function useAchievementTrack(): AchievementTrack | null {
 }
 
 /** A ref that always holds the latest value, for callbacks that outlive a render. */
+/** The value as the same object for as long as its contents stay the same: settings come back from each save as new objects. */
+export function useSameContents<T>(value: T): T {
+  const key = JSON.stringify(value)
+  return useMemo(() => JSON.parse(key) as T, [key])
+}
+
 export function useLatest<T>(value: T) {
   const ref = useRef(value)
   ref.current = value

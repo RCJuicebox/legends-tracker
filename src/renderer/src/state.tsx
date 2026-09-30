@@ -2,9 +2,26 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import { api, errorMessage, type AppState, type FeedEntry } from './api'
 import { FEED_MAX } from './constants'
 import { showError } from './toast'
+import { moveRemembered } from './movedSettings'
 import type { AppSettings, ArchiveStatus, CharacterSettings, FeedItem, TimerView, WatchStatus } from '../../shared/types'
 
 type Patch = (s: AppSettings) => AppSettings
+
+/** What this window's storage still holds that belongs in settings.json (movedSettings.ts). */
+function movedFromStorage(settings: AppSettings): { settings: AppSettings; keys: string[] } {
+  try {
+    return moveRemembered(settings, localStorage)
+  } catch {
+    return { settings, keys: [] }
+  }
+}
+function forget(key: string): void {
+  try {
+    localStorage.removeItem(key)
+  } catch {
+    // Moved again next start: what settings.json has wins.
+  }
+}
 
 /** What changes as the game is played: pushed every second or on every line. */
 type LiveKey = 'status' | 'timers' | 'feed' | 'archive'
@@ -82,10 +99,17 @@ export function StateProvider({ children }: { children: ReactNode }) {
     api.invoke('app:state').then(
       (s) => {
         if (!live) return
-        settingsRef.current = s.settings
-        const [settled, now] = split({ ...s, feed: s.feed.map(numbered) })
+        const moved = movedFromStorage(s.settings)
+        settingsRef.current = moved.settings
+        const [settled, now] = split({ ...s, settings: moved.settings, feed: s.feed.map(numbered) })
         liveStore.set(now)
         setState(settled)
+        // Forgotten here only once settings.json has them.
+        if (moved.keys.length)
+          api.invoke('settings:save', moved.settings).then(
+            () => moved.keys.forEach(forget),
+            (e) => showError('Could not move the faction plan and the setup checklist into settings.json', e)
+          )
       },
       (e) => live && setError(errorMessage(e))
     )

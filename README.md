@@ -806,7 +806,7 @@ The settings folder, `%APPDATA%\Legends Tracker` (or the `EQL_USER_DATA` folder)
 
 | File | What it holds |
 |---|---|
-| `settings.json` | Everything set on the pages: game folder, character log, tracking, audio, overlays, damage meter and archive settings, and per character the classes, levels, race and duration focus sources |
+| `settings.json` | Everything set on the pages: game folder, character log, tracking, audio, overlays, damage meter and archive settings, the faction plan's Assumptions, the Live page's setup checklist, and per character the classes, levels, race and duration focus sources and the faction plan's locks, rule-outs and paces |
 | `triggers.json` | Your triggers, respawn timers included; the first run copies them from `defaults/triggers.json` |
 | `spell-rules.json` | Per-spell settings from the Spell Timers page: tracking, cues, speech, colour, overlay, a fixed duration |
 | `casts.json` | Each ranked spell you have cast, when last and how often, for the Spell Timers page's list |

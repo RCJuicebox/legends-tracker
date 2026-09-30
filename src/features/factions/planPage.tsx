@@ -1,9 +1,8 @@
-import { Fragment, useDeferredValue, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { Fragment, useCallback, useDeferredValue, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { ago, api } from '../../renderer/src/api'
 import { showError } from '../../renderer/src/toast'
-import { useAchievementTrack, useInvoke, useLatest } from '../../renderer/src/hooks'
+import { useAchievementTrack, useInvoke, useLatest, useSameContents } from '../../renderer/src/hooks'
 import { useApp } from '../../renderer/src/state'
-import { useRemembered } from '../../renderer/src/remember'
 import { useCharacterRecord } from '../../renderer/src/character'
 import { useNow } from '../../renderer/src/components/TimerBars'
 import { Disclosure, GameCommand, Info, NumberInput, Pending, Segmented, Switch } from '../../renderer/src/components/ui'
@@ -218,21 +217,49 @@ export function Flags({ a }: { a: PlanActivity }) {
   )
 }
 
+/** The plan's assumptions the player changed, kept in settings.json for every character. */
+function useAssumptions(): [Partial<PlanSettings>, (next: Partial<PlanSettings>, debounceMs?: number) => void] {
+  const { state, patchSettings } = useApp()
+  const stored = useSameContents(state.settings.factionPlan.assumptions)
+  const set = useCallback(
+    (next: Partial<PlanSettings>, debounceMs?: number) => void patchSettings((s) => ({ ...s, factionPlan: { ...s.factionPlan, assumptions: next } }), { debounceMs }),
+    [patchSettings]
+  )
+  return [stored, set]
+}
+
 /** The plan's assumptions as the Plan tab has them, for a page that only reads them. */
 export function usePlanSettings(logPace: number | null): PlanSettings {
-  const [stored] = useRemembered<Partial<PlanSettings>>('factions.plan.settings', {})
+  const [stored] = useAssumptions()
   return useMemo(() => ({ ...DEFAULT_SETTINGS, killsPerHour: logPace ?? DEFAULT_SETTINGS.killsPerHour, ...stored }), [stored, logPace])
 }
 
-/** A character's locks, rule-outs and paces on the Plan tab. */
-export function useChoices(character: string): [PlanChoices, (c: PlanChoices) => void] {
-  const [stored, set] = useRemembered<PlanChoices>(`factions.plan.${character}`, NO_CHOICES)
-  const choices = useMemo<PlanChoices>(() => ({ locks: stored?.locks ?? {}, excluded: stored?.excluded ?? [], perHour: stored?.perHour ?? {} }), [stored])
+/** A character's locks, rule-outs and paces on the Plan tab, kept in settings.json. A number being typed saves once the typing stops. */
+export function useChoices(character: string): [PlanChoices, (c: PlanChoices, debounceMs?: number) => void] {
+  const { state, patchSettings } = useApp()
+  const kept = state.settings.factionPlan.choices
+  const choices = useSameContents(Object.hasOwn(kept, character) ? kept[character] : NO_CHOICES)
+  const set = useCallback(
+    (c: PlanChoices, debounceMs?: number) =>
+      void patchSettings(
+        (s) => {
+          const others = Object.fromEntries(Object.entries(s.factionPlan.choices).filter(([k]) => k !== character))
+          const none = !Object.keys(c.locks).length && !c.excluded.length && !Object.keys(c.perHour).length
+          return { ...s, factionPlan: { ...s.factionPlan, choices: none ? others : { ...others, [character]: c } } }
+        },
+        { debounceMs }
+      ),
+    [character, patchSettings]
+  )
   return [choices, set]
 }
 
+/** How long a number being typed waits before it is saved. */
+const TYPING_SAVE_MS = 150
+
 export function PlanTab({ character, view }: { character: string; view: FactionView | null }) {
-  const [stored, setSettings] = useRemembered<Partial<PlanSettings>>('factions.plan.settings', {})
+  const { state: app, patchSettings } = useApp()
+  const [stored, setSettings] = useAssumptions()
   const aim: PlanGoal = stored.goal === 'positive' ? 'positive' : 'fastest'
   // Most factions positive wants the ways to raise every faction, not only the achievements.
   const wide = aim === 'positive'
@@ -344,7 +371,6 @@ export function PlanTab({ character, view }: { character: string; view: FactionV
   }, [followKey, character, following])
   const track = useAchievementTrack()
   const tracked = track && track.character.toLowerCase() === character.toLowerCase() ? track.faction : null
-  const { state: app, patchSettings } = useApp()
   const overlay = app.settings.overlays.find((o) => o.kind === 'achievements')
 
   // Race swaps: what they save against the same plan without them, worked out once the plan shows.
@@ -433,7 +459,7 @@ export function PlanTab({ character, view }: { character: string; view: FactionV
     const next = { ...choices.perHour }
     if (perHour && perHour > 0) next[id] = perHour
     else delete next[id]
-    setChoices({ ...choices, perHour: next })
+    setChoices({ ...choices, perHour: next }, TYPING_SAVE_MS)
   }
   /** The step the Now card and the overlay follow, picked here: until the kills or hand-ins go toward another. */
   const workOn = (index: number) => void api.invoke('factions:follow-step', character, index).catch((e: unknown) => showError('Could not pick that step', e))
@@ -828,13 +854,13 @@ function Assumptions({
   settings: PlanSettings
   stored: Partial<PlanSettings>
   logPace: number | null
-  onChange: (s: Partial<PlanSettings>) => void
+  onChange: (s: Partial<PlanSettings>, debounceMs?: number) => void
 }) {
   const set = (k: NumberSetting) => (v: number | undefined) => {
     const next = { ...stored }
     if (v === undefined || !(v >= 0)) delete next[k]
     else next[k] = v
-    onChange(next)
+    onChange(next, TYPING_SAVE_MS)
   }
   // The goal and race unlocks first are set at the top of the tab, not here.
   const top = new Set<keyof PlanSettings>(['goal', 'unlocksFirst'])

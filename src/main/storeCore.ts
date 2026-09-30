@@ -40,7 +40,9 @@ export function defaultSettings(): AppSettings {
     theme: 'system',
     hotkeys: true,
     achievementCues: true,
-    combat: { fightGapSec: 10, historyMinutes: 60, newSessionOnZone: true, combinePet: true, charmPets: true }
+    combat: { fightGapSec: 10, historyMinutes: 60, newSessionOnZone: true, combinePet: true, charmPets: true },
+    factionPlan: { assumptions: {}, choices: {} },
+    setup: { hidden: false, accepted: [], arranged: false }
   }
 }
 

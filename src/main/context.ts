@@ -317,6 +317,9 @@ export function createContext(): AppContext {
     ctx.overlays.setArranging(on)
     ctx.refreshOverlayVisibility()
     toMain('state:arranging', on)
+    // Arranging them at all, from the tray, a page or the hotkey, is placing them (Live's checklist).
+    const s = store.settings.get()
+    if (on && !s.setup.arranged) ctx.saveSettings({ ...s, setup: { ...s.setup, arranged: true } })
   }
 
   ctx.toggleMute = () => {

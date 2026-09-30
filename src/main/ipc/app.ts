@@ -41,6 +41,11 @@ export function registerAppIpc(ctx: AppContext): void {
     const prev = store.settings.get()
     const clean = sanitizeSettings(s, prev)
     if (!clean) throw new Error('Settings were not saved: they were not in the expected form.')
+    // Character records are saved on their own (character:save, character:put), and a page's copy of
+    // them can be behind: the pages' settings never change them.
+    clean.characters = prev.characters
+    // Nor can a page's older copy undo the overlays having been arranged (set by setArranging).
+    clean.setup = { ...clean.setup, arranged: clean.setup.arranged || prev.setup.arranged }
     // The game folder is chosen or found (game:choose, game:find), each checked; a page cannot set another.
     if (clean.installDir !== prev.installDir && clean.installDir && !isGameFolder(clean.installDir)) clean.installDir = prev.installDir
     return ctx.saveSettings(clean)

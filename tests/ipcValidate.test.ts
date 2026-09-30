@@ -115,6 +115,44 @@ describe('settings from a page', () => {
     expect(out.characters.Kel_x.focusSources[0]).toMatchObject({ id: 'f', pct: 0, kind: 'item', appliesTo: 'both', enabled: true })
   })
 
+  it("keeps only the faction plan's assumptions the player changed, held to their inputs' ranges", () => {
+    const was = { ...defaultSettings(), factionPlan: { assumptions: { travelMin: 10, goal: 'positive' as const, raceSwaps: false }, choices: {} } }
+    const out = sanitizeSettings(
+      { ...defaultSettings(), factionPlan: { assumptions: { travelMin: 'x', killsPerHour: 5000, handInSec: -3, goal: 'slowest', raceSwaps: 1, unlocksFirst: true, junk: 4 } } },
+      was
+    )!
+    // A bad value keeps what was there; one not sent stays unset.
+    expect(out.factionPlan.assumptions).toEqual({ travelMin: 10, killsPerHour: 1000, handInSec: 0, goal: 'positive', raceSwaps: false, unlocksFirst: true })
+    expect(sanitizeSettings({ ...defaultSettings(), factionPlan: { assumptions: {} } }, was)!.factionPlan.assumptions).toEqual({})
+    // No faction plan sent: what was saved stays.
+    const { factionPlan: _, ...rest } = defaultSettings()
+    expect(sanitizeSettings(rest, was)!.factionPlan).toEqual(was.factionPlan)
+  })
+
+  it("keeps each character's plan choices, checked, and none for a character with none", () => {
+    const out = sanitizeSettings(
+      {
+        ...defaultSettings(),
+        factionPlan: {
+          assumptions: {},
+          choices: {
+            Tester_neriak: { locks: { 'Guards of Qeynos': 'a1', __proto__: 'x', Other: 5 }, excluded: ['a2', 'a2', 3], perHour: { a3: 20, a4: -1, a5: 'x', a6: 1e9 } },
+            Tester_qeynos: { locks: {}, excluded: [], perHour: {} },
+            'bad/key': { locks: { A: 'a1' }, excluded: [], perHour: {} },
+            Tester_x: 'junk'
+          }
+        }
+      },
+      current
+    )!
+    expect(out.factionPlan.choices).toEqual({ Tester_neriak: { locks: { 'Guards of Qeynos': 'a1' }, excluded: ['a2'], perHour: { a3: 20, a6: 100_000 } } })
+  })
+
+  it("keeps the Live page's checklist flags", () => {
+    const out = sanitizeSettings({ ...defaultSettings(), setup: { hidden: true, accepted: ['sound', 'sound', 7, 'x'.repeat(50)], arranged: 'yes' } }, current)!
+    expect(out.setup).toEqual({ hidden: true, accepted: ['sound'], arranged: false })
+  })
+
   it('keeps an old flat focus figure only as a number', () => {
     const c = sanitizeCharacter(
       { level: 50, classLevels: {}, focusSources: [], beneficialFocusPct: 15, detrimentalFocusPct: 'x' },

@@ -3,18 +3,16 @@ import { useEffect } from 'react'
 import { api, ago } from '../api'
 import { useApp, useLive } from '../state'
 import { useAchievementTrack, useInvoke } from '../hooks'
-import { remember, useRemembered } from '../remember'
+import { remember } from '../remember'
 import { useCombat } from '../combat'
 import { useNow } from './TimerBars'
 import { durationSec } from '../../../core/combatView'
 import { fmtCoin } from '../../../core/loot'
 import type { PageId } from '../main'
+import type { SetupFlags } from '../../../shared/types'
 
 // The Live page's summaries: what to set up still, a log that has gone quiet, the fight in hand and
 // the session so far.
-
-/** Remembered once the overlays have been arranged: the checklist's last step. */
-export const ARRANGED_KEY = 'setup.arranged'
 
 /** How long the log may go without a line while the game runs before the Live page asks why. */
 const QUIET_MS = 5 * 60_000
@@ -33,13 +31,12 @@ interface Step {
 
 /** First-run setup, step by step, until every step is done or the player hides it. */
 export function SetupChecklist({ go }: { go: Go }) {
-  const { state } = useApp()
+  const { state, patchSettings } = useApp()
   const spellsLoaded = useLive((l) => l.status.spellsLoaded)
-  const [hidden, setHidden] = useRemembered<boolean>('setup.hidden', false)
-  const [accepted, setAccepted] = useRemembered<string[]>('setup.accepted', [])
-  // Set by the shell whenever the overlays are arranged, from anywhere.
-  const [arranged] = useRemembered<boolean>(ARRANGED_KEY, false)
   const s = state.settings
+  // Kept in settings.json; `arranged` is set by the main process whenever the overlays are arranged, from anywhere.
+  const { hidden, accepted, arranged } = s.setup
+  const setSetup = (patch: Partial<SetupFlags>) => void patchSettings((x) => ({ ...x, setup: { ...x.setup, ...patch } }))
   const steps: Step[] = [
     { id: 'folder', done: !!s.installDir && spellsLoaded > 0, text: 'Find the game folder, so spells can be timed', page: 'settings', button: 'Settings' },
     { id: 'log', done: !!s.logFile, text: 'Choose your character log (type /log on in game if there is none)', page: 'settings', button: 'Settings' },
@@ -70,7 +67,7 @@ export function SetupChecklist({ go }: { go: Go }) {
           {steps.length - left.length} of {steps.length}
         </span>
         <span className="spacer" />
-        <button className="btn small ghost" onClick={() => setHidden(true)}>
+        <button className="btn small ghost" onClick={() => setSetup({ hidden: true })}>
           Hide
         </button>
       </h2>
@@ -82,7 +79,7 @@ export function SetupChecklist({ go }: { go: Go }) {
               <span className={`chip ${ok ? 'ok' : 'warn'}`}>{ok ? 'Done' : 'To do'}</span>
               <span className={`grow${ok ? ' faint' : ''}`}>{x.text}</span>
               {!ok && x.accept && (
-                <button className="btn small ghost" onClick={() => setAccepted([...accepted, x.id])}>
+                <button className="btn small ghost" onClick={() => setSetup({ accepted: [...accepted, x.id] })}>
                   {x.accept}
                 </button>
               )}

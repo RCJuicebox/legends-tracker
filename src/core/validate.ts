@@ -9,6 +9,8 @@ import {
   type MeterOverlayOptions,
   type OverlayConfig,
   type Phrase,
+  type PlanChoices,
+  type PlanSettings,
   type Trigger,
   type TriggerAction
 } from '../shared/types'
@@ -117,6 +119,62 @@ function shape<T>(v: Obj, fb: T, known: Partial<Record<keyof T, unknown>>): T {
 }
 
 const LEVEL_MAX = 255
+
+/** The faction plan's numbers, held to what their inputs on the Plan tab allow. */
+const PLAN_RANGES: Partial<Record<keyof PlanSettings, [number, number]>> = {
+  travelMin: [0, 120],
+  killsPerHour: [1, 1000],
+  namedRespawnMin: [1, 600],
+  handInSec: [0, 600],
+  gatherSec: [0, 3600],
+  unknownSec: [0, 3600],
+  keepMaxed: [0, 1],
+  positiveHours: [0, 100],
+  swapMin: [0, 120]
+}
+
+/**
+ * The faction plan's assumptions: only those the player changed are kept, so a default improved in a
+ * later build reaches them. One not sent stays unset; a bad one keeps what was there.
+ */
+function planAssumptions(v: unknown, fb: Partial<PlanSettings>): Partial<PlanSettings> {
+  if (!isObj(v)) return fb
+  const out: Record<string, unknown> = {}
+  const was = fb as Record<string, unknown>
+  for (const [k, [lo, hi]] of Object.entries(PLAN_RANGES)) {
+    const x = v[k]
+    if (typeof x === 'number' && Number.isFinite(x)) out[k] = Math.max(lo, Math.min(hi, x))
+    else if (k in v && typeof was[k] === 'number') out[k] = was[k]
+  }
+  if (v.goal === 'fastest' || v.goal === 'positive') out.goal = v.goal
+  else if ('goal' in v && fb.goal) out.goal = fb.goal
+  for (const k of ['raceSwaps', 'unlocksFirst'] as const) {
+    if (typeof v[k] === 'boolean') out[k] = v[k]
+    else if (k in v && fb[k] !== undefined) out[k] = fb[k]
+  }
+  return out as Partial<PlanSettings>
+}
+
+/** Locks, rule-outs or paces a page may keep for one character: about the size of every faction's ways. */
+const PLAN_CHOICES_MAX = 5000
+const ACTIVITY_ID_MAX = 300
+
+/** A character's locks, rule-outs and paces on the Plan tab; null when there are none. */
+function planChoices(v: unknown): PlanChoices | null {
+  if (!isObj(v)) return null
+  const locks: Record<string, string> = {}
+  if (isObj(v.locks))
+    for (const [faction, id] of Object.entries(v.locks).slice(0, PLAN_CHOICES_MAX)) {
+      if (isRecordKey(faction) && typeof id === 'string' && id.length > 0 && id.length <= ACTIVITY_ID_MAX) locks[faction] = id
+    }
+  const excluded = [...new Set(stringsArg(v.excluded, PLAN_CHOICES_MAX, ACTIVITY_ID_MAX))]
+  const perHour: Record<string, number> = {}
+  if (isObj(v.perHour))
+    for (const [id, n] of Object.entries(v.perHour).slice(0, PLAN_CHOICES_MAX)) {
+      if (isRecordKey(id, ACTIVITY_ID_MAX) && typeof n === 'number' && Number.isFinite(n) && n > 0) perHour[id] = Math.min(n, 100_000)
+    }
+  return Object.keys(locks).length || excluded.length || Object.keys(perHour).length ? { locks, excluded, perHour } : null
+}
 
 function focusSource(v: unknown): FocusSource | null {
   if (!isObj(v) || typeof v.id !== 'string' || !v.id) return null
@@ -300,6 +358,24 @@ export function sanitizeSettings(v: unknown, fb: AppSettings): AppSettings | nul
     }
   }
 
+  const fp = isObj(v.factionPlan) ? v.factionPlan : {}
+  let choices = fb.factionPlan.choices
+  if (isObj(fp.choices)) {
+    choices = {}
+    for (const [key, c] of Object.entries(fp.choices)) {
+      const clean = isCharacterKey(key) ? planChoices(c) : null
+      if (clean) choices[key] = clean
+    }
+  }
+  const factionPlan = { assumptions: planAssumptions(fp.assumptions, fb.factionPlan.assumptions), choices }
+
+  const su = isObj(v.setup) ? v.setup : {}
+  const setup = shape(su, fb.setup, {
+    hidden: bool(su.hidden, fb.setup.hidden),
+    accepted: Array.isArray(su.accepted) ? [...new Set(stringsArg(su.accepted, 20, 40))] : fb.setup.accepted,
+    arranged: bool(su.arranged, fb.setup.arranged)
+  })
+
   return shape(v, fb, {
     installDir: str(v.installDir, fb.installDir),
     // The tailer reads whatever this names: only a character log.
@@ -316,7 +392,9 @@ export function sanitizeSettings(v: unknown, fb: AppSettings): AppSettings | nul
     theme: oneOf(v.theme, ['system', 'light', 'dark'] as const, fb.theme),
     hotkeys: bool(v.hotkeys, fb.hotkeys),
     achievementCues: bool(v.achievementCues, fb.achievementCues),
-    combat
+    combat,
+    factionPlan,
+    setup
   })
 }
 

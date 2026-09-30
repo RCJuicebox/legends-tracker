@@ -5,6 +5,7 @@ import { factionKey, NO_MOB, STANDING_MAX, STANDING_MIN, standingBand, type Fact
 import type { QuestHandIn, QuestPage } from './questPages'
 import { allaKills, allaNeeds, allaQuestAmounts, questKey, type AllaFaction, type AllaKill, type Need } from './allakhazam'
 import type { RaceUnlock } from './unlocks'
+import type { PlanChoices, PlanSettings } from '../../shared/settings'
 
 // A plan for the faction achievements still to do: what to kill or hand in, how many, and in what
 // order, for the least time. Each achievement is done the moment its raw standing reaches 2000, and
@@ -1244,40 +1245,8 @@ export function buildCatalog(input: CatalogInput): FactionCatalog {
 
 // ---------- time ----------
 
-export interface PlanSettings {
-  /** Getting to a new zone, and set up there. */
-  travelMin: number
-  /** Kills an hour at a camp of common mobs the log has no pace for. */
-  killsPerHour: number
-  /** How often a named or single mob comes back. */
-  namedRespawnMin: number
-  /** A hand-in the log has not timed (Legends takes a whole stack at once). */
-  handInSec: number
-  /** Gathering one item a hand-in needs from common mobs, foraging or crafting. */
-  gatherSec: number
-  /** A hand-in when neither the log nor the wiki says what goes in it. */
-  unknownSec: number
-  /**
-   * A point a faction ends below 2000 after being there, as a share of a point on an achievement still
-   * to do: 0 is the quickest plan whatever it costs them (the achievements are kept), more keeps them
-   * up where another way is not much slower. Where a faction ends is what counts, so a point a later
-   * step gives back costs nothing.
-   */
-  keepMaxed: number
-  /** What the plan aims for: the least time, or also as few factions left below zero as it can. */
-  goal: PlanGoal
-  /** For the 'positive' goal: what one faction ending at 0 or above is worth, in hours of play. */
-  positiveHours: number
-  /** Swapping race in Loadouts for a quest the character's own race's con keeps closed: planned or not. */
-  raceSwaps: boolean
-  /** Minutes a swap takes, there and back. */
-  swapMin: number
-  /** Race unlocks before the rest: each one done sooner counts as time saved. */
-  unlocksFirst: boolean
-}
-
-/** 'fastest': every achievement in the least time. 'positive': every achievement, ending with as many factions at 0 or above as is worth the time. */
-export type PlanGoal = 'fastest' | 'positive'
+// The assumptions and choices are kept in settings.json (shared/settings.ts).
+export type { PlanChoices, PlanGoal, PlanSettings } from '../../shared/settings'
 
 export const KEEP_MAXED = { off: 0, light: 0.1, strong: 0.5 } as const
 
@@ -1298,15 +1267,6 @@ export const DEFAULT_SETTINGS: PlanSettings = {
 
 /** Buying one item from a merchant, in stacks. */
 const BUY_ITEM_SEC = 0.15
-
-/** What the player chose: an activity locked to an achievement, activities ruled out, their own pace for some. */
-export interface PlanChoices {
-  /** Faction → activity id. */
-  locks: Record<string, string>
-  excluded: string[]
-  /** Activity id → kills or hand-ins an hour. */
-  perHour: Record<string, number>
-}
 
 export const NO_CHOICES: PlanChoices = { locks: {}, excluded: [], perHour: {} }
 
