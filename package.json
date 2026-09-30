@@ -30,35 +30,35 @@
   },
   "dependencies": {
     "electron-updater": "^6.8.9",
-    "koffi": "^3.3.1",
+    "koffi": "^3.3.2",
     "yauzl": "^3.4.0",
     "yazl": "^3.3.1"
   },
   "devDependencies": {
-    "@types/node": "^26.6.2",
+    "@types/node": "^26.6.3",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
     "@types/yauzl": "^3.4.0",
     "@types/yazl": "^3.3.1",
     "@vitejs/plugin-react": "^5.2.0",
-    "@vitest/coverage-v8": "^5.0.2",
-    "electron": "^44.4.5",
+    "@vitest/coverage-v8": "^5.0.3",
+    "electron": "^44.5.1",
     "electron-builder": "^26.15.3",
     "electron-vite": "^5.0.0",
-    "oxlint": "1.85.0",
+    "oxlint": "1.86.0",
     "prettier": "^3.9.9",
     "react": "^19.3.0",
     "react-dom": "^19.3.0",
     "typescript": "^7.0.2",
     "vite": "^7.3.6",
-    "vitest": "^5.0.2"
+    "vitest": "^5.0.3"
   },
   "allowScripts": {
-    "electron@44.4.5": true,
+    "electron@44.5.1": true,
     "esbuild@0.25.12": true,
     "esbuild@0.28.2": true,
     "electron-winstaller": false,
-    "koffi@3.3.1": false
+    "koffi@3.3.2": false
   },
   "author": "RCJuicebox",
   "homepage": "https://github.com/RCJuicebox/legends-tracker",
