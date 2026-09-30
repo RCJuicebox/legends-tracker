@@ -89,7 +89,7 @@ Later checks, all exact:
 
 Over the soft cap, a point of gear AC is worth 0.43 mitigation and a point of buff AC 0.083, so gear AC is about five times better.
 
-Implemented in `src/core/acModel.ts` `computeAc`, with `acSum` and `raceClassBonus`. `tests/stats.test.ts` reproduces the 12 September and ring-off readings.
+Implemented in `src/core/acModel.ts` `computeAc`, with `acSum` and `raceClassBonus`. `tests/core/stats.test.ts` reproduces the 12 September and ring-off readings.
 
 ## AC buffs count a quarter
 
@@ -180,7 +180,7 @@ Confirmation, Test Sixty, one parse in Offensive then one in Balanced:
 - Test Sixty's avoidance is about 467.
 - A low-gear parse (most gear removed, DEX about 118) gave the predicted hit rates.
 
-Implemented in `src/core/combatModel.ts` `hitChance` and `avoidanceFromHitRate`. `tests/stats.test.ts` checks the 70.01% → 468 and 65.9% figures.
+Implemented in `src/core/combatModel.ts` `hitChance` and `avoidanceFromHitRate`. `tests/core/stats.test.ts` checks the 70.01% → 468 and 65.9% figures.
 
 ## Swings per round
 

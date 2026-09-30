@@ -1,5 +1,5 @@
 {
-  "_about": "The player's own damage and misses, one line of each shape seen in the test character's log (targets are mobs), plus a thousands separator and a damage shield. tests/damageGrammar.test.ts and the workspace's dps/test_grammar.py both read it, so the app's parser and the Python one cannot drift apart.",
+  "_about": "The player's own damage and misses, one line of each shape seen in the test character's log (targets are mobs), plus a thousands separator and a damage shield. tests/core/damageGrammar.test.ts and the workspace's dps/test_grammar.py both read it, so the app's parser and the Python one cannot drift apart.",
   "lines": [
     {
       "line": "You kick a marsh bear cub for 79 points of damage.",

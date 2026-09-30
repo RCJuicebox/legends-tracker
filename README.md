@@ -187,7 +187,7 @@ new session, and a pin that unlocks the rows so a click opens their breakdown. T
 sets what each meter window shows; there can be several, say one for the fight and one for the
 session.
 
-The line shapes, the fight rules and the sums are pinned in `tests/combat.test.ts` with lines
+The line shapes, the fight rules and the sums are pinned in `tests/core/combat.test.ts` with lines
 copied from the log.
 
 ## Buffs
@@ -310,7 +310,7 @@ Checked against a level-50 Shaman's in-game Spell windows (2026-09-23):
 | Plague X | 13 | 13 × 1.5 = 19.5 → 20 | 1:18 (2:00) |
 | Spirit of the Puma X | 10 | 10 × 2.0 × (1 + 0.50 + 0.105) = 32.1 → 32 | 1:00 (3:12) |
 
-…and against the landing-to-fade times of every rank of those spells in the log (`tests/durations.test.ts`).
+…and against the landing-to-fade times of every rank of those spells in the log (`tests/core/durations.test.ts`).
 Puma's focus is Spell Casting Reinforcement (AA, 50%) plus Extended Enhancement II (the Engineer's
 Ring's exaltation, +15%, cap 44) decayed six levels to 10.5%. Puma X really does last 3:12 in play
 (the log's fades land 192–198s after it lands).
@@ -872,7 +872,7 @@ the sounds in `AudioTriggers`.
 | `src/main` | Electron main process: windows, tray, overlays, speech, icons, persistence, the engine that joins it all (`engine/`, with the contract its parts keep in `feature.ts`), the data sources and long jobs (`sources/`), IPC handlers by family (`ipc/`) |
 | `src/preload` | The IPC bridge, which lets a page use only the channels in the contract |
 | `src/renderer` | The React UI (`index.html`), timer and meter overlays (`overlay.html`), the alerts overlay without React (`alerts.html`), the hidden audio mixer (`audio.html`) |
-| `tests` | Vitest; fixtures are real rows from the client's spell files and real lines from the test character's log. `*.bench.ts` are timing runs (`npm run bench`), not part of `npm test` |
+| `tests` | Vitest, in folders that mirror `src` (`core/`, `shared/`, `main/`, `features/factions/`, `renderer/`), each test named for the module it covers where it covers one; `helpers.ts` and `fixtures/` are shared. Fixtures are real rows from the client's spell files and real lines from the test character's log. `*.bench.ts` are timing runs (`npm run bench`), not part of `npm test` |
 | `docs/formulas.md` | The game formulas, how each was measured or confirmed, and where the app implements it |
 | `scripts` | The release push, the release notes from the changelog, the smoke test, the icon renderer |
 | `defaults/triggers.json` | Triggers installed on first run |

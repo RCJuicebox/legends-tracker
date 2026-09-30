@@ -601,7 +601,7 @@ const PUSH_CHANNELS: Record<PushChannel, true> = {
 }
 
 export const isInvokeChannel = (c: unknown): c is InvokeChannel => typeof c === 'string' && Object.hasOwn(INVOKE_CHANNELS, c)
-/** Every invoke channel the contract names: each must have a handler (tests/ipcHandlers.test.ts). */
+/** Every invoke channel the contract names: each must have a handler (tests/main/ipcHandlers.test.ts). */
 export const invokeChannels = (): InvokeChannel[] => Object.keys(INVOKE_CHANNELS) as InvokeChannel[]
 export const isSendChannel = (c: unknown): c is SendChannel => typeof c === 'string' && Object.hasOwn(SEND_CHANNELS, c)
 export const isPushChannel = (c: unknown): c is PushChannel => typeof c === 'string' && Object.hasOwn(PUSH_CHANNELS, c)
