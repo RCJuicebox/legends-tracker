@@ -9,7 +9,7 @@ import { CAST_BY_YOU } from '../core/phrases'
 import { PET_GEAR_HEAD, PetGearReader, parsePetGuide, parseSummonPage, type PetGearReading, type PetMelee, type PetProfile } from '../core/pets'
 import { log } from './log'
 import { wiki } from './sources/wiki'
-import type { PetState, PetSummon } from '../shared/ipc'
+import type { PetState } from '../shared/ipc'
 import { cacheDir } from './paths'
 import { sources } from './sources/registry'
 import { expired, WIKI_FRESH_MS } from './sources/freshness'
@@ -18,7 +18,7 @@ import { expired, WIKI_FRESH_MS } from './sources/freshness'
 // summoning spell cast), both kept per character so an archived log loses neither; and the pet's
 // classes, level, stats and base melee from its eqlwiki pages, cached a week.
 
-export type { PetState, PetSummon }
+export type { PetState }
 
 /**
  * The last gear list and the last summoning cast in a log, read from its end backwards. Stops at the

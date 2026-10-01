@@ -10,7 +10,8 @@ npm run check
 ```
 
 That is the type-check, the lint (oxlint, with the layer rules below), the format check (Prettier:
-no semicolons, single quotes, 180 columns, LF line ends) and the tests. `npm run format` fixes the
+no semicolons, single quotes, 180 columns, LF line ends), knip (no export, file or package that
+nothing uses; the entry points are in `knip.json`) and the tests. `npm run format` fixes the
 formatting. `npm run coverage` runs the tests with coverage and fails when a folder falls below its
 floor in `vitest.config.ts`; raise a floor when you add tests, never lower one to get a change in.
 After `npm run build`, `npm run smoke` starts the built app on a throwaway profile. CI runs all of it.

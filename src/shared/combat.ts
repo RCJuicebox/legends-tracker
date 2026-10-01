@@ -58,7 +58,7 @@ export interface Defense {
  */
 export type ProcOrigin = 'spell' | 'ability' | 'aa'
 
-export interface ProcStat {
+interface ProcStat {
   name: string
   origin: ProcOrigin
   count: number
@@ -106,10 +106,10 @@ export interface Entity {
   lastHitAt: number
 }
 
-export type SegmentKind = 'fight' | 'session'
+type SegmentKind = 'fight' | 'session'
 
 /** Damage per second of a fight, one entry per second from its start: you, your pets, the rest of your side, and damage to you. */
-export interface Timeline {
+interface Timeline {
   you: number[]
   pet: number[]
   group: number[]

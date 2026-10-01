@@ -97,7 +97,7 @@ export function castableSpells(all: Iterable<Spell>, classes: string[], level: n
 }
 
 /** The bit a class has in a focus's class limit (411), which the game stores shifted left by one. */
-export function classBits(classes: string[]): number {
+function classBits(classes: string[]): number {
   return classes.reduce((bits, c) => bits | ((1 << (CLASS_NUMBER[c as ClassId] ?? 0)) & ~1), 0)
 }
 
@@ -165,7 +165,7 @@ export function effectivePct(f: FocusSpec, spellLevel: number): number {
 }
 
 /** A spell the character casts, and its share of their casting. */
-export interface SpellUse {
+interface SpellUse {
   name: string
   /** The level it counts as for a focus's level cap. */
   level: number

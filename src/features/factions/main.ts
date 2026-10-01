@@ -149,7 +149,7 @@ async function firstStamp(logPath: string, size: number): Promise<number> {
 }
 
 /** What caused each faction change, kill or hand-in, as a LogHistory consumer. Version 2: a trade's items are counted together. */
-export const factionSourceConsumer: HistoryConsumer<FactionSourceTallies> = {
+const factionSourceConsumer: HistoryConsumer<FactionSourceTallies> = {
   version: 2,
   empty: emptySources,
   reader: sourceReader

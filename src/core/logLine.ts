@@ -81,8 +81,8 @@ export function decodeCp1252(bytes: Uint8Array): string {
 
 // "You have entered The Plane of Fear 4 (Refined)." Arenas and the Drunken Monkey's areas print the
 // same words without being zones.
-export const RE_ZONE = /^You have entered (.+)\.$/
-export const RE_NOT_ZONE = /^(?:an? (?:area|Arena)|the Drunken)/i
+const RE_ZONE = /^You have entered (.+)\.$/
+const RE_NOT_ZONE = /^(?:an? (?:area|Arena)|the Drunken)/i
 
 /** The zone a line says you entered, or null when it is not a zone change. */
 export function zoneEntered(text: string): string | null {

@@ -183,7 +183,7 @@ export function handSwings(p: { double: number; triple: number; dual: number; do
 }
 
 /** The melee damage table rows below level 51 (EQEmu, the commit Project 1999 cites). */
-export const DAMAGE_TABLE = { mnk: { max: 220, skip: 45, minus: 100 }, other: { max: 210, skip: 49, minus: 105 } }
+const DAMAGE_TABLE = { mnk: { max: 220, skip: 45, minus: 100 }, other: { max: 210, skip: 49, minus: 105 } }
 export const MELEE_CLASSES = ['war', 'pal', 'shd', 'rng', 'mnk', 'brd', 'rog', 'ber', 'bst']
 
 /** The table's average damage, as % of base. Under 115 Offense it never applies. */

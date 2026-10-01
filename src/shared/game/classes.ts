@@ -35,7 +35,7 @@ export const CLASS_NAMES: readonly ClassName[] = CLASS_TABLE.map((c) => c.name)
 export const CLASS_NUMBER = Object.fromEntries(CLASS_TABLE.map((c) => [c.id, c.number])) as Record<ClassId, number>
 
 /** Class ids grouped the way pickers list them: melee, then priests, then casters. */
-export const CLASS_IDS_BY_ROLE: readonly ClassId[] = ['war', 'pal', 'shd', 'rng', 'mnk', 'brd', 'rog', 'ber', 'bst', 'clr', 'dru', 'shm', 'enc', 'mag', 'nec', 'wiz']
+const CLASS_IDS_BY_ROLE: readonly ClassId[] = ['war', 'pal', 'shd', 'rng', 'mnk', 'brd', 'rog', 'ber', 'bst', 'clr', 'dru', 'shm', 'enc', 'mag', 'nec', 'wiz']
 
 /** [id, name] pairs in picker order. */
 export const CLASSES: readonly (readonly [ClassId, ClassName])[] = CLASS_IDS_BY_ROLE.map((id) => [id, className(id) as ClassName] as const)

@@ -38,7 +38,7 @@ import { factionNamer, isCity, zoneKey } from './names'
 // three times, which most likely was a quest's reward and is done. Those are listed, not planned,
 // unless the player locks one in: a lock says "I know it repeats; build around it".
 
-export type ActivityKind = 'kill' | 'turnin' | 'quest'
+type ActivityKind = 'kill' | 'turnin' | 'quest'
 
 export interface HandInItem {
   name: string
@@ -139,7 +139,7 @@ export interface Guesses {
   handDown: number
 }
 
-export const DEFAULT_GUESSES: Guesses = { killUp: 5, killDown: -2, handUp: 5, handDown: -1 }
+const DEFAULT_GUESSES: Guesses = { killUp: 5, killDown: -2, handUp: 5, handDown: -1 }
 
 export interface CatalogInput {
   /** Every faction the game knows, as it writes them (the factions export's names). */

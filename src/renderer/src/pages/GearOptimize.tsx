@@ -335,7 +335,7 @@ export function OptimizeTab({ m }: { m: GearModel }) {
 }
 
 /** The pieces locked in, and a picker to lock another: any piece in any slot it fits. */
-export function LockCard({
+function LockCard({
   plan,
   pieces,
   m,

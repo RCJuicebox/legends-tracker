@@ -96,7 +96,7 @@ const SIMPLE: Record<number, string> = {
 }
 
 /** What one effect of a spell does, in a few words, at the character's level; '' for a slot left blank. */
-export function spaWords(e: SpellEffect, level: number): string {
+function spaWords(e: SpellEffect, level: number): string {
   const v = effectValue(e, level)
   if (STAT_SPA[e.spa]) return v ? `${STAT_SPA[e.spa]} ${signed(v)}` : ''
   if (RESIST_SPA[e.spa]) return v ? `${RESIST_SPA[e.spa].toLowerCase()} resist ${signed(v)}` : ''
@@ -245,7 +245,7 @@ export function procDamage(spell: EffectSpell, level: number): number {
  * adding a second, so it does no more than its damage a tick kept up the whole time (10 ticks a
  * minute). Infinity for one that lands once.
  */
-export function procCeiling(spell: EffectSpell, level: number): number {
+function procCeiling(spell: EffectSpell, level: number): number {
   if (formulaTicks(level, spell.formula, spell.cap) <= 0) return Infinity
   return spell.effects.filter((e) => e.spa === 0 && e.base < 0).reduce((s, e) => s + Math.abs(effectValue(e, level)), 0) * 10
 }

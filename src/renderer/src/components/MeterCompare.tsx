@@ -88,7 +88,7 @@ export function ComparePane({
 }
 
 /** The rows a mode lists, in one shape for comparing: a name, its rate and its total. */
-export function comparable(seg: Segment, mode: MeterMode, scope: MeterScope, combinePet: boolean, active: boolean) {
+function comparable(seg: Segment, mode: MeterMode, scope: MeterScope, combinePet: boolean, active: boolean) {
   if (mode === 'healing') return healerRows(seg, scope).map((h) => ({ key: h.key, name: h.name, rate: h.hps, total: h.total }))
   const rows = mode === 'incoming' ? attackerRows(seg, scope) : damageRows(seg, scope, combinePet)
   return rows.map((r) => ({ key: r.key, name: r.name, rate: active ? r.activeDps : r.dps, total: r.total }))

@@ -28,7 +28,7 @@ function emit(): void {
   for (const l of listeners) l()
 }
 
-export function dismissToast(id: number): void {
+function dismissToast(id: number): void {
   toasts = toasts.filter((t) => t.id !== id)
   // The last one gone from under the pointer: no leave event comes, so the next toasts must not wait on it.
   if (!toasts.length) hovering = false

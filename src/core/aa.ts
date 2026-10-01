@@ -64,7 +64,7 @@ export const AA_USES: Record<AaEffect, { label: string; unit: string; feeds: str
   ac: { label: 'Armor class', unit: '', feeds: 'shown only', applied: false }
 }
 
-export interface AaAbility {
+interface AaAbility {
   id: number
   name: string
   cost: number | null
@@ -158,7 +158,7 @@ export function aaEffects(description: string): Partial<Record<AaEffect, number>
 }
 
 /** One of each ability (the list repeats some), and every effect totalled with who gave it. */
-export function summarizeAas(list: RawEntry[]): AaSummary {
+function summarizeAas(list: RawEntry[]): AaSummary {
   const seen = new Set<string>()
   const abilities: AaAbility[] = []
   const totals: AaSummary['totals'] = {}

@@ -23,7 +23,7 @@ export interface Gate {
   order: Int32Array
 }
 
-export interface Act {
+interface Act {
   a: PlanActivity
   /** Seconds a unit, and while its item is on hand. */
   unit: number
@@ -47,7 +47,7 @@ export interface Act {
 }
 
 /** A faction a block raises to the standing another activity's NPC wants (`for`, that activity). */
-export interface Reach {
+interface Reach {
   i: number
   v: number
   for: number

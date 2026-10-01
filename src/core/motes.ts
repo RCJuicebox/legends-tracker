@@ -64,7 +64,7 @@ const RE_CREATING = /^Player .+ creating instance .+ \d+\.$/
 const RE_COMPLETED = /^You have completed the Dungeon Crawl/
 
 /** A crawl you have been out of this long is taken as abandoned, ending when you left. */
-export const ABANDON_AFTER_MS = 30 * 60_000
+const ABANDON_AFTER_MS = 30 * 60_000
 /** The reward chest's motes are logged just after the completion line. */
 const CHEST_GRACE_MS = 15_000
 
@@ -77,7 +77,7 @@ export function parseMoteLoot(text: string): MoteLoot | null {
   return { rank, count, source: m[3].replace(/'s corpse$/, '') }
 }
 
-export function isCrawlInstance(zone: string): boolean {
+function isCrawlInstance(zone: string): boolean {
   return RE_INSTANCE.test(zone)
 }
 

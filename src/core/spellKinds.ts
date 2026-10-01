@@ -5,9 +5,7 @@ import type { SpellEffect } from './spells'
 import { SUMMON_SPAS } from '../shared/game/spa'
 
 /** Casting skills of songs: singing, brass, stringed, wind, percussion. */
-export const SONG_SKILLS = [12, 41, 49, 54, 70]
-
-export { SUMMON_SPAS } from '../shared/game/spa'
+const SONG_SKILLS = [12, 41, 49, 54, 70]
 
 export function isSong(spell: { skill: number }): boolean {
   return SONG_SKILLS.includes(spell.skill)

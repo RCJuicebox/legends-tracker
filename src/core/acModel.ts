@@ -31,7 +31,7 @@ const MONK_WEIGHT: [number, number, number][] = [
   [100, 58, 35]
 ]
 
-export function monkWeightCaps(level: number): { hard: number; soft: number } {
+function monkWeightCaps(level: number): { hard: number; soft: number } {
   let row = MONK_WEIGHT[0]
   for (const r of MONK_WEIGHT) if (level >= r[0]) row = r
   return { hard: row[1], soft: row[2] }
@@ -73,7 +73,7 @@ export interface AcInputs {
 const idiv = (a: number, b: number) => Math.trunc(a / b)
 
 /** Avoidance AC, the post's Computed Defence: defence skill and agility, plus item avoidance up to 100. */
-export function computedDefense(i: AcInputs) {
+function computedDefense(i: AcInputs) {
   const skill = idiv(i.defense * 400, 225)
   const agi = idiv(8000 * (i.agility - 40), 36000)
   const hagi = idiv(i.heroicAgility, 10)
@@ -87,7 +87,7 @@ export function computedDefense(i: AcInputs) {
 }
 
 /** Monk weight, rogue and beastlord agility, and the Iksar racial. */
-export function raceClassBonus(i: AcInputs) {
+function raceClassBonus(i: AcInputs) {
   const out = { monk: 0, cls: 0, iksar: 0, monkPenalty: false, caps: null as null | { hard: number; soft: number }, total: 0 }
   const has = (c: string) => i.trio.includes(c)
   const tier = (a: number) => (a < 80 ? 1 : a < 85 ? 2 : a < 90 ? 3 : a < 100 ? 4 : 5)
@@ -121,7 +121,7 @@ export function raceClassBonus(i: AcInputs) {
  * The AC Sum. `server` applies the anti-twink cap below level 50 (25 + 6 × level on worn AC), which
  * the Inventory window never shows.
  */
-export function acSum(i: AcInputs, server: boolean) {
+function acSum(i: AcInputs, server: boolean) {
   const silk = SILK.includes(i.cls)
   const gear = i.itemAC + i.foodDrinkAC + i.tributeAC
   const eqmath = idiv(gear * 4, 3)

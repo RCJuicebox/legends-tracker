@@ -17,7 +17,7 @@ import { cacheDir } from './paths'
 // REST: https://learn.microsoft.com/azure/ai-services/speech-service/rest-text-to-speech
 
 /** A voice setting naming an Azure voice: "azure:en-US-JennyNeural". Anything else is a Windows voice. */
-export const AZURE_PREFIX = 'azure:'
+const AZURE_PREFIX = 'azure:'
 const AGENT = 'LegendsTracker (https://github.com/RCJuicebox/legends-tracker)'
 const TIMEOUT_MS = 10_000
 const VOICES_FRESH_MS = 7 * 24 * 3600_000

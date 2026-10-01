@@ -26,7 +26,7 @@ import { CAST_BY_OTHER, CAST_BY_YOU, DIED, SLAIN_BY, SLAIN_BY_YOU, YOU_DIED } fr
 /** The player, however the log spells it: You, YOU, you, YOUR, or the character's own name. */
 export const SELF = 'You'
 
-export type MissOutcome = 'miss' | 'dodge' | 'parry' | 'block' | 'riposte' | 'absorb'
+type MissOutcome = 'miss' | 'dodge' | 'parry' | 'block' | 'riposte' | 'absorb'
 
 export type CombatEvent =
   | { kind: 'damage'; source: string; target: string; amount: number; how: 'melee' | 'spell' | 'dot' | 'ds'; skill: string; mods: string[] }

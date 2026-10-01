@@ -65,7 +65,7 @@ function splitCells(line: string): string[] {
 }
 
 /** A cell without its attributes (style="…"|) and bold marks; links are kept, for finding the spell. */
-export function cellText(cell: string): string {
+function cellText(cell: string): string {
   let s = cell
   // Attributes end at the first pipe outside a link.
   const outside = s.replace(/\[\[[^\]]*\]\]/g, (l) => '_'.repeat(l.length))

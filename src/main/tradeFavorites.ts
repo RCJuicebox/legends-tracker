@@ -2,12 +2,12 @@ import { promises as fs } from 'node:fs'
 import { writeFileAtomic } from './storeCore'
 import { log } from './log'
 import { sanitizeTradeSaved } from '../core/validate'
-import type { TradeFavorite, TradeSaved } from '../shared/ipc'
+import type { TradeSaved } from '../shared/ipc'
 
 // tradeskills.json: the recipes the player starred, how many combines they plan of each, and prices
 // they typed in for things the log has never seen them buy.
 
-export type { TradeFavorite, TradeSaved }
+export type { TradeSaved }
 
 const EMPTY: TradeSaved = { favorites: [], prices: {} }
 

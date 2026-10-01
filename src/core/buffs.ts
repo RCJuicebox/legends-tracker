@@ -82,9 +82,9 @@ export const LINE_LABELS: Record<BuffLine, string> = {
 }
 
 /** The lines the tracker picks from out of the box: every buff of them worth something (procs and "other" are permanent buffs). */
-export const DEFAULT_LINES: BuffLine[] = ['hpac', 'haste', 'spellHaste', 'manaRegen', 'stats', 'proc', 'other']
+const DEFAULT_LINES: BuffLine[] = ['hpac', 'haste', 'spellHaste', 'manaRegen', 'stats', 'proc', 'other']
 
-export interface BuffEffect {
+interface BuffEffect {
   line: BuffLine
   label: string
   /** The spell file's figure where it reads as one ("HP 800", "haste 70%"); '' where it does not. */
@@ -152,7 +152,7 @@ export interface BuffOffer {
  * twice (so a paladin's Symbol of Pinzarn, +307 HP, comes before Armor of Faith, +85 AC), STA 1.5
  * for the HP it brings, charisma nothing. Haste and spell haste are per percent, regen per point a tick.
  */
-export const VALUE_PER_POINT: Record<number, number> = {
+const VALUE_PER_POINT: Record<number, number> = {
   69: 1,
   1: 2,
   4: 1,
@@ -185,7 +185,7 @@ export const VALUE_PER_POINT: Record<number, number> = {
 
 /** What a weapon proc, and a permanent utility effect, count for: flat, since neither is a number of anything. */
 export const PROC_VALUE = 100
-export const OTHER_VALUE = 20
+const OTHER_VALUE = 20
 
 /**
  * A buff's worth from its effects at the level cap. Haste is counted above 100%; a damage shield by
@@ -266,7 +266,7 @@ export function offersFor(offers: BuffOffer[], classes: string[], level: number,
 }
 
 /** Worth most first; the higher-level spell first between two alike. */
-export function byValue(a: BuffOffer, b: BuffOffer): number {
+function byValue(a: BuffOffer, b: BuffOffer): number {
   return b.value - a.value || Math.max(...Object.values(b.classes)) - Math.max(...Object.values(a.classes)) || a.spell.localeCompare(b.spell)
 }
 
@@ -431,7 +431,7 @@ export function canCast(offer: BuffOffer, p: Person): boolean {
 }
 
 /** A groupmate who can cast this buff at their level, or undefined. */
-export function casterOf(offer: BuffOffer, group: Person[]): Person | undefined {
+function casterOf(offer: BuffOffer, group: Person[]): Person | undefined {
   return group.find((p) => canCast(offer, p))
 }
 
@@ -441,7 +441,7 @@ export const YOU = 'you'
 /** Asking is not worth it for less than this (a +5 DEX buff): the combination leaves such buffs out. */
 export const MIN_ASK_VALUE = 20
 
-export interface PlanItem {
+interface PlanItem {
   spell: string
   line: BuffLine
   value: number

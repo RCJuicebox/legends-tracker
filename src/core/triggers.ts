@@ -46,7 +46,7 @@ function compileWith(p: Phrase, character: string, bound: Record<string, string>
   }
 }
 
-export function renderTemplate(template: string, captures: Record<string, string>, character: string, line: string): string {
+function renderTemplate(template: string, captures: Record<string, string>, character: string, line: string): string {
   return template.replace(SNIPPET, (_, token: string | undefined, named: string | undefined) => {
     if (named) return captures[named] ?? ''
     const t = (token ?? '').toUpperCase()

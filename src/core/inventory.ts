@@ -16,7 +16,7 @@ export function storedEquipment(inv: Pick<Inventory, 'keyRing'>): InvItem[] {
 }
 
 /** Worn slots in the order the game lists them. "Any Slot" is the charm slot. */
-export const WORN_SLOTS = [
+const WORN_SLOTS = [
   'Any Slot',
   'Ear',
   'Head',
@@ -158,7 +158,7 @@ export function itemFoci(item: InvItem, focusOf: (name: string) => string | unde
 }
 
 export const STAT_KEYS = ['STR', 'STA', 'AGI', 'DEX', 'WIS', 'INT', 'CHA'] as const
-export const POOL_KEYS = ['HP', 'MANA', 'END'] as const
+const POOL_KEYS = ['HP', 'MANA', 'END'] as const
 export const SAVE_KEYS = ['COLD', 'DISEASE', 'FIRE', 'MAGIC', 'POISON', 'CORRUPTION', 'VOID'] as const
 
 /** What an item's stats block says, at its base (unmerged) level. */
@@ -249,12 +249,12 @@ export function scalePrimary(base: number, n: number): number {
 }
 
 /** Weapon damage: a tenth of base per level, rounded down. */
-export function scaleDamage(base: number, n: number): number {
+function scaleDamage(base: number, n: number): number {
   return base + Math.floor((base * n) / 10)
 }
 
 /** Haste and regen: flat +1 per level. */
-export function scaleFlat(base: number, n: number): number {
+function scaleFlat(base: number, n: number): number {
   return base ? base + n : 0
 }
 

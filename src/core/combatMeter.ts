@@ -15,7 +15,7 @@ export { displayName, isFriend, nameKey } from './combatRoster'
 // second-by-second damage, the timeline's (combatTimeline.ts).
 
 /** A gap between an entity's hits counts as combat time up to this long. */
-export const ACTIVE_GAP_MS = 3000
+const ACTIVE_GAP_MS = 3000
 /**
  * A spell effect landing this long after its cast line is the cast; later, or with no cast line at
  * all, it was fired by something else: a weapon, a buff, an ability. Long casts run to ten seconds.

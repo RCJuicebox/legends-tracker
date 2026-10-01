@@ -120,7 +120,7 @@ const RANK_SUFFIX = /^(.*?) (?:Rk\. )?(I|II|III|IV|V|VI|VII|VIII|IX|X|XI|XII|XII
  */
 export { LEVEL_CAP }
 
-export function categorize(beneficial: boolean, hasDuration: boolean, effects: SpellEffect[]): SpellCategory {
+function categorize(beneficial: boolean, hasDuration: boolean, effects: SpellEffect[]): SpellCategory {
   const has = (spa: number, sign?: 1 | -1) => effects.some((e) => e.spa === spa && (sign === undefined || Math.sign(e.base) === sign))
   if (beneficial) {
     if (!hasDuration) return 'heal'

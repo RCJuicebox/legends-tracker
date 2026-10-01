@@ -7,7 +7,7 @@ import { throwIfCancelled } from './jobs'
 // when the wiki says so (Retry-After, 429, 5xx, maxlag). The workspace's Python client
 // (eql_common.wiki_get) behaves the same way.
 
-export const WIKI_API = 'https://eqlwiki.com/api.php'
+const WIKI_API = 'https://eqlwiki.com/api.php'
 /** Who is asking, with the version, read when first needed (tests load this without Electron). */
 let agent = ''
 const userAgent = () => (agent ||= `LegendsTracker/${app?.getVersion?.() ?? 'dev'} (https://github.com/RCJuicebox/legends-tracker)`)
@@ -17,7 +17,7 @@ const ATTEMPTS = 6
 /** Between one request and the next. */
 const PACE_MS = 200
 
-export class WikiError extends Error {}
+class WikiError extends Error {}
 
 /** How soon a request is wanted: a page waiting on it goes ahead of a background download. */
 export type Urgency = 'now' | 'background'

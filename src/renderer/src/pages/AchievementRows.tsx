@@ -36,7 +36,7 @@ interface Entry {
 }
 
 /** The blocks of one section, filtered by search, Remaining only and Hide optional, then sorted. */
-export function sectionBody(book: AchievementBook, si: number, query: string, ctx: Ctx) {
+function sectionBody(book: AchievementBook, si: number, query: string, ctx: Ctx) {
   const s = book.sections[si]
   const k = secKey(s)
   const hide = !!ctx.hideOpt[k]
@@ -68,7 +68,7 @@ export function sectionBody(book: AchievementBook, si: number, query: string, ct
   return { entries, done, broken, blocked }
 }
 
-export function Blocks({ book, si, entries, query, ctx }: { book: AchievementBook; si: number; entries: Entry[]; query: string; ctx: Ctx }) {
+function Blocks({ book, si, entries, query, ctx }: { book: AchievementBook; si: number; entries: Entry[]; query: string; ctx: Ctx }) {
   // Single-objective achievements sit together in a compact grid, between the full blocks.
   const out: React.ReactNode[] = []
   let singles: React.ReactNode[] = []
@@ -182,7 +182,7 @@ export function SearchResults({ book, query, ctx }: { book: AchievementBook; que
   )
 }
 
-export function NamesLine({ label, names }: { label: string; names: string[] }) {
+function NamesLine({ label, names }: { label: string; names: string[] }) {
   if (!names.length) return null
   return (
     <p className="small muted ach-names">
@@ -197,7 +197,7 @@ export function NamesLine({ label, names }: { label: string; names: string[] }) 
   )
 }
 
-export function Block({ book, r, rows, query, ctx }: { book: AchievementBook; r: AchRef; rows: { c: AchObjective; ci: number }[]; query: string; ctx: Ctx }) {
+function Block({ book, r, rows, query, ctx }: { book: AchievementBook; r: AchRef; rows: { c: AchObjective; ci: number }[]; query: string; ctx: Ctx }) {
   const [si, ai] = r
   const s = book.sections[si]
   const a = book.ach(r)
@@ -260,7 +260,7 @@ export function Block({ book, r, rows, query, ctx }: { book: AchievementBook; r:
   )
 }
 
-export function SingleRow({ book, r, ctx }: { book: AchievementBook; r: AchRef; ctx: Ctx }) {
+function SingleRow({ book, r, ctx }: { book: AchievementBook; r: AchRef; ctx: Ctx }) {
   const a = book.ach(r)
   const c = a.c[0]
   const state = book.state(r)
@@ -295,23 +295,7 @@ export function SingleRow({ book, r, ctx }: { book: AchievementBook; r: AchRef; 
   )
 }
 
-export function ObjectiveRow({
-  book,
-  r,
-  c,
-  label,
-  sub,
-  ctx,
-  single
-}: {
-  book: AchievementBook
-  r: ObjRef
-  c: AchObjective
-  label: string
-  sub?: string
-  ctx: Ctx
-  single?: boolean
-}) {
+function ObjectiveRow({ book, r, c, label, sub, ctx, single }: { book: AchievementBook; r: ObjRef; c: AchObjective; label: string; sub?: string; ctx: Ctx; single?: boolean }) {
   const done = book.objDone(r)
   const ignored = !done && book.objIgnored(r)
   const to = book.link(r)
@@ -423,7 +407,7 @@ export function ObjectiveRow({
 }
 
 /** The star that keeps an achievement on the achievements overlay. */
-export function TrackStar({ k, name, ctx }: { k: string; name: string; ctx: Ctx }) {
+function TrackStar({ k, name, ctx }: { k: string; name: string; ctx: Ctx }) {
   const on = ctx.tracked.has(k)
   return (
     <button

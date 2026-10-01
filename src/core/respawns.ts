@@ -206,8 +206,8 @@ export function respawnPhrase(name: string): string {
 /** The name as speech should say it: "Coercer T`vala" is read "Coercer Tvala". */
 const spoken = (name: string) => name.replace(/[`]/g, '')
 
-export const RESPAWN_FOLDER = 'Respawns'
-export const RESPAWN_COLOR = '#6cc3ff'
+const RESPAWN_FOLDER = 'Respawns'
+const RESPAWN_COLOR = '#6cc3ff'
 
 export function respawnTrigger(spec: RespawnTimerSpec, existing?: Trigger): Trigger {
   const say = spoken(spec.name)
@@ -240,7 +240,7 @@ export function respawnTrigger(spec: RespawnTimerSpec, existing?: Trigger): Trig
 }
 
 /** A respawn trigger's timer, as the Respawns page shows it. */
-export interface RespawnTimerInfo {
+interface RespawnTimerInfo {
   triggerId: string
   enabled: boolean
   seconds: number
@@ -278,7 +278,7 @@ export function respawnView(records: RespawnRecords, triggers: Trigger[], zone: 
   return { zone, rows }
 }
 
-export function respawnTimerOf(t: Trigger): RespawnTimerInfo | null {
+function respawnTimerOf(t: Trigger): RespawnTimerInfo | null {
   const a = t.actions.find((x) => x.type === 'timer')
   if (!a || a.type !== 'timer') return null
   return { triggerId: t.id, enabled: t.enabled, seconds: a.durationSec, overlay: a.overlay, warnSec: a.warnSec, announce: !!a.endSpeech }

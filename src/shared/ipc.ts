@@ -73,7 +73,7 @@ export interface AppState {
   hotkeysTaken: string[]
 }
 
-export interface LogsOverview {
+interface LogsOverview {
   logs: LogFileInfo[]
   archives: ArchiveInfo[]
   archiveDir: string
@@ -107,7 +107,7 @@ export interface RecipeFile {
   eras?: Record<string, string>
 }
 
-export interface RecipeState {
+interface RecipeState {
   file: RecipeFile | null
   stale: boolean
   progress: WikiProgress
@@ -145,7 +145,7 @@ export interface TradeSaved {
   prices: Record<string, number>
 }
 
-export interface PetSummon {
+interface PetSummon {
   /** Unranked: "Frenzied Spirit". */
   spell: string
   at: number
@@ -157,12 +157,12 @@ export interface PetState {
   summon: PetSummon | null
 }
 
-export type PetUpdate = PetState & { character: string }
+type PetUpdate = PetState & { character: string }
 
 export type PetView = PetUpdate & { spells: PetSpellOption[]; spellsLoaded: boolean }
 
 /** A cast window over the log and its archives. */
-export interface CastWindow {
+interface CastWindow {
   total: number
   from: string
   to: string
@@ -170,13 +170,13 @@ export interface CastWindow {
 
 export type FocusData = FocusReport & { window: CastWindow | null }
 
-export interface GearEffects {
+interface GearEffects {
   spells: Record<string, EffectSpell>
   profile: MeleeProfile | null
   loaded: boolean
 }
 
-export interface SpellCasts {
+interface SpellCasts {
   rows: SpellCastRow[]
   unknown: { name: string; casts: number }[]
   window: CastWindow | null
@@ -191,7 +191,7 @@ export interface SkillCapRow {
   from: string
 }
 
-export interface Caps {
+interface Caps {
   skills: SkillCapRow[]
   ac: Record<string, { cap: number; mult: number }>
   /** What a point of STA, the casting stat and the endurance stats is worth, by class. */

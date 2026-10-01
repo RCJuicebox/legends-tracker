@@ -186,7 +186,7 @@ export function parseItemPage(title: string, content: string): CatalogItem | nul
  * Race lines eqlwiki has wrong, put right from a source that has them: its pages give "Race: ALL" to
  * armor only some races may wear. Every item whose title matches takes the races given.
  */
-export const RACE_FIXES: { match: RegExp; races: string; source: string }[] = [
+const RACE_FIXES: { match: RegExp; races: string; source: string }[] = [
   // The dwarven cultural plate, all four kinds: the small races only (eqlwiki's Cultural Tradeskills:
   // Dwarf page says as much in prose; its item pages say ALL).
   { match: /^(?:(?:Enchanted|Imbued) )?Dwarven (?:Plate \w+|Breastplate)\b/i, races: 'DWF HFL GNM FRG', source: 'Allakhazam, Enchanted Dwarven Plate Greaves (item 8010)' }

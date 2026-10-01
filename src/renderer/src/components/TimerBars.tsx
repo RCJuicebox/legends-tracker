@@ -8,7 +8,7 @@ const onVisibility = (l: () => void) => {
 }
 
 /** False while the window is hidden (in the tray, or an overlay hidden with the game). */
-export function usePageVisible(): boolean {
+function usePageVisible(): boolean {
   return useSyncExternalStore(onVisibility, () => document.visibilityState !== 'hidden')
 }
 
@@ -83,7 +83,7 @@ function useDrain(startedAt: number, endsAt: number, overdue: boolean, color: st
   return { track, fill, edge }
 }
 
-export function TimerBar({ t, now, showTarget }: { t: TimerView; now: number; showTarget: boolean }) {
+function TimerBar({ t, now, showTarget }: { t: TimerView; now: number; showTarget: boolean }) {
   const left = t.endsAt - now
   const overdue = left < 0
   const warning = !overdue && t.warnSec > 0 && left <= t.warnSec * 1000

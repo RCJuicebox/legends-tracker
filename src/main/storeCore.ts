@@ -7,7 +7,7 @@ import { log } from './log'
 // The pure half of the settings store: defaults, merging, and the JSON files themselves. No Electron
 // import, so it can be tested.
 
-export { DEFAULT_METER_OPTIONS, DEFAULT_OVERLAYS } from '../shared/overlays'
+export { DEFAULT_OVERLAYS } from '../shared/overlays'
 
 export function defaultSettings(): AppSettings {
   return {

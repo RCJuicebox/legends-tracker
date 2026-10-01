@@ -21,7 +21,7 @@ export function identityOf(st: { dev: bigint; ino: bigint }): string {
  * Reads a file back from the end (or from `end`) a chunk at a time. `onChunk` gets each chunk's text
  * and where it starts, and returns true to stop. Stops at the start of the file or after `maxBytes`.
  */
-export async function readChunksBackward(
+async function readChunksBackward(
   path: string,
   onChunk: (text: string, start: number) => boolean | void,
   opts: { step?: number; maxBytes?: number; stopAt?: number; end?: number } = {}

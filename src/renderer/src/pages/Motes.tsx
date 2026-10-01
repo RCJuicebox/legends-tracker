@@ -16,7 +16,7 @@ type View = MoteView
  * The mote history. While it is being rebuilt from the logs only the progress is pushed; the whole
  * state follows once the rebuild is done.
  */
-export function useMotesQuery() {
+function useMotesQuery() {
   const q = useInvoke('motes:get')
   const setData = q.setData
   useEffect(() => {

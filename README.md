@@ -75,7 +75,8 @@ npm run build
 npm test
 ```
 
-`npm run check` runs the type-check, lint, format check and tests together, as CI does. `npm run coverage`
+`npm run check` runs the type-check, lint, format check, knip (unused exports, files and packages)
+and tests together, as CI does. `npm run coverage`
 runs the tests with coverage and fails when a folder falls below its floor in `vitest.config.ts`
 (CI runs it too); `npm run bench` prints what each part of the engine costs a line. After
 `npm run build`, `npm run smoke` starts the app on a throwaway profile with a tiny game folder, checks

@@ -17,7 +17,7 @@ import type { LogLine } from './logLine'
 // first, as skills and factions are.
 
 /** A rank bought or given, or a refund of every rank of an ability. */
-export type AaEvent = { kind: 'rank'; at: number; name: string; rank: number; cost: number } | { kind: 'refund'; at: number; name: string }
+type AaEvent = { kind: 'rank'; at: number; name: string; rank: number; cost: number } | { kind: 'refund'; at: number; name: string }
 
 /** A stretch of log's AA lines. */
 export interface AaTally {
@@ -47,7 +47,7 @@ const POINTS = /^You have gained (?:an|\d+) ability point(?:\(s\)|s)?!\s+You now
 const REFUNDED = /^The alternate ability (.+) has been refunded\.$/
 
 /** "Symphonic Aura: Disabled" → "Symphonic Aura". */
-export const abilityName = (name: string): string => name.replace(/: (?:Enabled|Disabled)$/, '').trim()
+const abilityName = (name: string): string => name.replace(/: (?:Enabled|Disabled)$/, '').trim()
 
 /** An AA line's meaning, or null for any other line. Every line of a log comes through here, so it looks at the start first. */
 export function parseAaLine(text: string): AaLine | null {
@@ -108,7 +108,7 @@ export function joinAaTallies(stretches: AaTally[]): AaTally {
 
 // ---- The Stats page's view ----
 
-export interface AaRank {
+interface AaRank {
   at: number
   rank: number
   cost: number
@@ -136,7 +136,7 @@ export interface AaAbility {
   listOnly: boolean
 }
 
-export interface AaPoints {
+interface AaPoints {
   /** The last total the game reported, and when. */
   total: number
   at: number

@@ -17,7 +17,7 @@ export function appUserModelId(): string {
 }
 
 /** A Windows .ico of the PNG at the sizes the shell asks for, each stored as PNG (Vista and later read these). */
-export function icoFromPng(pngPath: string): Buffer {
+function icoFromPng(pngPath: string): Buffer {
   const src = nativeImage.createFromPath(pngPath)
   if (src.isEmpty()) throw new Error(`${pngPath} is not an image`)
   const sizes = [256, 64, 48, 32, 24, 16]

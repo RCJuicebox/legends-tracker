@@ -1,0 +1,14 @@
+{
+  "$schema": "https://unpkg.com/knip@6/schema.json",
+  "entry": [
+    "src/main/moteWorker.ts",
+    "src/renderer/src/main.tsx",
+    "src/renderer/src/overlay/main.tsx",
+    "src/renderer/src/overlay/host.tsx",
+    "src/renderer/src/alerts/main.ts",
+    "src/renderer/src/audio/main.ts",
+    "src/features/factions/planWorker.ts",
+    "scripts/*.{mjs,cjs}"
+  ],
+  "project": ["src/**/*.{ts,tsx}", "scripts/**/*.{mjs,cjs}"]
+}

@@ -27,8 +27,8 @@ import { classColumn, classIdOf } from '../shared/game/classes'
 // ---- slots ----
 
 const SLOT_BONUS: Record<string, number> = { mag: 3, bst: 3, nec: 2, enc: 1, dru: 1, shm: 1 }
-export const PET_BASE_SLOTS = 4
-export const PET_MAX_SLOTS = 12
+const PET_BASE_SLOTS = 4
+const PET_MAX_SLOTS = 12
 
 /** How many items the pet inventory holds for a character of these classes. */
 export function petSlots(classes: string[]): number {
@@ -36,7 +36,7 @@ export function petSlots(classes: string[]): number {
 }
 
 /** Where a pet wears things: one of each, two ears, wrists and rings. No charm or ammo slot is known to work. */
-export const PET_SLOT_CAPACITY: Record<string, number> = {
+const PET_SLOT_CAPACITY: Record<string, number> = {
   Head: 1,
   Face: 1,
   Ear: 2,
@@ -61,7 +61,7 @@ export const PET_SLOT_CAPACITY: Record<string, number> = {
 export const PET_GEAR_HEAD = 'Your pet has the following items equipped:'
 const RE_PET_GEAR_ITEM = /^([A-Z][A-Za-z]*(?: [A-Z][A-Za-z]*)?): (.+)$/
 
-export interface PetGearItem {
+interface PetGearItem {
   slot: string
   name: string
 }
@@ -73,7 +73,7 @@ export interface PetGearReading {
 }
 
 /** One line of the list that follows the heading: "Arms: Lustrous Russet Vambraces +7". */
-export function parsePetGearItem(text: string): PetGearItem | null {
+function parsePetGearItem(text: string): PetGearItem | null {
   const m = RE_PET_GEAR_ITEM.exec(text)
   return m ? { slot: m[1], name: m[2].trim() } : null
 }
@@ -340,7 +340,7 @@ export function petConversions(pet: PetProfile, factors: Record<string, ClassFac
 
 // ---- the optimiser ----
 
-export type PetSource = PieceSource | 'pet'
+type PetSource = PieceSource | 'pet'
 
 export interface PetPiece {
   item: InvItem
@@ -383,13 +383,13 @@ const weaponOf = (p: PetPiece | undefined): PetWeapon | null =>
   p?.stats.damage && p.stats.delay ? { damage: p.stats.damage, delay: p.stats.delay, twoHanded: isTwoHanded(p.r) } : null
 
 /** Where a piece could go on this pet. */
-export function petSlotsFor(p: PetPiece, wearer: Wearer): string[] {
+function petSlotsFor(p: PetPiece, wearer: Wearer): string[] {
   if (p.noPet) return []
   return Object.keys(PET_SLOT_CAPACITY).filter((s) => canWear(p.r, wearer, s) && !(s === 'Secondary' && isTwoHanded(p.r)))
 }
 
 /** A plan's worth: each item's stats (haste aside), the best haste once, and the melee its weapons give. */
-export function petPlanValue(
+function petPlanValue(
   chosen: PetChoice[],
   o: Pick<PetPlanOptions, 'weights' | 'melee' | 'level'>,
   statScore: (p: PetPiece) => number = statScorer(o.weights)
@@ -409,7 +409,7 @@ export function petPlanValue(
 const total = (v: { stats: number; haste: number; melee: number }) => v.stats + v.haste + v.melee
 
 /** Each piece's stats by the weights, haste and weapon aside (counted over the whole set); worked out once a piece. */
-export function statScorer(weights: Weights): (p: PetPiece) => number {
+function statScorer(weights: Weights): (p: PetPiece) => number {
   const w = { ...weights, haste: 0, ratio: 0, rangedRatio: 0 }
   const memo = new Map<PetPiece, number>()
   return (p) => {
@@ -503,7 +503,7 @@ export function optimizePetGear(o: PetPlanOptions): PetPlan {
 
 const ORDER = Object.keys(PET_SLOT_CAPACITY)
 /** In the order to hand them over: the main-hand weapon first, as the Pet Guide says, then head to feet. */
-export function sortChoices(list: PetChoice[]): PetChoice[] {
+function sortChoices(list: PetChoice[]): PetChoice[] {
   const rank = (s: string) => (s === 'Primary' ? -2 : s === 'Secondary' ? -1 : ORDER.indexOf(s))
   return [...list].sort((a, b) => rank(a.slot) - rank(b.slot) || a.piece.item.name.localeCompare(b.piece.item.name))
 }

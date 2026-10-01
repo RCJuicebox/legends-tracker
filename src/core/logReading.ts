@@ -88,7 +88,7 @@ export function zipTextSize(path: string): Promise<number> {
 }
 
 /** Whether an archive file belongs to a log stem: "eqlog_Kelwyn_neriak_2026-08-07_to_2026-09-24.zip". */
-export function isArchiveOf(name: string, stem: string): boolean {
+function isArchiveOf(name: string, stem: string): boolean {
   return name.toLowerCase().startsWith(stem.toLowerCase() + '_') && /\.(zip|txt)$/i.test(name)
 }
 

@@ -4,7 +4,7 @@ import type { Segment, StitchedTimeline } from '../shared/types'
 // side's, and what hit you. A session's chart is its fights end to end.
 
 /** A fight's per-second timeline stops growing past an hour. */
-export const TIMELINE_MAX = 3600
+const TIMELINE_MAX = 3600
 /** Quiet seconds between two fights in a session's chart. */
 const STITCH_GAP_SEC = 3
 

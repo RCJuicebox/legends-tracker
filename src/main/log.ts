@@ -50,7 +50,7 @@ function describe(arg: unknown): string {
 const two = (n: number) => String(n).padStart(2, '0')
 
 /** "2026-09-30 07:45:12.345 -04:00": local time, and how far it is from UTC. */
-export function stamp(d = new Date()): string {
+function stamp(d = new Date()): string {
   const off = -d.getTimezoneOffset()
   const sign = off < 0 ? '-' : '+'
   const zone = `${sign}${two(Math.floor(Math.abs(off) / 60))}:${two(Math.abs(off) % 60)}`

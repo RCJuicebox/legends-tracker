@@ -29,7 +29,7 @@ export interface Row {
 }
 
 /** A skill row's proc note: this effect fired without being cast. */
-export interface ProcTag {
+interface ProcTag {
   origin: ProcOrigin
   count: number
   /** Firings per minute of the entity's active combat time; null under MIN_PROC_ACTIVE_SEC of it. */
@@ -71,15 +71,10 @@ export interface HealRow {
   max: number
 }
 
-export interface ScopeInfo {
-  /** Group members' pets by name, when the meter knows their owners. */
-  otherPets?: Record<string, string>
-}
-
 export const durationSec = (seg: Pick<Segment, 'startedAt' | 'endedAt'>): number => durationMs(seg) / 1000
 
 /** Whether an entity's rows belong under the scope. */
-export function inScope(e: Entity, scope: MeterScope): boolean {
+function inScope(e: Entity, scope: MeterScope): boolean {
   if (!isFriend(e.kind)) return false
   if (scope === 'everyone') return true
   const mine = e.kind === 'you' || (e.kind === 'pet' && e.owner === SELF)
@@ -87,7 +82,7 @@ export function inScope(e: Entity, scope: MeterScope): boolean {
   return mine || e.kind === 'group' || (e.kind === 'pet' && !!e.owner && e.owner !== SELF)
 }
 
-export function scoped(seg: Segment, scope: MeterScope): Entity[] {
+function scoped(seg: Segment, scope: MeterScope): Entity[] {
   return Object.values(seg.entities).filter((e) => inScope(e, scope))
 }
 
@@ -445,7 +440,7 @@ export function procSummary(seg: Segment, scope: MeterScope, rows: ProcRow[]): P
   return { count, ppm: perMinute(count, activeMs), activeSec: activeMs / 1000 }
 }
 
-export const PROC_ORIGIN_LABEL: Record<ProcOrigin, string> = { spell: 'proc', ability: 'ability', aa: 'AA' }
+const PROC_ORIGIN_LABEL: Record<ProcOrigin, string> = { spell: 'proc', ability: 'ability', aa: 'AA' }
 
 /** "400", "42 + 42 healed", "300 healed". */
 export function procAmount(r: { damage: number; healed: number }): string {
@@ -496,7 +491,7 @@ export function rolling(series: number[], seconds: number, windowSec: number): n
 
 export const fmtRate = (n: number): string => (n >= 1000 ? `${(n / 1000).toFixed(n >= 10_000 ? 0 : 1)}k` : n >= 100 ? String(Math.round(n)) : n.toFixed(n >= 10 ? 0 : 1))
 
-export const KIND_LABEL: Record<EntityKind, string> = { you: '', pet: 'pet', group: 'group', player: '', npc: '', npcpet: 'pet', unknown: '?' }
+const KIND_LABEL: Record<EntityKind, string> = { you: '', pet: 'pet', group: 'group', player: '', npc: '', npcpet: 'pet', unknown: '?' }
 
 /** A plain-text table of a meter, for pasting into chat or a note. */
 export function copyText(seg: Segment, mode: MeterMode, scope: MeterScope, rows: Row[] | HealRow[], name: string): string {

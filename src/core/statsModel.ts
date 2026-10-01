@@ -39,7 +39,7 @@ export type Row = [label: string, value?: string | number, note?: string]
 export type Note = [kind: '' | 'good' | 'warn' | 'tip', title: string, text: string]
 
 /** The inputs a file, the game's tables or the AAs fill in unless the player types over them. */
-export type AutoKey = keyof StatsInputs['overrides']
+type AutoKey = keyof StatsInputs['overrides']
 export type Auto = Record<AutoKey, number | undefined>
 export type Val = (k: AutoKey) => number
 export type Skill = (id: number) => number

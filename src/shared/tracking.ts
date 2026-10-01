@@ -14,7 +14,7 @@ export interface FactionTrackGoal {
   done: boolean
 }
 
-export interface FactionTrackStep {
+interface FactionTrackStep {
   /** Its place in the plan, from 0, and its activity's id. */
   index: number
   id: string

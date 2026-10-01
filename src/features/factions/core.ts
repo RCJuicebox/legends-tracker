@@ -18,7 +18,7 @@ import { CLASS_TABLE } from '../../shared/game/classes'
 // name come as "Faction723". The page shows the export's standing plus what the log saw since.
 
 /** Where a faction was last seen stuck: "could not possibly get any better" (top) or "… any worse" (bottom). */
-export type FactionCap = 'top' | 'bottom'
+type FactionCap = 'top' | 'bottom'
 
 export type FactionLine = { faction: string; amount: number } | { faction: string; cap: FactionCap }
 
@@ -38,13 +38,13 @@ export function parseFactionLine(text: string): FactionLine | null {
 /** Adjustments kept per faction for its recent history. */
 export const RECENT_KEPT = 20
 
-export interface FactionChange {
+interface FactionChange {
   at: number
   amount: number
 }
 
 /** One faction over a stretch of log. */
-export interface FactionTally {
+interface FactionTally {
   /** As the log last wrote it. */
   name: string
   /** The sum of every adjustment. */
@@ -664,7 +664,7 @@ const linkTarget = (line: string) => {
 }
 
 /** What a faction page lists on one side: the mobs, the quest pages and the zones. */
-export interface FactionSide {
+interface FactionSide {
   mobs: FactionMob[]
   /** Quest page titles, as linked (the label can differ: [[Innoruuk Symbol Quests|Innoruuk Disciple]]). */
   quests: string[]

@@ -8,8 +8,6 @@ import { sanitizeBuffs, sanitizeCasts, sanitizeMoteStock, sanitizeMotes, sanitiz
 import { SCHEMAS, upgrade } from './schema'
 import { DEFAULT_OVERLAYS, JsonFile, characterKey, defaultSettings, mergeDefaults, readJsonFile, type ReadResult } from './storeCore'
 
-export { DEFAULT_OVERLAYS, characterKey, characterName, defaultSettings } from './storeCore'
-
 export interface KnownCast {
   rankedName: string
   lastCast: number

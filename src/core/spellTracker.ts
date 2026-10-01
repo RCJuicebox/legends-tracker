@@ -82,7 +82,7 @@ const RE_YOU_SLEW = SLAIN_BY_YOU
 const RE_DIED = DIED
 const youDied = (text: string) => YOU_DIED.test(text) || YOU_WERE_SLAIN.test(text)
 
-export function targetKey(target: string): string {
+function targetKey(target: string): string {
   return target.toLowerCase()
 }
 
@@ -90,7 +90,7 @@ export function timerKey(spellName: string, target: string): string {
   return `spell:${spellName}|${targetKey(target)}`
 }
 
-export function renderSpeech(template: string, spell: string, target: string): string {
+function renderSpeech(template: string, spell: string, target: string): string {
   return template.replace(/\{spell\}/gi, spell).replace(/\{target\}/gi, target === SELF ? 'you' : target)
 }
 

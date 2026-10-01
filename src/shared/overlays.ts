@@ -7,10 +7,10 @@ export const DEFAULT_METER_OPTIONS: MeterOverlayOptions = { mode: 'damage', span
 
 export const OVERLAY_BUFFS = 'buffs'
 export const OVERLAY_TARGETS = 'targets'
-export const OVERLAY_ALERTS = 'alerts'
-export const OVERLAY_METER = 'meter'
-export const OVERLAY_RESPAWNS = 'respawns'
-export const OVERLAY_ACHIEVEMENTS = 'achievements'
+const OVERLAY_ALERTS = 'alerts'
+const OVERLAY_METER = 'meter'
+const OVERLAY_RESPAWNS = 'respawns'
+const OVERLAY_ACHIEVEMENTS = 'achievements'
 
 /** A monitor's work area: where overlays can go, in screen coordinates. */
 export interface WorkArea {

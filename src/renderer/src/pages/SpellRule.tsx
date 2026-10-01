@@ -156,7 +156,7 @@ export function RuleEditor({ k, onSaved }: { k: KnownSpell; onSaved: (list: Know
  * refresh): each field the player has not touched takes the new value; each they changed keeps
  * theirs.
  */
-export function rebase(draft: SpellRule, oldBase: SpellRule, newBase: SpellRule): SpellRule {
+function rebase(draft: SpellRule, oldBase: SpellRule, newBase: SpellRule): SpellRule {
   const out: SpellRule = {}
   const keys = new Set([...Object.keys(draft), ...Object.keys(oldBase), ...Object.keys(newBase)]) as Set<keyof SpellRule>
   for (const key of keys) {

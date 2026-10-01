@@ -17,7 +17,7 @@ import { redact, settingsSummary } from '../core/diagnosticsText'
  * Memory and CPU by process: the main process, each window's renderer, the GPU. Working set is
  * what Task Manager shows as memory; the heap line is the main process's JavaScript alone.
  */
-export function processMetrics(): string[] {
+function processMetrics(): string[] {
   const titles = new Map<number, string>()
   for (const w of BrowserWindow.getAllWindows()) {
     if (w.isDestroyed()) continue
@@ -47,7 +47,7 @@ function logTail(n: number): string {
 }
 
 /** Each monitor: where it is, its size and its scaling, the primary marked. */
-export function displayLines(): string[] {
+function displayLines(): string[] {
   const primary = screen.getPrimaryDisplay().id
   return screen
     .getAllDisplays()
@@ -64,7 +64,7 @@ function modified(path: string): string {
 }
 
 /** The state of each data source, one line each; the ones in error first. */
-export function sourceLines(): string[] {
+function sourceLines(): string[] {
   const rows = sources.list().sort((a, b) => Number(b.status === 'error') - Number(a.status === 'error'))
   const when = (t: number) => (t ? new Date(t).toISOString() : 'never')
   return rows.map((r) => `  ${r.label}: ${r.status}${r.detail ? `, ${r.detail}` : ''}; last good ${when(r.lastOk)}${r.error ? `; error: ${r.error}` : ''}`)

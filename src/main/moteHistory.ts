@@ -19,7 +19,7 @@ export interface MoteScanJob {
   logs: { logPath: string; stem: string; end?: number }[]
 }
 
-export type { CharacterScan, MoteScanResult }
+export type { MoteScanResult }
 
 /**
  * Rebuilds mote history by replaying each character's logs, oldest first: its zipped and loose

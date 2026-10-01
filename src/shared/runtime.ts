@@ -3,7 +3,7 @@
 import type { SpellCategory } from './game/guide'
 import type { SpellRule } from './settings'
 
-export type TimerSource = 'spell' | 'trigger'
+type TimerSource = 'spell' | 'trigger'
 
 export interface TimerView {
   id: string

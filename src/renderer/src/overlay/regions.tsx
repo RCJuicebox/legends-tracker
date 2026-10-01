@@ -97,7 +97,7 @@ function SegmentMenu({
  * pointer leaves. Unlocking (the pin) keeps the mouse for the whole window, so rows can be clicked
  * into, until it is locked again. An open fight menu keeps it too: the list hangs below the header.
  */
-export function MeterOverlay({ config, snap, arranging }: { config: OverlayConfig; snap: CombatSnapshot | null; arranging: boolean }) {
+function MeterOverlay({ config, snap, arranging }: { config: OverlayConfig; snap: CombatSnapshot | null; arranging: boolean }) {
   const opts = config.meter ?? DEFAULT_METER_OPTIONS
   const [unlocked, setUnlocked] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
@@ -251,7 +251,7 @@ const doing = (s: { kind: TrackKind; title: string; npc?: string }) =>
  * the kills of the last half hour moved, and the skills the skill achievements want that went up in
  * that time. It draws nothing while there is nothing to show, so it costs no room over the game.
  */
-export function AchievementsRegion({ config, track, arranging }: { config: OverlayConfig; track: AchievementTrack | null; arranging: boolean }) {
+function AchievementsRegion({ config, track, arranging }: { config: OverlayConfig; track: AchievementTrack | null; arranging: boolean }) {
   const now = useNow(15_000)
   const style = { ['--fs' as string]: `${config.fontSize}px` }
   const plan = track?.faction ?? null
@@ -485,7 +485,7 @@ function TrackedRow({ t, now }: { t: TrackedAchievement; now: number }) {
 }
 
 /** Lines of text that fade on their own (the alerts overlay), in a host window. */
-export function AlertsRegion({ config }: { config: OverlayConfig }) {
+function AlertsRegion({ config }: { config: OverlayConfig }) {
   const [alerts, setAlerts] = useState<{ id: number; text: string; color: string; until: number }[]>([])
   useEffect(
     () =>

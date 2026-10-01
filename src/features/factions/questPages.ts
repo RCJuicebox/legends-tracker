@@ -43,7 +43,7 @@ export interface QuestHandIn {
   from?: string
 }
 
-export interface QuestStep {
+interface QuestStep {
   /** By faction as the page links it: the amount, or +1 / -1 where the page gives only the direction. */
   hits: Record<string, number>
   /** The factions whose amounts the page does not give. */

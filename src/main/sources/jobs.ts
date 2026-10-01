@@ -61,7 +61,7 @@ class JobRegistry {
 export const jobs = new JobRegistry()
 
 /** Thrown into a job's work when it was cancelled. */
-export class Cancelled extends Error {
+class Cancelled extends Error {
   constructor() {
     super('Cancelled')
   }

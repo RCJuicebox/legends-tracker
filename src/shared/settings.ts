@@ -103,14 +103,14 @@ export interface AudioSettings {
   muted: boolean
 }
 
-export interface ArchiveSettings {
+interface ArchiveSettings {
   autoEnabled: boolean
   thresholdMB: number
   /** Empty means `<Logs>\archive`. */
   archiveDir: string
 }
 
-export type OverlayKind = 'timers' | 'alerts' | 'meter' | 'achievements'
+type OverlayKind = 'timers' | 'alerts' | 'meter' | 'achievements'
 
 /** What a damage meter (page or overlay) lists. */
 export type MeterMode = 'damage' | 'incoming' | 'healing'
@@ -148,7 +148,7 @@ export interface OverlayConfig {
   meter?: MeterOverlayOptions
 }
 
-export interface CombatSettings {
+interface CombatSettings {
   /** Seconds without a hit before a fight is over. */
   fightGapSec: number
   /** How far back in the log to read fights from when watching starts. 0 = none. */
@@ -236,7 +236,7 @@ export interface PlanChoices {
   perHour: Record<string, number>
 }
 
-export interface FactionPlanSettings {
+interface FactionPlanSettings {
   /** Only what the player changed; the rest are the planner's defaults. */
   assumptions: Partial<PlanSettings>
   /** By character key. */

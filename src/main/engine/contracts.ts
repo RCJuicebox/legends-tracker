@@ -69,6 +69,4 @@ export interface EngineStore {
 
 export type Speaker = Pick<SpeechWorker, 'synthesize'> & { warm?(voice: string): void }
 
-export type Feed = (kind: FeedItem['kind'], text: string) => void
-
 export type { AudioCommand, LootView, MoteView }

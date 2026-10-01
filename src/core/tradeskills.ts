@@ -8,11 +8,11 @@
 // merchant value, which is what a vendor asks at best.
 
 import { linkTexts, field } from './wikiItem'
-export { parseVendors, type Vendor } from './wikiItem'
+export { parseVendors } from './wikiItem'
 import { parseWikiTables } from './wikiTable'
 import { parseCoin } from './loot'
 
-export interface Ingredient {
+interface Ingredient {
   name: string
   count: number
 }
@@ -29,7 +29,7 @@ export interface Recipe {
   from: 'page' | 'table'
 }
 
-export const skillOf = (page: string) => page.replace(/^Skill /, '')
+const skillOf = (page: string) => page.replace(/^Skill /, '')
 
 /** Adds up a list that names an ingredient more than once ("Small Vial + Small Vial …"). */
 function tally(parts: Ingredient[]): Ingredient[] {
@@ -187,7 +187,7 @@ export const unitPrice = (p: Pick<Purchase, 'count' | 'copper'>) => p.copper / p
 
 export type PriceSource = 'paid' | 'typed' | 'wiki' | 'none'
 
-export interface ShoppingLine {
+interface ShoppingLine {
   name: string
   perCombine: number
   need: number

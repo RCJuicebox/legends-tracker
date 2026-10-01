@@ -28,9 +28,8 @@ import type { AppSettings, ArchiveStatus, CharacterSettings, FeedItem, Notificat
 import type { EngineEnv, EngineOutputs, EngineStore, MoteView, Speaker } from './contracts'
 import { jobs } from '../sources/jobs'
 
-export type { AudioCommand, EngineEnv, EngineOutputs, EngineStore, LootView, MoteScanner, MoteView, Speaker } from './contracts'
+export type { EngineEnv, EngineOutputs, EngineStore, MoteView, Speaker } from './contracts'
 export type { EngineFeature } from './feature'
-export { workerScanner } from './moteCatchUp'
 
 interface Tail {
   tailer: LogTailer

@@ -36,7 +36,7 @@ interface CatchUpMark {
 }
 
 /** Where the live tailer is. */
-export interface TailInfo {
+interface TailInfo {
   /** The watched log, or '' when none is. */
   logFile(): string
   /** Just past the last line it gave, else where it attached; -1 before it knows. */

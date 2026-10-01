@@ -255,7 +255,7 @@ const STAT_WINDOW: { label: string; most?: number; pair?: true }[] = [
   { label: 'Kick', most: 100 }
 ]
 
-export const STAT_WINDOW_LABELS = STAT_WINDOW.map((l) => l.label)
+const STAT_WINDOW_LABELS = STAT_WINDOW.map((l) => l.label)
 
 const labelWords = STAT_WINDOW_LABELS.map((l) => ({ label: l, words: l.toLowerCase().split(' ') }))
 const CANONICAL: Record<string, string> = { 'Damage Shield Mitiga': 'Damage Shield Mitigation' }

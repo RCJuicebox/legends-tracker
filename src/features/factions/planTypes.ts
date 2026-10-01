@@ -42,7 +42,7 @@ export interface UnlockGoal {
 }
 
 /** The races a character could be, for the cons its NPCs give. */
-export interface RaceMods {
+interface RaceMods {
   /** Its race now. */
   own: string
   /** The races it can swap to in Loadouts now; null when no achievements export says, and then every race counts. */

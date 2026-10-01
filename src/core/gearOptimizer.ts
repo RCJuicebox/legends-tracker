@@ -71,7 +71,7 @@ export interface Piece {
 }
 
 /** An exaltation slot: 7 focus, 9 worn, 10 proc. */
-export type ExaltSlot = 'focus' | 'worn' | 'proc'
+type ExaltSlot = 'focus' | 'worn' | 'proc'
 
 /** An exaltation the character keeps, free to put in a piece's focus, worn or proc slot. */
 export interface Exaltation {

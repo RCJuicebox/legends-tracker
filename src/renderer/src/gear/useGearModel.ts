@@ -24,7 +24,7 @@ import { useFinderResults, type GearMode } from './useFinderResults'
 
 export { AC_OVER_CAP } from './useCharacterWeights'
 
-export type { CatalogState, FocusData, FocusCandidate, GearEffects, GearMode, HandInfo, OwnedFocus }
+export type { CatalogState, FocusCandidate, GearMode, OwnedFocus }
 
 /** Everything the finder, the focus tab and the optimiser share. */
 export interface GearModel {

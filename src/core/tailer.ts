@@ -3,7 +3,7 @@ import type { FileHandle } from 'node:fs/promises'
 import { decodeCp1252 } from './logLine'
 import { fileIdentity } from './fileIdentity'
 
-export type ResetReason = 'truncated' | 'replaced'
+type ResetReason = 'truncated' | 'replaced'
 
 export interface TailerOptions {
   /** Skip what the file already holds when the tailer first attaches. A file that appears later is read whole. */

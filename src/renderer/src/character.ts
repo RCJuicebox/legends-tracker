@@ -44,7 +44,7 @@ export function useCharacterRecord(key: string) {
 }
 
 /** The record's classes as the tracker's ids, in the player's order. */
-export function recordClasses(c: CharacterSettings | null | undefined): string[] {
+function recordClasses(c: CharacterSettings | null | undefined): string[] {
   return Object.keys(c?.classLevels ?? {}).flatMap((name) => {
     const id = classIdOf(name)
     return id ? [id] : []
@@ -62,7 +62,7 @@ export function recordLevel(c: CharacterSettings | null | undefined): number {
 }
 
 /** Iksar or not: the only race the AC sums tell apart. */
-export function recordIksar(c: CharacterSettings | null | undefined): boolean {
+function recordIksar(c: CharacterSettings | null | undefined): boolean {
   return (c?.race ?? '').toLowerCase() === 'iksar'
 }
 

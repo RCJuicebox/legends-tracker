@@ -10,7 +10,7 @@ import type { CatalogItem } from './wikiItem'
 import { procOf, wornEffectOf } from './itemEffects'
 
 /** Where a piece of gear ends up, when a candidate moves things around. */
-export interface RoundMove {
+interface RoundMove {
   slot: string
   /** What the slot held before; null for empty. */
   out: Piece | null

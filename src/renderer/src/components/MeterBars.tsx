@@ -9,7 +9,7 @@ import type { EntityKind, ProcOrigin } from '../../../shared/types'
 
 // Theme tokens throughout (styles.css), so each reads in light and dark: the plain ones fill bars and
 // dots, the -text ones are for words.
-export const KIND_COLOR: Record<EntityKind, string> = {
+const KIND_COLOR: Record<EntityKind, string> = {
   you: 'var(--accent)',
   pet: 'var(--violet)',
   group: 'var(--teal)',
@@ -21,7 +21,7 @@ export const KIND_COLOR: Record<EntityKind, string> = {
 
 export const KIND_TEXT: Partial<Record<EntityKind, string>> = { pet: 'var(--violet-text)', group: 'var(--teal-text)' }
 
-export const HOW_COLOR: Record<SkillRow['how'], string> = {
+const HOW_COLOR: Record<SkillRow['how'], string> = {
   melee: 'var(--accent)',
   spell: 'var(--orange)',
   dot: 'var(--violet)',
@@ -29,7 +29,7 @@ export const HOW_COLOR: Record<SkillRow['how'], string> = {
   pet: 'var(--violet)'
 }
 
-export const HEAL_COLOR = 'var(--green)'
+const HEAL_COLOR = 'var(--green)'
 export const HEAL_TEXT = 'var(--green-text)'
 
 export const PROC_COLOR: Record<ProcOrigin, string> = { spell: 'var(--magenta)', ability: 'var(--sky)', aa: 'var(--accent)' }
@@ -52,7 +52,7 @@ export function kindTag(kind: EntityKind, owner?: string): string {
   return ''
 }
 
-export function Bar({
+function Bar({
   color,
   fill,
   rank,

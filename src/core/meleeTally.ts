@@ -13,7 +13,7 @@ import type { LogLine } from './logLine'
 type Days = Record<string, Record<string, number>>
 
 /** Swings further apart than this are two stretches of fighting: the time between is not counted. */
-export const MELEE_GAP_MS = 6000
+const MELEE_GAP_MS = 6000
 
 /** A fresh counter: it remembers the last swing and the last casts across the lines it reads. */
 export function meleeCounter(): (line: LogLine, into: Days) => void {
@@ -57,7 +57,7 @@ export function meleeCounter(): (line: LogLine, into: Days) => void {
   }
 }
 
-export interface SkillUse {
+interface SkillUse {
   hits: number
   damage: number
   misses: number

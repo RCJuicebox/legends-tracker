@@ -43,7 +43,7 @@ export interface SourceTally {
 }
 
 /** Kills that moved a faction in a zone, with the time between them while the player was killing there. */
-export interface ZoneKills {
+interface ZoneKills {
   n: number
   runN: number
   runMs: number

@@ -8,7 +8,7 @@ import { procOf, wornEffectOf } from './itemEffects'
 import { classCode } from '../shared/game/classes'
 
 /** Worn locations as the inventory export names them → the words a stats block's "Slot:" line uses. */
-export const SLOT_WORDS: Record<string, string[]> = {
+const SLOT_WORDS: Record<string, string[]> = {
   Ear: ['EAR'],
   Head: ['HEAD'],
   Face: ['FACE'],
@@ -49,7 +49,7 @@ export const ERA_ORDER = ['Classic', OTHER_ERA, 'Kunark', 'Velious', 'Luclin', O
  * (key: the tag lowercased, spaces out). The catalog download reads the live list; this copy is the
  * fallback. Anything not listed is out, as on the wiki.
  */
-export const DEFAULT_ERA_STATUS: Record<string, 'in' | 'out'> = {
+const DEFAULT_ERA_STATUS: Record<string, 'in' | 'out'> = {
   classic: 'in',
   fear: 'in',
   hate: 'in',
@@ -304,7 +304,7 @@ export function score(s: ItemStats, w: Weights): number {
   return (Object.keys(w) as WeightKey[]).reduce((sum, k) => sum + v[k] * w[k], 0)
 }
 
-export interface Candidate {
+interface Candidate {
   item: CatalogItem
   stats: ItemStats
   score: number
@@ -336,13 +336,13 @@ export interface SlotResult {
 }
 
 /** Worn effects and procs in the finder: what a worn item carries (with its exaltations) and what they are worth. */
-export interface FinderEffects {
+interface FinderEffects {
   of: (item: InvItem) => { worn: string[]; procs: string[] }
   value: EffectValue
 }
 
 /** Focus effects in the finder: what a worn item carries (with its exaltations) and what a set of foci is worth. */
-export interface FinderFocus {
+interface FinderFocus {
   worn: (item: InvItem) => string[]
   value: (names: string[]) => number
 }

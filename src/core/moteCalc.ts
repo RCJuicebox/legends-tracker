@@ -18,7 +18,7 @@ export interface PlannedItem {
   to: number
 }
 
-export interface Combine {
+interface Combine {
   /** Rank index combined from … */
   from: number
   /** … how many of them … */
@@ -28,7 +28,7 @@ export interface Combine {
   to: number
 }
 
-export interface PlanStep {
+interface PlanStep {
   from: number
   to: number
   /** XP needed for this level. */
@@ -124,7 +124,7 @@ export function makeable(inv: number[], m: number): number {
 }
 
 /** Takes `count` motes of rank `m` from `inv` (mutated), combining up from lower ranks for any shortfall. */
-export function planStep(inv: number[], m: number, count: number): { take: number; short: number; combos: Combine[] } {
+function planStep(inv: number[], m: number, count: number): { take: number; short: number; combos: Combine[] } {
   const take = Math.min(count, makeable(inv, m))
   let need = take
   const combos: Combine[] = []

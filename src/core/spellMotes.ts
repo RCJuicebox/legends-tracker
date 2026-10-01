@@ -27,18 +27,18 @@ import type { SpellBook } from './spells'
 import { CLASS_NAMES, type CharacterSettings, type SpellCategory } from '../shared/types'
 import { RANK_BONUS, UNIVERSAL, UTILITY_BONUS, type RankBonus } from '../shared/game/guide'
 
-export const MAX_RANK = 10
+const MAX_RANK = 10
 
-export { RANK_BONUS, UNIVERSAL, UTILITY_BONUS, type RankBonus } from '../shared/game/guide'
+export { RANK_BONUS, UNIVERSAL, UTILITY_BONUS } from '../shared/game/guide'
 
 /** Gate, teleport, succor, translocate, teleport (v2): a spell that moves you. */
-export const TRANSPORT_SPAS = [26, 83, 88, 104, 145]
+const TRANSPORT_SPAS = [26, 83, 88, 104, 145]
 /** Bind affinity: misc, with the cures and summons. */
 /** Effects that heal: hit points now, or over time. */
 const HEAL_SPAS = [0, 79, 100]
 
 /** Percent a pet gains per rank: +1 pet level. */
-export const PET_LEVELS_PER_RANK = 1
+const PET_LEVELS_PER_RANK = 1
 
 /** How much each kind of gain counts, in points per percent (a level counts as `level` percent). */
 export interface SpellWeights {
@@ -92,7 +92,7 @@ export function sectionOf(category: SpellCategory, pet: boolean, effects: { spa:
 }
 
 /** The per-rank table for a spell: its category's row, unless its section has none in the guide. */
-export function bonusFor(category: SpellCategory, section: SectionKey): RankBonus {
+function bonusFor(category: SpellCategory, section: SectionKey): RankBonus {
   return section === 'transport' || section === 'utility' ? UTILITY_BONUS : RANK_BONUS[category]
 }
 
@@ -193,7 +193,7 @@ export function castRows(book: SpellBook, counts: Record<string, number>, charac
   return { rows: [...rows.values()], unknown: unknown.sort((a, b) => b.casts - a.casts) }
 }
 
-export interface Spend {
+interface Spend {
   /** Rank index into MOTE_RANKS … */
   m: number
   /** … and how many of it. */

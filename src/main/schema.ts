@@ -28,7 +28,7 @@ export interface Migration {
 }
 
 /** Every migration, oldest first. None yet: every file is still at its first schema. */
-export const MIGRATIONS: readonly Migration[] = []
+const MIGRATIONS: readonly Migration[] = []
 
 export type SchemaState = { state: 'current' } | { state: 'migrated'; from: number; backup: string } | { state: 'newer'; version: number }
 
