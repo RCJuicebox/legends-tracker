@@ -1,7 +1,7 @@
 import { STANDING_MAX, STANDING_MIN } from './core'
 import { itemKey } from '../../core/inventory'
 import type { PlanChoices, PlanSettings } from '../../shared/settings'
-import { classSwapOf, zoneKey } from './names'
+import { raceOfSwap, zoneKey } from './names'
 import { clamp, median, type PlanActivity } from './catalog'
 import { EPS, swapSeconds, unitTime, type UnitTime } from './ways'
 import type { PlanInput, PlanTarget } from './planTypes'
@@ -152,9 +152,10 @@ export function buildModel(input: PlanInput, settings: PlanSettings, choices: Pl
     : []
   const RN = raceNames.length
   const modOf = (r: number, f: string) => races?.mods[raceNames[r]]?.[f] ?? 0
-  // The races it can be at the start: its own, and with swaps planned the ones it has unlocked and its own with another class.
+  // The races it can be at the start: its own, and with swaps planned the ones it has unlocked, each with another class too.
+  const raceOf = raceNames.map(raceOfSwap)
   let races0 = 1
-  if (races && settings.raceSwaps) for (let r = 1; r < RN; r++) if (races.unlocked === null || races.unlocked.includes(raceNames[r]) || classSwapOf(raceNames[r])) races0 |= 1 << r
+  if (races && settings.raceSwaps) for (let r = 1; r < RN; r++) if (raceOf[r] === races.own || races.unlocked === null || races.unlocked.includes(raceOf[r])) races0 |= 1 << r
   const swapSec = Math.max(0, settings.swapMin) * 60
 
   // What each activity does to the factions: one that raises an achievement still to do, one that
@@ -297,7 +298,8 @@ export function buildModel(input: PlanInput, settings: PlanSettings, choices: Pl
   const anyOf = goals.map((g) => (g.anyOf ?? []).map((n) => goalNames.indexOf(n)))
   // One of its others that is not still to do is done: then so is this one.
   const anyDone = anyOf.map((xs) => xs.some((h) => h < 0))
-  const goalRace = Int32Array.from(goals, (g) => raceNames.indexOf(g.race))
+  // The races an unlock opens: its own, and it with another class.
+  const goalRaces = Int32Array.from(goals, (g) => raceOf.reduce((m, x, r) => (r > 0 && x === g.race ? m | (1 << r) : m), 0))
   const checkGoals = (st: State, t: number) => {
     for (let g = 0; g < G; g++) {
       if (st.goal[g]) continue
@@ -312,7 +314,7 @@ export function buildModel(input: PlanInput, settings: PlanSettings, choices: Pl
       if (!done) continue
       st.goal[g] = 1
       st.goalAt[g] = t
-      if (goalRace[g] > 0 && settings.raceSwaps) st.races |= 1 << goalRace[g]
+      if (settings.raceSwaps) st.races |= goalRaces[g]
     }
   }
 
@@ -360,7 +362,7 @@ export function buildModel(input: PlanInput, settings: PlanSettings, choices: Pl
   // unlock in the plan), or opened by raising the one faction its NPC wants more of with an activity
   // that is open now.
   let hope = base.races
-  if (settings.raceSwaps) for (let g = 0; g < G; g++) if (goalRace[g] > 0) hope |= 1 << goalRace[g]
+  if (settings.raceSwaps) for (let g = 0; g < G; g++) hope |= goalRaces[g]
   const openTo = (k: number, s: Float64Array, mask: number) => {
     const g = acts[k].gate
     if (!g || acts[k].locked) return true

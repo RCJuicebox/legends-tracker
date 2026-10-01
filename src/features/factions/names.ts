@@ -52,11 +52,14 @@ const CITIES = new Set(CITY_ZONES.map(zoneKey))
 export const isCity = (zone: string) => CITIES.has(zoneKey(zone))
 
 /**
- * A Loadouts swap that keeps the race and puts one more class in the trio ("Wood Elf + Bard"): a con
- * takes the best of the trio's class modifiers, so one class an NPC likes opens what the trio does not.
- * The plan counts it as a race of its own, there from the start.
+ * A Loadouts swap that puts one more class in the trio ("Wood Elf + Bard"), keeping the race or with
+ * another ("Dwarf + Rogue"): a con takes the best of the trio's class modifiers, so one class an NPC
+ * likes opens what the trio does not. The plan counts it as a race of its own, there whenever its race is.
  */
 export const classSwapName = (race: string, cls: string) => `${race} + ${cls}`
 
-/** The class a swap puts in the trio; null for a swap of race. */
+/** The class a swap puts in the trio; null for a swap of race alone. */
 export const classSwapOf = (name: string) => / \+ (.+)$/.exec(name)?.[1] ?? null
+
+/** The race of a swap: "Dwarf + Rogue" → "Dwarf". */
+export const raceOfSwap = (name: string) => name.replace(/ \+ .+$/, '')

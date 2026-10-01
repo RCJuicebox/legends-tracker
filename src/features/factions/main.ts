@@ -27,7 +27,7 @@ import {
 } from './core'
 import { emptySources, joinSources, shareSources, sourceReader, type FactionSourceTallies } from './attribution'
 import { parseQuestPage, type QuestPage } from './questPages'
-import { classSwapName, factionNamer, unmatchedNames } from './names'
+import { classSwapName, classSwapOf, factionNamer, unmatchedNames } from './names'
 import { buildCatalog, guessesFrom, itemsToLookUp, type CatalogInput } from './catalog'
 import { planFor, type FactionPlanData } from './planner'
 import { RACE_UNLOCK_DEFS, raceUnlocks, unlockedRaces, type RaceUnlockDef } from './unlocks'
@@ -265,7 +265,7 @@ function classSwaps(classes: string[], race: string): { name: string; classes: s
 
 /**
  * The same for each other race the character can swap to in Loadouts (`races`, or every playable race
- * when no achievements export says), and its own with another class, still as an Agnostic: which of
+ * when no achievements export says), and each race with another class, still as an Agnostic: which of
  * them opens a quest its own race and trio cannot.
  */
 async function swapConsFor(
@@ -279,10 +279,14 @@ async function swapConsFor(
   const out: Record<string, Record<string, number>> = {}
   if (!own) return out
   for (const race of PLAYABLE_RACES) if (race !== own && (!races || races.includes(race))) out[race] = consOf(await withConsFor(ctx, character, exported, view, 'Agnostic', race))
-  for (const s of classSwaps(Object.keys(ctx.store.characterByKey(character).classLevels ?? {}), own))
-    out[s.name] = consOf(await withConsFor(ctx, character, exported, view, 'Agnostic', own, s.classes))
+  const trio = Object.keys(ctx.store.characterByKey(character).classLevels ?? {})
+  for (const race of [own, ...Object.keys(out)])
+    for (const s of classSwaps(trio, race)) out[s.name] = consOf(await withConsFor(ctx, character, exported, view, 'Agnostic', race, s.classes))
   return out
 }
+
+/** As many races and swaps as the plan can tell apart: it holds the ones a character can be as bits of a number. */
+const RACE_ROOM = 31
 
 /** A character's achievements export's sections; null without one. */
 async function achievementSections(ctx: AppContext, character: string): Promise<AchSection[] | null> {
@@ -312,9 +316,11 @@ function factionIds(view: FactionView): Map<number, string> {
 /**
  * What each race a character could be adds to its cons, as an Agnostic of its classes, by the factions
  * whose id is known: for the plan to check what quests' NPCs want as the standings move. Every race with
- * an unlock (Drakkin has none yet) and its own; and its own with another class in the trio, where that
- * class does better than the trio with a faction some quest's NPC wants (`gates`). Null without a race
- * on its record.
+ * an unlock (Drakkin has none yet) and its own; its own with another class in the trio, where that
+ * class does better than the trio with a faction some quest's NPC wants (`gates`); and another race with
+ * another class, where only the pair does that well (a Dwarf Rogue for Jeet, who wants Amiable with
+ * Miners Guild 628: Dwarf +50 and Rogue +50, where a Dwarf or a Rogue alone cons 50 short), the best
+ * pair for each such faction, as many as the plan has room for. Null without a race on its record.
  */
 async function raceModsFor(
   ctx: AppContext,
@@ -350,7 +356,32 @@ async function raceModsFor(
     const m = modsOf(own, s.classes)
     if (m && [...gates].some((f) => (m[f] ?? 0) > (mine[f] ?? 0))) mods[s.name] = m
   }
-  return { own, mods }
+  const pairs = Object.keys(mods)
+    .filter((r) => r !== own && !classSwapOf(r))
+    .flatMap((race) => classSwaps(trio, race).map((s) => ({ name: s.name, mods: modsOf(race, s.classes) ?? {} })))
+  return { own, mods: { ...mods, ...bestPairs(mods, pairs, gates, RACE_ROOM - Object.keys(mods).length) } }
+}
+
+/**
+ * Of the race and class pairs, the ones that beat every race and swap in `single` with some faction of
+ * `gates`: the best pair for each such faction, those that gain the most first, at most `room` of them.
+ */
+export function bestPairs(
+  single: Record<string, Record<string, number>>,
+  pairs: { name: string; mods: Record<string, number> }[],
+  gates: Iterable<string>,
+  room: number
+): Record<string, Record<string, number>> {
+  const gain = new Map<string, number>()
+  for (const f of gates) {
+    const best = Math.max(...Object.values(single).map((m) => m[f] ?? 0))
+    let top: { name: string; v: number } | null = null
+    for (const p of pairs) if ((p.mods[f] ?? 0) > (top?.v ?? best)) top = { name: p.name, v: p.mods[f] ?? 0 }
+    if (top) gain.set(top.name, Math.max(gain.get(top.name) ?? 0, top.v - best))
+  }
+  const byName = new Map(pairs.map((p) => [p.name, p.mods]))
+  const kept = [...gain].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])).slice(0, Math.max(0, room))
+  return Object.fromEntries(kept.map(([name]) => [name, byName.get(name)!]))
 }
 
 /** The faction achievements, with what the character's achievements export says of them; null when the client lists none. */

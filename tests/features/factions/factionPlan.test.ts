@@ -5,7 +5,7 @@ import { baseZone, emptySources, joinSources, shareSources, sourceReader, usualA
 import { parseFactionPageFull, type FactionRow } from '../../../src/features/factions/core'
 import { parseQuestPage, readHandIn } from '../../../src/features/factions/questPages'
 import type { PlanSettings } from '../../../src/shared/settings'
-import { classSwapName, classSwapOf, factionNamer, unmatchedNames, zoneKey } from '../../../src/features/factions/names'
+import { classSwapName, classSwapOf, factionNamer, raceOfSwap, unmatchedNames, zoneKey } from '../../../src/features/factions/names'
 import { buildCatalog, howHad, itemsToLookUp, type CatalogInput, type PlanActivity } from '../../../src/features/factions/catalog'
 import { DEFAULT_SETTINGS, KEEP_MAXED, NO_CHOICES, plannable, unitTime, waysToRaise } from '../../../src/features/factions/ways'
 import type { PlanInput } from '../../../src/features/factions/planTypes'
@@ -1527,6 +1527,46 @@ describe('what quests want, race unlocks, and steps that open a way', () => {
     const closed = planFactions(input, { ...S, raceSwaps: false })
     expect(closed.unplanned).toEqual([SW])
     expect(closed.unplannedWhy).toEqual({ [SW]: 'gated' })
+  })
+
+  it('swaps race and class together where only the pair opens the quest, once the race is there', () => {
+    const MG = 'Miners Guild 628'
+    // Jeet wants Amiable: a Wood Elf cons -60, a Dwarf 40, a Wood Elf with a Rogue in the trio 0, a Dwarf with one 100.
+    const rats: PlanActivity = { ...dagger, id: 'rats', title: 'Rat Patrol', npc: 'Jeet', hits: { [MG]: 5 }, gate: [{ faction: MG, band: 'Amiable', min: 100 }] }
+    const mods = {
+      'Wood Elf': { [MG]: -60 },
+      Dwarf: { [MG]: 40 },
+      [classSwapName('Wood Elf', 'Rogue')]: { [MG]: 0 },
+      [classSwapName('Dwarf', 'Rogue')]: { [MG]: 100 }
+    }
+    const input: PlanInput = { targets: [{ faction: MG, achievement: MG, standing: 0 }], maxed: [], activities: [rats], races: { own: 'Wood Elf', unlocked: ['Dwarf'], mods } }
+    const plan = planFactions(input, S)
+    expect(plan.unplanned).toEqual([])
+    expect(plan.steps[0]).toMatchObject({ race: 'Dwarf + Rogue', swap: S.swapMin * 60 })
+    expect(raceOfSwap(plan.steps[0].race!)).toBe('Dwarf')
+    expect(raceOfSwap('Dwarf')).toBe('Dwarf')
+    // Not with Dwarf still locked.
+    expect(planFactions({ ...input, races: { ...input.races!, unlocked: [] } }, S).unplanned).toEqual([MG])
+  })
+
+  it('swaps race and class together once a goal on the way unlocks the race', () => {
+    const [MG, SD] = ['Miners Guild 628', 'Storm Guard']
+    const rats: PlanActivity = { ...dagger, id: 'rats', title: 'Rat Patrol', npc: 'Jeet', hits: { [MG]: 5 }, gate: [{ faction: MG, band: 'Amiable', min: 100 }] }
+    const input: PlanInput = {
+      targets: [{ faction: MG, achievement: MG, standing: 0 }],
+      standings: { [SD]: 0 },
+      maxed: [],
+      activities: [rats, act('guards', { [SD]: 20 }, 3600, { zone: 'Kaladim' })],
+      unlocks: [{ achievement: 'Race Unlock - Dwarf', race: 'Dwarf', factions: [SD] }],
+      races: { own: 'Wood Elf', unlocked: [], mods: { 'Wood Elf': { [MG]: -60 }, Dwarf: { [MG]: 40 }, [classSwapName('Dwarf', 'Rogue')]: { [MG]: 100 } } }
+    }
+    const plan = planFactions(input, S)
+    expect(plan.steps.map((st) => [st.activity.id, st.race ?? null])).toEqual([
+      ['guards', null],
+      ['rats', 'Dwarf + Rogue']
+    ])
+    expect(plan.steps[0].unlocks).toEqual(['Race Unlock - Dwarf'])
+    expect(plan.unplanned).toEqual([])
   })
 
   it('counts a race unlock: its factions are to do too, and once it is done the plan may swap to that race', () => {

@@ -12,7 +12,7 @@ import { runPlan } from './planRunner'
 import { deityName } from '../../shared/game/deities'
 import { playableRace } from '../../shared/game/races'
 import type { PlanChoices, PlanGoal, PlanSettings } from '../../shared/settings'
-import { classSwapOf } from './names'
+import { classSwapOf, raceOfSwap } from './names'
 import { DEFAULT_SETTINGS, NO_CHOICES } from './ways'
 import type { FactionPlan, PlanInput, PlanShape, PlanStep, Unplanned } from './planTypes'
 import { planFor, type FactionPlanData, type PlanFor } from './planner'
@@ -256,7 +256,7 @@ export function PlanTab({ character, view }: { character: string; view: FactionV
   }, [plan, data])
   /** Under a step done as another race: the race, and why the character's own will not do there. */
   const swapHint = (st: PlanStep): ReactNode =>
-    st.race ? <SwapHint step={st} own={ownRace} unlocksKnown={!!data && data.races !== null} unlockedAt={unlockedAt.get(st.race)} /> : null
+    st.race ? <SwapHint step={st} own={ownRace} unlocksKnown={!!data && data.races !== null} unlockedAt={unlockedAt.get(raceOfSwap(st.race))} /> : null
   const nowStep = plan && tracked?.current && plan.steps[tracked.current.index]?.activity.id === tracked.current.id ? plan.steps[tracked.current.index] : null
 
   if (!data)
@@ -766,19 +766,31 @@ function savedBySwaps(plan: FactionPlan, without: { seconds: number; unplanned: 
  * when the plan does.
  */
 function SwapHint({ step, own, unlocksKnown, unlockedAt }: { step: PlanStep; own: string; unlocksKnown: boolean; unlockedAt?: number }) {
-  const race = step.race ?? ''
-  const cls = classSwapOf(race)
-  const as = cls ? 'with your classes' : `as ${withArticle(own || 'your race')}`
+  const cls = classSwapOf(step.race ?? '')
+  // A class swap keeps the race, or comes with a race swap ("Dwarf + Rogue").
+  const race = raceOfSwap(step.race ?? '')
+  const both = !!cls && race !== own
+  const as = cls && !both ? 'with your classes' : `as ${withArticle(own || 'your race')}${both ? ' with your classes' : ''}`
   const why = step.why
     ? `${as} you would con ${standingWord(step.why.con)} (${plain(step.why.con)}) with ${step.why.faction} by then, and ${step.activity.npc ?? 'its NPC'} wants ${step.why.band}`
     : step.activity.blocked
       ? `${as}, it ${step.activity.blocked}`
       : ''
-  const unlocked = cls ? '' : unlockedAt ? `; the plan unlocks ${race} at step ${unlockedAt}` : unlocksKnown ? '' : '; if you have it unlocked'
+  const unlocked = cls && !both ? '' : unlockedAt ? `; the plan unlocks ${race} at step ${unlockedAt}` : unlocksKnown ? '' : '; if you have it unlocked'
   return (
     <div className="small fp-swap">
-      <span className="chip warn">{cls ? 'class swap' : 'race swap'}</span>{' '}
-      {cls ? (
+      <span className="chip warn">{both ? 'race and class swap' : cls ? 'class swap' : 'race swap'}</span>{' '}
+      {both ? (
+        step.swap > 0 ? (
+          <>
+            Swap to <b>{race}</b> and put <b>{cls}</b> in your classes in Loadouts for this step, then back (≈ {duration(step.swap)} in all{unlocked})
+          </>
+        ) : (
+          <>
+            Still {withArticle(race)} with <b>{cls}</b> in your classes, as for the step before{unlocked}
+          </>
+        )
+      ) : cls ? (
         step.swap > 0 ? (
           <>
             Put <b>{cls}</b> in your classes in Loadouts for this step, in place of one {step.activity.npc ?? 'its NPC'} likes no better, then back (≈ {duration(step.swap)} in all)

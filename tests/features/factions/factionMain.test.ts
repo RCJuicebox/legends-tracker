@@ -353,6 +353,22 @@ describe('the Factions page', () => {
     expect(plan.noAchievementList).toBeUndefined()
   })
 
+  it('of the race and class pairs, keeps the best for each faction a quest wants that no race or swap alone does as well', () => {
+    const [MG, TS, SW] = ['Miners Guild 628', "Tunare's Scouts", 'Song Weavers']
+    const single = { 'Wood Elf': { [MG]: -60, [TS]: 100 }, Dwarf: { [MG]: 40 }, 'Wood Elf + Rogue': { [MG]: 0 } }
+    const pairs = [
+      { name: 'Dwarf + Rogue', mods: { [MG]: 100 } },
+      { name: 'Dwarf + Warrior', mods: { [MG]: 90, [SW]: -10 } },
+      { name: 'Human + Bard', mods: { [SW]: 50 } },
+      { name: 'Human + Rogue', mods: { [TS]: 100 } }
+    ]
+    // Dwarf + Warrior is beaten for Miners Guild 628; Human + Rogue only ties Wood Elf with Tunare's Scouts.
+    expect(m.bestPairs(single, pairs, [MG, TS, SW], 5)).toEqual({ 'Dwarf + Rogue': { [MG]: 100 }, 'Human + Bard': { [SW]: 50 } })
+    // With room for one, the bigger gain: 60 over a Dwarf, against 50 over nothing.
+    expect(Object.keys(m.bestPairs(single, pairs, [MG, TS, SW], 1))).toEqual(['Dwarf + Rogue'])
+    expect(m.bestPairs(single, pairs, [MG], 0)).toEqual({})
+  })
+
   it("what moved a faction, in both characters' logs", async () => {
     const { movers } = await call('factions:moved', 'Tester_neriak', 'Emerald Warriors')
     expect(movers).toEqual([expect.objectContaining({ kind: 'kill', zone: 'The Greater Faydark', name: 'An orc pawn', others: ['Tester_qeynos'], own: true })])

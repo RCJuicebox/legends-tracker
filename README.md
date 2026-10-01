@@ -589,7 +589,9 @@ A swap can be of a class, too: a con takes the best of your three classes' modif
 class the NPC likes would open the quest, the plan may put it in your classes in place of one the NPC
 likes no better ("Put Bard in your classes in Loadouts for this step": Sylia Windlehands wants
 Amiable with Song Weavers, which a Wood Elf Monk, Shadow Knight and Shaman con Indifferent, and a Bard
-adds 50).
+adds 50). And it may swap both at once, a race you have unlocked with a class, where only the pair
+opens the quest ("Swap to Dwarf and put Rogue in your classes in Loadouts for this step": Jeet wants
+Amiable with Miners Guild 628, and a Dwarf and a Rogue add 50 each).
 
 **Race unlocks.** Each race unlock (Loadouts' "Race Unlock - Barbarian" and the rest) wants three of
 the race's factions maxed, as the game's own achievement files list them; the achievements export
