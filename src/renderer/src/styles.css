@@ -308,7 +308,9 @@ textarea {
   text-transform: uppercase;
   font-stretch: condensed;
 }
-.page-head p {
+/* .lead: a description holding an Info, which a <p> cannot. */
+.page-head p,
+.page-head .lead {
   margin: 4px 0 0;
   color: var(--text-2);
   max-width: 760px;

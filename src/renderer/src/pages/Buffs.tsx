@@ -100,10 +100,10 @@ export function Buffs() {
       <div className="page-head">
         <div>
           <h1>Buffs</h1>
-          <p>
+          <div className="lead">
             What your group can buff you with, what is on you now, and when to ask. Pick the buffs you want below; the tracker shows whom to ask when one is missing, and warns
             before one fades. <Info label="How it works" text={HOW} />
-          </p>
+          </div>
         </div>
         <label className="row" title="Timers for buffs others cast on you, and whom to ask for a missing one, on the overlays. Off, this page still shows both.">
           <Switch on={groupBuffs} onChange={(v) => patchSettings((x) => ({ ...x, tracking: { ...x.tracking, groupBuffs: v } }))} label="Buffs from my group on the overlays" />

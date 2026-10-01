@@ -466,7 +466,7 @@ export function PlanTab({ character, view }: { character: string; view: FactionV
             </button>
           </div>
         </div>
-        <p className="faint small mb-0">
+        <div className="faint small mt-10">
           For the achievements {who(character)} has still to do, from that character&apos;s log ({data.log.handIns.toLocaleString()} hand-ins and {data.log.kills.toLocaleString()}{' '}
           kills that moved a faction)
           {data.shared.characters.length > 0 &&
@@ -477,7 +477,7 @@ export function PlanTab({ character, view }: { character: string; view: FactionV
           {data.alla.wanted > 0 &&
             ` and Allakhazam (${data.alla.read} of ${data.alla.wanted} faction pages${data.alla.read < data.alla.wanted ? ', the rest coming a page every twenty seconds as the site asks' : ''})`}
           . <Info label="How the plan is made" text={HOW} />
-        </p>
+        </div>
         <Assumptions settings={settings} stored={stored} logPace={logPace} onChange={setSettings} />
         <Unmatched unmatched={data.wiki.unmatched} character={character} />
       </div>

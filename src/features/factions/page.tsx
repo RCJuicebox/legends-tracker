@@ -188,7 +188,7 @@ export function Factions() {
       <div className="page-head">
         <div>
           <h1>Factions</h1>
-          <p>
+          <div className="lead">
             {view?.export ? (
               <>
                 Where {who(character) || 'your character'} stands with each faction, from {view.export.file} (written by the game {ago(view.export.modified, now)}), plus the
@@ -201,7 +201,7 @@ export function Factions() {
               </>
             )}{' '}
             <Info label="How it is counted" text={HOW} />
-          </p>
+          </div>
         </div>
         <div className="actions">
           <CharacterPicker character={character} available={chars.available} onPick={chars.setCharacter} />

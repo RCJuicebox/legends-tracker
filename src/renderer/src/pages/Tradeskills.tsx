@@ -142,7 +142,7 @@ export function Tradeskills() {
       <div className="page-head">
         <div>
           <h1>Tradeskills</h1>
-          <p>
+          <div className="lead">
             Recipes you make, what goes in, what you have, where to buy the rest and what a batch costs. Counts are from your last <GameCommand cmd="/outputfile inventory" />
             {inv.view?.modified ? (
               <>
@@ -163,7 +163,7 @@ export function Tradeskills() {
                 </>
               }
             />
-          </p>
+          </div>
         </div>
         <div className="actions">
           <CharacterPicker character={character} available={exp.available} onPick={exp.setCharacter} />

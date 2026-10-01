@@ -4,7 +4,7 @@ import { defineConfig } from 'vitest/config'
 
 export default defineConfig({
   test: {
-    include: ['tests/**/*.test.ts'],
+    include: ['tests/**/*.test.{ts,tsx}'],
     environment: 'node',
     // Transformed modules are kept between runs (in node_modules/.vitest-cache): a cold run is quicker.
     fsModuleCache: true,

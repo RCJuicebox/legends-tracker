@@ -79,10 +79,10 @@ export function Respawns() {
       <div className="page-head">
         <div>
           <h1>Respawns</h1>
-          <p>
+          <div className="lead">
             How long each mob you kill takes to come back, measured from the log. Once you know, add a timer: it starts at every kill of that mob and counts down on an overlay.{' '}
             <Info label="How it is measured" text={HOW} />
-          </p>
+          </div>
         </div>
       </div>
 
