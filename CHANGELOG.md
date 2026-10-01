@@ -2,7 +2,7 @@
 
 What changed in each version. The release workflow publishes a version's section as its release notes, and installed copies show them when an update arrives.
 
-## Unreleased
+## 2.5.1 (2026-09-30)
 
 - **Fix: a race and class swap left out on Most factions positive.** The plan has room for 31 races and swaps, and the wider catalog that goal reads brought in pairs that gain more with factions no quest is near. The Dwarf Rogue that opens Rat Patrol at a Miners Guild 628 standing of 0 was crowded out, and the plan sent you to kill in North Kaladim to raise it first, though you were already Amiable as one (found in play). Pairs that open a quest at your standings now are kept first. A change in the pairs also makes the page plan afresh, rather than keep an earlier plan's steps.
 
