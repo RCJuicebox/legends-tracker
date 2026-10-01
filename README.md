@@ -58,8 +58,9 @@ of a packaged copy (`ci.yml`).
 
 ## Running from source
 
-Double-click **`Start Legends Tracker.cmd`** (after `npm install` and `npm run build`). A running copy
-keeps the code it started with, so after a rebuild use **`Restart Legends Tracker.cmd`**: it asks the
+Double-click **`scripts\Start Legends Tracker.cmd`** (after `npm install` and `npm run build`); a
+shortcut to it works from anywhere. A running copy keeps the code it started with, so after a rebuild
+use **`scripts\Restart Legends Tracker.cmd`**: it asks the
 running copy to quit (`electron . --quit`, which the copy answers by writing its settings and closing
 its overlays), waits for it to go, and starts a fresh one.
 
