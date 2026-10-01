@@ -320,7 +320,8 @@ function factionIds(view: FactionView): Map<number, string> {
  * class does better than the trio with a faction some quest's NPC wants (`gates`); and another race with
  * another class, where only the pair does that well (a Dwarf Rogue for Jeet, who wants Amiable with
  * Miners Guild 628: Dwarf +50 and Rogue +50, where a Dwarf or a Rogue alone cons 50 short), the best
- * pair for each such faction, as many as the plan has room for. Null without a race on its record.
+ * pair for each such faction, as many as the plan has room for: first those that open a quest at the
+ * standings now (`now`). Null without a race on its record.
  */
 async function raceModsFor(
   ctx: AppContext,
@@ -328,7 +329,8 @@ async function raceModsFor(
   exported: FactionExport | null,
   view: FactionView,
   defs: RaceUnlockDef[],
-  gates: Set<string>
+  gates: Set<string>,
+  now?: PairsNow
 ): Promise<FactionPlanData['raceMods']> {
   const rec = ctx.store.characterByKey(character)
   const own = playableRace(rec.race ?? '')
@@ -359,28 +361,47 @@ async function raceModsFor(
   const pairs = Object.keys(mods)
     .filter((r) => r !== own && !classSwapOf(r))
     .flatMap((race) => classSwaps(trio, race).map((s) => ({ name: s.name, mods: modsOf(race, s.classes) ?? {} })))
-  return { own, mods: { ...mods, ...bestPairs(mods, pairs, gates, RACE_ROOM - Object.keys(mods).length) } }
+  return { own, mods: { ...mods, ...bestPairs(mods, pairs, gates, RACE_ROOM - Object.keys(mods).length, now) } }
+}
+
+/** What quests' NPCs want (the least con each takes) and the standings now: for the pairs that open a quest today. */
+export interface PairsNow {
+  needs: { faction: string; min?: number }[]
+  standings: Record<string, number>
 }
 
 /**
  * Of the race and class pairs, the ones that beat every race and swap in `single` with some faction of
- * `gates`: the best pair for each such faction, those that gain the most first, at most `room` of them.
+ * `gates`: the best pair for each such faction, at most `room` of them. Those that open the most quests
+ * at the standings `now` that no race or swap alone opens come first (a Dwarf Rogue at 0 with Miners
+ * Guild 628, for Jeet), then those that gain the most.
  */
 export function bestPairs(
   single: Record<string, Record<string, number>>,
   pairs: { name: string; mods: Record<string, number> }[],
   gates: Iterable<string>,
-  room: number
+  room: number,
+  now?: PairsNow
 ): Record<string, Record<string, number>> {
   const gain = new Map<string, number>()
+  const opens = new Map<string, number>()
+  const seen = new Set<string>()
   for (const f of gates) {
     const best = Math.max(...Object.values(single).map((m) => m[f] ?? 0))
     let top: { name: string; v: number } | null = null
     for (const p of pairs) if ((p.mods[f] ?? 0) > (top?.v ?? best)) top = { name: p.name, v: p.mods[f] ?? 0 }
-    if (top) gain.set(top.name, Math.max(gain.get(top.name) ?? 0, top.v - best))
+    if (!top) continue
+    gain.set(top.name, Math.max(gain.get(top.name) ?? 0, top.v - best))
+    const raw = now?.standings[f] ?? 0
+    for (const n of now?.needs ?? []) {
+      const key = `${n.faction}|${n.min}`
+      if (n.faction !== f || n.min === undefined || seen.has(key)) continue
+      seen.add(key)
+      if (raw + best < n.min && raw + top.v >= n.min) opens.set(top.name, (opens.get(top.name) ?? 0) + 1)
+    }
   }
   const byName = new Map(pairs.map((p) => [p.name, p.mods]))
-  const kept = [...gain].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])).slice(0, Math.max(0, room))
+  const kept = [...gain].sort((a, b) => (opens.get(b[0]) ?? 0) - (opens.get(a[0]) ?? 0) || b[1] - a[1] || a[0].localeCompare(b[0])).slice(0, Math.max(0, room))
   return Object.fromEntries(kept.map(([name]) => [name, byName.get(name)!]))
 }
 
@@ -583,7 +604,10 @@ async function planData(ctx: AppContext, character: string, refresh: boolean, wi
     agnostic: agnosticOf(sections),
     races,
     unlocks,
-    raceMods: await raceModsFor(ctx, character, exported, view, defs, new Set(catalog.activities.flatMap((a) => a.gate?.map((n) => n.faction) ?? []))),
+    raceMods: await raceModsFor(ctx, character, exported, view, defs, new Set(catalog.activities.flatMap((a) => a.gate?.map((n) => n.faction) ?? [])), {
+      needs: catalog.activities.flatMap((a) => a.gate ?? []),
+      standings
+    }),
     ...(achievements ? {} : { noAchievementList: true })
   }
 }

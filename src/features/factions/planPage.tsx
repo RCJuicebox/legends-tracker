@@ -162,9 +162,10 @@ export function PlanTab({ character, view }: { character: string; view: FactionV
   const extras = useMemo(() => planExtras(data), [data])
   // A catalog with other ways in it (the wider one Most factions positive reads, or a hand-in newly seen three times) plans afresh
   // too, and so does a change of con: a race or class change, a race unlocked. The plan sees a quest open as a standing reaches
-  // what its NPC wants; without the races' modifiers, the quests open now are what it goes by.
+  // what its NPC wants; without the races' modifiers, the quests open now are what it goes by. Every race and pair counts: a
+  // pair newly in the catalog (one that opens a quest now) can make an earlier step's kills to open that quest needless.
   const cons = data?.raceMods
-    ? `${data.raceMods.own}|${(data.races ?? ['every race']).join(',')}|${JSON.stringify(data.raceMods.mods[data.raceMods.own] ?? {})}`
+    ? `${data.raceMods.own}|${(data.races ?? ['every race']).join(',')}|${JSON.stringify(data.raceMods.mods)}`
     : data
       ? data.catalog.activities.flatMap((a) => (a.blocked ? [a.id] : [])).join('|')
       : ''

@@ -2,6 +2,10 @@
 
 What changed in each version. The release workflow publishes a version's section as its release notes, and installed copies show them when an update arrives.
 
+## Unreleased
+
+- **Fix: a race and class swap left out on Most factions positive.** The plan has room for 31 races and swaps, and the wider catalog that goal reads brought in pairs that gain more with factions no quest is near. The Dwarf Rogue that opens Rat Patrol at a Miners Guild 628 standing of 0 was crowded out, and the plan sent you to kill in North Kaladim to raise it first, though you were already Amiable as one (found in play). Pairs that open a quest at your standings now are kept first. A change in the pairs also makes the page plan afresh, rather than keep an earlier plan's steps.
+
 ## 2.5.0 (2026-09-30)
 
 - **Race and class swaps together.** Where neither another race nor another class opens a quest but the two together do, the plan swaps both for the step: an Agnostic Wood Elf Monk cons Jeet's Miners Guild 628 at 40 as a Dwarf, short of the Amiable he wants, and at 100 as a Dwarf with Rogue in the trio (Dwarf +50, Rogue +50), so Rat Patrol is open from the start rather than after a step raising Miners Guild 628 first (found in play). The step says **race and class swap**: "Swap to Dwarf and put Rogue in your classes in Loadouts for this step, then back". A pair counts only once its race is unlocked, at the start or by a step of the plan.

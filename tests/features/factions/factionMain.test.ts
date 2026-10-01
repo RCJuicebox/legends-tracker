@@ -369,6 +369,28 @@ describe('the Factions page', () => {
     expect(m.bestPairs(single, pairs, [MG], 0)).toEqual({})
   })
 
+  it('keeps first the pairs that open a quest at the standings now, ahead of bigger gains', () => {
+    const [MG, TS] = ['Miners Guild 628', "Tunare's Scouts"]
+    const single = { 'Wood Elf': { [MG]: -60, [TS]: -200 }, Dwarf: { [MG]: 40 } }
+    const pairs = [
+      { name: 'Dwarf + Rogue', mods: { [MG]: 100 } },
+      { name: 'Halfling + Druid', mods: { [TS]: 300 } }
+    ]
+    // Halfling + Druid gains 300 with Tunare's Scouts but opens nothing yet (Warmly wanted); Dwarf + Rogue opens Rat Patrol at 0.
+    const now = {
+      needs: [
+        { faction: MG, min: 100 },
+        { faction: TS, min: 500 },
+        { faction: MG, min: 100 }
+      ],
+      standings: { [TS]: 0 }
+    }
+    expect(Object.keys(m.bestPairs(single, pairs, [MG, TS], 1))).toEqual(['Halfling + Druid'])
+    expect(Object.keys(m.bestPairs(single, pairs, [MG, TS], 1, now))).toEqual(['Dwarf + Rogue'])
+    // Once the standing opens the quest as a Dwarf alone, the pair opens nothing more, and the gain decides.
+    expect(Object.keys(m.bestPairs(single, pairs, [MG, TS], 1, { ...now, standings: { [MG]: 60 } }))).toEqual(['Halfling + Druid'])
+  })
+
   it("what moved a faction, in both characters' logs", async () => {
     const { movers } = await call('factions:moved', 'Tester_neriak', 'Emerald Warriors')
     expect(movers).toEqual([expect.objectContaining({ kind: 'kill', zone: 'The Greater Faydark', name: 'An orc pawn', others: ['Tester_qeynos'], own: true })])
