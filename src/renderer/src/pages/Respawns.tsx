@@ -5,7 +5,7 @@ import { useInvoke } from '../hooks'
 import { useRemembered } from '../remember'
 import { useNow } from '../components/TimerBars'
 import { act } from '../toast'
-import { ConfirmButton, Disclosure, Field, FilterBox, Info, NumberInput, Pending, SortTh, Sparkline, Switch, type Sort } from '../components/ui'
+import { ConfirmButton, Disclosure, Field, FilterBox, Info, NumberInput, Pending, SortTh, Sparkline, Switch, ToggleChip, type Sort } from '../components/ui'
 import { parseClock, SHARED_SEC, type RespawnRow, type RespawnTimerSpec, type RespawnView } from '../../../core/respawns'
 
 // How long mobs take to come back, measured from the log, and a timer on an overlay for any of them.
@@ -22,7 +22,8 @@ const HOW =
   'A kill starts a watch on that mob. The first line that names it again ends the watch: it hits or is hit, casts, ' +
   'speaks, is considered, or is killed again. A mob is only seen once it is back, so each gap is at least its ' +
   'respawn time and the shortest gap is the closest. Leaving the zone ends every watch. A gap under ' +
-  `${SHARED_SEC} seconds means two mobs share the name; those names are hidden unless you show them.`
+  `${SHARED_SEC} seconds means two mobs share the name; those names are hidden unless you show them. ` +
+  'A spawn point that pops one of several mobs, such as a placeholder and its named, can be made one row: a death of any of them starts its watch and its timer, and any of them seen ends the watch.'
 
 type SortKey = 'name' | 'kills' | 'respawn' | 'gap' | 'last'
 
@@ -62,11 +63,11 @@ export function Respawns() {
     const f = filter.trim().toLowerCase()
     return (view?.rows ?? [])
       .filter((r) => !hereOnly || !zone || !r.zone || r.zone === zone || !!r.timer)
-      .filter((r) => showShared || !r.shared || !!r.timer)
-      .filter((r) => !f || r.name.toLowerCase().includes(f) || r.zone.toLowerCase().includes(f))
+      .filter((r) => showShared || !r.shared || !!r.timer || !!r.names)
+      .filter((r) => !f || [r.name, r.zone, ...(r.names ?? [])].some((x) => x.toLowerCase().includes(f)))
       .sort(bySort(sort))
   }, [view, filter, hereOnly, showShared, zone, sort])
-  const hiddenShared = (view?.rows ?? []).filter((r) => r.shared && !r.timer).length
+  const hiddenShared = (view?.rows ?? []).filter((r) => r.shared && !r.timer && !r.names).length
   // What the zone switch hides: kills elsewhere, which after zoning is every one on record.
   const elsewhere = hereOnly && zone ? (view?.rows ?? []).filter((r) => r.zone && r.zone !== zone && !r.timer).length : 0
 
@@ -194,6 +195,7 @@ export function Respawns() {
                             initialSeconds={r.timer?.seconds ?? r.estimate ?? r.gaps[r.gaps.length - 1] ?? null}
                             measured={r.estimate ?? r.gaps[r.gaps.length - 1] ?? null}
                             timer={r.timer}
+                            names={r.names}
                             overlays={state.settings.overlays}
                             onDone={(v) => {
                               saved(v)
@@ -201,6 +203,17 @@ export function Respawns() {
                             }}
                             onCancel={() => setOpen(null)}
                           />
+                          {r.zone && (
+                            <SpawnEditor
+                              key={r.key}
+                              r={r}
+                              zoneMobs={(view?.rows ?? []).filter((x) => x.zone === r.zone && !x.names && x.key !== r.key).map((x) => x.name)}
+                              onDone={(v) => {
+                                saved(v)
+                                if (v) setOpen(null)
+                              }}
+                            />
+                          )}
                         </td>
                       </tr>
                     )}
@@ -242,6 +255,12 @@ function Row({
         <Disclosure open={open} onToggle={toggle} stop>
           {r.name}
         </Disclosure>
+        {r.names && (
+          <span className="chip" title="One spawn point that pops any of these mobs">
+            spawn
+          </span>
+        )}
+        {r.names && <div className="faint small">{r.names.join(' · ')}</div>}
         {r.zone && r.zone !== zone && <div className="faint small">{r.zone}</div>}
         {r.shared && (
           <span className="chip warn" title={`A gap under ${SHARED_SEC} seconds: more than one mob has this name, so its gaps may be any of them.`}>
@@ -277,7 +296,7 @@ function Row({
             className="btn small ghost"
             question="Forget it?"
             label={`Forget ${r.name}`}
-            title="Forget this mob's kills and gaps (a timer stays)"
+            title={r.names ? "Forget the spawn's kills and gaps (its mobs and timer stay)" : "Forget this mob's kills and gaps (a timer stays)"}
             onConfirm={() => void forget(r.key).then(onSaved)}
           >
             ×
@@ -295,6 +314,7 @@ function TimerEditor({
   initialSeconds,
   measured,
   timer,
+  names,
   overlays,
   onDone,
   onCancel
@@ -304,6 +324,8 @@ function TimerEditor({
   /** The shortest gap seen (or the only one, when two mobs share the name). */
   measured: number | null
   timer: RespawnRow['timer']
+  /** A spawn point's mobs. */
+  names?: string[]
   overlays: { id: string; name: string; kind: string }[]
   onDone: (v: RespawnView | undefined) => void
   onCancel: () => void
@@ -376,7 +398,115 @@ function TimerEditor({
         <button className="btn ghost" onClick={onCancel}>
           Cancel
         </button>
-        <span className="faint small">It starts at each kill of {name.trim() || 'the mob'}, anywhere, and can be edited further on the Triggers page (Respawns folder).</span>
+        <span className="faint small">
+          It starts at each kill of {names ? `any of ${names.join(', ')}` : name.trim() || 'the mob'}, anywhere, and can be edited further on the Triggers page (Respawns folder).
+        </span>
+      </div>
+    </div>
+  )
+}
+
+/** "Boog Mudtoe's spawn": named after the first of its mobs without "a", "an" or "the", else the first. */
+function spawnName(names: string[]): string {
+  const named = names.find((n) => !/^(?:a|an|the) /i.test(n)) ?? names[0] ?? ''
+  return named ? `${named}'s spawn` : ''
+}
+
+/** Which mobs pop at one spawn point: picked from the zone's mobs on record, or typed. */
+function SpawnEditor({ r, zoneMobs, onDone }: { r: RespawnRow; zoneMobs: string[]; onDone: (v: RespawnView | undefined) => void }) {
+  const isSpawn = !!r.names
+  const [editing, setEditing] = useState(isSpawn)
+  const [names, setNames] = useState<string[]>(r.names ?? [r.name])
+  const [label, setLabel] = useState<string | null>(null)
+  const [typed, setTyped] = useState('')
+  const [error, setError] = useState('')
+  const has = (n: string) => names.some((x) => x.toLowerCase() === n.toLowerCase())
+  const choices = [...new Map([...names, ...zoneMobs].map((n) => [n.toLowerCase(), n])).values()]
+  const shownLabel = isSpawn ? r.name : (label ?? spawnName(names))
+
+  if (!editing) {
+    return (
+      <div className="row" style={{ padding: '0 4px 8px' }}>
+        <button className="btn small" onClick={() => setEditing(true)}>
+          Same spawn as other mobs…
+        </button>
+        <span className="faint small">For a placeholder and the named it pops: one row and one timer for the spot.</span>
+      </div>
+    )
+  }
+
+  const toggle = (n: string, on: boolean) => setNames(on ? [...names, n] : names.filter((x) => x.toLowerCase() !== n.toLowerCase()))
+  const add = () => {
+    const n = typed.trim()
+    if (n && !has(n)) setNames([...names, n])
+    setTyped('')
+  }
+  const save = async () => {
+    setError('')
+    if (names.length < 2) return setError('Pick at least two mobs that pop there.')
+    if (!shownLabel.trim()) return setError('Give the spawn point a name.')
+    try {
+      onDone(await api.invoke('respawns:link', { zone: r.zone, name: shownLabel.trim(), names }))
+    } catch (e) {
+      setError(errorMessage(e))
+    }
+  }
+  const unlink = async () => {
+    try {
+      onDone(await api.invoke('respawns:unlink', r.key))
+    } catch (e) {
+      setError(errorMessage(e))
+    }
+  }
+
+  return (
+    <div className="stack gap-12" style={{ padding: '8px 4px', borderTop: '1px solid var(--line)' }}>
+      <div className="row" style={{ alignItems: 'flex-start', flexWrap: 'wrap' }}>
+        {!isSpawn && (
+          <Field label="Spawn point" hint="What the row, the timer and the voice call it">
+            <input value={shownLabel} onChange={(e) => setLabel(e.target.value)} style={{ width: 240 }} />
+          </Field>
+        )}
+        <Field label="Mobs that pop there" hint={`Killed in ${r.zone}, or add one by name as the log prints it`}>
+          <div className="row tight" style={{ flexWrap: 'wrap' }}>
+            {choices.map((n) => (
+              <ToggleChip key={n} on={has(n)} onChange={(on) => toggle(n, on)}>
+                {n}
+              </ToggleChip>
+            ))}
+            <input
+              value={typed}
+              onChange={(e) => setTyped(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && add()}
+              placeholder="a mob's name"
+              aria-label="Add a mob by name"
+              style={{ width: 180 }}
+            />
+            <button className="btn small" onClick={add} disabled={!typed.trim()}>
+              Add
+            </button>
+          </div>
+        </Field>
+      </div>
+      {error && <div className="notice bad">{error}</div>}
+      <div className="row">
+        <button className="btn primary" onClick={() => void save()}>
+          {isSpawn ? 'Save mobs' : 'Make one spawn'}
+        </button>
+        {isSpawn ? (
+          <ConfirmButton className="btn" question="Split it up? Each mob starts afresh, and the spawn's timer goes too." onConfirm={() => void unlink()}>
+            Split up
+          </ConfirmButton>
+        ) : (
+          <button className="btn ghost" onClick={() => setEditing(false)}>
+            Cancel
+          </button>
+        )}
+        <span className="faint small">
+          {isSpawn
+            ? 'A death of any of them starts the watch and the timer.'
+            : 'Their kills go into the spawn. Their gaps do not: each measured one name, not the spot, so the spawn measures afresh.'}
+        </span>
       </div>
     </div>
   )

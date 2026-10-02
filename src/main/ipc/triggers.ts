@@ -3,8 +3,8 @@ import { basename } from 'node:path'
 import { handle } from './handle'
 import { log } from '../log'
 import { testTrigger } from '../../core/triggers'
-import { respawnTrigger, respawnTriggerId } from '../../core/respawns'
-import { sanitizeRespawnTimer, sanitizeTrigger, sanitizeTriggers } from '../../core/validate'
+import { respawnTimerSpec, respawnTrigger, respawnTriggerId, type RespawnTimerSpec } from '../../core/respawns'
+import { sanitizeRespawnTimer, sanitizeSpawnLink, sanitizeTrigger, sanitizeTriggers } from '../../core/validate'
 import type { AppContext } from '../context'
 
 // Triggers, and the respawn timers that are triggers under the hood.
@@ -58,11 +58,38 @@ export function registerTriggerIpc(ctx: AppContext): void {
   handle('respawns:setTimer', (input) => {
     const spec = sanitizeRespawnTimer(input)
     if (!spec) throw new Error('The timer was not saved: it needs a name and a length.')
+    // A spawn point's timer starts at a death of any of its mobs.
+    const names = engine.respawns.namesOf(spec.name)
+    saveTimer(names ? { ...spec, names } : spec)
+    return engine.combat.respawnView()
+  })
+
+  function saveTimer(spec: RespawnTimerSpec): void {
     const list = store.triggers.get()
     const id = respawnTriggerId(spec.name)
     const existing = list.find((t) => t.id === id)
     const trigger = respawnTrigger(spec, existing)
     ctx.saveTriggers(existing ? list.map((t) => (t.id === id ? trigger : t)) : [...list, trigger])
+  }
+
+  // Spawn points live with the respawn records; their timers are triggers like any other, so they are
+  // made to match here: a link's names go into its timer, and an unlink takes the timer with it.
+  handle('respawns:link', (input) => {
+    const link = sanitizeSpawnLink(input)
+    if (!link) throw new Error('A spawn point needs a zone, a name and at least two mobs.')
+    engine.respawns.link(link)
+    const timer = store.triggers.get().find((t) => t.id === respawnTriggerId(link.name))
+    const spec = timer && respawnTimerSpec(timer)
+    if (spec) saveTimer({ ...spec, name: link.name, names: engine.respawns.namesOf(link.name) ?? link.names })
+    return engine.combat.respawnView()
+  })
+  handle('respawns:unlink', (key) => {
+    if (typeof key !== 'string') throw new Error('Not a spawn point.')
+    const name = engine.respawns.records[key]?.name
+    if (engine.respawns.unlink(key) && name) {
+      const id = respawnTriggerId(name)
+      ctx.saveTriggers(store.triggers.get().filter((t) => t.id !== id))
+    }
     return engine.combat.respawnView()
   })
   handle('respawns:removeTimer', (name) => {

@@ -3,7 +3,7 @@ import { act } from '../toast'
 import { BUILTIN_OVERLAYS } from '../constants'
 import { ConfirmButton, Field, Icon, NumberInput, Switch } from '../components/ui'
 import type { MeterOverlayOptions, OverlayConfig } from '../../../shared/types'
-import { DEFAULT_METER_OPTIONS, minOpacity, newOverlaySpot } from '../../../shared/overlays'
+import { DEFAULT_ACHIEVEMENT_OPTIONS, DEFAULT_METER_OPTIONS, minOpacity, newOverlaySpot } from '../../../shared/overlays'
 
 /** The middle of the screen this window is on, sized to fit it. */
 function bringOnScreen(o: OverlayConfig): Partial<OverlayConfig> {
@@ -151,6 +151,15 @@ export function Overlays() {
               {o.kind === 'meter' && <MeterOptions o={o} onChange={(m) => update(o.id, { meter: { ...DEFAULT_METER_OPTIONS, ...o.meter, ...m } })} />}
               {o.kind === 'achievements' && (
                 <>
+                  <label className="row">
+                    <Switch
+                      on={(o.achievements ?? DEFAULT_ACHIEVEMENT_OPTIONS).factionPlan}
+                      onChange={(v) => update(o.id, { achievements: { ...DEFAULT_ACHIEVEMENT_OPTIONS, ...o.achievements, factionPlan: v } })}
+                      label="Show the faction plan"
+                    />
+                    Show the faction plan
+                    <span className="faint small">off hides its step here; the plan is still followed, and still spoken if that is on</span>
+                  </label>
                   <label className="check">
                     <input type="checkbox" checked={state.settings.achievementCues} onChange={(e) => patchSettings((s) => ({ ...s, achievementCues: e.target.checked }))} />
                     Say when a faction plan step is done, and flash each achievement it finishes

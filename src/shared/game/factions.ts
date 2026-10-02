@@ -118,9 +118,7 @@ export const CITY_PEOPLE =
 /** Quests that cannot be done over and over, by page (lower-cased), and why: planned at most once unless locked in. */
 export const ONCE_IN_PLAY: Record<string, string> = {
   // From play (2026-09-29).
-  'illegible cantrip quest': 'cannot be done over and over',
-  // From play (2026-09-29): cyclops eyes do not seem to drop in the classic zones.
-  "xelha's cyclops eye": 'cyclops eyes do not drop in classic'
+  'illegible cantrip quest': 'cannot be done over and over'
 }
 
 /** Quests whose NPC takes the hand-in only at or above a con, by page (lower-cased). A con can be faked as far as Indifferent, not past it (from play). */
@@ -336,7 +334,10 @@ export const ITEMS_IN_PLAY: Record<string, ItemInPlay> = {
   'small piece of high quality ore': { how: 'drop', where: 'the Goblin Janitor (Runnyeye)', named: 1 },
   // For Rephas's Rat Ear Pie Quest, the one way to raise Arcane Scientists that repeats: five came
   // from eighteen rats in Misty Thicket in about twenty minutes (2026-09-29).
-  'rat ears': { how: 'drop', where: 'rats, such as in Misty Thicket', sec: 240 }
+  'rat ears': { how: 'drop', where: 'rats, such as in Misty Thicket', sec: 240 },
+  // For Xelha's Cyclops Eye: they do drop in classic after all, two from nine seafury cyclopes in Ocean of
+  // Tears in about seventeen minutes there (2026-10-02).
+  'cyclops eye': { how: 'drop', where: 'seafury cyclopes (Ocean of Tears)', sec: 510 }
 }
 
 /** A quest's hand-in item that is another than the one the wikis' item page is about, by quest page (lower-cased), then item. */

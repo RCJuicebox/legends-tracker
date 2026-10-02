@@ -1098,7 +1098,7 @@ describe('the catalog', () => {
     ])
   })
 
-  it('leaves out a quest whose items do not drop in classic', () => {
+  it("plans Xelha's Cyclops Eye over and over, the eyes from seafury cyclopes", () => {
     const eye = {
       page: "Xelha's Cyclops Eye",
       givers: ['Xelha Nevagon'],
@@ -1116,8 +1116,9 @@ describe('the catalog', () => {
         quests: { "Xelha's Cyclops Eye": eye }
       })
     ).activities.find((a) => a.title === "Xelha's Cyclops Eye")!
-    expect(quest.once).toBe('cyclops eyes do not drop in classic')
-    expect(plannable(quest, NO_CHOICES)).toBe(false)
+    expect(quest.once).toBeUndefined()
+    expect(quest.items?.map((it) => [it.name, it.how, it.where])).toEqual([['cyclops eye', 'drop', 'seafury cyclopes (Ocean of Tears)']])
+    expect(plannable(quest, NO_CHOICES)).toBe(true)
   })
 
   it('offers a race swap for a quest another race opens, and plans it when that beats the other ways', () => {

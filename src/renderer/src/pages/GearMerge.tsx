@@ -25,7 +25,7 @@ const HOW =
   'Every worn item the wiki knows, with what its next merge level would add to your stats, weighed the way the upgrade finder weighs them for the role picked ' +
   'above. The cost is the motes that level takes: a +N item needs 2^N xp from the mote of rank N+1, and since two motes of a rank make one of the next, a mote is ' +
   'worth 2^rank Infinitesimal motes. Gain per 100 is the stat gain per 100 Infinitesimal motes’ worth spent, so the cheap low levels of a good item come first ' +
-  'and the top levels of anything come last. Have counts what you could combine up from lower ranks. Plan puts the item in the Merge planner, on the Upgrades page.'
+  'and the top levels of anything come last. Under the motes: how many of that rank you have, and how many more combining your lower ranks would make. Plan puts the item in the Merge planner, on the Upgrades page.'
 
 function Deltas({ d }: { d: Partial<Record<WeightKey, number>> }) {
   const parts = (Object.entries(d) as [WeightKey, number][]).sort((a, b) => Math.abs(b[1]) - Math.abs(a[1]))
@@ -193,10 +193,16 @@ export function MergeTab({
                   </td>
                   <td className="mono num">{num1(o.gain)}</td>
                   <td className="small">
-                    <Tip className={`chip ${o.affordable ? 'ok' : 'warn'}`} text={`${o.motes} ${moteName(o.mote, o.motes)}: ${o.need} xp; you could make ${num(o.canMake)}`}>
+                    <Tip
+                      className={`chip ${o.affordable ? 'ok' : 'warn'}`}
+                      text={`${o.motes} ${moteName(o.mote, o.motes)}: ${o.need} xp. You have ${num(o.held)}${o.canMake > o.held ? `; combining your lower ranks makes ${num(o.canMake - o.held)} more, ${num(o.canMake)} in all` : ''}.`}
+                    >
                       {o.motes} × {rankName(o.mote)}
                     </Tip>
-                    <div className="faint">have {num(o.canMake)}</div>
+                    <div className="faint">
+                      have {num(o.held)}
+                      {o.canMake > o.held && ` · +${num(o.canMake - o.held)} by combining`}
+                    </div>
                   </td>
                   <td className="mono num">{num(o.cost)}</td>
                   <td className="mono num">{num1(o.rate)}</td>

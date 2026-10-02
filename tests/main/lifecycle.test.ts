@@ -56,7 +56,7 @@ function fakeContext(o: { engine?: Engine; flushAll?: () => Promise<unknown>; up
     h.calls.push(what)
   }
   const ctx = {
-    windows: { quitting: false, showMain: note('show main'), recover: () => false, flush: async () => note('flush windows')() },
+    windows: { quitting: false, showMain: note('show main'), recover: () => false, flush: async () => note('flush windows')(), noteRelaunch: async () => note('note relaunch')() },
     overlays: { destroy: note('stop overlays'), recover: () => {} },
     engine: o.engine ?? { shutdown: note('stop engine'), board: { endWhere: () => [] }, pushFeed: () => {} },
     updater: { stop: o.updaterStop ?? note('stop updater'), status: { state: 'idle' }, install: note('install update') },
@@ -160,6 +160,24 @@ describe('Quitting', () => {
     expect(h.calls).not.toContain('quit')
     // The installer's own quit goes straight through.
     expect(beforeQuit().preventDefault).not.toHaveBeenCalled()
+  })
+
+  it('notes the window first for a restart nobody asked for, and only then', async () => {
+    const ctx = fakeContext()
+    ctx.updater.status.state = 'ready'
+    registerLifecycle(ctx)
+    await ctx.installUpdate(true)
+    expect(h.calls[0]).toBe('note relaunch')
+    expect(h.calls.slice(1, STOPS.length + 1)).toEqual(STOPS)
+    expect(h.calls.at(-1)).toBe('install update')
+  })
+
+  it('does not note the window when the player asked for the restart', async () => {
+    const ctx = fakeContext()
+    ctx.updater.status.state = 'ready'
+    registerLifecycle(ctx)
+    await ctx.installUpdate()
+    expect(h.calls).not.toContain('note relaunch')
   })
 
   it('does not restart into an update that is not downloaded', async () => {

@@ -43,7 +43,12 @@ interface WindowPlace {
   maximized: boolean
   /** Told once that closing the window leaves the app in the tray. */
   trayTold?: boolean
+  /** Written just before a restart into an update nobody asked for: when, and whether the window was in use. */
+  relaunch?: { at: number; show: boolean }
 }
+
+/** A relaunch note older than this is from a restart that never came back, and is ignored. */
+const RELAUNCH_MS = 3 * 60 * 1000
 
 export interface TrayActions {
   arranging: () => boolean
@@ -101,6 +106,11 @@ export class Windows {
 
   createMain(): void {
     const place = this.savedPlace()
+    // After a restart into an update nobody asked for, the window comes back only if it was in use:
+    // over the game it would take the player's focus mid-fight. The app carries on from the tray.
+    const relaunch = this.place.get()?.relaunch
+    const quiet = !!relaunch && !relaunch.show && Date.now() - relaunch.at < RELAUNCH_MS
+    if (relaunch) this.place.set({ ...this.place.get()!, relaunch: undefined })
     const w = new BrowserWindow({
       width: 1320,
       height: 860,
@@ -126,6 +136,11 @@ export class Windows {
     nativeTheme.on('updated', retint)
     w.on('closed', () => nativeTheme.off('updated', retint))
     w.on('ready-to-show', () => {
+      if (quiet) {
+        this.setMainHidden(true)
+        this.tellUpdated()
+        return
+      }
       if (place?.maximized) w.maximize()
       w.show()
     })
@@ -156,6 +171,29 @@ export class Windows {
     new Notification({
       title: 'Legends Tracker is still running',
       body: 'Timers, overlays and speech carry on from the tray. Quit from the tray icon when you are done.',
+      icon: this.opts.icon
+    }).show()
+  }
+
+  /**
+   * Before a restart into an update nobody asked for: notes whether the main window is in use (open,
+   * not minimised, and in front), so the restarted app knows whether to bring it back.
+   */
+  async noteRelaunch(): Promise<void> {
+    const w = this.main
+    const show = !!w && !w.isDestroyed() && w.isVisible() && !w.isMinimized() && w.isFocused()
+    const place = this.place.get() ?? (w && !w.isDestroyed() ? { bounds: w.getNormalBounds(), maximized: w.isMaximized() } : null)
+    if (!place) return
+    this.place.set({ ...place, relaunch: { at: Date.now(), show } })
+    await this.place.flush()
+  }
+
+  /** Back from an update in the tray: a word that it happened, and where the app is. */
+  private tellUpdated(): void {
+    if (!Notification.isSupported()) return
+    new Notification({
+      title: `Legends Tracker updated to ${app.getVersion()}`,
+      body: 'It restarted in the tray, so your game kept the screen. Your settings, timers and overlays are as they were.',
       icon: this.opts.icon
     }).show()
   }

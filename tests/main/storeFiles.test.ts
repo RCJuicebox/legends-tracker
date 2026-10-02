@@ -319,10 +319,12 @@ describe('a file that will not parse', () => {
 })
 
 describe('files read back through the sanitisers', () => {
-  it('drop respawn records and buffs that make no sense', () => {
+  it('drop respawn records and buffs that make no sense', async () => {
     writeFileSync(file('respawns.json'), JSON.stringify({ good: { zone: 'z', name: 'A mob', kills: -2, gaps: [5, -1, 'x'] }, bad: { zone: 'z' }, worse: 'x' }))
     writeFileSync(file('buffs.json'), JSON.stringify({ people: { Tester: { name: 'Tester', classes: ['druid', 3] } }, wanted: { '../x': ['a'] }, active: 'x' }))
     const store = new Store(defaultTriggers)
+    // respawns.json at schema 1 is brought forward, and written at once.
+    await store.settled
     expect(store.respawns.get()).toEqual({ good: { zone: 'z', name: 'A mob', kills: 0, lastDeath: 0, pendingSince: 0, gaps: [5], shared: false } })
     expect(store.buffs.get()).toEqual({ people: { tester: { name: 'Tester', classes: ['druid'], level: 1, race: '', at: 0 } }, wanted: {}, active: {} })
   })

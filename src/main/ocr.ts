@@ -129,22 +129,33 @@ function composeArg(c: Composite): string {
   return [`${r(c.width)},${r(c.height)}`, ...c.pieces.map((p) => [p.from.x, p.from.y, p.from.w, p.from.h, p.x, p.y].map(r).join(','))].join(';')
 }
 
-/** Captures every monitor at full resolution and returns the PNG paths. Pass them to discardScreens() when done. */
+/**
+ * Captures every monitor at its own full resolution and returns the PNG paths. Pass them to
+ * discardScreens() when done.
+ *
+ * desktopCapturer fits every screen into the one thumbnail size it is asked for, so with monitors of
+ * different sizes (or one scaled to 200%) a smaller screen comes back stretched, and the game's small
+ * font smeared past reading: a 3440×1440 screen beside a 4K one read 1 mote row of 10 (2026-10-02).
+ * So it is asked once for each size there is, and each monitor is taken from the request at its own size.
+ */
 export async function captureScreens(): Promise<string[]> {
-  const largest = screen
-    .getAllDisplays()
-    .reduce((m, d) => ({ width: Math.max(m.width, Math.round(d.size.width * d.scaleFactor)), height: Math.max(m.height, Math.round(d.size.height * d.scaleFactor)) }), {
-      width: 0,
-      height: 0
-    })
-  const sources = await desktopCapturer.getSources({ types: ['screen'], thumbnailSize: largest })
+  const displays = screen.getAllDisplays().map((d) => ({ id: String(d.id), width: Math.round(d.size.width * d.scaleFactor), height: Math.round(d.size.height * d.scaleFactor) }))
+  const sizes = [...new Map(displays.map((d) => [`${d.width}x${d.height}`, { width: d.width, height: d.height }])).values()]
   const paths: string[] = []
   const stamp = Date.now().toString(36)
   try {
-    for (const [i, s] of sources.entries()) {
-      const p = join(cacheDir(), `screen-${stamp}-${i}.png`)
-      paths.push(p)
-      await fs.writeFile(p, s.thumbnail.toPNG())
+    for (const size of sizes) {
+      const sources = await desktopCapturer.getSources({ types: ['screen'], thumbnailSize: size })
+      // The monitors of this size, by id; a source whose id names no monitor counts when its picture is this size.
+      const wanted = new Set(displays.filter((d) => d.width === size.width && d.height === size.height).map((d) => d.id))
+      for (const s of sources) {
+        const pic = s.thumbnail.getSize()
+        const own = wanted.has(s.display_id) || (!displays.some((d) => d.id === s.display_id) && pic.width === size.width && pic.height === size.height)
+        if (!own || s.thumbnail.isEmpty()) continue
+        const p = join(cacheDir(), `screen-${stamp}-${paths.length}.png`)
+        paths.push(p)
+        await fs.writeFile(p, s.thumbnail.toPNG())
+      }
     }
   } catch (e) {
     await discardScreens(paths)

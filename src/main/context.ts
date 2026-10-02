@@ -108,7 +108,8 @@ export interface AppContext {
   /** Writes a summary of the settings to the diagnostic log, when it has changed. */
   logSettings(): void
   /** Set by the lifecycle: restarts into a downloaded update after everything is written. */
-  installUpdate(): Promise<void>
+  /** Restarts into a downloaded update; `unasked` when the player did not press for it. */
+  installUpdate(unasked?: boolean): Promise<void>
 }
 
 export function createContext(): AppContext {
@@ -220,6 +221,11 @@ export function createContext(): AppContext {
       announceUpdate(`found:${s.version}`, `Legends Tracker ${s.version} is available`, 'Downloading it now. You can restart into it once it has arrived.', () =>
         windows.showMain()
       )
+    } else if (s.state === 'ready' && store.settings.get().autoRestartUpdates) {
+      // The player chose not to be asked: restart into it now. A moment first, so the line is written.
+      ctx.engine.pushFeed('info', `Version ${s.version} has downloaded: restarting into it now.`)
+      log.info(`Restarting into ${s.version} by itself (Restart into updates by itself is on)`)
+      setTimeout(() => void ctx.installUpdate(true), 2000)
     } else if (s.state === 'ready') {
       ctx.engine.pushFeed('info', `Version ${s.version} is ready: restart to update.`)
       announceUpdate(

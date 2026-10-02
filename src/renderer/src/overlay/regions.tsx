@@ -254,7 +254,8 @@ const doing = (s: { kind: TrackKind; title: string; npc?: string }) =>
 function AchievementsRegion({ config, track, arranging }: { config: OverlayConfig; track: AchievementTrack | null; arranging: boolean }) {
   const now = useNow(15_000)
   const style = { ['--fs' as string]: `${config.fontSize}px` }
-  const plan = track?.faction ?? null
+  // Hidden from this overlay at the player's choice; the plan is followed (and spoken) all the same.
+  const plan = config.achievements?.factionPlan === false ? null : (track?.faction ?? null)
   const tracked = track?.tracked ?? []
   const trackedNames = new Set(tracked.map((t) => t.name))
   const trackedSkills = new Set(tracked.flatMap((t) => (t.done ? [] : (t.skills ?? []).map((k) => k.skill))))
@@ -279,7 +280,9 @@ function AchievementsRegion({ config, track, arranging }: { config: OverlayConfi
         <div className="ach-ov-empty">
           {arranging
             ? 'Tracked achievements, the faction plan’s step, and the Slayer counts and skills your kills move show here.'
-            : 'Nothing tracked. Track an achievement, or show your faction plan here from Factions › Plan.'}
+            : track?.faction
+              ? 'Nothing tracked. The faction plan is hidden from this overlay (Overlays).'
+              : 'Nothing tracked. Track an achievement, or show your faction plan here from Factions › Plan.'}
         </div>
       </div>
     )

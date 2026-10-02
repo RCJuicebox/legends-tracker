@@ -131,6 +131,11 @@ export interface MeterOverlayOptions {
   header: boolean
 }
 
+export interface AchievementOverlayOptions {
+  /** Show the step of the faction plan you follow (Factions › Plan). */
+  factionPlan: boolean
+}
+
 export interface OverlayConfig {
   id: string
   name: string
@@ -146,6 +151,8 @@ export interface OverlayConfig {
   groupByTarget: boolean
   /** Meter overlays only. */
   meter?: MeterOverlayOptions
+  /** Achievements overlays only. */
+  achievements?: AchievementOverlayOptions
 }
 
 interface CombatSettings {
@@ -168,6 +175,8 @@ export interface AppSettings {
   installDir: string
   logFile: string
   autoStart: boolean
+  /** Restart into a downloaded update as soon as it arrives, without asking; off, it installs when the app closes. */
+  autoRestartUpdates: boolean
   characters: Record<string, CharacterSettings>
   tracking: TrackingSettings
   audio: AudioSettings

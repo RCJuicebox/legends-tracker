@@ -2,7 +2,17 @@ import { describe, expect, it } from 'vitest'
 import { CombatMeter } from '../../src/core/combatMeter'
 import { parseLogLine } from '../../src/core/logLine'
 import { compilePhrase } from '../../src/core/triggers'
-import { RespawnLog, respawnEstimate, respawnKey, respawnPhrase, respawnTrigger, respawnTriggerId, respawnView, type RespawnRecords } from '../../src/core/respawns'
+import {
+  RespawnLog,
+  respawnEstimate,
+  respawnKey,
+  respawnPhrase,
+  respawnTimerSpec,
+  respawnTrigger,
+  respawnTriggerId,
+  respawnView,
+  type RespawnRecords
+} from '../../src/core/respawns'
 import type { Trigger } from '../../src/shared/types'
 
 // Line shapes copied from the log (September 2026); times moved to make the gaps.
@@ -130,6 +140,136 @@ describe('respawn log', () => {
   })
 })
 
+// A placeholder spot in Ocean of Tears: a seafury cyclops or an aqua goblin, or Boog Mudtoe in their place
+// (line shapes from the log, October 2026).
+const OOT = 'The Ocean of Tears'
+const BOOG = "Boog Mudtoe's spawn"
+const SPAWN = respawnKey(OOT, BOOG)
+const SPOT = { zone: OOT, name: BOOG, names: ['a seafury cyclops', 'an aqua goblin', 'Boog Mudtoe'] }
+
+describe('spawn points', () => {
+  it('takes in what its mobs had on record: their kills and the latest death, not their gaps', () => {
+    const f = feed()
+    f.run(`
+      [Fri Oct 02 10:00:00 2026] You have entered ${OOT}.
+      [Fri Oct 02 10:48:25 2026] You have slain a seafury cyclops!
+      [Fri Oct 02 10:51:12 2026] You have slain an aqua goblin!
+      [Fri Oct 02 10:54:16 2026] You have slain a seafury cyclops!
+    `)
+    expect(f.records[respawnKey(OOT, 'a seafury cyclops')].gaps).toEqual([351])
+    expect(f.log.link(SPOT)).toBe(SPAWN)
+    expect(Object.keys(f.records)).toEqual([SPAWN])
+    expect(f.records[SPAWN]).toMatchObject({
+      zone: OOT,
+      name: BOOG,
+      names: ['A seafury cyclops', 'An aqua goblin', 'Boog Mudtoe'],
+      kills: 3,
+      gaps: [],
+      lastDeath: new Date(2026, 9, 2, 10, 54, 16).getTime()
+    })
+    expect(f.records[SPAWN].pendingSince).toBe(f.records[SPAWN].lastDeath)
+  })
+
+  it('measures from a death of any of its mobs to any of them seen, speech included', () => {
+    const f = feed()
+    f.log.link(SPOT)
+    f.run(`
+      [Fri Oct 02 10:00:00 2026] You have entered ${OOT}.
+      [Fri Oct 02 10:57:01 2026] You have slain a seafury cyclops!
+      [Fri Oct 02 10:59:26 2026] Boog Mudtoe says, 'Smash you... No one bash better than Mudtoe.'
+      [Fri Oct 02 10:59:38 2026] Boog Mudtoe has been slain by Jobarab!
+      [Fri Oct 02 11:02:01 2026] An aqua goblin hits YOU for 12 points of damage.
+      [Fri Oct 02 11:03:11 2026] You have slain an aqua goblin!
+    `)
+    expect(Object.keys(f.records)).toEqual([SPAWN])
+    expect(f.records[SPAWN]).toMatchObject({ kills: 3, gaps: [145, 143], shared: false })
+    expect(respawnEstimate(f.records[SPAWN])).toBe(143)
+  })
+
+  it('leaves the same names in another zone to themselves', () => {
+    const f = feed()
+    f.log.link(SPOT)
+    f.run(`
+      [Fri Oct 02 11:20:00 2026] You have entered Erud's Crossing.
+      [Fri Oct 02 11:21:00 2026] You have slain an aqua goblin!
+    `)
+    expect(f.records[SPAWN].kills).toBe(0)
+    expect(f.records[respawnKey("Erud's Crossing", 'an aqua goblin')].kills).toBe(1)
+  })
+
+  it('changes its mobs when linked again under its name, and takes a mob from another spawn', () => {
+    const f = feed()
+    f.log.link(SPOT)
+    const other = f.log.link({ zone: OOT, name: 'The far spot', names: ['an aqua goblin', 'a seafury sentry'] })
+    expect(f.records[SPAWN].names).toEqual(['A seafury cyclops', 'Boog Mudtoe'])
+    expect(f.records[other].names).toEqual(['An aqua goblin', 'A seafury sentry'])
+    f.log.link({ ...SPOT, names: ['a seafury cyclops', 'Boog Mudtoe', 'an aqua goblin', 'a seafury sentry'] })
+    expect(f.records[other]).toBeUndefined()
+    expect(f.records[SPAWN].names).toHaveLength(4)
+  })
+
+  it('will not be named after a mob of its own that is not one of its mobs', () => {
+    const f = feed()
+    f.run(`
+      [Fri Oct 02 10:00:00 2026] You have entered ${OOT}.
+      [Fri Oct 02 10:48:25 2026] You have slain an old shark!
+    `)
+    expect(() => f.log.link({ zone: OOT, name: 'an old shark', names: ['a seafury cyclops', 'Boog Mudtoe'] })).toThrow(/mob of its own/)
+    // One of its mobs is fine: its record becomes the spawn's.
+    f.log.link({ zone: OOT, name: 'an old shark', names: ['an old shark', 'Boog Mudtoe'] })
+    expect(f.records[respawnKey(OOT, 'an old shark')]).toMatchObject({ kills: 1, names: ['An old shark', 'Boog Mudtoe'] })
+  })
+
+  it('forgets its kills and gaps but keeps its mobs', () => {
+    const f = feed()
+    f.log.link(SPOT)
+    f.run(`
+      [Fri Oct 02 10:00:00 2026] You have entered ${OOT}.
+      [Fri Oct 02 10:57:01 2026] You have slain a seafury cyclops!
+    `)
+    expect(f.log.forget(SPAWN)).toBe(true)
+    expect(f.records[SPAWN]).toMatchObject({ kills: 0, lastDeath: 0, pendingSince: 0, gaps: [], names: ['A seafury cyclops', 'An aqua goblin', 'Boog Mudtoe'] })
+    f.run('[Fri Oct 02 11:03:11 2026] You have slain an aqua goblin!')
+    expect(Object.keys(f.records)).toEqual([SPAWN])
+    expect(f.records[SPAWN].kills).toBe(1)
+  })
+
+  it('splits up into mobs of their own, starting afresh', () => {
+    const f = feed()
+    f.log.link(SPOT)
+    expect(f.log.unlink(respawnKey(OOT, 'a seafury cyclops'))).toBe(false)
+    expect(f.log.unlink(SPAWN)).toBe(true)
+    f.run(`
+      [Fri Oct 02 10:00:00 2026] You have entered ${OOT}.
+      [Fri Oct 02 10:48:25 2026] You have slain a seafury cyclops!
+    `)
+    expect(Object.keys(f.records)).toEqual([respawnKey(OOT, 'a seafury cyclops')])
+  })
+
+  it('counts nothing twice when the same log is read again after a restart', () => {
+    const lines = `
+      [Fri Oct 02 10:00:00 2026] You have entered ${OOT}.
+      [Fri Oct 02 10:57:01 2026] You have slain a seafury cyclops!
+      [Fri Oct 02 10:59:38 2026] Boog Mudtoe has been slain by Jobarab!
+    `
+    const first = feed()
+    first.log.link(SPOT)
+    first.run(lines)
+    const saved = JSON.parse(JSON.stringify(first.records)) as RespawnRecords
+    const again = feed(saved)
+    again.run(lines)
+    expect(again.records).toEqual(first.records)
+    expect(again.changes()).toBe(0)
+  })
+
+  it('names its mobs for its timer', () => {
+    const f = feed()
+    f.log.link(SPOT)
+    expect(f.log.namesOf("boog mudtoe's SPAWN")).toEqual(['A seafury cyclops', 'An aqua goblin', 'Boog Mudtoe'])
+    expect(f.log.namesOf('Boog Mudtoe')).toBeNull()
+  })
+})
+
 describe('respawn timers', () => {
   const lines = (name: string) => [`You have slain ${name}!`, `${name} has been slain by Jobarab!`, `${name} died.`]
 
@@ -165,6 +305,18 @@ describe('respawn timers', () => {
       expect.objectContaining({ type: 'timer', durationSec: 1100, overlay: 'targets', warnSpeech: '', endSpeech: '' }),
       { type: 'sound', file: 'ding.wav', volume: 1 }
     ])
+  })
+
+  it("starts a spawn point's timer at a death of any of its mobs", () => {
+    const names = ['A seafury cyclops', 'An aqua goblin', 'Boog Mudtoe']
+    const t = respawnTrigger({ name: BOOG, names, seconds: 143, overlay: 'respawns', warnSec: 0, announce: true })
+    expect(t).toMatchObject({ id: 'respawn-boog-mudtoe-s-spawn', name: `${BOOG} respawn` })
+    expect(t.comment).toContain('any of A seafury cyclops, An aqua goblin, Boog Mudtoe')
+    expect(t.actions[0]).toMatchObject({ type: 'timer', name: BOOG, endSpeech: `${BOOG} is up` })
+    const re = compilePhrase(t.phrases[0], 'Kelwyn')
+    for (const n of names) for (const l of lines(n)) expect(re.test(l)).toBe(true)
+    expect(re.test('You have slain a seafury sentry!')).toBe(false)
+    expect(respawnTimerSpec(t)).toEqual({ name: BOOG, seconds: 143, overlay: 'respawns', warnSec: 0, announce: true })
   })
 
   it('shows each record with its timer, and a timer whose mob has no record', () => {

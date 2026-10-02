@@ -32,6 +32,11 @@ said once per version. The update installs silently, with no installer window, a
 by itself; if you just quit instead, it installs on the way out. Settings live in `%APPDATA%\Legends Tracker`, outside the install folder, so
 they survive updates and uninstalls.
 
+**Restart into updates by itself** in Settings (off unless you turn it on) skips the asking: as soon
+as an update has downloaded, the app restarts into it, even mid-game. The overlays blink and come
+back. The main window comes back too if you were using it (open and in front); otherwise the app
+restarts in the tray, so the game keeps the screen, and a Windows notification says it updated.
+
 ### Releasing a new version
 
 1. Bump `version` in `package.json` (e.g. 1.0.0 → 1.1.0) and commit. The updater only offers a higher
@@ -247,6 +252,17 @@ death lines for that name (`You have slain X!`, `X has been slain by …!`, `X d
 on the overlay you choose, and can say "X in N seconds" and "X is up". Anything else added to that
 trigger on the Triggers page is kept when the timer is changed here.
 
+**A spawn point with several mobs.** Where a spot pops one of a few mobs, such as a placeholder and
+the named it gives way to, open any of their rows and choose **Same spawn as other mobs…**: tick the
+others killed in that zone (or add one by name, as the log prints it) and **Make one spawn**. The
+log never says where a mob is, so this is yours to say. The spawn gets one row, named after its named
+mob ("Boog Mudtoe's spawn") unless you call it something else: a death of any of its mobs opens its
+watch, and any of them seen again closes it. Its timer starts on a death of any of them. The mobs'
+kills go into the spawn; their gaps do not, since each measured one name rather than the spot. A
+placeholder's name that other mobs in the zone share (a seafury cyclops) counts there too, so its
+gaps are only as good as how well you keep to the one spot. **Split up** undoes it, and takes its
+timer with it.
+
 ## Tradeskills
 
 For the consumables you keep making. **Download the recipes** reads every page in eqlwiki's Player
@@ -394,7 +410,8 @@ Achievements page) shows the achievements you track (the star on the Achievement
 about how long, and the next step), the Slayer achievements your kills of the last half hour
 counted toward, and the skills your skill achievements want that went up in that time. A step done is said aloud with the next, and each achievement it finishes flashes on
 the alerts overlay (**Say when a faction plan step is done**). With nothing to show, it says so in
-one faint line.
+one faint line. **Show the faction plan**, on its card here, hides the plan's step from it; the plan is still
+followed, and still spoken if that is on.
 
 ## Motes
 
@@ -785,7 +802,8 @@ folder** opens the app's own `logs` folder.
 over the game either way. Every colour is a token in `styles.css`, with the light set beside the
 dark one.
 
-- The version, **Check for updates** (or **Restart and update**), **Open log folder**, and **Copy
+- The version, **Check for updates** (or **Restart and update**), **Restart into updates by itself**
+  (see [Updates](#updates)), **Open log folder**, and **Copy
   diagnostics**: the version, your PC, the settings that matter, each process's memory and CPU (see
   [Measuring](#measuring)) and the end of the app's log, ready to paste into a bug report, with no
   keys and no Windows user name.
@@ -820,7 +838,7 @@ The settings folder, `%APPDATA%\Legends Tracker` (or the `EQL_USER_DATA` folder)
 | `casts.json` | Each ranked spell you have cast, when last and how often, for the Spell Timers page's list |
 | `motes.json` | Mote history: instance runs, motes per day, runs whose kind you set by hand, and the time of the last line read |
 | `mote-stock.json` | Motes on hand, the item in the Merge planner, and whether looted motes are added |
-| `respawns.json` | Each mob's kills and death-to-sighting gaps, by zone |
+| `respawns.json` | Each mob's kills and death-to-sighting gaps, by zone, and the spawn points you made with the mobs they pop |
 | `buffs.json` | Who is who from `/who`, the buffs each character wants, and the buffs on each character now |
 | `schema.json` | The schema version of each file above; a file from an older build is backed up as `<file>.pre-<N>.json` before it is brought forward |
 | `window.json` | Where the main window was, whether it was maximised, and whether the tray notice was shown |

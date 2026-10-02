@@ -32,7 +32,9 @@ export interface MergeOption {
   cost: number
   /** Gain per 100 Infinitesimal motes' worth: the number to sort by. */
   rate: number
-  /** How many of that mote the stock could make, combining up from the ranks below. */
+  /** How many of that mote are on hand. */
+  held: number
+  /** How many of that mote the stock could make: those on hand and what combining up from the ranks below adds. */
   canMake: number
   affordable: boolean
 }
@@ -76,7 +78,21 @@ export function mergeOptions(o: MergeInput): MergeOption[] {
     const motes = Math.ceil(need / MOTE_RANKS[mote].xp)
     const cost = motes * moteWorth(mote)
     const canMake = makeable(inv, mote)
-    out.push({ item, level, next: level + 1, gain, deltas, need, mote, motes, cost, rate: round((gain / cost) * 100, 2), canMake, affordable: canMake >= motes })
+    out.push({
+      item,
+      level,
+      next: level + 1,
+      gain,
+      deltas,
+      need,
+      mote,
+      motes,
+      cost,
+      rate: round((gain / cost) * 100, 2),
+      held: inv[mote] ?? 0,
+      canMake,
+      affordable: canMake >= motes
+    })
   }
   return out.sort((a, b) => b.rate - a.rate || b.gain - a.gain || a.cost - b.cost)
 }

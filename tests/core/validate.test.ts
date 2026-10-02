@@ -8,6 +8,7 @@ import {
   sanitizeMotes,
   sanitizeRespawns,
   sanitizeRespawnTimer,
+  sanitizeSpawnLink,
   sanitizeSettings,
   sanitizeSheet,
   sanitizeSpellRule,
@@ -51,6 +52,23 @@ describe('respawn records read back from disk', () => {
 
   it('take the gap list only when it is a list', () => {
     expect(sanitizeRespawns({ k: { zone: 'z', name: 'A mob', gaps: { 0: 5 } } }).k.gaps).toEqual([])
+  })
+
+  it("keep a spawn point's names, and only names", () => {
+    const out = sanitizeRespawns({ k: { zone: 'z', name: 'A spot', names: ['A mob', '', 5, 'Boog Mudtoe'] }, l: { zone: 'z', name: 'A mob', names: 'x' } })
+    expect(out.k.names).toEqual(['A mob', 'Boog Mudtoe'])
+    expect(out.l).not.toHaveProperty('names')
+  })
+})
+
+describe('a spawn point from the Respawns page', () => {
+  it('needs a zone, a name and two different mobs', () => {
+    const good = { zone: ' OoT ', name: " Boog Mudtoe's spawn ", names: ['a seafury cyclops', ' Boog Mudtoe', 'A SEAFURY CYCLOPS', ''] }
+    expect(sanitizeSpawnLink(good)).toEqual({ zone: 'OoT', name: "Boog Mudtoe's spawn", names: ['A SEAFURY CYCLOPS', 'Boog Mudtoe'] })
+    for (const v of NOT_OBJECTS) expect(sanitizeSpawnLink(v)).toBeNull()
+    expect(sanitizeSpawnLink({ ...good, zone: '' })).toBeNull()
+    expect(sanitizeSpawnLink({ ...good, name: 5 })).toBeNull()
+    expect(sanitizeSpawnLink({ ...good, names: ['a mob', 'A mob'] })).toBeNull()
   })
 })
 
@@ -369,5 +387,22 @@ describe('meter overlay options', () => {
   it('hold the row count to 1 through 50', () => {
     expect(meterOptions({ rows: 0 }, DEFAULT_METER_OPTIONS)!.rows).toBe(1)
     expect(meterOptions({ rows: 500 }, DEFAULT_METER_OPTIONS)!.rows).toBe(50)
+  })
+})
+
+describe('achievements overlay options', () => {
+  const fb = defaultSettings()
+  const achievementsOverlay = (o: Record<string, unknown>) =>
+    sanitizeSettings({ ...fb, overlays: fb.overlays.map((x) => (x.kind === 'achievements' ? { ...x, ...o } : x)) }, fb)?.overlays.find((x) => x.kind === 'achievements')
+
+  it('show the faction plan unless it was hidden', () => {
+    expect(achievementsOverlay({})?.achievements).toEqual({ factionPlan: true })
+    expect(achievementsOverlay({ achievements: { factionPlan: false } })?.achievements).toEqual({ factionPlan: false })
+    expect(achievementsOverlay({ achievements: { factionPlan: 'no', junk: 1 } })?.achievements).toEqual({ factionPlan: true })
+  })
+
+  it('belong to the achievements overlay only', () => {
+    const others = sanitizeSettings({ ...fb, overlays: fb.overlays.map((x) => ({ ...x, achievements: { factionPlan: false } })) }, fb)?.overlays ?? []
+    expect(others.filter((x) => x.achievements).map((x) => x.kind)).toEqual(['achievements'])
   })
 })

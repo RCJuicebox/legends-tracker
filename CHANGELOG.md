@@ -2,6 +2,15 @@
 
 What changed in each version. The release workflow publishes a version's section as its release notes, and installed copies show them when an update arrives.
 
+## Unreleased
+
+- **Hide the faction plan from the achievements overlay.** A **Show the faction plan** switch on the overlay's card in Overlays. Off, the overlay leaves the plan's step out; the plan is still followed, and its steps are still spoken if that is on.
+- **Restart into updates by itself.** A new switch in Settings, off unless you turn it on: as soon as an update has downloaded, the app restarts into it without asking, even while you play. The overlays blink and come back; the main window comes back only if you were using it, otherwise the app restarts in the tray so the game keeps the screen, and a notification says it updated.
+- **Best merge says which motes you have and which you would combine.** Under each item's motes it said "have 11" when 11 was what combining your lower ranks could make; it now reads "have 0 · +11 by combining".
+- **Fix: reading motes (and the Stats tab) off the screen with monitors of different sizes.** Every monitor was captured at the size of the largest, so a smaller screen came back stretched and the game's small font past reading: next to a 4K monitor at 200%, a 3440×1440 game screen gave 1 or 2 of the 10 mote rows, and some counts wrong. Each monitor is now captured at its own size.
+- **Spawn points with several mobs.** A spot that pops one of a few mobs, such as a placeholder and the named it gives way to, can be made one row on the Respawns page: open a row, **Same spawn as other mobs…**, tick the others. A death of any of them starts its watch and its timer, and any of them seen again ends the watch, so the respawn is measured for the spot rather than for each name. **Split up** undoes it. respawns.json is brought to schema 2 (a copy of the old one is kept as respawns.pre-2.json).
+- **From play: cyclops eyes do drop.** Two came from nine seafury cyclopes in Ocean of Tears, so Xelha's Cyclops Eye is planned again, over and over, with the eyes from seafury cyclopes there (about one every eight or nine minutes, a guess from those first two). 2.5.0 had said they do not drop in the classic zones.
+
 ## 2.5.1 (2026-09-30)
 
 - **Fix: a race and class swap left out on Most factions positive.** The plan has room for 31 races and swaps, and the wider catalog that goal reads brought in pairs that gain more with factions no quest is near. The Dwarf Rogue that opens Rat Patrol at a Miners Guild 628 standing of 0 was crowded out, and the plan sent you to kill in North Kaladim to raise it first, though you were already Amiable as one (found in play). Pairs that open a quest at your standings now are kept first. A change in the pairs also makes the page plan afresh, rather than keep an earlier plan's steps.

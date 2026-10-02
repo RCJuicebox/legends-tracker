@@ -14,6 +14,7 @@ export function defaultSettings(): AppSettings {
     installDir: '',
     logFile: '',
     autoStart: true,
+    autoRestartUpdates: false,
     characters: {},
     tracking: {
       enabled: true,

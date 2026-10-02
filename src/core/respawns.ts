@@ -12,6 +12,10 @@ import type { EntityKind, Trigger } from '../shared/types'
 // Records survive restarts, and the same log is read again at every start (the last hour, for the
 // meter), so each step is idempotent: a kill at or before the record's last death is one already
 // counted, and a watch only closes on a line after its death.
+//
+// A spawn point that pops one of several mobs (a placeholder, or the named it gives way to) is one
+// record that lists their names: a death of any of them opens its watch, and any of them seen again
+// closes it. The log never says where a mob is, so the player says which names are one spawn.
 
 /** Lines naming the mob this soon after it died are its death, not its return. */
 const SETTLE_MS = 3_000
@@ -32,11 +36,20 @@ export interface RespawnRecord {
   gaps: number[]
   /** Two of this name were up at once, so its gaps say little about any one spawn. */
   shared: boolean
+  /** A spawn point several mobs pop at: their names, as the log prints them. `name` is then the spawn's own name. */
+  names?: string[]
 }
 
 export type RespawnRecords = Record<string, RespawnRecord>
 
 export const respawnKey = (zone: string, name: string): string => `${zone.toLowerCase()}|${name.toLowerCase()}`
+
+/** A spawn point's names, as the Respawns page sends them: which zone, what to call it, and the mobs it pops. */
+export interface SpawnLink {
+  zone: string
+  name: string
+  names: string[]
+}
 
 /** The shortest gap that could be a respawn, in seconds; null before any. */
 export function respawnEstimate(r: Pick<RespawnRecord, 'gaps'>): number | null {
@@ -79,8 +92,21 @@ export class RespawnLog {
     const watches = open.get(`${zone.toLowerCase()}|${line.text.slice(0, sp).toLowerCase()}`)
     if (!watches) return
     for (const w of watches) {
-      if (w.record.pendingSince && line.text.slice(0, w.prefix.length).toLowerCase() === w.prefix) this.seen(zone, w.record.name, line.time)
+      if (w.record.pendingSince && line.text.slice(0, w.prefix.length).toLowerCase() === w.prefix) this.sighted(w.record, line.time)
     }
+  }
+
+  // Which spawn each name belongs to, by zone and name, lowercased. Worked out again after a link changes.
+  private spawns: Map<string, string> | null = null
+
+  /** The record a mob's lines go to: its spawn's, when it is one of a spawn's names, else its own. */
+  private keyFor(zone: string, name: string): string {
+    if (!this.spawns) {
+      this.spawns = new Map()
+      for (const [key, r] of Object.entries(this.records)) for (const n of r.names ?? []) this.spawns.set(respawnKey(r.zone, n), key)
+    }
+    const own = respawnKey(zone, name)
+    return this.spawns.get(own) ?? own
   }
 
   // The watches open, by zone and the first word of the name, lowercased once: most lines are not
@@ -92,21 +118,85 @@ export class RespawnLog {
       this.open = new Map()
       for (const record of Object.values(this.records)) {
         if (!record.pendingSince) continue
-        const prefix = record.name.toLowerCase() + ' '
-        const key = `${record.zone.toLowerCase()}|${prefix.slice(0, prefix.indexOf(' '))}`
-        const list = this.open.get(key)
-        if (list) list.push({ record, prefix })
-        else this.open.set(key, [{ record, prefix }])
+        for (const name of record.names ?? [record.name]) {
+          const prefix = name.toLowerCase() + ' '
+          const key = `${record.zone.toLowerCase()}|${prefix.slice(0, prefix.indexOf(' '))}`
+          const list = this.open.get(key)
+          if (list) list.push({ record, prefix })
+          else this.open.set(key, [{ record, prefix }])
+        }
       }
     }
     return this.open
   }
 
-  /** Forgets a record. */
+  /** Forgets a record's kills and gaps; a spawn point keeps its mobs and starts afresh. */
   forget(key: string): boolean {
-    if (!this.records[key]) return false
-    delete this.records[key]
+    const r = this.records[key]
+    if (!r) return false
+    if (r.names) this.records[key] = { zone: r.zone, name: r.name, kills: 0, lastDeath: 0, pendingSince: 0, gaps: [], shared: false, names: r.names }
+    else delete this.records[key]
     this.open = null
+    this.hooks.onChange()
+    return true
+  }
+
+  /**
+   * Makes `link.names` one spawn point in `link.zone`, called `link.name`, or changes the names of the
+   * one already called that. What the names had on record of their own goes into it: the kills, and
+   * the last death with its watch. Their gaps do not, as each measured one name rather than the spot,
+   * and a name taken from another spawn leaves that one. Returns the spawn's key.
+   */
+  link(link: SpawnLink): string {
+    const key = respawnKey(link.zone, link.name)
+    const names = [...new Map(link.names.map((n) => [n.toLowerCase(), displayName(n)])).values()]
+    const was = this.records[key]
+    if (was && !was.names && !names.some((n) => n.toLowerCase() === was.name.toLowerCase())) {
+      throw new Error(`${was.name} is a mob of its own in ${was.zone}: call the spawn something else, or make ${was.name} one of its mobs.`)
+    }
+    const spawn: RespawnRecord = was?.names
+      ? { ...was, names }
+      : { zone: was?.zone ?? link.zone, name: link.name, kills: 0, lastDeath: 0, pendingSince: 0, gaps: [], shared: false, names }
+    const take = (r: RespawnRecord) => {
+      spawn.kills += r.kills
+      if (r.lastDeath > spawn.lastDeath) {
+        spawn.lastDeath = r.lastDeath
+        spawn.pendingSince = r.pendingSince
+      }
+    }
+    // A mob on record under the spawn's own name, one of its names.
+    if (was && !was.names) take(was)
+    for (const n of names) {
+      const from = this.keyFor(spawn.zone, n)
+      const r = this.records[from]
+      if (!r || from === key) continue
+      if (r.names) {
+        // Another spawn had this name: it keeps its record and the rest of its names.
+        r.names = r.names.filter((x) => x.toLowerCase() !== n.toLowerCase())
+        if (!r.names.length) delete this.records[from]
+        continue
+      }
+      take(r)
+      delete this.records[from]
+    }
+    this.records[key] = spawn
+    this.open = this.spawns = null
+    this.prune()
+    this.hooks.onChange()
+    return key
+  }
+
+  /** The names of the spawn point called `name`, in any zone; null when no spawn is called that. */
+  namesOf(name: string): string[] | null {
+    const r = Object.values(this.records).find((x) => x.names && x.name.toLowerCase() === name.toLowerCase())
+    return r?.names ? [...r.names] : null
+  }
+
+  /** Undoes a spawn point: its names are mobs of their own again, starting afresh. */
+  unlink(key: string): boolean {
+    if (!this.records[key]?.names) return false
+    delete this.records[key]
+    this.open = this.spawns = null
     this.hooks.onChange()
     return true
   }
@@ -117,7 +207,7 @@ export class RespawnLog {
     // A single capitalised word nobody has placed yet is a mob only if one of ours killed it.
     const mob = kind === 'npc' || (kind === 'unknown' && killer !== null && (killer === SELF || isFriend(this.hooks.kindOf(killer))))
     if (!mob) return
-    const key = respawnKey(zone, name)
+    const key = this.keyFor(zone, name)
     let r = this.records[key]
     if (r && at <= r.lastDeath + SETTLE_MS) return
     if (!r) r = this.records[key] = { zone, name: displayName(name), kills: 0, lastDeath: 0, pendingSince: 0, gaps: [], shared: false }
@@ -130,8 +220,12 @@ export class RespawnLog {
   }
 
   private seen(zone: string, name: string, at: number): void {
-    const r = this.records[respawnKey(zone, name)]
-    if (!r || !r.pendingSince || at < r.pendingSince + SETTLE_MS) return
+    const r = this.records[this.keyFor(zone, name)]
+    if (r) this.sighted(r, at)
+  }
+
+  private sighted(r: RespawnRecord, at: number): void {
+    if (!r.pendingSince || at < r.pendingSince + SETTLE_MS) return
     const gap = Math.round((at - r.pendingSince) / 1000)
     r.pendingSince = 0
     this.open = null
@@ -156,8 +250,9 @@ export class RespawnLog {
     }
   }
 
+  /** The oldest kills go past KEEP_RECORDS; a spawn point stays, as the player made it. */
   private prune(): void {
-    const keys = Object.keys(this.records)
+    const keys = Object.keys(this.records).filter((k) => !this.records[k].names)
     if (keys.length <= KEEP_RECORDS) return
     keys.sort((a, b) => this.records[a].lastDeath - this.records[b].lastDeath)
     for (const k of keys.slice(0, keys.length - KEEP_RECORDS)) delete this.records[k]
@@ -167,7 +262,10 @@ export class RespawnLog {
 // ---- the trigger a respawn timer is ----
 
 export interface RespawnTimerSpec {
+  /** The mob's, or a spawn point's own name. */
   name: string
+  /** A spawn point's: the mobs whose deaths start it. */
+  names?: string[]
   seconds: number
   overlay: string
   /** Seconds before it is up to say so; 0 = no warning. */
@@ -197,9 +295,10 @@ export function respawnTriggerId(name: string): string {
 
 const escapeRegex = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 
-/** The three ways the log reports a death, for exactly this name. Case-insensitive, as all phrases are. */
-export function respawnPhrase(name: string): string {
-  const n = escapeRegex(name)
+/** The three ways the log reports a death, for exactly this name, or any of these. Case-insensitive, as all phrases are. */
+export function respawnPhrase(name: string | string[]): string {
+  const names = typeof name === 'string' ? [name] : name
+  const n = names.length === 1 ? escapeRegex(names[0]) : `(?:${names.map(escapeRegex).join('|')})`
   return `^(?:You have slain ${n}!|${n} has been slain by .+!|${n} died\\.)$`
 }
 
@@ -217,8 +316,10 @@ export function respawnTrigger(spec: RespawnTimerSpec, existing?: Trigger): Trig
     name: `${spec.name} respawn`,
     folder: existing?.folder ?? RESPAWN_FOLDER,
     enabled: true,
-    comment: existing?.comment ?? `Made on the Respawns page. Starts when ${spec.name} dies.`,
-    phrases: [{ text: respawnPhrase(spec.name), regex: true }],
+    comment: spec.names?.length
+      ? `Made on the Respawns page. Starts when any of ${spec.names.join(', ')} dies.`
+      : (existing?.comment ?? `Made on the Respawns page. Starts when ${spec.name} dies.`),
+    phrases: [{ text: respawnPhrase(spec.names?.length ? spec.names : spec.name), regex: true }],
     cooldownSec: 0,
     actions: [
       {
@@ -266,7 +367,14 @@ export function respawnView(records: RespawnRecords, triggers: Trigger[], zone: 
   const mine = triggers.filter((t) => t.id.startsWith('respawn-'))
   const timers = new Map(mine.map((t) => [t.id, respawnTimerOf(t)]))
   const rows = Object.entries(records)
-    .map(([key, r]): RespawnRow => ({ ...r, gaps: [...r.gaps], key, estimate: respawnEstimate(r), timer: timers.get(respawnTriggerId(r.name)) ?? null }))
+    .map(([key, r]): RespawnRow => ({
+      ...r,
+      gaps: [...r.gaps],
+      ...(r.names ? { names: [...r.names] } : {}),
+      key,
+      estimate: respawnEstimate(r),
+      timer: timers.get(respawnTriggerId(r.name)) ?? null
+    }))
     .sort((a, b) => b.lastDeath - a.lastDeath)
   // A timer added by name, for a mob not killed since: listed so it can be changed here too.
   const named = new Set(rows.map((r) => respawnTriggerId(r.name)))
@@ -282,4 +390,11 @@ function respawnTimerOf(t: Trigger): RespawnTimerInfo | null {
   const a = t.actions.find((x) => x.type === 'timer')
   if (!a || a.type !== 'timer') return null
   return { triggerId: t.id, enabled: t.enabled, seconds: a.durationSec, overlay: a.overlay, warnSec: a.warnSec, announce: !!a.endSpeech }
+}
+
+/** A respawn trigger's timer as a spec to make it again with; null when it has no timer. */
+export function respawnTimerSpec(t: Trigger): RespawnTimerSpec | null {
+  const a = t.actions.find((x) => x.type === 'timer')
+  if (!a || a.type !== 'timer') return null
+  return { name: a.name, seconds: a.durationSec, overlay: a.overlay, warnSec: a.warnSec, announce: !!a.endSpeech }
 }

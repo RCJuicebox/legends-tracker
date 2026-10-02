@@ -1,9 +1,11 @@
-import type { MeterOverlayOptions, OverlayConfig } from './types'
+import type { AchievementOverlayOptions, MeterOverlayOptions, OverlayConfig } from './types'
 
 // The overlays every install ships with. Main seeds settings from these; the renderer reads the ids to
 // know which overlays may be hidden but not removed. Pure data, so both sides can import it.
 
 export const DEFAULT_METER_OPTIONS: MeterOverlayOptions = { mode: 'damage', span: 'fight', scope: 'everyone', rows: 8, combinePet: true, header: true }
+
+export const DEFAULT_ACHIEVEMENT_OPTIONS: AchievementOverlayOptions = { factionPlan: true }
 
 export const OVERLAY_BUFFS = 'buffs'
 export const OVERLAY_TARGETS = 'targets'
@@ -67,7 +69,17 @@ export const DEFAULT_OVERLAYS: OverlayConfig[] = [
   },
   { id: OVERLAY_RESPAWNS, name: 'Respawns', kind: 'timers', ...AT[OVERLAY_RESPAWNS], opacity: 1, fontSize: 15, visible: true, groupByTarget: false },
   // The faction plan's step and the Slayer counts; hidden until asked for (the Plan tab or the Overlays page).
-  { id: OVERLAY_ACHIEVEMENTS, name: 'Achievements', kind: 'achievements', ...AT[OVERLAY_ACHIEVEMENTS], opacity: 1, fontSize: 14, visible: false, groupByTarget: false }
+  {
+    id: OVERLAY_ACHIEVEMENTS,
+    name: 'Achievements',
+    kind: 'achievements',
+    ...AT[OVERLAY_ACHIEVEMENTS],
+    opacity: 1,
+    fontSize: 14,
+    visible: false,
+    groupByTarget: false,
+    achievements: { ...DEFAULT_ACHIEVEMENT_OPTIONS }
+  }
 ]
 
 /**

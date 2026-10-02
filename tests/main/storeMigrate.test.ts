@@ -3,7 +3,7 @@ import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'no
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
-// This build ships no migrations yet, so the schema table is swapped for one where settings.json is
+// The build's own migrations change no fields, so the schema table is swapped for one where settings.json is
 // at schema 2 with a migration that renames an old field. Everything else about the Store is real.
 const profile = vi.hoisted(() => ({ dir: '' }))
 const migrate = vi.hoisted(() => ({

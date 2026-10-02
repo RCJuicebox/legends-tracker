@@ -6,6 +6,7 @@ import {
   type MoteStock,
   type SpellRule,
   type FocusSource,
+  type AchievementOverlayOptions,
   type MeterOverlayOptions,
   type OverlayConfig,
   type Phrase,
@@ -14,8 +15,8 @@ import {
   type Trigger,
   type TriggerAction
 } from '../shared/types'
-import { DEFAULT_METER_OPTIONS, minOpacity } from '../shared/overlays'
-import type { RespawnRecords, RespawnTimerSpec } from './respawns'
+import { DEFAULT_ACHIEVEMENT_OPTIONS, DEFAULT_METER_OPTIONS, minOpacity } from '../shared/overlays'
+import type { RespawnRecords, RespawnTimerSpec, SpawnLink } from './respawns'
 import { MOTE_RANKS, type MoteSession, type MoteState } from './motes'
 import type { ActiveBuff, BuffsFile, Person } from './buffs'
 import type { TradeFavorite, TradeSaved } from '../shared/ipc'
@@ -250,6 +251,11 @@ export function meterOptions(v: unknown, fb: MeterOverlayOptions | undefined): M
   }
 }
 
+function achievementOptions(v: unknown, fb: AchievementOverlayOptions | undefined): AchievementOverlayOptions {
+  const base = fb ?? DEFAULT_ACHIEVEMENT_OPTIONS
+  return isObj(v) ? { factionPlan: bool(v.factionPlan, base.factionPlan) } : { ...base }
+}
+
 function overlay(v: unknown, fb: OverlayConfig | undefined): OverlayConfig | null {
   if (!isObj(v) || typeof v.id !== 'string' || !v.id) return null
   const base: OverlayConfig = fb ?? {
@@ -267,11 +273,13 @@ function overlay(v: unknown, fb: OverlayConfig | undefined): OverlayConfig | nul
   }
   const kind = oneOf(v.kind, ['timers', 'alerts', 'meter', 'achievements'] as const, base.kind)
   const meter = kind === 'meter' ? (meterOptions(v.meter, base.meter) ?? { ...DEFAULT_METER_OPTIONS }) : undefined
+  const achievements = kind === 'achievements' ? achievementOptions(v.achievements, base.achievements) : undefined
   return shape(v, base, {
     id: v.id,
     name: str(v.name, base.name),
     kind,
     meter,
+    achievements,
     x: num(v.x, base.x, -100_000, 100_000),
     y: num(v.y, base.y, -100_000, 100_000),
     width: num(v.width, base.width, 40, 20_000),
@@ -386,6 +394,7 @@ export function sanitizeSettings(v: unknown, fb: AppSettings): AppSettings | nul
     // The tailer reads whatever this names: only a character log.
     logFile: logFilePath(v.logFile, fb.logFile),
     autoStart: bool(v.autoStart, fb.autoStart),
+    autoRestartUpdates: bool(v.autoRestartUpdates, fb.autoRestartUpdates),
     characters,
     tracking,
     audio,
@@ -487,8 +496,28 @@ export function sanitizeRespawns(v: unknown): RespawnRecords {
       gaps: numbers(r.gaps).filter((g) => g >= 0),
       shared: bool(r.shared, false)
     }
+    const names = stringsArg(r.names, MAX_SPAWN_NAMES)
+    if (names.length) out[key].names = names
   }
   return out
+}
+
+/** The most mobs one spawn point can pop, as far as a link goes. */
+const MAX_SPAWN_NAMES = 12
+
+/** A spawn point as the Respawns page links it: a zone, its own name and at least two mobs; null otherwise. */
+export function sanitizeSpawnLink(v: unknown): SpawnLink | null {
+  if (!isObj(v) || typeof v.zone !== 'string' || !v.zone.trim() || typeof v.name !== 'string' || !v.name.trim()) return null
+  const names = [
+    ...new Map(
+      stringsArg(v.names, MAX_SPAWN_NAMES, 100)
+        .map((n) => n.trim())
+        .filter(Boolean)
+        .map((n) => [n.toLowerCase(), n])
+    ).values()
+  ]
+  if (names.length < 2) return null
+  return { zone: v.zone.trim(), name: v.name.trim().slice(0, 100), names }
 }
 
 /** A respawn timer as the Respawns page asks for it; null without a name or a length. */

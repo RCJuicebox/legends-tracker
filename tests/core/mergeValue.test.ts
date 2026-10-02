@@ -40,7 +40,10 @@ describe('the best merge next', () => {
     ])
     // Four Minor make two Lesser.
     const some = mergeOptions({ worn: inv.worn, baseStatsOf, weights, stock: { minor: 4 } })
-    expect(some.find((o) => o.item.name === 'Plain Ring +2')).toMatchObject({ canMake: 2, affordable: true })
+    expect(some.find((o) => o.item.name === 'Plain Ring +2')).toMatchObject({ held: 0, canMake: 2, affordable: true })
+    // Those on hand are told apart from those combining would make.
+    const both = mergeOptions({ worn: inv.worn, baseStatsOf, weights, stock: { minor: 4, lesser: 1 } })
+    expect(both.find((o) => o.item.name === 'Plain Ring +2')).toMatchObject({ held: 1, canMake: 3 })
   })
 
   it("counts xp already in the planned item's bar", () => {

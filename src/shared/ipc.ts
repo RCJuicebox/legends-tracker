@@ -20,7 +20,7 @@ import type { LootSnapshot } from '../core/loot'
 import type { MeleeProfile } from '../core/meleeTally'
 import type { MoteState } from '../core/motes'
 import type { PetGearReading, PetProfile, PetSpellOption } from '../core/pets'
-import type { RespawnTimerSpec, RespawnView } from '../core/respawns'
+import type { RespawnTimerSpec, RespawnView, SpawnLink } from '../core/respawns'
 import type { MyClass, SpellCastRow } from '../core/spellMotes'
 import type { Purchase, Recipe } from '../core/tradeskills'
 import type { CatalogItem } from '../core/wikiItem'
@@ -304,6 +304,8 @@ export interface Invokes {
   'respawns:setTimer': (spec: RespawnTimerSpec) => RespawnView
   'respawns:removeTimer': (name: string) => RespawnView
   'respawns:forget': (key: string) => RespawnView
+  'respawns:link': (link: SpawnLink) => RespawnView
+  'respawns:unlink': (key: string) => RespawnView
 
   'trade:recipes': () => RecipeState
   'trade:refresh': () => RecipeState
@@ -498,6 +500,8 @@ const INVOKE_CHANNELS: Record<InvokeChannel, true> = {
   'respawns:setTimer': true,
   'respawns:removeTimer': true,
   'respawns:forget': true,
+  'respawns:link': true,
+  'respawns:unlink': true,
   'trade:recipes': true,
   'trade:refresh': true,
   'trade:craftEras': true,

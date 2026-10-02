@@ -16,7 +16,7 @@ export const SCHEMAS: Readonly<Record<string, number>> = {
   'casts.json': 1,
   'motes.json': 1,
   'mote-stock.json': 1,
-  'respawns.json': 1,
+  'respawns.json': 2,
   'buffs.json': 1
 }
 
@@ -27,8 +27,12 @@ export interface Migration {
   run: (value: unknown) => unknown
 }
 
-/** Every migration, oldest first. None yet: every file is still at its first schema. */
-const MIGRATIONS: readonly Migration[] = []
+/** Every migration, oldest first. */
+const MIGRATIONS: readonly Migration[] = [
+  // Spawn points (a record with `names`). Nothing to change: the bump keeps an older build, which would
+  // drop the names, from writing the file.
+  { file: 'respawns.json', to: 2, run: (v) => v }
+]
 
 export type SchemaState = { state: 'current' } | { state: 'migrated'; from: number; backup: string } | { state: 'newer'; version: number }
 

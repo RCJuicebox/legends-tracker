@@ -95,11 +95,13 @@ export function registerLifecycle(ctx: AppContext): void {
   })
 
   // Restarts into a downloaded update. Everything is written first: quitAndInstall starts the
-  // installer straight away, so a flush left to before-quit would race it.
-  ctx.installUpdate = async () => {
+  // installer straight away, so a flush left to before-quit would race it. A restart nobody asked
+  // for (Restart into updates by itself) notes first whether the window should come back after it.
+  ctx.installUpdate = async (unasked = false) => {
     if (ctx.updater.status.state !== 'ready' || shuttingDown) return
     ctx.windows.quitting = true
     shuttingDown = true
+    if (unasked) await ctx.windows.noteRelaunch().catch((e: unknown) => log.warn('Could not note the window before updating', e))
     await stopAndSave(ctx)
     shutDown = true
     ctx.updater.install()
