@@ -2,7 +2,7 @@
 
 What changed in each version. The release workflow publishes a version's section as its release notes, and installed copies show them when an update arrives.
 
-## Unreleased
+## 2.6.0 (2026-10-02)
 
 - **Hide the faction plan from the achievements overlay.** A **Show the faction plan** switch on the overlay's card in Overlays. Off, the overlay leaves the plan's step out; the plan is still followed, and its steps are still spoken if that is on.
 - **Restart into updates by itself.** A new switch in Settings, off unless you turn it on: as soon as an update has downloaded, the app restarts into it without asking, even while you play. The overlays blink and come back; the main window comes back only if you were using it, otherwise the app restarts in the tray so the game keeps the screen, and a notification says it updated.
