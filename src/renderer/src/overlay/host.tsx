@@ -6,6 +6,7 @@ import { OverlayRegion } from './regions'
 import type { CombatSnapshot, OverlayConfig, TimerView } from '../../../shared/types'
 import type { AchievementTrack } from '../../../shared/tracking'
 import { opacityStyle } from '../../../shared/overlays'
+import { mergeCombat } from '../../../shared/combat'
 
 // The overlays on one monitor, each a region of one transparent window over the game: one
 // renderer instead of one per overlay. The window covers just their area; `origin` is where its
@@ -71,7 +72,7 @@ function Host() {
         setOrigin(p.origin)
       }),
       api.on('overlay:timers', (views: TimerView[]) => setTimers(views)),
-      api.on('overlay:combat', (snap: CombatSnapshot) => setCombat(snap)),
+      api.on('overlay:combat', (snap: CombatSnapshot) => setCombat((had) => mergeCombat(had, snap))),
       api.on('overlay:achievements', (t: AchievementTrack | null) => setTrack(t))
     ]
     return () => offs.forEach((off) => off())

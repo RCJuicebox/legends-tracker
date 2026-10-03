@@ -2,7 +2,7 @@ import { app, dialog, protocol } from 'electron'
 import { cpSync, existsSync, mkdirSync, renameSync, rmSync } from 'node:fs'
 import { release } from 'node:os'
 import { join } from 'node:path'
-import { initLog, log } from './log'
+import { flushLogSync, initLog, log } from './log'
 import { cacheDir } from './paths'
 
 // What has to happen before anything else is built: where settings and the log live, the icon scheme,
@@ -18,10 +18,23 @@ log.info(`Legends Tracker ${app.getVersion()}${app.isPackaged ? '' : ' (developm
 // state nobody meant. A second one ends it rather than carry on further. The box does not wait to be
 // closed: timers, the log and the overlays carry on behind it.
 let uncaught = 0
+/** What has to be written before the app ends on a second uncaught error: set once the store exists. */
+let saveOnFault: (() => Promise<unknown>) | null = null
+export function onFatalSave(save: () => Promise<unknown>): void {
+  saveOnFault = save
+}
+process.on('exit', () => flushLogSync())
 process.on('uncaughtException', (e) => {
   log.error('Uncaught exception:', e)
   if (++uncaught > 1) {
-    app.exit(1)
+    // Ends, but writes the settings and the rest first, given two seconds (LT-437).
+    if (uncaught > 2) return
+    const exit = () => {
+      flushLogSync()
+      app.exit(1)
+    }
+    const save = saveOnFault?.().catch(() => undefined) ?? Promise.resolve()
+    void Promise.race([save, new Promise((r) => setTimeout(r, 2000))]).then(exit, exit)
     return
   }
   const title = 'Legends Tracker hit an unexpected error'

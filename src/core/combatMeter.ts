@@ -594,7 +594,11 @@ export class CombatMeter {
     // A lifetap whose heal line came first already counted this firing.
     const paired = !!proc && Math.abs(at - (this.healFiring.get(procKey) ?? -Infinity)) <= 1000
     if (paired) this.healFiring.delete(procKey)
-    if (proc) this.lastProc.set(procKey, at)
+    if (proc) {
+      this.lastProc.set(procKey, at)
+      // Capped as lastCast is: a busy raid zone names hundreds (LT-382).
+      if (this.lastProc.size > 4000) this.lastProc.delete(this.lastProc.keys().next().value!)
+    }
     const finishing = ev.how === 'melee' && ev.mods.includes('finishing blow')
     for (const seg of closed ? [this.ensureSession(at), closed] : this.liveSegments(at, true)) {
       const src = this.ent(seg, source, at)
@@ -693,7 +697,10 @@ export class CombatMeter {
     const proc = ss === 'friend' && !ev.hot && !tap ? this.procOrigin(source, ev.spell, at) : null
     const procKey = `${nameKey(source)}|${spellBase(ev.spell)}`
     const firing = !!proc && Math.abs(at - (this.lastProc.get(procKey) ?? -Infinity)) > 1000
-    if (firing) this.healFiring.set(procKey, at)
+    if (firing) {
+      this.healFiring.set(procKey, at)
+      if (this.healFiring.size > 4000) this.healFiring.delete(this.healFiring.keys().next().value!)
+    }
     const ours = this.who.ours(source) || this.who.ours(target)
     for (const seg of this.liveSegments(at, false)) {
       // A heal between strangers is no more yours than their fight: it counts once either is in the segment.

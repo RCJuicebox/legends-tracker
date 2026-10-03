@@ -15,6 +15,16 @@ describe('Backlog', () => {
     expect(b.end()).toEqual([1, 2, 3, 4])
     expect(b).toMatchObject({ active: false, full: false, size: 0 })
   })
+
+  it('drops and counts past twice its size, for a reader that does not stop (LT-372)', () => {
+    const b = new Backlog<number>(2)
+    b.begin()
+    for (const n of [1, 2, 3, 4, 5, 6]) expect(b.hold(n)).toBe(true)
+    expect(b.dropped).toBe(2)
+    expect(b.end()).toEqual([1, 2, 3, 4])
+    b.begin()
+    expect(b.dropped).toBe(0)
+  })
 })
 
 describe('Throttled', () => {

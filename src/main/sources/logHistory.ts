@@ -359,17 +359,26 @@ export class LogHistory {
         }
       }
       if (size > live.offset) {
-        // Read into a copy: a read that fails part way leaves the values and the offset as they were.
-        const values = structuredClone(live.values)
-        const read = await this.feed(createReadStream(where.logPath, { start: live.offset }), Object.keys(this.consumers), values, false)
-        bytes += read
-        if (read > 0) {
-          cache.live[pathKey] = { id, offset: live.offset + read, values }
-          changed = true
+        // Read into the values kept, not a copy of them (half a megabyte cloned per Factions poll,
+        // LT-378): reads are one at a time, and one that fails part way has counted lines the offset
+        // does not cover, so those counts go and this log is read from the top next time.
+        const at = live
+        try {
+          const read = await this.feed(createReadStream(where.logPath, { start: at.offset }), Object.keys(this.consumers), at.values, false)
+          bytes += read
+          if (read > 0) {
+            at.offset += read
+            changed = true
+          }
+        } catch (e) {
+          delete cache.live[pathKey]
+          this.changed()
+          throw e
         }
       }
       const v = cache.live[pathKey].values[key]
-      if (v) out.live = v.value as T
+      // The asker's own copy of its one value: the one kept is read into in place next time.
+      if (v) out.live = structuredClone(v.value) as T
     }
     if (changed) this.changed()
     const ms = performance.now() - started

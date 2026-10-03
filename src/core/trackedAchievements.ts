@@ -52,7 +52,7 @@ export function trackedAchievements(sections: AchSection[], marks: { ticks: stri
       const open = required.filter(({ ci }) => !book.objDone([si, ai, ci]))
       const killedAt = (name: string) => {
         const times = kills.get(bare(name))?.times
-        return times?.length ? Math.max(...times) : 0
+        return times?.at(-1) ?? 0
       }
       // A named killed since the export is ticked off here before the next export says so.
       const justDone = open.map(({ c }) => ({ name: c.t, at: killedAt(c.t) })).filter((x) => x.at > 0)

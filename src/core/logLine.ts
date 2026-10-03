@@ -24,23 +24,36 @@ const MONTHS: Record<string, number> = {
 
 const LINE = /^\[\w{3} (\w{3}) ([ \d]\d) (\d\d):(\d\d):(\d\d) (\d{4})\] (.*)$/
 
-/** The last stamp read ("[Wed Sep 23 13:29:05 2026]") and its time: a raid writes dozens of lines a second. */
-let lastStamp = ''
-let lastTime = 0
+/**
+ * Parses lines, remembering the last stamp read ("[Wed Sep 23 13:29:05 2026]") and its time: a raid
+ * writes dozens of lines a second. One per reader, so a history read in between does not cost the
+ * live reader its stamp each turn (LT-381).
+ */
+class Stamps {
+  private stamp = ''
+  private time = 0
+
+  parse(raw: string): LogLine | null {
+    // The same second as the line before: its time is known, no Date to build.
+    if (this.stamp && raw.charCodeAt(26) === 32 && raw.startsWith(this.stamp)) return { time: this.time, text: raw.slice(27) }
+    const m = LINE.exec(raw)
+    if (!m) return null
+    const month = MONTHS[m[1]]
+    if (month === undefined) return null
+    const time = new Date(+m[6], month, +m[2], +m[3], +m[4], +m[5]).getTime()
+    if (raw.charCodeAt(25) === 93) {
+      this.stamp = raw.slice(0, 26)
+      this.time = time
+    }
+    return { time, text: m[7] }
+  }
+}
+
+/** For the readers without a clock of their own (history, catch-up, tests). */
+const shared = new Stamps()
 
 export function parseLogLine(raw: string): LogLine | null {
-  // The same second as the line before: its time is known, no Date to build.
-  if (lastStamp && raw.charCodeAt(26) === 32 && raw.startsWith(lastStamp)) return { time: lastTime, text: raw.slice(27) }
-  const m = LINE.exec(raw)
-  if (!m) return null
-  const month = MONTHS[m[1]]
-  if (month === undefined) return null
-  const time = new Date(+m[6], month, +m[2], +m[3], +m[4], +m[5]).getTime()
-  if (raw.charCodeAt(25) === 93) {
-    lastStamp = raw.slice(0, 26)
-    lastTime = time
-  }
-  return { time, text: m[7] }
+  return shared.parse(raw)
 }
 
 const HOUR = 3_600_000
@@ -59,9 +72,10 @@ function repeatedHour(time: number): boolean {
  */
 export class LogClock {
   private last = -Infinity
+  private readonly stamps = new Stamps()
 
   parse(raw: string): LogLine | null {
-    const line = parseLogLine(raw)
+    const line = this.stamps.parse(raw)
     if (!line) return null
     // Lines are in order to within a few seconds, so a step back of close to an hour is the repeat.
     if (line.time < this.last - 60_000 && line.time + HOUR >= this.last - 60_000 && repeatedHour(line.time)) line.time += HOUR

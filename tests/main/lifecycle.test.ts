@@ -67,6 +67,7 @@ function fakeContext(o: { engine?: Engine; flushAll?: () => Promise<unknown>; up
     store: { flushAll: o.flushAll ?? (async () => note('save stores')()) },
     features: [{ flush: async () => note('save followed plans')() }, {}, { flush: async () => note('save allakhazam pages')() }],
     logHistory: { flush: async () => note('save log history')() },
+    petStore: { flush: async () => undefined },
     installUpdate: async () => {}
   }
   return ctx as unknown as typeof ctx & AppContext

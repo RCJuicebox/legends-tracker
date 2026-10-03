@@ -11,7 +11,8 @@ export interface TailerOptions {
   pollMs?: number
   /** `end`: the byte offset just past the last line given, so a reader elsewhere can pick up exactly there. */
   onLines: (lines: string[], end: number) => void
-  onReset?: (reason: ResetReason) => void
+  /** `skipped`: the new file was already large, so reading goes on from its end rather than its top. */
+  onReset?: (reason: ResetReason, skipped: boolean) => void
   onMissing?: () => void
   onSize?: (size: number) => void
   /**
@@ -23,8 +24,26 @@ export interface TailerOptions {
   onRecovered?: () => void
 }
 
+/** What the tailer has done since it started, for diagnostics (LT-385). */
+export interface TailerStats {
+  polls: number
+  slices: number
+  bytes: number
+  lines: number
+  /** The longest the lines of one slice took to handle, in ms. */
+  maxSliceMs: number
+  failures: number
+}
+
 /** Reads come in bounded slices, so a burst of combat never turns into one large read. */
 const SLICE = 256 * 1024
+/**
+ * A log the game starts afresh is a few lines long when it is first seen. One already larger than
+ * this (a backup restored over the log, another file swapped in) is old play: replayed through the
+ * live pipeline it would speak every trigger and start a timer for every old cast (LT-373), so it is
+ * read on from its end, and the catch-up readers fill in what they need.
+ */
+const REPLAY_MAX = 1024 * 1024
 /** A sharing violation while the game writes clears by the next poll; this many in a row (3 s) is not that. */
 const FAIL_AFTER = 30
 
@@ -49,6 +68,7 @@ export class LogTailer {
   private handle: FileHandle | null = null
   /** Polls in a row that failed to read. */
   private failures = 0
+  readonly stats: TailerStats = { polls: 0, slices: 0, bytes: 0, lines: 0, maxSliceMs: 0, failures: 0 }
   /**
    * Bumped by start and stop. A poll or read begun under an older generation was overtaken (stopped,
    * perhaps restarted) and must neither read on nor schedule another poll, or two loops would run.
@@ -81,11 +101,17 @@ export class LogTailer {
     await h?.close().catch(() => undefined)
   }
 
+  /** How often to look: a tenth of a second while the game writes, a second while it is closed (LT-374). */
+  setPollMs(ms: number): void {
+    this.opts.pollMs = ms
+  }
+
   private schedule(gen: number): void {
     if (this.running && gen === this.generation) this.timer = setTimeout(() => void this.poll(gen), this.opts.pollMs ?? 100)
   }
 
   private async poll(gen: number): Promise<void> {
+    this.stats.polls++
     try {
       await this.readOnce()
       if (this.failures >= FAIL_AFTER) this.opts.onRecovered?.()
@@ -93,6 +119,7 @@ export class LogTailer {
     } catch (e) {
       // A transient sharing violation while the game writes clears by the next poll; one that does
       // not is said once, and the log is still tried every poll.
+      this.stats.failures++
       if (++this.failures === FAIL_AFTER) this.opts.onError?.(e, 'read')
     }
     this.schedule(gen)
@@ -125,13 +152,15 @@ export class LogTailer {
     } else if (identity !== this.identity) {
       await this.release()
       this.identity = identity
-      this.pos = 0
+      const skip = size > REPLAY_MAX
+      this.pos = skip ? size : 0
       this.partial = ''
-      this.opts.onReset?.('replaced')
+      this.opts.onReset?.('replaced', skip)
     } else if (size < this.pos) {
-      this.pos = 0
+      const skip = size > REPLAY_MAX
+      this.pos = skip ? size : 0
       this.partial = ''
-      this.opts.onReset?.('truncated')
+      this.opts.onReset?.('truncated', skip)
     }
     this.opts.onSize?.(size)
     if (size === this.pos) return
@@ -165,7 +194,11 @@ export class LogTailer {
         // Stopped mid-read: a newer read owns the position now.
         if (overtaken() || bytesRead <= 0) break
         this.pos += bytesRead
+        this.stats.slices++
+        this.stats.bytes += bytesRead
+        const started = performance.now()
         this.emit(decodeCp1252(buf.subarray(0, bytesRead)))
+        this.stats.maxSliceMs = Math.max(this.stats.maxSliceMs, performance.now() - started)
       }
     } catch (e) {
       if (overtaken()) return
@@ -182,6 +215,7 @@ export class LogTailer {
     const lines = parts.map((l) => (l.endsWith('\r') ? l.slice(0, -1) : l)).filter((l) => l.length > 0)
     // Windows-1252 decodes one byte to one character, so the held piece's length is its size in bytes.
     if (!lines.length) return
+    this.stats.lines += lines.length
     // The position has moved past these lines, so a reader that throws must not stop the rest of the
     // slice reaching the others (LT-340): it is told, and reading goes on.
     try {

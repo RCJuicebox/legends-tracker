@@ -291,7 +291,8 @@ export function slayerCounts(
       else unplaced.push({ name: k.name, n: k.times.length })
       if (!at.length) continue
     }
-    const newest = Math.max(...k.times)
+    // Kills are kept in log order: the newest is the last (no spread of a long grind's list, LT-380).
+    const newest = k.times.at(-1) ?? 0
     for (const c of at) {
       since[c] += k.times.length
       last[c] = Math.max(last[c], newest)

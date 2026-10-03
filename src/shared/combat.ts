@@ -193,4 +193,25 @@ export interface CombatSnapshot {
   otherPets: Record<string, string>
   /** Lines the meter is still reading from the log, or ''. */
   reading: string
+  /**
+   * Sent to an overlay that has the closed fights and sessions already: `fights` and `sessions` hold
+   * the open ones alone, and the page keeps its closed ones (mergeCombat). Twice a second, 300 closed
+   * summaries to every host were most of the push after an evening (LT-370).
+   */
+  openOnly?: true
+}
+
+/** A snapshot as an overlay draws it: one sent `openOnly` takes the closed fights and sessions it had. */
+export function mergeCombat(had: CombatSnapshot | null, next: CombatSnapshot): CombatSnapshot {
+  if (!next.openOnly) return next
+  const closed = (list: SegmentSummary[] | undefined) => (list ?? []).filter((s) => !s.open)
+  const { openOnly: _openOnly, ...rest } = next
+  return { ...rest, fights: [...next.fights, ...closed(had?.fights)], sessions: [...next.sessions, ...closed(had?.sessions)] }
+}
+
+/** What says the closed fights and sessions changed: closed summaries never change, so their count and newest do. */
+export function closedKey(s: CombatSnapshot): string {
+  const f = s.fights.filter((x) => !x.open)
+  const ss = s.sessions.filter((x) => !x.open)
+  return `${f.length}|${f[0]?.id ?? ''}|${ss.length}|${ss[0]?.id ?? ''}`
 }

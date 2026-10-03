@@ -1,4 +1,4 @@
-import { appendFileSync, mkdirSync, renameSync, rmSync, statSync } from 'node:fs'
+import { appendFileSync, mkdirSync, promises as fs, renameSync, rmSync, statSync } from 'node:fs'
 import { join } from 'node:path'
 
 // The app's own diagnostic log: %APPDATA%\Legends Tracker\logs\main.log, rolled over past 2 MB to
@@ -9,6 +9,10 @@ import { join } from 'node:path'
 // Times are the PC's local time with its offset from UTC, as the game's own log is local time: a line
 // here and a line there can be matched by eye. A line written again and again (a page's warning every
 // frame, a check failing each hour offline) is written once, then counted.
+//
+// Lines are appended asynchronously, a batch at a time, so a virus scanner holding the file does not
+// hold up the timers and overlays (LT-376); flushLogSync() writes what waits at once, for a process
+// about to end.
 
 const MAX_BYTES = 2 * 1024 * 1024
 /** The same line again within this long is counted, not written. */
@@ -19,10 +23,17 @@ let file = ''
 /** What main.log holds, kept here rather than asked of the disk for every line. */
 let size = 0
 let last = { text: '', at: 0, repeats: 0 }
+/** Lines not written yet, and the write under way. */
+let pending = ''
+let writing: Promise<void> | null = null
+/** A rollover that failed is said once, not at every line after. */
+let rollFailed = false
 
 export function initLog(folder: string): void {
+  flushLogSync()
   dir = folder
   file = join(folder, 'main.log')
+  rollFailed = false
   try {
     mkdirSync(folder, { recursive: true })
     size = statSync(file, { throwIfNoEntry: false })?.size ?? 0
@@ -57,8 +68,13 @@ function stamp(d = new Date()): string {
   return `${d.getFullYear()}-${two(d.getMonth() + 1)}-${two(d.getDate())} ${two(d.getHours())}:${two(d.getMinutes())}:${two(d.getSeconds())}.${String(d.getMilliseconds()).padStart(3, '0')} ${zone}`
 }
 
-function append(line: string): void {
-  if (size + line.length > MAX_BYTES) {
+/**
+ * Rolls main.log over past 2 MB. One that cannot be (the file held) leaves the log growing rather
+ * than silent: the size is reset only once the roll worked, and the failure said once (LT-435).
+ */
+function rollIfDue(adding: number): string {
+  if (size + adding <= MAX_BYTES) return ''
+  try {
     rmSync(join(dir, 'main.old2.log'), { force: true })
     try {
       renameSync(join(dir, 'main.old.log'), join(dir, 'main.old2.log'))
@@ -67,9 +83,50 @@ function append(line: string): void {
     }
     renameSync(file, join(dir, 'main.old.log'))
     size = 0
+    rollFailed = false
+    return ''
+  } catch (e) {
+    if (rollFailed) return ''
+    rollFailed = true
+    return `${stamp()} WARN  main.log could not be rolled over (${e instanceof Error ? e.message : String(e)}); it grows past 2 MB until it can be\n`
   }
-  appendFileSync(file, line, 'utf8')
-  size += Buffer.byteLength(line, 'utf8')
+}
+
+/** Writes what waits, a batch at a time; lines that come meanwhile go in the next. */
+function drain(): Promise<void> {
+  writing ??= (async () => {
+    while (pending && file) {
+      const batch = pending
+      pending = ''
+      const text = rollIfDue(batch.length) + batch
+      try {
+        await fs.appendFile(file, text, 'utf8')
+        size += Buffer.byteLength(text, 'utf8')
+      } catch {
+        // Nowhere left to report a failure to write the log.
+      }
+    }
+    writing = null
+  })()
+  return writing
+}
+
+/** Everything logged so far, written (tests, and a clean quit). */
+export function flushLog(): Promise<void> {
+  return pending ? drain() : (writing ?? Promise.resolve())
+}
+
+/** Writes what waits now, on this thread: for a process about to end (a second uncaught error). */
+export function flushLogSync(): void {
+  if (!pending || !file) return
+  const text = rollIfDue(pending.length) + pending
+  pending = ''
+  try {
+    appendFileSync(file, text, 'utf8')
+    size += Buffer.byteLength(text, 'utf8')
+  } catch {
+    // As above.
+  }
 }
 
 function write(level: 'info' | 'warn' | 'error', args: unknown[]): void {
@@ -89,11 +146,8 @@ function write(level: 'info' | 'warn' | 'error', args: unknown[]): void {
     for (const l of lines) (level === 'info' ? console.log : console.error)(l)
     return
   }
-  try {
-    append(lines.map((l) => l + '\n').join(''))
-  } catch {
-    // Nowhere left to report a failure to write the log.
-  }
+  pending += lines.map((l) => l + '\n').join('')
+  if (!writing) void drain()
 }
 
 export const log = {

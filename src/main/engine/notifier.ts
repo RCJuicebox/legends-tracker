@@ -2,6 +2,7 @@ import { existsSync, promises as fs } from 'node:fs'
 import { basename, isAbsolute, join } from 'node:path'
 import { log } from '../log'
 import { sources } from '../sources/registry'
+import { perf } from '../perf'
 import type { AppSettings, FeedItem, Notification } from '../../shared/types'
 import type { EngineOutputs, Speaker } from './contracts'
 
@@ -81,6 +82,7 @@ export class Notifier {
   speak(text: string, interrupt = false, expiresAt?: number): Promise<void> {
     if (!text.trim()) return Promise.resolve()
     const a = this.settings().audio
+    const asked = performance.now()
     // Rendered at once, but sent after every phrase asked for before it: a cached phrase must not
     // overtake one still rendering (LT-345).
     const rendered = this.speech.synthesize(text, a.voice, a.rate).then(
@@ -89,6 +91,7 @@ export class Notifier {
     )
     const sent = this.order.then(async () => {
       const r = await rendered
+      perf.cue.add(performance.now() - asked)
       if ('wav' in r) {
         this.out.audio({ kind: 'speech', wav: new Uint8Array(r.wav), interrupt, expiresAt })
         if (this.speechFailed) {

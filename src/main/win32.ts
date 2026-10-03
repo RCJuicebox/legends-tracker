@@ -80,50 +80,74 @@ const baseName = (path: string) =>
     .replace(/\.exe$/i, '')
     .toLowerCase()
 
+/**
+ * The game watcher asks these four times a second: one that throws (a koffi fault, a handle Windows
+ * takes back mid-call) answers as if it found nothing, said once in main.log, rather than throwing
+ * into a timer twice in half a second, which ends the app (LT-437).
+ */
+const warned = new Set<string>()
+function safely<T>(what: string, fallback: T, ask: () => T): T {
+  try {
+    return ask()
+  } catch (e) {
+    if (!warned.has(what)) {
+      warned.add(what)
+      log.warn(`Windows call failed (${what}); answering as if nothing was found:`, e)
+    }
+    return fallback
+  }
+}
+
 /** The id of the process that owns the foreground window; 0 when there is none. */
 export function foregroundPid(): number {
   const w = load()
   if (!w) return 0
-  const hwnd = w.GetForegroundWindow()
-  if (isNull(hwnd)) return 0
-  const pid = [0]
-  w.GetWindowThreadProcessId(hwnd, pid)
-  return pid[0]
+  return safely('foreground window', 0, () => {
+    const hwnd = w.GetForegroundWindow()
+    if (isNull(hwnd)) return 0
+    const pid = [0]
+    w.GetWindowThreadProcessId(hwnd, pid)
+    return pid[0]
+  })
 }
 
 /** A process's name by id, without .exe, lowercased; '' when Windows will not say. */
 export function processName(pid: number): string {
   const w = load()
   if (!w || !pid) return ''
-  const h = w.OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, false, pid)
-  if (isNull(h)) return ''
-  try {
-    const buf = Buffer.alloc(1040)
-    const size = [520]
-    return w.QueryFullProcessImageNameW(h, 0, buf, size) ? baseName(buf.toString('utf16le', 0, size[0] * 2)) : ''
-  } finally {
-    w.CloseHandle(h)
-  }
+  return safely('process name', '', () => {
+    const h = w.OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, false, pid)
+    if (isNull(h)) return ''
+    try {
+      const buf = Buffer.alloc(1040)
+      const size = [520]
+      return w.QueryFullProcessImageNameW(h, 0, buf, size) ? baseName(buf.toString('utf16le', 0, size[0] * 2)) : ''
+    } finally {
+      w.CloseHandle(h)
+    }
+  })
 }
 
 /** Whether a process with this executable name ("eqgame.exe") is running; null when Windows cannot be asked. */
 export function isProcessRunning(exe: string): boolean | null {
   const w = load()
   if (!w) return null
-  const snap = w.CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0)
-  if (isNull(snap)) return null
-  const want = exe.toLowerCase()
-  try {
-    const entry: Record<string, unknown> = { dwSize: w.entrySize }
-    let ok = w.Process32FirstW(snap, entry)
-    while (ok) {
-      if (String(entry.szExeFile).toLowerCase() === want) return true
-      ok = w.Process32NextW(snap, entry)
+  return safely<boolean | null>('process list', null, () => {
+    const snap = w.CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0)
+    if (isNull(snap)) return null
+    const want = exe.toLowerCase()
+    try {
+      const entry: Record<string, unknown> = { dwSize: w.entrySize }
+      let ok = w.Process32FirstW(snap, entry)
+      while (ok) {
+        if (String(entry.szExeFile).toLowerCase() === want) return true
+        ok = w.Process32NextW(snap, entry)
+      }
+      return false
+    } finally {
+      w.CloseHandle(snap)
     }
-    return false
-  } finally {
-    w.CloseHandle(snap)
-  }
+  })
 }
 
 export const HKEY_CURRENT_USER = 0x80000001

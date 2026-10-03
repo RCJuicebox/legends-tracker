@@ -48,11 +48,13 @@ export class Throttled {
 }
 
 /**
- * Live lines held while history is read, so a reader sees every line once and in order. It holds at
- * most `max`; past that it is `full`, and the history read should stop and let them through.
+ * Live lines held while history is read, so a reader sees every line once and in order. At `max` it
+ * is `full`, and the history read should stop and let them through; one that does not is not let
+ * hold lines without end: past twice `max` they are dropped and counted (LT-372).
  */
 export class Backlog<T> {
   private lines: T[] | null = null
+  private lost = 0
 
   constructor(private readonly max = 200_000) {}
 
@@ -69,14 +71,21 @@ export class Backlog<T> {
     return this.lines?.length ?? 0
   }
 
+  /** Lines dropped past the ceiling since holding began. */
+  get dropped(): number {
+    return this.lost
+  }
+
   begin(): void {
     this.lines = []
+    this.lost = 0
   }
 
   /** Holds the line while history is being read; false means handle it now. */
   hold(line: T): boolean {
     if (!this.lines) return false
-    this.lines.push(line)
+    if (this.lines.length >= this.max * 2) this.lost++
+    else this.lines.push(line)
     return true
   }
 

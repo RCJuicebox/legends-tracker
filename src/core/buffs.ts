@@ -403,6 +403,8 @@ export class BuffWatch {
 
   /** Buffs past their estimate by more than a tick are gone, fade line or not (a missed log, a restart). */
   prune(now: number): void {
+    // Casts that can no longer land: every stranger who casts a wanted buff is otherwise kept (LT-379).
+    for (const [caster, c] of this.casts) if (now - c.at > LAND_WINDOW_MS + c.spell.castMs) this.casts.delete(caster)
     const keep = this.active.filter((b) => b.endsAt === null || now < b.endsAt + 12_000)
     if (keep.length === this.active.length) return
     this.active = keep

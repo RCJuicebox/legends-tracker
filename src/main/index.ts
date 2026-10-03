@@ -1,6 +1,6 @@
 // The main process. bootstrap.ts runs first: it sets up the log and settings folder and decides
 // whether this copy runs at all; a second copy stops there, having built nothing.
-import { primaryInstance } from './bootstrap'
+import { appIcon, onFatalSave, primaryInstance } from './bootstrap'
 import { app, dialog, protocol, screen, session } from 'electron'
 import { basename, join } from 'node:path'
 import { createContext, type AppContext } from './context'
@@ -14,7 +14,6 @@ import { registerAudioIpc } from './ipc/audio'
 import { registerCharacterIpc } from './ipc/character'
 import { registerDemoIpc } from './demo'
 import { appUserModelId, ensureSourceShortcut } from './appIdentity'
-import { appIcon } from './bootstrap'
 import { isOwnPage } from './push'
 import { log, logDir } from './log'
 import { defaultPlacement, overlayScale } from '../shared/overlays'
@@ -25,6 +24,8 @@ if (primaryInstance) {
   let ctx: AppContext | undefined
   try {
     ctx = createContext()
+    const saved = ctx
+    onFatalSave(() => saved.store.flushAll())
     registerLifecycle(ctx)
   } catch (e) {
     cannotStart(e)

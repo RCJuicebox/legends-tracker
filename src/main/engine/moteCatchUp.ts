@@ -131,7 +131,9 @@ export class MoteCatchUp implements EngineFeature {
 
   /** History is read: the lines that waited are handled now, in order. */
   private end(logFile: string, reached: number): void {
+    const dropped = this.backlog.dropped
     const waiting = this.backlog.end()
+    if (dropped) log.warn(`Mote history: ${dropped} live lines were dropped while history was read (more than ${waiting.length} waiting).`)
     this.backlogFrom = -1
     this.backlogLog = ''
     for (const line of waiting) this.motes.handle(line)
@@ -256,7 +258,14 @@ export class MoteCatchUp implements EngineFeature {
       })
       this.scan = run
       job.signal.addEventListener('abort', () => run.stop())
-      const scanned = await run.done
+      // The log growing faster than history is read: stop rather than hold live lines without end (LT-372).
+      const watchFull = setInterval(() => {
+        if (!this.backlog.full) return
+        log.warn(`Rebuilding mote history: the log grew faster than it could be read; stopped with ${this.backlog.size} live lines held.`)
+        this.notifier.pushFeed('warn', 'Rebuilding mote history stopped: the log grew faster than it could be read. Try again when the game is quieter.')
+        run.stop()
+      }, 1000)
+      const scanned = await run.done.finally(() => clearInterval(watchFull))
       const merged = mergeRebuilt(this.motes.state, combineScans(scanned, watched, this.hooks.gameRunning()))
       const w = scanned.characters.find((c) => samePath(c.logPath, watched))
       if (merged.seenUntil === undefined && w?.lastTime) merged.seenUntil = w.lastTime

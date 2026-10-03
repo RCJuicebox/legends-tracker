@@ -15,8 +15,8 @@ export type Warn = (message: string, error: unknown) => void
  * Streams a log's lines, yielding to the event loop now and then so the live tailer and overlays keep
  * running. Returns how many bytes were read up to the end of the last line handed over. A last line
  * with no newline yet is handed over too unless `flushLast` is false: a live log may be mid-write.
- * `yieldEvery` is how many chunks go between yields (8: a read that should finish; 1: one that runs
- * while the player plays, a few milliseconds at a time). `stop` is asked before each chunk.
+ * `yieldEvery` is how many 64 KB chunks go between yields: 1 unless a caller has reason for more, so
+ * no read holds the main thread past a millisecond or so (LT-386). `stop` is asked before each chunk.
  */
 export async function readLines(
   stream: Readable,
@@ -26,7 +26,7 @@ export async function readLines(
   let partial = ''
   let pos = 0
   let n = 0
-  const every = Math.max(1, opts.yieldEvery ?? 8)
+  const every = Math.max(1, opts.yieldEvery ?? 1)
   const clock = new LogClock()
   for await (const chunk of stream) {
     if (opts.stop?.()) {

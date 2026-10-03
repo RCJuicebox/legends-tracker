@@ -1,5 +1,5 @@
 import { app } from 'electron'
-import { writeFileAtomic } from './storeCore'
+import { JsonFile, writeFileAtomic } from './storeCore'
 import { promises as fs } from 'node:fs'
 import { join } from 'node:path'
 import { parseLogLine } from '../core/logLine'
@@ -72,9 +72,13 @@ const PET_SCAN_MAX = 32 << 20
 /** A character's pet, and how far their log has been read back for it. */
 type PetRecord = PetState & { scanned?: { path: string; id: string; size: number } }
 
-/** pets.json: the newest gear list and summoning cast seen, per character. */
+/**
+ * pets.json: the newest gear list and summoning cast seen, per character. Written three seconds after
+ * a change, not at each summoning cast (LT-375), and on the way out.
+ */
 export class PetStore {
   private data: Record<string, PetRecord> | null = null
+  private file: JsonFile<Record<string, PetRecord>> | null = null
 
   private get path(): string {
     return join(app.getPath('userData'), 'pets.json')
@@ -88,7 +92,13 @@ export class PetStore {
     } catch {
       this.data = {}
     }
+    this.file = new JsonFile(this.path, this.data, { delayMs: 3000, pretty: false })
     return this.data
+  }
+
+  /** Writes what is waiting. */
+  flush(): Promise<void> {
+    return this.file?.flush() ?? Promise.resolve()
   }
 
   async get(character: string): Promise<PetState> {
@@ -125,11 +135,7 @@ export class PetStore {
     const summon = next.summon && (!cur.summon || next.summon.at >= cur.summon.at) ? next.summon : cur.summon
     if (gear === cur.gear && summon === cur.summon && !save) return false
     d[character] = { ...cur, gear, summon }
-    try {
-      await writeFileAtomic(this.path, JSON.stringify(d, null, 2))
-    } catch (e) {
-      log.warn('Could not save pets.json:', e)
-    }
+    this.file?.set(d)
     return gear !== cur.gear || summon !== cur.summon
   }
 }

@@ -27,8 +27,16 @@ import type { EngineFeature } from './feature'
 import type { AppSettings, ArchiveStatus, CharacterSettings, FeedItem, Notification, SpellRule, WatchStatus } from '../../shared/types'
 import type { EngineEnv, EngineOutputs, EngineStore, MoteView, Speaker } from './contracts'
 import { jobs } from '../sources/jobs'
+import { perf } from '../perf'
+import type { TailerStats } from '../../core/tailer'
 
 export type { EngineEnv, EngineOutputs, EngineStore, MoteView, Speaker } from './contracts'
+
+/** How often the log is looked at: while the game runs, and while it does not. */
+const LIVE_POLL_MS = 100
+const IDLE_POLL_MS = 1000
+/** The engine's clock: timers, cues and pushes go on its laps. */
+const TICK_MS = 200
 export type { EngineFeature } from './feature'
 
 interface Tail {
@@ -263,7 +271,7 @@ export class Engine {
       if (logs[0]) this.store.settings.set({ ...this.settings, logFile: logs[0].path })
     }
     await this.loadSpells()
-    this.tickTimer = setInterval(() => this.tick(), 200)
+    this.tickTimer = setInterval(() => this.tick(), TICK_MS)
     this.archiveTimer = setInterval(() => {
       void this.archiveCheck()
       void this.lookElsewhere()
@@ -299,7 +307,8 @@ export class Engine {
           this.emitStatus()
         },
         onCast: (r, at) => {
-          const casts = { ...this.store.casts.get() }
+          // Changed in place: the file needs only a mark, not a copy of every known cast per cast (LT-384).
+          const casts = this.store.casts.get()
           const prev = casts[r.rankedName]
           casts[r.rankedName] = { rankedName: r.rankedName, lastCast: at, count: (prev?.count ?? 0) + 1 }
           this.store.casts.set(casts)
@@ -381,8 +390,9 @@ export class Engine {
       clock: new LogClock(),
       tailer: new LogTailer(logFile, {
         startAtEnd: true,
+        pollMs: this.archive.gameRunning ? LIVE_POLL_MS : IDLE_POLL_MS,
         onLines: (lines, end) => this.tail === tail && this.onLines(tail, lines, end),
-        onReset: (reason) => this.tail === tail && this.onTailReset(tail, reason),
+        onReset: (reason, skipped) => this.tail === tail && this.onTailReset(tail, reason, skipped),
         onMissing: () => this.tail === tail && this.onTailMissing(tail),
         onSize: (size) => this.tail === tail && this.onTailSize(tail, size),
         onError: (e, where) => this.tail === tail && this.onTailError(e, where),
@@ -461,9 +471,14 @@ export class Engine {
     this.status.logSize = size
   }
 
-  private onTailReset(t: Tail, reason: 'truncated' | 'replaced'): void {
-    t.end = 0
+  private onTailReset(t: Tail, reason: 'truncated' | 'replaced', skipped: boolean): void {
+    t.end = skipped ? -1 : 0
     this.moteHistory.tailReset(t.logFile, reason)
+    if (skipped) {
+      // Old play, not new: replayed, every trigger in it would speak and every cast start a timer.
+      this.pushFeed('info', `${reason === 'replaced' ? 'Another file took the log’s place' : 'The log was cut short'}, already holding earlier play; reading on from its end.`)
+      return
+    }
     this.pushFeed('info', reason === 'replaced' ? 'A new log file was started.' : 'The log was truncated; reading from the top.')
   }
 
@@ -573,8 +588,12 @@ export class Engine {
     }
   }
 
+  private lastTickAt = 0
+
   private tick(): void {
     const now = Date.now()
+    if (this.lastTickAt) perf.tickLate.add(Math.max(0, now - this.lastTickAt - TICK_MS))
+    this.lastTickAt = now
     for (const f of this.features) {
       try {
         f.tick?.(now)
@@ -592,6 +611,11 @@ export class Engine {
   /** Lines or laps a part threw on this run (diagnostics). */
   get failures(): number {
     return this.lineFailures
+  }
+
+  /** The watched log's tailer's counts, or null when none is watched. */
+  get tailerStats(): TailerStats | null {
+    return this.tail?.tailer.stats ?? null
   }
 
   /**
@@ -698,11 +722,13 @@ export class Engine {
     this.board.clear()
     this.motes.gameClosed(Date.now())
     this.archives.set({ gameRunning: false })
+    this.tail?.tailer.setPollMs(IDLE_POLL_MS)
     this.pushFeed('info', n ? `The game closed; cleared ${n} timer${n === 1 ? '' : 's'}.` : 'The game closed.')
   }
 
   gameStarted(): void {
     this.archives.set({ gameRunning: true })
+    this.tail?.tailer.setPollMs(LIVE_POLL_MS)
     this.pushFeed('info', 'The game is running.')
   }
 

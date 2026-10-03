@@ -6,6 +6,7 @@ import { OverlayRegion } from './regions'
 import type { CombatSnapshot, OverlayConfig, TimerView } from '../../../shared/types'
 import type { AchievementTrack } from '../../../shared/tracking'
 import { opacityStyle } from '../../../shared/overlays'
+import { mergeCombat } from '../../../shared/combat'
 
 // One overlay in a window of its own: how the overlays are drawn while being arranged. While
 // playing they share a host window per monitor instead (host.tsx).
@@ -25,7 +26,7 @@ function Overlay() {
         setArranging(p.arranging)
       }),
       api.on('overlay:timers', (views: TimerView[]) => setTimers(views)),
-      api.on('overlay:combat', (snap: CombatSnapshot) => setCombat(snap)),
+      api.on('overlay:combat', (snap: CombatSnapshot) => setCombat((had) => mergeCombat(had, snap))),
       api.on('overlay:achievements', (t: AchievementTrack | null) => setTrack(t))
     ]
     return () => offs.forEach((off) => off())

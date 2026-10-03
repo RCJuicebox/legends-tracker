@@ -56,6 +56,13 @@ interface SlayerState {
 const FACTION_SECTION = 'EverQuest: Progression'
 /** A read waits this long after the last line that moves something: a stack hand-in or an area kill comes in a burst. */
 const SETTLE_MS = 800
+/**
+ * Kills settle longer: in an AoE grind they come a second or two apart, and each read opens the
+ * export and counts every Slayer achievement (LT-383). Still read at least this often while they
+ * keep coming.
+ */
+const KILLS_SETTLE_MS = 5000
+const KILLS_AT_MOST_MS = 15_000
 /** Everything is read again this often while watching: a new export, and anything the lines did not show. */
 const SWEEP_MS = 30_000
 /** A page that shows the track says so at least this often while it is open (useAchievementTrack). */
@@ -72,6 +79,8 @@ export class LiveAchievements implements AppFeature {
   /** When a line last moved each half, 0 when read since. */
   private factionAt = 0
   private slayerAt = 0
+  /** The first kill not read yet: kills that keep coming are still read every KILLS_AT_MOST_MS. */
+  private slayerSince = 0
   private sweptAt = 0
   /** What the faction lines since the last read did. */
   private moved: Record<string, number> = {}
@@ -140,8 +149,12 @@ export class LiveAchievements implements AppFeature {
     } else if (text.startsWith('You have completed achievement')) {
       this.factionAt = now
       this.slayerAt = now
+      this.slayerSince = 0
     } else if (text.startsWith('You have become better at ')) this.skillsAt = now
-    else if (text.startsWith('You have slain ') || text.includes(' has been slain by ') || text.endsWith(' died.')) this.slayerAt = now
+    else if (text.startsWith('You have slain ') || text.includes(' has been slain by ') || text.endsWith(' died.')) {
+      this.slayerAt = now
+      this.slayerSince ||= now
+    }
   }
 
   private tick(now: number): void {
@@ -169,12 +182,17 @@ export class LiveAchievements implements AppFeature {
     // The sweep catches what no log line announces (a new export, a mark on the Achievements page):
     // only worth its reads while something shows the result. Lines that move a count are read anyway.
     const sweep = now - this.sweptAt >= SWEEP_MS && this.shown(character, now)
-    if (!sweep && !due(this.factionAt) && !due(this.slayerAt) && !due(this.skillsAt)) return
+    // A completion line clears slayerSince's wait: it is read on the short settle.
+    const killsDue = this.slayerAt > 0 && (this.slayerSince ? now - this.slayerAt >= KILLS_SETTLE_MS || now - this.slayerSince >= KILLS_AT_MOST_MS : due(this.slayerAt))
+    if (!sweep && !due(this.factionAt) && !killsDue && !due(this.skillsAt)) return
     const faction = sweep || due(this.factionAt)
-    const slayer = sweep || due(this.slayerAt)
+    const slayer = sweep || killsDue
     const skills = sweep || due(this.skillsAt)
     if (faction) this.factionAt = 0
-    if (slayer) this.slayerAt = 0
+    if (slayer) {
+      this.slayerAt = 0
+      this.slayerSince = 0
+    }
     if (skills) this.skillsAt = 0
     if (sweep) this.sweptAt = now
     this.reading = true
@@ -341,6 +359,8 @@ export class LiveAchievements implements AppFeature {
           if ('pet' in x) state.pets.add(x.pet)
           if ('engaged' in x) {
             state.engaged.set(x.engaged.toLowerCase(), line.time)
+            // Only the last few minutes' are asked about: the rest go, a few hundred at a time (LT-380).
+            if (state.engaged.size > 500) for (const [k, t] of state.engaged) if (line.time - t > ENGAGED_MS) state.engaged.delete(k)
             return
           }
           if (line.time <= state.exportAt || 'pet' in x) return

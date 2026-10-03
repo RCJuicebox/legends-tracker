@@ -1,5 +1,6 @@
 import { BrowserWindow, screen, type WebContents } from 'electron'
 import type { CombatSnapshot, OverlayConfig, TimerView } from '../shared/types'
+import { closedKey } from '../shared/combat'
 import type { AchievementTrack } from '../shared/tracking'
 import type { PushChannel } from '../shared/ipc'
 import { push } from './push'
@@ -270,7 +271,11 @@ export class OverlayManager {
     for (const key of Object.keys(STREAMS) as (keyof Streams)[]) {
       const { channel, kind } = STREAMS[key]
       const value = this.last[key]
-      if (kinds.has(kind) && value !== null) push(wc, channel, value as never)
+      if (!kinds.has(kind) || value === null) continue
+      // A page that loads or shows again gets the whole meter, closed fights and all.
+      if (key === 'combat') this.closedSent.delete(wc)
+      if (key === 'combat') this.pushCombat(wc, value as CombatSnapshot)
+      else push(wc, channel, value as never)
     }
     if (kinds.has('alerts')) for (const a of this.liveAlerts()) push(wc, 'overlay:alert', a)
   }
@@ -294,6 +299,20 @@ export class OverlayManager {
     this.last[key] = value
     const { channel, kind } = STREAMS[key]
     this.toPages(kind, (wc) => push(wc, channel, value as never))
+  }
+
+  /** Which closed fights and sessions each meter page has, by closedKey. */
+  private readonly closedSent = new WeakMap<WebContents, string>()
+
+  /** A meter snapshot to one page: whole when the page lacks the closed ones, else the open ones alone. */
+  private pushCombat(wc: WebContents, snap: CombatSnapshot): void {
+    const key = closedKey(snap)
+    if (this.closedSent.get(wc) === key) {
+      push(wc, 'overlay:combat', { ...snap, fights: snap.fights.filter((s) => s.open), sessions: snap.sessions.filter((s) => s.open), openOnly: true })
+      return
+    }
+    this.closedSent.set(wc, key)
+    push(wc, 'overlay:combat', snap)
   }
 
   private create(c: OverlayConfig): BrowserWindow {
@@ -470,7 +489,8 @@ export class OverlayManager {
   }
 
   combat(snapshot: CombatSnapshot): void {
-    this.send('combat', snapshot)
+    this.last.combat = snapshot
+    this.toPages('meter', (wc) => this.pushCombat(wc, snapshot))
   }
 
   /** The faction plan's step and the Slayer counts, for the achievements overlays. */

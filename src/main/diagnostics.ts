@@ -9,6 +9,7 @@ import { win32Available } from './win32'
 import { characterKey } from './storeCore'
 import type { AppContext } from './context'
 import { redact, settingsSummary } from '../core/diagnosticsText'
+import { perf } from './perf'
 
 // What a bug report needs, in one block of text the player can copy: the version, the machine, the
 // settings that matter (no key, no Windows user name), what went wrong at start, and the end of the log.
@@ -108,6 +109,7 @@ export function diagnostics(ctx: AppContext): string {
   lines.push('Displays:', ...displayLines())
   lines.push('Data sources:', ...sourceLines())
   lines.push(...processMetrics())
+  lines.push('Performance (since the last ten-minute line in main.log):', ...perf.report({ tailer: ctx.engine.tailerStats, lineFailures: ctx.engine.failures }))
   if (ctx.store.recovered.length) lines.push(`Set aside at start (unreadable): ${ctx.store.recovered.map((f) => basename(f)).join(', ')}`)
   if (ctx.store.unreadable.length) lines.push(`Could not be opened at start (left as they are): ${ctx.store.unreadable.join(', ')}`)
   if (ctx.store.newer.length) lines.push(`Written by a newer version: ${ctx.store.newer.join(', ')}`)

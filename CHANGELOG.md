@@ -18,6 +18,9 @@ What changed in each version. The release workflow publishes a version's section
 - **Overlays stop fighting other windows for the top** while the game is not in front (Task Manager, a chat window), and the alerts arranging window is drawn in full whatever its opacity.
 - **A timers overlay too small for its bars says "+N more"**, and the same alert raised again shows once with "×N". At Background 0 the overlay text gets the alerts' deeper shadow, so it reads over snow or sky.
 - **Arrange and lock say the same everywhere**: Arrange overlays, Lock overlays.
+- **Performance in Copy diagnostics.** A new block says how late the engine's clock has been, how long the longest slice of the log took, what the log reader has done, lines any part failed on, what the meter, loot and timer pushes cost a minute, how long cues waited for their phrase, and the heap; main.log gets the same every ten minutes while a log is watched.
+- **A restored or swapped-in log is not replayed.** A file already holding earlier play that takes the log's place is read on from its end, rather than from the top through every trigger and timer.
+- **Lighter while you play, and while you do not.** The log is looked at once a second while the game is closed; main.log is written without holding up the timers (and keeps writing if it cannot be rolled over); an AoE grind no longer re-reads the achievements export after every kill; the meter overlays are sent only the fights that changed; pets.json is written a few seconds after a change, not on every summon; and a few lists that grew all evening (strangers' buff casts, kill times, the meter's names) are kept in bounds.
 
 ## 2.6.0 (2026-10-02)
 

@@ -28,6 +28,8 @@ export const ARTICLE = /^(?:a|an|the) /i
 const OWNED_PET = /^([A-Z][a-z]+)`s (?:warder|pet|familiar)$/
 const SINGLE_WORD = /^[A-Z][A-Za-z`']*$/
 
+const SIDES_KEPT = 5000
+
 export class Roster {
   private self = ''
   private selfKey = ''
@@ -35,7 +37,10 @@ export class Roster {
   readonly pets = new Map<string, string>()
   /** Your group, by name key. */
   readonly members = new Map<string, RosterMember>()
-  /** Which side a single-word name turned out to be on. */
+  /**
+   * Which side a single-word name turned out to be on. The longest unasked go past SIDES_KEPT (a
+   * name seen again is placed again as it fights), so an evening of raid zones does not keep them all.
+   */
   readonly sides = new Map<string, Side>()
 
   /** `changed` hears of a name whose kind may have changed (a stranger placed), so what shows it can follow. */
@@ -98,7 +103,9 @@ export class Roster {
     if (side === 'unknown') return
     const k = nameKey(name)
     if (this.sides.get(k) === side) return
+    this.sides.delete(k)
     this.sides.set(k, side)
+    if (this.sides.size > SIDES_KEPT) this.sides.delete(this.sides.keys().next().value!)
     this.changed(k)
   }
 

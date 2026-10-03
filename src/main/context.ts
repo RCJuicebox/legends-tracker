@@ -43,6 +43,7 @@ import { homedir } from 'node:os'
 import type { AppSettings, Trigger, WatchStatus } from '../shared/types'
 import type { AudioDevice } from '../shared/ipc'
 import { cacheDir } from './paths'
+import { perf } from './perf'
 import { characterLogFile, logStem } from './storeCore'
 
 /**
@@ -245,6 +246,7 @@ export function createContext(): AppContext {
     new VoiceRouter(speech, azure),
     {
       timers: (views) => {
+        perf.push('timers', views)
         ctx.overlays.timers(views)
         toMain('state:timers', views)
       },
@@ -260,10 +262,14 @@ export function createContext(): AppContext {
       moteScan: (s) => toMain('state:moteScan', s),
       stock: (s) => toMain('state:stock', s),
       combat: (snap) => {
+        perf.push('combat', snap)
         ctx.overlays.combat(snap)
         toMain('state:combat', snap)
       },
-      loot: (view) => toMain('state:loot', view),
+      loot: (view) => {
+        perf.push('loot', view)
+        toMain('state:loot', view)
+      },
       respawns: (view) => toMain('state:respawns', view),
       pet: (update) => {
         const character = ctx.characterKey()
@@ -517,6 +523,13 @@ function registerSources(ctx: AppContext): void {
       })
       .catch(() => undefined)
   }, 60_000).unref()
+
+  // How the app kept up over the last ten minutes, while a log is watched (FEAT-018).
+  setInterval(() => {
+    if (!ctx.engine.status.watching) return
+    log.info(['Performance, the last ten minutes:', ...perf.report({ tailer: ctx.engine.tailerStats, lineFailures: ctx.engine.failures })].join('\n'))
+    perf.restart()
+  }, 10 * 60_000).unref()
 }
 
 /** Reads the spell data, game tables and icons again. */
