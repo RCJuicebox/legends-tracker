@@ -2732,8 +2732,9 @@ button.tree-item {
   font-weight: 650;
 }
 
-/* Upgrade finder results being worked out again. */
-.lt-finder.stale {
+/* Upgrade finder results or the optimiser's set being worked out again. */
+.lt-finder.stale,
+.lt-stale {
   opacity: 0.6;
   transition: opacity 0.2s;
 }
@@ -3495,7 +3496,8 @@ button.tree-item {
   .disclosure .caret,
   details:not(.info) > summary::before,
   .lt-tile,
-  .lt-finder.stale {
+  .lt-finder.stale,
+  .lt-stale {
     transition: none;
   }
 }

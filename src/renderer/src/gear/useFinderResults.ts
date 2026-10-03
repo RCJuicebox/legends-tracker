@@ -3,24 +3,16 @@ import { statsFor } from '../../../core/wornGear'
 import type { InvItem } from '../../../core/inventory'
 import { findUpgrades, type HandWeights, type Wearer, type Weights } from '../../../core/gearFinder'
 import type { FocusWorth } from '../../../core/itemFocus'
-import { optimizeGear, type Exaltation, type Piece } from '../../../core/gearOptimizer'
+import type { Exaltation, Piece } from '../../../core/gearOptimizer'
 import { itemEffects } from '../../../core/itemEffects'
-import { bestInTheRound, bestOwned, judgeInTheRound, type RoundCandidate, type RoundSlot } from '../../../core/finderRound'
+import { bestOwned, type RoundSlot } from '../../../core/finderRound'
+import type { GearInput } from '../../../core/gearWork'
+import { Dropped, runRound } from './gearRunner'
 import type { CatalogItem } from '../../../core/wikiItem'
 import type { InventoryView } from '../../../shared/types'
 import type { GearEffects } from './useEffectsModel'
 
 export type GearMode = 'finder' | 'focus' | 'effects' | 'procs' | 'optimize' | 'merge' | 'pet'
-
-/** How long one slice of judging in the round may hold the page. */
-const SLICE_MS = 10
-
-/** Lets the page handle input and draw before the next slice of work. */
-function nextSlice(): Promise<void> {
-  const s = (globalThis as { scheduler?: { yield?: () => Promise<void> } }).scheduler
-  if (s?.yield) return s.yield()
-  return new Promise((resolve) => setTimeout(resolve, 0))
-}
 
 export function useFinderResults({
   mode,
@@ -147,45 +139,42 @@ export function useFinderResults({
       keepStatWinners: round
     })
     // Each candidate among everything owned, worn as well as it can be; its worth is what the set gains.
-    const opts = {
+    const input: GearInput = {
       pieces: d.pieces,
       wearer: d.wearer,
       weights: d.weights,
       twoHanders: d.twoHanders,
-      focusValue: d.valueOf,
+      worth: d.worth,
       exaltations: d.exaltations,
-      effects: d.effects.value ?? undefined,
+      effects: d.effects.inputs,
       hands: d.hands
     }
-    return { slots, round: round ? opts : null }
+    return { slots, round: round ? input : null }
   }, [deferred, classes.length, mode])
 
-  // Judging in the round runs the optimiser once a candidate (some 150 ms in all), so it is done a
-  // slice at a time with the page free in between; the last results stay up, marked stale, meanwhile.
+  // Judging in the round runs the optimiser once a candidate (0.4 to 3 s in all), so it is done in
+  // the gear worker, a newer ask overtaking an older (LT-391); the last results stay up, marked
+  // stale, meanwhile.
   const [judged, setJudged] = useState<{ of: NonNullable<typeof found>; slots: RoundSlot[] } | null>(null)
   useEffect(() => {
-    const opts = found?.round
-    if (!found || !opts) return
+    const input = found?.round
+    if (!found || !input) return
     let stopped = false
-    void (async () => {
-      await nextSlice()
-      const baseline = optimizeGear(opts)
-      const out: RoundSlot[] = []
-      let sliceEnd = performance.now() + SLICE_MS
-      for (const s of found.slots) {
-        const candidates: RoundCandidate[] = []
-        for (const c of s.candidates) {
-          if (performance.now() > sliceEnd) {
-            await nextSlice()
-            if (stopped) return
-            sliceEnd = performance.now() + SLICE_MS
-          }
-          candidates.push(judgeInTheRound(c, s.slot, opts, baseline))
-        }
-        out.push({ ...s, candidates: bestInTheRound(candidates) })
+    runRound(
+      input,
+      found.slots.map((s) => ({ slot: s.slot, candidates: s.candidates }))
+    ).then(
+      (answers) => {
+        if (stopped) return
+        setJudged({ of: found, slots: found.slots.map((s, k) => ({ ...s, candidates: (answers[k] ?? []).map((a) => ({ ...s.candidates[a.k], round: a.round })) })) })
+      },
+      (err: unknown) => {
+        if (stopped || err instanceof Dropped) return
+        // Shown as no upgrades rather than worked on for ever; what went wrong is in the console.
+        console.warn('Judging in the round failed:', err)
+        setJudged({ of: found, slots: found.slots.map((s) => ({ ...s, candidates: [] })) })
       }
-      if (!stopped) setJudged({ of: found, slots: out })
-    })()
+    )
     return () => {
       stopped = true
     }

@@ -2,7 +2,9 @@ import { useMemo, useState } from 'react'
 import { useRemembered } from '../remember'
 import { baseName, slotLabel } from '../../../core/inventory'
 import { canWear, score, weightsForSlot } from '../../../core/gearFinder'
-import { optimizeGear, pieceName, SLOT_LAYOUT, type GearLock, type Piece, type PieceSource, type Plan } from '../../../core/gearOptimizer'
+import { pieceName, SLOT_LAYOUT, type GearLock, type Piece, type PieceSource, type Plan } from '../../../core/gearOptimizer'
+import type { GearInput } from '../../../core/gearWork'
+import { useGearPlan } from '../gear/useGearPlan'
 import type { CatalogItem } from '../../../core/wikiItem'
 import type { GearModel } from '../gear/useGearModel'
 import { CATALOG_PER_SLOT } from '../../../core/gearCatalog'
@@ -58,21 +60,29 @@ export function OptimizeTab({ m }: { m: GearModel }) {
     [lockRefs, pieces]
   )
   const locks = useMemo(() => lockRefs.flatMap((r, i): GearLock[] => (lockPieces[i] ? [{ slot: r.slot, piece: lockPieces[i] }] : [])), [lockRefs, lockPieces])
-  const plan = useMemo(
-    () =>
-      optimizeGear({
-        pieces,
-        wearer: m.wearer,
-        weights: m.weights,
-        twoHanders: m.twoHanders,
-        focusValue: m.focusValue,
-        exaltations: m.exaltations,
-        effects: m.effects.value ?? undefined,
-        hands: m.weaponHands,
-        locks
-      }),
-    [pieces, m.wearer, m.weights, m.twoHanders, m.focusValue, m.exaltations, m.effects.value, m.weaponHands, locks]
+  // Worked out in the gear worker: with All gear or exaltations a search takes a few hundred
+  // milliseconds, which held the window on every lock or weight changed (LT-390).
+  const input = useMemo<GearInput>(
+    () => ({
+      pieces,
+      wearer: m.wearer,
+      weights: m.weights,
+      twoHanders: m.twoHanders,
+      worth: m.worth,
+      exaltations: m.exaltations,
+      effects: m.effects.inputs,
+      hands: m.weaponHands,
+      locks: locks.map((l) => ({ slot: l.slot, piece: pieces.indexOf(l.piece) }))
+    }),
+    [pieces, m.wearer, m.weights, m.twoHanders, m.worth, m.exaltations, m.effects.inputs, m.weaponHands, locks]
   )
+  const { plan, stale, error } = useGearPlan(input)
+  if (!plan)
+    return (
+      <div className="card" aria-busy={!error}>
+        {error ? <p className="notice warn">The best set could not be worked out: {error}</p> : <p className="muted">Working out the best set…</p>}
+      </div>
+    )
   const hostOf = (p: Piece) => p.host ?? p
   /** Locks `p` into slot `i`, in place of any lock on that slot or that piece. */
   const lock = (i: number, p: Piece) => {
@@ -111,7 +121,8 @@ export function OptimizeTab({ m }: { m: GearModel }) {
   const wantedLines = m.lines.filter((l) => m.wanted.has(l.key))
 
   return (
-    <div className="stack gap-12">
+    <div className={`stack gap-12${stale ? ' lt-stale' : ''}`} aria-busy={stale}>
+      {error && <p className="notice warn">The latest change could not be worked out, so this is the set from before it: {error}</p>}
       <div className="card stack gap-6">
         <div className="row">
           <h2 style={{ margin: 0 }}>{all ? 'Best set from all gear' : 'Best use of what you own'}</h2>

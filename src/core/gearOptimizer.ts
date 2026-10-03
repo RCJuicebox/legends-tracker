@@ -71,7 +71,7 @@ export interface Piece {
 }
 
 /** An exaltation slot: 7 focus, 9 worn, 10 proc. */
-type ExaltSlot = 'focus' | 'worn' | 'proc'
+export type ExaltSlot = 'focus' | 'worn' | 'proc'
 
 /** An exaltation the character keeps, free to put in a piece's focus, worn or proc slot. */
 export interface Exaltation {
@@ -112,7 +112,24 @@ export interface OptimizeOptions {
   hands?: HandWeights | null
   /** Pieces to keep in a slot, by the slot's index in SLOT_LAYOUT, whatever the weights say. */
   locks?: GearLock[]
+  /**
+   * Worth worked out by an earlier search, to use again: only for searches with the same weights,
+   * hands, focusValue and effects (judging in the round runs one per candidate, LT-391).
+   */
+  cache?: OptimizerCache
 }
+
+/** What a search works out piece by piece and set by set, kept for the next search alike. */
+export interface OptimizerCache {
+  /** A piece's score in each slot, by the slot's index. */
+  score: Map<Piece, number[]>
+  /** Foci worn together, worn effects together, a proc: by their names. */
+  focus: Map<string, number>
+  worn: Map<string, number>
+  proc: Map<string, number>
+}
+
+export const optimizerCache = (): OptimizerCache => ({ score: new Map(), focus: new Map(), worn: new Map(), proc: new Map() })
 
 export interface GearLock {
   slot: number
@@ -120,9 +137,10 @@ export interface GearLock {
 }
 
 // One exalted copy per piece, exaltation and slot, kept across searches so a set from one search (a
-// baseline, say) means the same pieces in the next.
+// baseline, say) means the same pieces in the next, and a plan from the gear worker finds the page's
+// own copies (gearWork.ts).
 const exaltedCopies = new WeakMap<Piece, WeakMap<Exaltation, Partial<Record<ExaltSlot, Piece>>>>()
-function exaltedCopy(h: Piece, e: Exaltation, slot: ExaltSlot): Piece {
+export function exaltedCopy(h: Piece, e: Exaltation, slot: ExaltSlot): Piece {
   let byExalt = exaltedCopies.get(h)
   if (!byExalt) exaltedCopies.set(h, (byExalt = new WeakMap()))
   let bySlot = byExalt.get(e)
@@ -250,7 +268,8 @@ export function optimizeGear(o: OptimizeOptions): Plan {
   // An offhand proc fires on offhand swings, so it counts as often as the offhand swings against the main hand.
   const offProc = o.hands && o.hands.main > 0 ? o.hands.off / o.hands.main : 1
   const hasteOf = (a: (Piece | null)[]) => Math.max(0, ...a.map((p) => p?.stats?.haste ?? 0)) * o.weights.haste
-  const scoreCache = new Map<Piece, number[]>()
+  const kept = o.cache ?? optimizerCache()
+  const scoreCache = kept.score
   const slotScore = (p: Piece | null, i: number): number => {
     if (!p?.stats) return 0
     let row = scoreCache.get(p)
@@ -280,7 +299,7 @@ export function optimizeGear(o: OptimizeOptions): Plan {
   }
   // Most moves leave the foci worn unchanged, and their worth does not depend on the order they are
   // worn in, so it is worked out once per set.
-  const focusCache = new Map<string, number>()
+  const focusCache = kept.focus
   const focusOf = (a: (Piece | null)[]) => {
     const names: string[] = []
     for (const p of a) if (p?.foci.length) names.push(...p.foci)
@@ -290,8 +309,8 @@ export function optimizeGear(o: OptimizeOptions): Plan {
     return v
   }
   // Worn effects count once each wherever worn; a proc counts on a weapon in either hand.
-  const wornCache = new Map<string, number>()
-  const procCache = new Map<string, number>()
+  const wornCache = kept.worn
+  const procCache = kept.proc
   const effectsOf = (a: (Piece | null)[]): number => {
     const fx = o.effects
     if (!fx) return 0
