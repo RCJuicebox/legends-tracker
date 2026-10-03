@@ -505,7 +505,7 @@ function SpawnEditor({ r, zoneMobs, onDone }: { r: RespawnRow; zoneMobs: string[
           </Field>
         )}
         <Field label="Mobs that pop there" hint={`Killed in ${r.zone}, or add one by name as the log prints it`}>
-          <div className="row tight" style={{ flexWrap: 'wrap' }}>
+          <div className="row tight wrap">
             {choices.map((n) => (
               <ToggleChip key={n} on={has(n)} onChange={(on) => toggle(n, on)}>
                 {n}

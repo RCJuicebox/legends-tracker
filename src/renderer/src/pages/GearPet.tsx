@@ -138,7 +138,7 @@ export function PetTab({ m }: { m: GearModel }) {
         </div>
 
         {!spell ? (
-          <p className="muted" style={{ margin: 0 }}>
+          <p className="muted m-0">
             {state.spellsLoaded ? 'None of your classes summons a pet by this level.' : 'The spell file is not loaded yet; set the game folder in Settings.'}
           </p>
         ) : profileQ.error && loading ? (
@@ -148,9 +148,7 @@ export function PetTab({ m }: { m: GearModel }) {
         ) : loading ? (
           <Pending inline doing={`Reading ${spell} from eqlwiki`} />
         ) : !profile ? (
-          <p className="muted small" style={{ margin: 0 }}>
-            eqlwiki has no page for the pet {spell} summons, so its classes are not known. Pick another pet.
-          </p>
+          <p className="muted small m-0">eqlwiki has no page for the pet {spell} summons, so its classes are not known. Pick another pet.</p>
         ) : (
           <div className="row small" style={{ flexWrap: 'wrap', gap: 18 }}>
             <span>
@@ -198,17 +196,17 @@ export function PetTab({ m }: { m: GearModel }) {
             />
           </div>
         )}
-        <label className="row small" style={{ gap: 8 }}>
+        <label className="row small gap-8">
           <Switch on={includeWorn} onChange={setIncludeWorn} label="Include what you wear" />
           Include what you wear yourself
         </label>
       </div>
 
       <div className="card stack gap-6">
-        <h2 style={{ margin: 0 }}>On your pet now</h2>
+        <h2 className="m-0">On your pet now</h2>
         {state.gear ? (
           <>
-            <p className="small muted" style={{ margin: 0 }}>
+            <p className="small muted m-0">
               From <span className="mono">/pet inventory check</span>, <Ago t={state.gear.at} />. Type it again in game after a change; this follows the log.
             </p>
             {state.gear.items.length ? (
@@ -232,11 +230,11 @@ export function PetTab({ m }: { m: GearModel }) {
                 })}
               </div>
             ) : (
-              <p style={{ margin: 0 }}>Nothing: the pet wears no items.</p>
+              <p className="m-0">Nothing: the pet wears no items.</p>
             )}
           </>
         ) : (
-          <p className="muted" style={{ margin: 0 }}>
+          <p className="muted m-0">
             Not known yet. Type <span className="mono">/pet inventory check</span> in game with your pet up, and what it wears appears here.
           </p>
         )}
@@ -244,8 +242,8 @@ export function PetTab({ m }: { m: GearModel }) {
 
       {plan && (
         <div className="card stack gap-6">
-          <h2 style={{ margin: 0 }}>Best use of what you own</h2>
-          <p className="small muted" style={{ margin: 0 }}>
+          <h2 className="m-0">Best use of what you own</h2>
+          <p className="small muted m-0">
             {owned.length + onPet.length} pieces you {includeWorn ? 'wear, ' : ''}carry, bank or have on the pet, tried in every slot they fit, at most {capacity}. Give them in
             this order: the main-hand weapon before the off hand, or the pet will not dual wield.
           </p>
@@ -291,11 +289,7 @@ export function PetTab({ m }: { m: GearModel }) {
               Take back: {takeBack.map((c) => c.piece.item.name).join(', ')}.
             </p>
           )}
-          {unknownOnPet.length > 0 && (
-            <p className="small muted" style={{ margin: 0 }}>
-              Not scored, not in the item catalog: {unknownOnPet.map((g) => g.name).join(', ')}.
-            </p>
-          )}
+          {unknownOnPet.length > 0 && <p className="small muted m-0">Not scored, not in the item catalog: {unknownOnPet.map((g) => g.name).join(', ')}.</p>}
         </div>
       )}
     </div>

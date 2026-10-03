@@ -98,6 +98,7 @@ export function MoteSpells({ go }: { go?: (page: PageId) => void }) {
   const ignore = (name: string, on: boolean) => setIgnored(on ? [...new Set([...ignored, name])] : ignored.filter((n) => n !== name))
   const [whose, setWhose] = useRemembered<'mine' | 'all'>('spellmotes.whose', 'mine')
   const [weights, setWeights] = useRemembered<SpellWeights>('spellmotes.weights', DEFAULT_SPELL_WEIGHTS)
+  const [unfolded, setUnfolded] = useRemembered<boolean>('spellmotes.settings', false)
   const tierPct = state.settings.tracking.tierDurationPct
   const q = useInvoke('motes:spellCasts', [state.characterKey, days], [state.characterKey, days, spellsLoaded])
   const stockQ = useStock()
@@ -152,69 +153,91 @@ export function MoteSpells({ go }: { go?: (page: PageId) => void }) {
             ]}
           />
         </div>
-        <div className="row small">
-          <b>A cast is worth more when it gets</b>
-          {(Object.keys(WEIGHT_LABELS) as (keyof SpellWeights)[]).map((k) => (
-            <label
-              key={k}
-              className="row tight"
-              title={
-                k === 'level'
-                  ? 'A pet level, or a level on the highest target a charm or mez takes, counts as this many percent'
-                  : `Points per percent of ${WEIGHT_LABELS[k].toLowerCase()}`
-              }
-            >
-              <span className="muted">{WEIGHT_LABELS[k]}</span>
-              <NumberInput value={weights[k]} min={0} step={0.25} width={58} label={`${WEIGHT_LABELS[k]} weight`} onChange={(v) => setWeights({ ...weights, [k]: v ?? 0 })} />
-            </label>
-          ))}
-          <button className="btn ghost small" onClick={() => setWeights(DEFAULT_SPELL_WEIGHTS)}>
-            Defaults
-          </button>
-        </div>
-        <p className="muted small m-0">
-          {w && w.total > 0
-            ? `${num(w.total)} casts from ${w.from} to ${w.to}, ${options.length} spell${options.length === 1 ? '' : 's'}${maxed ? `, ${maxed} at rank X already` : ''}${ignoredCount ? `, ${ignoredCount} ignored` : ''}.`
-            : 'No casts in your log for this window.'}{' '}
-          {stock ? `Your motes are worth ${num(xp)} xp on spells.` : 'Motes on hand are not loaded yet, so nothing is marked affordable.'} Spend the low ranks here: on an item a
-          mote only works at its own tier, but on a spell it always counts its xp. Every rank also takes −{UNIVERSAL.recovery}% recovery, −{UNIVERSAL.reuse}% reuse and −
-          {UNIVERSAL.resist} off the resist modifier of resistable spells. The duration a rank adds is{' '}
-          {go ? (
-            <button className="link-button inline" onClick={() => go('spells')}>
-              Spell Timers' Rank bonuses
+        {/* The weights, the notes and whose spells are set once and read past on every visit: one line
+            until asked for, as the upgrade finder's settings are (LT-479). */}
+        {!unfolded && (
+          <div className="row small">
+            <span className="muted grow">
+              {w && w.total > 0 ? `${num(w.total)} casts from ${w.from} to ${w.to}` : 'No casts in this window'} · spells of{' '}
+              {whose === 'mine' && mine.length ? 'your trio' : 'every class you have cast as'} · weights{' '}
+              {(Object.keys(WEIGHT_LABELS) as (keyof SpellWeights)[]).map((k) => `${WEIGHT_LABELS[k].toLowerCase()} ${weights[k]}`).join(', ')}
+            </span>
+            <button className="btn ghost small" aria-expanded={false} onClick={() => setUnfolded(true)}>
+              Change…
             </button>
-          ) : (
-            "Spell Timers' Rank bonuses"
-          )}
-          , which the timers go by too.
-          {unknown.length > 0 &&
-            ` Not spell-book spells (clickies, potions, abilities), so left out: ${unknown
-              .slice(0, 5)
-              .map((u) => `${u.name} (${u.casts})`)
-              .join(', ')}${unknown.length > 5 ? '…' : ''}.`}
-        </p>
-        <div className="row">
-          <b>Spells of</b>
-          <Segmented
-            label="Spells of"
-            value={whose}
-            onChange={setWhose}
-            title={
-              mine.length
-                ? `Your trio: ${mine.map((m) => `${m.name} ${m.level}`).join(', ')}. A spell counts when one of them has it at their level.`
-                : 'Your classes are not known yet: type /who in game, or set your classes and levels on the Stats page'
-            }
-            options={[
-              { value: 'mine', label: <>Your trio{mine.length > 0 && <small>{mine.map((m) => whoCode(m.name)).join('/')}</small>}</>, disabled: !mine.length },
-              ['all', 'Every class you have cast as']
-            ]}
-          />
-          <span className="muted small">
-            {whose === 'mine' && mine.length
-              ? 'Only spells one of your classes has at its level now: a spell a Necromancer gets at 39 is not the Shadow Knight’s until 49.'
-              : 'Everything cast in the window, whatever class you were.'}
-          </span>
-        </div>
+          </div>
+        )}
+        {unfolded && (
+          <>
+            <div className="row small">
+              <b>A cast is worth more when it gets</b>
+              {(Object.keys(WEIGHT_LABELS) as (keyof SpellWeights)[]).map((k) => (
+                <label
+                  key={k}
+                  className="row tight"
+                  title={
+                    k === 'level'
+                      ? 'A pet level, or a level on the highest target a charm or mez takes, counts as this many percent'
+                      : `Points per percent of ${WEIGHT_LABELS[k].toLowerCase()}`
+                  }
+                >
+                  <span className="muted">{WEIGHT_LABELS[k]}</span>
+                  <NumberInput value={weights[k]} min={0} step={0.25} width={58} label={`${WEIGHT_LABELS[k]} weight`} onChange={(v) => setWeights({ ...weights, [k]: v ?? 0 })} />
+                </label>
+              ))}
+              <button className="btn ghost small" onClick={() => setWeights(DEFAULT_SPELL_WEIGHTS)}>
+                Defaults
+              </button>
+            </div>
+            <p className="muted small m-0">
+              {w && w.total > 0
+                ? `${num(w.total)} casts from ${w.from} to ${w.to}, ${options.length} spell${options.length === 1 ? '' : 's'}${maxed ? `, ${maxed} at rank X already` : ''}${ignoredCount ? `, ${ignoredCount} ignored` : ''}.`
+                : 'No casts in your log for this window.'}{' '}
+              {stock ? `Your motes are worth ${num(xp)} xp on spells.` : 'Motes on hand are not loaded yet, so nothing is marked affordable.'} Spend the low ranks here: on an item
+              a mote only works at its own tier, but on a spell it always counts its xp. Every rank also takes −{UNIVERSAL.recovery}% recovery, −{UNIVERSAL.reuse}% reuse and −
+              {UNIVERSAL.resist} off the resist modifier of resistable spells. The duration a rank adds is{' '}
+              {go ? (
+                <button className="link-button inline" onClick={() => go('spells')}>
+                  Spell Timers' Rank bonuses
+                </button>
+              ) : (
+                "Spell Timers' Rank bonuses"
+              )}
+              , which the timers go by too.
+              {unknown.length > 0 &&
+                ` Not spell-book spells (clickies, potions, abilities), so left out: ${unknown
+                  .slice(0, 5)
+                  .map((u) => `${u.name} (${u.casts})`)
+                  .join(', ')}${unknown.length > 5 ? '…' : ''}.`}
+            </p>
+            <div className="row">
+              <b>Spells of</b>
+              <Segmented
+                label="Spells of"
+                value={whose}
+                onChange={setWhose}
+                title={
+                  mine.length
+                    ? `Your trio: ${mine.map((m) => `${m.name} ${m.level}`).join(', ')}. A spell counts when one of them has it at their level.`
+                    : 'Your classes are not known yet: type /who in game, or set your classes and levels on the Stats page'
+                }
+                options={[
+                  { value: 'mine', label: <>Your trio{mine.length > 0 && <small>{mine.map((m) => whoCode(m.name)).join('/')}</small>}</>, disabled: !mine.length },
+                  ['all', 'Every class you have cast as']
+                ]}
+              />
+              <span className="muted small">
+                {whose === 'mine' && mine.length
+                  ? 'Only spells one of your classes has at its level now: a spell a Necromancer gets at 39 is not the Shadow Knight’s until 49.'
+                  : 'Everything cast in the window, whatever class you were.'}
+              </span>
+              <span className="grow" />
+              <button className="btn ghost small" aria-expanded onClick={() => setUnfolded(false)}>
+                Fold
+              </button>
+            </div>
+          </>
+        )}
         <div className="row">
           <Segmented<SectionKey | 'all'>
             label="Section"

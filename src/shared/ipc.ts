@@ -443,6 +443,8 @@ export interface Pushes {
   'state:catalog': (progress: WikiProgress) => void
   'state:sources': (rows: SourceView[]) => void
   'state:jobs': (jobs: JobView[]) => void
+  /** A faction moved in the log, or a factions export was written: the Factions page reads again. */
+  'state:factionsChanged': () => void
   'state:recipes': (progress: WikiProgress) => void
   /** The faction plan's step and the Slayer counts, as they change. */
   'state:achievementTrack': (track: AchievementTrack) => void
@@ -612,6 +614,7 @@ const PUSH_CHANNELS: Record<PushChannel, true> = {
   'state:achievementTrack': true,
   'state:sources': true,
   'state:jobs': true,
+  'state:factionsChanged': true,
   'overlay:config': true,
   'overlay:timers': true,
   'overlay:combat': true,

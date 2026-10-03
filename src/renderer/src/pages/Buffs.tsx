@@ -133,7 +133,7 @@ export function Buffs() {
       <div className="grid two mb-16" style={{ alignItems: 'start' }}>
         <div className="card stack gap-8">
           <div className="row gap-8" style={{ justifyContent: 'space-between' }}>
-            <h2 style={{ margin: 0 }}>Your group</h2>
+            <h2 className="m-0">Your group</h2>
             {v.group.length > 0 && (
               <ConfirmButton
                 className="btn ghost small"
@@ -145,7 +145,7 @@ export function Buffs() {
               </ConfirmButton>
             )}
           </div>
-          <div className="stack" style={{ gap: 2 }}>
+          <div className="stack gap-2">
             <div className="row gap-8">
               <b>You</b>
               {v.me ? (
@@ -169,14 +169,14 @@ export function Buffs() {
             )}
           </div>
           {!v.group.length ? (
-            <p className="muted" style={{ margin: 0 }}>
+            <p className="muted m-0">
               Not in a group: the combination below is what you can cast yourself. Join one and each member shows here with what they could buff you with.
             </p>
           ) : (
             v.group.map((g) => {
               const can = g.person ? offersFor(v.offers, g.person.classes, g.person.level).filter((o) => wanted.has(o.spell)) : []
               return (
-                <div key={g.name} className="stack" style={{ gap: 2 }}>
+                <div key={g.name} className="stack gap-2">
                   <div className="row gap-8">
                     <b>{g.name}</b>
                     {g.person ? (
@@ -194,7 +194,7 @@ export function Buffs() {
               )
             })
           )}
-          <div className="small" style={{ marginTop: 4 }}>
+          <div className="small mt-4">
             {v.needs.length ? (
               <>
                 <b>To ask for:</b> {askText(v.needs, false)}.{v.needs.some((n) => n.after.length > 0) && ' In the order under Best combination.'}
@@ -221,11 +221,9 @@ export function Buffs() {
         </div>
 
         <div className="card stack gap-8">
-          <h2 style={{ margin: 0 }}>On you</h2>
+          <h2 className="m-0">On you</h2>
           {!v.active.length ? (
-            <p className="muted" style={{ margin: 0 }}>
-              No buffs from others seen on you.
-            </p>
+            <p className="muted m-0">No buffs from others seen on you.</p>
           ) : (
             v.active
               .slice()
@@ -251,7 +249,7 @@ export function Buffs() {
 
       <div className="card stack gap-10">
         <div className="row">
-          <h2 style={{ margin: 0 }}>Buffs you want</h2>
+          <h2 className="m-0">Buffs you want</h2>
           <span className="faint small">{v.wanted.length} picked</span>
           <span className="spacer" />
           <FilterBox placeholder="Filter by name or effect…" label="Filter buffs" value={filter} onChange={setFilter} />
@@ -266,7 +264,7 @@ export function Buffs() {
           const open = isOpen(c)
           const picked = list.filter((o) => wanted.has(o.spell)).length
           return (
-            <div key={c} className="stack" style={{ gap: 4 }}>
+            <div key={c} className="stack gap-4">
               <div className="row gap-8">
                 <Disclosure open={open} onToggle={() => flip(c)}>
                   {label}
@@ -299,13 +297,9 @@ export function Buffs() {
                             <a href={wikiUrl(o.spell)} target="_blank" rel="noreferrer">
                               {o.spell}
                             </a>
-                            {o.group && (
-                              <span className="lt-chip" style={{ marginLeft: 6 }}>
-                                group
-                              </span>
-                            )}
+                            {o.group && <span className="lt-chip ml-6">group</span>}
                             {o.self && (
-                              <Tip className="lt-chip" style={{ marginLeft: 6 }} text="Only the caster can have it: yours to cast when your classes can">
+                              <Tip className="lt-chip ml-6" text="Only the caster can have it: yours to cast when your classes can">
                                 self
                               </Tip>
                             )}
@@ -339,8 +333,8 @@ function BestCombination({ view, unpick }: { view: BuffView; unpick: (spell: str
   const order = castOrder(plan.chosen)
   return (
     <div className="card stack gap-10 mb-16">
-      <div className="row" style={{ flexWrap: 'wrap' }}>
-        <h2 style={{ margin: 0 }}>Best combination</h2>
+      <div className="row wrap">
+        <h2 className="m-0">Best combination</h2>
         <Segmented
           label="Whose buffs"
           value={scope}
@@ -356,20 +350,18 @@ function BestCombination({ view, unpick }: { view: BuffView; unpick: (spell: str
         </span>
       </div>
       {order.length > 1 && (
-        <p className="small" style={{ margin: 0 }}>
+        <p className="small m-0">
           <b>Cast order:</b> {order.join(', then ')}. By the stacking rules each holds only when it lands after the ones before it; the rest go in any order.
         </p>
       )}
       {!plan.chosen.length ? (
-        <p className="muted" style={{ margin: 0 }}>
-          {scope === 'group' ? 'Nothing: nobody in your group casts any of your picks, and nothing is on you.' : 'Nothing picked.'}
-        </p>
+        <p className="muted m-0">{scope === 'group' ? 'Nothing: nobody in your group casts any of your picks, and nothing is on you.' : 'Nothing picked.'}</p>
       ) : (
         LINE_ORDER.map((line) => {
           const rows = plan.chosen.filter((c) => c.line === line)
           if (!rows.length) return null
           return (
-            <div key={line} className="stack" style={{ gap: 2 }}>
+            <div key={line} className="stack gap-2">
               <b className="small">{LINE_LABELS[line]}</b>
               {rows.map((c) => {
                 const o = byName.get(c.spell)
@@ -404,7 +396,7 @@ function BestCombination({ view, unpick }: { view: BuffView; unpick: (spell: str
         })
       )}
       {stacked.length > 0 && (
-        <div className="stack" style={{ gap: 2 }}>
+        <div className="stack gap-2">
           <div className="row gap-8">
             <Disclosure className="small" open={leftOpen} onToggle={() => setLeftOpen(!leftOpen)}>
               Left out: {stacked.length} that do not stack with the combination

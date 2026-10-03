@@ -754,6 +754,20 @@ export class Factions implements AppFeature {
 
   // The handlers reach the feature through the context, as every other channel does.
   register(ctx: AppContext): void {
+    // The page is told when a standing moves or an export is written (a moment after, as the game
+    // finishes the file), rather than asking every ten seconds (LT-399).
+    let told: NodeJS.Timeout | null = null
+    ctx.engine.use({
+      id: 'factions',
+      line: (line) => {
+        if (!line.text.startsWith('Your faction standing with ') && !line.text.startsWith('Outputfile Complete:')) return
+        if (told) clearTimeout(told)
+        told = setTimeout(() => {
+          told = null
+          ctx.windows.toMain('state:factionsChanged')
+        }, 2000)
+      }
+    })
     sources.add('factionWiki', {
       label: 'Faction pages',
       kind: 'wiki',

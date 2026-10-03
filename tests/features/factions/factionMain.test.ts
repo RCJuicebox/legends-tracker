@@ -280,7 +280,9 @@ beforeAll(() => {
     factions: Object.assign(new m.Factions(history), { alla: { factions: async () => [], status: () => ({ read: 0, wanted: 0, error: '' }) } }),
     purchases: { latest: async () => ({}) },
     inventoryFiles: { lookup: async () => ({}) },
-    store: { characterByKey: () => record }
+    store: { characterByKey: () => record },
+    engine: { use: () => {} },
+    windows: { toMain: () => {} }
   }
   ctx.factions.register(ctx as unknown as AppContext)
   context = ctx as unknown as AppContext

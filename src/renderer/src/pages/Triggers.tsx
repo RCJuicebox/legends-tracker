@@ -250,6 +250,9 @@ export function Triggers() {
   )
 }
 
+/** Keys for the actions being edited: unique for the page's life. */
+let nextActionKey = 1
+
 function TriggerEditor({
   t,
   folders,
@@ -266,6 +269,18 @@ function TriggerEditor({
   const set = (patch: Partial<Trigger>) => onChange({ ...t, ...patch })
   const setPhrase = (i: number, p: Phrase) => set({ phrases: t.phrases.map((x, j) => (j === i ? p : x)) })
   const setAction = (i: number, a: TriggerAction) => set({ actions: t.actions.map((x, j) => (j === i ? a : x)) })
+  // Each action keeps a key of its own while it is edited, so removing one from the middle does not
+  // hand the editors below it (and a sound list each loaded) to the wrong actions (LT-397).
+  const [actionKeys, setActionKeys] = useState<number[]>(() => t.actions.map(() => nextActionKey++))
+  if (actionKeys.length !== t.actions.length) setActionKeys(t.actions.map((_, i) => actionKeys[i] ?? nextActionKey++))
+  const addAction = (a: TriggerAction) => {
+    setActionKeys((k) => [...k, nextActionKey++])
+    set({ actions: [...t.actions, a] })
+  }
+  const removeAction = (i: number) => {
+    setActionKeys((k) => k.filter((_, j) => j !== i))
+    set({ actions: t.actions.filter((_, j) => j !== i) })
+  }
   return (
     <div className="stack">
       <div className="card">
@@ -338,7 +353,7 @@ function TriggerEditor({
           <select
             value=""
             aria-label="Add an action"
-            onChange={(e) => e.target.value && set({ actions: [...t.actions, blankAction(e.target.value as TriggerAction['type'])] })}
+            onChange={(e) => e.target.value && addAction(blankAction(e.target.value as TriggerAction['type']))}
             style={{ textTransform: 'none', letterSpacing: 0 }}
           >
             <option value="">Add an action…</option>
@@ -351,7 +366,7 @@ function TriggerEditor({
         <div className="stack gap-10">
           {t.actions.length === 0 && <div className="empty">No actions: this trigger does nothing.</div>}
           {t.actions.map((a, i) => (
-            <ActionEditor key={i} a={a} onChange={(x) => setAction(i, x)} onRemove={() => set({ actions: t.actions.filter((_, j) => j !== i) })} />
+            <ActionEditor key={actionKeys[i] ?? `i${i}`} a={a} onChange={(x) => setAction(i, x)} onRemove={() => removeAction(i)} />
           ))}
         </div>
       </div>
