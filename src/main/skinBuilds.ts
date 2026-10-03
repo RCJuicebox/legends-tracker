@@ -1,0 +1,49 @@
+import { execFile } from 'node:child_process'
+import { promises as fs } from 'node:fs'
+import { join } from 'node:path'
+import { isCharacterKey } from '../core/validate'
+import { SKIN_BUILD_FILE, isSkinName, parseSkinBuild, tailOutput, type SkinBuild, type SkinBuildResult } from '../core/skinBuild'
+import { log } from './log'
+
+/** Long enough for a script that reads the game's files; a hung one is stopped. */
+const TIMEOUT_MS = 120_000
+
+/** The skins in the game's uifiles folder that ask for a rebuild button (src/core/skinBuild.ts). */
+export async function listSkinBuilds(gameDir: string): Promise<SkinBuild[]> {
+  if (!gameDir) return []
+  const root = join(gameDir, 'uifiles')
+  let names: string[]
+  try {
+    names = (await fs.readdir(root, { withFileTypes: true })).filter((d) => d.isDirectory()).map((d) => d.name)
+  } catch {
+    return []
+  }
+  const found = await Promise.all(names.filter(isSkinName).map((skin) => readSkinBuild(root, skin)))
+  return found.filter((b): b is SkinBuild => b !== null).sort((a, b) => a.skin.localeCompare(b.skin))
+}
+
+async function readSkinBuild(root: string, skin: string): Promise<SkinBuild | null> {
+  try {
+    return parseSkinBuild(skin, await fs.readFile(join(root, skin, SKIN_BUILD_FILE), 'utf8'))
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Runs a skin's rebuild, as its own file names it now (never a command a page sends), with no shell.
+ * The character the page shows goes to the command as EQL_CHARACTER, so a script can read that
+ * character's export.
+ */
+export async function runSkinBuild(gameDir: string, skin: string, character: string): Promise<SkinBuildResult> {
+  const build = isSkinName(skin) && gameDir ? await readSkinBuild(join(gameDir, 'uifiles'), skin) : null
+  if (!build) return { skin: String(skin), ok: false, output: `The ${String(skin)} skin no longer asks for a rebuild.` }
+  const env = { ...process.env, ...(isCharacterKey(character) ? { EQL_CHARACTER: character } : {}) }
+  return new Promise((resolve) => {
+    execFile(build.command[0], build.command.slice(1), { env, windowsHide: true, timeout: TIMEOUT_MS, maxBuffer: 4 * 1024 * 1024 }, (err, stdout, stderr) => {
+      const output = tailOutput(`${stdout}\n${stderr}`)
+      if (err) log.warn(`Rebuilding the ${skin} skin failed`, err)
+      resolve({ skin, ok: !err, output: err && !output ? err.message : output })
+    })
+  })
+}

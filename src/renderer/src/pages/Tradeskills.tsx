@@ -13,6 +13,7 @@ import type { ItemInfo } from '../../../shared/types'
 import { useExportCharacter, useInventory } from '../gear/model'
 import { ItemIcon } from './gearBits'
 import type { BookRecipe, TradeSaved } from '../../../shared/ipc'
+import type { SkinBuild, SkinBuildResult } from '../../../core/skinBuild'
 
 // Recipes the player keeps making: what goes in, what they have (bags, bank, tradeskill depot), where
 // to buy the rest and what a batch costs.
@@ -164,6 +165,7 @@ export function Tradeskills() {
               }
             />
           </div>
+          <SkinRebuilds character={character} />
         </div>
         <div className="actions">
           <CharacterPicker character={character} available={exp.available} onPick={exp.setCharacter} />
@@ -552,5 +554,42 @@ function PriceCell({ unit, from, last, onSet }: { unit: number; from: PriceSourc
       {from === 'wiki' ? '≈ ' : ''}
       {coin(unit)}
     </button>
+  )
+}
+
+/**
+ * A button for each UI skin that asks to be rebuilt from the inventory export (src/core/skinBuild.ts),
+ * here because this is where the export gets refreshed. Nothing shows when no skin asks.
+ */
+function SkinRebuilds({ character }: { character: string }) {
+  const builds = useInvoke('skins:builds')
+  const [busy, setBusy] = useState('')
+  const [result, setResult] = useState<SkinBuildResult | null>(null)
+  if (!builds.data?.length) return null
+  const run = async (b: SkinBuild) => {
+    setBusy(b.skin)
+    setResult(null)
+    const r = await act('skins:build', b.skin, character)
+    setBusy('')
+    if (r) setResult(r)
+  }
+  return (
+    <div className="row small mt-10">
+      {builds.data.map((b) => (
+        <button key={b.skin} className="btn" disabled={!!busy} title={b.command.join(' ')} onClick={() => void run(b)}>
+          {busy === b.skin ? 'Rebuilding…' : b.label}
+        </button>
+      ))}
+      {result?.ok && (
+        <span>
+          Rebuilt from {character ? `${character}'s` : 'the'} export. In game: <GameCommand cmd={`/loadskin ${result.skin} 1`} />
+        </span>
+      )}
+      {result && !result.ok && (
+        <ErrorText>
+          Could not rebuild {result.skin}: {result.output || 'no output'}
+        </ErrorText>
+      )}
+    </div>
   )
 }

@@ -6,6 +6,7 @@ import { diagnostics } from '../diagnostics'
 import { sources } from '../sources/registry'
 import { jobs } from '../sources/jobs'
 import { checkGameFolder, findInstall, isGameFolder, resolveGameFolder } from '../game'
+import { listSkinBuilds, runSkinBuild } from '../skinBuilds'
 import { assertCharacterKey, meterOptions, sanitizeCharacter, sanitizeSettings } from '../../core/validate'
 import { className } from '../../shared/game/classes'
 import type { CharacterSettings } from '../../shared/types'
@@ -99,6 +100,9 @@ export function registerAppIpc(ctx: AppContext): void {
 
   // Another folder is looked into only when it is a game folder.
   handle('game:check', (dir) => checkGameFolder(dir === undefined ? ctx.installDir() : typeof dir === 'string' && isGameFolder(dir) ? dir : ''))
+  // A UI skin's rebuild, as the skin's own file names it (src/core/skinBuild.ts).
+  handle('skins:builds', () => listSkinBuilds(ctx.installDir()))
+  handle('skins:build', (skin, character) => runSkinBuild(ctx.installDir(), skin, character))
   handle('game:find', async () => {
     const dir = await findInstall()
     if (dir) ctx.saveSettings({ ...store.settings.get(), installDir: dir })

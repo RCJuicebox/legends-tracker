@@ -22,6 +22,7 @@ import type { MoteState } from '../core/motes'
 import type { PetGearReading, PetProfile, PetSpellOption } from '../core/pets'
 import type { RespawnTimerSpec, RespawnView, SpawnLink } from '../core/respawns'
 import type { MyClass, SpellCastRow } from '../core/spellMotes'
+import type { SkinBuild, SkinBuildResult } from '../core/skinBuild'
 import type { Purchase, Recipe } from '../core/tradeskills'
 import type { CatalogItem } from '../core/wikiItem'
 import type { AchMarks, AchievementsView, CharacterSheet, GameFolderCheck, InventoryView, ItemInfo, MoteStock } from './character'
@@ -388,6 +389,10 @@ export interface Invokes {
   'game:check': (dir?: string) => GameFolderCheck
   'game:find': () => string
   'game:choose': () => { canceled: boolean; picked: string; dir: string }
+  /** The UI skins in the game folder that ask for a rebuild button (src/core/skinBuild.ts). */
+  'skins:builds': () => SkinBuild[]
+  /** Runs a skin's rebuild, for a character's export. */
+  'skins:build': (skin: string, character: string) => SkinBuildResult
   'dialog:folder': () => string | null
 
   'sources:list': () => SourceView[]
@@ -561,6 +566,8 @@ const INVOKE_CHANNELS: Record<InvokeChannel, true> = {
   'game:check': true,
   'game:find': true,
   'game:choose': true,
+  'skins:builds': true,
+  'skins:build': true,
   'dialog:folder': true,
   'sources:list': true,
   'sources:refresh': true,
