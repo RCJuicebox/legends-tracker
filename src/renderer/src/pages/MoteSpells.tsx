@@ -114,8 +114,10 @@ export function MoteSpells({ go }: { go?: (page: PageId) => void }) {
     return all
   }, [data, tierPct, weights, stock, sortBy, whose, mine])
 
+  // Main answers null without the spell file, which reads the same here as no answer yet: the
+  // watch status says which it is (LT-343).
+  if (!spellsLoaded) return <div className="card empty">The spell file is not loaded yet: check the game folder in Settings.</div>
   if (!q.data) return q.error ? <Pending what="your casts" error={q.error} retry={q.reload} /> : <Pending what="your casts" />
-  if (q.data === null) return <div className="card empty">The spell file is not loaded yet: check the game folder in Settings.</div>
 
   // The section chips count what the checkboxes leave, so a chip's number is its table's.
   const isIgnored = (o: SpellUpgradeOption) => ignored.includes(o.row.name)

@@ -49,8 +49,10 @@ export interface OverlayHost {
  * - Hidden (the game in the background), they get no pushes and their pages are throttled; the
  *   newest timers and meter reach them when they show again.
  * - Arrange mode lifts all of that so the windows can be dragged and resized.
- * - A meter overlay still sees the mouse move over it (Windows forwards the moves while the window
- *   ignores clicks), so its page can ask for the mouse back while the pointer is on its controls.
+ * - A meter overlay still sees the mouse move over it, so its page can ask for the mouse back while
+ *   the pointer is on its controls. Forwarding the moves installs a low-level mouse hook that every
+ *   mouse event on the system then passes through this process for, so it is on only while the
+ *   pointer is over a meter: the pointer is looked at ten times a second instead (LT-341).
  */
 export class OverlayManager {
   private readonly windows = new Map<string, BrowserWindow>()
@@ -64,6 +66,12 @@ export class OverlayManager {
   private shown = true
   private displayTimer: NodeJS.Timeout | null = null
   private followingDisplays = false
+  /** Ten times a second while a meter is up: is the pointer over it. */
+  private cursorTimer: NodeJS.Timeout | null = null
+  /** How each host takes the mouse now, so it is changed only when it changes. */
+  private readonly mouseState = new WeakMap<BrowserWindow, MouseState>()
+  /** Meters whose page has asked for the mouse (the pointer on the header, or unlocked and on it). */
+  private readonly wantMouse = new Set<string>()
 
   constructor(private readonly host: OverlayHost) {}
 
@@ -100,6 +108,7 @@ export class OverlayManager {
       this.closeWindows()
       this.applyHosts()
       this.keepOnTop()
+      this.followCursor()
       return
     }
     for (const [id, win] of this.windows) {
@@ -198,8 +207,8 @@ export class OverlayManager {
       webPreferences: { preload: this.host.preload, backgroundThrottling: false, sandbox: true }
     })
     win.setAlwaysOnTop(true, 'screen-saver')
-    // Clicks go through to the game; moves still come, so a meter's header can ask for the mouse.
-    win.setIgnoreMouseEvents(true, { forward: true })
+    // Clicks go through to the game; moves come only while the pointer is over a meter (followCursor).
+    this.setWinMouse(win, 'through')
     win.setMenu(null)
     win.webContents.on('did-finish-load', () => {
       const h = this.hosts.get(displayId)
@@ -224,11 +233,6 @@ export class OverlayManager {
       combat: this.hostHas(h.win, 'meter') ? this.last.combat : null,
       achievements: this.hostHas(h.win, 'achievements') ? this.last.achievements : null
     }
-  }
-
-  private hostOf(id: string): BrowserWindow | null {
-    for (const h of this.hosts.values()) if (h.ids.includes(id) && !h.win.isDestroyed()) return h.win
-    return null
   }
 
   private hostHas(win: BrowserWindow, kind: Kind): boolean {
@@ -281,7 +285,8 @@ export class OverlayManager {
       webPreferences: { preload: this.host.preload, backgroundThrottling: false, sandbox: true }
     })
     win.setAlwaysOnTop(true, 'screen-saver')
-    ignoreMouse(win, c.kind, true)
+    // An overlay has a window of its own only while arranging, when it takes the mouse to be dragged.
+    win.setIgnoreMouseEvents(!this.arranging)
     win.setMenu(null)
     const report = () => {
       if (win.isDestroyed()) return
@@ -324,6 +329,7 @@ export class OverlayManager {
   setShown(show: boolean): void {
     if (show === this.shown) return
     this.shown = show
+    this.followCursor()
     for (const h of this.hosts.values()) {
       const w = h.win
       if (w.isDestroyed()) continue
@@ -356,9 +362,10 @@ export class OverlayManager {
     // Arranging swaps the hosts for a window per overlay, and back.
     if (on) this.closeHosts()
     this.apply(this.configs)
+    this.followCursor()
     for (const [id, win] of this.windows) {
       const cfg = this.configs.find((c) => c.id === id)
-      ignoreMouse(win, cfg?.kind ?? 'timers', !on)
+      win.setIgnoreMouseEvents(!on)
       win.setFocusable(on)
       win.setResizable(on)
       if (cfg) push(win.webContents, 'overlay:config', { config: cfg, arranging: on })
@@ -386,15 +393,49 @@ export class OverlayManager {
 
   /** A meter overlay's page asks for the mouse while the pointer is on its controls, and gives it back after. */
   setMouse(id: string, interactive: boolean): void {
-    if (this.arranging) return
-    const host = this.hostOf(id)
-    if (host) {
-      if (this.configs.find((c) => c.id === id)?.kind === 'meter') ignoreMouse(host, 'meter', !interactive)
-      return
+    if (this.arranging || this.configs.find((c) => c.id === id)?.kind !== 'meter') return
+    if (interactive) this.wantMouse.add(id)
+    else this.wantMouse.delete(id)
+    this.lookAtCursor()
+  }
+
+  /** Looks at the pointer ten times a second while a meter is up and the overlays are shown; else not at all. */
+  private followCursor(): void {
+    const want = this.shown && !this.arranging && this.configs.some((c) => c.visible && c.kind === 'meter')
+    if (want && !this.cursorTimer) this.cursorTimer = setInterval(() => this.lookAtCursor(), CURSOR_MS)
+    else if (!want && this.cursorTimer) {
+      clearInterval(this.cursorTimer)
+      this.cursorTimer = null
+      for (const h of this.hosts.values()) if (!h.win.isDestroyed()) this.setWinMouse(h.win, 'through')
     }
-    const win = this.windows.get(id)
-    const cfg = this.configs.find((c) => c.id === id)
-    if (win && !win.isDestroyed() && cfg?.kind === 'meter') ignoreMouse(win, 'meter', !interactive)
+  }
+
+  /**
+   * Each host with a meter: the mouse while its page asks, the pointer's moves while the pointer is
+   * over (or just beside) a meter, so the page sees it come onto the header; otherwise plain
+   * click-through, with no hook.
+   */
+  private lookAtCursor(): void {
+    if (this.arranging) return
+    const p = screen.getCursorScreenPoint()
+    for (const h of this.hosts.values()) {
+      if (h.win.isDestroyed()) continue
+      const meters = this.configs.filter((c) => c.kind === 'meter' && h.ids.includes(c.id))
+      if (!meters.length) continue
+      const near = meters.some((c) => {
+        const r = onScreen(c)
+        return p.x >= r.x - NEAR_PX && p.x < r.x + r.width + NEAR_PX && p.y >= r.y - NEAR_PX && p.y < r.y + r.height + NEAR_PX
+      })
+      this.setWinMouse(h.win, meters.some((c) => this.wantMouse.has(c.id)) ? 'mouse' : near ? 'moves' : 'through')
+    }
+  }
+
+  private setWinMouse(win: BrowserWindow, state: MouseState): void {
+    if (this.mouseState.get(win) === state) return
+    this.mouseState.set(win, state)
+    if (state === 'mouse') win.setIgnoreMouseEvents(false)
+    else if (state === 'moves') win.setIgnoreMouseEvents(true, { forward: true })
+    else win.setIgnoreMouseEvents(true)
   }
 
   combat(snapshot: CombatSnapshot): void {
@@ -419,6 +460,8 @@ export class OverlayManager {
   destroy(): void {
     if (this.topmostTimer) clearInterval(this.topmostTimer)
     this.topmostTimer = null
+    if (this.cursorTimer) clearInterval(this.cursorTimer)
+    this.cursorTimer = null
     if (this.displayTimer) clearTimeout(this.displayTimer)
     this.displayTimer = null
     this.closeWindows()
@@ -426,11 +469,11 @@ export class OverlayManager {
   }
 }
 
-/** Click-through, with mouse moves still forwarded to a meter so its page knows when the pointer is on it. */
-function ignoreMouse(win: BrowserWindow, kind: Kind, ignore: boolean): void {
-  if (ignore && kind === 'meter') win.setIgnoreMouseEvents(true, { forward: true })
-  else win.setIgnoreMouseEvents(ignore)
-}
+/** A host's hold on the mouse: none (`through`), the pointer's moves only, or the mouse. */
+type MouseState = 'through' | 'moves' | 'mouse'
+/** How often the pointer is looked at while a meter is up, and how near a meter it counts as on it. */
+const CURSOR_MS = 100
+const NEAR_PX = 12
 
 /** Saved positions can point at a monitor that is no longer attached; pull those back onto one that is. */
 function onScreen(c: OverlayConfig) {

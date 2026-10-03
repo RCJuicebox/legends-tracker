@@ -396,8 +396,10 @@ must be windowed or borderless. **Arrange** lifts all of that so they can be dra
 **Done** on any of them, or Arrange again, puts them back. An overlay's **Background** slider fades
 the dark panel behind its text and bars, down to none; the alerts, text alone, fade as a whole.
 Timer bars sort soonest-first and can group under each target's name. A meter overlay is the damage
-meter's list; Windows keeps forwarding mouse moves to it while it ignores clicks, so hovering its
-header hands it the mouse for its controls and moving off hands it back.
+meter's list. While the pointer is over a meter (looked at ten times a second), Windows forwards the
+pointer's moves to it though it still lets clicks through, so hovering its header hands it the
+mouse for its controls and moving off hands it back; away from a meter nothing is forwarded, so no
+mouse hook runs. Timer bars step with their clock and glide only over their last twelve seconds.
 
 By default the overlays show only while the game (or this app's own window) has focus, and hide when
 you tab to anything else; audio cues play regardless. The app asks Windows (through koffi, no helper

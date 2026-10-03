@@ -2,6 +2,15 @@
 
 What changed in each version. The release workflow publishes a version's section as its release notes, and installed copies show them when an update arrives.
 
+## Unreleased
+
+- **Timer overlays cost a sixth of what they did.** A bar moving a third of a pixel a second was redrawn at the screen's refresh rate: five bars on screen took a third of a CPU core. Bars now step with their clock and glide only over their last twelve seconds, as they turn amber and red.
+- **The damage meter overlay no longer hooks every mouse move on the PC.** It watched the mouse through a system-wide hook all the time, so its header could take the mouse back. It now looks at the pointer ten times a second and asks Windows for the moves only while the pointer is over a meter. An open fight menu also closes as the pointer leaves the meter, so a click on the game beside it is no longer eaten.
+- **Fix: one fault in reading the log no longer loses the rest of what was read.** A part of the app (the meter, loot, motes, timers…) that failed on one line used to stop every other part seeing the next few thousand lines, silently. Each part now loses only the line it failed on; main.log says which part, and the Chat log row on Data Sources shows it. A log that cannot be read for a few seconds running is said too, in the feed and on Data Sources, and so is its recovery.
+- **New timer bars show at once**, with their line, rather than up to a third of a second after.
+- **Spell Timers keeps unsaved rule edits.** Opening another spell's row threw away what you had typed in the one before; the edits now stay until you save or discard them, the row says "not saved", and the sidebar marks Spell Timers.
+- **Fix: Upgrades › Spell upgrades without the spell file** said "Loading your casts…" for ever; it says the spell file is not loaded.
+
 ## 2.6.0 (2026-10-02)
 
 - **Hide the faction plan from the achievements overlay.** A **Show the faction plan** switch on the overlay's card in Overlays. Off, the overlay leaves the plan's step out; the plan is still followed, and its steps are still spoken if that is on.

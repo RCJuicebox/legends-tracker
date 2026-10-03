@@ -37,6 +37,7 @@ function SegmentMenu({
   selection,
   live,
   onPick,
+  open,
   onOpen
 }: {
   list: SegmentSummary[]
@@ -44,13 +45,10 @@ function SegmentMenu({
   selection: string
   live: Segment | SegmentSummary | null | undefined
   onPick: (id: string) => void
+  open: boolean
   onOpen: (open: boolean) => void
 }) {
-  const [open, setOpen] = useState(false)
-  const toggle = (v: boolean) => {
-    setOpen(v)
-    onOpen(v)
-  }
+  const toggle = onOpen
   const pick = (id: string) => {
     onPick(id)
     toggle(false)
@@ -94,8 +92,10 @@ function SegmentMenu({
 /**
  * The damage meter over the game. The window lets clicks through; while the pointer is on the
  * header the page asks for the mouse back, so the header's controls work, and gives it back as the
- * pointer leaves. Unlocking (the pin) keeps the mouse for the whole window, so rows can be clicked
- * into, until it is locked again. An open fight menu keeps it too: the list hangs below the header.
+ * pointer leaves. Unlocking (the pin) keeps the mouse while the pointer is anywhere on the meter, so
+ * rows can be clicked into, until it is locked again. An open fight menu keeps it on the meter too
+ * (the list hangs below the header) and closes as the pointer leaves the meter, so a click on the
+ * game beside it is never eaten (LT-348).
  */
 function MeterOverlay({ config, snap, arranging }: { config: OverlayConfig; snap: CombatSnapshot | null; arranging: boolean }) {
   const opts = config.meter ?? DEFAULT_METER_OPTIONS
@@ -111,13 +111,13 @@ function MeterOverlay({ config, snap, arranging }: { config: OverlayConfig; snap
 
   useEffect(() => setDrill(null), [opts.mode, opts.span, selection])
   useEffect(() => setSelection(LIVE), [opts.span])
-  // A locked meter has the mouse only while the pointer is on the header or the fight menu is open;
-  // an unlocked one while the pointer is anywhere on it. Never beyond it: the window may be a host
-  // that other overlays share. The pointer does not leave the header as a menu closes, so that moment
-  // is covered here too.
-  const wants = () => menuOpen || overHead.current || (unlocked && overMeter.current)
+  // A locked meter has the mouse only while the pointer is on the header, or on the meter with the
+  // fight menu open; an unlocked one while the pointer is anywhere on it. Never beyond it: the window
+  // may be a host that other overlays share. The pointer does not leave the header as a menu closes,
+  // so that moment is covered here too.
+  const wants = () => overHead.current || ((unlocked || menuOpen) && overMeter.current)
   useEffect(() => {
-    if (!arranging) api.send('overlay:mouse', config.id, menuOpen || overHead.current || (unlocked && overMeter.current))
+    if (!arranging) api.send('overlay:mouse', config.id, overHead.current || ((unlocked || menuOpen) && overMeter.current))
   }, [unlocked, menuOpen, arranging, config.id])
 
   const patch = (p: Partial<MeterOverlayOptions>) => api.send('overlay:meter', config.id, p)
@@ -127,6 +127,7 @@ function MeterOverlay({ config, snap, arranging }: { config: OverlayConfig; snap
   }
   const over = (on: boolean) => {
     overMeter.current = on
+    if (!on) setMenuOpen(false)
     if (!arranging) api.send('overlay:mouse', config.id, wants())
   }
 
@@ -167,7 +168,7 @@ function MeterOverlay({ config, snap, arranging }: { config: OverlayConfig; snap
               ‹ {drill.name}
             </button>
           ) : (
-            <SegmentMenu list={list} span={opts.span} selection={selection} live={live} onPick={setSelection} onOpen={setMenuOpen} />
+            <SegmentMenu list={list} span={opts.span} selection={selection} live={live} onPick={setSelection} open={menuOpen} onOpen={setMenuOpen} />
           )}
           <span className="dm-ov-title" title={name}>
             {name}

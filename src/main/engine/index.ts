@@ -85,6 +85,13 @@ export class Engine {
   /** The log last watched, to tell a switch of character from a restart of the same log. */
   private watchedLog = ''
   private missing = false
+  /** The tailer has said the log keeps failing to read, and has not said it reads again. */
+  private readFailing = false
+  /** Lines (or laps) a part threw on this run, and when each part was last said in main.log. */
+  private lineFailures = 0
+  private readonly featureWarned = new Map<string, number>()
+  /** When a part last threw: its error leaves the status a minute after. */
+  private lineErrorAt = 0
   private tickTimer: NodeJS.Timeout | null = null
   private archiveTimer: NodeJS.Timeout | null = null
   /** Pasted test lines must not add to the real mote history or stock. */
@@ -375,7 +382,9 @@ export class Engine {
         onLines: (lines, end) => this.tail === tail && this.onLines(tail, lines, end),
         onReset: (reason) => this.tail === tail && this.onTailReset(tail, reason),
         onMissing: () => this.tail === tail && this.onTailMissing(tail),
-        onSize: (size) => this.tail === tail && this.onTailSize(tail, size)
+        onSize: (size) => this.tail === tail && this.onTailSize(tail, size),
+        onError: (e, where) => this.tail === tail && this.onTailError(e, where),
+        onRecovered: () => this.tail === tail && this.onTailRecovered()
       })
     }
     this.tail = tail
@@ -471,9 +480,64 @@ export class Engine {
     for (const raw of lines) {
       const line = t.clock.parse(raw)
       if (!line) continue
-      for (const f of this.features) f.line?.(line)
+      for (const f of this.features) {
+        if (!f.line) continue
+        try {
+          f.line(line)
+        } catch (e) {
+          this.featureFailed(f, 'a line', e)
+        }
+      }
     }
-    for (const f of this.features) f.linesRead?.(t.logFile, end)
+    for (const f of this.features) {
+      try {
+        f.linesRead?.(t.logFile, end)
+      } catch (e) {
+        this.featureFailed(f, 'where the log is read to', e)
+      }
+    }
+    // A new timer's bar goes out with its line, not at the next lap of the clock (LT-353).
+    this.timersOut.tick(Date.now())
+  }
+
+  /**
+   * One part that throws loses that line (or lap) to itself only: every other part still gets it
+   * (LT-340). Said in main.log at most once a minute a part, and on the chat log's Data Sources row
+   * until a minute goes by without another.
+   */
+  private featureFailed(f: EngineFeature, what: string, e: unknown): void {
+    const now = Date.now()
+    this.lineFailures++
+    if (now - (this.featureWarned.get(f.id) ?? 0) >= 60_000) {
+      this.featureWarned.set(f.id, now)
+      log.warn(`The ${f.id} part failed on ${what} (${this.lineFailures} failure${this.lineFailures === 1 ? '' : 's'} this run):`, e)
+    }
+    this.lineErrorAt = now
+    const text = `The ${f.id} part failed on ${what}: ${e instanceof Error ? e.message : String(e)}`
+    if (this.status.logError !== text && !this.readFailing) {
+      this.status.logError = text
+      this.emitStatus()
+    }
+  }
+
+  private onTailError(e: unknown, where: 'read' | 'lines'): void {
+    if (where === 'lines') {
+      // Each part's own failures are caught in onLines; this is the wiring itself.
+      log.warn('Handling log lines failed:', e)
+      return
+    }
+    this.readFailing = true
+    log.warn('Reading the log keeps failing:', e)
+    this.status.logError = `Reading the log keeps failing: ${e instanceof Error ? e.message : String(e)}`
+    this.pushFeed('warn', `${this.status.logError}. Still trying.`)
+    this.emitStatus()
+  }
+
+  private onTailRecovered(): void {
+    this.readFailing = false
+    this.status.logError = undefined
+    this.pushFeed('info', 'The log reads again.')
+    this.emitStatus()
   }
 
   /** What the pet wears and which pet it is, as the log tells it. */
@@ -509,7 +573,23 @@ export class Engine {
 
   private tick(): void {
     const now = Date.now()
-    for (const f of this.features) f.tick?.(now)
+    for (const f of this.features) {
+      try {
+        f.tick?.(now)
+      } catch (e) {
+        this.featureFailed(f, 'a lap of the clock', e)
+      }
+    }
+    if (this.lineErrorAt && !this.readFailing && now - this.lineErrorAt > 60_000) {
+      this.lineErrorAt = 0
+      this.status.logError = undefined
+      this.emitStatus()
+    }
+  }
+
+  /** Lines or laps a part threw on this run (diagnostics). */
+  get failures(): number {
+    return this.lineFailures
   }
 
   /**

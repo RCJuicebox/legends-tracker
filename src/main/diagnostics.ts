@@ -77,7 +77,7 @@ export function diagnostics(ctx: AppContext): string {
     `Legends Tracker ${app.getVersion()}${app.isPackaged ? '' : ' (development)'}, Electron ${process.versions.electron}, Windows ${release()} ${process.arch}`,
     `Settings: ${app.getPath('userData')}   Caches: ${cacheDir()}`,
     `Settings summary: ${settingsSummary(s, ctx.store.triggers.get().length, homedir())}`,
-    `Watching: ${ctx.engine.status.watching ? 'yes' : 'no'}; spells loaded ${ctx.engine.status.spellsLoaded}${ctx.engine.status.spellError ? ` (${ctx.engine.status.spellError})` : ''}; game ${ctx.watcher.state.gameRunning ? 'running' : 'not running'}`,
+    `Watching: ${ctx.engine.status.watching ? 'yes' : 'no'}; spells loaded ${ctx.engine.status.spellsLoaded}${ctx.engine.status.spellError ? ` (${ctx.engine.status.spellError})` : ''}; game ${ctx.watcher.state.gameRunning ? 'running' : 'not running'}${ctx.engine.failures ? `; ${ctx.engine.failures} line${ctx.engine.failures === 1 ? '' : 's'} a part failed on` : ''}${ctx.engine.status.logError ? `; ${ctx.engine.status.logError}` : ''}`,
     `Update: ${u.state}${'version' in u ? ` ${u.version}` : ''}${u.state === 'error' ? ` (${u.message})` : ''}`
   ]
   const key = characterKey(s.logFile)

@@ -237,6 +237,60 @@ describe('LogTailer, more', () => {
       vi.useRealTimers()
     }
   })
+
+  it('keeps reading the slices after one whose reader threw, and says so (LT-340)', async () => {
+    const path = join(dir, 'eqlog_Throw_x.txt')
+    const long = 'b'.repeat(200 * 1024)
+    await fs.writeFile(path, `${long}\r\n${long}\r\nlast\r\n`)
+    const got: string[] = []
+    const errors: string[] = []
+    let first = true
+    const t = new LogTailer(path, {
+      startAtEnd: false,
+      onLines: (l) => {
+        if (first) {
+          first = false
+          throw new Error('consumer broke')
+        }
+        got.push(...l)
+      },
+      onError: (e, where) => errors.push(`${where}: ${(e as Error).message}`)
+    })
+    await t.readOnce()
+    await t.release()
+    expect(errors).toEqual(['lines: consumer broke'])
+    expect(got).toEqual([long, 'last'])
+  })
+
+  it('says a read failing poll after poll once, and when it reads again (LT-368)', async () => {
+    const path = join(dir, 'eqlog_Fail_x.txt')
+    await fs.writeFile(path, 'one\r\n')
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+    const stat = vi.spyOn(fs, 'stat').mockRejectedValue(Object.assign(new Error('held'), { code: 'EBUSY' }))
+    try {
+      const errors: string[] = []
+      let recovered = 0
+      const got: string[] = []
+      const t = new LogTailer(path, { startAtEnd: false, pollMs: 1, onLines: (l) => got.push(...l), onError: (_e, where) => errors.push(where), onRecovered: () => recovered++ })
+      t.start()
+      for (let i = 0; i < 40; i++) await vi.advanceTimersByTimeAsync(1)
+      expect(errors).toEqual(['read'])
+      stat.mockRestore()
+      await vi.waitFor(
+        async () => {
+          await vi.advanceTimersByTimeAsync(1)
+          expect(got).toEqual(['one'])
+        },
+        { timeout: 2000, interval: 5 }
+      )
+      expect(recovered).toBe(1)
+      t.stop()
+      await t.release()
+    } finally {
+      stat.mockRestore()
+      vi.useRealTimers()
+    }
+  })
 })
 
 describe('archiver, more', () => {

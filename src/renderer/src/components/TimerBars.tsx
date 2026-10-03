@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from 'react'
 import type { TimerView } from '../../../shared/types'
 import { clock, iconUrl, roman } from '../api'
 
@@ -31,14 +31,7 @@ const SHIFT_MS = 12_000
 const AMBER = '#e0a03a'
 const RED = '#ef5a4f'
 
-/**
- * The bar drains by itself: one animation per timer, started where the timer is and run to its
- * end, so the page renders only to change the text. The fill is scaled and its bright edge slid
- * along, rather than resized, so the animation costs no layout. Over its last twelve seconds the
- * bar's colour (the track's `color`, which the fill and edge paint with) runs to amber and then red:
- * a colour animation that only starts then. An overdue bar is full, striped.
- */
-/** The system's "show fewer animations": the bars then step with the clock instead of gliding. */
+/** The system's "show fewer animations": the bars then step with the clock to the very end. */
 function useReducedMotion(): boolean {
   const [reduced, setReduced] = useState(() => matchMedia('(prefers-reduced-motion: reduce)').matches)
   useEffect(() => {
@@ -50,36 +43,43 @@ function useReducedMotion(): boolean {
   return reduced
 }
 
+/**
+ * The bar drains in steps, set where it stands at each tick of the clock: a bar that moves a third
+ * of a pixel a second is not worth an animation frame (LT-339: a sixth of the cost with five bars
+ * up). Its last twelve seconds glide: one animation of the fill and edge to the end, and the bar's
+ * colour (the track's `color`, which the fill and edge paint with) running to amber and then red.
+ * The fill is scaled and its bright edge slid, rather than resized, so neither costs layout. With
+ * fewer animations asked for, the bar steps to the very end, turning amber and then red in two
+ * steps. An overdue bar is full, striped.
+ */
 function useDrain(startedAt: number, endsAt: number, overdue: boolean, color: string, now: number) {
   const track = useRef<HTMLDivElement>(null)
   const fill = useRef<HTMLDivElement>(null)
   const edge = useRef<HTMLDivElement>(null)
   const reduced = useReducedMotion()
-  // Fewer animations asked for: the fill is set where it stands at each tick of the clock, and the
-  // last twelve seconds turn amber and then red in two steps rather than by a fade.
-  useEffect(() => {
-    if (!reduced || overdue) return
-    const left = Math.max(0, endsAt - now)
-    const part = Math.max(0, Math.min(1, left / Math.max(1, endsAt - startedAt)))
+  const left = endsAt - now
+  const glide = !reduced && !overdue && left <= SHIFT_MS
+  // Set before the first paint, so a new bar never flashes full.
+  useLayoutEffect(() => {
+    if (overdue || glide) return
+    const part = Math.max(0, Math.min(1, Math.max(0, left) / Math.max(1, endsAt - startedAt)))
     if (fill.current) fill.current.style.transform = `scaleX(${part})`
     if (edge.current) edge.current.style.transform = `translateX(${(part - 1) * 100}%)`
     if (track.current) track.current.style.color = left > SHIFT_MS ? color : left > SHIFT_MS / 2 ? AMBER : RED
-  }, [reduced, overdue, startedAt, endsAt, color, now])
+  }, [glide, overdue, startedAt, endsAt, color, left])
   useEffect(() => {
-    if (overdue || reduced) return
+    if (!glide) return
     const timing: KeyframeAnimationOptions = { duration: Math.max(1, endsAt - startedAt), easing: 'linear', fill: 'forwards' }
     const runs = [
       fill.current?.animate([{ transform: 'scaleX(1)' }, { transform: 'scaleX(0)' }], timing),
       edge.current?.animate([{ transform: 'translateX(0)' }, { transform: 'translateX(-100%)' }], timing)
     ]
-    const now = Date.now()
-    const elapsed = Math.max(0, now - startedAt)
-    for (const r of runs) if (r) r.currentTime = elapsed
-    // Before its last twelve seconds the shift has not started: a negative time holds its first colour.
+    const at = Date.now()
+    for (const r of runs) if (r) r.currentTime = Math.max(0, at - startedAt)
     const shift = track.current?.animate([{ color }, { color: AMBER }, { color: RED }], { duration: SHIFT_MS, easing: 'linear', fill: 'both' })
-    if (shift) shift.currentTime = now - (endsAt - SHIFT_MS)
+    if (shift) shift.currentTime = Math.max(0, at - (endsAt - SHIFT_MS))
     return () => [...runs, shift].forEach((r) => r?.cancel())
-  }, [startedAt, endsAt, overdue, color, reduced])
+  }, [glide, startedAt, endsAt, color])
   return { track, fill, edge }
 }
 
@@ -120,8 +120,8 @@ function TimerBar({ t, now, showTarget }: { t: TimerView; now: number; showTarge
  * heading over each target, which is how you read DoTs across several mobs at a glance.
  */
 export function TimerBars({ timers, grouped, fontSize = 15, empty }: { timers: TimerView[]; grouped: boolean; fontSize?: number; empty?: ReactNode }) {
-  // The bars animate themselves; the clocks read whole seconds, so twice a second is enough, and
-  // four times near a warning so it lands on time.
+  // The bars step with this clock and glide only at the end; the clocks read whole seconds, so
+  // twice a second is enough, and four times near a warning so it lands on time.
   const [fast, setFast] = useState(false)
   const now = useNow(fast ? 250 : 500, timers.length > 0)
   const nearWarning = timers.some((t) => {

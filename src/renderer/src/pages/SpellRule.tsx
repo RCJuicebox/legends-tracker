@@ -1,5 +1,6 @@
-import { useState } from 'react'
+import { useEffect, useState, useSyncExternalStore } from 'react'
 import { useApp } from '../state'
+import { markUnsaved } from '../unsaved'
 import { api, errorMessage } from '../api'
 import { act, showToast } from '../toast'
 import { ConfirmButton, Field, NumberInput, SpellIcon, Switch } from '../components/ui'
@@ -7,20 +8,58 @@ import { type KnownSpell, type SpellRule } from '../../../shared/types'
 
 // One spell's rule on Spell Timers: tracking, cues, speech, colour, overlay and a fixed duration.
 
+const same = (a: SpellRule, b: SpellRule) => JSON.stringify(a) === JSON.stringify(b)
+
+/**
+ * Edits not saved yet, by spell, with the saved rule they were made over: kept here rather than in
+ * the editor, so opening another spell's row and coming back finds them as they were (LT-342), and
+ * the sidebar marks Spell Timers while any are open.
+ */
+const drafts = new Map<string, { rule: SpellRule; base: SpellRule }>()
+let draftNames: ReadonlySet<string> = new Set()
+const draftListeners = new Set<() => void>()
+
+function keepDraft(name: string, rule: SpellRule, base: SpellRule): void {
+  const had = drafts.has(name)
+  if (same(rule, base)) drafts.delete(name)
+  else drafts.set(name, { rule, base })
+  if (had === drafts.has(name)) return
+  draftNames = new Set(drafts.keys())
+  markUnsaved('spells', drafts.size > 0)
+  for (const l of draftListeners) l()
+}
+
+/** The spells with edits not saved yet. */
+export function useSpellDrafts(): ReadonlySet<string> {
+  return useSyncExternalStore(
+    (l) => {
+      draftListeners.add(l)
+      return () => draftListeners.delete(l)
+    },
+    () => draftNames
+  )
+}
+
 export function RuleEditor({ k, onSaved }: { k: KnownSpell; onSaved: (list: KnownSpell[]) => void }) {
   const { state } = useApp()
-  const [rule, setRule] = useState<SpellRule>(k.rule)
+  const [rule, setRule] = useState<SpellRule>(() => {
+    const d = drafts.get(k.name)
+    return d ? rebase(d.rule, d.base, k.rule) : k.rule
+  })
   const [base, setBase] = useState<SpellRule>(k.rule)
   const [error, setError] = useState('')
-  if (JSON.stringify(base) !== JSON.stringify(k.rule)) {
+  if (!same(base, k.rule)) {
     setRule((r) => rebase(r, base, k.rule))
     setBase(k.rule)
   }
+  useEffect(() => keepDraft(k.name, rule, base), [k.name, rule, base])
+  const dirty = !same(rule, base)
   const set = (patch: Partial<SpellRule>) => setRule((r) => ({ ...r, ...patch }))
   const save = async (r: SpellRule | null) => {
     setError('')
     try {
       onSaved(await api.invoke('spells:rule', k.name, r))
+      if (!r) setRule({})
       showToast(r ? `Saved ${k.name}'s settings.` : `Cleared ${k.name}'s settings.`)
     } catch (e) {
       setError(errorMessage(e))
@@ -125,6 +164,11 @@ export function RuleEditor({ k, onSaved }: { k: KnownSpell; onSaved: (list: Know
           <button className="btn primary" onClick={() => void save(rule)}>
             Save
           </button>
+          {dirty && (
+            <button className="btn ghost" onClick={() => setRule(base)}>
+              Discard changes
+            </button>
+          )}
           <button
             className="btn"
             onClick={() =>
@@ -141,6 +185,7 @@ export function RuleEditor({ k, onSaved }: { k: KnownSpell; onSaved: (list: Know
             Reset to defaults
           </ConfirmButton>
         </div>
+        {dirty && <div className="small faint">Not saved yet: the changes stay here while you look at other spells.</div>}
         {error && (
           <div className="notice bad small" role="alert">
             Could not save: {error}

@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { existsSync, promises as fs } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { Engine, type EngineEnv, type EngineStore } from '../../src/main/engine'
+import { Engine, type EngineEnv, type EngineFeature, type EngineStore } from '../../src/main/engine'
 import { scanMoteHistory } from '../../src/main/moteHistory'
 import { defaultSettings } from '../../src/main/storeCore'
 import { log } from '../../src/main/log'
@@ -137,6 +137,32 @@ describe('Engine', () => {
     await sleep(400)
     expect(engine.motes.state.daily['2026-09-24']).toEqual({ major: 4 })
     expect(feed.filter((f) => f.text.startsWith('Watching')).length).toBe(1)
+  })
+
+  it('a part that throws on a line loses it to itself only, and the log row says so (LT-340)', async () => {
+    const logFile = join(logs, 'eqlog_Kelwyn_neriak.txt')
+    await fs.writeFile(logFile, '')
+    const warn = vi.spyOn(log, 'warn')
+    const { engine } = makeEngine({ logFile })
+    const seen: string[] = []
+    // A part that throws ahead of the last: the one after it still sees every line.
+    const features = (engine as unknown as { features: EngineFeature[] }).features
+    features.unshift({
+      id: 'broken',
+      line: () => {
+        throw new Error('broken part')
+      }
+    })
+    engine.use({ id: 'after', line: (l) => seen.push(l.text) })
+    await engine.startWatching()
+    await sleep(250)
+    await fs.appendFile(logFile, LOOT('Thu Sep 24 16:23:16 2026') + '[Thu Sep 24 16:23:17 2026] One more line.\r\n')
+    await waitFor(() => seen.includes('One more line.'))
+    expect(engine.motes.state.daily['2026-09-24']).toEqual({ major: 4 })
+    expect(engine.status.logError).toMatch(/broken part failed on a line: broken part/)
+    expect(engine.failures).toBeGreaterThanOrEqual(2)
+    // Said in main.log once, not once a line.
+    expect(warn.mock.calls.filter((c) => String(c[0]).startsWith('The broken part')).length).toBe(1)
   })
 
   it('logs the size of the meter push while fighting (README, Measuring)', async () => {

@@ -40,6 +40,8 @@ export interface WatchStatus {
   spellError: string
   lastLineAt: number
   logSize: number
+  /** What went wrong reading the log, or handling its lines, until it reads clean again. */
+  logError?: string
   /** Another character's log that is being written while the watched one is quiet: likely who is being played now. */
   elsewhere?: { path: string; character: string } | null
 }

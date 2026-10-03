@@ -10,7 +10,7 @@ import { CategoryChip, Disclosure, Field, FilterBox, Info, LoadError, NumberInpu
 import { CATEGORY_LABELS, DEFAULT_TIER_DURATION_PCT, type ClassName, type KnownSpell, type SpellCategory, type SpellRule } from '../../../shared/types'
 import type { PageId } from '../main'
 import { FocusSources } from './SpellsFocus'
-import { RuleEditor } from './SpellRule'
+import { RuleEditor, useSpellDrafts } from './SpellRule'
 import { LogCheck } from './SpellsLogCheck'
 
 type SpellKey = 'name' | 'type' | 'window' | 'wears' | 'last'
@@ -178,6 +178,7 @@ function trackLabel(rule: SpellRule): string {
 
 function SpellRow({ k, open, toggle, onSaved }: { k: KnownSpell; open: boolean; toggle: () => void; onSaved: (list: KnownSpell[]) => void }) {
   const d = k.duration
+  const unsaved = useSpellDrafts().has(k.name)
   return (
     <>
       <tr className={`clickable${open ? ' selected' : ''}`} onClick={toggle}>
@@ -189,6 +190,12 @@ function SpellRow({ k, open, toggle, onSaved }: { k: KnownSpell; open: boolean; 
           <Disclosure open={open} onToggle={toggle} stop>
             {k.rule.alias ? `${k.rule.alias}` : k.rankedName}
           </Disclosure>
+          {unsaved && (
+            <span className="unsaved-mark" title="Changes not saved yet">
+              {' '}
+              ● not saved
+            </span>
+          )}
           {k.rule.alias && <div className="faint small">{k.rankedName}</div>}
         </td>
         <td>

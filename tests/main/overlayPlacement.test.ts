@@ -6,26 +6,31 @@ import type { OverlayConfig } from '../../src/shared/types'
 // Electron's windows and screen are stand-ins that record where a window was put.
 type Rect = { x: number; y: number; width: number; height: number }
 const displays: { workArea: Rect }[] = []
-const created: { opts: Rect; bounds: Rect[] }[] = []
+const created: { opts: Rect; bounds: Rect[]; mouse: string[] }[] = []
 const screenEvents = new Map<string, () => void>()
+const cursor = { x: 0, y: 0 }
 
 vi.mock('electron', () => {
   class BrowserWindow {
-    private readonly record: { opts: Rect; bounds: Rect[] }
+    private readonly record: { opts: Rect; bounds: Rect[]; mouse: string[] }
     webContents = { on: () => {}, send: () => {}, setBackgroundThrottling: () => {} }
     constructor(opts: Rect) {
-      this.record = { opts: { x: opts.x, y: opts.y, width: opts.width, height: opts.height }, bounds: [] }
+      this.record = { opts: { x: opts.x, y: opts.y, width: opts.width, height: opts.height }, bounds: [], mouse: [] }
       created.push(this.record)
     }
     setBounds(b: Rect) {
       this.record.bounds.push(b)
     }
     setAlwaysOnTop() {}
-    setIgnoreMouseEvents() {}
+    setIgnoreMouseEvents(ignore: boolean, o?: { forward?: boolean }) {
+      this.record.mouse.push(!ignore ? 'mouse' : o?.forward ? 'moves' : 'through')
+    }
     setMenu() {}
     setOpacity() {}
     setFocusable() {}
     setResizable() {}
+    hide() {}
+    showInactive() {}
     on() {}
     isDestroyed() {
       return false
@@ -39,6 +44,7 @@ vi.mock('electron', () => {
       getAllDisplays: () => displays,
       getPrimaryDisplay: () => displays[0],
       getDisplayMatching: () => ({ id: 1 }),
+      getCursorScreenPoint: () => ({ ...cursor }),
       on: (event: string, fn: () => void) => void screenEvents.set(event, fn)
     }
   }
@@ -147,6 +153,54 @@ describe('host windows', () => {
     expect(created).toHaveLength(3)
     manager.setArranging(false)
     expect(created).toHaveLength(4)
+  })
+})
+
+describe('the mouse over a meter (LT-341)', () => {
+  it('forwards the pointer moves only while it is over a meter, and gives the mouse while the page asks', async () => {
+    vi.useFakeTimers()
+    try {
+      displays.push({ workArea: PRIMARY })
+      cursor.x = 1500
+      cursor.y = 900
+      manager.apply([overlay({ id: 'm', kind: 'meter', x: 100, y: 100, width: 300, height: 200 }), overlay({ id: 't', x: 900, y: 600 })])
+      const w = created[0]
+      expect(w.mouse).toEqual(['through'])
+      await vi.advanceTimersByTimeAsync(300)
+      expect(w.mouse).toEqual(['through'])
+      cursor.x = 200
+      cursor.y = 150
+      await vi.advanceTimersByTimeAsync(150)
+      expect(w.mouse.at(-1)).toBe('moves')
+      manager.setMouse('m', true)
+      expect(w.mouse.at(-1)).toBe('mouse')
+      // A timers overlay never asks.
+      manager.setMouse('t', true)
+      manager.setMouse('m', false)
+      expect(w.mouse.at(-1)).toBe('moves')
+      cursor.x = 800
+      await vi.advanceTimersByTimeAsync(150)
+      expect(w.mouse.at(-1)).toBe('through')
+      expect(w.mouse).toEqual(['through', 'moves', 'mouse', 'moves', 'through'])
+      // Hidden with the game, the pointer is not looked at.
+      manager.setShown(false)
+      cursor.x = 200
+      await vi.advanceTimersByTimeAsync(500)
+      expect(w.mouse.at(-1)).toBe('through')
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('does not look at the pointer with no meter up', async () => {
+    vi.useFakeTimers()
+    try {
+      displays.push({ workArea: PRIMARY })
+      manager.apply([overlay({ id: 't' })])
+      expect(vi.getTimerCount()).toBe(1)
+    } finally {
+      vi.useRealTimers()
+    }
   })
 })
 

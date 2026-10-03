@@ -416,11 +416,12 @@ let lastReported = ''
  * go to the page) at most once a minute.
  */
 function reportStatus(s: WatchStatus, chosenLog: string): void {
-  const report = JSON.stringify([s.watching, s.logFile, chosenLog, s.lastLineAt ? timeOfDay(s.lastLineAt) : '', s.spellError, s.spellsLoaded])
+  const report = JSON.stringify([s.watching, s.logFile, chosenLog, s.lastLineAt ? timeOfDay(s.lastLineAt) : '', s.spellError, s.spellsLoaded, s.logError])
   if (report === lastReported) return
   lastReported = report
   const log = s.logFile || chosenLog
-  if (s.watching) sources.ok('log', `${basename(s.logFile)}${s.lastLineAt ? `, last line at ${timeOfDay(s.lastLineAt)}` : ''}`)
+  if (s.watching && s.logError) sources.fail('log', new Error(s.logError), basename(s.logFile))
+  else if (s.watching) sources.ok('log', `${basename(s.logFile)}${s.lastLineAt ? `, last line at ${timeOfDay(s.lastLineAt)}` : ''}`)
   else if (log) sources.missing('log', `${basename(log)} is not being watched. Start watching on the Live page.`)
   else sources.missing('log', 'No character log chosen (Settings).')
   if (s.spellError) sources.fail('spells', new Error(s.spellError))

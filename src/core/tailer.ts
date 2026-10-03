@@ -14,10 +14,19 @@ export interface TailerOptions {
   onReset?: (reason: ResetReason) => void
   onMissing?: () => void
   onSize?: (size: number) => void
+  /**
+   * `read`: the log could not be read FAIL_AFTER polls running (it is still tried every poll).
+   * `lines`: `onLines` threw; the slice's later lines and the next slices are still given.
+   */
+  onError?: (e: unknown, where: 'read' | 'lines') => void
+  /** The log reads again after `onError(…, 'read')`. */
+  onRecovered?: () => void
 }
 
 /** Reads come in bounded slices, so a burst of combat never turns into one large read. */
 const SLICE = 256 * 1024
+/** A sharing violation while the game writes clears by the next poll; this many in a row (3 s) is not that. */
+const FAIL_AFTER = 30
 
 /**
  * Follows a log file by polling. Filesystem events do not fire reliably for the game's buffered
@@ -38,6 +47,8 @@ export class LogTailer {
   private running = false
   private missing = false
   private handle: FileHandle | null = null
+  /** Polls in a row that failed to read. */
+  private failures = 0
   /**
    * Bumped by start and stop. A poll or read begun under an older generation was overtaken (stopped,
    * perhaps restarted) and must neither read on nor schedule another poll, or two loops would run.
@@ -77,8 +88,12 @@ export class LogTailer {
   private async poll(gen: number): Promise<void> {
     try {
       await this.readOnce()
-    } catch {
-      // A transient sharing violation while the game writes; try again next poll.
+      if (this.failures >= FAIL_AFTER) this.opts.onRecovered?.()
+      this.failures = 0
+    } catch (e) {
+      // A transient sharing violation while the game writes clears by the next poll; one that does
+      // not is said once, and the log is still tried every poll.
+      if (++this.failures === FAIL_AFTER) this.opts.onError?.(e, 'read')
     }
     this.schedule(gen)
   }
@@ -166,6 +181,13 @@ export class LogTailer {
     this.partial = parts.pop() ?? ''
     const lines = parts.map((l) => (l.endsWith('\r') ? l.slice(0, -1) : l)).filter((l) => l.length > 0)
     // Windows-1252 decodes one byte to one character, so the held piece's length is its size in bytes.
-    if (lines.length) this.opts.onLines(lines, this.pos - this.partial.length)
+    if (!lines.length) return
+    // The position has moved past these lines, so a reader that throws must not stop the rest of the
+    // slice reaching the others (LT-340): it is told, and reading goes on.
+    try {
+      this.opts.onLines(lines, this.pos - this.partial.length)
+    } catch (e) {
+      this.opts.onError?.(e, 'lines')
+    }
   }
 }
