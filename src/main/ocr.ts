@@ -60,6 +60,24 @@ $stream.Dispose(); Remove-Item $prepared -ErrorAction SilentlyContinue
 const OCR_TIMEOUT_MS = 45_000
 
 let scriptWritten: Promise<string> | null = null
+/** OCR runs under way: stopped when the app quits, so none outlives it holding a picture of the screen (LT-439). */
+const running = new Set<{ kill: () => void }>()
+
+/** Stops any OCR still running: the app is quitting. */
+export function stopOcr(): void {
+  for (const p of running) p.kill()
+  running.clear()
+}
+
+/**
+ * Removes screen pictures a crash, a forced exit or a shutdown mid-read left in the cache folder:
+ * each is a picture of the whole desktop (LT-439). Once at start.
+ */
+export async function sweepScreenCaptures(): Promise<void> {
+  const dir = cacheDir()
+  const names = await fs.readdir(dir).catch(() => [] as string[])
+  await Promise.all(names.filter((n) => /^(?:screen|ocr)-[\w-]+\.png$/.test(n)).map((n) => fs.rm(join(dir, n), { force: true }).catch(() => undefined)))
+}
 
 /** The OCR script in the cache folder: written once a run, and again if something cleared it away. */
 function scriptFile(): Promise<string> {
@@ -100,6 +118,8 @@ export async function ocrImage(path: string, scale = 3, layout?: Composite): Pro
       }
     )
     yieldPriority(p.pid)
+    running.add(p)
+    p.on('exit', () => running.delete(p))
     let stdout = ''
     let stderr = ''
     p.stdout.setEncoding('utf8').on('data', (d: string) => (stdout += d))

@@ -4,7 +4,7 @@ import { join } from 'node:path'
 import { parseAchievements, type AchMarks, type AchSection } from '../core/achievements'
 import type { AchievementsView } from '../shared/types'
 import { log } from './log'
-import { isCharacterKey } from '../core/validate'
+import { assertCharacterKey, isCharacterKey } from '../core/validate'
 import { sources } from './sources/registry'
 import { ExportWatch } from './exportWatch'
 
@@ -71,7 +71,7 @@ export class AchievementFiles {
   }
 
   async saveMarks(character: string, marks: AchMarks): Promise<void> {
-    if (!isCharacterKey(character)) return
+    assertCharacterKey(character)
     const ok = (a: unknown) => Array.isArray(a) && a.every((x) => typeof x === 'string')
     if (!marks || !ok(marks.ticks) || !ok(marks.broken) || (marks.tracked !== undefined && !ok(marks.tracked))) throw new Error('Achievement marks are not in the expected form.')
     await fs.mkdir(this.marksDir, { recursive: true })

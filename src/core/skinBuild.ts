@@ -21,6 +21,8 @@ export interface SkinBuildResult {
   skin: string
   ok: boolean
   output: string
+  /** Not run: a command not run before, shown whole to be agreed to first (LT-442). */
+  confirm?: string[]
 }
 
 const MAX_ARGS = 20

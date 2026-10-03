@@ -149,6 +149,30 @@ describe('saving and starting again', () => {
     expect(readFileSync(file('casts.json'), 'utf8')).toBe('{"x":{"rankedName":"X","lastCast":1,"count":1}}')
   })
 
+  it('reads triggers and spell rules through their checks, so a bad entry cannot stop the start (LT-432)', () => {
+    writeFileSync(file('triggers.json'), JSON.stringify([null, DEFAULT_TRIGGER, 'nonsense', { name: 'No id or phrases' }]))
+    writeFileSync(file('spell-rules.json'), JSON.stringify({ Odium: { warnSec: 5, bogus: true }, 'Tester Bolt': null, Plague: 'loud' }))
+    const store = new Store(defaultTriggers)
+    const triggers = store.triggers.get()
+    expect(triggers.map((t) => t.name)).toEqual(['Incoming tell', 'No id or phrases'])
+    expect(triggers[1]).toMatchObject({ phrases: [], actions: [], enabled: true })
+    expect(store.rules.get()).toEqual({ Odium: { warnSec: 5 } })
+  })
+
+  it('keeps triggers.json and settings.json as the run found them, once, before saving over them (LT-441)', async () => {
+    const first = new Store(defaultTriggers)
+    first.triggers.set([DEFAULT_TRIGGER])
+    await first.flushAll()
+    const second = new Store(defaultTriggers)
+    second.triggers.set([])
+    await second.flushAll()
+    second.triggers.set([{ ...DEFAULT_TRIGGER, name: 'later' }])
+    await second.flushAll()
+    // The copy is what the run started with, not the save just before.
+    expect((readJson('triggers.bak.json') as Trigger[]).map((t) => t.name)).toEqual(['Incoming tell'])
+    expect((readJson('triggers.json') as Trigger[]).map((t) => t.name)).toEqual(['later'])
+  })
+
   it('does not write anything when started again and quit with nothing changed', async () => {
     const first = new Store(defaultTriggers)
     first.settings.set(settings())

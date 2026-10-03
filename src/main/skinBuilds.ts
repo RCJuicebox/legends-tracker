@@ -1,9 +1,18 @@
 import { execFile } from 'node:child_process'
 import { promises as fs } from 'node:fs'
 import { join } from 'node:path'
+import { JsonFile, readJsonFile } from './storeCore'
 import { isCharacterKey } from '../core/validate'
 import { SKIN_BUILD_FILE, isSkinName, parseSkinBuild, tailOutput, type SkinBuild, type SkinBuildResult } from '../core/skinBuild'
 import { log } from './log'
+
+/** The rebuild commands the player has agreed to, kept with the settings in `path` (the newest fifty). */
+export function approvedCommands(path: string): { has: (command: string) => boolean; add: (command: string) => void } {
+  const read = readJsonFile(path)
+  const list = read.state === 'ok' && Array.isArray(read.value) ? read.value.filter((c): c is string => typeof c === 'string') : []
+  const file = new JsonFile<string[]>(path, list)
+  return { has: (c) => file.get().includes(c), add: (c) => file.set([...file.get(), c].slice(-50)) }
+}
 
 /** Long enough for a script that reads the game's files; a hung one is stopped. */
 const TIMEOUT_MS = 120_000
@@ -33,11 +42,25 @@ async function readSkinBuild(root: string, skin: string): Promise<SkinBuild | nu
 /**
  * Runs a skin's rebuild, as its own file names it now (never a command a page sends), with no shell.
  * The character the page shows goes to the command as EQL_CHARACTER, so a script can read that
- * character's export.
+ * character's export. A command not run before is not run until the player has seen it whole and
+ * said yes (`approve`): a skin downloaded from anywhere could name any program (LT-442). Each one
+ * agreed to is kept in `approved`, exactly as it was shown.
  */
-export async function runSkinBuild(gameDir: string, skin: string, character: string): Promise<SkinBuildResult> {
+export async function runSkinBuild(
+  gameDir: string,
+  skin: string,
+  character: string,
+  approved: { has: (command: string) => boolean; add: (command: string) => void },
+  approve = false
+): Promise<SkinBuildResult> {
   const build = isSkinName(skin) && gameDir ? await readSkinBuild(join(gameDir, 'uifiles'), skin) : null
   if (!build) return { skin: String(skin), ok: false, output: `The ${String(skin)} skin no longer asks for a rebuild.` }
+  const key = JSON.stringify(build.command)
+  if (!approved.has(key)) {
+    if (!approve) return { skin, ok: false, output: '', confirm: build.command }
+    approved.add(key)
+    log.info(`Rebuild command for the ${skin} skin agreed to: ${build.command.join(' ')}`)
+  }
   const env = { ...process.env, ...(isCharacterKey(character) ? { EQL_CHARACTER: character } : {}) }
   return new Promise((resolve) => {
     execFile(build.command[0], build.command.slice(1), { env, windowsHide: true, timeout: TIMEOUT_MS, maxBuffer: 4 * 1024 * 1024 }, (err, stdout, stderr) => {

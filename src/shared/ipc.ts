@@ -347,6 +347,8 @@ export interface Invokes {
   'audio:setAzure': (region: string, key: string) => AzureStatus
   'audio:sound': (file: string) => void
   'audio:sounds': () => string[]
+  /** The Audio page is open (true) or closed (false): the output devices are listed only meanwhile. */
+  'audio:watchDevices': (on: boolean) => void
   'audio:voices': () => { voices: string[]; error: string }
 
   'achievements:characters': () => { current: string; available: string[] }
@@ -396,7 +398,8 @@ export interface Invokes {
   /** The UI skins in the game folder that ask for a rebuild button (src/core/skinBuild.ts). */
   'skins:builds': () => SkinBuild[]
   /** Runs a skin's rebuild, for a character's export. */
-  'skins:build': (skin: string, character: string) => SkinBuildResult
+  /** `approve`: the player has seen the command and agreed to it; needed the first time a command runs. */
+  'skins:build': (skin: string, character: string, approve?: boolean) => SkinBuildResult
   'dialog:folder': () => string | null
 
   'sources:list': () => SourceView[]
@@ -455,6 +458,8 @@ export interface Pushes {
 
   'audio:config': (audio: AudioSettings) => void
   'audio:play': (command: AudioCommand) => void
+  /** Whether a page lists the output devices: the audio window lists them, and follows changes, only then. */
+  'audio:watchDevices': (on: boolean) => void
 }
 
 export type InvokeChannel = keyof Invokes
@@ -539,6 +544,7 @@ const INVOKE_CHANNELS: Record<InvokeChannel, true> = {
   'update:check': true,
   'update:install': true,
   'audio:test': true,
+  'audio:watchDevices': true,
   'audio:azure': true,
   'audio:setAzure': true,
   'audio:sound': true,
@@ -613,7 +619,8 @@ const PUSH_CHANNELS: Record<PushChannel, true> = {
   'overlay:achievements': true,
   'overlay:host': true,
   'audio:config': true,
-  'audio:play': true
+  'audio:play': true,
+  'audio:watchDevices': true
 }
 
 export const isInvokeChannel = (c: unknown): c is InvokeChannel => typeof c === 'string' && Object.hasOwn(INVOKE_CHANNELS, c)

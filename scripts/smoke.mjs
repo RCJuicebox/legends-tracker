@@ -87,6 +87,13 @@ try {
   if (motes.major !== 4) fail(`the mote history did not come from the worker: ${JSON.stringify(motes)}`)
   else console.log('smoke: the mote worker read the log (4 Major on 2026-09-24)')
 
+  // The Windows calls (koffi) load: without them the app takes the game for always running, and
+  // nothing else would fail (1.2.0 shipped so, LT-319; LT-431).
+  const diag = await until('the diagnostics', 10_000, () => evaluate(page.webSocketDebuggerUrl, "window.eql.invoke('app:diagnostics')"))
+  if (!/Windows calls \(koffi\): available/.test(diag)) fail(`the Windows calls did not load: ${/Windows calls \(koffi\): [^\n]*/.exec(diag)?.[0] ?? 'no line'}`)
+  else if (/Windows API unavailable/.test(diag)) fail('main.log says the Windows API is unavailable')
+  else console.log('smoke: the Windows calls (koffi) loaded')
+
   // A second copy with --quit asks the first to save and close, and exits itself.
   const quitter = spawn(exe, [...appArgs, '--quit'], { env, stdio: 'ignore' })
   await until('the app to quit', 20_000, () => exited !== null)

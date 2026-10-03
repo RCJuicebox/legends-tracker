@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useApp } from '../state'
 import { useInvoke } from '../hooks'
 import { useRemembered } from '../remember'
@@ -36,6 +36,11 @@ export function Audio() {
   const [allLanguages, setAllLanguages] = useRemembered<boolean>('audio.allLanguages', false)
   const azureVoices = (azure?.voices ?? []).filter((v) => allLanguages || v.locale.startsWith('en-') || `${AZURE}${v.name}` === a.voice)
   const usingAzure = a.voice.startsWith(AZURE)
+  // The output devices are listed only while this page is open (LT-447).
+  useEffect(() => {
+    void api.invoke('audio:watchDevices', true).catch(() => undefined)
+    return () => void api.invoke('audio:watchDevices', false).catch(() => undefined)
+  }, [])
 
   return (
     <>

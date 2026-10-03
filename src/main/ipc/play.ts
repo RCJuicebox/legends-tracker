@@ -1,5 +1,5 @@
 import { handle } from './handle'
-import { sanitizeStockCounts, sanitizeStockItem } from '../../core/validate'
+import { sanitizeStockCounts, sanitizeStockItem, stringsArg } from '../../core/validate'
 import type { AppContext } from '../context'
 
 // What happens in play: the damage meter, loot, buffs, respawns, motes and the mote stock.
@@ -35,12 +35,12 @@ export function registerPlayIpc(ctx: AppContext): void {
     return engine.combat.respawnView()
   })
   handle('buffs:get', () => engine.buffView())
-  handle('buffs:setWanted', (list) => engine.setWantedBuffs(Array.isArray(list) ? list.filter((x): x is string => typeof x === 'string').slice(0, 2000) : null))
+  handle('buffs:setWanted', (list) => engine.setWantedBuffs(Array.isArray(list) ? stringsArg(list, 2000, 120) : null))
 
   handle('motes:get', () => engine.moteView())
   handle('motes:start', () => engine.motes.startManual(Date.now()))
   handle('motes:stop', () => engine.motes.stop(Date.now()))
-  handle('motes:pause', (at) => engine.motes.pause(typeof at === 'number' ? at : Date.now(), Date.now()))
+  handle('motes:pause', (at) => engine.motes.pause(typeof at === 'number' && Number.isFinite(at) ? at : Date.now(), Date.now()))
   handle('motes:resume', () => engine.motes.resume(Date.now()))
   handle('motes:rescan', () => engine.rebuildMoteHistory())
   handle('motes:setKind', (id, kind) => {

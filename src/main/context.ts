@@ -45,6 +45,7 @@ import type { AudioDevice } from '../shared/ipc'
 import { cacheDir } from './paths'
 import { perf } from './perf'
 import { characterLogFile, logStem } from './storeCore'
+import { sweepScreenCaptures } from './ocr'
 
 /**
  * Everything the main process runs, built once. The IPC handlers, the lifecycle and the start-up all
@@ -218,11 +219,20 @@ export function createContext(): AppContext {
   })
 
   let lastUpdate = 'idle'
+  let lastUpdateCheck = 0
   ctx.updater = new Updater((s) => {
     toMain('state:update', s)
     const was = lastUpdate
     lastUpdate = s.state
-    if (s.state === 'error') sources.fail('updates', new Error(s.message))
+    if (s.state === 'idle' && s.checkedAt) lastUpdateCheck = s.checkedAt
+    // Offline is not a fault of the updater: said plainly, with when it last got through, rather than
+    // a red error first in every diagnostics paste all evening (LT-444).
+    if (s.state === 'error' && /could not reach GitHub/.test(s.message))
+      sources.missing(
+        'updates',
+        `Offline: GitHub could not be reached; ${lastUpdateCheck ? `last checked ${new Date(lastUpdateCheck).toLocaleString()}` : 'not checked yet this run'}. Tried again within the hour.`
+      )
+    else if (s.state === 'error') sources.fail('updates', new Error(s.message))
     else if (s.state === 'idle') sources.ok('updates', s.checkedAt ? `Up to date, checked ${new Date(s.checkedAt).toLocaleTimeString()}` : 'Up to date')
     else if (s.state === 'ready') sources.ok('updates', `${s.version} downloaded; installs at restart`)
     else if (s.state === 'downloading') sources.reading('updates', `Downloading ${s.version}, ${s.percent}%`)
@@ -241,10 +251,19 @@ export function createContext(): AppContext {
         windows.showMain()
       )
     } else if (s.state === 'ready' && store.settings.get().autoRestartUpdates) {
-      // The player chose not to be asked: restart into it now. A moment first, so the line is written.
-      ctx.engine.pushFeed('info', `Version ${s.version} has downloaded: restarting into it now.`)
-      log.info(`Restarting into ${s.version} by itself (Restart into updates by itself is on)`)
-      setTimeout(() => void ctx.installUpdate(true), 2000)
+      // The player chose not to be asked: restart into it at the first lull in play, so no fight's
+      // timers are lost to it (LT-430): out of combat with the log quiet a minute, or the game not in
+      // front, looked at every half minute, and at most two hours on.
+      ctx.engine.pushFeed('info', `Version ${s.version} has downloaded: restarting into it at the next lull in play.`)
+      log.info(`Restarting into ${s.version} by itself at the next lull (Restart into updates by itself is on)`)
+      const readyAt = Date.now()
+      const atLull = () => {
+        const quiet = !ctx.engine.meter.fighting && Date.now() - ctx.engine.status.lastLineAt > 60_000
+        const away = ctx.watcher.state.foregroundName !== 'eqgame'
+        if (quiet || away || !ctx.engine.status.watching || Date.now() - readyAt > 2 * 3600_000) void ctx.installUpdate(true)
+        else setTimeout(atLull, 30_000).unref()
+      }
+      setTimeout(atLull, 2000).unref()
     } else if (s.state === 'ready') {
       ctx.engine.pushFeed('info', `Version ${s.version} is ready: restart to update.`)
       announceUpdate(
@@ -534,6 +553,8 @@ function registerSources(ctx: AppContext): void {
   jobs.onChange((list) => ctx.windows.toMain('state:jobs', list))
   // What can be known without asking anyone: the downloads kept, and whether this copy updates at all.
   void ctx.wikiCatalog.stamp()
+  // Screen pictures a crash or a shutdown mid-read left behind.
+  void sweepScreenCaptures()
   void ctx.recipeBook.stored()
   if (ctx.updater.status.state === 'dev') sources.missing('updates', 'Running from source: only the installed app updates.')
 

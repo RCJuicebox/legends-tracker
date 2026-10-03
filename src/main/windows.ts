@@ -47,6 +47,27 @@ interface WindowPlace {
   relaunch?: { at: number; show: boolean }
 }
 
+/**
+ * window.json as read back: a place only with four finite numbers of a sane size, the rest only of
+ * its kind. A width that is not a number threw in new BrowserWindow, and the app could not start
+ * until the file was deleted (LT-433).
+ */
+function windowPlace(v: unknown): WindowPlace | null {
+  if (!v || typeof v !== 'object') return null
+  const o = v as Record<string, unknown>
+  const b = o.bounds as Record<string, unknown> | undefined
+  const n = (x: unknown, lo: number, hi: number) => typeof x === 'number' && Number.isFinite(x) && x >= lo && x <= hi
+  const bounds = b && n(b.x, -100_000, 100_000) && n(b.y, -100_000, 100_000) && n(b.width, 200, 20_000) && n(b.height, 150, 20_000) ? (b as unknown as Rectangle) : null
+  if (!bounds) return null
+  const r = o.relaunch as Record<string, unknown> | undefined
+  return {
+    bounds: { x: Math.round(bounds.x), y: Math.round(bounds.y), width: Math.round(bounds.width), height: Math.round(bounds.height) },
+    maximized: o.maximized === true,
+    ...(o.trayTold === true ? { trayTold: true } : {}),
+    ...(r && typeof r.at === 'number' && typeof r.show === 'boolean' ? { relaunch: { at: r.at, show: r.show } } : {})
+  }
+}
+
 /** A relaunch note older than this is from a restart that never came back, and is ignored. */
 const RELAUNCH_MS = 3 * 60 * 1000
 
@@ -82,7 +103,7 @@ export class Windows {
   constructor(private readonly opts: { preload: string; icon: string; audioSettings: () => AudioSettings; uiScale: () => number }) {
     const path = join(app.getPath('userData'), 'window.json')
     const r = readJsonFile(path)
-    this.place = new JsonFile<WindowPlace | null>(path, r.state === 'ok' ? (r.value as WindowPlace) : null)
+    this.place = new JsonFile<WindowPlace | null>(path, r.state === 'ok' ? windowPlace(r.value) : null)
   }
 
   /** Where the main window was last, if that spot is still on a connected monitor. */
@@ -213,7 +234,10 @@ export class Windows {
       show: false,
       webPreferences: { preload: this.opts.preload, sandbox: true, backgroundThrottling: false, autoplayPolicy: 'no-user-gesture-required' }
     })
-    this.audio.webContents.on('did-finish-load', () => this.audioConfig())
+    this.audio.webContents.on('did-finish-load', () => {
+      this.audioConfig()
+      if (this.devicesWatched) this.watchDevices(true)
+    })
     loadPage(this.audio, 'audio')
   }
 
@@ -229,6 +253,17 @@ export class Windows {
       return true
     }
     return false
+  }
+
+  /**
+   * A main window that kept crashing is closed rather than left blank: the tray's Open then makes a
+   * fresh one (LT-438). False when `wc` is not the main window's.
+   */
+  giveUp(wc: Electron.WebContents): boolean {
+    if (!this.main || this.main.isDestroyed() || this.main.webContents !== wc) return false
+    this.main.destroy()
+    this.main = null
+    return true
   }
 
   /** The tray icon: click to open, right-click for the menu. */
@@ -288,6 +323,18 @@ export class Windows {
     for (const args of this.heldFeed) push(w.webContents, 'state:feed', ...args)
     this.held.clear()
     this.heldFeed.length = 0
+  }
+
+  /** Whether a page lists the output devices; kept, so an audio window made afresh is told too. */
+  private devicesWatched = false
+
+  /**
+   * The audio window lists the output devices, and follows them changing, only while a page shows
+   * them: listing them at start kept Chromium's capture service (some 94 MB) running all evening (LT-447).
+   */
+  watchDevices(on: boolean): void {
+    this.devicesWatched = on
+    if (this.audio && !this.audio.isDestroyed()) push(this.audio.webContents, 'audio:watchDevices', on)
   }
 
   toAudio(cmd: AudioCommand): void {

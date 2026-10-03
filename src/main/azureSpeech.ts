@@ -58,7 +58,10 @@ export class AzureSpeech {
         const s = JSON.parse(await fs.readFile(this.file, 'utf8')) as Stored
         this.region = typeof s.region === 'string' ? s.region : ''
         this.key = s.key && safeStorage.isEncryptionAvailable() ? safeStorage.decryptString(Buffer.from(s.key, 'base64')) : ''
-        this.voices = Array.isArray(s.voices) ? s.voices : []
+        // Voices as the list fetched them; anything else in the file is left out (LT-433).
+        this.voices = Array.isArray(s.voices)
+          ? s.voices.filter((v) => v && typeof v.name === 'string' && typeof v.label === 'string' && typeof v.locale === 'string' && typeof v.gender === 'string')
+          : []
         this.voicesAt = s.voicesAt ?? 0
       } catch (e) {
         if ((e as NodeJS.ErrnoException).code !== 'ENOENT') log.warn('Could not read the Azure speech settings:', e)

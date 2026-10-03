@@ -144,7 +144,14 @@ async function reportDevices(): Promise<void> {
   )
 }
 
+const onDeviceChange = () => void reportDevices()
+
 api.on('audio:config', (c: AudioSettings) => void applyConfig(c))
 api.on('audio:play', (cmd: Play) => void handle(cmd))
-navigator.mediaDevices.addEventListener('devicechange', () => void reportDevices())
-void reportDevices()
+// Devices are listed, and followed, only while a page shows them (LT-447).
+api.on('audio:watchDevices', (on: boolean) => {
+  navigator.mediaDevices.removeEventListener('devicechange', onDeviceChange)
+  if (!on) return
+  navigator.mediaDevices.addEventListener('devicechange', onDeviceChange)
+  void reportDevices()
+})

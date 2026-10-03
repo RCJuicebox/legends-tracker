@@ -56,7 +56,14 @@ function fakeContext(o: { engine?: Engine; flushAll?: () => Promise<unknown>; up
     h.calls.push(what)
   }
   const ctx = {
-    windows: { quitting: false, showMain: note('show main'), recover: () => false, flush: async () => note('flush windows')(), noteRelaunch: async () => note('note relaunch')() },
+    windows: {
+      quitting: false,
+      showMain: note('show main'),
+      recover: () => false,
+      giveUp: () => false,
+      flush: async () => note('flush windows')(),
+      noteRelaunch: async () => note('note relaunch')()
+    },
     overlays: { destroy: note('stop overlays'), recover: () => {} },
     engine: o.engine ?? { shutdown: note('stop engine'), board: { endWhere: () => [] }, pushFeed: () => {} },
     updater: { stop: o.updaterStop ?? note('stop updater'), status: { state: 'idle' }, install: note('install update') },
@@ -103,6 +110,20 @@ describe('Quitting', () => {
     // The saves run side by side after the stops; quitting waits for them all.
     expect(h.calls.slice(STOPS.length, -1).sort()).toEqual(['flush windows', 'save allakhazam pages', 'save followed plans', 'save log history', 'save stores'])
     expect(h.calls.at(-1)).toBe('quit')
+  })
+
+  it('saves and quits when Windows ends the session, which sends no before-quit (LT-428)', async () => {
+    const ctx = fakeContext()
+    registerLifecycle(ctx)
+    const windowEvents = new Map<string, () => void>()
+    h.handlers.get('browser-window-created')!({}, { on: (event: string, fn: () => void) => void windowEvents.set(event, fn) })
+    windowEvents.get('query-session-end')!()
+    // Said twice (query, then the end itself): done once.
+    windowEvents.get('session-end')!()
+    await waitFor(() => h.calls.includes('quit'))
+    expect(h.calls).toContain('save stores')
+    expect(h.calls.filter((c) => c === 'stop engine')).toHaveLength(1)
+    expect(ctx.windows.quitting).toBe(true)
   })
 
   it('lets the quit through the second time round, once everything is saved', async () => {

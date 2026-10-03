@@ -88,7 +88,15 @@ export class PetStore {
     if (this.data) return this.data
     try {
       const v = JSON.parse(await fs.readFile(this.path, 'utf8')) as unknown
-      this.data = v && typeof v === 'object' && !Array.isArray(v) ? (v as Record<string, PetRecord>) : {}
+      // Each character's record kept only when shaped as one (LT-433); the log fills the rest in again.
+      const out: Record<string, PetRecord> = {}
+      if (v && typeof v === 'object' && !Array.isArray(v))
+        for (const [k, r] of Object.entries(v as Record<string, unknown>)) {
+          const p = r as Partial<PetRecord> | null
+          const at = (x: unknown) => !x || (typeof x === 'object' && typeof (x as { at?: unknown }).at === 'number')
+          if (p && typeof p === 'object' && at(p.gear) && at(p.summon)) out[k] = { gear: p.gear ?? null, summon: p.summon ?? null, ...(p.scanned ? { scanned: p.scanned } : {}) }
+        }
+      this.data = out
     } catch {
       this.data = {}
     }

@@ -1,5 +1,6 @@
 import { app, globalShortcut, powerMonitor, shell } from 'electron'
 import { isOwnPage } from './push'
+import { stopOcr } from './ocr'
 import { log } from './log'
 import type { AppContext } from './context'
 
@@ -17,6 +18,11 @@ export function registerLifecycle(ctx: AppContext): void {
     if (argv.includes('--quit')) {
       log.info('Quitting: another copy asked with --quit')
       app.quit()
+    } else if (shuttingDown) {
+      // Started again while this one is closing: the new copy has already given way to this one, so
+      // this one starts afresh once it has closed (LT-443).
+      log.info('Started again while quitting: starting afresh once closed')
+      relaunchAfter = true
     } else ctx.windows.showMain()
   })
 
@@ -52,8 +58,15 @@ export function registerLifecycle(ctx: AppContext): void {
     if (recent.length > CRASHES_RECOVERED) {
       if (recent.length === CRASHES_RECOVERED + 1) {
         const page = url.split('/').pop()?.split('?')[0] ?? url
-        log.error(`${page} crashed ${recent.length} times in five minutes; left closed until the app is restarted`)
-        ctx.engine.pushFeed('warn', `A window (${page}) kept crashing and was left closed. Restart the app to bring it back; main.log has the details.`)
+        // The main window is closed, not left white: Open in the tray makes another.
+        const main = ctx.windows.giveUp(wc)
+        log.error(`${page} crashed ${recent.length} times in five minutes; ${main ? 'closed; the tray opens a fresh one' : 'left closed until the app is restarted'}`)
+        ctx.engine.pushFeed(
+          'warn',
+          main
+            ? 'The window kept crashing and was closed. Open it again from the tray; main.log has the details.'
+            : `A window (${page}) kept crashing and was left closed. Restart the app to bring it back; main.log has the details.`
+        )
       }
       return
     }
@@ -79,6 +92,7 @@ export function registerLifecycle(ctx: AppContext): void {
   // still in its 400 ms wait. The first before-quit holds the quit, shuts down, writes, then quits again.
   let shutDown = false
   let shuttingDown = false
+  let relaunchAfter = false
   app.on('before-quit', (e) => {
     ctx.windows.quitting = true
     if (shutDown) return
@@ -87,11 +101,31 @@ export function registerLifecycle(ctx: AppContext): void {
     shuttingDown = true
     void stopAndSave(ctx).then(() => {
       shutDown = true
+      if (relaunchAfter) app.relaunch()
       app.quit()
     })
   })
   app.on('window-all-closed', () => {
     // Stay resident in the tray; Quit from the tray menu ends the app.
+  })
+
+  // Windows shutting down or signing out: Electron sends no before-quit then, so everything waiting
+  // to be written (settings, motes, faction steps, the log history, where mote tracking got to) would
+  // be lost, and the next start would read the log again from much further back (LT-428). It is
+  // written now, in two seconds at most, and the app ends.
+  const sessionEnding = () => {
+    if (shuttingDown) return
+    log.info('Windows is ending the session: saving and quitting')
+    ctx.windows.quitting = true
+    shuttingDown = true
+    void stopAndSave(ctx, 2000).then(() => {
+      shutDown = true
+      app.quit()
+    })
+  }
+  app.on('browser-window-created', (_e, win) => {
+    win.on('query-session-end', sessionEnding)
+    win.on('session-end', sessionEnding)
   })
 
   // Restarts into a downloaded update. Everything is written first: quitAndInstall starts the
@@ -105,11 +139,18 @@ export function registerLifecycle(ctx: AppContext): void {
     await stopAndSave(ctx)
     shutDown = true
     ctx.updater.install()
+    // The installer did not start (quarantined by a virus scanner, the updater's cache cleared): the
+    // app would sit in the tray with everything stopped. It starts again as it was instead (LT-429).
+    setTimeout(() => {
+      log.warn('The update did not start; restarting the app as it was')
+      app.relaunch()
+      app.exit(0)
+    }, 3000).unref()
   }
 }
 
-/** Stops every timer and poller and writes whatever changed; never rejects, and gives up waiting after 3 s. */
-async function stopAndSave(ctx: AppContext): Promise<void> {
+/** Stops every timer and poller and writes whatever changed; never rejects, and gives up waiting after `limitMs`. */
+async function stopAndSave(ctx: AppContext, limitMs = 3000): Promise<void> {
   log.info('Quitting')
   for (const [name, stop] of [
     ['engine', () => ctx.engine.shutdown()],
@@ -118,6 +159,7 @@ async function stopAndSave(ctx: AppContext): Promise<void> {
     ['achievement export poller', () => ctx.achievementFiles.stop()],
     ['inventory export poller', () => ctx.inventoryFiles.stop()],
     ['speech', () => ctx.speech.stop()],
+    ['screen reads', () => stopOcr()],
     ['overlays', () => ctx.overlays.destroy()],
     ['hotkeys', () => globalShortcut.unregisterAll()]
   ] as const) {
@@ -127,10 +169,10 @@ async function stopAndSave(ctx: AppContext): Promise<void> {
       log.warn(`Stopping the ${name} failed`, err)
     }
   }
-  const limit = new Promise<'timeout'>((r) => setTimeout(() => r('timeout'), 3000))
+  const limit = new Promise<'timeout'>((r) => setTimeout(() => r('timeout'), limitMs))
   const r = await Promise.race([
     Promise.allSettled([ctx.store.flushAll(), ctx.windows.flush(), ctx.logHistory.flush(), ctx.petStore.flush(), ...ctx.features.map((f) => f.flush?.())]),
     limit
   ])
-  if (r === 'timeout') log.warn('Saving settings took over 3s; quitting anyway')
+  if (r === 'timeout') log.warn(`Saving settings took over ${limitMs / 1000}s; quitting anyway`)
 }

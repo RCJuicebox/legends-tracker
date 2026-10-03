@@ -83,8 +83,8 @@ export function Settings({ go }: { go?: (page: PageId) => void }) {
             <Switch on={s.autoRestartUpdates} onChange={(v) => patchSettings((x) => ({ ...x, autoRestartUpdates: v }))} />
             Restart into updates by itself
             <span className="faint small">
-              as soon as one has downloaded, without asking, even while you play: the overlays blink and come back, and the window stays in the tray unless you were using it. Off,
-              an update installs when the app closes, or when you choose Restart and update.
+              once one has downloaded, without asking, at the first lull in play (out of combat, or the game not in front): the overlays blink and come back, and the window stays
+              in the tray unless you were using it. Timers running then do not survive it. Off, an update installs when the app closes, or when you choose Restart and update.
             </span>
           </label>
           <div className="row">

@@ -572,10 +572,10 @@ function SkinRebuilds({ character }: { character: string }) {
   const [busy, setBusy] = useState('')
   const [result, setResult] = useState<SkinBuildResult | null>(null)
   if (!builds.data?.length) return null
-  const run = async (b: SkinBuild) => {
+  const run = async (b: SkinBuild, approve = false) => {
     setBusy(b.skin)
     setResult(null)
-    const r = await act('skins:build', b.skin, character)
+    const r = await act('skins:build', b.skin, character, approve)
     setBusy('')
     if (r) setResult(r)
   }
@@ -591,7 +591,29 @@ function SkinRebuilds({ character }: { character: string }) {
           Rebuilt from {character ? `${character}'s` : 'the'} export. In game: <GameCommand cmd={`/loadskin ${result.skin} 1`} />
         </span>
       )}
-      {result && !result.ok && (
+      {result?.confirm && (
+        <div className="notice stack gap-6" role="alert">
+          <span>The {result.skin} skin asks to run this program, which this app has not run before. Run it only if you trust where the skin came from:</span>
+          <code className="mono small">{result.confirm.join(' ')}</code>
+          <span className="row tight">
+            <button
+              className="btn small primary"
+              onClick={() =>
+                void run(
+                  builds.data!.find((b) => b.skin === result.skin)!,
+                  true
+                )
+              }
+            >
+              Run it
+            </button>
+            <button className="btn small ghost" onClick={() => setResult(null)}>
+              Cancel
+            </button>
+          </span>
+        </div>
+      )}
+      {result && !result.ok && !result.confirm && (
         <ErrorText>
           Could not rebuild {result.skin}: {result.output || 'no output'}
         </ErrorText>

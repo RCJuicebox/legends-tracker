@@ -4,7 +4,7 @@ import type { RespawnRecords } from '../core/respawns'
 import type { BuffsFile } from '../core/buffs'
 import { join } from 'node:path'
 import { DEFAULT_CHARACTER, type AppSettings, type CharacterSettings, type FocusSource, type MoteStock, type SpellRule, type Trigger } from '../shared/types'
-import { sanitizeBuffs, sanitizeCasts, sanitizeMoteStock, sanitizeMotes, sanitizeRespawns, sanitizeSettings } from '../core/validate'
+import { sanitizeBuffs, sanitizeCasts, sanitizeMoteStock, sanitizeMotes, sanitizeRespawns, sanitizeSettings, sanitizeSpellRule, sanitizeTriggers } from '../core/validate'
 import { SCHEMAS, upgrade } from './schema'
 import { DEFAULT_OVERLAYS, JsonFile, characterKey, defaultSettings, mergeDefaults, readJsonFile, type ReadResult } from './storeCore'
 
@@ -71,7 +71,7 @@ export class Store {
     // older build let the meter and respawn overlays be removed) comes back. The result is checked the
     // way a save from a page is, so a hand-edited or half-migrated value cannot break the start.
     const merged = mergeDefaults(defaultSettings(), savedSettings, () => true)
-    this.settings = new JsonFile(p('settings.json'), sanitizeSettings(merged, defaultSettings()) ?? defaultSettings())
+    this.settings = new JsonFile(p('settings.json'), sanitizeSettings(merged, defaultSettings()) ?? defaultSettings(), { backup: true })
     if (savedSettings) {
       const saved = (savedSettings as { overlays?: unknown }).overlays
       const have = new Set(Array.isArray(saved) ? saved.map((o) => (o as { id?: unknown })?.id) : [])
@@ -83,11 +83,20 @@ export class Store {
     const triggersRead = readResult('triggers.json')
     const firstRun = triggersRead.state === 'missing'
     const triggers = firstRun ? readJsonFile(defaultTriggersPath, { setAside: false }) : triggersRead
-    const list = triggers.state === 'ok' && Array.isArray(triggers.value) ? (triggers.value as Trigger[]) : []
-    this.triggers = new JsonFile(p('triggers.json'), list)
+    // Checked as it is read, as the settings are: a null entry would throw in the engine's start and
+    // end the app on every launch (LT-432).
+    const list: Trigger[] = triggers.state === 'ok' ? (sanitizeTriggers(triggers.value) ?? []) : []
+    this.triggers = new JsonFile(p('triggers.json'), list, { backup: true })
     if (firstRun) this.triggers.markDirty()
 
-    this.rules = new JsonFile(p('spell-rules.json'), (read('spell-rules.json') as Record<string, SpellRule>) ?? {})
+    const rules = read('spell-rules.json')
+    const ruleList: Record<string, SpellRule> = {}
+    if (rules && typeof rules === 'object' && !Array.isArray(rules))
+      for (const [name, r] of Object.entries(rules)) {
+        const rule = sanitizeSpellRule(r)
+        if (rule) ruleList[name] = rule
+      }
+    this.rules = new JsonFile(p('spell-rules.json'), ruleList)
     // Files the log changes every few seconds wait a while and go compact: a crash loses at most that
     // long, and mote catch-up reads it back from the log anyway.
     const often = { delayMs: 15_000, pretty: false }

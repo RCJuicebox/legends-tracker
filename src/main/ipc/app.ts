@@ -6,8 +6,9 @@ import { diagnostics } from '../diagnostics'
 import { sources } from '../sources/registry'
 import { jobs } from '../sources/jobs'
 import { checkGameFolder, findInstall, isGameFolder, resolveGameFolder } from '../game'
-import { listSkinBuilds, runSkinBuild } from '../skinBuilds'
-import { assertCharacterKey, meterOptions, sanitizeCharacter, sanitizeSettings } from '../../core/validate'
+import { approvedCommands, listSkinBuilds, runSkinBuild } from '../skinBuilds'
+import { join } from 'node:path'
+import { assertCharacterKey, meterOptions, sanitizeCharacter, sanitizeSettings, textArg } from '../../core/validate'
 import { className } from '../../shared/game/classes'
 import type { CharacterSettings } from '../../shared/types'
 import type { AppContext } from '../context'
@@ -92,7 +93,8 @@ export function registerAppIpc(ctx: AppContext): void {
   }
   handle('watch:start', () => engine.startWatching())
   handle('watch:stop', () => engine.stopWatching())
-  handle('simulate', (text) => engine.simulate(text))
+  // Pasted lines are parsed on the main thread at once: a few hundred kilobytes at most (LT-434).
+  handle('simulate', (text) => engine.simulate(textArg(text, 200_000)))
 
   handle('update:status', () => ({ status: ctx.updater.status, version: app.getVersion() }))
   handle('update:check', () => ctx.updater.check())
@@ -102,7 +104,8 @@ export function registerAppIpc(ctx: AppContext): void {
   handle('game:check', (dir) => checkGameFolder(dir === undefined ? ctx.installDir() : typeof dir === 'string' && isGameFolder(dir) ? dir : ''))
   // A UI skin's rebuild, as the skin's own file names it (src/core/skinBuild.ts).
   handle('skins:builds', () => listSkinBuilds(ctx.installDir()))
-  handle('skins:build', (skin, character) => runSkinBuild(ctx.installDir(), skin, character))
+  const approved = approvedCommands(join(app.getPath('userData'), 'skin-commands.json'))
+  handle('skins:build', (skin, character, approve) => runSkinBuild(ctx.installDir(), skin, character, approved, approve === true))
   handle('game:find', async () => {
     const dir = await findInstall()
     if (dir) ctx.saveSettings({ ...store.settings.get(), installDir: dir })

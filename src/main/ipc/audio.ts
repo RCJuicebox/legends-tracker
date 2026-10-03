@@ -26,6 +26,7 @@ export function registerAudioIpc(ctx: AppContext): void {
     return engine.playSound(file, 1)
   })
   handle('audio:sounds', () => engine.listSounds())
+  handle('audio:watchDevices', (on) => ctx.windows.watchDevices(on === true))
   // The Windows voice list needs the speech process; the Audio page asks for it when it opens.
   handle('audio:voices', async () => {
     await speech.warm()
@@ -36,7 +37,10 @@ export function registerAudioIpc(ctx: AppContext): void {
 
   onSend('audio:devices', (devices) => {
     if (!Array.isArray(devices)) return
-    ctx.audioDevices = devices.filter((d) => d && typeof d.deviceId === 'string' && typeof d.label === 'string').map((d) => ({ deviceId: d.deviceId, label: d.label }))
+    ctx.audioDevices = devices
+      .filter((d) => d && typeof d.deviceId === 'string' && typeof d.label === 'string')
+      .slice(0, 64)
+      .map((d) => ({ deviceId: d.deviceId.slice(0, 200), label: d.label.slice(0, 200) }))
     ctx.windows.toMain('state:devices', ctx.audioDevices)
   })
 }

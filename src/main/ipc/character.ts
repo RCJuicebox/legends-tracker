@@ -89,7 +89,7 @@ export function registerCharacterIpc(ctx: AppContext): void {
   // of play (0 for all of it) to weigh them against.
   handle('gear:effects', async (names, character, days) => {
     const book = engine.book
-    const list = Array.isArray(names) ? [...new Set(names.filter((n): n is string => typeof n === 'string'))] : []
+    const list = [...new Set(stringsArg(names, 1000))]
     const spells: Record<string, EffectSpell> = {}
     for (const n of list) {
       const s = book?.named(n)

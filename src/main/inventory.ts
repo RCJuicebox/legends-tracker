@@ -5,7 +5,7 @@ import { parseInventory, type Inventory } from '../core/inventory'
 import type { ItemCatalog } from './items'
 import type { CharacterSheet, InventoryView } from '../shared/types'
 import { log } from './log'
-import { isCharacterKey } from '../core/validate'
+import { assertCharacterKey, isCharacterKey, sanitizeSheet } from '../core/validate'
 import { sources } from './sources/registry'
 import { ExportWatch } from './exportWatch'
 
@@ -92,8 +92,10 @@ export class InventoryFiles {
     const empty = { ...EMPTY_SHEET, acOverrides: {}, stats: {} }
     if (!isCharacterKey(character)) return empty
     try {
-      const s = JSON.parse(await fs.readFile(this.sheetPath(character), 'utf8')) as Partial<CharacterSheet>
-      return { ...EMPTY_SHEET, ...s, acOverrides: s.acOverrides ?? {}, stats: s.stats ?? {} }
+      // Checked as a save from the page is (LT-433): a hand-edited sheet of the wrong shape is an empty one.
+      const s = sanitizeSheet(JSON.parse(await fs.readFile(this.sheetPath(character), 'utf8')))
+      if (!s) log.warn(`The character sheet for ${character} is not in the expected form; starting it afresh`)
+      return s ? { ...EMPTY_SHEET, ...s } : empty
     } catch (e) {
       if ((e as NodeJS.ErrnoException).code !== 'ENOENT') log.warn(`Could not read the character sheet for ${character}`, e)
       return empty
@@ -101,7 +103,8 @@ export class InventoryFiles {
   }
 
   async saveSheet(character: string, sheet: CharacterSheet): Promise<void> {
-    if (!isCharacterKey(character)) return
+    // Said, not passed over: a page must not believe it saved (LT-434).
+    assertCharacterKey(character)
     if (!sheet || typeof sheet !== 'object' || Array.isArray(sheet)) throw new Error('The character sheet is not in the expected form.')
     const path = this.sheetPath(character)
     await fs.mkdir(join(path, '..'), { recursive: true })

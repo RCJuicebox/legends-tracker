@@ -145,6 +145,11 @@ export interface JsonFileOptions {
   delayMs?: number
   /** Indented for a person to read; files only the app reads are written compact. */
   pretty?: boolean
+  /**
+   * Keeps the file as this run found it in `<name>.bak.json`, copied before the run's first write: the
+   * atomic write guards against a torn file, not against wrong content saved whole (LT-441).
+   */
+  backup?: boolean
 }
 
 /** A JSON file held in memory. Changes are written a little after the last one, or at flush(). */
@@ -155,6 +160,8 @@ export class JsonFile<T> {
   private frozen = ''
   private readonly delayMs: number
   private readonly pretty: boolean
+  /** Still to copy the file as found to its .bak.json, before this run first writes it. */
+  private backup: boolean
 
   constructor(
     readonly path: string,
@@ -163,6 +170,7 @@ export class JsonFile<T> {
   ) {
     this.delayMs = opts.delayMs ?? 400
     this.pretty = opts.pretty ?? true
+    this.backup = opts.backup ?? false
   }
 
   get(): T {
@@ -204,6 +212,12 @@ export class JsonFile<T> {
     if (!this.dirty) return
     this.dirty = false
     if (this.frozen) return
+    if (this.backup) {
+      this.backup = false
+      await fs.copyFile(this.path, this.path.replace(/\.json$/i, '') + '.bak.json').catch((e: NodeJS.ErrnoException) => {
+        if (e.code !== 'ENOENT') log.warn(`Could not keep a copy of ${this.path} before saving it`, e)
+      })
+    }
     try {
       await writeFileAtomic(this.path, this.pretty ? JSON.stringify(this.value, null, 2) : JSON.stringify(this.value))
     } catch (e) {
