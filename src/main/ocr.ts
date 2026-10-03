@@ -76,7 +76,7 @@ export function stopOcr(): void {
 export async function sweepScreenCaptures(): Promise<void> {
   const dir = cacheDir()
   const names = await fs.readdir(dir).catch(() => [] as string[])
-  await Promise.all(names.filter((n) => /^(?:screen|ocr)-[\w-]+\.png$/.test(n)).map((n) => fs.rm(join(dir, n), { force: true }).catch(() => undefined)))
+  await Promise.all(names.filter((n) => /^(?:screen|ocr)-[\w-]+\.(?:png|bmp)$/.test(n)).map((n) => fs.rm(join(dir, n), { force: true }).catch(() => undefined)))
 }
 
 /** The OCR script in the cache folder: written once a run, and again if something cleared it away. */
@@ -172,9 +172,14 @@ export async function captureScreens(): Promise<string[]> {
         const pic = s.thumbnail.getSize()
         const own = wanted.has(s.display_id) || (!displays.some((d) => d.id === s.display_id) && pic.width === size.width && pic.height === size.height)
         if (!own || s.thumbnail.isEmpty()) continue
-        const p = join(cacheDir(), `screen-${stamp}-${paths.length}.png`)
+        // A bitmap as it is, not a PNG: encoding a 4K screen held the main process (the tick, the
+        // log, the pushes) for 100 ms, the raw pixels take 3 ms (LT-440). The OCR script reads either.
+        const pixels = s.thumbnail.toBitmap()
+        const bmp = pixels.length === pic.width * pic.height * 4
+        const p = join(cacheDir(), `screen-${stamp}-${paths.length}.${bmp ? 'bmp' : 'png'}`)
         paths.push(p)
-        await fs.writeFile(p, s.thumbnail.toPNG())
+        if (bmp) await writeBmp(p, pic.width, pic.height, pixels)
+        else await fs.writeFile(p, s.thumbnail.toPNG())
       }
     }
   } catch (e) {
@@ -182,6 +187,35 @@ export async function captureScreens(): Promise<string[]> {
     throw e
   }
   return paths
+}
+
+/**
+ * The headers of a 32-bit BMP of `width` × `height` pixels stored top row first, as Chromium's
+ * toBitmap() gives them on Windows (blue, green, red, then a byte the format ignores).
+ */
+export function bmpHeader(width: number, height: number): Buffer {
+  const pixels = width * height * 4
+  const h = Buffer.alloc(54)
+  h.write('BM', 0, 'ascii')
+  h.writeUInt32LE(54 + pixels, 2) // file size
+  h.writeUInt32LE(54, 10) // where the pixels start
+  h.writeUInt32LE(40, 14) // BITMAPINFOHEADER
+  h.writeInt32LE(width, 18)
+  h.writeInt32LE(-height, 22) // negative: top row first
+  h.writeUInt16LE(1, 26) // planes
+  h.writeUInt16LE(32, 28) // bits a pixel
+  h.writeUInt32LE(0, 30) // BI_RGB
+  h.writeUInt32LE(pixels, 34)
+  return h
+}
+
+async function writeBmp(path: string, width: number, height: number, pixels: Buffer): Promise<void> {
+  const f = await fs.open(path, 'w')
+  try {
+    await f.writev([bmpHeader(width, height), pixels])
+  } finally {
+    await f.close()
+  }
 }
 
 /** Deletes captures: they are pictures of the whole desktop, and have no business staying on disk. */
