@@ -31,7 +31,7 @@ import type { AppFeature } from './appFeature'
 import { SkillHistory, skillConsumer } from './skillHistory'
 import { AaHistory, aaConsumer } from './aaHistory'
 import { PetStore, PetWiki } from './pets'
-import { listLogs, logIsIn } from './game'
+import { isGameRunning, listLogs, logIsIn } from './game'
 import { Windows, loadPage } from './windows'
 import { appIcon, preloadPath, resources } from './bootstrap'
 import { log } from './log'
@@ -113,6 +113,9 @@ export interface AppContext {
   installUpdate(unasked?: boolean): Promise<void>
 }
 
+/** The newest loot entry the main window was sent whole or added to; 0 when it should get the whole list. */
+let lootSent = 0
+
 export function createContext(): AppContext {
   const store = new Store(join(resources, 'defaults', 'triggers.json'))
   const dataDir = app.getPath('userData')
@@ -129,8 +132,16 @@ export function createContext(): AppContext {
   const itemCatalog = new ItemCatalog(cacheDir())
   // Casts, the melee tally, purchases and faction changes over each character's log and archives,
   // read in one pass.
-  // Each had a cache file of its own before; log-history.json replaces them.
-  for (const f of ['cast-history.json', 'melee-history.json', 'purchases.json']) rmSync(join(dataDir, f), { force: true })
+  // Each had a cache file of its own before; log-history.json replaces them. faction-wiki.json has
+  // not been written since the faction book took its place (LT-422). A file another program holds is
+  // left for the next start, not a reason this one fails (LT-436).
+  for (const f of [join(dataDir, 'cast-history.json'), join(dataDir, 'melee-history.json'), join(dataDir, 'purchases.json'), join(cacheDir(), 'faction-wiki.json')]) {
+    try {
+      rmSync(f, { force: true })
+    } catch (e) {
+      log.warn(`Could not remove the retired ${basename(f)}; trying again next start:`, e)
+    }
+  }
   const logHistory = new LogHistory(join(cacheDir(), 'log-history.json'), {
     casts: dayConsumer(castCounter),
     melee: dayConsumer(meleeCounter),
@@ -267,8 +278,14 @@ export function createContext(): AppContext {
         toMain('state:combat', snap)
       },
       loot: (view) => {
-        perf.push('loot', view)
-        toMain('state:loot', view)
+        // The main window has the entries up to the newest it was sent: only those after go (LT-369).
+        // Hidden, it is sent the whole list, as only the last push is kept for it.
+        const newest = view.entries[0]?.id ?? 0
+        const oldest = view.entries.at(-1)?.id ?? 0
+        const push = windows.mainShown && lootSent > 0 && newest >= lootSent ? { ...view, entries: view.entries.filter((e) => e.id > lootSent), addedOnly: { oldest } } : view
+        lootSent = windows.mainShown ? newest : 0
+        perf.push('loot', push)
+        toMain('state:loot', push)
       },
       respawns: (view) => toMain('state:respawns', view),
       pet: (update) => {
@@ -295,7 +312,10 @@ export function createContext(): AppContext {
     },
     appEngineEnv({
       dataDir,
-      soundDirs: () => [join(dataDir, 'sounds'), join(installDir(), 'AudioTriggers', 'default'), join(installDir(), 'AudioTriggers', 'shared')]
+      soundDirs: () => [join(dataDir, 'sounds'), join(installDir(), 'AudioTriggers', 'default'), join(installDir(), 'AudioTriggers', 'shared')],
+      // The game watcher looks at the process list every three seconds anyway: its answer, rather than
+      // another walk of it every half minute for the archiver (LT-377). Before its first look, a walk.
+      isGameRunning: async () => ctx.watcher?.gameRunning ?? isGameRunning()
     })
   )
 

@@ -1,7 +1,7 @@
-import { Fragment, useEffect, useMemo } from 'react'
+import { Fragment, useMemo } from 'react'
 import { num1 } from '../../../core/format'
 import { api } from '../api'
-import { useInvoke } from '../hooks'
+import { useLootView } from '../hooks'
 import { remember, useRemembered } from '../remember'
 import { showError, showToast } from '../toast'
 import { Ago, GameCommand, Info, Segmented, Tip } from '../components/ui'
@@ -51,9 +51,7 @@ function Deltas({ d }: { d: Partial<Record<WeightKey, number>> }) {
  * what is worn, so after those the list may be behind the game.
  */
 function useSinceExport(view: InventoryView) {
-  const q = useInvoke('loot:get')
-  const setData = q.setData
-  useEffect(() => api.on('state:loot', (v) => setData(v)), [setData])
+  const q = useLootView()
   const me = (view.character || '').split('_')[0].toLowerCase()
   return useMemo(() => {
     const mine = (e: LootEntry) => e.looter === 'You' || e.looter.toLowerCase() === me

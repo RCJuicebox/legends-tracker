@@ -876,9 +876,9 @@ roaming profile:
 | `tradeskill-recipes.json` | Every player-crafted recipe on eqlwiki, with the era of each product and ingredient; refreshed at most weekly |
 | `pet-wiki.json` | eqlwiki's pet summon pages and Pet Guide, for the Pet tab |
 | `npc-races.json` | The race each mob's eqlwiki page gives, for the Slayer counts of mobs whose names do not say; kept, and a name with no page asked again after a day |
-| `faction-wiki.json` | What raises each faction, from its eqlwiki page, for the Factions page; kept a week |
 | `faction-book.json` | Every eqlwiki faction page and the quest pages they name, read into ways to raise each faction, for the Plan tab; kept a week |
 | `faction-alla.json` | Allakhazam's faction pages (the cons quests want, kill amounts), read one every 20 seconds; kept a month |
+| `faction-since.json`, `slayer-since.json` | What the live log has shown since the factions and achievements exports (standings moved, achievements completed, Slayer kills), and how far it was read, so a start reads on from there rather than from the export's line |
 | `log-history.json` | Casts, melee, purchases and AAs bought counted over each character's log and archives, for Gear, Spell upgrades, Tradeskills and Stats › AAs; only what a log gains is read again |
 | `speech-cache\` | Azure phrases as WAV files, the newest 4,000 |
 

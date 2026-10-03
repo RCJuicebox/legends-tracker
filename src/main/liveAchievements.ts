@@ -19,6 +19,7 @@ import { log } from './log'
 import { NpcRaces } from './npcRaces'
 import { offsetBefore, readForward } from './sources/logHistory'
 import { JsonFile, readJsonFile } from './storeCore'
+import { cacheDir } from './paths'
 
 // What the achievements overlay follows as the game is played: the step of the faction plan the
 // player follows (the Plan tab hands it over), the Slayer counts since the last achievements
@@ -50,6 +51,28 @@ interface SlayerState {
   engaged: Map<string, number>
   /** Achievements the game said were completed since the export (lower-cased). */
   completed: Set<string>
+}
+
+/** A SlayerState's counts as kept on disk, so a start reads on from where the last run got to (LT-371). */
+interface KeptSlayer {
+  character: string
+  logPath: string
+  exportAt: number
+  readTo: number
+  kills: [string, { name: string; times: number[] }][]
+  pets: string[]
+  completed: string[]
+}
+
+function keptSlayer(v: unknown): KeptSlayer | null {
+  const k = v as Partial<KeptSlayer> | null
+  if (!k || typeof k.character !== 'string' || typeof k.logPath !== 'string' || typeof k.exportAt !== 'number' || typeof k.readTo !== 'number') return null
+  if (!Array.isArray(k.kills) || !Array.isArray(k.pets) || !Array.isArray(k.completed)) return null
+  const kills = k.kills.filter(
+    (e): e is KeptSlayer['kills'][number] =>
+      Array.isArray(e) && typeof e[0] === 'string' && typeof e[1]?.name === 'string' && Array.isArray(e[1].times) && e[1].times.every((t) => typeof t === 'number')
+  )
+  return { ...(k as KeptSlayer), kills, pets: k.pets.filter((p) => typeof p === 'string'), completed: k.completed.filter((c) => typeof c === 'string') }
 }
 
 /** The faction achievements' section: tracking one of them reads the standings. */
@@ -108,6 +131,9 @@ export class LiveAchievements implements AppFeature {
     const value: Record<string, Followed> = read.state === 'ok' ? sanitizeFollows(read.value) : {}
     this.follows = new JsonFile(path, value, { delayMs: 3000, pretty: false })
     if (read.state === 'unreadable') this.follows.freeze('could not be read at start')
+    const keptPath = join(cacheDir(), 'slayer-since.json')
+    const kept = readJsonFile(keptPath)
+    this.keptSlayer = new JsonFile<KeptSlayer | null>(keptPath, kept.state === 'ok' ? keptSlayer(kept.value) : null, { delayMs: 10_000, pretty: false })
     void this.races.ready()
   }
 
@@ -121,10 +147,13 @@ export class LiveAchievements implements AppFeature {
     }
   }
 
-  /** Writes where the player is in each followed plan. */
+  /** Writes where the player is in each followed plan, and the Slayer counts since the export. */
   flush(): Promise<void> {
-    return this.follows.flush()
+    return Promise.all([this.follows.flush(), this.keptSlayer.flush()]).then(() => undefined)
   }
+
+  /** The Slayer counts since the export, kept so the next start need not read the log from the export again. */
+  private readonly keptSlayer: JsonFile<KeptSlayer | null>
 
   /** Its channel, and its part in following the log: registered after the engine's own, it sees each line last. */
   register(ctx: AppContext): void {
@@ -323,7 +352,13 @@ export class LiveAchievements implements AppFeature {
     if (!s || s.character !== character || s.exportAt !== st.mtimeMs || s.logPath !== logPath) {
       // A new export counts everything up to it: only the kills after it are kept.
       const counters = slayerCounters(exp.sections)
-      const kept = s && s.character === character && s.logPath === logPath && s.exportAt <= st.mtimeMs ? s : null
+      // Nothing in memory yet (a start): what the last run counted, for this character, log and export.
+      const disk = !s ? this.keptSlayer.get() : null
+      const fromDisk =
+        disk && disk.character === character && disk.logPath === logPath && disk.exportAt === st.mtimeMs
+          ? { readTo: disk.readTo, kills: new Map(disk.kills) as SlayerKills, pets: new Set(disk.pets), completed: new Set(disk.completed) }
+          : null
+      const kept = fromDisk ?? (s && s.character === character && s.logPath === logPath && s.exportAt <= st.mtimeMs ? s : null)
       const kills: SlayerKills = new Map()
       for (const [k, v] of kept?.kills ?? []) {
         const times = v.times.filter((t) => t > st.mtimeMs)
@@ -340,7 +375,7 @@ export class LiveAchievements implements AppFeature {
         kills,
         pets: kept?.pets ?? new Set(),
         engaged: new Map(),
-        completed: new Set()
+        completed: fromDisk?.completed ?? new Set()
       }
     }
     const size = (await fs.stat(logPath).catch(() => null))?.size ?? 0
@@ -380,6 +415,16 @@ export class LiveAchievements implements AppFeature {
         { flushLast: false }
       )
       s.readTo += read
+      if (read > 0)
+        this.keptSlayer.set({
+          character: s.character,
+          logPath: s.logPath,
+          exportAt: s.exportAt,
+          readTo: s.readTo,
+          kills: [...s.kills],
+          pets: [...s.pets],
+          completed: [...s.completed]
+        })
     }
     this.countSlayer()
   }

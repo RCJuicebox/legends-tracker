@@ -521,6 +521,36 @@ export class SinceExports {
   get completed(): ReadonlySet<string> {
     return this.done.line ? this.done.byLine : this.done.byTime
   }
+
+  /** As kept on disk, so a start reads on from where the last run got to (LT-371). */
+  toJSON(): SinceExportsJson {
+    return {
+      changes: { byLine: [...this.changes.byLine], byTime: [...this.changes.byTime], line: this.changes.line },
+      done: { byLine: [...this.done.byLine], byTime: [...this.done.byTime], line: this.done.line }
+    }
+  }
+
+  /** One kept on disk, for the same exports; null for anything not shaped as one. */
+  static from(json: unknown, factions: ExportMark | null, achievements: ExportMark | null): SinceExports | null {
+    const j = json as Partial<SinceExportsJson> | null
+    const pairs = (v: unknown) => Array.isArray(v) && v.every((p) => Array.isArray(p) && typeof p[0] === 'string' && typeof p[1] === 'number')
+    const names = (v: unknown) => Array.isArray(v) && v.every((n) => typeof n === 'string')
+    if (!j?.changes || !j.done || !pairs(j.changes.byLine) || !pairs(j.changes.byTime) || !names(j.done.byLine) || !names(j.done.byTime)) return null
+    const s = new SinceExports(factions, achievements)
+    for (const [k, n] of j.changes.byLine) s.changes.byLine.set(k, n)
+    for (const [k, n] of j.changes.byTime) s.changes.byTime.set(k, n)
+    for (const k of j.done.byLine) s.done.byLine.add(k)
+    for (const k of j.done.byTime) s.done.byTime.add(k)
+    s.changes.line = j.changes.line === true
+    s.done.line = j.done.line === true
+    return s
+  }
+}
+
+/** SinceExports as JSON. */
+export interface SinceExportsJson {
+  changes: { byLine: [string, number][]; byTime: [string, number][]; line: boolean }
+  done: { byLine: string[]; byTime: string[]; line: boolean }
 }
 
 /** What the log saw after the exports (SinceExports). `changes` is null when the log does not reach back to the factions export. */

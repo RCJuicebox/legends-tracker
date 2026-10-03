@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { fmtCoin, LootLedger, parseCoin, parseLootLine } from '../../src/core/loot'
+import { fmtCoin, LootLedger, mergeLoot, parseCoin, parseLootLine, type LootEntry, type LootSnapshot } from '../../src/core/loot'
 import { parseItemUse, plainText } from '../../src/core/wikiItem'
 import { parseLogLine } from '../../src/core/logLine'
 
@@ -148,5 +148,24 @@ WT: 1.0  Size: SMALL<br>
       sources: { drops: [], foraged: [], crafted: false }
     })
     expect(plainText("'''Bold''' and [[a link|words]]<br>next")).toBe('Bold and words next')
+  })
+})
+
+describe('loot pushed to a page (LT-369)', () => {
+  const e = (id: number) => ({ id, item: `Item ${id}` }) as LootEntry
+  const view = (ids: number[], addedOnly?: { oldest: number }): LootSnapshot => ({ entries: ids.map(e), coin: {}, reading: '', ...(addedOnly ? { addedOnly } : {}) })
+
+  it('puts new entries on top of those the page has, dropping what main no longer keeps', () => {
+    const had = view([5, 4, 3, 2])
+    const next = mergeLoot(had, view([7, 6], { oldest: 3 }))
+    expect(next.entries.map((x) => x.id)).toEqual([7, 6, 5, 4, 3])
+    expect(next).not.toHaveProperty('addedOnly')
+  })
+
+  it('takes a whole list as it is, and a list of new ones as whole when it has nothing', () => {
+    expect(mergeLoot(view([5, 4]), view([9])).entries.map((x) => x.id)).toEqual([9])
+    expect(mergeLoot(null, view([9], { oldest: 1 })).entries.map((x) => x.id)).toEqual([9])
+    // An entry sent again is not doubled.
+    expect(mergeLoot(view([6, 5]), view([6], { oldest: 5 })).entries.map((x) => x.id)).toEqual([6, 5])
   })
 })

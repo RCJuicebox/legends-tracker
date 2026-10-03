@@ -4,7 +4,8 @@ import { showError } from './toast'
 import { itemKey } from '../../core/inventory'
 import type { ItemInfo } from '../../shared/types'
 import type { AchievementTrack } from '../../shared/tracking'
-import type { InvokeChannel, InvokeResult, Invokes } from '../../shared/ipc'
+import type { InvokeChannel, InvokeResult, Invokes, LootView } from '../../shared/ipc'
+import { mergeLoot } from '../../core/loot'
 
 export interface Invoked<T> {
   data: T | null
@@ -29,6 +30,14 @@ function sameData(a: unknown, b: unknown): boolean {
   } catch {
     return false
   }
+}
+
+/** The loot list, as the main process pushes it: whole, or the entries added since (mergeLoot). */
+export function useLootView(): Invoked<LootView> {
+  const q = useInvoke('loot:get')
+  const setData = q.setData
+  useEffect(() => api.on('state:loot', (v: LootView) => setData((had) => mergeLoot(had, v))), [setData])
+  return q
 }
 
 export function useInvoke<K extends InvokeChannel>(channel: K | null, args?: Parameters<Invokes[K]>, deps: unknown[] = []): Invoked<InvokeResult<K>> {

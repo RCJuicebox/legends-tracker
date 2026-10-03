@@ -1,8 +1,7 @@
 import { clock, duration, num } from '../../../core/format'
-import { useEffect } from 'react'
-import { api, ago } from '../api'
+import { ago } from '../api'
 import { useApp, useLive } from '../state'
-import { useAchievementTrack, useInvoke } from '../hooks'
+import { useAchievementTrack, useLootView } from '../hooks'
 import { remember } from '../remember'
 import { useCombat } from '../combat'
 import { useNow } from './TimerBars'
@@ -117,9 +116,7 @@ export function QuietLogNotice({ go }: { go: Go }) {
 /** The fight in hand (or the last one) and the session so far, with the meter a click away. */
 export function FightSummary({ go }: { go: Go }) {
   const snap = useCombat()
-  const lootQ = useInvoke('loot:get')
-  const setLoot = lootQ.setData
-  useEffect(() => api.on('state:loot', (v) => setLoot(v)), [setLoot])
+  const lootQ = useLootView()
   useNow(1000)
   const fight = snap?.liveFight ?? null
   const last = snap?.fights[0]

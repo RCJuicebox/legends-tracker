@@ -4,6 +4,6 @@ import { findInstall, isGameRunning } from './game'
 import type { EngineEnv } from './engine'
 
 /** The engine's view of the running app: the worker script electron-vite builds, and the Windows lookups. */
-export function appEngineEnv(o: { dataDir: string; soundDirs: () => string[] }): EngineEnv {
+export function appEngineEnv(o: { dataDir: string; soundDirs: () => string[]; isGameRunning?: () => Promise<boolean> }): EngineEnv {
   return { moteWorkerPath, isGameRunning, findInstall, ...o }
 }

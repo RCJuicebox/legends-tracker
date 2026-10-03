@@ -312,6 +312,23 @@ describe('SinceExports', () => {
     expect(Object.fromEntries(s.factionChanges)).toEqual({ 'brownies of faydwer': 3 })
   })
 
+  it('is kept on disk and read back the same, and nothing else is taken for it (LT-371)', () => {
+    const s = new SinceExports(factions, achievements)
+    for (const l of [
+      at(10, 'Outputfile Complete: Tester_neriak-MNK-Factions.txt'),
+      at(11, adjusted('Brownies of Faydwer', 4)),
+      at(20, 'You have completed achievement: Crimson Hands')
+    ])
+      s.add(l)
+    const back = SinceExports.from(JSON.parse(JSON.stringify(s)), factions, achievements)!
+    expect(Object.fromEntries(back.factionChanges)).toEqual(Object.fromEntries(s.factionChanges))
+    expect([...back.completed]).toEqual([...s.completed])
+    back.add(at(30, adjusted('Brownies of Faydwer', 1)))
+    expect(back.factionChanges.get('brownies of faydwer')).toBe(5)
+    expect(SinceExports.from({ changes: { byLine: 'no' } }, factions, achievements)).toBeNull()
+    expect(SinceExports.from(null, factions, achievements)).toBeNull()
+  })
+
   it('takes the achievements the game completed after the achievements export', () => {
     const s = new SinceExports(null, achievements)
     for (const l of [

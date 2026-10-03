@@ -1,4 +1,4 @@
-import { promises as fs } from 'node:fs'
+import { promises as fs, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import {
   addFactionLine,
@@ -42,7 +42,7 @@ import { CLASS_NAMES } from '../../shared/game/classes'
 import { itemKey, parseInventory } from '../../core/inventory'
 import { unitPrice } from '../../core/tradeskills'
 import { handle } from '../../main/ipc/handle'
-import { writeFileAtomic } from '../../main/storeCore'
+import { JsonFile, writeFileAtomic } from '../../main/storeCore'
 import { assertCharacterKey } from '../../core/validate'
 import { sources } from '../../main/sources/registry'
 import { expired } from '../../main/sources/freshness'
@@ -84,15 +84,62 @@ interface SinceRead {
   tally: SinceExports
 }
 
+/** A SinceRead as kept in faction-since.json. */
+interface KeptSince {
+  key: string
+  id: string
+  readTo: number
+  whole: boolean
+  tally: unknown
+}
+
+/** faction-since.json, or nothing for a file missing or not shaped as one (it is only a head start). */
+function readKept(path: string): Record<string, KeptSince> {
+  try {
+    const v = JSON.parse(readFileSync(path, 'utf8')) as unknown
+    return v && typeof v === 'object' && !Array.isArray(v) ? (v as Record<string, KeptSince>) : {}
+  } catch {
+    return {}
+  }
+}
+
 export class FactionHistory {
   /** Per live log: what it saw after the exports, read on from where it ended the time before. */
   private readonly since = new Map<string, SinceRead>()
   private readonly reading = new Map<string, Promise<unknown>>()
+  /**
+   * The same, kept on disk: without it every start read the log again from the export's line, some
+   * seconds of a large log with an old export (LT-371).
+   */
+  private readonly kept: JsonFile<Record<string, KeptSince>> | null
 
   constructor(
     private readonly history: LogHistory,
-    private readonly key: string
-  ) {}
+    private readonly key: string,
+    keptFile?: string
+  ) {
+    this.kept = keptFile ? new JsonFile(keptFile, readKept(keptFile), { delayMs: 10_000, pretty: false }) : null
+  }
+
+  /** Writes what is waiting. */
+  flush(): Promise<void> {
+    return this.kept?.flush() ?? Promise.resolve()
+  }
+
+  /** A read kept from an earlier run, for these exports, made whole again. */
+  private recall(logPath: string, key: string, factions: ExportMark | null, achievements: ExportMark | null): SinceRead | null {
+    const k = this.kept?.get()[logPath.toLowerCase()]
+    if (!k || k.key !== key || typeof k.readTo !== 'number' || typeof k.id !== 'string') return null
+    const tally = SinceExports.from(k.tally, factions, achievements)
+    return tally ? { key, id: k.id, readTo: k.readTo, whole: k.whole === true, tally } : null
+  }
+
+  private keep(logPath: string, s: SinceRead): void {
+    if (!this.kept) return
+    const all = this.kept.get()
+    all[logPath.toLowerCase()] = { key: s.key, id: s.id, readTo: s.readTo, whole: s.whole, tally: s.tally.toJSON() }
+    this.kept.set(all)
+  }
 
   /** Every faction the log saw change, over the live log and every archive of it, with the export's standings. */
   async view(where: HistoryWhere, exported: FactionExport | null = null, achievements: FactionAchievements | null = null): Promise<FactionView> {
@@ -122,7 +169,7 @@ export class FactionHistory {
     if (!st || !size) return null
     const id = identityOf(st)
     const key = [factions, achievements].map((m) => (m ? `${m.file}@${m.modified}` : '')).join('|')
-    let s = this.since.get(logPath)
+    let s = this.since.get(logPath) ?? this.recall(logPath, key, factions, achievements) ?? undefined
     // New exports, or a log started afresh (another file at the path, or this one cut short even if it
     // has since grown past where the last read ended): read again from the line before the earlier export.
     if (!s || s.key !== key || !sameFile({ id: s.id, size: s.readTo }, { id, size })) {
@@ -131,9 +178,12 @@ export class FactionHistory {
       s = { key, id, readTo, whole, tally: new SinceExports(factions, achievements) }
       this.since.set(logPath, s)
     }
+    this.since.set(logPath, s)
     if (size > s.readTo) {
       const tally = s.tally
-      s.readTo += await readForward(logPath, s.readTo, size, (line) => tally.add(line), { flushLast: false })
+      const read = await readForward(logPath, s.readTo, size, (line) => tally.add(line), { flushLast: false })
+      s.readTo += read
+      if (read > 0) this.keep(logPath, s)
     }
     return { changes: s.whole ? s.tally.factionChanges : null, completed: s.tally.completed }
   }
@@ -676,13 +726,13 @@ export class Factions implements AppFeature {
   readonly alla = new FactionAlla()
 
   constructor(logHistory: LogHistory) {
-    this.history = new FactionHistory(logHistory, HISTORY_KEY)
+    this.history = new FactionHistory(logHistory, HISTORY_KEY, join(cacheDir(), 'faction-since.json'))
     this.causes = new FactionSourceHistory(logHistory, CAUSES_KEY)
   }
 
   /** Writes the Allakhazam pages read since the last write. */
   flush(): Promise<void> {
-    return this.alla.flush()
+    return Promise.all([this.alla.flush(), this.history.flush()]).then(() => undefined)
   }
 
   // The handlers reach the feature through the context, as every other channel does.

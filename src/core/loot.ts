@@ -139,6 +139,22 @@ export interface LootSnapshot {
   /** Coin per session id: from corpses, and from sales. */
   coin: Record<string, { corpse: number; sales: number }>
   reading: string
+  /**
+   * Sent to a page that has the entries already: `entries` holds the new ones alone, and the page
+   * keeps those it has from `oldest` on (mergeLoot). Entries never change once added, so a loot
+   * line costs one entry, not the whole list (LT-369: 580 KB at the 2,000 kept).
+   */
+  addedOnly?: { oldest: number }
+}
+
+/** The loot as a page shows it, after a push of new entries alone or a whole list. */
+export function mergeLoot<T extends LootSnapshot>(had: T | null, next: T): T {
+  if (!next.addedOnly || !had) return next
+  const { oldest } = next.addedOnly
+  const fresh = new Set(next.entries.map((e) => e.id))
+  const kept = had.entries.filter((e) => e.id >= oldest && !fresh.has(e.id))
+  const { addedOnly: _addedOnly, ...rest } = next
+  return { ...rest, entries: [...next.entries, ...kept].slice(0, KEPT) } as T
 }
 
 const KEPT = 2000

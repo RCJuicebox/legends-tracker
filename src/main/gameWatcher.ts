@@ -15,6 +15,13 @@ export class GameWatcher {
   private timer: NodeJS.Timeout | null = null
   private ticks = 0
   state: GameState = { foregroundPid: 0, foregroundName: '', gameRunning: false }
+  /** Whether the process list has been looked at yet: until then `gameRunning` is only a default. */
+  private looked = false
+
+  /** The game running, as the last look (at most three seconds ago) found; null before the first look. */
+  get gameRunning(): boolean | null {
+    return this.looked ? this.state.gameRunning : null
+  }
 
   constructor(private readonly onChange: (state: GameState, previous: GameState) => void) {}
 
@@ -25,6 +32,7 @@ export class GameWatcher {
       // than hidden for good, and timers are not stopped for a game that may well be running.
       const previous = this.state
       this.state = { foregroundPid: 0, foregroundName: 'eqgame', gameRunning: true }
+      this.looked = true
       this.onChange(this.state, previous)
       return
     }
@@ -34,7 +42,9 @@ export class GameWatcher {
 
   private check(): void {
     const pid = foregroundPid()
-    const running = this.ticks++ % 12 === 0 ? (isProcessRunning('eqgame.exe') ?? true) : this.state.gameRunning
+    const looking = this.ticks++ % 12 === 0
+    const running = looking ? (isProcessRunning('eqgame.exe') ?? true) : this.state.gameRunning
+    if (looking) this.looked = true
     const previous = this.state
     if (pid === previous.foregroundPid && running === previous.gameRunning) return
     // The name is only looked up when the foreground process changes.

@@ -1,7 +1,6 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { day, timeOfDay } from '../../../core/format'
-import { api } from '../api'
-import { useInvoke, useItemInfo } from '../hooks'
+import { useItemInfo, useLootView } from '../hooks'
 import { useRemembered } from '../remember'
 import { actDone } from '../toast'
 import { wikiUrl } from '../../../core/format'
@@ -9,12 +8,9 @@ import { Ago, Disclosure, FilterBox, Icon, Info, Pending, ToggleChip } from '../
 import { describeItem, fmtCoin, type LootEntry, type LootOutcome } from '../../../core/loot'
 import { itemKey } from '../../../core/inventory'
 import type { ItemInfo } from '../../../shared/types'
-import type { LootView } from '../../../shared/ipc'
 
 // What has dropped, session by session, with a line on what each item is for and a link to its
 // page. The looking-up is the Gear page's: eqlwiki, cached a week.
-
-type View = LootView
 
 const OUTCOMES: { key: LootOutcome; label: string; hint: string }[] = [
   { key: 'kept', label: 'Kept', hint: 'Put in your bags' },
@@ -31,12 +27,7 @@ const SHOWN = 400
 /** Opened sessions remembered at most; older ones fold again. */
 const OPEN_KEPT = 50
 
-function useLoot() {
-  const q = useInvoke('loot:get')
-  const setData = q.setData
-  useEffect(() => api.on('state:loot', (v: View) => setData(v)), [setData])
-  return q
-}
+const useLoot = useLootView
 
 export function Loot() {
   const q = useLoot()
@@ -120,7 +111,7 @@ export function Loot() {
           const open = isOpen(g.id)
           const name = s?.name || first.zone || 'Session'
           return (
-            <div className={`card loot-session${open ? '' : ' folded'}`} key={`${g.id}-${last.id}`}>
+            <div className={`card loot-session${open ? '' : ' folded'}`} key={`${g.id}-${first.id}`}>
               <div className="loot-session-head">
                 <Disclosure open={open} onToggle={() => toggleOpen(g.id)} label={name} title={filtering ? 'Open while filtering' : undefined} disabled={filtering} />
                 <h2>{name}</h2>

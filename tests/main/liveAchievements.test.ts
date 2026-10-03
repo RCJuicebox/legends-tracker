@@ -12,6 +12,7 @@ import type { LogLine } from '../../src/core/logLine'
 
 const h = vi.hoisted(() => ({ dir: '' }))
 vi.mock('electron', () => ({ app: { getPath: () => h.dir }, ipcMain: { handle: () => {}, on: () => {} } }))
+vi.mock('../../src/main/paths', () => ({ cacheDir: () => h.dir }))
 
 h.dir = mkdtempSync(join(tmpdir(), 'eql-live-'))
 process.env['EQL_USER_DATA'] = h.dir
