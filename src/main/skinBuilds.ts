@@ -1,9 +1,20 @@
 import { execFile } from 'node:child_process'
 import { promises as fs } from 'node:fs'
 import { join } from 'node:path'
-import { JsonFile, readJsonFile } from './storeCore'
+import { JsonFile, readJsonFile, writeFileAtomic } from './storeCore'
 import { isCharacterKey } from '../core/validate'
-import { SKIN_BUILD_FILE, isSkinName, parseSkinBuild, tailOutput, type SkinBuild, type SkinBuildResult } from '../core/skinBuild'
+import {
+  BAG_LAYOUT_FILE,
+  SKIN_BUILD_FILE,
+  isSkinName,
+  parseSkinBuild,
+  readBagSlots,
+  sanitizeColumns,
+  tailOutput,
+  type BagLayoutView,
+  type SkinBuild,
+  type SkinBuildResult
+} from '../core/skinBuild'
 import { log } from './log'
 
 /** The rebuild commands the player has agreed to, kept with the settings in `path` (the newest fifty). */
@@ -69,4 +80,44 @@ export async function runSkinBuild(
       resolve({ skin, ok: !err, output: err && !output ? err.message : output })
     })
   })
+}
+
+/** A skin that keeps a bag layout, as its own file says now; null for any other. */
+async function layoutSkin(gameDir: string, skin: unknown): Promise<(SkinBuild & Required<Pick<SkinBuild, 'bagLayout'>>) | null> {
+  const build = isSkinName(skin) && gameDir ? await readSkinBuild(join(gameDir, 'uifiles'), skin) : null
+  return build?.bagLayout ? { ...build, bagLayout: build.bagLayout } : null
+}
+
+/**
+ * A skin's bag layout (src/core/skinBuild.ts): its rules, the choices saved in its folder, and the
+ * bags the character's inventory export holds, read from `exportPath` ('' for no character).
+ */
+export async function readBagLayout(gameDir: string, skin: string, exportPath: string): Promise<BagLayoutView | null> {
+  const build = await layoutSkin(gameDir, skin)
+  if (!build) return null
+  const spec = build.bagLayout
+  const saved = readJsonFile(join(gameDir, 'uifiles', build.skin, BAG_LAYOUT_FILE))
+  const columns = saved.state === 'ok' && saved.value && typeof saved.value === 'object' ? sanitizeColumns((saved.value as { columns?: unknown }).columns, spec) : {}
+  let text = ''
+  let exportedAt = 0
+  let error = exportPath ? '' : 'No character chosen.'
+  if (exportPath) {
+    try {
+      const [t, st] = await Promise.all([fs.readFile(exportPath, 'utf8'), fs.stat(exportPath)])
+      text = t
+      exportedAt = st.mtimeMs
+    } catch (e) {
+      error = (e as NodeJS.ErrnoException).code === 'ENOENT' ? 'missing' : (e as Error).message
+    }
+  }
+  return { skin: build.skin, spec, columns, bags: readBagSlots(text, spec), exportedAt, error }
+}
+
+/** Keeps a skin's bag layout in its folder, held to what the skin allows; returns what was kept. */
+export async function saveBagLayout(gameDir: string, skin: string, columns: unknown): Promise<Record<string, number>> {
+  const build = await layoutSkin(gameDir, skin)
+  if (!build) throw new Error(`The ${String(skin)} skin does not keep a bag layout.`)
+  const kept = sanitizeColumns(columns, build.bagLayout)
+  await writeFileAtomic(join(gameDir, 'uifiles', build.skin, BAG_LAYOUT_FILE), JSON.stringify({ version: 1, columns: kept }, null, 2))
+  return kept
 }

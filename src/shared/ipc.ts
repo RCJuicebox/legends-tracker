@@ -22,7 +22,7 @@ import type { MoteState } from '../core/motes'
 import type { PetGearReading, PetProfile, PetSpellOption } from '../core/pets'
 import type { RespawnTimerSpec, RespawnView, SpawnLink } from '../core/respawns'
 import type { MyClass, SpellCastRow } from '../core/spellMotes'
-import type { SkinBuild, SkinBuildResult } from '../core/skinBuild'
+import type { BagLayoutView, SkinBuild, SkinBuildResult } from '../core/skinBuild'
 import type { Purchase, Recipe } from '../core/tradeskills'
 import type { CatalogItem } from '../core/wikiItem'
 import type { AchMarks, AchievementsView, CharacterSheet, GameFolderCheck, InventoryView, ItemInfo, MoteStock } from './character'
@@ -400,6 +400,10 @@ export interface Invokes {
   /** Runs a skin's rebuild, for a character's export. */
   /** `approve`: the player has seen the command and agreed to it; needed the first time a command runs. */
   'skins:build': (skin: string, character: string, approve?: boolean) => SkinBuildResult
+  /** A skin's bag layout and the character's bags, for Tradeskills › Bag layout; null for a skin that keeps none. */
+  'skins:layout': (skin: string, character: string) => BagLayoutView | null
+  /** Keeps a skin's bag layout (cells per line, by the export's bag slot names); returns what was kept. */
+  'skins:saveLayout': (skin: string, columns: Record<string, number>) => Record<string, number>
   'dialog:folder': () => string | null
 
   'sources:list': () => SourceView[]
@@ -581,6 +585,8 @@ const INVOKE_CHANNELS: Record<InvokeChannel, true> = {
   'game:choose': true,
   'skins:builds': true,
   'skins:build': true,
+  'skins:layout': true,
+  'skins:saveLayout': true,
   'dialog:folder': true,
   'sources:list': true,
   'sources:refresh': true,

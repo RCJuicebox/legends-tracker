@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest'
-import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { listSkinBuilds, runSkinBuild } from '../../src/main/skinBuilds'
-import { SKIN_BUILD_FILE } from '../../src/core/skinBuild'
+import { listSkinBuilds, readBagLayout, runSkinBuild, saveBagLayout } from '../../src/main/skinBuilds'
+import { BAG_LAYOUT_FILE, SKIN_BUILD_FILE } from '../../src/core/skinBuild'
 
 // Skins in the game's uifiles folder that ask for a rebuild button, and running one: the command
 // comes from the skin's own file, and the character goes to it as EQL_CHARACTER.
@@ -66,5 +66,28 @@ describe('runSkinBuild', () => {
     const dir = gameFolder({ Plain: undefined })
     expect((await runSkinBuild(dir, 'Plain', '', agreed(true))).ok).toBe(false)
     expect((await runSkinBuild(dir, '../Plain', '', agreed(true))).ok).toBe(false)
+  })
+})
+
+describe('bag layout files', () => {
+  const bagLayout = { defaults: { General: 13, Bank: 11, SharedBank: 6 }, slots: { General: 1, Bank: 0, SharedBank: 0 }, minSlots: 10, maxColumns: 30 }
+
+  it("keeps the layout in the skin's folder and reads it back with the export's bags", async () => {
+    const dir = gameFolder({ Mine: { command: [node], bagLayout } })
+    const exp = join(dir, 'Kelwyn_test-Inventory.txt')
+    writeFileSync(exp, 'Location\tName\tID\tCount\tSlots\nGeneral 1\tSpacious Rucksack\t1\t1\t24\n')
+    expect(await saveBagLayout(dir, 'Mine', { 'General 1': 12, Primary: 3 })).toEqual({ 'General 1': 12 })
+    expect(JSON.parse(readFileSync(join(dir, 'uifiles', 'Mine', BAG_LAYOUT_FILE), 'utf8'))).toEqual({ version: 1, columns: { 'General 1': 12 } })
+    const view = await readBagLayout(dir, 'Mine', exp)
+    expect(view).toMatchObject({ skin: 'Mine', columns: { 'General 1': 12 }, bags: [{ location: 'General 1', name: 'Spacious Rucksack', slots: 24 }], error: '' })
+    expect(view?.exportedAt).toBeGreaterThan(0)
+  })
+
+  it('says when there is no export, and keeps nothing for a skin without a layout', async () => {
+    const dir = gameFolder({ Mine: { command: [node], bagLayout }, Plain: { command: [node] } })
+    expect((await readBagLayout(dir, 'Mine', join(dir, 'none.txt')))?.error).toBe('missing')
+    expect((await readBagLayout(dir, 'Mine', ''))?.error).toBe('No character chosen.')
+    expect(await readBagLayout(dir, 'Plain', '')).toBeNull()
+    await expect(saveBagLayout(dir, 'Plain', {})).rejects.toThrow(/does not keep a bag layout/)
   })
 })

@@ -4085,3 +4085,26 @@ input[aria-invalid='true'] {
   height: 1.15em;
   vertical-align: -0.2em;
 }
+
+/* Tradeskills › Bag layout: a bag's cells in their lines, the bag's own slot first. */
+.bag-preview {
+  display: inline-grid;
+  gap: 1px;
+  vertical-align: middle;
+}
+.bag-preview i {
+  width: 7px;
+  height: 7px;
+  border-radius: 1px;
+  background: var(--line-2);
+}
+.bag-preview i.bag {
+  background: var(--accent);
+}
+.bag-layout input.bag-cols {
+  width: 3.5em;
+  text-align: center;
+}
+.bag-layout tr.changed td {
+  background: var(--panel-2);
+}

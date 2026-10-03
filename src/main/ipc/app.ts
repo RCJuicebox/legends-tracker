@@ -6,9 +6,9 @@ import { diagnostics } from '../diagnostics'
 import { sources } from '../sources/registry'
 import { jobs } from '../sources/jobs'
 import { checkGameFolder, findInstall, isGameFolder, resolveGameFolder } from '../game'
-import { approvedCommands, listSkinBuilds, runSkinBuild } from '../skinBuilds'
+import { approvedCommands, listSkinBuilds, readBagLayout, runSkinBuild, saveBagLayout } from '../skinBuilds'
 import { join } from 'node:path'
-import { assertCharacterKey, meterOptions, sanitizeCharacter, sanitizeSettings, textArg } from '../../core/validate'
+import { assertCharacterKey, isCharacterKey, meterOptions, sanitizeCharacter, sanitizeSettings, textArg } from '../../core/validate'
 import { className } from '../../shared/game/classes'
 import type { CharacterSettings } from '../../shared/types'
 import type { AppContext } from '../context'
@@ -106,6 +106,8 @@ export function registerAppIpc(ctx: AppContext): void {
   handle('skins:builds', () => listSkinBuilds(ctx.installDir()))
   const approved = approvedCommands(join(app.getPath('userData'), 'skin-commands.json'))
   handle('skins:build', (skin, character, approve) => runSkinBuild(ctx.installDir(), skin, character, approved, approve === true))
+  handle('skins:layout', (skin, character) => readBagLayout(ctx.installDir(), skin, isCharacterKey(character) ? ctx.inventoryFiles.exportPath(character) : ''))
+  handle('skins:saveLayout', (skin, columns) => saveBagLayout(ctx.installDir(), skin, columns))
   handle('game:find', async () => {
     const dir = await findInstall()
     if (dir) ctx.saveSettings({ ...store.settings.get(), installDir: dir })

@@ -4,7 +4,7 @@ import { api, ago } from '../api'
 import { useInvoke, useItemInfo, useVisibleInterval } from '../hooks'
 import { useRemembered } from '../remember'
 import { act, showError } from '../toast'
-import { Ago, Disclosure, ErrorText, FilterBox, GameCommand, Info, Pending } from '../components/ui'
+import { Ago, Disclosure, ErrorText, FilterBox, GameCommand, Info, Pending, Tabs } from '../components/ui'
 import { wikiUrl } from '../../../core/format'
 import { fmtCoin } from '../../../core/loot'
 import { itemKey } from '../../../core/inventory'
@@ -13,7 +13,7 @@ import type { ItemInfo } from '../../../shared/types'
 import { useExportCharacter, useInventory } from '../gear/model'
 import { ItemIcon } from './gearBits'
 import type { BookRecipe, TradeSaved } from '../../../shared/ipc'
-import type { SkinBuild, SkinBuildResult } from '../../../core/skinBuild'
+import { BagLayout, SkinBuildOutcome, useSkinBuild } from './TradeskillsBags'
 
 // Recipes the player keeps making: what goes in, what they have (bags, bank, tradeskill depot), where
 // to buy the rest and what a batch costs.
@@ -63,6 +63,11 @@ export function Tradeskills() {
   const savedQ = useInvoke('trade:favorites')
   const purchasesQ = useInvoke(character ? 'trade:purchases' : null, [character])
   const [query, setQuery] = useState('')
+  // The Bag layout tab shows for a UI skin that keeps one (src/core/skinBuild.ts).
+  const skinBuilds = useInvoke('skins:builds')
+  const layoutBuild = skinBuilds.data?.find((b) => b.bagLayout)
+  const [tab, setTab] = useRemembered<'recipes' | 'bags'>('trade.tab', 'recipes')
+  const showBags = tab === 'bags' && !!layoutBuild
   // Recipe cards folded shut, by recipe key; kept across restarts.
   const [collapsed, setCollapsed] = useRemembered<string[]>('trade.collapsed', [])
 
@@ -169,138 +174,156 @@ export function Tradeskills() {
         </div>
       </div>
 
-      <div className="card stack gap-10 mb-16">
-        {!rs ? (
-          <Pending what="the recipes" error={recipes.error} retry={recipes.reload} />
-        ) : !rs.file ? (
-          <div className="row">
-            <span className="muted">
-              The recipes come from eqlwiki.com: some seven minutes to download (two thousand pages, as fast as the wiki likes), once a week, kept on this PC.
-            </span>
-            {p?.busy ? (
-              <span className="small">
-                Reading pages {p.pages} of {p.total || '…'}
-              </span>
-            ) : (
-              <button className="btn primary" onClick={() => void recipes.refresh()}>
-                Download the recipes
-              </button>
-            )}
-            {p?.error && <ErrorText>Could not download them: {p.error}</ErrorText>}
-          </div>
-        ) : (
-          <>
-            <div className="row">
-              <FilterBox placeholder="Filter recipes: distillate of clarity, elixir…" label="Filter recipes" value={query} onChange={setQuery} width={360} />
-              <span className="spacer" />
-              <span className="faint small">
-                {book.length.toLocaleString()} recipes, <Ago t={rs.file.fetchedAt} />
-              </span>
-              {p?.busy ? (
-                <span className="small">
-                  Reading {p.pages}/{p.total}
-                </span>
-              ) : (
-                <button className="btn ghost small" onClick={() => void recipes.refresh()}>
-                  Refresh
-                </button>
-              )}
-            </div>
-            {results.length > 0 && (
-              <div className="lt-opt">
-                {results.map((r) => {
-                  const on = favKeys.has(recipeKey(r))
-                  return (
-                    <div key={recipeKey(r)} className="lt-opt-row">
-                      <button
-                        className={`btn small${on ? ' primary' : ''}`}
-                        aria-pressed={on}
-                        aria-label={on ? `Remove ${r.product} from favourites` : `Add ${r.product} to favourites`}
-                        title={on ? 'Remove from favourites' : 'Add to favourites'}
-                        onClick={() => toggle(r)}
-                      >
-                        {on ? '★' : '☆'}
-                      </button>
-                      <div className="lt-cand-body">
-                        <div className="row gap-8">
-                          <ItemIcon icon={r.icon} size={24} />
-                          <b>{r.product}</b>
-                          <span className="small muted">
-                            {r.skill} {r.trivial ? `(trivial ${r.trivial})` : ''}
-                            {r.yields > 1 ? ` · makes ${r.yields}` : ''}
-                          </span>
-                        </div>
-                        <div className="small muted">{r.ingredients.map((i) => `${i.count > 1 ? `${i.count} × ` : ''}${i.name}`).join(' + ')}</div>
-                      </div>
-                    </div>
-                  )
-                })}
-              </div>
-            )}
-            {query.trim().length >= 2 && !results.length && <span className="muted small">No recipe makes anything by that name.</span>}
-          </>
-        )}
-      </div>
-
-      {!saved ? (
-        <Pending what="your favourites" error={savedQ.error} retry={savedQ.reload} />
-      ) : !favorites.length ? (
-        <div className="card empty">No favourites yet. Find a recipe above and star it.</div>
+      {layoutBuild && (
+        <Tabs
+          className="mb-14"
+          label="Tradeskills view"
+          value={showBags ? 'bags' : 'recipes'}
+          onChange={setTab}
+          tabs={[
+            ['recipes', 'Recipes'],
+            ['bags', 'Bag layout']
+          ]}
+        />
+      )}
+      {showBags && layoutBuild ? (
+        <BagLayout build={layoutBuild} character={character} />
       ) : (
-        favorites.map(({ f, r }) =>
-          // Only a book that is here, and not being downloaded, can say a recipe is gone from it (LT-427).
-          !r && (!book.length || recipes.data?.progress.busy) ? (
-            <div key={f.key} className="card row mb-16">
-              <span>
-                <b>{f.product}</b> <span className="muted">— waiting for the recipes…</span>
-              </span>
-            </div>
-          ) : !r ? (
-            <div key={f.key} className="card row mb-16">
-              <span>
-                <b>{f.product}</b> <span className="muted">is no longer in the wiki's recipes under this recipe.</span>
-              </span>
-              <span className="spacer" />
-              <button
-                className="btn small"
-                onClick={() =>
-                  void save({
-                    ...saved,
-                    favorites: saved.favorites.filter((x) => x.key !== f.key)
-                  })
-                }
-              >
-                Remove
-              </button>
-            </div>
+        <>
+          <div className="card stack gap-10 mb-16">
+            {!rs ? (
+              <Pending what="the recipes" error={recipes.error} retry={recipes.reload} />
+            ) : !rs.file ? (
+              <div className="row">
+                <span className="muted">
+                  The recipes come from eqlwiki.com: some seven minutes to download (two thousand pages, as fast as the wiki likes), once a week, kept on this PC.
+                </span>
+                {p?.busy ? (
+                  <span className="small">
+                    Reading pages {p.pages} of {p.total || '…'}
+                  </span>
+                ) : (
+                  <button className="btn primary" onClick={() => void recipes.refresh()}>
+                    Download the recipes
+                  </button>
+                )}
+                {p?.error && <ErrorText>Could not download them: {p.error}</ErrorText>}
+              </div>
+            ) : (
+              <>
+                <div className="row">
+                  <FilterBox placeholder="Filter recipes: distillate of clarity, elixir…" label="Filter recipes" value={query} onChange={setQuery} width={360} />
+                  <span className="spacer" />
+                  <span className="faint small">
+                    {book.length.toLocaleString()} recipes, <Ago t={rs.file.fetchedAt} />
+                  </span>
+                  {p?.busy ? (
+                    <span className="small">
+                      Reading {p.pages}/{p.total}
+                    </span>
+                  ) : (
+                    <button className="btn ghost small" onClick={() => void recipes.refresh()}>
+                      Refresh
+                    </button>
+                  )}
+                </div>
+                {results.length > 0 && (
+                  <div className="lt-opt">
+                    {results.map((r) => {
+                      const on = favKeys.has(recipeKey(r))
+                      return (
+                        <div key={recipeKey(r)} className="lt-opt-row">
+                          <button
+                            className={`btn small${on ? ' primary' : ''}`}
+                            aria-pressed={on}
+                            aria-label={on ? `Remove ${r.product} from favourites` : `Add ${r.product} to favourites`}
+                            title={on ? 'Remove from favourites' : 'Add to favourites'}
+                            onClick={() => toggle(r)}
+                          >
+                            {on ? '★' : '☆'}
+                          </button>
+                          <div className="lt-cand-body">
+                            <div className="row gap-8">
+                              <ItemIcon icon={r.icon} size={24} />
+                              <b>{r.product}</b>
+                              <span className="small muted">
+                                {r.skill} {r.trivial ? `(trivial ${r.trivial})` : ''}
+                                {r.yields > 1 ? ` · makes ${r.yields}` : ''}
+                              </span>
+                            </div>
+                            <div className="small muted">{r.ingredients.map((i) => `${i.count > 1 ? `${i.count} × ` : ''}${i.name}`).join(' + ')}</div>
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
+                {query.trim().length >= 2 && !results.length && <span className="muted small">No recipe makes anything by that name.</span>}
+              </>
+            )}
+          </div>
+
+          {!saved ? (
+            <Pending what="your favourites" error={savedQ.error} retry={savedQ.reload} />
+          ) : !favorites.length ? (
+            <div className="card empty">No favourites yet. Find a recipe above and star it.</div>
           ) : (
-            <RecipeCard
-              key={f.key}
-              r={r}
-              combines={f.combines}
-              setCombines={(n) =>
-                void save({
-                  ...saved,
-                  favorites: saved.favorites.map((x) => (x.key === f.key ? { ...x, combines: n } : x))
-                })
-              }
-              unfavorite={() => toggle(r)}
-              have={(n) => have.get(itemKey(n)) ?? 0}
-              price={price}
-              setPrice={(name, copper) =>
-                void save({
-                  ...saved,
-                  prices: { ...saved.prices, [name.toLowerCase()]: copper }
-                })
-              }
-              info={info}
-              bought={bought}
-              madeBy={madeBy}
-              open={!collapsed.includes(f.key)}
-              toggleOpen={() => setCollapsed(collapsed.includes(f.key) ? collapsed.filter((k) => k !== f.key) : [...collapsed, f.key])}
-            />
-          )
-        )
+            favorites.map(({ f, r }) =>
+              // Only a book that is here, and not being downloaded, can say a recipe is gone from it (LT-427).
+              !r && (!book.length || recipes.data?.progress.busy) ? (
+                <div key={f.key} className="card row mb-16">
+                  <span>
+                    <b>{f.product}</b> <span className="muted">— waiting for the recipes…</span>
+                  </span>
+                </div>
+              ) : !r ? (
+                <div key={f.key} className="card row mb-16">
+                  <span>
+                    <b>{f.product}</b> <span className="muted">is no longer in the wiki's recipes under this recipe.</span>
+                  </span>
+                  <span className="spacer" />
+                  <button
+                    className="btn small"
+                    onClick={() =>
+                      void save({
+                        ...saved,
+                        favorites: saved.favorites.filter((x) => x.key !== f.key)
+                      })
+                    }
+                  >
+                    Remove
+                  </button>
+                </div>
+              ) : (
+                <RecipeCard
+                  key={f.key}
+                  r={r}
+                  combines={f.combines}
+                  setCombines={(n) =>
+                    void save({
+                      ...saved,
+                      favorites: saved.favorites.map((x) => (x.key === f.key ? { ...x, combines: n } : x))
+                    })
+                  }
+                  unfavorite={() => toggle(r)}
+                  have={(n) => have.get(itemKey(n)) ?? 0}
+                  price={price}
+                  setPrice={(name, copper) =>
+                    void save({
+                      ...saved,
+                      prices: { ...saved.prices, [name.toLowerCase()]: copper }
+                    })
+                  }
+                  info={info}
+                  bought={bought}
+                  madeBy={madeBy}
+                  open={!collapsed.includes(f.key)}
+                  toggleOpen={() => setCollapsed(collapsed.includes(f.key) ? collapsed.filter((k) => k !== f.key) : [...collapsed, f.key])}
+                />
+              )
+            )
+          )}
+        </>
       )}
     </>
   )
@@ -570,55 +593,16 @@ function PriceCell({ unit, from, last, onSet }: { unit: number; from: PriceSourc
  */
 function SkinRebuilds({ character }: { character: string }) {
   const builds = useInvoke('skins:builds')
-  const [busy, setBusy] = useState('')
-  const [result, setResult] = useState<SkinBuildResult | null>(null)
+  const rebuild = useSkinBuild(character)
   if (!builds.data?.length) return null
-  const run = async (b: SkinBuild, approve = false) => {
-    setBusy(b.skin)
-    setResult(null)
-    const r = await act('skins:build', b.skin, character, approve)
-    setBusy('')
-    if (r) setResult(r)
-  }
   return (
     <div className="row small mt-10">
       {builds.data.map((b) => (
-        <button key={b.skin} className="btn" disabled={!!busy} title={b.command.join(' ')} onClick={() => void run(b)}>
-          {busy === b.skin ? 'Rebuilding…' : b.label}
+        <button key={b.skin} className="btn" disabled={!!rebuild.busy} title={b.command.join(' ')} onClick={() => void rebuild.run(b.skin)}>
+          {rebuild.busy === b.skin ? 'Rebuilding…' : b.label}
         </button>
       ))}
-      {result?.ok && (
-        <span>
-          Rebuilt from {character ? `${character}'s` : 'the'} export. In game: <GameCommand cmd={`/loadskin ${result.skin} 1`} />
-        </span>
-      )}
-      {result?.confirm && (
-        <div className="notice stack gap-6" role="alert">
-          <span>The {result.skin} skin asks to run this program, which this app has not run before. Run it only if you trust where the skin came from:</span>
-          <code className="mono small">{result.confirm.join(' ')}</code>
-          <span className="row tight">
-            <button
-              className="btn small primary"
-              onClick={() =>
-                void run(
-                  builds.data!.find((b) => b.skin === result.skin)!,
-                  true
-                )
-              }
-            >
-              Run it
-            </button>
-            <button className="btn small ghost" onClick={() => setResult(null)}>
-              Cancel
-            </button>
-          </span>
-        </div>
-      )}
-      {result && !result.ok && !result.confirm && (
-        <ErrorText>
-          Could not rebuild {result.skin}: {result.output || 'no output'}
-        </ErrorText>
-      )}
+      <SkinBuildOutcome build={rebuild} character={character} />
     </div>
   )
 }
