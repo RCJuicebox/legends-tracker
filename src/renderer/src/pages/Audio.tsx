@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { useApp } from '../state'
+import { useActions, useSettled } from '../state'
 import { useInvoke } from '../hooks'
 import { useRemembered } from '../remember'
 import { act } from '../toast'
@@ -21,8 +21,12 @@ const UNNAMED = 'Output device'
 const SLIDER_SAVE_MS = 150
 
 export function Audio() {
-  const { state, patchSettings } = useApp()
-  const a = state.settings.audio
+  const { patchSettings } = useActions()
+  const audio = useSettled((s) => s.settings.audio)
+  const speechError = useSettled((s) => s.speechError)
+  const devices = useSettled((s) => s.devices)
+  const voices = useSettled((s) => s.voices)
+  const a = audio
   const [text, setText] = useState('Spirit of the Puma fading')
   const soundsQ = useInvoke('audio:sounds')
   // Starts the Windows speech engine if it is not running; the list arrives as state:voices.
@@ -59,8 +63,8 @@ export function Audio() {
         </div>
       </div>
 
-      {state.speechError && (
-        <div className="notice bad mb-16">The Windows speech engine did not start ({state.speechError}). Speech falls back to the browser voice on the default device.</div>
+      {speechError && (
+        <div className="notice bad mb-16">The Windows speech engine did not start ({speechError}). Speech falls back to the browser voice on the default device.</div>
       )}
 
       <div className="grid two" style={{ alignItems: 'start' }}>
@@ -69,14 +73,14 @@ export function Audio() {
           <Field
             label="Output device"
             hint={
-              state.devices.some((d) => d.label === UNNAMED)
+              devices.some((d) => d.label === UNNAMED)
                 ? 'If this device is unplugged, audio falls back to the default instead of going silent. Windows gave some devices no name (it can, for a device still starting up or one a driver hides); unplugging and plugging it back in, or restarting the app, usually brings the name back.'
                 : 'If this device is unplugged, audio falls back to the default instead of going silent.'
             }
           >
             <select value={a.deviceId} onChange={(e) => set({ deviceId: e.target.value })}>
               <option value="default">System default</option>
-              {state.devices
+              {devices
                 .filter((d) => d.deviceId !== 'default' && d.deviceId !== 'communications')
                 .map((d) => (
                   <option key={d.deviceId} value={d.deviceId}>
@@ -109,7 +113,7 @@ export function Audio() {
             <select value={a.voice} onChange={(e) => set({ voice: e.target.value })}>
               <option value="">Windows default</option>
               <optgroup label="Windows">
-                {state.voices.map((v) => (
+                {voices.map((v) => (
                   <option key={v}>{v}</option>
                 ))}
               </optgroup>

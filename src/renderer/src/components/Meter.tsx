@@ -1,6 +1,6 @@
 import { clock, num, num1, pct, round, timeOfDay } from '../../../core/format'
 import { useEffect, useMemo, useState } from 'react'
-import { useApp, useLive } from '../state'
+import { useActions, useLive, useSettled } from '../state'
 import { act, showToast, actDone, showUndo } from '../toast'
 import { useRemembered } from '../remember'
 import { LIVE, useCombat, useSegment } from '../combat'
@@ -80,9 +80,10 @@ function SegmentPicker({
 }
 
 export function Meter({ standalone = false }: { standalone?: boolean }) {
-  const { state, patchSettings } = useApp()
+  const { patchSettings } = useActions()
+  const combat = useSettled((s) => s.settings.combat)
   const watching = useLive((l) => l.status.watching)
-  const minutes = state.settings.combat.historyMinutes || 60
+  const minutes = combat.historyMinutes || 60
   const snap = useCombat()
   const [span, setSpan] = useRemembered<MeterSpan>('meter.span', 'fight')
   const [mode, setMode] = useRemembered<MeterMode>('meter.mode', 'damage')
@@ -91,7 +92,7 @@ export function Meter({ standalone = false }: { standalone?: boolean }) {
   const [selection, setSelection] = useState(LIVE)
   const [drill, setDrill] = useState<Drill>(null)
   const [compareId, setCompareId] = useState('')
-  const combinePet = state.settings.combat.combinePet
+  const combinePet = combat.combinePet
   const seg = useSegment(snap, span, selection)
 
   // A new span or mode starts at the top; a new segment keeps the drill, so a name can be followed across fights.
@@ -178,11 +179,7 @@ export function Meter({ standalone = false }: { standalone?: boolean }) {
           Pets with owners
         </label>
         <label className="check small">
-          <input
-            type="checkbox"
-            checked={state.settings.combat.charmPets}
-            onChange={(e) => patchSettings((s) => ({ ...s, combat: { ...s.combat, charmPets: e.target.checked } }))}
-          />
+          <input type="checkbox" checked={combat.charmPets} onChange={(e) => patchSettings((s) => ({ ...s, combat: { ...s.combat, charmPets: e.target.checked } }))} />
           Charm pets
           <Info
             label="About charm pets"

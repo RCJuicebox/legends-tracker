@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useApp } from '../state'
+import { useActions, useSettled } from '../state'
 import { useSearch } from '../hooks'
 import { showUndo } from '../toast'
 import { NumberInput, Switch } from '../components/ui'
@@ -11,8 +11,8 @@ import { type FocusSource } from '../../../shared/types'
 const TYPING_MS = 400
 
 export function FocusSources() {
-  const { state, saveCharacter, latest } = useApp()
-  const c = state.character
+  const { saveCharacter, latest } = useActions()
+  const c = useSettled((s) => s.character)
   const [q, setQ] = useState('')
   const results = useSearch('focus:search', q)
   const [from, setFrom] = useState('')

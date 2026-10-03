@@ -1,4 +1,4 @@
-import { useApp, useLive } from '../state'
+import { useActions, useLive, useSettled } from '../state'
 import { api } from '../api'
 import { act, showError, showToast, actDone } from '../toast'
 import { useUpdate, type UpdateState } from '../update'
@@ -49,9 +49,11 @@ function noCheckReason(u: UpdateState | null): string | undefined {
 }
 
 export function Settings({ go }: { go?: (page: PageId) => void }) {
-  const { state, patchSettings } = useApp()
+  const { patchSettings } = useActions()
+  const settings = useSettled((s) => s.settings)
+  const hotkeysTaken = useSettled((s) => s.hotkeysTaken)
   const watching = useLive((l) => l.status.watching)
-  const s = state.settings
+  const s = settings
   const t = s.tracking
   const setT = (patch: Partial<TrackingSettings>, debounceMs?: number) => patchSettings((x) => ({ ...x, tracking: { ...x.tracking, ...patch } }), { debounceMs })
   // A phrase is saved once typing stops, not at every key (LT-393): each save reconfigures the engine.
@@ -181,7 +183,7 @@ export function Settings({ go }: { go?: (page: PageId) => void }) {
               ).map(([k, what]) => (
                 <div key={k}>
                   <span className="mono">{hotkeyLabel(k)}</span> {what}
-                  {state.hotkeysTaken.includes(k) && <span className="chip warn"> another program holds this key</span>}
+                  {hotkeysTaken.includes(k) && <span className="chip warn"> another program holds this key</span>}
                 </div>
               ))}
             </div>

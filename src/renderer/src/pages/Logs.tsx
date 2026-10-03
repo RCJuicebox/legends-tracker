@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { day } from '../../../core/format'
-import { useApp, useLive } from '../state'
+import { useActions, useLive, useSettled } from '../state'
 import { api, mb, errorMessage } from '../api'
 import { useInvoke } from '../hooks'
 import { act, showError, showToast } from '../toast'
@@ -10,20 +10,21 @@ import { useRemembered } from '../remember'
 
 export function Logs() {
   const [sort, setSort] = useRemembered<Sort<'log' | 'size' | 'written'>>('logs.sort', { key: 'written', dir: -1 })
-  const { state, patchSettings } = useApp()
+  const { patchSettings } = useActions()
+  const settings = useSettled((s) => s.settings)
   const status = useLive((l) => l.archive)
   const watching = useLive((l) => l.status.watching)
-  const q = useInvoke('logs:overview', [], [status.busy, state.settings.archive.archiveDir, state.settings.installDir])
+  const q = useInvoke('logs:overview', [], [status.busy, settings.archive.archiveDir, settings.installDir])
   const view = q.data
   const refresh = q.reload
   const [zipping, setZipping] = useState(false)
   const [zipErrors, setZipErrors] = useState<string[]>([])
-  const a = state.settings.archive
+  const a = settings.archive
   const threshold = a.thresholdMB * 1048576
   const setA = (patch: Partial<typeof a>, debounceMs?: number) => patchSettings((s) => ({ ...s, archive: { ...s.archive, ...patch } }), { debounceMs })
   const totalZip = view?.archives.filter((x) => !x.loose).reduce((n, x) => n + x.size, 0) ?? 0
   const loose = view?.archives.filter((x) => x.loose) ?? []
-  const followed = state.settings.logFile
+  const followed = settings.logFile
   const follow = (path: string, character: string) => {
     void patchSettings((x) => ({ ...x, logFile: path }))
     // While watching, the watch follows the new log at once: said, since nothing else here shows it.
@@ -186,7 +187,7 @@ export function Logs() {
           </div>
         )}
         <label className="row mt-10">
-          <Switch on={state.settings.autoStart} onChange={(v) => patchSettings((x) => ({ ...x, autoStart: v }))} />
+          <Switch on={settings.autoStart} onChange={(v) => patchSettings((x) => ({ ...x, autoStart: v }))} />
           Start watching the followed log as soon as the app opens
         </label>
       </div>

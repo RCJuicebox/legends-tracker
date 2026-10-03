@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { api, errorMessage } from '../api'
-import { useApp } from '../state'
+import { useSettled } from '../state'
 import { act, showError, actDone } from '../toast'
 import { OVERLAY_TARGETS, TRY_LINES } from '../constants'
 import { TRIGGER_TEXT_COLOR, TRIGGER_TIMER_COLOR } from '../../../shared/overlays'
@@ -76,12 +76,12 @@ function rebase(d: Draft, stored: Trigger[]): Draft {
 const NO_TRIGGERS: Trigger[] = []
 
 export function Triggers() {
-  const { state } = useApp()
+  const triggerErrors = useSettled((s) => s.triggerErrors)
   const [draft, setDraft] = useState<Draft | null>(kept)
   const [loadError, setLoadError] = useState('')
   const [attempt, setAttempt] = useState(0)
   const [query, setQuery] = useState('')
-  const [errors, setErrors] = useState<TriggerError[]>(state.triggerErrors)
+  const [errors, setErrors] = useState<TriggerError[]>(triggerErrors)
 
   useEffect(() => {
     keep(draft)
@@ -377,7 +377,7 @@ function TriggerEditor({
 }
 
 function ActionEditor({ a, onChange, onRemove }: { a: TriggerAction; onChange: (a: TriggerAction) => void; onRemove: () => void }) {
-  const { state } = useApp()
+  const overlays = useSettled((s) => s.settings.overlays)
   const [sounds, setSounds] = useState<string[]>([])
   useEffect(() => {
     if (a.type !== 'sound') return
@@ -445,7 +445,7 @@ function ActionEditor({ a, onChange, onRemove }: { a: TriggerAction; onChange: (
           </Field>
           <Field label="Overlay">
             <select value={a.overlay} onChange={(e) => onChange({ ...a, overlay: e.target.value })}>
-              {state.settings.overlays
+              {overlays
                 .filter((o) => o.kind === 'timers')
                 .map((o) => (
                   <option key={o.id} value={o.id}>

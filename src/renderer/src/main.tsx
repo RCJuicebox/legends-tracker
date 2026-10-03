@@ -1,7 +1,7 @@
 import { memo, type ComponentType } from 'react'
 import { createRoot } from 'react-dom/client'
 import './styles.css'
-import { StateProvider, useApp, useLive } from './state'
+import { StateProvider, useLive, useSettled } from './state'
 import { Ago, Icon, type IconName } from './components/ui'
 import { GoContext } from './nav'
 import { ErrorBoundary } from './components/ErrorBoundary'
@@ -123,7 +123,8 @@ const PageHost = memo(function PageHost({ Page, go }: { Page: PageComponent; go:
 })
 
 function Shell() {
-  const { state } = useApp()
+  const muted = useSettled((s) => s.settings.audio.muted)
+  const arranging = useSettled((s) => s.arranging)
   // Opens where it was left, including across restarts.
   const [saved, setPage] = useRemembered<string>('page', 'dashboard')
   // 'inventory' was Gear's first name.
@@ -138,8 +139,8 @@ function Shell() {
         <span className="brand">
           Legends <b>Tracker</b>
         </span>
-        {state.settings.audio.muted && <span className="chip warn">Muted</span>}
-        {state.arranging && <span className="chip warn">Arranging overlays</span>}
+        {muted && <span className="chip warn">Muted</span>}
+        {arranging && <span className="chip warn">Arranging overlays</span>}
         {update.status?.state === 'ready' && (
           <button className="btn small primary" style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties} onClick={() => void act('update:install')}>
             Update ready ({update.status.version}): restart

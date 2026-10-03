@@ -1,6 +1,6 @@
 import { Fragment, useEffect, useMemo, useState } from 'react'
 import { api, clock, errorMessage } from '../api'
-import { useApp } from '../state'
+import { useSettled } from '../state'
 import { useInvoke } from '../hooks'
 import { useRemembered } from '../remember'
 import { act } from '../toast'
@@ -62,7 +62,7 @@ function bySort(sort: Sort<SortKey>) {
 }
 
 export function Respawns() {
-  const { state } = useApp()
+  const overlays = useSettled((s) => s.settings.overlays)
   const q = useRespawns()
   const view = q.data
   const [filter, setFilter] = useState('')
@@ -125,7 +125,7 @@ export function Respawns() {
             initialSeconds={null}
             measured={null}
             timer={null}
-            overlays={state.settings.overlays}
+            overlays={overlays}
             onDone={(v) => {
               saved(v)
               if (v) setAdding(false)
@@ -197,7 +197,7 @@ export function Respawns() {
               <tbody>
                 {rows.map((r) => (
                   <Fragment key={r.key}>
-                    <Row r={r} zone={zone} open={open === r.key} toggle={() => setOpen(open === r.key ? null : r.key)} overlays={state.settings.overlays} onSaved={saved} />
+                    <Row r={r} zone={zone} open={open === r.key} toggle={() => setOpen(open === r.key ? null : r.key)} overlays={overlays} onSaved={saved} />
                     {open === r.key && (
                       <tr>
                         <td colSpan={8} style={{ background: 'var(--bg-2)' }}>
@@ -207,7 +207,7 @@ export function Respawns() {
                             measured={r.estimate ?? r.gaps[r.gaps.length - 1] ?? null}
                             timer={r.timer}
                             names={r.names}
-                            overlays={state.settings.overlays}
+                            overlays={overlays}
                             onDone={(v) => {
                               saved(v)
                               if (v) setOpen(null)

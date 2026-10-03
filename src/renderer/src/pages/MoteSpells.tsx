@@ -1,5 +1,5 @@
 import { useMemo } from 'react'
-import { useApp, useLive } from '../state'
+import { useLive, useSettled } from '../state'
 import { roman } from '../api'
 import { useInvoke } from '../hooks'
 import type { PageId } from '../main'
@@ -85,7 +85,8 @@ function PayWith({ o }: { o: SpellUpgradeOption }) {
 }
 
 export function MoteSpells({ go }: { go?: (page: PageId) => void }) {
-  const { state } = useApp()
+  const characterKey = useSettled((s) => s.characterKey)
+  const tracking = useSettled((s) => s.settings.tracking)
   const spellsLoaded = useLive((l) => l.status.spellsLoaded)
   const [days, setDays] = useRemembered<number>('spellmotes.days', 14)
   const [section, setSection] = useRemembered<SectionKey | 'all'>('spellmotes.section', 'all')
@@ -94,13 +95,13 @@ export function MoteSpells({ go }: { go?: (page: PageId) => void }) {
   const [showMaxed, setShowMaxed] = useRemembered<boolean>('spellmotes.maxed', false)
   const [showIgnored, setShowIgnored] = useRemembered<boolean>('spellmotes.showIgnored', false)
   // Spells the player will never put motes into, by name, kept per character.
-  const [ignored, setIgnored] = useRemembered<string[]>(`spellmotes.ignored.${state.characterKey || 'none'}`, [])
+  const [ignored, setIgnored] = useRemembered<string[]>(`spellmotes.ignored.${characterKey || 'none'}`, [])
   const ignore = (name: string, on: boolean) => setIgnored(on ? [...new Set([...ignored, name])] : ignored.filter((n) => n !== name))
   const [whose, setWhose] = useRemembered<'mine' | 'all'>('spellmotes.whose', 'mine')
   const [weights, setWeights] = useRemembered<SpellWeights>('spellmotes.weights', DEFAULT_SPELL_WEIGHTS)
   const [unfolded, setUnfolded] = useRemembered<boolean>('spellmotes.settings', false)
-  const tierPct = state.settings.tracking.tierDurationPct
-  const q = useInvoke('motes:spellCasts', [state.characterKey, days], [state.characterKey, days, spellsLoaded])
+  const tierPct = tracking.tierDurationPct
+  const q = useInvoke('motes:spellCasts', [characterKey, days], [characterKey, days, spellsLoaded])
   const stockQ = useStock()
   const stock = stockQ.data?.counts
 

@@ -3,6 +3,7 @@ import { api, errorMessage, type AppState, type FeedEntry } from './api'
 import { FEED_MAX } from './constants'
 import { showError } from './toast'
 import { moveRemembered } from './movedSettings'
+import { keepUnchanged } from './keepUnchanged'
 import { characterKey } from '../../core/validate'
 import type { AppSettings, ArchiveStatus, CharacterSettings, FeedItem, TimerView, WatchStatus } from '../../shared/types'
 
@@ -30,9 +31,7 @@ export type LiveState = Pick<AppState, LiveKey>
 /** Everything else: settings, the character, devices. Changes when the player changes something. */
 export type SettledState = Omit<AppState, LiveKey>
 
-interface Ctx {
-  /** The settled part of the state; `useLive` has the part that changes while playing. */
-  state: SettledState
+interface Actions {
   saveSettings: (s: AppSettings) => Promise<void>
   /**
    * Changes the settings at once on screen and saves them. With `debounceMs` the save waits until
@@ -44,17 +43,19 @@ interface Ctx {
   latest: () => AppState
 }
 
-const StateContext = createContext<Ctx | null>(null)
 /**
- * The live part is held outside React and read through `useLive(select)`, so a component renders
- * again only when the value it picked changes, not on every status tick or feed line.
+ * Both parts of the state are held outside React and read through `useLive(select)` and
+ * `useSettled(select)`, so a component renders again only when the value it picked changes: not on
+ * every status tick or feed line, nor on every settings change while a slider moves (LT-404).
  */
-class LiveStore {
-  private value: LiveState | null = null
+class Store<T> {
+  private value: T | null = null
   private readonly listeners = new Set<() => void>()
-  get = (): LiveState | null => this.value
-  set(next: LiveState | null | ((s: LiveState | null) => LiveState | null)): void {
-    this.value = typeof next === 'function' ? next(this.value) : next
+  get = (): T | null => this.value
+  set(next: T | null | ((s: T | null) => T | null)): void {
+    const value = typeof next === 'function' ? (next as (s: T | null) => T | null)(this.value) : next
+    if (value === this.value) return
+    this.value = value
     for (const l of this.listeners) l()
   }
   subscribe = (l: () => void): (() => void) => {
@@ -62,7 +63,9 @@ class LiveStore {
     return () => this.listeners.delete(l)
   }
 }
-const LiveContext = createContext<LiveStore | null>(null)
+const ActionsContext = createContext<Actions | null>(null)
+const LiveContext = createContext<Store<LiveState> | null>(null)
+const SettledContext = createContext<Store<SettledState> | null>(null)
 
 const LIVE: LiveKey[] = ['status', 'timers', 'feed', 'archive']
 const split = (s: AppState): [SettledState, LiveState] => {
@@ -74,24 +77,28 @@ let feedId = 0
 const numbered = (item: FeedItem): FeedEntry => ({ ...item, id: ++feedId })
 
 export function StateProvider({ children }: { children: ReactNode }) {
-  const [state, setState] = useState<SettledState | null>(null)
-  const [liveStore] = useState(() => new LiveStore())
+  const [liveStore] = useState(() => new Store<LiveState>())
+  const [settledStore] = useState(() => new Store<SettledState>())
   const setLive = useCallback((next: (s: LiveState | null) => LiveState | null) => liveStore.set(next), [liveStore])
+  const setState = useCallback((next: (s: SettledState | null) => SettledState | null) => settledStore.set(next), [settledStore])
+  // The provider itself draws again only once: when the first state arrives.
+  const [ready, setReady] = useState(false)
   const [error, setError] = useState('')
   const [attempt, setAttempt] = useState(0)
-  const stateRef = useRef<SettledState | null>(null)
-  stateRef.current = state
   // The settings as the player last set them, ahead of React's render and of the save.
   const settingsRef = useRef<AppSettings | null>(null)
   // Changes made on screen but not yet written. An echo of an older save that arrives meanwhile is
   // taken, with these laid over it again, so a slider being dragged never jumps back.
   const pending = useRef<{ fns: Patch[]; timer: ReturnType<typeof setTimeout> | null }>({ fns: [], timer: null })
 
-  const showSettings = useCallback((next: AppSettings) => {
-    settingsRef.current = next
-    // The character being played is the log's; its record comes as state:character when it changes.
-    setState((s) => (s ? { ...s, settings: next, characterKey: characterKey(next.logFile) } : s))
-  }, [])
+  const showSettings = useCallback(
+    (next: AppSettings) => {
+      settingsRef.current = next
+      // The character being played is the log's; its record comes as state:character when it changes.
+      setState((s) => (s ? { ...s, settings: keepUnchanged(s.settings, next), characterKey: characterKey(next.logFile) } : s))
+    },
+    [setState]
+  )
 
   const takeSettings = useCallback((incoming: AppSettings) => showSettings(pending.current.fns.reduce((s, fn) => fn(s), incoming)), [showSettings])
 
@@ -105,7 +112,8 @@ export function StateProvider({ children }: { children: ReactNode }) {
         settingsRef.current = moved.settings
         const [settled, now] = split({ ...s, settings: moved.settings, feed: s.feed.map(numbered) })
         liveStore.set(now)
-        setState(settled)
+        settledStore.set(settled)
+        setReady(true)
         // Forgotten here only once settings.json has them.
         if (moved.keys.length)
           api.invoke('settings:save', moved.settings).then(
@@ -134,7 +142,7 @@ export function StateProvider({ children }: { children: ReactNode }) {
       live = false
       offs.forEach((off) => off())
     }
-  }, [attempt, takeSettings, liveStore, setLive])
+  }, [attempt, takeSettings, liveStore, setLive, settledStore, setState])
 
   const write = useCallback(async () => {
     const p = pending.current
@@ -174,29 +182,32 @@ export function StateProvider({ children }: { children: ReactNode }) {
 
   // A typed name is saved once typing stops (`debounceMs`); what is shown follows every key.
   const characterTimer = useRef<{ timer: ReturnType<typeof setTimeout> | null; send: (() => void) | null }>({ timer: null, send: null })
-  const saveCharacter = useCallback(async (c: CharacterSettings, opts?: { debounceMs?: number }) => {
-    setState((s) => (s ? { ...s, character: c } : s))
-    const pend = characterTimer.current
-    if (pend.timer) clearTimeout(pend.timer)
-    pend.timer = null
-    const send = async () => {
-      pend.send = null
-      try {
-        await api.invoke('character:save', c)
-      } catch (e) {
-        showError('Could not save the character', e)
+  const saveCharacter = useCallback(
+    async (c: CharacterSettings, opts?: { debounceMs?: number }) => {
+      setState((s) => (s ? { ...s, character: c } : s))
+      const pend = characterTimer.current
+      if (pend.timer) clearTimeout(pend.timer)
+      pend.timer = null
+      const send = async () => {
+        pend.send = null
+        try {
+          await api.invoke('character:save', c)
+        } catch (e) {
+          showError('Could not save the character', e)
+        }
       }
-    }
-    if (opts?.debounceMs) {
-      pend.send = () => void send()
-      pend.timer = setTimeout(() => {
-        pend.timer = null
-        pend.send?.()
-      }, opts.debounceMs)
-      return
-    }
-    await send()
-  }, [])
+      if (opts?.debounceMs) {
+        pend.send = () => void send()
+        pend.timer = setTimeout(() => {
+          pend.timer = null
+          pend.send?.()
+        }, opts.debounceMs)
+        return
+      }
+      await send()
+    },
+    [setState]
+  )
 
   // A save still waiting when the window closes goes out now.
   useEffect(() => {
@@ -208,10 +219,10 @@ export function StateProvider({ children }: { children: ReactNode }) {
     return () => window.removeEventListener('beforeunload', flush)
   }, [write])
 
-  const latest = useCallback((): AppState => ({ ...stateRef.current!, ...liveStore.get()! }), [liveStore])
-  const value = useMemo(() => (state ? { state, saveSettings, patchSettings, saveCharacter, latest } : null), [state, saveSettings, patchSettings, saveCharacter, latest])
+  const latest = useCallback((): AppState => ({ ...settledStore.get()!, ...liveStore.get()! }), [liveStore, settledStore])
+  const actions = useMemo(() => ({ saveSettings, patchSettings, saveCharacter, latest }), [saveSettings, patchSettings, saveCharacter, latest])
 
-  if (!value || !liveStore.get()) {
+  if (!ready || !settledStore.get() || !liveStore.get()) {
     if (!error) return <div className="empty">Loading…</div>
     return (
       <div className="boot-error" role="alert">
@@ -230,16 +241,30 @@ export function StateProvider({ children }: { children: ReactNode }) {
     )
   }
   return (
-    <StateContext.Provider value={value}>
-      <LiveContext.Provider value={liveStore}>{children}</LiveContext.Provider>
-    </StateContext.Provider>
+    <ActionsContext.Provider value={actions}>
+      <SettledContext.Provider value={settledStore}>
+        <LiveContext.Provider value={liveStore}>{children}</LiveContext.Provider>
+      </SettledContext.Provider>
+    </ActionsContext.Provider>
   )
 }
 
-export function useApp(): Ctx {
-  const ctx = useContext(StateContext)
-  if (!ctx) throw new Error('useApp outside StateProvider')
+/** Saving settings and the character, and the state as it is now; never draws a component again. */
+export function useActions(): Actions {
+  const ctx = useContext(ActionsContext)
+  if (!ctx) throw new Error('useActions outside StateProvider')
   return ctx
+}
+
+/**
+ * A value from the settled state (settings, the character, devices). The component renders again
+ * only when that value changes, so pick the smallest part needed, and return a part of the state
+ * rather than a new object.
+ */
+export function useSettled<T>(select: (s: SettledState) => T): T {
+  const settled = useContext(SettledContext)
+  if (!settled) throw new Error('useSettled outside StateProvider')
+  return useSyncExternalStore(settled.subscribe, () => select(settled.get()!))
 }
 
 /**

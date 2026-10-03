@@ -1,7 +1,7 @@
 import { remember, useRemembered } from '../remember'
 import { UPGRADES_TAB } from '../constants'
 import { useState } from 'react'
-import { useApp, useLive } from '../state'
+import { useActions, useLive, useSettled } from '../state'
 import { api, clock } from '../api'
 import { useInvoke, useSearch } from '../hooks'
 import { showError, showUndo } from '../toast'
@@ -16,13 +16,14 @@ import { LogCheck } from './SpellsLogCheck'
 type SpellKey = 'name' | 'type' | 'window' | 'wears' | 'last'
 
 export function Spells({ go }: { go?: (page: PageId) => void }) {
-  const { state } = useApp()
+  const character = useSettled((s) => s.character)
+  const tracking = useSettled((s) => s.settings.tracking)
   const spellsLoaded = useLive((l) => l.status.spellsLoaded)
   // Each settings push is a fresh object: the list is asked for again only when what it depends on
   // reads differently, not on every save or overlay move.
   // A focus's name and "from" are labels: typing them does not ask for every spell's duration again (LT-394).
-  const timing = { ...state.character, focusSources: state.character.focusSources.map(({ name: _name, from: _from, ...f }) => f) }
-  const deps = JSON.stringify([timing, state.settings.tracking])
+  const timing = { ...character, focusSources: character.focusSources.map(({ name: _name, from: _from, ...f }) => f) }
+  const deps = JSON.stringify([timing, tracking])
   const q = useInvoke('spells:known', [], [deps, spellsLoaded])
   const known = q.data ?? []
   const setKnown = q.setData
@@ -126,21 +127,21 @@ export function Spells({ go }: { go?: (page: PageId) => void }) {
  * every page, and the duration focus that is this page's own.
  */
 function CharacterCard({ go }: { go?: (page: PageId) => void }) {
-  const { state } = useApp()
-  const c = state.character
+  const c = useSettled((s) => s.character)
+  const characterKey = useSettled((s) => s.characterKey)
   const classes = Object.entries(c.classLevels) as [ClassName, number][]
-  if (!state.characterKey) {
+  if (!characterKey) {
     return <div className="notice">Choose a character log on Log Files to set up focus and levels.</div>
   }
   return (
     <div className="card">
       <h2>
-        {who(state.characterKey)} <span className="spacer" />
+        {who(characterKey)} <span className="spacer" />
         <button
           className="btn small"
           onClick={() => {
             // Stats shows the character picked there: this one, the one being played.
-            remember('character', state.characterKey)
+            remember('character', characterKey)
             go?.('stats')
           }}
         >
@@ -294,8 +295,9 @@ function AddSpell({ onAdded }: { onAdded: (list: KnownSpell[]) => void }) {
 }
 
 function TierTable({ go }: { go?: (page: PageId) => void }) {
-  const { state, patchSettings } = useApp()
-  const pct = state.settings.tracking.tierDurationPct
+  const { patchSettings } = useActions()
+  const tracking = useSettled((s) => s.settings.tracking)
+  const pct = tracking.tierDurationPct
   const cats = ['dot', 'hot', 'buff', 'debuff', 'mez', 'charm'] as SpellCategory[]
   return (
     <div className="card">
@@ -305,7 +307,7 @@ function TierTable({ go }: { go?: (page: PageId) => void }) {
           className="btn small ghost"
           onClick={() => {
             // Six typed numbers go back to the guide's: said, with a way back (LT-467).
-            const before = { ...state.settings.tracking.tierDurationPct }
+            const before = { ...tracking.tierDurationPct }
             void patchSettings((s) => ({ ...s, tracking: { ...s.tracking, tierDurationPct: { ...DEFAULT_TIER_DURATION_PCT } } }))
             showUndo('Rank bonuses set back to the guide values.', () => void patchSettings((s) => ({ ...s, tracking: { ...s.tracking, tierDurationPct: before } })))
           }}

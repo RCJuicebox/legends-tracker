@@ -1,6 +1,6 @@
 import { clock, duration, num } from '../../../core/format'
 import { ago } from '../api'
-import { useApp, useLive } from '../state'
+import { useActions, useLive, useSettled } from '../state'
 import { useAchievementTrack, useLootView } from '../hooks'
 import { remember } from '../remember'
 import { useCombat } from '../combat'
@@ -30,9 +30,11 @@ interface Step {
 
 /** First-run setup, step by step, until every step is done or the player hides it. */
 export function SetupChecklist({ go }: { go: Go }) {
-  const { state, patchSettings } = useApp()
+  const { patchSettings } = useActions()
+  const settings = useSettled((s) => s.settings)
+  const classLevels = useSettled((s) => s.character.classLevels)
   const spellsLoaded = useLive((l) => l.status.spellsLoaded)
-  const s = state.settings
+  const s = settings
   // Kept in settings.json; `arranged` is set by the main process whenever the overlays are arranged, from anywhere.
   const { hidden, accepted, arranged } = s.setup
   const setSetup = (patch: Partial<SetupFlags>) => void patchSettings((x) => ({ ...x, setup: { ...x.setup, ...patch } }))
@@ -41,7 +43,7 @@ export function SetupChecklist({ go }: { go: Go }) {
     { id: 'log', done: !!s.logFile, text: 'Choose your character log (type /log on in game if there is none)', page: 'logs', button: 'Log Files' },
     {
       id: 'classes',
-      done: Object.keys(state.character.classLevels).length > 0,
+      done: Object.keys(classLevels).length > 0,
       text: 'Set your classes and their levels, so durations use the right level',
       page: 'stats',
       button: 'Stats'

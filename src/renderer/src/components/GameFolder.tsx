@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { api, errorMessage } from '../api'
-import { useApp, useLive } from '../state'
+import { useActions, useLive, useSettled } from '../state'
 import { whoList as who } from '../../../core/format'
 import type { GameFolderCheck } from '../../../shared/types'
 import { WithCommands } from './ui'
@@ -35,9 +35,9 @@ function useFolderActions() {
 
 /** The Settings card: the folder, what it holds, and ways to change it. */
 export function GameFolderCard() {
-  const { state, patchSettings } = useApp()
+  const { patchSettings } = useActions()
   const spellsLoaded = useLive((l) => l.status.spellsLoaded)
-  const dir = state.settings.installDir
+  const dir = useSettled((s) => s.settings.installDir)
   const [check, setCheck] = useState<GameFolderCheck | null>(null)
   const [checkError, setCheckError] = useState('')
   const { busy, message, find, choose } = useFolderActions()
@@ -123,15 +123,14 @@ export function GameFolderCard() {
 
 /** Shown on the Live page when there is no usable game folder: first runs where detection failed. */
 export function GameFolderPrompt() {
-  const { state } = useApp()
+  const installDir = useSettled((s) => s.settings.installDir)
   const spellError = useLive((l) => l.status.spellError)
   const { busy, message, find, choose } = useFolderActions()
-  const s = state.settings
-  if (s.installDir && !spellError) return null
+  if (installDir && !spellError) return null
   return (
     <div className="notice bad stack gap-8 mb-16">
       <div>
-        <b>{s.installDir ? `No EverQuest Legends game files in ${s.installDir}.` : 'Could not find your EverQuest Legends folder.'}</b> The tracker reads your logs, spell data,
+        <b>{installDir ? `No EverQuest Legends game files in ${installDir}.` : 'Could not find your EverQuest Legends folder.'}</b> The tracker reads your logs, spell data,
         inventory, achievement and faction files from it. Point it at the folder the game is installed in, usually …\Daybreak Game Company\Installed Games\EverQuest Legends.
       </div>
       <div className="row">

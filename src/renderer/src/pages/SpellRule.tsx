@@ -1,5 +1,5 @@
 import { useEffect, useState, useSyncExternalStore } from 'react'
-import { useApp } from '../state'
+import { useSettled } from '../state'
 import { markUnsaved } from '../unsaved'
 import { api, errorMessage } from '../api'
 import { duration } from '../../../core/format'
@@ -44,7 +44,8 @@ export function useSpellDrafts(): ReadonlySet<string> {
 }
 
 export function RuleEditor({ k, onSaved }: { k: KnownSpell; onSaved: (list: KnownSpell[]) => void }) {
-  const { state } = useApp()
+  const allOverlays = useSettled((s) => s.settings.overlays)
+  const tracking = useSettled((s) => s.settings.tracking)
   const [rule, setRule] = useState<SpellRule>(() => {
     const d = drafts.get(k.name)
     return d ? rebase(d.rule, d.base, k.rule) : k.rule
@@ -69,8 +70,8 @@ export function RuleEditor({ k, onSaved }: { k: KnownSpell; onSaved: (list: Know
     }
   }
   const beneficial = k.beneficial
-  const t = state.settings.tracking
-  const overlays = state.settings.overlays.filter((o) => o.kind === 'timers')
+  const t = tracking
+  const overlays = allOverlays.filter((o) => o.kind === 'timers')
   return (
     <div
       className="grid two"

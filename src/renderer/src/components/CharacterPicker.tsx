@@ -1,4 +1,4 @@
-import { useApp } from '../state'
+import { useSettled } from '../state'
 import { who } from '../../../core/format'
 
 /**
@@ -8,7 +8,7 @@ import { who } from '../../../core/format'
  * and gives a way back to that one.
  */
 export function CharacterPicker({ character, available, onPick }: { character: string; available: string[]; onPick: (key: string) => void }) {
-  const played = useApp().state.characterKey
+  const played = useSettled((s) => s.characterKey)
   const same = (a: string, b: string) => a.toLowerCase() === b.toLowerCase()
   const other = !!played && !!character && !same(character, played)
   const canGoBack = other && available.some((a) => same(a, played))

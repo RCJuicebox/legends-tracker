@@ -2,7 +2,7 @@ import { Fragment, useCallback, useDeferredValue, useEffect, useMemo, useRef, us
 import { ago, api } from '../../renderer/src/api'
 import { showError } from '../../renderer/src/toast'
 import { useAchievementTrack, useInvoke, useLatest, useSameContents, useVisibleInterval } from '../../renderer/src/hooks'
-import { useApp } from '../../renderer/src/state'
+import { useActions, useSettled } from '../../renderer/src/state'
 import { useCharacterRecord } from '../../renderer/src/character'
 import { useNow } from '../../renderer/src/components/TimerBars'
 import { ConfirmButton, Disclosure, GameCommand, Info, Pending, Segmented, Switch, Tip } from '../../renderer/src/components/ui'
@@ -71,8 +71,9 @@ const standingWord = (con: number) => standingBand(con).word
 
 /** The plan's assumptions the player changed, kept in settings.json for every character. */
 function useAssumptions(): [Partial<PlanSettings>, (next: Partial<PlanSettings>, debounceMs?: number) => void] {
-  const { state, patchSettings } = useApp()
-  const stored = useSameContents(state.settings.factionPlan.assumptions)
+  const { patchSettings } = useActions()
+  const factionPlan = useSettled((s) => s.settings.factionPlan)
+  const stored = useSameContents(factionPlan.assumptions)
   const set = useCallback(
     (next: Partial<PlanSettings>, debounceMs?: number) => void patchSettings((s) => ({ ...s, factionPlan: { ...s.factionPlan, assumptions: next } }), { debounceMs }),
     [patchSettings]
@@ -88,8 +89,9 @@ export function usePlanSettings(logPace: number | null): PlanSettings {
 
 /** A character's locks, rule-outs and paces on the Plan tab, kept in settings.json. A number being typed saves once the typing stops. */
 export function useChoices(character: string): [PlanChoices, (c: PlanChoices, debounceMs?: number) => void] {
-  const { state, patchSettings } = useApp()
-  const kept = state.settings.factionPlan.choices
+  const { patchSettings } = useActions()
+  const factionPlan = useSettled((s) => s.settings.factionPlan)
+  const kept = factionPlan.choices
   const choices = useSameContents(Object.hasOwn(kept, character) ? kept[character] : NO_CHOICES)
   const set = useCallback(
     (c: PlanChoices, debounceMs?: number) =>
@@ -110,7 +112,8 @@ export function useChoices(character: string): [PlanChoices, (c: PlanChoices, de
 const dismissedNotices = new Set<string>()
 
 export function PlanTab({ character, view }: { character: string; view: FactionView | null }) {
-  const { state: app, patchSettings } = useApp()
+  const { patchSettings } = useActions()
+  const achievementCues = useSettled((s) => s.settings.achievementCues)
   const [stored, setSettings] = useAssumptions()
   const aim: PlanGoal = stored.goal === 'positive' ? 'positive' : 'fastest'
   // Most factions positive wants the ways to raise every faction, not only the achievements.
@@ -389,7 +392,7 @@ export function PlanTab({ character, view }: { character: string; view: FactionV
         character={character}
         track={tracked}
         hint={nowStep ? swapHint(nowStep) : null}
-        cues={app.settings.achievementCues}
+        cues={achievementCues}
         onCues={(on) => void patchSettings((s) => ({ ...s, achievementCues: on }))}
         onFirst={() => workOn(0)}
       />

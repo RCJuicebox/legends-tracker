@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { timeOfDay } from '../../../core/format'
 import { useRemembered } from '../remember'
-import { useApp, useLive } from '../state'
+import { useActions, useLive, useSettled } from '../state'
 import { ago, mb } from '../api'
 import { act } from '../toast'
 import { OVERLAY_BUFFS, TRY_LINES } from '../constants'
@@ -26,8 +26,10 @@ const FEED_SHOWN = 100
  * each select their own, so a status tick or a feed line draws only the part it changes (LT-403).
  */
 export function Dashboard({ go }: { go: (p: PageId) => void }) {
-  const { state, patchSettings } = useApp()
-  const { settings } = state
+  const { patchSettings } = useActions()
+  const arranging = useSettled((s) => s.arranging)
+  const muted = useSettled((s) => s.settings.audio.muted)
+  const logFile = useSettled((s) => s.settings.logFile)
   const watching = useLive((l) => l.status.watching)
   const character = useLive((l) => l.status.character)
   const elsewherePath = useLive((l) => l.status.elsewhere?.path ?? '')
@@ -49,16 +51,11 @@ export function Dashboard({ go }: { go: (p: PageId) => void }) {
               <Icon name="stop" /> Stop watching
             </button>
           ) : (
-            <button
-              className="btn primary"
-              onClick={() => void act('watch:start')}
-              disabled={!settings.logFile}
-              title={settings.logFile ? undefined : 'Follow a character log on Log Files first'}
-            >
+            <button className="btn primary" onClick={() => void act('watch:start')} disabled={!logFile} title={logFile ? undefined : 'Follow a character log on Log Files first'}>
               <Icon name="play" /> Start watching
             </button>
           )}
-          {!watching && !settings.logFile && (
+          {!watching && !logFile && (
             <span className="faint small">
               Follow a character log on{' '}
               <button className="link-button inline" onClick={() => go('logs')}>
@@ -67,15 +64,11 @@ export function Dashboard({ go }: { go: (p: PageId) => void }) {
               first.
             </span>
           )}
-          <button className={`btn${state.arranging ? ' on' : ''}`} aria-pressed={state.arranging} onClick={() => void act('overlays:arrange', !state.arranging)}>
-            <Icon name="move" /> {state.arranging ? 'Lock overlays' : 'Arrange overlays'}
+          <button className={`btn${arranging ? ' on' : ''}`} aria-pressed={arranging} onClick={() => void act('overlays:arrange', !arranging)}>
+            <Icon name="move" /> {arranging ? 'Lock overlays' : 'Arrange overlays'}
           </button>
-          <button
-            className={`btn${settings.audio.muted ? ' on' : ''}`}
-            aria-pressed={settings.audio.muted}
-            onClick={() => patchSettings((s) => ({ ...s, audio: { ...s.audio, muted: !s.audio.muted } }))}
-          >
-            <Icon name="mute" /> {settings.audio.muted ? 'Unmute' : 'Mute'}
+          <button className={`btn${muted ? ' on' : ''}`} aria-pressed={muted} onClick={() => patchSettings((s) => ({ ...s, audio: { ...s.audio, muted: !s.audio.muted } }))}>
+            <Icon name="mute" /> {muted ? 'Unmute' : 'Mute'}
           </button>
         </div>
       </div>
@@ -141,8 +134,7 @@ export function Dashboard({ go }: { go: (p: PageId) => void }) {
 
 /** Status, character, motes and log size: what a status tick changes. */
 function StatCards({ go }: { go: (p: PageId) => void }) {
-  const { state } = useApp()
-  const { settings } = state
+  const archive = useSettled((s) => s.settings.archive)
   const watching = useLive((l) => l.status.watching)
   const lastLineAt = useLive((l) => l.status.lastLineAt)
   const character = useLive((l) => l.status.character)
@@ -178,7 +170,7 @@ function StatCards({ go }: { go: (p: PageId) => void }) {
       <button className="card stat card-button" onClick={() => go('logs')}>
         <span className="label">Log size</span>
         <span className="value">{status.logSize ? mb(status.logSize) : '—'}</span>
-        <span className="sub">{settings.archive.autoEnabled ? `archives at ${settings.archive.thresholdMB} MB` : 'auto-archive off'}</span>
+        <span className="sub">{archive.autoEnabled ? `archives at ${archive.thresholdMB} MB` : 'auto-archive off'}</span>
       </button>
     </div>
   )

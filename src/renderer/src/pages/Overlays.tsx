@@ -1,4 +1,4 @@
-import { useApp } from '../state'
+import { useActions, useSettled } from '../state'
 import { act } from '../toast'
 import { BUILTIN_OVERLAYS } from '../constants'
 import { ConfirmButton, Field, Icon, NumberInput, Switch } from '../components/ui'
@@ -73,8 +73,11 @@ function MeterOptions({ o, onChange }: { o: OverlayConfig; onChange: (m: Partial
 }
 
 export function Overlays() {
-  const { state, patchSettings } = useApp()
-  const overlays = state.settings.overlays
+  const { patchSettings } = useActions()
+  const arranging = useSettled((s) => s.arranging)
+  const achievementCues = useSettled((s) => s.settings.achievementCues)
+  const overlays = useSettled((s) => s.settings.overlays)
+  const overlaysOnlyWithGame = useSettled((s) => s.settings.overlaysOnlyWithGame)
   const update = (id: string, patch: Partial<OverlayConfig>, debounceMs?: number) =>
     patchSettings((s) => ({ ...s, overlays: s.overlays.map((o) => (o.id === id ? { ...o, ...patch } : o)) }), { debounceMs })
 
@@ -103,18 +106,14 @@ export function Overlays() {
           >
             Reset layout
           </ConfirmButton>
-          <button className={`btn ${state.arranging ? 'on' : 'primary'}`} aria-pressed={state.arranging} onClick={() => void act('overlays:arrange', !state.arranging)}>
-            <Icon name="move" /> {state.arranging ? 'Lock overlays' : 'Arrange overlays'}
+          <button className={`btn ${arranging ? 'on' : 'primary'}`} aria-pressed={arranging} onClick={() => void act('overlays:arrange', !arranging)}>
+            <Icon name="move" /> {arranging ? 'Lock overlays' : 'Arrange overlays'}
           </button>
         </div>
       </div>
 
       <label className="card row mb-16">
-        <Switch
-          on={state.settings.overlaysOnlyWithGame}
-          label="Only show overlays while the game has focus"
-          onChange={(v) => patchSettings((s) => ({ ...s, overlaysOnlyWithGame: v }))}
-        />
+        <Switch on={overlaysOnlyWithGame} label="Only show overlays while the game has focus" onChange={(v) => patchSettings((s) => ({ ...s, overlaysOnlyWithGame: v }))} />
         <div className="grow">
           <div style={{ fontWeight: 600 }}>Only show overlays while the game has focus</div>
           <div className="muted small">
@@ -124,7 +123,7 @@ export function Overlays() {
         </div>
       </label>
 
-      {state.arranging && (
+      {arranging && (
         <div className="notice mb-16">
           Drag each outlined window where you want it and drag its edges to resize. Positions save as you go. Click
           <b> Lock overlays</b> to make them click-through again.
@@ -179,7 +178,7 @@ export function Overlays() {
                     <span className="faint small">off hides its step here; the plan is still followed, and still spoken if that is on</span>
                   </label>
                   <label className="check">
-                    <input type="checkbox" checked={state.settings.achievementCues} onChange={(e) => patchSettings((s) => ({ ...s, achievementCues: e.target.checked }))} />
+                    <input type="checkbox" checked={achievementCues} onChange={(e) => patchSettings((s) => ({ ...s, achievementCues: e.target.checked }))} />
                     Say when a step is done
                     <span className="faint small">the faction plan's, as on the Plan tab's Now card; each achievement it finishes flashes on the alerts overlay</span>
                   </label>

@@ -6,7 +6,7 @@ import { useRemembered } from '../remember'
 import { act } from '../toast'
 import { useNow } from '../components/TimerBars'
 import { ConfirmButton, Disclosure, FilterBox, Info, Pending, Segmented, Switch, Tip } from '../components/ui'
-import { useApp } from '../state'
+import { useActions, useSettled } from '../state'
 import { wikiUrl } from '../../../core/format'
 import { CLASSES, className } from '../../../shared/game/classes'
 import {
@@ -69,8 +69,9 @@ const HOW = (
 export function Buffs() {
   const q = useBuffs()
   const v = q.data
-  const { state, patchSettings } = useApp()
-  const groupBuffs = state.settings.tracking.groupBuffs
+  const { patchSettings } = useActions()
+  const tracking = useSettled((s) => s.settings.tracking)
+  const groupBuffs = tracking.groupBuffs
   const now = useNow(1000, !!v?.active.length)
   const [filter, setFilter] = useState('')
   const [openClasses, setOpenClasses] = useRemembered<string[]>('buffs.openClasses', [])
