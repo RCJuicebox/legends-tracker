@@ -219,9 +219,11 @@ export function PlanTab({ character, view }: { character: string; view: FactionV
   const track = useAchievementTrack()
   const tracked = track && track.character.toLowerCase() === character.toLowerCase() ? track.faction : null
 
-  // Race swaps: what they save against the same plan without them, worked out once the plan shows.
+  // Race swaps: what they save against the same plan without them, worked out once asked for: a
+  // second run of the planner at every change of the plan is a third of a second each (LT-425).
   const swapSteps = plan ? plan.steps.filter((st) => st.race).length : 0
-  const swapKey = swapSteps ? structure : ''
+  const [askSaves, setAskSaves] = useState(false)
+  const swapKey = swapSteps && askSaves ? structure : ''
   const [noSwap, setNoSwap] = useState<{ key: string; seconds: number; unplanned: number } | null>(null)
   useEffect(() => {
     if (!swapKey || !data || !todo || noSwap?.key === swapKey) return
@@ -440,7 +442,16 @@ export function PlanTab({ character, view }: { character: string; view: FactionV
             >
               <span className="label">Loadout swaps</span>
               <span className="value">{swapSteps}</span>
-              <span className="sub">{swapSaves ?? 'working out what they save…'}</span>
+              <span className="sub">
+                {swapSaves ??
+                  (askSaves ? (
+                    'working out what they save…'
+                  ) : (
+                    <button className="link-button inline" onClick={() => setAskSaves(true)}>
+                      What do they save?
+                    </button>
+                  ))}
+              </span>
             </div>
           )}
           <span className="spacer" />

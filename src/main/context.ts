@@ -1,5 +1,5 @@
 import { timeOfDay } from '../core/format'
-import { app, globalShortcut, nativeTheme, Notification } from 'electron'
+import { app, globalShortcut, nativeTheme, Notification, session } from 'electron'
 import { HOTKEYS } from '../shared/hotkeys'
 import { promises as fs, rmSync } from 'node:fs'
 import { basename, join } from 'node:path'
@@ -166,7 +166,11 @@ export function createContext(): AppContext {
     ),
     gameTables: new GameTables(installDir),
     wikiCatalog: new WikiCatalog(
-      (p) => toMain('state:catalog', p),
+      (p) => {
+        toMain('state:catalog', p)
+        // The download is over: what it brought the item cache is written now, once.
+        if (!p.busy) void itemCatalog.flush()
+      },
       (pages) => void itemCatalog.refreshFrom(pages)
     ),
     logHistory,
@@ -558,6 +562,8 @@ function registerSources(ctx: AppContext): void {
 async function reloadGameData(ctx: AppContext, why: string): Promise<void> {
   ctx.gameTables.clear()
   ctx.icons.clear()
+  // Pages keep icons a day (eqicon:// answers max-age=86400): yesterday's would outlive the patch (LT-421).
+  await session.defaultSession.clearCache().catch((e: unknown) => log.warn('Could not clear the icon cache:', e))
   await ctx.engine.loadSpells()
   ctx.engine.pushFeed('info', `${why}: spell data, game tables and icons read again.`)
 }

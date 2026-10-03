@@ -132,7 +132,11 @@ describe('the book of eqlwiki faction pages', () => {
     expect(h.wiki.reads).toBe(2)
     expect(served).toMatchObject({ error: 'offline', book: { version: kept.version - 1, fetchedAt: 0 } })
     h.wiki.fail = null
-    expect((await book.get()).book.version).toBe(kept.version)
+    // Asked again soon after (the plan asks every minute): the old book serves, the wiki is left alone (LT-411).
+    expect(await book.get()).toMatchObject({ error: 'offline', book: { version: kept.version - 1 } })
+    expect(h.wiki.reads).toBe(2)
+    // A refresh asked for reads it at once.
+    expect((await book.get(true)).book.version).toBe(kept.version)
     expect(h.wiki.reads).toBe(3)
   })
 

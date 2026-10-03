@@ -100,6 +100,33 @@ describe('LogHistory', () => {
     expect((await history.get<Days>('casts', where)).live).toEqual({ '2026-09-24': { 'Envenomed Bolt X': 1, Odium: 1 } })
   })
 
+  it('forgets an archive gone from the folder, and a live log nobody asked about for two months (LT-423)', async () => {
+    const logPath = join(dir, 'eqlog_Kelwyn_neriak.txt')
+    const archiveDir = join(dir, 'archive')
+    const cacheFile = join(dir, 'log-history.json')
+    await fs.mkdir(archiveDir)
+    const archive = join(archiveDir, 'eqlog_Kelwyn_neriak_2026-09-01_to_2026-09-10.zip')
+    await zip(archive, 'eqlog_Kelwyn_neriak.txt', line('Tue Sep 01 10:00:00 2026', 'You begin casting Odium.'))
+    await fs.writeFile(logPath, line('Thu Sep 24 16:00:00 2026', 'You begin casting Odium.'))
+    const where = { logPath, archiveDir, stem: 'eqlog_Kelwyn_neriak' }
+    const history = new LogHistory(cacheFile, { casts: dayConsumer(castCounter) })
+    expect((await history.get<Days>('casts', where)).archives).toHaveLength(1)
+    await fs.rm(archive)
+    expect((await history.get<Days>('casts', where)).archives).toHaveLength(0)
+    await history.flush()
+    const saved = JSON.parse(await fs.readFile(cacheFile, 'utf8'))
+    expect(Object.keys(saved.archives)).toEqual([])
+    // A live log last asked about long ago is gone at the next start.
+    const key = Object.keys(saved.live)[0]
+    saved.live[key].askedAt = Date.now() - 61 * 86_400_000
+    saved.live['c:\\elsewhere\\eqlog_old_x.txt'] = { ...saved.live[key], askedAt: Date.now() - 61 * 86_400_000 }
+    await fs.writeFile(cacheFile, JSON.stringify(saved))
+    const again = new LogHistory(cacheFile, { casts: dayConsumer(castCounter) })
+    await again.get<Days>('casts', where)
+    await again.flush()
+    expect(Object.keys(JSON.parse(await fs.readFile(cacheFile, 'utf8')).live)).toEqual([key])
+  })
+
   it('drops what a consumer the app no longer has left in the cache', async () => {
     const logPath = join(dir, 'eqlog_Kelwyn_neriak.txt')
     const cacheFile = join(dir, 'log-history.json')

@@ -38,12 +38,40 @@ describe('the wiki client', () => {
       calls.push(url)
       return answers.shift()!
     })
-    const titles = new WikiClient().search('odium')
+    const titles = new WikiClient().search('odium', 10, 'background')
     await vi.runAllTimersAsync()
     expect(await titles).toEqual(['Odium'])
     expect(calls).toHaveLength(3)
     expect(calls[0]).toContain('maxlag=5')
     expect(calls[0]).toContain('format=json')
+  })
+
+  it('tries a page twice, lets others through while it waits, and fails fast for a minute once offline (LT-410)', async () => {
+    vi.useFakeTimers()
+    const asked: string[] = []
+    vi.stubGlobal('fetch', async (url: string) => {
+      const q = new URL(url).searchParams.get('srsearch') ?? ''
+      asked.push(q)
+      if (q === 'down') throw new TypeError('fetch failed')
+      return json({ query: { search: [{ title: q }] } })
+    })
+    const c = new WikiClient()
+    const down = c.search('down').catch((e: Error) => e.message)
+    // While the failed try waits, another request gets its turn.
+    const other = c.search('other')
+    await vi.runAllTimersAsync()
+    expect(await other).toEqual(['other'])
+    expect(await down).toMatch(/fetch failed/)
+    expect(asked.filter((q) => q === 'down')).toHaveLength(2)
+    expect(asked.indexOf('other')).toBeLessThan(asked.lastIndexOf('down'))
+    // Offline: the next request fails at once, without asking.
+    const before = asked.length
+    await expect(c.search('again')).rejects.toThrow(/could not be reached a moment ago/)
+    expect(asked.length).toBe(before)
+    vi.advanceTimersByTime(61_000)
+    const later = c.search('later')
+    await vi.runAllTimersAsync()
+    expect(await later).toEqual(['later'])
   })
 
   it('fails at once on a mistake in the request', async () => {

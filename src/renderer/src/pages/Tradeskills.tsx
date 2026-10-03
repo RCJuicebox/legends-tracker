@@ -174,7 +174,9 @@ export function Tradeskills() {
           <Pending what="the recipes" error={recipes.error} retry={recipes.reload} />
         ) : !rs.file ? (
           <div className="row">
-            <span className="muted">The recipes come from eqlwiki.com: about a minute to download, once a week, kept on this PC.</span>
+            <span className="muted">
+              The recipes come from eqlwiki.com: some seven minutes to download (two thousand pages, as fast as the wiki likes), once a week, kept on this PC.
+            </span>
             {p?.busy ? (
               <span className="small">
                 Reading pages {p.pages} of {p.total || '…'}
@@ -245,7 +247,14 @@ export function Tradeskills() {
         <div className="card empty">No favourites yet. Find a recipe above and star it.</div>
       ) : (
         favorites.map(({ f, r }) =>
-          !r ? (
+          // Only a book that is here, and not being downloaded, can say a recipe is gone from it (LT-427).
+          !r && (!book.length || recipes.data?.progress.busy) ? (
+            <div key={f.key} className="card row mb-16">
+              <span>
+                <b>{f.product}</b> <span className="muted">— waiting for the recipes…</span>
+              </span>
+            </div>
+          ) : !r ? (
             <div key={f.key} className="card row mb-16">
               <span>
                 <b>{f.product}</b> <span className="muted">is no longer in the wiki's recipes under this recipe.</span>

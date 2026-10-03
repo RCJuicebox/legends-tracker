@@ -40,6 +40,9 @@ describe('AchievementFiles, reading the achievements export', () => {
     expect(row()).toMatchObject({ status: 'missing', detail: 'No Tester_neriak-Achievements.txt yet: type /outputfile achievements in game.' })
 
     writeFileSync(path, EXPORT)
+    // Written a while ago: read at once (one just written is left a moment and a half first, LT-417).
+    const earlier = new Date(Date.now() - 20_000)
+    utimesSync(path, earlier, earlier)
     const first = await files.exported('Tester_neriak')
     expect(first?.file).toBe('Tester_neriak-Achievements.txt')
     expect(first?.sections.length).toBeGreaterThan(0)
@@ -51,7 +54,7 @@ describe('AchievementFiles, reading the achievements export', () => {
 
     // Written again: read again.
     writeFileSync(path, EXPORT.split('\r\n').slice(0, 3).join('\r\n'))
-    const later = new Date(Date.now() + 60_000)
+    const later = new Date(Date.now() - 10_000)
     utimesSync(path, later, later)
     const again = await files.exported('Tester_neriak')
     expect(again?.sections).not.toBe(first?.sections)

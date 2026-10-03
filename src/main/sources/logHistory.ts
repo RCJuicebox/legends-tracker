@@ -4,7 +4,7 @@ import { join } from 'node:path'
 import type { Readable } from 'node:stream'
 import { decodeCp1252, parseLogLine, type LogLine } from '../../core/logLine'
 import { fileIdentity, sameFile } from '../../core/fileIdentity'
-import { characterArchives, feedZip, readLines } from '../../core/logReading'
+import { characterArchives, feedZip, isArchiveOf, readLines } from '../../core/logReading'
 import { log } from '../log'
 import { sources } from './registry'
 
@@ -175,9 +175,12 @@ interface CacheFile {
   version: 1
   /** By archive file name; archives never change, so each is read once. */
   archives: Record<string, { size: number; values: Values }>
-  /** By lower-cased log path: how far into the live log the values go. */
-  live: Record<string, { id: string; offset: number; values: Values }>
+  /** By lower-cased log path: how far into the live log the values go, and when it was last asked about. */
+  live: Record<string, { id: string; offset: number; values: Values; askedAt?: number }>
 }
+
+/** A live log nothing has asked about in this long (a moved Logs folder, a renamed character) is forgotten (LT-423). */
+const UNASKED_MS = 60 * 86_400_000
 
 export interface HistorySlice<T> {
   /** The archives read, oldest first, with the last date each covers. */
@@ -240,6 +243,12 @@ export class LogHistory {
         // Values of a consumer the app no longer has (a page since removed) are dropped, not kept for ever.
         for (const entry of [...Object.values(p.archives), ...Object.values(p.live)])
           for (const k of Object.keys(entry.values ?? {})) if (!(k in this.consumers)) delete entry.values[k]
+        // Live logs unasked for two months go; one kept before this was noted counts as asked now.
+        const now = Date.now()
+        for (const [path, entry] of Object.entries(p.live)) {
+          if (now - (entry.askedAt ?? now) > UNASKED_MS) delete p.live[path]
+          else entry.askedAt ??= now
+        }
         this.cache = p
       }
     } catch (e) {
@@ -305,7 +314,23 @@ export class LogHistory {
     let changed = false
     const out: HistorySlice<T> = { archives: [], live: this.consumers[key].empty() as T }
 
-    for (const name of await characterArchives(where.archiveDir, where.stem, log.warn)) {
+    const listed = await characterArchives(where.archiveDir, where.stem, log.warn)
+    // This character's archives no longer in the folder (moved, deleted) are forgotten (LT-423); a
+    // folder that could not be read says nothing either way.
+    const present = new Set(listed)
+    const looked =
+      listed.length > 0 ||
+      (await fs.access(where.archiveDir).then(
+        () => true,
+        (e: NodeJS.ErrnoException) => e.code === 'ENOENT'
+      ))
+    if (looked)
+      for (const name of Object.keys(cache.archives))
+        if (isArchiveOf(name, where.stem) && !present.has(name)) {
+          delete cache.archives[name]
+          changed = true
+        }
+    for (const name of listed) {
       // "…_2026-08-07_to_2026-09-24.zip", "…_thru-2026-08-07.zip": the last date is where it ends.
       const end = [...name.matchAll(/(\d{4}-\d{2}-\d{2})/g)].pop()?.[1] ?? ''
       if (!wantArchive(name, end)) continue
@@ -376,6 +401,7 @@ export class LogHistory {
           throw e
         }
       }
+      cache.live[pathKey].askedAt = Date.now()
       const v = cache.live[pathKey].values[key]
       // The asker's own copy of its one value: the one kept is read into in place next time.
       if (v) out.live = structuredClone(v.value) as T

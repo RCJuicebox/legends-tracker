@@ -37,6 +37,16 @@ interface AllaFile {
 
 const userAgent = () => `LegendsTracker/${app?.getVersion?.() ?? 'dev'} (https://github.com/RCJuicebox/legends-tracker)`
 
+/** A page the site answered with an error status. */
+class AllaStatusError extends Error {
+  constructor(
+    readonly status: number,
+    message: string
+  ) {
+    super(message)
+  }
+}
+
 export class FactionAlla {
   private file: AllaFile | null = null
   private disk: JsonFile<AllaFile> | null = null
@@ -107,7 +117,7 @@ export class FactionAlla {
     if (wait > 0) await new Promise((r) => setTimeout(r, wait))
     this.last = Date.now()
     const res = await fetch(url, { headers: { 'User-Agent': userAgent() }, signal: AbortSignal.timeout(30_000) })
-    if (!res.ok) throw new Error(`Allakhazam answered ${res.status} for ${url}`)
+    if (!res.ok) throw new AllaStatusError(res.status, `Allakhazam answered ${res.status} for ${url}`)
     return res.text()
   }
 
@@ -129,7 +139,17 @@ export class FactionAlla {
       for (let n = this.next(f, oddNames); n; n = this.next(f, oddNames)) {
         const { id, name } = n
         sources.reading('allakhazam', `Reading ${name} (${this.status().read + 1} of ${this.wanted.size}), a page every ${GAP_MS / 1000} seconds as the site asks`)
-        const html = await this.fetchPage(allaPageUrl(id))
+        let html: string
+        try {
+          html = await this.fetchPage(allaPageUrl(id))
+        } catch (e) {
+          // One page the site will not give (gone, moved): that page waits a day, the rest go on. Only
+          // the site out of reach, busy or asking us to slow down pauses everything (LT-413).
+          if (!(e instanceof AllaStatusError) || e.status === 429 || e.status >= 500) throw e
+          log.warn(`Allakhazam would not give ${name}'s page (${e.status}); trying it again tomorrow`)
+          this.odd.set(id, Date.now())
+          continue
+        }
         const faction = parseAllaFaction(id, html)
         // Titled but not laid out as known: the site changed, and an empty page kept a month would hide it.
         if (faction && !allaFactionLaidOut(html)) {

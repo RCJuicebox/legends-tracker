@@ -484,9 +484,17 @@ const BOOK_SHAPE_SINCE = 2
  * the planner needs and kept a week (kept on, however old, when the wiki cannot be reached). About
  * sixteen requests of fifty pages each.
  */
+/** How long one build of the plan's data answers every page that asks for it. */
+const PLAN_SHARED_MS = 5000
+
+/** After the wiki could not be read, the old book serves this long before it is tried again. */
+const BOOK_RETRY_MS = 10 * 60_000
+
 export class FactionBook {
   private book: FactionBookFile | null = null
   private reading: Promise<FactionBookFile> | null = null
+  /** When a read last failed, and why: the plan asks every minute, and must not read sixteen requests' worth each time (LT-411). */
+  private failed: { at: number; error: string } | null = null
 
   private get path(): string {
     return join(cacheDir(), 'faction-book.json')
@@ -532,16 +540,25 @@ export class FactionBook {
   async get(refresh = false): Promise<{ book: FactionBookFile; error: string }> {
     const had = await this.load()
     if (had && !refresh && !expired(had.fetchedAt)) return { book: had, error: '' }
+    // Stale, but the last read failed lately: the old book serves until it is time to try again.
+    if (had && !refresh && this.failed && Date.now() - this.failed.at < BOOK_RETRY_MS) return { book: had, error: this.failed.error }
     try {
       this.reading ??= this.read().finally(() => (this.reading = null))
       const book = await this.reading
       this.book = book
       await writeFileAtomic(this.path, JSON.stringify(book))
       sources.ok('factionWiki', bookDetail(book))
+      this.failed = null
       return { book, error: '' }
     } catch (e) {
-      sources.fail('factionWiki', e, "Could not read eqlwiki's faction and quest pages")
-      if (had) return { book: had, error: e instanceof Error ? e.message : String(e) }
+      const error = e instanceof Error ? e.message : String(e)
+      this.failed = { at: Date.now(), error }
+      sources.fail(
+        'factionWiki',
+        e,
+        `Could not read eqlwiki's faction and quest pages; the copy kept serves, and it is tried again from ${new Date(Date.now() + BOOK_RETRY_MS).toLocaleTimeString()}`
+      )
+      if (had) return { book: had, error }
       throw e
     }
   }
@@ -777,10 +794,19 @@ export class Factions implements AppFeature {
     })
     // Everything the Plan tab needs to plan the achievements still to do; `refresh` reads eqlwiki again,
     // `wide` adds the ways to raise every other faction (the Most factions positive goal).
+    // The Standings tab (a row opened) and the Plan tab each ask for this, the Plan tab every minute:
+    // one answer serves both for a few seconds, and two asking at once share one build (LT-424).
+    const plans = new Map<string, { at: number; data: ReturnType<typeof planData> }>()
     handle('factions:plan', async (character, refresh, wide) => {
       assertCharacterKey(character)
       if (!ctx.installDir()) throw new Error('Choose the game folder on the Settings page first.')
-      return planData(ctx, character, refresh === true, wide === true)
+      const key = `${character}|${wide === true}`
+      const had = plans.get(key)
+      if (!refresh && had && Date.now() - had.at < PLAN_SHARED_MS) return had.data
+      const data = planData(ctx, character, refresh === true, wide === true)
+      plans.set(key, { at: Date.now(), data })
+      data.catch(() => plans.get(key)?.data === data && plans.delete(key))
+      return data
     })
     // What moved a faction in the player's logs: this character's and the others'.
     handle('factions:moved', async (character, faction) => {

@@ -13,7 +13,10 @@ let agent = ''
 const userAgent = () => (agent ||= `LegendsTracker/${app?.getVersion?.() ?? 'dev'} (https://github.com/RCJuicebox/legends-tracker)`)
 /** A stalled wiki must not hold a page for ever. */
 const TIMEOUT_MS = 20_000
-const ATTEMPTS = 6
+/** Tries for a request: a page waiting on it would rather hear soon that the wiki is down. */
+const ATTEMPTS = { now: 2, background: 6 } as const
+/** After eqlwiki could not be reached at all, requests fail at once for this long rather than each wait it out. */
+const DOWN_MS = 60_000
 /** Between one request and the next. */
 const PACE_MS = 200
 
@@ -46,10 +49,15 @@ function retryAfter(res: Response | null, fallback: number): number {
   return Number.isFinite(v) && v > 0 ? Math.min(300, Math.max(1, v)) * 1000 : fallback
 }
 
+/** One try's outcome: the answer, or how long to wait before the next and why. */
+type Attempt<T> = { body: T } | { wait: number; error: unknown; offline: boolean }
+
 export class WikiClient {
   private readonly waiting: { urgency: Urgency; run: () => void }[] = []
   private busy = false
   private lastAt = 0
+  /** Until when eqlwiki counts as unreachable (it could not be reached at all); 0 when it answers. */
+  downUntil = 0
 
   /** Runs `job` when its turn comes: one request at a time, a page's before a download's. */
   private turn<T>(urgency: Urgency, job: () => Promise<T>): Promise<T> {
@@ -79,38 +87,51 @@ export class WikiClient {
     this.waiting.shift()?.run()
   }
 
-  /** One API call. Retries network trouble, 5xx, 429 and maxlag; any other 4xx or API error fails at once. */
-  get<T = unknown>(params: Record<string, string>, urgency: Urgency = 'now'): Promise<T> {
+  /**
+   * One API call. Retries network trouble, 5xx, 429 and maxlag; any other 4xx or API error fails at
+   * once. Each try takes its own turn in the lane and the wait between tries is spent out of it, so one
+   * request the wiki keeps refusing does not hold every other caller for minutes (LT-410). After the
+   * wiki could not be reached at all, every request fails at once for a minute.
+   */
+  async get<T = unknown>(params: Record<string, string>, urgency: Urgency = 'now'): Promise<T> {
     const q = new URLSearchParams({ format: 'json', formatversion: '2', maxlag: '5', ...params })
     const url = `${WIKI_API}?${q}`
-    return this.turn(urgency, async () => {
-      let last: unknown = null
-      for (let attempt = 0; attempt < ATTEMPTS; attempt++) {
-        let wait = 2000 * (attempt + 1)
-        let res: Response | null = null
-        try {
-          res = await fetch(url, { headers: { 'User-Agent': userAgent(), 'Api-User-Agent': userAgent() }, signal: AbortSignal.timeout(TIMEOUT_MS) })
-          if (res.ok) {
-            const body = (await res.json()) as { error?: { code: string; info?: string } }
-            if (body.error?.code === 'maxlag') {
-              last = new WikiError(`eqlwiki is busy: ${body.error.info ?? ''}`)
-              wait = retryAfter(res, 5000 * (attempt + 1))
-            } else if (body.error) {
-              throw new WikiError(`${body.error.code}: ${body.error.info ?? ''}`)
-            } else return body as T
-          } else if (res.status === 429 || res.status >= 500) {
-            last = new WikiError(`eqlwiki answered ${res.status}`)
-            wait = retryAfter(res, wait)
-          } else throw new WikiError(`eqlwiki answered ${res.status}`)
-        } catch (e) {
-          if (e instanceof WikiError) throw e
-          last = e // network trouble, a timeout, or a garbled body
-        }
-        if (attempt + 1 < ATTEMPTS) await sleep(wait)
+    const attempts = ATTEMPTS[urgency]
+    let last: Attempt<T> | null = null
+    for (let attempt = 0; attempt < attempts; attempt++) {
+      if (Date.now() < this.downUntil) throw new WikiError(`eqlwiki could not be reached a moment ago; it is tried again from ${new Date(this.downUntil).toLocaleTimeString()}`)
+      const r: Attempt<T> = await this.turn(urgency, () => this.attempt<T>(url, attempt))
+      if ('body' in r) {
+        this.downUntil = 0
+        return r.body
       }
-      log.warn(`eqlwiki: gave up after ${ATTEMPTS} attempts`, last)
-      throw last instanceof Error ? last : new WikiError('eqlwiki could not be reached')
-    })
+      last = r
+      if (attempt + 1 < attempts) await sleep(r.wait)
+    }
+    log.warn(`eqlwiki: gave up after ${attempts} attempts`, last?.error)
+    if (last && 'offline' in last && last.offline) this.downUntil = Date.now() + DOWN_MS
+    const error = last && 'error' in last ? last.error : null
+    throw error instanceof Error ? error : new WikiError('eqlwiki could not be reached')
+  }
+
+  /** One try. Throws for an answer that trying again will not change. */
+  private async attempt<T>(url: string, attempt: number): Promise<Attempt<T>> {
+    let res: Response | null = null
+    try {
+      res = await fetch(url, { headers: { 'User-Agent': userAgent(), 'Api-User-Agent': userAgent() }, signal: AbortSignal.timeout(TIMEOUT_MS) })
+      if (res.ok) {
+        const body = (await res.json()) as { error?: { code: string; info?: string } }
+        if (body.error?.code === 'maxlag') return { error: new WikiError(`eqlwiki is busy: ${body.error.info ?? ''}`), wait: retryAfter(res, 5000 * (attempt + 1)), offline: false }
+        if (body.error) throw new WikiError(`${body.error.code}: ${body.error.info ?? ''}`)
+        return { body: body as T }
+      }
+      if (res.status === 429 || res.status >= 500) return { error: new WikiError(`eqlwiki answered ${res.status}`), wait: retryAfter(res, 2000 * (attempt + 1)), offline: false }
+      throw new WikiError(`eqlwiki answered ${res.status}`)
+    } catch (e) {
+      if (e instanceof WikiError) throw e
+      // Network trouble, a timeout, or a garbled body; no answer at all is the wiki out of reach.
+      return { error: e, wait: 2000 * (attempt + 1), offline: !res }
+    }
   }
 
   /**

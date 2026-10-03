@@ -8,6 +8,9 @@ import { isCharacterKey } from '../core/validate'
 import { sources } from './sources/registry'
 import { ExportWatch } from './exportWatch'
 
+/** How long a just-written export is left before it is read. */
+const EXPORT_SETTLE_MS = 1500
+
 const EMPTY_MARKS: AchMarks = { ticks: [], broken: [] }
 
 /** A character's achievements export as read: its file name, when the game wrote it, and what it lists. */
@@ -93,6 +96,14 @@ export class AchievementFiles {
     }
     let kept = this.read.get(path)
     if (kept?.modified !== modified) {
+      // Just written: left a moment first, as the factions and inventory exports are, so a read never
+      // catches the game mid-write and counts a cut-off Progression section's tail as done (LT-417).
+      const young = Math.min(EXPORT_SETTLE_MS, EXPORT_SETTLE_MS - (Date.now() - modified))
+      if (young > 0) {
+        await new Promise((r) => setTimeout(r, young))
+        const again = (await fs.stat(path)).mtimeMs
+        if (again !== modified) return this.readExport(character)
+      }
       kept = { modified, sections: parseAchievements(await fs.readFile(path, 'utf8')).sections }
       if (this.read.size > 20) this.read.clear()
       this.read.set(path, kept)

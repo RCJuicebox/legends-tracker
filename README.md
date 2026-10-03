@@ -266,7 +266,7 @@ timer with it.
 ## Tradeskills
 
 For the consumables you keep making. **Download the recipes** reads every page in eqlwiki's Player
-Crafted category (about a minute, kept a week on this PC): each gives its recipe and how many a
+Crafted category (some seven minutes, two thousand pages at the wiki's pace; kept a week on this PC): each gives its recipe and how many a
 combine makes, and the Alchemy table adds the potions whose own pages give none. Find a recipe and
 star it; each starred recipe gets a card with its ingredients, how many of each you have, how many
 combines that makes, where to buy the rest and what the batch costs.
@@ -752,7 +752,7 @@ level slider scales them. Pages are kept a week; **Refresh item stats** fetches 
   `/pet inventory check` list), with the pet's classes from its summon page on eqlwiki.
 
 The finder, the focus items and the optimiser need the wiki's item catalog: **Download the item
-catalog** reads every piece of equipment on eqlwiki (about a minute), and later refreshes, at most
+catalog** reads every piece of equipment on eqlwiki (a few minutes the first time), and later refreshes, at most
 weekly, read only the pages edited since. Best merge is on the Upgrades page.
 
 ## Upgrades

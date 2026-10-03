@@ -218,9 +218,8 @@ export function useItemInfo(names: string[]): { info: Record<string, ItemInfo>; 
     for (const n of want) asked.add(itemKey(n))
     api.invoke('inventory:lookup', want).then(
       (r) => mounted.current && setInfo((prev) => ({ ...prev, ...r })),
-      () => {
-        for (const n of want) asked.delete(itemKey(n))
-      }
+      // Asked again a minute later, not at the next change of `names` (a loot line, LT-412).
+      () => setTimeout(() => want.forEach((n) => asked.delete(itemKey(n))), 60_000)
     )
   }, [names, asked])
   /** Reads one item's page again from eqlwiki. */

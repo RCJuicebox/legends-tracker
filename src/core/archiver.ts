@@ -227,7 +227,12 @@ function readZipEntryCrc(zipPath: string): Promise<{ crc: number; size: number }
   return new Promise((resolve, reject) => {
     yauzl.open(zipPath, { lazyEntries: true, validateEntrySizes: true }, (err, zip) => {
       if (err || !zip) return reject(err ?? new Error('could not open archive'))
-      zip.on('error', reject)
+      // Closed however it ends, a failure included (LT-419).
+      const fail = (e: unknown) => {
+        zip.close()
+        reject(e)
+      }
+      zip.on('error', fail)
       // Only reached when there is no entry at all: the first one settles the promise and closes the zip.
       zip.on('end', () => {
         zip.close()
@@ -235,14 +240,14 @@ function readZipEntryCrc(zipPath: string): Promise<{ crc: number; size: number }
       })
       zip.on('entry', (entry: yauzl.Entry) => {
         zip.openReadStream(entry, (e2, stream) => {
-          if (e2 || !stream) return reject(e2 ?? new Error('could not read archive entry'))
+          if (e2 || !stream) return fail(e2 ?? new Error('could not read archive entry'))
           let crc = 0
           let size = 0
           stream.on('data', (c: Buffer) => {
             crc = crc32(c, crc)
             size += c.length
           })
-          stream.on('error', reject)
+          stream.on('error', fail)
           stream.on('end', () => {
             zip.close()
             resolve({ crc, size })

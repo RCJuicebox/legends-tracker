@@ -132,9 +132,15 @@ export function registerCharacterIpc(ctx: AppContext): void {
   })
   // Crafted items' eras for the Gear page: the era tags each untagged product's ingredients need. A
   // stale recipe book is fetched again in the background; the page asks again when it has been.
+  // A stale book is fetched in the background at most once in ten minutes, not on every Gear visit
+  // (LT-418): offline, each try is a minute's failing job.
+  let craftRefreshAt = 0
   handle('trade:craftEras', async () => {
     const file = await ctx.recipeBook.stored()
-    if (ctx.recipeBook.isStale(file) && !ctx.recipeBook.progress.busy) void ctx.recipeBook.refresh().catch((e) => log.warn('Could not refresh the recipes', e))
+    if (ctx.recipeBook.isStale(file) && !ctx.recipeBook.progress.busy && Date.now() - craftRefreshAt > 10 * 60_000) {
+      craftRefreshAt = Date.now()
+      void ctx.recipeBook.refresh().catch((e) => log.warn('Could not refresh the recipes', e))
+    }
     return file?.eras ? craftEras(file.recipes, file.eras) : {}
   })
   handle('trade:refresh', async () => {

@@ -80,7 +80,7 @@ function Finder({ view, sheet, mode }: { view: InventoryView; sheet: CharacterSh
         <h2 style={{ margin: 0 }}>Item catalog</h2>
         <p className="muted" style={{ margin: 0 }}>
           The upgrade finder, the focus effects and the optimiser read every piece of equipment on eqlwiki.com: what your classes, race and level can use, and what focus effects it
-          carries. That needs the wiki's item catalog first: about a minute to download, once a week, kept on this PC.
+          carries. That needs the wiki's item catalog first: a few minutes to download the first time, less once a week after, kept on this PC.
         </p>
         {p.busy ? (
           <Progress p={p} />

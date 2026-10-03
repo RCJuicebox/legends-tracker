@@ -51,18 +51,25 @@ export async function readLines(
   return pos
 }
 
-/** Feeds each .txt entry of a zipped log to `feed`, one after another. */
+/**
+ * Feeds each .txt entry of a zipped log to `feed`, one after another. The archive is closed however
+ * it ends: an entry or a reader that fails would otherwise hold it open until collected (LT-419).
+ */
 export function feedZip(path: string, feed: (s: Readable) => Promise<unknown>): Promise<void> {
   return new Promise((resolve, reject) => {
     yauzl.open(path, { lazyEntries: true }, (err, zip) => {
       if (err || !zip) return reject(err ?? new Error('could not open archive'))
-      zip.on('error', reject)
+      const fail = (e: unknown) => {
+        zip.close()
+        reject(e)
+      }
+      zip.on('error', fail)
       zip.on('end', () => resolve())
       zip.on('entry', (entry: yauzl.Entry) => {
         if (!entry.fileName.toLowerCase().endsWith('.txt')) return zip.readEntry()
         zip.openReadStream(entry, (e2, stream) => {
-          if (e2 || !stream) return reject(e2 ?? new Error('could not read archive'))
-          feed(stream).then(() => zip.readEntry(), reject)
+          if (e2 || !stream) return fail(e2 ?? new Error('could not read archive'))
+          feed(stream).then(() => zip.readEntry(), fail)
         })
       })
       zip.readEntry()
@@ -88,7 +95,7 @@ export function zipTextSize(path: string): Promise<number> {
 }
 
 /** Whether an archive file belongs to a log stem: "eqlog_Kelwyn_neriak_2026-08-07_to_2026-09-24.zip". */
-function isArchiveOf(name: string, stem: string): boolean {
+export function isArchiveOf(name: string, stem: string): boolean {
   return name.toLowerCase().startsWith(stem.toLowerCase() + '_') && /\.(zip|txt)$/i.test(name)
 }
 

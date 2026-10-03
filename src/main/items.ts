@@ -17,9 +17,28 @@ interface Cached extends ItemInfo {
   fetchedAt: number
 }
 
+/**
+ * item-cache.json's shape, written as `{ format, items }` (LT-415): a change to what an entry keeps
+ * bumps it, and an older file's entries are fetched again as they are asked for. A file from before
+ * the format was written is the bare record, and counts as 1.
+ */
+const ITEM_FORMAT = 2
+/** An entry not asked for in this long (its last fetch is older, as any asked for is fetched weekly) goes at the next save. */
+const UNUSED_MS = 90 * 86_400_000
+/** A name the wiki could not be asked about is not asked about again for this long (LT-412). */
+const RETRY_MS = 10 * 60_000
+/** Pages from a catalog download are written once it has gone quiet this long, not per batch (LT-414). */
+const QUIET_SAVE_MS = 15_000
+
 export class ItemCatalog {
   private cache: Record<string, Cached> | null = null
-  private saving: Promise<void> | null = null
+  /** Writes one after another, so two never share the .tmp file (LT-420). */
+  private saving: Promise<void> = Promise.resolve()
+  /** Lookups under way, by itemKey: a name asked for again meanwhile waits for the same one (LT-412). */
+  private readonly fetching = new Map<string, Promise<void>>()
+  /** When a name last could not be looked up. */
+  private readonly failedAt = new Map<string, number>()
+  private quietSave: NodeJS.Timeout | null = null
 
   /** `cacheDir`: the app's cache folder (main/paths.ts cacheDir()), where item-cache.json is kept. */
   constructor(private readonly cacheDir: string) {}
@@ -31,7 +50,12 @@ export class ItemCatalog {
   private async load(): Promise<Record<string, Cached>> {
     if (this.cache) return this.cache
     try {
-      this.cache = JSON.parse(await fs.readFile(this.path, 'utf8')) as Record<string, Cached>
+      const raw = JSON.parse(await fs.readFile(this.path, 'utf8')) as { format?: unknown; items?: unknown } & Record<string, Cached>
+      const shaped = typeof raw.format === 'number' && raw.items && typeof raw.items === 'object'
+      const items = (shaped ? raw.items : raw) as Record<string, Cached>
+      const format = shaped ? (raw.format as number) : 1
+      // Entries kept in an older shape count as never fetched: each is fetched again as it is asked for.
+      this.cache = format >= ITEM_FORMAT || format === 1 ? items : Object.fromEntries(Object.entries(items).map(([k, v]) => [k, { ...v, fetchedAt: 0 }]))
     } catch (e) {
       if ((e as NodeJS.ErrnoException).code !== 'ENOENT') log.warn('The item cache could not be read; starting it afresh', e)
       this.cache = {}
@@ -39,10 +63,15 @@ export class ItemCatalog {
     return this.cache
   }
 
-  private async save(): Promise<void> {
-    await this.saving
-    this.saving = writeFileAtomic(this.path, JSON.stringify(this.cache))
-    await this.saving
+  private save(): Promise<void> {
+    const run = this.saving.then(() => {
+      const cache = this.cache ?? {}
+      const old = Date.now() - UNUSED_MS
+      for (const [k, v] of Object.entries(cache)) if (v.fetchedAt < old) delete cache[k]
+      return writeFileAtomic(this.path, JSON.stringify({ format: ITEM_FORMAT, items: cache }))
+    })
+    this.saving = run.catch(() => undefined)
+    return run
   }
 
   /**
@@ -61,16 +90,31 @@ export class ItemCatalog {
         expired(cache[k].fetchedAt) ||
         (cache[k].found && (cache[k].icon === undefined || cache[k].use === undefined || cache[k].use.vendors === undefined || cache[k].use.sources === undefined))
     )
-    if (stale.length) {
-      try {
-        await this.fetchInto(cache, stale)
-        await this.save()
-        sources.ok('items', `${Object.keys(cache).length} items looked up and kept`)
-      } catch (e) {
-        // Offline or the wiki is down: what is cached still serves, however old.
-        sources.fail('items', e, `${stale.length} item(s) could not be looked up; the ones kept serve meanwhile`)
-      }
+    // Names being looked up already are waited for, not asked again; names that failed lately are
+    // left for now, and what is cached serves.
+    const now = Date.now()
+    const busy = stale.filter(([k]) => this.fetching.has(k)).map(([k]) => this.fetching.get(k)!)
+    const ask = stale.filter(([k]) => !this.fetching.has(k) && (force || now - (this.failedAt.get(k) ?? 0) >= RETRY_MS))
+    if (ask.length) {
+      const run = (async () => {
+        try {
+          await this.fetchInto(cache, ask)
+          for (const [k] of ask) this.failedAt.delete(k)
+          await this.save()
+          sources.ok('items', `${Object.keys(cache).length} items looked up and kept`)
+        } catch (e) {
+          // Offline or the wiki is down: what is cached still serves, however old.
+          for (const [k] of ask) this.failedAt.set(k, Date.now())
+          sources.fail('items', e, `${ask.length} item(s) could not be looked up; the ones kept serve meanwhile`)
+        }
+      })()
+      for (const [k] of ask) this.fetching.set(k, run)
+      void run.finally(() => {
+        for (const [k] of ask) if (this.fetching.get(k) === run) this.fetching.delete(k)
+      })
+      busy.push(run)
     }
+    await Promise.all(busy)
     const out: Record<string, ItemInfo> = {}
     for (const k of wanted.keys()) if (cache[k]) out[k] = strip(cache[k])
     return out
@@ -89,7 +133,21 @@ export class ItemCatalog {
       cache[key] = { ...info, fetchedAt: now }
       changed = true
     }
-    if (changed) await this.save().catch((e) => log.warn('Could not save the item cache', e))
+    if (!changed) return
+    if (this.quietSave) clearTimeout(this.quietSave)
+    this.quietSave = setTimeout(() => {
+      this.quietSave = null
+      void this.save().catch((e) => log.warn('Could not save the item cache', e))
+    }, QUIET_SAVE_MS)
+    this.quietSave.unref?.()
+  }
+
+  /** Writes what a catalog download brought, if it is still waiting to be. */
+  async flush(): Promise<void> {
+    if (!this.quietSave) return
+    clearTimeout(this.quietSave)
+    this.quietSave = null
+    await this.save().catch((e) => log.warn('Could not save the item cache', e))
   }
 
   private async fetchInto(cache: Record<string, Cached>, items: [string, string][]): Promise<void> {
