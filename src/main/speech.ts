@@ -76,8 +76,13 @@ interface Waiter {
   timer: NodeJS.Timeout
 }
 
-/** A phrase that takes longer than this to render means the engine has hung; it is restarted. */
+/**
+ * A phrase that takes longer than this to render is given up on (its caller falls back); two in a
+ * row mean the engine has hung, and it is restarted. One slow phrase restarting it would throw every
+ * other phrase waiting into the fallback voice (LT-364).
+ */
 const REQUEST_TIMEOUT_MS = 10_000
+const TIMEOUTS_TO_RESTART = 2
 /** With nothing said for this long the process is stopped; the next phrase, or warm(), starts it again. */
 const IDLE_MS = 5 * 60_000
 
@@ -87,6 +92,10 @@ export class SpeechWorker {
   private seq = 0
   private readonly waiting = new Map<number, Waiter>()
   private readonly cache = new Map<string, Buffer>()
+  /** Phrases being rendered, so a phrase got ready ahead and then asked for is rendered once. */
+  private readonly rendering = new Map<string, Promise<Buffer>>()
+  /** Requests in a row that got no answer in time. */
+  private timeouts = 0
   voices: string[] = []
   failed = ''
   /** The PowerShell process is up (it starts on first need and stops when idle). */
@@ -164,6 +173,7 @@ export class SpeechWorker {
             if (slow) clearTimeout(slow)
             resolve()
           } else if (msg.id !== undefined) {
+            this.timeouts = 0
             const w = this.waiting.get(msg.id)
             if (!w) continue
             this.waiting.delete(msg.id)
@@ -214,10 +224,18 @@ export class SpeechWorker {
   }
 
   /** Renders `text` to WAV. Phrases repeat constantly, so results are cached. */
-  async synthesize(text: string, voice: string, rate: number): Promise<Buffer> {
+  synthesize(text: string, voice: string, rate: number): Promise<Buffer> {
     const key = `${voice}|${rate}|${text}`
     const hit = this.cache.get(key)
-    if (hit) return hit
+    if (hit) return Promise.resolve(hit)
+    const busy = this.rendering.get(key)
+    if (busy) return busy
+    const p = this.render(key, text, voice, rate).finally(() => this.rendering.delete(key))
+    this.rendering.set(key, p)
+    return p
+  }
+
+  private async render(key: string, text: string, voice: string, rate: number): Promise<Buffer> {
     await this.warm()
     const proc = this.proc
     if (!proc) throw new Error(this.failed || 'Speech engine unavailable')
@@ -225,8 +243,13 @@ export class SpeechWorker {
     const wav = await new Promise<Buffer>((resolve, reject) => {
       const timer = setTimeout(() => {
         if (!this.waiting.delete(id)) return
-        log.warn(`Speech took over ${REQUEST_TIMEOUT_MS / 1000}s; restarting the engine`)
         reject(new Error('Speech engine did not answer'))
+        if (++this.timeouts < TIMEOUTS_TO_RESTART) {
+          log.warn(`Speech took over ${REQUEST_TIMEOUT_MS / 1000}s for one phrase`)
+          return
+        }
+        log.warn(`Speech took over ${REQUEST_TIMEOUT_MS / 1000}s twice running; restarting the engine`)
+        this.timeouts = 0
         // The next request starts a fresh one.
         this.restart(proc)
       }, REQUEST_TIMEOUT_MS)

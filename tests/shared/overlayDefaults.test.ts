@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { DEFAULT_OVERLAYS, defaultPlacement, minOpacity, newOverlaySpot, opacityStyle, type WorkArea } from '../../src/shared/overlays'
+import { DEFAULT_OVERLAYS, defaultPlacement, minOpacity, newOverlaySpot, opacityStyle, overlayScale, type WorkArea } from '../../src/shared/overlays'
 
 const inside = (r: WorkArea, a: WorkArea) => r.x >= a.x && r.y >= a.y && r.x + r.width <= a.x + a.width && r.y + r.height <= a.y + a.height
 const overlap = (p: WorkArea, q: WorkArea) => p.x < q.x + q.width && q.x < p.x + p.width && p.y < q.y + q.height && q.y < p.y + p.height
@@ -22,6 +22,17 @@ describe('where the overlays go', () => {
       for (const [id, r] of place) expect(inside(r, a), `${id} on ${a.width}×${a.height}`).toBe(true)
       for (const [p, r] of place) for (const [q, s] of place) if (p !== q) expect(overlap(r, s), `${p} and ${q} on ${a.width}×${a.height}`).toBe(false)
     }
+  })
+
+  it('starts them larger on a taller monitor, a quarter at a time, at most half again (LT-355)', () => {
+    expect(overlayScale({ x: 0, y: 0, width: 1920, height: 1040 })).toBe(1)
+    expect(overlayScale({ x: 0, y: 0, width: 1280, height: 680 })).toBe(1)
+    expect(overlayScale({ x: 0, y: 0, width: 2560, height: 1400 })).toBe(1.25)
+    expect(overlayScale({ x: 0, y: 0, width: 3840, height: 2120 })).toBe(1.5)
+    const big = defaultPlacement({ x: 0, y: 0, width: 2560, height: 1400 })
+    expect(big['meter'].width).toBe(475)
+    // The shipped defaults are the 1080p layout.
+    expect(DEFAULT_OVERLAYS.find((o) => o.id === 'meter')).toMatchObject(defaultPlacement({ x: 0, y: 0, width: 1920, height: 1040 })['meter'])
   })
 
   it('steps an added overlay past the ones already where it would go', () => {

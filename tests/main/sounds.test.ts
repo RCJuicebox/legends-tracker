@@ -87,7 +87,9 @@ describe('playing a sound', () => {
     await notifier.playSound('bell.mp3', 0.5)
     expect(audio).toHaveLength(1)
     const a = audio[0]
-    expect(a).toMatchObject({ kind: 'sound', volume: 0.5, name: 'bell.mp3' })
+    expect(a).toMatchObject({ kind: 'sound', volume: 0.5 })
+    // Named by its whole path and when it was written, so two folders' bell.mp3 are two sounds.
+    expect(a.kind === 'sound' && a.name.startsWith(`${join(defaults, 'bell.mp3')}|`)).toBe(true)
     expect(a.kind === 'sound' && Buffer.from(a.data).toString()).toBe('sound bell.mp3')
   })
 

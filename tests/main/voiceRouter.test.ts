@@ -8,14 +8,14 @@ vi.mock('../../src/main/log', () => ({ log: { info: vi.fn(), warn: vi.fn(), erro
 const { VoiceRouter } = await import('../../src/main/azureSpeech')
 const { log } = await import('../../src/main/log')
 
-function engines() {
+function engines(clock = { t: 0 }) {
   const windows = {
     synthesize: vi.fn(async (text: string, voice: string, rate: number) => Buffer.from(`win:${voice}:${rate}:${text}`)),
     warm: vi.fn(async () => undefined)
   }
   const azure = { synthesize: vi.fn(async (text: string, voice: string, rate: number) => Buffer.from(`azure:${voice}:${rate}:${text}`)) }
-  const router = new VoiceRouter(windows, azure as unknown as AzureSpeech)
-  return { windows, azure, router }
+  const router = new VoiceRouter(windows, azure as unknown as AzureSpeech, () => clock.t)
+  return { windows, azure, router, clock }
 }
 
 beforeEach(() => vi.mocked(log.warn).mockClear())
@@ -45,14 +45,34 @@ describe('speaking through the voice router', () => {
     expect(windows.synthesize).toHaveBeenCalledWith('Tester Spell down', '', 1.5)
   })
 
-  it('goes back to Azure for the next phrase once it answers again', async () => {
-    const { windows, azure, router } = engines()
+  it('leaves Azure alone for a minute after it fails, Windows warmed, then tries it again (LT-347)', async () => {
+    const { windows, azure, router, clock } = engines()
     azure.synthesize.mockRejectedValueOnce(new Error('offline'))
     await router.synthesize('one', 'azure:en-US-TesterNeural', 1)
-    const wav = await router.synthesize('two', 'azure:en-US-TesterNeural', 1)
-    expect(wav.toString()).toBe('azure:en-US-TesterNeural:1:two')
-    expect(windows.synthesize).toHaveBeenCalledOnce()
+    expect(windows.warm).toHaveBeenCalled()
+    clock.t += 30_000
+    expect((await router.synthesize('two', 'azure:en-US-TesterNeural', 1)).toString()).toBe('win::1:two')
+    expect(azure.synthesize).toHaveBeenCalledOnce()
+    clock.t += 31_000
+    const wav = await router.synthesize('three', 'azure:en-US-TesterNeural', 1)
+    expect(wav.toString()).toBe('azure:en-US-TesterNeural:1:three')
+    expect(windows.synthesize).toHaveBeenCalledTimes(2)
     expect(azure.synthesize).toHaveBeenCalledTimes(2)
+  })
+
+  it('races a phrase Azure is slow on against Windows after a second', async () => {
+    vi.useFakeTimers()
+    try {
+      const { windows, azure, router } = engines()
+      azure.synthesize.mockImplementationOnce(() => new Promise((r) => setTimeout(() => r(Buffer.from('late azure')), 8000)))
+      const said = router.synthesize('slow', 'azure:en-US-TesterNeural', 1)
+      await vi.advanceTimersByTimeAsync(1100)
+      expect((await said).toString()).toBe('win::1:slow')
+      expect(windows.synthesize).toHaveBeenCalledOnce()
+      await vi.advanceTimersByTimeAsync(8000)
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   it('writes the Azure failure to the diagnostic log only the first time', async () => {

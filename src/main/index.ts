@@ -17,7 +17,7 @@ import { appUserModelId, ensureSourceShortcut } from './appIdentity'
 import { appIcon } from './bootstrap'
 import { isOwnPage } from './push'
 import { log, logDir } from './log'
-import { defaultPlacement } from '../shared/overlays'
+import { defaultPlacement, overlayScale } from '../shared/overlays'
 
 if (primaryInstance) {
   // Building the context reads every settings file; a throw there must end this copy, not leave a
@@ -113,10 +113,14 @@ async function start(ctx: AppContext): Promise<void> {
   setInterval(ctx.applyPriority, 60_000).unref()
 }
 
-/** A first install gets its overlays laid out on the primary monitor, not wherever the defaults point. */
+/**
+ * A first install gets its overlays laid out on the primary monitor, not wherever the defaults point,
+ * and sized, text too, for its height.
+ */
 function placeOverlaysForNewInstall(ctx: AppContext): void {
   const a = screen.getPrimaryDisplay().workArea
   const s = ctx.store.settings.get()
-  const place = defaultPlacement(a)
-  ctx.store.settings.set({ ...s, overlays: s.overlays.map((o) => (place[o.id] ? { ...o, ...place[o.id] } : o)) })
+  const scale = overlayScale(a)
+  const place = defaultPlacement(a, scale)
+  ctx.store.settings.set({ ...s, overlays: s.overlays.map((o) => (place[o.id] ? { ...o, ...place[o.id], fontSize: Math.round(o.fontSize * scale) } : o)) })
 }

@@ -215,18 +215,34 @@ describe('the Windows speech engine failing', () => {
     w.stop()
   })
 
-  it('restarts an engine that takes over ten seconds over a phrase', async () => {
+  it('gives up on one slow phrase alone, and restarts an engine that takes over ten seconds twice running (LT-364)', async () => {
     const w = new SpeechWorker()
     await w.warm()
     procs[0].answer = false
     const pending = w.synthesize('stuck', '', 1)
     const settled = expect(pending).rejects.toThrow('Speech engine did not answer')
-    await vi.advanceTimersByTimeAsync(10_000)
+    await vi.advanceTimersByTimeAsync(5_000)
+    const other = w.synthesize('waiting', '', 1)
+    const otherSettled = expect(other).rejects.toThrow('Speech engine did not answer')
+    await vi.advanceTimersByTimeAsync(5_000)
     await settled
+    // One timeout: the other phrase still waits on the same engine.
+    expect(procs[0].killed).toBe(false)
+    await vi.advanceTimersByTimeAsync(5_000)
+    await otherSettled
     expect(procs[0].killed).toBe(true)
     const wav = await w.synthesize('unstuck', '', 1)
     expect(wav.toString()).toBe('wav:unstuck')
     expect(spawn).toHaveBeenCalledTimes(2)
+    w.stop()
+  })
+
+  it('renders a phrase asked for twice while rendering once', async () => {
+    const w = new SpeechWorker()
+    await w.warm()
+    const [a, b] = await Promise.all([w.synthesize('twice', '', 1), w.synthesize('twice', '', 1)])
+    expect(a).toBe(b)
+    expect(procs[0].asked.filter((r) => r.text === 'twice')).toHaveLength(1)
     w.stop()
   })
 

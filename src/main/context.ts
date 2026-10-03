@@ -185,7 +185,9 @@ export function createContext(): AppContext {
     load: loadPage,
     onBoundsChanged: (id, b) => {
       const s = store.settings.get()
-      store.settings.set({ ...s, overlays: s.overlays.map((o) => (o.id === id ? { ...o, x: b.x, y: b.y, width: b.width, height: b.height } : o)) })
+      // Through the same floor the saved settings have (40 px), though the window will not go smaller anyway.
+      const size = { width: Math.max(40, b.width), height: Math.max(40, b.height) }
+      store.settings.set({ ...s, overlays: s.overlays.map((o) => (o.id === id ? { ...o, x: b.x, y: b.y, ...size } : o)) })
       toMain('state:settings', store.settings.get())
     }
   })
@@ -194,6 +196,7 @@ export function createContext(): AppContext {
     if (previous.gameRunning && !state.gameRunning) ctx.engine.gameClosed()
     if (!previous.gameRunning && state.gameRunning) ctx.engine.gameStarted()
     ctx.refreshOverlayVisibility()
+    ctx.overlays.setGameInFront(state.foregroundName === 'eqgame')
     // Another window to the front: the game may have put itself above the overlays as it came back.
     if (state.foregroundPid !== previous.foregroundPid) ctx.overlays.reassertTop()
   })

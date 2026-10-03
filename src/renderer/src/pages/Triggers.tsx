@@ -454,7 +454,10 @@ function ActionEditor({ a, onChange, onRemove }: { a: TriggerAction; onChange: (
           <Field label="Bar colour">
             <input type="color" value={a.color} onChange={(e) => onChange({ ...a, color: e.target.value })} style={{ width: 44, height: 32, padding: 2 }} />
           </Field>
-          <Field label="End early when" hint="One phrase per line. ${Name} is fixed to what started this timer.">
+          <Field
+            label="End early when"
+            hint="One phrase per line. ${Name} is fixed to what started this timer. A timer runs to its end and says its end speech unless one of these ends it: a mob's death ends spell timers on it, not this one, so add its death line (You have slain ${Name}!) to stop it then."
+          >
             <textarea
               className="mono"
               rows={2}

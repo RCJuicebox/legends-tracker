@@ -7,8 +7,8 @@ import type { AudioSettings } from '../../../shared/types'
 // are worse than losing them.
 
 type Play =
-  | { kind: 'speech'; wav: Uint8Array; interrupt: boolean }
-  | { kind: 'speech-fallback'; text: string; interrupt: boolean }
+  | { kind: 'speech'; wav: Uint8Array; interrupt: boolean; expiresAt?: number }
+  | { kind: 'speech-fallback'; text: string; interrupt: boolean; expiresAt?: number }
   | { kind: 'sound'; data: Uint8Array; volume: number; name: string }
 
 const MAX_QUEUE = 6
@@ -22,14 +22,26 @@ soundGain.connect(master)
 master.connect(ctx.destination)
 
 let config: AudioSettings | null = null
+/** Decoded sounds by path, the most recently played last; at most SOUNDS_KEPT. */
 const soundCache = new Map<string, AudioBuffer>()
-const queue: (() => Promise<void>)[] = []
+const SOUNDS_KEPT = 32
+/** Phrases waiting their turn, each with when it is too late to say. */
+const queue: { play: () => Promise<void>; expiresAt?: number }[] = []
 let speaking: { stop: () => void } | null = null
 let busy = false
 
+/** Everything said or waiting stops. */
+function hush(): void {
+  queue.length = 0
+  speaking?.stop()
+  window.speechSynthesis?.cancel()
+}
+
 async function applyConfig(c: AudioSettings): Promise<void> {
+  // Muting silences the phrase playing and those queued too, not only what comes after (LT-344).
+  if (c.muted && !config?.muted) hush()
   config = c
-  master.gain.value = c.masterVolume
+  master.gain.value = c.muted ? 0 : c.masterVolume
   speechGain.gain.value = c.speechVolume
   soundGain.gain.value = c.soundVolume
   const sink = c.deviceId && c.deviceId !== 'default' ? c.deviceId : ''
@@ -65,8 +77,10 @@ async function pump(): Promise<void> {
   busy = true
   while (queue.length) {
     const next = queue.shift()!
+    // A cue whose timer has ended by its turn is not worth saying.
+    if (next.expiresAt !== undefined && Date.now() > next.expiresAt) continue
     try {
-      await next()
+      await next.play()
     } catch {
       // A phrase that fails to play must not block the ones behind it.
     }
@@ -74,14 +88,11 @@ async function pump(): Promise<void> {
   busy = false
 }
 
-function enqueueSpeech(job: () => Promise<void>, interrupt: boolean): void {
-  if (interrupt) {
-    queue.length = 0
-    speaking?.stop()
-    window.speechSynthesis?.cancel()
-  }
+function enqueueSpeech(play: () => Promise<void>, interrupt: boolean, expiresAt?: number): void {
+  if (config?.muted) return
+  if (interrupt) hush()
   if (queue.length >= MAX_QUEUE) queue.shift()
-  queue.push(job)
+  queue.push({ play, expiresAt })
   void pump()
 }
 
@@ -89,19 +100,23 @@ async function handle(cmd: Play): Promise<void> {
   if (ctx.state === 'suspended') await ctx.resume()
   if (cmd.kind === 'sound') {
     let buf = soundCache.get(cmd.name)
-    if (!buf) {
-      buf = await decode(cmd.data)
-      soundCache.set(cmd.name, buf)
-    }
+    if (buf) soundCache.delete(cmd.name)
+    else buf = await decode(cmd.data)
+    soundCache.set(cmd.name, buf)
+    if (soundCache.size > SOUNDS_KEPT) soundCache.delete(soundCache.keys().next().value!)
     playBuffer(buf, soundGain, cmd.volume)
   } else if (cmd.kind === 'speech') {
     const wav = cmd.wav
-    enqueueSpeech(async () => {
-      const p = playBuffer(await decode(wav), speechGain)
-      speaking = p
-      await p.done
-      speaking = null
-    }, cmd.interrupt)
+    enqueueSpeech(
+      async () => {
+        const p = playBuffer(await decode(wav), speechGain)
+        speaking = p
+        await p.done
+        speaking = null
+      },
+      cmd.interrupt,
+      cmd.expiresAt
+    )
   } else {
     // The speech engine is unavailable: Chromium's own voice, on the default device.
     const text = cmd.text
@@ -115,7 +130,8 @@ async function handle(cmd: Play): Promise<void> {
           u.onerror = () => resolve()
           window.speechSynthesis.speak(u)
         }),
-      cmd.interrupt
+      cmd.interrupt,
+      cmd.expiresAt
     )
   }
 }

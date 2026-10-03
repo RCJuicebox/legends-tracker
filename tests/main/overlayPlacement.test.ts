@@ -7,7 +7,7 @@ import type { OverlayConfig } from '../../src/shared/types'
 type Rect = { x: number; y: number; width: number; height: number }
 const displays: { workArea: Rect }[] = []
 const created: { opts: Rect; bounds: Rect[]; mouse: string[] }[] = []
-const screenEvents = new Map<string, () => void>()
+const screenEvents = new Map<string, (...args: unknown[]) => void>()
 const cursor = { x: 0, y: 0 }
 
 vi.mock('electron', () => {
@@ -21,6 +21,10 @@ vi.mock('electron', () => {
     setBounds(b: Rect) {
       this.record.bounds.push(b)
     }
+    getBounds() {
+      return this.record.bounds.at(-1) ?? this.record.opts
+    }
+    setMinimumSize() {}
     setAlwaysOnTop() {}
     setIgnoreMouseEvents(ignore: boolean, o?: { forward?: boolean }) {
       this.record.mouse.push(!ignore ? 'mouse' : o?.forward ? 'moves' : 'through')
@@ -45,7 +49,7 @@ vi.mock('electron', () => {
       getPrimaryDisplay: () => displays[0],
       getDisplayMatching: () => ({ id: 1 }),
       getCursorScreenPoint: () => ({ ...cursor }),
-      on: (event: string, fn: () => void) => void screenEvents.set(event, fn)
+      on: (event: string, fn: (...args: unknown[]) => void) => void screenEvents.set(event, fn)
     }
   }
 })
@@ -142,7 +146,7 @@ describe('host windows', () => {
     manager.apply([overlay({ id: 'a', x: 100, y: 100, width: 300, height: 200 }), overlay({ id: 'b', x: 900, y: 600, width: 200, height: 100 })])
     expect(created).toHaveLength(1)
     const w = created[0]
-    expect(w.bounds[w.bounds.length - 1]).toEqual({ x: 100, y: 100, width: 1000, height: 600 })
+    expect(w.bounds.at(-1) ?? w.opts).toEqual({ x: 100, y: 100, width: 1000, height: 600 })
   })
 
   it('gives each overlay a window of its own while arranging, and one host again after', () => {
@@ -212,16 +216,32 @@ describe('monitors changing', () => {
       manager.followDisplays()
       manager.apply([overlay({ x: 2400, y: 300 })])
       expect(created).toHaveLength(1)
-      expect(created[0].bounds.at(-1)).toMatchObject({ x: 2400, y: 300 })
+      expect(created[0].bounds.at(-1) ?? created[0].opts).toMatchObject({ x: 2400, y: 300 })
       // The right-hand monitor goes; Windows reports it more than once.
       displays.splice(1, 1)
       screenEvents.get('display-removed')!()
       screenEvents.get('display-metrics-changed')!()
       await vi.advanceTimersByTimeAsync(1000)
-      // A new host window, brought onto the primary monitor.
-      expect(created).toHaveLength(2)
-      const b = created[1].bounds.at(-1)!
+      // The same host window, moved onto the primary monitor: the overlays do not blank (LT-349).
+      expect(created).toHaveLength(1)
+      const b = created[0].bounds.at(-1)!
       expect(b.x + b.width).toBeLessThanOrEqual(PRIMARY.width)
+      // A change of the work area alone (the taskbar moved) places nothing again.
+      const moves = created[0].bounds.length
+      screenEvents.get('display-metrics-changed')!(undefined, undefined, ['workArea'])
+      await vi.advanceTimersByTimeAsync(1000)
+      expect(created[0].bounds.length).toBe(moves)
+      // Nor does a change while the overlays are hidden, until they show.
+      manager.setShown(false)
+      displays.push({ workArea: RIGHT })
+      manager.apply([overlay({ x: 2400, y: 300 })])
+      const before = created[0].bounds.length
+      screenEvents.get('display-added')!()
+      await vi.advanceTimersByTimeAsync(1000)
+      manager.apply = vi.fn(manager.apply.bind(manager))
+      manager.setShown(true)
+      expect(manager.apply).toHaveBeenCalledOnce()
+      expect(created[0].bounds.length).toBeGreaterThanOrEqual(before)
     } finally {
       vi.useRealTimers()
     }

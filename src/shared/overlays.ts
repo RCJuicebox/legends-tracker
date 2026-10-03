@@ -26,27 +26,38 @@ export interface WorkArea {
 const FULL_HD: WorkArea = { x: 0, y: 0, width: 1920, height: 1040 }
 
 /**
+ * How much larger than the shipped sizes overlays and their text start on a monitor, by its height in
+ * Windows' scaled pixels: 1 at 1080p, 1.25 at 1440p, at most 1.5. A 13 px meter row is some 3 mm
+ * on a 27-inch 1440p screen (LT-355).
+ */
+export function overlayScale(a: WorkArea): number {
+  return Math.min(1.5, Math.max(1, Math.round((a.height / 1040) * 4) / 4))
+}
+
+/**
  * Where the built-in overlays go on a monitor, none over another: the alerts high in the middle,
  * buffs and DoTs at the right under them, respawns under the buffs, the meter at the lower left and
- * achievements above it. A small screen gets shorter bars and narrower alerts. A new install gets
- * this for its primary monitor.
+ * achievements above it. A small screen gets shorter bars and narrower alerts; a tall one, larger
+ * overlays (`scale`). A new install gets this for its primary monitor.
  */
-export function defaultPlacement(a: WorkArea): Record<string, WorkArea> {
+export function defaultPlacement(a: WorkArea, scale = overlayScale(a)): Record<string, WorkArea> {
+  const s = (n: number) => Math.round(n * scale)
   const top = a.y + Math.round(a.height * 0.18)
   // Narrower on a narrow screen, so they clear the achievements at the left.
-  const alertsWidth = Math.min(800, a.width - 880)
+  const alertsWidth = Math.min(s(800), a.width - s(880))
   // The bars start under the alerts and share what height is left with the respawns.
-  const bars = top + 200
+  const bars = top + s(180) + 20
   const room = a.y + a.height - 20 - bars
-  const barsHeight = Math.min(420, Math.round((room - 20) * 0.62))
-  const meterY = a.y + a.height - 360
+  const barsHeight = Math.min(s(420), Math.round((room - 20) * 0.62))
+  const meterY = a.y + a.height - s(300) - 60
+  const bar = s(340)
   return {
-    [OVERLAY_ALERTS]: { x: a.x + Math.round((a.width - alertsWidth) / 2), y: top, width: alertsWidth, height: 180 },
-    [OVERLAY_BUFFS]: { x: a.x + a.width - 720, y: bars, width: 340, height: barsHeight },
-    [OVERLAY_TARGETS]: { x: a.x + a.width - 370, y: bars, width: 340, height: barsHeight },
-    [OVERLAY_RESPAWNS]: { x: a.x + a.width - 720, y: bars + barsHeight + 20, width: 340, height: Math.min(260, room - barsHeight - 20) },
-    [OVERLAY_METER]: { x: a.x + 40, y: meterY, width: 380, height: 300 },
-    [OVERLAY_ACHIEVEMENTS]: { x: a.x + 40, y: top, width: 360, height: Math.min(400, meterY - 20 - top) }
+    [OVERLAY_ALERTS]: { x: a.x + Math.round((a.width - alertsWidth) / 2), y: top, width: alertsWidth, height: s(180) },
+    [OVERLAY_BUFFS]: { x: a.x + a.width - 2 * bar - 40, y: bars, width: bar, height: barsHeight },
+    [OVERLAY_TARGETS]: { x: a.x + a.width - bar - 30, y: bars, width: bar, height: barsHeight },
+    [OVERLAY_RESPAWNS]: { x: a.x + a.width - 2 * bar - 40, y: bars + barsHeight + 20, width: bar, height: Math.min(s(260), room - barsHeight - 20) },
+    [OVERLAY_METER]: { x: a.x + 40, y: meterY, width: s(380), height: s(300) },
+    [OVERLAY_ACHIEVEMENTS]: { x: a.x + 40, y: top, width: s(360), height: Math.min(s(400), meterY - 20 - top) }
   }
 }
 

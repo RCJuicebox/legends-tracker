@@ -1,7 +1,6 @@
-import { memo, useEffect, useMemo, useState } from 'react'
+import { memo, useEffect, useMemo, useRef, useState } from 'react'
 import { createRoot } from 'react-dom/client'
 import '../styles.css'
-import '../alerts/alerts.css'
 import { api } from '../api'
 import { OverlayRegion } from './regions'
 import type { CombatSnapshot, OverlayConfig, TimerView } from '../../../shared/types'
@@ -15,19 +14,19 @@ import { opacityStyle } from '../../../shared/overlays'
 const NO_TIMERS: TimerView[] = []
 
 /**
- * One overlay's region. Each is given only what it draws (a meter region never sees the timers), and
- * is drawn again only when that changes: timers come up to five times a second and the meter twice.
+ * One overlay's region. Each is given only what it draws (a meter region never sees the timers, a
+ * timers region only its own), and is drawn again only when that changes: timers come up to five
+ * times a second and the meter twice.
  */
 const Region = memo(function Region(p: { c: OverlayConfig; origin: { x: number; y: number }; timers: TimerView[]; combat: CombatSnapshot | null; track: AchievementTrack | null }) {
   const { c, origin } = p
-  const mine = useMemo(() => p.timers.filter((t) => t.overlay === c.id), [p.timers, c.id])
   return (
     <div
       className="host-region"
       style={{ left: Math.round(c.x) - origin.x, top: Math.round(c.y) - origin.y, width: Math.round(c.width), height: Math.round(c.height), ...opacityStyle(c) }}
     >
       <div className="overlay">
-        <OverlayRegion config={c} timers={mine} combat={p.combat} track={p.track} arranging={false} />
+        <OverlayRegion config={c} timers={p.timers} combat={p.combat} track={p.track} arranging={false} />
       </div>
     </div>
   )
@@ -39,6 +38,21 @@ function Host() {
   const [timers, setTimers] = useState<TimerView[]>([])
   const [combat, setCombat] = useState<CombatSnapshot | null>(null)
   const [track, setTrack] = useState<AchievementTrack | null>(null)
+  // The timers split once by overlay, each list kept as it was when its timers did not change, so a
+  // push for one overlay does not draw the others again (LT-360).
+  const split = useRef(new Map<string, { key: string; list: TimerView[] }>())
+  const byOverlay = useMemo(() => {
+    const next = new Map<string, TimerView[]>()
+    for (const t of timers) next.set(t.overlay, [...(next.get(t.overlay) ?? []), t])
+    const kept = new Map<string, { key: string; list: TimerView[] }>()
+    for (const [id, list] of next) {
+      const key = JSON.stringify(list)
+      const had = split.current.get(id)
+      kept.set(id, had && had.key === key ? had : { key, list })
+    }
+    split.current = kept
+    return kept
+  }, [timers])
 
   useEffect(() => {
     // What to draw, asked for once the page listens (a push sent while it loaded may be gone).
@@ -70,7 +84,7 @@ function Host() {
           key={c.id}
           c={c}
           origin={origin}
-          timers={c.kind === 'timers' ? timers : NO_TIMERS}
+          timers={(c.kind === 'timers' && byOverlay.get(c.id)?.list) || NO_TIMERS}
           combat={c.kind === 'meter' ? combat : null}
           track={c.kind === 'achievements' ? track : null}
         />

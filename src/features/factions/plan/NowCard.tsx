@@ -54,8 +54,11 @@ export function NowCard({
           </button>
         )}
         <span className="spacer" />
-        <label className="row tight small" title="Said aloud when a step is done, with the next; each achievement it finishes flashes on the alerts overlay">
-          <Switch on={cues} onChange={onCues} label="Say when a step is done" /> Say when a step is done
+        <label
+          className="row tight small"
+          title="Said aloud when a step is done, with the next; each achievement it finishes flashes on the alerts overlay. The same switch is on Overlays"
+        >
+          <Switch on={cues} onChange={onCues} label="Say when a step is done" /> Say when a step is done <span className="faint">(also on Overlays)</span>
         </label>
       </div>
       {step && track ? (

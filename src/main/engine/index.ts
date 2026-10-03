@@ -114,7 +114,8 @@ export class Engine {
     this.statusOut = new Throttled(1000, () => this.out.status({ ...this.status }))
     this.board = new TimerBoard({
       onChange: () => this.timersOut.mark(),
-      onNotify: (ns) => this.notifier.notify(ns)
+      onNotify: (ns, t) => this.notifier.notify(ns, t),
+      onAdd: (t) => this.notifier.prepare(t.onWarn)
     })
     this.triggers = new TriggerEngine(this.board, {
       notify: (ns) => this.notifier.notify(ns),
@@ -337,6 +338,7 @@ export class Engine {
   }
 
   reconfigure(): void {
+    this.notifier.reconfigure()
     this.tracker?.configure(this.trackerConfig())
     // Charm pets on or off changes whose every past blow was: the fights on record are read again.
     if (this.combat.applySettings() && this.status.watching) void this.rebuildCombat(this.settings.combat.historyMinutes)

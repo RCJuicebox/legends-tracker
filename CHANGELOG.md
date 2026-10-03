@@ -10,6 +10,14 @@ What changed in each version. The release workflow publishes a version's section
 - **New timer bars show at once**, with their line, rather than up to a third of a second after.
 - **Spell Timers keeps unsaved rule edits.** Opening another spell's row threw away what you had typed in the one before; the edits now stay until you save or discard them, the row says "not saved", and the sidebar marks Spell Timers.
 - **Fix: Upgrades › Spell upgrades without the spell file** said "Loading your casts…" for ever; it says the spell file is not loaded.
+- **Cues are not said late.** Three DoTs cueing at once queued their phrases one behind another, so the last could come ten seconds after its DoT had ended. A recast cue still waiting when its timer ends is now dropped, a fade line a few seconds after, a trigger's after ten seconds; phrases are said in the order they were due; and a cue's phrase is prepared as its timer starts, so the first cue of a new spell no longer waits on the speech engine or Azure.
+- **Muting stops what is being said.** Ctrl+Shift+F9 used to let the phrase playing and those queued (up to ten seconds) run on.
+- **Azure voices fall back quickly.** A phrase Azure is slow on is said in the Windows voice after a second, and after Azure fails it is left alone for a minute, the Windows voice made ready meanwhile. One slow Windows phrase no longer restarts the speech engine and sends every phrase waiting to the fallback voice; two in a row do. Unmuting gets the speech engine going straight away.
+- **Overlays: Reset layout, typed positions, a floor.** The Overlays page has **Reset layout** (the built-in overlays back where a new install puts them, sized for the screen) and Left, Top, Width and Height boxes on every overlay; arranging can no longer shrink one to a sliver. A new install on a 1440p or 4K screen starts the overlays and their text a quarter or a half larger.
+- **Overlays: plugging in a monitor, or the taskbar moving, no longer blanks them.** They are moved, not made again; a change while they are hidden waits until they show.
+- **Overlays stop fighting other windows for the top** while the game is not in front (Task Manager, a chat window), and the alerts arranging window is drawn in full whatever its opacity.
+- **A timers overlay too small for its bars says "+N more"**, and the same alert raised again shows once with "×N". At Background 0 the overlay text gets the alerts' deeper shadow, so it reads over snow or sky.
+- **Arrange and lock say the same everywhere**: Arrange overlays, Lock overlays.
 
 ## 2.6.0 (2026-10-02)
 

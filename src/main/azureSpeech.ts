@@ -203,31 +203,58 @@ export class AzureSpeech {
   }
 }
 
+/** A phrase Azure has not answered in this long is raced against the Windows voice. */
+const AZURE_SLOW_MS = 1000
+/** After Azure fails, phrases go to Windows for this long before Azure is tried again. */
+const AZURE_REST_MS = 60_000
+
 /**
  * Speech for the engine: an "azure:" voice through Azure, falling back to the Windows default voice
  * when Azure cannot answer (offline, a bad key), so a cue is never lost; anything else through Windows.
+ * A cue has seconds, not Azure's ten: a phrase Azure is slow on is raced against Windows after a
+ * second (Azure's answer is still kept for next time), and after a failure Azure is left alone for a
+ * minute, Windows warmed meanwhile (LT-347, LT-363).
  */
 export class VoiceRouter {
   private warned = false
+  private downUntil = 0
 
   constructor(
     private readonly windows: Pick<SpeechWorker, 'synthesize' | 'warm'>,
-    private readonly azure: AzureSpeech
+    private readonly azure: AzureSpeech,
+    private readonly now: () => number = Date.now
   ) {}
 
-  /** Gets the Windows engine going ahead of the next phrase, unless the voice comes from Azure. */
+  /** Gets the Windows engine going ahead of the next phrase, unless the voice comes from a working Azure. */
   warm(voice: string): void {
-    if (!voice.startsWith(AZURE_PREFIX)) void this.windows.warm()
+    if (!voice.startsWith(AZURE_PREFIX) || this.now() < this.downUntil) void this.windows.warm()
   }
 
   async synthesize(text: string, voice: string, rate: number): Promise<Buffer> {
-    if (!voice.startsWith(AZURE_PREFIX)) return this.windows.synthesize(text, voice, rate)
-    try {
-      return await this.azure.synthesize(text, voice.slice(AZURE_PREFIX.length), rate)
-    } catch (e) {
+    if (!voice.startsWith(AZURE_PREFIX) || this.now() < this.downUntil) return this.windows.synthesize(text, voice.startsWith(AZURE_PREFIX) ? '' : voice, rate)
+    const azure = this.azure.synthesize(text, voice.slice(AZURE_PREFIX.length), rate)
+    const failed = (e: unknown) => {
       if (!this.warned) log.warn('Azure speech failed; using the Windows voice meanwhile:', e)
       this.warned = true
+      this.downUntil = this.now() + AZURE_REST_MS
+      void this.windows.warm()
+    }
+    let slow: NodeJS.Timeout | undefined
+    const first = await Promise.race([
+      azure.then(
+        (wav) => ({ wav }),
+        (error: unknown) => ({ error })
+      ),
+      new Promise<null>((r) => (slow = setTimeout(() => r(null), AZURE_SLOW_MS)))
+    ])
+    clearTimeout(slow)
+    if (first && 'wav' in first) return first.wav
+    if (first) {
+      failed(first.error)
       return this.windows.synthesize(text, '', rate)
     }
+    // Slow: whichever answers first; Azure's answer, if it comes, is kept on disk for next time.
+    azure.catch(failed)
+    return Promise.any([azure, this.windows.synthesize(text, '', rate)])
   }
 }

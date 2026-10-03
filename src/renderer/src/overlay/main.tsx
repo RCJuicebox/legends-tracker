@@ -10,7 +10,7 @@ import { opacityStyle } from '../../../shared/overlays'
 // One overlay in a window of its own: how the overlays are drawn while being arranged. While
 // playing they share a host window per monitor instead (host.tsx).
 
-/** Timers and the damage meter; the alerts overlay has a page of its own (src/alerts). */
+/** Any kind of overlay, alone in its window while it is arranged. */
 function Overlay() {
   const [config, setConfig] = useState<OverlayConfig | null>(null)
   const [arranging, setArranging] = useState(false)
@@ -34,12 +34,13 @@ function Overlay() {
   if (!config) return null
   const mine = timers.filter((t) => t.overlay === config.id)
   return (
-    <div className={`overlay${arranging ? ' arranging' : ''}`} style={opacityStyle(config)}>
+    // Arranging, the alerts are drawn in full, whatever their opacity, so they can be found (LT-351).
+    <div className={`overlay${arranging ? ' arranging' : ''}`} style={arranging && config.kind === 'alerts' ? undefined : opacityStyle(config)}>
       <OverlayRegion config={config} timers={mine} combat={combat} track={track} arranging={arranging} />
       {arranging && (
         <div className="arrange-label">
           {config.name} — drag to move, drag edges to resize
-          <button onClick={() => void api.invoke('overlays:arrange', false)}>Done</button>
+          <button onClick={() => void api.invoke('overlays:arrange', false)}>Lock overlays</button>
         </div>
       )}
     </div>

@@ -22,6 +22,8 @@ export type EndReason = 'faded' | 'expired' | 'died' | 'zoned' | 'cleared' | 're
 
 export interface BoardEvents {
   onChange: () => void
+  /** A timer not running before: its cue phrases can be got ready. */
+  onAdd?: (timer: BoardTimer) => void
   onNotify: (n: Notification[], timer: BoardTimer) => void
   onEnd?: (timer: BoardTimer, reason: EndReason) => void
 }
@@ -74,7 +76,9 @@ export class TimerBoard {
   }
 
   upsert(timer: BoardTimer): void {
+    const added = !this.timers.has(timer.key)
     this.timers.set(timer.key, timer)
+    if (added) this.events.onAdd?.(timer)
     this.events.onChange()
   }
 

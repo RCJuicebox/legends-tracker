@@ -23,9 +23,8 @@ const STREAMS = {
   achievements: { channel: 'overlay:achievements', kind: 'achievements' }
 } as const satisfies Record<keyof Streams, { channel: PushChannel; kind: Kind }>
 
-/** The alerts overlay has a page of its own, without React or the meter; the rest share one. */
-type OverlayPage = 'overlay' | 'alerts' | 'overlays'
-const pageFor = (kind: Kind): OverlayPage => (kind === 'alerts' ? 'alerts' : 'overlay')
+/** An overlay alone in its window (arranging), or the overlays of one monitor (playing). */
+type OverlayPage = 'overlay' | 'overlays'
 
 export interface OverlayHost {
   load: (win: BrowserWindow, page: OverlayPage, query: Record<string, string>) => void
@@ -44,7 +43,7 @@ export interface OverlayHost {
  * - Click-through (ignore mouse events), so a bar over the game never eats a click in combat.
  * - Never focusable: EverQuest stops taking keyboard input the moment it loses focus.
  * - Kept out of the taskbar and Alt-Tab.
- * - Topmost is re-asserted every two seconds while shown: a borderless-windowed game re-asserts its
+ * - Topmost is re-asserted every two seconds while shown and the game is in front: a borderless-windowed game re-asserts its
  *   own z-order and can end up above overlays that were topmost when created.
  * - Hidden (the game in the background), they get no pushes and their pages are throttled; the
  *   newest timers and meter reach them when they show again.
@@ -57,8 +56,7 @@ export interface OverlayHost {
 export class OverlayManager {
   private readonly windows = new Map<string, BrowserWindow>()
   /** Play mode: one window per display that has overlays, by display id. */
-  private readonly hosts = new Map<number, { win: BrowserWindow; ids: string[]; origin: { x: number; y: number } }>()
-  private readonly pages = new Map<string, OverlayPage>()
+  private readonly hosts = new Map<number, { win: BrowserWindow; ids: string[]; origin: { x: number; y: number }; sent?: string }>()
   private configs: OverlayConfig[] = []
   private arranging = false
   private topmostTimer: NodeJS.Timeout | null = null
@@ -66,6 +64,12 @@ export class OverlayManager {
   private shown = true
   private displayTimer: NodeJS.Timeout | null = null
   private followingDisplays = false
+  /** A monitor changed while the overlays were hidden: they are placed again as they show. */
+  private displaysChanged = false
+  /** Whether the game is the window in front: topmost is fought for only then (LT-358). */
+  private gameInFront = true
+  /** Alerts of the last few seconds, for a host that loads or shows just after them (LT-362). */
+  private recentAlerts: { text: string; color: string; durationSec: number; at: number }[] = []
   /** Ten times a second while a meter is up: is the pointer over it. */
   private cursorTimer: NodeJS.Timeout | null = null
   /** How each host takes the mouse now, so it is changed only when it changes. */
@@ -78,24 +82,35 @@ export class OverlayManager {
   /**
    * Places the overlays again when a monitor is plugged in or out, or its resolution or scaling
    * changes: each host covers its overlays on one display, worked out when it was made. Once the app
-   * is ready (`screen` is not usable before); changes a moment apart are taken as one.
+   * is ready (`screen` is not usable before); changes a moment apart are taken as one. The hosts are
+   * moved, not made again, so the overlays do not blank; a change of the work area alone (the taskbar)
+   * moves nothing, and a change while they are hidden waits until they show (LT-349).
    */
   followDisplays(): void {
     if (this.followingDisplays) return
     this.followingDisplays = true
-    const changed = () => {
+    const changed = (_e?: unknown, _d?: unknown, metrics?: string[]) => {
+      if (metrics?.length && metrics.every((m) => m === 'workArea')) return
       if (this.displayTimer) clearTimeout(this.displayTimer)
       this.displayTimer = setTimeout(() => {
         this.displayTimer = null
         // Arranging, each overlay has its own window where the player is dragging it: left be.
         if (this.arranging) return
-        this.closeHosts()
+        if (!this.shown) {
+          this.displaysChanged = true
+          return
+        }
         this.apply(this.configs)
       }, 750)
     }
     screen.on('display-added', changed)
     screen.on('display-removed', changed)
     screen.on('display-metrics-changed', changed)
+  }
+
+  /** Which window is in front: the game, or another (this app's own included). */
+  setGameInFront(inFront: boolean): void {
+    this.gameInFront = inFront
   }
 
   get isArranging(): boolean {
@@ -112,20 +127,16 @@ export class OverlayManager {
       return
     }
     for (const [id, win] of this.windows) {
-      // Gone, hidden, or now another kind, whose page is another.
+      // Gone or hidden.
       const c = configs.find((x) => x.id === id)
-      if (!c?.visible || pageFor(c.kind) !== this.pages.get(id)) {
+      if (!c?.visible) {
         win.destroy()
         this.windows.delete(id)
-        this.pages.delete(id)
       }
     }
     for (const c of configs) {
       if (!c.visible) continue
       const win = this.windows.get(c.id) ?? this.create(c)
-      if (!this.arranging) win.setBounds(onScreen(c))
-      // The alerts' text fades as a whole; the others fade their panel alone, on the page (opacityStyle).
-      win.setOpacity(c.kind === 'alerts' ? c.opacity : 1)
       push(win.webContents, 'overlay:config', { config: c, arranging: this.arranging })
     }
     this.keepOnTop()
@@ -142,8 +153,10 @@ export class OverlayManager {
       clearInterval(this.topmostTimer)
       this.topmostTimer = null
     } else if (any && !this.topmostTimer) {
+      // Only while the game is in front: above Task Manager or a chat window the player brought up,
+      // the overlays have no business fighting for the top (LT-358).
       this.topmostTimer = setInterval(() => {
-        if (!this.shown) return
+        if (!this.shown || !this.gameInFront) return
         for (const w of this.allWindows) w.setAlwaysOnTop(true, 'screen-saver')
       }, 2000)
     }
@@ -152,7 +165,6 @@ export class OverlayManager {
   private closeWindows(): void {
     for (const w of this.windows.values()) if (!w.isDestroyed()) w.destroy()
     this.windows.clear()
-    this.pages.clear()
   }
 
   private closeHosts(): void {
@@ -184,10 +196,17 @@ export class OverlayManager {
         h = { win: this.createHost(bounds, displayId), ids: [], origin: { x, y } }
         this.hosts.set(displayId, h)
       }
-      h.win.setBounds(bounds)
+      // A meter header click changes one overlay's options: only its host is told, and no window is
+      // moved that has not moved (LT-361).
+      const b = h.win.getBounds()
+      if (b.x !== bounds.x || b.y !== bounds.y || b.width !== bounds.width || b.height !== bounds.height) h.win.setBounds(bounds)
       h.ids = list.map((c) => c.id)
       h.origin = { x, y }
-      push(h.win.webContents, 'overlay:host', { configs: list, origin: h.origin })
+      const sent = JSON.stringify([list, h.origin])
+      if (sent !== h.sent) {
+        h.sent = sent
+        push(h.win.webContents, 'overlay:host', { configs: list, origin: h.origin })
+      }
     }
   }
 
@@ -246,13 +265,21 @@ export class OverlayManager {
     return new Set()
   }
 
-  /** The latest of every stream a page draws: as it loads, and as it shows again. */
+  /** The latest of every stream a page draws, and alerts still up: as it loads, and as it shows again. */
   private catchUp(wc: WebContents, kinds: Set<Kind>): void {
     for (const key of Object.keys(STREAMS) as (keyof Streams)[]) {
       const { channel, kind } = STREAMS[key]
       const value = this.last[key]
       if (kinds.has(kind) && value !== null) push(wc, channel, value as never)
     }
+    if (kinds.has('alerts')) for (const a of this.liveAlerts()) push(wc, 'overlay:alert', a)
+  }
+
+  /** The alerts raised in the last few seconds that are still up. */
+  private liveAlerts() {
+    const now = Date.now()
+    this.recentAlerts = this.recentAlerts.filter((a) => now - a.at < ALERT_KEEP_MS && a.at + a.durationSec * 1000 > now)
+    return this.recentAlerts
   }
 
   /** Every shown page that draws `kind`: hosts with such an overlay, and such an overlay's own window while arranging. */
@@ -285,8 +312,10 @@ export class OverlayManager {
       webPreferences: { preload: this.host.preload, backgroundThrottling: false, sandbox: true }
     })
     win.setAlwaysOnTop(true, 'screen-saver')
-    // An overlay has a window of its own only while arranging, when it takes the mouse to be dragged.
+    // An overlay has a window of its own only while arranging, when it takes the mouse to be dragged;
+    // never so small it cannot be found and grabbed again (LT-351).
     win.setIgnoreMouseEvents(!this.arranging)
+    win.setMinimumSize(MIN_ARRANGE.width, MIN_ARRANGE.height)
     win.setMenu(null)
     const report = () => {
       if (win.isDestroyed()) return
@@ -304,10 +333,8 @@ export class OverlayManager {
       if (this.shown) win.showInactive()
       else win.webContents.setBackgroundThrottling(true)
     })
-    const page = pageFor(c.kind)
-    this.host.load(win, page, { id: c.id })
+    this.host.load(win, 'overlay', { id: c.id })
     this.windows.set(c.id, win)
-    this.pages.set(c.id, page)
     return win
   }
 
@@ -329,6 +356,10 @@ export class OverlayManager {
   setShown(show: boolean): void {
     if (show === this.shown) return
     this.shown = show
+    if (show && this.displaysChanged) {
+      this.displaysChanged = false
+      this.apply(this.configs)
+    }
     this.followCursor()
     for (const h of this.hosts.values()) {
       const w = h.win
@@ -452,9 +483,15 @@ export class OverlayManager {
     this.send('timers', views)
   }
 
-  /** An alert is for now: not kept, so one raised while the overlays are hidden is not shown later. */
+  /**
+   * An alert is for now: one raised while the overlays are hidden is not shown later. The last few
+   * seconds' are kept for a host that is still loading (just started, or placed again).
+   */
   alert(payload: { text: string; color: string; durationSec: number }): void {
-    this.toPages('alerts', (wc) => push(wc, 'overlay:alert', payload))
+    const a = { ...payload, at: Date.now() }
+    this.recentAlerts.push(a)
+    if (this.recentAlerts.length > 20) this.recentAlerts.shift()
+    this.toPages('alerts', (wc) => push(wc, 'overlay:alert', a))
   }
 
   destroy(): void {
@@ -471,6 +508,10 @@ export class OverlayManager {
 
 /** A host's hold on the mouse: none (`through`), the pointer's moves only, or the mouse. */
 type MouseState = 'through' | 'moves' | 'mouse'
+/** The smallest an overlay can be dragged to while arranging. */
+const MIN_ARRANGE = { width: 120, height: 48 }
+/** How long an alert is kept for a host that loads after it. */
+const ALERT_KEEP_MS = 5000
 /** How often the pointer is looked at while a meter is up, and how near a meter it counts as on it. */
 const CURSOR_MS = 100
 const NEAR_PX = 12

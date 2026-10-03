@@ -3,17 +3,24 @@ import { act } from '../toast'
 import { BUILTIN_OVERLAYS } from '../constants'
 import { ConfirmButton, Field, Icon, NumberInput, Switch } from '../components/ui'
 import type { MeterOverlayOptions, OverlayConfig } from '../../../shared/types'
-import { DEFAULT_ACHIEVEMENT_OPTIONS, DEFAULT_METER_OPTIONS, minOpacity, newOverlaySpot } from '../../../shared/overlays'
+import { DEFAULT_ACHIEVEMENT_OPTIONS, DEFAULT_METER_OPTIONS, defaultPlacement, minOpacity, newOverlaySpot, type WorkArea } from '../../../shared/overlays'
+
+/** Where overlays can go on the screen this window is on. */
+function thisScreen(): WorkArea {
+  const sc = window.screen as Screen & { availLeft?: number; availTop?: number }
+  return { x: sc.availLeft ?? 0, y: sc.availTop ?? 0, width: sc.availWidth, height: sc.availHeight }
+}
 
 /** The middle of the screen this window is on, sized to fit it. */
 function bringOnScreen(o: OverlayConfig): Partial<OverlayConfig> {
-  const sc = window.screen as Screen & { availLeft?: number; availTop?: number }
-  const left = sc.availLeft ?? 0
-  const top = sc.availTop ?? 0
-  const width = Math.min(o.width, sc.availWidth - 40)
-  const height = Math.min(o.height, sc.availHeight - 40)
-  return { x: Math.round(left + (sc.availWidth - width) / 2), y: Math.round(top + (sc.availHeight - height) / 2), width, height }
+  const a = thisScreen()
+  const width = Math.min(o.width, a.width - 40)
+  const height = Math.min(o.height, a.height - 40)
+  return { x: Math.round(a.x + (a.width - width) / 2), y: Math.round(a.y + (a.height - height) / 2), width, height }
 }
+
+/** Typed edits to an overlay's place save once typing stops for this long. */
+const TYPING_SAVE_MS = 300
 
 /** The opacity slider saves once it stops moving for this long; the overlay follows it at once. */
 const SLIDER_SAVE_MS = 150
@@ -85,13 +92,24 @@ export function Overlays() {
           <button className="btn" onClick={() => void act('overlays:demo')}>
             <Icon name="sparkle" /> Show demo timers
           </button>
+          <ConfirmButton
+            className="btn"
+            question="Put the built-in overlays back where they start, on this screen?"
+            title="Where a new install puts them, sized for this screen: the overlays you added stay where they are"
+            onConfirm={() => {
+              const place = defaultPlacement(thisScreen())
+              void patchSettings((s) => ({ ...s, overlays: s.overlays.map((o) => (place[o.id] ? { ...o, ...place[o.id] } : o)) }))
+            }}
+          >
+            Reset layout
+          </ConfirmButton>
           <button className={`btn ${state.arranging ? 'on' : 'primary'}`} aria-pressed={state.arranging} onClick={() => void act('overlays:arrange', !state.arranging)}>
-            <Icon name="move" /> {state.arranging ? 'Done arranging' : 'Arrange on screen'}
+            <Icon name="move" /> {state.arranging ? 'Lock overlays' : 'Arrange overlays'}
           </button>
         </div>
       </div>
 
-      <div className="card row mb-16">
+      <label className="card row mb-16">
         <Switch
           on={state.settings.overlaysOnlyWithGame}
           label="Only show overlays while the game has focus"
@@ -104,12 +122,12 @@ export function Overlays() {
             Audio cues play either way.
           </div>
         </div>
-      </div>
+      </label>
 
       {state.arranging && (
         <div className="notice mb-16">
           Drag each outlined window where you want it and drag its edges to resize. Positions save as you go. Click
-          <b> Done arranging</b> to make them click-through again.
+          <b> Lock overlays</b> to make them click-through again.
         </div>
       )}
 
@@ -124,7 +142,7 @@ export function Overlays() {
             </h2>
             <div className="stack gap-12">
               <Field label="Name">
-                <input value={o.name} onChange={(e) => update(o.id, { name: e.target.value })} />
+                <input value={o.name} onChange={(e) => update(o.id, { name: e.target.value }, TYPING_SAVE_MS)} />
               </Field>
               <div className="grid two">
                 <Field label={o.kind === 'timers' ? 'Bar text size' : 'Text size'}>
@@ -162,7 +180,8 @@ export function Overlays() {
                   </label>
                   <label className="check">
                     <input type="checkbox" checked={state.settings.achievementCues} onChange={(e) => patchSettings((s) => ({ ...s, achievementCues: e.target.checked }))} />
-                    Say when a faction plan step is done, and flash each achievement it finishes
+                    Say when a step is done
+                    <span className="faint small">the faction plan's, as on the Plan tab's Now card; each achievement it finishes flashes on the alerts overlay</span>
                   </label>
                   <p className="faint small m-0">
                     The step of the faction plan you follow (Factions › Plan), counting down as your factions move; the Slayer achievements your last half hour of kills counted
@@ -171,10 +190,23 @@ export function Overlays() {
                   </p>
                 </>
               )}
-              <div className="row tight">
-                <span className="faint small mono grow">
-                  {o.width}×{o.height} at {o.x}, {o.y}
-                </span>
+              <div className="overlay-place">
+                {(
+                  [
+                    ['x', 'Left'],
+                    ['y', 'Top'],
+                    ['width', 'Width'],
+                    ['height', 'Height']
+                  ] as const
+                ).map(([k, label]) => (
+                  <Field key={k} label={label}>
+                    <NumberInput
+                      value={Math.round(o[k])}
+                      min={k === 'width' || k === 'height' ? 40 : undefined}
+                      onChange={(v) => v !== undefined && update(o.id, { [k]: k === 'width' || k === 'height' ? Math.max(40, v) : v }, TYPING_SAVE_MS)}
+                    />
+                  </Field>
+                ))}
                 <button
                   className="btn small ghost"
                   title="Moves it to the middle of the screen this window is on: for an overlay lost off screen after a monitor change"

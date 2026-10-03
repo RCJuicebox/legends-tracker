@@ -489,13 +489,25 @@ function TrackedRow({ t, now }: { t: TrackedAchievement; now: number }) {
 }
 
 /** Lines of text that fade on their own (the alerts overlay), in a host window. */
-function AlertsRegion({ config }: { config: OverlayConfig }) {
-  const [alerts, setAlerts] = useState<{ id: number; text: string; color: string; until: number }[]>([])
+/**
+ * A few lines of text that fade on their own. The same text again while it shows is one line,
+ * "×N", kept up for its new time (LT-362), so ten identical trigger lines do not fill the overlay.
+ */
+function AlertsRegion({ config, arranging }: { config: OverlayConfig; arranging: boolean }) {
+  const [alerts, setAlerts] = useState<{ id: number; text: string; color: string; until: number; times: number; ats: number[] }[]>([])
   useEffect(
     () =>
-      api.on('overlay:alert', (a: { text: string; color: string; durationSec: number }) => {
-        const id = Date.now() + Math.random()
-        setAlerts((list) => [...list.slice(-5), { id, text: a.text, color: a.color || '#ffd84d', until: Date.now() + (a.durationSec || 5) * 1000 }])
+      api.on('overlay:alert', (a: { text: string; color: string; durationSec: number; at?: number }) => {
+        const at = a.at ?? Date.now()
+        const until = at + (a.durationSec || 5) * 1000
+        if (until <= Date.now()) return
+        setAlerts((list) => {
+          // One sent again as the overlay shows again is already here.
+          if (list.some((x) => x.ats.includes(at) && x.text === a.text)) return list
+          const same = list.find((x) => x.text === a.text && x.until > Date.now())
+          if (same) return list.map((x) => (x === same ? { ...x, color: a.color || x.color, until: Math.max(x.until, until), times: x.times + 1, ats: [...x.ats, at] } : x))
+          return [...list.slice(-5), { id: Date.now() + Math.random(), text: a.text, color: a.color || '#ffd84d', until, times: 1, ats: [at] }]
+        })
       }),
     []
   )
@@ -509,8 +521,14 @@ function AlertsRegion({ config }: { config: OverlayConfig }) {
       {alerts.map((a) => (
         <div key={a.id} className="alert-line" style={{ color: a.color, fontSize: config.fontSize }}>
           {a.text}
+          {a.times > 1 && <span className="times">×{a.times}</span>}
         </div>
       ))}
+      {arranging && !alerts.length && (
+        <div className="alert-line" style={{ color: '#ffd84d', fontSize: config.fontSize }}>
+          Alert text appears here
+        </div>
+      )}
     </div>
   )
 }
@@ -540,6 +558,6 @@ export function OverlayRegion({
     case 'achievements':
       return <AchievementsRegion config={config} track={track} arranging={arranging} />
     case 'alerts':
-      return <AlertsRegion config={config} />
+      return <AlertsRegion config={config} arranging={arranging} />
   }
 }

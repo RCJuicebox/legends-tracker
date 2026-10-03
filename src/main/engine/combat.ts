@@ -109,7 +109,11 @@ export class CombatFeed implements EngineFeature {
     const started = performance.now()
     const kb = JSON.stringify(snap).length / 1024
     const entities = Object.keys(this.meter.liveSession?.entities ?? {}).length
-    log.info(`Meter push: ${kb.toFixed(0)} KB, ${entities} in the session, ${snap.fights.length} fights kept (${Math.round(performance.now() - started)} ms to measure)`)
+    // The open session as a page showing it fetches it every two seconds (LT-366: kept so, but seen).
+    const sessionKb = this.meter.liveSession ? JSON.stringify(this.meter.liveSession).length / 1024 : 0
+    log.info(
+      `Meter push: ${kb.toFixed(0)} KB, ${entities} in the session, ${snap.fights.length} fights kept; the session itself ${sessionKb.toFixed(0)} KB a fetch (${Math.round(performance.now() - started)} ms to measure)`
+    )
   }
 
   meterConfig() {

@@ -391,10 +391,15 @@ instead, so no cue is lost.
 ## Overlays
 
 Transparent windows that let clicks through, never take focus (EverQuest drops keyboard input the
-moment it loses focus), stay out of Alt-Tab, and re-assert always-on-top every two seconds. The game
-must be windowed or borderless. **Arrange** lifts all of that so they can be dragged and resized;
-**Done** on any of them, or Arrange again, puts them back. An overlay's **Background** slider fades
-the dark panel behind its text and bars, down to none; the alerts, text alone, fade as a whole.
+moment it loses focus), stay out of Alt-Tab, and re-assert always-on-top every two seconds while the
+game is in front. The game must be windowed or borderless. **Arrange overlays** lifts all of that so
+they can be dragged and resized (never below 120×48); **Lock overlays**, on any of them or in the app,
+puts them back. Each overlay's place can also be typed on the Overlays page, and **Reset layout** puts
+the built-in ones back where a new install has them, sized for the screen (a new install starts them a
+quarter or a half larger on a 1440p or 4K screen). An overlay's **Background** slider fades the dark
+panel behind its text and bars, down to none, and the text's shadow deepens as it goes; the alerts,
+text alone, fade as a whole, and the same alert again shows once with "×N". A timers overlay too small
+for its bars says how many are cut off.
 Timer bars sort soonest-first and can group under each target's name. A meter overlay is the damage
 meter's list. While the pointer is over a meter (looked at ten times a second), Windows forwards the
 pointer's moves to it though it still lets clicks through, so hovering its header hands it the
@@ -899,7 +904,7 @@ the sounds in `AudioTriggers`.
 | `src/shared` | What both processes use: the IPC contract (`ipc.ts`), settings and view types, the game's tables and what is known of the game beyond them (`game/`: classes, spell effect numbers, guide bonuses; `factions.ts`, the faction planner's lore from play and Allakhazam; `hunt.ts`, where to hunt each Slayer race), the default overlays and hotkeys |
 | `src/main` | Electron main process: windows, tray, overlays, speech, icons, persistence, the engine that joins it all (`engine/`, with the contract its parts keep in `feature.ts`), the data sources and long jobs (`sources/`), IPC handlers by family (`ipc/`) |
 | `src/preload` | The IPC bridge, which lets a page use only the channels in the contract |
-| `src/renderer` | The React UI (`index.html`), timer and meter overlays (`overlay.html`), the alerts overlay without React (`alerts.html`), the hidden audio mixer (`audio.html`) |
+| `src/renderer` | The React UI (`index.html`), the overlays of one monitor (`overlays.html`), one overlay alone while it is arranged (`overlay.html`), the hidden audio mixer (`audio.html`) |
 | `tests` | Vitest, in folders that mirror `src` (`core/`, `shared/`, `main/`, `features/factions/`, `renderer/`), each test named for the module it covers where it covers one; `helpers.ts` and `fixtures/` are shared. `renderer/pages.test.tsx` draws every page in jsdom with a stub bridge, before the main process answers and with every call failing, and opens the tabs it can reach. Fixtures are real rows from the client's spell files and real lines from the test character's log. `*.bench.ts` are timing runs (`npm run bench`), not part of `npm test` |
 | `docs/formulas.md` | The game formulas, how each was measured or confirmed, and where the app implements it |
 | `scripts` | The release push, the release notes from the changelog, the smoke test, the icon renderer |

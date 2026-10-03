@@ -9,12 +9,22 @@ import type { EngineOutputs, Speaker } from './contracts'
 const SOUND_FILE = /\.(wav|mp3|ogg)$/i
 /** As many activity lines as the Live page keeps. */
 const FEED_MAX = 300
+/**
+ * How late a phrase may still be said: a timer's cue until the timer ends (a fade a few seconds
+ * after), a trigger's for ten seconds. Past that the audio window drops it rather than say it about
+ * a fight that has moved on (LT-345).
+ */
+const LATE_MS = 4000
+const TRIGGER_LATE_MS = 10_000
 
 /** What the player hears and reads: alerts, speech, sounds and the activity feed. */
 export class Notifier {
   private readonly items: FeedItem[] = []
   private speechFailed = false
   private warmedAt = 0
+  private wasMuted: boolean | null = null
+  /** Phrases go to the audio window in the order they were asked for, whichever renders first. */
+  private order: Promise<void> = Promise.resolve()
 
   constructor(
     private readonly speech: Speaker,
@@ -27,14 +37,37 @@ export class Notifier {
     return this.items
   }
 
-  notify(ns: Notification[]): void {
+  /** `timer`: the timer whose cue this is, which says how late it may still be said. */
+  notify(ns: Notification[], timer?: { endsAt: number }): void {
     const audio = this.settings().audio
+    const now = Date.now()
+    const expiresAt = timer ? Math.max(timer.endsAt, now + LATE_MS) : now + TRIGGER_LATE_MS
     for (const n of ns) {
       if (n.kind === 'text') this.out.alert({ text: n.text, color: n.color, durationSec: n.durationSec })
       else if (audio.muted) continue
-      else if (n.kind === 'speak') void this.speak(n.text, n.interrupt)
+      else if (n.kind === 'speak') void this.speak(n.text, n.interrupt, expiresAt)
       else if (n.kind === 'sound') void this.playSound(n.file, n.volume)
     }
+  }
+
+  /**
+   * Renders a new timer's cue phrases now, so the cue, when it is due, does not wait on the speech
+   * engine or Azure (LT-346). Both keep what they render, by text.
+   */
+  prepare(ns: Notification[]): void {
+    const a = this.settings().audio
+    if (a.muted) return
+    for (const n of ns) if (n.kind === 'speak' && n.text.trim()) void this.speech.synthesize(n.text, a.voice, a.rate).catch(() => {})
+  }
+
+  /** The settings changed: unmuted, the speech engine is started ahead of the next phrase (LT-363). */
+  reconfigure(): void {
+    const a = this.settings().audio
+    if (this.wasMuted === true && !a.muted) {
+      this.warmedAt = Date.now()
+      this.speech.warm?.(a.voice)
+    }
+    this.wasMuted = a.muted
   }
 
   /** The log is growing, so someone is playing: keeps the speech engine up so a cue is not held up while it starts. */
@@ -45,26 +78,36 @@ export class Notifier {
     this.speech.warm?.(this.settings().audio.voice)
   }
 
-  async speak(text: string, interrupt = false): Promise<void> {
-    if (!text.trim()) return
+  speak(text: string, interrupt = false, expiresAt?: number): Promise<void> {
+    if (!text.trim()) return Promise.resolve()
     const a = this.settings().audio
-    try {
-      const wav = await this.speech.synthesize(text, a.voice, a.rate)
-      this.out.audio({ kind: 'speech', wav: new Uint8Array(wav), interrupt })
-      if (this.speechFailed) {
-        this.speechFailed = false
-        sources.ok('speech', 'Speaking again')
+    // Rendered at once, but sent after every phrase asked for before it: a cached phrase must not
+    // overtake one still rendering (LT-345).
+    const rendered = this.speech.synthesize(text, a.voice, a.rate).then(
+      (wav) => ({ wav }),
+      (error: unknown) => ({ error })
+    )
+    const sent = this.order.then(async () => {
+      const r = await rendered
+      if ('wav' in r) {
+        this.out.audio({ kind: 'speech', wav: new Uint8Array(r.wav), interrupt, expiresAt })
+        if (this.speechFailed) {
+          this.speechFailed = false
+          sources.ok('speech', 'Speaking again')
+        }
+        return
       }
-    } catch (e) {
       // The audio window speaks it itself instead. Said once in the log, and shown on Data Sources
       // until the engine speaks again.
       if (!this.speechFailed) {
-        log.warn('Speech synthesis failed; falling back to the audio window’s own voice:', e)
-        sources.fail('speech', e, 'The audio window speaks with its own voice meanwhile')
+        log.warn('Speech synthesis failed; falling back to the audio window’s own voice:', r.error)
+        sources.fail('speech', r.error, 'The audio window speaks with its own voice meanwhile')
       }
       this.speechFailed = true
-      this.out.audio({ kind: 'speech-fallback', text, interrupt })
-    }
+      this.out.audio({ kind: 'speech-fallback', text, interrupt, expiresAt })
+    })
+    this.order = sent
+    return sent
   }
 
   async playSound(file: string, volume: number): Promise<void> {
@@ -74,8 +117,10 @@ export class Notifier {
       return
     }
     try {
-      const data = await fs.readFile(path)
-      this.out.audio({ kind: 'sound', data: new Uint8Array(data), volume, name: basename(path) })
+      const [data, stat] = await Promise.all([fs.readFile(path), fs.stat(path)])
+      // Named by its whole path and when it was written, so a trigger's own alert.wav is not taken for
+      // the library's, nor an edited file for the old one (LT-357).
+      this.out.audio({ kind: 'sound', data: new Uint8Array(data), volume, name: `${path}|${stat.mtimeMs}` })
     } catch (e) {
       this.pushFeed('warn', `Could not play ${basename(path)}: ${(e as Error).message}`)
     }

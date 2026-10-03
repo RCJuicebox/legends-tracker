@@ -241,9 +241,10 @@ export interface SourceView {
   refreshable: boolean
 }
 
+/** `expiresAt`: past this time (epoch ms) a phrase still queued is dropped, not said late. */
 export type AudioCommand =
-  | { kind: 'speech'; wav: Uint8Array; interrupt: boolean }
-  | { kind: 'speech-fallback'; text: string; interrupt: boolean }
+  | { kind: 'speech'; wav: Uint8Array; interrupt: boolean; expiresAt?: number }
+  | { kind: 'speech-fallback'; text: string; interrupt: boolean; expiresAt?: number }
   | { kind: 'sound'; data: Uint8Array; volume: number; name: string }
 
 // ---- The channels ----
@@ -443,7 +444,8 @@ export interface Pushes {
   'overlay:config': (update: { config: OverlayConfig; arranging: boolean }) => void
   'overlay:timers': (timers: TimerView[]) => void
   'overlay:combat': (snapshot: CombatSnapshot) => void
-  'overlay:alert': (alert: { text: string; color: string; durationSec: number }) => void
+  /** `at`: when it was raised, so a host that loads a moment later shows it for what is left of its time. */
+  'overlay:alert': (alert: { text: string; color: string; durationSec: number; at?: number }) => void
   'overlay:achievements': (track: AchievementTrack | null) => void
   /** The overlays one host window draws, and where the window's top left is on the screen. */
   'overlay:host': (update: { configs: OverlayConfig[]; origin: { x: number; y: number } }) => void

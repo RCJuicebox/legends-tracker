@@ -11,9 +11,9 @@ export function push<K extends PushChannel>(wc: WebContents, channel: K, ...args
   wc.send(channel, ...args)
 }
 
-/** The app's pages: the main window, an overlay alone (arranging), the overlays of a monitor, the alerts, the sound player. */
-export type PageName = 'index' | 'overlay' | 'overlays' | 'alerts' | 'audio'
-const PAGES: readonly PageName[] = ['index', 'overlay', 'overlays', 'alerts', 'audio']
+/** The app's pages: the main window, an overlay alone (arranging), the overlays of a monitor, the sound player. */
+export type PageName = 'index' | 'overlay' | 'overlays' | 'audio'
+const PAGES: readonly PageName[] = ['index', 'overlay', 'overlays', 'audio']
 
 /** Where the built pages are, as a file URL ending in a slash (lower-cased: Windows paths are case-blind). */
 export function rendererUrl(): string {
