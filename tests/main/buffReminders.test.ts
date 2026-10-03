@@ -75,7 +75,7 @@ function setup(o: { groupBuffs?: boolean; group?: string[] } = {}) {
   )
   const board = new TimerBoard({ onChange: () => {}, onNotify: (ns) => notifier.notify(ns) })
   const state = { group: o.group ?? ['Brenna'], fighting: false, readingHistory: false, live: true }
-  const out = { push: (channel: string, view: unknown) => void pushed.push({ channel, view }) }
+  const out = { push: (channel: string, view?: unknown) => void pushed.push({ channel, view }) }
   const buffs = new BuffCoordinator(store, out, board, new SpellQueries(store, () => book), notifier, {
     book: () => book,
     group: () => state.group,
