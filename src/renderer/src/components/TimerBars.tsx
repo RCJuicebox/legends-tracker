@@ -1,16 +1,7 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import type { TimerView } from '../../../shared/types'
 import { clock, iconUrl, roman } from '../api'
-
-const onVisibility = (l: () => void) => {
-  document.addEventListener('visibilitychange', l)
-  return () => document.removeEventListener('visibilitychange', l)
-}
-
-/** False while the window is hidden (in the tray, or an overlay hidden with the game). */
-function usePageVisible(): boolean {
-  return useSyncExternalStore(onVisibility, () => document.visibilityState !== 'hidden')
-}
+import { usePageVisible } from '../hooks'
 
 /** The time, ticking every `intervalMs` while active and the window can be seen. */
 export function useNow(intervalMs: number, active = true): number {

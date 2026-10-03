@@ -21,11 +21,12 @@ export function usePickedCharacter(): [string, (key: string) => void] {
 /** A character's record, and a way to change it; changes save at once. */
 export function useCharacterRecord(key: string) {
   const q = useInvoke(key ? 'character:get' : null, [key])
-  const setData = q.setData
+  const { setData, reload } = q
   const latest = useRef<CharacterSettings | null>(null)
   latest.current = q.data
-  // The character being played can also change on the Spell Timers page.
-  useEffect(() => api.on('state:character', () => q.reload()), [q])
+  // The character being played can also change on the Spell Timers page. Subscribed once, not on
+  // every render (q is a fresh object each time, LT-395).
+  useEffect(() => api.on('state:character', () => reload()), [reload])
   const save = useCallback(
     async (patch: (c: CharacterSettings) => CharacterSettings) => {
       const cur = latest.current

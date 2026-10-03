@@ -8,9 +8,6 @@ import type { CharacterSheet, InventoryView } from '../../../shared/types'
 // What the Gear and Stats pages (and the Gear tools) share: which character, and its inventory and
 // sheet. What the worn gear adds up to is core/wornGear's.
 
-/** How often to look again for an export that is not there yet. */
-const EXPORT_POLL_MS = 5000
-
 /** How long typing into the character sheet waits before it is written to disk. */
 const SHEET_SAVE_MS = 300
 
@@ -26,16 +23,11 @@ export function useExportCharacter(kind: 'inventory' | 'achievements') {
   const exports = q.data
   const available = exports?.[kind] ?? []
   const character = picked && available.includes(picked) ? picked : exports?.current || available[0] || ''
-  const waiting = !!exports && !available.includes(character)
+  // A new export is pushed as the game writes it (ExportWatch): no polling for one (LT-398).
   useEffect(() => {
     const offs = [api.on('state:inventory', reload), api.on('state:achievements', reload)]
     return () => offs.forEach((off) => off())
   }, [reload])
-  useEffect(() => {
-    if (!waiting) return
-    const t = setInterval(reload, EXPORT_POLL_MS)
-    return () => clearInterval(t)
-  }, [waiting, reload])
   return { exports, available, character, setCharacter: setPicked, error: q.error, reload }
 }
 

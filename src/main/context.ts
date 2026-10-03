@@ -388,6 +388,8 @@ export function createContext(): AppContext {
       if (!logIsIn(next.logFile, next.installDir)) void followNewestLog(next.installDir)
     }
     if (next.logFile !== prev.logFile && (ctx.engine.status.watching || next.autoStart)) void ctx.engine.startWatching()
+    // Another character's log: its record, for the pages that show the character being played.
+    if (next.logFile !== prev.logFile) toMain('state:character', store.characterOf(next.logFile))
     toMain('state:settings', next)
     ctx.logSettings()
     return next
@@ -527,7 +529,7 @@ function registerSources(ctx: AppContext): void {
   sources.onChange((rows) => ctx.windows.toMain('state:sources', rows))
   jobs.onChange((list) => ctx.windows.toMain('state:jobs', list))
   // What can be known without asking anyone: the downloads kept, and whether this copy updates at all.
-  void ctx.wikiCatalog.stored()
+  void ctx.wikiCatalog.stamp()
   void ctx.recipeBook.stored()
   if (ctx.updater.status.state === 'dev') sources.missing('updates', 'Running from source: only the installed app updates.')
 

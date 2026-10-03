@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { CharacterPicker } from '../components/CharacterPicker'
 import { api, ago } from '../api'
-import { useInvoke, useItemInfo } from '../hooks'
+import { useInvoke, useItemInfo, useVisibleInterval } from '../hooks'
 import { useRemembered } from '../remember'
 import { act, showError } from '../toast'
 import { Ago, Disclosure, ErrorText, FilterBox, GameCommand, Info, Pending } from '../components/ui'
@@ -68,10 +68,7 @@ export function Tradeskills() {
 
   // New purchases show up as they happen: the log is read on from where it stopped.
   const reloadPurchases = purchasesQ.reload
-  useEffect(() => {
-    const t = setInterval(reloadPurchases, 30_000)
-    return () => clearInterval(t)
-  }, [reloadPurchases])
+  useVisibleInterval(reloadPurchases, 30_000)
 
   const saved = savedQ.data
   const save = async (next: Saved) => {

@@ -1,7 +1,7 @@
 import { Fragment, useCallback, useDeferredValue, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { ago, api } from '../../renderer/src/api'
 import { showError } from '../../renderer/src/toast'
-import { useAchievementTrack, useInvoke, useLatest, useSameContents } from '../../renderer/src/hooks'
+import { useAchievementTrack, useInvoke, useLatest, useSameContents, useVisibleInterval } from '../../renderer/src/hooks'
 import { useApp } from '../../renderer/src/state'
 import { useCharacterRecord } from '../../renderer/src/character'
 import { useNow } from '../../renderer/src/components/TimerBars'
@@ -140,10 +140,7 @@ export function PlanTab({ character, view }: { character: string; view: FactionV
 
   // New kills and hand-ins show up as the log grows; the catalog comes from caches after the first read.
   const reload = q.reload
-  useEffect(() => {
-    const t = setInterval(reload, 60_000)
-    return () => clearInterval(t)
-  }, [reload])
+  useVisibleInterval(reload, 60_000)
   // An achievement the catalog was not built for (one fallen back below 2000 with no achievements export): read it again now.
   const unknown = !!live && !!data && live.targets.some((t) => !data.targets.some((d) => d.faction === t.faction))
   useEffect(() => {

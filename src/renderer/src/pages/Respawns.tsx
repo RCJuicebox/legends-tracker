@@ -1,11 +1,10 @@
 import { Fragment, useEffect, useMemo, useState } from 'react'
-import { api, ago, clock, errorMessage } from '../api'
+import { api, clock, errorMessage } from '../api'
 import { useApp } from '../state'
 import { useInvoke } from '../hooks'
 import { useRemembered } from '../remember'
-import { useNow } from '../components/TimerBars'
 import { act } from '../toast'
-import { ConfirmButton, Disclosure, Field, FilterBox, Info, NumberInput, Pending, SortTh, Sparkline, Switch, ToggleChip, type Sort } from '../components/ui'
+import { Ago, ConfirmButton, Countdown, Disclosure, Field, FilterBox, Info, NumberInput, Pending, SortTh, Sparkline, Switch, ToggleChip, type Sort } from '../components/ui'
 import { parseClock, SHARED_SEC, type RespawnRow, type RespawnTimerSpec, type RespawnView } from '../../../core/respawns'
 
 // How long mobs take to come back, measured from the log, and a timer on an overlay for any of them.
@@ -56,7 +55,6 @@ export function Respawns() {
   const [sort, setSort] = useRemembered<Sort<SortKey>>('respawns.sort', { key: 'last', dir: -1 })
   const [open, setOpen] = useState<string | null>(null)
   const [adding, setAdding] = useState(false)
-  const now = useNow(1000, !!view?.rows.some((r) => r.pendingSince))
 
   const zone = view?.zone ?? ''
   const rows = useMemo(() => {
@@ -178,15 +176,7 @@ export function Respawns() {
               <tbody>
                 {rows.map((r) => (
                   <Fragment key={r.key}>
-                    <Row
-                      r={r}
-                      now={now}
-                      zone={zone}
-                      open={open === r.key}
-                      toggle={() => setOpen(open === r.key ? null : r.key)}
-                      overlays={state.settings.overlays}
-                      onSaved={saved}
-                    />
+                    <Row r={r} zone={zone} open={open === r.key} toggle={() => setOpen(open === r.key ? null : r.key)} overlays={state.settings.overlays} onSaved={saved} />
                     {open === r.key && (
                       <tr>
                         <td colSpan={8} style={{ background: 'var(--bg-2)' }}>
@@ -230,7 +220,6 @@ export function Respawns() {
 
 function Row({
   r,
-  now,
   zone,
   open,
   toggle,
@@ -238,7 +227,6 @@ function Row({
   onSaved
 }: {
   r: RespawnRow
-  now: number
   zone: string
   open: boolean
   toggle: () => void
@@ -247,7 +235,7 @@ function Row({
 }) {
   const last = r.gaps[r.gaps.length - 1]
   const length = r.timer?.seconds ?? r.estimate
-  const backIn = r.pendingSince && length ? r.pendingSince + length * 1000 - now : null
+  const backAt = r.pendingSince && length ? r.pendingSince + length * 1000 : null
   const overlayName = r.timer ? (overlays.find((o) => o.id === r.timer!.overlay)?.name ?? r.timer.overlay) : ''
   return (
     <tr className={`clickable${open ? ' selected' : ''}`} onClick={toggle}>
@@ -277,8 +265,10 @@ function Row({
         {last !== undefined ? clock(last) : '—'}
         {r.gaps.length > 1 && <Sparkline values={r.gaps} title={`Every gap seen, oldest first: ${r.gaps.map(clock).join(', ')}`} />}
       </td>
-      <td className="faint small nowrap">{r.lastDeath ? ago(r.lastDeath, now) : '—'}</td>
-      <td className="mono nowrap">{backIn === null ? <span className="faint">—</span> : backIn > 0 ? clock(backIn / 1000) : <span className="chip ok">up</span>}</td>
+      <td className="faint small nowrap">
+        <Ago t={r.lastDeath} never="—" />
+      </td>
+      <td className="mono nowrap">{backAt === null ? <span className="faint">—</span> : <Countdown until={backAt} done={<span className="chip ok">up</span>} />}</td>
       <td onClick={(e) => e.stopPropagation()}>
         {r.timer ? (
           <button className="chip ok" onClick={toggle} title={`On the ${overlayName} overlay. Click to change it.`}>

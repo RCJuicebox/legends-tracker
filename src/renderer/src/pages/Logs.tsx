@@ -20,7 +20,7 @@ export function Logs() {
   const [zipErrors, setZipErrors] = useState<string[]>([])
   const a = state.settings.archive
   const threshold = a.thresholdMB * 1048576
-  const setA = (patch: Partial<typeof a>) => patchSettings((s) => ({ ...s, archive: { ...s.archive, ...patch } }))
+  const setA = (patch: Partial<typeof a>, debounceMs?: number) => patchSettings((s) => ({ ...s, archive: { ...s.archive, ...patch } }), { debounceMs })
   const totalZip = view?.archives.filter((x) => !x.loose).reduce((n, x) => n + x.size, 0) ?? 0
   const loose = view?.archives.filter((x) => x.loose) ?? []
   const followed = state.settings.logFile
@@ -72,7 +72,7 @@ export function Logs() {
           </div>
           <Field label="Archive folder" hint={a.archiveDir ? undefined : `Default: ${view?.archiveDir ?? 'Logs\\archive'}`}>
             <div className="row">
-              <input className="grow" value={a.archiveDir} placeholder="Logs\archive (default)" onChange={(e) => setA({ archiveDir: e.target.value })} />
+              <input className="grow" value={a.archiveDir} placeholder="Logs\archive (default)" onChange={(e) => setA({ archiveDir: e.target.value }, 400)} />
               <button
                 className="btn"
                 onClick={async () => {

@@ -128,6 +128,8 @@ export interface CatalogState {
   file: CatalogFile | null
   stale: boolean
   progress: WikiProgress
+  /** The page already has this catalog (it said when it was fetched): `file` is left out. */
+  same?: true
 }
 
 /** The newest purchase of each item, by lower-cased name. */
@@ -375,7 +377,8 @@ export interface Invokes {
   /** `force` reads the pages again from eqlwiki, however recently they were read. */
   'inventory:lookup': (names: string[], force?: boolean) => Record<string, ItemInfo>
 
-  'gear:catalog': () => CatalogState
+  /** `have`: when the catalog the page holds was fetched, so the same one is not sent again. */
+  'gear:catalog': (have?: number) => CatalogState
   'gear:catalogRefresh': () => CatalogState
   'gear:foci': (names: string[], classes: string[], level: number, character: string, days: number) => FocusData | null
   'gear:effects': (names: string[], character: string, days: number) => GearEffects

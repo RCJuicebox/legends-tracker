@@ -20,7 +20,9 @@ export function Spells({ go }: { go?: (page: PageId) => void }) {
   const spellsLoaded = useLive((l) => l.status.spellsLoaded)
   // Each settings push is a fresh object: the list is asked for again only when what it depends on
   // reads differently, not on every save or overlay move.
-  const deps = JSON.stringify([state.character, state.settings.tracking])
+  // A focus's name and "from" are labels: typing them does not ask for every spell's duration again (LT-394).
+  const timing = { ...state.character, focusSources: state.character.focusSources.map(({ name: _name, from: _from, ...f }) => f) }
+  const deps = JSON.stringify([timing, state.settings.tracking])
   const q = useInvoke('spells:known', [], [deps, spellsLoaded])
   const known = q.data ?? []
   const setKnown = q.setData

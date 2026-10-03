@@ -77,6 +77,23 @@ export function Buffs() {
 
   const groupClasses = useMemo(() => [...new Set((v?.group ?? []).flatMap((g) => g.person?.classes ?? []))], [v])
   const classOrder = useMemo(() => [...CLASSES].sort((a, b) => Number(groupClasses.includes(b[0])) - Number(groupClasses.includes(a[0]))), [groupClasses])
+  // Each class's buffs, filtered and sorted when the buffs or the filter change, not at every tick of
+  // the clock the buffs on you count down by (LT-401).
+  const offers = v?.offers
+  const classLists = useMemo(() => {
+    const f = filter.trim().toLowerCase()
+    return classOrder.map(
+      ([c, label]) =>
+        [
+          c,
+          label,
+          (offers ?? [])
+            .filter((o) => o.classes[c] !== undefined)
+            .filter((o) => !f || o.spell.toLowerCase().includes(f) || effectText(o).toLowerCase().includes(f) || LINE_LABELS[o.line].toLowerCase().includes(f))
+            .sort((a, b) => LINE_ORDER.indexOf(a.line) - LINE_ORDER.indexOf(b.line) || b.classes[c] - a.classes[c])
+        ] as const
+    )
+  }, [offers, filter, classOrder])
 
   if (!v) return <Pending what="the buffs" error={q.error} retry={q.reload} />
 
@@ -244,11 +261,7 @@ export function Buffs() {
             </button>
           )}
         </div>
-        {classOrder.map(([c, label]) => {
-          const list = v.offers
-            .filter((o) => o.classes[c] !== undefined)
-            .filter((o) => !f || o.spell.toLowerCase().includes(f) || effectText(o).toLowerCase().includes(f) || LINE_LABELS[o.line].toLowerCase().includes(f))
-            .sort((a, b) => LINE_ORDER.indexOf(a.line) - LINE_ORDER.indexOf(b.line) || b.classes[c] - a.classes[c])
+        {classLists.map(([c, label, list]) => {
           if (!list.length) return null
           const open = isOpen(c)
           const picked = list.filter((o) => wanted.has(o.spell)).length

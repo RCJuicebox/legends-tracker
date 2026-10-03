@@ -40,7 +40,9 @@ export function Settings({ go }: { go?: (page: PageId) => void }) {
   const watching = useLive((l) => l.status.watching)
   const s = state.settings
   const t = s.tracking
-  const setT = (patch: Partial<TrackingSettings>) => patchSettings((x) => ({ ...x, tracking: { ...x.tracking, ...patch } }))
+  const setT = (patch: Partial<TrackingSettings>, debounceMs?: number) => patchSettings((x) => ({ ...x, tracking: { ...x.tracking, ...patch } }), { debounceMs })
+  // A phrase is saved once typing stops, not at every key (LT-393): each save reconfigures the engine.
+  const TYPING_MS = 300
   const update = useUpdate()
   const u = update.status
   const noCheck = noCheckReason(u)
@@ -247,10 +249,10 @@ export function Settings({ go }: { go?: (page: PageId) => void }) {
               <NumberInput value={t.buffWarnSec} min={0} onChange={(v) => setT({ buffWarnSec: v ?? 0 })} />
             </Field>
             <Field label="Warning" hint="{spell} and {target} are filled in.">
-              <input value={t.buffWarnSpeech} onChange={(e) => setT({ buffWarnSpeech: e.target.value })} />
+              <input value={t.buffWarnSpeech} onChange={(e) => setT({ buffWarnSpeech: e.target.value }, TYPING_MS)} />
             </Field>
             <Field label="When it fades" hint="Blank for silence.">
-              <input value={t.buffFadeSpeech} onChange={(e) => setT({ buffFadeSpeech: e.target.value })} />
+              <input value={t.buffFadeSpeech} onChange={(e) => setT({ buffFadeSpeech: e.target.value }, TYPING_MS)} />
             </Field>
             <label className="row">
               <Switch on={t.announceOtherBuffFades} onChange={(v) => setT({ announceOtherBuffFades: v })} />
@@ -263,10 +265,10 @@ export function Settings({ go }: { go?: (page: PageId) => void }) {
               <NumberInput value={t.dotWarnSec} min={0} onChange={(v) => setT({ dotWarnSec: v ?? 0 })} />
             </Field>
             <Field label="Warning">
-              <input value={t.dotWarnSpeech} onChange={(e) => setT({ dotWarnSpeech: e.target.value })} />
+              <input value={t.dotWarnSpeech} onChange={(e) => setT({ dotWarnSpeech: e.target.value }, TYPING_MS)} />
             </Field>
             <Field label="When it wears off" hint="Blank for silence.">
-              <input value={t.dotFadeSpeech} onChange={(e) => setT({ dotFadeSpeech: e.target.value })} />
+              <input value={t.dotFadeSpeech} onChange={(e) => setT({ dotFadeSpeech: e.target.value }, TYPING_MS)} />
             </Field>
           </div>
         </div>

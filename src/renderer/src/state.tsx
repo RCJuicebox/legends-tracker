@@ -3,6 +3,7 @@ import { api, errorMessage, type AppState, type FeedEntry } from './api'
 import { FEED_MAX } from './constants'
 import { showError } from './toast'
 import { moveRemembered } from './movedSettings'
+import { characterKey } from '../../core/validate'
 import type { AppSettings, ArchiveStatus, CharacterSettings, FeedItem, TimerView, WatchStatus } from '../../shared/types'
 
 type Patch = (s: AppSettings) => AppSettings
@@ -38,7 +39,7 @@ interface Ctx {
    * the changes stop (a slider being dragged); the change still shows immediately.
    */
   patchSettings: (fn: Patch, opts?: { debounceMs?: number }) => Promise<void>
-  saveCharacter: (c: CharacterSettings) => Promise<void>
+  saveCharacter: (c: CharacterSettings, opts?: { debounceMs?: number }) => Promise<void>
   /** The state as it is now, for a callback that runs after its render (an undo, a timer). */
   latest: () => AppState
 }
@@ -88,7 +89,8 @@ export function StateProvider({ children }: { children: ReactNode }) {
 
   const showSettings = useCallback((next: AppSettings) => {
     settingsRef.current = next
-    setState((s) => (s ? { ...s, settings: next } : s))
+    // The character being played is the log's; its record comes as state:character when it changes.
+    setState((s) => (s ? { ...s, settings: next, characterKey: characterKey(next.logFile) } : s))
   }, [])
 
   const takeSettings = useCallback((incoming: AppSettings) => showSettings(pending.current.fns.reduce((s, fn) => fn(s), incoming)), [showSettings])
@@ -142,9 +144,9 @@ export function StateProvider({ children }: { children: ReactNode }) {
     const next = settingsRef.current
     if (!next) return
     try {
+      // No app:state afterwards: three hundred feed lines fetched and every page drawn twice, per
+      // keystroke, to copy the character record, which main pushes when it changes (LT-392).
       await api.invoke('settings:save', next)
-      const fresh = await api.invoke('app:state')
-      setState((s) => (s ? { ...s, character: fresh.character, characterKey: fresh.characterKey } : s))
     } catch (e) {
       // What was typed stays on screen rather than snapping back mid-edit (typing 200 passes
       // through 2); the next change that is accepted saves it all.
@@ -170,19 +172,37 @@ export function StateProvider({ children }: { children: ReactNode }) {
 
   const saveSettings = useCallback((next: AppSettings) => patchSettings(() => next), [patchSettings])
 
-  const saveCharacter = useCallback(async (c: CharacterSettings) => {
+  // A typed name is saved once typing stops (`debounceMs`); what is shown follows every key.
+  const characterTimer = useRef<{ timer: ReturnType<typeof setTimeout> | null; send: (() => void) | null }>({ timer: null, send: null })
+  const saveCharacter = useCallback(async (c: CharacterSettings, opts?: { debounceMs?: number }) => {
     setState((s) => (s ? { ...s, character: c } : s))
-    try {
-      await api.invoke('character:save', c)
-    } catch (e) {
-      showError('Could not save the character', e)
+    const pend = characterTimer.current
+    if (pend.timer) clearTimeout(pend.timer)
+    pend.timer = null
+    const send = async () => {
+      pend.send = null
+      try {
+        await api.invoke('character:save', c)
+      } catch (e) {
+        showError('Could not save the character', e)
+      }
     }
+    if (opts?.debounceMs) {
+      pend.send = () => void send()
+      pend.timer = setTimeout(() => {
+        pend.timer = null
+        pend.send?.()
+      }, opts.debounceMs)
+      return
+    }
+    await send()
   }, [])
 
   // A save still waiting when the window closes goes out now.
   useEffect(() => {
     const flush = () => {
       if (pending.current.timer) void write()
+      characterTimer.current.send?.()
     }
     window.addEventListener('beforeunload', flush)
     return () => window.removeEventListener('beforeunload', flush)

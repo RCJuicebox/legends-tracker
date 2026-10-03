@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import { api, errorMessage } from './api'
 import { showError } from './toast'
 import { itemKey } from '../../core/inventory'
@@ -32,6 +32,36 @@ function sameData(a: unknown, b: unknown): boolean {
   }
 }
 
+const onVisibility = (l: () => void) => {
+  document.addEventListener('visibilitychange', l)
+  return () => document.removeEventListener('visibilitychange', l)
+}
+
+/** False while the window is hidden (in the tray, or an overlay hidden with the game). */
+export function usePageVisible(): boolean {
+  return useSyncExternalStore(onVisibility, () => document.visibilityState !== 'hidden')
+}
+
+/**
+ * Calls `fn` every `ms` while `active` and the window can be seen, and once as it shows again: a
+ * page in the tray polls nothing (LT-387).
+ */
+export function useVisibleInterval(fn: () => void, ms: number, active = true): void {
+  const visible = usePageVisible()
+  const latest = useRef(fn)
+  latest.current = fn
+  const was = useRef(visible)
+  useEffect(() => {
+    if (!active || !visible) return
+    if (!was.current) latest.current()
+    const t = setInterval(() => latest.current(), ms)
+    return () => clearInterval(t)
+  }, [ms, active, visible])
+  useEffect(() => {
+    was.current = visible
+  }, [visible])
+}
+
 /** The loot list, as the main process pushes it: whole, or the entries added since (mergeLoot). */
 export function useLootView(): Invoked<LootView> {
   const q = useInvoke('loot:get')
@@ -40,14 +70,36 @@ export function useLootView(): Invoked<LootView> {
   return q
 }
 
-export function useInvoke<K extends InvokeChannel>(channel: K | null, args?: Parameters<Invokes[K]>, deps: unknown[] = []): Invoked<InvokeResult<K>> {
+/**
+ * The last answer to each of the last LAST_KEPT questions (channel and arguments), so a page opened
+ * again shows what it showed at once and brings it up to date behind, rather than "Loading…" on
+ * every visit (LT-408).
+ */
+const lastAnswers = new Map<string, unknown>()
+const LAST_KEPT = 20
+
+function keepAnswer(key: string, value: unknown): void {
+  lastAnswers.delete(key)
+  lastAnswers.set(key, value)
+  if (lastAnswers.size > LAST_KEPT) lastAnswers.delete(lastAnswers.keys().next().value!)
+}
+
+export function useInvoke<K extends InvokeChannel>(
+  channel: K | null,
+  args?: Parameters<Invokes[K]>,
+  deps: unknown[] = [],
+  /** `same`: whether two answers would draw the same; by default they are compared as JSON, too costly for a large one. */
+  opts?: { same?: (a: InvokeResult<K>, b: InvokeResult<K>) => boolean }
+): Invoked<InvokeResult<K>> {
   type T = InvokeResult<K>
-  const [data, setDataState] = useState<T | null>(null)
+  const key = JSON.stringify(args ?? [])
+  const answerKey = `${channel}|${key}`
+  const [data, setDataState] = useState<T | null>(() => (channel === null ? null : ((lastAnswers.get(answerKey) as T | undefined) ?? null)))
   const [error, setError] = useState('')
   const [tick, setTick] = useState(0)
   const argsRef = useRef(args)
   argsRef.current = args
-  const key = JSON.stringify(args ?? [])
+  const same = opts?.same
   useEffect(() => {
     if (channel === null) return
     let live = true
@@ -56,7 +108,8 @@ export function useInvoke<K extends InvokeChannel>(channel: K | null, args?: Par
         if (!live) return
         // A reload that brings back what is shown keeps the old value, so a page polled every few
         // seconds draws nothing again until something changes.
-        setDataState((prev) => (prev !== null && sameData(prev, v) ? prev : v))
+        setDataState((prev) => (prev !== null && (same ?? sameData)(prev, v) ? prev : v))
+        keepAnswer(`${channel}|${JSON.stringify(argsRef.current ?? [])}`, v)
         setError('')
       },
       (e) => live && setError(errorMessage(e))
@@ -87,15 +140,22 @@ export function useAchievementTrack(): AchievementTrack | null {
         () => undefined
       )
     void ask()
-    const again = setInterval(() => void ask(), 60_000)
     const off = api.on('state:achievementTrack', (t: AchievementTrack) => setTrack(t))
     return () => {
       live = false
-      clearInterval(again)
       off()
       void api.invoke('achievements:track', false).catch(() => undefined)
     }
   }, [])
+  // Still open, once a minute, while the window can be seen: in the tray it lets the reads lapse.
+  useVisibleInterval(
+    () =>
+      void api.invoke('achievements:track', true).then(
+        (t) => t && setTrack(t),
+        () => undefined
+      ),
+    60_000
+  )
   return track
 }
 

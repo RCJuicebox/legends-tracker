@@ -52,7 +52,12 @@ export function registerCharacterIpc(ctx: AppContext): void {
   // The upgrade finder's catalog: what is stored, and a download when asked (or when none is stored).
   // The page needs the items, not the revision table kept for the next refresh.
   const catalogState = (file: CatalogFile | null) => ({ file: file && { ...file, revs: undefined }, stale: ctx.wikiCatalog.isStale(file), progress: ctx.wikiCatalog.progress })
-  handle('gear:catalog', async () => catalogState(await ctx.wikiCatalog.stored()))
+  handle('gear:catalog', async (have) => {
+    // The page has this one already: ten megabytes not parsed, sent or compared again (LT-389).
+    const stamp = typeof have === 'number' && have > 0 ? await ctx.wikiCatalog.stamp() : null
+    if (stamp && stamp.fetchedAt === have) return { file: null, same: true as const, stale: ctx.wikiCatalog.isStale(stamp), progress: ctx.wikiCatalog.progress }
+    return catalogState(await ctx.wikiCatalog.stored())
+  })
   handle('gear:catalogRefresh', async () => catalogState(await ctx.wikiCatalog.refresh()))
 
   // Focus effects on gear, read from the game's spell file: each one's line and strength for these

@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { CharacterPicker } from '../components/CharacterPicker'
 import { api, errorMessage } from '../api'
 import { useRemembered } from '../remember'
-import { useInvoke } from '../hooks'
+import { useInvoke, useVisibleInterval } from '../hooks'
 import { Pending, Tabs } from '../components/ui'
 import { who } from '../../../core/format'
 import { parseLogLine } from '../../../core/logLine'
@@ -94,11 +94,7 @@ export function Stats() {
   const aaQ = useInvoke(character ? 'stats:aaHistory' : null, [character])
   const aaHistory = aaQ.data?.character === character ? aaQ.data.view : null
   const reloadAaHistory = aaQ.reload
-  useEffect(() => {
-    if (tab !== 'aas') return
-    const t = setInterval(reloadAaHistory, AA_RELOAD_MS)
-    return () => clearInterval(t)
-  }, [tab, reloadAaHistory])
+  useVisibleInterval(reloadAaHistory, AA_RELOAD_MS, tab === 'aas')
 
   // Looks for AAs without being asked: on a character's first visit, and when the log holds a newer
   // /alternateadv list than the one kept (typed again after buying some). Once for each: readAas

@@ -3,6 +3,7 @@ import { basename, dirname, join } from 'node:path'
 import { DEFAULT_TIER_DURATION_PCT, type AppSettings } from '../shared/types'
 import { DEFAULT_OVERLAYS } from '../shared/overlays'
 import { log } from './log'
+import { characterKey } from '../core/validate'
 
 // The pure half of the settings store: defaults, merging, and the JSON files themselves. No Electron
 // import, so it can be tested.
@@ -233,11 +234,7 @@ export async function writeFileAtomic(path: string, text: string): Promise<void>
   }
 }
 
-/** `...\Logs\eqlog_Kelwyn_neriak.txt` → `Kelwyn_neriak` */
-export function characterKey(logFile: string): string {
-  const m = /eqlog_(.+)\.txt$/i.exec(logFile)
-  return m ? m[1] : ''
-}
+export { characterKey }
 
 /** A character's log in the game folder: `Kelwyn_neriak` → `<install>\Logs\eqlog_Kelwyn_neriak.txt`. */
 export function logFileFor(installDir: string, key: string): string {

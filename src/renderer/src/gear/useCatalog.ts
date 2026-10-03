@@ -5,9 +5,19 @@ import { showError } from '../toast'
 import { CATALOG_FORMAT } from '../../../core/wikiItem'
 import type { CatalogState } from '../../../shared/ipc'
 
+/**
+ * The catalog this window holds, for as long as it runs: a Gear tool opened again asks whether it
+ * is still the one stored, and is not sent it again when it is (LT-389).
+ */
+let kept: CatalogState | null = null
+
+/** Two answers alike enough not to draw again: compared by their catalog's date, never by its ten megabytes (LT-402). */
+const sameCatalog = (a: CatalogState, b: CatalogState) =>
+  a.file?.fetchedAt === b.file?.fetchedAt && !!a.file === !!b.file && a.stale === b.stale && JSON.stringify(a.progress) === JSON.stringify(b.progress)
+
 /** The wiki's item catalog as stored on this PC, and a way to fetch it again. */
 export function useCatalog() {
-  const q = useInvoke('gear:catalog')
+  const q = useInvoke('gear:catalog', [kept?.file?.fetchedAt ?? 0], [], { same: sameCatalog })
   const { setData, reload } = q
   useEffect(
     () =>
@@ -28,7 +38,11 @@ export function useCatalog() {
     reload()
   }, [reload])
   // A catalog stored by an older build lacks what this one reads; fetch it again once, on its own.
-  const state = q.data
+  const reply = q.data
+  useEffect(() => {
+    if (reply?.file) kept = reply
+  }, [reply])
+  const state = reply?.same && kept ? { ...kept, stale: reply.stale, progress: reply.progress } : reply
   const [autoRefreshed, setAutoRefreshed] = useState(false)
   useEffect(() => {
     if (state?.file && (state.file.format ?? 1) < CATALOG_FORMAT && !state.progress.busy && !autoRefreshed) {

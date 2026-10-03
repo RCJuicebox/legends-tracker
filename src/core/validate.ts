@@ -76,6 +76,12 @@ export function isFullPath(v: unknown): v is string {
   return typeof v === 'string' && /^(?:[A-Za-z]:[\\/]|\\\\[^\\/])/.test(v)
 }
 
+/** `...\Logs\eqlog_Kelwyn_neriak.txt` → `Kelwyn_neriak` */
+export function characterKey(logFile: string): string {
+  const m = /eqlog_(.+)\.txt$/i.exec(logFile)
+  return m ? m[1] : ''
+}
+
 /** A character log as the game writes it, by its full path; '' is none chosen. Anything else keeps what was set. */
 function logFilePath(v: unknown, fb: string): string {
   if (v === '') return ''

@@ -7,14 +7,21 @@ import { type FocusSource } from '../../../shared/types'
 
 // Spell Timers' duration focus effects: the AAs and item focus that lengthen your spells, as the tracker counts them.
 
+/** A name or "from" typed is saved once typing stops (LT-394). */
+const TYPING_MS = 400
+
 export function FocusSources() {
   const { state, saveCharacter, latest } = useApp()
   const c = state.character
   const [q, setQ] = useState('')
   const results = useSearch('focus:search', q)
   const [from, setFrom] = useState('')
-  const save = (list: FocusSource[]) => saveCharacter({ ...c, focusSources: list })
-  const update = (id: string, patch: Partial<FocusSource>) => save(c.focusSources.map((f) => (f.id === id ? { ...f, ...patch } : f)))
+  const save = (list: FocusSource[], debounceMs?: number) => saveCharacter({ ...c, focusSources: list }, { debounceMs })
+  const update = (id: string, patch: Partial<FocusSource>, debounceMs?: number) =>
+    save(
+      c.focusSources.map((f) => (f.id === id ? { ...f, ...patch } : f)),
+      debounceMs
+    )
   // A removed focus goes back where it was, into the list as it is by then.
   const remove = (f: FocusSource) => {
     const at = c.focusSources.indexOf(f)
@@ -77,7 +84,7 @@ export function FocusSources() {
                     <Switch on={f.enabled} label={`Use ${f.name}`} onChange={(v) => update(f.id, { enabled: v })} />
                   </td>
                   <td>
-                    <input value={f.name} aria-label="Focus name" onChange={(e) => update(f.id, { name: e.target.value })} style={{ width: 210 }} />
+                    <input value={f.name} aria-label="Focus name" onChange={(e) => update(f.id, { name: e.target.value }, TYPING_MS)} style={{ width: 210 }} />
                   </td>
                   <td>
                     <select value={f.kind} aria-label={`${f.name} type`} onChange={(e) => update(f.id, { kind: e.target.value as FocusSource['kind'] })}>
@@ -90,7 +97,7 @@ export function FocusSources() {
                       value={f.from}
                       placeholder="Which item?"
                       aria-label={`${f.name} comes from`}
-                      onChange={(e) => update(f.id, { from: e.target.value })}
+                      onChange={(e) => update(f.id, { from: e.target.value }, TYPING_MS)}
                       style={{ width: 150 }}
                     />
                   </td>

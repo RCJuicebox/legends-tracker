@@ -21,23 +21,21 @@ const SAMPLE = `[Tue Sep 01 12:15:08 2026] You begin casting Envenomed Bolt X.
 /** Feed items drawn on Live, newest first. */
 const FEED_SHOWN = 100
 
+/**
+ * The page selects only what its head and notices read; the stat cards, the timers and the activity
+ * each select their own, so a status tick or a feed line draws only the part it changes (LT-403).
+ */
 export function Dashboard({ go }: { go: (p: PageId) => void }) {
   const { state, patchSettings } = useApp()
   const { settings } = state
-  const status = useLive((l) => l.status)
-  const timers = useLive((l) => l.timers)
-  const feed = useLive((l) => l.feed)
+  const watching = useLive((l) => l.status.watching)
+  const character = useLive((l) => l.status.character)
+  const elsewherePath = useLive((l) => l.status.elsewhere?.path ?? '')
+  const elsewhereCharacter = useLive((l) => l.status.elsewhere?.character ?? '')
+  const spellError = useLive((l) => l.status.spellError)
   // Shared with the Triggers page's Test panel: lines pasted in either are waiting in the other.
   const [sim, setSim] = useRemembered<string>(TRY_LINES, '')
   const [simOpen, setSimOpen] = useState(() => !!sim)
-  useNow(5000)
-  const motes = useMotes()
-  const crawl = motes?.active
-  const now = Date.now()
-  const buffs = useMemo(() => timers.filter((t) => t.overlay === OVERLAY_BUFFS), [timers])
-  const others = useMemo(() => timers.filter((t) => t.overlay !== OVERLAY_BUFFS), [timers])
-  // Newest first, and no more than a page shows: the feed keeps 300.
-  const recent = useMemo(() => feed.slice(-FEED_SHOWN).reverse(), [feed])
 
   return (
     <>
@@ -47,7 +45,7 @@ export function Dashboard({ go }: { go: (p: PageId) => void }) {
           <p>Every timer the tracker is running, as the overlays show them, plus what has happened recently.</p>
         </div>
         <div className="actions">
-          {status.watching ? (
+          {watching ? (
             <button className="btn" onClick={() => void act('watch:stop')}>
               <Icon name="stop" /> Stop watching
             </button>
@@ -61,7 +59,7 @@ export function Dashboard({ go }: { go: (p: PageId) => void }) {
               <Icon name="play" /> Start watching
             </button>
           )}
-          {!status.watching && !settings.logFile && (
+          {!watching && !settings.logFile && (
             <span className="faint small">
               Choose a character log on{' '}
               <button className="link-button inline" onClick={() => go('logs')}>
@@ -86,15 +84,15 @@ export function Dashboard({ go }: { go: (p: PageId) => void }) {
       <GameFolderPrompt />
       <SetupChecklist go={go} />
       <QuietLogNotice go={go} />
-      {status.elsewhere && (
+      {elsewherePath && (
         <div className="notice mb-16">
-          {status.elsewhere.character}&apos;s log is being written while {status.character || 'this character'}&apos;s is quiet.{' '}
-          <button className="btn small primary" onClick={() => patchSettings((s) => ({ ...s, logFile: status.elsewhere!.path }))}>
-            Follow {status.elsewhere.character}
+          {elsewhereCharacter}&apos;s log is being written while {character || 'this character'}&apos;s is quiet.{' '}
+          <button className="btn small primary" onClick={() => patchSettings((s) => ({ ...s, logFile: elsewherePath }))}>
+            Follow {elsewhereCharacter}
           </button>
         </div>
       )}
-      {settings.installDir && !status.spellError && !settings.logFile && (
+      {settings.installDir && !spellError && !settings.logFile && (
         <div className="notice mb-16">
           No character log selected.{' '}
           <button className="btn small" onClick={() => go('logs')}>
@@ -103,68 +101,15 @@ export function Dashboard({ go }: { go: (p: PageId) => void }) {
         </div>
       )}
 
-      <div className="grid four mb-16">
-        <div className="card stat">
-          <span className="label">Status</span>
-          <span className="value row tight">
-            <span className={`status-dot${status.watching ? ' live' : ''}`} />
-            {status.watching ? 'Watching' : 'Stopped'}
-          </span>
-          <span className="sub">{status.watching ? (status.lastLineAt ? `last line ${ago(status.lastLineAt)}` : 'no line yet') : 'Start watching to track'}</span>
-        </div>
-        <div className="card stat">
-          <span className="label">Character</span>
-          <span className="value">{status.character || '—'}</span>
-          <span className="sub">{status.zone || 'zone unknown'}</span>
-        </div>
-        <button className="card stat card-button" onClick={() => go('motes')}>
-          <span className="label">{crawl ? (crawl.kind === 'manual' ? 'Session motes' : 'Instance run motes') : 'Motes today'}</span>
-          <span className="value">
-            {crawl ? `${totalMotes(crawl.motes)} · ${perHour(totalMotes(crawl.motes), sessionHours(crawl, now))}/h` : totalMotes(motes?.daily[localDay(now)] ?? {})}
-          </span>
-          <span className="sub">{crawl ? `${crawl.pausedSince ? 'Paused · ' : ''}${crawl.name}` : 'no run in progress'}</span>
-        </button>
-        <button className="card stat card-button" onClick={() => go('logs')}>
-          <span className="label">Log size</span>
-          <span className="value">{status.logSize ? mb(status.logSize) : '—'}</span>
-          <span className="sub">{settings.archive.autoEnabled ? `archives at ${settings.archive.thresholdMB} MB` : 'auto-archive off'}</span>
-        </button>
-      </div>
+      <StatCards go={go} />
 
       <FightSummary go={go} />
       <FactionNowCard go={go} />
 
-      <div className="grid two mb-16">
-        <div className="card">
-          <h2>
-            Buffs <span className="chip">{buffs.length}</span>
-          </h2>
-          <TimerBars timers={buffs} grouped fontSize={15} empty={<div className="empty">No buffs running. Cast one and it appears here.</div>} />
-        </div>
-        <div className="card">
-          <h2>
-            DoTs &amp; timers <span className="chip">{others.length}</span>
-          </h2>
-          <TimerBars timers={others} grouped fontSize={15} empty={<div className="empty">No DoTs or debuffs running.</div>} />
-        </div>
-      </div>
+      <LiveTimers />
 
       <div className="grid two">
-        <div className="card">
-          <h2>
-            Activity <span className="spacer" />
-          </h2>
-          <div className="feed">
-            {feed.length === 0 && <div className="empty">Nothing yet.</div>}
-            {recent.map((f) => (
-              <div className="feed-item" key={f.id}>
-                <span className="t">{timeOfDay(f.at, true)}</span>
-                <span className={`k k-${f.kind}`}>{f.kind}</span>
-                <span>{f.text}</span>
-              </div>
-            ))}
-          </div>
-        </div>
+        <Activity />
         <div className="card">
           <h2>
             Try log lines <span className="spacer" />
@@ -200,5 +145,97 @@ export function Dashboard({ go }: { go: (p: PageId) => void }) {
         </div>
       </div>
     </>
+  )
+}
+
+/** Status, character, motes and log size: what a status tick changes. */
+function StatCards({ go }: { go: (p: PageId) => void }) {
+  const { state } = useApp()
+  const { settings } = state
+  const watching = useLive((l) => l.status.watching)
+  const lastLineAt = useLive((l) => l.status.lastLineAt)
+  const character = useLive((l) => l.status.character)
+  const zone = useLive((l) => l.status.zone)
+  const logSize = useLive((l) => l.status.logSize)
+  const status = { watching, lastLineAt, character, zone, logSize }
+  useNow(5000)
+  const motes = useMotes()
+  const crawl = motes?.active
+  const now = Date.now()
+  return (
+    <div className="grid four mb-16">
+      <div className="card stat">
+        <span className="label">Status</span>
+        <span className="value row tight">
+          <span className={`status-dot${status.watching ? ' live' : ''}`} />
+          {status.watching ? 'Watching' : 'Stopped'}
+        </span>
+        <span className="sub">{status.watching ? (status.lastLineAt ? `last line ${ago(status.lastLineAt)}` : 'no line yet') : 'Start watching to track'}</span>
+      </div>
+      <div className="card stat">
+        <span className="label">Character</span>
+        <span className="value">{status.character || '—'}</span>
+        <span className="sub">{status.zone || 'zone unknown'}</span>
+      </div>
+      <button className="card stat card-button" onClick={() => go('motes')}>
+        <span className="label">{crawl ? (crawl.kind === 'manual' ? 'Session motes' : 'Instance run motes') : 'Motes today'}</span>
+        <span className="value">
+          {crawl ? `${totalMotes(crawl.motes)} · ${perHour(totalMotes(crawl.motes), sessionHours(crawl, now))}/h` : totalMotes(motes?.daily[localDay(now)] ?? {})}
+        </span>
+        <span className="sub">{crawl ? `${crawl.pausedSince ? 'Paused · ' : ''}${crawl.name}` : 'no run in progress'}</span>
+      </button>
+      <button className="card stat card-button" onClick={() => go('logs')}>
+        <span className="label">Log size</span>
+        <span className="value">{status.logSize ? mb(status.logSize) : '—'}</span>
+        <span className="sub">{settings.archive.autoEnabled ? `archives at ${settings.archive.thresholdMB} MB` : 'auto-archive off'}</span>
+      </button>
+    </div>
+  )
+}
+
+/** The buffs and the other timers, as the overlays show them. */
+function LiveTimers() {
+  const timers = useLive((l) => l.timers)
+  const buffs = useMemo(() => timers.filter((t) => t.overlay === OVERLAY_BUFFS), [timers])
+  const others = useMemo(() => timers.filter((t) => t.overlay !== OVERLAY_BUFFS), [timers])
+  return (
+    <div className="grid two mb-16">
+      <div className="card">
+        <h2>
+          Buffs <span className="chip">{buffs.length}</span>
+        </h2>
+        <TimerBars timers={buffs} grouped fontSize={15} empty={<div className="empty">No buffs running. Cast one and it appears here.</div>} />
+      </div>
+      <div className="card">
+        <h2>
+          DoTs &amp; timers <span className="chip">{others.length}</span>
+        </h2>
+        <TimerBars timers={others} grouped fontSize={15} empty={<div className="empty">No DoTs or debuffs running.</div>} />
+      </div>
+    </div>
+  )
+}
+
+/** What has happened lately: a feed line draws this card alone. */
+function Activity() {
+  const feed = useLive((l) => l.feed)
+  // Newest first, and no more than a page shows: the feed keeps 300.
+  const recent = useMemo(() => feed.slice(-FEED_SHOWN).reverse(), [feed])
+  return (
+    <div className="card">
+      <h2>
+        Activity <span className="spacer" />
+      </h2>
+      <div className="feed">
+        {feed.length === 0 && <div className="empty">Nothing yet.</div>}
+        {recent.map((f) => (
+          <div className="feed-item" key={f.id}>
+            <span className="t">{timeOfDay(f.at, true)}</span>
+            <span className={`k k-${f.kind}`}>{f.kind}</span>
+            <span>{f.text}</span>
+          </div>
+        ))}
+      </div>
+    </div>
   )
 }

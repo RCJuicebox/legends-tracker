@@ -2252,6 +2252,9 @@ details:not(.info) > summary::before {
   align-content: start;
 }
 .lt-row {
+  /* Rows off screen are not laid out or painted: the list runs to some 900 (LT-405). */
+  content-visibility: auto;
+  contain-intrinsic-size: auto 28px;
   display: grid;
   grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr) 54px;
   gap: 10px;

@@ -11,8 +11,6 @@ import { AchievementBook, norm, secKey, type AchMarks, type AchRef, type ObjRef 
 import type { AchievementsView } from '../../../shared/types'
 import { SectionView, SearchResults, TrackedBar } from './AchievementRows'
 
-const isKill = (sectionName: string) => /hunter|raids/i.test(sectionName)
-
 /** Open and closed blocks are remembered by name; at most this many, the newest kept. */
 const OPEN_KEEP = 1000
 
@@ -53,7 +51,14 @@ export function Achievements() {
   const [touched, setTouched] = useState<Set<string>>(new Set())
   const [flash, setFlash] = useState('')
 
-  const book = useMemo(() => (view ? new AchievementBook(view.sections, { ticks: view.marks.ticks, broken: [] }) : null), [view])
+  // A tick builds the next book to see what it finished; that one is kept and used here, not built
+  // a second time (LT-407).
+  const [built, setBuilt] = useState<{ sections: unknown; ticks: unknown; book: AchievementBook } | null>(null)
+  const book = useMemo(() => {
+    if (!view) return null
+    if (built && built.sections === view.sections && built.ticks === view.marks.ticks) return built.book
+    return new AchievementBook(view.sections, { ticks: view.marks.ticks, broken: [] })
+  }, [view, built])
   // The Slayer counts move with every kill; the export only when it is written again.
   const track = useAchievementTrack()
   const since = useMemo(() => {
@@ -114,6 +119,7 @@ export function Achievements() {
           {done.length > 3 ? ` and ${done.length - 3} more` : ''}
         </>
       )
+    setBuilt({ sections: view.sections, ticks: marks.ticks, book: after })
     setView({ ...view, marks })
     api.invoke('achievements:marks', view.character, marks).catch((e) => showError('Could not save your ticks', e))
   }
@@ -121,13 +127,7 @@ export function Achievements() {
   const tick = (r: ObjRef, on: boolean) => {
     const targets = book!.tickTargets(r)
     setTouched((t) => new Set([...t, ...targets.map(([si, ai, ci]) => `${si}:${ai}:${ci}`), ...targets.map(([si, ai]) => `a:${si}:${ai}`)]))
-    const c = book!.sections[r[0]].ach[r[1]].c[r[2]]
-    if (on && isKill(book!.sections[r[0]].name))
-      toast(
-        <>
-          You have slain <b>{c.t}</b>!
-        </>
-      )
+    // No "You have slain" toast per tick (LT-468): the row strikes through, and finishing the list says so.
     saveMarks(book!.withTick(r, on, view.marks))
   }
 

@@ -654,7 +654,18 @@ function Carried({ view }: { view: InventoryView }) {
   const counts = { all: rows.length, worn: 0, bags: 0, bank: 0, keyring: 0 }
   for (const r of rows) counts[r.kind]++
   const query = q.trim().toLowerCase()
-  const shown = rows.filter((r) => (filter === 'all' || r.kind === filter) && (!query || r.name.toLowerCase().includes(query)))
+  // Each row keyed by where it is and what, so a filter keeps rows rather than remounting them (LT-405).
+  const shown = useMemo(() => {
+    const seen = new Map<string, number>()
+    return rows
+      .filter((r) => (filter === 'all' || r.kind === filter) && (!query || r.name.toLowerCase().includes(query)))
+      .map((r) => {
+        const k = `${r.where}|${r.name}`
+        const n = seen.get(k) ?? 0
+        seen.set(k, n + 1)
+        return { ...r, key: n ? `${k}|${n}` : k }
+      })
+  }, [rows, filter, query])
   const label: Record<Filter, string> = { all: 'Everything', worn: 'Worn', bags: 'Bags', bank: 'Bank', keyring: 'Storage' }
   return (
     <div className="card lt-carried">
@@ -675,8 +686,8 @@ function Carried({ view }: { view: InventoryView }) {
         <FilterBox className="inv-search" placeholder="Find an item" label="Find an item" value={q} onChange={setQ} width={200} />
       </div>
       <div className="lt-list">
-        {shown.map((r, i) => (
-          <div key={i} className="lt-row">
+        {shown.map((r) => (
+          <div key={r.key} className="lt-row">
             <span className="lt-row-name">{r.name}</span>
             <span className="muted small">{r.where}</span>
             <span className="mono small">{r.count > 1 ? `×${num(r.count)}` : ''}</span>

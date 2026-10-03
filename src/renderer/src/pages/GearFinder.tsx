@@ -1,5 +1,6 @@
-import { useState } from 'react'
+import { useState, type CSSProperties } from 'react'
 import { useRemembered } from '../remember'
+import { useDebounced } from '../hooks'
 
 import { slotLabel } from '../../../core/inventory'
 import { DEFAULT_HIDDEN_ERAS, OTHER_ERA, OTHER_OUT_ERA } from '../../../core/gearFinder'
@@ -9,6 +10,7 @@ import { className } from '../../../shared/game/classes'
 import { Ago, ErrorText, Info, Pending, Segmented, ToggleChip } from '../components/ui'
 import { num, wikiUrl } from '../../../core/format'
 import { AC_OVER_CAP, useGearModel, type CatalogState, type GearMode } from '../gear/useGearModel'
+import { useCharacterWeights } from '../gear/useCharacterWeights'
 import { ItemIcon, source } from './gearBits'
 import { FocusTab } from './GearFocus'
 import { OptimizeTab } from './GearOptimize'
@@ -30,6 +32,18 @@ function eraTip(era: string): string {
 }
 
 export function GearFinder({ view, sheet, mode, onPlan }: { view: InventoryView; sheet: CharacterSheet | null; mode: GearMode; onPlan?: () => void }) {
+  // The best merge reads only what is worn and the wiki's stats for it: none of the catalog, its
+  // foci, effects or recipes is fetched or worked out for it (LT-388).
+  if (mode === 'merge') return <MergeView view={view} sheet={sheet} onPlan={onPlan} />
+  return <Finder view={view} sheet={sheet} mode={mode} />
+}
+
+function MergeView({ view, sheet, onPlan }: { view: InventoryView; sheet: CharacterSheet | null; onPlan?: () => void }) {
+  const c = useCharacterWeights(view, sheet)
+  return <MergeTab view={view} weights={c.weights} hands={c.hands} preset={c.controls.preset} setPreset={c.controls.setPreset} onPlan={onPlan} />
+}
+
+function Finder({ view, sheet, mode }: { view: InventoryView; sheet: CharacterSheet | null; mode: GearMode }) {
   const g = useGearModel(view, sheet, mode)
   const { catalog, model, results, stats, classes, level, role, conv, acState, overCap, secondaryInUse, twoHanders, eraCounts, fociOf, lines, wanted, points, setPoints } = g
   const {
@@ -56,9 +70,6 @@ export function GearFinder({ view, sheet, mode, onPlan }: { view: InventoryView;
   const [unfolded, setUnfolded] = useRemembered<boolean>('gear.settings', false)
   const state = catalog.state
   const refresh = catalog.refresh
-
-  // The best merge reads only what is worn and the wiki's stats for it: no catalog needed.
-  if (mode === 'merge') return <MergeTab view={view} weights={g.weights} hands={g.hands} preset={preset} setPreset={setPreset} onPlan={onPlan} />
 
   if (!state) return <Pending what="the item catalog" error={catalog.error} retry={catalog.reload} />
   const p = state.progress
@@ -261,14 +272,12 @@ export function GearFinder({ view, sheet, mode, onPlan }: { view: InventoryView;
                     {(Object.keys(ROLE_LABELS) as RoleKey[]).map((k) => (
                       <label key={k} className="lt-weight">
                         <span>{ROLE_LABELS[k]}</span>
-                        <input
-                          type="number"
+                        <TypedNumber
                           step={0.1}
-                          min={0}
                           value={role[k]}
                           title={k === 'ac' && overCap ? `Counts as ${Math.round(role.ac * AC_OVER_CAP * 100) / 100} while over the soft cap` : undefined}
-                          onChange={(e) => {
-                            setCustom({ ...role, [k]: Math.max(0, Number(e.target.value) || 0) })
+                          onCommit={(v) => {
+                            setCustom({ ...role, [k]: v })
                             setPreset('Custom')
                           }}
                         />
@@ -479,20 +488,40 @@ export function GearFinder({ view, sheet, mode, onPlan }: { view: InventoryView;
   )
 }
 
+/**
+ * A number the finder runs on, taken once typing stops (LT-406): each value on the way to "1.5" ran
+ * the finder over eleven thousand items, and the round after it. Never below 0.
+ */
+function TypedNumber({ value, onCommit, ...rest }: { value: number; onCommit: (v: number) => void; step: number; title?: string; style?: CSSProperties; 'aria-label'?: string }) {
+  const [draft, setDraft] = useState(String(value))
+  const [shown, setShown] = useState(value)
+  // Taken from outside (a preset picked): shown, unless it is what is typed already.
+  if (value !== shown) {
+    setShown(value)
+    if (Number(draft) !== value) setDraft(String(value))
+  }
+  const commit = useDebounced(onCommit, 250)
+  return (
+    <input
+      type="number"
+      min={0}
+      {...rest}
+      value={draft}
+      onChange={(e) => {
+        setDraft(e.target.value)
+        commit.call(Math.max(0, Number(e.target.value) || 0))
+      }}
+      onBlur={commit.flush}
+    />
+  )
+}
+
 function FocusPoints({ points, setPoints, wanted, lines }: { points: number; setPoints: (n: number) => void; wanted: number; lines: number }) {
   return (
     <div className="row small">
       <b>Focus effects</b>
       <span className="muted">making every spell you cast 10% better is worth</span>
-      <input
-        type="number"
-        min={0}
-        step={25}
-        value={points}
-        style={{ width: 72 }}
-        aria-label="Points for making every spell 10% better"
-        onChange={(e) => setPoints(Math.max(0, Number(e.target.value) || 0))}
-      />
+      <TypedNumber step={25} value={points} style={{ width: 72 }} aria-label="Points for making every spell 10% better" onCommit={setPoints} />
       <span className="muted">
         points; a focus counts for the spells it touches, by how often you cast them. {wanted} of the {lines} that touch your spells are wanted (Focus items tab).
       </span>

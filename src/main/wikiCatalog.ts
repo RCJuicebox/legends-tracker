@@ -22,8 +22,11 @@ const FORMAT = CATALOG_FORMAT
 export type { CatalogFile }
 export type CatalogProgress = WikiProgress
 
-/** How long the parsed catalog stays in memory after it was last asked for. */
-const KEEP_MS = 60_000
+/**
+ * How long the parsed catalog stays in memory after it was last asked for: long enough that going
+ * between the Gear tools does not parse ten megabytes again each time (LT-389).
+ */
+const KEEP_MS = 10 * 60_000
 
 export class WikiCatalog {
   // The catalog (some 10 MB parsed) is wanted only by the Gear pages and a download, so it is read
@@ -45,6 +48,27 @@ export class WikiCatalog {
     return join(cacheDir(), 'item-catalog.json')
   }
 
+  /** A hundred bytes beside the catalog: what Data Sources says of it, without parsing it at start (LT-416). */
+  private get metaPath(): string {
+    return join(cacheDir(), 'item-catalog.meta.json')
+  }
+
+  /** When the stored catalog was fetched and in what format, from memory, the meta file, or the catalog itself. */
+  async stamp(): Promise<Pick<CatalogFile, 'fetchedAt' | 'format'> | null> {
+    if (this.summary) return this.summary
+    try {
+      const m = JSON.parse(await fs.readFile(this.metaPath, 'utf8')) as { fetchedAt?: unknown; format?: unknown; count?: unknown }
+      if (typeof m.fetchedAt === 'number' && typeof m.count === 'number') {
+        this.summary = { fetchedAt: m.fetchedAt, format: typeof m.format === 'number' ? m.format : undefined, count: m.count }
+        this.report({})
+        return this.summary
+      }
+    } catch {
+      // No meta file yet (a catalog from an older build): the catalog itself says.
+    }
+    return (await this.stored()) && this.summary
+  }
+
   /** The stored catalog, whatever its age; null before the first download. */
   async stored(): Promise<CatalogFile | null> {
     if (!this.file) {
@@ -63,7 +87,10 @@ export class WikiCatalog {
 
   private hold(file: CatalogFile): void {
     this.file = file
+    const had = this.summary
     this.summary = { fetchedAt: file.fetchedAt, format: file.format, count: file.items.length }
+    // A catalog stored before the meta file existed gets one, so the next start need not parse it.
+    if (!had) void writeFileAtomic(this.metaPath, JSON.stringify(this.summary)).catch(() => undefined)
   }
 
   private forgetLater(): void {
@@ -106,6 +133,7 @@ export class WikiCatalog {
       file.eraStatus = (await this.eraStatus()) ?? old?.eraStatus
       await writeFileAtomic(this.path, JSON.stringify(file))
       this.hold(file)
+      await writeFileAtomic(this.metaPath, JSON.stringify(this.summary)).catch((e: unknown) => log.warn('Could not write item-catalog.meta.json:', e))
       this.forgetLater()
       this.report({ busy: false })
       return file

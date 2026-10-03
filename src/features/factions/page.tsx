@@ -2,7 +2,7 @@ import { Fragment, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { CharacterPicker } from '../../renderer/src/components/CharacterPicker'
 import { ago } from '../../renderer/src/api'
 import { useApp } from '../../renderer/src/state'
-import { useInvoke } from '../../renderer/src/hooks'
+import { useInvoke, useVisibleInterval } from '../../renderer/src/hooks'
 import { useRemembered } from '../../renderer/src/remember'
 import { usePickedCharacter } from '../../renderer/src/character'
 import { useNow } from '../../renderer/src/components/TimerBars'
@@ -162,11 +162,7 @@ export function Factions() {
 
   // New changes show up as they happen, since the log is read on from where it stopped, and a new
   // export within a few seconds of the game writing it.
-  const reload = q.reload
-  useEffect(() => {
-    const t = setInterval(reload, 10_000)
-    return () => clearInterval(t)
-  }, [reload])
+  useVisibleInterval(q.reload, 10_000)
 
   const hasExport = !!view?.export
   const unnamed = useMemo(() => (view?.factions ?? []).filter((r) => UNNAMED.test(r.name)).length, [view])

@@ -77,7 +77,13 @@ export function GameFolderCard() {
       <label className="field">
         <span>EverQuest Legends folder</span>
         <div className="row">
-          <input className="grow" value={dir} placeholder="Not found yet" onChange={(e) => patchSettings((x) => ({ ...x, installDir: e.target.value }))} />
+          <input
+            className="grow"
+            value={dir}
+            placeholder="Not found yet"
+            // Saved once typing stops: each save looks in the folder again and may read the spell data (LT-393).
+            onChange={(e) => patchSettings((x) => ({ ...x, installDir: e.target.value }), { debounceMs: 400 })}
+          />
           <button className="btn" onClick={() => void choose()}>
             Choose…
           </button>

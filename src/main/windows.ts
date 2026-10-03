@@ -280,6 +280,9 @@ export class Windows {
   private setMainHidden(hidden: boolean): void {
     this.mainHidden = hidden
     const w = this.main
+    // Hidden in the tray, the page is throttled and told it cannot be seen, so its clocks and polls
+    // stop (LT-387); the overlays had this already.
+    if (w && !w.isDestroyed()) w.webContents.setBackgroundThrottling(hidden)
     if (hidden || !w || w.isDestroyed()) return
     for (const send of this.held.values()) send()
     for (const args of this.heldFeed) push(w.webContents, 'state:feed', ...args)
