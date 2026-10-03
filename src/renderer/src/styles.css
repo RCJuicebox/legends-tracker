@@ -365,7 +365,8 @@ textarea {
   grid-template-columns: repeat(auto-fit, minmax(max(240px, calc((100% - 32px) / 3)), 1fr));
 }
 .grid.four {
-  grid-template-columns: repeat(auto-fit, minmax(max(200px, calc((100% - 48px) / 4)), 1fr));
+  /* Four across, or two and two: never three and one left on a row of its own (LT-493). */
+  grid-template-columns: repeat(auto-fit, minmax(max(240px, calc((100% - 48px) / 4)), 1fr));
 }
 .stack {
   display: grid;
@@ -4024,4 +4025,23 @@ input[aria-invalid='true'] {
     margin-top: 8px;
     margin-bottom: 2px;
   }
+}
+
+/* A narrow window: a page's buttons go in a row under its title, not a column beside it (LT-493). */
+@media (max-width: 1100px) {
+  .page-head {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .page-head .actions {
+    margin-left: 0;
+    justify-content: flex-start;
+  }
+}
+
+/* The meter overlay's flag and pin: the app's own monochrome icons, sized with the text (LT-499). */
+.dm-ov-btn svg {
+  width: 1.15em;
+  height: 1.15em;
+  vertical-align: -0.2em;
 }

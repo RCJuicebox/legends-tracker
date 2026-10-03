@@ -14,7 +14,8 @@ import { ItemIcon } from './gearBits'
 // The pet's gear: the best items the character owns for the pet to wear, within the pet
 // inventory's slots, against what the pet wears now (the log's `/pet inventory check` list).
 
-const code = (c: string) => c.toUpperCase()
+/** A class as the pages name it: "Shadow Knight", not "SHD" (LT-488). */
+const code = (c: string) => className(c)
 
 /** Where an item is now, in a few words. */
 function where(p: PetPiece): string {
@@ -111,7 +112,7 @@ export function PetTab({ m }: { m: GearModel }) {
             {!spells.some((s) => s.spell === spell) && spell && <option value={spell}>{spell}</option>}
             {spells.map((s) => (
               <option key={s.spell} value={s.spell}>
-                {s.spell} (level {s.level} {s.classes.map(code).join('/')})
+                {s.spell} (level {s.level} {s.classes.map(code).join(', ')})
               </option>
             ))}
           </select>
@@ -154,7 +155,7 @@ export function PetTab({ m }: { m: GearModel }) {
           <div className="row small" style={{ flexWrap: 'wrap', gap: 18 }}>
             <span>
               <a href={wikiUrl(`${spell} Summon`)} target="_blank" rel="noreferrer">
-                {petClasses.map(code).join(' / ')}
+                {petClasses.map(code).join(', ')}
               </a>
               , level {profile.level}
             </span>

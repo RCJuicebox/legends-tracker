@@ -65,7 +65,7 @@ export function Settings({ go }: { go?: (page: PageId) => void }) {
       <div className="page-head">
         <div>
           <h1>Settings</h1>
-          <p>Where the game is, how this window looks, and what the spell tracker does by default.</p>
+          <p>Where the game is, how this window looks, and what Spell Timers does by default.</p>
         </div>
       </div>
 
@@ -207,6 +207,7 @@ export function Settings({ go }: { go?: (page: PageId) => void }) {
                 >
                   Read the log again
                 </button>
+                {!watching && <span className="faint small"> Start watching first.</span>}
               </div>
             </Field>
           </div>
@@ -235,7 +236,7 @@ export function Settings({ go }: { go?: (page: PageId) => void }) {
         </div>
 
         <div className="card stack gap-14">
-          <h2>Spell tracking</h2>
+          <h2>Spell Timers</h2>
           <div className="grid two">
             <label className="row">
               <Switch on={t.enabled} onChange={(v) => setT({ enabled: v })} /> Track spells I cast

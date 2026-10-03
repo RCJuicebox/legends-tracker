@@ -150,6 +150,7 @@ export function SectionView({
         >
           Hide optional
         </button>
+        {!st.opt && <span className="faint small">none here</span>}
       </div>
       {body.entries.length ? (
         <Blocks book={book} si={si} entries={body.entries} query="" ctx={ctx} />

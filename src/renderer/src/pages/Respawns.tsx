@@ -4,7 +4,23 @@ import { useApp } from '../state'
 import { useInvoke } from '../hooks'
 import { useRemembered } from '../remember'
 import { act } from '../toast'
-import { Ago, ConfirmButton, Countdown, Disclosure, Field, FilterBox, Info, NumberInput, Pending, SortTh, Sparkline, Switch, ToggleChip, type Sort } from '../components/ui'
+import {
+  Ago,
+  ConfirmButton,
+  Countdown,
+  Disclosure,
+  ErrorText,
+  Field,
+  FilterBox,
+  Info,
+  NumberInput,
+  Pending,
+  SortTh,
+  Sparkline,
+  Switch,
+  ToggleChip,
+  type Sort
+} from '../components/ui'
 import { parseClock, SHARED_SEC, type RespawnRow, type RespawnTimerSpec, type RespawnView } from '../../../core/respawns'
 
 // How long mobs take to come back, measured from the log, and a timer on an overlay for any of them.
@@ -332,12 +348,16 @@ function TimerEditor({
   const [warnSec, setWarnSec] = useState(timer?.warnSec ?? 30)
   const [announce, setAnnounce] = useState(timer?.announce ?? true)
   const [error, setError] = useState('')
+  // Each field says what is wrong with it, under it (LT-484).
+  const [nameError, setNameError] = useState('')
+  const [lengthError, setLengthError] = useState('')
   const seconds = parseClock(length)
 
   const save = async () => {
     setError('')
-    if (!name.trim()) return setError('Give the mob’s name as the log prints it.')
-    if (!seconds) return setError('Give the length as minutes:seconds, e.g. 18:30.')
+    setNameError(name.trim() ? '' : 'Give the mob’s name as the log prints it.')
+    setLengthError(seconds ? '' : 'Give the length as minutes:seconds, e.g. 18:30.')
+    if (!name.trim() || !seconds) return
     const spec: RespawnTimerSpec = { name: name.trim(), seconds, overlay, warnSec, announce }
     try {
       onDone(await api.invoke('respawns:setTimer', spec))
@@ -354,15 +374,37 @@ function TimerEditor({
   }
 
   return (
-    <div className="stack gap-12" style={{ padding: '8px 4px' }}>
+    // Enter saves, Escape cancels, as in the other editors (LT-483).
+    <form
+      className="stack gap-12"
+      style={{ padding: '8px 4px' }}
+      onSubmit={(e) => {
+        e.preventDefault()
+        void save()
+      }}
+      onKeyDown={(e) => {
+        if (e.key !== 'Escape') return
+        e.preventDefault()
+        onCancel()
+      }}
+    >
       <div className="row" style={{ alignItems: 'flex-start', flexWrap: 'wrap' }}>
         {!initialName && (
           <Field label="Mob" hint="As the log prints it, e.g. Coercer T`vala or a shiverback.">
-            <input value={name} onChange={(e) => setName(e.target.value)} style={{ width: 240 }} autoFocus />
+            <input value={name} onChange={(e) => setName(e.target.value)} style={{ width: 240 }} autoFocus aria-invalid={!!nameError} />
+            {nameError && <ErrorText block>{nameError}</ErrorText>}
           </Field>
         )}
         <Field label="Respawn" hint={measured ? `Measured: ${clock(measured)}` : 'minutes:seconds'}>
-          <input className="mono" value={length} onChange={(e) => setLength(e.target.value)} placeholder="18:30" style={{ width: 100 }} aria-invalid={!!length && !seconds} />
+          <input
+            className="mono"
+            value={length}
+            onChange={(e) => setLength(e.target.value)}
+            placeholder="18:30"
+            style={{ width: 100 }}
+            aria-invalid={!!lengthError || (!!length && !seconds)}
+          />
+          {lengthError && <ErrorText block>{lengthError}</ErrorText>}
         </Field>
         <Field label="Overlay">
           <select value={overlay} onChange={(e) => setOverlay(e.target.value)}>
@@ -382,7 +424,7 @@ function TimerEditor({
       </div>
       {error && <div className="notice bad">{error}</div>}
       <div className="row">
-        <button className="btn primary" onClick={() => void save()}>
+        <button type="submit" className="btn primary">
           {timer ? 'Save timer' : 'Add timer'}
         </button>
         {timer && (
@@ -390,14 +432,14 @@ function TimerEditor({
             Remove timer
           </ConfirmButton>
         )}
-        <button className="btn ghost" onClick={onCancel}>
+        <button type="button" className="btn ghost" onClick={onCancel}>
           Cancel
         </button>
         <span className="faint small">
           It starts at each kill of {names ? `any of ${names.join(', ')}` : name.trim() || 'the mob'}, anywhere, and can be edited further on the Triggers page (Respawns folder).
         </span>
       </div>
-    </div>
+    </form>
   )
 }
 

@@ -1,3 +1,4 @@
+import { Tip } from '../../../renderer/src/components/ui'
 import { Fragment } from 'react'
 import { duration, wikiUrl } from '../../../core/format'
 import { fmtCoin } from '../../../core/loot'
@@ -144,9 +145,9 @@ export function Flags({ a }: { a: PlanActivity }) {
   return (
     <>
       {flags.map((f) => (
-        <span key={f.label} className={`chip fp-flag ${f.tone}`.trim()} title={f.why}>
+        <Tip key={f.label} className={`chip fp-flag ${f.tone}`.trim()} text={f.why}>
           {f.label}
-        </span>
+        </Tip>
       ))}
     </>
   )

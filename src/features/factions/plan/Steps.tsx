@@ -1,3 +1,4 @@
+import { Info, Tip } from '../../../renderer/src/components/ui'
 import type { ReactNode } from 'react'
 import { duration } from '../../../core/format'
 import { fmtCoin } from '../../../core/loot'
@@ -38,7 +39,12 @@ export function Steps({
   return (
     <div className="card mb-16">
       <h2>
-        The plan, step by step<span className="spacer"></span>
+        The plan, step by step {/* What each step's buttons do, for those not using a mouse to hover them (LT-453). */}
+        <Info
+          label="About the step buttons"
+          text="Work on this: follow that step now, on the Now card and the achievements overlay, until your kills or hand-ins go toward another. Lock in: keep this way for the achievements it finishes, and build the plan around it. Rule out: leave this way out of the plan (it is listed under Ruled out, to bring back)."
+        />
+        <span className="spacer"></span>
         <span className="faint small mono">≈ {duration(plan.seconds)}</span>
       </h2>
       <ol className="fp-steps">
@@ -54,29 +60,33 @@ export function Steps({
                   <span className="fp-zone">{a.zone || 'Somewhere'}</span>
                   <span className={`chip fp-kind ${a.kind}`}>{KIND_LABEL[a.kind]}</span>
                   {st.restores && (
-                    <span className="chip fp-restore" title="It finishes no achievement: it brings factions back to 0 or above">
+                    <Tip className="chip fp-restore" text="It finishes no achievement: it brings factions back to 0 or above">
                       restore
-                    </span>
+                    </Tip>
                   )}
                   {st.reaches.length > 0 && !st.finishes.length && (
-                    <span className="chip fp-restore" title="It finishes no achievement itself: it raises a faction to where a quicker quest's NPC takes it">
+                    <Tip className="chip fp-restore" text="It finishes no achievement itself: it raises a faction to where a quicker quest's NPC takes it">
                       opens a way
-                    </span>
+                    </Tip>
                   )}
                   {isNow && (
-                    <span className="chip fp-now-chip" title="The step you are on: the achievements overlay follows it">
+                    <Tip className="chip fp-now-chip" text="The step you are on: the achievements overlay follows it">
                       now
-                    </span>
+                    </Tip>
                   )}
                   <Doing a={a} />
                   <Flags a={a} />
                   <span className="spacer" />
-                  <span className="mono" title={`${st.units.toLocaleString()} ${a.kind === 'kill' ? 'kills' : 'hand-ins'}`}>
+                  <Tip className="mono" text={`${st.units.toLocaleString()} ${a.kind === 'kill' ? 'kills' : 'hand-ins'}`}>
                     ×{st.units.toLocaleString()}
-                  </span>
-                  <span className="mono fp-time" title={timeNote(st)}>
-                    {duration(st.seconds)}
-                  </span>
+                  </Tip>
+                  {timeNote(st) ? (
+                    <Tip className="mono fp-time" text={timeNote(st)!}>
+                      {duration(st.seconds)}
+                    </Tip>
+                  ) : (
+                    <span className="mono fp-time">{duration(st.seconds)}</span>
+                  )}
                 </div>
                 {hint(st)}
                 {a.kind === 'quest' && a.line && <div className="faint small">“{a.line}”</div>}

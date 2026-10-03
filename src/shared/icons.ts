@@ -29,3 +29,5 @@ export type IconName =
   | 'loot'
   | 'link'
   | 'sources'
+  | 'pin'
+  | 'unlock'

@@ -3,6 +3,7 @@ import { api, errorMessage } from '../api'
 import { useApp } from '../state'
 import { act, showError, actDone } from '../toast'
 import { OVERLAY_TARGETS, TRY_LINES } from '../constants'
+import { TRIGGER_TEXT_COLOR, TRIGGER_TIMER_COLOR } from '../../../shared/overlays'
 import { recall, remember, useRemembered } from '../remember'
 import { markUnsaved } from '../unsaved'
 import { ConfirmButton, Field, FilterBox, Icon, LoadError, NumberInput, Pending, Switch } from '../components/ui'
@@ -31,9 +32,9 @@ function blankAction(type: TriggerAction['type']): TriggerAction {
     case 'sound':
       return { type, file: '', volume: 1 }
     case 'text':
-      return { type, text: '', color: '#ffd84d', durationSec: 5 }
+      return { type, text: '', color: TRIGGER_TEXT_COLOR, durationSec: 5 }
     case 'timer':
-      return { type, name: '', durationSec: 30, color: '#e8b44c', overlay: OVERLAY_TARGETS, warnSec: 5, warnSpeech: '', endSpeech: '', restart: 'restart', endEarly: [] }
+      return { type, name: '', durationSec: 30, color: TRIGGER_TIMER_COLOR, overlay: OVERLAY_TARGETS, warnSec: 5, warnSpeech: '', endSpeech: '', restart: 'restart', endEarly: [] }
   }
 }
 
@@ -152,7 +153,7 @@ export function Triggers() {
       <div className="page-head">
         <div>
           <h1>Triggers</h1>
-          <p>Your own alerts for any log line. Spell durations don't need a trigger; the spell tracker handles every spell you cast.</p>
+          <p>Your own alerts for any log line. Spell durations don't need a trigger: Spell Timers times every spell you cast.</p>
         </div>
         <div className="actions">
           <button
@@ -273,8 +274,9 @@ function TriggerEditor({
           <button className="btn small" onClick={onDuplicate}>
             Duplicate
           </button>
-          <ConfirmButton question={`Delete ${t.name || 'this trigger'}?`} onConfirm={onDelete}>
-            Delete
+          {/* Taken out of the list being edited; it is gone once the changes are saved (LT-477). */}
+          <ConfirmButton question={`Remove ${t.name || 'this trigger'}? It goes with Save changes.`} onConfirm={onDelete}>
+            Remove
           </ConfirmButton>
         </h2>
         <div className="grid three">
@@ -407,6 +409,7 @@ function ActionEditor({ a, onChange, onRemove }: { a: TriggerAction; onChange: (
           <button className="btn small" disabled={!a.file} title={a.file ? undefined : 'Choose a sound first'} onClick={() => void act('audio:sound', a.file)}>
             Play
           </button>
+          {!a.file && <span className="faint small">choose a sound first</span>}
         </div>
       )}
       {a.type === 'text' && (
@@ -516,7 +519,7 @@ function TestPanel({ t }: { t: Trigger }) {
         <button
           className="btn"
           disabled={!line.trim()}
-          title="Run the line through the spell tracker and every trigger, as if it had just been logged, as Try it on the Live page does: you hear and see what it does"
+          title="Run the line through Spell Timers and every trigger, as if it had just been logged, as Try it on the Live page does: you hear and see what it does"
           onClick={() => void act('simulate', line)}
         >
           Run it for real

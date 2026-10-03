@@ -177,6 +177,7 @@ export function Logs() {
                       >
                         Archive now
                       </ConfirmButton>
+                      {(status.busy || l.size === 0) && <span className="faint small"> {status.busy ? 'after the current job' : 'nothing in it yet'}</span>}
                     </td>
                   </tr>
                 ))}

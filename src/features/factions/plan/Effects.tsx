@@ -1,3 +1,4 @@
+import { Tip } from '../../../renderer/src/components/ui'
 import type { PlanStep } from '../planTypes'
 import { plain, signed } from './parts'
 
@@ -9,9 +10,9 @@ export function Effects({ step }: { step: PlanStep }) {
   return (
     <>
       {step.unlocks.map((u) => (
-        <span key={u} className="chip ok fp-unlock" title={`${u}: done here, so you can pick the race in Loadouts, and the plan may swap to it after`}>
+        <Tip key={u} className="chip ok fp-unlock" text={`${u}: done here, so you can pick the race in Loadouts, and the plan may swap to it after`}>
           {u.replace(/^Race Unlock - /, '')} unlocked
-        </span>
+        </Tip>
       ))}
       {step.finishes.map((f) => (
         <span
@@ -39,24 +40,24 @@ export function Effects({ step }: { step: PlanStep }) {
         </span>
       ))}
       {also.map(([f, v]) => (
-        <span key={f} className="chip" title="Raised on the way; finished in a later step">
+        <Tip key={f} className="chip" text="Raised on the way; finished in a later step">
           {f} {signed(v)}
-        </span>
+        </Tip>
       ))}
       {lowers.map(([f, v]) => (
-        <span key={f} className="chip warn" title="Lowered while still to do: the plan makes these points up later">
+        <Tip key={f} className="chip warn" text="Lowered while still to do: the plan makes these points up later">
           {f} {signed(-v)}
-        </span>
+        </Tip>
       ))}
       {step.lifts.map((f) => (
-        <span key={`up ${f}`} className="chip ok" title="Brought back from below zero here">
+        <Tip key={`up ${f}`} className="chip ok" text="Brought back from below zero here">
           {f} back to 0+
-        </span>
+        </Tip>
       ))}
       {step.sinks.map((f) => (
-        <span key={`down ${f}`} className="chip bad" title="Taken below zero here">
+        <Tip key={`down ${f}`} className="chip bad" text="Taken below zero here">
           {f} below 0
-        </span>
+        </Tip>
       ))}
       {maxed.length > 0 && (
         <span

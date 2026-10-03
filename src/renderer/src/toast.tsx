@@ -109,7 +109,7 @@ export function Toasts() {
             </button>
           )}
           <button className="btn ghost small x-btn" aria-label="Dismiss" onClick={() => dismissToast(t.id)}>
-            ×
+            ✕
           </button>
         </div>
       ))}

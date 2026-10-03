@@ -7,6 +7,7 @@ import { useRemembered } from '../remember'
 import { num, wikiUrl } from '../../../core/format'
 import { ItemIcon, source, whereText } from './gearBits'
 import { DAY_WINDOWS, Pending, Segmented } from '../components/ui'
+import { className } from '../../../shared/game/classes'
 
 // The Gear page's worn effects and procs tabs: what each one on gear the character owns or could get
 // does, what it is worth to them (melee from their own log, stats by their weights), and where to
@@ -143,7 +144,7 @@ export function EffectsTab({ m, kind }: { m: GearModel; kind: EffectKind }) {
             value={who}
             onChange={setWho}
             options={[
-              ['yours', `Your classes (${m.classes.map((c) => c.toUpperCase()).join(' ')})`],
+              ['yours', `Your classes (${m.classes.map((c) => className(c)).join(', ')})`],
               ['all', 'All classes']
             ]}
           />

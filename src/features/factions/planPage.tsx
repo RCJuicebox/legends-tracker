@@ -5,7 +5,7 @@ import { useAchievementTrack, useInvoke, useLatest, useSameContents, useVisibleI
 import { useApp } from '../../renderer/src/state'
 import { useCharacterRecord } from '../../renderer/src/character'
 import { useNow } from '../../renderer/src/components/TimerBars'
-import { ConfirmButton, Disclosure, GameCommand, Info, Pending, Segmented, Switch } from '../../renderer/src/components/ui'
+import { ConfirmButton, Disclosure, GameCommand, Info, Pending, Segmented, Switch, Tip } from '../../renderer/src/components/ui'
 import { duration, who, wikiUrl } from '../../core/format'
 import { STANDING_MAX, standingBand, type FactionView } from './core'
 import { runPlan } from './planRunner'
@@ -632,17 +632,17 @@ export function PlanTab({ character, view }: { character: string; view: FactionV
                         <td className="num mono">{done ? '—' : Math.round(STANDING_MAX - t.standing).toLocaleString()}</td>
                         <td>
                           {done ? (
-                            <span className="chip ok" title="At 2000 now: the achievement shows done at your next achievements export">
+                            <Tip className="chip ok" text="At 2000 now: the achievement shows done at your next achievements export">
                               at 2000
-                            </span>
+                            </Tip>
                           ) : step ? (
                             <span>
                               <span className="fp-num-inline">{step}</span> <Doing a={plan!.steps[step - 1].activity} />
                             </span>
                           ) : (
-                            <span className="chip warn" title={`${UNPLANNED[plan?.unplannedWhy[t.faction] ?? 'nothing known']}: open it for what there is`}>
+                            <Tip className="chip warn" text={`${UNPLANNED[plan?.unplannedWhy[t.faction] ?? 'nothing known']}: open it for what there is`}>
                               not planned{plan?.unplannedWhy[t.faction] ? ` · ${plan.unplannedWhy[t.faction]}` : ''}
-                            </span>
+                            </Tip>
                           )}
                         </td>
                       </tr>

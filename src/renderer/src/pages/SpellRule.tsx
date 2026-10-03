@@ -3,6 +3,8 @@ import { useApp } from '../state'
 import { markUnsaved } from '../unsaved'
 import { api, errorMessage } from '../api'
 import { duration } from '../../../core/format'
+// The colour a bar has unless one is set: its kind's, not a fixed teal (LT-495).
+import { CATEGORY_COLORS } from '../../../core/spellTracker'
 import { act, showToast } from '../toast'
 import { ConfirmButton, Field, NumberInput, SpellIcon, Switch } from '../components/ui'
 import { type KnownSpell, type SpellRule } from '../../../shared/types'
@@ -70,7 +72,21 @@ export function RuleEditor({ k, onSaved }: { k: KnownSpell; onSaved: (list: Know
   const t = state.settings.tracking
   const overlays = state.settings.overlays.filter((o) => o.kind === 'timers')
   return (
-    <div className="grid two" style={{ padding: '8px 4px', alignItems: 'start' }}>
+    <div
+      className="grid two"
+      style={{ padding: '8px 4px', alignItems: 'start' }}
+      // Enter in a box saves, Escape puts back what is saved, as the other editors do (LT-483).
+      onKeyDown={(e) => {
+        const typing = (e.target as HTMLElement).tagName === 'INPUT'
+        if (e.key === 'Enter' && typing) {
+          e.preventDefault()
+          void save(rule)
+        } else if (e.key === 'Escape' && dirty) {
+          e.preventDefault()
+          setRule(base)
+        }
+      }}
+    >
       <div className="stack gap-12">
         <div className="row">
           <SpellIcon icon={k.icon} large />
@@ -149,7 +165,12 @@ export function RuleEditor({ k, onSaved }: { k: KnownSpell; onSaved: (list: Know
           </Field>
           <Field label="Bar colour">
             <div className="row tight">
-              <input type="color" value={rule.color ?? '#3fb6a8'} onChange={(e) => set({ color: e.target.value })} style={{ width: 44, height: 32, padding: 2 }} />
+              <input
+                type="color"
+                value={rule.color ?? CATEGORY_COLORS[k.category]}
+                onChange={(e) => set({ color: e.target.value })}
+                style={{ width: 44, height: 32, padding: 2 }}
+              />
               {rule.color && (
                 <button className="btn ghost small" onClick={() => set({ color: undefined })}>
                   Reset

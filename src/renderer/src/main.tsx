@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client'
 import './styles.css'
 import { StateProvider, useApp, useLive } from './state'
 import { Ago, Icon, type IconName } from './components/ui'
+import { GoContext } from './nav'
 import { ErrorBoundary } from './components/ErrorBoundary'
 import { Jobs } from './components/Jobs'
 import { act, Toasts } from './toast'
@@ -41,12 +42,13 @@ const SHELL_PAGES = [
   { id: 'buffs', group: 'Play', label: 'Buffs', icon: 'sparkle', el: Buffs },
   { id: 'respawns', group: 'Play', label: 'Respawns', icon: 'respawn', el: Respawns },
   { id: 'motes', group: 'Play', label: 'Motes', icon: 'motes', el: Motes },
+  // Read mid-session ("what just dropped?"), beside the meter it shares New session with (LT-494).
+  { id: 'loot', group: 'Play', label: 'Loot', icon: 'loot', el: Loot },
   { id: 'achievements', group: 'Plan', label: 'Achievements', icon: 'trophy', el: Achievements },
   { id: 'stats', group: 'Plan', label: 'Stats', icon: 'stats', el: Stats },
   { id: 'gear', group: 'Plan', label: 'Gear', icon: 'bag', el: Gear },
   { id: 'upgrades', group: 'Plan', label: 'Upgrades', icon: 'upgrade', el: Upgrades },
   { id: 'tradeskills', group: 'Plan', label: 'Tradeskills', icon: 'flask', el: Tradeskills },
-  { id: 'loot', group: 'Plan', label: 'Loot', icon: 'loot', el: Loot },
   { id: 'spells', group: 'Setup', label: 'Spell Timers', icon: 'spells', el: Spells },
   { id: 'triggers', group: 'Setup', label: 'Triggers', icon: 'triggers', el: Triggers },
   { id: 'overlays', group: 'Setup', label: 'Overlays', icon: 'overlays', el: Overlays },
@@ -167,7 +169,9 @@ function Shell() {
       <main className="main">
         <Jobs />
         <ErrorBoundary key={page} what={`The ${PAGES.find((p) => p.id === page)!.label} page`}>
-          <PageHost Page={Page} go={setPage} />
+          <GoContext.Provider value={setPage}>
+            <PageHost Page={Page} go={setPage} />
+          </GoContext.Provider>
         </ErrorBoundary>
       </main>
       <Toasts />

@@ -2,7 +2,7 @@ import { num } from '../../../core/format'
 import { acInputs, acReport } from '../../../core/statsModel'
 import { className } from '../../../shared/game/classes'
 import { Notes, NumField, Trace, type TabProps } from './statsBits'
-import { GameCommand } from '../components/ui'
+import { Ago, GameCommand } from '../components/ui'
 
 export function AcTab({
   s,
@@ -14,8 +14,9 @@ export function AcTab({
   primary,
   tableCap,
   skill,
-  hasInventory
-}: TabProps & { tableCap?: { cap: number; mult: number }; hasInventory: boolean }) {
+  hasInventory,
+  exportedAt = 0
+}: TabProps & { tableCap?: { cap: number; mult: number }; hasInventory: boolean; exportedAt?: number }) {
   const i = acInputs(s, trio, primary, val, skill)
   const { r, full, sum, notes, rows } = acReport(i, primary)
 
@@ -72,7 +73,15 @@ export function AcTab({
 
       <div className="stack gap-14">
         <div className="card stack gap-10">
-          <h2>Worn gear</h2>
+          <h2>
+            Worn gear
+            {/* The worn figures are only as new as the export they come from (LT-486). */}
+            {hasInventory && exportedAt > 0 && (
+              <span className="faint small" style={{ fontWeight: 400, marginLeft: 8, textTransform: 'none', letterSpacing: 0 }}>
+                inventory export <Ago t={exportedAt} />
+              </span>
+            )}
+          </h2>
           <div className="stats-fields two">
             <NumField
               label="AC on equipped items"

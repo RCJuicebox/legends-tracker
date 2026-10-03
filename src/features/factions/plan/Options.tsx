@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Disclosure, NumberInput } from '../../../renderer/src/components/ui'
+import { Disclosure, NumberInput, Tip } from '../../../renderer/src/components/ui'
 import { duration, wikiUrl } from '../../../core/format'
 import type { PlanChoices } from '../../../shared/settings'
 import { plannable } from '../ways'
@@ -55,9 +55,9 @@ export function Options({
               {o.chosen && <span className="chip ok">in the plan</span>}
               {!o.chosen && o.used && <span className="chip">in the plan for others</span>}
               {a.once && !locked && (
-                <span className="chip warn" title={`Taken to be once only: ${a.once}. Lock it in if you know it repeats.`}>
+                <Tip className="chip warn" text={`Taken to be once only: ${a.once}. Lock it in if you know it repeats.`}>
                   one-time?
-                </span>
+                </Tip>
               )}
               <Flags a={a} />
               <span className="spacer" />

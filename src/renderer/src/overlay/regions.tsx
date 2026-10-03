@@ -3,6 +3,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { api } from '../api'
 import { LIVE, useSegment } from '../combat'
 import { EntityBar, HealBar, SkillBar } from '../components/MeterBars'
+import { Icon } from '../components/ui'
 import {
   attackerRows,
   attackerSkillRows,
@@ -201,14 +202,14 @@ function MeterOverlay({ config, snap, arranging }: { config: OverlayConfig; snap
               {opts.scope === 'everyone' ? 'All' : opts.scope === 'group' ? 'Group' : 'You'}
             </button>
             <button className="dm-ov-btn" onClick={() => void api.invoke('combat:newSession').catch(() => {})} title="Start a new session from now">
-              ⚑
+              <Icon name="flag" />
             </button>
             <button
               className={`dm-ov-btn${unlocked ? ' on' : ''}`}
               onClick={() => setUnlocked(!unlocked)}
               title={unlocked ? 'Rows can be clicked; lock to let clicks through to the game' : 'Unlock to click rows for their breakdown'}
             >
-              {unlocked ? '🔓' : '📌'}
+              <Icon name={unlocked ? 'unlock' : 'pin'} />
             </button>
           </span>
         </div>

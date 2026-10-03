@@ -1,4 +1,5 @@
-import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore, type CSSProperties, type HTMLAttributes, type ReactNode } from 'react'
+import { useContext, useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore, type CSSProperties, type HTMLAttributes, type ReactNode } from 'react'
+import { GoContext } from '../nav'
 import type { SpellCategory } from '../../../shared/types'
 import type { IconName } from '../../../shared/icons'
 import { CATEGORY_LABELS } from '../../../shared/types'
@@ -138,6 +139,10 @@ const paths: Record<IconName, ReactNode> = {
   sparkle: <path d="M12 2l2.4 7.4H22l-6.2 4.5 2.4 7.4L12 16.8l-6.2 4.5 2.4-7.4L2 9.4h7.6z" />,
   meter: <path d="M3 4h18v3H3zm0 6.5h12v3H3zm0 6.5h7v3H3z" />,
   flag: <path d="M5 2h2v20H5zm4 1h10l-2.5 4L19 11H9z" />,
+  pin: <path d="M16 3v2h-1v6l3 3v2h-5v6l-1 1-1-1v-6H6v-2l3-3V5H8V3z" />,
+  unlock: (
+    <path d="M17 9h-7V6.5a2 2 0 0 1 4 0V7h2v-.5a4 4 0 0 0-8 0V9H7a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-9a2 2 0 0 0-2-2zm0 11H7v-9h10zm-5-2a2 2 0 1 0 0-4 2 2 0 0 0 0 4z" />
+  ),
   check: <path d="M9 16.2 4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4z" />,
   copy: <path d="M8 2h10a2 2 0 0 1 2 2v12h-2V4H8zm-4 4h10a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2zm0 2v12h10V8z" />,
   back: <path d="M20 11H7.8l5.6-5.6L12 4l-8 8 8 8 1.4-1.4L7.8 13H20z" />,
@@ -260,11 +265,18 @@ export function ErrorText({ children, block }: { children: ReactNode; block?: bo
 
 /** A failed load, said plainly, with a retry. */
 export function LoadError({ error, retry, what = 'this' }: { error: string; retry?: () => void; what?: string }) {
+  const go = useContext(GoContext)
   return (
     <div className="notice bad row mb-16" role="alert">
       <span className="grow">
         Could not load {what}: {error}
       </span>
+      {/* Where the answer usually is: what each source last said, and a Refresh (LT-487). */}
+      {go && (
+        <button className="btn small ghost" onClick={() => go('sources')}>
+          Data Sources
+        </button>
+      )}
       {retry && (
         <button className="btn small" onClick={retry}>
           Try again
@@ -298,15 +310,26 @@ export function ConfirmButton({
   const [asking, setAsking] = useState(false)
   if (!asking) {
     return (
-      <button className={className} title={title} aria-label={label} disabled={disabled} onClick={() => setAsking(true)}>
+      <button type="button" className={className} title={title} aria-label={label} disabled={disabled} onClick={() => setAsking(true)}>
         {children}
       </button>
     )
   }
   return (
-    <span className="confirm row tight" role="group" aria-label={question} onKeyDown={(e) => e.key === 'Escape' && setAsking(false)}>
+    <span
+      className="confirm row tight"
+      role="group"
+      aria-label={question}
+      onKeyDown={(e) => {
+        if (e.key !== 'Escape') return
+        // Its own Escape: not the form's around it, which would cancel the whole edit.
+        e.stopPropagation()
+        setAsking(false)
+      }}
+    >
       <span className="small">{question}</span>
       <button
+        type="button"
         className="btn small danger"
         autoFocus
         onClick={() => {
@@ -316,7 +339,7 @@ export function ConfirmButton({
       >
         Yes
       </button>
-      <button className="btn small ghost" onClick={() => setAsking(false)}>
+      <button type="button" className="btn small ghost" onClick={() => setAsking(false)}>
         No
       </button>
     </span>
@@ -370,6 +393,9 @@ export function Disclosure({
  * Something with an explanation behind it: the explanation is its hover title, and it can be reached
  * by Tab, where the same words show beside it (a title alone reaches only the mouse). The words are
  * drawn fixed to the window, so a table that scrolls cannot clip them; they go on a scroll.
+ *
+ * In a table's rows, or a list of achievement objectives, a Tip is not a Tab stop of its own: a
+ * hundred rows were three hundred stops (LT-481). There its words are read out with the row instead.
  */
 export function Tip({
   text,
@@ -378,6 +404,9 @@ export function Tip({
   ...rest
 }: { text: string; className?: string; children: ReactNode } & Omit<HTMLAttributes<HTMLSpanElement>, 'title' | 'className' | 'children'>) {
   const [at, setAt] = useState<CSSProperties | null>(null)
+  const self = useRef<HTMLSpanElement>(null)
+  const [inRows, setInRows] = useState(false)
+  useLayoutEffect(() => setInRows(!!self.current?.closest('tbody, .ach-obj')), [])
   useEffect(() => {
     if (!at) return
     const hide = () => setAt(null)
@@ -387,8 +416,9 @@ export function Tip({
   return (
     <span
       {...rest}
+      ref={self}
       className={`tip ${className}`.trim()}
-      tabIndex={0}
+      tabIndex={inRows ? undefined : 0}
       title={text}
       onFocus={(e) => {
         if (!e.currentTarget.matches(':focus-visible')) return
@@ -398,6 +428,7 @@ export function Tip({
       onBlur={() => setAt(null)}
     >
       {children}
+      {inRows && <span className="sr-only">{` (${text})`}</span>}
       {at && (
         <span className="tip-pop" role="tooltip" style={at}>
           {text}

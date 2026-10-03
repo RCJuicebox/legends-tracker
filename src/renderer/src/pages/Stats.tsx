@@ -222,7 +222,19 @@ export function Stats() {
       {tab === 'character' ? (
         <CharacterTab s={s} set={set} val={val} trio={trio} primary={primary} skill={skill} gear={gear?.totals ?? null} />
       ) : tab === 'ac' ? (
-        <AcTab s={s} set={set} setOverride={setOverride} auto={auto} val={val} trio={trio} primary={primary} tableCap={tableCap} skill={skill} hasInventory={!!gear} />
+        <AcTab
+          s={s}
+          set={set}
+          setOverride={setOverride}
+          auto={auto}
+          val={val}
+          trio={trio}
+          primary={primary}
+          tableCap={tableCap}
+          skill={skill}
+          hasInventory={!!gear}
+          exportedAt={view.modified}
+        />
       ) : tab === 'combat' ? (
         <CombatTab s={s} set={set} setOverride={setOverride} auto={auto} val={val} trio={trio} primary={primary} caps={caps} skill={skill} />
       ) : (

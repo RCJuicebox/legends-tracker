@@ -216,17 +216,30 @@ function AzureCard({ status, error, onSaved }: { status: AzureStatus | null; err
           </ConfirmButton>
         </div>
       ) : null}
-      <div className="row" style={{ flexWrap: 'wrap', alignItems: 'flex-end' }}>
+      <form
+        className="row"
+        style={{ flexWrap: 'wrap', alignItems: 'flex-end' }}
+        // Enter saves the key; Escape clears what was typed (LT-483).
+        onSubmit={(e) => {
+          e.preventDefault()
+          if (!busy && key.trim() && (region.trim() || status?.region)) void save(region.trim() || status?.region || '', key)
+        }}
+        onKeyDown={(e) => {
+          if (e.key !== 'Escape') return
+          setKey('')
+          setRegion('')
+        }}
+      >
         <Field label="Region">
           <input value={region} placeholder={status?.region || 'eastus'} onChange={(e) => setRegion(e.target.value)} style={{ width: 150 }} />
         </Field>
         <Field label={status?.configured ? 'New key' : 'Key'}>
           <input type="password" value={key} autoComplete="off" onChange={(e) => setKey(e.target.value)} style={{ width: 320 }} />
         </Field>
-        <button className="btn primary" disabled={busy || !key.trim() || !(region.trim() || status?.region)} onClick={() => void save(region.trim() || status?.region || '', key)}>
+        <button type="submit" className="btn primary" disabled={busy || !key.trim() || !(region.trim() || status?.region)}>
           {busy ? 'Checking…' : 'Save and check'}
         </button>
-      </div>
+      </form>
       {problem && <div className="notice bad">{problem}</div>}
     </div>
   )

@@ -7,6 +7,13 @@ export const DEFAULT_METER_OPTIONS: MeterOverlayOptions = { mode: 'damage', span
 
 export const DEFAULT_ACHIEVEMENT_OPTIONS: AchievementOverlayOptions = { factionPlan: true }
 
+/**
+ * A new trigger's colours: a timer bar's and an alert's. Colours over the game, so one value for both
+ * themes, kept here so the Triggers page and the check of a saved trigger agree (LT-495).
+ */
+export const TRIGGER_TIMER_COLOR = '#e8b44c'
+export const TRIGGER_TEXT_COLOR = '#ffd84d'
+
 export const OVERLAY_BUFFS = 'buffs'
 export const OVERLAY_TARGETS = 'targets'
 const OVERLAY_ALERTS = 'alerts'

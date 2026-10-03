@@ -15,7 +15,7 @@ import {
   type Trigger,
   type TriggerAction
 } from '../shared/types'
-import { DEFAULT_ACHIEVEMENT_OPTIONS, DEFAULT_METER_OPTIONS, minOpacity } from '../shared/overlays'
+import { DEFAULT_ACHIEVEMENT_OPTIONS, DEFAULT_METER_OPTIONS, minOpacity, TRIGGER_TIMER_COLOR } from '../shared/overlays'
 import type { RespawnRecords, RespawnTimerSpec, SpawnLink } from './respawns'
 import { MOTE_RANKS, type MoteSession, type MoteState } from './motes'
 import type { ActiveBuff, BuffsFile, Person } from './buffs'
@@ -443,7 +443,7 @@ function action(v: unknown): TriggerAction | null {
         type: 'timer',
         name: str(v.name, ''),
         durationSec: num(v.durationSec, 30, 0, 7 * DAY),
-        color: str(v.color, '#e8b44c'),
+        color: str(v.color, TRIGGER_TIMER_COLOR),
         overlay: str(v.overlay, 'targets'),
         warnSec: num(v.warnSec, 0, 0, 7 * DAY),
         warnSpeech: str(v.warnSpeech, ''),

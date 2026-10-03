@@ -32,7 +32,6 @@ export function Dashboard({ go }: { go: (p: PageId) => void }) {
   const character = useLive((l) => l.status.character)
   const elsewherePath = useLive((l) => l.status.elsewhere?.path ?? '')
   const elsewhereCharacter = useLive((l) => l.status.elsewhere?.character ?? '')
-  const spellError = useLive((l) => l.status.spellError)
   // Shared with the Triggers page's Test panel: lines pasted in either are waiting in the other.
   const [sim, setSim] = useRemembered<string>(TRY_LINES, '')
   const [simOpen, setSimOpen] = useState(() => !!sim)
@@ -54,14 +53,14 @@ export function Dashboard({ go }: { go: (p: PageId) => void }) {
               className="btn primary"
               onClick={() => void act('watch:start')}
               disabled={!settings.logFile}
-              title={settings.logFile ? undefined : 'Choose a character log on Log Files first'}
+              title={settings.logFile ? undefined : 'Follow a character log on Log Files first'}
             >
               <Icon name="play" /> Start watching
             </button>
           )}
           {!watching && !settings.logFile && (
             <span className="faint small">
-              Choose a character log on{' '}
+              Follow a character log on{' '}
               <button className="link-button inline" onClick={() => go('logs')}>
                 Log Files
               </button>{' '}
@@ -92,14 +91,6 @@ export function Dashboard({ go }: { go: (p: PageId) => void }) {
           </button>
         </div>
       )}
-      {settings.installDir && !spellError && !settings.logFile && (
-        <div className="notice mb-16">
-          No character log selected.{' '}
-          <button className="btn small" onClick={() => go('logs')}>
-            Choose one
-          </button>
-        </div>
-      )}
 
       <StatCards go={go} />
 
@@ -118,7 +109,7 @@ export function Dashboard({ go }: { go: (p: PageId) => void }) {
             </button>
           </h2>
           <p className="muted small mt-0">
-            Paste log lines to run them through the live tracker and triggers, with their times moved to now. To see which trigger a line matches and what it would say, without
+            Paste log lines to run them through Spell Timers and the triggers, with their times moved to now. To see which trigger a line matches and what it would say, without
             running it, use{' '}
             <button className="link-button inline" onClick={() => go('triggers')}>
               Test on the Triggers page
@@ -178,7 +169,7 @@ function StatCards({ go }: { go: (p: PageId) => void }) {
         <span className="sub">{status.zone || 'zone unknown'}</span>
       </div>
       <button className="card stat card-button" onClick={() => go('motes')}>
-        <span className="label">{crawl ? (crawl.kind === 'manual' ? 'Session motes' : 'Instance run motes') : 'Motes today'}</span>
+        <span className="label">{crawl ? (crawl.kind === 'manual' ? 'Run motes' : 'Instance run motes') : 'Motes today'}</span>
         <span className="value">
           {crawl ? `${totalMotes(crawl.motes)} · ${perHour(totalMotes(crawl.motes), sessionHours(crawl, now))}/h` : totalMotes(motes?.daily[localDay(now)] ?? {})}
         </span>

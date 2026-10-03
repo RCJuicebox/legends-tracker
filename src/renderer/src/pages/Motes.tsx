@@ -127,18 +127,18 @@ function MoteTracking() {
           <h1>Motes</h1>
           <p>
             Every mote you loot, counted from the log. Every instance run is timed from when you enter; the log cannot tell a Dungeon Crawl from a normal instance, so a run becomes
-            a crawl when the game says it is complete (reward chest included). Only the instance owner gets that line, so click a run's type to mark it a crawl yourself. Use a
-            manual session for anything else.
+            a crawl when the game says it is complete (reward chest included). Only the instance owner gets that line, so click a run's type to mark it a crawl yourself. Time a run
+            yourself for anything else. (A run times motes; the damage meter's sessions are its own.)
           </p>
         </div>
         <div className="actions">
           {a ? (
             <button className="btn" onClick={() => void act('motes:stop')}>
-              <Icon name="stop" /> Stop {a.kind === 'manual' ? 'session' : 'run'}
+              <Icon name="stop" /> Stop {a.kind === 'manual' ? 'timing' : 'run'}
             </button>
           ) : (
             <button className="btn primary" onClick={() => void act('motes:start')}>
-              <Icon name="play" /> Start a session
+              <Icon name="play" /> Start timing a run
             </button>
           )}
           <button className="btn" disabled={!!view.scanning} onClick={() => void act('motes:rescan')}>
@@ -209,7 +209,7 @@ function ActiveSession({ a }: { a: MoteSession | null | undefined }) {
   return (
     <div className="card">
       <h2>
-        {a ? (a.kind === 'manual' ? 'Session in progress' : 'Instance run in progress') : 'No session running'}
+        {a ? (a.kind === 'manual' ? 'Timing a run' : 'Instance run in progress') : 'No run being timed'}
         <span className="spacer" />
         {a && <span className={`chip ${a.outsideSince ? 'warn' : 'ok'}`}>{a.kind === 'manual' ? 'manual' : a.outsideSince ? 'outside the instance' : 'in the instance'}</span>}
       </h2>
@@ -244,7 +244,7 @@ function ActiveSession({ a }: { a: MoteSession | null | undefined }) {
           <PauseControl s={a} now={now} />
         </div>
       ) : (
-        <div className="empty">Enter a dungeon crawl, or start a session yourself.</div>
+        <div className="empty">Enter a dungeon crawl, or start timing a run yourself.</div>
       )}
     </div>
   )
