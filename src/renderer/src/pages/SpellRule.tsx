@@ -2,6 +2,7 @@ import { useEffect, useState, useSyncExternalStore } from 'react'
 import { useApp } from '../state'
 import { markUnsaved } from '../unsaved'
 import { api, errorMessage } from '../api'
+import { duration } from '../../../core/format'
 import { act, showToast } from '../toast'
 import { ConfirmButton, Field, NumberInput, SpellIcon, Switch } from '../components/ui'
 import { type KnownSpell, type SpellRule } from '../../../shared/types'
@@ -116,7 +117,7 @@ export function RuleEditor({ k, onSaved }: { k: KnownSpell; onSaved: (list: Know
           <Field label="Short name" hint="Shown on the bar and spoken.">
             <input value={rule.alias ?? ''} placeholder={k.name} onChange={(e) => set({ alias: e.target.value || undefined })} />
           </Field>
-          <Field label="Warn before it ends" hint={`Seconds. Default: ${beneficial ? t.buffWarnSec : t.dotWarnSec}s (0 = off).`}>
+          <Field label="Warn before it ends" hint={`Seconds. Default: ${duration(beneficial ? t.buffWarnSec : t.dotWarnSec)} (0 = off).`}>
             <NumberInput value={rule.warnSec} placeholder="default" min={0} onChange={(v) => set({ warnSec: v })} />
           </Field>
           <Field label="Overlay">

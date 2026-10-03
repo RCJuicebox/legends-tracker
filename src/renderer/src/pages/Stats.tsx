@@ -25,7 +25,7 @@ import { AasTab } from './StatsAas'
 type Tab = 'character' | 'ac' | 'combat' | 'aas'
 const TABS: [Tab, string][] = [
   // The in-game Stats window, read off the screen; the character record is the card above the tabs.
-  ['character', 'Stats window'],
+  ['character', 'Inventory › Stats'],
   ['ac', 'AC'],
   ['combat', 'Combat'],
   ['aas', 'AAs']

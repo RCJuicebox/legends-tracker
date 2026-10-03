@@ -1,5 +1,5 @@
 import { Fragment } from 'react'
-import { duration, num1, wikiUrl } from '../../../core/format'
+import { duration, wikiUrl } from '../../../core/format'
 import { fmtCoin } from '../../../core/loot'
 import type { HandInItem, PlanActivity } from '../catalog'
 
@@ -10,7 +10,7 @@ import type { HandInItem, PlanActivity } from '../catalog'
 /** How long a number being typed waits before it is saved. */
 export const TYPING_SAVE_MS = 150
 
-export const signed = (n: number) => (n > 0 ? `+${num1(n)}` : n < 0 ? `−${num1(-n)}` : '0')
+export { signed } from '../../../core/format'
 /** A standing with a true minus: "−702". */
 export const plain = (n: number) => (n < 0 ? `−${-n}` : String(n))
 /** A standing with thousands separators and a true minus: "1,415", "−702". */

@@ -1,8 +1,11 @@
 // Number, time and name formatting shared by the pages and the main process: one clock, one way of
 // writing a length of time, a percentage, a day. A page with a figure to show uses these, not its own.
 
-/** A number with thousands separators, rounded to a whole number: 12,345. */
-export const num = (n: number) => Math.round(n).toLocaleString()
+/** A true minus sign (U+2212) in place of a leading hyphen: "−702", as the plan and the meter print it (LT-470). */
+const minus = (s: string) => (s.startsWith('-') ? `−${s.slice(1)}` : s)
+
+/** A number with thousands separators, rounded to a whole number: 12,345, −702. */
+export const num = (n: number) => minus(Math.round(n).toLocaleString())
 
 /** A number with thousands separators, as it is (no rounding). */
 export const numExact = (n: number) => n.toLocaleString()
@@ -20,7 +23,10 @@ export const wikiUrl = (title: string) => `https://eqlwiki.com/index.php?title=$
 export const round = (v: number, places: number) => Math.round(v * 10 ** places) / 10 ** places
 
 /** A whole number with thousands separators, anything else to one place: 1,415 or 12.5. */
-export const num1 = (n: number) => (Number.isInteger(n) ? n.toLocaleString() : n.toFixed(1))
+export const num1 = (n: number) => minus(Number.isInteger(n) ? n.toLocaleString() : n.toFixed(1))
+
+/** A change, with its sign always shown: "+12", "−3.5", "0". */
+export const signed = (n: number) => (n > 0 ? `+${num1(n)}` : n < 0 ? num1(n) : '0')
 
 /**
  * A fraction as a percentage, to so many places with the trailing zeros left off: 0.1234 → "12%",

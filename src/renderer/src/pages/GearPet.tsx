@@ -1,9 +1,8 @@
 import { useMemo } from 'react'
-import { ago } from '../api'
 import { useInvoke } from '../hooks'
 import { useRemembered } from '../remember'
-import { ErrorText, Info, Pending, Segmented, Switch } from '../components/ui'
-import { num, wikiUrl } from '../../../core/format'
+import { Ago, ErrorText, Info, Pending, Segmented, Switch } from '../components/ui'
+import { num, signed, wikiUrl } from '../../../core/format'
 import { className } from '../../../shared/game/classes'
 import { itemKey, mergeLevel, parseStatsBlock, scaledStats, slotLabel, type InvItem } from '../../../core/inventory'
 import { restrictions, isLore, score } from '../../../core/gearFinder'
@@ -117,7 +116,15 @@ export function PetTab({ m }: { m: GearModel }) {
             ))}
           </select>
           {state.summon && (
-            <span className="small muted">{state.summon.spell === spell ? `your last summon, ${ago(state.summon.at)}` : `you last summoned ${state.summon.spell}`}</span>
+            <span className="small muted">
+              {state.summon.spell === spell ? (
+                <>
+                  your last summon, <Ago t={state.summon.at} />
+                </>
+              ) : (
+                `you last summoned ${state.summon.spell}`
+              )}
+            </span>
           )}
           {picked && (
             <button className="btn ghost small" onClick={() => setPicked('')}>
@@ -201,7 +208,7 @@ export function PetTab({ m }: { m: GearModel }) {
         {state.gear ? (
           <>
             <p className="small muted" style={{ margin: 0 }}>
-              From <span className="mono">/pet inventory check</span>, {ago(state.gear.at)}. Type it again in game after a change; this follows the log.
+              From <span className="mono">/pet inventory check</span>, <Ago t={state.gear.at} />. Type it again in game after a change; this follows the log.
             </p>
             {state.gear.items.length ? (
               <div className="lt-opt">
@@ -293,8 +300,6 @@ export function PetTab({ m }: { m: GearModel }) {
     </div>
   )
 }
-
-const signed = (n: number) => `${n >= 0 ? '+' : ''}${num(n)}`
 
 /** One item's stats by the pet's weights, haste and weapon aside. */
 const scoreOf = (c: PetChoice, weights: ReturnType<typeof rawWeights> | null) => (weights ? score(c.piece.stats, { ...weights, haste: 0, ratio: 0, rangedRatio: 0 }) : 0)

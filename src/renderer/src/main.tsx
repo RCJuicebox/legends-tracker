@@ -2,10 +2,9 @@ import { memo, type ComponentType } from 'react'
 import { createRoot } from 'react-dom/client'
 import './styles.css'
 import { StateProvider, useApp, useLive } from './state'
-import { Icon, type IconName } from './components/ui'
+import { Ago, Icon, type IconName } from './components/ui'
 import { ErrorBoundary } from './components/ErrorBoundary'
 import { Jobs } from './components/Jobs'
-import { ago } from './api'
 import { act, Toasts } from './toast'
 import { useUpdate } from './update'
 import { useRemembered } from './remember'
@@ -98,7 +97,20 @@ function WatchFoot() {
         <span className="who">{s.character || 'No character'}</span>
       </div>
       <div>{s.zone || 'Zone unknown'}</div>
-      <div className="faint">{s.watching ? (s.lastLineAt ? `Last line ${ago(s.lastLineAt)}` : 'Watching; no line yet') : 'Not watching'}</div>
+      {/* Ticks by itself: status comes only with a line, so a quiet log would freeze it (LT-450). */}
+      <div className="faint">
+        {s.watching ? (
+          s.lastLineAt ? (
+            <>
+              Last line <Ago t={s.lastLineAt} />
+            </>
+          ) : (
+            'Watching; no line yet'
+          )
+        ) : (
+          'Not watching'
+        )}
+      </div>
     </div>
   )
 }

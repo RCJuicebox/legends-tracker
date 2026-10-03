@@ -131,7 +131,7 @@ export function FocusSources() {
       <div className="row">
         <input
           className="grow"
-          placeholder="Add an item focus by name, e.g. Extended Enhancement II"
+          placeholder="Find an item focus to add, e.g. Extended Enhancement II…"
           aria-label="Add an item focus by name"
           value={q}
           onChange={(e) => setQ(e.target.value)}

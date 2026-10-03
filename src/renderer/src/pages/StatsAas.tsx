@@ -234,9 +234,9 @@ function AbilityList({ aa, status, onRead }: { aa: AaSummary | null; status: str
         {status && <span className="faint">{status}</span>}
         <span className="grow" />
         {aa && (
-          <button className="btn ghost small" onClick={() => setOpen(!open)}>
-            {open ? 'Hide' : 'Show'} details
-          </button>
+          <Disclosure open={open} onToggle={() => setOpen(!open)}>
+            Details
+          </Disclosure>
         )}
         <button className="btn small" onClick={onRead}>
           Read the log again

@@ -191,7 +191,7 @@ export function Tradeskills() {
         ) : (
           <>
             <div className="row">
-              <FilterBox placeholder="Find a recipe: distillate of clarity, elixir…" label="Find a recipe" value={query} onChange={setQuery} width={360} />
+              <FilterBox placeholder="Filter recipes: distillate of clarity, elixir…" label="Filter recipes" value={query} onChange={setQuery} width={360} />
               <span className="spacer" />
               <span className="faint small">
                 {book.length.toLocaleString()} recipes, <Ago t={rs.file.fetchedAt} />
@@ -215,6 +215,7 @@ export function Tradeskills() {
                       <button
                         className={`btn small${on ? ' primary' : ''}`}
                         aria-pressed={on}
+                        aria-label={on ? `Remove ${r.product} from favourites` : `Add ${r.product} to favourites`}
                         title={on ? 'Remove from favourites' : 'Add to favourites'}
                         onClick={() => toggle(r)}
                       >
@@ -340,7 +341,7 @@ function RecipeCard({
     <div className="card stack gap-10 mb-16">
       <div className="row" style={{ flexWrap: 'wrap', gap: 14 }}>
         <Disclosure open={open} onToggle={toggleOpen} label={r.product} />
-        <button className="btn small primary" aria-pressed title="Remove from favourites" onClick={unfavorite}>
+        <button className="btn small primary" aria-pressed aria-label={`Remove ${r.product} from favourites`} title="Remove from favourites" onClick={unfavorite}>
           ★
         </button>
         <ItemIcon icon={r.icon} size={30} />

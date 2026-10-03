@@ -1,15 +1,16 @@
 import { useApp, useLive } from '../state'
-import { api, ago } from '../api'
+import { api } from '../api'
 import { act, showError, showToast, actDone } from '../toast'
 import { useUpdate, type UpdateState } from '../update'
-import { Field, NumberInput, Segmented, Switch } from '../components/ui'
+import { Ago, Field, NumberInput, Segmented, Switch } from '../components/ui'
+import type { ReactNode } from 'react'
 import { GameFolderCard } from '../components/GameFolder'
 import type { TrackingSettings } from '../../../shared/types'
 import type { PageId } from '../main'
 import { HOTKEYS, hotkeyLabel } from '../../../shared/hotkeys'
 
 /** One line on where updates stand. */
-function updateText(u: UpdateState | null): string {
+function updateText(u: UpdateState | null): ReactNode {
   if (!u) return 'Running from source: updates apply to the installed app only.'
   switch (u.state) {
     case 'dev':
@@ -23,7 +24,19 @@ function updateText(u: UpdateState | null): string {
     case 'error':
       return `Could not check for updates: ${u.message}`
     default:
-      return `Up to date${u.checkedAt ? `, checked ${ago(u.checkedAt)}` : ''}. Checks again every hour, and a new version is announced with a notification.`
+      return (
+        <>
+          Up to date
+          {u.checkedAt ? (
+            <>
+              , checked <Ago t={u.checkedAt} />
+            </>
+          ) : (
+            ''
+          )}
+          . Checks again every hour, and a new version is announced with a notification.
+        </>
+      )
   }
 }
 
@@ -58,6 +71,7 @@ export function Settings({ go }: { go?: (page: PageId) => void }) {
 
       <div className="stack">
         <div className="card stack gap-12">
+          <h2>About</h2>
           <div className="row">
             <div className="grow">
               <div style={{ fontWeight: 650 }}>Legends Tracker {update.version}</div>
@@ -113,14 +127,19 @@ export function Settings({ go }: { go?: (page: PageId) => void }) {
             </button>
             .
           </p>
-          <p className="hint">
-            Closing this window keeps Legends Tracker running in the tray, so timers, overlays and speech carry on. To end it, use Quit on the tray icon&apos;s menu.
-          </p>
           <label className="row">
             <Switch on={s.yieldToGame} onChange={(v) => patchSettings((x) => ({ ...x, yieldToGame: v }))} />
             Yield CPU to EverQuest
             <span className="faint small">runs this app below normal priority, so the game wins every tie for a frame; sound stays normal</span>
           </label>
+        </div>
+
+        {/* This window's own look and keys, under a heading of their own (LT-457). */}
+        <div className="card stack gap-14">
+          <h2>This window</h2>
+          <p className="hint">
+            Closing this window keeps Legends Tracker running in the tray, so timers, overlays and speech carry on. To end it, use Quit on the tray icon&apos;s menu.
+          </p>
           <Field label="Appearance" hint="Light or dark, or as Windows is set. Overlays stay dark over the game either way.">
             <div>
               <Segmented
@@ -135,9 +154,12 @@ export function Settings({ go }: { go?: (page: PageId) => void }) {
               />
             </div>
           </Field>
-          <Field label="UI size" hint="The size of everything in this window. Overlays have their own text sizes, on the Overlays page.">
+          <Field
+            label="UI size"
+            hint="The size of everything in this window; Ctrl and + or − change it, Ctrl+0 puts it back. Overlays have their own text sizes, on the Overlays page."
+          >
             <select value={s.uiScale} onChange={(e) => patchSettings((x) => ({ ...x, uiScale: Number(e.target.value) }))}>
-              {[0.9, 1, 1.1, 1.25, 1.5].map((f) => (
+              {[0.9, 1, 1.1, 1.25, 1.5, 1.75, 2].map((f) => (
                 <option key={f} value={f}>
                   {Math.round(f * 100)}%
                 </option>
@@ -192,7 +214,7 @@ export function Settings({ go }: { go?: (page: PageId) => void }) {
             <Switch on={s.combat.newSessionOnZone} onChange={(v) => patchSettings((x) => ({ ...x, combat: { ...x.combat, newSessionOnZone: v } }))} />
             Entering a zone starts a new session
             <span className="faint small">
-              the Overall figures then cover one zone or instance at a time; New session on the{' '}
+              the Session figures then cover one zone or instance at a time; New session on the{' '}
               <button className="link-button inline" onClick={() => go?.('meter')}>
                 Damage Meter
               </button>{' '}

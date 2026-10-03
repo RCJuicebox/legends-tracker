@@ -8,6 +8,7 @@ import { num, pct as pctOf, wikiUrl } from '../../../core/format'
 /** A focus figure, given as a percentage already (10.5), to one place. */
 export const pct = (n: number) => pctOf(n / 100, 1)
 import { ItemIcon, source, whereText } from './gearBits'
+import { showUndo } from '../toast'
 
 // The Gear page's focus effects tab and its optimizer for what the character already owns.
 
@@ -67,23 +68,27 @@ export function FocusTab({ m }: { m: GearModel }) {
           <span className="grow" />
           <button
             className="btn ghost small"
-            onClick={() =>
+            onClick={() => {
+              const off = m.lines.filter((l) => !m.wanted.has(l.key)).map((l) => l.key)
               m.setWanted(
                 m.lines.map((l) => l.key),
                 true
               )
-            }
+              showUndo('Every focus wanted.', () => m.setWanted(off, false))
+            }}
           >
             Want all
           </button>
           <button
             className="btn ghost small"
-            onClick={() =>
+            onClick={() => {
+              const on = m.lines.filter((l) => m.wanted.has(l.key)).map((l) => l.key)
               m.setWanted(
                 m.lines.map((l) => l.key),
                 false
               )
-            }
+              showUndo('No focus wanted.', () => m.setWanted(on, true))
+            }}
           >
             Want none
           </button>

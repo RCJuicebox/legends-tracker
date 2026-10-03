@@ -106,8 +106,8 @@ export function QuietLogNotice({ go }: { go: Go }) {
     <div className="notice warn mb-16">
       The game is running, but {status.character || 'this character'}&apos;s log has had nothing new since {ago(status.lastLineAt, now)}. Is logging on (type{' '}
       <span className="mono">/log on</span>), and is this the character you are playing?{' '}
-      <button className="btn small" onClick={() => go('settings')}>
-        Choose the log
+      <button className="btn small" onClick={() => go('logs')}>
+        Choose the log to follow on Log Files
       </button>
     </div>
   )

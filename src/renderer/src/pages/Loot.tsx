@@ -113,8 +113,11 @@ export function Loot() {
           return (
             <div className={`card loot-session${open ? '' : ' folded'}`} key={`${g.id}-${first.id}`}>
               <div className="loot-session-head">
-                <Disclosure open={open} onToggle={() => toggleOpen(g.id)} label={name} title={filtering ? 'Open while filtering' : undefined} disabled={filtering} />
-                <h2>{name}</h2>
+                <h2>
+                  <Disclosure open={open} onToggle={() => toggleOpen(g.id)} title={filtering ? 'Open while filtering' : undefined} disabled={filtering}>
+                    {name}
+                  </Disclosure>
+                </h2>
                 <span className="faint small">
                   {day(first.at)} · {timeOfDay(first.at)}
                   {last.at - first.at > 60_000 ? ` – ${timeOfDay(last.at)}` : ''}

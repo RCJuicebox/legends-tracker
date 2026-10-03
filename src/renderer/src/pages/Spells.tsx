@@ -2,11 +2,11 @@ import { remember, useRemembered } from '../remember'
 import { UPGRADES_TAB } from '../constants'
 import { useState } from 'react'
 import { useApp, useLive } from '../state'
-import { api, clock, ago } from '../api'
+import { api, clock } from '../api'
 import { useInvoke, useSearch } from '../hooks'
-import { showError } from '../toast'
-import { who } from '../../../core/format'
-import { CategoryChip, Disclosure, Field, FilterBox, Info, LoadError, NumberInput, SortTh, sortRows, SpellIcon, Switch, type Sort } from '../components/ui'
+import { showError, showUndo } from '../toast'
+import { duration, who } from '../../../core/format'
+import { Ago, CategoryChip, Disclosure, Field, FilterBox, Info, LoadError, NumberInput, Pending, SortTh, sortRows, SpellIcon, Switch, type Sort } from '../components/ui'
 import { CATEGORY_LABELS, DEFAULT_TIER_DURATION_PCT, type ClassName, type KnownSpell, type SpellCategory, type SpellRule } from '../../../shared/types'
 import type { PageId } from '../main'
 import { FocusSources } from './SpellsFocus'
@@ -64,7 +64,9 @@ export function Spells({ go }: { go?: (page: PageId) => void }) {
             <span className="spacer" />
             <FilterBox label="Filter spells" value={filter} onChange={setFilter} width={200} />
           </h2>
-          {known.length === 0 ? (
+          {!q.data && !q.error ? (
+            <Pending what="your spells" />
+          ) : known.length === 0 ? (
             <div className="empty">No spells yet. Cast something while watching, or add a spell below.</div>
           ) : (
             <div className="table-scroll">
@@ -223,7 +225,7 @@ function SpellRow({ k, open, toggle, onSaved }: { k: KnownSpell; open: boolean; 
               label={`Recast warning for ${k.rankedName}`}
               onChange={(v) => void setCue(k, { recastCue: v ? undefined : false }, onSaved)}
             />
-            {k.rule.recastCue !== false && <span className="faint small">{k.rule.warnSec !== undefined ? `${k.rule.warnSec}s` : 'default'}</span>}
+            {k.rule.recastCue !== false && <span className="faint small">{k.rule.warnSec !== undefined ? duration(k.rule.warnSec) : 'default'}</span>}
           </span>
         </td>
         <td onClick={(e) => e.stopPropagation()}>
@@ -234,7 +236,9 @@ function SpellRow({ k, open, toggle, onSaved }: { k: KnownSpell; open: boolean; 
             onChange={(v) => void setCue(k, { fadeCue: v ? undefined : false }, onSaved)}
           />
         </td>
-        <td className="faint small nowrap">{k.lastCast ? ago(k.lastCast) : 'rule only'}</td>
+        <td className="faint small nowrap">
+          <Ago t={k.lastCast ?? 0} never="rule only" />
+        </td>
       </tr>
       {open && (
         <tr>
@@ -255,7 +259,7 @@ function AddSpell({ onAdded }: { onAdded: (list: KnownSpell[]) => void }) {
     <div className="mt-14">
       <div className="row">
         <input
-          placeholder="Add a spell you haven't cast yet — search the spell book…"
+          placeholder="Find a spell to add, one you have not cast yet…"
           aria-label="Add a spell: search the spell book"
           value={q}
           onChange={(e) => setQ(e.target.value)}
@@ -297,7 +301,15 @@ function TierTable({ go }: { go?: (page: PageId) => void }) {
     <div className="card">
       <h2>
         Rank bonuses <span className="spacer" />
-        <button className="btn small ghost" onClick={() => patchSettings((s) => ({ ...s, tracking: { ...s.tracking, tierDurationPct: { ...DEFAULT_TIER_DURATION_PCT } } }))}>
+        <button
+          className="btn small ghost"
+          onClick={() => {
+            // Six typed numbers go back to the guide's: said, with a way back (LT-467).
+            const before = { ...state.settings.tracking.tierDurationPct }
+            void patchSettings((s) => ({ ...s, tracking: { ...s.tracking, tierDurationPct: { ...DEFAULT_TIER_DURATION_PCT } } }))
+            showUndo('Rank bonuses set back to the guide values.', () => void patchSettings((s) => ({ ...s, tracking: { ...s.tracking, tierDurationPct: before } })))
+          }}
+        >
           Reset to guide values
         </button>
       </h2>

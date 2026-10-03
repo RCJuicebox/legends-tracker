@@ -84,6 +84,9 @@ export interface TrayActions {
 /** As many feed lines as the Live page keeps. */
 const HELD_FEED_MAX = 300
 
+/** The UI sizes offered, as Settings lists them. */
+const UI_SCALES = [0.9, 1, 1.1, 1.25, 1.5, 1.75, 2]
+
 export class Windows {
   main: BrowserWindow | null = null
   private audio: BrowserWindow | null = null
@@ -100,7 +103,7 @@ export class Windows {
   private readonly held = new Map<string, () => void>()
   private readonly heldFeed: Parameters<Pushes['state:feed']>[] = []
 
-  constructor(private readonly opts: { preload: string; icon: string; audioSettings: () => AudioSettings; uiScale: () => number }) {
+  constructor(private readonly opts: { preload: string; icon: string; audioSettings: () => AudioSettings; uiScale: () => number; setUiScale?: (scale: number) => void }) {
     const path = join(app.getPath('userData'), 'window.json')
     const r = readJsonFile(path)
     this.place = new JsonFile<WindowPlace | null>(path, r.state === 'ok' ? windowPlace(r.value) : null)
@@ -166,6 +169,24 @@ export class Windows {
       w.show()
     })
     w.webContents.on('did-finish-load', () => this.applyScale())
+    // Ctrl and + or - steps the UI size, Ctrl+0 puts it back to 100%, as browsers do (LT-492).
+    w.webContents.on('before-input-event', (e, input) => {
+      if (input.type !== 'keyDown' || !input.control || input.alt || input.meta) return
+      const now = this.opts.uiScale()
+      // The size offered nearest the one set (a hand-edited 1.3 counts as 1.25).
+      const at = UI_SCALES.reduce((best, f, i) => (Math.abs(f - now) < Math.abs(UI_SCALES[best] - now) ? i : best), 0)
+      const next =
+        input.key === '=' || input.key === '+'
+          ? UI_SCALES[Math.min(UI_SCALES.length - 1, at + 1)]
+          : input.key === '-'
+            ? UI_SCALES[Math.max(0, at - 1)]
+            : input.key === '0'
+              ? 1
+              : null
+      if (next === null) return
+      e.preventDefault()
+      if (next !== now) this.opts.setUiScale?.(next)
+    })
     for (const event of ['move', 'resize', 'maximize', 'unmaximize'] as const) w.on(event as 'move', () => this.rememberPlace())
     w.on('hide', () => this.setMainHidden(true))
     w.on('minimize', () => this.setMainHidden(true))
@@ -315,9 +336,6 @@ export class Windows {
   private setMainHidden(hidden: boolean): void {
     this.mainHidden = hidden
     const w = this.main
-    // Hidden in the tray, the page is throttled and told it cannot be seen, so its clocks and polls
-    // stop (LT-387); the overlays had this already.
-    if (w && !w.isDestroyed()) w.webContents.setBackgroundThrottling(hidden)
     if (hidden || !w || w.isDestroyed()) return
     for (const send of this.held.values()) send()
     for (const args of this.heldFeed) push(w.webContents, 'state:feed', ...args)

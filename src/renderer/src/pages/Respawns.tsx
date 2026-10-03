@@ -87,10 +87,15 @@ export function Respawns() {
 
       <div className="card row mb-16">
         <FilterBox placeholder="Filter by mob or zone…" label="Filter mobs" value={filter} onChange={setFilter} width={240} />
-        <Switch on={hereOnly} onChange={setHereOnly} label={zone ? `Only ${zone}` : 'Only this zone'} />
-        <span className="small muted">{zone ? `Only ${zone}` : 'Only this zone'}</span>
-        <Switch on={showShared} onChange={setShowShared} label="Show names several mobs share" />
-        <span className="small muted">Shared names{hiddenShared && !showShared ? ` (${hiddenShared} hidden)` : ''}</span>
+        {/* The words beside a switch are part of it: clicking them flips it too (LT-462). */}
+        <label className="row tight">
+          <Switch on={hereOnly} onChange={setHereOnly} label={zone ? `Only ${zone}` : 'Only this zone'} />
+          <span className="small muted">{zone ? `Only ${zone}` : 'Only this zone'}</span>
+        </label>
+        <label className="row tight">
+          <Switch on={showShared} onChange={setShowShared} label="Show names several mobs share" />
+          <span className="small muted">Shared names{hiddenShared && !showShared ? ` (${hiddenShared} hidden)` : ''}</span>
+        </label>
         <span className="spacer" />
         <button className="btn" onClick={() => setAdding((a) => !a)} aria-expanded={adding}>
           Add a timer by name
@@ -275,7 +280,7 @@ function Row({
             {clock(r.timer.seconds)} · {overlayName}
           </button>
         ) : (
-          <button className="btn small primary" onClick={toggle}>
+          <button className="btn small" onClick={toggle}>
             Add timer
           </button>
         )}

@@ -279,6 +279,16 @@ export function Buffs() {
               {open && (
                 <div className="table-scroll">
                   <table className="table">
+                    <thead>
+                      <tr>
+                        <th>Want</th>
+                        <th>Buff</th>
+                        <th>Line</th>
+                        <th>Effects</th>
+                        <th>Level</th>
+                        <th>Lasts</th>
+                      </tr>
+                    </thead>
                     <tbody>
                       {list.map((o) => (
                         <tr key={o.spell}>

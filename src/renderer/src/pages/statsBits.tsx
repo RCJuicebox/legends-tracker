@@ -99,6 +99,13 @@ export function Trace({ rows }: { rows: Row[] }) {
       <summary>Show every step</summary>
       <div className="table-scroll">
         <table className="table small">
+          <thead>
+            <tr>
+              <th>Step</th>
+              <th style={{ textAlign: 'right' }}>Value</th>
+              <th>Why</th>
+            </tr>
+          </thead>
           <tbody>
             {rows.map(([label, value, note], i) =>
               label.startsWith('#') ? (

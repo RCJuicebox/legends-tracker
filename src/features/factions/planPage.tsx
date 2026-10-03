@@ -5,7 +5,7 @@ import { useAchievementTrack, useInvoke, useLatest, useSameContents, useVisibleI
 import { useApp } from '../../renderer/src/state'
 import { useCharacterRecord } from '../../renderer/src/character'
 import { useNow } from '../../renderer/src/components/TimerBars'
-import { Disclosure, GameCommand, Info, Pending, Segmented, Switch } from '../../renderer/src/components/ui'
+import { ConfirmButton, Disclosure, GameCommand, Info, Pending, Segmented, Switch } from '../../renderer/src/components/ui'
 import { duration, who, wikiUrl } from '../../core/format'
 import { STANDING_MAX, standingBand, type FactionView } from './core'
 import { runPlan } from './planRunner'
@@ -106,6 +106,9 @@ export function useChoices(character: string): [PlanChoices, (c: PlanChoices, de
   return [choices, set]
 }
 
+/** Web notices put away this session, by what they said: the same failure stays away, a new one shows. */
+const dismissedNotices = new Set<string>()
+
 export function PlanTab({ character, view }: { character: string; view: FactionView | null }) {
   const { state: app, patchSettings } = useApp()
   const [stored, setSettings] = useAssumptions()
@@ -131,6 +134,11 @@ export function PlanTab({ character, view }: { character: string; view: FactionV
     }
   }
   const now = useNow(30_000)
+  const [, setDismissed] = useState(0)
+  const dismissNotice = (key: string) => {
+    dismissedNotices.add(key)
+    setDismissed((n) => n + 1)
+  }
   const [choices, setChoices] = useChoices(character)
   const [open, setOpen] = useState<string | null>(null)
   // The plan counts everyone as Agnostic; the character's own deity says whether it has a step to take first.
@@ -336,26 +344,44 @@ export function PlanTab({ character, view }: { character: string; view: FactionV
           )}
         </div>
       )}
-      {!(view?.export ?? data.export) && (
+      {/* What is missing, in one notice rather than one each above the plan for weeks (LT-455). */}
+      {(!(view?.export ?? data.export) || !achievementsExport) && (
         <div className="notice mb-16">
-          No factions export for {who(character)} yet, so every standing counts from 0. Type <GameCommand cmd="/outputfile faction" /> in game for a plan from where you really
-          stand.
+          {!(view?.export ?? data.export) && !achievementsExport ? (
+            <>
+              No factions or achievements export for {who(character)} yet: every standing counts from 0, and an achievement counts as done only while its standing is at 2000. Type{' '}
+              <GameCommand cmd="/outputfile faction" /> and <GameCommand cmd="/outputfile achievements" /> in game for a plan from where you really stand.
+            </>
+          ) : !(view?.export ?? data.export) ? (
+            <>
+              No factions export for {who(character)} yet, so every standing counts from 0. Type <GameCommand cmd="/outputfile faction" /> in game for a plan from where you really
+              stand.
+            </>
+          ) : (
+            <>
+              No achievements export for {who(character)} yet, so an achievement counts as done only while its standing is at 2000. Type{' '}
+              <GameCommand cmd="/outputfile achievements" /> in game to plan only what is really left.
+            </>
+          )}
         </div>
       )}
-      {!achievementsExport && (
-        <div className="notice mb-16">
-          No achievements export for {who(character)} yet, so an achievement counts as done only while its standing is at 2000: any finished and then fallen back from are planned
-          again. Type <GameCommand cmd="/outputfile achievements" /> in game to plan only what is really left.
+      {/* The web being out of reach is a passing state, not a fault: amber, and put away for the session (LT-455). */}
+      {data.wiki.error && !dismissedNotices.has(`wiki:${data.wiki.error}`) && (
+        <div className="notice warn row mb-16">
+          <span className="grow">
+            Could not read eqlwiki again ({data.wiki.error}); the pages read {ago(data.wiki.fetchedAt, now)} serve meanwhile.
+          </span>
+          <button className="btn small ghost" onClick={() => dismissNotice(`wiki:${data.wiki.error}`)}>
+            Hide
+          </button>
         </div>
       )}
-      {data.wiki.error && (
-        <div className="notice bad mb-16">
-          Could not read eqlwiki again ({data.wiki.error}); the pages read {ago(data.wiki.fetchedAt, now)} serve meanwhile.
-        </div>
-      )}
-      {data.alla.error && (
-        <div className="notice bad mb-16">
-          Could not read Allakhazam ({data.alla.error}); it is tried again in ten minutes, and the plan goes on without the pages not yet read.
+      {data.alla.error && !dismissedNotices.has(`alla:${data.alla.error}`) && (
+        <div className="notice warn row mb-16">
+          <span className="grow">Could not read Allakhazam ({data.alla.error}); it is tried again in ten minutes, and the plan goes on without the pages not yet read.</span>
+          <button className="btn small ghost" onClick={() => dismissNotice(`alla:${data.alla.error}`)}>
+            Hide
+          </button>
         </div>
       )}
 
@@ -466,9 +492,14 @@ export function PlanTab({ character, view }: { character: string; view: FactionV
               </button>
             )}
             {chose > 0 && (
-              <button className="btn small ghost" onClick={() => setChoices(NO_CHOICES)} title="Clear every lock, rule-out and pace you set">
+              <ConfirmButton
+                className="btn small ghost"
+                question={`Clear all ${chose} of your locks, rule-outs and paces?`}
+                title="Clear every lock, rule-out and pace you set"
+                onConfirm={() => setChoices(NO_CHOICES)}
+              >
                 Clear my choices ({chose})
-              </button>
+              </ConfirmButton>
             )}
             <button className="btn small ghost" disabled={reading} onClick={() => void readAgain()} title="Read eqlwiki's faction and quest pages again (they are kept a week)">
               {reading ? 'Reading eqlwiki…' : 'Read eqlwiki again'}

@@ -244,7 +244,7 @@ textarea {
 }
 .nav-item .count {
   margin-left: auto;
-  font-size: 11px;
+  font-size: 12px;
   padding: 1px 7px;
   border-radius: 2px;
   background: var(--accent);
@@ -637,7 +637,7 @@ p.hint {
   gap: 5px;
   padding: 2px 8px;
   border-radius: 2px;
-  font-size: 11.5px;
+  font-size: 12px;
   font-weight: 600;
   background: var(--line);
   color: var(--text-2);
@@ -1523,7 +1523,7 @@ details:not(.info) > summary::before {
   margin-left: auto;
   display: grid;
   gap: 2px;
-  font-size: 11.5px;
+  font-size: 12px;
   color: var(--text-2);
   min-width: 80px;
 }
@@ -1535,7 +1535,7 @@ details:not(.info) > summary::before {
 }
 .ach-zone {
   margin-left: auto;
-  font-size: 11.5px;
+  font-size: 12px;
   color: var(--text-3);
   white-space: nowrap;
 }
@@ -1570,7 +1570,7 @@ details:not(.info) > summary::before {
 .ach-hunt > span:first-child {
   color: var(--text-3);
   text-transform: uppercase;
-  font-size: 10.5px;
+  font-size: 12px;
   letter-spacing: 0.08em;
 }
 .ach-hunt em {
@@ -2016,7 +2016,7 @@ details:not(.info) > summary::before {
   overflow: hidden;
   gap: 6px;
   align-items: baseline;
-  font-size: 10.5px;
+  font-size: 12px;
   font-weight: 650;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -2025,7 +2025,7 @@ details:not(.info) > summary::before {
 .lt-plus {
   color: var(--accent-2);
   letter-spacing: 0;
-  font-size: 11.5px;
+  font-size: 12px;
 }
 .lt-name {
   font-size: 13px;
@@ -2095,7 +2095,7 @@ details:not(.info) > summary::before {
   display: inline-block;
   padding: 2px 9px;
   border-radius: 12px;
-  font-size: 11.5px;
+  font-size: 12px;
   font-weight: 600;
   background: var(--line);
   color: var(--text-2);
@@ -2121,7 +2121,7 @@ details:not(.info) > summary::before {
   font-variant-numeric: tabular-nums;
 }
 .lt-big span {
-  font-size: 10.5px;
+  font-size: 12px;
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--text-3);
@@ -2411,7 +2411,7 @@ details:not(.info) > summary::before {
   min-width: 0;
 }
 .lt-focus-cap {
-  font-size: 11px;
+  font-size: 12px;
   text-transform: uppercase;
   letter-spacing: 0.06em;
   color: var(--text-3);
@@ -2968,7 +2968,7 @@ button.tree-item {
 .dm-proc {
   font-style: normal;
   font-weight: 600;
-  font-size: 10.5px;
+  font-size: 12px;
   margin-left: 6px;
   letter-spacing: 0.02em;
 }
@@ -3108,7 +3108,7 @@ button.tree-item {
   border: 1px solid var(--line-2);
   background: var(--panel-2);
   color: var(--text-2);
-  font-size: 11.5px;
+  font-size: 12px;
   font-weight: 600;
   text-decoration: none;
 }
@@ -3248,7 +3248,7 @@ button.tree-item {
   background: rgba(0, 0, 0, 0.45);
   color: #fff;
   font: inherit;
-  font-size: calc(var(--fs) * 0.8);
+  font-size: calc(var(--fs) * 0.85);
   padding: 1px 6px;
   cursor: pointer;
   white-space: nowrap;
@@ -3597,7 +3597,7 @@ input[aria-invalid='true'] {
 .fp-num-inline {
   width: 20px;
   height: 20px;
-  font-size: 11.5px;
+  font-size: 12px;
   vertical-align: middle;
 }
 .fp-body {
@@ -3824,7 +3824,7 @@ input[aria-invalid='true'] {
 }
 .ach-ov-tag {
   font-family: var(--font-display);
-  font-size: calc(var(--fs) * 0.72);
+  font-size: calc(var(--fs) * 0.85);
   font-weight: 650;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -3944,4 +3944,84 @@ input[aria-invalid='true'] {
 .overlay-place .btn {
   grid-column: 1 / -1;
   justify-self: start;
+}
+
+/* Targets of at least 24 px either way (LT-452, LT-464): a fold caret on its own, the ✕ on a tracked
+   achievement, the copy icon by a game command, a chip that is a button. */
+.disclosure {
+  min-height: 24px;
+}
+.disclosure:has(> .caret:only-child) {
+  min-width: 24px;
+  justify-content: center;
+}
+.ach-untrack,
+.game-cmd-copy {
+  min-width: 24px;
+  min-height: 24px;
+}
+.chip-btn {
+  min-height: 24px;
+}
+
+/* A warning notice by name: the default notice is the accent's, and would stay so if that changed (LT-490). */
+.notice.warn {
+  background: color-mix(in srgb, var(--amber) 8%, transparent);
+  border-color: color-mix(in srgb, var(--amber) 30%, transparent);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  /* The bars that fill by width go there at once (LT-491). */
+  .ach-ov-bar i,
+  .fp-now-bar i {
+    transition: none;
+  }
+}
+
+/* Windows high contrast: what shows only by its background gets a border in the system's colours (LT-466). */
+@media (forced-colors: active) {
+  .switch {
+    border: 1px solid CanvasText;
+  }
+  .switch.on {
+    background: Highlight;
+    border-color: Highlight;
+  }
+  .switch::after {
+    background: CanvasText;
+  }
+  .ach-box {
+    border: 1px solid CanvasText;
+  }
+  .ach-obj.done .ach-box {
+    background: Highlight;
+  }
+  .status-dot {
+    border: 1px solid CanvasText;
+  }
+  .status-dot.live {
+    background: Highlight;
+  }
+  .timer .fill,
+  .dm-fill,
+  .job-bar > span {
+    forced-color-adjust: none;
+    background: Highlight;
+  }
+  .lt-seg [aria-pressed='true'] {
+    outline: 2px solid Highlight;
+  }
+}
+
+/* A short window (a 1080p screen less the taskbar): the sidebar tightens so all of its pages and the
+   watch footer fit without scrolling (LT-456). */
+@media (max-height: 940px) {
+  .nav-item {
+    padding-top: 6px;
+    padding-bottom: 6px;
+  }
+  .nav-group {
+    margin-top: 8px;
+    margin-bottom: 2px;
+  }
 }

@@ -127,7 +127,15 @@ export function createContext(): AppContext {
   // The theme is Windows' own setting for this app's windows, so every page's prefers-color-scheme
   // follows it: System, or Light or Dark whatever Windows says.
   nativeTheme.themeSource = store.settings.get().theme
-  const windows = new Windows({ preload: preloadPath, icon: appIcon, audioSettings: () => store.settings.get().audio, uiScale: () => store.settings.get().uiScale })
+  const windows = new Windows({
+    preload: preloadPath,
+    icon: appIcon,
+    audioSettings: () => store.settings.get().audio,
+    uiScale: () => store.settings.get().uiScale,
+    setUiScale: (uiScale) => {
+      ctx.saveSettings({ ...store.settings.get(), uiScale })
+    }
+  })
   const toMain = windows.toMain.bind(windows)
   // Item pages the Gear page looked up, kept a week; a catalog download refreshes them in passing.
   const itemCatalog = new ItemCatalog(cacheDir())

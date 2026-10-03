@@ -280,7 +280,7 @@ export function Achievements() {
       </div>
 
       <div className="row ach-controls">
-        <FilterBox className="grow" placeholder="Find an achievement or objective in any section" label="Find an achievement or objective" value={q} onChange={setQ} />
+        <FilterBox className="grow" placeholder="Filter achievements and objectives in every section…" label="Find an achievement or objective" value={q} onChange={setQ} />
         <button className={`btn${remaining ? ' on' : ' ghost'}`} aria-pressed={remaining} onClick={() => setRemaining(!remaining)}>
           Remaining only
         </button>

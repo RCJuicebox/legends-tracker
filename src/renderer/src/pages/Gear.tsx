@@ -683,7 +683,7 @@ function Carried({ view }: { view: InventoryView }) {
             </>
           ])}
         />
-        <FilterBox className="inv-search" placeholder="Find an item" label="Find an item" value={q} onChange={setQ} width={200} />
+        <FilterBox className="inv-search" placeholder="Filter items…" label="Filter items" value={q} onChange={setQ} width={200} />
       </div>
       <div className="lt-list">
         {shown.map((r) => (

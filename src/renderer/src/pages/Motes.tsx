@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { timeOfDay, when } from '../../../core/format'
+import { num1, round, timeOfDay, when } from '../../../core/format'
 import { api, clock } from '../api'
 import { useInvoke } from '../hooks'
 import { act } from '../toast'
@@ -37,7 +37,7 @@ const VALUE_HINT =
   'Counted in Infinitesimal motes. Two of a rank combine into one of the next, so each rank is worth double the one below: Minor 2, Lesser 4, Potential 8, Major 16, Greater 32, Superior 64, Grand 128.'
 
 export function perHour(n: number, hours: number): string {
-  return hours >= 1 / 60 ? (n / hours).toFixed(1) : '—'
+  return hours >= 1 / 60 ? num1(round(n / hours, 1)) : '—'
 }
 
 function RankChips({ counts }: { counts: MoteCounts }) {

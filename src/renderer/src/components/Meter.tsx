@@ -1,4 +1,4 @@
-import { clock, num, pct, timeOfDay } from '../../../core/format'
+import { clock, num, num1, pct, round, timeOfDay } from '../../../core/format'
 import { useEffect, useMemo, useState } from 'react'
 import { useApp, useLive } from '../state'
 import { act, showToast, actDone, showUndo } from '../toast'
@@ -488,7 +488,7 @@ function ProcsCard({ seg, scope, name }: { seg: Segment; scope: MeterScope; name
           {rows.length > 0 && (
             <span className="faint small">
               {sum.count} firing{sum.count === 1 ? '' : 's'}
-              {sum.ppm !== null ? ` · ${sum.ppm.toFixed(1)}/min` : ''}
+              {sum.ppm !== null ? ` · ${num1(round(sum.ppm, 1))}/min` : ''}
             </span>
           )}
           {rows.length > 0 && (
@@ -510,7 +510,7 @@ function ProcsCard({ seg, scope, name }: { seg: Segment; scope: MeterScope; name
             </em>
           </span>
           <span className="dm-right">
-            {r.ppm === null ? '–' : `${r.ppm.toFixed(1)}/min`} · <b>×{r.count}</b> · {procAmount(r)}
+            {r.ppm === null ? '–' : `${num1(round(r.ppm, 1))}/min`} · <b>×{r.count}</b> · {procAmount(r)}
           </span>
         </div>
       ))}

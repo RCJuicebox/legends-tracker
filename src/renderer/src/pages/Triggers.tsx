@@ -205,7 +205,7 @@ export function Triggers() {
 
       <div className="split">
         <div className="card" style={{ padding: 10 }}>
-          <FilterBox placeholder="Search triggers…" label="Search triggers" value={query} onChange={setQuery} width="100%" className="mb-6" />
+          <FilterBox placeholder="Filter triggers…" label="Filter triggers" value={query} onChange={setQuery} width="100%" className="mb-6" />
           <div className="tree">
             {folders.length === 0 && <div className="empty">No triggers.</div>}
             {folders.map(([folder, items]) => (

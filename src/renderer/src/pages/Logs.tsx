@@ -151,7 +151,7 @@ export function Logs() {
                     </td>
                     <td className="nowrap" style={{ textAlign: 'right' }}>
                       {l.path === followed ? (
-                        <span className="chip good" title="Timers, the meter, the overlays and the character pages follow this log">
+                        <span className="chip ok" title="Timers, the meter, the overlays and the character pages follow this log">
                           Followed
                         </span>
                       ) : (
@@ -241,6 +241,14 @@ export function Logs() {
         ) : (
           <div className="table-scroll">
             <table className="table">
+              <thead>
+                <tr>
+                  <th>Archive</th>
+                  <th>Size</th>
+                  <th>Written</th>
+                  <th />
+                </tr>
+              </thead>
               <tbody>
                 {view?.archives.map((x) => (
                   <tr key={x.path}>

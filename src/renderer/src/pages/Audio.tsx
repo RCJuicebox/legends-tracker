@@ -53,9 +53,9 @@ export function Audio() {
           </p>
         </div>
         <div className="actions">
-          <span className="row tight">
+          <label className="row tight">
             <Switch on={!a.muted} label="Sound on" onChange={(v) => set({ muted: !v })} /> {a.muted ? 'Muted' : 'Sound on'}
-          </span>
+          </label>
         </div>
       </div>
 

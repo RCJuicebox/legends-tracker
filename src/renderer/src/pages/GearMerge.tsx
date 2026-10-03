@@ -146,7 +146,7 @@ export function MergeTab({
       </div>
 
       {since.looted > 0 && (
-        <div className="notice bad">
+        <div className="notice warn">
           Since that export you looted {since.looted} piece{since.looted === 1 ? '' : 's'} of gear
           {since.merged > 0 ? ` and merged ${since.merged} into ${since.into.length ? since.into.join(', ') : 'your gear'}` : ''}, so this list may not be what you wear now. Type{' '}
           <GameCommand cmd="/outputfile inventory" /> in game and it follows the new file.

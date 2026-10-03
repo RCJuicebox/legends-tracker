@@ -1,4 +1,4 @@
-import { num, pct } from '../../../core/format'
+import { num, num1, pct, round } from '../../../core/format'
 import type { CSSProperties, ReactNode } from 'react'
 import { fmtRate, type HealRow, type Row, type SkillRow } from '../../../core/combatView'
 import type { EntityKind, ProcOrigin } from '../../../shared/types'
@@ -129,8 +129,8 @@ export function SkillBar({ s, rank, onClick, per }: { s: SkillRow; rank?: number
   const swings = s.hits + s.misses
   const bits: string[] = []
   if (s.hits) bits.push(`${s.hits} hit${s.hits === 1 ? '' : 's'}`)
-  if (s.crits) bits.push(`${Math.round((s.crits / Math.max(1, s.hits)) * 100)}% crit`)
-  if (s.misses) bits.push(`${Math.round((s.hits / Math.max(1, swings)) * 100)}% landed`)
+  if (s.crits) bits.push(`${pct(s.crits / Math.max(1, s.hits))} crit`)
+  if (s.misses) bits.push(`${pct(s.hits / Math.max(1, swings))} landed`)
   if (s.resists) bits.push(`${s.resists} resisted`)
   if (s.hits) bits.push(`avg ${num(s.avg)} · max ${num(s.max)}`)
   const extras = Object.entries(s.mods)
@@ -149,7 +149,7 @@ export function SkillBar({ s, rank, onClick, per }: { s: SkillRow; rank?: number
             {s.name}
             <em className="dm-proc" style={{ color: PROC_TEXT[proc.origin] }} title={PROC_HINT[proc.origin]}>
               {PROC_WORD[proc.origin]}
-              {proc.ppm !== null ? ` · ${proc.ppm.toFixed(1)}/min` : ''}
+              {proc.ppm !== null ? ` · ${num1(round(proc.ppm, 1))}/min` : ''}
             </em>
           </>
         ) : (

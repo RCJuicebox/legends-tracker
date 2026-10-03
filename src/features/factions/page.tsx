@@ -250,7 +250,7 @@ export function Factions() {
                 Unnamed ({unnamed})
               </ToggleChip>
             )}
-            <FilterBox placeholder="What does a mob or NPC do?" label="Look up a mob or NPC" value={look} onChange={setLook} width={250} />
+            <FilterBox placeholder="Find a mob or NPC…" label="Find a mob or NPC" value={look} onChange={setLook} width={250} />
             <span className="spacer" />
             <span className="faint small">{view ? `${view.factions.length} faction${view.factions.length === 1 ? '' : 's'} on record` : ''}</span>
           </div>

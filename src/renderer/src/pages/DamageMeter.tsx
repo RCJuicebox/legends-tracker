@@ -9,7 +9,7 @@ export function DamageMeter({ go }: { go?: (page: PageId) => void }) {
           <h1>Damage Meter</h1>
           <p>
             Every fight the log can see, read from the last hour at start and live from then on: who dealt what, what hit your side, who healed, and what fired on its own. Fight or
-            Overall, for everyone, your group, or just you. When a fight ends, how much of the log is read back at start and whether a zone starts a new session are set in{' '}
+            Session, for everyone, your group, or just you. When a fight ends, how much of the log is read back at start and whether a zone starts a new session are set in{' '}
             {go ? (
               <button className="link-button inline" onClick={() => go('settings')}>
                 Settings

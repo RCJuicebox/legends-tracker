@@ -45,9 +45,10 @@ export function mb(bytes: number): string {
 export function ago(t: number, now = Date.now()): string {
   if (!t) return 'never'
   const s = Math.round((now - t) / 1000)
+  // The same units as duration() everywhere else: "12 s", "3 min", "2 h" (LT-471).
   if (s < 5) return 'just now'
-  if (s < 60) return `${s}s ago`
-  if (s < 3600) return `${Math.floor(s / 60)}m ago`
-  if (s < 86400) return `${Math.floor(s / 3600)}h ago`
+  if (s < 60) return `${s} s ago`
+  if (s < 3600) return `${Math.floor(s / 60)} min ago`
+  if (s < 86400) return `${Math.floor(s / 3600)} h ago`
   return day(t, now)
 }

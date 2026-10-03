@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { api, errorMessage } from '../api'
+import { duration } from '../../../core/format'
 import { showError } from '../toast'
 import { CategoryChip, NumberInput } from '../components/ui'
 import { type KnownSpell, type LogCheckRow } from '../../../shared/types'
@@ -83,9 +84,9 @@ export function LogCheck({ known, onSaved }: { known: KnownSpell[]; onSaved: (k:
                     <CategoryChip category={r.category} />
                   </td>
                   <td className="muted">{r.samples}</td>
-                  <td className="mono">{r.observedMedianSec}s</td>
+                  <td className="mono">{duration(r.observedMedianSec)}</td>
                   <td className="mono">
-                    {r.calculatedEarliestSec}–{r.calculatedLatestSec}s
+                    {r.calculatedEarliestSec}–{duration(r.calculatedLatestSec)}
                   </td>
                   <td>
                     {r.fits ? (
