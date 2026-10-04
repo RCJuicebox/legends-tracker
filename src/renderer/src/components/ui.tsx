@@ -273,8 +273,8 @@ export function LoadError({ error, retry, what = 'this' }: { error: string; retr
       </span>
       {/* Where the answer usually is: what each source last said, and a Refresh (LT-487). */}
       {go && (
-        <button className="btn small ghost" onClick={() => go('sources')}>
-          Data Sources
+        <button className="btn small ghost" onClick={() => go('settings', 'sources')}>
+          Data sources
         </button>
       )}
       {retry && (

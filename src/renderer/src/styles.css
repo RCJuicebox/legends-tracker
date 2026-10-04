@@ -351,6 +351,12 @@ textarea {
 .card h2 .spacer {
   flex: 1;
 }
+/* A card's own heading that folds the card away (Damage Meter › Fights and sessions) keeps the heading's look. */
+.card h2 > .disclosure.head {
+  text-transform: inherit;
+  letter-spacing: inherit;
+  font-weight: inherit;
+}
 
 .grid {
   display: grid;
@@ -1600,6 +1606,14 @@ details:not(.info) > summary::before {
 }
 .nav-group:first-child {
   margin-top: 2px;
+}
+/* A group's name folds its pages away (Setup starts folded): the name is the button. */
+.nav-group:hover {
+  color: var(--text-2);
+}
+.nav-group .unsaved-mark {
+  margin-left: auto;
+  letter-spacing: 0;
 }
 
 /* ---------- gear page inputs and stat blocks ---------- */

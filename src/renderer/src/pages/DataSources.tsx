@@ -48,7 +48,6 @@ export function DataSources() {
     <>
       <div className="page-head">
         <div>
-          <h1>Data Sources</h1>
           <p>Where everything the app shows comes from, and how each source last fared. If a page is empty or out of date, the answer is usually here.</p>
         </div>
         <div className="actions">

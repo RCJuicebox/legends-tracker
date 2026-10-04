@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { CharacterPicker } from '../components/CharacterPicker'
 import { api } from '../api'
-import { remember, useRemembered } from '../remember'
+import { useRemembered } from '../remember'
 import { showError } from '../toast'
 import { Ago, FilterBox, GameCommand, Pending, Segmented, Tabs } from '../components/ui'
 import { numExact as num, who, wikiUrl } from '../../../core/format'
@@ -15,8 +15,7 @@ import { ItemIcon } from './gearBits'
 import { GearFinder, type GearMode } from './GearFinder'
 import { useCharacterRecord, withRecord } from '../character'
 import { readStatsInputs } from '../../../core/statsInputs'
-import type { PageId } from '../main'
-import { UPGRADES_TAB } from '../constants'
+import type { Go } from '../nav'
 
 /** The highest merge an item takes: +10. */
 const MAX_MERGE = MAX_LEVEL
@@ -60,21 +59,30 @@ function MergePips({ level }: { level: number }) {
 
 type Filter = 'all' | 'worn' | 'bags' | 'bank' | 'keyring'
 
-const MODES: ['sheet' | GearMode, string][] = [
+type GearTab = 'sheet' | 'effects' | 'finder' | 'optimize' | 'pet'
+
+const TABS: [GearTab, string][] = [
   ['sheet', 'Character sheet'],
+  ['effects', 'Effects'],
   ['finder', 'Upgrade finder'],
-  ['focus', 'Focus items'],
-  ['effects', 'Worn effects'],
-  ['procs', 'Procs'],
   ['optimize', 'Gear optimiser'],
   ['pet', 'Pet']
 ]
 
+/** What gear does beyond its stats: the three kinds the Effects tab shows, one at a time. */
+type EffectsKind = 'focus' | 'effects' | 'procs'
+
+const EFFECTS: [EffectsKind, string][] = [
+  ['focus', 'Focus items'],
+  ['effects', 'Worn effects'],
+  ['procs', 'Procs']
+]
+
 /**
- * The Gear page, or with `only` one of its views on its own (the Upgrades page shows Best merge this
+ * The Gear page, or with `only` one of its views on its own (the Motes page shows Best merge this
  * way). `onPlan` is where a merge's Plan button goes.
  */
-export function Gear({ go, only, onPlan }: { go?: (page: PageId) => void; only?: GearMode; onPlan?: () => void }) {
+export function Gear({ go, only, onPlan }: { go?: Go; only?: GearMode; onPlan?: () => void }) {
   const exp = useExportCharacter('inventory')
   const { exports, available, character, setCharacter } = exp
   const inv = useInventory(character, !!exports, available.join(','))
@@ -83,9 +91,11 @@ export function Gear({ go, only, onPlan }: { go?: (page: PageId) => void; only?:
   const [selected, setSelected] = useState<string | null>(null)
   const [scaled, setScaled] = useRemembered<boolean>('gear.scaled', true)
   const [refreshing, setRefreshing] = useState(false)
-  const [remembered, setMode] = useRemembered<'sheet' | GearMode>('gear.view', 'sheet')
-  // Best merge moved to the Upgrades page; a remembered 'merge' opens the sheet here.
-  const mode = only ?? (remembered === 'merge' ? 'sheet' : remembered)
+  const [remembered, setTab] = useRemembered<'sheet' | GearMode>('gear.view', 'sheet')
+  const [kind, setKind] = useRemembered<EffectsKind>('gear.effects', 'focus')
+  // Focus items and Procs were tabs of their own, now under Effects; Best merge is on the Motes page, and a remembered 'merge' opens the sheet here.
+  const tab: GearTab = remembered === 'merge' ? 'sheet' : remembered === 'focus' || remembered === 'procs' ? 'effects' : remembered
+  const mode = only ?? (tab === 'effects' ? kind : tab)
   // Worked out once per inventory and sheet, for the card and the totals both.
   const summary = useMemo(() => (view?.inventory ? wornSummary(view, sheet) : null), [view, sheet])
 
@@ -147,7 +157,7 @@ export function Gear({ go, only, onPlan }: { go?: (page: PageId) => void; only?:
       </div>
     </div>
   )
-  // On another page (Upgrades), no second title: whose gear it is, with the same picker and refresh.
+  // On another page (Motes), no second title: whose gear it is, with the same picker and refresh.
   const top = only ? (
     <div className="row mb-12" style={{ flexWrap: 'wrap' }}>
       <span className="small muted grow">The gear of the character picked here, from its inventory export.</span>
@@ -211,9 +221,17 @@ export function Gear({ go, only, onPlan }: { go?: (page: PageId) => void; only?:
   })
 
   const switcher = (
-    <div className="row mb-12">
-      <Tabs label="Gear view" value={mode} onChange={setMode} tabs={MODES} />
-    </div>
+    <>
+      <div className="row mb-12">
+        <Tabs label="Gear view" value={tab} onChange={setTab} tabs={TABS} />
+      </div>
+      {tab === 'effects' && (
+        <div className="row mb-12">
+          <b>Show</b>
+          <Segmented label="Which effects" value={kind} onChange={setKind} options={EFFECTS} />
+        </div>
+      )}
+    </>
   )
 
   if (only)
@@ -228,7 +246,7 @@ export function Gear({ go, only, onPlan }: { go?: (page: PageId) => void; only?:
       <>
         {head}
         {switcher}
-        <GearFinder view={view} sheet={sheet} mode={mode} onPlan={() => go?.('upgrades')} />
+        <GearFinder view={view} sheet={sheet} mode={mode} />
       </>
     )
 
@@ -262,8 +280,7 @@ export function Gear({ go, only, onPlan }: { go?: (page: PageId) => void; only?:
               showError('Could not set up the planner', e)
               return
             }
-            remember(UPGRADES_TAB, 'planner')
-            go?.('upgrades')
+            go?.('motes', 'planner')
           }}
         />
       )}
@@ -563,7 +580,7 @@ function ItemPanel({
           </div>
         </div>
         {lvl < MAX_MERGE && (
-          <button className="btn primary small" onClick={onPlan} title="Open Upgrades › Merge planner with this item">
+          <button className="btn primary small" onClick={onPlan} title="Open Motes › Merge planner with this item">
             Plan this upgrade
           </button>
         )}

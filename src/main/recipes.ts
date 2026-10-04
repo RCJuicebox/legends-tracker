@@ -16,7 +16,8 @@ import { downloadStale, reportDownload } from './sources/freshness'
 // table adds the potions whose own pages give no recipe (Elixir of Greater Concentration). Kept in
 // the app's data and refreshed at most once a week, like the item catalog.
 // 2: the era tag of every page read (products and their ingredients), for crafted items' eras.
-const FORMAT = 2
+// 3: a page listing one ingredient a line is one recipe, not one a line (Tumpy Tonic's).
+const FORMAT = 3
 const ERA_TAG = /\{\{\s*([A-Za-z][A-Za-z ]*?)\s+Era\s*\}\}/
 
 export type { BookRecipe, RecipeFile }

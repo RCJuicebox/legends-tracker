@@ -11,7 +11,7 @@ const UNIT_WORDS: Record<PlanActivity['kind'], [string, string]> = { kill: ['kil
 /**
  * Where the character being played is in this plan, as the achievements overlay follows it: the step
  * it is on, counting down as the factions move, and the next. With the switch for its cues; the
- * overlay's own switch is on Overlays. For a character not being played it says what it will do.
+ * overlay's own switch is on Settings › Overlays. For a character not being played it says what it will do.
  */
 export function NowCard({
   character,
@@ -56,9 +56,9 @@ export function NowCard({
         <span className="spacer" />
         <label
           className="row tight small"
-          title="Said aloud when a step is done, with the next; each achievement it finishes flashes on the alerts overlay. The same switch is on Overlays"
+          title="Said aloud when a step is done, with the next; each achievement it finishes flashes on the alerts overlay. The same switch is on Settings › Overlays"
         >
-          <Switch on={cues} onChange={onCues} label="Say when a step is done" /> Say when a step is done <span className="faint">(also on Overlays)</span>
+          <Switch on={cues} onChange={onCues} label="Say when a step is done" /> Say when a step is done <span className="faint">(also on Settings › Overlays)</span>
         </label>
       </div>
       {step && track ? (

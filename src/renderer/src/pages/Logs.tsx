@@ -35,7 +35,6 @@ export function Logs() {
     <>
       <div className="page-head">
         <div>
-          <h1>Log Files</h1>
           <p>
             Which character&apos;s log is followed, and keeping the logs small. An archived log is zipped, named by the dates it covers, read back and checked byte-for-byte, and
             only then removed. The game starts a fresh log on its next line.

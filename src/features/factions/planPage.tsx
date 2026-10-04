@@ -48,7 +48,8 @@ const HOW = (
     </div>
     <div>
       <b>Time.</b> Mobs are grouped into camps by zone: common ones at your kill pace, named ones at one a respawn, so a camp of one or two named mobs loses to a quest. A hand-in
-      takes the stack at once, so what counts is getting the items: bought is quick, gathered takes the time you set, and what you hold is free.
+      takes the stack at once, so what counts is getting the items: bought is quick, and so is a craft whose materials merchants sell (Tumpy Tonic); gathered takes the time you
+      set, Bone Chips about 5 seconds; and what you hold is free.
     </div>
     <div>
       <b>Quests.</b> A step is repeatable when it wants one kind of item nobody in the walkthrough hands you; chain steps, big one-off rewards and hand-ins your log saw fewer than
@@ -62,6 +63,11 @@ const HOW = (
     <div>
       <b>Goals.</b> Fastest takes every achievement in the least time. Most factions positive also counts each faction that ends at 0 or above, worth the hours you set, so it may
       take a slower way that keeps a faction up, or end with steps that bring factions back from below zero. Either way, only where a faction ends counts.
+    </div>
+    <div>
+      <b>What a lost point costs</b> is what winning it back takes. A faction a hand-in of bought items raises (Red Wine, Bone Chips, Bat Wings, a stack at a time) comes back in
+      moments, so the plan would rather sink that one than one only a slow camp raises, and brings it back with a quick step at the end; points off a maxed faction weigh the same
+      way, lightly.
     </div>
   </>
 )
@@ -521,6 +527,7 @@ export function PlanTab({ character, view }: { character: string; view: FactionV
             ` and Allakhazam (${data.alla.read} of ${data.alla.wanted} faction pages${data.alla.read < data.alla.wanted ? ', the rest coming a page every twenty seconds as the site asks' : ''})`}
           . <Info label="How the plan is made" text={HOW} />
         </div>
+        <LeftOut left={data.catalog.leftOut ?? []} />
         <Assumptions settings={settings} stored={stored} logPace={logPace} onChange={setSettings} />
         <Unmatched unmatched={data.wiki.unmatched} character={character} />
       </div>
@@ -725,6 +732,35 @@ function Unmatched({ unmatched, character }: { unmatched: FactionPlanData['wiki'
       {unmatched.pages.length > 0 && (
         <p className="small mb-0">
           <strong>{unmatched.pages.length} wiki pages that match none of them</strong> <span className="faint">(mostly factions not met yet)</span>: {unmatched.pages.join(', ')}
+        </p>
+      )}
+    </details>
+  )
+}
+
+/**
+ * The named mobs no camp holds, by what eqlwiki says of them: not in Legends at all (Allakhazam lists
+ * live EverQuest's), or far too tough to farm (Legends' unkillable guildmasters).
+ */
+function LeftOut({ left }: { left: NonNullable<FactionPlanData['catalog']['leftOut']> }) {
+  if (!left.length) return null
+  const tough = left.filter((l) => l.why === 'tough')
+  const missing = left.filter((l) => l.why === 'missing')
+  return (
+    <details className="fp-assume">
+      <summary>Mobs left out of the kill camps ({left.length})</summary>
+      <p className="faint small">
+        Allakhazam lists the NPCs of live EverQuest, and eqlwiki has a page for each named one Legends has. A named mob with no eqlwiki page is taken not to be in Legends, and one
+        with more health than any raid boss of the era is no camp.
+      </p>
+      {tough.length > 0 && (
+        <p className="small">
+          <strong>Too tough to farm:</strong> {tough.map((l) => `${l.name} (${l.zone}, ${(l.hp ?? 0).toLocaleString()} HP)`).join(', ')}
+        </p>
+      )}
+      {missing.length > 0 && (
+        <p className="small mb-0">
+          <strong>Not in Legends (no eqlwiki page):</strong> {missing.map((l) => `${l.name} (${l.zone})`).join(', ')}
         </p>
       )}
     </details>

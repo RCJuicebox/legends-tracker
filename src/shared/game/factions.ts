@@ -285,6 +285,32 @@ export const CYCLES: Cycle[] = [
     line: 'Hand Bone Chips to Vexia D`Ynth in Neriak Commons, four a task (try a whole stack in one trade); she wants Indifferent, so sneak or be invisible for the trade if you con worse.'
   },
   {
+    // Messages For Neriak over and over (eqlwiki's walkthrough; pointed out as a good one for The Dead,
+    // 2026-10-03): ask Kizdean Gix in West Commonlands (by the toll booth at -162, 262; one of his two
+    // spawns has a message) "Do you have any messages for Neriak?" for a Sealed Letter, and hand it to
+    // Loveal S`Nez on the second floor of the Lodge of the Dead in Neriak Third Gate: The Dead +10, Queen
+    // Cristanos Thex +5, Primordial Malice -20, King Naythox Thex, Keepers of the Art and Eldritch
+    // Collective -1. The quest wants Amiable with The Dead (eqlwiki and Allakhazam), and Kizdean, The
+    // Dead's own, attacks one it scowls at. The letter is taken to be lore, so one a round trip (a
+    // guess, as Innoruuk Disciple's: set your own pace on it).
+    page: 'Messages For Neriak',
+    zone: 'West Commonlands',
+    npc: 'Loveal S`Nez',
+    hits: {
+      'The Dead': 10,
+      'Queen Cristanos Thex': 5,
+      'King Naythox Thex': -1,
+      'Keepers of the Art': -1,
+      'Eldritch Collective': -1,
+      'Primordial Malice': -20
+    },
+    guessed: [],
+    items: [{ name: 'Sealed Letter', count: 1, how: 'drop', where: 'Kizdean Gix (West Commonlands), for "Do you have any messages for Neriak?"; lore, one a trip', sec: 240 }],
+    needs: { faction: 'The Dead', band: 'Amiable', min: 100 },
+    replaces: true,
+    line: 'Ask Kizdean Gix in West Commonlands (by the toll booth at -162, 262) "Do you have any messages for Neriak?" for a Sealed Letter, and hand it to Loveal S`Nez on the second floor of the Lodge of the Dead in Neriak Third Gate. The quest wants Amiable with The Dead, and Kizdean attacks anyone The Dead hates.'
+  },
+  {
     // Merchants of Erudin without Peace Keepers (a comment on Allakhazam's Peacekeeper Staff, taken up
     // 2026-09-29): Small Lanterns to Jyle Windshot in West Freeport (the Hogcallers' Inn, upstairs;
     // Faydarks Champions, who gives only at Indifferent or better) give Wooden Shards back (Allakhazam's
@@ -337,7 +363,10 @@ export const ITEMS_IN_PLAY: Record<string, ItemInPlay> = {
   'rat ears': { how: 'drop', where: 'rats, such as in Misty Thicket', sec: 240 },
   // For Xelha's Cyclops Eye: they do drop in classic after all, two from nine seafury cyclopes in Ocean of
   // Tears in about seventeen minutes there (2026-10-02).
-  'cyclops eye': { how: 'drop', where: 'seafury cyclopes (Ocean of Tears)', sec: 510 }
+  'cyclops eye': { how: 'drop', where: 'seafury cyclopes (Ocean of Tears)', sec: 510 },
+  // Easy to come by (2026-10-03): nearly every skeleton drops them, a couple at a time, and 69 came in
+  // under six minutes of skeletons in play (2026-10-01); eqlwiki lists them only as a drop.
+  'bone chips': { how: 'drop', where: 'skeletons, in most zones', sec: 5 }
 }
 
 /** A quest's hand-in item that is another than the one the wikis' item page is about, by quest page (lower-cased), then item. */

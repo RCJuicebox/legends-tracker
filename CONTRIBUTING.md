@@ -58,6 +58,9 @@ A new feature module:
 - **Pages**: waits use `Pending` (`doing=` for anything but "Loading …"), errors `LoadError` or
   `ErrorText`, ages `<Ago>`, filters `FilterBox`, tabs `Tabs`, choices `Segmented`, and anything that
   cannot be undone a `ConfirmButton` or `showUndo`. Web data is **Refreshed**; a log is **Read again**.
+- **Places**: what is set once and seldom opened is a tab of Settings, not a page; what one page
+  alone uses is set on that page. A page others open on a given tab names its tabs in
+  `src/renderer/src/nav.ts` and is opened with `go(page, tab)`.
 - **Files the app keeps** are written through `JsonFile` (`src/main/storeCore.ts`): a `.tmp` file
   renamed over, tried again while another program holds it. Settings-store files have a schema number
   in `src/main/schema.ts`; a change of shape bumps it and adds a migration.
@@ -79,7 +82,7 @@ A new feature module:
 | record | the character's classes, levels, race, deity and focus, kept in the settings, edited on Stats |
 | sheet | what the player has told the tracker about a character that no file records (`CharacterSheet`): AC typed in for items, the shield choice and the stats inputs, kept in `characters\<key>.json` |
 | stats inputs | the Stats page's part of the sheet (`StatsInputs`, `src/core/statsInputs.ts`): classes, level, skills, AC inputs, stances |
-| Upgrades | the page where motes go: the best merge, the merge planner, spell upgrades. The gear finder (`src/core/gearFinder.ts`, Gear › Upgrade finder) looks for better items, not merges |
+| Motes | the page for motes coming and going: the runs they dropped on, then where they go (the best merge, the merge planner, spell upgrades). The gear finder (`src/core/gearFinder.ts`, Gear › Upgrade finder) looks for better items, not merges |
 | export | a file the game writes on `/outputfile inventory`, `achievements` or `faction` |
 | log history | every consumer's counts over a character's live log and archives (`log-history.json`) |
 | source | a row on Data Sources: something read from the game, the log or the web, and how it fared |

@@ -6,10 +6,11 @@ import { parseFactionPageFull, type FactionRow } from '../../../src/features/fac
 import { parseQuestPage, readHandIn } from '../../../src/features/factions/questPages'
 import type { PlanSettings } from '../../../src/shared/settings'
 import { classSwapName, classSwapOf, factionNamer, raceOfSwap, unmatchedNames, zoneKey } from '../../../src/features/factions/names'
-import { buildCatalog, howHad, itemsToLookUp, type CatalogInput, type PlanActivity } from '../../../src/features/factions/catalog'
+import { buildCatalog, craftMaterials, howHad, itemsToLookUp, npcsToLookUp, type CatalogInput, type PlanActivity } from '../../../src/features/factions/catalog'
 import { DEFAULT_SETTINGS, KEEP_MAXED, NO_CHOICES, plannable, unitTime, waysToRaise } from '../../../src/features/factions/ways'
 import type { PlanInput } from '../../../src/features/factions/planTypes'
 import { planFactions, planFor } from '../../../src/features/factions/planner'
+import { buildModel } from '../../../src/features/factions/model'
 import type { ItemInfo } from '../../../src/shared/types'
 import { lookUp, moversOf, sourcesOf } from '../../../src/features/factions/lookup'
 import {
@@ -628,8 +629,9 @@ describe("Allakhazam's faction pages", () => {
     // The sapling is eqlwiki's too, with no amount: Allakhazam's camp has it, with one.
     expect(camps).toHaveLength(1)
     expect(camps[0]).toMatchObject({ zone: 'Greater Faydark', site: 'Allakhazam', mobs: ['a mature arborean', 'an arborean sapling'], common: 2 })
-    // The mature arborean lowers the Arboreans by 5 and the sapling not at all: -2.5 a kill.
-    expect(camps[0].hits).toEqual({ "Tunare's Scouts": 1, 'Arboreans of the Faydark': -2.5 })
+    // The mature arborean lowers the Arboreans by 5 and the sapling not at all: -2.5 a kill. Allakhazam's
+    // +1 is +5 in Legends, which gives no gain smaller; a loss is as listed.
+    expect(camps[0].hits).toEqual({ "Tunare's Scouts": 5, 'Arboreans of the Faydark': -2.5 })
     expect(camps[0].guessed).toBeUndefined()
   })
 
@@ -648,6 +650,109 @@ describe("Allakhazam's faction pages", () => {
     expect(unknown.blocked).toBeUndefined()
     expect(unknown.conUnknown).toEqual(["Tunare's Scouts"])
     expect(buildCatalog(input({ cons: { "Tunare's Scouts": -200 } })).activities.find((a) => a.kind === 'quest')!.conUnknown).toBeUndefined()
+  })
+})
+
+describe("eqlwiki's word on a camp's named mobs", () => {
+  // Two factions' pages, made up in Allakhazam's shape: a guildmaster Legends made unkillable, an NPC of
+  // live EverQuest's that Legends never had, and two gate guards, one whose eqlwiki page gives Legends'
+  // own amounts and respawn and one whose page gives neither.
+  const rogues: AllaFaction = {
+    id: 11,
+    name: 'Test Rogues',
+    needs: [],
+    quests: [],
+    mobs: [
+      { name: 'Guildmaster Orrin', zone: 'Test Hold', amount: 45 },
+      { name: 'Phantom Pell', zone: 'Test Hold', amount: 88 },
+      { name: 'Gate Guard Bram', zone: 'Test Pass', amount: 1 },
+      { name: 'Gate Guard Toll', zone: 'Test Pass', amount: 1 },
+      { name: 'a pass bandit', zone: 'Test Pass', amount: -5 }
+    ]
+  }
+  const miners: AllaFaction = {
+    id: 12,
+    name: 'Test Miners',
+    needs: [],
+    quests: [],
+    mobs: [
+      { name: 'Guildmaster Orrin', zone: 'Test Hold', amount: -305 },
+      { name: 'Phantom Pell', zone: 'Test Hold', amount: -589 },
+      { name: 'Gate Guard Bram', zone: 'Test Pass', amount: -5 },
+      { name: 'Gate Guard Toll', zone: 'Test Pass', amount: -5 }
+    ]
+  }
+  const npcs = {
+    'guildmaster orrin': { found: true, hp: 2_500_000, respawnSec: 400 },
+    'phantom pell': { found: false },
+    'gate guard bram': { found: true, hp: 1512, respawnSec: 400, hits: { 'Test Rogues': 5, 'Test Miners': -5 } },
+    'gate guard toll': { found: true, hp: 1512 },
+    'lord brute': { found: true, hp: 300_000 },
+    'sergeant pike': { found: false }
+  }
+  const input = (over: Partial<CatalogInput> = {}) =>
+    catalogInput({
+      factions: ['Test Rogues', 'Test Miners'],
+      targets: ['Test Rogues'],
+      pages: [
+        {
+          page: 'Test Rogues',
+          raise: {
+            mobs: [
+              { name: 'Lord Brute', zone: 'Test Keep', note: '' },
+              { name: 'Sergeant Pike', zone: 'Test Keep', note: '' }
+            ],
+            quests: [],
+            zones: []
+          },
+          lower: { mobs: [], quests: [], zones: [] }
+        }
+      ],
+      alla: [rogues, miners],
+      ...over
+    })
+  const camps = (c: ReturnType<typeof buildCatalog>) => c.activities.filter((a) => a.kind === 'kill')
+
+  it('asks about the named mobs of the camps that raise what the plan is for, not the many alike', () => {
+    expect(npcsToLookUp(input()).sort()).toEqual(['Gate Guard Bram', 'Gate Guard Toll', 'Guildmaster Orrin', 'Lord Brute', 'Phantom Pell', 'Sergeant Pike'])
+  })
+
+  it('leaves out a mob Legends does not have, and one far too tough to farm, and says which', () => {
+    const c = buildCatalog(input({ npcs }))
+    // Sergeant Pike has no page of his own, but eqlwiki's faction page lists him: he is Legends'.
+    expect(camps(c).map((a) => [a.zone, a.mobs])).toEqual([
+      ['Test Keep', ['Sergeant Pike']],
+      ['Test Pass', ['Gate Guard Bram', 'Gate Guard Toll']]
+    ])
+    expect(c.leftOut).toEqual([
+      { name: 'Lord Brute', zone: 'Test Keep', why: 'tough', hp: 300_000 },
+      { name: 'Guildmaster Orrin', zone: 'Test Hold', why: 'tough', hp: 2_500_000 },
+      { name: 'Phantom Pell', zone: 'Test Hold', why: 'missing' }
+    ])
+  })
+
+  it("takes a page's own amounts and respawn, and Legends' +5 for any smaller gain", () => {
+    const pass = camps(buildCatalog(input({ npcs }))).find((a) => a.zone === 'Test Pass')!
+    // Bram's page gives +5; Toll's gives nothing, and Allakhazam's +1 is +5 in Legends.
+    expect(pass).toMatchObject({ mobs: ['Gate Guard Bram', 'Gate Guard Toll'], hits: { 'Test Rogues': 5, 'Test Miners': -5 }, named: 2, respawnSec: [400] })
+    // Bram back every 6:40 (9 an hour), Toll at the assumed 20 minutes (3 an hour).
+    expect(unitTime(pass, DEFAULT_SETTINGS).seconds).toBeCloseTo(300)
+  })
+
+  it("plans them all as before while eqlwiki's word is not in", () => {
+    const c = buildCatalog(input())
+    expect(
+      camps(c)
+        .map((a) => a.zone)
+        .sort()
+    ).toEqual(['Test Hold', 'Test Keep', 'Test Pass'])
+    expect(c.leftOut).toBeUndefined()
+    expect(
+      unitTime(
+        camps(c).find((a) => a.zone === 'Test Pass')!,
+        DEFAULT_SETTINGS
+      ).seconds
+    ).toBeCloseTo(600)
   })
 })
 
@@ -777,8 +882,8 @@ describe('the catalog', () => {
     expect(plannable(quest, NO_CHOICES)).toBe(true)
     expect(plannable({ ...quest, gate: undefined }, NO_CHOICES)).toBe(false)
     expect(plannable({ ...quest, gate: undefined }, { ...NO_CHOICES, locks: { "Tunare's Scouts": quest.id } })).toBe(true)
-    // The arboreans of Greater Faydark, which eqlwiki does not list, raise it meanwhile.
-    expect(camp).toMatchObject({ kind: 'kill', zone: 'Greater Faydark', site: 'Allakhazam', hits: { "Tunare's Scouts": 1, 'Emerald Warriors': 1 } })
+    // The arboreans of Greater Faydark, which eqlwiki does not list, raise it meanwhile: Allakhazam's +1, +5 in Legends.
+    expect(camp).toMatchObject({ kind: 'kill', zone: 'Greater Faydark', site: 'Allakhazam', hits: { "Tunare's Scouts": 5, 'Emerald Warriors': 5 } })
     expect(plannable(camp, NO_CHOICES)).toBe(true)
     // At Amiable the NPC takes it.
     expect(buildCatalog(input(100)).activities[1].blocked).toBeUndefined()
@@ -1253,6 +1358,46 @@ describe('the catalog', () => {
     expect(howHad('Head', has)).toEqual({ how: 'drop', where: 'East Freeport', named: 1 })
     expect(howHad('Scalp', has)).toEqual({ how: 'drop', where: 'Highpass' })
     expect(howHad('Nothing Known', has).how).toBe('unknown')
+  })
+
+  it('takes a craft from what merchants sell as quick to come by: buying the materials and a combine', () => {
+    const recipe = (ingredients: { name: string; count: number }[], yields = 1) => ({ skill: 'Brewing', trivial: 135, yields, ingredients })
+    const items = {
+      'test tonic': item({
+        sources: {
+          drops: [],
+          foraged: [],
+          crafted: true,
+          recipe: recipe([
+            { name: 'Test Nut', count: 1 },
+            { name: 'Water Flask', count: 2 }
+          ])
+        }
+      }),
+      'test stew': item({
+        sources: {
+          drops: [],
+          foraged: [],
+          crafted: true,
+          recipe: recipe([
+            { name: 'Test Nut', count: 1 },
+            { name: 'Rare Meat', count: 1 }
+          ])
+        }
+      }),
+      'test cake': item({ sources: { drops: [], foraged: [], crafted: true, recipe: recipe([{ name: 'Flour', count: 4 }], 2) } }),
+      'test nut': item({ vendors: [{ zone: 'Test Isle', npc: 'Nutter', note: '' }] }),
+      'water flask': item({ vendors: [{ zone: 'Rivervale', npc: 'Kizzie', note: '' }] }),
+      'rare meat': item({ sources: { drops: [{ zone: 'Test Woods', mobs: ['a rare bear'] }], foraged: [], crafted: false } })
+    }
+    const has = { bought: { flour: { merchant: 'Baker', each: 2 } }, items }
+    // Three bought materials at 0.15 s each and a 3 s combine.
+    expect(howHad('Test Tonic', has)).toEqual({ how: 'crafted', where: 'from Test Nut + 2 Water Flask, all sold by merchants', sec: 3.45 })
+    // A material that only drops: as slow as any craft.
+    expect(howHad('Test Stew', has)).toEqual({ how: 'crafted', where: '' })
+    // Bought before counts as sold; a combine making two, half each.
+    expect(howHad('Test Cake', has).sec).toBeCloseTo((4 * 0.15 + 3) / 2)
+    expect(craftMaterials(items).sort()).toEqual(['Flour', 'Rare Meat', 'Test Nut', 'Water Flask'])
   })
 
   it("learns from the player's other characters' logs: their hand-ins and camps, but not their kill pace", () => {
@@ -1840,6 +1985,56 @@ describe('the two goals', () => {
     expect(plan.belowZero).toEqual({ now: 2, after: 1 })
     // Nothing is worth any time: no restores.
     expect(planFactions(input, { ...POSITIVE, positiveHours: 0 }).steps.map((s) => s.activity.id)).toEqual(['a'])
+  })
+
+  it('sinks the faction bought items bring back in moments rather than one slow to raise, and brings it back at the end', () => {
+    // Two ways to A, each sinking a faction: E comes back with a hand-in of bought wine (4 s for 5 points),
+    // H only with a slow camp (10 minutes for 5). The way that sinks H takes half as long, which is worth
+    // less than H, with the positive faction worth 10 hours; sinking E and buying it back is worth more.
+    const input: PlanInput = {
+      targets: [{ faction: 'A', achievement: 'A', standing: 0 }],
+      maxed: [],
+      standings: { A: 0, E: 100, H: 100 },
+      activities: [
+        act('sinkEasy', { A: 10, E: -10 }, 12, { zone: 'z' }),
+        act('sinkHard', { A: 10, H: -10 }, 24, { zone: 'z' }),
+        act('wine', { E: 5 }, 900, { zone: 'w', kind: 'turnin', items: [{ name: 'Red Wine', count: 1, how: 'bought', where: 'Merchant' }] }),
+        act('slow', { H: 5 }, 6, { zone: 'h' })
+      ]
+    }
+    const settings = { ...POSITIVE, positiveHours: 10 }
+    // Choosing the way: sinking E costs the trip and the wine (600 s and 1,900 points at 0.83 s), sinking H the faction's whole worth.
+    const m = buildModel(input, settings, NO_CHOICES)
+    const value = (id: string) => m.valueOf(m.actIndex.get(id)!, 200, m.fresh())
+    expect(value('sinkEasy') - value('sinkHard')).toBeCloseTo(36_000 - (600 + 1900 * 0.83))
+    const plan = planFactions(input, settings)
+    expect(plan.steps.map((s) => [s.activity.id, s.units])).toEqual([
+      ['sinkEasy', 200],
+      ['wine', 380]
+    ])
+    expect(plan.steps[1].lifts).toEqual(['E'])
+    expect(plan.belowZero.after).toBe(0)
+    // Fastest has no care for where factions end: the quicker way.
+    expect(planFactions(input, S).steps.map((s) => s.activity.id)).toEqual(['sinkHard'])
+  })
+
+  it('takes points off the maxed faction quickest to win back', () => {
+    // Both ways leave their maxed faction well above 0; points off H, which only a slow camp raises,
+    // weigh more than the twenty minutes the other way takes.
+    const input: PlanInput = {
+      targets: [{ faction: 'A', achievement: 'A', standing: 0 }],
+      maxed: ['E', 'H'],
+      standings: { A: 0, E: 2000, H: 2000 },
+      activities: [
+        act('sinkEasy', { A: 10, E: -2 }, 6, { zone: 'z' }),
+        act('sinkHard', { A: 10, H: -2 }, 6.06, { zone: 'z' }),
+        act('wine', { E: 5 }, 900, { zone: 'w', kind: 'turnin', items: [{ name: 'Red Wine', count: 1, how: 'bought', where: 'Merchant' }] }),
+        act('slow', { H: 5 }, 6, { zone: 'h' })
+      ]
+    }
+    const plan = planFactions(input, { ...POSITIVE, keepMaxed: KEEP_MAXED.light })
+    expect(plan.steps.map((s) => s.activity.id)).toEqual(['sinkEasy'])
+    expect(plan.maxedLost).toBe(400)
   })
 })
 

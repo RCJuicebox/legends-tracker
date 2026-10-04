@@ -128,12 +128,13 @@ tells you little.
 
 ## Live
 
-The first page. **Start watching** and **Stop watching** follow the character log chosen on
-Log Files; **Arrange overlays** and **Mute** sit beside them. Below:
+The first page. The sidebar's groups (Play, Plan, Setup) fold at a click on their names, and Setup
+starts folded: it is set once. **Start watching** and **Stop watching** follow the character log
+chosen on Settings › Log files; **Arrange overlays** and **Mute** sit beside them. Below:
 
 - **Getting set up**, a checklist shown until every step is done or it is hidden: the game folder
   (so spells can be timed), the character log, your classes and levels (Stats), where sound plays
-  (Audio) and where the overlays sit (Overlays). The last two can be marked fine as they are.
+  (Settings › Audio) and where the overlays sit (Settings › Overlays). The last two can be marked fine as they are.
 - A warning when the game is running but the watched log has had nothing new for five minutes:
   logging may be off (`/log on`), or another character is being played. When another character's
   log is being written while this one is quiet, a button follows that log instead.
@@ -154,7 +155,7 @@ read into it: your melee, spells, DoT ticks and damage shields, your pet's, your
 fighting near you, and everything hitting your side.
 
 - **Fights and sessions.** A fight opens on the first blow between your side and an enemy and
-  closes when the last enemy it engaged dies, or after ten seconds without a blow (Settings). The log
+  closes when the last enemy it engaged dies, or after ten seconds without a blow (**Fights and sessions**, under the meter). The log
   names two of a kind alike, so a blow from or to another of that name in the next four seconds takes
   the fight up again: two haunted chests fought at once are one fight with two kills. It is
   named after the mob that took the most ("a fetid fiend +2"). A session is everything since you
@@ -185,12 +186,12 @@ fighting near you, and everything hitting your side.
 - **Pets.** Your own pet is yours from the first `<pet> told you, 'Attacking … Master.'`, and what
   it did before that line is re-attributed. A mob's pet is "<mob> pet".
 - **Copy** puts the list on the clipboard as text, for chat.
-- **On start**, the last hour of the log (Settings) is read into the meter before live lines, so the
+- **On start**, the last hour of the log (**Fights and sessions**) is read into the meter before live lines, so the
   fights before the app opened are there; **Read the log again** rebuilds from scratch.
 
 The meter overlay is a compact copy of the same list over the game, click-through like the others.
 Hover its header for the controls: fight or session, what it lists, whose rows, a flag that starts a
-new session, and a pin that unlocks the rows so a click opens their breakdown. The Overlays page
+new session, and a pin that unlocks the rows so a click opens their breakdown. Settings › Overlays
 sets what each meter window shows; there can be several, say one for the fight and one for the
 session.
 
@@ -208,7 +209,7 @@ class can cast, and at what level, comes from `spells_us.txt`, up to the level c
 A buff counts as on you from its "you feel…" line, matched to the cast just before it, until its
 fade line or your death. Someone else's buff is timed at their `/who` level without their focus, so
 its real end can come later; the fade line is what counts. With **Buffs from my group on the overlays** on
-(here or in Settings), it gets a bar on the buffs overlay and a spoken "… is fading, ask
+(here or on Spell Timers), it gets a bar on the buffs overlay and a spoken "… is fading, ask
 <caster>" a minute before its earliest end. Songs and buffs under five minutes are left out.
 
 **Buffs you want** lists every class's buffs, the group's classes first, to pick from; by default
@@ -372,7 +373,7 @@ The sound library is the game's own `AudioTriggers\default` and `shared` folders
 
 ## Audio
 
-Speech is rendered by Windows' own speech engine (a PowerShell process driving WinRT and
+A tab of Settings. Speech is rendered by Windows' own speech engine (a PowerShell process driving WinRT and
 `System.Speech`, started when first needed and stopped after five quiet minutes) to WAV, or by Azure's
 neural voices with your own key, then mixed with alert sounds in one audio context on the device you
 choose. Speech follows that device instead of the system default. Phrases are cached. Speech plays
@@ -380,8 +381,8 @@ one phrase at a time, and the backlog is capped so warnings about a finished fig
 
 **Microsoft voices.** Azure AI Speech gives Microsoft's neural voices (Jenny, Aria, Guy and hundreds
 more) with your own key. Create a Speech resource in the Azure portal (the free tier allows half a
-million characters a month), then paste its key and region into the **Microsoft voices** card on the
-Audio page and press **Save and check**; the voices then join the Voice list. The key is kept
+million characters a month), then paste its key and region into the **Microsoft voices** card on
+Settings › Audio and press **Save and check**; the voices then join the Voice list. The key is kept
 encrypted with Windows' own data protection in `azure-speech.json`, is only ever sent to Azure, and
 is never shown again. Each phrase is fetched from Azure once and kept as a WAV in `speech-cache` in
 the cache folder (the newest 4,000), so a night's cues cost a few hundred characters. When Azure
@@ -390,11 +391,11 @@ instead, so no cue is lost.
 
 ## Overlays
 
-Transparent windows that let clicks through, never take focus (EverQuest drops keyboard input the
+A tab of Settings. Transparent windows that let clicks through, never take focus (EverQuest drops keyboard input the
 moment it loses focus), stay out of Alt-Tab, and re-assert always-on-top every two seconds while the
 game is in front. The game must be windowed or borderless. **Arrange overlays** lifts all of that so
 they can be dragged and resized (never below 120×48); **Lock overlays**, on any of them or in the app,
-puts them back. Each overlay's place can also be typed on the Overlays page, and **Reset layout** puts
+puts them back. Each overlay's place can also be typed on Settings › Overlays, and **Reset layout** puts
 the built-in ones back where a new install has them, sized for the screen (a new install starts them a
 quarter or a half larger on a 1440p or 4K screen). An overlay's **Background** slider fades the dark
 panel behind its text and bars, down to none, and the text's shadow deepens as it goes; the alerts,
@@ -422,7 +423,7 @@ followed, and still spoken if that is on.
 
 ## Motes
 
-Every mote you loot is counted from its loot line (`You looted 4 Mote of Major Potential from Reward Chest
+One page for motes coming and going, in four tabs. **Runs** is the count: every mote you loot is counted from its loot line (`You looted 4 Mote of Major Potential from Reward Chest
 and stored it in your currency`), per day and per rank, with each rank's item-XP value from the mote
 guide (Infinitesimal 1 … Infinite 10).
 
@@ -438,9 +439,25 @@ motes. Manual Start/Stop covers anything else.
 
 On first launch, history is rebuilt from the character's log and its zipped archives.
 
+### Where they go
+
+The page's other three tabs spend the same stock:
+
+- **Best merge**: the next +1 of each item you wear, best stat boost per mote first, by the Gear
+  page's stat weights. What you wear is the inventory export; if you have looted or merged gear
+  since it was written, the tab says so. **Only what your motes cover** hides the rest, and **Plan**
+  sets an item up in the planner.
+- **Merge planner**: put in an item's level, the xp in its bar and the level you want, and it works
+  out which motes it takes, how many, and what to combine from your stock. Each mote works on one
+  item level, one below its rank (Greater on +5, Superior on +6), and two combine into one of the
+  next rank. The stock can be typed in, read off the game's currency window with Windows OCR
+  (**Read motes from screen**), and with **Add looted motes automatically** grows as motes drop.
+  **Done** takes the motes used off the stock and sets the item to its new level.
+- **Spell upgrades**: below.
+
 ### Spell upgrades
 
-The Upgrades page's **Spell upgrades** tab says which of the spells and songs you cast to put motes
+The **Spell upgrades** tab says which of the spells and songs you cast to put motes
 into next. It counts your casts (`You begin casting …` / `You begin singing …`) over the last 7, 14
 or 30 days of play, or all your logs, and scores the next rank of each spell with the community's
 EQL spell upgrade (mote) guide:
@@ -738,10 +755,10 @@ level slider scales them. Pages are kept a week; **Refresh item stats** fetches 
   candidates as they drop or merged to your level. **Judge** takes them **In the round** (everything
   you own rearranged around the candidate, so an item it pushes out may go to an Any slot and keep
   its focus) or **This slot only**. The era buttons hide what is out of era on Legends.
-- **Focus items**: each focus effect on gear, worth what it does to the spells your log shows you
+- **Effects**, one kind at a time. **Focus items**: each focus effect on gear, worth what it does to the spells your log shows you
   casting, spell by spell; only the best of a kind works on a spell, as in game. What a focus does
   comes from `spells_us.txt`, which items carry it from eqlwiki.
-- **Worn effects** and **Procs**: worth damage a minute against your own melee in the log; the stats
+  **Worn effects** and **Procs**: worth damage a minute against your own melee in the log; the stats
   a worn effect gives are priced by your weights.
 - **Gear optimiser**: the best way to wear what you own (worn, carried, banked, in Storage ›
   Equipment or on your pet), each piece tried in every slot it fits, both Any slots included, and
@@ -753,31 +770,15 @@ level slider scales them. Pages are kept a week; **Refresh item stats** fetches 
 
 The finder, the focus items and the optimiser need the wiki's item catalog: **Download the item
 catalog** reads every piece of equipment on eqlwiki (a few minutes the first time), and later refreshes, at most
-weekly, read only the pages edited since. Best merge is on the Upgrades page.
-
-## Upgrades
-
-Where motes go, in three tabs that spend the same stock:
-
-- **Best merge**: the next +1 of each item you wear, best stat boost per mote first, by the Gear
-  page's stat weights. What you wear is the inventory export; if you have looted or merged gear
-  since it was written, the tab says so. **Only what your motes cover** hides the rest, and **Plan**
-  sets an item up in the planner.
-- **Merge planner**: put in an item's level, the xp in its bar and the level you want, and it works
-  out which motes it takes, how many, and what to combine from your stock. Each mote works on one
-  item level, one below its rank (Greater on +5, Superior on +6), and two combine into one of the
-  next rank. The stock can be typed in, read off the game's currency window with Windows OCR
-  (**Read motes from screen**), and with **Add looted motes automatically** grows as motes drop.
-  **Done** takes the motes used off the stock and sets the item to its new level.
-- **Spell upgrades**: see [Spell upgrades](#spell-upgrades) under Motes.
+weekly, read only the pages edited since. Best merge is on the Motes page.
 
 ## Log files
 
-**Follow** on a character log's row picks the log the app watches: the timers, the meter, the overlays
+A tab of Settings. **Follow** on a character log's row picks the log the app watches: the timers, the meter, the overlays
 and the character pages are for that character. A switch under the list starts watching it as the
 app opens.
 
-A character log past the size limit (off by default; one switch on the Log Files page) is archived:
+A character log past the size limit (off by default; one switch on this tab) is archived:
 moved aside, zipped as `eqlog_<char>_<first date>_to_<last date>.zip`, read back and checked by CRC
 and length, and only then deleted. **Archive now** does the same on demand.
 
@@ -792,10 +793,10 @@ assume either way; it watches what happens:
 
 No path loses a line. An archive interrupted by the app closing is finished on the next start.
 
-## Data Sources
+## Data sources
 
-Every place the app's information comes from reports how its last read went, so nothing fails
-quietly. The page groups them: your logs (the chat log, log history, mote history), the game's files
+A tab of Settings. Every place the app's information comes from reports how its last read went, so
+nothing fails quietly. The tab groups them: your logs (the chat log, log history, mote history), the game's files
 (spell data, game tables, icons, the character exports), eqlwiki.com (item lookups, the item
 catalog, recipes, pet pages), the screen (OCR reads) and the app itself (Windows voices, updates).
 Each row says what the source is for, its state (OK, due a refresh, failed, not there, reading, not
@@ -804,6 +805,11 @@ it again makes sense. If a page is empty or out of date, the answer is usually h
 folder** opens the app's own `logs` folder.
 
 ## Settings
+
+Five tabs: **General** (below), then [Overlays](#overlays), [Audio](#audio), [Log files](#log-files)
+and [Data sources](#data-sources), each of them set once and seldom opened again. What one page
+alone uses is set on that page: the damage meter's fights and sessions under the meter, and what
+Spell Timers tracks and says by default on Spell Timers.
 
 **Appearance** is System, Light or Dark (System follows Windows); the overlays keep the dark set
 over the game either way. Every colour is a token in `styles.css`, with the light set beside the
@@ -814,17 +820,13 @@ dark one.
   diagnostics**: the version, your PC, the settings that matter, each process's memory and CPU (see
   [Measuring](#measuring)) and the end of the app's log, ready to paste into a bug report, with no
   keys and no Windows user name.
-- **Game**: the game folder (the character log is chosen on Log Files) and **Yield CPU to
+- **Game**: the game folder (the character log is chosen on the Log files tab) and **Yield CPU to
   EverQuest** (the app runs below normal priority, so the game wins every tie; sound stays normal).
   **UI size** scales this window from 90% to 150%; overlays have their own text sizes, on the
-  Overlays page.
+  Overlays tab.
 - **Hotkeys**, which work with the game in front: `Ctrl+Shift+F9` mutes or unmutes,
   `Ctrl+Shift+F10` starts a new damage meter session, and `Ctrl+Shift+F11` arranges or locks the
   overlays. A key another program already holds is flagged.
-- The damage meter's fight gap, how much log it reads back on start, **Read the log again**, and
-  whether entering a zone starts a new session; which spells are tracked by default (your own
-  casts, buffs on you, buffs you cast on others, your group's buffs, DoTs, debuffs, mez and charm);
-  and the buff and DoT warnings and what is said when they fade.
 
 Closing the window leaves the app running in the tray, and a notification says so the first time.
 The tray menu has **Open**, **Arrange overlays** (or **Lock overlays**), **Mute**, the update when
@@ -880,18 +882,19 @@ roaming profile:
 | `npc-races.json` | The race each mob's eqlwiki page gives, for the Slayer counts of mobs whose names do not say; kept, and a name with no page asked again after a day |
 | `faction-book.json` | Every eqlwiki faction page and the quest pages they name, read into ways to raise each faction, for the Plan tab; kept a week |
 | `faction-alla.json` | Allakhazam's faction pages (the cons quests want, kill amounts), read one every 20 seconds; kept a month |
+| `faction-npcs.json` | eqlwiki's page for each named mob the faction plan's kill camps would hold: whether Legends has it, its health, respawn and kill amounts; kept a month, a name with no page asked again after a week |
 | `faction-since.json`, `slayer-since.json` | What the live log has shown since the factions and achievements exports (standings moved, achievements completed, Slayer kills), and how far it was read, so a start reads on from there rather than from the export's line |
 | `log-history.json` | Casts, melee, purchases and AAs bought counted over each character's log and archives, for Gear, Spell upgrades, Tradeskills and Stats › AAs; only what a log gains is read again |
 | `speech-cache\` | Azure phrases as WAV files, the newest 4,000 |
 
 It also holds `ocr.ps1`, the OCR script, written each run; the screen captures an OCR read takes are
 deleted as soon as it is done. Everything here can be fetched or counted again, so the folder can be
-deleted safely: the wiki downloads come back from their pages (or **Refresh** on Data Sources), log
+deleted safely: the wiki downloads come back from their pages (or **Refresh** on Settings › Data sources), log
 history is counted again from your logs and archives, and Azure phrases are fetched again as they
 are spoken.
 
-The app reads what the game writes and changes none of it, apart from the archiver on the Log Files
-page, which moves logs into `Logs\archive` or a folder you choose. It reads the chat logs in `Logs`
+The app reads what the game writes and changes none of it, apart from the archiver on Settings ›
+Log files, which moves logs into `Logs\archive` or a folder you choose. It reads the chat logs in `Logs`
 (`eqlog_<name>_<server>.txt`), the `/outputfile inventory` and `/outputfile achievements` exports
 in the game folder, `spells_us.txt` and `spells_us_str.txt`, the game tables in `Resources`
 (`basedata.txt`, `skillcaps.txt`, `ACMitigation.txt`), the icon sheets in `uifiles\default`, and

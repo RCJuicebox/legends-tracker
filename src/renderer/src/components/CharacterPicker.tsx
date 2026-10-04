@@ -3,7 +3,7 @@ import { who } from '../../../core/format'
 
 /**
  * Which character a page shows. The pages that read the game's exports (Stats, Gear, Achievements,
- * Factions, Tradeskills, Upgrades) show one picked character, which need not be the one being played:
+ * Factions, Tradeskills, Motes) show one picked character, which need not be the one being played:
  * this names it (a list to pick from when there are several), says when it is not the one played,
  * and gives a way back to that one.
  */

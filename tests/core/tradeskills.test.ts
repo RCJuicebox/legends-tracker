@@ -57,6 +57,31 @@ describe('recipes from the wiki', () => {
     ])
   })
 
+  it('reads a recipe written one ingredient a line as one recipe', () => {
+    const page = `{{Itempage
+|itemname = Test Tonic
+|playercrafted =
+
+* [[Skill Brewing|Brewing]] (Trivial: 135)
+** [[Test Nut]]
+** [[Water Flask]] x 2
+
+}}</onlyinclude>`
+    expect(parseCrafted('Test Tonic', page)).toEqual([
+      {
+        product: 'Test Tonic',
+        skill: 'Brewing',
+        trivial: 135,
+        yields: 1,
+        ingredients: [
+          { name: 'Test Nut', count: 1 },
+          { name: 'Water Flask', count: 2 }
+        ],
+        from: 'page'
+      }
+    ])
+  })
+
   it('reads a tradeskill page’s tables, whatever columns sit between the items', () => {
     const page = `
 {| class="wikitable"

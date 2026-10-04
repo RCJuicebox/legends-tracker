@@ -8,6 +8,7 @@ import { useNow } from './TimerBars'
 import { durationSec } from '../../../core/combatView'
 import { fmtCoin } from '../../../core/loot'
 import type { PageId } from '../main'
+import type { Go, SettingsTab } from '../nav'
 import type { SetupFlags } from '../../../shared/types'
 
 // The Live page's summaries: what to set up still, a log that has gone quiet, the fight in hand and
@@ -16,13 +17,13 @@ import type { SetupFlags } from '../../../shared/types'
 /** How long the log may go without a line while the game runs before the Live page asks why. */
 const QUIET_MS = 5 * 60_000
 
-type Go = (p: PageId) => void
-
 interface Step {
   id: string
   done: boolean
   text: string
   page: PageId
+  /** The Settings tab the step is done on. */
+  tab?: SettingsTab
   button: string
   /** Marks a step as fine as it is, where "done" is a matter of taste (the audio device). */
   accept?: string
@@ -39,8 +40,8 @@ export function SetupChecklist({ go }: { go: Go }) {
   const { hidden, accepted, arranged } = s.setup
   const setSetup = (patch: Partial<SetupFlags>) => void patchSettings((x) => ({ ...x, setup: { ...x.setup, ...patch } }))
   const steps: Step[] = [
-    { id: 'folder', done: !!s.installDir && spellsLoaded > 0, text: 'Find the game folder, so spells can be timed', page: 'settings', button: 'Settings' },
-    { id: 'log', done: !!s.logFile, text: 'Choose your character log (type /log on in game if there is none)', page: 'logs', button: 'Log Files' },
+    { id: 'folder', done: !!s.installDir && spellsLoaded > 0, text: 'Find the game folder, so spells can be timed', page: 'settings', tab: 'general', button: 'Settings' },
+    { id: 'log', done: !!s.logFile, text: 'Choose your character log (type /log on in game if there is none)', page: 'settings', tab: 'logs', button: 'Log files' },
     {
       id: 'classes',
       done: Object.keys(classLevels).length > 0,
@@ -48,12 +49,21 @@ export function SetupChecklist({ go }: { go: Go }) {
       page: 'stats',
       button: 'Stats'
     },
-    { id: 'audio', done: s.audio.deviceId !== 'default', text: 'Pick where speech and sounds play', page: 'audio', button: 'Audio', accept: 'The default is fine' },
+    {
+      id: 'audio',
+      done: s.audio.deviceId !== 'default',
+      text: 'Pick where speech and sounds play',
+      page: 'settings',
+      tab: 'audio',
+      button: 'Audio',
+      accept: 'The default is fine'
+    },
     {
       id: 'overlays',
       done: arranged,
       text: 'Place the overlays over your game (Arrange, drag, then Lock)',
-      page: 'overlays',
+      page: 'settings',
+      tab: 'overlays',
       button: 'Overlays',
       accept: 'They are fine where they are'
     }
@@ -85,7 +95,7 @@ export function SetupChecklist({ go }: { go: Go }) {
                 </button>
               )}
               {!ok && (
-                <button className="btn small" onClick={() => go(x.page)}>
+                <button className="btn small" onClick={() => go(x.page, x.tab)}>
                   {x.button}
                 </button>
               )}
@@ -108,8 +118,8 @@ export function QuietLogNotice({ go }: { go: Go }) {
     <div className="notice warn mb-16">
       The game is running, but {status.character || 'this character'}&apos;s log has had nothing new since {ago(status.lastLineAt, now)}. Is logging on (type{' '}
       <span className="mono">/log on</span>), and is this the character you are playing?{' '}
-      <button className="btn small" onClick={() => go('logs')}>
-        Follow another log on Log Files
+      <button className="btn small" onClick={() => go('settings', 'logs')}>
+        Follow another log on Settings › Log files
       </button>
     </div>
   )

@@ -2,7 +2,7 @@ import { useMemo } from 'react'
 import { useLive, useSettled } from '../state'
 import { roman } from '../api'
 import { useInvoke } from '../hooks'
-import type { PageId } from '../main'
+import type { Go } from '../nav'
 import { useRemembered } from '../remember'
 import { CategoryChip, DAY_WINDOWS, Info, NumberInput, Pending, Segmented, SpellIcon } from '../components/ui'
 import { num, num1, pct } from '../../../core/format'
@@ -24,7 +24,7 @@ import {
   type SpellWeights
 } from '../../../core/spellMotes'
 
-// Upgrades › Spell upgrades: which of the spells you cast to put motes into next.
+// Motes › Spell upgrades: which of the spells you cast to put motes into next.
 
 const short = (i: number) => MOTE_RANKS[i].name || 'Potential'
 /** "Shadow Knight" → "SHD", the way /who abbreviates classes. */
@@ -84,7 +84,7 @@ function PayWith({ o }: { o: SpellUpgradeOption }) {
   )
 }
 
-export function MoteSpells({ go }: { go?: (page: PageId) => void }) {
+export function MoteSpells({ go }: { go?: Go }) {
   const characterKey = useSettled((s) => s.characterKey)
   const tracking = useSettled((s) => s.settings.tracking)
   const spellsLoaded = useLive((l) => l.status.spellsLoaded)

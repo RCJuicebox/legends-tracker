@@ -50,7 +50,6 @@ export function Audio() {
     <>
       <div className="page-head">
         <div>
-          <h1>Audio</h1>
           <p>
             Speech and sounds share one output, so they follow the device you choose here rather than the system default. Speech plays one phrase at a time; a long backlog is
             dropped rather than read out after the fight.

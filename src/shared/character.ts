@@ -93,6 +93,12 @@ export interface ItemSources {
   drops: { zone: string; mobs: string[] }[]
   foraged: string[]
   crafted: boolean
+  /**
+   * How it is crafted, the first recipe its page gives: what goes into a combine and how many come out;
+   * null for a crafted item whose recipe could not be read. Absent when not crafted, and on entries
+   * cached before it was kept.
+   */
+  recipe?: { skill: string; trivial: number; yields: number; ingredients: { name: string; count: number }[] } | null
 }
 
 /** An item's eqlwiki page, as far as the tracker uses it. */

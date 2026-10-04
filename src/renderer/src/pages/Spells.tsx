@@ -1,5 +1,4 @@
 import { remember, useRemembered } from '../remember'
-import { UPGRADES_TAB } from '../constants'
 import { useState } from 'react'
 import { useActions, useLive, useSettled } from '../state'
 import { api, clock } from '../api'
@@ -8,14 +7,15 @@ import { showError, showUndo } from '../toast'
 import { duration, who } from '../../../core/format'
 import { Ago, CategoryChip, Disclosure, Field, FilterBox, Info, LoadError, NumberInput, Pending, SortTh, sortRows, SpellIcon, Switch, type Sort } from '../components/ui'
 import { CATEGORY_LABELS, DEFAULT_TIER_DURATION_PCT, type ClassName, type KnownSpell, type SpellCategory, type SpellRule } from '../../../shared/types'
-import type { PageId } from '../main'
+import type { Go } from '../nav'
 import { FocusSources } from './SpellsFocus'
+import { SpellDefaults } from './SpellsDefaults'
 import { RuleEditor, useSpellDrafts } from './SpellRule'
 import { LogCheck } from './SpellsLogCheck'
 
 type SpellKey = 'name' | 'type' | 'window' | 'wears' | 'last'
 
-export function Spells({ go }: { go?: (page: PageId) => void }) {
+export function Spells({ go }: { go?: Go }) {
   const character = useSettled((s) => s.character)
   const tracking = useSettled((s) => s.settings.tracking)
   const spellsLoaded = useLive((l) => l.status.spellsLoaded)
@@ -115,6 +115,7 @@ export function Spells({ go }: { go?: (page: PageId) => void }) {
           <AddSpell onAdded={setKnown} />
         </div>
 
+        <SpellDefaults />
         <LogCheck known={known} onSaved={setKnown} />
         <TierTable go={go} />
       </div>
@@ -126,12 +127,12 @@ export function Spells({ go }: { go?: (page: PageId) => void }) {
  * Whose spells these are: the character's classes, levels and race, which the Stats page edits for
  * every page, and the duration focus that is this page's own.
  */
-function CharacterCard({ go }: { go?: (page: PageId) => void }) {
+function CharacterCard({ go }: { go?: Go }) {
   const c = useSettled((s) => s.character)
   const characterKey = useSettled((s) => s.characterKey)
   const classes = Object.entries(c.classLevels) as [ClassName, number][]
   if (!characterKey) {
-    return <div className="notice">Choose a character log on Log Files to set up focus and levels.</div>
+    return <div className="notice">Choose a character log on Settings › Log files to set up focus and levels.</div>
   }
   return (
     <div className="card">
@@ -294,7 +295,7 @@ function AddSpell({ onAdded }: { onAdded: (list: KnownSpell[]) => void }) {
   )
 }
 
-function TierTable({ go }: { go?: (page: PageId) => void }) {
+function TierTable({ go }: { go?: Go }) {
   const { patchSettings } = useActions()
   const tracking = useSettled((s) => s.settings.tracking)
   const pct = tracking.tierDurationPct
@@ -319,17 +320,11 @@ function TierTable({ go }: { go?: (page: PageId) => void }) {
         Duration bonus per rank, from the EQL spell upgrade guide: rank X is ten tiers, an unranked spell none. Confirmed in game for DoTs (Envenomed Bolt X 0:36 → 0:54) and buffs
         (Spirit of the Puma X). Heal over time is fitted rather than from the guide: 7% matches Slugs Healing V's Spell window and log, where the guide's 5% does not.{' '}
         {go ? (
-          <button
-            className="link-button inline"
-            onClick={() => {
-              remember(UPGRADES_TAB, 'spells')
-              go('upgrades')
-            }}
-          >
-            Upgrades › Spell upgrades
+          <button className="link-button inline" onClick={() => go('motes', 'spells')}>
+            Motes › Spell upgrades
           </button>
         ) : (
-          'Upgrades › Spell upgrades'
+          'Motes › Spell upgrades'
         )}{' '}
         values a rank by these too.
       </p>

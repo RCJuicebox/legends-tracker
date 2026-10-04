@@ -476,11 +476,11 @@ function Finder({ view, sheet, mode }: { view: InventoryView; sheet: CharacterSh
           )}
           <p className="faint small">
             Weights are on outcomes (HP, mana, AC, avoidance, Offense, haste…); a raw stat counts for what it buys you, worked out from your classes, level, current stats and AAs,
-            the same formulas the Stats page checks against the game. Focus effects you want (Focus items tab) count too: a candidate that brings a better one gains, and replacing
-            an item loses what its focus and exaltations gave. Worn effects and procs count as what they add to your melee and, for worn effects, the stats they give (Worn effects
-            and Procs tabs). Your two Any slots take any piece of gear. Scores only rank items against each other. The wiki holds base stats, so a candidate "as it drops" is at +0
-            while your gear counts at its merge level; switch to "At your merge level" to compare like with like. In era and out of era follow eqlwiki's own list; an item with no
-            era on its page takes the era of the zones it drops in. Item data from eqlwiki.com.
+            the same formulas the Stats page checks against the game. Focus effects you want (Effects › Focus items) count too: a candidate that brings a better one gains, and
+            replacing an item loses what its focus and exaltations gave. Worn effects and procs count as what they add to your melee and, for worn effects, the stats they give
+            (Effects › Worn effects and Procs). Your two Any slots take any piece of gear. Scores only rank items against each other. The wiki holds base stats, so a candidate "as
+            it drops" is at +0 while your gear counts at its merge level; switch to "At your merge level" to compare like with like. In era and out of era follow eqlwiki's own
+            list; an item with no era on its page takes the era of the zones it drops in. Item data from eqlwiki.com.
           </p>
         </>
       )}
@@ -523,7 +523,7 @@ function FocusPoints({ points, setPoints, wanted, lines }: { points: number; set
       <span className="muted">making every spell you cast 10% better is worth</span>
       <TypedNumber step={25} value={points} style={{ width: 72 }} aria-label="Points for making every spell 10% better" onCommit={setPoints} />
       <span className="muted">
-        points; a focus counts for the spells it touches, by how often you cast them. {wanted} of the {lines} that touch your spells are wanted (Focus items tab).
+        points; a focus counts for the spells it touches, by how often you cast them. {wanted} of the {lines} that touch your spells are wanted (Effects › Focus items).
       </span>
     </div>
   )

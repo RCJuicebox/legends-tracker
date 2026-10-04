@@ -3,6 +3,7 @@ import { writeFileAtomic } from './storeCore'
 import { join } from 'node:path'
 import { baseName, itemKey } from '../core/inventory'
 import { parseItemUse, statsblockOf } from '../core/wikiItem'
+import { parseCrafted } from '../core/tradeskills'
 import { wiki, type WikiPage } from './sources/wiki'
 import type { ItemInfo } from '../shared/types'
 import { log } from './log'
@@ -82,13 +83,18 @@ export class ItemCatalog {
     const cache = await this.load()
     const wanted = new Map<string, string>()
     for (const n of Array.isArray(names) ? names : []) if (n && typeof n === 'string') wanted.set(itemKey(n), baseName(n))
-    // Entries cached before icons, or before what an item is for, were kept have no such field; fetch those again once.
+    // Entries cached before icons, or before what an item is for (a crafted one's recipe among it), were kept have no such field; fetch those again once.
     const stale = [...wanted].filter(
       ([k]) =>
         force ||
         !cache[k] ||
         expired(cache[k].fetchedAt) ||
-        (cache[k].found && (cache[k].icon === undefined || cache[k].use === undefined || cache[k].use.vendors === undefined || cache[k].use.sources === undefined))
+        (cache[k].found &&
+          (cache[k].icon === undefined ||
+            cache[k].use === undefined ||
+            cache[k].use.vendors === undefined ||
+            cache[k].use.sources === undefined ||
+            (cache[k].use.sources.crafted && cache[k].use.sources.recipe === undefined)))
     )
     // Names being looked up already are waited for, not asked again; names that failed lately are
     // left for now, and what is cached serves.
@@ -177,6 +183,11 @@ export class ItemCatalog {
     for (const [asked, p] of pages) {
       const statsblock = statsblockOf(p.content)
       const use = parseItemUse(p.content)
+      // A crafted item's recipe, for what making one takes (the faction plan's hand-ins).
+      if (use.sources?.crafted) {
+        const r = parseCrafted(p.title, p.content)[0]
+        use.sources.recipe = r ? { skill: r.skill, trivial: r.trivial, yields: r.yields, ingredients: r.ingredients } : null
+      }
       // A page with no stats block is still the item's page when it says what the item is for.
       if (!statsblock && !use.notes && !use.quests.length && !use.recipes.length) continue
       const icon = Number(/\|\s*lucy_img_ID\s*=\s*(\d+)/.exec(p.content)?.[1] ?? 0)

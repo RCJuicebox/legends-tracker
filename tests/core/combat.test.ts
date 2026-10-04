@@ -535,6 +535,19 @@ describe('CombatMeter', () => {
     expect(m.snapshot().sessions[0].id).toBe(m.sessions[2].id)
   })
 
+  it('an evacuate within the zone closes the fight but keeps the session', () => {
+    const { m, feed } = meter()
+    feed(`
+      [Sat Oct 03 20:19:16 2026] You have entered The Plane of Hate 4 (Refined).
+      [Sat Oct 03 20:59:05 2026] You punch a loathling lich for 100 points of damage.
+      [Sat Oct 03 20:59:07 2026] Aldric begins casting Exodus I.
+      [Sat Oct 03 20:59:15 2026] You have entered The Plane of Hate 4 (Refined).
+      [Sat Oct 03 20:59:30 2026] You punch an elite dragoon for 50 points of damage.`)
+    expect(m.fights.map((f) => f.open)).toEqual([false, true])
+    expect(m.sessions).toHaveLength(1)
+    expect(m.sessions[0].entities['you'].out.total).toBe(150)
+  })
+
   it('your own name in a line means you; heals do not open a fight; enemy heals are damage undone', () => {
     const { m, feed } = meter()
     feed(`

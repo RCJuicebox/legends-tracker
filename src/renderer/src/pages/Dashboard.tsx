@@ -9,8 +9,8 @@ import { TimerBars, useNow } from '../components/TimerBars'
 import { Icon } from '../components/ui'
 import { GameFolderPrompt } from '../components/GameFolder'
 import { FactionNowCard, FightSummary, QuietLogNotice, SetupChecklist } from '../components/LiveSummary'
-import type { PageId } from '../main'
-import { perHour, useMotes } from './Motes'
+import type { Go } from '../nav'
+import { perHour, useMotes } from './MoteRuns'
 import { localDay, sessionHours, totalMotes } from '../../../core/motes'
 
 const SAMPLE = `[Tue Sep 01 12:15:08 2026] You begin casting Envenomed Bolt X.
@@ -25,7 +25,7 @@ const FEED_SHOWN = 100
  * The page selects only what its head and notices read; the stat cards, the timers and the activity
  * each select their own, so a status tick or a feed line draws only the part it changes (LT-403).
  */
-export function Dashboard({ go }: { go: (p: PageId) => void }) {
+export function Dashboard({ go }: { go: Go }) {
   const { patchSettings } = useActions()
   const arranging = useSettled((s) => s.arranging)
   const muted = useSettled((s) => s.settings.audio.muted)
@@ -51,15 +51,20 @@ export function Dashboard({ go }: { go: (p: PageId) => void }) {
               <Icon name="stop" /> Stop watching
             </button>
           ) : (
-            <button className="btn primary" onClick={() => void act('watch:start')} disabled={!logFile} title={logFile ? undefined : 'Follow a character log on Log Files first'}>
+            <button
+              className="btn primary"
+              onClick={() => void act('watch:start')}
+              disabled={!logFile}
+              title={logFile ? undefined : 'Follow a character log on Settings › Log files first'}
+            >
               <Icon name="play" /> Start watching
             </button>
           )}
           {!watching && !logFile && (
             <span className="faint small">
               Follow a character log on{' '}
-              <button className="link-button inline" onClick={() => go('logs')}>
-                Log Files
+              <button className="link-button inline" onClick={() => go('settings', 'logs')}>
+                Settings › Log files
               </button>{' '}
               first.
             </span>
@@ -133,7 +138,7 @@ export function Dashboard({ go }: { go: (p: PageId) => void }) {
 }
 
 /** Status, character, motes and log size: what a status tick changes. */
-function StatCards({ go }: { go: (p: PageId) => void }) {
+function StatCards({ go }: { go: Go }) {
   const archive = useSettled((s) => s.settings.archive)
   const watching = useLive((l) => l.status.watching)
   const lastLineAt = useLive((l) => l.status.lastLineAt)
@@ -160,14 +165,14 @@ function StatCards({ go }: { go: (p: PageId) => void }) {
         <span className="value">{status.character || '—'}</span>
         <span className="sub">{status.zone || 'zone unknown'}</span>
       </div>
-      <button className="card stat card-button" onClick={() => go('motes')}>
+      <button className="card stat card-button" onClick={() => go('motes', 'runs')}>
         <span className="label">{crawl ? (crawl.kind === 'manual' ? 'Run motes' : 'Instance run motes') : 'Motes today'}</span>
         <span className="value">
           {crawl ? `${totalMotes(crawl.motes)} · ${perHour(totalMotes(crawl.motes), sessionHours(crawl, now))}/h` : totalMotes(motes?.daily[localDay(now)] ?? {})}
         </span>
         <span className="sub">{crawl ? `${crawl.pausedSince ? 'Paused · ' : ''}${crawl.name}` : 'no run in progress'}</span>
       </button>
-      <button className="card stat card-button" onClick={() => go('logs')}>
+      <button className="card stat card-button" onClick={() => go('settings', 'logs')}>
         <span className="label">Log size</span>
         <span className="value">{status.logSize ? mb(status.logSize) : '—'}</span>
         <span className="sub">{archive.autoEnabled ? `archives at ${archive.thresholdMB} MB` : 'auto-archive off'}</span>

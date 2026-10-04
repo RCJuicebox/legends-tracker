@@ -146,10 +146,10 @@ export function OptimizeTab({ m }: { m: GearModel }) {
         )}
         <p className="small muted" style={{ margin: 0 }}>
           Every piece you wear, carry, bank, keep in Storage › Equipment or have on your pet ({m.pieces.length} of them), tried in every slot it fits, both Any slots included,
-          scored with these weights plus the focus effects you want and what worn effects and procs add to your melee (Worn effects and Procs tabs). Exaltations stay in the item
-          that holds them; the {m.exaltations.length} you may use in Storage › Exaltations are tried in the focus, worn and proc slots of each piece of their own kind (a ring's in
-          a ring), in place of what it has there. Your pet's pieces count without any exaltations they hold, which the game does not list. Haste does not stack, so one haste item
-          is all it wears for it: each you own is tried as that one, wherever it leaves the rest of the set best.
+          scored with these weights plus the focus effects you want and what worn effects and procs add to your melee (Effects › Worn effects and Procs). Exaltations stay in the
+          item that holds them; the {m.exaltations.length} you may use in Storage › Exaltations are tried in the focus, worn and proc slots of each piece of their own kind (a
+          ring's in a ring), in place of what it has there. Your pet's pieces count without any exaltations they hold, which the game does not list. Haste does not stack, so one
+          haste item is all it wears for it: each you own is tried as that one, wherever it leaves the rest of the set best.
         </p>
         {changes.length ? (
           <div className="row" style={{ gap: 18, flexWrap: 'wrap', marginTop: 4 }}>

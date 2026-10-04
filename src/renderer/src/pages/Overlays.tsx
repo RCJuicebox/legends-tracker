@@ -85,7 +85,6 @@ export function Overlays() {
     <>
       <div className="page-head">
         <div>
-          <h1>Overlays</h1>
           <p>
             Transparent windows over the game. They let clicks through and never take focus, so they never cost you a keypress mid-fight. The game must run in windowed or
             borderless mode for them to show over it.

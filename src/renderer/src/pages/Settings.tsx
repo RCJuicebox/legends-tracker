@@ -1,13 +1,17 @@
-import { useActions, useLive, useSettled } from '../state'
+import { useActions, useSettled } from '../state'
 import { api } from '../api'
-import { act, showError, showToast, actDone } from '../toast'
+import { act, showError, showToast } from '../toast'
 import { useUpdate, type UpdateState } from '../update'
-import { Ago, Field, NumberInput, Segmented, Switch } from '../components/ui'
+import { Ago, Field, Segmented, Switch, Tabs } from '../components/ui'
 import type { ReactNode } from 'react'
 import { GameFolderCard } from '../components/GameFolder'
-import type { TrackingSettings } from '../../../shared/types'
-import type { PageId } from '../main'
+import { TAB_KEY, type SettingsTab } from '../nav'
+import { useRemembered } from '../remember'
 import { HOTKEYS, hotkeyLabel } from '../../../shared/hotkeys'
+import { Overlays } from './Overlays'
+import { Audio } from './Audio'
+import { Logs } from './Logs'
+import { DataSources } from './DataSources'
 
 /** One line on where updates stand. */
 function updateText(u: UpdateState | null): ReactNode {
@@ -48,16 +52,48 @@ function noCheckReason(u: UpdateState | null): string | undefined {
   return undefined
 }
 
-export function Settings({ go }: { go?: (page: PageId) => void }) {
+const TABS: [SettingsTab, string][] = [
+  ['general', 'General'],
+  ['overlays', 'Overlays'],
+  ['audio', 'Audio'],
+  ['logs', 'Log files'],
+  ['sources', 'Data sources']
+]
+
+/**
+ * What is set once: the app's own settings, and the overlays, audio, log files and data sources,
+ * each a tab. What a page alone uses is set on that page (the damage meter's fights, Spell Timers'
+ * defaults).
+ */
+export function Settings() {
+  const [saved, setTab] = useRemembered<SettingsTab>(TAB_KEY.settings, 'general')
+  const tab = TABS.some(([id]) => id === saved) ? saved : 'general'
+  return (
+    <>
+      <div className="page-head">
+        <h1>Settings</h1>
+      </div>
+      <Tabs className="mb-14" label="Settings view" value={tab} onChange={setTab} tabs={TABS} />
+      {tab === 'overlays' ? (
+        <Overlays />
+      ) : tab === 'audio' ? (
+        <Audio />
+      ) : tab === 'logs' ? (
+        <Logs />
+      ) : tab === 'sources' ? (
+        <DataSources />
+      ) : (
+        <General openLogs={() => setTab('logs')} />
+      )}
+    </>
+  )
+}
+
+function General({ openLogs }: { openLogs: () => void }) {
   const { patchSettings } = useActions()
   const settings = useSettled((s) => s.settings)
   const hotkeysTaken = useSettled((s) => s.hotkeysTaken)
-  const watching = useLive((l) => l.status.watching)
   const s = settings
-  const t = s.tracking
-  const setT = (patch: Partial<TrackingSettings>, debounceMs?: number) => patchSettings((x) => ({ ...x, tracking: { ...x.tracking, ...patch } }), { debounceMs })
-  // A phrase is saved once typing stops, not at every key (LT-393): each save reconfigures the engine.
-  const TYPING_MS = 300
   const update = useUpdate()
   const u = update.status
   const noCheck = noCheckReason(u)
@@ -65,10 +101,7 @@ export function Settings({ go }: { go?: (page: PageId) => void }) {
   return (
     <>
       <div className="page-head">
-        <div>
-          <h1>Settings</h1>
-          <p>Where the game is, how this window looks, and what Spell Timers does by default.</p>
-        </div>
+        <p>The app itself: its version and updates, where the game is, and how this window looks.</p>
       </div>
 
       <div className="stack">
@@ -124,8 +157,8 @@ export function Settings({ go }: { go?: (page: PageId) => void }) {
           <GameFolderCard />
           <p className="hint">
             Which character&apos;s log is followed is chosen on{' '}
-            <button className="link-button inline" onClick={() => go?.('logs')}>
-              Log Files
+            <button className="link-button inline" onClick={openLogs}>
+              Log files
             </button>
             .
           </p>
@@ -158,7 +191,7 @@ export function Settings({ go }: { go?: (page: PageId) => void }) {
           </Field>
           <Field
             label="UI size"
-            hint="The size of everything in this window; Ctrl and + or − change it, Ctrl+0 puts it back. Overlays have their own text sizes, on the Overlays page."
+            hint="The size of everything in this window; Ctrl and + or − change it, Ctrl+0 puts it back. Overlays have their own text sizes, on the Overlays tab."
           >
             <select value={s.uiScale} onChange={(e) => patchSettings((x) => ({ ...x, uiScale: Number(e.target.value) }))}>
               {[0.9, 1, 1.1, 1.25, 1.5, 1.75, 2].map((f) => (
@@ -188,114 +221,6 @@ export function Settings({ go }: { go?: (page: PageId) => void }) {
               ))}
             </div>
           )}
-        </div>
-
-        <div className="card stack gap-14">
-          <h2>Damage meter</h2>
-          <div className="grid three">
-            <Field label="A fight ends after" hint="Seconds without a blow between your side and an enemy. A fight also ends when the last enemy it engaged dies.">
-              <NumberInput value={s.combat.fightGapSec} min={2} max={600} onChange={(v) => patchSettings((x) => ({ ...x, combat: { ...x.combat, fightGapSec: v ?? 10 } }))} />
-            </Field>
-            <Field label="Read back on start" hint="Minutes of the log read into the meter when watching starts, so the fights before the app opened are there. 0 reads nothing.">
-              <NumberInput value={s.combat.historyMinutes} min={0} max={1440} onChange={(v) => patchSettings((x) => ({ ...x, combat: { ...x.combat, historyMinutes: v ?? 0 } }))} />
-            </Field>
-            <Field label="Rebuild" hint="Forgets every fight and reads that much of the log again.">
-              <div>
-                <button
-                  className="btn"
-                  onClick={() => void actDone(`Read the last ${s.combat.historyMinutes || 60} minutes of the log again.`, 'combat:rebuild', s.combat.historyMinutes || 60)}
-                  disabled={!watching}
-                  title={watching ? 'Forget every fight and read the log again' : 'Start watching first'}
-                >
-                  Read the log again
-                </button>
-                {!watching && <span className="faint small"> Start watching first.</span>}
-              </div>
-            </Field>
-          </div>
-          <label className="row">
-            <Switch on={s.combat.newSessionOnZone} onChange={(v) => patchSettings((x) => ({ ...x, combat: { ...x.combat, newSessionOnZone: v } }))} />
-            Entering a zone starts a new session
-            <span className="faint small">
-              the Session figures then cover one zone or instance at a time; New session on the{' '}
-              <button className="link-button inline" onClick={() => go?.('meter')}>
-                Damage Meter
-              </button>{' '}
-              page splits by hand
-            </span>
-          </label>
-          <p className="faint small m-0">
-            Pets with owners, charm pets and active DPS are set on the{' '}
-            <button className="link-button inline" onClick={() => go?.('meter')}>
-              Damage Meter
-            </button>{' '}
-            page; each meter overlay has its own on{' '}
-            <button className="link-button inline" onClick={() => go?.('overlays')}>
-              Overlays
-            </button>
-            .
-          </p>
-        </div>
-
-        <div className="card stack gap-14">
-          <h2>Spell Timers</h2>
-          <div className="grid two">
-            <label className="row">
-              <Switch on={t.enabled} onChange={(v) => setT({ enabled: v })} /> Track spells I cast
-            </label>
-            <span />
-            <label className="row">
-              <Switch on={t.selfBuffs} onChange={(v) => setT({ selfBuffs: v })} /> Buffs on me
-            </label>
-            <label className="row">
-              <Switch on={t.otherBuffs} onChange={(v) => setT({ otherBuffs: v })} /> Buffs I cast on others
-            </label>
-            <label className="row">
-              <Switch on={t.groupBuffs} onChange={(v) => setT({ groupBuffs: v })} /> Buffs from my group on the overlays
-              <span className="faint small">timers for their buffs on me, and whom to ask, on the overlays</span>
-            </label>
-            <label className="row">
-              <Switch on={t.dots} onChange={(v) => setT({ dots: v })} /> DoTs
-            </label>
-            <label className="row">
-              <Switch on={t.debuffs} onChange={(v) => setT({ debuffs: v })} /> Debuffs, mez and charm
-            </label>
-          </div>
-          <p className="muted small m-0">These are the defaults. Any spell can override them on the Spell Timers page: with buffs off, set a buff you want to "Always track".</p>
-        </div>
-
-        <div className="grid two">
-          <div className="card stack gap-12">
-            <h2>Buff announcements</h2>
-            <Field
-              label="Warn before a buff on me ends"
-              hint="Seconds; 0 turns it off. Buff ends are known to within one 6-second tick, so this counts from the earliest they could end."
-            >
-              <NumberInput value={t.buffWarnSec} min={0} onChange={(v) => setT({ buffWarnSec: v ?? 0 })} />
-            </Field>
-            <Field label="Warning" hint="{spell} and {target} are filled in.">
-              <input value={t.buffWarnSpeech} onChange={(e) => setT({ buffWarnSpeech: e.target.value }, TYPING_MS)} />
-            </Field>
-            <Field label="When it fades" hint="Blank for silence.">
-              <input value={t.buffFadeSpeech} onChange={(e) => setT({ buffFadeSpeech: e.target.value }, TYPING_MS)} />
-            </Field>
-            <label className="row">
-              <Switch on={t.announceOtherBuffFades} onChange={(v) => setT({ announceOtherBuffFades: v })} />
-              Also announce buffs fading from other players
-            </label>
-          </div>
-          <div className="card stack gap-12">
-            <h2>DoT announcements</h2>
-            <Field label="Warn before a DoT ends" hint="Seconds; 0 turns it off. Exact to the second once the DoT has ticked.">
-              <NumberInput value={t.dotWarnSec} min={0} onChange={(v) => setT({ dotWarnSec: v ?? 0 })} />
-            </Field>
-            <Field label="Warning">
-              <input value={t.dotWarnSpeech} onChange={(e) => setT({ dotWarnSpeech: e.target.value }, TYPING_MS)} />
-            </Field>
-            <Field label="When it wears off" hint="Blank for silence.">
-              <input value={t.dotFadeSpeech} onChange={(e) => setT({ dotFadeSpeech: e.target.value }, TYPING_MS)} />
-            </Field>
-          </div>
         </div>
       </div>
     </>

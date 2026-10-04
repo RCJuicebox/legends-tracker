@@ -33,7 +33,7 @@ function itemSource(it: HandInItem): string {
     case 'vendor':
       return `sold by${where}`
     case 'crafted':
-      return 'crafted'
+      return `crafted${where}${it.sec ? `, about ${duration(it.sec)} each` : ''}`
     case 'drop':
       return it.named ? `from${where || ' a named mob'} (named: one a respawn)` : `drops${it.where ? ` from ${it.where}` : ''}${it.sec ? `, about ${duration(it.sec)} each` : ''}`
     default:
@@ -110,7 +110,10 @@ export function sourceNote(a: PlanActivity): string {
     return `from your log (${n})`
   }
   const site = a.site ?? 'eqlwiki'
-  return a.guessed?.length ? `from ${site}, amounts guessed` : `from ${site}`
+  // The named mobs' respawns eqlwiki gives, which set the camp's pace: "respawn 6:40 on eqlwiki".
+  const back = [...new Set(a.respawnSec ?? [])].map((s) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`)
+  const respawn = back.length ? `, respawn ${back.join(', ')} on eqlwiki` : ''
+  return a.guessed?.length ? `from ${site}, amounts guessed${respawn}` : `from ${site}${respawn}`
 }
 
 /** What could make a step slower or rougher than planned: said on the step and on each way to raise an achievement. */

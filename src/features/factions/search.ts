@@ -70,6 +70,7 @@ export function search(m: Model, keep?: PlanShape): { best: { blocks: Block[]; c
     mayOpen,
     reachable,
     maxedPoint,
+    below,
     counted,
     first,
     timeFor,
@@ -166,6 +167,8 @@ export function search(m: Model, keep?: PlanShape): { best: { blocks: Block[]; c
   // A locked achievement another activity happened to finish on the way is in no block, so an order
   // that no longer finishes it on the way is as good as no plan.
   const sim = fresh()
+  /** Whether a faction below 0 costs the goal's whole worth (the steps that bring factions back are in), or what bringing it back takes. */
+  let strict = false
   function simulate(blocks: Block[]): number {
     const { total, flow } = run(blocks, sim)
     let missed = 0
@@ -176,17 +179,19 @@ export function search(m: Model, keep?: PlanShape): { best: { blocks: Block[]; c
       for (const g of counted) soon += sim.goal[g] ? sim.goalAt[g] : total
       soon = (soon / counted.length) * UNLOCK_WEIGHT
     }
-    return total + missed + flow * FLOW_WEIGHT + ending(sim) + soon
+    return total + missed + flow * FLOW_WEIGHT + ending(sim, strict) + soon
   }
 
   // ---- the 'positive' goal: steps at the end that bring factions back to 0 or above ----
   // Each is one activity run until a faction below zero is back at 0, taken when the factions it
-  // brings back (less any it takes below) are worth more than its time.
+  // brings back are worth more than its time and what it costs the others: one it takes below 0 counts
+  // what bringing that one back takes (a later step may), unless an earlier step here brought it back.
   function addLifts(blocks: Block[]): Block[] {
     if (!W) return blocks
     const out = blocks.slice()
     const st = fresh()
     run(out, st)
+    const lifted = new Uint8Array(F)
     for (let guard = 0; guard < LIFTS_MAX; guard++) {
       let best = 0
       let pick = -1
@@ -201,16 +206,20 @@ export function search(m: Model, keep?: PlanShape): { best: { blocks: Block[]; c
           const r = raceFor(k, st)
           if (r < 0) continue
           let up = 0
+          let gain = 0
           let lost = 0
           for (const { i: j, h } of acts[k].touch) {
             const v = st.s[j]
             const after = clamp(v + n * h, STANDING_MIN, STANDING_MAX)
-            up += (after >= 0 ? 1 : 0) - (v >= 0 ? 1 : 0)
+            if (v < 0 && after >= 0) {
+              up++
+              gain += W
+            } else if (after < 0) gain -= v >= 0 && lifted[j] ? W : below(j, after) - below(j, v)
             const peakAfter = st.peak[j] || after >= STANDING_MAX
-            lost += (peakAfter ? STANDING_MAX - after : 0) - (st.peak[j] ? STANDING_MAX - v : 0)
+            lost += ((peakAfter ? STANDING_MAX - after : 0) - (st.peak[j] ? STANDING_MAX - v : 0)) * maxedPoint[j]
           }
           if (up <= 0) continue
-          const value = W * up - timeFor(k, n, st.stock, false) * acts[k].risk - setup(k, st, r) - lost * maxedPoint
+          const value = gain - timeFor(k, n, st.stock, false) * acts[k].risk - setup(k, st, r) - lost
           if (value > best) {
             best = value
             pick = k
@@ -223,11 +232,32 @@ export function search(m: Model, keep?: PlanShape): { best: { blocks: Block[]; c
       if (pick < 0) break
       out.push({ act: pick, finish: [], lift: [pickI], reach: [] })
       timeFor(pick, pickN, st.stock, true)
+      for (const { i: j, h } of acts[pick].touch) if (h > 0 && st.s[j] < 0 && st.s[j] + pickN * h >= 0) lifted[j] = 1
       apply(pick, pickN, st)
       st.zone = acts[pick].zone
       st.act = pick
       st.race = pickR
       checkGoals(st, 0)
+    }
+    return out
+  }
+
+  /**
+   * Drops each step that brings factions back whose plan is no better for it, counting a faction left
+   * below 0 at the goal's whole worth: one that took another below 0 for a later step to bring back,
+   * where that later step never came.
+   */
+  function prune(blocks: Block[]): Block[] {
+    let out = blocks
+    let cost = simulate(out)
+    for (let j = out.length - 1; j >= 0; j--) {
+      if (out[j].finish.length || !out[j].lift.length) continue
+      const trial = out.filter((_, x) => x !== j)
+      const c = simulate(trial)
+      if (c < cost - 1e-6) {
+        out = trial
+        cost = c
+      }
     }
     return out
   }
@@ -360,7 +390,10 @@ export function search(m: Model, keep?: PlanShape): { best: { blocks: Block[]; c
       })
       return finish.length || lift.length || reach.length ? [{ act: k, finish, lift, reach }] : []
     })
+    // Its steps that bring factions back are in it already.
+    strict = true
     const cost = simulate(blocks)
+    strict = false
     if (cost < MISSED) {
       best = { blocks, cost }
       kept = true
@@ -380,10 +413,12 @@ export function search(m: Model, keep?: PlanShape): { best: { blocks: Block[]; c
       if (got.cost < best.cost) best = got
     })
     budget = work
-    // The search may have left factions below zero that more steps would be worth bringing back.
+    // The search may have left factions below zero that more steps would be worth bringing back. From
+    // here a faction left below zero costs the goal's whole worth, so no step bringing one back is
+    // dropped for the little it costs.
     if (W) {
-      const more = addLifts(best.blocks)
-      if (more.length > best.blocks.length) best = improve(more)
+      strict = true
+      best = improve(prune(addLifts(best.blocks)))
     }
   }
   return { best, kept }

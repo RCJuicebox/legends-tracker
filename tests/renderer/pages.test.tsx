@@ -11,7 +11,7 @@ import type { PageId } from '../../src/renderer/src/main'
 
 // Each page drawn once with nothing from the main process yet and once with every call failing: a
 // hook called out of order, or a page reading what has not arrived, throws here rather than on a
-// player's screen. Every tab a page has is opened too.
+// player's screen. Every tab a page has is opened too: what is a tab of Settings or Motes is drawn there.
 
 const appState: AppState = {
   settings: defaultSettings(),
@@ -44,27 +44,7 @@ const bridge = {
 type Page = ComponentType<{ go: (p: PageId) => void }>
 
 /** The window's pages, as main.tsx imports them. */
-const PAGE_NAMES = [
-  'Dashboard',
-  'DamageMeter',
-  'Buffs',
-  'Respawns',
-  'Motes',
-  'Achievements',
-  'Stats',
-  'Gear',
-  'Upgrades',
-  'Tradeskills',
-  'Loot',
-  'Spells',
-  'Triggers',
-  'Overlays',
-  'Audio',
-  'Logs',
-  'DataSources',
-  'Settings',
-  'Factions'
-]
+const PAGE_NAMES = ['Dashboard', 'DamageMeter', 'Buffs', 'Respawns', 'Motes', 'Achievements', 'Stats', 'Gear', 'Tradeskills', 'Loot', 'Spells', 'Triggers', 'Settings', 'Factions']
 let pages: Record<string, Page>
 let StateProvider: ComponentType<{ children: React.ReactNode }>
 
@@ -82,15 +62,10 @@ beforeAll(async () => {
     Achievements: (await import('../../src/renderer/src/pages/Achievements')).Achievements,
     Stats: (await import('../../src/renderer/src/pages/Stats')).Stats,
     Gear: (await import('../../src/renderer/src/pages/Gear')).Gear,
-    Upgrades: (await import('../../src/renderer/src/pages/Upgrades')).Upgrades,
     Tradeskills: (await import('../../src/renderer/src/pages/Tradeskills')).Tradeskills,
     Loot: (await import('../../src/renderer/src/pages/Loot')).Loot,
     Spells: (await import('../../src/renderer/src/pages/Spells')).Spells,
     Triggers: (await import('../../src/renderer/src/pages/Triggers')).Triggers,
-    Overlays: (await import('../../src/renderer/src/pages/Overlays')).Overlays,
-    Audio: (await import('../../src/renderer/src/pages/Audio')).Audio,
-    Logs: (await import('../../src/renderer/src/pages/Logs')).Logs,
-    DataSources: (await import('../../src/renderer/src/pages/DataSources')).DataSources,
     Settings: (await import('../../src/renderer/src/pages/Settings')).Settings,
     Factions: (await import('../../src/features/factions/page')).Factions
   }
@@ -156,7 +131,14 @@ describe('every page draws', () => {
 
   it('opens a page’s tabs', async () => {
     mode = 'pending'
-    expect((await draw(pages.Upgrades)).tabs).toEqual(['Upgrades view/Best merge', 'Upgrades view/Merge planner', 'Upgrades view/Spell upgrades'])
+    expect((await draw(pages.Motes)).tabs).toEqual(['Motes view/Runs', 'Motes view/Best merge', 'Motes view/Merge planner', 'Motes view/Spell upgrades'])
+    expect((await draw(pages.Settings)).tabs).toEqual([
+      'Settings view/General',
+      'Settings view/Overlays',
+      'Settings view/Audio',
+      'Settings view/Log files',
+      'Settings view/Data sources'
+    ])
   })
 
   for (const which of ['pending', 'fail'] as const)

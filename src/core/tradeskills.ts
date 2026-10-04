@@ -55,6 +55,10 @@ function ingredientOf(text: string): Ingredient | null {
  * The recipes on a product's page:
  *   * [[Skill Alchemy|Alchemy]] (Trivial: 302, yields 5)
  *   ** [[Comfrey]] + [[Deepwater Ink]] + [[Katuka Bark]] + [[Small Vial]] x 5
+ * or one ingredient a line, the lines under a skill line one recipe (Tumpy Tonic's):
+ *   * [[Skill Brewing|Brewing]] (Trivial: 135)
+ *   ** [[Kiola Nut]]
+ *   ** [[Water Flask]]
  */
 export function parseCrafted(product: string, content: string): Recipe[] {
   const out: Recipe[] = []
@@ -85,7 +89,9 @@ export function parseCrafted(product: string, content: string): Recipe[] {
             .map(ingredientOf)
             .filter((x): x is Ingredient => !!x)
         )
-        if (ingredients.length) out.push({ product, ...head, ingredients, from: 'page' })
+        // A line of one ingredient is one of the recipe's, the lines after it the rest of it.
+        if (ingredients.length === 1 && !/\s\+\s/.test(body)) listed.push(ingredients[0])
+        else if (ingredients.length) out.push({ product, ...head, ingredients, from: 'page' })
       }
     } else if (t.startsWith('*')) {
       flush()

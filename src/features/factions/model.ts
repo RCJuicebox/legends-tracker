@@ -398,8 +398,25 @@ export function buildModel(input: PlanInput, settings: PlanSettings, choices: Pl
     for (const { i, h } of acts[k].touch) if (i < T && h > 0 && credits(k, i)) worth[i] = Math.min(worth[i], (acts[k].unit * acts[k].risk) / h)
   }
   const reachable = Array.from(worth, Number.isFinite)
-  // A point a faction ends below 2000 after being there, in seconds.
-  const maxedPoint = (median(Array.from(worth).filter(Number.isFinite)) || 1) * settings.keepMaxed
+  // What winning a point of each faction back takes, in seconds: its quickest way. A faction a hand-in of
+  // bought items raises (Red Wine, Bone Chips, Bat Wings, a stack at a time) comes back in moments; one
+  // only a named mob's respawn raises, slowly; one nothing known raises, not at all (Infinity).
+  const back = new Float64Array(F).fill(Infinity)
+  for (let k = 0; k < K; k++) {
+    if (!mayOpen[k]) continue
+    for (const { i, h } of acts[k].touch) if (h > 0) back[i] = Math.min(back[i], (acts[k].unit * acts[k].risk) / h)
+  }
+  const usual = median(Array.from(worth).filter(Number.isFinite)) || 1
+  // A point a faction ends below 2000 after being there, in seconds: a share of what winning it back
+  // takes (the usual point's where nothing known raises it).
+  const maxedPoint = Float64Array.from(back, (b) => (Number.isFinite(b) ? b : usual) * settings.keepMaxed)
+  /**
+   * The 'positive' goal's price on a faction left at s below 0: what bringing it back to 0 takes, a trip
+   * and its quickest way, or the worth of a faction at 0 or above when that is less. The steps that bring
+   * factions back at the end are taken where they cost less than that worth, so this is what sinking a
+   * faction costs the plan: a little for one bought items bring back, the whole worth for one hard to raise.
+   */
+  const below = (i: number, s: number) => (s >= 0 || !W ? 0 : Math.min(W, travel - s * back[i]))
 
   // The race unlocks the plan can get done, and with race unlocks first, what each of their factions weighs.
   const doable = new Uint8Array(G)
@@ -447,22 +464,26 @@ export function buildModel(input: PlanInput, settings: PlanSettings, choices: Pl
     for (const q of b.reach) if (st.s[q.i] < q.v) n = Math.max(n, Math.ceil((q.v - st.s[q.i]) / amount(b.act, q.i) - EPS))
     return n
   }
-  /** What the end of a plan is worth against its time: points off factions that were at 2000, and, for the 'positive' goal, the factions at 0 or above. */
-  const ending = (st: State) => {
-    let lost = 0
-    let up = 0
+  /**
+   * What the end of a plan costs besides its time: points off factions that were at 2000, and, for the
+   * 'positive' goal, the factions below 0: each at what bringing it back would take, while the route is
+   * being chosen; at the goal's whole worth once the steps that bring factions back are in (`strict`), so
+   * none of those is dropped for the little it costs.
+   */
+  const ending = (st: State, strict = false) => {
+    let cost = 0
     for (let i = 0; i < F; i++) {
-      if (st.peak[i]) lost += STANDING_MAX - st.s[i]
-      if (st.s[i] >= 0) up++
+      if (st.peak[i]) cost += (STANDING_MAX - st.s[i]) * maxedPoint[i]
+      cost += strict ? (st.s[i] < 0 ? W : 0) : below(i, st.s[i])
     }
-    return lost * maxedPoint - W * up
+    return cost
   }
 
   // ---- greedy: the achievements ----
   /**
    * What n units of k do for the plan, in seconds of work: points on achievements still to do (a race
    * unlock's weigh more while they come first), less points taken off them and off factions that were
-   * at 2000, and for the 'positive' goal factions crossing 0.
+   * at 2000, and for the 'positive' goal what it saves or adds in bringing factions back to 0.
    */
   const valueOf = (k: number, n: number, st: State) => {
     let gain = 0
@@ -477,8 +498,8 @@ export function buildModel(input: PlanInput, settings: PlanSettings, choices: Pl
         continue
       }
       const after = clamp(v + n * h, STANDING_MIN, STANDING_MAX)
-      if (st.peak[i]) kept += (v - after) * maxedPoint
-      if (W) cross += ((after >= 0 ? 1 : 0) - (v >= 0 ? 1 : 0)) * W
+      if (st.peak[i]) kept += (v - after) * maxedPoint[i]
+      if (W) cross += below(i, v) - below(i, after)
     }
     return gain - loss - kept + cross
   }
@@ -556,6 +577,7 @@ export function buildModel(input: PlanInput, settings: PlanSettings, choices: Pl
     mayOpen,
     reachable,
     maxedPoint,
+    below,
     counted,
     first,
     covered: () => covered,

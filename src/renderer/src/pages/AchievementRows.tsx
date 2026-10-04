@@ -425,7 +425,7 @@ function TrackStar({ k, name, ctx }: { k: string; name: string; ctx: Ctx }) {
 
 /**
  * What is tracked, at the top of the page: a click goes to one, ✕ stops tracking it. The achievements
- * overlay shows it over the game; that overlay's switch is on Overlays, with the rest.
+ * overlay shows it over the game; that overlay's switch is on Settings › Overlays, with the rest.
  */
 export function TrackedBar({ book, tracked, onUntrack, goTo }: { book: AchievementBook; tracked: string[]; onUntrack: (k: string) => void; goTo: (r: AchRef) => void }) {
   if (!tracked.length) return null

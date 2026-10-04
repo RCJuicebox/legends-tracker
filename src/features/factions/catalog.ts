@@ -19,6 +19,8 @@ import {
   type Need
 } from '../../shared/game/factions'
 import { factionNamer, isCity, zoneKey } from './names'
+import { bareNpc, isNamedNpc, TOO_TOUGH_HP, type NpcInfo } from './npcPages'
+import { BUY_ITEM_SEC, COMBINE_SEC } from './ways'
 
 // What raises a faction comes from two places:
 //   - the character's own log: every kill and hand-in that moved a faction, with the amounts
@@ -86,6 +88,8 @@ export interface PlanActivity {
   named?: number
   /** Kill camps: how many spawns there are of mobs play found only a few of; the camp goes at their respawn, whatever pace the log saw. */
   few?: number
+  /** Kill camps: the respawns eqlwiki gives for their named mobs, in seconds (the rest come back at the assumed one). */
+  respawnSec?: number[]
   /** Hand-ins: what goes in each. */
   items?: HandInItem[]
   /** Taken to be done once only: why. Planned at most once unless locked in. */
@@ -166,6 +170,8 @@ export interface CatalogInput {
   cons?: Record<string, number>
   /** The same for each other race the character could swap to, by race: which of them opens a quest its own race cannot. */
   swapCons?: Record<string, Record<string, number>>
+  /** What eqlwiki's pages say of the named mobs camps would hold, by lower-cased name (npcsToLookUp): whether Legends has them, how tough they are, how soon back. */
+  npcs?: Record<string, NpcInfo>
 }
 
 export interface FactionCatalog {
@@ -173,6 +179,8 @@ export interface FactionCatalog {
   /** The player's kills an hour while killing things that move factions, over the log's runs; null with too few. */
   killsPerHour: number | null
   guesses: Guesses
+  /** Named mobs a camp would have held, left out by what eqlwiki says of them: not in Legends (no page), or too tough to be killed (its health). */
+  leftOut?: { name: string; zone: string; why: 'missing' | 'tough'; hp?: number }[]
 }
 
 export const median = (xs: number[]) => {
@@ -254,12 +262,21 @@ const fewOf = (names: string[]): { few?: number } => {
 const isCommon = (name: string, note = '') =>
   (/^(?:a|an)\s/i.test(name) || /^[a-z]/.test(name)) && !/quest|merchant|guildmaster|npc|banker|named/i.test(note) && !FEW_IN_PLAY.has(bareMob(name))
 
+/** Whether an item can be bought: the character has bought it, play found it sold, or eqlwiki names a merchant. */
+function buyable(name: string, input: Pick<CatalogInput, 'bought' | 'items'>): boolean {
+  const plain = itemName(name)
+  const known = ITEMS_IN_PLAY[plain.toLowerCase()]
+  return (
+    !!input.bought[plain.toLowerCase()] || known?.how === 'bought' || known?.how === 'vendor' || !!(input.items[itemKey(name)] ?? input.items[itemKey(plain)])?.use?.vendors?.length
+  )
+}
+
 /** How a hand-in item is come by: coin, bought before, a merchant sells it, crafted, dropped, or not known. */
 export function howHad(
   name: string,
   input: Pick<CatalogInput, 'bought' | 'items'>,
   common: (mob: string) => boolean = (m) => isCommon(m)
-): Pick<HandInItem, 'how' | 'where' | 'each' | 'named'> {
+): Pick<HandInItem, 'how' | 'where' | 'each' | 'named' | 'sec'> {
   const plain = itemName(name)
   if (COIN.test(plain)) return { how: 'coin', where: '' }
   const bought = input.bought[plain.toLowerCase()]
@@ -269,7 +286,15 @@ export function howHad(
   const use = (input.items[itemKey(name)] ?? input.items[itemKey(plain)])?.use
   const vendor = use?.vendors?.[0]
   if (vendor) return { how: 'vendor', where: vendor.zone ? `${vendor.npc} (${vendor.zone})` : vendor.npc }
-  if (use?.sources?.crafted) return { how: 'crafted', where: '' }
+  if (use?.sources?.crafted) {
+    // Made from what merchants sell (Tumpy Tonic: Kiola Nut and Water Flask): buying them and a combine.
+    const r = use.sources.recipe
+    if (r?.ingredients.length && r.ingredients.every((g) => buyable(g.name, input))) {
+      const sec = (r.ingredients.reduce((n, g) => n + g.count, 0) * BUY_ITEM_SEC + COMBINE_SEC) / Math.max(1, r.yields)
+      return { how: 'crafted', where: `from ${r.ingredients.map((g) => (g.count > 1 ? `${g.count} ${g.name}` : g.name)).join(' + ')}, all sold by merchants`, sec }
+    }
+    return { how: 'crafted', where: '' }
+  }
   const drops = use?.sources?.drops ?? []
   if (drops.length) {
     const mobs = drops.flatMap((d) => d.mobs)
@@ -308,6 +333,13 @@ function notItems(input: Omit<CatalogInput, 'items'>): { isThing: (name: string)
   return { isThing: (name) => names.has(name.toLowerCase()) || names.has(factionKey(name)) || isZone(name), isZone }
 }
 
+/** What goes into the crafted ones of these items, by their recipes: eqlwiki's word on each says whether merchants sell it. */
+export function craftMaterials(items: Record<string, ItemInfo>): string[] {
+  const out = new Set<string>()
+  for (const info of Object.values(items)) for (const g of info.use?.sources?.recipe?.ingredients ?? []) out.add(g.name)
+  return [...out]
+}
+
 /** The hand-in items the catalog would like eqlwiki's word on: not coin, not bought before. */
 export function itemsToLookUp(input: Omit<CatalogInput, 'items'>): string[] {
   const want = new Set<string>()
@@ -325,6 +357,27 @@ export function itemsToLookUp(input: Omit<CatalogInput, 'items'>): string[] {
   }
   return [...want]
 }
+
+/**
+ * The named mobs the camps would hold, from Allakhazam's pages and eqlwiki's, that eqlwiki's own page
+ * for each should be asked about (npcPages.ts): Allakhazam lists live EverQuest's, and Legends lacks some.
+ */
+export function npcsToLookUp(input: Omit<CatalogInput, 'items'>): string[] {
+  const name = factionNamer(input.factions)
+  const open = wanted(input, name)
+  const want = new Set<string>()
+  for (const m of allaKills(input.alla ?? [], name)) if (isNamedNpc(m.name) && raisesAny(m.hits, open)) want.add(bareNpc(m.name))
+  for (const p of input.pages) if (open.has(name(p.page))) for (const m of p.raise.mobs) if (!NO_MOB.test(m.name) && isNamedNpc(m.name)) want.add(bareNpc(m.name))
+  return [...want]
+}
+
+/**
+ * Legends gives at least 5 for any gain: of some 2,200 gains in play none was smaller, but where 2000
+ * cut one short, and Allakhazam's and the walkthroughs' +1s and +3s came as +5. Losses are as listed.
+ */
+const MIN_GAIN = 5
+const legends = (v: number) => (v > 0 && v < MIN_GAIN ? MIN_GAIN : v)
+const legendsHits = (hits: Record<string, number>) => Object.fromEntries(Object.entries(hits).map(([f, v]) => [f, legends(v)]))
 
 /** A tally's per-unit amounts by the game's faction names, with capped factions guessed at. */
 function tallyHits(t: SourceTally, name: (f: string) => string, up: number, down: number): { hits: Record<string, number>; guessed: string[] } {
@@ -394,7 +447,32 @@ export function buildCatalog(input: CatalogInput): FactionCatalog {
   const alla = input.alla ?? []
   const allaNeed = allaNeeds(alla, name)
   const allaAmount = allaQuestAmounts(alla, name)
-  const allaKill = allaKills(alla, name)
+  // What eqlwiki's page for a named mob says: whether Legends has it, how tough, how soon back, and what
+  // a kill does where it gives amounts (Legends' own, over Allakhazam's live ones).
+  const npcOf = (mob: string): NpcInfo | undefined => (isNamedNpc(mob) ? input.npcs?.[bareNpc(mob).toLowerCase()] : undefined)
+  const leftOut: NonNullable<FactionCatalog['leftOut']> = []
+  /** Leaves a camp's mob out where eqlwiki has no page for one of Allakhazam's (not in Legends), or gives one too tough to farm; true when it does. */
+  const leave = (mob: string, zone: string, site: 'eqlwiki' | 'Allakhazam') => {
+    const info = npcOf(mob)
+    const tough = info?.found && info.hp !== undefined && info.hp >= TOO_TOUGH_HP ? info.hp : 0
+    // A name eqlwiki's own faction pages list is Legends' though it has no page of its own ("Orc Pawn", "High Elf Guards (Felwithe)").
+    if (!info || (info.found && !tough) || (!info.found && site === 'eqlwiki')) return false
+    if (!leftOut.some((l) => l.name === bareNpc(mob) && l.zone === zone))
+      leftOut.push({ name: bareNpc(mob), zone, ...(tough ? { why: 'tough' as const, hp: tough } : { why: 'missing' as const }) })
+    return true
+  }
+  /** The respawns eqlwiki gives for a camp's named mobs, as a field: none when it gives none. */
+  const respawnsOf = (mobs: { name: string; note?: string }[]): { respawnSec?: number[] } => {
+    const known = mobs.flatMap((m) => {
+      const r = isCommon(m.name, m.note) ? undefined : npcOf(m.name)?.respawnSec
+      return r ? [r] : []
+    })
+    return known.length ? { respawnSec: known } : {}
+  }
+  const allaKill = allaKills(alla, name).map((m) => {
+    const own = npcOf(m.name)?.hits
+    return { ...m, hits: legendsHits({ ...m.hits, ...(own ? Object.fromEntries(Object.entries(own).map(([f, v]) => [name(f), v])) : {}) }) }
+  })
   const allaMobs = new Set(allaKill.map((m) => `${m.name.toLowerCase()}|${zoneKey(m.zone)}`))
   const activities: PlanActivity[] = []
   const entries = Object.entries(input.sources.acts)
@@ -564,7 +642,7 @@ export function buildCatalog(input: CatalogInput): FactionCatalog {
   const wikiCamps = new Map<string, WikiMob[]>()
   for (const [k, e] of wikiMobs) {
     // A mob Allakhazam gives amounts for is its camp's, below.
-    if (logged.has(k) || allaMobs.has(k) || ![...e.raise].some((f) => open.has(f))) continue
+    if (logged.has(k) || allaMobs.has(k) || ![...e.raise].some((f) => open.has(f)) || leave(e.mob.name, e.mob.zone, 'eqlwiki')) continue
     const ck = `${zoneKey(e.mob.zone)}|${[...e.raise].sort().join('+')}`
     wikiCamps.set(ck, [...(wikiCamps.get(ck) ?? []), e])
   }
@@ -588,6 +666,7 @@ export function buildCatalog(input: CatalogInput): FactionCatalog {
       common: members.filter((m) => isCommon(m.mob.name, m.mob.note)).length,
       named: members.filter((m) => !isCommon(m.mob.name, m.mob.note)).length,
       ...fewOf(members.map((m) => m.mob.name)),
+      ...respawnsOf(members.map((m) => m.mob)),
       page: members[0].page,
       ...(notes.length ? { note: notes.join(', ') } : {}),
       ...(isCity(zone) && members.some((m) => !isCommon(m.mob.name, m.mob.note) || CITY_PEOPLE.test(m.mob.name)) ? { city: true } : {})
@@ -597,7 +676,7 @@ export function buildCatalog(input: CatalogInput): FactionCatalog {
   // ---- kill camps from Allakhazam: the mobs its pages give amounts for, that the log has not seen killed ----
   const allaCamps = new Map<string, AllaKill[]>()
   for (const m of allaKill) {
-    if (logged.has(`${m.name.toLowerCase()}|${zoneKey(m.zone)}`) || !raisesAny(m.hits, open)) continue
+    if (logged.has(`${m.name.toLowerCase()}|${zoneKey(m.zone)}`) || !raisesAny(m.hits, open) || leave(m.name, m.zone, 'Allakhazam')) continue
     const ck = `${zoneKey(m.zone)}|${positives(m.hits).join('+')}`
     allaCamps.set(ck, [...(allaCamps.get(ck) ?? []), m])
   }
@@ -619,13 +698,14 @@ export function buildCatalog(input: CatalogInput): FactionCatalog {
       common: members.filter((m) => isCommon(m.name)).length,
       named: members.filter((m) => !isCommon(m.name)).length,
       ...fewOf(members.map((m) => m.name)),
+      ...respawnsOf(members),
       ...(isCity(zone) && members.some((m) => !isCommon(m.name) || CITY_PEOPLE.test(m.name)) ? { city: true } : {})
     })
   }
 
   // ---- kill camps known from play or read off Allakhazam by hand, for mobs nothing above has ----
   for (const c of CAMPS) {
-    const hits = Object.fromEntries(Object.entries(c.hits).map(([f, v]) => [name(f), v]))
+    const hits = Object.fromEntries(Object.entries(c.hits).map(([f, v]) => [name(f), legends(v)]))
     const known = c.mobs.some((m) => {
       const k = `${m.toLowerCase()}|${zoneKey(c.zone)}`
       return logged.has(k) || wikiMobs.has(k) || allaMobs.has(k)
@@ -672,11 +752,11 @@ export function buildCatalog(input: CatalogInput): FactionCatalog {
             // the skullcap's, which "got better").
             const alla = step.guessed.includes(f) ? allaAmount.get(questKey(q.page))?.[g] : undefined
             const given = AMOUNTS[q.page.toLowerCase()]?.[g] ?? (alla !== undefined && Math.sign(alla) === Math.sign(v) ? alla : undefined)
-            if (given !== undefined) hits[g] = (hits[g] ?? 0) + given
+            if (given !== undefined) hits[g] = (hits[g] ?? 0) + legends(given)
             else if (step.guessed.includes(f)) {
               hits[g] = (hits[g] ?? 0) + (v > 0 ? guesses.handUp : guesses.handDown)
               if (!guessed.includes(g)) guessed.push(g)
-            } else hits[g] = (hits[g] ?? 0) + v
+            } else hits[g] = (hits[g] ?? 0) + legends(v)
           }
         if (!raisesAny(hits, open)) return
         // Whom its line names, else the giver its quest names on a page of several, else the page's.
@@ -821,5 +901,5 @@ export function buildCatalog(input: CatalogInput): FactionCatalog {
   const rates: number[] = []
   for (const z of Object.values(input.sources.zones)) if (z.runN >= 10 && z.runMs > 0) for (let i = 0; i < Math.min(z.runN, 200); i++) rates.push(z.runN / (z.runMs / 3_600_000))
   const killsPerHour = rates.length >= 30 ? Math.round(clamp(median(rates), 10, 400)) : null
-  return { activities, killsPerHour, guesses }
+  return { activities, killsPerHour, guesses, ...(leftOut.length ? { leftOut } : {}) }
 }

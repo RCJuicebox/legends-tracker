@@ -15,7 +15,7 @@ import { MOTE_RANKS } from '../../../core/motes'
 import { ROLE_PRESETS } from '../../../core/statValue'
 import { WEIGHT_LABELS, type HandWeights, type WeightKey, type Weights } from '../../../core/gearFinder'
 import type { InventoryView } from '../../../shared/types'
-import { UPGRADES_TAB } from '../constants'
+import { TAB_KEY } from '../nav'
 
 const moteName = (i: number, n: number) => `${n === 1 ? 'Mote' : 'Motes'} of ${MOTE_RANKS[i].name ? MOTE_RANKS[i].name + ' ' : ''}Potential`
 /** A rank as the Motes page's chips name it: "Major", "Potential". */
@@ -25,7 +25,7 @@ const HOW =
   'Every worn item the wiki knows, with what its next merge level would add to your stats, weighed the way the upgrade finder weighs them for the role picked ' +
   'above. The cost is the motes that level takes: a +N item needs 2^N xp from the mote of rank N+1, and since two motes of a rank make one of the next, a mote is ' +
   'worth 2^rank Infinitesimal motes. Gain per 100 is the stat gain per 100 Infinitesimal motes’ worth spent, so the cheap low levels of a good item come first ' +
-  'and the top levels of anything come last. Under the motes: how many of that rank you have, and how many more combining your lower ranks would make. Plan puts the item in the Merge planner, on the Upgrades page.'
+  'and the top levels of anything come last. Under the motes: how many of that rank you have, and how many more combining your lower ranks would make. Plan puts the item in the Merge planner, the next tab.'
 
 function Deltas({ d }: { d: Partial<Record<WeightKey, number>> }) {
   const parts = (Object.entries(d) as [WeightKey, number][]).sort((a, b) => Math.abs(b[1]) - Math.abs(a[1]))
@@ -61,7 +61,7 @@ function useSinceExport(view: InventoryView) {
   }, [q.data, view.modified, me])
 }
 
-/** Upgrades' Best merge tab: which worn item's next +1 gives the most for its motes. */
+/** Motes › Best merge: which worn item's next +1 gives the most for its motes. */
 export function MergeTab({
   view,
   weights,
@@ -103,9 +103,9 @@ export function MergeTab({
       showError('Could not set up the planner', e)
       return
     }
-    remember(UPGRADES_TAB, 'planner')
+    remember(TAB_KEY.motes, 'planner')
     if (onPlan) onPlan()
-    else showToast(`${o.item.name} is set up in Upgrades › Merge planner`)
+    else showToast(`${o.item.name} is set up in Motes › Merge planner`)
   }
 
   return (

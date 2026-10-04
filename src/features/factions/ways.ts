@@ -25,7 +25,9 @@ export const DEFAULT_SETTINGS: PlanSettings = {
 }
 
 /** Buying one item from a merchant, in stacks. */
-const BUY_ITEM_SEC = 0.15
+export const BUY_ITEM_SEC = 0.15
+/** One tradeskill combine, the materials on hand. */
+export const COMBINE_SEC = 3
 
 export const NO_CHOICES: PlanChoices = { locks: {}, excluded: [], perHour: {} }
 
@@ -43,7 +45,10 @@ export function unitTime(a: PlanActivity, s: PlanSettings, choices: PlanChoices 
   if (own > 0) return { seconds: 3600 / own, handSeconds: 3600 / own, from: 'yours' }
   if (a.kind === 'kill') {
     const respawn = (n: number) => n * (60 / Math.max(1, s.namedRespawnMin))
-    const pace = a.measured ?? (a.common ? s.killsPerHour : Math.min(s.killsPerHour, respawn(a.named || 1)))
+    // The named come back each at its own respawn where eqlwiki gives it, the rest at the assumed one.
+    const known = a.respawnSec ?? []
+    const named = known.reduce((sum, r) => sum + 3600 / Math.max(1, r), 0) + respawn(Math.max(known.length ? 0 : 1, (a.named ?? 0) - known.length))
+    const pace = a.measured ?? (a.common ? s.killsPerHour : Math.min(s.killsPerHour, named))
     // A few spawns go at their respawn once killed, however quickly the log saw the first of them go.
     const perHour = a.few ? Math.min(pace, respawn(a.few)) : pace
     const sec = 3600 / Math.max(0.1, perHour)

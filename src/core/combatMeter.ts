@@ -393,8 +393,11 @@ export class CombatMeter {
     this.lastKilled = null
     // Charm does not survive a zone line.
     this.charmed.clear()
+    // An evacuate (Exodus, Succor) into the zone you are in prints the same "You have entered" line;
+    // only a different zone is a new session.
+    const moved = zone !== this.zone
     this.zone = zone
-    if (this.config.newSessionOnZone || !this.session) this.newSession(at, zone)
+    if ((this.config.newSessionOnZone && moved) || !this.session) this.newSession(at, zone)
   }
 
   // ---- lines ----

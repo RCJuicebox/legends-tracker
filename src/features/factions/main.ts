@@ -28,12 +28,13 @@ import {
 import { emptySources, joinSources, shareSources, sourceReader, type FactionSourceTallies } from './attribution'
 import { parseQuestPage, type QuestPage } from './questPages'
 import { classSwapName, classSwapOf, factionNamer, unmatchedNames } from './names'
-import { buildCatalog, guessesFrom, itemsToLookUp, type CatalogInput } from './catalog'
+import { buildCatalog, craftMaterials, guessesFrom, itemsToLookUp, npcsToLookUp, type CatalogInput } from './catalog'
 import { planFor, type FactionPlanData } from './planner'
 import { RACE_UNLOCK_DEFS, raceUnlocks, unlockedRaces, type RaceUnlockDef } from './unlocks'
 import { lookUp, moversOf, sourcesOf } from './lookup'
 import { sanitizeFollowedPlan } from './tracker'
 import { FactionAlla } from './allaSource'
+import { FactionNpcs } from './npcSource'
 import { listLogs } from '../../main/game'
 import type { Purchases } from '../../shared/ipc'
 import type { AchSection } from '../../core/achievements'
@@ -487,6 +488,9 @@ const BOOK_SHAPE_SINCE = 2
 /** How long one build of the plan's data answers every page that asks for it. */
 const PLAN_SHARED_MS = 5000
 
+/** How long a plan waits for eqlwiki's word on its camps' named mobs, asked for the first time; what comes later counts from the next plan. */
+const NPC_WAIT_MS = 20_000
+
 /** After the wiki could not be read, the old book serves this long before it is tried again. */
 const BOOK_RETRY_MS = 10 * 60_000
 
@@ -625,6 +629,11 @@ async function planData(ctx: AppContext, character: string, refresh: boolean, wi
   }
   // What the wiki says of the items hand-ins want: a merchant, a drop, a recipe. Kept a week, like the Gear page's.
   const items = await ctx.inventoryFiles.lookup(itemsToLookUp(input))
+  // And of what goes into the crafted ones: one made from what merchants sell is quick to come by (Tumpy Tonic).
+  const mats = craftMaterials(items).filter((m) => !items[itemKey(m)])
+  if (mats.length) Object.assign(items, await ctx.inventoryFiles.lookup(mats))
+  // Which of the camps' named mobs Legends has, and how tough they are and how soon back (Allakhazam lists live EverQuest's).
+  const npcs = await ctx.factions.npcs.lookup(npcsToLookUp(input), NPC_WAIT_MS)
   // The race unlocks, done or not, part by part; the races done are the ones to swap to.
   const [sections, defs] = await Promise.all([achievementSections(ctx, character), ctx.gameTables.get(RACE_UNLOCK_DEFS)])
   const ids = factionIds(view)
@@ -636,7 +645,7 @@ async function planData(ctx: AppContext, character: string, refresh: boolean, wi
     (f) => standings[f] ?? null
   )
   const races = unlockedRaces(unlocks)
-  const catalog = buildCatalog({ ...input, items, swapCons: await swapConsFor(ctx, character, exported, view, races) })
+  const catalog = buildCatalog({ ...input, items, npcs, swapCons: await swapConsFor(ctx, character, exported, view, races) })
   const acts = Object.values(tallies.acts)
   const theirs = others.flatMap((o) => Object.values(o.tallies.acts))
   return {
@@ -741,6 +750,8 @@ export class Factions implements AppFeature {
   readonly book = new FactionBook()
   /** Allakhazam's faction pages, for the con a quest wants and the kills eqlwiki lacks. */
   readonly alla = new FactionAlla()
+  /** eqlwiki's pages for the named mobs of the plan's kill camps: whether Legends has them, how tough, how soon back. */
+  readonly npcs = new FactionNpcs()
 
   constructor(logHistory: LogHistory) {
     this.history = new FactionHistory(logHistory, HISTORY_KEY, join(cacheDir(), 'faction-since.json'))
@@ -773,6 +784,11 @@ export class Factions implements AppFeature {
       kind: 'wiki',
       what: "eqlwiki's faction pages and the quest pages they name, for what raises a faction and the Factions page's plan. Kept a week.",
       refresh: () => ctx.factions.book.get(true)
+    })
+    sources.add('factionNpcs', {
+      label: 'NPC pages',
+      kind: 'wiki',
+      what: "eqlwiki's pages for the named mobs the plan's kill camps would hold: whether Legends has them at all, their health and respawn, and kill amounts. Kept a month."
     })
     sources.add('allakhazam', {
       label: 'Allakhazam',
