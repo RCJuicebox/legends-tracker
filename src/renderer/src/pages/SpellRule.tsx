@@ -4,7 +4,7 @@ import { markUnsaved } from '../unsaved'
 import { api, errorMessage } from '../api'
 import { duration } from '../../../core/format'
 // The colour a bar has unless one is set: its kind's, not a fixed teal (LT-495).
-import { CATEGORY_COLORS } from '../../../core/spellTracker'
+import { CATEGORY_COLORS, DEFAULT_OTHERS_SPEECH } from '../../../core/spellTracker'
 import { act, showToast } from '../toast'
 import { ConfirmButton, Field, NumberInput, SpellIcon, Switch } from '../components/ui'
 import { type KnownSpell, type SpellRule } from '../../../shared/types'
@@ -122,7 +122,25 @@ export function RuleEditor({ k, onSaved }: { k: KnownSpell; onSaved: (list: Know
             <Switch on={rule.fadeCue !== false} onChange={(v) => set({ fadeCue: v ? undefined : false })} />
             Fade announcement
           </label>
+          {!beneficial && (
+            <label className="row tight" title="For a spell a mob carries only one of, such as Harm Touch: anyone's cast of it gets the bar, so nobody casts over another's">
+              <Switch on={rule.others === true} onChange={(v) => set({ others: v ? true : undefined })} />
+              Anyone's casts
+            </label>
+          )}
         </div>
+        {rule.others && (
+          <Field
+            label="Said when someone else's lands"
+            hint="{caster}, {spell}, {target} and {seconds} are filled in. Their bar carries their name; its end is exact once it ticks."
+          >
+            <input
+              value={rule.othersSpeech ?? ''}
+              placeholder={DEFAULT_OTHERS_SPEECH}
+              onChange={(e) => set({ othersSpeech: e.target.value === '' ? undefined : e.target.value })}
+            />
+          </Field>
+        )}
         <div className="grid two">
           <Field label="Tracking">
             <select value={rule.track === undefined ? '' : rule.track ? 'on' : 'off'} onChange={(e) => set({ track: e.target.value === '' ? undefined : e.target.value === 'on' })}>

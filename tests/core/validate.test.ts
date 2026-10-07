@@ -180,6 +180,7 @@ describe("a spell's own settings from the Spell Timers page", () => {
       extraFocusPct: 15
     }
     expect(sanitizeSpellRule({ ...rule })).toEqual(rule)
+    expect(sanitizeSpellRule({ others: true, othersSpeech: '{caster} cast it', track: 'yes' })).toEqual({ others: true, othersSpeech: '{caster} cast it' })
     expect(sanitizeSpellRule({})).toEqual({})
   })
 

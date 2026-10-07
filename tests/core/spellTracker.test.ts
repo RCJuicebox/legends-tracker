@@ -274,3 +274,71 @@ describe('more tracking rules', () => {
     expect(dropped.board.list()).toEqual([])
   })
 })
+
+describe("anyone's casts (a rule with others)", () => {
+  const others = { 'Envenomed Bolt': { others: true } }
+
+  it("times another player's cast from their cast and the landing line, with their name, and says who and how long", () => {
+    const h = harness({ rules: others })
+    h.feed(`
+      [Sat Sep 12 23:11:04 2026] Corvin begins casting Envenomed Bolt X.
+      [Sat Sep 12 23:11:05 2026] A ratman warrior has been poisoned.`)
+    const t = h.board.get(timerKey('Envenomed Bolt', 'A ratman warrior'))!
+    expect(t.label).toBe('Envenomed Bolt (Corvin)')
+    expect(t.rank).toBe(10)
+    expect(t.endsAt - at('Sat Sep 12 23:11:05 2026')).toBe(54_000)
+    expect(h.spoken).toEqual(['Corvin cast Envenomed Bolt on A ratman warrior, do not cast for 54 seconds'])
+  })
+
+  it('joins from their tick when the cast was missed, pins the end on the tick, and says nothing of recasting', () => {
+    const h = harness({ rules: others })
+    h.feed('[Sat Sep 12 23:11:10 2026] A ratman warrior has taken 489 damage from Envenomed Bolt X by Corvin.')
+    const t = h.board.get(timerKey('Envenomed Bolt', 'A ratman warrior'))!
+    // Joined at a tick: the end is the last tick's, 9 ticks on, held as an estimate as your own joined DoT is.
+    expect(t.endsAt).toBe(at('Sat Sep 12 23:12:04 2026'))
+    expect(t.warnSec).toBe(0)
+    expect(h.spoken).toEqual(['Corvin cast Envenomed Bolt on A ratman warrior, do not cast for 54 seconds'])
+    h.feed('[Sat Sep 12 23:12:20 2026] A ratman warrior hits Kelwyn for 10 points of damage.')
+    expect(h.board.list()).toEqual([])
+    expect(h.spoken).toEqual(['Corvin cast Envenomed Bolt on A ratman warrior, do not cast for 54 seconds'])
+  })
+
+  it("uses the rule's own words, and the target dying ends it", () => {
+    const h = harness({ rules: { 'Envenomed Bolt': { others: true, othersSpeech: '{caster} bolted {target}, hold {seconds}' } } })
+    h.feed(`
+      [Sat Sep 12 23:11:04 2026] Corvin begins casting Envenomed Bolt X.
+      [Sat Sep 12 23:11:05 2026] A ratman warrior has been poisoned.
+      [Sat Sep 12 23:11:30 2026] A ratman warrior has been slain by Corvin!`)
+    expect(h.spoken).toEqual(['Corvin bolted A ratman warrior, hold 54'])
+    expect(h.board.list()).toEqual([])
+  })
+
+  it("ignores a mob's cast and ticks, and anyone's without the rule", () => {
+    const h = harness({ rules: others })
+    h.feed(`
+      [Sat Sep 12 23:11:04 2026] A ratman shaman begins casting Envenomed Bolt X.
+      [Sat Sep 12 23:11:05 2026] Kelwyn has been poisoned.
+      [Sat Sep 12 23:11:10 2026] Kelwyn has taken 89 damage from Envenomed Bolt X by a ratman shaman.`)
+    expect(h.board.list()).toEqual([])
+    const plain = harness()
+    plain.feed(`
+      [Sat Sep 12 23:11:04 2026] Corvin begins casting Envenomed Bolt X.
+      [Sat Sep 12 23:11:05 2026] A ratman warrior has been poisoned.
+      [Sat Sep 12 23:11:10 2026] A ratman warrior has taken 489 damage from Envenomed Bolt X by Corvin.`)
+    expect(plain.board.list()).toEqual([])
+    expect(plain.spoken).toEqual([])
+  })
+
+  it('shares the bar with your own cast: yours replaces theirs on the same target', () => {
+    const h = harness({ rules: others })
+    h.feed(`
+      [Sat Sep 12 23:11:04 2026] Corvin begins casting Envenomed Bolt X.
+      [Sat Sep 12 23:11:05 2026] A ratman warrior has been poisoned.
+      [Sat Sep 12 23:11:20 2026] You begin casting Envenomed Bolt X.
+      [Sat Sep 12 23:11:21 2026] A ratman warrior has been poisoned.`)
+    const list = h.board.list()
+    expect(list).toHaveLength(1)
+    expect(list[0].label).toBe('Envenomed Bolt')
+    expect(list[0].startedAt).toBe(at('Sat Sep 12 23:11:21 2026'))
+  })
+})

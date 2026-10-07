@@ -3,7 +3,7 @@ import type { RankedSpell, Spell, SpellBook } from './spells'
 import { isBeneficialCategory, TICK_MS } from './durations'
 import type { BoardTimer, TimerBoard } from './timers'
 import type { DurationBreakdown, FeedItem, Notification, SpellCategory, SpellRule, TrackingSettings } from '../shared/types'
-import { CAST_BY_YOU, DIED, SLAIN_BY, SLAIN_BY_YOU, YOU_DIED, YOU_WERE_SLAIN } from './phrases'
+import { CAST_BY_OTHER, CAST_BY_YOU, DIED, SLAIN_BY, SLAIN_BY_YOU, YOU_DIED, YOU_WERE_SLAIN } from './phrases'
 
 export type TimerKind = 'selfBuff' | 'otherBuff' | 'dot' | 'debuff'
 
@@ -25,6 +25,8 @@ interface PendingCast {
   at: number
   expires: number
   targets: Set<string>
+  /** Another player's cast (a rule with `others`); yours when absent. */
+  caster?: string
 }
 
 export const CATEGORY_COLORS: Record<SpellCategory, string> = {
@@ -39,6 +41,8 @@ export const CATEGORY_COLORS: Record<SpellCategory, string> = {
 }
 
 const SELF = 'You'
+/** Said when another player's cast of a spell with `others` lands, unless the rule has its own words. */
+export const DEFAULT_OTHERS_SPEECH = '{caster} cast {spell} on {target}, do not cast for {seconds} seconds'
 /**
  * An estimated timer ends at the earliest its spell can wear off; the real fade comes up to one tick
  * later. One whose fade line never arrives (the log was missed, or the target left) is dropped once
@@ -75,6 +79,8 @@ const FAIL_PREFIXES = [
 ]
 // A tick that crits ends "(Critical)", as combatLines reads it.
 const RE_DOT_TICK = /^(.+?) has taken [\d,]+ damage from your (.+?)\.(?: \((.+)\))?$/
+/** "A forsaken revenant has taken 451 damage from Harm Touch X by Rathor.": another player's DoT ticking. */
+const RE_DOT_TICK_OTHER = /^(.+?) has taken [\d,]+ damage from (.+?) by (.+?)\.(?: \((.+)\))?$/
 const RE_WORN_OFF = /^Your (.+) spell has worn off of (.+)\.$/
 const RE_PET_WORN_OFF = /^Your pet's (.+) spell has worn off\.$/
 const RE_SLAIN_BY = SLAIN_BY
@@ -90,8 +96,21 @@ export function timerKey(spellName: string, target: string): string {
   return `spell:${spellName}|${targetKey(target)}`
 }
 
-function renderSpeech(template: string, spell: string, target: string): string {
-  return template.replace(/\{spell\}/gi, spell).replace(/\{target\}/gi, target === SELF ? 'you' : target)
+function renderSpeech(template: string, spell: string, target: string, caster = '', seconds = 0): string {
+  return template
+    .replace(/\{spell\}/gi, spell)
+    .replace(/\{target\}/gi, target === SELF ? 'you' : target)
+    .replace(/\{caster\}/gi, caster)
+    .replace(/\{seconds\}/gi, String(seconds))
+}
+
+/**
+ * Whether a caster the log names is another player: one capitalised word, as player names are. A
+ * mob's name has an article or several words ("An ire ghast", "Phinigel Autropos"), and a pet is
+ * "Name`s pet".
+ */
+function isPlayer(caster: string): boolean {
+  return /^[A-Z][a-z]+$/.test(caster)
 }
 
 /**
@@ -103,6 +122,10 @@ function renderSpeech(template: string, spell: string, target: string): string {
  * 3. A DoT's first tick line pins its end exactly: it wears off on its target's tick, (ticks − 1)
  *    ticks after the first one.
  * 4. The fade line, the target dying, or a zone change ends it.
+ *
+ * A spell whose rule has `others` is timed for other players' casts too, on the same bar: their
+ * "begins casting" and the landing text, or their ticks ("… from X by Caster."), with a word spoken
+ * as it lands. For a spell a mob carries only one of (Harm Touch), so nobody casts over another's.
  */
 export class SpellTracker {
   private pending: PendingCast[] = []
@@ -131,6 +154,7 @@ export class SpellTracker {
 
     let m = RE_CAST.exec(text)
     if (m) return this.onCast(m[1], now)
+    if (text.includes(' begins ') && (m = CAST_BY_OTHER.exec(text))) return this.onOtherCast(m[1], m[2], now)
 
     if ((m = RE_FAIL_NAMED.exec(text))) return void this.dropPending(m[1])
     if (RE_FAIL.test(text)) return void this.pending.pop()
@@ -150,7 +174,10 @@ export class SpellTracker {
     if (this.tryLand(text, now)) return
 
     // Each "^(.+) …" pattern backtracks over the whole line, so a cheap look for its fixed words goes first.
-    if (text.includes(' damage from your ') && (m = RE_DOT_TICK.exec(text))) return this.onDotTick(m[1], m[2], now)
+    if (text.includes(' damage from ')) {
+      if (text.includes(' damage from your ') && (m = RE_DOT_TICK.exec(text))) return this.onDotTick(m[1], m[2], now)
+      if ((m = RE_DOT_TICK_OTHER.exec(text)) && isPlayer(m[3])) return this.onDotTick(m[1], m[2], now, m[3])
+    }
     if (text.startsWith('Your ')) {
       if ((m = RE_WORN_OFF.exec(text))) return this.onWornOff(m[1], m[2])
       if ((m = RE_PET_WORN_OFF.exec(text))) return this.onPetWornOff(m[1])
@@ -194,6 +221,17 @@ export class SpellTracker {
     const d = this.config.durationFor(r.spell, r.rank)
     if (d.ticks === 0 || d.permanent) return
     this.pending.push({ r, at: now, expires: now + r.spell.castMs + CAST_SLACK_MS, targets: new Set() })
+    if (this.pending.length > MAX_PENDING) this.pending.shift()
+  }
+
+  /** Another player's cast of a spell timed for everyone: it waits for its landing text like yours. */
+  private onOtherCast(caster: string, name: string, now: number): void {
+    if (!isPlayer(caster)) return
+    const r = this.book.resolve(name)
+    if (!r || !this.config.ruleFor(r.spell.name).others) return
+    const d = this.config.durationFor(r.spell, r.rank)
+    if (d.ticks === 0 || d.permanent) return
+    this.pending.push({ r, at: now, expires: now + r.spell.castMs + CAST_SLACK_MS, targets: new Set(), caster })
     if (this.pending.length > MAX_PENDING) this.pending.shift()
   }
 
@@ -243,7 +281,7 @@ export class SpellTracker {
       }
       if (!target || p.targets.has(targetKey(target))) continue
       p.targets.add(targetKey(target))
-      this.start(p.r, target, now)
+      this.start(p.r, target, now, false, p.caster)
       if (s.beneficial) p.expires = Math.min(p.expires, now + GROUP_LAND_MS)
       else this.pending.splice(i, 1)
       return true
@@ -263,16 +301,19 @@ export class SpellTracker {
     return { selfBuff: t.selfBuffs, otherBuff: t.otherBuffs, dot: t.dots, debuff: t.debuffs }[kind]
   }
 
-  private start(r: RankedSpell, target: string, now: number, joinedAtTick = false): void {
+  private start(r: RankedSpell, target: string, now: number, joinedAtTick = false, caster?: string): void {
     const s = r.spell
     const rule = this.config.ruleFor(s.name)
     const kind = this.kindOf(s, target)
-    if (!this.enabled(kind, rule)) return
+    // Another player's cast is timed by the spell's `others` alone; yours by its tracking.
+    if (caster ? !rule.others : !this.enabled(kind, rule)) return
     const d = this.config.durationFor(s, r.rank)
     if (d.ticks <= 0) return
     const t = this.config.tracking
-    const label = rule.alias || s.name
-    const warnSec = rule.recastCue === false ? 0 : (rule.warnSec ?? (kind === 'selfBuff' ? t.buffWarnSec : kind === 'dot' ? t.dotWarnSec : 0))
+    const name = rule.alias || s.name
+    const label = caster ? `${name} (${caster})` : name
+    // "Recast …" is not said of another's cast unless the rule has its own words for the warning.
+    const warnSec = rule.recastCue === false || (caster && !rule.warnSpeech) ? 0 : (rule.warnSec ?? (kind === 'selfBuff' ? t.buffWarnSec : kind === 'dot' ? t.dotWarnSec : 0))
     const warnTemplate = rule.warnSpeech ?? (s.beneficial ? t.buffWarnSpeech : t.dotWarnSpeech)
     const endsAt = joinedAtTick ? now + (d.ticks - 1) * TICK_MS : now + d.seconds * 1000
     const key = timerKey(s.name, target)
@@ -292,24 +333,30 @@ export class SpellTracker {
       exact: false,
       warnSec,
       rank: r.rank,
-      onWarn: warnSec > 0 && warnTemplate ? [{ kind: 'speak', text: renderSpeech(warnTemplate, label, target), interrupt: false }] : [],
+      onWarn: warnSec > 0 && warnTemplate ? [{ kind: 'speak', text: renderSpeech(warnTemplate, name, target, caster), interrupt: false }] : [],
       onExpire: [],
       warned: false,
       graceMs: GRACE_MS,
-      meta: { kind, ticks: d.ticks, firstTick: joinedAtTick, joined: joinedAtTick, rankedName: r.rankedName }
+      meta: { kind, ticks: d.ticks, firstTick: joinedAtTick, joined: joinedAtTick, rankedName: r.rankedName, name, caster }
     }
     this.board.upsert(timer)
-    this.hooks.feed('timer', `${r.rankedName} on ${target}: ${d.earliestSec}–${d.latestSec}s${joinedAtTick ? ' (joined at a tick)' : ''}`)
+    const by = caster ? ` by ${caster}` : ''
+    this.hooks.feed('timer', `${r.rankedName}${by} on ${target}: ${d.earliestSec}–${d.latestSec}s${joinedAtTick ? ' (joined at a tick)' : ''}`)
+    if (caster) {
+      const seconds = Math.round((endsAt - now) / 1000)
+      this.hooks.notify([{ kind: 'speak', text: renderSpeech(rule.othersSpeech ?? DEFAULT_OTHERS_SPEECH, name, target, caster, seconds), interrupt: false }])
+    }
   }
 
-  private onDotTick(target: string, rankedName: string, now: number): void {
+  private onDotTick(target: string, rankedName: string, now: number, caster?: string): void {
     const r = this.book.resolve(rankedName)
     if (!r) return
+    if (caster && !this.config.ruleFor(r.spell.name).others) return
     const key = timerKey(r.spell.name, target)
     const t = this.board.get(key)
     if (!t) {
       // Landed before we were watching, or its landing text was missed.
-      this.start(r, target, now, true)
+      this.start(r, target, now, true, caster)
       return
     }
     if (t.meta?.firstTick) return
@@ -351,6 +398,8 @@ export class SpellTracker {
     const rule = this.config.ruleFor(t.spell ?? '')
     const cfg = this.config.tracking
     const kind = t.meta?.kind as TimerKind
+    // Spoken by the spell's name: a bar of another's cast carries the caster too.
+    const name = (t.meta?.name as string | undefined) ?? t.label
     this.hooks.feed('fade', `${t.label} faded from ${t.target}`)
     if (rule.fadeCue === false) return
     let template = rule.fadeSpeech
@@ -359,7 +408,7 @@ export class SpellTracker {
       else if (kind === 'otherBuff') template = cfg.announceOtherBuffFades ? cfg.buffFadeSpeech + ' on {target}' : ''
       else template = cfg.dotFadeSpeech
     }
-    if (template) this.hooks.notify([{ kind: 'speak', text: renderSpeech(template, t.label, t.target), interrupt: false }])
+    if (template) this.hooks.notify([{ kind: 'speak', text: renderSpeech(template, name, t.target), interrupt: false }])
   }
 }
 

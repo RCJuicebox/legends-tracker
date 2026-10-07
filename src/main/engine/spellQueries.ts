@@ -51,7 +51,13 @@ export class SpellQueries {
       const prev = byBase.get(r.spell.name)
       if (!prev || c.lastCast > prev.lastCast) byBase.set(r.spell.name, c)
     }
-    for (const name of Object.keys(rules)) if (!byBase.has(name)) byBase.set(name, { rankedName: name, lastCast: 0 })
+    // A rule's key is normally a base name; one left keyed by a ranked name ("Harm Touch X", from
+    // when the file held that as its own spell) is placed by the spell it resolves to, or the page
+    // would get two rows of one spell, and React two rows with one key (an orphaned row per refresh).
+    for (const name of Object.keys(rules)) {
+      const base = book.resolve(name)?.spell.name ?? name
+      if (!byBase.has(base)) byBase.set(base, { rankedName: name, lastCast: 0 })
+    }
     const out: KnownSpell[] = []
     for (const { rankedName, lastCast } of byBase.values()) {
       const r = book.resolve(rankedName)

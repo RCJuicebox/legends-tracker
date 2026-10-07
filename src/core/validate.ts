@@ -594,8 +594,8 @@ export function sanitizeBuffs(v: unknown): BuffsFile {
 export function sanitizeSpellRule(v: unknown): SpellRule | null {
   if (!isObj(v)) return null
   const out: SpellRule = {}
-  for (const k of ['track', 'recastCue', 'fadeCue'] as const) if (typeof v[k] === 'boolean') out[k] = v[k] as boolean
-  for (const k of ['alias', 'warnSpeech', 'fadeSpeech', 'color', 'overlay'] as const) if (typeof v[k] === 'string') out[k] = (v[k] as string).slice(0, 500)
+  for (const k of ['track', 'recastCue', 'fadeCue', 'others'] as const) if (typeof v[k] === 'boolean') out[k] = v[k] as boolean
+  for (const k of ['alias', 'warnSpeech', 'fadeSpeech', 'othersSpeech', 'color', 'overlay'] as const) if (typeof v[k] === 'string') out[k] = (v[k] as string).slice(0, 500)
   if (typeof v.warnSec === 'number' && Number.isFinite(v.warnSec)) out.warnSec = num(v.warnSec, 0, 0, 3600)
   if (typeof v.durationOverrideSec === 'number' && Number.isFinite(v.durationOverrideSec)) out.durationOverrideSec = num(v.durationOverrideSec, 0, 0, 7 * DAY)
   if (typeof v.extraFocusPct === 'number' && Number.isFinite(v.extraFocusPct)) out.extraFocusPct = num(v.extraFocusPct, 0, -100, 1000)

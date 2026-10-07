@@ -217,7 +217,14 @@ function SpellRow({ k, open, toggle, onSaved }: { k: KnownSpell; open: boolean; 
         <td className="mono nowrap">{d.permanent ? 'Permanent' : `${clock(d.baseSec)} (${clock(d.spellWindowSec)})`}</td>
         <td className="nowrap muted">{d.permanent ? '—' : `${clock(d.earliestSec)}–${clock(d.latestSec)}`}</td>
         <td>
-          <span className={`chip${k.rule.track === false ? ' bad' : k.rule.track ? ' ok' : ''}`}>{trackLabel(k.rule)}</span>
+          <span className="row tight">
+            <span className={`chip${k.rule.track === false ? ' bad' : k.rule.track ? ' ok' : ''}`}>{trackLabel(k.rule)}</span>
+            {k.rule.others && (
+              <span className="chip ok" title="Other players' casts of this spell are timed too">
+                anyone's
+              </span>
+            )}
+          </span>
         </td>
         <td onClick={(e) => e.stopPropagation()}>
           <span className="row tight nowrap">

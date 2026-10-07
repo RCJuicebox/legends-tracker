@@ -292,6 +292,15 @@ Every spell you cast is tracked automatically. No trigger needed.
 4. The fade line (`Your X spell has worn off of T.`, or the spell's own fade text on you), the target
    dying, or a zone change (DoTs only) ends it.
 
+**Anyone's casts.** A spell's settings can time other players' casts of it too (Harm Touch: a mob
+carries one at a time, so nobody should cast over another's). Their `Name begins casting X.` and the
+landing text, or their ticks (`… has taken N damage from X by Name.`), start the same bar as yours
+would, with their name on it, and the app says who cast it and how long to hold ("Rathor cast Harm
+Touch on a forsaken revenant, do not cast for 54 seconds"; the words are a setting). Its end is
+exact once it ticks, and the usual fade announcement says when it is clear. No "Recast" is said of
+someone else's cast unless the spell has its own warning words. A caster is taken to be a player
+when the log names them in one word.
+
 **Recast cues.** By default the app says "Recast {spell}" 12 seconds before a DoT or a buff on you
 ends; the time and wording are settings, and any spell can override them. A DoT's cue is exact to the
 second once it has ticked. A buff on you shows no ticks, so its end is only known to within its last

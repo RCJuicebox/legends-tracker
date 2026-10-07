@@ -68,6 +68,13 @@ export interface SpellRule {
   fadeSpeech?: string
   color?: string
   overlay?: string
+  /**
+   * Other players' casts of this spell are timed too, on the same bar as yours: for a spell only one
+   * of which a mob can carry (Harm Touch), so nobody casts over another's.
+   */
+  others?: boolean
+  /** Spoken when another player's cast lands; {caster}, {spell}, {target} and {seconds} are filled in. */
+  othersSpeech?: string
   /** A fixed duration, for the rare spell whose formula the calculation cannot model. */
   durationOverrideSec?: number
   /** Extra focus in percent for this spell only, on top of the character's focus sources. */
