@@ -43,6 +43,7 @@ export function defaultSettings(): AppSettings {
     hotkeys: true,
     achievementCues: true,
     combat: { fightGapSec: 10, historyMinutes: 60, newSessionOnZone: true, combinePet: true, charmPets: true },
+    groupHealth: { enabled: false, belowPct: 25, speech: '{name} at {pct} percent' },
     factionPlan: { assumptions: {}, choices: {} },
     setup: { hidden: false, accepted: [], arranged: false }
   }

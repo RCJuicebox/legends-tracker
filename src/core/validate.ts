@@ -353,6 +353,13 @@ export function sanitizeSettings(v: unknown, fb: AppSettings): AppSettings | nul
     charmPets: bool(cb.charmPets, fb.combat.charmPets)
   })
 
+  const gh = isObj(v.groupHealth) ? v.groupHealth : {}
+  const groupHealth = shape(gh, fb.groupHealth, {
+    enabled: bool(gh.enabled, fb.groupHealth.enabled),
+    belowPct: Math.round(num(gh.belowPct, fb.groupHealth.belowPct, 5, 80)),
+    speech: str(gh.speech, fb.groupHealth.speech).slice(0, 200)
+  })
+
   let overlays = fb.overlays
   if (Array.isArray(v.overlays)) {
     const seen = new Set<string>()
@@ -413,6 +420,7 @@ export function sanitizeSettings(v: unknown, fb: AppSettings): AppSettings | nul
     hotkeys: bool(v.hotkeys, fb.hotkeys),
     achievementCues: bool(v.achievementCues, fb.achievementCues),
     combat,
+    groupHealth,
     factionPlan,
     setup
   })

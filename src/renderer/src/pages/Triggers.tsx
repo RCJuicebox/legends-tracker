@@ -6,6 +6,7 @@ import { OVERLAY_TARGETS, TRY_LINES } from '../constants'
 import { TRIGGER_TEXT_COLOR, TRIGGER_TIMER_COLOR } from '../../../shared/overlays'
 import { recall, remember, useRemembered } from '../remember'
 import { markUnsaved } from '../unsaved'
+import { GroupHealthCard } from '../components/GroupHealthCard'
 import { ConfirmButton, Field, FilterBox, Icon, LoadError, NumberInput, Pending, Switch } from '../components/ui'
 import type { Phrase, Trigger, TriggerAction, TriggerTestResult } from '../../../shared/types'
 import type { TriggerError } from '../../../shared/ipc'
@@ -203,6 +204,8 @@ export function Triggers() {
           ))}
         </div>
       )}
+
+      <GroupHealthCard />
 
       <div className="split">
         <div className="card" style={{ padding: 10 }}>

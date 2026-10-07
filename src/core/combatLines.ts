@@ -91,6 +91,8 @@ const RE_YOU_REMOVE = /^You remove (.+) from the group\.$/
 const RE_INVITED = /^(.+) invites you to join a group\.$/
 const RE_YOU_JOINED = /^You have joined the group\.$/
 const RE_YOU_LEFT = /^(?:You have been removed from the group\.|You have left the group\.|Your group has been disbanded\.|You disband the group\.)$/
+/** Any of the lines above: the group changed. The group health watch looks at the Group window again on one. */
+export const RE_GROUP_CHANGE = new RegExp([RE_JOINED, RE_LEFT, RE_REMOVED, RE_YOU_REMOVE, RE_YOU_JOINED, RE_YOU_LEFT].map((r) => r.source).join('|'))
 const RE_CAST_YOU = CAST_BY_YOU
 const RE_CAST = CAST_BY_OTHER
 

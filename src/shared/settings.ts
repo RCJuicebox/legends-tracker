@@ -171,6 +171,15 @@ interface CombatSettings {
   charmPets: boolean
 }
 
+/** Saying when a group member's health drops low, read off JuiceboxUI's Group window (Triggers page). */
+export interface GroupHealthSettings {
+  enabled: boolean
+  /** Said at this health or under, once until they are back 10 over it. */
+  belowPct: number
+  /** What is said: {name} the member, {pct} their health. */
+  speech: string
+}
+
 export interface AppSettings {
   installDir: string
   logFile: string
@@ -195,6 +204,7 @@ export interface AppSettings {
   /** Say when a step of the faction plan being followed is done, and flash each achievement it finishes. */
   achievementCues: boolean
   combat: CombatSettings
+  groupHealth: GroupHealthSettings
   factionPlan: FactionPlanSettings
   setup: SetupFlags
 }

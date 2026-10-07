@@ -209,7 +209,8 @@ export function bmpHeader(width: number, height: number): Buffer {
   return h
 }
 
-async function writeBmp(path: string, width: number, height: number, pixels: Buffer): Promise<void> {
+/** Writes 32-bit pixels, top row first, as a BMP the OCR script reads. */
+export async function writeBmp(path: string, width: number, height: number, pixels: Buffer): Promise<void> {
   const f = await fs.open(path, 'w')
   try {
     await f.writev([bmpHeader(width, height), pixels])

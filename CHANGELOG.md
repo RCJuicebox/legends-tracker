@@ -12,6 +12,7 @@ What changed in each version. The release workflow publishes a version's section
 - **Fix: Lizard Tails No 2 goes to Grevak**, not Soonog as eqlwiki's walkthrough line says.
 - **Fix: Ogre Heads held counted for the wrong quests.** Boog Mudtoe's Ogre Heads (Miners Pick) were taken as Pungla's for Clurg's Revenge, and as Corflunk's and Zarchoomi's for Byzar Bloodforge; only Miners Pick counts them now.
 - **The faction plan's overlay says what to hand in.** A hand-in step shows what goes into each hand-in and how many that is for what is left ("2 Lizard Tail each · 840 in all"), and the next step shows its items too; so does the Now card on Factions › Plan. Open Factions › Plan once after updating, so the plan the overlay follows carries them.
+- **Triggers: a word when a group member's health is low.** The log never prints anyone's health, so this watches the health bars of JuiceboxUI's Group window on the screen while the game runs; the window has to be in view, and the stock window's textured bars do not read. Each member is said once when they fall to the line (25% unless you set it), then again only after they are back 10% over it; one at 0 (dead, or in another zone) is never said. Off until you turn it on at the foot of Triggers; the words are a setting.
 
 ## 2.8.0 (2026-10-04)
 
