@@ -1,7 +1,7 @@
 import { STANDING_MAX, STANDING_MIN } from './core'
 import { zoneKey } from './names'
 import type { FactionPlan, PlanTarget } from './planTypes'
-import type { FactionTrackGoal, FactionTrackView, TrackKind } from '../../shared/tracking'
+import type { FactionTrackGoal, FactionTrackView, TrackItem, TrackKind } from '../../shared/tracking'
 
 // Following a faction plan while playing. The Plan tab hands the plan it shows to the main
 // process, which keeps it per character and, as the log moves factions, works out which step is being
@@ -18,6 +18,8 @@ export interface FollowStep {
   title: string
   zone: string
   npc?: string
+  /** What goes into one hand-in; none for a kill. */
+  items?: TrackItem[]
   /** The achievements it finishes (by faction), and the factions it brings back to 0 or above. */
   finish: string[]
   lift: string[]
@@ -116,6 +118,7 @@ export function followedPlan(plan: FactionPlan, targets: PlanTarget[], at = Date
         title: a.title,
         zone: a.zone,
         ...(a.npc ? { npc: a.npc } : {}),
+        ...(a.kind !== 'kill' && a.items?.length ? { items: a.items.map((it) => ({ name: it.name, count: it.count, ...(it.makes ? { makes: it.makes } : {}) })) } : {}),
         finish: s.finishes,
         lift: s.lifts,
         ...(s.reaches.length ? { reach: s.reaches.map((r) => ({ faction: r.faction, to: r.to, label: `${r.faction} for ${r.opens}` })) } : {}),
@@ -144,6 +147,12 @@ export function sanitizeFollowedPlan(v: unknown): FollowedPlan | null {
     if (!isStr(s.id) || !kind || !isStr(s.title)) continue
     const per: Record<string, number> = {}
     if (s.per && typeof s.per === 'object') for (const [f, h] of Object.entries(s.per as Record<string, unknown>)) if (typeof h === 'number' && Number.isFinite(h) && h) per[f] = h
+    const items = (Array.isArray(s.items) ? s.items : []).slice(0, 10).flatMap((r: unknown): TrackItem[] => {
+      const o = r && typeof r === 'object' ? (r as Record<string, unknown>) : null
+      return o && isStr(o.name) && o.name
+        ? [{ name: o.name.slice(0, 120), count: Math.max(1, Math.round(finite(o.count, 1, 1e6))), ...(isStr(o.makes) && o.makes ? { makes: o.makes.slice(0, 120) } : {}) }]
+        : []
+    })
     const reach = (Array.isArray(s.reach) ? s.reach : []).slice(0, 20).flatMap((r: unknown) => {
       const o = r && typeof r === 'object' ? (r as Record<string, unknown>) : null
       return o && isStr(o.faction) && isStr(o.label) && typeof o.to === 'number' && Number.isFinite(o.to)
@@ -156,6 +165,7 @@ export function sanitizeFollowedPlan(v: unknown): FollowedPlan | null {
       title: s.title.slice(0, 300),
       zone: isStr(s.zone) ? s.zone.slice(0, 120) : '',
       ...(isStr(s.npc) ? { npc: s.npc.slice(0, 120) } : {}),
+      ...(items.length ? { items } : {}),
       finish: strs(s.finish),
       lift: strs(s.lift),
       ...(reach.length ? { reach } : {}),
@@ -323,6 +333,7 @@ export function readFollow(
       title: s.title,
       zone: s.zone,
       ...(s.npc ? { npc: s.npc } : {}),
+      ...(s.items?.length ? { items: s.items } : {}),
       unitsLeft: left,
       secondsLeft: left * s.unitSec,
       progress: Math.max(0, Math.min(1, 1 - left / start)),
@@ -338,8 +349,9 @@ export function readFollow(
     if (i !== active) secondsLeft += (s.lift.length ? s.units : Math.min(s.units, unitsLeft(s))) * s.unitSec
   }
   const n = nextOf(active)
+  const ns = n === null ? null : plan.steps[n]
   const next =
-    n === null ? null : { index: n, kind: plan.steps[n].kind, title: plan.steps[n].title, zone: plan.steps[n].zone, ...(plan.steps[n].npc ? { npc: plan.steps[n].npc } : {}) }
+    n === null || !ns ? null : { index: n, kind: ns.kind, title: ns.title, zone: ns.zone, ...(ns.npc ? { npc: ns.npc } : {}), ...(ns.items?.length ? { items: ns.items } : {}) }
   return { state, view: { steps: plan.steps.length, done: state.done.length, current, next, secondsLeft }, events }
 }
 

@@ -4,6 +4,7 @@ import { duration, who } from '../../../core/format'
 import { STANDING_MAX } from '../core'
 import type { PlanActivity } from '../catalog'
 import type { FactionTrackView } from '../../../shared/tracking'
+import { itemsSaid } from '../../../shared/tracking'
 import { KIND_LABEL, signedPlain } from './parts'
 
 const UNIT_WORDS: Record<PlanActivity['kind'], [string, string]> = { kill: ['kill', 'kills'], turnin: ['hand-in', 'hand-ins'], quest: ['hand-in', 'hand-ins'] }
@@ -73,6 +74,17 @@ export function NowCard({
             </span>
             <span className="mono fp-time">{duration(step.secondsLeft)}</span>
           </div>
+          {step.items?.length ? (
+            <span className="small">
+              Each hand-in: <b>{itemsSaid(step.items)}</b>
+              {step.items.length === 1 && step.unitsLeft > 1 ? (
+                <span className="faint">
+                  {' '}
+                  · {(step.items[0].count * step.unitsLeft).toLocaleString()} for the {step.unitsLeft.toLocaleString()} left
+                </span>
+              ) : null}
+            </span>
+          ) : null}
           {hint}
           <div className="fp-now-bar" title={`${Math.round(step.progress * 100)}% of the way since you started this step`}>
             <i style={{ width: `${Math.round(step.progress * 100)}%` }} />
@@ -91,6 +103,7 @@ export function NowCard({
             {track.next && (
               <span className="faint small">
                 Next, step {track.next.index + 1}: {track.next.kind === 'turnin' ? (track.next.npc ?? track.next.title) : track.next.title}
+                {track.next.items?.length ? ` (${itemsSaid(track.next.items)} each)` : ''}
                 {track.next.zone ? ` · ${track.next.zone}` : ''}
               </span>
             )}

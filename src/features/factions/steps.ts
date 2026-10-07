@@ -106,7 +106,7 @@ export function planSteps(m: Model, best: { blocks: Block[]; cost: number }, kep
         last.finishes.push(...finishes)
         last.unlocks.push(...unlocks)
         last.reaches.push(...reaches)
-        last.restores &&= !b.finish.length && !b.reach.length
+        last.restores &&= !b.finish.length && !b.reach.length && !b.use
         for (const [f, v] of Object.entries(raises)) last.raises[f] = (last.raises[f] ?? 0) + v
         for (const [f, v] of Object.entries(lowers)) last.lowers[f] = (last.lowers[f] ?? 0) + v
         for (const [f, v] of Object.entries(maxedLowered)) last.maxedLowered[f] = (last.maxedLowered[f] ?? 0) + v
@@ -129,7 +129,7 @@ export function planSteps(m: Model, best: { blocks: Block[]; cost: number }, kep
           maxedLowered,
           lifts,
           sinks,
-          restores: !b.finish.length && !b.reach.length,
+          restores: !b.finish.length && !b.reach.length && !b.use,
           locked: [],
           onTheWay: {},
           ...(race ? { race } : {}),
@@ -178,7 +178,8 @@ export function planSteps(m: Model, best: { blocks: Block[]; cost: number }, kep
     act: acts[b.act].a.id,
     finish: b.finish.map((i) => names[i]),
     ...(b.lift.length ? { lift: b.lift.map((i) => names[i]) } : {}),
-    ...(b.reach.length ? { reach: b.reach.map((q) => ({ faction: names[q.i], to: q.v, for: acts[q.for].a.id })) } : {})
+    ...(b.reach.length ? { reach: b.reach.map((q) => ({ faction: names[q.i], to: q.v, for: acts[q.for].a.id })) } : {}),
+    ...(b.use ? { use: true } : {})
   }))
 
   // ---- every way to raise each achievement still open ----

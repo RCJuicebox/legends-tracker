@@ -169,7 +169,8 @@ export function PlanTab({ character, view }: { character: string; view: FactionV
   const deferredSettings = useDeferredValue(settings)
   const deferredChoices = useDeferredValue(choices)
   // The order is kept while only the standings move, so the steps are not reshuffled mid-grind. An
-  // achievement done, a change of choices or assumptions, or Plan afresh searches for the order again.
+  // achievement done, a change of choices or assumptions, a new inventory export (what is held may
+  // make another way quicker: the Lizard Meat in the depot), or Plan afresh searches for the order again.
   const [afresh, setAfresh] = useState(0)
   const openSet = todo ? todo.targets.flatMap((t) => (t.standing < STANDING_MAX ? [t.faction] : [])).join('|') : ''
   // The race unlocks still to do, and what each race adds to the cons, as the catalog came with them.
@@ -197,7 +198,8 @@ export function PlanTab({ character, view }: { character: string; view: FactionV
     [data]
   )
   const keySettings = stored.killsPerHour === undefined ? { ...deferredSettings, killsPerHour: 0 } : deferredSettings
-  const structure = JSON.stringify([openSet, keySettings, deferredChoices, afresh, ways, cons, unlocksKey])
+  const held = data?.inventory?.modified ?? 0
+  const structure = JSON.stringify([openSet, keySettings, deferredChoices, afresh, ways, cons, unlocksKey, held])
   const keptShape = useRef<{ key: string; shape: PlanShape } | null>(null)
   // Worked out in a worker (planRunner.ts), so a search does not freeze the page; the plan shown
   // stays until the next one arrives, and a plan overtaken by newer inputs is dropped.

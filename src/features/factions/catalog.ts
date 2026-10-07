@@ -15,6 +15,7 @@ import {
   ONCE_IN_PLAY,
   QUEST_COIN,
   QUEST_ITEMS_IN_PLAY,
+  QUEST_NPCS,
   type HandInHow,
   type Need
 } from '../../shared/game/factions'
@@ -760,7 +761,7 @@ export function buildCatalog(input: CatalogInput): FactionCatalog {
           }
         if (!raisesAny(hits, open)) return
         // Whom its line names, else the giver its quest names on a page of several, else the page's.
-        const npc = [s.npc, s.giver, ...q.givers].find((n) => n && !isZone(n)) ?? ''
+        const npc = QUEST_NPCS[q.page.toLowerCase()] ?? [s.npc, s.giver, ...q.givers].find((n) => n && !isZone(n)) ?? ''
         // The cons its NPC wants: known from play, and as Allakhazam lists them. The first not met holds it back.
         const needs = [NEEDS[q.page.toLowerCase()], ...(allaNeed.get(questKey(q.page)) ?? [])]
           .filter((n): n is Need => !!n)
@@ -810,10 +811,11 @@ export function buildCatalog(input: CatalogInput): FactionCatalog {
           // shop's), though not what the player bought or found in play.
           const raw = h.madeOf ? h.madeOf.item : h.item
           const plain = itemName(raw).toLowerCase()
-          const source =
+          const { notHeld, ...source } =
             QUEST_ITEMS_IN_PLAY[q.page.toLowerCase()]?.[plain] ??
             (h.from && !input.bought[plain] && !ITEMS_IN_PLAY[plain] ? { how: 'drop' as const, where: h.from, ...(common(h.from) ? {} : { named: 1 }) } : had(raw))
-          return withStock({ name: itemName(raw), count: h.count * (h.madeOf?.count ?? 1), ...source, ...(h.madeOf ? { makes: itemName(h.item) } : {}) })
+          const item: HandInItem = { name: itemName(raw), count: h.count * (h.madeOf?.count ?? 1), ...source, ...(h.madeOf ? { makes: itemName(h.item) } : {}) }
+          return notHeld ? item : withStock(item)
         })
         const coin = QUEST_COIN[q.page.toLowerCase()]
         if (coin && items.length) items.push({ name: coin.name, count: coin.count, how: 'coin', where: '' })

@@ -76,6 +76,7 @@ export function search(m: Model, keep?: PlanShape): { best: { blocks: Block[]; c
     timeFor,
     apply,
     blockUnits,
+    onHand,
     ending,
     valueOf,
     toNext,
@@ -91,6 +92,7 @@ export function search(m: Model, keep?: PlanShape): { best: { blocks: Block[]; c
       let pick = -1
       let pickN = 0
       let pickR = 0
+      let pickUse = false
       let opened: Opening | null = null
       for (let k = 0; k < K; k++) {
         if (!mayOpen[k]) continue
@@ -99,14 +101,24 @@ export function search(m: Model, keep?: PlanShape): { best: { blocks: Block[]; c
         const jitter = 1 + noise * (random() - 0.5)
         const r = raceFor(k, st)
         if (r >= 0) {
-          const time = Math.max(1, timeFor(k, n, st.stock, false) * acts[k].risk + setup(k, st, r))
-          const score = (valueOf(k, n, st) / time) * jitter
-          if (score > best) {
-            best = score
-            pick = k
-            pickN = n
-            pickR = r
-            opened = null
+          // As far as what the character holds goes, or on until the next achievement it serves is done.
+          const have = onHand(k, st)
+          for (const [u, use] of have > 0 && have < n
+            ? ([
+                [have, true],
+                [n, false]
+              ] as const)
+            : ([[n, false]] as const)) {
+            const time = Math.max(1, timeFor(k, u, st.stock, false) * acts[k].risk + setup(k, st, r))
+            const score = (valueOf(k, u, st) / time) * jitter
+            if (score > best) {
+              best = score
+              pick = k
+              pickN = u
+              pickR = r
+              pickUse = use
+              opened = null
+            }
           }
           continue
         }
@@ -121,6 +133,7 @@ export function search(m: Model, keep?: PlanShape): { best: { blocks: Block[]; c
           pick = o.j
           pickN = o.n
           pickR = o.r
+          pickUse = false
           opened = o
         }
       }
@@ -136,8 +149,8 @@ export function search(m: Model, keep?: PlanShape): { best: { blocks: Block[]; c
       for (let i = 0; i < T; i++) if (st.done[i] && !before[i] && credits(pick, i) && amount(pick, i) > 0) finished.push(i)
       const reach = opened ? [opened.reach] : []
       const last = blocks[blocks.length - 1]
-      if (last && last.act === pick && !reach.length) last.finish.push(...finished)
-      else blocks.push({ act: pick, finish: finished, lift: [], reach })
+      if (last && last.act === pick && !reach.length && !pickUse && !last.use) last.finish.push(...finished)
+      else blocks.push({ act: pick, finish: finished, lift: [], reach, ...(pickUse ? { use: true } : {}) })
     }
     return blocks
   }
@@ -388,7 +401,7 @@ export function search(m: Model, keep?: PlanShape): { best: { blocks: Block[]; c
         const to = actIndex.get(q.for)
         return i !== undefined && to !== undefined && amount(k, i) > 0 ? [{ i, v: q.to, for: to }] : []
       })
-      return finish.length || lift.length || reach.length ? [{ act: k, finish, lift, reach }] : []
+      return finish.length || lift.length || reach.length || b.use ? [{ act: k, finish, lift, reach, ...(b.use ? { use: true } : {}) }] : []
     })
     // Its steps that bring factions back are in it already.
     strict = true
@@ -421,5 +434,31 @@ export function search(m: Model, keep?: PlanShape): { best: { blocks: Block[]; c
       best = improve(prune(addLifts(best.blocks)))
     }
   }
+  if (best.blocks.length) best = together(best)
   return { best, kept }
+
+  /**
+   * Puts a block that hands in what is held beside the later block of the same activity (the tails
+   * held, then the tails still to gather), so they are one step, wherever that costs nothing.
+   */
+  function together(plan: { blocks: Block[]; cost: number }): { blocks: Block[]; cost: number } {
+    let { blocks, cost } = plan
+    let moves = 0
+    for (let j = 0; j < blocks.length; j++) {
+      if (!blocks[j].use) continue
+      const later = blocks.findIndex((o, y) => y > j + 1 && o.act === blocks[j].act)
+      if (later < 0) continue
+      // The held ones moved down to the rest, or the rest moved up to the held ones.
+      const down = blocks.slice()
+      down.splice(later - 1, 0, down.splice(j, 1)[0])
+      const up = blocks.slice()
+      up.splice(j + 1, 0, up.splice(later, 1)[0])
+      const best = [down, up].map((t) => ({ blocks: t, cost: simulate(t) })).sort((p, q) => p.cost - q.cost)[0]
+      if (best.cost > cost + 1e-6) continue
+      ;({ blocks, cost } = best)
+      if (++moves > blocks.length) break
+      j = -1
+    }
+    return { blocks, cost }
+  }
 }

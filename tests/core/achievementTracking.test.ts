@@ -7,6 +7,7 @@ import type { PlanSettings } from '../../src/shared/settings'
 import type { PlanActivity } from '../../src/features/factions/catalog'
 import { DEFAULT_SETTINGS } from '../../src/features/factions/ways'
 import { planFactions } from '../../src/features/factions/planner'
+import { itemsSaid } from '../../src/shared/tracking'
 import {
   carryFollow,
   followedPlan,
@@ -386,6 +387,44 @@ describe('following a faction plan', () => {
       ]
     })!
     expect(f).toEqual({ at: 5, names: { A: 'x' }, steps: [{ id: 'a', kind: 'kill', title: 't', zone: '', finish: ['A'], lift: [], per: { A: 5 }, units: 3, unitSec: 0 }] })
+  })
+
+  it("carries each hand-in's items to the overlay: what goes in, and what it is made into", () => {
+    const plan = planFactions(
+      {
+        targets: [
+          { faction: 'A', achievement: 'A', standing: 1900 },
+          { faction: 'B', achievement: 'B', standing: 1950 }
+        ],
+        maxed: [],
+        activities: [
+          { ...act('Clurg', { A: 5 }, 600, 'Oggok', 'quest'), items: [{ name: 'Lizard Tail', count: 2, how: 'drop', where: 'lizardmen' }] },
+          { ...act('Noxhil', { B: 10 }, 600, 'Oggok', 'quest'), items: [{ name: 'Fire Beetle Eye', count: 10, how: 'drop', where: '', makes: 'Box of Beetle Eyes' }] },
+          act('camp', { A: 5 }, 1, 'West Freeport')
+        ]
+      },
+      S
+    )
+    const f = followedPlan(plan, [])
+    const byId = Object.fromEntries(f.steps.map((st) => [st.id, st.items]))
+    expect(byId).toEqual({ Clurg: [{ name: 'Lizard Tail', count: 2 }], Noxhil: [{ name: 'Fire Beetle Eye', count: 10, makes: 'Box of Beetle Eyes' }] })
+    // A kill has none.
+    expect(twoSteps().steps.find((st) => st.id === 'camp')!.items).toBeUndefined()
+    // A page sends them; what is not an item is dropped.
+    const clurg = f.steps.find((st) => st.id === 'Clurg')!
+    expect(sanitizeFollowedPlan({ ...f, steps: [{ ...clurg, items: [{ name: 'Lizard Tail', count: 2.4 }, { count: 3 }, 'x'] }] })!.steps[0].items).toEqual([
+      { name: 'Lizard Tail', count: 2 }
+    ])
+    const r = readFollow(f, freshFollow(), { A: 1900, B: 1950 }, new Set())
+    expect(r.view.current!.items).toEqual(byId[r.view.current!.id])
+    expect(r.view.next!.items).toEqual(byId[f.steps[r.view.next!.index].id])
+    expect(itemsSaid(byId.Noxhil!)).toBe('10 Fire Beetle Eye made into Box of Beetle Eyes')
+    expect(
+      itemsSaid([
+        { name: 'Lizard Tail', count: 2 },
+        { name: 'Gold', count: 1 }
+      ])
+    ).toBe('2 Lizard Tail + Gold')
   })
 
   it('says a step aloud', () => {

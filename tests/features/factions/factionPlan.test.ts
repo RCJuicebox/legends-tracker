@@ -1896,6 +1896,124 @@ describe('keeping the order while you play', () => {
   })
 })
 
+describe('what the character holds', () => {
+  it('hands in what it holds of one item first, then goes on another way', () => {
+    // Meat is slow to gather but 200 are held (50 hand-ins); tails are quicker to gather, none held.
+    const input: PlanInput = {
+      targets: [{ faction: 'A', achievement: 'A', standing: 0 }],
+      maxed: [],
+      activities: [
+        act('meat', { A: 5 }, 3600, { zone: 'z', kind: 'turnin', items: [{ name: 'Meat', count: 4, how: 'drop', where: '', have: 200 }] }),
+        act('tails', { A: 5 }, 3600, { zone: 'z', kind: 'turnin', items: [{ name: 'Tail', count: 1, how: 'drop', where: '' }] })
+      ]
+    }
+    const plan = planFactions(input, S)
+    expect(plan.steps.map((st) => [st.activity.id, st.units, st.fromStock, st.finishes])).toEqual([
+      ['meat', 50, 50, []],
+      ['tails', 350, 0, ['A']]
+    ])
+    expect(plan.shape[0]).toMatchObject({ act: 'meat', use: true })
+  })
+
+  it('keeps what is held and what is still to gather of one hand-in together, as one step', () => {
+    // Tails held cover 100 hand-ins; B's dooga flesh (held) goes between them in the order found, at no cost either way.
+    const input: PlanInput = {
+      targets: [{ faction: 'A', achievement: 'A', standing: 0 }],
+      maxed: [],
+      activities: [
+        act('meat', { A: 5 }, 3600, { zone: 'z', kind: 'turnin', items: [{ name: 'Meat', count: 4, how: 'drop', where: '', have: 200 }] }),
+        act('tails', { A: 5 }, 3600, { zone: 'z', kind: 'turnin', items: [{ name: 'Tail', count: 2, how: 'drop', where: '', have: 200 }] }),
+        act('flesh', { A: 5 }, 3600, { zone: 'z', kind: 'turnin', items: [{ name: 'Flesh', count: 1, how: 'drop', where: '', named: 1, have: 8 }] })
+      ]
+    }
+    const plan = planFactions(input, S)
+    const ids = plan.steps.map((st) => st.activity.id)
+    expect(new Set(ids).size).toBe(ids.length)
+    expect(plan.steps.find((st) => st.activity.id === 'tails')).toMatchObject({ fromStock: 100 })
+  })
+
+  it("does not count another quest's item of the same name as held (Boog's Ogre Heads are not Pungla's)", () => {
+    const revenge = {
+      page: "Clurg's Revenge",
+      givers: ['Clurg'],
+      zones: ['Oggok'],
+      level: 1,
+      steps: [{ hits: { 'Craknek Warriors': 15 }, guessed: [], handIn: [{ item: 'Ogre Head', count: 1, from: 'Pungla' }], npc: 'Clurg', line: '' }]
+    }
+    const c = buildCatalog(
+      catalogInput({
+        factions: ['Craknek Warriors'],
+        targets: ['Craknek Warriors'],
+        pages: [{ page: 'Craknek Warriors', raise: { mobs: [], quests: ["Clurg's Revenge"], zones: [] }, lower: { mobs: [], quests: [], zones: [] } }],
+        quests: { "Clurg's Revenge": revenge },
+        have: { 'ogre head': 25 }
+      })
+    )
+    expect(c.activities.find((x) => x.title === "Clurg's Revenge")!.items).toEqual([{ name: 'Ogre Head', count: 1, how: 'drop', where: 'Pungla', named: 1 }])
+  })
+
+  it("plans Moss Snakes as rounds of scales and fangs, and Lyda Nasin's head at one a game day", () => {
+    const step = (hits: Record<string, number>, handIn: { item: string; count: number }[], npc: string) => ({ hits, guessed: [], handIn, npc, line: '' })
+    const c = buildCatalog(
+      catalogInput({
+        factions: ['Ebon Mask'],
+        targets: ['Ebon Mask'],
+        pages: [{ page: 'Ebon Mask', raise: { mobs: [], quests: ['Moss Snakes', 'Death of Lyda Nasin'], zones: [] }, lower: { mobs: [], quests: [], zones: [] } }],
+        quests: {
+          // The walkthrough reads as three hand-ins of different things.
+          'Moss Snakes': {
+            page: 'Moss Snakes',
+            givers: ['Hekzin G`Zule'],
+            zones: ['Neriak Third Gate'],
+            level: 1,
+            steps: [
+              step(
+                { 'Ebon Mask': 10 },
+                [
+                  { item: 'Snake Scales', count: 3 },
+                  { item: 'Snake Fang', count: 3 },
+                  { item: 'Bag of Snake Parts', count: 1 }
+                ],
+                'Hekzin'
+              )
+            ]
+          },
+          'Death of Lyda Nasin': {
+            page: 'Death of Lyda Nasin',
+            givers: ['Tani N`Mar'],
+            zones: ['Neriak Third Gate'],
+            level: 4,
+            steps: [step({ 'Ebon Mask': 20 }, [{ item: 'Human Head', count: 1 }], 'Tani N`Mar')]
+          }
+        },
+        have: { 'snake scales': 612 },
+        // Dubious: a faked con passes Apprehensive.
+        cons: { 'Ebon Mask': -177 }
+      })
+    )
+    const snakes = c.activities.filter((a) => a.title === 'Moss Snakes')
+    expect(snakes.map((a) => a.id)).toEqual(['cycle:moss snakes'])
+    expect(snakes[0]).toMatchObject({ npc: 'Hekzin G`Zule', hits: { 'Ebon Mask': 10 } })
+    expect(snakes[0].blocked).toBeUndefined()
+    expect(snakes[0].items).toMatchObject([
+      { name: 'Snake Scales', count: 3, have: 612 },
+      { name: 'Snake Fang', count: 3, how: 'drop', sec: 50 }
+    ])
+    const lyda = c.activities.find((a) => a.title === 'Death of Lyda Nasin')!
+    expect(lyda.items).toEqual([{ name: 'Human Head', count: 1, how: 'drop', where: expect.stringContaining('Lyda Nasin'), named: 1, sec: 4320 }])
+    // A point from her head takes many times a point from a bag of snake parts.
+    expect(unitTime(lyda, S).seconds / 20).toBeGreaterThan((10 * unitTime(snakes[0], S).seconds) / 10)
+  })
+
+  it("plans Blackburrow Stout Shipment as rounds of McNeal Jocub's notes, one an ask", () => {
+    const stout = buildCatalog(catalogInput({ factions: ['Circle of Unseen Hands'], targets: ['Circle of Unseen Hands'] })).activities.find(
+      (a) => a.id === 'cycle:blackburrow stout shipment'
+    )!
+    expect(stout).toMatchObject({ npc: 'McNeal Jocub', zone: 'South Qeynos', hits: { 'Circle of Unseen Hands': 5, 'Karana Residents': 30 } })
+    expect(stout.items).toEqual([{ name: 'Tattered Note', count: 1, how: 'drop', where: 'McNeal Jocub (South Qeynos), one an ask', sec: 5, to: 'Gnasher Furgutt' }])
+  })
+})
+
 describe('the two goals', () => {
   const POSITIVE: PlanSettings = { ...S, goal: 'positive', positiveHours: 3 }
 

@@ -115,7 +115,7 @@ export type Unplanned = 'nothing known' | 'once only' | 'ruled out' | 'gated' | 
  * A plan's order: each block's activity, the achievements it is there to finish, the factions it is
  * there to bring back to 0 or above, and those it is there to raise to what another activity's NPC wants.
  */
-export type PlanShape = { act: string; finish: string[]; lift?: string[]; reach?: { faction: string; to: number; for: string }[] }[]
+export type PlanShape = { act: string; finish: string[]; lift?: string[]; reach?: { faction: string; to: number; for: string }[]; use?: boolean }[]
 
 export interface FactionPlan {
   steps: PlanStep[]

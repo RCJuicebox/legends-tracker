@@ -2,6 +2,17 @@
 
 What changed in each version. The release workflow publishes a version's section as its release notes, and installed copies show them when an update arrives.
 
+## Unreleased
+
+- **Factions › Plan uses up what you hold first.** A step may now hand in all you hold of one item and leave the rest to another way: Lizard Tails to Clurg, then your Lizard Meat to Soonog, rather than gathering more tails for the last of Green Blood Knights. What you hold comes from your last inventory export (`/outputfile inventory`), which lists everything wherever you looted it.
+- **Fix: a new inventory export did not change the plan's order.** The order is kept while you play; a new export now searches it again, as what you hold can make another way quicker.
+- **Factions › Plan: Moss Snakes for Ebon Mask.** Hekzin G`Zule in Neriak Third Gate gives an Empty Bag for three Snake Scales and three Snake Fangs, combined into a Bag of Snake Parts: Ebon Mask +10 a bag, at Apprehensive, which a faked con passes. Moss snakes in Nektulos Forest drop both (in play, about one fang a kill), and merchants sell the scales. The walkthrough reads as three hand-ins of different things, so the plan had left it out.
+- **Factions › Plan: Blackburrow Stout Shipment for Circle of Unseen Hands.** McNeal Jocub in South Qeynos gives a note for every ask; Gnasher Furgutt in Qeynos Hills, at night, takes them for Cases of Blackburrow Stout, which go back to McNeal: Circle of Unseen Hands +5 and Karana Residents +30 a round, with Allakhazam's amounts.
+- **Fix: Death of Lyda Nasin was planned as a quick camp.** It wants Lyda Nasin's own head, which is lore and comes once a game day (72 minutes); the plan had counted any Human Head, from four named mobs at the assumed 20-minute respawn.
+- **Fix: Lizard Tails No 2 goes to Grevak**, not Soonog as eqlwiki's walkthrough line says.
+- **Fix: Ogre Heads held counted for the wrong quests.** Boog Mudtoe's Ogre Heads (Miners Pick) were taken as Pungla's for Clurg's Revenge, and as Corflunk's and Zarchoomi's for Byzar Bloodforge; only Miners Pick counts them now.
+- **The faction plan's overlay says what to hand in.** A hand-in step shows what goes into each hand-in and how many that is for what is left ("2 Lizard Tail each · 840 in all"), and the next step shows its items too; so does the Now card on Factions › Plan. Open Factions › Plan once after updating, so the plan the overlay follows carries them.
+
 ## 2.8.0 (2026-10-04)
 
 - **A shorter sidebar: 14 pages where there were 19.** Overlays, Audio, Log Files and Data Sources are tabs of **Settings** now, beside its own General tab. **Upgrades** has joined **Motes**: one page with Runs (what you looted, as before), Best merge, Merge planner and Spell upgrades. On **Gear**, Focus items, Worn effects and Procs share one **Effects** tab. The sidebar's groups fold at a click on their names, and Setup starts folded. Settings that belong to one page have moved to it: the damage meter's fight gap, read-back and new session per zone are under **Fights and sessions** below the meter, and what Spell Timers tracks and says by default is on Spell Timers. Nothing was removed, and the app opens where you left it, on the tab your last page became.

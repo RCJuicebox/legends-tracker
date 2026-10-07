@@ -3877,6 +3877,10 @@ input[aria-invalid='true'] {
 .ach-ov-step.next .ach-ov-title {
   font-weight: 500;
 }
+/* What goes into each hand-in of a step: the item to have on you. */
+.ach-ov-items {
+  font-size: calc(var(--fs) * 0.92);
+}
 .ach-ov-tag {
   font-family: var(--font-display);
   font-size: calc(var(--fs) * 0.85);

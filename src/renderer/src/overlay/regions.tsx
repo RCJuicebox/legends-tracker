@@ -21,6 +21,7 @@ import {
 } from '../../../core/combatView'
 import type { CombatSnapshot, MeterMode, MeterOverlayOptions, MeterSpan, OverlayConfig, Segment, SegmentSummary, TimerView } from '../../../shared/types'
 import type { AchievementTrack, SkillRow as SkillGoalRow, TrackKind, TrackedAchievement } from '../../../shared/tracking'
+import { itemsSaid } from '../../../shared/tracking'
 import { TimerBars, useNow } from '../components/TimerBars'
 import { DEFAULT_METER_OPTIONS } from '../../../shared/overlays'
 
@@ -316,6 +317,12 @@ function AchievementsRegion({ config, track, arranging }: { config: OverlayConfi
                 <div className="ach-ov-title" title={doing(step)}>
                   {doing(step)}
                 </div>
+                {step.items?.length ? (
+                  <div className="ach-ov-items" title="What goes into each hand-in">
+                    {itemsSaid(step.items)} each
+                    {step.items.length === 1 && step.unitsLeft > 1 && <span className="ach-ov-faint"> · {(step.items[0].count * step.unitsLeft).toLocaleString()} in all</span>}
+                  </div>
+                ) : null}
                 <div className="ach-ov-faint">{step.zone}</div>
                 <div className="ach-ov-bar">
                   <i style={{ width: `${Math.round(step.progress * 100)}%` }} />
@@ -342,6 +349,7 @@ function AchievementsRegion({ config, track, arranging }: { config: OverlayConfi
                   <div className="ach-ov-title" title={doing(plan.next)}>
                     {doing(plan.next)}
                   </div>
+                  {plan.next.items?.length ? <div className="ach-ov-items">{itemsSaid(plan.next.items)} each</div> : null}
                   {plan.next.zone && <div className="ach-ov-faint">{plan.next.zone === step.zone ? `${plan.next.zone}, here too` : plan.next.zone}</div>}
                 </div>
               ) : (

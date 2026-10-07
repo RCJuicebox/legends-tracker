@@ -16,6 +16,8 @@ export interface ItemInPlay {
   named?: number
   /** Seconds to come by one. */
   sec?: number
+  /** What the character holds by that name is another item (another quest's), so none of it counts. */
+  notHeld?: boolean
 }
 
 /** A con a quest wants: of which faction, the band's word, and the lowest and highest con allowed. */
@@ -311,6 +313,53 @@ export const CYCLES: Cycle[] = [
     line: 'Ask Kizdean Gix in West Commonlands (by the toll booth at -162, 262) "Do you have any messages for Neriak?" for a Sealed Letter, and hand it to Loveal S`Nez on the second floor of the Lodge of the Dead in Neriak Third Gate. The quest wants Amiable with The Dead, and Kizdean attacks anyone The Dead hates.'
   },
   {
+    // Blackburrow Stout Shipment over and over (eqlwiki's walkthrough with Allakhazam's amounts, taken up
+    // 2026-10-06): McNeal Jocub in Fish's Ale, South Qeynos, gives a tattered note for each ask (in play,
+    // 2026-10-06: one a second); Gnasher Furgutt in Qeynos Hills, up only at night, takes it for a Case of
+    // Blackburrow Stout (no trade): Circle of Unseen Hands +5, Corrupt Qeynos Guards and Kane Bayle +1,
+    // Merchants of Qeynos and Guards of Qeynos -1. The case back to McNeal: Karana Residents +30, Knights of
+    // Thunder +9, Guards of Qeynos +7, Priests of Life +4. Play makes the +1s and +4 +5, as every small
+    // gain. eqlwiki leaves Gnasher's amounts out and its walkthrough reads as a chain, so its steps are left out.
+    page: 'Blackburrow Stout Shipment',
+    zone: 'South Qeynos',
+    npc: 'McNeal Jocub',
+    hits: {
+      'Circle of Unseen Hands': 5,
+      'Corrupt Qeynos Guards': 5,
+      'Kane Bayle': 5,
+      'Merchants of Qeynos': -1,
+      'Guards of Qeynos': 6,
+      'Karana Residents': 30,
+      'Knights of Thunder': 9,
+      'Priests of Life': 5
+    },
+    guessed: [],
+    items: [{ name: 'Tattered Note', count: 1, how: 'drop', where: 'McNeal Jocub (South Qeynos), one an ask', sec: 5, to: 'Gnasher Furgutt' }],
+    site: 'Allakhazam',
+    replaces: true,
+    line: "Ask McNeal Jocub in Fish's Ale (South Qeynos) what he is running low on and agree to pick up the shipment, once for every note needed; give the notes to Gnasher Furgutt in Qeynos Hills, who is up only at night, for Cases of Blackburrow Stout, and bring the cases back to McNeal."
+  },
+  {
+    // Moss Snakes over and over (eqlwiki's walkthrough, taken up 2026-10-06): Hekzin G`Zule in the rogue
+    // guild of Neriak Third Gate gives an Empty Bag (not lore) for three Snake Scales and three Snake
+    // Fangs, combined in it into a Bag of Snake Parts and handed back: Ebon Mask +10, Guards of Qeynos -1,
+    // Wolves of the North -2, Guardians of the Vale -1, Carson McCabe -2. eqlwiki has it done at
+    // Apprehensive, which a faked con passes (Allakhazam says Amiable). The page reads as three hand-ins of
+    // different things, so its steps are left out.
+    page: 'Moss Snakes',
+    zone: 'Neriak Third Gate',
+    npc: 'Hekzin G`Zule',
+    hits: { 'Ebon Mask': 10, 'Guards of Qeynos': -1, 'Wolves of the North': -2, 'Guardians of the Vale': -1, 'Carson McCabe': -2 },
+    guessed: [],
+    items: [
+      { name: 'Snake Scales', count: 3 },
+      { name: 'Snake Fang', count: 3 }
+    ],
+    needs: { faction: 'Ebon Mask', band: 'Apprehensive', min: -100 },
+    replaces: true,
+    line: 'Get an Empty Bag from Hekzin G`Zule in the rogue guild of Neriak Third Gate, combine three Snake Scales and three Snake Fangs in it, and hand him the Bag of Snake Parts; then the next bag. Moss snakes in Nektulos Forest drop both, and merchants sell the scales (Pardor the Blessed in East Commonlands, Hrak in Oggok).'
+  },
+  {
     // Merchants of Erudin without Peace Keepers (a comment on Allakhazam's Peacekeeper Staff, taken up
     // 2026-09-29): Small Lanterns to Jyle Windshot in West Freeport (the Hogcallers' Inn, upstairs;
     // Faydarks Champions, who gives only at Indifferent or better) give Wooden Shards back (Allakhazam's
@@ -366,14 +415,32 @@ export const ITEMS_IN_PLAY: Record<string, ItemInPlay> = {
   'cyclops eye': { how: 'drop', where: 'seafury cyclopes (Ocean of Tears)', sec: 510 },
   // Easy to come by (2026-10-03): nearly every skeleton drops them, a couple at a time, and 69 came in
   // under six minutes of skeletons in play (2026-10-01); eqlwiki lists them only as a drop.
-  'bone chips': { how: 'drop', where: 'skeletons, in most zones', sec: 5 }
+  'bone chips': { how: 'drop', where: 'skeletons, in most zones', sec: 5 },
+  // 879 from 988 moss snakes in Nektulos Forest, at some 81 kills an hour (2026-10-04).
+  'snake fang': { how: 'drop', where: 'moss snakes, such as in Nektulos Forest', sec: 50 }
 }
 
 /** A quest's hand-in item that is another than the one the wikis' item page is about, by quest page (lower-cased), then item. */
 export const QUEST_ITEMS_IN_PLAY: Record<string, Record<string, ItemInPlay>> = {
   // Jeet's is the Scrap Metal Cleaner VII drops in North Kaladim, lore and no drop, so one a kill of
   // him; eqlwiki's item page puts it together with others, rogue clockworks' among them (2026-09-29).
-  "miner's cap": { 'scrap metal': { how: 'drop', where: 'Cleaner VII (North Kaladim), lore: one at a time', named: 1 } }
+  "miner's cap": { 'scrap metal': { how: 'drop', where: 'Cleaner VII (North Kaladim), lore: one at a time', named: 1 } },
+  // Three quests want an "Ogre Head", each its own: Boog Mudtoe's for Miners Pick are not Pungla's for
+  // Clurg's Revenge (2026-10-05), nor Corflunk's and Zarchoomi's for Byzar Bloodforge, so Ogre Heads held
+  // count only for Miners Pick.
+  "clurg's revenge": { 'ogre head': { how: 'drop', where: 'Pungla', named: 1, notHeld: true } },
+  'ogre heads': { 'ogre head': { how: 'drop', where: 'Corflunk and Zarchoomi', named: 2, notHeld: true } },
+  // Lyda Nasin's own head (the walkthrough), lore and no drop, so one at a time; she comes up once a game
+  // day (72 minutes: /time moves an hour every 3 minutes in the log), in a spawn she shares with Lunce
+  // Nasin (eqlwiki) (2026-10-06). eqlwiki's item page adds other named mobs' heads.
+  'death of lyda nasin': { 'human head': { how: 'drop', where: 'Lyda Nasin (East Freeport), lore: one a game day, when she is up', named: 1, sec: 4320 } }
+}
+
+/** Who takes a quest's hand-in where the walkthrough's line names someone else, by quest page (lower-cased). */
+export const QUEST_NPCS: Record<string, string> = {
+  // eqlwiki's walkthrough says to hand the tails to Soonog, copied from Lizard Meat No 2; its own lead and
+  // quest giver say Grevak (2026-10-05).
+  'lizard tails no 2': 'Grevak'
 }
 
 /** Coin a quest's hand-in wants with its item, where the walkthrough says it in words the quest reader passes over, by quest page (lower-cased). */

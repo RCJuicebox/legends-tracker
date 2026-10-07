@@ -14,6 +14,17 @@ export interface FactionTrackGoal {
   done: boolean
 }
 
+/** What goes into one hand-in of a step: the item and how many, and what the items are combined into first. */
+export interface TrackItem {
+  name: string
+  count: number
+  makes?: string
+}
+
+/** A hand-in's items in a few words: "2 Lizard Tail", "10 Fire Beetle Eye made into a Box of Beetle Eyes", "2 Rusty Dagger + 2 Gold". */
+export const itemsSaid = (items: TrackItem[]) =>
+  items.map((it) => `${it.count > 1 ? `${it.count.toLocaleString()} ` : ''}${it.name}${it.makes ? ` made into ${it.makes}` : ''}`).join(' + ')
+
 interface FactionTrackStep {
   /** Its place in the plan, from 0, and its activity's id. */
   index: number
@@ -22,6 +33,8 @@ interface FactionTrackStep {
   title: string
   zone: string
   npc?: string
+  /** What goes into one hand-in; none for a kill. */
+  items?: TrackItem[]
   /** Kills or hand-ins still to go, and about how long they take. */
   unitsLeft: number
   secondsLeft: number
@@ -36,7 +49,7 @@ export interface FactionTrackView {
   done: number
   /** The step being worked on; null when every step is done. */
   current: FactionTrackStep | null
-  next: { index: number; kind: TrackKind; title: string; zone: string; npc?: string } | null
+  next: { index: number; kind: TrackKind; title: string; zone: string; npc?: string; items?: TrackItem[] } | null
   /** About how long the steps not done take. */
   secondsLeft: number
 }

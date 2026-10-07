@@ -61,6 +61,8 @@ export interface Block {
   lift: number[]
   /** Factions it is there to raise to what a later block's NPC wants. */
   reach: Reach[]
+  /** There to hand in what the character holds of its item (the Lizard Meat in the depot), however far that goes toward what it raises. */
+  use?: boolean
 }
 
 /** A plan's state as it goes: standings, targets done, factions that have been at 2000, what is on hand, where the player is and as what. */
@@ -456,12 +458,21 @@ export function buildModel(input: PlanInput, settings: PlanSettings, choices: Pl
     }
     return newly
   }
+  /** Units of k what the character holds covers. */
+  const onHand = (k: number, st: State) => (acts[k].slot >= 0 ? Math.floor(st.stock[acts[k].slot] / acts[k].per + EPS) : 0)
+  /** Units of k until every achievement still to do that it raises is done. */
+  const toDone = (k: number, st: State) => {
+    let n = 0
+    for (const { i, h } of acts[k].touch) if (i < T && h > 0 && !st.done[i] && credits(k, i)) n = Math.max(n, Math.ceil((STANDING_MAX - st.s[i]) / h - EPS))
+    return n
+  }
   /** Units a block runs: until the achievements it is there for are done, the factions it lifts are at 0 or above and the ones it raises for a quest are there; 0 when they already are. */
   const blockUnits = (b: Block, st: State) => {
     let n = 0
     for (const i of b.finish) if (!st.done[i]) n = Math.max(n, Math.ceil((STANDING_MAX - st.s[i]) / amount(b.act, i) - EPS))
     for (const i of b.lift) if (st.s[i] < 0) n = Math.max(n, Math.ceil(-st.s[i] / amount(b.act, i) - EPS))
     for (const q of b.reach) if (st.s[q.i] < q.v) n = Math.max(n, Math.ceil((q.v - st.s[q.i]) / amount(b.act, q.i) - EPS))
+    if (b.use) n = Math.max(n, Math.min(onHand(b.act, st), toDone(b.act, st)))
     return n
   }
   /**
@@ -584,6 +595,7 @@ export function buildModel(input: PlanInput, settings: PlanSettings, choices: Pl
     timeFor,
     apply,
     blockUnits,
+    onHand,
     ending,
     valueOf,
     toNext,
