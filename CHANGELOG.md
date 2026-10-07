@@ -2,7 +2,7 @@
 
 What changed in each version. The release workflow publishes a version's section as its release notes, and installed copies show them when an update arrives.
 
-## Unreleased
+## 2.9.0 (2026-10-06)
 
 - **Spell Timers: a spell can be timed for anyone's cast of it.** For Harm Touch, which a mob carries one of at a time: turn on **Anyone's casts** in its settings and another player's cast gets the same bar yours would, with their name on it, and the app says "Rathor cast Harm Touch on a forsaken revenant, do not cast for 54 seconds" (the words are a setting; {caster}, {spell}, {target} and {seconds} are filled in). It starts on their cast and the landing line, or on their first tick if that was missed, ends exactly on the ticks, and the fade announcement says when the mob is clear.
 - **Fix: Spell Timers showed rows of one spell over and over, and kept them through the filter.** A spell setting saved under a ranked name ("Harm Touch X", from when the spell file held that as its own spell) and the spell's casts made two rows of one spell; each refresh of the page then left a row behind that no filter or sort could move. The setting is now placed by the spell it names. A setting left under a ranked name is not applied to its timers, though: save it again from the spell's row.
