@@ -528,14 +528,20 @@ track is kept per character with your ticks.
 
 Slayer counts go on as you play: the export gives each open Slayer achievement's count when it was
 written, and every kill since that the log shows (yours, your pet's and your group's) is added to the
-achievements whose races it is, shown as `+N` beside the count and on the achievements overlay. The
-log names the mob, never its race, so a kill is placed by its name (`a kobold runt`, `an orc
-centurion`, `a fire giant warrior`, `a rattlesnake`) or, where the name does not say, by the race
-eqlwiki's page for the mob gives (`A Forsaken Revenant`: Elf Vampire), looked up in the background
-and kept. A mob that dies of your damage over time with no killer named (`A bixie died.`) counts
-too. Checked against the game's own `You have completed achievement:` lines over a day of play, the
-counts ran 0 to 4 kills short of the game's; the next export puts them right. One the game says is
-completed shows done.
+achievements that list its race. The log names the mob, never its race, so each mob is given one race
+in the game's own words, the race names in the client's `dbstr_us.txt`: the race eqlwiki's page for it
+gives (looked up in the background and kept), its older names brought to the client's (`Giant Bat` is
+the client's Bat; `Qeynos Citizen` is Human), or, where the wiki has none, the race its name ends on
+(`a fire giant warrior` is a Giant, `a giant bat` a Bat, `a dark elf guard` a Dark Elf). It counts
+toward an achievement whose list names that race, and no other: a race is never a word found inside
+another name. A count with kills placed only by a name shows `+~N`, and its tooltip says how many. A
+mob that dies of your damage over time with no killer named (`A bixie died.`) counts too.
+
+Each new export then checks the kills: between two exports, every achievement's count rose by the
+kills that counted toward it. Ten giant bats killed and Giants not moved: bats are not Giants. What
+the numbers force is kept (`slayer-facts.json`), shared by your characters, and outranks the wiki and
+the name from then on; the app's log says each thing an export settled. An export after a stretch of
+one kind of mob settles that mob. One the game says is completed shows done.
 
 A skill objective (General › Skills: "Reach the maximum skill in Divination at level 50.") shows
 the skill as the log last gave it (`You have become better at Divination! (190)`) against the cap
@@ -865,6 +871,7 @@ The settings folder, `%APPDATA%\Legends Tracker` (or the `EQL_USER_DATA` folder)
 | `pets.json` | Per character, the newest pet gear list (`/pet inventory check`) and summoning cast the log showed, and how far back it was read |
 | `tradeskills.json` | Starred recipes, the combines planned of each, and prices typed in |
 | `faction-follow.json` | Per character, the faction plan the achievements overlay follows: its steps, the step you are on, and what is done |
+| `slayer-facts.json` | Which mobs your achievements exports showed do, or do not, count toward which Slayer achievements, with the kills and the rise that settled it |
 | `azure-speech.json` | The Azure region, the key encrypted with Windows' data protection, and the voice list |
 | `app-icon.ico` | Running from source only: the icon for the "Legends Tracker (source)" Start menu shortcut |
 | `catchup.json` | How far into which log mote tracking had read when the app closed, so the next start carries on from there |
@@ -888,7 +895,7 @@ roaming profile:
 | `item-cache.json` | eqlwiki pages for the items you wear and look at (Gear, Loot, Tradeskills), kept a week |
 | `tradeskill-recipes.json` | Every player-crafted recipe on eqlwiki, with the era of each product and ingredient; refreshed at most weekly |
 | `pet-wiki.json` | eqlwiki's pet summon pages and Pet Guide, for the Pet tab |
-| `npc-races.json` | The race each mob's eqlwiki page gives, for the Slayer counts of mobs whose names do not say; kept, and a name with no page asked again after a day |
+| `npc-races.json` | The race each mob's eqlwiki page gives, for the Slayer counts; kept, and a name with no page asked again after a day |
 | `faction-book.json` | Every eqlwiki faction page and the quest pages they name, read into ways to raise each faction, for the Plan tab; kept a week |
 | `faction-alla.json` | Allakhazam's faction pages (the cons quests want, kill amounts), read one every 20 seconds; kept a month |
 | `faction-npcs.json` | eqlwiki's page for each named mob the faction plan's kill camps would hold: whether Legends has it, its health, respawn and kill amounts; kept a month, a name with no page asked again after a week |

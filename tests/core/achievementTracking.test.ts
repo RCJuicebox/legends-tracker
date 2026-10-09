@@ -1,7 +1,19 @@
 import { describe, expect, it } from 'vitest'
 import { achKey, objKey, parseAchievements } from '../../src/core/achievements'
 import { trackedAchievements } from '../../src/core/trackedAchievements'
-import { RaceIndex, raceWords, slayerCounters, slayerCounts, slayerLine, wikiRace, type SlayerKills } from '../../src/core/slayer'
+import {
+  achievementRaces,
+  forced,
+  learnFromExport,
+  SlayerRaces,
+  slayerCounters,
+  slayerCounts,
+  slayerLine,
+  wikiRace,
+  type SlayerFacts,
+  type SlayerKills
+} from '../../src/core/slayer'
+import { parseRaceTable, PLAYABLE_MARK, raceKey, wikiRaceKey } from '../../src/core/raceNames'
 import { joinSkillValues, skillGoals, skillId, skillUp, skillValue } from '../../src/core/skillAchievements'
 import type { PlanSettings } from '../../src/shared/settings'
 import type { PlanActivity } from '../../src/features/factions/catalog'
@@ -52,9 +64,64 @@ const EXPORT = [
   'I\t\tHunter of Faydwer'
 ].join('\n')
 
+// Rows from the client's string table (dbstr_us.txt): race names (type 11) and their plurals (type 12).
+const DBSTR = [
+  '1^10^Dexterity affects your chances for special melee abilities.^0^',
+  '1^11^Human^0^',
+  '1^12^Humans^0^',
+  '6^11^Dark Elf^0^',
+  '8^11^Dwarf^0^',
+  '10^11^Ogre^0^',
+  '14^11^Werewolf^0^',
+  '15^11^Brownie^0^',
+  '15^12^Brownies^0^',
+  '18^11^Giant^0^',
+  '18^12^Giants^0^',
+  '22^11^Beetle^0^',
+  '23^11^Kerran^0^',
+  '25^11^Fairy^0^',
+  '25^12^Fairies^0^',
+  '34^11^Bat^0^',
+  '34^12^Bats^0^',
+  '36^11^Rat^0^',
+  '37^11^Snake^0^',
+  '38^11^Spider^0^',
+  '39^11^Gnoll^0^',
+  '42^11^Wolf^0^',
+  '43^11^Bear^0^',
+  '44^11^Guard^0^',
+  '48^11^Kobold^0^',
+  '49^11^Dragon^0^',
+  '50^11^Lion^0^',
+  '51^11^Lizard Man^0^',
+  '51^12^Lizard Men^0^',
+  '54^11^Orc^0^',
+  '56^11^Pixie^0^',
+  '60^11^Skeleton^0^',
+  '69^11^Will-O-Wisp^0^',
+  '79^11^Bixie^0^',
+  '100^11^Dervish^0^',
+  '100^12^Dervishes^0^',
+  '133^11^Drolvarg^0^',
+  '140^11^Giant^0^',
+  '243^11^Dryad^0^',
+  '263^11^Tin Soldier^0^',
+  '276^11^Clockwork Beetle^0^',
+  '457^11^Gnomework^0^',
+  '459^11^Corathus^0^',
+  '626^11^Giant (Rallosian mats)^0^',
+  '666^11^Gingerbread Man^0^',
+  '666^12^Gingerbread Men^0^',
+  '758^11^Clockwork Spider^0^',
+  '759^11^Clockwork Copter^0^',
+  '785^11^Lizardman^0^'
+].join('\r\n')
+const GAME = parseRaceTable(DBSTR)
+
 const counters = slayerCounters(parseAchievements(EXPORT).sections)
-const index = new RaceIndex(counters)
-const names = (ids: number[]) => ids.map((i) => counters[i].name).sort()
+const races = new SlayerRaces(counters, GAME)
+const keysOf = (text: string) => [...achievementRaces(text, GAME).keys].sort()
+const noFacts: SlayerFacts = () => undefined
 
 describe('Slayer counts', () => {
   it("reads the open Slayer achievements' counts from the achievements export", () => {
@@ -73,56 +140,91 @@ describe('Slayer counts', () => {
     expect(counters[0]).toEqual({ section: 'Slayer: Conquest', name: "Puttin' On The Dog", races: 'Kobolds', count: 2645, max: 5000 })
   })
 
-  it('knows each listed race singular and plural', () => {
-    expect(raceWords('Orcs and Wereorcs.')).toEqual(expect.arrayContaining(['orc', 'wereorc']))
-    expect(raceWords('Corathus Beasts, Wolves, Brownies, Gingerbread Men, Sphinxes')).toEqual(
-      expect.arrayContaining(['corathus beast', 'wolf', 'brownie', 'gingerbread man', 'sphinx'])
-    )
-    expect(raceWords('The playable races.')).toContain('dark elf')
-    expect(raceWords('Clockwork: Beetles, Boars')).toEqual(['clockwork'])
-    expect(raceWords('True Dragons')).toEqual(expect.arrayContaining(['true dragon', 'dragon']))
+  it("reads the client's race names and plurals, each brought to one key", () => {
+    expect(GAME.races.has('giant')).toBe(true)
+    expect(GAME.races.has('will o wisp')).toBe(true)
+    // "Lizardman" is the client's other name for the Lizard Man.
+    expect(GAME.races.has('lizardman')).toBe(false)
+    expect(GAME.races.has('lizard man')).toBe(true)
+    expect(GAME.plurals.get('lizard men')).toBe('lizard man')
+    // Not a race: type 10 is a stat's description.
+    expect([...GAME.races].some((r) => r.startsWith('dexterity'))).toBe(false)
   })
 
-  it("places a kill by the mob's name", () => {
-    expect(names(index.byName('a kobold runt'))).toEqual(["Puttin' On The Dog"])
-    expect(names(index.byName('an orc centurion'))).toEqual(['Orc Stomp!'])
-    // "giant" before the kind is a size; after a place it is the race.
-    expect(names(index.byName('a giant spider'))).toEqual(["Don't Bug Me"])
-    expect(names(index.byName('a fire giant warrior'))).toEqual(['Might They Be Giants?'])
-    expect(names(index.byName('a rattlesnake'))).toEqual(['I Hate Snakes!'])
-    expect(names(index.byName('a dune spiderling'))).toEqual(["Don't Bug Me"])
-    expect(names(index.byName('a lioness'))).toEqual(['Strange Weather'])
-    expect(names(index.byName('a lizardman scout'))).toEqual(['I Hate Snakes!'])
-    expect(names(index.byName('a Teir`Dal shadowknight'))).toEqual(["Doesn't Play Well With Others"])
-    expect(names(index.byName('a werewolf'))).toEqual(['Strange Weather'])
-    // A word that describes gives way to the one that names: a skeletal wolf is a wolf, counted once,
-    // and a dwarven miner a dwarf.
-    const undead = new RaceIndex([{ races: 'Skeletons' }, { races: 'Wolves' }, { races: 'Dwarves' }])
-    expect(undead.byName('a skeletal wolf')).toEqual([1])
-    expect(undead.byName('a skeleton')).toEqual([0])
-    expect(undead.byName('a dwarven skeleton')).toEqual([0])
-    expect(undead.byName('a dwarven miner')).toEqual([2])
+  it('brings every name of a race to the same key', () => {
+    expect(raceKey('Will-O-Wisp')).toBe(raceKey("Will O' Wisp"))
+    expect(raceKey('Giant (Rallosian mats)')).toBe('giant')
+    expect(raceKey('Giant Bat')).toBe('bat')
+    expect(raceKey('Qeynos Citizen')).toBe('human')
+    expect(raceKey('Neriak Citizen')).toBe('dark elf')
+    expect(raceKey('Vah Shir')).toBe('kerran')
+    expect(wikiRaceKey('Half-Elf')).toBe('half elf')
+    expect(wikiRaceKey('Lycanthrope')).toBe('drolvarg')
+    // Not one race: the name places the mob instead.
+    expect(wikiRaceKey('Animal')).toBeNull()
+    expect(wikiRaceKey('Human, Barbarian, Half-Elf')).toBeNull()
+    expect(wikiRaceKey('High Elf OR Dark Elf')).toBeNull()
+    expect(wikiRaceKey('???')).toBeNull()
+  })
+
+  it("lists each achievement's races as the client names them", () => {
+    expect(keysOf('Giants')).toEqual(['giant'])
+    expect(keysOf('Bixies, Brownies, Dryads, Fairies, and Pixies.')).toEqual(['bixie', 'brownie', 'dryad', 'fairy', 'pixie'])
+    expect(keysOf('Orcs and Wereorcs.')).toEqual(['orc', 'wereorc'])
+    expect(keysOf('Corathus, Wolves, Gingerbread Men, Lizard Men')).toEqual(['corathus', 'gingerbread man', 'lizard man', 'wolf'])
+    // The achievements' own names for the client's races.
+    expect(keysOf('Corathus Beasts, Vah Shir, Fay Drakes')).toEqual(['corathus', 'fae drake', 'kerran'])
+    expect(keysOf('The playable races.')).toEqual(expect.arrayContaining(['dark elf', 'kerran', PLAYABLE_MARK]))
+    // A clockwork kind is the client's "Clockwork X", or its own name; a kind the client does not name is kept as written.
+    const cw = achievementRaces('Clockwork: Beetles, Rats, Spiders, Gnomeworks, Copters, and Tin Soldiers.', GAME)
+    expect([...cw.keys].sort()).toEqual(['clockwork', 'clockwork beetle', 'clockwork copter', 'clockwork rat', 'clockwork spider', 'gnomework', 'tin soldier'])
+    expect(cw.unnamed).toEqual(['clockwork rat'])
+    expect(achievementRaces('Dracoliches, Water Dragons, and Witherans.', GAME).unnamed).toEqual(['dracolich', 'water dragon', 'witheran'])
+  })
+
+  it('takes the race a name ends on, never a word inside another', () => {
+    // "giant" before the kind is a size; after a place it is the race. No rule says so: the race comes last.
+    expect(races.byName('a giant bat')).toBe('bat')
+    expect(races.byName('a giant spider')).toBe('spider')
+    expect(races.byName('a hill giant')).toBe('giant')
+    expect(races.byName('a fire giant warrior')).toBe('giant')
+    expect(races.byName('a kobold runt')).toBe('kobold')
+    expect(races.byName('an orc centurion')).toBe('orc')
+    expect(races.byName('a rattlesnake')).toBe('snake')
+    expect(races.byName('a dune spiderling')).toBe('spider')
+    expect(races.byName('a lioness')).toBe('lion')
+    expect(races.byName('a lizardman scout')).toBe('lizard man')
+    expect(races.byName('a Teir`Dal shadowknight')).toBe('dark elf')
+    expect(races.byName('a werewolf')).toBe('werewolf')
+    // A word that describes gives way to the one that names: a skeletal wolf is a wolf, a dwarven miner a dwarf.
+    expect(races.byName('a skeletal wolf')).toBe('wolf')
+    expect(races.byName('a dwarven skeleton')).toBe('skeleton')
+    expect(races.byName('a dwarven miner')).toBe('dwarf')
+    // A calling is not a race.
+    expect(races.byName('a dark elf guard')).toBe('dark elf')
     // A clockwork is a clockwork, whatever it is made to look like.
-    expect(names(index.byName('a clockwork spider'))).toEqual(['Domo Arigato'])
-    expect(index.byName('Terror')).toEqual([])
+    expect(races.byName('a clockwork spider')).toBe('clockwork spider')
+    expect(races.byName('Clockwork Sweeper')).toBe('clockwork')
+    expect(races.byName('Terror')).toBeNull()
   })
 
-  it("does not take the Dervish Cutthroats for Dervishes: they are the playable races' bandits", () => {
-    expect(names(index.byName('a dervish cutthroat'))).toEqual(["Doesn't Play Well With Others"])
-    expect(names(index.byName('a cutthroat dervish'))).toEqual(["Doesn't Play Well With Others"])
-    // An Ogre: one of the playable races, not a Dervish.
-    expect(names(index.byName('a dervish thug'))).toEqual(["Doesn't Play Well With Others"])
+  it("places a mob by eqlwiki's race first, then by its name, and by what play settled before either", () => {
+    expect(races.place('a giant bat', 'Giant Bat')).toEqual({ key: 'bat', by: 'wiki', sure: true })
+    expect(races.place('Cleric of Innoruuk', 'Neriak Citizen')).toEqual({ key: 'dark elf', by: 'wiki', sure: true })
+    expect(races.place('A Drolvarg Growler', 'Lycanthrope')).toEqual({ key: 'drolvarg', by: 'wiki', sure: false })
+    expect(races.place('A Seafury Cyclops', 'Giant/Cyclops')).toEqual({ key: 'giant', by: 'wiki', sure: false })
+    // A wiki race that is no race, no page, or not looked up yet: the name places it, as a guess.
+    expect(races.place('A Grizzly Bear', 'Animal')).toEqual({ key: 'bear', by: 'name', sure: false })
+    expect(races.place('a hill giant', undefined)).toEqual({ key: 'giant', by: 'name', sure: false })
+    expect(races.place('Terror', null)).toEqual({ key: null, by: null, sure: false })
+    // The Dervish Cutthroats of Ro and the Commonlands are the playable races' bandits; a Dervish Thug is an Ogre.
+    expect(races.place('a dervish cutthroat', 'Dervish')).toEqual({ key: PLAYABLE_MARK, by: 'play', sure: true })
+    expect(races.place('a dervish thug', null)).toEqual({ key: 'ogre', by: 'play', sure: true })
     // The Plane of Sky's blade storms are Dervishes, as eqlwiki gives their race.
-    expect(index.byName('a blade storm')).toEqual([])
-    expect(names(index.byRace('Dervish'))).toEqual(['Spin Me Right Round'])
-  })
-
-  it("places a kill by eqlwiki's race when the name does not say", () => {
-    expect(names(index.byRace('Dark Elf'))).toEqual(["Doesn't Play Well With Others"])
-    expect(names(index.byRace('Dragon Skeleton'))).toEqual(['Stop Dragon This Out'])
-    expect(wikiRace('{{Namedmobpage\n| race = [[Dark Elf]]\n| zone = [[Neriak]]\n}}')).toBe('Dark Elf')
-    expect(wikiRace('{{Namedmobpage|race=[[Troll|Trolls]]|level=12}}')).toBe('Trolls')
-    expect(wikiRace('{{Namedmobpage\n| race =\n| zone = x\n}}')).toBeNull()
+    expect(races.place('a blade storm', 'Dervish')).toEqual({ key: 'dervish', by: 'wiki', sure: true })
+    // A wiki race no list names is read as a name is, and is a guess.
+    expect(races.place('High Priest M`kari', 'Dark Elf Guard')).toEqual({ key: 'dark elf', by: 'wiki', sure: false })
+    expect(races.place('Cleaner VII', 'Clockwork Rat')).toEqual({ key: 'clockwork rat', by: 'wiki', sure: true })
   })
 
   it('reads kills, pets and completions off the log', () => {
@@ -135,28 +237,126 @@ describe('Slayer counts', () => {
     expect(slayerLine('A bixie died.')).toEqual({ died: 'A bixie' })
     expect(slayerLine('You have completed achievement: Bear With Me')).toEqual({ completed: 'Bear With Me' })
     expect(slayerLine('You gain party experience!')).toBeNull()
+    expect(wikiRace('{{Namedmobpage\n| race = [[Dark Elf]]\n| zone = [[Neriak]]\n}}')).toBe('Dark Elf')
+    expect(wikiRace('{{Namedmobpage|race=[[Troll|Trolls]]|level=12}}')).toBe('Trolls')
+    expect(wikiRace('{{Namedmobpage\n| race =\n| zone = x\n}}')).toBeNull()
   })
 
-  it('adds the kills since the export to its counts, and says what it cannot place', () => {
-    const kills: SlayerKills = new Map([
-      ['a kobold runt', { name: 'a kobold runt', times: [10, 20, 30] }],
-      ['cleric of innoruuk', { name: 'Cleric of Innoruuk', times: [40] }],
-      ['terror', { name: 'Terror', times: [50, 60] }],
-      ['a griffawn', { name: 'a griffawn', times: [70] }],
-      ['a bat', { name: 'a bat', times: [80] }]
-    ])
-    const race: Record<string, string | null> = { 'Cleric of Innoruuk': 'Dark Elf', Terror: null, 'a bat': null }
-    const got = slayerCounts(counters, index, kills, (m) => race[m], new Set(['orc stomp!']))
+  const kills: SlayerKills = new Map([
+    ['a kobold runt', { name: 'a kobold runt', times: [10, 20, 30] }],
+    ['cleric of innoruuk', { name: 'Cleric of Innoruuk', times: [40] }],
+    ['terror', { name: 'Terror', times: [50, 60] }],
+    ['a griffawn', { name: 'a griffawn', times: [70] }],
+    ['a giant bat', { name: 'a giant bat', times: [80, 81, 82] }],
+    ['a hill giant', { name: 'a hill giant', times: [90, 91] }]
+  ])
+  const wiki: Record<string, string | null> = { 'Cleric of Innoruuk': 'Neriak Citizen', Terror: null, 'a giant bat': 'Giant Bat', 'a hill giant': null, 'a kobold runt': 'Kobold' }
+
+  it('adds the kills since the export to the achievements of their races, and says what it cannot place', () => {
+    const got = slayerCounts(counters, races, kills, (m) => wiki[m], noFacts, new Set(['orc stomp!']))
     const row = (n: string) => got.rows.find((r) => r.counter.name === n)!
-    expect(row("Puttin' On The Dog")).toMatchObject({ since: 3, last: 30, done: false })
-    expect(row("Doesn't Play Well With Others")).toMatchObject({ since: 1, last: 40 })
+    expect(row("Puttin' On The Dog")).toMatchObject({ since: 3, guessed: 0, last: 30, done: false })
+    expect(row("Doesn't Play Well With Others")).toMatchObject({ since: 1, guessed: 0, last: 40 })
     expect(row('Orc Stomp!')).toMatchObject({ since: 0, done: true })
-    expect(got.unplaced).toEqual([
-      { name: 'Terror', n: 2 },
-      { name: 'a bat', n: 1 }
-    ])
+    // A giant bat is a bat: not one of the Giants. A hill giant is, by its name alone (no wiki race).
+    expect(row('Might They Be Giants?')).toMatchObject({ since: 2, guessed: 2, last: 91 })
+    expect(got.unplaced).toEqual([{ name: 'Terror', n: 2 }])
     // Not looked up yet.
     expect(got.unknown).toEqual(['a griffawn'])
+  })
+
+  it('counts as the exports settled, over any race', () => {
+    const facts: SlayerFacts = (mob, ach) =>
+      mob === 'a giant bat' && ach === 'might they be giants?' ? true : mob === 'a hill giant' && ach === 'might they be giants?' ? false : undefined
+    const got = slayerCounts(counters, races, kills, (m) => wiki[m], facts, new Set())
+    expect(got.rows.find((r) => r.counter.name === 'Might They Be Giants?')).toMatchObject({ since: 3, guessed: 0, last: 82 })
+  })
+})
+
+describe('what an export settles', () => {
+  it('rules a mob out when its kills alone are more than the count rose', () => {
+    expect(forced([{ mob: 'a giant bat', n: 10 }], 0)).toEqual([{ mob: 'a giant bat', counts: false }])
+    // Two kills are within what the log can be off by: nothing is settled.
+    expect(forced([{ mob: 'a giant bat', n: 2 }], 0)).toEqual([])
+  })
+
+  it('rules a mob in when the rise cannot be made without it', () => {
+    expect(forced([{ mob: 'a hill giant', n: 40 }], 38)).toEqual([{ mob: 'a hill giant', counts: true }])
+    expect(
+      forced(
+        [
+          { mob: 'a hill giant', n: 40 },
+          { mob: 'a giant bat', n: 30 }
+        ],
+        41
+      )
+    ).toEqual([
+      { mob: 'a hill giant', counts: true },
+      { mob: 'a giant bat', counts: false }
+    ])
+  })
+
+  it('settles nothing the numbers leave open, or cannot explain', () => {
+    // Either one alone makes the rise.
+    expect(
+      forced(
+        [
+          { mob: 'a hill giant', n: 20 },
+          { mob: 'a forest giant', n: 20 }
+        ],
+        20
+      )
+    ).toEqual([])
+    // More than every kill seen: kills the log did not show.
+    expect(forced([{ mob: 'a hill giant', n: 5 }], 50)).toEqual([])
+  })
+
+  it('sets the kills between two exports against each count, leaving out mobs surely of another race', () => {
+    const before = new Map(counters.map((c) => [c.name.toLowerCase(), c.count]))
+    const rose: Record<string, number> = { 'Might They Be Giants?': 1, "Puttin' On The Dog": 30, 'Orc Stomp!': 25 }
+    const after = counters.map((c) => ({ ...c, count: c.count + (rose[c.name] ?? 0) }))
+    const got = learnFromExport(
+      before,
+      after,
+      races,
+      [
+        { name: 'a hill giant', n: 1 },
+        { name: 'A Seafury Cyclops', n: 12 },
+        { name: 'a kobold runt', n: 30 },
+        { name: 'an orc pawn', n: 25 }
+      ],
+      (m) => ({ 'A Seafury Cyclops': 'Giant/Cyclops', 'a kobold runt': 'Kobold', 'an orc pawn': 'Orc' })[m] ?? null,
+      noFacts
+    )
+    const said = (mob: string, ach: string) => got.find((f) => f.mob === mob && f.achievement === ach)?.counts
+    // Twelve cyclopes and Giants rose by one: whatever eqlwiki says, they are not Giants.
+    expect(said('a seafury cyclops', 'might they be giants?')).toBe(false)
+    // The orcs alone make the orcs' rise; the kobolds are too many for it.
+    expect(said('an orc pawn', 'orc stomp!')).toBe(true)
+    expect(said('a kobold runt', 'orc stomp!')).toBe(false)
+    // The orcs alone could also have made the kobolds' rise, so the numbers do not say; and the
+    // kobolds' race is eqlwiki's, not a guess, so it is not taken on eqlwiki's word either.
+    expect(said('a kobold runt', "puttin' on the dog")).toBeUndefined()
+    // One hill giant is within what the log can be off by.
+    expect(got.some((f) => f.mob === 'a hill giant')).toBe(false)
+  })
+
+  it('learns which of a race the client names as one an achievement lists some of counts', () => {
+    // The client calls every dragon Dragon; Dragonbane lists True Dragons. Nagafen is a dragon for
+    // certain, and whether he is a true one only an export can say.
+    const dragons = [{ section: 'Slayer: Special', name: 'Dragonbane', races: 'True Dragons', count: 0, max: 50 }]
+    const r = new SlayerRaces(dragons, GAME)
+    expect([...r.broader[0]]).toEqual(['dragon'])
+    const raceOf = (m: string) => ({ 'Lord Nagafen': 'Lava Dragon', 'a kobold runt': 'Kobold' })[m]
+    const kills = [
+      { name: 'Lord Nagafen', n: 5 },
+      { name: 'a kobold runt', n: 5 }
+    ]
+    // Not counted on his race alone.
+    expect(slayerCounts(dragons, r, new Map([['lord nagafen', { name: 'Lord Nagafen', times: [1, 2, 3, 4, 5] }]]), raceOf, noFacts, new Set()).rows[0].since).toBe(0)
+    // The numbers alone cannot tell him from the kobolds; the kobolds' race can.
+    const got = learnFromExport(new Map([['dragonbane', 0]]), [{ ...dragons[0], count: 5 }], r, kills, raceOf, noFacts)
+    expect(got).toEqual([{ mob: 'lord nagafen', achievement: 'dragonbane', counts: true, kills: 5, rise: 5 }])
   })
 })
 
@@ -510,7 +710,7 @@ describe('tracked achievements', () => {
       // The Thaumaturgist ticked by hand on the Achievements page.
       { ticks: [objKey(sections[3], sections[3].ach[0], sections[3].ach[0].c[2])], tracked },
       {
-        slayer: [{ name: "Puttin' On The Dog", section: 'Slayer: Conquest', races: 'Kobolds', count: 2645, since: 75, max: 5000, last: 1, done: false }],
+        slayer: [{ name: "Puttin' On The Dog", section: 'Slayer: Conquest', races: 'Kobolds', count: 2645, since: 75, guessed: 0, max: 5000, last: 1, done: false }],
         skills: [{ achievement: "Shaman's Casting Proficiency, Level 50", className: 'Shaman', skill: 'Divination', level: 50, value: 190, target: 250, last: 1 }],
         factions: { 'priests of marr': { faction: 'Priests of Marr', standing: 1285 } },
         // The log names it with its article.

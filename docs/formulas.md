@@ -294,3 +294,14 @@ The readings that settled it:
 A /con while invisible reads "regards you indifferently" whatever the standing: it proves nothing.
 
 Implemented in `src/features/factions/core.ts`: `STANDINGS` and `standingBand` (the bands), `RACE_KEYS`, `conBasis` and `conOf` (the sum, best class by `clsIndex`), `withCons` for the Standings tab; the Plan tab plans every character as Agnostic (`consFor` in `main.ts`). Standings since an export are the export plus every change the log wrote after its "Outputfile Complete" line (`SinceExports`).
+
+## Slayer races
+
+Read 2026-10-09 from the client's files; what counts is still the server's, settled one export at a time (below).
+
+- The client names every race in `dbstr_us.txt`: string type 11 is the race's name by race ID, type 12 its plural (`18^11^Giant`, `18^12^Giants`). Many IDs share a name: Giant is 18, 140, 188, 189, 306-312 and 453; Dragon a dozen. 354 of the 400 race list entries in the achievement components (`Resources/Achievements/AchievementComponentsClient.txt`) are type 12 plurals as written; the rest are the achievements' own words (Corathus Beasts, Vah Shir, True Dragons).
+- eqlwiki's races are the names of an older race list: two thirds of its NPC pages give a client name, the rest an old one for a single ID. Giant Bat is 34, which the client calls **Bat**; Giant Rat 36 Rat, Giant Snake 37 Snake, Giant Spider 38 Spider. The city races are the client's playable races (Qeynos Citizen 71 Human, Neriak Citizen 77 Dark Elf, Iksar Citizen 139 Iksar), but the Freeport guards (44), Felguards (106) and Fayguards (112) are **Guard**. Lycanthrope pages are all Drolvargs (133), Flying Monkey the Holgresh (168), Denizen the Amygdalan (99). Not settled: whether the server counts the guards among the playable races, and whether eqlwiki's Giant/Cyclops and Cyclops are race 18.
+- No list gives which IDs an achievement counts, so where the client gives one name to races an achievement splits (Dragon, for True Dragons, Lesser Dragons and Water Dragons), the race alone does not say.
+- An export settles it: between two achievements exports, each achievement's count rose by the kills that counted toward it. A mob whose kills alone are more than the rise did not count; one without which the rise cannot be made did. The log's kills ran up to 4 in 55 short of the game's over a day (2026-09-28), so the rise is taken within 15% (at least 2).
+
+Implemented in `src/core/raceNames.ts` (the race table, every other name to the client's, the aliases not settled) and `src/core/slayer.ts` (`achievementRaces`, `SlayerRaces.place`, `slayerCounts`; `forced` and `learnFromExport` for the exports); what exports settled is kept in `slayer-facts.json`.

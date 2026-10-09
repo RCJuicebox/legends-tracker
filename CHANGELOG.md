@@ -4,6 +4,8 @@ What changed in each version. The release workflow publishes a version's section
 
 ## Unreleased
 
+- **Slayer counts go by race, as the game counts them.** A kill used to count toward every achievement whose list had a word of its name or eqlwiki race in it, so giant bats, rattlesnakes and moss snakes ("Giant Snake" on eqlwiki) all went toward Giants: of the kills A Giant Problem gained since one export, half were snakes and bats. Now every mob is given one race in the client's own race names, eqlwiki's older names brought to them (Giant Bat is a Bat, Qeynos Citizen a Human), and counts only toward the achievements that list that race. Kills placed by the mob's name alone show as `+~N` until an export settles them.
+- **Each achievements export teaches the Slayer counts.** When a new export arrives, each achievement's rise is set against the kills since the last one, and what the numbers force is kept: ten giant bats and Giants not moved means bats are not Giants, for every character from then on. It settles what no list says, too: whether a dragon is one of Dragonbane's True Dragons.
 - **Factions › Plan: Lizard Tails and Lizard Meat to Grapok for Shamen of War.** Grapok, behind Oggok's shaman guild, takes four Lizard Tail for Shamen of War +10, and four Lizard Meat for +5 (Ruthless Armor, a beastlord quest on Allakhazam that eqlwiki does not list). With tails and meat in your bags it finishes Shamen of War in minutes, where Froglok tadpoles took some 20 hours. Lizard tails and meat are also planned at the pace lizardmen drop them in play (a tail every 39 seconds, meat every 71).
 
 ## 2.9.0 (2026-10-06)

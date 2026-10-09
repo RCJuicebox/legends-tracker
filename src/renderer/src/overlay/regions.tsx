@@ -372,14 +372,24 @@ function AchievementsRegion({ config, track, arranging }: { config: OverlayConfi
           {slayer.slice(0, SLAYER_ROWS).map((r) => {
             const n = Math.min(r.max, r.count + r.since)
             return (
-              <div key={r.name} className="ach-ov-count" title={`${r.races}: ${r.count.toLocaleString()} at your achievements export, +${r.since.toLocaleString()} since`}>
+              <div
+                key={r.name}
+                className="ach-ov-count"
+                title={`${r.races}: ${r.count.toLocaleString()} at your achievements export, +${r.since.toLocaleString()} since${
+                  r.guessed ? ` (${r.guessed.toLocaleString()} placed by the mob's name alone; your next export settles them)` : ''
+                }`}
+              >
                 <div className="ach-ov-goal">
                   <span>
                     {r.done ? '✓ ' : ''}
                     {r.name}
                   </span>
                   <span className="ach-ov-num">
-                    {n.toLocaleString()} / {r.max.toLocaleString()} <span className="ach-ov-plus">+{r.since.toLocaleString()}</span>
+                    {n.toLocaleString()} / {r.max.toLocaleString()}{' '}
+                    <span className="ach-ov-plus">
+                      +{r.guessed ? '~' : ''}
+                      {r.since.toLocaleString()}
+                    </span>
                   </span>
                 </div>
                 <div className="ach-ov-bar thin">

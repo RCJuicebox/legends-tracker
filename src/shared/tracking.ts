@@ -62,6 +62,8 @@ export interface SlayerRow {
   races: string
   count: number
   since: number
+  /** Of `since`, the kills only a mob's name (or an alias not yet settled) put here: no eqlwiki race, and no export has said. */
+  guessed: number
   max: number
   /** The last kill it counted; 0 for none since the export. */
   last: number

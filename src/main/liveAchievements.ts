@@ -3,7 +3,8 @@ import { join } from 'node:path'
 import { trackedAchievements } from '../core/trackedAchievements'
 import { SELF } from '../core/combatLines'
 import { isFriend } from '../core/combatMeter'
-import { RaceIndex, slayerCounters, slayerCounts, slayerLine, type SlayerCounter, type SlayerKills } from '../core/slayer'
+import { learnFromExport, SlayerRaces, slayerCounters, slayerCounts, slayerLine, type SlayerCounter, type SlayerKills } from '../core/slayer'
+import { NO_RACE_TABLE, RACE_TABLE, type RaceTable } from '../core/raceNames'
 import { skillGoals, skillId, skillValue } from '../core/skillAchievements'
 import { classIdOf, type ClassId } from '../shared/game/classes'
 import { parseFactionLine } from '../features/factions/core'
@@ -40,7 +41,11 @@ interface SlayerState {
   exportFile: string
   exportAt: number
   counters: SlayerCounter[]
-  index: RaceIndex
+  /** Each open achievement's count at the export, by lower-cased name: what the next export's are set against. */
+  counts: Map<string, number>
+  /** The client's race table the races were built with: a new one (a patch) builds them again. */
+  game: RaceTable
+  races: SlayerRaces
   logPath: string
   /** How far into the log the kills have been counted; -1 before the first read. */
   readTo: number
@@ -49,8 +54,8 @@ interface SlayerState {
   pets: Set<string>
   /** Mobs the player or its pet went for lately (lower-cased), and when: one of those dying with no killer named is the player's kill. */
   engaged: Map<string, number>
-  /** Achievements the game said were completed since the export (lower-cased). */
-  completed: Set<string>
+  /** Achievements the game said were completed since the export (lower-cased), and when. */
+  completed: Map<string, number>
 }
 
 /** A SlayerState's counts as kept on disk, so a start reads on from where the last run got to (LT-371). */
@@ -61,7 +66,10 @@ interface KeptSlayer {
   readTo: number
   kills: [string, { name: string; times: number[] }][]
   pets: string[]
-  completed: string[]
+  /** With when each was; an older file kept the names alone. */
+  completed: ([string, number] | string)[]
+  /** The export's counts, by lower-cased name; missing from an older file. */
+  counts?: [string, number][]
 }
 
 function keptSlayer(v: unknown): KeptSlayer | null {
@@ -72,7 +80,27 @@ function keptSlayer(v: unknown): KeptSlayer | null {
     (e): e is KeptSlayer['kills'][number] =>
       Array.isArray(e) && typeof e[0] === 'string' && typeof e[1]?.name === 'string' && Array.isArray(e[1].times) && e[1].times.every((t) => typeof t === 'number')
   )
-  return { ...(k as KeptSlayer), kills, pets: k.pets.filter((p) => typeof p === 'string'), completed: k.completed.filter((c) => typeof c === 'string') }
+  const completed = k.completed.filter((c) => typeof c === 'string' || (Array.isArray(c) && typeof c[0] === 'string' && typeof c[1] === 'number'))
+  const counts = Array.isArray(k.counts) ? k.counts.filter((c): c is [string, number] => Array.isArray(c) && typeof c[0] === 'string' && typeof c[1] === 'number') : undefined
+  return { ...(k as KeptSlayer), kills, pets: k.pets.filter((p) => typeof p === 'string'), completed, counts }
+}
+
+/** What the exports settled about which mobs count toward which Slayer achievements, for every character: a race is the game's, not the player's. */
+interface FactsFile {
+  version: 1
+  /** By lower-cased mob, then lower-cased achievement: whether its kills count, when that was settled, and on what. */
+  mobs: Record<string, Record<string, { counts: boolean; at: number; kills: number; rise: number }>>
+}
+
+function factsFile(v: unknown): FactsFile {
+  const f = v as Partial<FactsFile> | null
+  if (!f || f.version !== 1 || !f.mobs || typeof f.mobs !== 'object') return { version: 1, mobs: {} }
+  const mobs: FactsFile['mobs'] = {}
+  for (const [mob, by] of Object.entries(f.mobs)) {
+    if (!by || typeof by !== 'object') continue
+    for (const [ach, x] of Object.entries(by)) if (x && typeof x.counts === 'boolean') (mobs[mob] ??= {})[ach] = x
+  }
+  return { version: 1, mobs }
 }
 
 /** The faction achievements' section: tracking one of them reads the standings. */
@@ -134,6 +162,10 @@ export class LiveAchievements implements AppFeature {
     const keptPath = join(cacheDir(), 'slayer-since.json')
     const kept = readJsonFile(keptPath)
     this.keptSlayer = new JsonFile<KeptSlayer | null>(keptPath, kept.state === 'ok' ? keptSlayer(kept.value) : null, { delayMs: 10_000, pretty: false })
+    const factsPath = join(ctx.store.dir, 'slayer-facts.json')
+    const facts = readJsonFile(factsPath)
+    this.facts = new JsonFile(factsPath, factsFile(facts.state === 'ok' ? facts.value : null), { delayMs: 3000, pretty: false })
+    if (facts.state === 'unreadable') this.facts.freeze('could not be read at start')
     void this.races.ready()
   }
 
@@ -149,11 +181,13 @@ export class LiveAchievements implements AppFeature {
 
   /** Writes where the player is in each followed plan, and the Slayer counts since the export. */
   flush(): Promise<void> {
-    return Promise.all([this.follows.flush(), this.keptSlayer.flush()]).then(() => undefined)
+    return Promise.all([this.follows.flush(), this.keptSlayer.flush(), this.facts.flush()]).then(() => undefined)
   }
 
   /** The Slayer counts since the export, kept so the next start need not read the log from the export again. */
   private readonly keptSlayer: JsonFile<KeptSlayer | null>
+  /** What the exports settled (slayer.ts, learnFromExport). */
+  private readonly facts: JsonFile<FactsFile>
 
   /** Its channel, and its part in following the log: registered after the engine's own, it sees each line last. */
   register(ctx: AppContext): void {
@@ -345,95 +379,145 @@ export class LiveAchievements implements AppFeature {
       this.slayerView = null
       return
     }
-    const st = { mtimeMs: exp.modified }
-    const file = exp.file
     const logPath = this.ctx.historyOf(character).logPath
-    let s = this.slayer
-    if (!s || s.character !== character || s.exportAt !== st.mtimeMs || s.logPath !== logPath) {
-      // A new export counts everything up to it: only the kills after it are kept.
+    const game = await this.ctx.gameTables.get(RACE_TABLE)
+    const mem = this.slayer
+    // Nothing in memory for this character and log yet (a start): what the last run counted.
+    let s = mem && mem.character === character && mem.logPath === logPath ? mem : this.fromDisk(character, logPath, game)
+    if (!s || s.exportAt !== exp.modified || s.game !== game) {
       const counters = slayerCounters(exp.sections)
-      // Nothing in memory yet (a start): what the last run counted, for this character, log and export.
-      const disk = !s ? this.keptSlayer.get() : null
-      const fromDisk =
-        disk && disk.character === character && disk.logPath === logPath && disk.exportAt === st.mtimeMs
-          ? { readTo: disk.readTo, kills: new Map(disk.kills) as SlayerKills, pets: new Set(disk.pets), completed: new Set(disk.completed) }
-          : null
-      const kept = fromDisk ?? (s && s.character === character && s.logPath === logPath && s.exportAt <= st.mtimeMs ? s : null)
+      const races = new SlayerRaces(counters, game)
+      if (s && s.exportAt < exp.modified) {
+        // A new export: the kills up to it, read to the end first, are set against how far its counts rose.
+        await this.readLog(s)
+        this.learn(s, exp.modified, counters, races)
+      }
+      // The new export counts everything up to it: only what came after it is kept.
+      const kept = s && s.exportAt <= exp.modified ? s : null
       const kills: SlayerKills = new Map()
       for (const [k, v] of kept?.kills ?? []) {
-        const times = v.times.filter((t) => t > st.mtimeMs)
+        const times = v.times.filter((t) => t > exp.modified)
         if (times.length) kills.set(k, { name: v.name, times })
       }
-      s = this.slayer = {
+      s = {
         character,
-        exportFile: file,
-        exportAt: st.mtimeMs,
+        exportFile: exp.file,
+        exportAt: exp.modified,
         counters,
-        index: new RaceIndex(counters),
+        counts: new Map(counters.map((c) => [c.name.toLowerCase(), c.count])),
+        game,
+        races,
         logPath,
         readTo: kept ? kept.readTo : -1,
         kills,
         pets: kept?.pets ?? new Set(),
-        engaged: new Map(),
-        completed: fromDisk?.completed ?? new Set()
+        engaged: kept?.engaged ?? new Map(),
+        completed: new Map([...(kept?.completed ?? [])].filter(([, t]) => t > exp.modified))
       }
     }
-    const size = (await fs.stat(logPath).catch(() => null))?.size ?? 0
-    // The first read starts at the line before the export was written; a log started afresh, at its top.
-    if (s.readTo < 0) s.readTo = size ? await offsetBefore(logPath, s.exportAt, { slackMs: 2000 }) : 0
-    else if (size < s.readTo) s.readTo = 0
-    if (size > s.readTo) {
-      const state = s
-      const read = await readForward(
-        logPath,
-        s.readTo,
-        size,
-        (line) => {
-          const x = slayerLine(line.text)
-          if (!x) return
-          if ('pet' in x) state.pets.add(x.pet)
-          if ('engaged' in x) {
-            state.engaged.set(x.engaged.toLowerCase(), line.time)
-            // Only the last few minutes' are asked about: the rest go, a few hundred at a time (LT-380).
-            if (state.engaged.size > 500) for (const [k, t] of state.engaged) if (line.time - t > ENGAGED_MS) state.engaged.delete(k)
-            return
-          }
-          if (line.time <= state.exportAt || 'pet' in x) return
-          if ('completed' in x) state.completed.add(x.completed.toLowerCase())
-          else {
-            let mob: string | null = null
-            // A player your side killed (a duel, a charmed pet turned) is nobody's Slayer kill.
-            if ('kill' in x) mob = this.credited(x.kill.by, state.pets) && !this.friendly(x.kill.mob) ? x.kill.mob : null
-            else if (line.time - (state.engaged.get(x.died.toLowerCase()) ?? -Infinity) <= ENGAGED_MS) mob = x.died
-            if (!mob) return
-            const k = mob.toLowerCase()
-            const had = state.kills.get(k) ?? { name: mob, times: [] }
-            had.times.push(line.time)
-            state.kills.set(k, had)
-          }
-        },
-        { flushLast: false }
-      )
-      s.readTo += read
-      if (read > 0)
-        this.keptSlayer.set({
-          character: s.character,
-          logPath: s.logPath,
-          exportAt: s.exportAt,
-          readTo: s.readTo,
-          kills: [...s.kills],
-          pets: [...s.pets],
-          completed: [...s.completed]
-        })
-    }
+    this.slayer = s
+    await this.readLog(s)
     this.countSlayer()
   }
 
-  /** The counts from the kills so far; mobs whose names do not say what they are are asked of eqlwiki, and counted again when it answers. */
+  /** What the last run kept for this character and log, at whichever export it was counting from; null for none. */
+  private fromDisk(character: string, logPath: string, game: RaceTable): SlayerState | null {
+    const d = this.keptSlayer.get()
+    if (!d || d.character !== character || d.logPath !== logPath) return null
+    return {
+      character,
+      exportFile: '',
+      exportAt: d.exportAt,
+      // Only its counts are wanted from an export since written over; the same export is read again.
+      counters: [],
+      counts: new Map(d.counts ?? []),
+      // Not the table read now: the state is built again from the export either way.
+      game: NO_RACE_TABLE,
+      races: new SlayerRaces([], game),
+      logPath,
+      readTo: d.readTo,
+      kills: new Map(d.kills),
+      pets: new Set(d.pets),
+      engaged: new Map(),
+      completed: new Map(d.completed.map((c): [string, number] => (typeof c === 'string' ? [c, Infinity] : c)))
+    }
+  }
+
+  /** Reads the log on from where the counts got to, and keeps how far. */
+  private async readLog(s: SlayerState): Promise<void> {
+    const size = (await fs.stat(s.logPath).catch(() => null))?.size ?? 0
+    // The first read starts at the line before the export was written; a log started afresh, at its top.
+    if (s.readTo < 0) s.readTo = size ? await offsetBefore(s.logPath, s.exportAt, { slackMs: 2000 }) : 0
+    else if (size < s.readTo) s.readTo = 0
+    if (size <= s.readTo) return
+    const read = await readForward(
+      s.logPath,
+      s.readTo,
+      size,
+      (line) => {
+        const x = slayerLine(line.text)
+        if (!x) return
+        if ('pet' in x) s.pets.add(x.pet)
+        if ('engaged' in x) {
+          s.engaged.set(x.engaged.toLowerCase(), line.time)
+          // Only the last few minutes' are asked about: the rest go, a few hundred at a time (LT-380).
+          if (s.engaged.size > 500) for (const [k, t] of s.engaged) if (line.time - t > ENGAGED_MS) s.engaged.delete(k)
+          return
+        }
+        if (line.time <= s.exportAt || 'pet' in x) return
+        if ('completed' in x) s.completed.set(x.completed.toLowerCase(), line.time)
+        else {
+          let mob: string | null = null
+          // A player your side killed (a duel, a charmed pet turned) is nobody's Slayer kill.
+          if ('kill' in x) mob = this.credited(x.kill.by, s.pets) && !this.friendly(x.kill.mob) ? x.kill.mob : null
+          else if (line.time - (s.engaged.get(x.died.toLowerCase()) ?? -Infinity) <= ENGAGED_MS) mob = x.died
+          if (!mob) return
+          const k = mob.toLowerCase()
+          const had = s.kills.get(k) ?? { name: mob, times: [] }
+          had.times.push(line.time)
+          s.kills.set(k, had)
+        }
+      },
+      { flushLast: false }
+    )
+    s.readTo += read
+    if (read > 0)
+      this.keptSlayer.set({
+        character: s.character,
+        logPath: s.logPath,
+        exportAt: s.exportAt,
+        readTo: s.readTo,
+        kills: [...s.kills],
+        pets: [...s.pets],
+        completed: [...s.completed],
+        counts: [...s.counts]
+      })
+  }
+
+  /** Whether the exports settled that a mob's kills count toward an achievement (both lower-cased). */
+  private readonly fact = (mob: string, achievement: string): boolean | undefined => this.facts.get().mobs[mob]?.[achievement]?.counts
+
+  /**
+   * Sets the kills between the export counted from and a new one against how far the new one's
+   * counts rose, and keeps what that settles.
+   */
+  private learn(s: SlayerState, at: number, counters: SlayerCounter[], races: SlayerRaces): void {
+    const kills = [...s.kills.values()].map((k) => ({ name: k.name, n: k.times.filter((t) => t <= at).length }))
+    const got = learnFromExport(s.counts, counters, races, kills, (m) => this.races.race(m), this.fact)
+    if (!got.length) return
+    const mobs = { ...this.facts.get().mobs }
+    for (const f of got) {
+      mobs[f.mob] = { ...mobs[f.mob], [f.achievement]: { counts: f.counts, at, kills: f.kills, rise: f.rise } }
+      log.info(`Slayer: the export says ${f.mob} ${f.counts ? 'counts' : 'does not count'} toward ${f.achievement} (${f.kills} killed, the count rose ${f.rise})`)
+    }
+    this.facts.set({ version: 1, mobs })
+  }
+
+  /** The counts from the kills so far; mobs not looked up on eqlwiki yet are asked about, and counted again when it answers. */
   private countSlayer(): void {
     const s = this.slayer
     if (!s) return
-    const got = slayerCounts(s.counters, s.index, s.kills, (m) => this.races.race(m), s.completed)
+    const got = slayerCounts(s.counters, s.races, s.kills, (m) => this.races.race(m), this.fact, new Set(s.completed.keys()))
     if (got.unknown.length)
       void this.races.lookUp(got.unknown).then((learned) => {
         if (!learned || this.slayer !== s) return
@@ -449,6 +533,7 @@ export class LiveAchievements implements AppFeature {
         races: r.counter.races,
         count: r.counter.count,
         since: r.since,
+        guessed: r.guessed,
         max: r.counter.max,
         last: r.last,
         done: r.done
@@ -530,7 +615,7 @@ export class LiveAchievements implements AppFeature {
       skills: this.skills?.rows,
       factions: this.byAchievement,
       kills: this.slayer?.kills,
-      completed: this.slayer?.completed
+      completed: this.slayer ? new Set(this.slayer.completed.keys()) : undefined
     })
   }
 
