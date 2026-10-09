@@ -2,6 +2,10 @@
 
 What changed in each version. The release workflow publishes a version's section as its release notes, and installed copies show them when an update arrives.
 
+## Unreleased
+
+- **Factions › Plan: Lizard Tails and Lizard Meat to Grapok for Shamen of War.** Grapok, behind Oggok's shaman guild, takes four Lizard Tail for Shamen of War +10, and four Lizard Meat for +5 (Ruthless Armor, a beastlord quest on Allakhazam that eqlwiki does not list). With tails and meat in your bags it finishes Shamen of War in minutes, where Froglok tadpoles took some 20 hours. Lizard tails and meat are also planned at the pace lizardmen drop them in play (a tail every 39 seconds, meat every 71).
+
 ## 2.9.0 (2026-10-06)
 
 - **Spell Timers: a spell can be timed for anyone's cast of it.** For Harm Touch, which a mob carries one of at a time: turn on **Anyone's casts** in its settings and another player's cast gets the same bar yours would, with their name on it, and the app says "Rathor cast Harm Touch on a forsaken revenant, do not cast for 54 seconds" (the words are a setting; {caster}, {spell}, {target} and {seconds} are filled in). It starts on their cast and the landing line, or on their first tick if that was missed, ends exactly on the ticks, and the fade announcement says when the mob is clear.

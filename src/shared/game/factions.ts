@@ -340,6 +340,33 @@ export const CYCLES: Cycle[] = [
     line: "Ask McNeal Jocub in Fish's Ale (South Qeynos) what he is running low on and agree to pick up the shipment, once for every note needed; give the notes to Gnasher Furgutt in Qeynos Hills, who is up only at night, for Cases of Blackburrow Stout, and bring the cases back to McNeal."
   },
   {
+    // Ruthless Armor's Lizard Tail step over and over (Allakhazam's walkthrough, a Luclin beastlord quest
+    // that Legends has; taken up 2026-10-08, its tails found taken in play): Grapok, behind the shaman guild
+    // in Oggok (/waypoint +430, +1140), takes four Lizard Tail for Shamen of War +10. eqlwiki has no page for it.
+    page: 'Ruthless Armor',
+    key: 'lizard tail',
+    zone: 'Oggok',
+    npc: 'Grapok',
+    hits: { 'Shamen of War': 10 },
+    guessed: [],
+    items: [{ name: 'Lizard Tail', count: 4 }],
+    site: 'Allakhazam',
+    line: 'Hand Lizard Tails to Grapok behind the shaman guild in Oggok (/waypoint +430, +1140), four a hand-in (try a whole stack in one trade). Lizardmen in The Feerrott drop them.'
+  },
+  {
+    // The same quest's Lizard Meat step: four Lizard Meat to Grapok, Allakhazam's Shamen of War +1, which
+    // play makes +5 as every small gain. That it repeats as the tails do is taken, not seen.
+    page: 'Ruthless Armor',
+    key: 'lizard meat',
+    zone: 'Oggok',
+    npc: 'Grapok',
+    hits: { 'Shamen of War': 5 },
+    guessed: [],
+    items: [{ name: 'Lizard Meat', count: 4 }],
+    site: 'Allakhazam',
+    line: 'Hand Lizard Meat to Grapok behind the shaman guild in Oggok (/waypoint +430, +1140), four a hand-in (try a whole stack in one trade). Lizardmen in The Feerrott drop it.'
+  },
+  {
     // Moss Snakes over and over (eqlwiki's walkthrough, taken up 2026-10-06): Hekzin G`Zule in the rogue
     // guild of Neriak Third Gate gives an Empty Bag (not lore) for three Snake Scales and three Snake
     // Fangs, combined in it into a Bag of Snake Parts and handed back: Ebon Mask +10, Guards of Qeynos -1,
@@ -417,7 +444,10 @@ export const ITEMS_IN_PLAY: Record<string, ItemInPlay> = {
   // under six minutes of skeletons in play (2026-10-01); eqlwiki lists them only as a drop.
   'bone chips': { how: 'drop', where: 'skeletons, in most zones', sec: 5 },
   // 879 from 988 moss snakes in Nektulos Forest, at some 81 kills an hour (2026-10-04).
-  'snake fang': { how: 'drop', where: 'moss snakes, such as in Nektulos Forest', sec: 50 }
+  'snake fang': { how: 'drop', where: 'moss snakes, such as in Nektulos Forest', sec: 50 },
+  // 1,048 tails and 580 meat from 2,249 lizardmen in The Feerrott, at some 200 kills an hour (2026-10-05 and 06).
+  'lizard tail': { how: 'drop', where: 'lizardmen (The Feerrott)', sec: 39 },
+  'lizard meat': { how: 'drop', where: 'lizardmen (The Feerrott)', sec: 71 }
 }
 
 /** A quest's hand-in item that is another than the one the wikis' item page is about, by quest page (lower-cased), then item. */

@@ -2005,6 +2005,21 @@ describe('what the character holds', () => {
     expect(unitTime(lyda, S).seconds / 20).toBeGreaterThan((10 * unitTime(snakes[0], S).seconds) / 10)
   })
 
+  it("plans Grapok's Lizard Tails and Lizard Meat for Shamen of War, from what is held", () => {
+    const ways = buildCatalog(catalogInput({ factions: ['Shamen of War'], targets: ['Shamen of War'], have: { 'lizard tail': 773, 'lizard meat': 330 } })).activities.filter(
+      (a) => a.title === 'Ruthless Armor'
+    )
+    expect(ways.map((a) => [a.id, a.hits['Shamen of War']])).toEqual([
+      ['cycle:ruthless armor#lizard tail', 10],
+      ['cycle:ruthless armor#lizard meat', 5]
+    ])
+    expect(ways[0]).toMatchObject({ npc: 'Grapok', zone: 'Oggok' })
+    expect(ways.map((a) => a.items?.[0])).toMatchObject([
+      { name: 'Lizard Tail', count: 4, how: 'drop', sec: 39, have: 773 },
+      { name: 'Lizard Meat', count: 4, how: 'drop', sec: 71, have: 330 }
+    ])
+  })
+
   it("plans Blackburrow Stout Shipment as rounds of McNeal Jocub's notes, one an ask", () => {
     const stout = buildCatalog(catalogInput({ factions: ['Circle of Unseen Hands'], targets: ['Circle of Unseen Hands'] })).activities.find(
       (a) => a.id === 'cycle:blackburrow stout shipment'
