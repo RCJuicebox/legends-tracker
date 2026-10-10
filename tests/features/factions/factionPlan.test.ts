@@ -667,6 +667,7 @@ describe("eqlwiki's word on a camp's named mobs", () => {
       { name: 'Phantom Pell', zone: 'Test Hold', amount: 88 },
       { name: 'Gate Guard Bram', zone: 'Test Pass', amount: 1 },
       { name: 'Gate Guard Toll', zone: 'Test Pass', amount: 1 },
+      { name: 'Hollow Hask', zone: 'Test Fjord', amount: 150 },
       { name: 'a pass bandit', zone: 'Test Pass', amount: -5 }
     ]
   }
@@ -683,12 +684,14 @@ describe("eqlwiki's word on a camp's named mobs", () => {
     ]
   }
   const npcs = {
-    'guildmaster orrin': { found: true, hp: 2_500_000, respawnSec: 400 },
+    'guildmaster orrin': { found: true, hp: 2_500_000, respawnSec: 400, guildmaster: true },
     'phantom pell': { found: false },
     'gate guard bram': { found: true, hp: 1512, respawnSec: 400, hits: { 'Test Rogues': 5, 'Test Miners': -5 } },
     'gate guard toll': { found: true, hp: 1512 },
     'lord brute': { found: true, hp: 300_000 },
-    'sergeant pike': { found: false }
+    'sergeant pike': { found: false },
+    // A page eqlwiki marks for deletion: "this NPC does not exist in the game".
+    'hollow hask': { found: true, hp: 51_000, gone: true }
   }
   const input = (over: Partial<CatalogInput> = {}) =>
     catalogInput({
@@ -714,11 +717,12 @@ describe("eqlwiki's word on a camp's named mobs", () => {
   const camps = (c: ReturnType<typeof buildCatalog>) => c.activities.filter((a) => a.kind === 'kill')
 
   it('asks about the named mobs of the camps that raise what the plan is for, not the many alike', () => {
-    expect(npcsToLookUp(input()).sort()).toEqual(['Gate Guard Bram', 'Gate Guard Toll', 'Guildmaster Orrin', 'Lord Brute', 'Phantom Pell', 'Sergeant Pike'])
+    expect(npcsToLookUp(input()).sort()).toEqual(['Gate Guard Bram', 'Gate Guard Toll', 'Guildmaster Orrin', 'Hollow Hask', 'Lord Brute', 'Phantom Pell', 'Sergeant Pike'])
   })
 
   it('leaves out a mob Legends does not have, and one far too tough to farm, and says which', () => {
     const c = buildCatalog(input({ npcs }))
+    // Hollow Hask has a page, but one eqlwiki marks as not in the game.
     // Sergeant Pike has no page of his own, but eqlwiki's faction page lists him: he is Legends'.
     expect(camps(c).map((a) => [a.zone, a.mobs])).toEqual([
       ['Test Keep', ['Sergeant Pike']],
@@ -726,8 +730,9 @@ describe("eqlwiki's word on a camp's named mobs", () => {
     ])
     expect(c.leftOut).toEqual([
       { name: 'Lord Brute', zone: 'Test Keep', why: 'tough', hp: 300_000 },
-      { name: 'Guildmaster Orrin', zone: 'Test Hold', why: 'tough', hp: 2_500_000 },
-      { name: 'Phantom Pell', zone: 'Test Hold', why: 'missing' }
+      { name: 'Guildmaster Orrin', zone: 'Test Hold', why: 'guildmaster' },
+      { name: 'Phantom Pell', zone: 'Test Hold', why: 'missing' },
+      { name: 'Hollow Hask', zone: 'Test Fjord', why: 'missing' }
     ])
   })
 
@@ -739,13 +744,39 @@ describe("eqlwiki's word on a camp's named mobs", () => {
     expect(unitTime(pass, DEFAULT_SETTINGS).seconds).toBeCloseTo(300)
   })
 
+  it('leaves out an NPC found not in the game in play, though eqlwiki has a page for it', () => {
+    const c = buildCatalog(
+      input({
+        npcs: { ...npcs, berinsan: { found: true, hp: 144 } },
+        pages: [
+          {
+            page: 'Test Rogues',
+            raise: { mobs: [{ name: 'Berinsan', zone: 'Test Mountains', note: '' }], quests: [], zones: [] },
+            lower: { mobs: [], quests: [], zones: [] }
+          }
+        ]
+      })
+    )
+    expect(camps(c).some((a) => a.mobs?.includes('Berinsan'))).toBe(false)
+    expect(c.leftOut).toContainEqual({ name: 'Berinsan', zone: 'Test Mountains', why: 'missing' })
+  })
+
+  it('takes a respawn found in play where eqlwiki gives none', () => {
+    const muses: AllaFaction = { id: 6, name: 'Deepmuses', needs: [], quests: [], mobs: [{ name: 'Khrix Fritchoff', zone: 'Estate of Unrest', amount: 5 }] }
+    const c = buildCatalog(catalogInput({ factions: ['Deepmuses'], targets: ['Deepmuses'], alla: [muses], npcs: { 'khrix fritchoff': { found: true, hp: 1575 } } }))
+    const khrix = camps(c).find((a) => a.mobs?.includes('Khrix Fritchoff'))!
+    expect(khrix.respawnSec).toEqual([445])
+    // Back every 7:25: some 8 an hour.
+    expect(3600 / unitTime(khrix, DEFAULT_SETTINGS).seconds).toBeCloseTo(3600 / 445)
+  })
+
   it("plans them all as before while eqlwiki's word is not in", () => {
     const c = buildCatalog(input())
     expect(
       camps(c)
         .map((a) => a.zone)
         .sort()
-    ).toEqual(['Test Hold', 'Test Keep', 'Test Pass'])
+    ).toEqual(['Test Fjord', 'Test Hold', 'Test Keep', 'Test Pass'])
     expect(c.leftOut).toBeUndefined()
     expect(
       unitTime(
@@ -1353,6 +1384,8 @@ describe('the catalog', () => {
     const has = { bought: { milk: { merchant: 'Bim', each: 3 } }, items }
     expect(howHad('Gold', has).how).toBe('coin')
     expect(howHad('Milk', has)).toEqual({ how: 'bought', where: 'Bim', each: 3 })
+    // Where it was bought, when the log had said.
+    expect(howHad('Milk', { ...has, bought: { milk: { merchant: 'Bim', each: 3, zone: 'Test Vale' } } }).where).toBe('Bim in Test Vale')
     expect(howHad('Rock', has)).toEqual({ how: 'vendor', where: 'Kizzie (Rivervale)' })
     expect(howHad('Box of Eyes', has).how).toBe('crafted')
     expect(howHad('Head', has)).toEqual({ how: 'drop', where: 'East Freeport', named: 1 })
@@ -2079,6 +2112,26 @@ describe('the two goals', () => {
     ])
     expect(plan.steps[1].lifts).toEqual(['N'])
     expect(plan.belowZero.after).toBe(0)
+  })
+
+  it('brings back two factions that cost each other, the one whose loss the floor takes first and past 0', () => {
+    // A's only way takes D to -2000. D's way takes K down, K's way takes D down. K is at -2000 already, so
+    // the camp for D goes first, to +800, and the ales for K after, at 2 D each: both end at 0.
+    const input: PlanInput = {
+      targets: [{ faction: 'A', achievement: 'A', standing: 0 }],
+      maxed: [],
+      standings: { A: 0, D: 2000, K: -2000 },
+      activities: [act('muses', { A: 10, D: -30 }, 3600, { zone: 'za' }), act('clocks', { D: 5, K: -10 }, 3600, { zone: 'zb' }), act('ale', { K: 5, D: -2 }, 3600, { zone: 'zc' })]
+    }
+    const plan = planFactions(input, POSITIVE)
+    expect(plan.steps.map((s) => [s.activity.id, s.units])).toEqual([
+      ['muses', 200],
+      ['clocks', 560],
+      ['ale', 400]
+    ])
+    expect(plan.belowZero.after).toBe(0)
+    // The camp's target is kept with the order.
+    expect(plan.shape.flatMap((b) => (b.act === 'clocks' ? (b.above ?? []) : []))).toEqual([{ faction: 'D', to: 800 }])
   })
 
   it('keeps an order with a step that brings a faction back, and keeps that step once the achievements are done', () => {

@@ -45,6 +45,15 @@ describe("eqlwiki's NPC pages", () => {
     expect(parseNpcPage(PAGE)).toEqual({ hp: 1512, respawnSec: 400, hits: { 'Test Miners': -5, 'Test Rogues': 5, 'Hall of the Test Mask': 3 } })
     // A page that gives none of it.
     expect(parseNpcPage('{{Namedmobpage\n| name = Somebody\n| HP =\n}}')).toEqual({})
+    // A page marked for deletion as an NPC the game does not have; one marked for another reason is still Legends'.
+    expect(parseNpcPage("{{Delete}}\n\n'''Reason for deletion:''' this NPC does not exist in the game.\n\n{{Namedmobpage\n| name = Somebody\n| HP = 51000\n}}")).toEqual({
+      hp: 51_000,
+      gone: true
+    })
+    expect(parseNpcPage("{{Delete}}\n'''Reason for deletion:''' moved to Somebody (Test Hold).\n{{Namedmobpage\n| name = Somebody\n}}")).toEqual({})
+    // A guildmaster by its class, not a shaman who leads a camp.
+    expect(parseNpcPage('{{Namedmobpage\n| name = Somebody\n| class             = GM [[Necromancer]]\n| HP = 20000\n}}')).toEqual({ hp: 20_000, guildmaster: true })
+    expect(parseNpcPage('{{Namedmobpage\n| name = Somebody\n| class             = [[Shaman]]\n}}')).toEqual({})
   })
 
   it('reads health however it is written', () => {

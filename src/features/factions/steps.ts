@@ -179,6 +179,7 @@ export function planSteps(m: Model, best: { blocks: Block[]; cost: number }, kep
     finish: b.finish.map((i) => names[i]),
     ...(b.lift.length ? { lift: b.lift.map((i) => names[i]) } : {}),
     ...(b.reach.length ? { reach: b.reach.map((q) => ({ faction: names[q.i], to: q.v, for: acts[q.for].a.id })) } : {}),
+    ...(b.above?.length ? { above: b.above.map((q) => ({ faction: names[q.i], to: q.v })) } : {}),
     ...(b.use ? { use: true } : {})
   }))
 

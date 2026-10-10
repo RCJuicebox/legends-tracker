@@ -12,7 +12,9 @@ import {
   FEW_IN_PLAY,
   ITEMS_IN_PLAY,
   NEEDS,
+  NOT_IN_PLAY,
   ONCE_IN_PLAY,
+  RESPAWNS_IN_PLAY,
   QUEST_COIN,
   QUEST_ITEMS_IN_PLAY,
   QUEST_NPCS,
@@ -156,7 +158,7 @@ export interface CatalogInput {
   /** Quest pages by title as faction pages link them. */
   quests: Record<string, QuestPage | null>
   /** Items the character has bought, by lower-cased name: from whom, and what one cost (copper). */
-  bought: Record<string, { merchant: string; each: number }>
+  bought: Record<string, { merchant: string; each: number; zone?: string }>
   /** What the character holds, by itemKey: bags, bank, shared bank and depot. */
   have: Record<string, number>
   /** What eqlwiki says of hand-in items, by itemKey. */
@@ -181,7 +183,7 @@ export interface FactionCatalog {
   killsPerHour: number | null
   guesses: Guesses
   /** Named mobs a camp would have held, left out by what eqlwiki says of them: not in Legends (no page), or too tough to be killed (its health). */
-  leftOut?: { name: string; zone: string; why: 'missing' | 'tough'; hp?: number }[]
+  leftOut?: { name: string; zone: string; why: 'missing' | 'tough' | 'guildmaster'; hp?: number }[]
 }
 
 export const median = (xs: number[]) => {
@@ -281,7 +283,7 @@ export function howHad(
   const plain = itemName(name)
   if (COIN.test(plain)) return { how: 'coin', where: '' }
   const bought = input.bought[plain.toLowerCase()]
-  if (bought) return { how: 'bought', where: bought.merchant, ...(bought.each > 0 ? { each: bought.each } : {}) }
+  if (bought) return { how: 'bought', where: bought.zone ? `${bought.merchant} in ${bought.zone}` : bought.merchant, ...(bought.each > 0 ? { each: bought.each } : {}) }
   const known = ITEMS_IN_PLAY[plain.toLowerCase()]
   if (known) return { ...known }
   const use = (input.items[itemKey(name)] ?? input.items[itemKey(plain)])?.use
@@ -455,17 +457,25 @@ export function buildCatalog(input: CatalogInput): FactionCatalog {
   /** Leaves a camp's mob out where eqlwiki has no page for one of Allakhazam's (not in Legends), or gives one too tough to farm; true when it does. */
   const leave = (mob: string, zone: string, site: 'eqlwiki' | 'Allakhazam') => {
     const info = npcOf(mob)
-    const tough = info?.found && info.hp !== undefined && info.hp >= TOO_TOUGH_HP ? info.hp : 0
-    // A name eqlwiki's own faction pages list is Legends' though it has no page of its own ("Orc Pawn", "High Elf Guards (Felwithe)").
-    if (!info || (info.found && !tough) || (!info.found && site === 'eqlwiki')) return false
+    // Found not in the game in play, whatever eqlwiki has.
+    const absent = !!NOT_IN_PLAY[bareNpc(mob).toLowerCase()]
+    const guildmaster = !absent && !!(info?.found && !info.gone && info.guildmaster)
+    const tough = !absent && info?.found && !info.gone && !guildmaster && info.hp !== undefined && info.hp >= TOO_TOUGH_HP ? info.hp : 0
+    // A name eqlwiki's own faction pages list is Legends' though it has no page of its own ("Orc Pawn", "High
+    // Elf Guards (Felwithe)"); one whose page eqlwiki marks as not in the game is not, whoever lists it.
+    if (!absent && (!info || (info.found && !tough && !info.gone && !guildmaster) || (!info.found && site === 'eqlwiki'))) return false
     if (!leftOut.some((l) => l.name === bareNpc(mob) && l.zone === zone))
-      leftOut.push({ name: bareNpc(mob), zone, ...(tough ? { why: 'tough' as const, hp: tough } : { why: 'missing' as const }) })
+      leftOut.push({
+        name: bareNpc(mob),
+        zone,
+        ...(guildmaster ? { why: 'guildmaster' as const } : tough ? { why: 'tough' as const, hp: tough } : { why: 'missing' as const })
+      })
     return true
   }
   /** The respawns eqlwiki gives for a camp's named mobs, as a field: none when it gives none. */
   const respawnsOf = (mobs: { name: string; note?: string }[]): { respawnSec?: number[] } => {
     const known = mobs.flatMap((m) => {
-      const r = isCommon(m.name, m.note) ? undefined : npcOf(m.name)?.respawnSec
+      const r = isCommon(m.name, m.note) ? undefined : (RESPAWNS_IN_PLAY[bareNpc(m.name).toLowerCase()] ?? npcOf(m.name)?.respawnSec)
       return r ? [r] : []
     })
     return known.length ? { respawnSec: known } : {}

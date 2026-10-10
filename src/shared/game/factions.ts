@@ -481,6 +481,18 @@ export const QUEST_COIN: Record<string, { name: string; count: number }> = {
   'tunare scouts dagger': { name: 'Gold', count: 2 }
 }
 
+/** Respawns found in play where eqlwiki gives none, in seconds, by the named NPC's lower-cased name. */
+export const RESPAWNS_IN_PLAY: Record<string, number> = {
+  // Estate of Unrest, Deep Muses +5 a kill (2026-10-09).
+  'khrix fritchoff': 7 * 60 + 25
+}
+
+/** Named NPCs found not to be in Legends though eqlwiki has a page for them, by lower-cased name, and why: no kill camp holds them. */
+export const NOT_IN_PLAY: Record<string, string> = {
+  // Steamfont's Berinsan, eqlwiki's Deep Muses +10 a kill, is of Luclin's Steamfont and not in the game (2026-10-09).
+  berinsan: 'Luclin, not in the game'
+}
+
 /**
  * Mobs with "a" or "an" before the name that are only a few spawns in their zone, as found in play, and how
  * many, by the name without the article or what the wikis add after it ("an elven slave (male)" → "elven slave"):

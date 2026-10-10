@@ -612,7 +612,8 @@ async function planData(ctx: AppContext, character: string, refresh: boolean, wi
   )
   const bought: CatalogInput['bought'] = {}
   // This character's own purchases first; an item only another character has bought is still bought somewhere.
-  for (const p of [purchases, ...others.map((o) => o.purchases)]) for (const [k, v] of Object.entries(p)) bought[k] ??= { merchant: v.merchant, each: unitPrice(v) }
+  for (const p of [purchases, ...others.map((o) => o.purchases)])
+    for (const [k, v] of Object.entries(p)) bought[k] ??= { merchant: v.merchant, each: unitPrice(v), ...(v.zone ? { zone: v.zone } : {}) }
   const input = {
     factions: view.factions.map((r) => r.name),
     targets: targets.map((t) => t.faction),

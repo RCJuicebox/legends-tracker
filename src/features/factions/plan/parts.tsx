@@ -110,9 +110,9 @@ export function sourceNote(a: PlanActivity): string {
     return `from your log (${n})`
   }
   const site = a.site ?? 'eqlwiki'
-  // The named mobs' respawns eqlwiki gives, which set the camp's pace: "respawn 6:40 on eqlwiki".
+  // The named mobs' respawns, eqlwiki's or found in play, which set the camp's pace: "respawn 6:40".
   const back = [...new Set(a.respawnSec ?? [])].map((s) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`)
-  const respawn = back.length ? `, respawn ${back.join(', ')} on eqlwiki` : ''
+  const respawn = back.length ? `, respawn ${back.join(', ')}` : ''
   return a.guessed?.length ? `from ${site}, amounts guessed${respawn}` : `from ${site}${respawn}`
 }
 

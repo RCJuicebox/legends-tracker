@@ -476,7 +476,7 @@ function RecipeDetail({
                     {last ? (
                       <span title={`You last bought ${last.count} from ${last.merchant}, ${ago(last.at)}`}>
                         <b>{last.merchant}</b>
-                        {vendorZone(vendors, last.merchant) ? `, ${vendorZone(vendors, last.merchant)}` : ''}
+                        {(last.zone ?? vendorZone(vendors, last.merchant)) ? `, ${last.zone ?? vendorZone(vendors, last.merchant)}` : ''}
                       </span>
                     ) : vendors.length ? (
                       <span title={vendors.map((v) => `${v.npc}, ${v.zone}${v.note ? ` (${v.note})` : ''}`).join('\n')}>

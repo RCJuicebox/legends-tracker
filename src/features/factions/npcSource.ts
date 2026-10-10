@@ -17,7 +17,7 @@ const MISSING_FRESH_MS = 7 * 24 * 3600_000
 /** After the wiki could not be reached, a while before asking again. */
 const FAIL_WAIT_MS = 10 * 60_000
 /** Bumped when what is kept of a page changes, so pages read by an older build are read again. */
-const VERSION = 1
+const VERSION = 3
 
 interface NpcFile {
   version: number
@@ -71,7 +71,15 @@ export class FactionNpcs {
     const out: Record<string, NpcInfo> = {}
     for (const n of names) {
       const e = file.npcs[keyOf(n)]
-      if (e) out[keyOf(n)] = { found: e.found, ...(e.hp ? { hp: e.hp } : {}), ...(e.respawnSec ? { respawnSec: e.respawnSec } : {}), ...(e.hits ? { hits: e.hits } : {}) }
+      if (e)
+        out[keyOf(n)] = {
+          found: e.found,
+          ...(e.hp ? { hp: e.hp } : {}),
+          ...(e.respawnSec ? { respawnSec: e.respawnSec } : {}),
+          ...(e.hits ? { hits: e.hits } : {}),
+          ...(e.gone ? { gone: true } : {}),
+          ...(e.guildmaster ? { guildmaster: true } : {})
+        }
     }
     return out
   }

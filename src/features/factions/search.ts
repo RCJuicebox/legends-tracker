@@ -199,9 +199,11 @@ export function search(m: Model, keep?: PlanShape): { best: { blocks: Block[]; c
   // Each is one activity run until a faction below zero is back at 0, taken when the factions it
   // brings back are worth more than its time and what it costs the others: one it takes below 0 counts
   // what bringing that one back takes (a later step may), unless an earlier step here brought it back.
+  // Once none is worth adding at the end, a step that would take another below 0 again is tried either
+  // side of the step that brings that one back (see `around`).
   function addLifts(blocks: Block[]): Block[] {
     if (!W) return blocks
-    const out = blocks.slice()
+    let out = blocks.slice()
     const st = fresh()
     run(out, st)
     const lifted = new Uint8Array(F)
@@ -211,6 +213,9 @@ export function search(m: Model, keep?: PlanShape): { best: { blocks: Block[]; c
       let pickN = 0
       let pickI = -1
       let pickR = 0
+      let pickSunk: number[] = []
+      /** Ways that bring one back but take others below 0: worth trying before what brings those back. */
+      const sinking: { k: number; i: number; sunk: number[] }[] = []
       for (let i = 0; i < F; i++) {
         if (st.s[i] >= 0) continue
         for (const k of raisers[i]) {
@@ -221,17 +226,22 @@ export function search(m: Model, keep?: PlanShape): { best: { blocks: Block[]; c
           let up = 0
           let gain = 0
           let lost = 0
+          const sunk: number[] = []
           for (const { i: j, h } of acts[k].touch) {
             const v = st.s[j]
             const after = clamp(v + n * h, STANDING_MIN, STANDING_MAX)
             if (v < 0 && after >= 0) {
               up++
               gain += W
-            } else if (after < 0) gain -= v >= 0 && lifted[j] ? W : below(j, after) - below(j, v)
+            } else if (after < 0) {
+              gain -= v >= 0 && lifted[j] ? W : below(j, after) - below(j, v)
+              if (v >= 0) sunk.push(j)
+            }
             const peakAfter = st.peak[j] || after >= STANDING_MAX
             lost += ((peakAfter ? STANDING_MAX - after : 0) - (st.peak[j] ? STANDING_MAX - v : 0)) * maxedPoint[j]
           }
           if (up <= 0) continue
+          if (sunk.length) sinking.push({ k, i, sunk })
           const value = gain - timeFor(k, n, st.stock, false) * acts[k].risk - setup(k, st, r) - lost
           if (value > best) {
             best = value
@@ -239,11 +249,22 @@ export function search(m: Model, keep?: PlanShape): { best: { blocks: Block[]; c
             pickN = n
             pickI = i
             pickR = r
+            pickSunk = sunk
           }
         }
       }
+      // Nothing worth adding at the end, or what is takes another below 0 again: either side of what
+      // brings that one back may be better.
+      const next = { act: pick, finish: [], lift: [pickI], reach: [] }
+      const moved = !strict ? null : pick < 0 ? around(out, sinking) : pickSunk.length ? around(out, [{ k: pick, i: pickI, sunk: pickSunk }], simulate([...out, next])) : null
+      if (moved) {
+        out = moved.blocks
+        lifted[moved.i] = 1
+        run(out, st)
+        continue
+      }
       if (pick < 0) break
-      out.push({ act: pick, finish: [], lift: [pickI], reach: [] })
+      out.push(next)
       timeFor(pick, pickN, st.stock, true)
       for (const { i: j, h } of acts[pick].touch) if (h > 0 && st.s[j] < 0 && st.s[j] + pickN * h >= 0) lifted[j] = 1
       apply(pick, pickN, st)
@@ -253,6 +274,49 @@ export function search(m: Model, keep?: PlanShape): { best: { blocks: Block[]; c
       checkGoals(st, 0)
     }
     return out
+  }
+
+  /**
+   * A way that brings a faction back but takes another below 0 that a step here brings back, tried
+   * either side of that step, and kept where the whole plan is better for it (the best tried), else null:
+   * - before it, raised past 0 as far as the steps after it take back: the clockworks for Dark Reflection
+   *   while King Ak`Anon is still at -2000, where what they take off it is lost to the floor, to +800, and
+   *   then the ales that bring King Ak`Anon back at 2 Dark Reflection each;
+   * - after everything, that step raising its faction past 0 as far as this one takes back.
+   * Better than `bar`: the plan as it is, or with the way added at the end.
+   */
+  function around(blocks: Block[], ways: { k: number; i: number; sunk: number[] }[], bar = simulate(blocks)): { blocks: Block[]; i: number } | null {
+    let cost = bar
+    let got: { blocks: Block[]; i: number } | null = null
+    for (const { k, i, sunk } of ways) {
+      for (let at = 0; at < blocks.length; at++) {
+        const b = blocks[at]
+        const j = sunk.find((f) => amount(b.act, f) > 0)
+        if (!b.lift.length || j === undefined) continue
+        for (const side of ['before', 'after'] as const) {
+          // Raised past 0 by what the steps after took back, try after try.
+          const f = side === 'before' ? i : j
+          let v = 0
+          for (let tries = 0; tries < 4; tries++) {
+            const trial = blocks.slice()
+            if (side === 'before') trial.splice(at, 0, { act: k, finish: [], lift: [i], reach: [], ...(v > 0 ? { above: [{ i, v }] } : {}) })
+            else {
+              if (v > 0) trial[at] = { ...b, above: [...(b.above ?? []).filter((q) => q.i !== j), { i: j, v }] }
+              trial.push({ act: k, finish: [], lift: [i], reach: [] })
+            }
+            const c = simulate(trial)
+            if (c < cost - 1e-6) {
+              cost = c
+              got = { blocks: trial, i }
+            }
+            const short = -sim.s[f]
+            if (short <= 0 || v >= STANDING_MAX) break
+            v = Math.min(STANDING_MAX, v + short)
+          }
+        }
+      }
+    }
+    return got
   }
 
   /**
@@ -401,7 +465,11 @@ export function search(m: Model, keep?: PlanShape): { best: { blocks: Block[]; c
         const to = actIndex.get(q.for)
         return i !== undefined && to !== undefined && amount(k, i) > 0 ? [{ i, v: q.to, for: to }] : []
       })
-      return finish.length || lift.length || reach.length || b.use ? [{ act: k, finish, lift, reach, ...(b.use ? { use: true } : {}) }] : []
+      const above = (b.above ?? []).flatMap((q) => {
+        const i = index.get(q.faction)
+        return i !== undefined && amount(k, i) > 0 ? [{ i, v: q.to }] : []
+      })
+      return finish.length || lift.length || reach.length || b.use ? [{ act: k, finish, lift, reach, ...(above.length ? { above } : {}), ...(b.use ? { use: true } : {}) }] : []
     })
     // Its steps that bring factions back are in it already.
     strict = true

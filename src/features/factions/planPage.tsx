@@ -742,19 +742,25 @@ function Unmatched({ unmatched, character }: { unmatched: FactionPlanData['wiki'
 
 /**
  * The named mobs no camp holds, by what eqlwiki says of them: not in Legends at all (Allakhazam lists
- * live EverQuest's), or far too tough to farm (Legends' unkillable guildmasters).
+ * live EverQuest's), guildmasters (Legends does not let them be killed), or far too tough to farm.
  */
 function LeftOut({ left }: { left: NonNullable<FactionPlanData['catalog']['leftOut']> }) {
   if (!left.length) return null
+  const guildmasters = left.filter((l) => l.why === 'guildmaster')
   const tough = left.filter((l) => l.why === 'tough')
   const missing = left.filter((l) => l.why === 'missing')
   return (
     <details className="fp-assume">
       <summary>Mobs left out of the kill camps ({left.length})</summary>
       <p className="faint small">
-        Allakhazam lists the NPCs of live EverQuest, and eqlwiki has a page for each named one Legends has. A named mob with no eqlwiki page is taken not to be in Legends, and one
-        with more health than any raid boss of the era is no camp.
+        Allakhazam lists the NPCs of live EverQuest, and eqlwiki has a page for each named one Legends has. A named mob with no eqlwiki page, or one whose page eqlwiki marks as not
+        in the game, is taken not to be in Legends; a guildmaster cannot be killed in Legends; and one with more health than any raid boss of the era is no camp.
       </p>
+      {guildmasters.length > 0 && (
+        <p className="small">
+          <strong>Guildmasters, which cannot be killed:</strong> {guildmasters.map((l) => `${l.name} (${l.zone})`).join(', ')}
+        </p>
+      )}
       {tough.length > 0 && (
         <p className="small">
           <strong>Too tough to farm:</strong> {tough.map((l) => `${l.name} (${l.zone}, ${(l.hp ?? 0).toLocaleString()} HP)`).join(', ')}
@@ -762,7 +768,7 @@ function LeftOut({ left }: { left: NonNullable<FactionPlanData['catalog']['leftO
       )}
       {missing.length > 0 && (
         <p className="small mb-0">
-          <strong>Not in Legends (no eqlwiki page):</strong> {missing.map((l) => `${l.name} (${l.zone})`).join(', ')}
+          <strong>Not in Legends, by eqlwiki:</strong> {missing.map((l) => `${l.name} (${l.zone})`).join(', ')}
         </p>
       )}
     </details>

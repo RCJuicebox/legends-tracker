@@ -13,6 +13,14 @@ export interface NpcInfo {
   respawnSec?: number
   /** What a kill does to each faction the page gives an amount for, as the page names them: - its own, + its foes. */
   hits?: Record<string, number>
+  /** The page is marked for deletion as an NPC not in the game (Elgar Donbrand, Halas): not Legends', page or no. */
+  gone?: boolean
+  /**
+   * Its class is "GM …": a guildmaster, which Legends does not let be killed (Ak'Anon's, found in play
+   * 2026-10-09; Founy Jestands has 2,500,000 HP). The faction pages' "… Guildmaster" notes are not to be
+   * trusted for it: they call West Karana's Chief Goonda one, and he dies like any camp's boss.
+   */
+  guildmaster?: boolean
 }
 
 /** Health past this is no camp: more than any raid boss of the era (Lord Nagafen has 32,000), so one of Legends' guildmasters made not to be killed. */
@@ -108,5 +116,15 @@ export function parseNpcPage(content: string): Omit<NpcInfo, 'found'> {
   const hits: Record<string, number> = {}
   factionAmounts(f.get('factions'), -1, hits)
   factionAmounts(f.get('opposing_factions'), 1, hits)
-  return { ...(hp ? { hp } : {}), ...(respawnSec ? { respawnSec } : {}), ...(Object.keys(hits).length ? { hits } : {}) }
+  // "{{Delete}} Reason for deletion: this NPC does not exist in the game."
+  const gone = /\{\{\s*delete\s*(?:\||\}\})/i.test(content) && /\b(?:does not|doesn't|not) exist|not in (?:the )?game/i.test(plain(content))
+  // "| class = GM [[Necromancer]]"
+  const guildmaster = /^GM\b/i.test(plain(f.get('class') ?? ''))
+  return {
+    ...(hp ? { hp } : {}),
+    ...(respawnSec ? { respawnSec } : {}),
+    ...(Object.keys(hits).length ? { hits } : {}),
+    ...(gone ? { gone } : {}),
+    ...(guildmaster ? { guildmaster } : {})
+  }
 }

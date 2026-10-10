@@ -61,6 +61,11 @@ export interface Block {
   lift: number[]
   /** Factions it is there to raise to what a later block's NPC wants. */
   reach: Reach[]
+  /**
+   * Factions it is there to raise past 0, as far as the steps after it take back (Dark Reflection to
+   * +800 before the ales that bring King Ak`Anon back cost it 800), so they end at 0 or above.
+   */
+  above?: { i: number; v: number }[]
   /** There to hand in what the character holds of its item (the Lizard Meat in the depot), however far that goes toward what it raises. */
   use?: boolean
 }
@@ -472,6 +477,7 @@ export function buildModel(input: PlanInput, settings: PlanSettings, choices: Pl
     for (const i of b.finish) if (!st.done[i]) n = Math.max(n, Math.ceil((STANDING_MAX - st.s[i]) / amount(b.act, i) - EPS))
     for (const i of b.lift) if (st.s[i] < 0) n = Math.max(n, Math.ceil(-st.s[i] / amount(b.act, i) - EPS))
     for (const q of b.reach) if (st.s[q.i] < q.v) n = Math.max(n, Math.ceil((q.v - st.s[q.i]) / amount(b.act, q.i) - EPS))
+    for (const q of b.above ?? []) if (st.s[q.i] < q.v) n = Math.max(n, Math.ceil((q.v - st.s[q.i]) / amount(b.act, q.i) - EPS))
     if (b.use) n = Math.max(n, Math.min(onHand(b.act, st), toDone(b.act, st)))
     return n
   }

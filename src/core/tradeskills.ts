@@ -173,6 +173,8 @@ export interface Purchase {
   /** What the lot cost, in copper. */
   copper: number
   at: number
+  /** The zone it was bought in, where the log had said ("You have entered …"). */
+  zone?: string
 }
 
 const RE_PURCHASE = /^You purchased (?:(\d+) )?(.+?) from (.+?) for\s+(.+)\.$/
