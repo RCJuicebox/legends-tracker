@@ -2,7 +2,7 @@
 
 What changed in each version. The release workflow publishes a version's section as its release notes, and installed copies show them when an update arrives.
 
-## Unreleased
+## 2.10.0 (2026-10-09)
 
 - **Slayer counts go by race, as the game counts them.** A kill used to count toward every achievement whose list had a word of its name or eqlwiki race in it, so giant bats, rattlesnakes and moss snakes ("Giant Snake" on eqlwiki) all went toward Giants: of the kills A Giant Problem gained since one export, half were snakes and bats. Now every mob is given one race in the client's own race names, eqlwiki's older names brought to them (Giant Bat is a Bat, Qeynos Citizen a Human), and counts only toward the achievements that list that race. Kills placed by the mob's name alone show as `+~N` until an export settles them.
 - **Each achievements export teaches the Slayer counts.** When a new export arrives, each achievement's rise is set against the kills since the last one, and what the numbers force is kept: ten giant bats and Giants not moved means bats are not Giants, for every character from then on. It settles what no list says, too: whether a dragon is one of Dragonbane's True Dragons.
