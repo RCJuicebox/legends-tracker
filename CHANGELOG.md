@@ -2,6 +2,11 @@
 
 What changed in each version. The release workflow publishes a version's section as its release notes, and installed copies show them when an update arrives.
 
+## Unreleased
+
+- **Plan › Slayer works through Banestrike in order: Progressive, then Highly Decorated, then A Force of Nature, then Megadeath.** Each tier's achievements are done before the next tier is begun, the one that can be finished soonest first, so each Banestrike rank comes as early as it can. The steps are listed under their tier, with its time. Kills along the way still count toward later tiers.
+- **Fix: Plan › Slayer's Every day list was squeezed into a narrow column.** Each raid lockout is one row now: the zone, the boss, kills a day and days left, then what it is for.
+
 ## 2.11.0 (2026-10-11)
 
 - **Factions › Plan: a Cities plan, Welcome in every city.** Beside the two plans for the achievements (Fastest and Most factions positive, now under **Achievements plan**), the **Cities plan** leaves the achievements alone and gets every starting city's guards to con you Indifferent or better, so you can walk into any of them without being attacked, in the least time. Each city counts its guards' faction (Guards of Qeynos, The Freeport Militia, Neriak's two Dreadguards, Da Bashers, Storm Guard, Emerald Warriors for Kelethin and Felwithe, and the rest) with your race's and best class's modifiers: a Troll from nothing has a long way to go in Qeynos and none in Grobb. The plan keeps them there to the end: a step that takes one city's guards below is made up after, or another way is taken. A **Cities** table shows how each city's guards con you now and the step that wins them over; one no standing will do for as your race says so. **Race unlocks first** still works: on, the race unlocks come first, then the cities.

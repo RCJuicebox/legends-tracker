@@ -10,6 +10,7 @@ import type { HistoryConsumer, LogHistory } from '../../main/sources/logHistory'
 import type { AppContext } from '../../main/context'
 import type { AppFeature } from '../../main/appFeature'
 import {
+  banestrikeTiers,
   buildCamps,
   DEFAULT_CHOICES,
   emptyKillTallies,
@@ -118,7 +119,7 @@ export class SlayerPlanner implements AppFeature {
     const track = ctx.liveAchievements.view
     const since = new Map<string, number>()
     if (track?.character === character && track.slayer?.exportAt === exp.modified) for (const r of track.slayer.rows) since.set(r.name.toLowerCase(), r.since)
-    const goals = slayerGoals(counters, since, optionalSlayer(exp.sections))
+    const goals = slayerGoals(counters, since, optionalSlayer(exp.sections), banestrikeTiers(exp.sections))
     const game = await ctx.gameTables.get(RACE_TABLE)
     const races = new SlayerRaces(counters, game)
     const zones = await this.kills(ctx, character)

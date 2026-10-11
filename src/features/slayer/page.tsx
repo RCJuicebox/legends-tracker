@@ -7,7 +7,7 @@ import { usePickedCharacter } from '../../renderer/src/character'
 import { useNow } from '../../renderer/src/components/TimerBars'
 import { Disclosure, GameCommand, Info, NumberInput, Pending, Tip, ToggleChip } from '../../renderer/src/components/ui'
 import { duration, num, who } from '../../core/format'
-import { DEFAULT_CHOICES, goalsInPlay, planSlayer, type CampSource, type SlayerGoal, type SlayerPlanCamp, type SlayerPlanChoices, type SlayerStep } from './core'
+import { BANESTRIKE, DEFAULT_CHOICES, goalsInPlay, planSlayer, type CampSource, type SlayerGoal, type SlayerPlanCamp, type SlayerPlanChoices, type SlayerStep } from './core'
 
 // Plan › Slayer: the Slayer achievements still open and where to kill for them quickest, step by
 // step (core.ts plans it). Counts are the achievements export plus the kills the log has shown since,
@@ -50,6 +50,9 @@ function useSlayerCharacter() {
 }
 
 const kills = (n: number) => num(Math.ceil(n))
+
+/** A Banestrike tier's name: the meta whose achievements it is. */
+const tierName = (tier: number) => BANESTRIKE[tier] ?? 'Not for Banestrike'
 
 /** "Orc Stomp! 1,989 (done)" for each achievement a step moves. */
 function StepWork({ step, goals }: { step: SlayerStep; goals: SlayerGoal[] }) {
@@ -105,6 +108,18 @@ export function Slayer() {
   }
   const data = q.data?.data
   const plan = useMemo(() => (data ? planSlayer(data, choices) : null), [data, choices])
+  // The steps by Banestrike tier, in the plan's order: where each tier's run starts and ends, and its time.
+  const tiers = useMemo(() => {
+    const out: { tier: number; from: number; to: number; seconds: number }[] = []
+    plan?.steps.forEach((st, i) => {
+      const last = out.at(-1)
+      if (last && last.tier === st.tier) {
+        last.to = i + 1
+        last.seconds += st.seconds + st.travel
+      } else out.push({ tier: st.tier, from: i, to: i + 1, seconds: st.seconds + st.travel })
+    })
+    return out
+  }, [plan])
   const inPlay = useMemo(() => new Set(data ? goalsInPlay(data.goals, choices) : []), [data, choices])
   const sections = useMemo(() => {
     const by = new Map<string, number[]>()
@@ -189,17 +204,32 @@ export function Slayer() {
                 <ul className="fp-steps">
                   {plan.daily.map((d) => (
                     <li key={d.camp.id} className="fp-step">
+                      <Tip className="fp-num" text="A raid lockout: every day">
+                        ↻
+                      </Tip>
                       <div className="fp-body">
                         <div className="fp-head">
                           <span className="fp-zone">{d.camp.zone}</span>
                           <span className="small">{d.camp.mobs.join(', ')}</span>
                           <span className="spacer" />
-                          <span className="mono">{d.days} days</span>
+                          <span className="mono fp-time">
+                            {Math.max(...d.goals.map((g) => d.camp.pace[g] ?? 0))} a day · {d.days} days
+                          </span>
                         </div>
-                        <div className="small">{d.goals.map((g) => `${data.goals[g].name} ${num(data.goals[g].count)}/${num(data.goals[g].max)}`).join(' · ')}</div>
+                        <div className="small">
+                          {d.goals.map((g) => (
+                            <span key={g}>
+                              {data.goals[g].name}{' '}
+                              <span className="mono">
+                                {num(data.goals[g].count)}/{num(data.goals[g].max)}
+                              </span>{' '}
+                              <span className="faint">({tierName(data.goals[g].tier)})</span>
+                            </span>
+                          ))}
+                        </div>
                         {d.camp.note && (
                           <div className="faint small">
-                            {d.camp.note} <span className="faint">({d.camp.said})</span>
+                            {d.camp.note} ({d.camp.said})
                           </div>
                         )}
                       </div>
@@ -216,43 +246,56 @@ export function Slayer() {
                   <span className="spacer" />
                   <span className="faint small mono">≈ {duration(plan.seconds)}</span>
                 </h2>
-                <ol className="fp-steps">
-                  {plan.steps.map((st, i) => (
-                    <li key={st.camp.id + i} className="fp-step">
-                      <span className="fp-num">{i + 1}</span>
-                      <div className="fp-body">
-                        <div className="fp-head">
-                          <span className="fp-zone">{st.camp.zone}</span>
-                          <Tip className={`chip fp-kind ${st.camp.source === 'log' ? 'kill' : 'quest'}`} text={SOURCE[st.camp.source].tip}>
-                            {SOURCE[st.camp.source].label}
-                          </Tip>
-                          <span className="spacer" />
-                          <Tip className="mono" text="Kills toward the achievements, counting each kill once">
-                            ×{kills(Math.max(...Object.values(st.kills)))}
-                          </Tip>
-                          <Tip className="mono fp-time" text={st.travel ? `Including ${duration(st.travel)} to get there` : 'Time killing there'}>
-                            {duration(st.seconds + st.travel)}
-                          </Tip>
-                        </div>
-                        <StepWork step={st} goals={data.goals} />
-                        {st.camp.mobs.length > 0 && <div className="faint small fp-mobs">{st.camp.mobs.slice(0, 8).join(', ')}</div>}
-                        <div className="row tight fp-effects">
-                          <FactionCost camp={st.camp} />
-                          {st.camp.note && <span className="faint small">{st.camp.note}</span>}
-                          <span className="spacer" />
-                          <span className="faint small">
-                            {st.camp.source === 'log' && st.camp.hours
-                              ? `${num(st.camp.kills ?? 0)} kills in ${duration(st.camp.hours * 3600)} there`
-                              : st.camp.said && `said by ${st.camp.said}`}
-                          </span>
-                          <button className="btn small ghost" onClick={() => ruleOut(st.camp.id, true)} title="Leave this camp out of the plan">
-                            Rule out
-                          </button>
-                        </div>
-                      </div>
-                    </li>
-                  ))}
-                </ol>
+                {tiers.map(({ tier, from, to, seconds }) => (
+                  <div key={tier} className="mb-8">
+                    <h3 className="row tight">
+                      {tierName(tier)}
+                      {tier < BANESTRIKE.length - 1 && <span className="faint small">Banestrike rank {tier + 2}</span>}
+                      <span className="spacer" />
+                      <span className="faint small mono">≈ {duration(seconds)}</span>
+                    </h3>
+                    <ol className="fp-steps" start={from + 1}>
+                      {plan.steps.slice(from, to).map((st, j) => {
+                        const i = from + j
+                        return (
+                          <li key={st.camp.id + i} className="fp-step">
+                            <span className="fp-num">{i + 1}</span>
+                            <div className="fp-body">
+                              <div className="fp-head">
+                                <span className="fp-zone">{st.camp.zone}</span>
+                                <Tip className={`chip fp-kind ${st.camp.source === 'log' ? 'kill' : 'quest'}`} text={SOURCE[st.camp.source].tip}>
+                                  {SOURCE[st.camp.source].label}
+                                </Tip>
+                                <span className="spacer" />
+                                <Tip className="mono" text="Kills toward the achievements, counting each kill once">
+                                  ×{kills(Math.max(...Object.values(st.kills)))}
+                                </Tip>
+                                <Tip className="mono fp-time" text={st.travel ? `Including ${duration(st.travel)} to get there` : 'Time killing there'}>
+                                  {duration(st.seconds + st.travel)}
+                                </Tip>
+                              </div>
+                              <StepWork step={st} goals={data.goals} />
+                              {st.camp.mobs.length > 0 && <div className="faint small fp-mobs">{st.camp.mobs.slice(0, 8).join(', ')}</div>}
+                              <div className="row tight fp-effects">
+                                <FactionCost camp={st.camp} />
+                                {st.camp.note && <span className="faint small">{st.camp.note}</span>}
+                                <span className="spacer" />
+                                <span className="faint small">
+                                  {st.camp.source === 'log' && st.camp.hours
+                                    ? `${num(st.camp.kills ?? 0)} kills in ${duration(st.camp.hours * 3600)} there`
+                                    : st.camp.said && `said by ${st.camp.said}`}
+                                </span>
+                                <button className="btn small ghost" onClick={() => ruleOut(st.camp.id, true)} title="Leave this camp out of the plan">
+                                  Rule out
+                                </button>
+                              </div>
+                            </div>
+                          </li>
+                        )
+                      })}
+                    </ol>
+                  </div>
+                ))}
               </div>
             ) : (
               <div className="card empty mb-16">

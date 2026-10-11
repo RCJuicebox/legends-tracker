@@ -94,6 +94,35 @@ export interface SlayerGoal {
   max: number
   /** Only an optional part of the meta achievements that hold it (out of era, most of them). */
   optional: boolean
+  /** The Banestrike tier it is needed for (BANESTRIKE's index), or BANESTRIKE.length for none. */
+  tier: number
+}
+
+/** An achievement's name as the metas name it: "Catnipped in the bud." is Catnipped In the Bud. */
+const metaName = (s: string) => s.toLowerCase().replace(/\s+/g, ' ').trim().replace(/\.+$/, '')
+
+/** The Slayer metas, in the order the plan works through them: each raises Banestrike a rank, Megadeath crowns them. */
+export const BANESTRIKE = ['Progressive', 'Highly Decorated', 'A Force of Nature', 'Megadeath'] as const
+
+/**
+ * Each achievement the Slayer metas name, lower-cased, with the first tier that needs it: Progressive's
+ * are 0, Highly Decorated's 1, A Force of Nature's 2, what Megadeath names besides the three 3.
+ */
+export function banestrikeTiers(sections: AchSection[]): Map<string, number> {
+  const out = new Map<string, number>()
+  const LINK = /^(?:\(Optional\)\s*)?Complete the achievement "(.+)"\.?$/i
+  BANESTRIKE.forEach((meta, tier) => {
+    const a = sections
+      .filter((s) => s.cat === 'Slayer')
+      .flatMap((s) => s.ach)
+      .find((x) => metaName(x.n) === metaName(meta))
+    for (const o of a?.c ?? []) {
+      const m = LINK.exec(o.t.trim())
+      const name = m && metaName(m[1])
+      if (name && !out.has(name)) out.set(name, tier)
+    }
+  })
+  return out
 }
 
 /**
@@ -111,7 +140,7 @@ export function optionalSlayer(sections: AchSection[]): Set<string> {
       for (const o of a.c) {
         // The parser keeps "(Optional)" as a flag; the text may still carry it.
         const m = LINK.exec(o.t.trim())
-        if (m) (o.o || m[1] ? optional : required).add(m[2].toLowerCase())
+        if (m) (o.o || m[1] ? optional : required).add(metaName(m[2]))
       }
   }
   for (const r of required) optional.delete(r)
@@ -132,14 +161,20 @@ export function slayerRaceLists(sections: AchSection[], game: RaceTable): Map<st
 }
 
 /** The open Slayer achievements, with their counts now: the export's, plus `since` (lower-cased name → kills since). */
-export function slayerGoals(counters: SlayerCounter[], since: ReadonlyMap<string, number>, optional: ReadonlySet<string>): SlayerGoal[] {
+export function slayerGoals(
+  counters: SlayerCounter[],
+  since: ReadonlyMap<string, number>,
+  optional: ReadonlySet<string>,
+  tiers: ReadonlyMap<string, number> = new Map()
+): SlayerGoal[] {
   return counters.map((c) => ({
     name: c.name,
     section: c.section,
     races: c.races,
     count: Math.min(c.max, c.count + (since.get(c.name.toLowerCase()) ?? 0)),
     max: c.max,
-    optional: optional.has(c.name.toLowerCase())
+    optional: optional.has(metaName(c.name)),
+    tier: tiers.get(metaName(c.name)) ?? BANESTRIKE.length
   }))
 }
 
@@ -313,6 +348,8 @@ export interface SlayerStep {
   kills: Record<number, number>
   /** Goals it finishes. */
   finishes: number[]
+  /** The Banestrike tier it works toward. */
+  tier: number
 }
 
 /** A raid lockout to run each day beside the plan. */
@@ -367,66 +404,54 @@ export function planSlayer(data: Pick<SlayerPlanData, 'goals' | 'camps'>, choice
     if (fed.length) daily.push({ camp: c, days: Math.ceil(Math.max(...fed.map((g) => (need.get(g) ?? 0) / perDay(g)))), goals: fed })
   }
   const travelSec = choices.travelMin * 60
+  const tierOf = (g: number) => data.goals[g].tier ?? BANESTRIKE.length
   const steps: SlayerStep[] = []
   let at = ''
-  for (let guard = 0; guard < 500; guard++) {
-    let best: { c: SlayerPlanCamp; secs: number; score: number; fed: number[] } | null = null
-    for (const c of hourly) {
-      const fed = goals.filter((g) => !onlyDaily.has(g) && (need.get(g) ?? 0) > 0 && paceOf(c, g) > 0)
-      if (!fed.length) continue
-      // Until the first achievement it feeds is done.
-      const secs = Math.min(...fed.map((g) => ((need.get(g) ?? 0) / paceOf(c, g)) * 3600))
-      const work = fed.reduce((s, g) => s + Math.min(need.get(g) ?? 0, (paceOf(c, g) * secs) / 3600), 0)
-      const score = work / (secs + (c.id === at ? 0 : travelSec))
-      if (!best || score > best.score) best = { c, secs, score, fed }
+  // Banestrike's tiers in turn, each done before the next is begun; within a tier, the achievement
+  // that can be finished soonest, travel counted, first. Every kill still counts toward whatever
+  // else its race feeds, a later tier's too.
+  for (const tier of [...new Set(goals.map(tierOf))].sort((a, b) => a - b)) {
+    const from = steps.length
+    for (let guard = 0; guard < 500; guard++) {
+      let best: { c: SlayerPlanCamp; secs: number; cost: number; work: number } | null = null
+      for (const c of hourly) {
+        const fed = goals.filter((g) => tierOf(g) === tier && !onlyDaily.has(g) && (need.get(g) ?? 0) > 0 && paceOf(c, g) > 0)
+        if (!fed.length) continue
+        // Until the first of this tier's achievements it feeds is done.
+        const secs = Math.min(...fed.map((g) => ((need.get(g) ?? 0) / paceOf(c, g)) * 3600))
+        const cost = secs + (c.id === at ? 0 : travelSec)
+        // As soon: the camp doing more besides.
+        const work = goals.reduce((s, g) => s + Math.min(need.get(g) ?? 0, (paceOf(c, g) * secs) / 3600), 0)
+        if (!best || cost < best.cost - 1e-6 || (Math.abs(cost - best.cost) <= 1e-6 && work > best.work)) best = { c, secs, cost, work }
+      }
+      if (!best) break
+      const { c, secs } = best
+      const kills: Record<number, number> = {}
+      for (const g of goals) {
+        const k = Math.min(need.get(g) ?? 0, (paceOf(c, g) * secs) / 3600)
+        if (k <= 0) continue
+        kills[g] = k
+        need.set(g, (need.get(g) ?? 0) - k)
+      }
+      // Staying on at the same camp is one step.
+      const prev = steps.length > from ? steps[steps.length - 1] : null
+      if (prev?.camp.id === c.id) {
+        prev.seconds += secs
+        for (const [g, k] of Object.entries(kills)) prev.kills[+g] = (prev.kills[+g] ?? 0) + k
+      } else steps.push({ camp: c, seconds: secs, travel: 0, kills, finishes: [], tier })
+      at = c.id
     }
-    if (!best) break
-    const { c, secs, fed } = best
-    const kills: Record<number, number> = {}
-    const finishes: number[] = []
-    for (const g of fed) {
-      const k = Math.min(need.get(g) ?? 0, (paceOf(c, g) * secs) / 3600)
-      kills[g] = k
-      const left = (need.get(g) ?? 0) - k
-      need.set(g, left)
-      if (left <= 1e-6) finishes.push(g)
-    }
-    const prev = steps.at(-1)
-    if (prev && prev.camp.id === c.id) {
-      prev.seconds += secs
-      for (const [g, k] of Object.entries(kills)) prev.kills[+g] = (prev.kills[+g] ?? 0) + k
-      prev.finishes.push(...finishes)
-    } else steps.push({ camp: c, seconds: secs, travel: at ? travelSec : 0, kills, finishes })
-    at = c.id
   }
   const unplanned = goals.filter((g) => (need.get(g) ?? 0) > 1e-6 && !onlyDaily.has(g))
-  const merged = oneVisitEach(steps, data.goals, goals, travelSec)
-  return { steps: merged, daily, seconds: merged.reduce((s, st) => s + st.seconds + st.travel, 0), unplanned, goals }
-}
-
-/**
- * The steps with every camp visited once, at its first place in the plan: a camp's kills toward each
- * goal are the same however its time is split, so joining its visits keeps every count and saves the
- * travel back. What each step finishes is worked out again in the new order.
- */
-function oneVisitEach(steps: SlayerStep[], all: SlayerGoal[], goals: number[], travelSec: number): SlayerStep[] {
-  const by = new Map<string, SlayerStep>()
-  for (const st of steps) {
-    const had = by.get(st.camp.id)
-    if (!had) {
-      by.set(st.camp.id, { ...st, kills: { ...st.kills }, finishes: [] })
-      continue
-    }
-    had.seconds += st.seconds
-    for (const [g, k] of Object.entries(st.kills)) had.kills[+g] = (had.kills[+g] ?? 0) + k
-  }
-  const need = new Map(goals.map((g) => [g, all[g].max - all[g].count]))
-  return [...by.values()].map((st, i) => {
+  // What each step finishes, and the travel to it, in the order they are done.
+  const left = new Map(goals.map((g) => [g, data.goals[g].max - data.goals[g].count]))
+  steps.forEach((st, i) => {
+    st.travel = i && steps[i - 1].camp.id !== st.camp.id ? travelSec : 0
     for (const [g, k] of Object.entries(st.kills)) {
-      const left = (need.get(+g) ?? 0) - k
-      need.set(+g, left)
-      if (left <= 1e-6) st.finishes.push(+g)
+      const l = (left.get(+g) ?? 0) - k
+      left.set(+g, l)
+      if (l <= 1e-6 && l + k > 1e-6) st.finishes.push(+g)
     }
-    return { ...st, travel: i ? travelSec : 0 }
   })
+  return { steps, daily, seconds: steps.reduce((s, st) => s + st.seconds + st.travel, 0), unplanned, goals }
 }

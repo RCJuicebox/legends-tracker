@@ -748,8 +748,11 @@ in (`src/shared/game/slayerCamps.ts`, dated: the EQL Discord's Slayer talk, and 
 the app), then eqlwiki's count of the race's NPCs in a zone, marked a guess; eqlwiki's zones are
 also offered beside a camp your logs make a crawl (under ten an hour).
 
-The plan takes the camp that does the most still-open work an hour, travel counted, until its first
-achievement is done, and again; then each camp's time is joined into one visit. Raid lockouts
+The plan works through Banestrike's tiers in turn: Progressive's achievements first (Banestrike rank
+2), then Highly Decorated's (rank 3), A Force of Nature's (rank 4) and what Megadeath names besides,
+each tier done before the next is begun. Within a tier it takes the achievement that can be finished
+soonest, travel counted, then the next; every kill still counts toward whatever else its race feeds,
+a later tier's too. Staying on at one camp is one step. Raid lockouts
 (Phinigel Autropos, the only kedge; Lady Vox and Lord Nagafen for the true dragons) give a kill a
 difficulty a day, so they are listed beside the plan with the days they take, the lockouts that feed
 one achievement together. Each step says what it moves and finishes, the mobs, where the pace came

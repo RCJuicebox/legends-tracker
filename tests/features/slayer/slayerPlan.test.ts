@@ -3,6 +3,7 @@ import { parseAchievements } from '../../../src/core/achievements'
 import { parseRaceTable } from '../../../src/core/raceNames'
 import { SlayerRaces, slayerCounters } from '../../../src/core/slayer'
 import {
+  banestrikeTiers,
   buildCamps,
   campZone,
   DEFAULT_CHOICES,
@@ -31,7 +32,8 @@ const EXPORT = [
   'I\t\tComplete the achievement "Re-Extinction"',
   'I\t\t(Optional) Complete the achievement "Sarnak Slayer"',
   'I\tHighly Decorated',
-  'I\t\tComplete the achievement "A Giant Problem"',
+  // As the game writes some: another case, and a full stop inside the quotes.
+  'I\t\tComplete the achievement "A giant problem."',
   'Slayer: Conquest',
   'I\tOrc Stomp!',
   'I\t\tOrcs and Wereorcs.\t4900/5000',
@@ -170,7 +172,7 @@ describe('Slayer plan: the camps', () => {
 })
 
 describe('Slayer plan: the plan', () => {
-  const g = (name: string, count: number, max: number): SlayerGoal => ({ name, section: 'Slayer: Conquest', races: '', count, max, optional: false })
+  const g = (name: string, count: number, max: number, tier = 4): SlayerGoal => ({ name, section: 'Slayer: Conquest', races: '', count, max, optional: false, tier })
   const goals = [g('Orc Stomp!', 4900, 5000), g('Might They Be Giants?', 4950, 5000), g('A Giant Problem', 980, 1000), g('Re-Extinction', 40, 50)]
   const camps: SlayerPlanCamp[] = [
     { id: 'log:Clan Crushbone', zone: 'Clan Crushbone', mobs: [], source: 'log', pace: { 0: 100 } },
@@ -178,18 +180,41 @@ describe('Slayer plan: the plan', () => {
     { id: 'play:Kedge Keep', zone: 'Kedge Keep', mobs: [], source: 'play', pace: { 3: 5 }, daily: true }
   ]
 
-  it('takes the camp doing the most open work a second, travel counted, until its first achievement is done', () => {
+  it('finishes the achievement that can be done soonest first, travel counted, every kill counting toward all its race feeds', () => {
     const plan = planSlayer({ goals, camps }, DEFAULT_CHOICES)
-    // Crushbone: 100 orcs in an hour and ten minutes' travel; the Permafrost: 40 in twenty minutes and ten.
+    // A Giant Problem is done in twenty minutes in the Permafrost, Orc Stomp! in an hour at Crushbone; then the giants
+    // go on where they are (half an hour, no travel) before Crushbone: one visit to the Permafrost.
     expect(plan.steps.map((s) => [s.camp.id, Math.round(s.seconds), s.travel, s.finishes])).toEqual([
-      ['log:Clan Crushbone', 3600, 0, [0]],
-      // A Giant Problem is done first, then the giants go on at the same camp: one step.
-      ['log:The Permafrost Caverns', 3000, 600, [1, 2]]
+      ['log:The Permafrost Caverns', 3000, 0, [1, 2]],
+      ['log:Clan Crushbone', 3600, 600, [0]]
     ])
     expect(Math.round(plan.seconds)).toBe(7200)
     // Ten kedge at five a day, beside the plan.
     expect(plan.daily.map((d) => [d.camp.id, d.days, d.goals])).toEqual([['play:Kedge Keep', 2, [3]]])
     expect(plan.unplanned).toEqual([])
+  })
+
+  it('works through Banestrike’s tiers in turn, however much quicker a later one is', () => {
+    // Orc Stomp! for Progressive, the giants for Highly Decorated: Crushbone first, slower as it is.
+    const tiered = [g('Orc Stomp!', 4900, 5000, 0), g('Might They Be Giants?', 4950, 5000, 1), g('A Giant Problem', 980, 1000, 1)]
+    const plan = planSlayer({ goals: tiered, camps: camps.slice(0, 2) }, DEFAULT_CHOICES)
+    expect(plan.steps.map((s) => [s.camp.id, s.tier])).toEqual([
+      ['log:Clan Crushbone', 0],
+      ['log:The Permafrost Caverns', 1]
+    ])
+  })
+
+  it('reads each achievement’s tier from the metas that name it', () => {
+    const tiers = banestrikeTiers(sections)
+    expect(Object.fromEntries(tiers)).toEqual({ barbarous: 0, 're-extinction': 0, 'sarnak slayer': 0, 'a giant problem': 1 })
+    expect(slayerGoals(counters, new Map(), new Set(), tiers).map((x) => [x.name, x.tier])).toEqual([
+      ['Orc Stomp!', 4],
+      ['Might They Be Giants?', 4],
+      ['A Giant Problem', 1],
+      ['Barbarous', 0],
+      ['Re-Extinction', 0],
+      ['Sarnak Slayer', 0]
+    ])
   })
 
   it('says what nothing feeds, and leaves out the camps ruled out', () => {

@@ -30,8 +30,8 @@ const data: SlayerPlanData = {
   character: 'Kelwyn_neriak',
   export: { file: 'Kelwyn_neriak-Achievements.txt', modified: Date.now() - 3600_000 },
   goals: [
-    { name: 'Orc Stomp!', section: 'Slayer: Conquest', races: 'Orcs and Wereorcs.', count: 4900, max: 5000, optional: false },
-    { name: 'Re-Extinction', section: 'Slayer: Skill', races: 'Kedge', count: 40, max: 50, optional: false }
+    { name: 'Orc Stomp!', section: 'Slayer: Conquest', races: 'Orcs and Wereorcs.', count: 4900, max: 5000, optional: false, tier: 0 },
+    { name: 'Re-Extinction', section: 'Slayer: Skill', races: 'Kedge', count: 40, max: 50, optional: false, tier: 0 }
   ],
   camps: [
     {
@@ -104,7 +104,9 @@ it('draws the plan, the lockouts beside it, and keeps a camp ruled out', async (
   expect(text).toContain('costs Kaladim Residents −40 an hour')
   // Ten kedge at five a day.
   expect(text).toContain('Every day')
-  expect(text).toContain('2 days')
+  expect(text).toContain('5 a day · 2 days')
+  // The steps under the Banestrike tier they work toward.
+  expect(text).toContain('ProgressiveBanestrike rank 2')
   expect(text).toContain('a mystery ×3')
   const out = [...host.querySelectorAll('button')].find((b) => b.textContent === 'Rule out')!
   await act(async () => out.click())
