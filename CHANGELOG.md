@@ -2,7 +2,7 @@
 
 What changed in each version. The release workflow publishes a version's section as its release notes, and installed copies show them when an update arrives.
 
-## Unreleased
+## 2.11.1 (2026-10-11)
 
 - **Plan › Slayer works through Banestrike in order: Progressive, then Highly Decorated, then A Force of Nature, then Megadeath.** Each tier's achievements are done before the next tier is begun, the one that can be finished soonest first, so each Banestrike rank comes as early as it can. The steps are listed under their tier, with its time. Kills along the way still count toward later tiers.
 - **Fix: Plan › Slayer's Every day list was squeezed into a narrow column.** Each raid lockout is one row now: the zone, the boss, kills a day and days left, then what it is for.
