@@ -95,9 +95,9 @@ export interface Way {
   rateFrom: UnitTime['from']
 }
 
-/** A way to raise a faction by `h` a unit from `standing` to 2000: what the character holds goes first, as in the plan. */
-export function wayFor(a: PlanActivity, h: number, standing: number, unit: UnitTime, travel: number): Way {
-  const units = Math.max(0, Math.ceil((STANDING_MAX - standing) / h - EPS))
+/** A way to raise a faction by `h` a unit from `standing` to 2000 (or `to`): what the character holds goes first, as in the plan. */
+export function wayFor(a: PlanActivity, h: number, standing: number, unit: UnitTime, travel: number, to = STANDING_MAX): Way {
+  const units = Math.max(0, Math.ceil((to - standing) / h - EPS))
   const onHand = a.items?.length === 1 && a.items[0].have ? Math.min(units, Math.floor(a.items[0].have / a.items[0].count)) : 0
   return { activity: a, units, seconds: onHand * unit.handSeconds + (units - onHand) * unit.seconds + travel, unitSeconds: unit.seconds, rateFrom: unit.from }
 }

@@ -6,13 +6,17 @@ import type { Block, Model } from './model'
 
 // The plan as the Plan tab shows it (planner.ts): the order the search found (search.ts) as steps,
 // each with how many, how long, what it finishes and what it moves on the way; what is left undone and
-// why; and every way to raise each achievement still open.
+// why; and every way to raise each target still open (an achievement, or a city's guards).
 
 /** The steps of the order found, and all the plan says around them. */
 export function planSteps(m: Model, best: { blocks: Block[]; cost: number }, kept: boolean): FactionPlan {
   const {
     activities,
     targets,
+    aim,
+    floor,
+    satisfied,
+    openAtStart,
     travel,
     T,
     names,
@@ -61,10 +65,12 @@ export function planSteps(m: Model, best: { blocks: Block[]; cost: number }, kep
         const v = st.s[i]
         const after = clamp(v + n * h, STANDING_MIN, STANDING_MAX)
         if (i < T && !st.done[i]) {
-          if (h > 0) raises[f] = Math.min(STANDING_MAX - v, n * h)
+          if (h > 0) raises[f] = Math.min(aim[i] - v, n * h)
           else if (h < 0) lowers[f] = Math.min(n * -h, v - STANDING_MIN)
           continue
         }
+        // A city's guards taken below where they must end: a later step makes it up.
+        if (i < T && h < 0 && after < floor[i]) lowers[f] = v - after
         if (h < 0 && v >= STANDING_MAX) maxedLowered[f] = v - after
         if (v < 0 && after >= 0) lifts.push(f)
         else if (v >= 0 && after < 0) sinks.push(f)
@@ -78,7 +84,7 @@ export function planSteps(m: Model, best: { blocks: Block[]; cost: number }, kep
           if (v < g.lo[j] || v > g.hi[j]) why = { faction: names[g.i[j]], band: g.bands[j], con: Math.round(v + modOf(0, names[g.i[j]])) }
         }
       }
-      const before = Uint8Array.from(st.done)
+      const before = Uint8Array.from(targets, (_, i) => (satisfied(i, st) ? 1 : 0))
       const goalsBefore = st.goal.slice()
       const move = x.zone === st.zone ? 0 : travel
       const swap = setup(b.act, st, r) - move
@@ -86,7 +92,7 @@ export function planSteps(m: Model, best: { blocks: Block[]; cost: number }, kep
       const fast = covered()
       apply(b.act, n, st)
       checkGoals(st, 0)
-      const finishes = targets.flatMap((tg, i) => (st.done[i] && !before[i] ? [tg.faction] : []))
+      const finishes = targets.flatMap((tg, i) => (satisfied(i, st) && !before[i] ? [tg.faction] : []))
       const unlocks = goalNames.filter((_, g) => st.goal[g] && !goalsBefore[g])
       const reaches = b.reach.map((q) => {
         const g = acts[q.for].gate
@@ -148,11 +154,11 @@ export function planSteps(m: Model, best: { blocks: Block[]; cost: number }, kep
     }
   }
   const seconds = steps.reduce((n, step) => n + step.seconds, 0)
-  // What nothing the planner may use gets done, as the plan stands.
-  const unplanned = targets.filter((_, i) => start[i] < STANDING_MAX && !st.done[i]).map((t) => t.faction)
+  // What nothing the planner may use gets done, as the plan stands (or a city's guards it leaves below where they must end).
+  const unplanned = targets.filter((_, i) => !satisfied(i, st)).map((t) => t.faction)
   const unplannedWhy: Record<string, Unplanned> = {}
   targets.forEach((t, i) => {
-    if (start[i] >= STANDING_MAX || st.done[i]) return
+    if (satisfied(i, st)) return
     const ways = activities.filter((a) => (a.hits[t.faction] ?? 0) > 0)
     const usable = ways.filter((a) => lockedIds.has(a.id) || (!a.once && !choices.excluded.includes(a.id)))
     const opens = acts.some((x, k) => mayOpen[k] && credits(k, i) && x.touch.some((u) => u.i === i && u.h > 0))
@@ -188,7 +194,8 @@ export function planSteps(m: Model, best: { blocks: Block[]; cost: number }, kep
   const chosenFor = new Map<string, string>()
   for (const step of steps) for (const f of step.finishes) if (!chosenFor.has(f)) chosenFor.set(f, step.activity.id)
   const used = new Set(steps.map((step) => step.activity.id))
-  const stillOpen = new Set(targets.filter((_, i) => start[i] < STANDING_MAX).map((t) => t.faction))
+  const stillOpen = new Set(targets.filter((_, i) => openAtStart(i)).map((t) => t.faction))
+  const aimOf = new Map(targets.map((t, i) => [t.faction, aim[i]]))
   const options: Record<string, PlanOption[]> = {}
   for (const t of targets) if (stillOpen.has(t.faction)) options[t.faction] = []
   for (const a of activities) {
@@ -200,7 +207,7 @@ export function planSteps(m: Model, best: { blocks: Block[]; cost: number }, kep
       .map(([f]) => f)
     for (const [f, h] of raised)
       options[f].push({
-        ...wayFor(a, h, start[index.get(f)!], unit, travel + swapSeconds(a, settings)),
+        ...wayFor(a, h, start[index.get(f)!], unit, travel + swapSeconds(a, settings), aimOf.get(f)),
         lowersOpen: lowered,
         chosen: chosenFor.get(f) === a.id,
         used: used.has(a.id)

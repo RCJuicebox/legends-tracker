@@ -107,6 +107,34 @@ export const CITY_ZONES = [
   'Shar Vahl'
 ]
 
+/**
+ * The starting cities, and the faction each one's guards fight for: the Plan tab's Cities plan gets them
+ * all to con the character Indifferent or better, so it can walk into any of them. The faction is the one
+ * that drops most when that city's guards die, on eqlwiki's and Allakhazam's kill lists (2026-10-11); most
+ * are among the factions the city's race unlock wants maxed. Both wikis have Kelethin's guards and
+ * Felwithe's on Emerald Warriors. The races Legends adds to the classic twelve start at home too: Iksars
+ * at the New Sebilis Expedition (its troopers), Frogloks at Gukta (Rathe Mountains), Kerrans on Kerra Isle.
+ */
+export const CITY_GUARDS: readonly { city: string; faction: string }[] = [
+  { city: 'Qeynos', faction: 'Guards of Qeynos' },
+  { city: 'Freeport', faction: 'The Freeport Militia' },
+  { city: 'Neriak, Foreign Quarter', faction: 'Dreadguard Outer' },
+  { city: 'Neriak, Commons and Third Gate', faction: 'Dreadguard Inner' },
+  { city: 'Grobb', faction: 'Da Bashers' },
+  { city: 'Oggok', faction: 'Oggok Guards' },
+  { city: 'Kaladim', faction: 'Storm Guard' },
+  { city: "Ak'Anon", faction: 'Gem Choppers' },
+  { city: 'Kelethin', faction: 'Emerald Warriors' },
+  { city: 'Felwithe', faction: 'Emerald Warriors' },
+  { city: 'Erudin', faction: 'High Guard of Erudin' },
+  { city: 'Paineel', faction: 'Heretics' },
+  { city: 'Halas', faction: 'Wolves of the North' },
+  { city: 'Rivervale', faction: 'Guardians of the Vale' },
+  { city: 'Gukta', faction: 'Protectors of Gukta' },
+  { city: 'Kerra Isle', faction: 'Kerra Isle' },
+  { city: 'New Sebilis Expedition', faction: 'New Sebilisian Expedition' }
+]
+
 /** A city's people rather than its vermin: named, or by what they are. */
 export const CITY_PEOPLE =
   /\b(?:guards?|guardsman|citizens?|merchant|guildmaster|banker|captain|sentry|sentinel|watchman|lieutenant|sergeant|priest(?:ess)?|paladin|knight|warden)\b/i

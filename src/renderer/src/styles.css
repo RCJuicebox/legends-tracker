@@ -3576,6 +3576,28 @@ input[aria-invalid='true'] {
 }
 
 /* ---------- factions: the plan ---------- */
+/* The plan's aims, grouped under what each plan is for: the Achievements plan's two, the Cities plan. */
+.fp-aims {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 8px 20px;
+}
+.fp-aim {
+  display: grid;
+  gap: 4px;
+}
+.fp-aim-label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-3);
+  font-weight: 650;
+}
+.fp-aim-says {
+  align-self: flex-end;
+  padding-bottom: 6px;
+}
 .fp-stats {
   display: flex;
   flex-wrap: wrap;

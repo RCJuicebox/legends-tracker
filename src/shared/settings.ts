@@ -238,7 +238,7 @@ export interface PlanSettings {
    * step gives back costs nothing.
    */
   keepMaxed: number
-  /** What the plan aims for: the least time, or also as few factions left below zero as it can. */
+  /** What the plan aims for: the achievements in the least time, or with as few factions left below zero as it can; or every city's guards content. */
   goal: PlanGoal
   /** For the 'positive' goal: what one faction ending at 0 or above is worth, in hours of play. */
   positiveHours: number
@@ -250,8 +250,12 @@ export interface PlanSettings {
   unlocksFirst: boolean
 }
 
-/** 'fastest': every achievement in the least time. 'positive': every achievement, ending with as many factions at 0 or above as is worth the time. */
-export type PlanGoal = 'fastest' | 'positive'
+/**
+ * The Achievements plan's two: 'fastest', every achievement in the least time; 'positive', every
+ * achievement, ending with as many factions at 0 or above as is worth the time. The Cities plan's:
+ * 'cities', every starting city's guards conning the character Indifferent or better, in the least time.
+ */
+export type PlanGoal = 'fastest' | 'positive' | 'cities'
 
 /** What the player chose: an activity locked to an achievement, activities ruled out, their own pace for some. */
 export interface PlanChoices {

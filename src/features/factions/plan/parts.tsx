@@ -17,6 +17,9 @@ export const plain = (n: number) => (n < 0 ? `−${-n}` : String(n))
 /** A standing with thousands separators and a true minus: "1,415", "−702". */
 export const signedPlain = (n: number) => (n < 0 ? `−${(-n).toLocaleString()}` : n.toLocaleString())
 
+/** "a Wood Elf", "an Iksar". */
+export const withArticle = (w: string) => `${/^[aeiou]/i.test(w) ? 'an' : 'a'} ${w}`
+
 /** "Human", "Human or Erudite", "Human, Erudite or Gnome". */
 export const listed = (xs: string[]) => (xs.length < 2 ? (xs[0] ?? '') : `${xs.slice(0, -1).join(', ')} or ${xs[xs.length - 1]}`)
 

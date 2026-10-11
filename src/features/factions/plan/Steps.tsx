@@ -22,7 +22,9 @@ export function Steps({
   onExclude,
   onWork,
   now,
-  hint
+  hint,
+  labels,
+  empty
 }: {
   plan: FactionPlan
   choices: PlanChoices
@@ -34,8 +36,12 @@ export function Steps({
   now: FactionTrackView['current']
   /** Anything to do first for a step, such as a race swap. */
   hint: (st: PlanStep) => ReactNode
+  /** What a faction a step finishes is for, where not an achievement: the city whose guards it contents. */
+  labels?: Record<string, string>
+  /** Said when there are no steps, in place of the achievements' words. */
+  empty?: string
 }) {
-  if (!plan.steps.length) return <div className="card empty mb-16">Nothing the planner knows raises the achievements left. Open each one below for what there is.</div>
+  if (!plan.steps.length) return <div className="card empty mb-16">{empty ?? 'Nothing the planner knows raises the achievements left. Open each one below for what there is.'}</div>
   return (
     <div className="card mb-16">
       <h2>
@@ -98,7 +104,7 @@ export function Steps({
                 )}
                 {a.kind === 'kill' && a.mobs && a.mobs.length > 2 && <div className="faint small fp-mobs">{a.mobs.join(', ')}</div>}
                 <div className="row tight fp-effects">
-                  <Effects step={st} />
+                  <Effects step={st} labels={labels} />
                   <span className="spacer" />
                   <span className="faint small">{sourceNote(a)}</span>
                   {!isNow && (

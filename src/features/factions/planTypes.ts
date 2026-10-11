@@ -7,9 +7,13 @@ import type { Way } from './ways'
 
 export interface PlanTarget {
   faction: string
-  /** The achievement's name ("New Sebilis Expedition" for faction New Sebilisian Expedition). */
+  /** The achievement's name ("New Sebilis Expedition" for faction New Sebilisian Expedition); for a city's guards, the city's ("Qeynos guards"). */
   achievement: string
   standing: number
+  /** The standing it is done at, once there: 2000, an achievement's, unless set (a city's guards: where they con the character Indifferent). */
+  to?: number
+  /** The standing it must end at or above: a step that takes it below has to be made up after (a city's guards, whatever else wants it maxed). */
+  floor?: number
 }
 
 export interface PlanInput {

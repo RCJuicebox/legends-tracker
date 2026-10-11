@@ -158,7 +158,7 @@ function planAssumptions(v: unknown, fb: Partial<PlanSettings>): Partial<PlanSet
     if (typeof x === 'number' && Number.isFinite(x)) out[k] = Math.max(lo, Math.min(hi, x))
     else if (k in v && typeof was[k] === 'number') out[k] = was[k]
   }
-  if (v.goal === 'fastest' || v.goal === 'positive') out.goal = v.goal
+  if (v.goal === 'fastest' || v.goal === 'positive' || v.goal === 'cities') out.goal = v.goal
   else if ('goal' in v && fb.goal) out.goal = fb.goal
   for (const k of ['raceSwaps', 'unlocksFirst'] as const) {
     if (typeof v[k] === 'boolean') out[k] = v[k]

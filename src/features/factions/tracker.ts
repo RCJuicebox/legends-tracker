@@ -23,8 +23,11 @@ export interface FollowStep {
   /** The achievements it finishes (by faction), and the factions it brings back to 0 or above. */
   finish: string[]
   lift: string[]
-  /** Factions it raises to what a later step's NPC wants: the standing, and what to call it ("Miners Guild 628 for Miner's Cap"). */
-  reach?: { faction: string; to: number; label: string }[]
+  /**
+   * Factions it raises to what a later step's NPC wants, or (`city`) where a city's guards con the
+   * character Indifferent: the standing, and what to call it ("Miners Guild 628 for Miner's Cap", "Qeynos guards").
+   */
+  reach?: { faction: string; to: number; label: string; city?: boolean }[]
   /** What one kill or hand-in does to each of those. */
   per: Record<string, number>
   /** As planned: kills or hand-ins, and seconds each (the trip there left out). */
@@ -101,10 +104,14 @@ export const pickStep = (state: FollowState, index: number): FollowState => ({ .
 /** What a read finds worth saying: an achievement done, a step done (with the one to go on to). */
 export type FollowEvent = { kind: 'achievement'; faction: string; name: string } | { kind: 'step'; index: number; step: FollowStep; next: FollowStep | null }
 
-/** A plan as the Plan tab shows it, to follow. */
+/** A plan as the Plan tab shows it, to follow. A city's guards, done at a standing of their own rather than 2000, are followed as factions to raise there. */
 export function followedPlan(plan: FactionPlan, targets: PlanTarget[], at = Date.now()): FollowedPlan {
   const names: Record<string, string> = {}
-  for (const t of targets) if (t.achievement !== t.faction) names[t.faction] = t.achievement
+  const guards = new Map<string, PlanTarget>()
+  for (const t of targets) {
+    if ((t.to ?? STANDING_MAX) < STANDING_MAX) guards.set(t.faction, t)
+    else if (t.achievement !== t.faction) names[t.faction] = t.achievement
+  }
   return {
     at,
     names,
@@ -112,6 +119,13 @@ export function followedPlan(plan: FactionPlan, targets: PlanTarget[], at = Date
       const a = s.activity
       const per: Record<string, number> = {}
       for (const f of [...s.finishes, ...s.lifts, ...s.reaches.map((r) => r.faction)]) if (a.hits[f]) per[f] = a.hits[f]
+      const reach = [
+        ...s.reaches.map((r) => ({ faction: r.faction, to: r.to, label: `${r.faction} for ${r.opens}` })),
+        ...s.finishes.flatMap((f) => {
+          const t = guards.get(f)
+          return t ? [{ faction: f, to: Math.ceil((t.to ?? 0) - 1e-9), label: t.achievement, city: true }] : []
+        })
+      ]
       return {
         id: a.id,
         kind: a.kind,
@@ -119,9 +133,9 @@ export function followedPlan(plan: FactionPlan, targets: PlanTarget[], at = Date
         zone: a.zone,
         ...(a.npc ? { npc: a.npc } : {}),
         ...(a.kind !== 'kill' && a.items?.length ? { items: a.items.map((it) => ({ name: it.name, count: it.count, ...(it.makes ? { makes: it.makes } : {}) })) } : {}),
-        finish: s.finishes,
+        finish: s.finishes.filter((f) => !guards.has(f)),
         lift: s.lifts,
-        ...(s.reaches.length ? { reach: s.reaches.map((r) => ({ faction: r.faction, to: r.to, label: `${r.faction} for ${r.opens}` })) } : {}),
+        ...(reach.length ? { reach } : {}),
         per,
         units: s.units,
         unitSec: s.units > 0 ? Math.max(0, s.seconds - s.travel - s.swap) / s.units : 0
@@ -156,7 +170,7 @@ export function sanitizeFollowedPlan(v: unknown): FollowedPlan | null {
     const reach = (Array.isArray(s.reach) ? s.reach : []).slice(0, 20).flatMap((r: unknown) => {
       const o = r && typeof r === 'object' ? (r as Record<string, unknown>) : null
       return o && isStr(o.faction) && isStr(o.label) && typeof o.to === 'number' && Number.isFinite(o.to)
-        ? [{ faction: o.faction.slice(0, 120), to: finite(o.to, STANDING_MIN, STANDING_MAX), label: o.label.slice(0, 300) }]
+        ? [{ faction: o.faction.slice(0, 120), to: finite(o.to, STANDING_MIN, STANDING_MAX), label: o.label.slice(0, 300), ...(o.city === true ? { city: true } : {}) }]
         : []
     })
     steps.push({
@@ -324,7 +338,14 @@ export function readFollow(
     const goals: FactionTrackGoal[] = [
       ...s.finish.map((f) => ({ faction: f, ...(plan.names[f] ? { achievement: plan.names[f] } : {}), standing: standing(f), to: STANDING_MAX, done: isDone(f) })),
       ...s.lift.map((f) => ({ faction: f, standing: standing(f), to: 0, done: standing(f) >= 0 })),
-      ...(s.reach ?? []).map((r) => ({ faction: r.faction, achievement: r.label, standing: standing(r.faction), to: r.to, done: standing(r.faction) >= r.to }))
+      ...(s.reach ?? []).map((r) => ({
+        faction: r.faction,
+        achievement: r.label,
+        standing: standing(r.faction),
+        to: r.to,
+        done: standing(r.faction) >= r.to,
+        ...(r.city ? { city: true } : {})
+      }))
     ]
     current = {
       index: active,

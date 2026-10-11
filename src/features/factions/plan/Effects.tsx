@@ -2,8 +2,11 @@ import { Tip } from '../../../renderer/src/components/ui'
 import type { PlanStep } from '../planTypes'
 import { plain, signed } from './parts'
 
-/** What a step does to the achievements: done here, raised on the way, lowered, and what it takes off maxed factions. */
-export function Effects({ step }: { step: PlanStep }) {
+/**
+ * What a step does to the achievements: done here, raised on the way, lowered, and what it takes off
+ * maxed factions. `labels` names what a faction done here is for when not an achievement (a city's guards).
+ */
+export function Effects({ step, labels }: { step: PlanStep; labels?: Record<string, string> }) {
   const also = Object.entries(step.raises).filter(([f]) => !step.finishes.includes(f) && !step.reaches.some((r) => r.faction === f))
   const lowers = Object.entries(step.lowers)
   const maxed = Object.entries(step.maxedLowered)
@@ -21,12 +24,15 @@ export function Effects({ step }: { step: PlanStep }) {
           title={
             step.onTheWay[f]
               ? `Done here on the way: you locked it in to ${step.onTheWay[f]}, but this step gets it to 2000 first, so that is not needed for it`
-              : step.locked.includes(f)
-                ? 'Done here, as you locked in'
-                : 'Done here'
+              : labels?.[f]
+                ? `${labels[f]}'s guards con you Indifferent from here`
+                : step.locked.includes(f)
+                  ? 'Done here, as you locked in'
+                  : 'Done here'
           }
         >
           {f}
+          {labels?.[f] ? ` (${labels[f]})` : ''}
           {step.onTheWay[f] ? ' (on the way)' : step.locked.includes(f) ? ' (locked)' : ''}
         </span>
       ))}

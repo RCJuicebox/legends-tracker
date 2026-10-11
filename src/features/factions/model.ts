@@ -90,6 +90,13 @@ export interface State {
 
 /** While race unlocks come first, the greedy build counts a point on one's factions this many times over. */
 const UNLOCK_BOOST = 3
+/** A standing this close to one wanted is there: the amounts a unit adds sum in floating point. */
+const NEAR = 1e-6
+/**
+ * A point taken off a city's guards below where they must end, where nothing known raises them back: so
+ * many of the usual point's worth (the loss stands for good).
+ */
+const LOST_FLOOR = 100
 /** How much to trust a figure: the log's own, seen often, most; the wiki's guesses least. */
 function riskOf(a: PlanActivity, choices: PlanChoices, locked: boolean): number {
   if (locked || choices.perHour[a.id] > 0) return 1
@@ -117,9 +124,18 @@ export function buildModel(input: PlanInput, settings: PlanSettings, choices: Pl
   const openGoals = (input.unlocks ?? []).filter((g) => g.factions.length > 0 || (g.anyOf?.length ?? 0) > 0)
   const targets: PlanTarget[] = [...input.targets]
   for (const g of openGoals)
-    for (const f of g.factions) if (!targets.some((t) => t.faction === f)) targets.push({ faction: f, achievement: g.achievement, standing: known[f] ?? 0 })
+    for (const f of g.factions) {
+      const at = targets.findIndex((t) => t.faction === f)
+      if (at < 0) targets.push({ faction: f, achievement: g.achievement, standing: known[f] ?? 0 })
+      // A city's guards the unlock wants maxed: to 2000 for it, and still where they are content at the end.
+      else if ((targets[at].to ?? STANDING_MAX) < STANDING_MAX)
+        targets[at] = { ...targets[at], achievement: g.achievement, to: STANDING_MAX, floor: targets[at].floor ?? targets[at].to }
+    }
   const travel = settings.travelMin * 60
   const T = targets.length
+  /** The standing each target is done at (2000 for an achievement), and the one it must end at or above (-Infinity: none). */
+  const aim = Float64Array.from(targets, (t) => clamp(t.to ?? STANDING_MAX, STANDING_MIN, STANDING_MAX))
+  const floor = Float64Array.from(targets, (t) => (t.floor === undefined ? -Infinity : clamp(t.floor, STANDING_MIN, STANDING_MAX)))
   /** One faction ending at 0 or above, in seconds; nothing when only time counts. */
   const W = settings.goal === 'positive' ? Math.max(0, settings.positiveHours) * 3600 : 0
   // Every faction whose standing is known: the targets first (index below T), then the rest, then the ones only an NPC's con wants.
@@ -338,11 +354,16 @@ export function buildModel(input: PlanInput, settings: PlanSettings, choices: Pl
     goalAt: new Float64Array(G)
   }
   for (let i = 0; i < F; i++) {
-    if (start[i] < STANDING_MAX) continue
-    base.peak[i] = 1
-    if (i < T) base.done[i] = 1
+    if (start[i] >= STANDING_MAX) base.peak[i] = 1
+    if (i < T && start[i] >= aim[i] - NEAR) base.done[i] = 1
   }
   checkGoals(base, 0)
+  /** Whether target i is where the plan wants it: done (it has been at its standing), and not fallen below where it must end since. */
+  const satisfied = (i: number, st: State) => st.done[i] === 1 && st.s[i] >= floor[i] - NEAR
+  /** The standing target i still wants: its own until done, then, while below it, where it must end; NaN when neither. */
+  const need = (i: number, st: State) => (!st.done[i] ? aim[i] : st.s[i] < floor[i] - NEAR ? floor[i] : NaN)
+  /** Whether target i is still to do at the start. */
+  const openAtStart = (i: number) => !satisfied(i, base)
   const fresh = (): State => ({
     ...base,
     s: base.s.slice(),
@@ -447,34 +468,39 @@ export function buildModel(input: PlanInput, settings: PlanSettings, choices: Pl
     }
     return covered * x.hand + (n - covered) * x.unit
   }
-  /** n units of k: standings move; achievements that reach 2000 are done. How many were done by it. */
+  /** n units of k: standings move; targets that reach their standing (an achievement's 2000) are done. How many were done by it. */
   const apply = (k: number, n: number, st: State) => {
     let newly = 0
     for (const { i, h } of acts[k].touch) {
       const v = clamp(st.s[i] + n * h, STANDING_MIN, STANDING_MAX)
       st.s[i] = v
-      if (v >= STANDING_MAX) {
-        st.peak[i] = 1
-        if (i < T && !st.done[i]) {
-          st.done[i] = 1
-          newly++
-        }
+      if (v >= STANDING_MAX) st.peak[i] = 1
+      if (i < T && !st.done[i] && v >= aim[i] - NEAR) {
+        st.done[i] = 1
+        newly++
       }
     }
     return newly
   }
   /** Units of k what the character holds covers. */
   const onHand = (k: number, st: State) => (acts[k].slot >= 0 ? Math.floor(st.stock[acts[k].slot] / acts[k].per + EPS) : 0)
-  /** Units of k until every achievement still to do that it raises is done. */
+  /** Units of k until every target still to do that it raises is where it is wanted. */
   const toDone = (k: number, st: State) => {
     let n = 0
-    for (const { i, h } of acts[k].touch) if (i < T && h > 0 && !st.done[i] && credits(k, i)) n = Math.max(n, Math.ceil((STANDING_MAX - st.s[i]) / h - EPS))
+    for (const { i, h } of acts[k].touch) {
+      if (i >= T || h <= 0 || !credits(k, i)) continue
+      const v = need(i, st)
+      if (!Number.isNaN(v)) n = Math.max(n, Math.ceil((v - st.s[i]) / h - EPS))
+    }
     return n
   }
-  /** Units a block runs: until the achievements it is there for are done, the factions it lifts are at 0 or above and the ones it raises for a quest are there; 0 when they already are. */
+  /** Units a block runs: until the targets it is there for are where they are wanted, the factions it lifts are at 0 or above and the ones it raises for a quest are there; 0 when they already are. */
   const blockUnits = (b: Block, st: State) => {
     let n = 0
-    for (const i of b.finish) if (!st.done[i]) n = Math.max(n, Math.ceil((STANDING_MAX - st.s[i]) / amount(b.act, i) - EPS))
+    for (const i of b.finish) {
+      const v = need(i, st)
+      if (!Number.isNaN(v)) n = Math.max(n, Math.ceil((v - st.s[i]) / amount(b.act, i) - EPS))
+    }
     for (const i of b.lift) if (st.s[i] < 0) n = Math.max(n, Math.ceil(-st.s[i] / amount(b.act, i) - EPS))
     for (const q of b.reach) if (st.s[q.i] < q.v) n = Math.max(n, Math.ceil((q.v - st.s[q.i]) / amount(b.act, q.i) - EPS))
     for (const q of b.above ?? []) if (st.s[q.i] < q.v) n = Math.max(n, Math.ceil((q.v - st.s[q.i]) / amount(b.act, q.i) - EPS))
@@ -498,9 +524,10 @@ export function buildModel(input: PlanInput, settings: PlanSettings, choices: Pl
 
   // ---- greedy: the achievements ----
   /**
-   * What n units of k do for the plan, in seconds of work: points on achievements still to do (a race
-   * unlock's weigh more while they come first), less points taken off them and off factions that were
-   * at 2000, and for the 'positive' goal what it saves or adds in bringing factions back to 0.
+   * What n units of k do for the plan, in seconds of work: points on targets still to do (a race unlock's
+   * weigh more while they come first), less points taken off them, off a city's guards below where they
+   * must end (points put back there count as on one still to do) and off factions that were at 2000,
+   * and for the 'positive' goal what it saves or adds in bringing factions back to 0.
    */
   const valueOf = (k: number, n: number, st: State) => {
     let gain = 0
@@ -510,20 +537,31 @@ export function buildModel(input: PlanInput, settings: PlanSettings, choices: Pl
     for (const { i, h } of acts[k].touch) {
       const v = st.s[i]
       if (i < T && !st.done[i]) {
-        if (h > 0 && credits(k, i)) gain += worth[i] * boost(i, st) * Math.min(STANDING_MAX - v, n * h)
+        if (h > 0 && credits(k, i)) gain += worth[i] * boost(i, st) * Math.min(aim[i] - v, n * h)
         else if (h < 0 && reachable[i]) loss += worth[i] * boost(i, st) * Math.min(n * -h, v - STANDING_MIN)
         continue
       }
       const after = clamp(v + n * h, STANDING_MIN, STANDING_MAX)
+      if (i < T && floor[i] > -Infinity) {
+        const short = Math.max(0, floor[i] - v)
+        const then = Math.max(0, floor[i] - after)
+        const w = reachable[i] ? worth[i] : usual * LOST_FLOOR
+        if (then < short && credits(k, i)) gain += w * (short - then)
+        else if (then > short) loss += w * (then - short)
+      }
       if (st.peak[i]) kept += (v - after) * maxedPoint[i]
       if (W) cross += below(i, v) - below(i, after)
     }
     return gain - loss - kept + cross
   }
-  /** Units of k until the next achievement it is there for is done; Infinity when it serves none. */
+  /** Units of k until the next target it is there for is where it is wanted; Infinity when it serves none. */
   const toNext = (k: number, st: State) => {
     let n = Infinity
-    for (const { i, h } of acts[k].touch) if (i < T && h > 0 && !st.done[i] && credits(k, i)) n = Math.min(n, Math.ceil((STANDING_MAX - st.s[i]) / h - EPS))
+    for (const { i, h } of acts[k].touch) {
+      if (i >= T || h <= 0 || !credits(k, i)) continue
+      const v = need(i, st)
+      if (!Number.isNaN(v)) n = Math.min(n, Math.ceil((v - st.s[i]) / h - EPS))
+    }
     return n
   }
   /** The quickest way to open k, which no race the character can be may do yet: raise the one faction its NPC wants more of with an activity open now. */
@@ -563,6 +601,11 @@ export function buildModel(input: PlanInput, settings: PlanSettings, choices: Pl
   return {
     activities,
     targets,
+    aim,
+    floor,
+    satisfied,
+    need,
+    openAtStart,
     travel,
     T,
     W,

@@ -666,14 +666,32 @@ the standing after, so the order is what matters: work that lowers an achievemen
 after that achievement is done, where it costs nothing. When two orders take as long, the one that
 finishes achievements sooner wins, so stopping part way leaves the most done.
 
-Two goals, switched at the top of the tab. **Fastest** takes every achievement in the least time.
-**Most factions positive** takes every achievement too, and also counts every faction that ends at 0
-or above (of those whose standing the factions export gives), each worth the hours set in
-**Assumptions** (3 by default): it may take a slower way that keeps a faction up, and add
-**restore** steps at the end that bring factions back from below zero, including ones below zero
-now, when that is worth the time. Either way a faction is judged by where it ends: points an early
-step takes and a later step gives back cost nothing. The tab shows how many factions are below zero
-now and at the end of the plan, and the points left off factions that were at 2000.
+Three goals, switched at the top of the tab: the **Achievements plan**'s two, and the **Cities
+plan**. **Fastest** takes every achievement in the least time. **Most factions positive** takes every
+achievement too, and also counts every faction that ends at 0 or above (of those whose standing the
+factions export gives), each worth the hours set in **Assumptions** (3 by default): it may take a
+slower way that keeps a faction up, and add **restore** steps at the end that bring factions back
+from below zero, including ones below zero now, when that is worth the time. Either way a faction is
+judged by where it ends: points an early step takes and a later step gives back cost nothing. The tab
+shows how many factions are below zero now and at the end of the plan, and the points left off
+factions that were at 2000.
+
+**Welcome in every city** (the Cities plan) leaves the achievements alone: it gets every starting
+city's guards to con you Indifferent or better, so you can walk into any of them, in the least time.
+A guard cons on its faction's standing with your race's and best class's modifiers added (as an
+Agnostic), so each city wants its own standing of you: a Troll from nothing has a long way to go in
+Qeynos and none in Grobb. The guards' factions are Guards of Qeynos, The Freeport Militia, Dreadguard
+Outer (Neriak's Foreign Quarter) and Dreadguard Inner (its Commons and Third Gate), Da Bashers
+(Grobb), Oggok Guards, Storm Guard (Kaladim), Gem Choppers (Ak'Anon), Emerald Warriors (Kelethin
+and Felwithe), High Guard of Erudin, Heretics (Paineel), Wolves of the North (Halas), Guardians of
+the Vale (Rivervale), Protectors of Gukta, Kerra Isle and the New Sebilisian Expedition: the faction
+that drops most when that city's guards die, on eqlwiki's and Allakhazam's kill lists. The plan
+keeps them there to the end, so a step that takes one city's guards below is made up after, or
+another way is taken. A city no standing will do for as your race is **out of reach**: swap race in
+Loadouts for it. The **Cities** table shows how each city's guards con you now and the step that wins
+them over; open one for every way to raise its guards' faction. With **Race unlocks first**, the
+race unlocks come first, then the cities; without it, the Cities plan does only the cities. Without a
+race on record, the guards' factions are aimed at 0 before any modifiers, and the tab says so.
 
 What raises a faction comes from two places. Your log first: every faction change is put down to
 the kill or hand-in around it (the faction lines of a kill come just before `You have slain …!`,
@@ -921,7 +939,7 @@ the sounds in `AudioTriggers`.
 | Path | What |
 |---|---|
 | `src/core` | Log parsing and tailing, spell book, duration model, spell tracker, triggers, archiver, log check, the damage meter (`combatLines` reads the lines, `combatRoster` knows who is on which side, `combatMeter` keeps the fights, `combatTimeline` their seconds for the chart, `combatView` sums them for display), the loot ledger (`loot`), motes (`motes` counts them, `moteCalc` plans item upgrades, `mergeValue` picks the best merge, `spellMotes` the best spell to upgrade). Plain TypeScript with no Electron dependency, so it is unit-tested directly |
-| `src/features` | Feature modules, one folder each (factions): the feature's logic (`core.ts`; for factions also `attribution.ts`, what caused each change, `questPages.ts`, eqlwiki's quest pages, and the achievement plan: `catalog.ts`, what can raise each faction, `names.ts`, `ways.ts`, one faction's ways to 2000, and `planner.ts` with its `model.ts`, `search.ts` and `steps.ts`), its main-process side (`main.ts`: the log-history consumers and what the page asks for) and its pages (`page.tsx`, `planPage.tsx`, with the Plan tab's parts in `plan/`). `index.ts` lists their pages for the sidebar |
+| `src/features` | Feature modules, one folder each (factions): the feature's logic (`core.ts`; for factions also `attribution.ts`, what caused each change, `questPages.ts`, eqlwiki's quest pages, and the achievement plan: `catalog.ts`, what can raise each faction, `names.ts`, `ways.ts`, one faction's ways to 2000, and `planner.ts` with its `model.ts`, `search.ts` and `steps.ts`; `cities.ts`, the Cities plan's guards), its main-process side (`main.ts`: the log-history consumers and what the page asks for) and its pages (`page.tsx`, `planPage.tsx`, with the Plan tab's parts in `plan/`). `index.ts` lists their pages for the sidebar |
 | `src/shared` | What both processes use: the IPC contract (`ipc.ts`), settings and view types, the game's tables and what is known of the game beyond them (`game/`: classes, spell effect numbers, guide bonuses; `factions.ts`, the faction planner's lore from play and Allakhazam; `hunt.ts`, where to hunt each Slayer race), the default overlays and hotkeys |
 | `src/main` | Electron main process: windows, tray, overlays, speech, icons, persistence, the engine that joins it all (`engine/`, with the contract its parts keep in `feature.ts`), the data sources and long jobs (`sources/`), IPC handlers by family (`ipc/`) |
 | `src/preload` | The IPC bridge, which lets a page use only the channels in the contract |

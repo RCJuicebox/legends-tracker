@@ -129,6 +129,8 @@ describe('settings from a page', () => {
     )!
     // A bad value keeps what was there; one not sent stays unset.
     expect(out.factionPlan.assumptions).toEqual({ travelMin: 10, killsPerHour: 1000, handInSec: 0, goal: 'positive', raceSwaps: false, unlocksFirst: true })
+    // The Cities plan is a goal like the others.
+    expect(sanitizeSettings({ ...defaultSettings(), factionPlan: { assumptions: { goal: 'cities' } } }, was)!.factionPlan.assumptions).toEqual({ goal: 'cities' })
     expect(sanitizeSettings({ ...defaultSettings(), factionPlan: { assumptions: {} } }, was)!.factionPlan.assumptions).toEqual({})
     // No faction plan sent: what was saved stays.
     const { factionPlan: _, ...rest } = defaultSettings()

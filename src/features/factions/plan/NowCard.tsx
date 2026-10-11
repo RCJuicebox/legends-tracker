@@ -94,7 +94,15 @@ export function NowCard({
               <span
                 key={g.faction}
                 className={`chip ${g.done ? 'ok' : ''}`.trim()}
-                title={g.to === STANDING_MAX ? 'An achievement, done at 2000' : g.to === 0 ? 'Brought back to 0 or above' : 'Raised to where a later step’s NPC takes it'}
+                title={
+                  g.city
+                    ? `Its guards con you Indifferent from ${g.to.toLocaleString()}`
+                    : g.to === STANDING_MAX
+                      ? 'An achievement, done at 2000'
+                      : g.to === 0
+                        ? 'Brought back to 0 or above'
+                        : 'Raised to where a later step’s NPC takes it'
+                }
               >
                 {g.achievement ?? g.faction} {signedPlain(Math.round(g.standing))} / {g.to.toLocaleString()}
               </span>

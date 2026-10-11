@@ -3,15 +3,17 @@
 
 export type TrackKind = 'kill' | 'turnin' | 'quest'
 
-/** A faction a step is there for: an achievement to take to 2000, or a faction to bring back to 0. */
+/** A faction a step is there for: an achievement to take to 2000, a faction to bring back to 0, or a city's guards to content. */
 export interface FactionTrackGoal {
   faction: string
-  /** The achievement's name, when it is one. */
+  /** The achievement's name, when it is one; else what the standing is for ("Qeynos guards"). */
   achievement?: string
   standing: number
-  /** 2000 for an achievement, 0 for a faction brought back, else the standing a later step's NPC wants. */
+  /** 2000 for an achievement, 0 for a faction brought back, else the standing a later step's NPC wants or a city's guards con the character Indifferent at. */
   to: number
   done: boolean
+  /** A city's guards: at `to`, they con the character Indifferent. */
+  city?: boolean
 }
 
 /** What goes into one hand-in of a step: the item and how many, and what the items are combined into first. */

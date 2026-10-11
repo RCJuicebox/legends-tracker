@@ -2,6 +2,10 @@
 
 What changed in each version. The release workflow publishes a version's section as its release notes, and installed copies show them when an update arrives.
 
+## Unreleased
+
+- **Factions › Plan: a Cities plan, Welcome in every city.** Beside the two plans for the achievements (Fastest and Most factions positive, now under **Achievements plan**), the **Cities plan** leaves the achievements alone and gets every starting city's guards to con you Indifferent or better, so you can walk into any of them without being attacked, in the least time. Each city counts its guards' faction (Guards of Qeynos, The Freeport Militia, Neriak's two Dreadguards, Da Bashers, Storm Guard, Emerald Warriors for Kelethin and Felwithe, and the rest) with your race's and best class's modifiers: a Troll from nothing has a long way to go in Qeynos and none in Grobb. The plan keeps them there to the end: a step that takes one city's guards below is made up after, or another way is taken. A **Cities** table shows how each city's guards con you now and the step that wins them over; one no standing will do for as your race says so. **Race unlocks first** still works: on, the race unlocks come first, then the cities.
+
 ## 2.10.0 (2026-10-09)
 
 - **Slayer counts go by race, as the game counts them.** A kill used to count toward every achievement whose list had a word of its name or eqlwiki race in it, so giant bats, rattlesnakes and moss snakes ("Giant Snake" on eqlwiki) all went toward Giants: of the kills A Giant Problem gained since one export, half were snakes and bats. Now every mob is given one race in the client's own race names, eqlwiki's older names brought to them (Giant Bat is a Bat, Qeynos Citizen a Human), and counts only toward the achievements that list that race. Kills placed by the mob's name alone show as `+~N` until an export settles them.

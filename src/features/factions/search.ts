@@ -46,6 +46,9 @@ const UNLOCK_WEIGHT = 1
 export function search(m: Model, keep?: PlanShape): { best: { blocks: Block[]; cost: number }; kept: boolean } {
   const {
     targets,
+    floor,
+    satisfied,
+    openAtStart,
     travel,
     T,
     W,
@@ -83,11 +86,21 @@ export function search(m: Model, keep?: PlanShape): { best: { blocks: Block[]; c
     opening
   } = m
 
+  /** Whether any target the plan can get to is not where it is wanted. */
+  const wanting = (st: State) => {
+    for (let i = 0; i < T; i++) if (reachable[i] && !satisfied(i, st)) return true
+    return false
+  }
+  /** Whether each target is where it is wanted, now. */
+  const met = (st: State) => Uint8Array.from({ length: T }, (_, i) => (satisfied(i, st) ? 1 : 0))
+  // A city's guards content at the start whom nothing known raises: taken below where they must end, they stay there.
+  const held = Uint8Array.from({ length: T }, (_, i) => (!reachable[i] && floor[i] > -Infinity && !openAtStart(i) ? 1 : 0))
+
   function greedy(noise: number, random: () => number): Block[] {
     const st = fresh()
     for (let i = 0; i < T; i++) if (!reachable[i]) st.done[i] = 1
     const blocks: Block[] = []
-    for (let guard = 0; guard < 1000 && st.done.includes(0); guard++) {
+    for (let guard = 0; guard < 1000 && wanting(st); guard++) {
       let best = -Infinity
       let pick = -1
       let pickN = 0
@@ -138,7 +151,7 @@ export function search(m: Model, keep?: PlanShape): { best: { blocks: Block[]; c
         }
       }
       if (pick < 0) break
-      const before = Uint8Array.from(st.done)
+      const before = met(st)
       timeFor(pick, pickN, st.stock, true)
       apply(pick, pickN, st)
       st.zone = acts[pick].zone
@@ -146,7 +159,7 @@ export function search(m: Model, keep?: PlanShape): { best: { blocks: Block[]; c
       st.race = pickR
       checkGoals(st, 0)
       const finished: number[] = []
-      for (let i = 0; i < T; i++) if (st.done[i] && !before[i] && credits(pick, i) && amount(pick, i) > 0) finished.push(i)
+      for (let i = 0; i < T; i++) if (!before[i] && satisfied(i, st) && credits(pick, i) && amount(pick, i) > 0) finished.push(i)
       const reach = opened ? [opened.reach] : []
       const last = blocks[blocks.length - 1]
       if (last && last.act === pick && !reach.length && !pickUse && !last.use) last.finish.push(...finished)
@@ -185,7 +198,7 @@ export function search(m: Model, keep?: PlanShape): { best: { blocks: Block[]; c
   function simulate(blocks: Block[]): number {
     const { total, flow } = run(blocks, sim)
     let missed = 0
-    for (let i = 0; i < T; i++) if (reachable[i] && !sim.done[i]) missed += MISSED
+    for (let i = 0; i < T; i++) if ((reachable[i] || held[i]) && !satisfied(i, sim)) missed += MISSED
     // Race unlocks first: when the average one is done counts too (one not done, as late as the plan ends).
     let soon = 0
     if (first) {
@@ -446,15 +459,16 @@ export function search(m: Model, keep?: PlanShape): { best: { blocks: Block[]; c
 
   let best: { blocks: Block[]; cost: number } = { blocks: [], cost: Infinity }
   let kept = false
-  const open = reachable.some((r, i) => r && start[i] < STANDING_MAX) || (W > 0 && Array.from(start).some((v, i) => v < 0 && raisers[i].length > 0))
+  const open = reachable.some((r, i) => r && openAtStart(i)) || (W > 0 && Array.from(start).some((v, i) => v < 0 && raisers[i].length > 0))
   if (keep && open) {
     // The earlier order, less what is done and what is gone; kept when it still finishes everything.
     const blocks = keep.flatMap((b): Block[] => {
       const k = actIndex.get(b.act)
       if (k === undefined) return []
+      // A step there for a city's guards stays, though they are content now: one before it may take them below.
       const finish = b.finish.flatMap((f) => {
         const i = index.get(f)
-        return i !== undefined && i < T && reachable[i] && start[i] < STANDING_MAX && credits(k, i) && amount(k, i) > 0 ? [i] : []
+        return i !== undefined && i < T && reachable[i] && (openAtStart(i) || floor[i] > -Infinity) && credits(k, i) && amount(k, i) > 0 ? [i] : []
       })
       const lift = (b.lift ?? []).flatMap((f) => {
         const i = index.get(f)

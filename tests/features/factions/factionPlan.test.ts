@@ -11,6 +11,8 @@ import { DEFAULT_SETTINGS, KEEP_MAXED, NO_CHOICES, plannable, unitTime, waysToRa
 import type { PlanInput } from '../../../src/features/factions/planTypes'
 import { planFactions, planFor } from '../../../src/features/factions/planner'
 import { buildModel } from '../../../src/features/factions/model'
+import { cityGuards, cityTargets } from '../../../src/features/factions/cities'
+import { CITY_GUARDS } from '../../../src/shared/game/factions'
 import type { ItemInfo } from '../../../src/shared/types'
 import { lookUp, moversOf, sourcesOf } from '../../../src/features/factions/lookup'
 import {
@@ -2221,6 +2223,69 @@ describe('the two goals', () => {
     const plan = planFactions(input, { ...POSITIVE, keepMaxed: KEEP_MAXED.light })
     expect(plan.steps.map((s) => s.activity.id)).toEqual(['sinkEasy'])
     expect(plan.maxedLost).toBe(400)
+  })
+})
+
+describe('the Cities plan', () => {
+  it("wants each city's guards where they con the character Indifferent, by its own names for them", () => {
+    // The game writes "DaBashers"; a Grobb basher cons this character 500 under the standing.
+    const rows = cityGuards(
+      ['DaBashers', 'Emerald Warriors', 'Guards of Qeynos'],
+      { DaBashers: -300, 'Guards of Qeynos': 500 },
+      { DaBashers: -500, 'Emerald Warriors': -2500, 'Guards of Qeynos': 100 }
+    )
+    expect(rows).toHaveLength(CITY_GUARDS.length)
+    expect(rows.find((r) => r.city === 'Grobb')).toEqual({ city: 'Grobb', faction: 'DaBashers', standing: -300, mod: -500, to: 500 })
+    expect(rows.find((r) => r.city === 'Qeynos')).toMatchObject({ standing: 500, to: -100 })
+    // No standing will do for Kelethin's and Felwithe's guards: left out of the plan.
+    expect(rows.find((r) => r.city === 'Felwithe')).toMatchObject({ faction: 'Emerald Warriors', standing: 0, to: 2500 })
+    const targets = cityTargets(rows)
+    expect(targets.find((t) => t.faction === 'Emerald Warriors')).toBeUndefined()
+    expect(targets.find((t) => t.faction === 'DaBashers')).toEqual({ faction: 'DaBashers', achievement: 'Grobb guards', standing: -300, to: 500, floor: 500 })
+    // Guards two cities share are one target; without a race on record, the standing alone counts.
+    const plain = cityTargets(cityGuards([], {}, null))
+    expect(plain.find((t) => t.faction === 'Emerald Warriors')).toMatchObject({ achievement: 'Kelethin and Felwithe guards', to: 0, floor: 0 })
+    expect(plain.find((t) => t.faction === 'Dreadguard Outer')).toMatchObject({ achievement: 'Neriak, Foreign Quarter guards' })
+  })
+
+  it("raises the guards' faction as far as they need, not to 2000", () => {
+    const g = { faction: 'G', achievement: 'Grobb guards', standing: -300, to: 500, floor: 500 }
+    const plan = planFactions({ targets: [g], maxed: [], activities: [act('camp', { G: 10 }, 60)] }, S)
+    expect(plan.steps).toHaveLength(1)
+    expect(plan.steps[0]).toMatchObject({ units: 80, finishes: ['G'], raises: { G: 800 } })
+    expect(plan.options['G'][0].units).toBe(80)
+    expect(plan.unplanned).toEqual([])
+    // Already there: nothing to do.
+    expect(planFactions({ targets: [{ ...g, standing: 600 }], maxed: [], activities: [act('camp', { G: 10 }, 60)] }, S).steps).toEqual([])
+  })
+
+  it("keeps a city's guards content to the end: makes up what a step takes off them, or goes another way", () => {
+    // x is the quick way for Grobb, but takes Qeynos's guards from 100 to -400; y brings them back.
+    const q = { faction: 'Q', achievement: 'Qeynos guards', standing: 100, to: 0, floor: 0 }
+    const g = { faction: 'G', achievement: 'Grobb guards', standing: -500, to: 0, floor: 0 }
+    const x = act('x', { G: 10, Q: -10 }, 600, { zone: 'z' })
+    const y = act('y', { Q: 10 }, 600, { zone: 'z' })
+    const plan = planFactions({ targets: [q, g], maxed: [], activities: [x, y] }, S)
+    expect(plan.steps.map((s) => [s.activity.id, s.units])).toEqual([
+      ['x', 50],
+      ['y', 40]
+    ])
+    expect(plan.steps[0]).toMatchObject({ finishes: ['G'], lowers: { Q: 500 } })
+    expect(plan.steps[1].finishes).toEqual(['Q'])
+    expect(plan.unplanned).toEqual([])
+    // Nothing brings Qeynos's guards back: the slower way that leaves them alone.
+    const z = act('z', { G: 5 }, 600, { zone: 'z' })
+    expect(planFactions({ targets: [q, g], maxed: [], activities: [x, z] }, S).steps.map((s) => s.activity.id)).toEqual(['z'])
+  })
+
+  it('takes the guards to 2000 when a race unlock in the plan wants them maxed, and keeps them content after', () => {
+    const g = { faction: 'G', achievement: 'Grobb guards', standing: -300, to: 500, floor: 500 }
+    const plan = planFactions(
+      { targets: [g], maxed: [], activities: [act('camp', { G: 10 }, 60)], unlocks: [{ achievement: 'Race Unlock - Troll', race: 'Troll', factions: ['G'] }] },
+      S
+    )
+    expect(plan.steps[0]).toMatchObject({ units: 230, finishes: ['G'], unlocks: ['Race Unlock - Troll'] })
+    expect(plan.targets).toEqual([{ faction: 'G', achievement: 'Race Unlock - Troll', standing: -300, to: 2000, floor: 500 }])
   })
 })
 
