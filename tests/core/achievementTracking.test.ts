@@ -10,6 +10,7 @@ import {
   slayerCounts,
   slayerLine,
   wikiRace,
+  wikiTitles,
   type SlayerFacts,
   type SlayerKills
 } from '../../src/core/slayer'
@@ -240,6 +241,11 @@ describe('Slayer counts', () => {
     expect(wikiRace('{{Namedmobpage\n| race = [[Dark Elf]]\n| zone = [[Neriak]]\n}}')).toBe('Dark Elf')
     expect(wikiRace('{{Namedmobpage|race=[[Troll|Trolls]]|level=12}}')).toBe('Trolls')
     expect(wikiRace('{{Namedmobpage\n| race =\n| zone = x\n}}')).toBeNull()
+    // eqlwiki's titles are exact past the first letter: the log's own, and each word capitalised.
+    expect(wikiTitles('lesser blade fiend')).toEqual(['Lesser blade fiend', 'Lesser Blade Fiend'])
+    expect(wikiTitles('*Magi P`tasa')).toEqual(['Magi P`tasa', 'Magi P`Tasa'])
+    expect(wikiTitles('Cleric of Innoruuk')).toEqual(['Cleric of Innoruuk', 'Cleric Of Innoruuk'])
+    expect(wikiTitles('Terror')).toEqual(['Terror'])
   })
 
   const kills: SlayerKills = new Map([
@@ -467,6 +473,19 @@ describe('following a faction plan', () => {
     expect(r.events).toEqual([{ kind: 'step', index: 0, step: f.steps[0], next: f.steps[1] }])
     expect(r.view.current).toMatchObject({ index: 1, unitsLeft: 1150 })
     // What a page sends is checked too.
+    expect(sanitizeFollowedPlan(JSON.parse(JSON.stringify(f)))).toEqual(f)
+  })
+
+  it("follows a city's guards to where they con the character Indifferent, not to 2000", () => {
+    const g = { faction: 'DaBashers', achievement: 'Grobb guards', standing: -300, to: 500, floor: 500 }
+    const plan = planFactions({ targets: [g], maxed: [], activities: [act('bashers', { DaBashers: 10 }, 600, 'Innothule Swamp')] }, S)
+    const f = followedPlan(plan, [g])
+    expect(f.steps.map((s) => [s.id, s.finish, s.reach])).toEqual([['bashers', [], [{ faction: 'DaBashers', to: 500, label: 'Grobb guards', city: true }]]])
+    expect(f.names).toEqual({})
+    let r = readFollow(f, freshFollow(), { DaBashers: 400 }, new Set())
+    expect(r.view.current).toMatchObject({ unitsLeft: 10, goals: [{ faction: 'DaBashers', achievement: 'Grobb guards', standing: 400, to: 500, done: false, city: true }] })
+    r = readFollow(f, r.state, { DaBashers: 500 }, new Set())
+    expect(r.events).toEqual([{ kind: 'step', index: 0, step: f.steps[0], next: null }])
     expect(sanitizeFollowedPlan(JSON.parse(JSON.stringify(f)))).toEqual(f)
   })
 

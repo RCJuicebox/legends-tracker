@@ -367,6 +367,18 @@ export function learnFromExport(
   return out
 }
 
+/**
+ * The titles eqlwiki may keep a mob's page under: as the log writes it ("Lesser blade fiend",
+ * "Cleric of Innoruuk"), and each word capitalised ("Lesser Blade Fiend", "Magi P`Tasa"). A title is
+ * matched exactly past its first letter.
+ */
+export function wikiTitles(mob: string): string[] {
+  const t = mob.replace(/^\*+/, '').trim()
+  const first = t.charAt(0).toUpperCase() + t.slice(1)
+  const words = t.replace(/(^|[\s`'-])([a-z])/g, (_, a: string, b: string) => a + b.toUpperCase())
+  return words === first ? [first] : [first, words]
+}
+
 /** The race a {{Namedmobpage}} gives, links and markup taken off; null when it gives none. */
 export function wikiRace(wikitext: string): string | null {
   const m = /\|\s*race\s*=\s*((?:\[\[[^\]]*\]\]|[^\n|}])*)/i.exec(wikitext)
