@@ -39,7 +39,12 @@ put(
 // Twenty minutes of orcs in Crushbone, one every minute; a bat between, which counts toward nothing; a mob no race is known for.
 const crushbone = [line('10:00:00', 'You have entered Clan Crushbone.')]
 for (let i = 1; i <= 20; i++) crushbone.push(line(`10:${String(i).padStart(2, '0')}:00`, 'You have slain an orc pawn!'))
-crushbone.push(line('10:20:30', 'You have slain a bat!'), line('10:21:00', 'You have slain a mystery!'))
+crushbone.push(
+  line('10:20:30', 'You have slain a bat!'),
+  line('10:21:00', 'You have slain a mystery!'),
+  line('10:21:30', 'You have slain a riddle!'),
+  line('10:21:40', 'You have slain a riddle!')
+)
 put(join(game, 'Logs', 'eqlog_Kelwyn_neriak.txt'), crushbone.join(''))
 // An alt's giants in the Permafrost: its log counts toward the pace too.
 const permafrost = [line('12:00:00', 'You have entered The Permafrost Caverns.')]
@@ -50,7 +55,7 @@ for (let i = 1; i <= 12; i++)
   )
 put(join(game, 'Logs', 'eqlog_Aldric_neriak.txt'), permafrost.join(''))
 
-const races: Record<string, string | null> = { 'an orc pawn': 'Orc', 'a hill giant': 'Giant', 'a bat': 'Bat', 'a mystery': null }
+const races: Record<string, string | null> = { 'an orc pawn': 'Orc', 'a hill giant': 'Giant', 'a bat': 'Bat', 'a mystery': null, 'a riddle': null }
 const asked: string[][] = []
 /** Whether eqlwiki's answer taught anything: the next plan is read afresh when it did. */
 let learned = false
@@ -98,14 +103,18 @@ describe('the Slayer page', () => {
       ['Might They Be Giants?', 4990]
     ])
     const crush = data.camps.find((c: { id: string }) => c.id === 'log:Clan Crushbone')
-    // Twenty orcs in the twenty minutes spent killing there (the bat and the mystery count toward the time, not the achievements).
-    expect(crush.mobs).toEqual(['an orc pawn'])
-    expect(Math.round(crush.pace[0])).toBe(60)
+    // Twenty orcs in the twenty minutes and forty seconds spent killing there (the other kills count toward the time, not the achievements).
+    expect(crush.kinds.map((k: { name: string }) => k.name)).toEqual(['an orc pawn'])
+    expect(Math.round(crush.pace[0])).toBe(58)
     // Each kill there lowered Kaladim Residents by one.
-    expect(crush.factions).toEqual([{ faction: 'Kaladim Residents', perHour: expect.closeTo(-60, 0) }])
+    expect(crush.factions).toEqual([{ faction: 'Kaladim Residents', perHour: expect.closeTo(-58, 0) }])
     // The alt's giants, at its pace.
     expect(data.camps.find((c: { id: string }) => c.id === 'log:The Permafrost Caverns').pace).toEqual({ 1: expect.closeTo(32.7, 0) })
-    expect(data.unplaced).toEqual([{ name: 'a mystery', n: 1 }])
+    // Most first.
+    expect(data.unplaced).toEqual([
+      { name: 'a riddle', n: 2 },
+      { name: 'a mystery', n: 1 }
+    ])
     expect(data.pending).toBe(0)
   })
 
@@ -152,6 +161,15 @@ describe('the Slayer page', () => {
     expect(JSON.parse(readFileSync(join(h.dir, 'slayer-plan.json'), 'utf8')).Kelwyn_neriak.outCamps).toEqual(['log:Clan Crushbone'])
     await expect(call('slayer:choices', '../x', DEFAULT_CHOICES)).rejects.toThrow()
     await expect(call('slayer:plan', '../x')).rejects.toThrow()
+  })
+
+  it('reads the choices kept at the next start', async () => {
+    await planner.flush()
+    const again = new SlayerPlanner(new LogHistory(join(h.dir, 'log-history-2.json'), SlayerPlanner.consumers), h.dir)
+    again.register(ctx as unknown as AppContext)
+    const { choices } = await call('slayer:plan', 'Kelwyn_neriak')
+    expect(choices.outCamps).toEqual(['log:Clan Crushbone'])
+    planner.register(ctx as unknown as AppContext)
   })
 
   it('has nothing to plan without an achievements export', async () => {

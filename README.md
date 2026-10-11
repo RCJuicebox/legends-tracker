@@ -755,8 +755,10 @@ soonest, travel counted, then the next; every kill still counts toward whatever 
 a later tier's too. Staying on at one camp is one step. Raid lockouts
 (Phinigel Autropos, the only kedge; Lady Vox and Lord Nagafen for the true dragons) give a kill a
 difficulty a day, so they are listed beside the plan with the days they take, the lockouts that feed
-one achievement together. Each step says what it moves and finishes, the mobs, where the pace came
-from, and what an hour there did to your factions (from the faction lines after kills there; players
+one achievement together. Each step says what it is there for: each achievement of its tier it
+moves, how many and the mobs to kill for it ("Cubic +7 done · gelatinous cube ×7"), and ×N, the
+kills you make there, each once however many achievements it counts toward (what the same kills do
+for a later tier is in a tooltip). It says where the pace came from, and what an hour there did to your factions (from the faction lines after kills there; players
 say a kill your pet lands while you feign death costs none). **Rule out** leaves a camp out.
 **Achievements in the plan** turns achievements off, or the optional ones on: those the Slayer metas
 hold only as optional are out of era, and Banestrike does not need them. Kills no race was found for

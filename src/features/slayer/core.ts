@@ -7,6 +7,7 @@ import { baseZone } from '../factions/attribution'
 import { zoneKey } from '../factions/names'
 import { SLAYER_CAMPS, type SlayerCamp } from '../../shared/game/slayerCamps'
 import { HUNT } from '../../shared/game/hunt'
+import { num } from '../../core/format'
 
 // The Slayer plan: where to kill what each open Slayer achievement still wants, quickest first. A
 // camp is a zone and what dies there an hour; it is worth every open achievement its races feed, so
@@ -181,17 +182,27 @@ export function slayerGoals(
 /** Where a camp's pace comes from. */
 export type CampSource = 'log' | 'play' | 'wiki'
 
+/**
+ * One kind of kill at a camp: a mob the log saw die there, a mob or race play names, or a race eqlwiki
+ * counts there; what dies an hour (a day, for a raid lockout), and the goals each kill counts toward.
+ */
+interface CampKind {
+  name: string
+  perHour: number
+  goals: number[]
+}
+
 /** A place to kill, and what dies there an hour toward each achievement. */
 export interface SlayerPlanCamp {
   /** Stable across plans: "log:<zone>", "play:<zone>|<mob>", "wiki:<zone>". */
   id: string
   zone: string
-  /** The mobs that count toward something, most killed first (the log's), or play's. */
-  mobs: string[]
+  /** What dies there that counts toward something, most first. */
+  kinds: CampKind[]
   source: CampSource
   /**
-   * Per goal index, kills an hour toward it (or a day, for a raid lockout); for a camp play names
-   * without a number (`assumed`), the share of the assumed pace its races make up.
+   * Per goal index, kills an hour toward it (or a day, for a raid lockout): its kinds' together. For a
+   * camp play names without a number (`assumed`), the share of the assumed pace.
    */
   pace: Record<number, number>
   assumed?: boolean
@@ -267,7 +278,7 @@ export function buildCamps(
     camps.push({
       id: `log:${zone}`,
       zone,
-      mobs: counted.sort((a, b) => b.n - a.n).map((m) => m.name),
+      kinds: counted.sort((a, b) => b.n - a.n).map((m) => ({ name: m.name, perHour: m.n / hours, goals: place(m.name) })),
       source: 'log',
       pace,
       hours,
@@ -291,10 +302,15 @@ export function buildCamps(
     // counts whole toward every goal they feed.
     const part = (g: number) => (daily ? 1 : k.races.filter((r) => races.keys[g].has(r)).length / k.races.length)
     if (!daily) for (const g of open) fed.add(feeds(k.zone, g))
+    // A boss, or one kind of mob: the mobs named. Several races: each its own kind, the camp's kills shared alike.
+    const kinds: CampKind[] =
+      daily || k.races.length === 1
+        ? [{ name: k.mobs.join(', '), perHour: per ?? 1, goals: open }]
+        : k.races.map((r) => ({ name: r, perHour: (per ?? 1) / k.races.length, goals: open.filter((g) => races.keys[g].has(r)) })).filter((x) => x.goals.length)
     camps.push({
       id: `play:${k.zone}|${k.mobs.join('|')}`,
       zone: k.zone,
-      mobs: k.mobs,
+      kinds,
       source: 'play',
       pace: Object.fromEntries(open.map((g) => [g, (per ?? 1) * part(g)])),
       ...(per === undefined ? { assumed: true } : {}),
@@ -309,19 +325,26 @@ export function buildCamps(
   const fedGoal = new Set([...fed].map((f) => +f.split('|')[1]).filter((g) => best(g) >= SLOW || camps.some((c) => c.assumed && c.pace[g])))
   // A race only raid bosses are (the kedge, Phinigel): no census guess stands in for the lockout.
   const lockoutRaces = new Set(known.filter((k) => k.perDay !== undefined).flatMap((k) => k.races))
-  goals.forEach((_, i) => {
-    if (fedGoal.has(i) || [...races.keys[i]].every((k) => lockoutRaces.has(k))) return
-    for (const [name, rows] of Object.entries(HUNT)) {
-      const keys = raceLists.get(name)
-      if (!keys || ![...keys].some((k) => races.keys[i].has(k))) continue
-      for (const [zone, npcs] of rows) {
-        const id = `wiki:${zoneKey(zone)}`
-        let c = camps.find((x) => x.id === id)
-        if (!c) camps.push((c = { id, zone, mobs: [], source: 'wiki', pace: {}, note: `${npcs} NPCs of the race on eqlwiki`, said: 'eqlwiki, 2026-09-24' }))
-        c.pace[i] = Math.max(c.pace[i] ?? 0, npcs * WIKI_PER_NPC)
-      }
+  const wanting = goals.flatMap((_, i) => (fedGoal.has(i) || [...races.keys[i]].every((k) => lockoutRaces.has(k)) ? [] : [i]))
+  for (const [name, rows] of Object.entries(HUNT)) {
+    const keys = raceLists.get(name)
+    const at = keys ? wanting.filter((i) => [...keys].some((k) => races.keys[i].has(k))) : []
+    if (!keys || !at.length) continue
+    // One kind a race eqlwiki counts in the zone, named for the race: it lists no mobs.
+    const kind = [...keys].join(' / ')
+    for (const [zone, npcs] of rows) {
+      const id = `wiki:${zoneKey(zone)}`
+      let c = camps.find((x) => x.id === id)
+      if (!c) camps.push((c = { id, zone, kinds: [], source: 'wiki', pace: {}, said: 'eqlwiki, 2026-09-24' }))
+      if (!c.kinds.some((x) => x.name === kind)) c.kinds.push({ name: kind, perHour: npcs * WIKI_PER_NPC, goals: at })
     }
-  })
+  }
+  for (const c of camps.filter((x) => x.source === 'wiki')) {
+    c.kinds.sort((a, b) => b.perHour - a.perHour)
+    c.pace = {}
+    for (const k of c.kinds) for (const g of k.goals) c.pace[g] = (c.pace[g] ?? 0) + k.perHour
+    c.note = c.kinds.map((k) => `${k.name}: ${num(k.perHour / WIKI_PER_NPC)} on eqlwiki`).join(', ')
+  }
   return camps
 }
 
@@ -350,8 +373,16 @@ export interface SlayerStep {
   kills: Record<number, number>
   /** Goals it finishes. */
   finishes: number[]
-  /** The Banestrike tier it works toward. */
+  /** The Banestrike tier it works toward, and the goals of that tier it is there for. */
   tier: number
+  focus: number[]
+}
+
+/** What a step kills: each kind there that feeds the goals it is there for, and how many in its time. */
+export function stepKills(st: SlayerStep, choices: Pick<SlayerPlanChoices, 'pace'>): { name: string; n: number; goals: number[] }[] {
+  const focus = new Set(st.focus)
+  const scale = st.camp.assumed ? choices.pace : 1
+  return st.camp.kinds.filter((k) => k.goals.some((g) => focus.has(g))).map((k) => ({ name: k.name, n: (k.perHour * scale * st.seconds) / 3600, goals: k.goals }))
 }
 
 /** A raid lockout to run each day beside the plan. */
@@ -428,6 +459,7 @@ export function planSlayer(data: Pick<SlayerPlanData, 'goals' | 'camps'>, choice
       }
       if (!best) break
       const { c, secs } = best
+      const focus = goals.filter((g) => tierOf(g) === tier && !onlyDaily.has(g) && (need.get(g) ?? 0) > 0 && paceOf(c, g) > 0)
       const kills: Record<number, number> = {}
       for (const g of goals) {
         const k = Math.min(need.get(g) ?? 0, (paceOf(c, g) * secs) / 3600)
@@ -440,7 +472,8 @@ export function planSlayer(data: Pick<SlayerPlanData, 'goals' | 'camps'>, choice
       if (prev?.camp.id === c.id) {
         prev.seconds += secs
         for (const [g, k] of Object.entries(kills)) prev.kills[+g] = (prev.kills[+g] ?? 0) + k
-      } else steps.push({ camp: c, seconds: secs, travel: 0, kills, finishes: [], tier })
+        for (const g of focus) if (!prev.focus.includes(g)) prev.focus.push(g)
+      } else steps.push({ camp: c, seconds: secs, travel: 0, kills, finishes: [], tier, focus })
       at = c.id
     }
   }

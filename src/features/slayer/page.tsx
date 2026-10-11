@@ -7,7 +7,18 @@ import { usePickedCharacter } from '../../renderer/src/character'
 import { useNow } from '../../renderer/src/components/TimerBars'
 import { Disclosure, GameCommand, Info, NumberInput, Pending, Tip, ToggleChip } from '../../renderer/src/components/ui'
 import { duration, num, who } from '../../core/format'
-import { BANESTRIKE, DEFAULT_CHOICES, goalsInPlay, planSlayer, type CampSource, type SlayerGoal, type SlayerPlanCamp, type SlayerPlanChoices, type SlayerStep } from './core'
+import {
+  BANESTRIKE,
+  DEFAULT_CHOICES,
+  goalsInPlay,
+  stepKills,
+  planSlayer,
+  type CampSource,
+  type SlayerGoal,
+  type SlayerPlanCamp,
+  type SlayerPlanChoices,
+  type SlayerStep
+} from './core'
 
 // Plan › Slayer: the Slayer achievements still open and where to kill for them quickest, step by
 // step (core.ts plans it). Counts are the achievements export plus the kills the log has shown since,
@@ -55,19 +66,46 @@ const kills = (n: number) => num(Math.ceil(n))
 const tierName = (tier: number) => BANESTRIKE[tier] ?? 'Not for Banestrike'
 
 /** "Orc Stomp! 1,989 (done)" for each achievement a step moves. */
-function StepWork({ step, goals }: { step: SlayerStep; goals: SlayerGoal[] }) {
+/** A few names, and the rest in a tooltip: a camp's log can hold a dozen kinds of gnoll. */
+function Names({ names, shown = 3 }: { names: string[]; shown?: number }) {
+  if (names.length <= shown) return <>{names.join(', ')}</>
+  return (
+    <>
+      {names.slice(0, shown).join(', ')}, <Tip text={names.slice(shown).join(', ')}>and {names.length - shown} more</Tip>
+    </>
+  )
+}
+
+/**
+ * What a step is there for: each achievement of its tier it moves, with how many and the mobs that
+ * count toward it. What the same kills do for a later tier is in the tooltip, not the line.
+ */
+function StepWork({ step, goals, choices }: { step: SlayerStep; goals: SlayerGoal[]; choices: SlayerPlanChoices }) {
   const done = new Set(step.finishes)
+  const killed = stepKills(step, choices)
+  const besides = Object.keys(step.kills)
+    .map(Number)
+    .filter((g) => !step.focus.includes(g))
   return (
     <div className="small">
-      {Object.entries(step.kills)
-        .sort((a, b) => b[1] - a[1])
-        .map(([g, k], i) => (
-          <span key={g}>
-            {i > 0 && ' · '}
-            {goals[+g].name} <span className="mono">+{kills(k)}</span>
-            {done.has(+g) && <b> done</b>}
+      {step.focus.map((g) => (
+        <div key={g}>
+          <b>{goals[g].name}</b> <span className="mono">+{kills(step.kills[g] ?? 0)}</span>
+          {done.has(g) && <b> done</b>}
+          <span className="faint">
+            {' '}
+            · <Names names={killed.filter((k) => k.goals.includes(g)).map((k) => `${k.name} ×${kills(k.n)}`)} />
           </span>
-        ))}
+        </div>
+      ))}
+      {besides.length > 0 && (
+        <Tip
+          className="faint"
+          text={`The same kills count toward these too: ${besides.map((g) => `${goals[g].name} +${kills(step.kills[g])}${done.has(g) ? ' (done)' : ''}`).join(', ')}`}
+        >
+          also counts toward {besides.length} more
+        </Tip>
+      )}
     </div>
   )
 }
@@ -210,7 +248,7 @@ export function Slayer() {
                       <div className="fp-body">
                         <div className="fp-head">
                           <span className="fp-zone">{d.camp.zone}</span>
-                          <span className="small">{d.camp.mobs.join(', ')}</span>
+                          <span className="small">{d.camp.kinds.map((k) => k.name).join(', ')}</span>
                           <span className="spacer" />
                           <span className="mono fp-time">
                             {Math.max(...d.goals.map((g) => d.camp.pace[g] ?? 0))} a day · {d.days} days
@@ -267,15 +305,19 @@ export function Slayer() {
                                   {SOURCE[st.camp.source].label}
                                 </Tip>
                                 <span className="spacer" />
-                                <Tip className="mono" text="Kills toward the achievements, counting each kill once">
-                                  ×{kills(Math.max(...Object.values(st.kills)))}
+                                <Tip
+                                  className="mono"
+                                  text={`What you kill there: ${stepKills(st, choices)
+                                    .map((k) => `${k.name} ×${kills(k.n)}`)
+                                    .join(', ')}`}
+                                >
+                                  ×{kills(stepKills(st, choices).reduce((t, k) => t + k.n, 0))}
                                 </Tip>
                                 <Tip className="mono fp-time" text={st.travel ? `Including ${duration(st.travel)} to get there` : 'Time killing there'}>
                                   {duration(st.seconds + st.travel)}
                                 </Tip>
                               </div>
-                              <StepWork step={st} goals={data.goals} />
-                              {st.camp.mobs.length > 0 && <div className="faint small fp-mobs">{st.camp.mobs.slice(0, 8).join(', ')}</div>}
+                              <StepWork step={st} goals={data.goals} choices={choices} />
                               <div className="row tight fp-effects">
                                 <FactionCost camp={st.camp} />
                                 {st.camp.note && <span className="faint small">{st.camp.note}</span>}

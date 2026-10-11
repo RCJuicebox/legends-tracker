@@ -15,6 +15,7 @@ import {
   readKillLine,
   slayerGoals,
   slayerRaceLists,
+  stepKills,
   type SlayerGoal,
   type SlayerPlanCamp
 } from '../../../src/features/slayer/core'
@@ -132,10 +133,15 @@ describe('Slayer plan: the goals', () => {
 describe('Slayer plan: the camps', () => {
   const goals = slayerGoals(counters, new Map(), optionalSlayer(sections))
   const gi = (name: string) => goals.findIndex((g) => g.name === name)
-  const byRace: Record<string, string> = { 'an orc pawn': 'orc', 'a hill giant': 'giant', 'a bat': 'bat', 'phinigel autropos': 'kedge' }
+  const byRace: Record<string, string> = { 'an orc pawn': 'orc', 'an orc centurion': 'orc', 'a hill giant': 'giant', 'a bat': 'bat', 'phinigel autropos': 'kedge' }
   const place = (mob: string) => goals.flatMap((_, i) => (races.keys[i].has(byRace[mob.toLowerCase()] ?? '') ? [i] : []))
   const zones = {
-    'Clan Crushbone': { sec: 3600, kills: 160, last: 0, mobs: { 'an orc pawn': { name: 'an orc pawn', n: 150 }, 'a bat': { name: 'a bat', n: 10 } } },
+    'Clan Crushbone': {
+      sec: 3600,
+      kills: 160,
+      last: 0,
+      mobs: { 'an orc pawn': { name: 'an orc pawn', n: 150 }, 'an orc centurion': { name: 'an orc centurion', n: 5 }, 'a bat': { name: 'a bat', n: 10 } }
+    },
     'The Permafrost Caverns': { sec: 1800, kills: 30, last: 0, mobs: { 'a hill giant': { name: 'a hill giant', n: 30 } } },
     // Phinigel, five a day on a lockout: no hourly camp, however quick the log made his kills look.
     'Kedge Keep': { sec: 3600, kills: 50, last: 0, mobs: { 'phinigel autropos': { name: 'Phinigel Autropos', n: 50 } } },
@@ -151,6 +157,8 @@ describe('Slayer plan: the camps', () => {
     slayerRaceLists(sections, GAME),
     [
       { zone: 'Kedge Keep', mobs: ['Phinigel Autropos'], races: ['kedge'], perDay: 5, note: 'One a difficulty a day.', said: 'test' },
+      // Players name a zone of giants and orcs with no number: each race half the assumed pace.
+      { zone: 'The Rathe Mountains', mobs: ['a hill giant', 'an orc'], races: ['giant', 'orc'], note: '', said: 'test' },
       // One boss under two names: the client's race, and the achievement's.
       { zone: 'Permafrost Caverns', mobs: ['Lady Vox'], races: ['dragon', 'true dragon'], perDay: 5, note: '', said: 'test' },
       // The log has the pace for giants in the Permafrost: play's camp gives way.
@@ -160,8 +168,12 @@ describe('Slayer plan: the camps', () => {
   const camp = (id: string) => camps.find((c) => c.id === id) as SlayerPlanCamp
 
   it('takes the log’s pace where the player has hunted, a kill counting toward every achievement of its race', () => {
-    expect(camp('log:Clan Crushbone').pace).toEqual({ [gi('Orc Stomp!')]: 150 })
-    expect(camp('log:Clan Crushbone').mobs).toEqual(['an orc pawn'])
+    expect(camp('log:Clan Crushbone').pace).toEqual({ [gi('Orc Stomp!')]: 155 })
+    // Each mob a kind, most killed first; the bat counts toward nothing.
+    expect(camp('log:Clan Crushbone').kinds).toEqual([
+      { name: 'an orc pawn', perHour: 150, goals: [gi('Orc Stomp!')] },
+      { name: 'an orc centurion', perHour: 5, goals: [gi('Orc Stomp!')] }
+    ])
     expect(camp('log:The Permafrost Caverns').pace).toEqual({ [gi('Might They Be Giants?')]: 60, [gi('A Giant Problem')]: 60 })
     expect(camps.some((c) => c.id === 'log:Halas')).toBe(false)
     expect(camps.some((c) => c.id === 'log:Kedge Keep')).toBe(false)
@@ -175,6 +187,13 @@ describe('Slayer plan: the camps', () => {
 
   it('adds the raid lockouts, and eqlwiki’s count where nothing else feeds a goal', () => {
     expect(camp('play:Kedge Keep|Phinigel Autropos')).toMatchObject({ daily: true, pace: { [gi('Re-Extinction')]: 5 } })
+    expect(camp('play:The Rathe Mountains|a hill giant|an orc')).toMatchObject({
+      assumed: true,
+      kinds: [
+        { name: 'giant', perHour: 0.5, goals: [gi('Might They Be Giants?'), gi('A Giant Problem')] },
+        { name: 'orc', perHour: 0.5, goals: [gi('Orc Stomp!')] }
+      ]
+    })
     // Every kill of Lady Vox counts whole for Dragonbane: five a day, not half of them for each of her names.
     expect(camp('play:Permafrost Caverns|Lady Vox')).toMatchObject({ daily: true, pace: { [gi('Dragonbane')]: 5 } })
     const wiki = camps.filter((c) => c.source === 'wiki')
@@ -186,6 +205,8 @@ describe('Slayer plan: the camps', () => {
           .every((g) => g === gi('Barbarous'))
       )
     ).toBe(true)
+    // Named for the race eqlwiki counts there, which lists no mobs.
+    expect(wiki[0].kinds.map((k) => k.name)).toEqual(['barbarian'])
   })
 })
 
@@ -193,9 +214,9 @@ describe('Slayer plan: the plan', () => {
   const g = (name: string, count: number, max: number, tier = 4): SlayerGoal => ({ name, section: 'Slayer: Conquest', races: '', count, max, optional: false, tier })
   const goals = [g('Orc Stomp!', 4900, 5000), g('Might They Be Giants?', 4950, 5000), g('A Giant Problem', 980, 1000), g('Re-Extinction', 40, 50)]
   const camps: SlayerPlanCamp[] = [
-    { id: 'log:Clan Crushbone', zone: 'Clan Crushbone', mobs: [], source: 'log', pace: { 0: 100 } },
-    { id: 'log:The Permafrost Caverns', zone: 'The Permafrost Caverns', mobs: [], source: 'log', pace: { 1: 60, 2: 60 } },
-    { id: 'play:Kedge Keep', zone: 'Kedge Keep', mobs: [], source: 'play', pace: { 3: 5 }, daily: true }
+    { id: 'log:Clan Crushbone', zone: 'Clan Crushbone', kinds: [], source: 'log', pace: { 0: 100 } },
+    { id: 'log:The Permafrost Caverns', zone: 'The Permafrost Caverns', kinds: [], source: 'log', pace: { 1: 60, 2: 60 } },
+    { id: 'play:Kedge Keep', zone: 'Kedge Keep', kinds: [], source: 'play', pace: { 3: 5 }, daily: true }
   ]
 
   it('finishes the achievement that can be done soonest first, travel counted, every kill counting toward all its race feeds', () => {
@@ -222,6 +243,18 @@ describe('Slayer plan: the plan', () => {
     ])
   })
 
+  it('says what a step is there for, and what it kills: each kill once, however many achievements it counts toward', () => {
+    // Giants for Highly Decorated's A Giant Problem; the same kills count toward A Force of Nature's Might They Be Giants?.
+    const tiered = [g('Might They Be Giants?', 4950, 5000, 2), g('A Giant Problem', 980, 1000, 1)]
+    const giants: SlayerPlanCamp = { id: 'log:P', zone: 'P', kinds: [{ name: 'a hill giant', perHour: 60, goals: [0, 1] }], source: 'log', pace: { 0: 60, 1: 60 } }
+    const plan = planSlayer({ goals: tiered, camps: [giants] }, DEFAULT_CHOICES)
+    const [first] = plan.steps
+    expect(first.focus).toEqual([1])
+    expect(first.kills).toEqual({ 0: 20, 1: 20 })
+    // Twenty giants, not forty: one kill, two achievements.
+    expect(stepKills(first, DEFAULT_CHOICES)).toEqual([{ name: 'a hill giant', n: 20, goals: [0, 1] }])
+  })
+
   it('reads each achievement’s tier from the metas that name it', () => {
     const tiers = banestrikeTiers(sections)
     expect(Object.fromEntries(tiers)).toEqual({ barbarous: 0, 're-extinction': 0, 'sarnak slayer': 0, 'a giant problem': 1 })
@@ -245,19 +278,19 @@ describe('Slayer plan: the plan', () => {
   it('takes the assumed pace where play gives none, shared among the camp’s races', () => {
     // Half the camp's kills are orcs: ten of the twenty an hour.
     const plan = planSlayer(
-      { goals: [g('Orc Stomp!', 4990, 5000)], camps: [{ id: 'play:x', zone: 'x', mobs: [], source: 'play', pace: { 0: 0.5 }, assumed: true }] },
+      { goals: [g('Orc Stomp!', 4990, 5000)], camps: [{ id: 'play:x', zone: 'x', kinds: [], source: 'play', pace: { 0: 0.5 }, assumed: true }] },
       { ...DEFAULT_CHOICES, pace: 20 }
     )
     expect(Math.round(plan.steps[0].seconds)).toBe(3600)
   })
 
   it('counts a lockout only toward what nothing else feeds, the lockouts that feed it together', () => {
-    const lock = (id: string, pace: Record<number, number>): SlayerPlanCamp => ({ id, zone: id, mobs: [], source: 'play', pace, daily: true })
+    const lock = (id: string, pace: Record<number, number>): SlayerPlanCamp => ({ id, zone: id, kinds: [], source: 'play', pace, daily: true })
     const plan = planSlayer(
       {
         goals: [g('Dragonbane', 50, 250), g('Swordfishmermaid', 520, 5000)],
         // Fish die by the hundred elsewhere: Phinigel's five a day are no step of theirs.
-        camps: [lock('Vox', { 0: 5 }), lock('Nagafen', { 0: 5 }), lock('Phinigel', { 1: 5 }), { id: 'log:OoT', zone: 'OoT', mobs: [], source: 'log', pace: { 1: 100 } }]
+        camps: [lock('Vox', { 0: 5 }), lock('Nagafen', { 0: 5 }), lock('Phinigel', { 1: 5 }), { id: 'log:OoT', zone: 'OoT', kinds: [], source: 'log', pace: { 1: 100 } }]
       },
       DEFAULT_CHOICES
     )

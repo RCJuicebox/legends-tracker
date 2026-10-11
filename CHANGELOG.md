@@ -5,6 +5,7 @@ What changed in each version. The release workflow publishes a version's section
 ## Unreleased
 
 - **Fix: Plan › Slayer counted half of each raid boss for Dragonbane.** Lady Vox and Lord Nagafen are listed under two names, the game's race (Dragon) and the achievement's (True Dragons), and the plan shared each kill between them: 2.5 a day each, and 41 days for Dragonbane. A raid boss's kill counts whole: 5 a day each, ten together.
+- **Plan › Slayer's steps say what you are there to kill.** Each step lists the achievements of its tier it is there for, how many each, and the mobs to kill for it: "Cubic +7 done · gelatinous cube ×7". What the same kills do for a later tier is in a tooltip, not the line. ×N is now the kills you make there, each counted once: it had been the largest of the achievements' counts, which for the Runnyeye step was a different race's.
 
 ## 2.11.1 (2026-10-11)
 

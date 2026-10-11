@@ -37,7 +37,7 @@ const data: SlayerPlanData = {
     {
       id: 'log:Clan Crushbone',
       zone: 'Clan Crushbone',
-      mobs: ['an orc pawn'],
+      kinds: [{ name: 'an orc pawn', perHour: 150, goals: [0] }],
       source: 'log',
       pace: { 0: 150 },
       hours: 5,
@@ -47,7 +47,7 @@ const data: SlayerPlanData = {
     {
       id: 'play:Kedge Keep|Phinigel Autropos',
       zone: 'Kedge Keep',
-      mobs: ['Phinigel Autropos'],
+      kinds: [{ name: 'Phinigel Autropos', perHour: 5, goals: [1] }],
       source: 'play',
       pace: { 1: 5 },
       daily: true,
@@ -100,7 +100,9 @@ it('draws the plan, the lockouts beside it, and keeps a camp ruled out', async (
   const text = host.textContent ?? ''
   expect(text).toContain('The plan, step by step')
   expect(text).toContain('Clan Crushbone')
-  expect(text).toContain('Orc Stomp! +100 done')
+  // What the step is there for, and what to kill for it.
+  expect(text).toContain('Orc Stomp! +100 done · an orc pawn ×100')
+  expect(text).toContain('×100')
   expect(text).toContain('costs Kaladim Residents −40 an hour')
   // Ten kedge at five a day.
   expect(text).toContain('Every day')
