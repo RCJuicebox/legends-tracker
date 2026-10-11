@@ -286,8 +286,10 @@ export function buildCamps(
     const open = daily ? at : at.filter((g) => !fed.has(feeds(k.zone, g)))
     if (!open.length) continue
     const per = k.perDay ?? k.perHour ?? (k.respawnMin ? (60 / k.respawnMin) * (k.spawns ?? 1) : undefined)
-    // The camp's kills are shared among its races alike: a goal gets the part its races make up.
-    const part = (g: number) => k.races.filter((r) => races.keys[g].has(r)).length / k.races.length
+    // A camp of several kinds shares its kills among its races alike: a goal gets the part its races
+    // make up. A raid lockout is one boss, its races only its names ("dragon", "true dragon"): each kill
+    // counts whole toward every goal they feed.
+    const part = (g: number) => (daily ? 1 : k.races.filter((r) => races.keys[g].has(r)).length / k.races.length)
     if (!daily) for (const g of open) fed.add(feeds(k.zone, g))
     camps.push({
       id: `play:${k.zone}|${k.mobs.join('|')}`,

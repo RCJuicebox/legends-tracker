@@ -22,7 +22,18 @@ import { sanitizeChoices } from '../../../src/features/slayer/main'
 
 // Rows from the client's string table: race names (type 11) and plurals (type 12).
 const GAME = parseRaceTable(
-  ['2^11^Barbarian^0^', '2^12^Barbarians^0^', '18^11^Giant^0^', '18^12^Giants^0^', '34^11^Bat^0^', '54^11^Orc^0^', '54^12^Orcs^0^', '103^11^Kedge^0^', '103^12^Kedge^0^'].join('\n')
+  [
+    '2^11^Barbarian^0^',
+    '2^12^Barbarians^0^',
+    '18^11^Giant^0^',
+    '18^12^Giants^0^',
+    '34^11^Bat^0^',
+    '49^11^Dragon^0^',
+    '54^11^Orc^0^',
+    '54^12^Orcs^0^',
+    '103^11^Kedge^0^',
+    '103^12^Kedge^0^'
+  ].join('\n')
 )
 
 const EXPORT = [
@@ -42,6 +53,8 @@ const EXPORT = [
   'Slayer: Special',
   'I\tA Giant Problem',
   'I\t\tGiants\t980/1000',
+  'I\tDragonbane',
+  'I\t\tTrue Dragons\t47/250',
   'Slayer: Skill',
   'I\tBarbarous',
   'I\t\tBarbarians\t90/100',
@@ -103,6 +116,7 @@ describe('Slayer plan: the goals', () => {
     expect(names(goalsInPlay(goals, { ...DEFAULT_CHOICES, included: ['sarnak slayer'], excluded: ['orc stomp!'] }))).toEqual([
       'Might They Be Giants?',
       'A Giant Problem',
+      'Dragonbane',
       'Barbarous',
       'Re-Extinction',
       'Sarnak Slayer'
@@ -137,6 +151,8 @@ describe('Slayer plan: the camps', () => {
     slayerRaceLists(sections, GAME),
     [
       { zone: 'Kedge Keep', mobs: ['Phinigel Autropos'], races: ['kedge'], perDay: 5, note: 'One a difficulty a day.', said: 'test' },
+      // One boss under two names: the client's race, and the achievement's.
+      { zone: 'Permafrost Caverns', mobs: ['Lady Vox'], races: ['dragon', 'true dragon'], perDay: 5, note: '', said: 'test' },
       // The log has the pace for giants in the Permafrost: play's camp gives way.
       { zone: 'Permafrost Caverns', mobs: ['a hill giant'], races: ['giant'], perHour: 999, note: '', said: 'test' }
     ]
@@ -149,7 +165,7 @@ describe('Slayer plan: the camps', () => {
     expect(camp('log:The Permafrost Caverns').pace).toEqual({ [gi('Might They Be Giants?')]: 60, [gi('A Giant Problem')]: 60 })
     expect(camps.some((c) => c.id === 'log:Halas')).toBe(false)
     expect(camps.some((c) => c.id === 'log:Kedge Keep')).toBe(false)
-    expect(camps.some((c) => c.id.startsWith('play:Permafrost'))).toBe(false)
+    expect(camps.some((c) => c.id === 'play:Permafrost Caverns|a hill giant')).toBe(false)
     // What an hour there does to the factions, the worst first.
     expect(camp('log:Clan Crushbone').factions).toEqual([
       { faction: 'Kaladim Residents', perHour: -75 },
@@ -159,6 +175,8 @@ describe('Slayer plan: the camps', () => {
 
   it('adds the raid lockouts, and eqlwiki’s count where nothing else feeds a goal', () => {
     expect(camp('play:Kedge Keep|Phinigel Autropos')).toMatchObject({ daily: true, pace: { [gi('Re-Extinction')]: 5 } })
+    // Every kill of Lady Vox counts whole for Dragonbane: five a day, not half of them for each of her names.
+    expect(camp('play:Permafrost Caverns|Lady Vox')).toMatchObject({ daily: true, pace: { [gi('Dragonbane')]: 5 } })
     const wiki = camps.filter((c) => c.source === 'wiki')
     expect(wiki.length).toBeGreaterThan(0)
     expect(
@@ -211,6 +229,7 @@ describe('Slayer plan: the plan', () => {
       ['Orc Stomp!', 4],
       ['Might They Be Giants?', 4],
       ['A Giant Problem', 1],
+      ['Dragonbane', 4],
       ['Barbarous', 0],
       ['Re-Extinction', 0],
       ['Sarnak Slayer', 0]

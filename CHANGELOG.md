@@ -2,6 +2,10 @@
 
 What changed in each version. The release workflow publishes a version's section as its release notes, and installed copies show them when an update arrives.
 
+## Unreleased
+
+- **Fix: Plan › Slayer counted half of each raid boss for Dragonbane.** Lady Vox and Lord Nagafen are listed under two names, the game's race (Dragon) and the achievement's (True Dragons), and the plan shared each kill between them: 2.5 a day each, and 41 days for Dragonbane. A raid boss's kill counts whole: 5 a day each, ten together.
+
 ## 2.11.1 (2026-10-11)
 
 - **Plan › Slayer works through Banestrike in order: Progressive, then Highly Decorated, then A Force of Nature, then Megadeath.** Each tier's achievements are done before the next tier is begun, the one that can be finished soonest first, so each Banestrike rank comes as early as it can. The steps are listed under their tier, with its time. Kills along the way still count toward later tiers.
