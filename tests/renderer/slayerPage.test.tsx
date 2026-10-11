@@ -110,6 +110,25 @@ it('draws the plan, the lockouts beside it, and keeps a camp ruled out', async (
   await act(async () => out.click())
   expect(invoke).toHaveBeenCalledWith('slayer:choices', 'Kelwyn_neriak', expect.objectContaining({ outCamps: ['log:Clan Crushbone'] }))
   expect(host.textContent).toContain('Ruled out')
+  const button = (text: string) => [...host.querySelectorAll('button')].find((b) => b.textContent?.trim().startsWith(text))!
+  // Brought back from the list of camps ruled out.
+  await act(async () => button('Ruled out').click())
+  await act(async () => button('Bring back').click())
+  expect(invoke).toHaveBeenLastCalledWith('slayer:choices', 'Kelwyn_neriak', expect.objectContaining({ outCamps: [] }))
+  // An achievement turned off, from the list of those in the plan.
+  await act(async () => button('Achievements in the plan').click())
+  await act(async () => button('Orc Stomp!').click())
+  expect(invoke).toHaveBeenLastCalledWith('slayer:choices', 'Kelwyn_neriak', expect.objectContaining({ excluded: ['orc stomp!'] }))
+  await act(async () => button('Orc Stomp!').click())
+  expect(invoke).toHaveBeenLastCalledWith('slayer:choices', 'Kelwyn_neriak', expect.objectContaining({ excluded: [] }))
+  // The minutes between camps, typed in.
+  const travel = host.querySelector<HTMLInputElement>('input[type="number"]')!
+  await act(async () => {
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(travel, '25')
+    travel.dispatchEvent(new Event('input', { bubbles: true }))
+  })
+  expect(invoke).toHaveBeenLastCalledWith('slayer:choices', 'Kelwyn_neriak', expect.objectContaining({ travelMin: 25 }))
+  await act(async () => button('Read again').click())
   act(() => root.unmount())
   host.remove()
 })
