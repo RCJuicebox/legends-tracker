@@ -25,6 +25,7 @@ import { Buffs } from './pages/Buffs'
 import { DamageMeter } from './pages/DamageMeter'
 import { FEATURE_PAGES, type FeaturePageId } from '../../features'
 import { Factions } from '../../features/factions/page'
+import { Slayer } from '../../features/slayer/page'
 
 /**
  * The pages that are not feature modules, in sidebar order, grouped by the player's day: Play for
@@ -55,7 +56,7 @@ export type PageId = (typeof SHELL_PAGES)[number]['id'] | FeaturePageId
 type PageComponent = ComponentType<{ go: Go }>
 
 /** Each feature module's page (src/features/<name>/page.tsx), by id. */
-const FEATURE_ELEMENTS: Record<FeaturePageId, PageComponent> = { factions: Factions }
+const FEATURE_ELEMENTS: Record<FeaturePageId, PageComponent> = { factions: Factions, slayer: Slayer }
 
 interface PageEntry {
   id: PageId

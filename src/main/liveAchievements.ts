@@ -124,7 +124,8 @@ const ENGAGED_MS = 60_000
 export class LiveAchievements implements AppFeature {
   readonly id = 'achievements'
   private readonly follows: JsonFile<Record<string, Followed>>
-  private readonly races = new NpcRaces()
+  /** eqlwiki's race for each mob, kept: the Slayer plan asks it too. */
+  readonly races = new NpcRaces()
   private character = ''
   private zone = ''
   /** When a line last moved each half, 0 when read since. */
@@ -494,8 +495,8 @@ export class LiveAchievements implements AppFeature {
       })
   }
 
-  /** Whether the exports settled that a mob's kills count toward an achievement (both lower-cased). */
-  private readonly fact = (mob: string, achievement: string): boolean | undefined => this.facts.get().mobs[mob]?.[achievement]?.counts
+  /** Whether the exports settled that a mob's kills count toward an achievement (both lower-cased): the Slayer plan asks it too. */
+  readonly fact = (mob: string, achievement: string): boolean | undefined => this.facts.get().mobs[mob]?.[achievement]?.counts
 
   /**
    * Sets the kills between the export counted from and a new one against how far the new one's

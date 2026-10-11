@@ -139,6 +139,7 @@ const paths: Record<IconName, ReactNode> = {
   sparkle: <path d="M12 2l2.4 7.4H22l-6.2 4.5 2.4 7.4L12 16.8l-6.2 4.5 2.4-7.4L2 9.4h7.6z" />,
   meter: <path d="M3 4h18v3H3zm0 6.5h12v3H3zm0 6.5h7v3H3z" />,
   flag: <path d="M5 2h2v20H5zm4 1h10l-2.5 4L19 11H9z" />,
+  sword: <path d="M21 3h-4l-9.5 9.5 4 4L21 7zM4.5 12.5 6 11l7 7-1.5 1.5zM7.2 16l1.5 1.5-4 4-1.5-1.5z" />,
   pin: <path d="M16 3v2h-1v6l3 3v2h-5v6l-1 1-1-1v-6H6v-2l3-3V5H8V3z" />,
   unlock: (
     <path d="M17 9h-7V6.5a2 2 0 0 1 4 0V7h2v-.5a4 4 0 0 0-8 0V9H7a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-9a2 2 0 0 0-2-2zm0 11H7v-9h10zm-5-2a2 2 0 1 0 0-4 2 2 0 0 0 0 4z" />

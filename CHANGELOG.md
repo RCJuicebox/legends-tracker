@@ -2,6 +2,11 @@
 
 What changed in each version. The release workflow publishes a version's section as its release notes, and installed copies show them when an update arrives.
 
+## Unreleased
+
+- **Plan › Slayer: where to kill for the Slayer achievements still open, quickest first.** A new page in the Plan group plans them like Factions › Plan: step by step, each a zone, the hours there and what it moves and finishes, a kill counting toward every open achievement of its race. The pace is your own: every kill over your logs, their archives and your other characters', and the time you spent killing in each zone (kobolds in the Warrens, gnolls in Blackburrow). Where you have not hunted a race, the camps players settled on stand in (mimics in Runnyeye, giants in the Rathe Mountains, Dervishes at Unrest's lesser blade fiends), then eqlwiki's count of the race in a zone, marked a guess. Phinigel, Lady Vox and Lord Nagafen are raid lockouts, a kill a difficulty a day: they are listed beside the plan with the days they take. A step says what an hour there did to your factions. Rule out a camp, or turn achievements off; the out-of-era ones Banestrike does not need start off.
+- **Fix: Slayer counts missed mobs whose eqlwiki page has every word capitalised.** "Lesser blade fiend" missed the page "Lesser Blade Fiend" (a Dervish), so two hundred kills counted toward nothing. Both are asked now, and the mobs missed before are asked again.
+
 ## 2.10.0 (2026-10-09)
 
 - **Slayer counts go by race, as the game counts them.** A kill used to count toward every achievement whose list had a word of its name or eqlwiki race in it, so giant bats, rattlesnakes and moss snakes ("Giant Snake" on eqlwiki) all went toward Giants: of the kills A Giant Problem gained since one export, half were snakes and bats. Now every mob is given one race in the client's own race names, eqlwiki's older names brought to them (Giant Bat is a Bat, Qeynos Citizen a Human), and counts only toward the achievements that list that race. Kills placed by the mob's name alone show as `+~N` until an export settles them.

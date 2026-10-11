@@ -14,6 +14,7 @@ import type { FactionSources, FactionView } from '../features/factions/core'
 import type { FactionPlanData } from '../features/factions/planner'
 import type { FactionLookup, FactionMover } from '../features/factions/lookup'
 import type { FollowedPlan } from '../features/factions/tracker'
+import type { SlayerPlanChoices, SlayerPlanData } from '../features/slayer/core'
 import type { AchievementTrack } from './tracking'
 import type { FocusReport } from '../core/itemFocus'
 import type { LootSnapshot } from '../core/loot'
@@ -369,6 +370,10 @@ export interface Invokes {
   'factions:follow': (character: string, plan: FollowedPlan | null) => void
   /** The step of the followed plan to work on now, picked by the player: shown until kills or hand-ins go toward another. */
   'factions:follow-step': (character: string, index: number) => void
+  /** What the Slayer page plans from: the open Slayer achievements and where kills of their races come from; `refresh` reads the logs again. */
+  'slayer:plan': (character: string, refresh?: boolean) => { data: SlayerPlanData; choices: SlayerPlanChoices }
+  /** What the player chose on the Slayer page for a character. */
+  'slayer:choices': (character: string, choices: SlayerPlanChoices) => void
   /** Where the character being played is in its faction plan, and its Slayer counts since its achievements export. */
   'achievements:track': (watching?: boolean) => AchievementTrack | null
 
@@ -566,6 +571,8 @@ const INVOKE_CHANNELS: Record<InvokeChannel, true> = {
   'factions:lookup': true,
   'factions:follow': true,
   'factions:follow-step': true,
+  'slayer:plan': true,
+  'slayer:choices': true,
   'achievements:track': true,
   'character:exports': true,
   'character:sheet': true,
