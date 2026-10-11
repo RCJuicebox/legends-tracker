@@ -98,7 +98,8 @@ beforeAll(async () => {
   for (const m of modules) for (const [name, fn] of Object.entries(m)) if (/^register\w*Ipc$/.test(name)) (fn as (c: unknown) => void)(ctx)
   const { Factions } = await import('../../src/features/factions/main')
   const { LiveAchievements } = await import('../../src/main/liveAchievements')
-  for (const f of [new Factions(stub() as never), new LiveAchievements({ store: { dir: h.dir } } as never)]) f.register(ctx as never)
+  const { SlayerPlanner } = await import('../../src/features/slayer/main')
+  for (const f of [new Factions(stub() as never), new LiveAchievements({ store: { dir: h.dir } } as never), new SlayerPlanner(stub() as never, h.dir)]) f.register(ctx as never)
 }, 30_000)
 
 describe('the invoke handlers', () => {

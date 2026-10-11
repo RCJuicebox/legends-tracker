@@ -733,6 +733,32 @@ The plan shown is the one followed while you play that character: **Now** at the
 way of, or the first left in your zone), what it still wants and about how long, with the next. It
 moves on by itself as achievements are done, and follows the order the tab showed last, open or not.
 
+## Slayer
+
+Plan › Slayer plans the Slayer achievements still open: where to kill for them quickest, step by
+step. Counts are the achievements export (`/outputfile achievements`) plus the kills the log has shown
+since, as on the Achievements page.
+
+A camp is a zone and what dies there an hour toward each achievement. Its pace comes from your own
+logs first: every kill over your log, its archives and your other characters' logs, put to the zone
+it was in, and the time spent killing there (kills within ten minutes of the one before). A kill
+counts toward every open achievement that lists its race, so a zone of giants feeds Might They Be
+Giants? and A Giant Problem at once. Where you have not hunted a race, what play has settled stands
+in (`src/shared/game/slayerCamps.ts`, dated: the EQL Discord's Slayer talk, and what you have told
+the app), then eqlwiki's count of the race's NPCs in a zone, marked a guess; eqlwiki's zones are
+also offered beside a camp your logs make a crawl (under ten an hour).
+
+The plan takes the camp that does the most still-open work an hour, travel counted, until its first
+achievement is done, and again; then each camp's time is joined into one visit. Raid lockouts
+(Phinigel Autropos, the only kedge; Lady Vox and Lord Nagafen for the true dragons) give a kill a
+difficulty a day, so they are listed beside the plan with the days they take, the lockouts that feed
+one achievement together. Each step says what it moves and finishes, the mobs, where the pace came
+from, and what an hour there did to your factions (from the faction lines after kills there; players
+say a kill your pet lands while you feign death costs none). **Rule out** leaves a camp out.
+**Achievements in the plan** turns achievements off, or the optional ones on: those the Slayer metas
+hold only as optional are out of era, and Banestrike does not need them. Kills no race was found for
+are listed at the foot. Your choices are kept per character.
+
 ## Stats
 
 Your character's record: up to three classes, the level of each, race (one of the sixteen playable
@@ -888,6 +914,7 @@ The settings folder, `%APPDATA%\Legends Tracker` (or the `EQL_USER_DATA` folder)
 | `window.json` | Where the main window was, whether it was maximised, and whether the tray notice was shown |
 | `pets.json` | Per character, the newest pet gear list (`/pet inventory check`) and summoning cast the log showed, and how far back it was read |
 | `tradeskills.json` | Starred recipes, the combines planned of each, and prices typed in |
+| `slayer-plan.json` | Per character, what you chose on the Slayer page: achievements left out or taken in, camps ruled out, minutes between camps and the pace assumed where players give none |
 | `faction-follow.json` | Per character, the faction plan the achievements overlay follows: its steps, the step you are on, and what is done |
 | `slayer-facts.json` | Which mobs your achievements exports showed do, or do not, count toward which Slayer achievements, with the kills and the rise that settled it |
 | `azure-speech.json` | The Azure region, the key encrypted with Windows' data protection, and the voice list |

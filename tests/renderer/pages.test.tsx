@@ -44,7 +44,23 @@ const bridge = {
 type Page = ComponentType<{ go: (p: PageId) => void }>
 
 /** The window's pages, as main.tsx imports them. */
-const PAGE_NAMES = ['Dashboard', 'DamageMeter', 'Buffs', 'Respawns', 'Motes', 'Achievements', 'Stats', 'Gear', 'Tradeskills', 'Loot', 'Spells', 'Triggers', 'Settings', 'Factions']
+const PAGE_NAMES = [
+  'Dashboard',
+  'DamageMeter',
+  'Buffs',
+  'Respawns',
+  'Motes',
+  'Achievements',
+  'Stats',
+  'Gear',
+  'Tradeskills',
+  'Loot',
+  'Spells',
+  'Triggers',
+  'Settings',
+  'Factions',
+  'Slayer'
+]
 let pages: Record<string, Page>
 let StateProvider: ComponentType<{ children: React.ReactNode }>
 
@@ -67,7 +83,8 @@ beforeAll(async () => {
     Spells: (await import('../../src/renderer/src/pages/Spells')).Spells,
     Triggers: (await import('../../src/renderer/src/pages/Triggers')).Triggers,
     Settings: (await import('../../src/renderer/src/pages/Settings')).Settings,
-    Factions: (await import('../../src/features/factions/page')).Factions
+    Factions: (await import('../../src/features/factions/page')).Factions,
+    Slayer: (await import('../../src/features/slayer/page')).Slayer
   }
 })
 

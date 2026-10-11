@@ -31,3 +31,4 @@ export type IconName =
   | 'sources'
   | 'pin'
   | 'unlock'
+  | 'sword'
