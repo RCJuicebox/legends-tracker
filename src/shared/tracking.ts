@@ -123,6 +123,18 @@ export interface TrackedAchievement {
   justDone?: { name: string; at: number }[]
 }
 
+/** The Hunter achievements of the zone the player is in: the named each still wants. */
+export interface HunterTrackView {
+  zone: string
+  rows: {
+    achievement: string
+    left: string[]
+    total: number
+    /** Killed since the export, the export not knowing yet. */
+    since: string[]
+  }[]
+}
+
 export interface AchievementTrack {
   /** The character being played (its key). */
   character: string
@@ -130,6 +142,8 @@ export interface AchievementTrack {
   faction: FactionTrackView | null
   slayer: SlayerTrackView | null
   skills: SkillTrackView | null
+  /** The Hunter named left in the zone the player is in; null outside a Hunter zone. */
+  hunter?: HunterTrackView | null
   /** The achievements the player tracks, in the order tracked. */
   tracked: TrackedAchievement[]
 }

@@ -32,3 +32,4 @@ export type IconName =
   | 'pin'
   | 'unlock'
   | 'sword'
+  | 'crosshair'

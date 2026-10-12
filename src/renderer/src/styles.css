@@ -4163,3 +4163,40 @@ input[aria-invalid='true'] {
 .btn.small.ghost.sl-out:focus-visible {
   opacity: 1;
 }
+
+/* Plan › Slayer: what a mob's spawns allow, beside its kills, and a step's map. */
+.sl-spawn {
+  font-size: 11px;
+  opacity: 0.8;
+}
+
+.sl-map-wrap {
+  margin-top: 6px;
+}
+
+.sl-map {
+  display: block;
+  width: 100%;
+  max-height: 420px;
+  background: var(--well);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow);
+}
+
+.sl-map-line {
+  fill: none;
+  stroke: rgb(var(--ink) / 0.3);
+  stroke-width: 1;
+}
+
+.sl-map-label {
+  fill: var(--teal-text);
+  opacity: 0.8;
+}
+
+.sl-map-spot {
+  fill: var(--red);
+  stroke: var(--bg);
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+}

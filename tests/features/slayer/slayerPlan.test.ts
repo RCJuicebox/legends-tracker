@@ -87,7 +87,7 @@ describe('Slayer plan: the kills in the logs', () => {
     const z = t.zones['Clan Crushbone']
     expect(z.kills).toBe(3)
     expect(z.sec).toBe(60)
-    expect(z.mobs['an orc pawn']).toEqual({ name: 'an orc pawn', n: 2 })
+    expect(z.mobs['an orc pawn']).toEqual({ name: 'an orc pawn', n: 2, at: 24 * MIN })
     expect(z.mobs['an orc centurion'].n).toBe(1)
     // An instance is its zone's camp.
     expect(t.zones['The Permafrost Caverns'].kills).toBe(1)

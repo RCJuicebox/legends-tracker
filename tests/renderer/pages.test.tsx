@@ -59,7 +59,8 @@ const PAGE_NAMES = [
   'Triggers',
   'Settings',
   'Factions',
-  'Slayer'
+  'Slayer',
+  'Hunter'
 ]
 let pages: Record<string, Page>
 let StateProvider: ComponentType<{ children: React.ReactNode }>
@@ -84,7 +85,8 @@ beforeAll(async () => {
     Triggers: (await import('../../src/renderer/src/pages/Triggers')).Triggers,
     Settings: (await import('../../src/renderer/src/pages/Settings')).Settings,
     Factions: (await import('../../src/features/factions/page')).Factions,
-    Slayer: (await import('../../src/features/slayer/page')).Slayer
+    Slayer: (await import('../../src/features/slayer/page')).Slayer,
+    Hunter: (await import('../../src/features/hunter/page')).Hunter
   }
 })
 

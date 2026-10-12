@@ -25,6 +25,7 @@ import { RecipeBook } from './recipes'
 import { PurchaseHistory, purchaseConsumer } from './purchases'
 import { Factions } from '../features/factions/main'
 import { SlayerPlanner } from '../features/slayer/main'
+import { HunterPlanner } from '../features/hunter/main'
 import { LogHistory, type HistoryWhere } from './sources/logHistory'
 import { TradeFavorites } from './tradeFavorites'
 import { LiveAchievements } from './liveAchievements'
@@ -364,7 +365,7 @@ export function createContext(): AppContext {
   // It reads the standings and the log as they settle, so its engine feature goes after everything the
   // engine has of its own (registered with the features, below).
   ctx.liveAchievements = new LiveAchievements(ctx)
-  ctx.features = [ctx.factions, ctx.liveAchievements, new SlayerPlanner(logHistory, store.dir), new GroupHealth()]
+  ctx.features = [ctx.factions, ctx.liveAchievements, new SlayerPlanner(logHistory, store.dir), new HunterPlanner(logHistory), new GroupHealth()]
 
   ctx.refreshOverlayVisibility = () =>
     ctx.overlays.setShown(

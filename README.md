@@ -745,8 +745,31 @@ it was in, and the time spent killing there (kills within ten minutes of the one
 counts toward every open achievement that lists its race, so a zone of giants feeds Might They Be
 Giants? and A Giant Problem at once. Where you have not hunted a race, what play has settled stands
 in (`src/shared/game/slayerCamps.ts`, dated: the EQL Discord's Slayer talk, and what you have told
-the app), then eqlwiki's count of the race's NPCs in a zone, marked a guess; eqlwiki's zones are
-also offered beside a camp your logs make a crawl (under ten an hour).
+the app), then TAKP's classic spawn tables (`src/shared/game/takpSpawns.json`, read from
+[TAKP's AllaClone](https://www.takproject.net/allaclone/) by `scripts/takp-spawns.mjs`): every zone
+Legends has, its spawn spots, the mobs each rolls and how often, and their timers. A zone's pace
+from the tables is what its spots allow, killing each mob as it pops, at no more than your usual
+kills an hour (the middle of the zones you have hunted an hour or more); each step says which holds
+it back. Legends' respawns are not classic's: a zone's spawns come back on one timer of its own,
+quicker than classic in every zone timed so far (Blackburrow's gnoll brewer, eighteen minutes classic,
+and its Splitpaw sharpshooter both 3:40; Ak'Anon's clockworks 4:50 against twenty minutes). So a zone
+runs on the respawn your Respawns page has timed there, from a spawn the tables give one spot, and a
+zone you have timed nothing in keeps classic's timers. A mob timed on its own is one spot on its own
+timer (the lesser blade fiend is a 3% roll in TAKP, a spawn of its own in Legends). The tables leave
+out named NPCs (one of each, and their timers Legends' own), raid zones' timers of over an hour, and
+cities. Zones TAKP lacks fall back on eqlwiki's count of the race's NPCs in a zone, marked a guess.
+Beside each mob a step says what its spawns allow ("12 spots · 6:24"), and "spawn-bound" where your
+own pace there is up against it.
+
+**Travel** between steps is the way your log has seen you go: from a camp's last kill to the next
+zone, then across each zone between as long as crossing it took you (gates and ports are trips like
+any other; a death's way home is not). Where your log knows no way, your minutes between camps stand
+in. **Map** under a step draws the zone from the game's own map files (`maps\`) with a dot at every
+spot its mobs pop at, and **Mark on the game's map** puts those dots (and the Hunter named left,
+gold) on the in-game map, in a map set of its own: the game's maps copied into
+`maps\LegendsTracker`, then each marked zone's label layer written as the game's plus the marks.
+Pick LegendsTracker in the map window to see them, the default set to go back. The game's own files
+are only read; **Clear marks** puts the copies back as the game has them.
 
 The plan works through Banestrike's tiers in turn: Progressive's achievements first (Banestrike rank
 2), then Highly Decorated's (rank 3), A Force of Nature's (rank 4) and what Megadeath names besides,
@@ -763,6 +786,19 @@ say a kill your pet lands while you feign death costs none). **Rule out** leaves
 **Achievements in the plan** turns achievements off, or the optional ones on: those the Slayer metas
 hold only as optional are out of era, and Banestrike does not need them. Kills no race was found for
 are listed at the foot. Your choices are kept per character.
+
+## Hunter
+
+Plan › Hunter lists each Hunter achievement not done ("Hunter of Befallen") with the named it still
+wants: the achievements export, less the named your log has shown you killing since. Beside each
+named, what TAKP's spawn tables say of it: its spots, how often it is up against its placeholders,
+its timer (the zone's respawn as your log timed it, as on the Slayer page), and the wait, how long
+its spots are cleared on average before it pops (its timer over how often it is up). A zone's named
+pop side by side, so a zone takes as long as its longest wait, and the quickest zones come first;
+those with a named the tables lack come after. **Map** shows where the named left spawn, and **Mark
+on the game's map** puts them on the in-game map with the Slayer plan's marks (each page's are kept
+apart). Legends has changed some spawns, so the odds are a lead. The achievements overlay shows the
+Hunter named left in the zone you are in, under a switch of its own (Overlays).
 
 ## Stats
 
@@ -919,7 +955,8 @@ The settings folder, `%APPDATA%\Legends Tracker` (or the `EQL_USER_DATA` folder)
 | `window.json` | Where the main window was, whether it was maximised, and whether the tray notice was shown |
 | `pets.json` | Per character, the newest pet gear list (`/pet inventory check`) and summoning cast the log showed, and how far back it was read |
 | `tradeskills.json` | Starred recipes, the combines planned of each, and prices typed in |
-| `slayer-plan.json` | Per character, what you chose on the Slayer page: achievements left out or taken in, camps ruled out, minutes between camps and the pace assumed where players give none |
+| `slayer-plan.json` | Per character, what you chose on the Slayer page: achievements left out or taken in, camps and mobs ruled out, minutes between camps and the pace assumed where nothing gives one |
+| `map-marks.json` | What the Slayer and Hunter pages last marked on the game's map (`maps\LegendsTracker`), each page's apart |
 | `faction-follow.json` | Per character, the faction plan the achievements overlay follows: its steps, the step you are on, and what is done |
 | `slayer-facts.json` | Which mobs your achievements exports showed do, or do not, count toward which Slayer achievements, with the kills and the rise that settled it |
 | `azure-speech.json` | The Azure region, the key encrypted with Windows' data protection, and the voice list |

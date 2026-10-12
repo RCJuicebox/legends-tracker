@@ -37,7 +37,15 @@ const data: SlayerPlanData = {
     {
       id: 'log:Clan Crushbone',
       zone: 'Clan Crushbone',
-      kinds: [{ name: 'an orc pawn', perHour: 150, goals: [0] }],
+      kinds: [
+        {
+          name: 'an orc pawn',
+          perHour: 150,
+          goals: [0],
+          spawn: { name: 'an orc pawn', race: 'Orc', lo: 1, hi: 3, spots: 12, up: 12, timer: 384, timerFrom: 'zone' as const, ceiling: 112 },
+          bound: true
+        }
+      ],
       source: 'log',
       pace: { 0: 150 },
       hours: 5,
@@ -56,7 +64,33 @@ const data: SlayerPlanData = {
     }
   ],
   unplaced: [{ name: 'a mystery', n: 3 }],
-  pending: 0
+  pending: 0,
+  moves: [],
+  killSpeed: 90,
+  timings: [
+    {
+      zone: 'Clan Crushbone',
+      timer: 384,
+      timed: [
+        { name: 'Orc scoutsman', legends: 384, classic: 600 },
+        { name: 'A wanderer', legends: 300, classic: null }
+      ]
+    },
+    { zone: 'Kedge Keep', timer: null, timed: [{ name: 'A sailfin', legends: 300, classic: null }] }
+  ],
+  hunter: [
+    {
+      zone: 'Clan Crushbone',
+      achievement: 'Hunter of Clan Crushbone',
+      left: [
+        { name: 'Lord Darish', spawn: { name: 'Lord Darish', race: 'Orc', lo: 15, hi: 15, spots: 1, up: 0.25, timer: 384, timerFrom: 'zone', ceiling: 2.3 } },
+        { name: 'Ambassador DVinn' }
+      ],
+      total: 3,
+      since: [],
+      wait: null
+    }
+  ]
 }
 
 const invoke = vi.fn((channel: string, ...args: unknown[]) => {
@@ -71,6 +105,19 @@ const invoke = vi.fn((channel: string, ...args: unknown[]) => {
       return Promise.resolve({ data, choices: DEFAULT_CHOICES })
     case 'slayer:choices':
       return Promise.resolve(args.length)
+    case 'slayer:map':
+      return Promise.resolve({
+        zone: 'Clan Crushbone',
+        short: 'crushbone',
+        lines: [0, 0, 100, 100, 50, 0, 50, 100],
+        labels: [
+          { x: 10, y: 10, text: 'to Greater Faydark' },
+          { x: 20, y: 20, text: 'Throne' }
+        ],
+        spots: [{ x: 30, y: 40, z: 0, mobs: [{ name: 'an orc pawn', chance: 50 }], timer: 600 }]
+      })
+    case 'slayer:mark':
+      return (args[0] as unknown[]).length ? Promise.resolve({ folder: 'maps/LegendsTracker', zones: 1, spots: 12 }) : Promise.reject(new Error('locked'))
     default:
       return new Promise(() => {})
   }
@@ -140,6 +187,27 @@ it('draws the plan, the lockouts beside it, and keeps a camp ruled out', async (
   })
   expect(invoke).toHaveBeenLastCalledWith('slayer:choices', 'Kelwyn_neriak', expect.objectContaining({ travelMin: 25 }))
   await act(async () => button('Read again').click())
+  // What the spawns allow beside each mob, what holds the camp back, and the Hunter named on the way.
+  expect(host.textContent).toContain('(12 spots · 6:24 · spawn-bound)')
+  expect(host.textContent).toContain('Hunter of Clan Crushbone · Lord Darish, Ambassador DVinn')
+  expect(host.textContent).toContain('your usual pace 90/h')
+  // The step's map.
+  await act(async () => button('Map').click())
+  for (let i = 0; i < 10 && !host.querySelector('svg.sl-map'); i++) await act(async () => new Promise((r) => setTimeout(r, 20)))
+  expect(host.querySelectorAll('circle.sl-map-spot')).toHaveLength(1)
+  expect(host.textContent).toContain('to Greater Faydark')
+  expect(host.textContent).not.toContain('Throne')
+  await act(async () => button('Map').click())
+  // Timed respawns against classic.
+  await act(async () => button('Zone respawns').click())
+  expect(host.textContent).toContain('Clan Crushbone 6:24 · Orc scoutsman 6:24 (classic 10:00), A wanderer 5:00')
+  expect(host.textContent).toContain('Kedge Keep no timer · A sailfin 5:00')
+  // Marked on the game's map, then cleared (here, failing).
+  await act(async () => button('Mark on the game’s map').click())
+  expect(host.textContent).toContain('Marked 12 spots in 1 zone')
+  expect(invoke).toHaveBeenLastCalledWith('slayer:mark', [{ zone: 'Clan Crushbone', mobs: ['an orc pawn'], named: ['Lord Darish', 'Ambassador DVinn'] }])
+  await act(async () => button('Clear marks').click())
+  expect(host.textContent).toContain('Could not mark the map: locked')
   act(() => root.unmount())
   host.remove()
 })

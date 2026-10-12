@@ -1,0 +1,176 @@
+import { useState } from 'react'
+import { CharacterPicker } from '../../renderer/src/components/CharacterPicker'
+import { ago, api } from '../../renderer/src/api'
+import { useInvoke, useVisibleInterval } from '../../renderer/src/hooks'
+import { useNow } from '../../renderer/src/components/TimerBars'
+import { GameCommand, Info, Pending, Tip } from '../../renderer/src/components/ui'
+import { duration, num, who } from '../../core/format'
+import { usePlanCharacter } from '../slayer/page'
+import { clock } from '../slayer/core'
+import { SpawnMap } from '../slayer/SpawnMap'
+import type { HunterNamed } from './core'
+
+// Plan › Hunter: each Hunter achievement not done, the named it still wants, and what classic's spawn
+// tables say of each (core.ts), the zones quickest to finish first. The achievements overlay shows
+// the zone the player is in (Overlays).
+
+const HOW = (
+  <>
+    <div>
+      <b>What is left</b> is your achievements export (<code>/outputfile achievements</code>), less the named your log has shown you killing since.
+    </div>
+    <div>
+      <b>Spawns</b> are TAKP’s classic spawn tables: the spots a named can pop at, how often it rolls there against its placeholders, and its timer. Legends’ respawns run quicker
+      than classic, one timer for a zone, so a zone runs on the respawn your Respawns page has timed there. Legends has changed some spawns too: take the odds as a lead.
+    </div>
+    <div>
+      <b>The wait</b> is how long its spots are cleared, on average, before the named pops: its timer over how often it is up. A zone’s named pop side by side, so a zone takes as
+      long as its longest wait; the quickest zones come first.
+    </div>
+  </>
+)
+
+/** How a named spawns, short: "1 spot · 10% · 6:00 · ≈ 1 h". */
+function NamedSpawn({ n }: { n: HunterNamed }) {
+  if (!n.spawn) return <span className="faint small"> (not in TAKP’s tables)</span>
+  const s = n.spawn
+  const odds = s.up >= 1 ? 'always up' : `${num(Math.round(s.up * 100))}%`
+  return (
+    <Tip
+      className="mono sl-spawn"
+      text={`${s.name}, level ${s.lo === s.hi ? s.lo : `${s.lo}–${s.hi}`}: ${s.spots === 1 ? 'one spot' : `${num(s.spots)} spots`}, up ${odds} of the time, respawn ${clock(s.timer)}${
+        s.timerFrom === 'timed' ? ' (timed by your log)' : s.timerFrom === 'zone' ? ' (the zone’s respawn as you timed it)' : ' (classic)'
+      }. Clearing its spots, it pops in about ${duration(n.wait ?? s.timer)} on average.`}
+    >
+      {' '}
+      ({s.spots === 1 ? '1 spot' : `${num(s.spots)} spots`} · {odds} · {clock(s.timer)} · ≈ {duration(n.wait ?? s.timer)})
+    </Tip>
+  )
+}
+
+export function Hunter() {
+  const chars = usePlanCharacter()
+  const character = chars.character
+  const q = useInvoke(character ? 'hunter:plan' : null, [character])
+  useVisibleInterval(q.reload, 60_000)
+  const now = useNow(30_000)
+  const [maps, setMaps] = useState<Set<string>>(new Set())
+  const [marked, setMarked] = useState('')
+  const data = q.data
+  const toggleMap = (a: string) => setMaps((m) => (m.has(a) ? new Set([...m].filter((x) => x !== a)) : new Set([...m, a])))
+  const mark = async (on: boolean) => {
+    const marks = on && data ? data.zones.map((z) => ({ zone: z.zone, mobs: [], named: z.left.map((n) => n.name) })) : []
+    try {
+      const r = await api.invoke('slayer:mark', marks, 'hunter')
+      setMarked(
+        on ? `Marked ${num(r.spots)} spots in ${r.zones} zone${r.zones === 1 ? '' : 's'}: pick the LegendsTracker map set in the game’s map window.` : 'Hunter marks cleared.'
+      )
+    } catch (e) {
+      setMarked(`Could not mark the map: ${e instanceof Error ? e.message : String(e)}`)
+    }
+  }
+  const left = data ? data.zones.reduce((s, z) => s + z.left.length, 0) : 0
+
+  return (
+    <>
+      <div className="page-head">
+        <div>
+          <h1>Hunter</h1>
+          <div className="lead">
+            The named each Hunter achievement still wants, and where and how often they spawn
+            {data?.export ? (
+              <>
+                . Counts are {data.export.file} (written by the game {ago(data.export.modified, now)}) plus your kills since; type <GameCommand cmd="/outputfile achievements" /> in
+                game to refresh it.
+              </>
+            ) : (
+              '.'
+            )}{' '}
+            <Info label="How it is worked out" text={HOW} />
+          </div>
+        </div>
+        <div className="actions">
+          <CharacterPicker character={character} available={chars.available} onPick={chars.setCharacter} />
+        </div>
+      </div>
+
+      {!chars.ready ? (
+        <Pending error={chars.error} retry={chars.reload} what="your characters" />
+      ) : !character ? (
+        <div className="card empty">No character yet. Choose the game folder on the Settings page, then play with logging on (/log on).</div>
+      ) : !data ? (
+        <Pending error={q.error} retry={q.reload} doing="Reading your kills" />
+      ) : !data.export ? (
+        <div className="card empty">
+          No achievements export for {who(character)} yet. Type <GameCommand cmd="/outputfile achievements" /> in game.
+        </div>
+      ) : !data.zones.length ? (
+        <div className="card empty">Every Hunter achievement is done.</div>
+      ) : (
+        <>
+          <div className="card row mb-16">
+            <span>
+              <b>{data.zones.length}</b> Hunter achievement{data.zones.length === 1 ? '' : 's'} to go, <b>{num(left)}</b> named
+            </span>
+            <span className="spacer" />
+            <Tip text="Puts a gold dot at every spot the named left pop at, on the game’s own map: in a map set of its own, LegendsTracker (a copy of the game’s maps, so its own stay as they are). Pick it in the map window.">
+              <button className="btn small" onClick={() => void mark(true)}>
+                Mark on the game’s map
+              </button>
+            </Tip>
+            <button className="btn small ghost" onClick={() => void mark(false)} title="Take the Hunter marks off the LegendsTracker map set">
+              Clear marks
+            </button>
+          </div>
+          {marked && <div className="card mb-16 small">{marked}</div>}
+          <div className="card mb-16">
+            <ol className="fp-steps">
+              {data.zones.map((z, i) => (
+                <li key={z.achievement} className="fp-step">
+                  <span className="fp-num">{i + 1}</span>
+                  <div className="fp-body">
+                    <div className="fp-head">
+                      <span className="fp-zone">{z.zone}</span>
+                      <span className="small">{z.achievement}</span>
+                      <span className="spacer" />
+                      <span className="mono small">
+                        {z.left.length} of {z.total} left
+                      </span>
+                      <Tip
+                        className="mono fp-time"
+                        text={z.wait === null ? 'A named here is not in TAKP’s tables: no time for the zone' : 'The longest wait of the named left: they pop side by side'}
+                      >
+                        {z.wait === null ? '—' : `≈ ${duration(z.wait)}`}
+                      </Tip>
+                    </div>
+                    <div className="small">
+                      {z.left.map((n) => (
+                        <div key={n.name}>
+                          <b>{n.name}</b>
+                          <NamedSpawn n={n} />
+                        </div>
+                      ))}
+                    </div>
+                    {z.since.length > 0 && <div className="faint small">Killed since your export: {z.since.join(', ')}</div>}
+                    <div className="row tight fp-effects">
+                      <span className="spacer" />
+                      <button
+                        className="btn small ghost"
+                        onClick={() => toggleMap(z.achievement)}
+                        aria-expanded={maps.has(z.achievement)}
+                        title="Where the named left spawn, on the game’s own map of the zone"
+                      >
+                        Map
+                      </button>
+                    </div>
+                    {maps.has(z.achievement) && <SpawnMap zone={z.zone} mobs={z.left.map((n) => n.name)} />}
+                  </div>
+                </li>
+              ))}
+            </ol>
+          </div>
+        </>
+      )}
+    </>
+  )
+}

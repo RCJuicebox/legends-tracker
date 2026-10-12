@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import type { AppContext } from '../../../src/main/context'
@@ -15,7 +15,8 @@ vi.mock('electron', () => ({ app: { getPath: () => h.dir }, ipcMain: { handle: (
 h.dir = mkdtempSync(join(tmpdir(), 'lt-slayer-main-'))
 process.env['EQL_USER_DATA'] = h.dir
 mkdirSync(join(h.dir, 'local'), { recursive: true })
-const { SlayerPlanner } = await import('../../../src/features/slayer/main')
+const { SlayerPlanner, markMaps, usualPace } = await import('../../../src/features/slayer/main')
+const { HunterPlanner } = await import('../../../src/features/hunter/main')
 const { DEFAULT_CHOICES } = await import('../../../src/features/slayer/core')
 const { LogHistory } = await import('../../../src/main/sources/logHistory')
 const { rendererUrl } = await import('../../../src/main/push')
@@ -34,7 +35,17 @@ put(join(game, 'dbstr_us.txt'), ['54^11^Orc^0^', '54^12^Orcs^0^', '18^11^Giant^0
 mkdirSync(join(game, 'Resources'), { recursive: true })
 put(
   join(game, 'Kelwyn_neriak-Achievements.txt'),
-  ['Slayer: Conquest', 'I\tOrc Stomp!', 'I\t\tOrcs and Wereorcs.\t4900/5000', 'I\tMight They Be Giants?', 'I\t\tGiants\t4990/5000'].join('\r\n')
+  [
+    'Slayer: Conquest',
+    'I\tOrc Stomp!',
+    'I\t\tOrcs and Wereorcs.\t4900/5000',
+    'I\tMight They Be Giants?',
+    'I\t\tGiants\t4990/5000',
+    'EverQuest: Hunter',
+    'I\tHunter of Clan Crushbone',
+    'I\t\tAmbassador DVinn',
+    'C\t\tEmperor Crush'
+  ].join('\r\n')
 )
 // Twenty minutes of orcs in Crushbone, one every minute; a bat between, which counts toward nothing; a mob no race is known for.
 const crushbone = [line('10:00:00', 'You have entered Clan Crushbone.')]
@@ -61,6 +72,22 @@ const asked: string[][] = []
 let learned = false
 const ctx = {
   installDir: () => game,
+  // The Respawns page's records: Khrix Fritchoff timed at 7:21 in Unrest, against classic's sixteen minutes.
+  store: {
+    respawns: {
+      get: () => ({
+        'the estate of unrest|khrix fritchoff': {
+          zone: 'The Estate of Unrest',
+          name: 'Khrix Fritchoff',
+          kills: 20,
+          lastDeath: 0,
+          pendingSince: 0,
+          gaps: [441, 460, 470],
+          shared: false
+        }
+      })
+    }
+  },
   gameTables: new GameTables(() => game),
   achievementFiles: new AchievementFiles(
     h.dir,
@@ -91,6 +118,11 @@ const ctx = {
 }
 const planner = new SlayerPlanner(new LogHistory(join(h.dir, 'log-history.json'), SlayerPlanner.consumers), h.dir)
 planner.register(ctx as unknown as AppContext)
+new HunterPlanner(new LogHistory(join(h.dir, 'log-history-h.json'), SlayerPlanner.consumers)).register(ctx as unknown as AppContext)
+// The game's own map of Crushbone: a wall, and the way out.
+put(join(game, 'maps', 'crushbone.txt'), 'L 0, 0, 0, 100, 100, 0, 0, 0, 0\r\n')
+put(join(game, 'maps', 'crushbone_1.txt'), 'P 10, 10, 0, 0, 0, 0, 3, to_Greater_Faydark')
+put(join(game, 'maps', 'unrest.txt'), 'L 0, 0, 0, 1, 1, 0, 0, 0, 0\r\n')
 const call = (channel: string, ...args: unknown[]) => Promise.resolve(h.handlers.get(channel)!(OWN, ...args)) as Promise<any>
 
 describe('the Slayer page', () => {
@@ -175,5 +207,84 @@ describe('the Slayer page', () => {
   it('has nothing to plan without an achievements export', async () => {
     const { data } = await call('slayer:plan', 'Aldric_neriak')
     expect(data).toMatchObject({ export: null, goals: [], camps: [] })
+  })
+
+  it('paces with the spawn tables, their timers scaled to the respawns timed', async () => {
+    const { data } = await call('slayer:plan', 'Kelwyn_neriak')
+    // Khrix Fritchoff timed at 7:21 in Unrest, against sixteen minutes classic.
+    expect(data.timings).toEqual([{ zone: 'The Estate of Unrest', timer: 441, timed: [{ name: 'Khrix Fritchoff', legends: 441, classic: 960 }] }])
+    // Under an hour hunted anywhere: no usual pace of the player's own.
+    expect(data.killSpeed).toBeNull()
+    expect(data.camps.some((c: { source: string }) => c.source === 'spawns')).toBe(true)
+    // The log's orc pawns, and what their spawns allow.
+    expect(data.camps.find((c: { id: string }) => c.id === 'log:Clan Crushbone').kinds[0].spawn).toMatchObject({ name: 'orc pawn', race: 'Orc' })
+    // Twenty minutes of Crushbone, then out: no trip yet.
+    expect(data.moves).toEqual([])
+    expect(data.hunter.map((z: { achievement: string; left: { name: string; spawn?: unknown }[] }) => [z.achievement, z.left.map((n) => [n.name, !!n.spawn])])).toEqual([
+      ['Hunter of Clan Crushbone', [['Ambassador DVinn', true]]]
+    ])
+  })
+
+  it('takes the player’s usual pace from the zones hunted an hour or more', () => {
+    const z = (sec: number, kills: number) => ({ sec, kills, last: 0, mobs: {} })
+    expect(usualPace({ a: z(3600, 100), b: z(7200, 100), c: z(600, 999) })).toBe(75)
+    expect(usualPace({ a: z(3600, 100), b: z(3600, 50), c: z(3600, 70) })).toBe(70)
+    expect(usualPace({})).toBeNull()
+  })
+
+  it('lists the Hunter named left for Plan › Hunter', async () => {
+    const data = await call('hunter:plan', 'Kelwyn_neriak')
+    expect(data.zones.map((z: { zone: string; left: { name: string }[]; total: number }) => [z.zone, z.left.map((n) => n.name), z.total])).toEqual([
+      ['Clan Crushbone', ['Ambassador DVinn'], 2]
+    ])
+    expect(await call('hunter:plan', 'Aldric_neriak')).toEqual({ character: 'Aldric_neriak', export: null, zones: [] })
+    await expect(call('hunter:plan', '../x')).rejects.toThrow()
+  })
+
+  it('draws a step’s zone from the game’s map files, with the spots its mobs pop at', async () => {
+    const map = await call('slayer:map', 'Clan Crushbone 1 (Awakened)', ['An orc pawn'])
+    expect(map).toMatchObject({ zone: 'Clan Crushbone', short: 'crushbone', lines: [0, 0, 100, 100], labels: [{ x: 10, y: 10, text: 'to Greater Faydark' }] })
+    expect(map.spots.length).toBeGreaterThan(0)
+    expect(map.spots[0].mobs[0].name).toBe('orc pawn')
+    expect(await call('slayer:map', 'Lake Nerius', ['a fish'])).toEqual({ zone: 'Lake Nerius', short: '', lines: [], labels: [], spots: [] })
+    await expect(call('slayer:map', 3, [])).rejects.toThrow()
+  })
+
+  it('marks the spawns in a copy of the game’s maps, each page’s kept, and clears them', async () => {
+    const set = join(game, 'maps', 'LegendsTracker')
+    const r = await call('slayer:mark', [
+      { zone: 'Clan Crushbone', mobs: ['an orc pawn'] },
+      { zone: 'Lake Nerius', mobs: ['a fish'] }
+    ])
+    expect(r.zones).toBe(1)
+    // The game's maps copied; its own label layer as it was.
+    expect(readFileSync(join(set, 'crushbone.txt'), 'latin1')).toContain('L 0, 0, 0')
+    expect(readFileSync(join(game, 'maps', 'crushbone_1.txt'), 'latin1')).not.toContain('Slayer_')
+    const marked = readFileSync(join(set, 'crushbone_1.txt'), 'latin1')
+    expect(marked).toContain('to_Greater_Faydark\r\nP ')
+    expect(marked).toContain('Slayer_orc_pawn')
+    // Hunter's marks join the Slayer plan's; Unrest has no label layer of the game's.
+    const h2 = await call(
+      'slayer:mark',
+      [
+        { zone: 'Clan Crushbone', mobs: [], named: ['Ambassador DVinn'] },
+        { zone: 'The Estate of Unrest', mobs: [], named: ['Khrix Fritchoff'] }
+      ],
+      'hunter'
+    )
+    expect(h2.zones).toBe(2)
+    expect(readFileSync(join(set, 'crushbone_1.txt'), 'latin1')).toMatch(/Slayer_orc_pawn[\s\S]*Hunter_Ambassador_DVinn/)
+    expect(readFileSync(join(set, 'unrest_1.txt'), 'latin1')).toContain('Hunter_Khrix_Fritchoff')
+    // Hunter's cleared: Unrest's layer gone, Crushbone's the Slayer plan's alone.
+    await call('slayer:mark', [], 'hunter')
+    expect(existsSync(join(set, 'unrest_1.txt'))).toBe(false)
+    expect(readFileSync(join(set, 'crushbone_1.txt'), 'latin1')).not.toContain('Hunter_')
+    await call('slayer:mark', [])
+    expect(readFileSync(join(set, 'crushbone_1.txt'), 'latin1')).toBe(readFileSync(join(game, 'maps', 'crushbone_1.txt'), 'latin1'))
+    await expect(call('slayer:mark', 'x')).rejects.toThrow()
+    await expect(call('slayer:mark', [], 'other')).rejects.toThrow()
+    await expect(markMaps('', [])).rejects.toThrow('game folder')
+    await planner.flush()
+    expect(JSON.parse(readFileSync(join(h.dir, 'map-marks.json'), 'utf8'))).toEqual({ slayer: [], hunter: [] })
   })
 })

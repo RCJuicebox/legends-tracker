@@ -176,6 +176,15 @@ export function Overlays() {
                     Show the faction plan
                     <span className="faint small">off hides its step here; the plan is still followed, and still spoken if that is on</span>
                   </label>
+                  <label className="row">
+                    <Switch
+                      on={(o.achievements ?? DEFAULT_ACHIEVEMENT_OPTIONS).hunter ?? true}
+                      onChange={(v) => update(o.id, { achievements: { ...DEFAULT_ACHIEVEMENT_OPTIONS, ...o.achievements, hunter: v } })}
+                      label="Show the Hunter named in your zone"
+                    />
+                    Show the Hunter named in your zone
+                    <span className="faint small">the named each Hunter achievement of the zone you are in still wants (Plan › Hunter)</span>
+                  </label>
                   <label className="check">
                     <input type="checkbox" checked={achievementCues} onChange={(e) => patchSettings((s) => ({ ...s, achievementCues: e.target.checked }))} />
                     Say when a step is done

@@ -1,4 +1,6 @@
 import type { AchSection } from '../../core/achievements'
+import { mobSpawns, spawnKey, zoneIndex, type MobSpawn, type SpawnTables, type ZoneTiming } from './spawns'
+import type { HunterZone } from '../hunter/core'
 import type { LogLine } from '../../core/logLine'
 import { zoneEntered } from '../../core/logLine'
 import { achievementRaces, slayerLine, type SlayerCounter, type SlayerRaces } from '../../core/slayer'
@@ -15,11 +17,16 @@ import { num } from '../../core/format'
 // from, best first: the player's own logs (every kill over the archives and the live log, and the
 // time spent killing in each zone), what play has settled (slayerCamps.ts: the raid lockouts, the
 // camps the Discord agrees on) and eqlwiki's count of a race's NPCs in a zone (hunt.ts), a guess.
-// The plan takes the camp that does the most still-open work an hour, until its first achievement
-// is done, and again; raid lockouts go beside it, a few kills a day.
+// Where nobody has hunted, TAKP's classic spawn tables (spawns.ts) say what a zone's spots allow, at
+// no more than the player's own usual pace. The plan takes the camp that finishes something soonest,
+// travel counted (the log's own trips between zones), and again; raid lockouts go beside it.
 
 /** A run of kills: within this of the one before, the time between counts as time spent killing there. */
 const KILL_RUN_MS = 10 * 60_000
+/** A trip between zones takes no longer than this: a longer stay is not travel. */
+const MOVE_SEC = 30 * 60
+/** Trips kept for each way between two zones. */
+const KEEP_MOVES = 15
 
 /** Each zone's kills and the time spent killing there, over one stretch of log. */
 export interface SlayerKillTallies {
@@ -28,11 +35,17 @@ export interface SlayerKillTallies {
   /** The last kill, and its zone: the next kill within KILL_RUN_MS there adds the gap to the zone's time. */
   lastAt: number
   lastZone: string
-  /** By zone (instances folded in), then by mob lower-cased: the name as the log gave it, and kills. */
-  zones: Record<string, { sec: number; kills: number; last: number; mobs: Record<string, { name: string; n: number }> }>
+  /** By zone (instances folded in), then by mob lower-cased: the name as the log gave it, kills, and the last one's time. */
+  zones: Record<string, { sec: number; kills: number; last: number; mobs: Record<string, { name: string; n: number; at?: number }> }>
+  /** When the zone the stretch is in was entered, the kills there since, and whether the player has died since. */
+  enteredAt: number
+  killsHere: number
+  died: boolean
+  /** Trips from zone to zone ("from|to"), seconds: across a zone killing nothing there, and from a camp's last kill to the next zone. */
+  moves: Record<string, { pass: number[]; leave: number[] }>
 }
 
-export const emptyKillTallies = (): SlayerKillTallies => ({ zone: '', lastAt: 0, lastZone: '', zones: {} })
+export const emptyKillTallies = (): SlayerKillTallies => ({ zone: '', lastAt: 0, lastZone: '', zones: {}, enteredAt: 0, killsHere: 0, died: false, moves: {} })
 
 /** The zone an instance is of: "The Permafrost Caverns - Solo" and "Befallen 1 (Awakened)" are their zones' camps. */
 export const campZone = (zone: string) => baseZone(zone).replace(/ - (?:Solo|Group)$/, '')
@@ -49,7 +62,28 @@ const ourSide = (by: string) => by === 'You' || /^[A-Z][a-z']+$/.test(by)
 export function readKillLine(line: LogLine, into: SlayerKillTallies): void {
   const z = zoneEntered(line.text)
   if (z) {
-    into.zone = campZone(z)
+    const to = campZone(z)
+    const from = into.zone
+    // A trip: from a zone crossed without a kill, or from a camp's last kill. Not a death's way home.
+    if (from && from !== to && !into.died) {
+      const crossed = (line.time - into.enteredAt) / 1000
+      const left = (line.time - into.lastAt) / 1000
+      const way = (into.moves[`${from}|${to}`] ??= { pass: [], leave: [] })
+      const keep = (list: number[], sec: number) => {
+        list.push(Math.round(sec))
+        if (list.length > KEEP_MOVES) list.splice(0, list.length - KEEP_MOVES)
+      }
+      if (!into.killsHere && crossed > 0 && crossed <= MOVE_SEC) keep(way.pass, crossed)
+      else if (into.killsHere && left > 0 && left <= MOVE_SEC) keep(way.leave, left)
+    }
+    into.zone = to
+    into.enteredAt = line.time
+    into.killsHere = 0
+    into.died = false
+    return
+  }
+  if (line.text === 'You died.' || line.text.startsWith('You have been slain by ')) {
+    into.died = true
     return
   }
   if (!into.zone || !(line.text.startsWith('You have slain ') || line.text.includes(' has been slain by '))) return
@@ -60,11 +94,13 @@ export function readKillLine(line: LogLine, into: SlayerKillTallies): void {
   if (into.lastZone === into.zone && gap > 0 && gap <= KILL_RUN_MS) zone.sec += gap / 1000
   into.lastAt = line.time
   into.lastZone = into.zone
+  into.killsHere++
   zone.kills++
   zone.last = Math.max(zone.last, line.time)
   const k = x.kill.mob.replace(/^\*+/, '').toLowerCase()
   const m = (zone.mobs[k] ??= { name: x.kill.mob.replace(/^\*+/, ''), n: 0 })
   m.n++
+  m.at = Math.max(m.at ?? 0, line.time)
 }
 
 /** Stretches of log (archives and the live log, and other characters') as one. */
@@ -79,10 +115,97 @@ export function joinKillTallies(stretches: SlayerKillTallies[]): SlayerKillTalli
       for (const [k, m] of Object.entries(z.mobs)) {
         const hm = (had.mobs[k] ??= { name: m.name, n: 0 })
         hm.n += m.n
+        if (m.at) hm.at = Math.max(hm.at ?? 0, m.at)
       }
     }
   return out
 }
+
+/** A way between two zones the log has seen taken: crossing `from` toward `to`, and leaving a camp there for it, seconds. */
+export interface SlayerMove {
+  from: string
+  to: string
+  pass: number[]
+  leave: number[]
+}
+
+/** The stretches' trips as one list, each way's latest kept. */
+export function joinMoves(stretches: SlayerKillTallies[]): SlayerMove[] {
+  const out = new Map<string, SlayerMove>()
+  for (const s of stretches)
+    for (const [key, w] of Object.entries(s.moves ?? {})) {
+      const [from, to] = key.split('|')
+      const had = out.get(key) ?? { from, to, pass: [], leave: [] }
+      had.pass = [...had.pass, ...w.pass].slice(-KEEP_MOVES)
+      had.leave = [...had.leave, ...w.leave].slice(-KEEP_MOVES)
+      out.set(key, had)
+    }
+  return [...out.values()]
+}
+
+const median = (xs: number[]) => {
+  if (!xs.length) return null
+  const s = [...xs].sort((a, b) => a - b)
+  const mid = s.length / 2
+  return s.length % 2 ? s[Math.floor(mid)] : (s[mid - 1] + s[mid]) / 2
+}
+
+/** A way from one camp to another, as the log has taken it: seconds, and the zones crossed between. */
+export interface SlayerRoute {
+  seconds: number
+  via: string[]
+}
+
+/**
+ * The quickest way between two zones over the trips the log has seen: leaving the first (its camp's
+ * last kill to the next zone), then crossing each zone between as long as crossing it took. A gate or
+ * a port is a trip like any other. Null where the log knows no way.
+ */
+export function routeFinder(moves: SlayerMove[]): (from: string, to: string) => SlayerRoute | null {
+  const edges = new Map<string, { to: string; leave: number; pass: number }[]>()
+  const names = new Map<string, string>()
+  for (const m of moves) {
+    const leave = median(m.leave) ?? median(m.pass)
+    const pass = median(m.pass) ?? median(m.leave)
+    if (leave === null || pass === null) continue
+    const a = zoneKey(m.from)
+    const b = zoneKey(m.to)
+    names.set(a, m.from)
+    names.set(b, m.to)
+    edges.set(a, [...(edges.get(a) ?? []), { to: b, leave, pass }])
+  }
+  const cache = new Map<string, Map<string, { sec: number; prev: string | null }>>()
+  const from = (src: string) => {
+    let done = cache.get(src)
+    if (done) return done
+    done = new Map()
+    const open = new Map<string, { sec: number; prev: string | null }>([[src, { sec: 0, prev: null }]])
+    while (open.size) {
+      const [k, v] = [...open].reduce((a, b) => (b[1].sec < a[1].sec ? b : a))
+      open.delete(k)
+      done.set(k, v)
+      for (const e of edges.get(k) ?? []) {
+        if (done.has(e.to)) continue
+        const sec = v.sec + (k === src ? e.leave : e.pass)
+        if (!open.has(e.to) || sec < open.get(e.to)!.sec) open.set(e.to, { sec, prev: k })
+      }
+    }
+    cache.set(src, done)
+    return done
+  }
+  return (a, b) => {
+    const src = zoneKey(a)
+    const reached = from(src)
+    const hit = reached.get(zoneKey(b))
+    if (!hit) return null
+    const via: string[] = []
+    for (let k = hit.prev; k && k !== src; k = reached.get(k)?.prev ?? null) via.unshift(names.get(k) ?? k)
+    return { seconds: hit.sec, via }
+  }
+}
+
+/** A name as a Hunter objective, the log and the spawn tables all have it: no article, no marks, lower-cased. */
+export const bareName = spawnKey
 
 /** An open Slayer achievement the plan works toward. */
 export interface SlayerGoal {
@@ -180,7 +303,7 @@ export function slayerGoals(
 }
 
 /** Where a camp's pace comes from. */
-export type CampSource = 'log' | 'play' | 'wiki'
+export type CampSource = 'log' | 'play' | 'spawns' | 'wiki'
 
 /**
  * One kind of kill at a camp: a mob the log saw die there, a mob or race play names, or a race eqlwiki
@@ -190,6 +313,9 @@ interface CampKind {
   name: string
   perHour: number
   goals: number[]
+  /** What its spawns in the zone allow, where TAKP's tables know it; and whether the log's pace is up against that. */
+  spawn?: MobSpawn
+  bound?: boolean
 }
 
 /** A place to kill, and what dies there an hour toward each achievement. */
@@ -215,6 +341,12 @@ export interface SlayerPlanCamp {
   said?: string
   /** Each faction an hour there moves, from what the faction lines after kills there did (negative first). */
   factions?: { faction: string; perHour: number }[]
+  /**
+   * For a camp the spawn tables paced: what holds it back (the spawns, or the player's usual pace,
+   * where the spawns allow more), and the kills an hour its spawns allow.
+   */
+  limit?: 'spawns' | 'you'
+  ceiling?: number
 }
 
 /** What the plan is built from, all of it from main. */
@@ -228,6 +360,56 @@ export interface SlayerPlanData {
   unplaced: { name: string; n: number }[]
   /** Mobs still being looked up on eqlwiki for their race. */
   pending: number
+  /** The trips between zones the logs have seen: the plan's travel. */
+  moves: SlayerMove[]
+  /** The player's usual kills an hour where spawns allow (the logs' camps, the middle one), or null before any. */
+  killSpeed: number | null
+  /** Each zone's timers against classic, from the spawns the log has timed. */
+  timings: { zone: string; timer: number | null; timed: { name: string; legends: number; classic: number | null }[] }[]
+  /** The Hunter named still to kill, by place (Plan › Hunter's). */
+  hunter: HunterZone[]
+}
+
+/** TAKP's spawn tables for buildCamps, with how a zone's timers compare and how the tables' mobs count. */
+export interface SpawnSource {
+  tables: SpawnTables
+  timings: ReadonlyMap<string, ZoneTiming>
+  /** The goals a mob the tables list counts toward, by its name and the tables' race. */
+  place: (mob: string, race: string) => number[]
+  /** Kills an hour the player keeps where the spawns allow more: what a camp of plenty gives at most. */
+  killSpeed: number
+}
+
+/** A mob counts as up against its spawns when the log's pace reaches this much of what they allow. */
+const BOUND = 0.7
+/** Kinds the tables allow fewer kills an hour than this are left out: a rare roll is no camp. */
+const MIN_KIND = 0.2
+/**
+ * A classic timer longer than this is a raid zone's or a named's, which Legends runs its own way (its
+ * planes are instances): the tables say nothing of it unless the log timed it.
+ */
+const LONG_SEC = 3600
+const usable = (m: MobSpawn) => m.timerFrom === 'timed' || m.timer <= LONG_SEC
+/** A named NPC, one of its kind ("Guard Gruilka", "Quillmane"): the tables name the many in lower case ("orc pawn"). */
+const named = (name: string) => /^[A-Z]/.test(name) && !/^(?:A|An|The) /.test(name)
+
+/** Kinds at a spawn-paced camp, held to the player's pace: the spawns allow `ceiling`, the player kills at most `speed`. */
+function capped(kinds: CampKind[], speed: number): { kinds: CampKind[]; limit: 'spawns' | 'you'; ceiling: number } {
+  const ceiling = kinds.reduce((s, k) => s + k.perHour, 0)
+  const scale = Math.min(1, speed / ceiling)
+  return { kinds: kinds.map((k) => ({ ...k, perHour: k.perHour * scale })), limit: scale < 1 ? 'you' : 'spawns', ceiling }
+}
+
+/** A timer as the game's clocks show it: 7:47. */
+export const clock = (sec: number) => {
+  const s = Math.round(sec)
+  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`
+}
+
+const paceOfKinds = (kinds: CampKind[]) => {
+  const pace: Record<number, number> = {}
+  for (const k of kinds) for (const g of k.goals) pace[g] = (pace[g] ?? 0) + k.perHour
+  return pace
 }
 
 /** How long a zone must have been hunted, and how many kills it gave, before its pace is taken as the log's. */
@@ -252,12 +434,30 @@ export function buildCamps(
   factionPerKill: (zone: string, mob: string) => Record<string, number> | null,
   /** Every Slayer achievement's races, done ones too (slayerRaceLists): what eqlwiki's census is keyed by. */
   raceLists: ReadonlyMap<string, ReadonlySet<string>>,
-  known: SlayerCamp[] = SLAYER_CAMPS
+  known: SlayerCamp[] = SLAYER_CAMPS,
+  spawns?: SpawnSource
 ): SlayerPlanCamp[] {
   const camps: SlayerPlanCamp[] = []
   const fed = new Set<string>()
+  // What the spawn tables say of a zone's mobs, worked out once a zone.
+  const tableOf = spawns ? zoneIndex(spawns.tables) : () => null
+  const spawnCache = new Map<string, Map<string, MobSpawn>>()
+  const spawnsIn = (zone: string) => {
+    const short = tableOf(zone)
+    if (!short || !spawns) return null
+    let m = spawnCache.get(short)
+    if (!m) spawnCache.set(short, (m = mobSpawns(spawns.tables[short], spawns.timings.get(short))))
+    return m
+  }
+  // A zone's mobs that feed these goals, as kinds: what their spawns allow an hour.
+  const spawnKinds = (zone: string, open: (g: number) => boolean): CampKind[] =>
+    [...(spawnsIn(zone)?.values() ?? [])]
+      .filter((m) => usable(m) && (!named(m.name) || m.timerFrom === 'timed') && !lockoutMobs.has(spawnKey(m.name)) && m.ceiling >= MIN_KIND)
+      .map((m) => ({ name: m.name, perHour: m.ceiling, goals: spawns!.place(m.name, m.race).filter(open), spawn: m }))
+      .filter((k) => k.goals.length)
+      .sort((a, b) => b.perHour - a.perHour)
   // A raid boss's kills are a lockout's, a few a day, however quick the log made them look.
-  const lockoutMobs = new Set(known.filter((k) => k.perDay !== undefined).flatMap((k) => k.mobs.map((m) => m.toLowerCase())))
+  const lockoutMobs = new Set(known.filter((k) => k.perDay !== undefined).flatMap((k) => k.mobs.map(spawnKey)))
   const feeds = (zone: string, g: number) => `${zoneKey(zone)}|${g}`
   for (const [zone, z] of Object.entries(zones)) {
     if (z.sec < MIN_LOG_SEC || z.kills < MIN_LOG_KILLS) continue
@@ -269,16 +469,24 @@ export function buildCamps(
       const at = place(m.name)
       const hits = factionPerKill(zone, m.name)
       if (hits) for (const [f, v] of Object.entries(hits)) moved[f] = (moved[f] ?? 0) + (v * m.n) / hours
-      if (!at.length || lockoutMobs.has(m.name.toLowerCase())) continue
+      if (!at.length || lockoutMobs.has(spawnKey(m.name))) continue
       counted.push(m)
       for (const g of at) pace[g] = (pace[g] ?? 0) + m.n / hours
     }
     if (!counted.length) continue
     for (const g of Object.keys(pace)) fed.add(feeds(zone, +g))
+    const here = spawnsIn(zone)
     camps.push({
       id: `log:${zone}`,
       zone,
-      kinds: counted.sort((a, b) => b.n - a.n).map((m) => ({ name: m.name, perHour: m.n / hours, goals: place(m.name) })),
+      kinds: counted
+        .sort((a, b) => b.n - a.n)
+        .map((m) => {
+          const found = here?.get(spawnKey(m.name))
+          const spawn = found && usable(found) ? found : undefined
+          const perHour = m.n / hours
+          return { name: m.name, perHour, goals: place(m.name), ...(spawn ? { spawn, bound: perHour >= spawn.ceiling * BOUND } : {}) }
+        }),
       source: 'log',
       pace,
       hours,
@@ -302,17 +510,30 @@ export function buildCamps(
     // counts whole toward every goal they feed.
     const part = (g: number) => (daily ? 1 : k.races.filter((r) => races.keys[g].has(r)).length / k.races.length)
     if (!daily) for (const g of open) fed.add(feeds(k.zone, g))
+    // A camp named without a number: the zone's spawns of what it feeds, where the tables know them.
+    const table = per === undefined && spawns ? spawnKinds(k.zone, (g) => open.includes(g)) : []
+    let id = `play:${k.zone}|${k.mobs.join('|')}`
+    let left = open
+    if (table.length) {
+      const c = capped(table, spawns!.killSpeed)
+      camps.push({ id, zone: k.zone, kinds: c.kinds, source: 'play', pace: paceOfKinds(c.kinds), limit: c.limit, ceiling: c.ceiling, note: k.note, said: k.said })
+      // What play names there and the tables lack (South Karana's treants): at the assumed pace, beside.
+      const covered = new Set(table.flatMap((t) => t.goals))
+      left = open.filter((g) => !covered.has(g))
+      if (!left.length) continue
+      id += '|rest'
+    }
     // A boss, or one kind of mob: the mobs named. Several races: each its own kind, the camp's kills shared alike.
     const kinds: CampKind[] =
       daily || k.races.length === 1
-        ? [{ name: k.mobs.join(', '), perHour: per ?? 1, goals: open }]
-        : k.races.map((r) => ({ name: r, perHour: (per ?? 1) / k.races.length, goals: open.filter((g) => races.keys[g].has(r)) })).filter((x) => x.goals.length)
+        ? [{ name: k.mobs.join(', '), perHour: per ?? 1, goals: left }]
+        : k.races.map((r) => ({ name: r, perHour: (per ?? 1) / k.races.length, goals: left.filter((g) => races.keys[g].has(r)) })).filter((x) => x.goals.length)
     camps.push({
-      id: `play:${k.zone}|${k.mobs.join('|')}`,
+      id,
       zone: k.zone,
       kinds,
       source: 'play',
-      pace: Object.fromEntries(open.map((g) => [g, (per ?? 1) * part(g)])),
+      pace: Object.fromEntries(left.map((g) => [g, (per ?? 1) * part(g)])),
       ...(per === undefined ? { assumed: true } : {}),
       ...(daily ? { daily: true } : {}),
       note: k.note,
@@ -324,6 +545,27 @@ export function buildCamps(
   // taken off. A race only raid bosses are (the kedge, Phinigel): no census guess stands in for the lockout.
   const lockoutRaces = new Set(known.filter((k) => k.perDay !== undefined).flatMap((k) => k.races))
   const wanting = goals.flatMap((_, i) => ([...races.keys[i]].every((k) => lockoutRaces.has(k)) ? [] : [i]))
+  // TAKP's tables: each zone of them, for what nothing measured or named feeds there, paced by its spawns
+  // at no more than the player's usual pace. A city's people are its citizens and guards: no camp.
+  if (spawns)
+    for (const [short, z] of Object.entries(spawns.tables)) {
+      if (isCity(z.name)) continue
+      const kinds = spawnKinds(z.name, (g) => wanting.includes(g) && !fed.has(feeds(z.name, g)))
+      if (!kinds.length) continue
+      const c = capped(kinds, spawns.killSpeed)
+      const timed = spawns.timings.get(short)
+      camps.push({
+        id: `spawns:${short}`,
+        zone: z.name,
+        kinds: c.kinds,
+        source: 'spawns',
+        pace: paceOfKinds(c.kinds),
+        limit: c.limit,
+        ceiling: c.ceiling,
+        note: timed?.timer ? `respawns as you timed them here (${clock(timed.timer)})` : 'classic timers: Legends has been as quick or quicker',
+        said: 'TAKP’s spawn table'
+      })
+    }
   for (const [name, rows] of Object.entries(HUNT)) {
     const keys = raceLists.get(name)
     const at = keys ? wanting.filter((i) => [...keys].some((k) => races.keys[i].has(k))) : []
@@ -331,8 +573,9 @@ export function buildCamps(
     // One kind a race eqlwiki counts in the zone, named for the race: it lists no mobs.
     const kind = [...keys].join(' / ')
     for (const [zone, npcs] of rows) {
-      // A city's people are its citizens and guards: no camp to send anyone to on a count alone.
-      if (isCity(zone)) continue
+      // A city's people are its citizens and guards: no camp to send anyone to on a count alone. A zone
+      // the spawn tables have is theirs.
+      if (isCity(zone) || tableOf(zone)) continue
       const id = `wiki:${zoneKey(zone)}`
       let c = camps.find((x) => x.id === id)
       if (!c) camps.push((c = { id, zone, kinds: [], source: 'wiki', pace: {}, said: 'eqlwiki, 2026-09-24' }))
@@ -370,6 +613,8 @@ export interface SlayerStep {
   /** Hours there, and the travel to it. */
   seconds: number
   travel: number
+  /** The zones crossed on the way there, when the log knows the way. */
+  via?: string[]
   /** Kills toward each goal it moves (index → kills). */
   kills: Record<number, number>
   /** Goals it finishes. */
@@ -380,10 +625,12 @@ export interface SlayerStep {
 }
 
 /** What a step kills: each kind there that feeds the goals it is there for, and how many in its time. */
-export function stepKills(st: SlayerStep, choices: Pick<SlayerPlanChoices, 'pace'>): { name: string; n: number; goals: number[] }[] {
+export function stepKills(st: SlayerStep, choices: Pick<SlayerPlanChoices, 'pace'>): { name: string; n: number; goals: number[]; spawn?: MobSpawn; bound?: boolean }[] {
   const focus = new Set(st.focus)
   const scale = st.camp.assumed ? choices.pace : 1
-  return st.camp.kinds.filter((k) => k.goals.some((g) => focus.has(g))).map((k) => ({ name: k.name, n: (k.perHour * scale * st.seconds) / 3600, goals: k.goals }))
+  return st.camp.kinds
+    .filter((k) => k.goals.some((g) => focus.has(g)))
+    .map((k) => ({ name: k.name, n: (k.perHour * scale * st.seconds) / 3600, goals: k.goals, ...(k.spawn ? { spawn: k.spawn } : {}), ...(k.bound ? { bound: true } : {}) }))
 }
 
 /** A raid lockout to run each day beside the plan. */
@@ -424,7 +671,9 @@ function fallbackOnly(camps: SlayerPlanCamp[]): SlayerPlanCamp[] {
 /** A camp without the mobs ruled out, its pace their kinds' together again; none when nothing is left. */
 function withoutMobs(c: SlayerPlanCamp, out: string[]): SlayerPlanCamp[] {
   if (!out.length) return [c]
-  const kinds = c.kinds.filter((k) => !out.includes(k.name.toLowerCase()))
+  // By the name without its article: the log's "an orc pawn" is the spawn tables' "orc pawn".
+  const gone = new Set(out.map(spawnKey))
+  const kinds = c.kinds.filter((k) => !gone.has(spawnKey(k.name)))
   if (kinds.length === c.kinds.length) return [c]
   if (!kinds.length) return []
   const pace: Record<number, number> = {}
@@ -445,9 +694,10 @@ export function goalsInPlay(goals: SlayerGoal[], choices: SlayerPlanChoices): nu
 /**
  * The plan: at each step the camp that does the most still-open kills a second, travel counted, kept
  * until the first achievement it feeds is done; a step that stays at the same camp joins the one
- * before. Raid lockouts are not steps: each gives its kills a day beside the plan.
+ * before. Raid lockouts are not steps: each gives its kills a day beside the plan. Travel is the way
+ * the log has seen taken between the two zones, or the player's minutes between camps where it knows none.
  */
-export function planSlayer(data: Pick<SlayerPlanData, 'goals' | 'camps'>, choices: SlayerPlanChoices): SlayerPlan {
+export function planSlayer(data: Pick<SlayerPlanData, 'goals' | 'camps'> & { moves?: SlayerMove[] }, choices: SlayerPlanChoices): SlayerPlan {
   const goals = goalsInPlay(data.goals, choices)
   const need = new Map(goals.map((g) => [g, data.goals[g].max - data.goals[g].count]))
   const ruled = new Set(choices.outCamps)
@@ -466,9 +716,14 @@ export function planSlayer(data: Pick<SlayerPlanData, 'goals' | 'camps'>, choice
     if (fed.length) daily.push({ camp: c, days: Math.ceil(Math.max(...fed.map((g) => (need.get(g) ?? 0) / perDay(g)))), goals: fed })
   }
   const travelSec = choices.travelMin * 60
+  const route = routeFinder(data.moves ?? [])
+  const trip = (a: SlayerPlanCamp | null, b: SlayerPlanCamp): SlayerRoute => {
+    if (!a || a.id === b.id || zoneKey(a.zone) === zoneKey(b.zone)) return { seconds: 0, via: [] }
+    return route(a.zone, b.zone) ?? { seconds: travelSec, via: [] }
+  }
   const tierOf = (g: number) => data.goals[g].tier ?? BANESTRIKE.length
   const steps: SlayerStep[] = []
-  let at = ''
+  let at: SlayerPlanCamp | null = null
   // Banestrike's tiers in turn, each done before the next is begun; within a tier, the achievement
   // that can be finished soonest, travel counted, first. Every kill still counts toward whatever
   // else its race feeds, a later tier's too.
@@ -481,13 +736,14 @@ export function planSlayer(data: Pick<SlayerPlanData, 'goals' | 'camps'>, choice
         if (!fed.length) continue
         // Until the first of this tier's achievements it feeds is done.
         const secs = Math.min(...fed.map((g) => ((need.get(g) ?? 0) / paceOf(c, g)) * 3600))
-        const cost = secs + (c.id === at ? 0 : travelSec)
+        const cost: number = secs + trip(at, c).seconds
         // As soon: the camp doing more besides.
         const work = goals.reduce((s, g) => s + Math.min(need.get(g) ?? 0, (paceOf(c, g) * secs) / 3600), 0)
         if (!best || cost < best.cost - 1e-6 || (Math.abs(cost - best.cost) <= 1e-6 && work > best.work)) best = { c, secs, cost, work }
       }
       if (!best) break
-      const { c, secs } = best
+      const c: SlayerPlanCamp = best.c
+      const secs: number = best.secs
       const focus = goals.filter((g) => tierOf(g) === tier && !onlyDaily.has(g) && (need.get(g) ?? 0) > 0 && paceOf(c, g) > 0)
       const kills: Record<number, number> = {}
       for (const g of goals) {
@@ -503,14 +759,16 @@ export function planSlayer(data: Pick<SlayerPlanData, 'goals' | 'camps'>, choice
         for (const [g, k] of Object.entries(kills)) prev.kills[+g] = (prev.kills[+g] ?? 0) + k
         for (const g of focus) if (!prev.focus.includes(g)) prev.focus.push(g)
       } else steps.push({ camp: c, seconds: secs, travel: 0, kills, finishes: [], tier, focus })
-      at = c.id
+      at = c
     }
   }
   const unplanned = goals.filter((g) => (need.get(g) ?? 0) > 1e-6 && !onlyDaily.has(g))
   // What each step finishes, and the travel to it, in the order they are done.
   const left = new Map(goals.map((g) => [g, data.goals[g].max - data.goals[g].count]))
   steps.forEach((st, i) => {
-    st.travel = i && steps[i - 1].camp.id !== st.camp.id ? travelSec : 0
+    const way = trip(i ? steps[i - 1].camp : null, st.camp)
+    st.travel = way.seconds
+    if (way.via.length) st.via = way.via
     for (const [g, k] of Object.entries(st.kills)) {
       const l = (left.get(+g) ?? 0) - k
       left.set(+g, l)

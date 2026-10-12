@@ -15,6 +15,8 @@ import type { FactionPlanData } from '../features/factions/planner'
 import type { FactionLookup, FactionMover } from '../features/factions/lookup'
 import type { FollowedPlan } from '../features/factions/tracker'
 import type { SlayerPlanChoices, SlayerPlanData } from '../features/slayer/core'
+import type { SlayerMap, SlayerMark } from '../features/slayer/spawns'
+import type { HunterPlanData } from '../features/hunter/core'
 import type { AchievementTrack } from './tracking'
 import type { FocusReport } from '../core/itemFocus'
 import type { LootSnapshot } from '../core/loot'
@@ -374,6 +376,12 @@ export interface Invokes {
   'slayer:plan': (character: string, refresh?: boolean) => { data: SlayerPlanData; choices: SlayerPlanChoices }
   /** What the player chose on the Slayer page for a character. */
   'slayer:choices': (character: string, choices: SlayerPlanChoices) => void
+  /** A zone's map as the game draws it, with the spots these mobs pop at (TAKP's spawn tables); no short name for a zone they lack. */
+  'slayer:map': (zone: string, mobs: string[]) => SlayerMap
+  /** Marks these spawns on the game's map, in its own map set (maps\LegendsTracker, a copy of the game's); none clears them. Each page's (`set`) are kept apart and written together. */
+  'slayer:mark': (marks: SlayerMark[], set?: 'slayer' | 'hunter') => { folder: string; zones: number; spots: number }
+  /** What Plan › Hunter shows: each Hunter achievement not done, the named it still wants, and what their spawns allow. */
+  'hunter:plan': (character: string) => HunterPlanData
   /** Where the character being played is in its faction plan, and its Slayer counts since its achievements export. */
   'achievements:track': (watching?: boolean) => AchievementTrack | null
 
@@ -573,6 +581,9 @@ const INVOKE_CHANNELS: Record<InvokeChannel, true> = {
   'factions:follow-step': true,
   'slayer:plan': true,
   'slayer:choices': true,
+  'slayer:map': true,
+  'slayer:mark': true,
+  'hunter:plan': true,
   'achievements:track': true,
   'character:exports': true,
   'character:sheet': true,

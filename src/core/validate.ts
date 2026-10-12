@@ -259,7 +259,7 @@ export function meterOptions(v: unknown, fb: MeterOverlayOptions | undefined): M
 
 function achievementOptions(v: unknown, fb: AchievementOverlayOptions | undefined): AchievementOverlayOptions {
   const base = fb ?? DEFAULT_ACHIEVEMENT_OPTIONS
-  return isObj(v) ? { factionPlan: bool(v.factionPlan, base.factionPlan) } : { ...base }
+  return isObj(v) ? { factionPlan: bool(v.factionPlan, base.factionPlan), hunter: bool(v.hunter, base.hunter ?? true) } : { ...base }
 }
 
 function overlay(v: unknown, fb: OverlayConfig | undefined): OverlayConfig | null {

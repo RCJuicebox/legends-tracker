@@ -9,6 +9,7 @@ import { Disclosure, GameCommand, Info, NumberInput, Pending, Tip, ToggleChip } 
 import { duration, num, who } from '../../core/format'
 import {
   BANESTRIKE,
+  clock,
   DEFAULT_CHOICES,
   goalsInPlay,
   stepKills,
@@ -19,6 +20,10 @@ import {
   type SlayerPlanChoices,
   type SlayerStep
 } from './core'
+import { zoneKey } from '../factions/names'
+import { SpawnMap } from './SpawnMap'
+import type { MobSpawn } from './spawns'
+import type { HunterZone } from '../hunter/core'
 
 // Plan › Slayer: the Slayer achievements still open and where to kill for them quickest, step by
 // step (core.ts plans it). Counts are the achievements export plus the kills the log has shown since,
@@ -27,6 +32,10 @@ import {
 const SOURCE: Record<CampSource, { label: string; tip: string }> = {
   log: { label: 'your log', tip: 'The pace your own kills there kept: kills of these races an hour while you were killing in the zone' },
   play: { label: 'players', tip: 'What play has settled: the EQL Discord’s Slayer talk, or what you told the app' },
+  spawns: {
+    label: 'spawn table',
+    tip: 'TAKP’s classic spawn table for the zone: its spots, on the respawn your log has timed there (else classic’s timers), at no more than your usual kills an hour'
+  },
   wiki: { label: 'eqlwiki guess', tip: 'eqlwiki counts NPCs of the race in this zone; the pace is a guess from that count' }
 }
 
@@ -38,8 +47,14 @@ const HOW = (
     </div>
     <div>
       <b>Pace</b> comes from your own logs first: every kill over your log and its archives (and your other characters’), and the time you spent killing in each zone. Where you
-      have not hunted a race, what players have settled on stands in (the raid lockouts, the camps the EQL Discord agrees on), then eqlwiki’s count of the race’s NPCs in a zone, a
-      guess.
+      have not hunted a race, what players have settled on stands in (the raid lockouts, the camps the EQL Discord agrees on), then TAKP’s classic spawn tables: how many spots a
+      zone has for the race and how quickly they pop, at no more than your usual kills an hour. Legends’ respawns are its own: a zone’s spawns come back on one timer, quicker than
+      classic’s, so a zone runs on the respawn your Respawns page has timed there (a spawn of one spot); a zone you have timed nothing in keeps the classic timers. Zones TAKP lacks
+      fall back on eqlwiki’s count of a race’s NPCs, a guess.
+    </div>
+    <div>
+      <b>Travel</b> is the way your log has seen you go between two zones: from a camp’s last kill to the next zone, then across each zone between, gates and ports included. Where
+      your log knows no way, your minutes between camps stand in.
     </div>
     <div>
       <b>The plan</b> works through Banestrike’s tiers in turn (Progressive, Highly Decorated, A Force of Nature, then what Megadeath names besides), each done before the next is
@@ -50,7 +65,8 @@ const HOW = (
   </>
 )
 
-function useSlayerCharacter() {
+/** The character a Plan page is for: picked, or the one being played; any with a log or an achievements export. */
+export function usePlanCharacter() {
   const characterKey = useSettled((s) => s.characterKey)
   const installDir = useSettled((s) => s.settings.installDir)
   const logFile = useSettled((s) => s.settings.logFile)
@@ -64,16 +80,34 @@ function useSlayerCharacter() {
 
 const kills = (n: number) => num(Math.ceil(n))
 
+const TIMED: Record<MobSpawn['timerFrom'], string> = { timed: 'timed by your log', zone: 'the zone’s respawn as you timed it', classic: 'classic' }
+
+/** What a mob's spawns allow, short: "12 spots · 6:00", and the rest in the tooltip. */
+function SpawnHint({ spawn, bound }: { spawn: MobSpawn; bound?: boolean }) {
+  const spots = spawn.spots === 1 ? '1 spot' : `${num(Math.round(spawn.spots))} spots`
+  return (
+    <Tip
+      className="mono sl-spawn"
+      text={`${spawn.name}, level ${spawn.lo === spawn.hi ? spawn.lo : `${spawn.lo}–${spawn.hi}`}: ${spots}, about ${num(Math.round(spawn.up * 10) / 10)} up at once, respawn ${clock(spawn.timer)} (${TIMED[spawn.timerFrom]}). At most ${num(Math.round(spawn.ceiling))} an hour.${bound ? ' Your pace there is up against that: the spawns are the limit.' : ''}`}
+    >
+      {' '}
+      ({spots} · {clock(spawn.timer)}
+      {bound ? ' · spawn-bound' : ''})
+    </Tip>
+  )
+}
+
 /** A Banestrike tier's name: the meta whose achievements it is. */
 const tierName = (tier: number) => BANESTRIKE[tier] ?? 'Not for Banestrike'
 
 /** "Orc Stomp! 1,989 (done)" for each achievement a step moves. */
 /** A few names, and the rest in a tooltip: a camp's log can hold a dozen kinds of gnoll. */
-function Names({ names, shown = 3, onOut }: { names: { name: string; n: number }[]; shown?: number; onOut: (mob: string) => void }) {
-  const one = (k: { name: string; n: number }, i: number) => (
+function Names({ names, shown = 3, onOut }: { names: { name: string; n: number; spawn?: MobSpawn; bound?: boolean }[]; shown?: number; onOut: (mob: string) => void }) {
+  const one = (k: { name: string; n: number; spawn?: MobSpawn; bound?: boolean }, i: number) => (
     <span key={k.name}>
       {i > 0 && ', '}
       {k.name} ×{kills(k.n)}
+      {k.spawn && <SpawnHint spawn={k.spawn} bound={k.bound} />}
       <button className="btn small ghost sl-out" onClick={() => onOut(k.name)} title={`Rule out ${k.name}: the plan finds the kills elsewhere`} aria-label={`Rule out ${k.name}`}>
         ✕
       </button>
@@ -122,6 +156,52 @@ function StepWork({ step, goals, choices, onOut }: { step: SlayerStep; goals: Sl
   )
 }
 
+/** What holds a spawn-paced camp back: its spawns, or the player's own pace where they allow more. */
+function Limit({ camp }: { camp: SlayerPlanCamp }) {
+  if (!camp.limit || camp.ceiling === undefined) return null
+  return camp.limit === 'you' ? (
+    <Tip className="small faint" text="The spawns there allow more than your usual kills an hour, so the plan counts your usual pace: kill quicker and it goes quicker.">
+      your pace is the limit (spawns allow {num(Math.round(camp.ceiling))}/h)
+    </Tip>
+  ) : (
+    <Tip className="small faint" text="Killing each mob as it pops, this is all the spawns there give: bring something else to kill between pops.">
+      the spawns are the limit ({num(Math.round(camp.ceiling * 10) / 10)}/h)
+    </Tip>
+  )
+}
+
+/** The Hunter named still to kill in a step's zone: one trip does both. */
+function HunterHere({ hunter }: { hunter: HunterZone[] }) {
+  if (!hunter.length) return null
+  return (
+    <div className="small">
+      {hunter.map((h) => (
+        <div key={h.achievement}>
+          <span className="chip fp-kind quest">Hunter</span> <b>{h.achievement}</b>
+          <span className="faint">
+            {' '}
+            ·{' '}
+            {h.left.map((n, i) => (
+              <span key={n.name}>
+                {i > 0 && ', '}
+                {n.spawn ? (
+                  <Tip
+                    text={`Classic (TAKP): ${n.spawn.spots === 1 ? 'one spot' : `${num(n.spawn.spots)} spots`}, up ${num(Math.round(n.spawn.up * 100))}% of the time, respawn ${clock(n.spawn.timer)} (${TIMED[n.spawn.timerFrom]})`}
+                  >
+                    {n.name}
+                  </Tip>
+                ) : (
+                  n.name
+                )}
+              </span>
+            ))}
+          </span>
+        </div>
+      ))}
+    </div>
+  )
+}
+
 function FactionCost({ camp }: { camp: SlayerPlanCamp }) {
   const worst = (camp.factions ?? []).filter((f) => f.perHour < 0).slice(0, 3)
   if (!worst.length) return null
@@ -136,7 +216,7 @@ function FactionCost({ camp }: { camp: SlayerPlanCamp }) {
 }
 
 export function Slayer() {
-  const chars = useSlayerCharacter()
+  const chars = usePlanCharacter()
   const character = chars.character
   const q = useInvoke(character ? 'slayer:plan' : null, [character])
   useVisibleInterval(q.reload, 60_000)
@@ -144,6 +224,10 @@ export function Slayer() {
   const [choices, setChoicesState] = useState<SlayerPlanChoices>(DEFAULT_CHOICES)
   const [openGoals, setOpenGoals] = useState(false)
   const [openOut, setOpenOut] = useState(false)
+  const [openTimes, setOpenTimes] = useState(false)
+  /** The steps whose map is shown, by index. */
+  const [maps, setMaps] = useState<Set<number>>(new Set())
+  const [marked, setMarked] = useState('')
   // The choices kept for the character, taken once its first answer comes: not on every reload, which would undo a change not yet saved.
   const kept = q.data?.choices
   const [keptFor, setKeptFor] = useState('')
@@ -191,6 +275,25 @@ export function Slayer() {
     setChoices({ ...choices, outMobs: out ? [...choices.outMobs.filter((x) => x !== m), m] : choices.outMobs.filter((x) => x !== m) })
   }
   const left = plan ? plan.goals.reduce((s, g) => s + (data!.goals[g].max - data!.goals[g].count), 0) : 0
+  const hunterAt = (zone: string) => (data?.hunter ?? []).filter((h) => zoneKey(h.zone) === zoneKey(zone))
+  const toggleMap = (i: number) => setMaps((m) => (m.has(i) ? new Set([...m].filter((x) => x !== i)) : new Set([...m, i])))
+  // The plan's steps on the game's own map, in a map set of the app's: the game's maps stay as they are.
+  const mark = async (on: boolean) => {
+    const marks =
+      on && plan
+        ? plan.steps.map((st) => ({ zone: st.camp.zone, mobs: stepKills(st, choices).map((k) => k.name), named: hunterAt(st.camp.zone).flatMap((h) => h.left.map((n) => n.name)) }))
+        : []
+    try {
+      const r = await api.invoke('slayer:mark', marks)
+      setMarked(
+        on
+          ? `Marked ${num(r.spots)} spots in ${r.zones} zone${r.zones === 1 ? '' : 's'}: pick the LegendsTracker map set in the game’s map window.`
+          : 'Marks cleared: the LegendsTracker map set is the game’s own again.'
+      )
+    } catch (e) {
+      setMarked(`Could not mark the map: ${e instanceof Error ? e.message : String(e)}`)
+    }
+  }
 
   return (
     <>
@@ -329,12 +432,21 @@ export function Slayer() {
                                 >
                                   ×{kills(stepKills(st, choices).reduce((t, k) => t + k.n, 0))}
                                 </Tip>
-                                <Tip className="mono fp-time" text={st.travel ? `Including ${duration(st.travel)} to get there` : 'Time killing there'}>
+                                <Tip
+                                  className="mono fp-time"
+                                  text={
+                                    st.travel
+                                      ? `Including ${duration(st.travel)} to get there${st.via?.length ? `, by ${st.via.join(', ')}, as your log has gone` : ''}`
+                                      : 'Time killing there'
+                                  }
+                                >
                                   {duration(st.seconds + st.travel)}
                                 </Tip>
                               </div>
                               <StepWork step={st} goals={data.goals} choices={choices} onOut={(mob) => ruleOutMob(mob, true)} />
+                              <HunterHere hunter={hunterAt(st.camp.zone)} />
                               <div className="row tight fp-effects">
+                                <Limit camp={st.camp} />
                                 <FactionCost camp={st.camp} />
                                 {st.camp.note && <span className="faint small">{st.camp.note}</span>}
                                 <span className="spacer" />
@@ -343,10 +455,24 @@ export function Slayer() {
                                     ? `${num(st.camp.kills ?? 0)} kills in ${duration(st.camp.hours * 3600)} there`
                                     : st.camp.said && `said by ${st.camp.said}`}
                                 </span>
+                                <button
+                                  className="btn small ghost"
+                                  onClick={() => toggleMap(i)}
+                                  title="Where its mobs spawn, on the game’s own map of the zone"
+                                  aria-expanded={maps.has(i)}
+                                >
+                                  Map
+                                </button>
                                 <button className="btn small ghost" onClick={() => ruleOut(st.camp.id, true)} title="Leave this camp out of the plan">
                                   Rule out
                                 </button>
                               </div>
+                              {maps.has(i) && (
+                                <SpawnMap
+                                  zone={st.camp.zone}
+                                  mobs={[...stepKills(st, choices).map((k) => k.name), ...hunterAt(st.camp.zone).flatMap((h) => h.left.map((n) => n.name))]}
+                                />
+                              )}
                             </div>
                           </li>
                         )
@@ -445,20 +571,59 @@ export function Slayer() {
               </div>
             )}
 
+            {data.timings.length > 0 && (
+              <div className="card mb-16">
+                <Disclosure open={openTimes} onToggle={() => setOpenTimes(!openTimes)} label="Zone respawns">
+                  <h2>
+                    Zone respawns <span className="faint small">{data.timings.length}</span>
+                  </h2>
+                </Disclosure>
+                {openTimes && (
+                  <>
+                    <div className="faint small mb-8">
+                      The spawns your Respawns page has timed (one spawn, a few gaps seen), beside TAKP’s classic timer: a zone’s spawn-table pace runs on the timer of those the
+                      tables give one spot.
+                    </div>
+                    {data.timings.map((t) => (
+                      <div key={t.zone} className="small">
+                        <b>{t.zone}</b> <span className="mono">{t.timer === null ? 'no timer' : clock(t.timer)}</span>{' '}
+                        <span className="faint">· {t.timed.map((x) => `${x.name} ${clock(x.legends)}${x.classic ? ` (classic ${clock(x.classic)})` : ''}`).join(', ')}</span>
+                      </div>
+                    ))}
+                  </>
+                )}
+              </div>
+            )}
+
             <div className="card row mb-16">
               <label className="row tight small">
                 Minutes between camps
                 <NumberInput value={choices.travelMin} min={0} max={120} width={64} onChange={(v) => setChoices({ ...choices, travelMin: v ?? DEFAULT_CHOICES.travelMin })} />
               </label>
               <label className="row tight small">
-                <Tip text="For a camp players name without a number: kills an hour while there">Kills an hour where players give no number</Tip>
+                <Tip text="For a camp players name without a number and no spawn table knows: kills an hour while there">Kills an hour where nothing gives a number</Tip>
                 <NumberInput value={choices.pace} min={1} max={2000} width={72} onChange={(v) => setChoices({ ...choices, pace: v ?? DEFAULT_CHOICES.pace })} />
               </label>
+              {data.killSpeed !== null && (
+                <Tip className="small faint" text="The middle of your kills an hour over the zones you have hunted an hour or more: a spawn-table camp gives no more than this">
+                  your usual pace {num(Math.round(data.killSpeed))}/h
+                </Tip>
+              )}
               <span className="spacer" />
+              <Tip text="Puts a dot at every spot the plan’s mobs (red) and the Hunter named left (gold) pop at, on the game’s own map: in a map set of its own, LegendsTracker (a copy of the game’s maps, so its own stay as they are). Pick it in the map window.">
+                <button className="btn small" onClick={() => void mark(true)}>
+                  Mark on the game’s map
+                </button>
+              </Tip>
+              <button className="btn small ghost" onClick={() => void mark(false)} title="Take the marks off the LegendsTracker map set">
+                Clear marks
+              </button>
               <button className="btn small ghost" onClick={() => q.reload()}>
                 Read again
               </button>
             </div>
+
+            {marked && <div className="card mb-16 small">{marked}</div>}
 
             {data.unplaced.length > 0 && (
               <div className="card mb-16 small">

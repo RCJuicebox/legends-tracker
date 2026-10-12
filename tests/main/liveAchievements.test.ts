@@ -71,6 +71,35 @@ afterEach(() => {
   vi.useRealTimers()
 })
 
+describe('LiveAchievements tells the Hunter named', () => {
+  it('left in the zone the player is in: the export’s, less those killed since', () => {
+    const { live } = setup()
+    const inner = live as unknown as {
+      character: string
+      zone: string
+      exported: unknown
+      slayer: unknown
+      hunterHere: () => unknown
+    }
+    inner.character = 'Tester_neriak'
+    inner.exported = {
+      character: 'Tester_neriak',
+      file: 'x',
+      modified: T0,
+      sections: [{ cat: 'EverQuest', name: 'Hunter', ach: [{ n: 'Hunter of Befallen', c: [{ t: 'Skeletal Orc' }, { t: 'Andrew Pine' }, { t: 'Skeleton Grimfiend', d: true }] }] }]
+    }
+    inner.slayer = { kills: new Map([['a skeletal orc', { name: 'a skeletal orc', times: [T0 + 1000] }]]) }
+    expect(inner.hunterHere()).toBeNull()
+    inner.zone = 'Befallen 2 (Adaptive)'
+    expect(inner.hunterHere()).toEqual({
+      zone: 'Befallen 2 (Adaptive)',
+      rows: [{ achievement: 'Hunter of Befallen', left: ['Andrew Pine'], total: 3, since: ['Skeletal Orc'] }]
+    })
+    inner.zone = 'Kedge Keep'
+    expect(inner.hunterHere()).toBeNull()
+  })
+})
+
 describe('LiveAchievements reads', () => {
   it('nothing while nothing shows the track and no line moved anything', async () => {
     const s = setup()

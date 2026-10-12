@@ -8,3 +8,4 @@ tests/**/__snapshots__/
 package-lock.json
 # Prose is wrapped by hand.
 *.md
+src/shared/game/takpSpawns.json

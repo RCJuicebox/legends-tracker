@@ -141,6 +141,8 @@ export interface MeterOverlayOptions {
 export interface AchievementOverlayOptions {
   /** Show the step of the faction plan you follow (Factions › Plan). */
   factionPlan: boolean
+  /** Show the Hunter named still to kill in the zone you are in (Plan › Hunter). */
+  hunter: boolean
 }
 
 export interface OverlayConfig {

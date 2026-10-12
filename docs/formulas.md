@@ -306,3 +306,14 @@ Read 2026-10-09 from the client's files; what counts is still the server's, sett
 - An export settles it: between two achievements exports, each achievement's count rose by the kills that counted toward it. A mob whose kills alone are more than the rise did not count; one without which the rise cannot be made did. The log's kills ran up to 4 in 55 short of the game's over a day (2026-09-28), so the rise is taken within 15% (at least 2).
 
 Implemented in `src/core/raceNames.ts` (the race table, every other name to the client's, the aliases not settled) and `src/core/slayer.ts` (`achievementRaces`, `SlayerRaces.place`, `slayerCounts`; `forced` and `learnFromExport` for the exports); what exports settled is kept in `slayer-facts.json`.
+
+## Spawns and respawns
+
+Read 2026-10-12. TAKP's AllaClone (`zone.php?name=<zone>&mode=spawngroups`; its robots.txt allows `/allaclone`) lists every spawn group of a zone: its spots as `(y / x / z)`, the classic respawn, and the mobs it rolls with their chance. The game's map files draw a spot at `(-x, -y)`: TAKP's spots fall inside the client's own maps of Unrest, Runnyeye and Befallen. A mob's id is its zone's id × 1000 + n, and the zone ids are the client's (`Resources/ZoneNames.txt`, whose third field is 0 for a zone not in the game).
+
+- **What a mob's spawns allow:** each spot × its chance (a group's chances past 100 taken as shares) × 3600 ÷ the timer, summed over its groups. A group on a timer under two minutes is a roamer's, with a cap TAKP does not show (South Karana: 58 spots on 1:18, Quillmane among them): four spots at most count.
+- **Legends' timers are a zone's own,** from the Respawns page's shortest gaps, for spawns of one spot: Blackburrow 3:40-3:56 (its gnoll brewer 18:00 classic, its Splitpaw sharpshooter not in TAKP); Ak'Anon's clockworks 4:50-5:09 (20:00); the Ocean of Tears 2:27 (6:00); Unrest 7:21-7:47 (16:00); Crushbone's orc scoutsman 6:24 (10:00); Butcherblock's guards 8:49-8:53 (9:30). None slower than classic, so a zone not timed keeps classic's.
+- **Legends changed spawns too:** the lesser blade fiend is a 3% roll on one spot in TAKP and its own spawn in Legends (the player has killed over three hundred); Blackburrow has mobs TAKP lacks. A mob timed on its own is one spot on its own timer.
+- **A named's wait:** its timer over how often it is up (its chance, summed over its spots), at least a timer.
+
+Implemented in `src/features/slayer/spawns.ts` (`zoneTimings`, `mobSpawns`, `spotsOf`, the map files) and `scripts/takp-spawns.mjs` (the tables).

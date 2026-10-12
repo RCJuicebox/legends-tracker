@@ -99,7 +99,14 @@ beforeAll(async () => {
   const { Factions } = await import('../../src/features/factions/main')
   const { LiveAchievements } = await import('../../src/main/liveAchievements')
   const { SlayerPlanner } = await import('../../src/features/slayer/main')
-  for (const f of [new Factions(stub() as never), new LiveAchievements({ store: { dir: h.dir } } as never), new SlayerPlanner(stub() as never, h.dir)]) f.register(ctx as never)
+  const { HunterPlanner } = await import('../../src/features/hunter/main')
+  for (const f of [
+    new Factions(stub() as never),
+    new LiveAchievements({ store: { dir: h.dir } } as never),
+    new SlayerPlanner(stub() as never, h.dir),
+    new HunterPlanner(stub() as never)
+  ])
+    f.register(ctx as never)
 }, 30_000)
 
 describe('the invoke handlers', () => {

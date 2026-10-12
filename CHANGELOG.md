@@ -2,6 +2,14 @@
 
 What changed in each version. The release workflow publishes a version's section as its release notes, and installed copies show them when an update arrives.
 
+## Unreleased
+
+- **Plan › Slayer knows each zone's spawns.** TAKP's classic spawn tables are built in: every zone Legends has, its spawn spots, what each rolls and how often, and the timers. Where you have not hunted a race, the plan paces a zone by what its spots allow, at no more than your usual kills an hour, and says which holds it back; beside each mob, its spots and respawn ("12 spots · 6:24"), and "spawn-bound" where your own pace is up against them. This replaces eqlwiki's flat guess of four kills an hour a name, and gives the players' camps with no number one (the Rathe's giants: 22 spots). Legends' respawns are quicker than classic and one timer a zone, so a zone runs on the respawn your Respawns page has timed there (Blackburrow 3:45, Ak'Anon 4:50), listed under **Zone respawns**.
+- **Plan › Slayer's travel is your own.** The time between steps is the way your log has seen you go between the two zones, gates and ports included, with the zones crossed in the tooltip; your minutes between camps only where it knows no way.
+- **Plan › Slayer: a map for each step, and marks on the game's map.** **Map** draws the zone from the game's map files with a dot at every spot the step's mobs pop at. **Mark on the game's map** puts them on the in-game map, in a map set of its own (`maps\LegendsTracker`, a copy of the game's maps, so its own stay as they are): pick it in the map window.
+- **Plan › Hunter, a page of its own.** Each Hunter achievement not done, the named it still wants (the export, less those your log has seen you kill since), where they spawn, how often and on what timer, and about how long their spots take to give them, the quickest zones first. Each zone has its map, and the named can go on the game's map beside the Slayer plan's marks. Steps of the Slayer plan list the Hunter named in their zone too.
+- **The achievements overlay shows the Hunter named left in the zone you are in,** with a switch of its own under Overlays (on by default).
+
 ## 2.12.0 (2026-10-12)
 
 - **Fix: Factions › Plan sent you to Veeshan's Peak 1.0,** which Legends does not have (onyx skywings, to bring Mayong Mistmoore back). Allakhazam's zones found not in the game now get no kill camps, its mobs of many alike included, which have no eqlwiki page to tell by; they are listed under **Mobs left out of the kill camps**.

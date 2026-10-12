@@ -238,6 +238,8 @@ function MeterOverlay({ config, snap, arranging }: { config: OverlayConfig; snap
 const SLAYER_RECENT_MS = 30 * 60_000
 /** Slayer counts, and skills, shown at most each. */
 const SLAYER_ROWS = 3
+/** Hunter named shown at most, for each achievement of the zone. */
+const HUNTER_ROWS = 6
 /** Tracked achievements shown at most, and the objectives or skills of each. */
 const TRACKED_ROWS = 5
 const TRACKED_LINES = 3
@@ -276,13 +278,15 @@ function AchievementsRegion({ config, track, arranging }: { config: OverlayConfi
       .values()
   ].sort((a, b) => b.last - a.last)
   const step = plan?.current ?? null
+  // The Hunter named left in this zone, at the player's choice; what is tracked shows in its own place.
+  const hunter = config.achievements?.hunter === false ? [] : (track?.hunter?.rows ?? []).filter((r) => !trackedNames.has(r.achievement))
   // Shown on purpose and empty would look broken; one faint line says what it waits for.
-  if (!tracked.length && !plan && !slayer.length && !skills.length)
+  if (!tracked.length && !plan && !slayer.length && !skills.length && !hunter.length)
     return (
       <div className="ach-ov" style={style}>
         <div className="ach-ov-empty">
           {arranging
-            ? 'Tracked achievements, the faction plan’s step, and the Slayer counts and skills your kills move show here.'
+            ? 'Tracked achievements, the faction plan’s step, the Slayer counts and skills your kills move, and the Hunter named left in your zone show here.'
             : track?.faction
               ? 'Nothing tracked. The faction plan is hidden from this overlay (Overlays).'
               : 'Nothing tracked. Track an achievement, or show your faction plan here from Factions › Plan.'}
@@ -361,6 +365,31 @@ function AchievementsRegion({ config, track, arranging }: { config: OverlayConfi
           ) : (
             <div className="ach-ov-line">Every step is done.</div>
           )}
+        </section>
+      )}
+      {hunter.length > 0 && (
+        <section className="ach-ov-hunter">
+          {hunter.slice(0, 2).map((r) => (
+            <div key={r.achievement}>
+              <div className="ach-ov-head">
+                <span>{r.achievement}</span>
+                <span className="ach-ov-faint">
+                  {r.left.length} of {r.total} left
+                </span>
+              </div>
+              {r.left.slice(0, HUNTER_ROWS).map((n) => (
+                <div key={n} className="ach-ov-line">
+                  {n}
+                </div>
+              ))}
+              {r.left.length > HUNTER_ROWS && <div className="ach-ov-faint">+{r.left.length - HUNTER_ROWS} more</div>}
+              {r.since.length > 0 && (
+                <div className="ach-ov-faint" title="Killed since your achievements export: your next export settles them">
+                  ✓ {r.since.join(', ')}
+                </div>
+              )}
+            </div>
+          ))}
         </section>
       )}
       {slayer.length > 0 && (

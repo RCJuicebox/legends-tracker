@@ -64,10 +64,14 @@ export const ZONE_ALIASES: Record<string, string> = {
   mountainsofrathe: 'rathemountains',
   northro: 'northerndesertofro',
   southro: 'southerndesertofro',
+  northdesertofro: 'northerndesertofro',
+  southdesertofro: 'southerndesertofro',
   commonlands: 'westcommonlands',
   eastcommons: 'eastcommonlands',
   westcommons: 'westcommonlands',
-  thehole: 'ruinsofoldpaineel'
+  thehole: 'ruinsofoldpaineel',
+  // The game's zone table calls it a keep; the zone line, the caverns.
+  permafrostkeep: 'permafrostcaverns'
 }
 
 // ---------- places ----------
