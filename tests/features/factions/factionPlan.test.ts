@@ -763,6 +763,22 @@ describe("eqlwiki's word on a camp's named mobs", () => {
     expect(c.leftOut).toContainEqual({ name: 'Berinsan', zone: 'Test Mountains', why: 'missing' })
   })
 
+  it('plans no camp in an Allakhazam zone found not in the game, its mobs of many alike too', () => {
+    const rogues: AllaFaction = {
+      id: 11,
+      name: 'Test Rogues',
+      needs: [],
+      quests: [],
+      mobs: [
+        { name: 'an onyx skywing', zone: "Veeshan's Peak 1.0", amount: 150 },
+        { name: 'a cave bat', zone: 'Test Cave', amount: 5 }
+      ]
+    }
+    const c = buildCatalog(catalogInput({ factions: ['Test Rogues'], targets: ['Test Rogues'], alla: [rogues], npcs: {} }))
+    expect(camps(c).map((a) => a.zone)).toEqual(['Test Cave'])
+    expect(c.leftOut).toEqual([{ name: 'an onyx skywing', zone: "Veeshan's Peak 1.0", why: 'missing' }])
+  })
+
   it('takes a respawn found in play where eqlwiki gives none', () => {
     const muses: AllaFaction = { id: 6, name: 'Deepmuses', needs: [], quests: [], mobs: [{ name: 'Khrix Fritchoff', zone: 'Estate of Unrest', amount: 5 }] }
     const c = buildCatalog(catalogInput({ factions: ['Deepmuses'], targets: ['Deepmuses'], alla: [muses], npcs: { 'khrix fritchoff': { found: true, hp: 1575 } } }))

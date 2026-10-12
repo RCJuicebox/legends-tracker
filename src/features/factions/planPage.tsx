@@ -864,7 +864,8 @@ function LeftOut({ left }: { left: NonNullable<FactionPlanData['catalog']['leftO
       <summary>Mobs left out of the kill camps ({left.length})</summary>
       <p className="faint small">
         Allakhazam lists the NPCs of live EverQuest, and eqlwiki has a page for each named one Legends has. A named mob with no eqlwiki page, or one whose page eqlwiki marks as not
-        in the game, is taken not to be in Legends; a guildmaster cannot be killed in Legends; and one with more health than any raid boss of the era is no camp.
+        in the game, is taken not to be in Legends, as are those found not in it in play, and every mob of a zone found not in it; a guildmaster cannot be killed in Legends; and
+        one with more health than any raid boss of the era is no camp.
       </p>
       {guildmasters.length > 0 && (
         <p className="small">
@@ -878,7 +879,7 @@ function LeftOut({ left }: { left: NonNullable<FactionPlanData['catalog']['leftO
       )}
       {missing.length > 0 && (
         <p className="small mb-0">
-          <strong>Not in Legends, by eqlwiki:</strong> {missing.map((l) => `${l.name} (${l.zone})`).join(', ')}
+          <strong>Not in Legends:</strong> {missing.map((l) => `${l.name} (${l.zone})`).join(', ')}
         </p>
       )}
     </details>

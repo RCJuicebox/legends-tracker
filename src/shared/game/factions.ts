@@ -515,6 +515,15 @@ export const RESPAWNS_IN_PLAY: Record<string, number> = {
   'khrix fritchoff': 7 * 60 + 25
 }
 
+/**
+ * Allakhazam's zones found not to be in Legends, by the name it gives them, and why: no kill camp is planned
+ * there. Its mobs of many alike ("an onyx skywing") have no eqlwiki page to tell by.
+ */
+export const ZONES_NOT_IN_PLAY: Record<string, string> = {
+  // The plan sent a restore to onyx skywings there, for Mayong Mistmoore (2026-10-12).
+  "Veeshan's Peak 1.0": 'not in the game'
+}
+
 /** Named NPCs found not to be in Legends though eqlwiki has a page for them, by lower-cased name, and why: no kill camp holds them. */
 export const NOT_IN_PLAY: Record<string, string> = {
   // Steamfont's Berinsan, eqlwiki's Deep Muses +10 a kill, is of Luclin's Steamfont and not in the game (2026-10-09).

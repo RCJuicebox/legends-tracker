@@ -15,6 +15,7 @@ import {
   NOT_IN_PLAY,
   ONCE_IN_PLAY,
   RESPAWNS_IN_PLAY,
+  ZONES_NOT_IN_PLAY,
   QUEST_COIN,
   QUEST_ITEMS_IN_PLAY,
   QUEST_NPCS,
@@ -686,8 +687,14 @@ export function buildCatalog(input: CatalogInput): FactionCatalog {
 
   // ---- kill camps from Allakhazam: the mobs its pages give amounts for, that the log has not seen killed ----
   const allaCamps = new Map<string, AllaKill[]>()
+  const goneZones = new Set(Object.keys(ZONES_NOT_IN_PLAY).map(zoneKey))
   for (const m of allaKill) {
-    if (logged.has(`${m.name.toLowerCase()}|${zoneKey(m.zone)}`) || !raisesAny(m.hits, open) || leave(m.name, m.zone, 'Allakhazam')) continue
+    if (logged.has(`${m.name.toLowerCase()}|${zoneKey(m.zone)}`) || !raisesAny(m.hits, open)) continue
+    if (goneZones.has(zoneKey(m.zone))) {
+      if (!leftOut.some((l) => l.name === bareNpc(m.name) && l.zone === m.zone)) leftOut.push({ name: bareNpc(m.name), zone: m.zone, why: 'missing' })
+      continue
+    }
+    if (leave(m.name, m.zone, 'Allakhazam')) continue
     const ck = `${zoneKey(m.zone)}|${positives(m.hits).join('+')}`
     allaCamps.set(ck, [...(allaCamps.get(ck) ?? []), m])
   }
