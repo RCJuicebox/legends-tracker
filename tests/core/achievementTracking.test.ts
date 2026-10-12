@@ -181,6 +181,12 @@ describe('Slayer counts', () => {
     expect([...cw.keys].sort()).toEqual(['clockwork', 'clockwork beetle', 'clockwork copter', 'clockwork rat', 'clockwork spider', 'gnomework', 'tin soldier'])
     expect(cw.unnamed).toEqual(['clockwork rat'])
     expect(achievementRaces('Dracoliches, Water Dragons, and Witherans.', GAME).unnamed).toEqual(['dracolich', 'water dragon', 'witheran'])
+    // Words that name no race: the avatars are Innoruuk and Cazic-Thule.
+    expect([...achievementRaces('The avatar of a deity.', GAME).keys]).toEqual(['innoruuk', 'cazic thule'])
+    // As the log names them.
+    const gods = new SlayerRaces([{ races: 'The avatar of a deity.' }], GAME)
+    expect(gods.place('Innoruuk, the Prince of Hate', null).key).toBe('innoruuk')
+    expect(gods.place('Cazic-Thule', null).key).toBe('cazic thule')
   })
 
   it('takes the race a name ends on, never a word inside another', () => {

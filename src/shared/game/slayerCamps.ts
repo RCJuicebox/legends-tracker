@@ -49,6 +49,22 @@ export const SLAYER_CAMPS: SlayerCamp[] = [
     said: 'EQL Discord, 2026-09 to 10'
   },
   {
+    zone: 'The Plane of Hate',
+    mobs: ['Innoruuk, the Prince of Hate'],
+    races: ['innoruuk'],
+    perDay: 5,
+    note: 'One of the two avatars of a deity, with Cazic-Thule: a raid lockout, one kill a difficulty (0 to 4) a day.',
+    said: 'the player, 2026-10-12; EQL Discord, 2026-09-21'
+  },
+  {
+    zone: 'The Plane of Fear',
+    mobs: ['Cazic-Thule'],
+    races: ['cazic thule'],
+    perDay: 5,
+    note: 'One of the two avatars of a deity, with Innoruuk: taken for a raid lockout like the others, one kill a difficulty a day.',
+    said: 'the player, 2026-10-12'
+  },
+  {
     zone: 'The Liberated Citadel of Runnyeye',
     mobs: ['a mimic'],
     races: ['mimic'],

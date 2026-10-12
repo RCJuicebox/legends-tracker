@@ -1,6 +1,19 @@
 import type { AchSection } from '../shared/character'
 import { DIED, SLAIN_BY, SLAIN_BY_YOU } from './phrases'
-import { MOB_RACES, NAME_CALLINGS, NAME_WORDS, normalRace, PLAYABLE, PLAYABLE_MARK, raceKey, singulars, unsureRace, wikiRaceKey, type RaceTable } from './raceNames'
+import {
+  ACHIEVEMENT_RACES,
+  MOB_RACES,
+  NAME_CALLINGS,
+  NAME_WORDS,
+  normalRace,
+  PLAYABLE,
+  PLAYABLE_MARK,
+  raceKey,
+  singulars,
+  unsureRace,
+  wikiRaceKey,
+  type RaceTable
+} from './raceNames'
 
 // Slayer achievements count kills of races of creature: "Kobolds", "Orcs and Wereorcs.", "Beetles,
 // Cliknars, Corathus Beasts, … Ursarachnids." The achievements export gives each open one's count as
@@ -57,6 +70,11 @@ export function achievementRaces(text: string, game: RaceTable): { keys: Set<str
   for (const raw of (cw ? cw[1] : t).split(/,\s*(?:and\s+)?|\s+and\s+/)) {
     const item = normalRace(raw.replace(/\s+of\s+.*$/i, ''))
     if (!item) continue
+    const named = ACHIEVEMENT_RACES[item]
+    if (named) {
+      for (const r of named) keys.add(r)
+      continue
+    }
     const words = item.split(' ')
     const head = words.slice(0, -1).join(' ')
     const forms = singulars(words[words.length - 1]).map((s) => (head ? `${head} ${s}` : s))

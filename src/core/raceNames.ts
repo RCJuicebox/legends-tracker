@@ -249,6 +249,15 @@ export function wikiRaceKey(race: string): string | null {
   return n
 }
 
+/**
+ * What an achievement's words stand for where they name no race: "The avatar of a deity." is
+ * Innoruuk and Cazic-Thule, the client's races 123 and 95 (the player, 2026-10-12). Keyed as the
+ * achievement's item is read, its " of …" off.
+ */
+export const ACHIEVEMENT_RACES: Record<string, string[]> = {
+  'the avatar': ['innoruuk', 'cazic thule']
+}
+
 /** The races "The playable races." stands for. */
 export const PLAYABLE = [
   'barbarian',
