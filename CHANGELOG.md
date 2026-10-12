@@ -2,7 +2,7 @@
 
 What changed in each version. The release workflow publishes a version's section as its release notes, and installed copies show them when an update arrives.
 
-## Unreleased
+## 2.12.0 (2026-10-12)
 
 - **Fix: Factions › Plan sent you to Veeshan's Peak 1.0,** which Legends does not have (onyx skywings, to bring Mayong Mistmoore back). Allakhazam's zones found not in the game now get no kill camps, its mobs of many alike included, which have no eqlwiki page to tell by; they are listed under **Mobs left out of the kill camps**.
 - **Fix: Plan › Slayer counted half of each raid boss for Dragonbane.** Lady Vox and Lord Nagafen are listed under two names, the game's race (Dragon) and the achievement's (True Dragons), and the plan shared each kill between them: 2.5 a day each, and 41 days for Dragonbane. A raid boss's kill counts whole: 5 a day each, ten together.
