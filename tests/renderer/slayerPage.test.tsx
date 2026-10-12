@@ -110,13 +110,20 @@ it('draws the plan, the lockouts beside it, and keeps a camp ruled out', async (
   // The steps under the Banestrike tier they work toward.
   expect(text).toContain('ProgressiveBanestrike rank 2')
   expect(text).toContain('a mystery ×3')
+  // A mob ruled out from beside its name.
+  await act(async () => host.querySelector<HTMLButtonElement>('button[aria-label="Rule out an orc pawn"]')!.click())
+  expect(invoke).toHaveBeenLastCalledWith('slayer:choices', 'Kelwyn_neriak', expect.objectContaining({ outMobs: ['an orc pawn'] }))
+  const toggle = () => [...host.querySelectorAll('button')].find((b) => b.textContent?.startsWith('Ruled out'))!
+  await act(async () => toggle().click())
+  expect(host.textContent).toContain('an orc pawn, wherever it is')
+  await act(async () => [...host.querySelectorAll('button')].find((b) => b.textContent === 'Bring back')!.click())
+  expect(invoke).toHaveBeenLastCalledWith('slayer:choices', 'Kelwyn_neriak', expect.objectContaining({ outMobs: [] }))
   const out = [...host.querySelectorAll('button')].find((b) => b.textContent === 'Rule out')!
   await act(async () => out.click())
   expect(invoke).toHaveBeenCalledWith('slayer:choices', 'Kelwyn_neriak', expect.objectContaining({ outCamps: ['log:Clan Crushbone'] }))
   expect(host.textContent).toContain('Ruled out')
   const button = (text: string) => [...host.querySelectorAll('button')].find((b) => b.textContent?.trim().startsWith(text))!
-  // Brought back from the list of camps ruled out.
-  await act(async () => button('Ruled out').click())
+  // Brought back from the list of camps ruled out, still open from the mob's.
   await act(async () => button('Bring back').click())
   expect(invoke).toHaveBeenLastCalledWith('slayer:choices', 'Kelwyn_neriak', expect.objectContaining({ outCamps: [] }))
   // An achievement turned off, from the list of those in the plan.

@@ -42,8 +42,10 @@ const HOW = (
       guess.
     </div>
     <div>
-      <b>The plan</b> takes the camp that does the most still-open work an hour, a kill counting once for every open achievement its race feeds, and stays until its first
-      achievement is done; then again. Raid lockouts (Phinigel, Lady Vox, Lord Nagafen) are a few kills a day, so they run beside it.
+      <b>The plan</b> works through Banestrike’s tiers in turn (Progressive, Highly Decorated, A Force of Nature, then what Megadeath names besides), each done before the next is
+      begun; within a tier, the achievement that can be finished soonest, travel counted, first. A kill counts toward every open achievement its race feeds, a later tier’s too.
+      Raid lockouts (Phinigel, Lady Vox, Lord Nagafen, Innoruuk, Cazic-Thule) are a few kills a day, so they run beside it. Rule out a camp, or a mob with the ✕ beside its name
+      (one that takes a faction to spawn, say), and the plan finds the kills elsewhere.
     </div>
   </>
 )
@@ -67,11 +69,21 @@ const tierName = (tier: number) => BANESTRIKE[tier] ?? 'Not for Banestrike'
 
 /** "Orc Stomp! 1,989 (done)" for each achievement a step moves. */
 /** A few names, and the rest in a tooltip: a camp's log can hold a dozen kinds of gnoll. */
-function Names({ names, shown = 3 }: { names: string[]; shown?: number }) {
-  if (names.length <= shown) return <>{names.join(', ')}</>
+function Names({ names, shown = 3, onOut }: { names: { name: string; n: number }[]; shown?: number; onOut: (mob: string) => void }) {
+  const one = (k: { name: string; n: number }, i: number) => (
+    <span key={k.name}>
+      {i > 0 && ', '}
+      {k.name} ×{kills(k.n)}
+      <button className="btn small ghost sl-out" onClick={() => onOut(k.name)} title={`Rule out ${k.name}: the plan finds the kills elsewhere`} aria-label={`Rule out ${k.name}`}>
+        ✕
+      </button>
+    </span>
+  )
+  if (names.length <= shown) return <>{names.map(one)}</>
+  const rest = names.slice(shown)
   return (
     <>
-      {names.slice(0, shown).join(', ')}, <Tip text={names.slice(shown).join(', ')}>and {names.length - shown} more</Tip>
+      {names.slice(0, shown).map(one)}, <Tip text={rest.map((k) => `${k.name} ×${kills(k.n)}`).join(', ')}>and {rest.length} more</Tip>
     </>
   )
 }
@@ -80,7 +92,7 @@ function Names({ names, shown = 3 }: { names: string[]; shown?: number }) {
  * What a step is there for: each achievement of its tier it moves, with how many and the mobs that
  * count toward it. What the same kills do for a later tier is in the tooltip, not the line.
  */
-function StepWork({ step, goals, choices }: { step: SlayerStep; goals: SlayerGoal[]; choices: SlayerPlanChoices }) {
+function StepWork({ step, goals, choices, onOut }: { step: SlayerStep; goals: SlayerGoal[]; choices: SlayerPlanChoices; onOut: (mob: string) => void }) {
   const done = new Set(step.finishes)
   const killed = stepKills(step, choices)
   const besides = Object.keys(step.kills)
@@ -94,7 +106,7 @@ function StepWork({ step, goals, choices }: { step: SlayerStep; goals: SlayerGoa
           {done.has(g) && <b> done</b>}
           <span className="faint">
             {' '}
-            · <Names names={killed.filter((k) => k.goals.includes(g)).map((k) => `${k.name} ×${kills(k.n)}`)} />
+            · <Names names={killed.filter((k) => k.goals.includes(g))} onOut={onOut} />
           </span>
         </div>
       ))}
@@ -174,6 +186,10 @@ export function Slayer() {
     )
   }
   const ruleOut = (id: string, out: boolean) => setChoices({ ...choices, outCamps: out ? [...choices.outCamps, id] : choices.outCamps.filter((x) => x !== id) })
+  const ruleOutMob = (mob: string, out: boolean) => {
+    const m = mob.toLowerCase()
+    setChoices({ ...choices, outMobs: out ? [...choices.outMobs.filter((x) => x !== m), m] : choices.outMobs.filter((x) => x !== m) })
+  }
   const left = plan ? plan.goals.reduce((s, g) => s + (data!.goals[g].max - data!.goals[g].count), 0) : 0
 
   return (
@@ -317,7 +333,7 @@ export function Slayer() {
                                   {duration(st.seconds + st.travel)}
                                 </Tip>
                               </div>
-                              <StepWork step={st} goals={data.goals} choices={choices} />
+                              <StepWork step={st} goals={data.goals} choices={choices} onOut={(mob) => ruleOutMob(mob, true)} />
                               <div className="row tight fp-effects">
                                 <FactionCost camp={st.camp} />
                                 {st.camp.note && <span className="faint small">{st.camp.note}</span>}
@@ -399,22 +415,33 @@ export function Slayer() {
               )}
             </div>
 
-            {choices.outCamps.length > 0 && (
+            {choices.outCamps.length + choices.outMobs.length > 0 && (
               <div className="card mb-16">
                 <Disclosure open={openOut} onToggle={() => setOpenOut(!openOut)} label="Ruled out">
                   <h2>
-                    Ruled out <span className="faint small">{choices.outCamps.length}</span>
+                    Ruled out <span className="faint small">{choices.outCamps.length + choices.outMobs.length}</span>
                   </h2>
                 </Disclosure>
-                {openOut &&
-                  choices.outCamps.map((id) => (
-                    <div key={id} className="row tight small">
-                      <span>{data.camps.find((c) => c.id === id)?.zone ?? id.replace(/^\w+:/, '')}</span>
-                      <button className="btn small ghost" onClick={() => ruleOut(id, false)}>
-                        Bring back
-                      </button>
-                    </div>
-                  ))}
+                {openOut && (
+                  <>
+                    {choices.outCamps.map((id) => (
+                      <div key={id} className="row tight small">
+                        <span>{data.camps.find((c) => c.id === id)?.zone ?? id.replace(/^\w+:/, '')}</span>
+                        <button className="btn small ghost" onClick={() => ruleOut(id, false)}>
+                          Bring back
+                        </button>
+                      </div>
+                    ))}
+                    {choices.outMobs.map((m) => (
+                      <div key={m} className="row tight small">
+                        <span>{m}, wherever it is</span>
+                        <button className="btn small ghost" onClick={() => ruleOutMob(m, false)}>
+                          Bring back
+                        </button>
+                      </div>
+                    ))}
+                  </>
+                )}
               </div>
             )}
 

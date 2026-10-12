@@ -207,6 +207,9 @@ describe('Slayer plan: the camps', () => {
     ).toBe(true)
     // Named for the race eqlwiki counts there, which lists no mobs.
     expect(wiki[0].kinds.map((k) => k.name)).toEqual(['barbarian'])
+    // Not Halas, where eqlwiki counts most: a city's barbarians are its people and guards.
+    expect(wiki.map((c) => c.zone)).not.toContain('Halas')
+    expect(wiki[0].zone).toBe('Lake Rathetear')
   })
 })
 
@@ -273,6 +276,33 @@ describe('Slayer plan: the plan', () => {
     const plan = planSlayer({ goals, camps }, { ...DEFAULT_CHOICES, outCamps: ['log:Clan Crushbone'] })
     expect(plan.unplanned).toEqual([0])
     expect(plan.steps.map((s) => s.camp.id)).toEqual(['log:The Permafrost Caverns'])
+  })
+
+  it('leaves a mob ruled out out of every camp, and finds its kills elsewhere', () => {
+    const two: SlayerPlanCamp[] = [
+      {
+        id: 'log:WC',
+        zone: 'WC',
+        kinds: [
+          { name: 'Duggin Scumber', perHour: 190, goals: [0] },
+          { name: 'a puma', perHour: 5, goals: [0] }
+        ],
+        source: 'log',
+        pace: { 0: 195 }
+      },
+      { id: 'log:Qeynos', zone: 'Qeynos', kinds: [{ name: 'a guard', perHour: 50, goals: [0] }], source: 'log', pace: { 0: 50 } }
+    ]
+    const goal = [g('What Keeps Mankind Alive?', 900, 1000)]
+    expect(planSlayer({ goals: goal, camps: two }, DEFAULT_CHOICES).steps.map((s) => s.camp.id)).toEqual(['log:WC'])
+    const plan = planSlayer({ goals: goal, camps: two }, { ...DEFAULT_CHOICES, outMobs: ['duggin scumber'] })
+    // Without him the West Commonlands give five an hour: Qeynos's fifty win.
+    expect(plan.steps.map((s) => [s.camp.id, Math.round(s.seconds)])).toEqual([['log:Qeynos', 7200]])
+    // eqlwiki's guess stays out while a measured camp is quick, and stands in once its mob is ruled out.
+    const guess: SlayerPlanCamp = { id: 'wiki:halas', zone: 'Halas', kinds: [{ name: 'barbarian', perHour: 116, goals: [0] }], source: 'wiki', pace: { 0: 116 } }
+    expect(planSlayer({ goals: goal, camps: [...two, guess] }, DEFAULT_CHOICES).steps.map((s) => s.camp.id)).toEqual(['log:WC'])
+    expect(planSlayer({ goals: goal, camps: [two[0], guess] }, { ...DEFAULT_CHOICES, outMobs: ['duggin scumber'] }).steps.map((s) => s.camp.id)).toEqual(['wiki:halas'])
+    // A camp with nothing left is gone.
+    expect(planSlayer({ goals: goal, camps: two }, { ...DEFAULT_CHOICES, outMobs: ['duggin scumber', 'a puma', 'a guard'] }).unplanned).toEqual([0])
   })
 
   it('takes the assumed pace where play gives none, shared among the camp’s races', () => {

@@ -51,6 +51,7 @@ export function sanitizeChoices(v: unknown): SlayerPlanChoices {
     excluded: names(c.excluded),
     included: names(c.included),
     outCamps: names(c.outCamps),
+    outMobs: names(c.outMobs).map((m) => m.toLowerCase()),
     travelMin: num(c.travelMin, 0, 120, DEFAULT_CHOICES.travelMin),
     pace: num(c.pace, 1, 2000, DEFAULT_CHOICES.pace)
   }

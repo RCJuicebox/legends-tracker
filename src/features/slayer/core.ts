@@ -4,7 +4,7 @@ import { zoneEntered } from '../../core/logLine'
 import { achievementRaces, slayerLine, type SlayerCounter, type SlayerRaces } from '../../core/slayer'
 import type { RaceTable } from '../../core/raceNames'
 import { baseZone } from '../factions/attribution'
-import { zoneKey } from '../factions/names'
+import { isCity, zoneKey } from '../factions/names'
 import { SLAYER_CAMPS, type SlayerCamp } from '../../shared/game/slayerCamps'
 import { HUNT } from '../../shared/game/hunt'
 import { num } from '../../core/format'
@@ -319,13 +319,11 @@ export function buildCamps(
       said: k.said
     })
   }
-  // eqlwiki's census, for goals nothing else feeds: keyed by the Skill achievements' names.
-  // A goal counts as fed only where something feeds it at a fair pace: eqlwiki's zones are offered beside a crawl.
-  const best = (g: number) => Math.max(0, ...camps.filter((c) => !c.daily && !c.assumed).map((c) => c.pace[g] ?? 0))
-  const fedGoal = new Set([...fed].map((f) => +f.split('|')[1]).filter((g) => best(g) >= SLOW || camps.some((c) => c.assumed && c.pace[g])))
-  // A race only raid bosses are (the kedge, Phinigel): no census guess stands in for the lockout.
+  // eqlwiki's census, keyed by the Skill achievements' names: for every goal, the plan offering it only
+  // where nothing measured feeds the goal at a fair pace (fallbackOnly), once the player's rule-outs are
+  // taken off. A race only raid bosses are (the kedge, Phinigel): no census guess stands in for the lockout.
   const lockoutRaces = new Set(known.filter((k) => k.perDay !== undefined).flatMap((k) => k.races))
-  const wanting = goals.flatMap((_, i) => (fedGoal.has(i) || [...races.keys[i]].every((k) => lockoutRaces.has(k)) ? [] : [i]))
+  const wanting = goals.flatMap((_, i) => ([...races.keys[i]].every((k) => lockoutRaces.has(k)) ? [] : [i]))
   for (const [name, rows] of Object.entries(HUNT)) {
     const keys = raceLists.get(name)
     const at = keys ? wanting.filter((i) => [...keys].some((k) => races.keys[i].has(k))) : []
@@ -333,6 +331,8 @@ export function buildCamps(
     // One kind a race eqlwiki counts in the zone, named for the race: it lists no mobs.
     const kind = [...keys].join(' / ')
     for (const [zone, npcs] of rows) {
+      // A city's people are its citizens and guards: no camp to send anyone to on a count alone.
+      if (isCity(zone)) continue
       const id = `wiki:${zoneKey(zone)}`
       let c = camps.find((x) => x.id === id)
       if (!c) camps.push((c = { id, zone, kinds: [], source: 'wiki', pace: {}, said: 'eqlwiki, 2026-09-24' }))
@@ -353,15 +353,16 @@ export interface SlayerPlanChoices {
   /** Achievements (lower-cased) left out of the plan, and optional ones taken in. */
   excluded: string[]
   included: string[]
-  /** Camps (ids) ruled out. */
+  /** Camps (ids) ruled out, and mobs (lower-cased), wherever they are: one that takes a faction to spawn. */
   outCamps: string[]
+  outMobs: string[]
   /** Minutes to get from one camp to another. */
   travelMin: number
   /** Kills an hour where play names a camp without a number. */
   pace: number
 }
 
-export const DEFAULT_CHOICES: SlayerPlanChoices = { excluded: [], included: [], outCamps: [], travelMin: 10, pace: 60 }
+export const DEFAULT_CHOICES: SlayerPlanChoices = { excluded: [], included: [], outCamps: [], outMobs: [], travelMin: 10, pace: 60 }
 
 /** A step of the plan: a stretch at one camp. */
 export interface SlayerStep {
@@ -403,6 +404,34 @@ export interface SlayerPlan {
   goals: number[]
 }
 
+/**
+ * eqlwiki's census only where nothing measured or named feeds a goal at a fair pace: beside a crawl,
+ * or in place of a mob or camp ruled out. Its guesses never outbid the log's pace or play's camps.
+ */
+function fallbackOnly(camps: SlayerPlanCamp[]): SlayerPlanCamp[] {
+  const firm = camps.filter((c) => c.source !== 'wiki' && !c.daily)
+  const wanted = (g: number) => !firm.some((c) => (c.assumed && c.pace[g]) || (c.pace[g] ?? 0) >= SLOW)
+  return camps.flatMap((c) => {
+    if (c.source !== 'wiki') return [c]
+    const kinds = c.kinds.map((k) => ({ ...k, goals: k.goals.filter(wanted) })).filter((k) => k.goals.length)
+    if (!kinds.length) return []
+    const pace: Record<number, number> = {}
+    for (const k of kinds) for (const g of k.goals) pace[g] = (pace[g] ?? 0) + k.perHour
+    return [{ ...c, kinds, pace }]
+  })
+}
+
+/** A camp without the mobs ruled out, its pace their kinds' together again; none when nothing is left. */
+function withoutMobs(c: SlayerPlanCamp, out: string[]): SlayerPlanCamp[] {
+  if (!out.length) return [c]
+  const kinds = c.kinds.filter((k) => !out.includes(k.name.toLowerCase()))
+  if (kinds.length === c.kinds.length) return [c]
+  if (!kinds.length) return []
+  const pace: Record<number, number> = {}
+  for (const k of kinds) for (const g of k.goals) pace[g] = (pace[g] ?? 0) + k.perHour
+  return [{ ...c, kinds, pace }]
+}
+
 /** The goals the plan works toward: open, not left out, and optional ones only when taken in. */
 export function goalsInPlay(goals: SlayerGoal[], choices: SlayerPlanChoices): number[] {
   const out = new Set(choices.excluded)
@@ -423,7 +452,7 @@ export function planSlayer(data: Pick<SlayerPlanData, 'goals' | 'camps'>, choice
   const need = new Map(goals.map((g) => [g, data.goals[g].max - data.goals[g].count]))
   const ruled = new Set(choices.outCamps)
   const paceOf = (c: SlayerPlanCamp, g: number) => (c.pace[g] ?? 0) * (c.assumed ? choices.pace : 1)
-  const camps = data.camps.filter((c) => !ruled.has(c.id))
+  const camps = fallbackOnly(data.camps.filter((c) => !ruled.has(c.id)).flatMap((c) => withoutMobs(c, choices.outMobs)))
   // The lockouts: what they alone feed is out of the hourly plan, done in the days the lockouts'
   // kills a day take together (Lady Vox and Lord Nagafen, ten true dragons a day). What an hourly
   // camp also feeds, they only help along.

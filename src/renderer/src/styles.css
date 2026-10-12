@@ -4148,3 +4148,18 @@ input[aria-invalid='true'] {
 .bag-layout tr.changed td {
   background: var(--panel-2);
 }
+
+/* Plan › Slayer: the rule-out cross beside a mob a step kills. */
+.btn.small.ghost.sl-out {
+  padding: 0 4px;
+  margin-left: 2px;
+  min-height: 0;
+  line-height: 1.2;
+  font-size: 10px;
+  opacity: 0.5;
+  vertical-align: baseline;
+}
+.btn.small.ghost.sl-out:hover,
+.btn.small.ghost.sl-out:focus-visible {
+  opacity: 1;
+}
