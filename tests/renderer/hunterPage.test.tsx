@@ -50,7 +50,8 @@ const data: HunterPlanData = {
       since: [],
       wait: null
     }
-  ]
+  ],
+  broken: ['Hunter of Befallen']
 }
 let answer: HunterPlanData = data
 
@@ -64,6 +65,8 @@ const invoke = vi.fn((channel: string, ...args: unknown[]) => {
       return Promise.resolve({ current: 'Kelwyn_neriak', achievements: ['Kelwyn_neriak'], inventory: [], factions: [] })
     case 'hunter:plan':
       return Promise.resolve(answer)
+    case 'hunter:broken':
+      return args[1] ? Promise.resolve([]) : Promise.reject(new Error('read-only'))
     case 'slayer:map':
       return Promise.resolve({ zone: 'Lake Nerius', short: '', lines: [], labels: [], spots: [] })
     case 'slayer:mark':
@@ -123,12 +126,23 @@ it('lists the named left, zone by zone, with what their spawns allow', async () 
   )
   await act(async () => button('Clear marks').click())
   expect(host.textContent).toContain('Could not mark the map: locked')
+  // One that does not work in Legends, said so; one said not to work, working again (here, failing).
+  expect(host.textContent).toContain('Hunter of BefallenWorks again')
+  await act(async () => button('Doesn’t work').click())
+  expect(invoke).toHaveBeenCalledWith('hunter:broken', 'Hunter of Clan Crushbone', true)
+  await act(async () => button('Works again').click())
+  expect(invoke).toHaveBeenLastCalledWith('hunter:broken', 'Hunter of Befallen', false)
+  expect(host.textContent).toContain('Could not save that: read-only')
   done()
 })
 
 it('says when every Hunter achievement is done, and when there is no export', async () => {
   answer = { ...data, zones: [] }
   let d = await draw()
+  expect(d.host.textContent).toContain('Every Hunter achievement that works is done.')
+  d.done()
+  answer = { ...data, zones: [], broken: [] }
+  d = await draw()
   expect(d.host.textContent).toContain('Every Hunter achievement is done.')
   d.done()
   answer = { ...data, export: null, zones: [] }

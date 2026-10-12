@@ -97,6 +97,10 @@ describe('LiveAchievements tells the Hunter named', () => {
     })
     inner.zone = 'Kedge Keep'
     expect(inner.hunterHere()).toBeNull()
+    // Said not to work (Plan › Hunter): not shown.
+    Object.assign((live as unknown as { ctx: object }).ctx, { hunter: { isBroken: (a: string) => a === 'Hunter of Befallen' } })
+    inner.zone = 'Befallen'
+    expect(inner.hunterHere()).toBeNull()
   })
 })
 

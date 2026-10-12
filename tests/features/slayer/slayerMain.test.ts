@@ -118,7 +118,9 @@ const ctx = {
 }
 const planner = new SlayerPlanner(new LogHistory(join(h.dir, 'log-history.json'), SlayerPlanner.consumers), h.dir)
 planner.register(ctx as unknown as AppContext)
-new HunterPlanner(new LogHistory(join(h.dir, 'log-history-h.json'), SlayerPlanner.consumers)).register(ctx as unknown as AppContext)
+const hunter = new HunterPlanner(new LogHistory(join(h.dir, 'log-history-h.json'), SlayerPlanner.consumers), h.dir)
+hunter.register(ctx as unknown as AppContext)
+Object.assign(ctx, { hunter })
 // The game's own map of Crushbone: a wall, and the way out.
 put(join(game, 'maps', 'crushbone.txt'), 'L 0, 0, 0, 100, 100, 0, 0, 0, 0\r\n')
 put(join(game, 'maps', 'crushbone_1.txt'), 'P 10, 10, 0, 0, 0, 0, 3, to_Greater_Faydark')
@@ -237,8 +239,24 @@ describe('the Slayer page', () => {
     expect(data.zones.map((z: { zone: string; left: { name: string }[]; total: number }) => [z.zone, z.left.map((n) => n.name), z.total])).toEqual([
       ['Clan Crushbone', ['Ambassador DVinn'], 2]
     ])
-    expect(await call('hunter:plan', 'Aldric_neriak')).toEqual({ character: 'Aldric_neriak', export: null, zones: [] })
+    expect(await call('hunter:plan', 'Aldric_neriak')).toEqual({ character: 'Aldric_neriak', export: null, zones: [], broken: [] })
     await expect(call('hunter:plan', '../x')).rejects.toThrow()
+    // Said not to work: out of Plan › Hunter and the Slayer plan's steps, for every character, until it works again.
+    expect(await call('hunter:broken', 'Hunter of Clan Crushbone', true)).toEqual(['Hunter of Clan Crushbone'])
+    expect(await call('hunter:broken', 'hunter of clan crushbone', true)).toEqual(['hunter of clan crushbone'])
+    expect(await call('hunter:plan', 'Kelwyn_neriak')).toMatchObject({ zones: [], broken: ['hunter of clan crushbone'] })
+    expect((await call('slayer:plan', 'Kelwyn_neriak', true)).data.hunter).toEqual([])
+    await hunter.flush()
+    expect(JSON.parse(readFileSync(join(h.dir, 'hunter-broken.json'), 'utf8'))).toEqual({ broken: ['hunter of clan crushbone'] })
+    // Kept at the next start; one in a bad shape left out.
+    writeFileSync(join(h.dir, 'hunter-broken.json'), JSON.stringify({ broken: ['Hunter of Clan Crushbone', 3] }))
+    const again = new HunterPlanner(new LogHistory(join(h.dir, 'log-history-h2.json'), SlayerPlanner.consumers), h.dir)
+    expect(again.isBroken('HUNTER OF CLAN CRUSHBONE')).toBe(true)
+    writeFileSync(join(h.dir, 'hunter-broken.json'), 'not json')
+    expect(new HunterPlanner(new LogHistory(join(h.dir, 'log-history-h3.json'), SlayerPlanner.consumers), h.dir).isBroken('x')).toBe(false)
+    expect(await call('hunter:broken', 'Hunter of Clan Crushbone', false)).toEqual([])
+    expect((await call('hunter:plan', 'Kelwyn_neriak')).zones).toHaveLength(1)
+    await expect(call('hunter:broken', '', true)).rejects.toThrow()
   })
 
   it('draws a step’s zone from the game’s map files, with the spots its mobs pop at', async () => {

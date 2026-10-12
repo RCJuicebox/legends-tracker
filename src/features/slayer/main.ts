@@ -199,7 +199,8 @@ export class SlayerPlanner implements AppFeature {
       place: placeSpawn,
       killSpeed: killSpeed ?? DEFAULT_CHOICES.pace
     })
-    const hunter = hunterZones(exp.sections, lastKills(zones), exp.modified, namedSpawns(timings))
+    // Less the Hunter achievements the player has said do not work.
+    const hunter = hunterZones(exp.sections, lastKills(zones), exp.modified, namedSpawns(timings)).filter((z) => !ctx.hunter?.isBroken(z.achievement))
     // Kills no race was found for: the wiki answered, and neither it nor the name places them.
     for (const z of Object.values(zones))
       for (const m of Object.values(z.mobs)) {

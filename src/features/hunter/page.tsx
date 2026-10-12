@@ -70,6 +70,14 @@ export function Hunter() {
     }
   }
   const left = data ? data.zones.reduce((s, z) => s + z.left.length, 0) : 0
+  const setBroken = async (achievement: string, broken: boolean) => {
+    try {
+      await api.invoke('hunter:broken', achievement, broken)
+      q.reload()
+    } catch (e) {
+      setMarked(`Could not save that: ${e instanceof Error ? e.message : String(e)}`)
+    }
+  }
 
   return (
     <>
@@ -104,71 +112,101 @@ export function Hunter() {
         <div className="card empty">
           No achievements export for {who(character)} yet. Type <GameCommand cmd="/outputfile achievements" /> in game.
         </div>
-      ) : !data.zones.length ? (
-        <div className="card empty">Every Hunter achievement is done.</div>
       ) : (
         <>
-          <div className="card row mb-16">
-            <span>
-              <b>{data.zones.length}</b> Hunter achievement{data.zones.length === 1 ? '' : 's'} to go, <b>{num(left)}</b> named
-            </span>
-            <span className="spacer" />
-            <Tip text="Puts a gold dot at every spot the named left pop at, on the game’s own map: in a map set of its own, LegendsTracker (a copy of the game’s maps, so its own stay as they are). Pick it in the map window.">
-              <button className="btn small" onClick={() => void mark(true)}>
-                Mark on the game’s map
-              </button>
-            </Tip>
-            <button className="btn small ghost" onClick={() => void mark(false)} title="Take the Hunter marks off the LegendsTracker map set">
-              Clear marks
-            </button>
-          </div>
-          {marked && <div className="card mb-16 small">{marked}</div>}
-          <div className="card mb-16">
-            <ol className="fp-steps">
-              {data.zones.map((z, i) => (
-                <li key={z.achievement} className="fp-step">
-                  <span className="fp-num">{i + 1}</span>
-                  <div className="fp-body">
-                    <div className="fp-head">
-                      <span className="fp-zone">{z.zone}</span>
-                      <span className="small">{z.achievement}</span>
-                      <span className="spacer" />
-                      <span className="mono small">
-                        {z.left.length} of {z.total} left
-                      </span>
-                      <Tip
-                        className="mono fp-time"
-                        text={z.wait === null ? 'A named here is not in TAKP’s tables: no time for the zone' : 'The longest wait of the named left: they pop side by side'}
-                      >
-                        {z.wait === null ? '—' : `≈ ${duration(z.wait)}`}
-                      </Tip>
-                    </div>
-                    <div className="small">
-                      {z.left.map((n) => (
-                        <div key={n.name}>
-                          <b>{n.name}</b>
-                          <NamedSpawn n={n} />
+          {!data.zones.length && (
+            <div className="card empty mb-16">{data.broken.length ? 'Every Hunter achievement that works is done.' : 'Every Hunter achievement is done.'}</div>
+          )}
+          {data.zones.length > 0 && (
+            <>
+              <div className="card row mb-16">
+                <span>
+                  <b>{data.zones.length}</b> Hunter achievement{data.zones.length === 1 ? '' : 's'} to go, <b>{num(left)}</b> named
+                </span>
+                <span className="spacer" />
+                <Tip text="Puts a gold dot at every spot the named left pop at, on the game’s own map: in a map set of its own, LegendsTracker (a copy of the game’s maps, so its own stay as they are). Pick it in the map window.">
+                  <button className="btn small" onClick={() => void mark(true)}>
+                    Mark on the game’s map
+                  </button>
+                </Tip>
+                <button className="btn small ghost" onClick={() => void mark(false)} title="Take the Hunter marks off the LegendsTracker map set">
+                  Clear marks
+                </button>
+              </div>
+              {marked && <div className="card mb-16 small">{marked}</div>}
+              <div className="card mb-16">
+                <ol className="fp-steps">
+                  {data.zones.map((z, i) => (
+                    <li key={z.achievement} className="fp-step">
+                      <span className="fp-num">{i + 1}</span>
+                      <div className="fp-body">
+                        <div className="fp-head">
+                          <span className="fp-zone">{z.zone}</span>
+                          <span className="small">{z.achievement}</span>
+                          <span className="spacer" />
+                          <span className="mono small">
+                            {z.left.length} of {z.total} left
+                          </span>
+                          <Tip
+                            className="mono fp-time"
+                            text={z.wait === null ? 'A named here is not in TAKP’s tables: no time for the zone' : 'The longest wait of the named left: they pop side by side'}
+                          >
+                            {z.wait === null ? '—' : `≈ ${duration(z.wait)}`}
+                          </Tip>
                         </div>
-                      ))}
-                    </div>
-                    {z.since.length > 0 && <div className="faint small">Killed since your export: {z.since.join(', ')}</div>}
-                    <div className="row tight fp-effects">
-                      <span className="spacer" />
-                      <button
-                        className="btn small ghost"
-                        onClick={() => toggleMap(z.achievement)}
-                        aria-expanded={maps.has(z.achievement)}
-                        title="Where the named left spawn, on the game’s own map of the zone"
-                      >
-                        Map
-                      </button>
-                    </div>
-                    {maps.has(z.achievement) && <SpawnMap zone={z.zone} mobs={z.left.map((n) => n.name)} />}
-                  </div>
-                </li>
+                        <div className="small">
+                          {z.left.map((n) => (
+                            <div key={n.name}>
+                              <b>{n.name}</b>
+                              <NamedSpawn n={n} />
+                            </div>
+                          ))}
+                        </div>
+                        {z.since.length > 0 && <div className="faint small">Killed since your export: {z.since.join(', ')}</div>}
+                        <div className="row tight fp-effects">
+                          <span className="spacer" />
+                          <button
+                            className="btn small ghost"
+                            onClick={() => void setBroken(z.achievement, true)}
+                            title="It does not work in Legends: leave it out of the plans and the overlay until you say it works again"
+                          >
+                            Doesn’t work
+                          </button>
+                          <button
+                            className="btn small ghost"
+                            onClick={() => toggleMap(z.achievement)}
+                            aria-expanded={maps.has(z.achievement)}
+                            title="Where the named left spawn, on the game’s own map of the zone"
+                          >
+                            Map
+                          </button>
+                        </div>
+                        {maps.has(z.achievement) && <SpawnMap zone={z.zone} mobs={z.left.map((n) => n.name)} />}
+                      </div>
+                    </li>
+                  ))}
+                </ol>
+              </div>
+            </>
+          )}
+          {data.broken.length > 0 && (
+            <div className="card mb-16">
+              <h2>
+                Not working <span className="faint small">{data.broken.length}</span>
+              </h2>
+              <div className="faint small mb-8">
+                Hunter achievements you said do not work in Legends: left out of the plans, the Slayer plan’s steps and the overlay, for every character.
+              </div>
+              {data.broken.map((b) => (
+                <div key={b} className="row tight small">
+                  <span>{b}</span>
+                  <button className="btn small ghost" onClick={() => void setBroken(b, false)}>
+                    Works again
+                  </button>
+                </div>
               ))}
-            </ol>
-          </div>
+            </div>
+          )}
         </>
       )}
     </>

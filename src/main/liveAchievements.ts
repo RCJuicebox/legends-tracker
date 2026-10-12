@@ -628,10 +628,11 @@ export class LiveAchievements implements AppFeature {
     if (!exp || exp.character !== this.character || !this.zone) return null
     const last = new Map<string, number>()
     for (const k of this.slayer?.kills.values() ?? []) last.set(bareName(k.name), Math.max(last.get(bareName(k.name)) ?? 0, k.times.at(-1) ?? 0))
+    // Less those the player has said do not work (Plan › Hunter).
     const rows = hunterHere(
       hunterZones(exp.sections, (bare) => last.get(bare) ?? 0, exp.modified),
       this.zone
-    )
+    ).filter((r) => !this.ctx.hunter?.isBroken(r.achievement))
     return rows.length ? { zone: this.zone, rows: rows.map((r) => ({ achievement: r.achievement, left: r.left.map((n) => n.name), total: r.total, since: r.since })) } : null
   }
 

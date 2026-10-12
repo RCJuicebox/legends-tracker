@@ -31,7 +31,10 @@ export interface HunterZone {
 export interface HunterPlanData {
   character: string
   export: { file: string; modified: number } | null
+  /** Not done, and not said not to work. */
   zones: HunterZone[]
+  /** The Hunter achievements the player has said do not work in Legends: left out until they say they do. */
+  broken: string[]
 }
 
 /** On average, how long its spots are cleared before the named pops: one up at once or more, a timer's worth. */

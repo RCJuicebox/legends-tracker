@@ -8,6 +8,7 @@ What changed in each version. The release workflow publishes a version's section
 - **Plan › Slayer's travel is your own.** The time between steps is the way your log has seen you go between the two zones, gates and ports included, with the zones crossed in the tooltip; your minutes between camps only where it knows no way.
 - **Plan › Slayer: a map for each step, and marks on the game's map.** **Map** draws the zone from the game's map files with a dot at every spot the step's mobs pop at. **Mark on the game's map** puts them on the in-game map, in a map set of its own (`maps\LegendsTracker`, a copy of the game's maps, so its own stay as they are): pick it in the map window.
 - **Plan › Hunter, a page of its own.** Each Hunter achievement not done, the named it still wants (the export, less those your log has seen you kill since), where they spawn, how often and on what timer, and about how long their spots take to give them, the quickest zones first. Each zone has its map, and the named can go on the game's map beside the Slayer plan's marks. Steps of the Slayer plan list the Hunter named in their zone too.
+- **Plan › Hunter: say a Hunter achievement doesn't work.** Some do not work in Legends yet (Hunter of Crushbone). **Doesn't work** leaves one out of the page, the Slayer plan's steps and the overlay, for every character, until you say it **works again**.
 - **The achievements overlay shows the Hunter named left in the zone you are in,** with a switch of its own under Overlays (on by default).
 
 ## 2.12.0 (2026-10-12)

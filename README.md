@@ -797,8 +797,10 @@ its spots are cleared on average before it pops (its timer over how often it is 
 pop side by side, so a zone takes as long as its longest wait, and the quickest zones come first;
 those with a named the tables lack come after. **Map** shows where the named left spawn, and **Mark
 on the game's map** puts them on the in-game map with the Slayer plan's marks (each page's are kept
-apart). Legends has changed some spawns, so the odds are a lead. The achievements overlay shows the
-Hunter named left in the zone you are in, under a switch of its own (Overlays).
+apart). Legends has changed some spawns, so the odds are a lead. Some Hunter achievements do not
+work in Legends (Hunter of Crushbone): **Doesn't work** leaves one out of the page, the Slayer plan's
+steps and the overlay, for every character, until **Works again** under Not working. The achievements
+overlay shows the Hunter named left in the zone you are in, under a switch of its own (Overlays).
 
 ## Stats
 
@@ -956,6 +958,7 @@ The settings folder, `%APPDATA%\Legends Tracker` (or the `EQL_USER_DATA` folder)
 | `pets.json` | Per character, the newest pet gear list (`/pet inventory check`) and summoning cast the log showed, and how far back it was read |
 | `tradeskills.json` | Starred recipes, the combines planned of each, and prices typed in |
 | `slayer-plan.json` | Per character, what you chose on the Slayer page: achievements left out or taken in, camps and mobs ruled out, minutes between camps and the pace assumed where nothing gives one |
+| `hunter-broken.json` | The Hunter achievements you said do not work in Legends, left out of the plans and the overlay |
 | `map-marks.json` | What the Slayer and Hunter pages last marked on the game's map (`maps\LegendsTracker`), each page's apart |
 | `faction-follow.json` | Per character, the faction plan the achievements overlay follows: its steps, the step you are on, and what is done |
 | `slayer-facts.json` | Which mobs your achievements exports showed do, or do not, count toward which Slayer achievements, with the kills and the rise that settled it |

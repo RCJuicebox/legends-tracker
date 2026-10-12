@@ -104,7 +104,7 @@ beforeAll(async () => {
     new Factions(stub() as never),
     new LiveAchievements({ store: { dir: h.dir } } as never),
     new SlayerPlanner(stub() as never, h.dir),
-    new HunterPlanner(stub() as never)
+    new HunterPlanner(stub() as never, h.dir)
   ])
     f.register(ctx as never)
 }, 30_000)

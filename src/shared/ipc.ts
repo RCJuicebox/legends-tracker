@@ -382,6 +382,8 @@ export interface Invokes {
   'slayer:mark': (marks: SlayerMark[], set?: 'slayer' | 'hunter') => { folder: string; zones: number; spots: number }
   /** What Plan › Hunter shows: each Hunter achievement not done, the named it still wants, and what their spawns allow. */
   'hunter:plan': (character: string) => HunterPlanData
+  /** Says a Hunter achievement does not work in Legends (left out of the plans and the overlay), or works again; the list after. */
+  'hunter:broken': (achievement: string, broken: boolean) => string[]
   /** Where the character being played is in its faction plan, and its Slayer counts since its achievements export. */
   'achievements:track': (watching?: boolean) => AchievementTrack | null
 
@@ -584,6 +586,7 @@ const INVOKE_CHANNELS: Record<InvokeChannel, true> = {
   'slayer:map': true,
   'slayer:mark': true,
   'hunter:plan': true,
+  'hunter:broken': true,
   'achievements:track': true,
   'character:exports': true,
   'character:sheet': true,
