@@ -1,5 +1,5 @@
 import { joinSkillValues, skillUp, type SkillValues } from '../core/skillAchievements'
-import type { HistoryConsumer, HistoryWhere, LogHistory } from './sources/logHistory'
+import { everyStretch, type HistoryConsumer, type HistoryWhere, type LogHistory } from './sources/logHistory'
 
 // Each skill's last value the log gave ("You have become better at Divination! (190)"), over a
 // character's log and its archives, read with everything else LogHistory counts.
@@ -22,6 +22,6 @@ export class SkillHistory {
   /** Every skill's last value, over the live log and every archive of it. */
   async view(where: HistoryWhere): Promise<SkillValues> {
     const slice = await this.history.get<SkillValues>(this.key, where)
-    return joinSkillValues([...slice.archives.map((a) => a.value), slice.live])
+    return joinSkillValues(everyStretch(slice))
   }
 }

@@ -3,7 +3,6 @@ import { summarize } from '../../core/spells'
 import { focusFromSpell, isDurationFocus } from '../../core/focus'
 import { castRows } from '../../core/spellMotes'
 import { intArg, isCharacterKey, isRecordKey, sanitizeSpellRule, textArg } from '../../core/validate'
-import { logFileFor, logStem } from '../storeCore'
 import type { AppContext } from '../context'
 
 // Spells: the ones cast lately, their per-spell settings, the log check, focus effects and the casts
@@ -41,12 +40,8 @@ export function registerSpellIpc(ctx: AppContext): void {
     if (!book) return null
     const key = character || ctx.characterKey()
     if (!isCharacterKey(key)) return { rows: [], unknown: [], window: null, mine: [] }
-    const recent = await ctx.castHistory.recent({
-      logPath: logFileFor(ctx.installDir(), key),
-      archiveDir: engine.archives.archiveDir(),
-      stem: logStem(key),
-      days: intArg(days, 0, 3650, 14)
-    })
+    // Its logs on every PC it is played on.
+    const recent = await ctx.castHistory.recent({ ...ctx.historyOf(key), days: intArg(days, 0, 3650, 14) })
     return { ...castRows(book, recent.counts, engine.character()), window: { total: recent.total, from: recent.from, to: recent.to }, mine: engine.myClasses() }
   })
 }

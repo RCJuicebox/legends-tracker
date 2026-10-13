@@ -1,6 +1,6 @@
 import { promises as fs } from 'node:fs'
 import { latestAas, type AaSummary } from './aa'
-import { decodeCp1252 } from './logLine'
+import { decodeCp1252, parseLogLine } from './logLine'
 
 // The AAs a log's latest /alternateadv list names, read back from the end of the log.
 
@@ -42,4 +42,12 @@ export async function readAasFromLog(
   } finally {
     await handle.close()
   }
+}
+
+/** The newest of several logs' lists (a character's logs on two PCs); null when none has one. */
+export function newestAas(lists: (AaSummary | null)[]): AaSummary | null {
+  const at = (s: AaSummary) => parseLogLine(`[${s.when}] Ability #`)?.time ?? 0
+  let best: AaSummary | null = null
+  for (const s of lists) if (s && (!best || at(s) > at(best))) best = s
+  return best
 }

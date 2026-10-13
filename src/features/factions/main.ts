@@ -35,7 +35,6 @@ import { lookUp, moversOf, sourcesOf } from './lookup'
 import { sanitizeFollowedPlan } from './tracker'
 import { FactionAlla } from './allaSource'
 import { FactionNpcs } from './npcSource'
-import { listLogs } from '../../main/game'
 import type { Purchases } from '../../shared/ipc'
 import type { AchSection } from '../../core/achievements'
 import { PLAYABLE_RACES, playableRace } from '../../shared/game/races'
@@ -50,7 +49,7 @@ import { expired } from '../../main/sources/freshness'
 import { wiki } from '../../main/sources/wiki'
 import { cacheDir } from '../../main/paths'
 import { log } from '../../main/log'
-import { identityOf, offsetBefore, readForward, type HistoryConsumer, type HistoryWhere, type LogHistory } from '../../main/sources/logHistory'
+import { everyStretch, identityOf, offsetBefore, readForward, type HistoryConsumer, type HistoryWhere, type LogHistory } from '../../main/sources/logHistory'
 import { sameFile } from '../../core/fileIdentity'
 import type { AppContext } from '../../main/context'
 import type { AppFeature } from '../../main/appFeature'
@@ -145,17 +144,40 @@ export class FactionHistory {
   /** Every faction the log saw change, over the live log and every archive of it, with the export's standings. */
   async view(where: HistoryWhere, exported: FactionExport | null = null, achievements: FactionAchievements | null = null): Promise<FactionView> {
     const slice = await this.history.get<FactionTallies>(this.key, where)
-    const since = await this.sinceExports(where.logPath, exported, achievements?.exported ?? null).catch((e) => {
+    const since = await this.sinceAll(where, exported, achievements?.exported ?? null).catch((e) => {
       log.warn('Could not read the log since the exports:', e)
       return null
     })
-    // Archives oldest first, then the live log.
-    return factionView(joinFactions([...slice.archives.map((a) => a.value), slice.live]), exported, achievements, since)
+    // Archives oldest first, then the live log; another PC's among them by when each was written.
+    return factionView(joinFactions(everyStretch(slice)), exported, achievements, since)
   }
 
-  /** What the live log saw after the exports; one read at a time per log, since two at once would count its lines twice. */
-  private sinceExports(logPath: string, factions: ExportMark | null, achievements: ExportMark | null): Promise<SinceView | null> {
-    if (!factions && !achievements) return Promise.resolve(null)
+  /**
+   * What the character's logs saw after the exports: this PC's live log, and the character's log on
+   * each other PC. Another PC's log has no line for an export written here, so its changes count by
+   * time; one whose PC is out of reach counts as it was last read.
+   */
+  private async sinceAll(where: HistoryWhere, factions: ExportMark | null, achievements: ExportMark | null): Promise<SinceView | null> {
+    if (!factions && !achievements) return null
+    const own = await this.sinceExports(where.logPath, factions, achievements)
+    const others: SinceRead[] = []
+    for (const o of where.elsewhere ?? []) {
+      const there = (await this.history.reachable(o.folder)) ? await this.sinceExports(o.logPath, factions, achievements) : this.lastSince(o.logPath, factions, achievements)
+      if (there) others.push(there)
+    }
+    if (!own && !others.length) return null
+    const reads = own ? [own, ...others] : others
+    // This PC's log not reaching back to the export: the tallies' recent changes stand in, as before.
+    let changes: Map<string, number> | null = null
+    if (!own || own.whole) {
+      changes = new Map()
+      for (const r of reads) for (const [k, n] of r.tally.factionChanges) changes.set(k, (changes.get(k) ?? 0) + n)
+    }
+    return { changes, completed: new Set(reads.flatMap((r) => [...r.tally.completed])) }
+  }
+
+  /** What a log saw after the exports; one read at a time per log, since two at once would count its lines twice. */
+  private sinceExports(logPath: string, factions: ExportMark | null, achievements: ExportMark | null): Promise<SinceRead | null> {
     const run = (this.reading.get(logPath) ?? Promise.resolve()).then(() => this.readSince(logPath, factions, achievements))
     this.reading.set(
       logPath,
@@ -164,12 +186,19 @@ export class FactionHistory {
     return run
   }
 
-  private async readSince(logPath: string, factions: ExportMark | null, achievements: ExportMark | null): Promise<SinceView | null> {
+  /** A log's read after these exports as it was last made, without reading: its PC is out of reach. */
+  private lastSince(logPath: string, factions: ExportMark | null, achievements: ExportMark | null): SinceRead | null {
+    const key = sinceKey(factions, achievements)
+    const s = this.since.get(logPath) ?? this.recall(logPath, key, factions, achievements)
+    return s?.key === key ? s : null
+  }
+
+  private async readSince(logPath: string, factions: ExportMark | null, achievements: ExportMark | null): Promise<SinceRead | null> {
     const st = await fs.stat(logPath, { bigint: true }).catch(() => null)
     const size = Number(st?.size ?? 0)
     if (!st || !size) return null
     const id = identityOf(st)
-    const key = [factions, achievements].map((m) => (m ? `${m.file}@${m.modified}` : '')).join('|')
+    const key = sinceKey(factions, achievements)
     let s = this.since.get(logPath) ?? this.recall(logPath, key, factions, achievements) ?? undefined
     // New exports, or a log started afresh (another file at the path, or this one cut short even if it
     // has since grown past where the last read ended): read again from the line before the earlier export.
@@ -186,9 +215,12 @@ export class FactionHistory {
       s.readTo += read
       if (read > 0) this.keep(logPath, s)
     }
-    return { changes: s.whole ? s.tally.factionChanges : null, completed: s.tally.completed }
+    return s
   }
 }
+
+/** Which exports a read after them was made for. */
+const sinceKey = (factions: ExportMark | null, achievements: ExportMark | null): string => [factions, achievements].map((m) => (m ? `${m.file}@${m.modified}` : '')).join('|')
 
 /** When a log's first line was written; Infinity for a log without one near its start. */
 async function firstStamp(logPath: string, size: number): Promise<number> {
@@ -215,7 +247,7 @@ export class FactionSourceHistory {
   /** Every kill and hand-in that moved a faction, over the live log and every archive of it. */
   async view(where: HistoryWhere): Promise<FactionSourceTallies> {
     const slice = await this.history.get<FactionSourceTallies>(this.key, where)
-    return joinSources([...slice.archives.map((a) => a.value), slice.live])
+    return joinSources(everyStretch(slice))
   }
 }
 
@@ -714,10 +746,9 @@ async function sharedTallies(ctx: AppContext, character: string) {
   )
 }
 
-/** The player's other characters with a log in the game folder: what their logs saw of factions, and what they bought. */
+/** The player's other characters with a log, on this PC or another: what their logs saw of factions, and what they bought. */
 async function otherCharacters(ctx: AppContext, character: string): Promise<{ character: string; tallies: FactionSourceTallies; purchases: Purchases }[]> {
-  const logs = await listLogs(ctx.installDir())
-  const keys = [...new Set(logs.map((l) => l.character))].filter((c) => c.toLowerCase() !== character.toLowerCase())
+  const keys = (await ctx.logCharacters()).filter((c) => c.toLowerCase() !== character.toLowerCase())
   const out = []
   // One at a time: LogHistory reads one log at a time anyway, and a failed one is left out rather than failing the plan.
   for (const c of keys) {

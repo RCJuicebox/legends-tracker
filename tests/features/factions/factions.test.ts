@@ -143,6 +143,28 @@ describe('joinFactions', () => {
     expect(joined['guards of qeynos']).toMatchObject({ cap: 'bottom', net: -3 })
   })
 
+  it("joins two PCs' logs of one character as the lines happened, whichever comes first in the list", () => {
+    const lines: [number, string][] = [
+      [0, better('Guards of Qeynos')],
+      [5, adjusted('Guards of Qeynos', -1)],
+      [10, adjusted('Clan Runnyeye', -2)],
+      [20, worse('Clan Runnyeye')],
+      [30, adjusted('Guards of Qeynos', 2)]
+    ]
+    const at = (part: [number, string][]) => {
+      const into: FactionTallies = {}
+      for (const [sec, text] of part) addFactionLine(into, { time: T0 + sec * 1000, text })
+      return into
+    }
+    const here = at(lines.filter((_, i) => i % 2 === 0))
+    const there = at(lines.filter((_, i) => i % 2 === 1))
+    const whole = factionView(at(lines))
+    expect(whole.factions.find((r) => r.name === 'Guards of Qeynos')).toMatchObject({ cap: null, net: 1 })
+    expect(whole.factions.find((r) => r.name === 'Clan Runnyeye')).toMatchObject({ cap: 'bottom', net: -2 })
+    expect(factionView(joinFactions([here, there]))).toEqual(whole)
+    expect(factionView(joinFactions([there, here]))).toEqual(whole)
+  })
+
   it('keeps the last changes over the stretches', () => {
     const a = tally(Array.from({ length: 15 }, () => adjusted('Gem Choppers', 1)))
     const b = tally(
@@ -472,6 +494,36 @@ describe('FactionHistory over a real log', () => {
       line(stamp(0), 'Outputfile Complete: Tester_neriak-MNK-Factions.txt') + Array.from({ length: 60 }, (_, i) => line(stamp(11 + i), adjusted('Crimson Hands', -1))).join('')
     )
     expect((await row())?.standing).toMatchObject({ value: 1355, since: -60 })
+  })
+
+  it("adds what the character's log on another PC saw after the export, and counts it as last read while that PC is off", async () => {
+    const logPath = join(dir, 'eqlog_Tester_neriak.txt')
+    const there = join(dir, 'there', 'Logs')
+    const otherLog = join(there, 'eqlog_Tester_neriak.txt')
+    await fs.mkdir(there, { recursive: true })
+    await fs.writeFile(
+      logPath,
+      line('Sun Sep 27 12:00:10 2026', 'Outputfile Complete: Tester_neriak-MNK-Factions.txt') +
+        Array.from({ length: 3 }, (_, i) => line(`Sun Sep 27 12:00:${11 + i} 2026`, adjusted('Crimson Hands', 13))).join('')
+    )
+    // That PC has no line for the export written here: what it saw goes by time.
+    await fs.writeFile(otherLog, line('Sun Sep 27 11:59:00 2026', adjusted('Crimson Hands', 50)) + line('Sun Sep 27 14:00:00 2026', adjusted('Crimson Hands', 20)))
+    const written = new Date(2026, 8, 27, 12, 0, 10).getTime() + 400
+    const exported = { file: 'Tester_neriak-MNK-Factions.txt', modified: written, standings: parseFactionsExport('233\tCrimson Hands\t1415\t585') }
+    let answers = true
+    const history = new LogHistory(join(dir, 'log-history.json'), { factions: factionConsumer }, async () => answers)
+    const kept = join(dir, 'faction-since.json')
+    const fh = new FactionHistory(history, 'factions', kept)
+    const where = { logPath, archiveDir: join(dir, 'archive'), stem: 'eqlog_Tester_neriak', elsewhere: [{ folder: there, logPath: otherLog, archiveDir: join(there, 'archive') }] }
+    const row = async (f = fh) => (await f.view(where, exported)).factions.find((x) => x.name === 'Crimson Hands')
+    expect((await row())?.standing).toMatchObject({ value: 1474, since: 59, sinceAll: true })
+    await fh.flush()
+
+    answers = false
+    await fs.rm(join(dir, 'there'), { recursive: true })
+    expect((await row())?.standing).toMatchObject({ value: 1474, since: 59 })
+    // At the next start too, from what was kept.
+    expect((await row(new FactionHistory(history, 'factions', kept)))?.standing).toMatchObject({ value: 1474, since: 59 })
   })
 
   it('reads a log cut short in place from its start again', async () => {

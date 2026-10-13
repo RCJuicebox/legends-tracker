@@ -89,15 +89,28 @@ export function addAaLine(into: AaTally, line: LogLine): void {
   }
 }
 
-/** Two stretches' tallies as one, `b` being the later. */
+/**
+ * Two stretches' tallies as one, `b` most often the later. Two PCs' logs of one character can overlap
+ * in time; the character is never on both at once, so their events merged by time fall in the order
+ * they happened.
+ */
 function join(a: AaTally, b: AaTally): AaTally {
-  const n = a.events.length
+  const events: AaEvent[] = []
+  for (let i = 0, j = 0; i < a.events.length || j < b.events.length;) {
+    if (j >= b.events.length || (i < a.events.length && a.events[i].at <= b.events[j].at)) events.push(a.events[i++])
+    else events.push(b.events[j++])
+  }
+  // A mark's `after` counts the events before it: its own stretch's, and the other's that came earlier
+  // (in the same second, `a`'s first).
+  const fromA = <M extends { at: number; after: number }>(m: M): M => ({ ...m, after: m.after + b.events.filter((e) => e.at < m.at).length })
+  const fromB = <M extends { at: number; after: number }>(m: M): M => ({ ...m, after: m.after + a.events.filter((e) => e.at <= m.at).length })
+  const later = <M extends { at: number; after: number }>(x: M | null, y: M | null): M | null => (y && (!x || y.at >= x.at) ? fromB(y) : x && fromA(x))
   return {
-    events: [...a.events, ...b.events],
-    points: b.points ? { ...b.points, after: b.points.after + n } : a.points,
-    cap: b.cap ? { ...b.cap, after: b.cap.after + n } : a.cap,
-    list: b.list ?? a.list,
-    from: a.from || b.from
+    events,
+    points: later(a.points, b.points),
+    cap: later(a.cap, b.cap),
+    list: b.list && (!a.list || b.list.at >= a.list.at) ? b.list : a.list,
+    from: a.from && b.from ? Math.min(a.from, b.from) : a.from || b.from
   }
 }
 

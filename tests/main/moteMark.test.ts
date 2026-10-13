@@ -93,7 +93,7 @@ const env = (): EngineEnv => ({
 })
 
 /** Mote catch-up with the live tailer played by hand: `tail` is where it is and whether it has settled. */
-function catchUpRig() {
+function catchUpRig(extra: Partial<EngineEnv> = {}) {
   const store = makeStore(logFile, { active: null, sessions: [], daily: {}, seenUntil: SEEN })
   const feed: FeedItem[] = []
   const notifier = new Notifier(
@@ -109,7 +109,7 @@ function catchUpRig() {
     () => {}
   )
   const tail = { logFile: '', position: -1, settling: true, asked: false }
-  const catchUp = new MoteCatchUp(store, env(), { moteScan: () => {}, motes: () => {} }, notifier, {
+  const catchUp = new MoteCatchUp(store, { ...env(), ...extra }, { moteScan: () => {}, motes: () => {} }, notifier, {
     motes: () => tracker,
     stock,
     tail: {
@@ -283,5 +283,26 @@ describe('The engine when the watched log is truncated', () => {
     } finally {
       engine.shutdown()
     }
+  })
+})
+
+describe('Rebuilding mote history with another PC', () => {
+  it("reads the other PC's log with this one's, and goes on from where it read to without counting twice", async () => {
+    await fs.writeFile(logFile, ZONE + LOOT('Thu Sep 24 16:10:00 2026', 4))
+    const there = join(dir, 'there', 'Logs')
+    await fs.mkdir(there, { recursive: true })
+    const otherLog = join(there, 'eqlog_Kelwyn_neriak.txt')
+    await fs.writeFile(otherLog, LOOT('Thu Sep 24 18:00:00 2026', 2) + LOOT('Fri Sep 25 09:00:00 2026', 1, 'Superior'))
+    const logFolders = { lookAll: async () => [{ dir: there, reachable: true, logs: [{ path: otherLog, modified: Date.now() }] }] }
+    const r = catchUpRig({ logFolders })
+    r.tail.settling = false
+    await r.catchUp.rebuild(join(dir, 'game'), logFile, () => ({}) as never)
+    const rebuilt = { '2026-09-24': { major: 6 }, '2026-09-25': { superior: 1 } }
+    expect(r.tracker.state.daily).toEqual(rebuilt)
+    await r.catchUp.others.check()
+    expect(r.tracker.state.daily).toEqual(rebuilt)
+    await fs.appendFile(otherLog, LOOT('Fri Sep 25 10:00:00 2026', 1, 'Superior'))
+    await r.catchUp.others.check()
+    expect(r.tracker.state.daily['2026-09-25']).toEqual({ superior: 2 })
   })
 })

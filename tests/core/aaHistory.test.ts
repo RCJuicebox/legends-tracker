@@ -213,6 +213,26 @@ describe('AA history over a log and its archives', () => {
     expect(v.listAt).toBe(at(1000))
   })
 
+  it("joins two PCs' logs of one character as the lines happened, whichever comes first in the list", () => {
+    const lines: [number, string][] = [
+      [0, 'You have gained the ability "Combat Stability" at a cost of 2 ability points.'],
+      [10, 'You have gained an ability point!  You now have 8 ability points.'],
+      [100, 'You have improved Combat Stability 2 at a cost of 4 ability points.'],
+      [200, 'You have gained an ability point!  You now have 5 ability points.'],
+      [300, 'Ability #1: Innate Eminence'],
+      [500, 'You have improved Combat Stability 3 at a cost of 6 ability points.'],
+      [600, 'You have gained the ability "Burst of Power" at a cost of 3 ability points.']
+    ]
+    // This PC played at 0, 10 and 500; the other in between.
+    const here = tally(lines.filter(([sec]) => [0, 10, 500].includes(sec)))
+    const there = tally(lines.filter(([sec]) => ![0, 10, 500].includes(sec)))
+    const whole = aaHistoryView(tally(lines))
+    expect(whole.bought.find((a) => a.name === 'Combat Stability')).toMatchObject({ rank: 3, spent: 12 })
+    expect(whole.points).toMatchObject({ total: 5, spentSince: 9 })
+    expect(aaHistoryView(joinAaTallies([here, there]))).toEqual(whole)
+    expect(aaHistoryView(joinAaTallies([there, here]))).toEqual(whole)
+  })
+
   it('is empty with nothing read', () => {
     const v = aaHistoryView(joinAaTallies([emptyAaTally(), emptyAaTally()]))
     expect(v).toEqual({ bought: [], granted: [], spent: 0, points: null, capAt: 0, listAt: 0, from: 0 })

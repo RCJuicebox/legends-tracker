@@ -4,7 +4,7 @@ import { act, showError, showToast } from '../toast'
 import { useUpdate, type UpdateState } from '../update'
 import { Ago, Field, Segmented, Switch, Tabs } from '../components/ui'
 import type { ReactNode } from 'react'
-import { GameFolderCard } from '../components/GameFolder'
+import { GameFolderCard, OtherLogFolders } from '../components/GameFolder'
 import { TAB_KEY, type SettingsTab } from '../nav'
 import { useRemembered } from '../remember'
 import { HOTKEYS, hotkeyLabel } from '../../../shared/hotkeys'
@@ -155,6 +155,7 @@ function General({ openLogs }: { openLogs: () => void }) {
         <div className="card stack gap-14">
           <h2>Game</h2>
           <GameFolderCard />
+          <OtherLogFolders />
           <p className="hint">
             Which character&apos;s log is followed is chosen on{' '}
             <button className="link-button inline" onClick={openLogs}>

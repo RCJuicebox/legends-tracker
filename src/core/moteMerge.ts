@@ -85,3 +85,31 @@ export function mergeRebuilt(current: MoteState, rebuilt: RebuiltMotes): MoteSta
 export function samePath(a: string, b: string): boolean {
   return !!a && a.toLowerCase() === b.toLowerCase()
 }
+
+/** Another PC's log as mote tracking has read it (mote-others.json). */
+export interface OtherMoteMark {
+  /** The file's identity, and how far into it was read. */
+  id: string
+  offset: number
+  /** That log's own tracking: the run it is in, runs not handed over yet, and every mote it held per day. */
+  state: MoteState
+  /** Its last line's time. */
+  lastTime: number
+}
+
+/**
+ * Hands what another PC's log added over to the history kept here: its motes per day, and runs that
+ * are over. A run already handed over (the same id) is not taken twice.
+ */
+export function absorbOther(current: MoteState, added: Record<string, MoteCounts>, runs: MoteSession[]): MoteState {
+  const daily = { ...current.daily }
+  for (const [day, counts] of Object.entries(added)) {
+    const into = { ...daily[day] }
+    for (const r of MOTE_RANKS) if (counts[r.key]) into[r.key] = (into[r.key] ?? 0) + counts[r.key]!
+    daily[day] = into
+  }
+  const known = new Set(current.sessions.map((s) => s.id))
+  const fresh = runs.filter((s) => !known.has(s.id))
+  const sessions = fresh.length ? [...fresh, ...current.sessions].sort((a, b) => b.startedAt - a.startedAt || a.id.localeCompare(b.id)) : current.sessions
+  return applyMarks({ ...current, daily, sessions })
+}

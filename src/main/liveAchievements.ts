@@ -51,6 +51,8 @@ interface SlayerState {
   logPath: string
   /** How far into the log the kills have been counted; -1 before the first read. */
   readTo: number
+  /** The same for the character's log on each other PC, by lower-cased path. */
+  others: Map<string, number>
   kills: SlayerKills
   /** The player's pets, as they said so ("Attacking a gnoll, Master."). */
   pets: Set<string>
@@ -72,6 +74,8 @@ interface KeptSlayer {
   completed: ([string, number] | string)[]
   /** The export's counts, by lower-cased name; missing from an older file. */
   counts?: [string, number][]
+  /** How far into the character's log on each other PC, by lower-cased path; missing from an older file. */
+  others?: [string, number][]
 }
 
 function keptSlayer(v: unknown): KeptSlayer | null {
@@ -83,8 +87,8 @@ function keptSlayer(v: unknown): KeptSlayer | null {
       Array.isArray(e) && typeof e[0] === 'string' && typeof e[1]?.name === 'string' && Array.isArray(e[1].times) && e[1].times.every((t) => typeof t === 'number')
   )
   const completed = k.completed.filter((c) => typeof c === 'string' || (Array.isArray(c) && typeof c[0] === 'string' && typeof c[1] === 'number'))
-  const counts = Array.isArray(k.counts) ? k.counts.filter((c): c is [string, number] => Array.isArray(c) && typeof c[0] === 'string' && typeof c[1] === 'number') : undefined
-  return { ...(k as KeptSlayer), kills, pets: k.pets.filter((p) => typeof p === 'string'), completed, counts }
+  const pairs = (v: unknown) => (Array.isArray(v) ? v.filter((c): c is [string, number] => Array.isArray(c) && typeof c[0] === 'string' && typeof c[1] === 'number') : undefined)
+  return { ...(k as KeptSlayer), kills, pets: k.pets.filter((p) => typeof p === 'string'), completed, counts: pairs(k.counts), others: pairs(k.others) }
 }
 
 /** What the exports settled about which mobs count toward which Slayer achievements, for every character: a race is the game's, not the player's. */
@@ -412,6 +416,7 @@ export class LiveAchievements implements AppFeature {
         races,
         logPath,
         readTo: kept ? kept.readTo : -1,
+        others: new Map(kept?.others ?? []),
         kills,
         pets: kept?.pets ?? new Set(),
         engaged: kept?.engaged ?? new Map(),
@@ -439,6 +444,7 @@ export class LiveAchievements implements AppFeature {
       races: new SlayerRaces([], game),
       logPath,
       readTo: d.readTo,
+      others: new Map(d.others ?? []),
       kills: new Map(d.kills),
       pets: new Set(d.pets),
       engaged: new Map(),
@@ -446,16 +452,56 @@ export class LiveAchievements implements AppFeature {
     }
   }
 
-  /** Reads the log on from where the counts got to, and keeps how far. */
+  /**
+   * Reads the character's logs on from where the counts got to, and keeps how far: this PC's, then
+   * its log on each other PC that answers (a kill there counts the same).
+   */
   private async readLog(s: SlayerState): Promise<void> {
-    const size = (await fs.stat(s.logPath).catch(() => null))?.size ?? 0
+    const own = await this.readOne(s, s.logPath, s.readTo)
+    s.readTo = own.readTo
+    let read = own.read
+    for (const o of this.ctx.historyOf(s.character).elsewhere ?? []) {
+      if (!(await this.ctx.logHistory.reachable(o.folder))) continue
+      const k = o.logPath.toLowerCase()
+      try {
+        const there = await this.readOne(s, o.logPath, s.others.get(k) ?? -1)
+        s.others.set(k, there.readTo)
+        read += there.read
+      } catch (e) {
+        // Its PC went away part way: nothing from this read was counted, and the next one starts where this did.
+        log.warn(`Slayer: could not read ${o.logPath}:`, e)
+      }
+    }
+    if (read > 0)
+      this.keptSlayer.set({
+        character: s.character,
+        logPath: s.logPath,
+        exportAt: s.exportAt,
+        readTo: s.readTo,
+        kills: [...s.kills],
+        pets: [...s.pets],
+        completed: [...s.completed],
+        counts: [...s.counts],
+        others: [...s.others]
+      })
+  }
+
+  /**
+   * Reads one log on from `from` (-1 before its first read), counting what it finds only once the read
+   * is done: how much was read, and how far into the log the counts now go.
+   */
+  private async readOne(s: SlayerState, logPath: string, from: number): Promise<{ read: number; readTo: number }> {
+    const size = (await fs.stat(logPath).catch(() => null))?.size ?? 0
+    let readTo = from
     // The first read starts at the line before the export was written; a log started afresh, at its top.
-    if (s.readTo < 0) s.readTo = size ? await offsetBefore(s.logPath, s.exportAt, { slackMs: 2000 }) : 0
-    else if (size < s.readTo) s.readTo = 0
-    if (size <= s.readTo) return
+    if (readTo < 0) readTo = size ? await offsetBefore(logPath, s.exportAt, { slackMs: 2000 }) : 0
+    else if (size < readTo) readTo = 0
+    if (size <= readTo) return { read: 0, readTo }
+    const kills: { mob: string; at: number }[] = []
+    const completed: [string, number][] = []
     const read = await readForward(
-      s.logPath,
-      s.readTo,
+      logPath,
+      readTo,
       size,
       (line) => {
         const x = slayerLine(line.text)
@@ -468,33 +514,27 @@ export class LiveAchievements implements AppFeature {
           return
         }
         if (line.time <= s.exportAt || 'pet' in x) return
-        if ('completed' in x) s.completed.set(x.completed.toLowerCase(), line.time)
+        if ('completed' in x) completed.push([x.completed.toLowerCase(), line.time])
         else {
           let mob: string | null = null
           // A player your side killed (a duel, a charmed pet turned) is nobody's Slayer kill.
           if ('kill' in x) mob = this.credited(x.kill.by, s.pets) && !this.friendly(x.kill.mob) ? x.kill.mob : null
           else if (line.time - (s.engaged.get(x.died.toLowerCase()) ?? -Infinity) <= ENGAGED_MS) mob = x.died
-          if (!mob) return
-          const k = mob.toLowerCase()
-          const had = s.kills.get(k) ?? { name: mob, times: [] }
-          had.times.push(line.time)
-          s.kills.set(k, had)
+          if (mob) kills.push({ mob, at: line.time })
         }
       },
       { flushLast: false }
     )
-    s.readTo += read
-    if (read > 0)
-      this.keptSlayer.set({
-        character: s.character,
-        logPath: s.logPath,
-        exportAt: s.exportAt,
-        readTo: s.readTo,
-        kills: [...s.kills],
-        pets: [...s.pets],
-        completed: [...s.completed],
-        counts: [...s.counts]
-      })
+    for (const [k, t] of completed) s.completed.set(k, t)
+    for (const { mob, at } of kills) {
+      const k = mob.toLowerCase()
+      const had = s.kills.get(k) ?? { name: mob, times: [] }
+      had.times.push(at)
+      // Another PC's kills can come before this PC's: times stay in order, the newest last.
+      if (had.times.length > 1 && had.times[had.times.length - 2] > at) had.times.sort((a, b) => a - b)
+      s.kills.set(k, had)
+    }
+    return { read, readTo: readTo + read }
   }
 
   /** Whether the exports settled that a mob's kills count toward an achievement (both lower-cased): the Slayer plan asks it too. */

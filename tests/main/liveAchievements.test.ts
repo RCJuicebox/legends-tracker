@@ -289,3 +289,62 @@ describe('LiveAchievements reads', () => {
     expect(s.live.view?.character).toBe('Tester_neriak')
   })
 })
+
+describe('LiveAchievements counts Slayer kills since the export', () => {
+  it("in the character's log on another PC too: in time order, each log read on from where it got to, one out of reach left alone", async () => {
+    const { live } = setup()
+    const { promises: fs } = await import('node:fs')
+    const root = mkdtempSync(join(tmpdir(), 'eql-slayer-'))
+    const here = join(root, 'eqlog_Tester_neriak.txt')
+    const there = join(root, 'there', 'Logs')
+    const otherLog = join(there, 'eqlog_Tester_neriak.txt')
+    await fs.mkdir(there, { recursive: true })
+    const kill = (stamp: string) => `[${stamp}] You have slain a gnoll!\r\n`
+    // Before the export, then after it on this PC and on the other in turn.
+    await fs.writeFile(here, kill('Wed Sep 30 11:59:00 2026') + kill('Wed Sep 30 12:00:10 2026') + kill('Wed Sep 30 12:05:00 2026'))
+    await fs.writeFile(otherLog, kill('Wed Sep 30 11:58:00 2026') + kill('Wed Sep 30 12:01:40 2026'))
+    let answers = true
+    Object.assign((live as unknown as { ctx: object }).ctx, {
+      historyOf: () => ({
+        logPath: here,
+        archiveDir: join(root, 'archive'),
+        stem: 'eqlog_Tester_neriak',
+        elsewhere: [{ folder: there, logPath: otherLog, archiveDir: join(there, 'archive') }]
+      }),
+      logHistory: { reachable: async () => answers }
+    })
+    Object.assign((live as unknown as { ctx: { engine: object } }).ctx.engine, { meter: { kindOf: () => ({ kind: 'mob' }) } })
+    const s = {
+      character: 'Tester_neriak',
+      exportAt: T0,
+      logPath: here,
+      readTo: -1,
+      others: new Map<string, number>(),
+      kills: new Map<string, { name: string; times: number[] }>(),
+      pets: new Set<string>(),
+      engaged: new Map<string, number>(),
+      completed: new Map<string, number>(),
+      counts: new Map<string, number>()
+    }
+    const readLog = (live as unknown as { readLog: (state: typeof s) => Promise<void> }).readLog.bind(live)
+    const at = (hms: string) => new Date(`2026-09-30T${hms}`).getTime()
+    await readLog(s)
+    expect(s.kills.get('a gnoll')?.times).toEqual([at('12:00:10'), at('12:01:40'), at('12:05:00')])
+    expect(s.readTo).toBe((await fs.stat(here)).size)
+    expect(s.others.get(otherLog.toLowerCase())).toBe((await fs.stat(otherLog)).size)
+
+    await fs.appendFile(otherLog, kill('Wed Sep 30 12:06:40 2026'))
+    await readLog(s)
+    expect(s.kills.get('a gnoll')?.times).toHaveLength(4)
+
+    // That PC off: its log is not touched, and what it counted stands.
+    answers = false
+    await fs.appendFile(otherLog, kill('Wed Sep 30 12:08:00 2026'))
+    await readLog(s)
+    expect(s.kills.get('a gnoll')?.times).toHaveLength(4)
+    answers = true
+    await readLog(s)
+    expect(s.kills.get('a gnoll')?.times).toHaveLength(5)
+    await fs.rm(root, { recursive: true, force: true })
+  })
+})

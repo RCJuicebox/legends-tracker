@@ -3,6 +3,7 @@ import { promises as fs, mkdirSync, mkdtempSync, utimesSync, writeFileSync } fro
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import type { AppContext } from '../../../src/main/context'
+import { listLogs } from '../../../src/main/game'
 
 // The factions feature's main side against a game folder on disk: the book of eqlwiki's faction pages
 // (kept a week, served old while the wiki cannot be reached, read once however many ask), and each
@@ -276,6 +277,7 @@ beforeAll(() => {
       () => {}
     ),
     historyOf: (c: string) => ({ logPath: join(game, 'Logs', `eqlog_${c}.txt`), archiveDir: join(game, 'Logs', 'Archive'), stem: `eqlog_${c}` }),
+    logCharacters: async () => (await listLogs(setting.installDir)).map((l) => l.character),
     // Allakhazam is not read here: it has its own tests.
     factions: Object.assign(new m.Factions(history), { alla: { factions: async () => [], status: () => ({ read: 0, wanted: 0, error: '' }) } }),
     purchases: { latest: async () => ({}) },

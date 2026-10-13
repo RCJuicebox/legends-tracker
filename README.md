@@ -943,7 +943,7 @@ The settings folder, `%APPDATA%\Legends Tracker` (or the `EQL_USER_DATA` folder)
 
 | File | What it holds |
 |---|---|
-| `settings.json` | Everything set on the pages: game folder, character log, tracking, audio, overlays, damage meter and archive settings, the faction plan's Assumptions, the Live page's setup checklist, and per character the classes, levels, race and duration focus sources and the faction plan's locks, rule-outs and paces |
+| `settings.json` | Everything set on the pages: game folder, character log, other PCs' Logs folders, tracking, audio, overlays, damage meter and archive settings, the faction plan's Assumptions, the Live page's setup checklist, and per character the classes, levels, race and duration focus sources and the faction plan's locks, rule-outs and paces |
 | `settings.bak.json`, `triggers.bak.json` | The two files you make by hand, as each run found them, copied before the run first saves over them |
 | `skin-commands.json` | The UI skin rebuild commands you have agreed to run (Tradeskills) |
 | `triggers.json` | Your triggers, respawn timers included; the first run copies them from `defaults/triggers.json` |
@@ -965,6 +965,7 @@ The settings folder, `%APPDATA%\Legends Tracker` (or the `EQL_USER_DATA` folder)
 | `azure-speech.json` | The Azure region, the key encrypted with Windows' data protection, and the voice list |
 | `app-icon.ico` | Running from source only: the icon for the "Legends Tracker (source)" Start menu shortcut |
 | `catchup.json` | How far into which log mote tracking had read when the app closed, so the next start carries on from there |
+| `mote-others.json` | For each character log on another PC (Settings › Game): how far mote tracking has read it, the run it is in, and the motes it held per day |
 | `sounds\` | Sound files of your own for triggers, beside the game's `AudioTriggers` folders |
 | `characters\` | One file per character: the Stats page's inputs, AC typed in per item and the shield choice from the Gear page |
 | `achievements\` | One file per character: your ticks on the Achievements page |
@@ -989,7 +990,7 @@ roaming profile:
 | `faction-book.json` | Every eqlwiki faction page and the quest pages they name, read into ways to raise each faction, for the Plan tab; kept a week |
 | `faction-alla.json` | Allakhazam's faction pages (the cons quests want, kill amounts), read one every 20 seconds; kept a month |
 | `faction-npcs.json` | eqlwiki's page for each named mob the faction plan's kill camps would hold: whether Legends has it, its health, respawn and kill amounts; kept a month, a name with no page asked again after a week |
-| `faction-since.json`, `slayer-since.json` | What the live log has shown since the factions and achievements exports (standings moved, achievements completed, Slayer kills), and how far it was read, so a start reads on from there rather than from the export's line |
+| `faction-since.json`, `slayer-since.json` | What the live log, and the character's log on another PC, has shown since the factions and achievements exports (standings moved, achievements completed, Slayer kills), and how far each was read, so a start reads on from there rather than from the export's line |
 | `log-history.json` | Casts, melee, purchases and AAs bought counted over each character's log and archives, for Gear, Spell upgrades, Tradeskills and Stats › AAs; only what a log gains is read again |
 | `speech-cache\` | Azure phrases as WAV files, the newest 4,000 |
 

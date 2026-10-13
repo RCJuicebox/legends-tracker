@@ -17,6 +17,7 @@ export function settingsSummary(s: AppSettings, triggers: number, home: string):
     [
       `game folder ${s.installDir || 'not set'}`,
       `log ${s.logFile ? basename(s.logFile) : 'none'}`,
+      ...(s.logFolders.length ? [`other log folders ${s.logFolders.length}`] : []),
       `watch at start ${s.autoStart ? 'on' : 'off'}`,
       `overlays ${overlays || 'none'}${s.overlaysOnlyWithGame ? ', only with the game' : ''}`,
       `voice ${voice}${s.audio.muted ? ', muted' : ''}`,

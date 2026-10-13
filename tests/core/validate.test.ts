@@ -232,6 +232,14 @@ describe('paths in the settings', () => {
     }
   })
 
+  it("keep other PCs' Logs folders as full paths, each once, at most four", () => {
+    const folders = (logFolders: unknown) => sanitizeSettings({ ...fb, logFolders }, { ...fb, logFolders: ['\\\\laptop\\Logs'] })?.logFolders
+    expect(folders(['\\\\laptop\\Logs\\', '\\\\LAPTOP\\logs', 'D:\\EQ\\Logs', 'Logs', 'D:', 42, 'E:\\'])).toEqual(['\\\\laptop\\Logs', 'D:\\EQ\\Logs', 'E:\\'])
+    expect(folders(['A:\\1', 'B:\\2', 'C:\\3', 'D:\\4', 'E:\\5'])).toHaveLength(4)
+    expect(folders('\\\\laptop\\Logs')).toEqual(['\\\\laptop\\Logs'])
+    expect(folders([])).toEqual([])
+  })
+
   it('know a full path from one that depends on the current folder', () => {
     expect(['C:\\x', 'c:/x', '\\\\server\\share'].map(isFullPath)).toEqual([true, true, true])
     expect(['', 'C:', 'C:x', 'x\\y', '\\\\', 7].map(isFullPath)).toEqual([false, false, false, false, false, false])

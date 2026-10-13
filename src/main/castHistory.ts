@@ -1,7 +1,7 @@
 import { localDay } from '../core/dates'
 import type { LogLine } from '../core/logLine'
 import { CAST_BY_YOU } from '../core/phrases'
-import type { HistoryConsumer, LogHistory } from './sources/logHistory'
+import { everyStretch, type HistoryConsumer, type HistoryWhere, type LogHistory } from './sources/logHistory'
 
 // What a character casts, and how often, counted from their logs: "You begin casting Envenomed Bolt X."
 // Counts are kept per day so a window (the last two weeks) can be taken. The counting is LogHistory's:
@@ -42,16 +42,20 @@ export class CastHistory {
   ) {}
 
   /** Counts over the last `days` days of play (0 for all of it), ending at the newest day counted. */
-  async recent(o: { logPath: string; archiveDir: string; stem: string; days: number }): Promise<CastCounts> {
-    // The live log first: archives are needed only when it does not reach back far enough.
+  async recent(o: HistoryWhere & { days: number }): Promise<CastCounts> {
+    // The live logs first (this PC's and any other's): archives are needed only when one of them does
+    // not reach back far enough.
     const first = await this.history.get<Days>(this.key, o, () => false)
-    const newest = Object.keys(first.live).sort().pop() ?? localDay(Date.now())
+    const lives = [first.live, ...first.elsewhere.map((e) => e.value)]
+    const newest =
+      lives
+        .flatMap((d) => Object.keys(d))
+        .sort()
+        .pop() ?? localDay(Date.now())
     const cutoff = o.days ? localDay(new Date(newest + 'T12:00:00').getTime() - (o.days - 1) * 86400_000) : ''
-    const oldestLive = Object.keys(first.live).sort()[0] ?? newest
-    const all: Days[] = [first.live]
-    if (!o.days || oldestLive > cutoff) {
-      const withArchives = await this.history.get<Days>(this.key, o, (_name, end) => !cutoff || !end || end >= cutoff)
-      all.push(...withArchives.archives.map((a) => a.value))
+    let all: Days[] = lives
+    if (!o.days || lives.some((d) => (Object.keys(d).sort()[0] ?? newest) > cutoff)) {
+      all = everyStretch(await this.history.get<Days>(this.key, o, (_name, end) => !cutoff || !end || end >= cutoff))
     }
 
     const counts: Record<string, number> = {}

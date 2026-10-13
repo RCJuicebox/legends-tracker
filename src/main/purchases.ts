@@ -1,6 +1,6 @@
 import { parsePurchase, type Purchase } from '../core/tradeskills'
 import { zoneEntered } from '../core/logLine'
-import type { HistoryConsumer, LogHistory } from './sources/logHistory'
+import { everyStretch, type HistoryConsumer, type HistoryWhere, type LogHistory } from './sources/logHistory'
 import type { Purchases } from '../shared/ipc'
 
 // What a character paid for things, and where, from "You purchased N X from M for coin." lines in the
@@ -44,12 +44,11 @@ export class PurchaseHistory {
   ) {}
 
   /** The last price paid for each item, over the live log and every archive of it. */
-  async latest(o: { logPath: string; archiveDir: string; stem: string }): Promise<Purchases> {
+  async latest(o: HistoryWhere): Promise<Purchases> {
     const slice = await this.history.get<PurchaseLog>(this.key, o)
     const all: Purchases = {}
-    // Archives oldest first, then the live log: the newest purchase wins.
-    for (const a of slice.archives) for (const p of Object.values(a.value.bought)) keep(all, p)
-    for (const p of Object.values(slice.live.bought)) keep(all, p)
+    // The newest purchase wins, whichever log or archive it is in.
+    for (const stretch of everyStretch(slice)) for (const p of Object.values(stretch.bought)) keep(all, p)
     return all
   }
 }

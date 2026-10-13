@@ -17,6 +17,7 @@ import type { EngineEnv, EngineOutputs, EngineStore, MoteScanner } from './contr
 import type { Notifier } from './notifier'
 import type { EngineFeature } from './feature'
 import { jobs, type Job } from '../sources/jobs'
+import { OtherMotes } from './otherMotes'
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
 /** In the hour clocks go back, log stamps repeat: catching up by time looks back this much further. */
@@ -71,6 +72,8 @@ export class MoteCatchUp implements EngineFeature {
   private scan: { stop: () => void } | null = null
   scanning = ''
   scanProgress = 0
+  /** Motes looted on other PCs, from their logs (Settings › Game). */
+  readonly others: OtherMotes
 
   constructor(
     private readonly store: EngineStore,
@@ -78,7 +81,16 @@ export class MoteCatchUp implements EngineFeature {
     private readonly out: Pick<EngineOutputs, 'moteScan' | 'motes'>,
     private readonly notifier: Notifier,
     private readonly hooks: MoteHooks
-  ) {}
+  ) {
+    this.others = new OtherMotes(env.dataDir, env.logFolders, {
+      motes: () => this.motes,
+      busy: () => this.backlog.active,
+      changed: (state) => {
+        this.store.motes.set(state)
+        this.hooks.changed()
+      }
+    })
+  }
 
   private get markFile(): string {
     return join(this.env.dataDir, 'catchup.json')
@@ -233,6 +245,8 @@ export class MoteCatchUp implements EngineFeature {
   }
 
   private async rebuildAs(job: Job, installDir: string, watched: string, view: () => Parameters<EngineOutputs['motes']>[0]): Promise<void> {
+    // A look at other PCs' logs finishes first: the rebuild reads them too, and goes on from where it ends.
+    await this.others.idle()
     if (this.scan || this.backlog.active) {
       this.notifier.pushFeed('info', 'Already reading your logs.')
       return
@@ -243,14 +257,16 @@ export class MoteCatchUp implements EngineFeature {
       this.setScan('Getting ready to read your logs…')
       const paths = installDir ? (await listLogs(installDir)).map((l) => l.path) : []
       if (watched && !paths.some((p) => samePath(p, watched)) && existsSync(watched)) paths.push(watched)
-      if (!paths.length) {
+      // Other PCs' logs too; one out of reach stands in as it was last read, so its motes stay in the days rebuilt.
+      const others = await this.others.forRebuild()
+      if (!paths.length && !others.logs.length) {
         this.notifier.pushFeed('info', 'No character logs to read mote history from.')
         return
       }
       const until = watched ? await this.mark(watched) : -1
       const scanJob: MoteScanJob = {
         archiveDir: this.hooks.archiveDir(),
-        logs: paths.map((p) => ({ logPath: p, stem: basename(p, '.txt'), ...(until >= 0 && samePath(p, watched) ? { end: until } : {}) }))
+        logs: [...paths.map((p) => ({ logPath: p, stem: basename(p, '.txt'), ...(until >= 0 && samePath(p, watched) ? { end: until } : {}) })), ...others.logs]
       }
       const run = (this.env.scanMotes ?? workerScanner(this.env.moteWorkerPath))(scanJob, (m, f) => {
         this.setScan(m, f)
@@ -266,7 +282,8 @@ export class MoteCatchUp implements EngineFeature {
         run.stop()
       }, 1000)
       const scanned = await run.done.finally(() => clearInterval(watchFull))
-      const merged = mergeRebuilt(this.motes.state, combineScans(scanned, watched, this.hooks.gameRunning()))
+      const merged = mergeRebuilt(this.motes.state, combineScans({ ...scanned, characters: [...scanned.characters, ...others.standIns] }, watched, this.hooks.gameRunning()))
+      await this.others.rebuilt(scanned.characters.filter((c) => others.logs.some((o) => samePath(o.logPath, c.logPath))))
       const w = scanned.characters.find((c) => samePath(c.logPath, watched))
       if (merged.seenUntil === undefined && w?.lastTime) merged.seenUntil = w.lastTime
       this.motes.state = merged

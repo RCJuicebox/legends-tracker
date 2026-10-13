@@ -1,6 +1,6 @@
 import { createReadStream, promises as fs } from 'node:fs'
 import { writeFileAtomic } from '../storeCore'
-import { join } from 'node:path'
+import { basename, join } from 'node:path'
 import type { Readable } from 'node:stream'
 import { decodeCp1252, parseLogLine, type LogLine } from '../../core/logLine'
 import { fileIdentity, sameFile } from '../../core/fileIdentity'
@@ -173,19 +173,62 @@ const SLOW_MS = 250
 
 interface CacheFile {
   version: 1
-  /** By archive file name; archives never change, so each is read once. */
-  archives: Record<string, { size: number; values: Values }>
-  /** By lower-cased log path: how far into the live log the values go, and when it was last asked about. */
-  live: Record<string, { id: string; offset: number; values: Values; askedAt?: number }>
+  /**
+   * Archives never change, so each is read once. By file name for this PC's archive folder; by
+   * lower-cased path for another PC's. `at` is when the file was last written to.
+   */
+  archives: Record<string, { size: number; values: Values; at?: number }>
+  /** By lower-cased log path: how far into the live log the values go, when it was last written to and last asked about. */
+  live: Record<string, { id: string; offset: number; values: Values; askedAt?: number; at?: number }>
 }
 
 /** A live log nothing has asked about in this long (a moved Logs folder, a renamed character) is forgotten (LT-423). */
 const UNASKED_MS = 60 * 86_400_000
 
+/** One stretch of a character's log that was read: an archive, or a live log. */
+export interface HistoryStretch<T> {
+  /** The file's name. */
+  name: string
+  /** The last date an archive covers ("2026-09-24"); '' for a live log. */
+  end: string
+  /** When the file was last written to: what puts two PCs' stretches in order. 0 when not known. */
+  at: number
+  value: T
+}
+
 export interface HistorySlice<T> {
-  /** The archives read, oldest first, with the last date each covers. */
-  archives: { name: string; end: string; value: T }[]
+  /** This PC's archives read, oldest first, with the last date each covers. */
+  archives: HistoryStretch<T>[]
   live: T
+  /** When the live log was last written to; 0 when there is none. */
+  liveAt: number
+  /**
+   * The character's archives and live logs in other PCs' Logs folders. One whose PC is out of reach
+   * is as it was last read.
+   */
+  elsewhere: HistoryStretch<T>[]
+}
+
+/**
+ * Every stretch of a slice, oldest first: the archives, then the live log; with other PCs' logs among
+ * them, in the order each file was last written to. Joins that let a later stretch settle something
+ * (a cap, the last rank bought) take them in this order.
+ */
+export function everyStretch<T>(slice: HistorySlice<T>): T[] {
+  if (!slice.elsewhere.length) return [...slice.archives.map((a) => a.value), slice.live]
+  const live: HistoryStretch<T> = { name: '', end: '', at: slice.liveAt || Infinity, value: slice.live }
+  return [...slice.archives, ...slice.elsewhere, live]
+    .map((s, i) => ({ s, i }))
+    .sort((a, b) => a.s.at - b.s.at || a.i - b.i)
+    .map(({ s }) => s.value)
+}
+
+/** The character's log in another PC's Logs folder. */
+interface ElsewhereLog {
+  /** The Logs folder, as the settings name it: whether it answers is asked by this. */
+  folder: string
+  logPath: string
+  archiveDir: string
 }
 
 export interface HistoryWhere {
@@ -193,6 +236,17 @@ export interface HistoryWhere {
   archiveDir: string
   /** "eqlog_Kelwyn_neriak": only archives named for it are read. */
   stem: string
+  /** The same character's logs on other PCs (Settings › Game). */
+  elsewhere?: ElsewhereLog[]
+}
+
+/** "…_2026-08-07_to_2026-09-24.zip", "…_thru-2026-08-07.zip": the last date is where it ends. */
+const archiveEnd = (name: string): string => [...name.matchAll(/(\d{4}-\d{2}-\d{2})/g)].pop()?.[1] ?? ''
+
+/** What one read did, for the cache and the slow-read line. */
+interface ReadRun {
+  bytes: number
+  changed: boolean
 }
 
 /**
@@ -211,7 +265,9 @@ export class LogHistory {
 
   constructor(
     private readonly cacheFile: string,
-    private readonly consumers: Record<string, HistoryConsumer<unknown>>
+    private readonly consumers: Record<string, HistoryConsumer<unknown>>,
+    /** Whether another PC's Logs folder answers now (LogFolders): one that does not is never touched. */
+    readonly reachable: (folder: string) => Promise<boolean> = async () => true
   ) {}
 
   /**
@@ -223,7 +279,10 @@ export class LogHistory {
       .then(() => this.read<T>(key, where, wantArchive))
       .then(
         (slice) => {
-          sources.ok('history', `${where.stem.replace(/^eqlog_/, '')}: ${slice.archives.length} archive${slice.archives.length === 1 ? '' : 's'} and the live log`)
+          sources.ok(
+            'history',
+            `${where.stem.replace(/^eqlog_/, '')}: ${slice.archives.length} archive${slice.archives.length === 1 ? '' : 's'} and the live log${slice.elsewhere.length ? `, and ${slice.elsewhere.length} from other PCs` : ''}`
+          )
           return slice
         },
         (e: unknown) => {
@@ -310,105 +369,182 @@ export class LogHistory {
   private async read<T>(key: string, where: HistoryWhere, wantArchive: (name: string, end: string) => boolean): Promise<HistorySlice<T>> {
     const cache = await this.load()
     const started = performance.now()
-    let bytes = 0
-    let changed = false
-    const out: HistorySlice<T> = { archives: [], live: this.consumers[key].empty() as T }
+    const run: ReadRun = { bytes: 0, changed: false }
+    const out: HistorySlice<T> = { archives: [], live: this.consumers[key].empty() as T, liveAt: 0, elsewhere: [] }
 
-    const listed = await characterArchives(where.archiveDir, where.stem, log.warn)
+    out.archives = await this.readArchives<T>(cache, key, where.archiveDir, where.stem, wantArchive, (name) => name, run)
+    const live = await this.readLive<T>(cache, key, where.logPath, run, false)
+    if (live) {
+      out.live = live.value
+      out.liveAt = live.at
+    }
+    for (const o of where.elsewhere ?? []) {
+      if (o.logPath.toLowerCase() === where.logPath.toLowerCase()) continue
+      // Another PC's archives are kept by path: two PCs' archives can share a name.
+      const keyOf = (name: string) => join(o.archiveDir, name).toLowerCase()
+      if (await this.reachable(o.folder)) {
+        out.elsewhere.push(...(await this.readArchives<T>(cache, key, o.archiveDir, where.stem, wantArchive, keyOf, run)))
+        const there = await this.readLive<T>(cache, key, o.logPath, run, true)
+        if (there) out.elsewhere.push(there)
+      } else out.elsewhere.push(...this.lastRead<T>(cache, key, o.logPath, where.stem, wantArchive, keyOf))
+    }
+
+    if (run.changed) this.changed()
+    const ms = performance.now() - started
+    if (ms > SLOW_MS) log.info(`Log history: read ${(run.bytes / 1048576).toFixed(1)} MB of ${where.stem} in ${Math.round(ms)} ms`)
+    return out
+  }
+
+  /** A character's archives in one folder, read where the cache has not got them; `keyOf` names each in the cache. */
+  private async readArchives<T>(
+    cache: CacheFile,
+    key: string,
+    dir: string,
+    stem: string,
+    wantArchive: (name: string, end: string) => boolean,
+    keyOf: (name: string) => string,
+    run: ReadRun
+  ): Promise<HistoryStretch<T>[]> {
+    const out: HistoryStretch<T>[] = []
+    const listed = await characterArchives(dir, stem, log.warn)
     // This character's archives no longer in the folder (moved, deleted) are forgotten (LT-423); a
     // folder that could not be read says nothing either way.
-    const present = new Set(listed)
+    const present = new Set(listed.map(keyOf))
     const looked =
       listed.length > 0 ||
-      (await fs.access(where.archiveDir).then(
+      (await fs.access(dir).then(
         () => true,
         (e: NodeJS.ErrnoException) => e.code === 'ENOENT'
       ))
     if (looked)
-      for (const name of Object.keys(cache.archives))
-        if (isArchiveOf(name, where.stem) && !present.has(name)) {
-          delete cache.archives[name]
-          changed = true
+      for (const k of Object.keys(cache.archives))
+        if (keyOf(basename(k)) === k && isArchiveOf(basename(k), stem) && !present.has(k)) {
+          delete cache.archives[k]
+          run.changed = true
         }
     for (const name of listed) {
-      // "…_2026-08-07_to_2026-09-24.zip", "…_thru-2026-08-07.zip": the last date is where it ends.
-      const end = [...name.matchAll(/(\d{4}-\d{2}-\d{2})/g)].pop()?.[1] ?? ''
+      const end = archiveEnd(name)
       if (!wantArchive(name, end)) continue
-      const path = join(where.archiveDir, name)
-      const size = (await fs.stat(path).catch(() => null))?.size ?? 0
-      let entry = cache.archives[name]
-      if (entry?.size !== size) entry = cache.archives[name] = { size, values: {} }
+      const path = join(dir, name)
+      const k = keyOf(name)
+      const st = await fs.stat(path).catch(() => null)
+      const size = st?.size ?? 0
+      let entry = cache.archives[k]
+      if (entry?.size !== size) entry = cache.archives[k] = { size, values: {} }
+      if (st && entry.at !== st.mtimeMs) {
+        entry.at = st.mtimeMs
+        run.changed = true
+      }
       const stale = this.stale(entry.values)
       if (stale.length) {
         const values: Values = { ...entry.values }
-        for (const k of stale) delete values[k]
+        for (const c of stale) delete values[c]
         try {
-          if (name.toLowerCase().endsWith('.zip')) await feedZip(path, async (s) => (bytes += await this.feed(s, stale, values, true)))
-          else bytes += await this.feed(createReadStream(path), stale, values, true)
+          if (name.toLowerCase().endsWith('.zip')) await feedZip(path, async (s) => (run.bytes += await this.feed(s, stale, values, true)))
+          else run.bytes += await this.feed(createReadStream(path), stale, values, true)
         } catch (e) {
           log.warn(`Log history: could not read ${path}; leaving it out:`, e)
-          delete cache.archives[name]
+          delete cache.archives[k]
           continue
         }
         entry.values = values
-        changed = true
+        run.changed = true
       }
-      out.archives.push({ name, end, value: entry.values[key].value as T })
+      out.push({ name, end, at: entry.at ?? 0, value: entry.values[key].value as T })
     }
+    return out
+  }
 
+  /**
+   * A live log brought up to date; null when it is not there. Another PC's (`apart`) is read into a
+   * copy: its PC can go away part way through a read, and its last good counts stand until it is back.
+   */
+  private async readLive<T>(cache: CacheFile, key: string, logPath: string, run: ReadRun, apart: boolean): Promise<HistoryStretch<T> | null> {
     let st
     try {
-      st = await fs.stat(where.logPath, { bigint: true })
+      st = await fs.stat(logPath, { bigint: true })
     } catch (e) {
-      if ((e as NodeJS.ErrnoException).code !== 'ENOENT') log.warn(`Log history: could not look at ${where.logPath}:`, e)
+      if ((e as NodeJS.ErrnoException).code !== 'ENOENT') log.warn(`Log history: could not look at ${logPath}:`, e)
     }
-    if (st) {
-      const pathKey = where.logPath.toLowerCase()
-      const id = identityOf(st)
-      const size = Number(st.size)
-      let live = cache.live[pathKey]
-      // A new file at this path, or the same file cut short: from the top, for every consumer.
-      if (!live || !sameFile({ id: live.id, size: live.offset }, { id, size })) {
-        live = cache.live[pathKey] = { id, offset: 0, values: {} }
-        changed = true
-      } else {
-        // A consumer new, or bumped to a new version, reads alone up to where the others have got; the
-        // others' counts stand, and all go on together from there.
-        const stale = this.stale(live.values)
-        if (stale.length && live.offset > 0) {
-          const values = structuredClone(live.values)
-          for (const k of stale) delete values[k]
-          bytes += await this.feed(createReadStream(where.logPath, { start: 0, end: live.offset - 1 }), stale, values, true)
-          live = cache.live[pathKey] = { id, offset: live.offset, values }
-          changed = true
-        }
+    if (!st) return null
+    const pathKey = logPath.toLowerCase()
+    const id = identityOf(st)
+    const size = Number(st.size)
+    let live = cache.live[pathKey]
+    // A new file at this path, or the same file cut short: from the top, for every consumer.
+    if (!live || !sameFile({ id: live.id, size: live.offset }, { id, size })) {
+      live = cache.live[pathKey] = { id, offset: 0, values: {} }
+      run.changed = true
+    } else {
+      // A consumer new, or bumped to a new version, reads alone up to where the others have got; the
+      // others' counts stand, and all go on together from there.
+      const stale = this.stale(live.values)
+      if (stale.length && live.offset > 0) {
+        const values = structuredClone(live.values)
+        for (const k of stale) delete values[k]
+        run.bytes += await this.feed(createReadStream(logPath, { start: 0, end: live.offset - 1 }), stale, values, true)
+        live = cache.live[pathKey] = { ...live, id, values }
+        run.changed = true
       }
-      if (size > live.offset) {
-        // Read into the values kept, not a copy of them (half a megabyte cloned per Factions poll,
-        // LT-378): reads are one at a time, and one that fails part way has counted lines the offset
-        // does not cover, so those counts go and this log is read from the top next time.
-        const at = live
-        try {
-          const read = await this.feed(createReadStream(where.logPath, { start: at.offset }), Object.keys(this.consumers), at.values, false)
-          bytes += read
-          if (read > 0) {
-            at.offset += read
-            changed = true
-          }
-        } catch (e) {
+    }
+    if (size > live.offset) {
+      // This PC's log is read into the values kept, not a copy of them (half a megabyte cloned per
+      // Factions poll, LT-378): reads are one at a time, and one that fails part way has counted lines
+      // the offset does not cover, so those counts go and this log is read from the top next time.
+      const into = apart ? structuredClone(live.values) : live.values
+      try {
+        const read = await this.feed(createReadStream(logPath, { start: live.offset }), Object.keys(this.consumers), into, false)
+        run.bytes += read
+        if (read > 0) {
+          live.values = into
+          live.offset += read
+          run.changed = true
+        }
+      } catch (e) {
+        if (!apart) {
           delete cache.live[pathKey]
           this.changed()
           throw e
         }
+        log.warn(`Log history: could not read ${logPath}; its counts stay as they were:`, e)
       }
-      cache.live[pathKey].askedAt = Date.now()
-      const v = cache.live[pathKey].values[key]
-      // The asker's own copy of its one value: the one kept is read into in place next time.
-      if (v) out.live = structuredClone(v.value) as T
     }
-    if (changed) this.changed()
-    const ms = performance.now() - started
-    if (ms > SLOW_MS) log.info(`Log history: read ${(bytes / 1048576).toFixed(1)} MB of ${where.stem} in ${Math.round(ms)} ms`)
+    const at = Number(st.mtimeMs)
+    if (live.at !== at) {
+      live.at = at
+      run.changed = true
+    }
+    live.askedAt = Date.now()
+    const v = live.values[key]
+    // The asker's own copy of its one value: the one kept is read into in place next time.
+    return { name: basename(logPath), end: '', at, value: (v ? structuredClone(v.value) : this.consumers[key].empty()) as T }
+  }
+
+  /** Another PC's archives and live log as they were last read, while that PC is out of reach. */
+  private lastRead<T>(
+    cache: CacheFile,
+    key: string,
+    logPath: string,
+    stem: string,
+    wantArchive: (name: string, end: string) => boolean,
+    keyOf: (name: string) => string
+  ): HistoryStretch<T>[] {
+    const version = this.consumers[key].version
+    const out: HistoryStretch<T>[] = []
+    for (const [k, entry] of Object.entries(cache.archives)) {
+      const name = basename(k)
+      const v = entry.values[key]
+      if (keyOf(name) !== k || !isArchiveOf(name, stem) || v?.version !== version || !wantArchive(name, archiveEnd(name))) continue
+      out.push({ name, end: archiveEnd(name), at: entry.at ?? 0, value: v.value as T })
+    }
+    out.sort((a, b) => a.at - b.at)
+    const live = cache.live[logPath.toLowerCase()]
+    if (live) {
+      // Asked about, though not read: kept while its PC is off.
+      live.askedAt = Date.now()
+      const v = live.values[key]
+      if (v?.version === version) out.push({ name: basename(logPath), end: '', at: live.at ?? 0, value: structuredClone(v.value) as T })
+    }
     return out
   }
 }

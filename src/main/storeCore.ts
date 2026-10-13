@@ -14,6 +14,7 @@ export function defaultSettings(): AppSettings {
   return {
     installDir: '',
     logFile: '',
+    logFolders: [],
     autoStart: true,
     autoRestartUpdates: false,
     characters: {},
@@ -252,7 +253,7 @@ export async function writeFileAtomic(path: string, text: string): Promise<void>
 export { characterKey }
 
 /** A character's log in the game folder: `Kelwyn_neriak` → `<install>\Logs\eqlog_Kelwyn_neriak.txt`. */
-export function logFileFor(installDir: string, key: string): string {
+function logFileFor(installDir: string, key: string): string {
   return join(installDir, 'Logs', `${logStem(key)}.txt`)
 }
 

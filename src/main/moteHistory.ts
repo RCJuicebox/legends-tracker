@@ -14,9 +14,9 @@ export interface MoteScanJob {
   /**
    * The character logs to read, each with its archives. `stem` is the log's name without .txt
    * ("eqlog_Kelwyn_neriak"): only archives named for it are read. `end` stops the live log there,
-   * where the live tailer took over.
+   * where the live tailer took over. Another PC's log names that PC's archive folder.
    */
-  logs: { logPath: string; stem: string; end?: number }[]
+  logs: { logPath: string; stem: string; end?: number; archiveDir?: string }[]
 }
 
 export type { MoteScanResult }
@@ -40,7 +40,7 @@ export async function scanMoteHistory(job: MoteScanJob, progress?: (message: str
     report()
   }
 
-  const plan = await Promise.all(job.logs.map(async (l) => ({ ...l, archives: await characterArchivePaths(job.archiveDir, l.stem, log.warn) })))
+  const plan = await Promise.all(job.logs.map(async (l) => ({ ...l, archives: await characterArchivePaths(l.archiveDir ?? job.archiveDir, l.stem, log.warn) })))
   // The whole job in bytes, so progress is honest: a zip counts at its unpacked size.
   const sizeOf = (p: string) => (p.toLowerCase().endsWith('.zip') ? zipTextSize(p) : fs.stat(p).then((s) => s.size)).catch(() => 0)
   const sizes = await Promise.all(plan.flatMap((l) => [...l.archives.map(sizeOf), l.end !== undefined ? Promise.resolve(l.end) : sizeOf(l.logPath)]))

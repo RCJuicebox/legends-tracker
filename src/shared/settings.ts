@@ -189,9 +189,18 @@ export interface GroupHealthSettings {
   speech: string
 }
 
+/** Other PCs' Logs folders the settings hold at most. */
+export const MAX_LOG_FOLDERS = 4
+
 export interface AppSettings {
   installDir: string
   logFile: string
+  /**
+   * Logs folders of other PCs the player plays on, most often a network share ("\\Laptop\EverQuest Legends\Logs"):
+   * their character logs count toward each character's history as this PC's do. Only ever read: never
+   * followed live, archived or written to.
+   */
+  logFolders: string[]
   autoStart: boolean
   /** Restart into a downloaded update as soon as it arrives, without asking; off, it installs when the app closes. */
   autoRestartUpdates: boolean

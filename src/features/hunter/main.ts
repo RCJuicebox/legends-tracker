@@ -2,7 +2,7 @@ import { join } from 'node:path'
 import { isCharacterKey } from '../../core/validate'
 import { handle } from '../../main/ipc/handle'
 import { JsonFile, readJsonFile } from '../../main/storeCore'
-import type { LogHistory } from '../../main/sources/logHistory'
+import { everyStretch, type LogHistory } from '../../main/sources/logHistory'
 import type { AppContext } from '../../main/context'
 import type { AppFeature } from '../../main/appFeature'
 import { joinKillTallies, type SlayerKillTallies } from '../slayer/core'
@@ -61,7 +61,7 @@ export class HunterPlanner implements AppFeature {
     if (!exp) return { character, export: null, zones: [], broken }
     // A named counts for the character that killed it: its own log alone.
     const slice = await this.history.get<SlayerKillTallies>(KILLS_KEY, ctx.historyOf(character))
-    const zones = joinKillTallies([...slice.archives.map((a) => a.value), slice.live])
+    const zones = joinKillTallies(everyStretch(slice))
     const spawns = namedSpawns(spawnTimings(Object.values(ctx.store.respawns.get())))
     const all = hunterZones(exp.sections, lastKills(zones), exp.modified, spawns)
     return { character, export: { file: exp.file, modified: exp.modified }, zones: all.filter((z) => !this.isBroken(z.achievement)), broken }

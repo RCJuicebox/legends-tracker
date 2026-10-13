@@ -119,8 +119,22 @@ export function logIsIn(logFile: string, dir: string): boolean {
   return !!logFile && !!dir && dirname(logFile).toLowerCase() === join(dir, 'Logs').toLowerCase()
 }
 
-export async function listLogs(installDir: string): Promise<LogFileInfo[]> {
-  const dir = join(installDir, 'Logs')
+/** The character logs in a game folder's Logs, newest first. */
+export function listLogs(installDir: string): Promise<LogFileInfo[]> {
+  return listLogsIn(join(installDir, 'Logs'))
+}
+
+/**
+ * The Logs folder in a folder someone picked as another PC's: its Logs when they picked the game
+ * folder (or that PC's Installed Games above it), else the folder itself.
+ */
+export function logsFolderOf(dir: string): string {
+  const game = resolveGameFolder(dir)
+  return game && !/[\\/]logs$/i.test(dir) ? join(game, 'Logs') : dir
+}
+
+/** The character logs in a Logs folder, newest first. */
+export async function listLogsIn(dir: string): Promise<LogFileInfo[]> {
   let names: string[]
   try {
     names = await fs.readdir(dir)

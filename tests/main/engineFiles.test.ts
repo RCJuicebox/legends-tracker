@@ -6,7 +6,7 @@ import { Readable } from 'node:stream'
 import { readLines } from '../../src/main/moteHistory'
 import { lineStartAfter, offsetBefore } from '../../src/main/sources/logHistory'
 import { lastZone, lastZoneLine } from '../../src/main/game'
-import { readAasFromLog } from '../../src/core/aaLog'
+import { newestAas, readAasFromLog } from '../../src/core/aaLog'
 import type { LogLine } from '../../src/core/logLine'
 
 let dir: string
@@ -137,5 +137,20 @@ describe('readAasFromLog', () => {
     await fs.writeFile(path, dump + filler)
     expect(await readAasFromLog(path, { firstSpan: 256, maxSpan: 1024 })).toBeNull()
     expect((await readAasFromLog(path, { firstSpan: 256 }))?.abilities.map((a) => a.name)).toEqual(['Combat Stability'])
+  })
+})
+
+describe('newestAas', () => {
+  it("takes the newest list of a character's logs on two PCs", async () => {
+    const one = join(dir, 'eqlog_A_b.txt')
+    const two = join(dir, 'other', 'eqlog_A_b.txt')
+    await fs.mkdir(join(dir, 'other'))
+    await fs.writeFile(one, '[Sat Sep 12 16:23:16 2026] Ability #33: Combat Stability\r\n')
+    await fs.writeFile(two, '[Sun Sep 13 09:00:00 2026] Ability #33: Combat Stability\r\n[Sun Sep 13 09:00:00 2026] Ability #2: Innate Eminence\r\n')
+    const [a, b] = await Promise.all([readAasFromLog(one), readAasFromLog(two)])
+    expect(newestAas([a, b])?.count).toBe(2)
+    expect(newestAas([b, a])?.count).toBe(2)
+    expect(newestAas([null, a])).toBe(a)
+    expect(newestAas([null, null])).toBeNull()
   })
 })

@@ -96,13 +96,17 @@ export function addFactionLine(into: FactionTallies, line: LogLine): void {
   }
 }
 
-/** Two stretches' tallies of one faction as one, `b` being the later. */
+/**
+ * Two stretches' tallies of one faction as one, `b` most often the later. Two PCs' logs of one
+ * character can overlap in time, so what settles the cap goes by when things happened.
+ */
 function join(a: FactionTally, b: FactionTally): FactionTally {
-  // A cap line in the later stretch settles it; else the earlier cap stands unless the later
-  // stretch moved the other way.
-  const cap = b.capAt ? b.cap : (a.cap === 'top' && b.down) || (a.cap === 'bottom' && b.up) ? null : a.cap
+  // The latest cap line settles it, unless the other stretch moved the other way after it.
+  const [late, other] = b.capAt >= a.capAt ? [b, a] : [a, b]
+  const undone = other.last > late.capAt && ((late.cap === 'top' && other.down) || (late.cap === 'bottom' && other.up))
+  const cap = undone ? null : late.cap
   return {
-    name: b.name,
+    name: b.last >= a.last ? b.name : a.name,
     net: a.net + b.net,
     changes: a.changes + b.changes,
     first: Math.min(a.first, b.first),
@@ -111,7 +115,7 @@ function join(a: FactionTally, b: FactionTally): FactionTally {
     capAt: Math.max(a.capAt, b.capAt),
     up: a.up || b.up,
     down: a.down || b.down,
-    recent: [...a.recent, ...b.recent].slice(-RECENT_KEPT)
+    recent: [...a.recent, ...b.recent].sort((x, y) => x.at - y.at).slice(-RECENT_KEPT)
   }
 }
 

@@ -102,17 +102,19 @@ describe('PurchaseHistory', () => {
 
   it('asks the history for its own key', async () => {
     const asked: string[] = []
-    await new PurchaseHistory(historyOf({ archives: [], live: logOf({}) }, asked), 'purchases').latest(where)
+    await new PurchaseHistory(historyOf({ archives: [], live: logOf({}), liveAt: 0, elsewhere: [] }, asked), 'purchases').latest(where)
     expect(asked).toEqual(['purchases'])
   })
 
   it('gives the last price paid for each item over the archives and the live log', async () => {
     const slice: HistorySlice<PurchaseLog> = {
       archives: [
-        { name: 'a1.zip', end: '2026-09-01', value: logOf({ 'small vial': bought('Small Vial', T0 - 3000, 5), bottle: bought('Bottle', T0 - 3000, 7) }) },
-        { name: 'a2.zip', end: '2026-09-10', value: logOf({ 'small vial': bought('Small Vial', T0 - 2000, 6) }) }
+        { name: 'a1.zip', end: '2026-09-01', at: 0, value: logOf({ 'small vial': bought('Small Vial', T0 - 3000, 5), bottle: bought('Bottle', T0 - 3000, 7) }) },
+        { name: 'a2.zip', end: '2026-09-10', at: 0, value: logOf({ 'small vial': bought('Small Vial', T0 - 2000, 6) }) }
       ],
-      live: logOf({ 'small vial': bought('Small Vial', T0, 8), 'fishing pole': bought('Fishing Pole', T0, 50) })
+      live: logOf({ 'small vial': bought('Small Vial', T0, 8), 'fishing pole': bought('Fishing Pole', T0, 50) }),
+      liveAt: 0,
+      elsewhere: []
     }
     const all = await new PurchaseHistory(historyOf(slice), 'purchases').latest(where)
     expect(Object.keys(all).sort()).toEqual(['bottle', 'fishing pole', 'small vial'])
@@ -122,8 +124,10 @@ describe('PurchaseHistory', () => {
 
   it('keeps an archive purchase that is newer than the live one', async () => {
     const slice: HistorySlice<PurchaseLog> = {
-      archives: [{ name: 'a1.zip', end: '2026-09-30', value: logOf({ bottle: bought('Bottle', T0 + 5000, 9) }) }],
-      live: logOf({ bottle: bought('Bottle', T0, 4) })
+      archives: [{ name: 'a1.zip', end: '2026-09-30', at: 0, value: logOf({ bottle: bought('Bottle', T0 + 5000, 9) }) }],
+      live: logOf({ bottle: bought('Bottle', T0, 4) }),
+      liveAt: 0,
+      elsewhere: []
     }
     const all = await new PurchaseHistory(historyOf(slice), 'purchases').latest(where)
     expect(all['bottle'].copper).toBe(9)
@@ -132,18 +136,32 @@ describe('PurchaseHistory', () => {
   it('prefers the live log on a tie, and a later archive over an earlier one', async () => {
     const slice: HistorySlice<PurchaseLog> = {
       archives: [
-        { name: 'a1.zip', end: '2026-09-01', value: logOf({ bottle: bought('Bottle', T0, 1) }) },
-        { name: 'a2.zip', end: '2026-09-02', value: logOf({ bottle: bought('Bottle', T0, 2), vial: bought('Vial', T0, 2) }) }
+        { name: 'a1.zip', end: '2026-09-01', at: 0, value: logOf({ bottle: bought('Bottle', T0, 1) }) },
+        { name: 'a2.zip', end: '2026-09-02', at: 0, value: logOf({ bottle: bought('Bottle', T0, 2), vial: bought('Vial', T0, 2) }) }
       ],
-      live: logOf({ vial: bought('Vial', T0, 3) })
+      live: logOf({ vial: bought('Vial', T0, 3) }),
+      liveAt: 0,
+      elsewhere: []
     }
     const all = await new PurchaseHistory(historyOf(slice), 'purchases').latest(where)
     expect(all['bottle'].copper).toBe(2)
     expect(all['vial'].copper).toBe(3)
   })
 
+  it('takes a newer purchase made on another PC', async () => {
+    const slice: HistorySlice<PurchaseLog> = {
+      archives: [],
+      live: logOf({ bottle: bought('Bottle', T0, 4) }),
+      liveAt: T0,
+      elsewhere: [{ name: 'eqlog_Kelwyn_neriak.txt', end: '', at: T0 + 9000, value: logOf({ bottle: bought('Bottle', T0 + 9000, 6), vial: bought('Vial', T0 + 8000, 3) }) }]
+    }
+    const all = await new PurchaseHistory(historyOf(slice), 'purchases').latest(where)
+    expect(all['bottle'].copper).toBe(6)
+    expect(all['vial'].copper).toBe(3)
+  })
+
   it('is empty for a character who never bought anything', async () => {
-    expect(await new PurchaseHistory(historyOf({ archives: [], live: logOf({}) }), 'purchases').latest(where)).toEqual({})
+    expect(await new PurchaseHistory(historyOf({ archives: [], live: logOf({}), liveAt: 0, elsewhere: [] }), 'purchases').latest(where)).toEqual({})
   })
 
   describe('over a real log', () => {

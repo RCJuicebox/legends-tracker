@@ -73,6 +73,12 @@ describe('settings:save', () => {
     expect(saved.setup).toEqual({ hidden: true, accepted: ['sound'], arranged: true })
   })
 
+  it("lets a page take another PC's Logs folder off the list, never put one on", async () => {
+    saved = { ...defaultSettings(), logFolders: ['\\\\laptop\\Logs', 'D:\\Other\\Logs'] }
+    await save({ ...defaultSettings(), logFolders: ['\\\\LAPTOP\\Logs', 'C:\\Windows'] })
+    expect(saved.logFolders).toEqual(['\\\\LAPTOP\\Logs'])
+  })
+
   it('keeps the faction plan a page sends, checked', async () => {
     saved = defaultSettings()
     const factionPlan = { assumptions: { travelMin: 500, goal: 'positive' }, choices: { Tester_neriak: { locks: { 'Guards of Qeynos': 'a1' }, excluded: ['a2'], perHour: {} } } }

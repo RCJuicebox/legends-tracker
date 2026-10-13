@@ -230,6 +230,19 @@ export interface JobView {
 /** How a source of information last fared (see the Data Sources page). */
 export type SourceStatus = 'ok' | 'stale' | 'error' | 'missing' | 'reading' | 'waiting'
 
+/** Another PC's Logs folder as last looked at (Settings › Game). */
+export interface LogFolderView {
+  dir: string
+  /** It answered at the last look. */
+  reachable: boolean
+  /** When it was last looked at; 0 before the first look. */
+  at: number
+  /** The characters with a log there, at its last answer. */
+  characters: string[]
+  /** Why the last look failed; '' when it answered. */
+  error: string
+}
+
 export interface SourceView {
   id: string
   label: string
@@ -286,6 +299,10 @@ export interface Invokes {
   'logs:archive': (path: string) => ArchiveOutcome
   'logs:compress': (path: string) => ArchiveOutcome
   'logs:reveal': (path: string) => void
+  /** Other PCs' Logs folders, looked at; `again` looks now however recent the last look. */
+  'logs:folders': (again?: boolean) => LogFolderView[]
+  /** Picks another PC's Logs folder and adds it. */
+  'logs:addFolder': () => { canceled: boolean; dir: string; problem: string }
 
   'overlays:arrange': (on: boolean) => void
   'overlays:demo': () => void
@@ -518,6 +535,8 @@ const INVOKE_CHANNELS: Record<InvokeChannel, true> = {
   'logs:archive': true,
   'logs:compress': true,
   'logs:reveal': true,
+  'logs:folders': true,
+  'logs:addFolder': true,
   'overlays:arrange': true,
   'overlays:demo': true,
   'combat:get': true,

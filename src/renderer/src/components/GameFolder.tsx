@@ -2,7 +2,8 @@ import { useEffect, useState } from 'react'
 import { api, errorMessage } from '../api'
 import { useActions, useLive, useSettled } from '../state'
 import { whoList as who } from '../../../core/format'
-import type { GameFolderCheck } from '../../../shared/types'
+import { MAX_LOG_FOLDERS, type GameFolderCheck } from '../../../shared/types'
+import type { LogFolderView } from '../../../shared/ipc'
 import { WithCommands } from './ui'
 
 /** Finds the game folder again, or lets the player point at it. Reports what happened in a line under the buttons. */
@@ -143,6 +144,120 @@ export function GameFolderPrompt() {
       </div>
       {message && (
         <div className="small" role="status">
+          {message}
+        </div>
+      )}
+    </div>
+  )
+}
+
+/** How long the Settings card waits between looks at other PCs' folders (main looks again no sooner anyway). */
+const FOLDER_LOOK_MS = 30_000
+
+/**
+ * Settings › Game: the Logs folders of other PCs the player plays on, whether each answers and whose
+ * logs it holds, and adding or taking one off. Added only through the folder picker (logs:addFolder).
+ */
+export function OtherLogFolders() {
+  const { patchSettings } = useActions()
+  const dirs = useSettled((s) => s.settings.logFolders)
+  const [looks, setLooks] = useState<LogFolderView[] | null>(null)
+  const [busy, setBusy] = useState(false)
+  const [message, setMessage] = useState('')
+
+  useEffect(() => {
+    let live = true
+    const read = () =>
+      api.invoke('logs:folders').then(
+        (l) => live && setLooks(l),
+        (e) => live && setMessage(`Could not look at the folders: ${errorMessage(e)}`)
+      )
+    void read()
+    const t = setInterval(() => void read(), FOLDER_LOOK_MS)
+    return () => {
+      live = false
+      clearInterval(t)
+    }
+  }, [dirs])
+
+  const add = async () => {
+    setMessage('')
+    try {
+      const r = await api.invoke('logs:addFolder')
+      if (r.problem) setMessage(r.problem)
+    } catch (e) {
+      setMessage(`Could not add that folder: ${errorMessage(e)}`)
+    }
+  }
+  const lookAgain = async () => {
+    setBusy(true)
+    setMessage('')
+    try {
+      setLooks(await api.invoke('logs:folders', true))
+    } catch (e) {
+      setMessage(`Could not look at the folders: ${errorMessage(e)}`)
+    } finally {
+      setBusy(false)
+    }
+  }
+  const remove = (dir: string) => patchSettings((x) => ({ ...x, logFolders: x.logFolders.filter((d) => d !== dir) }))
+
+  return (
+    <div className="stack gap-10">
+      <div className="field">
+        <span>Other PCs&apos; logs</span>
+        <p className="hint">
+          Play on another PC too? Add its Logs folder and each character&apos;s log there counts toward that character here: motes, Slayer and Hunter kills, factions, AAs, skills,
+          casts and purchases. Share the folder on that PC (right-click EverQuest Legends\Logs, Properties, Sharing; reading is enough), then add it here as{' '}
+          <span className="mono">{'\\\\THATPC\\Logs'}</span>. It is only ever read. Timers, overlays and the meter stay with this PC&apos;s log.
+        </p>
+      </div>
+      {dirs.length > 0 && (
+        <div className="table-scroll">
+          <table className="table small">
+            <tbody>
+              {dirs.map((dir) => {
+                const l = looks?.find((x) => x.dir.toLowerCase() === dir.toLowerCase())
+                const held = l?.characters.length ? who(l.characters) : ''
+                return (
+                  <tr key={dir}>
+                    <td style={{ width: 24 }}>
+                      {!l ? <span className="chip">looking</span> : l.reachable ? <span className="chip ok">answering</span> : <span className="chip warn">not answering</span>}
+                    </td>
+                    <td className="mono" style={{ wordBreak: 'break-all' }}>
+                      {dir}
+                    </td>
+                    <td className={l?.reachable && held ? '' : 'muted'}>
+                      {!l
+                        ? ''
+                        : l.reachable
+                          ? held || 'No character logs in it yet'
+                          : `Is that PC on, with the folder shared? What was read from it before still counts${held ? ` (${held})` : ''}.`}
+                    </td>
+                    <td style={{ width: 1 }}>
+                      <button className="btn small ghost" onClick={() => void remove(dir)}>
+                        Remove
+                      </button>
+                    </td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+      <div className="row">
+        <button className="btn" disabled={dirs.length >= MAX_LOG_FOLDERS} onClick={() => void add()}>
+          Add folder…
+        </button>
+        {dirs.length > 0 && (
+          <button className="btn" disabled={busy} onClick={() => void lookAgain()}>
+            {busy ? 'Looking…' : 'Look again'}
+          </button>
+        )}
+      </div>
+      {message && (
+        <div className="notice bad small" role="status">
           {message}
         </div>
       )}

@@ -3,6 +3,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import type { AppContext } from '../../../src/main/context'
+import { listLogs } from '../../../src/main/game'
 
 // The Slayer page's main side against a game folder on disk: the achievements export, the client's
 // race table and two characters' logs, read as the app reads them. The live Slayer tracker (eqlwiki's
@@ -95,6 +96,7 @@ const ctx = {
     () => {}
   ),
   historyOf: (c: string) => ({ logPath: join(game, 'Logs', `eqlog_${c}.txt`), archiveDir: join(game, 'Logs', 'Archive'), stem: `eqlog_${c}` }),
+  logCharacters: async () => (await listLogs(game)).map((l) => l.character),
   liveAchievements: {
     view: null as unknown,
     races: {

@@ -1,5 +1,6 @@
 import {
   CLASS_NAMES,
+  MAX_LOG_FOLDERS,
   type AppSettings,
   type CharacterSettings,
   type CharacterSheet,
@@ -88,6 +89,19 @@ function logFilePath(v: unknown, fb: string): string {
   if (!isFullPath(v)) return fb
   const m = /[\\/]eqlog_([^\\/]+)\.txt$/i.exec(v)
   return m && isCharacterKey(m[1]) ? v : fb
+}
+
+/** Other PCs' Logs folders: full paths, each once whatever its case or a trailing slash, at most MAX_LOG_FOLDERS. */
+function logFolders(v: unknown, fb: string[]): string[] {
+  if (!Array.isArray(v)) return fb
+  const out: string[] = []
+  for (const x of v) {
+    if (!isFullPath(x) || x.length > 260) continue
+    // "E:\" keeps its slash: "E:" alone is a drive's current folder.
+    const dir = x.length > 3 ? x.replace(/[\\/]+$/, '') : x
+    if (!out.some((d) => d.toLowerCase() === dir.toLowerCase())) out.push(dir)
+  }
+  return out.slice(0, MAX_LOG_FOLDERS)
 }
 
 function str(v: unknown, fb: string): string {
@@ -406,6 +420,7 @@ export function sanitizeSettings(v: unknown, fb: AppSettings): AppSettings | nul
     installDir: str(v.installDir, fb.installDir),
     // The tailer reads whatever this names: only a character log.
     logFile: logFilePath(v.logFile, fb.logFile),
+    logFolders: logFolders(v.logFolders, fb.logFolders),
     autoStart: bool(v.autoStart, fb.autoStart),
     autoRestartUpdates: bool(v.autoRestartUpdates, fb.autoRestartUpdates),
     characters,

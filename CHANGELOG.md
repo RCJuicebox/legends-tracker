@@ -2,6 +2,10 @@
 
 What changed in each version. The release workflow publishes a version's section as its release notes, and installed copies show them when an update arrives.
 
+## Unreleased
+
+- **Play on more than one PC? Add the other PC's logs.** Settings › Game › **Other PCs' logs** takes the Logs folder of another PC you play on, most often shared over your home network (`\\THATPC\Logs`). Each character's log there counts toward that character here as this PC's does: motes and instance runs, Slayer and Hunter kills, faction standings, AAs, skills, casts and purchases. Where both PCs played the same character, their logs are put together in the order things happened. While the other PC is off, what was read from it before still counts, and nothing waits on it. Its log is only ever read: timers, overlays and the meter stay with this PC's log. Data Sources has a row for it.
+
 ## 2.13.0 (2026-10-12)
 
 - **Plan › Slayer knows each zone's spawns.** TAKP's classic spawn tables are built in: every zone Legends has, its spawn spots, what each rolls and how often, and the timers. Where you have not hunted a race, the plan paces a zone by what its spots allow, at no more than your usual kills an hour, and says which holds it back; beside each mob, its spots and respawn ("12 spots · 6:24"), and "spawn-bound" where your own pace is up against them. This replaces eqlwiki's flat guess of four kills an hour a name, and gives the players' camps with no number one (the Rathe's giants: 22 spots). Legends' respawns are quicker than classic and one timer a zone, so a zone runs on the respawn your Respawns page has timed there (Blackburrow 3:45, Ak'Anon 4:50), listed under **Zone respawns**.

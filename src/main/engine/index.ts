@@ -275,11 +275,18 @@ export class Engine {
     this.archiveTimer = setInterval(() => {
       void this.archiveCheck()
       void this.lookElsewhere()
+      // Motes looted on other PCs since the last look.
+      void this.moteHistory.others.check()
     }, 30_000)
     this.archives.resumeStaging().catch((e: unknown) => log.error('Finishing interrupted archives failed:', e))
     // Reading history starts the backlog before the tailer can give a line, so nothing slips between.
     const history = this.store.motesFresh ? this.rebuildMoteHistory() : this.catchUpMotes()
     history.catch((e: unknown) => log.error('Reading mote history at startup failed:', e))
+    // Then what other PCs' logs gained while this app was closed.
+    void history.then(
+      () => this.moteHistory.others.check(),
+      () => undefined
+    )
     // Catching up reads the log's end on this thread; the meter's own read of it waits its turn. A
     // rebuild runs in a worker and is not waited for.
     if (!this.store.motesFresh) this.startupRead = history.catch(() => undefined)
@@ -739,6 +746,11 @@ export class Engine {
   }
 
   /** Reads what was logged while the app was closed (see MoteCatchUp.catchUp). */
+  /** Motes looted on other PCs since the last look at their logs (Settings › Game). */
+  checkOtherLogs(): Promise<void> {
+    return this.moteHistory.others.check()
+  }
+
   catchUpMotes(): Promise<void> {
     return this.moteHistory.catchUp(this.settings.logFile)
   }

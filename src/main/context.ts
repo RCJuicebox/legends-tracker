@@ -35,6 +35,7 @@ import { SkillHistory, skillConsumer } from './skillHistory'
 import { AaHistory, aaConsumer } from './aaHistory'
 import { PetStore, PetWiki } from './pets'
 import { isGameRunning, listLogs, logIsIn } from './game'
+import { LogFolders, otherArchiveDir } from './logFolders'
 import { Windows, loadPage } from './windows'
 import { appIcon, preloadPath, resources } from './bootstrap'
 import { log } from './log'
@@ -70,6 +71,8 @@ export interface AppContext {
   wikiCatalog: WikiCatalog
   /** Every consumer's counts over each character's log history, in one cache file (log-history.json). */
   logHistory: LogHistory
+  /** Other PCs' Logs folders (Settings › Game), and whether each answers. */
+  logFolders: LogFolders
   castHistory: CastHistory
   /** The character's own melee day by day, read the way casts are: what worn effects and procs are weighed against. */
   meleeHistory: CastHistory
@@ -100,6 +103,8 @@ export interface AppContext {
   characterKey(): string
   /** A character's log, with its archives: where the log-history pages read from. */
   historyOf(character: string): HistoryWhere
+  /** Every character with a log on this PC or in another PC's folder: this PC's first, each newest first. */
+  logCharacters(): Promise<string[]>
   /** Stores settings and makes everything follow them: overlays, audio, priority, the engine. */
   saveSettings(next: AppSettings): AppSettings
   /** Stores the trigger list and makes the engine use it. */
@@ -156,15 +161,21 @@ export function createContext(): AppContext {
       log.warn(`Could not remove the retired ${basename(f)}; trying again next start:`, e)
     }
   }
-  const logHistory = new LogHistory(join(cacheDir(), 'log-history.json'), {
-    casts: dayConsumer(castCounter),
-    melee: dayConsumer(meleeCounter),
-    purchases: purchaseConsumer,
-    skills: skillConsumer,
-    aas: aaConsumer,
-    ...Factions.consumers,
-    ...SlayerPlanner.consumers
-  })
+  // Other PCs' Logs folders: each looked at no more than one look at a time, so one whose PC is off never holds things up.
+  const logFolders = new LogFolders(() => store.settings.get().logFolders)
+  const logHistory = new LogHistory(
+    join(cacheDir(), 'log-history.json'),
+    {
+      casts: dayConsumer(castCounter),
+      melee: dayConsumer(meleeCounter),
+      purchases: purchaseConsumer,
+      skills: skillConsumer,
+      aas: aaConsumer,
+      ...Factions.consumers,
+      ...SlayerPlanner.consumers
+    },
+    (folder) => logFolders.reachable(folder)
+  )
 
   const ctx = {
     store,
@@ -189,6 +200,7 @@ export function createContext(): AppContext {
       (pages) => void itemCatalog.refreshFrom(pages)
     ),
     logHistory,
+    logFolders,
     castHistory: new CastHistory(logHistory, 'casts'),
     meleeHistory: new CastHistory(logHistory, 'melee'),
     recipeBook: new RecipeBook((p) => toMain('state:recipes', p)),
@@ -352,18 +364,27 @@ export function createContext(): AppContext {
       soundDirs: () => [join(dataDir, 'sounds'), join(installDir(), 'AudioTriggers', 'default'), join(installDir(), 'AudioTriggers', 'shared')],
       // The game watcher looks at the process list every three seconds anyway: its answer, rather than
       // another walk of it every half minute for the archiver (LT-377). Before its first look, a walk.
-      isGameRunning: async () => ctx.watcher?.gameRunning ?? isGameRunning()
+      isGameRunning: async () => ctx.watcher?.gameRunning ?? isGameRunning(),
+      logFolders
     })
   )
 
   ctx.characterKey = () => ctx.engine.characterKey()
   // The character being played reads the log chosen in Settings, wherever it is; any other its own
-  // file in the game's Logs folder.
+  // file in the game's Logs folder. The same character played on another PC: its log there, and that
+  // PC's archives if it keeps them.
   ctx.historyOf = (character) => ({
     logPath: characterLogFile(character, ctx.characterKey(), store.settings.get().logFile, installDir()),
     archiveDir: ctx.engine.archives.archiveDir(),
-    stem: logStem(character)
+    stem: logStem(character),
+    elsewhere: store.settings.get().logFolders.map((folder) => ({ folder, logPath: join(folder, `${logStem(character)}.txt`), archiveDir: otherArchiveDir(folder) }))
   })
+  ctx.logCharacters = async () => {
+    // A folder out of reach still names the characters it held when it last answered: their history is kept.
+    const [here, looks] = await Promise.all([listLogs(installDir()), logFolders.lookAll()])
+    const there = looks.flatMap((l) => l.logs).sort((a, b) => b.modified - a.modified)
+    return [...new Set([...here, ...there].map((l) => l.character))]
+  }
   // It reads the standings and the log as they settle, so its engine feature goes after everything the
   // engine has of its own (registered with the features, below).
   ctx.liveAchievements = new LiveAchievements(ctx)
@@ -527,6 +548,12 @@ function registerSources(ctx: AppContext): void {
     label: 'Log history',
     kind: 'log',
     what: 'Casts, melee, purchases, faction changes and the kills and hand-ins behind them, counted over your log and its archives, for the Gear, Spell upgrades, Tradeskills and Factions pages. Only what the log gains is read again.'
+  })
+  sources.add('logFolders', {
+    label: "Other PCs' logs",
+    kind: 'log',
+    what: "The Logs folders of other PCs you play on (Settings › Game), usually shared over your network. Their logs count toward each character's history; while one is off, what was read from it before still counts.",
+    refresh: () => ctx.logFolders.lookAll(true)
   })
   sources.add('motes', {
     label: 'Mote history',

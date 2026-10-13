@@ -3,11 +3,10 @@ import { copyFile, mkdir, readdir, readFile, rm, writeFile } from 'node:fs/promi
 import { RACE_TABLE } from '../../core/raceNames'
 import { SlayerRaces, slayerCounters } from '../../core/slayer'
 import { isCharacterKey } from '../../core/validate'
-import { listLogs } from '../../main/game'
 import { handle } from '../../main/ipc/handle'
 import { log } from '../../main/log'
 import { JsonFile, readJsonFile } from '../../main/storeCore'
-import type { HistoryConsumer, LogHistory } from '../../main/sources/logHistory'
+import { everyStretch, type HistoryConsumer, type LogHistory } from '../../main/sources/logHistory'
 import type { AppContext } from '../../main/context'
 import type { AppFeature } from '../../main/appFeature'
 import {
@@ -133,14 +132,13 @@ export class SlayerPlanner implements AppFeature {
 
   /** Every kill in this character's logs and the player's other characters', by zone, and their trips between zones. */
   private async kills(ctx: AppContext, character: string): Promise<{ zones: SlayerKillTallies['zones']; moves: SlayerMove[] }> {
-    const logs = await listLogs(ctx.installDir())
-    const who = [character, ...new Set(logs.map((l) => l.character).filter((c) => c.toLowerCase() !== character.toLowerCase()))]
+    const who = [character, ...(await ctx.logCharacters()).filter((c) => c.toLowerCase() !== character.toLowerCase())]
     const stretches: SlayerKillTallies[] = []
     // One at a time: LogHistory reads one log at a time anyway, and a log that fails is left out.
     for (const c of who) {
       try {
         const slice = await this.history.get<SlayerKillTallies>(KILLS_KEY, ctx.historyOf(c))
-        stretches.push(...slice.archives.map((a) => a.value), slice.live)
+        stretches.push(...everyStretch(slice))
       } catch (e) {
         log.warn(`${c}'s log could not be read for the Slayer plan:`, e)
       }

@@ -1,7 +1,7 @@
 import { handle } from './handle'
 import { log } from '../log'
 import { checkGameFolder } from '../game'
-import { readAasFromLog } from '../../core/aaLog'
+import { newestAas, readAasFromLog } from '../../core/aaLog'
 import { aaHistoryView, emptyAaTally } from '../../core/aaHistory'
 import { readMotesFromScreen, readStatsFromScreen } from '../screenRead'
 import { castableSpells, focusReport, focusSpec } from '../../core/itemFocus'
@@ -112,10 +112,13 @@ export function registerCharacterIpc(ctx: AppContext): void {
       factors: await ctx.gameTables.classFactors(classes, level)
     }
   })
-  // The picked character's own /alternateadv list, whichever character is being played.
-  handle('stats:readAAs', (character) => {
+  // The picked character's own /alternateadv list, whichever character is being played: the newest,
+  // when it is played on other PCs too.
+  handle('stats:readAAs', async (character) => {
     assertCharacterKey(character)
-    return readAasFromLog(liveLog(character), { warn: (m, e) => log.warn(m, e) })
+    const warn = (m: string, e: unknown) => log.warn(m, e)
+    const there = (history(character).elsewhere ?? []).map(async (o) => ((await ctx.logFolders.reachable(o.folder)) ? readAasFromLog(o.logPath, { warn }) : null))
+    return newestAas(await Promise.all([readAasFromLog(liveLog(character), { warn }), ...there]))
   })
   // The AAs its log and archives saw bought, for Stats › AAs.
   handle('stats:aaHistory', async (character) => {

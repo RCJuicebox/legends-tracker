@@ -51,6 +51,14 @@ export interface EngineEnv {
   dataDir: string
   /** Reads mote history in place of the worker thread; for tests. */
   scanMotes?: MoteScanner
+  /** Other PCs' Logs folders (Settings › Game), for the motes looted there. */
+  logFolders?: OtherLogFolders
+}
+
+/** Other PCs' Logs folders as last looked at (LogFolders). */
+export interface OtherLogFolders {
+  /** Each folder the settings name: whether it answers now, and the character logs it held at its last answer. */
+  lookAll(): Promise<{ dir: string; reachable: boolean; logs: { path: string; modified: number }[] }[]>
 }
 
 /** The parts of the settings store the engine uses. */
