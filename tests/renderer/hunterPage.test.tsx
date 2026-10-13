@@ -150,3 +150,31 @@ it('says when every Hunter achievement is done, and when there is no export', as
   expect(d.host.textContent).toContain('No achievements export for')
   d.done()
 })
+
+it('finds a zone by any of its words, its achievement or a named, and the zone the player is in at a click', async () => {
+  answer = data
+  appState.status.zone = 'Kedge Keep'
+  const { host, done } = await draw()
+  const zones = () => [...host.querySelectorAll('.fp-zone')].map((z) => z.textContent)
+  const input = host.querySelector<HTMLInputElement>('input[type="search"]')!
+  const type = async (v: string) =>
+    act(async () => {
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(input, v)
+      input.dispatchEvent(new Event('input', { bubbles: true }))
+    })
+  await type('crush clan')
+  expect(zones()).toEqual(['Clan Crushbone'])
+  await type('hammerhead')
+  expect(zones()).toEqual(['Kedge Keep'])
+  // Its number in the list stays the one it has among them all.
+  expect(host.querySelector('.fp-num')?.textContent).toBe('2')
+  await type('karana')
+  expect(zones()).toEqual([])
+  expect(host.textContent).toContain('Nothing to go matches “karana”.')
+  const here = [...host.querySelectorAll('button')].find((b) => b.textContent === 'Kedge Keep')!
+  await act(async () => here.click())
+  expect(input.value).toBe('Kedge Keep')
+  expect(zones()).toEqual(['Kedge Keep'])
+  appState.status.zone = ''
+  done()
+})

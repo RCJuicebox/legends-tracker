@@ -87,3 +87,14 @@ export function hunterHere(zones: HunterZone[], zone: string): HunterZone[] {
   const k = zoneKey(campZone(zone))
   return k ? zones.filter((z) => zoneKey(z.zone) === k) : []
 }
+
+/**
+ * Whether a Hunter achievement answers a search: every word typed is found in its zone, its name or a
+ * named still wanted, any case ("west karana" finds The Western Plains of Karana).
+ */
+export function hunterMatch(z: Pick<HunterZone, 'zone' | 'achievement' | 'left'>, search: string): boolean {
+  const words = search.toLowerCase().split(/\s+/).filter(Boolean)
+  if (!words.length) return true
+  const text = [z.zone, z.achievement, ...z.left.map((n) => n.name)].join(' ').toLowerCase()
+  return words.every((w) => text.includes(w))
+}

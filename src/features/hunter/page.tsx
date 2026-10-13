@@ -1,14 +1,15 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { CharacterPicker } from '../../renderer/src/components/CharacterPicker'
 import { ago, api } from '../../renderer/src/api'
 import { useInvoke, useVisibleInterval } from '../../renderer/src/hooks'
+import { useLive } from '../../renderer/src/state'
 import { useNow } from '../../renderer/src/components/TimerBars'
-import { GameCommand, Info, Pending, Tip } from '../../renderer/src/components/ui'
+import { FilterBox, GameCommand, Info, Pending, Tip } from '../../renderer/src/components/ui'
 import { duration, num, who } from '../../core/format'
 import { usePlanCharacter } from '../slayer/page'
 import { clock } from '../slayer/core'
 import { SpawnMap } from '../slayer/SpawnMap'
-import type { HunterNamed } from './core'
+import { hunterHere, hunterMatch, type HunterNamed } from './core'
 
 // Plan › Hunter: each Hunter achievement not done, the named it still wants, and what classic's spawn
 // tables say of each (core.ts), the zones quickest to finish first. The achievements overlay shows
@@ -67,7 +68,12 @@ export function Hunter() {
   const now = useNow(30_000)
   const [maps, setMaps] = useState<Set<string>>(new Set())
   const [marked, setMarked] = useState('')
+  const [filter, setFilter] = useState('')
+  const zoneNow = useLive((l) => l.status.zone)
   const data = q.data
+  const shown = useMemo(() => (data?.zones ?? []).map((z, i) => ({ z, i })).filter(({ z }) => hunterMatch(z, filter)), [data, filter])
+  // The zone the player is in, when it has a Hunter achievement here: a click finds it.
+  const here = data && zoneNow ? hunterHere(data.zones, zoneNow)[0]?.zone : undefined
   const toggleMap = (a: string) => setMaps((m) => (m.has(a) ? new Set([...m].filter((x) => x !== a)) : new Set([...m, a])))
   const mark = async (on: boolean) => {
     const marks = on && data ? data.zones.map((z) => ({ zone: z.zone, mobs: [], named: z.left.map((n) => n.name) })) : []
@@ -134,6 +140,12 @@ export function Hunter() {
                 <span>
                   <b>{data.zones.length}</b> Hunter achievement{data.zones.length === 1 ? '' : 's'} to go, <b>{num(left)}</b> named
                 </span>
+                <FilterBox placeholder="Find a zone or named…" label="Find a zone, achievement or named" value={filter} onChange={setFilter} width={240} />
+                {here && filter !== here && (
+                  <button className="btn small ghost" onClick={() => setFilter(here)} title="Show only the zone you are in">
+                    {here}
+                  </button>
+                )}
                 <span className="spacer" />
                 <Tip text="Puts a gold dot at every spot the named left pop at, on the game’s own map: in a map set of its own, LegendsTracker (a copy of the game’s maps, so its own stay as they are). Pick it in the map window.">
                   <button className="btn small" onClick={() => void mark(true)}>
@@ -146,8 +158,9 @@ export function Hunter() {
               </div>
               {marked && <div className="card mb-16 small">{marked}</div>}
               <div className="card mb-16">
+                {!shown.length && <div className="faint small">Nothing to go matches “{filter.trim()}”.</div>}
                 <ol className="fp-steps">
-                  {data.zones.map((z, i) => (
+                  {shown.map(({ z, i }) => (
                     <li key={z.achievement} className="fp-step">
                       <span className="fp-num">{i + 1}</span>
                       <div className="fp-body">

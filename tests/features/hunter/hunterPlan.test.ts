@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { parseAchievements } from '../../../src/core/achievements'
-import { hunterHere, hunterZones, namedWait } from '../../../src/features/hunter/core'
+import { hunterHere, hunterMatch, hunterZones, namedWait } from '../../../src/features/hunter/core'
 import type { MobSpawn } from '../../../src/features/slayer/spawns'
 
 // Plan › Hunter: the named each Hunter achievement still wants, with what the spawn tables say of
@@ -75,5 +75,15 @@ describe('Plan › Hunter', () => {
     const [z] = hunterZones(karana, () => 0, 0)
     expect(z.left).toEqual([{ name: 'a werewolf bandit', legends: { spots: 4, ph: ['a bandit'], said: 'the player, 2026-10-13' } }])
     expect(z.wait).toBeNull()
+  })
+})
+
+describe('Plan › Hunter search', () => {
+  const z = { zone: 'The Western Plains of Karana', achievement: 'Hunter of The Western Plains of Karana', left: [{ name: 'a werewolf bandit' }] }
+  it('finds an achievement when every word typed is in its zone, its name or a named left', () => {
+    expect(hunterMatch(z, '')).toBe(true)
+    expect(hunterMatch(z, '  West  karana ')).toBe(true)
+    expect(hunterMatch(z, 'werewolf')).toBe(true)
+    expect(hunterMatch(z, 'north karana')).toBe(false)
   })
 })
