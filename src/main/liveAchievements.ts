@@ -13,6 +13,7 @@ import { carryFollow, freshFollow, pickStep, readFollow, sanitizeFollows, saySte
 import type { AchievementTrack, FactionTrackView, HunterTrackView, SkillRow, SkillTrackView, SlayerPlanTrackView, SlayerTrackView, TrackedAchievement } from '../shared/tracking'
 import { hunterHere, hunterZones } from '../features/hunter/core'
 import { bareName, planSlayer, slayerPlanView } from '../features/slayer/core'
+import { takpRaceMix } from '../features/slayer/main'
 import type { AchievementsExport } from './achievements'
 import type { AppContext } from './context'
 import type { AppFeature } from './appFeature'
@@ -21,6 +22,8 @@ import { handle } from './ipc/handle'
 import { log } from './log'
 import { NpcRaces } from './npcRaces'
 import { offsetBefore, readForward } from './sources/logHistory'
+import { lastZoneLine } from './game'
+import { zoneEntered } from '../core/logLine'
 import { JsonFile, readJsonFile } from './storeCore'
 import { cacheDir } from './paths'
 
@@ -53,6 +56,8 @@ interface SlayerState {
   readTo: number
   /** The same for the character's log on each other PC, by lower-cased path. */
   others: Map<string, number>
+  /** The zone each log was in where its counts got to, by lower-cased path: each kill is put to its zone. */
+  zoneIn: Map<string, string>
   kills: SlayerKills
   /** The player's pets, as they said so ("Attacking a gnoll, Master."). */
   pets: Set<string>
@@ -68,7 +73,8 @@ interface KeptSlayer {
   logPath: string
   exportAt: number
   readTo: number
-  kills: [string, { name: string; times: number[] }][]
+  /** Each kill's zone beside its time; an older file kept the times alone. */
+  kills: [string, { name: string; times: number[]; zones?: string[] }][]
   pets: string[]
   /** With when each was; an older file kept the names alone. */
   completed: ([string, number] | string)[]
@@ -76,19 +82,28 @@ interface KeptSlayer {
   counts?: [string, number][]
   /** How far into the character's log on each other PC, by lower-cased path; missing from an older file. */
   others?: [string, number][]
+  /** The zone each log was in where the counts got to, by lower-cased path; missing from an older file. */
+  zoneIn?: [string, string][]
 }
 
 function keptSlayer(v: unknown): KeptSlayer | null {
   const k = v as Partial<KeptSlayer> | null
   if (!k || typeof k.character !== 'string' || typeof k.logPath !== 'string' || typeof k.exportAt !== 'number' || typeof k.readTo !== 'number') return null
   if (!Array.isArray(k.kills) || !Array.isArray(k.pets) || !Array.isArray(k.completed)) return null
-  const kills = k.kills.filter(
-    (e): e is KeptSlayer['kills'][number] =>
-      Array.isArray(e) && typeof e[0] === 'string' && typeof e[1]?.name === 'string' && Array.isArray(e[1].times) && e[1].times.every((t) => typeof t === 'number')
-  )
+  const kills = k.kills
+    .filter(
+      (e): e is KeptSlayer['kills'][number] =>
+        Array.isArray(e) && typeof e[0] === 'string' && typeof e[1]?.name === 'string' && Array.isArray(e[1].times) && e[1].times.every((t) => typeof t === 'number')
+    )
+    .map(([key, v]): KeptSlayer['kills'][number] => {
+      // Zones that do not line up with the times are not known.
+      const zones = Array.isArray(v.zones) && v.zones.length === v.times.length && v.zones.every((z) => typeof z === 'string') ? v.zones : v.times.map(() => '')
+      return [key, { name: v.name, times: v.times, zones }]
+    })
   const completed = k.completed.filter((c) => typeof c === 'string' || (Array.isArray(c) && typeof c[0] === 'string' && typeof c[1] === 'number'))
   const pairs = (v: unknown) => (Array.isArray(v) ? v.filter((c): c is [string, number] => Array.isArray(c) && typeof c[0] === 'string' && typeof c[1] === 'number') : undefined)
-  return { ...(k as KeptSlayer), kills, pets: k.pets.filter((p) => typeof p === 'string'), completed, counts: pairs(k.counts), others: pairs(k.others) }
+  const zoneIn = Array.isArray(k.zoneIn) ? k.zoneIn.filter((c): c is [string, string] => Array.isArray(c) && typeof c[0] === 'string' && typeof c[1] === 'string') : undefined
+  return { ...(k as KeptSlayer), kills, pets: k.pets.filter((p) => typeof p === 'string'), completed, counts: pairs(k.counts), others: pairs(k.others), zoneIn }
 }
 
 /** What the exports settled about which mobs count toward which Slayer achievements, for every character: a race is the game's, not the player's. */
@@ -412,8 +427,8 @@ export class LiveAchievements implements AppFeature {
       const kept = s && s.exportAt <= exp.modified ? s : null
       const kills: SlayerKills = new Map()
       for (const [k, v] of kept?.kills ?? []) {
-        const times = v.times.filter((t) => t > exp.modified)
-        if (times.length) kills.set(k, { name: v.name, times })
+        const after = v.times.flatMap((t, i) => (t > exp.modified ? [i] : []))
+        if (after.length) kills.set(k, { name: v.name, times: after.map((i) => v.times[i]), zones: after.map((i) => v.zones?.[i] ?? '') })
       }
       s = {
         character,
@@ -426,6 +441,7 @@ export class LiveAchievements implements AppFeature {
         logPath,
         readTo: kept ? kept.readTo : -1,
         others: new Map(kept?.others ?? []),
+        zoneIn: new Map(kept?.zoneIn ?? []),
         kills,
         pets: kept?.pets ?? new Set(),
         engaged: kept?.engaged ?? new Map(),
@@ -454,6 +470,7 @@ export class LiveAchievements implements AppFeature {
       logPath,
       readTo: d.readTo,
       others: new Map(d.others ?? []),
+      zoneIn: new Map(d.zoneIn ?? []),
       kills: new Map(d.kills),
       pets: new Set(d.pets),
       engaged: new Map(),
@@ -491,7 +508,8 @@ export class LiveAchievements implements AppFeature {
         pets: [...s.pets],
         completed: [...s.completed],
         counts: [...s.counts],
-        others: [...s.others]
+        others: [...s.others],
+        zoneIn: [...s.zoneIn]
       })
   }
 
@@ -503,16 +521,28 @@ export class LiveAchievements implements AppFeature {
     const size = (await fs.stat(logPath).catch(() => null))?.size ?? 0
     let readTo = from
     // The first read starts at the line before the export was written; a log started afresh, at its top.
+    const path = logPath.toLowerCase()
+    let zone = s.zoneIn.get(path)
     if (readTo < 0) readTo = size ? await offsetBefore(logPath, s.exportAt, { slackMs: 2000 }) : 0
-    else if (size < readTo) readTo = 0
+    else if (size < readTo) {
+      readTo = 0
+      zone = ''
+    }
     if (size <= readTo) return { read: 0, readTo }
-    const kills: { mob: string; at: number }[] = []
+    // The zone the read starts in, the first time: the last one entered before it.
+    if (zone === undefined) zone = readTo > 0 ? ((await lastZoneLine(logPath, { end: readTo }).then((l) => l && zoneEntered(l.text))) ?? '') : ''
+    const kills: { mob: string; at: number; zone: string }[] = []
     const completed: [string, number][] = []
     const read = await readForward(
       logPath,
       readTo,
       size,
       (line) => {
+        const entered = zoneEntered(line.text)
+        if (entered) {
+          zone = entered
+          return
+        }
         const x = slayerLine(line.text)
         if (!x) return
         if ('pet' in x) s.pets.add(x.pet)
@@ -529,20 +559,27 @@ export class LiveAchievements implements AppFeature {
           // A player your side killed (a duel, a charmed pet turned) is nobody's Slayer kill.
           if ('kill' in x) mob = this.credited(x.kill.by, s.pets) && !this.friendly(x.kill.mob) ? x.kill.mob : null
           else if (line.time - (s.engaged.get(x.died.toLowerCase()) ?? -Infinity) <= ENGAGED_MS) mob = x.died
-          if (mob) kills.push({ mob, at: line.time })
+          if (mob) kills.push({ mob, at: line.time, zone: zone ?? '' })
         }
       },
       { flushLast: false }
     )
     for (const [k, t] of completed) s.completed.set(k, t)
-    for (const { mob, at } of kills) {
+    for (const { mob, at, zone: where } of kills) {
       const k = mob.toLowerCase()
-      const had = s.kills.get(k) ?? { name: mob, times: [] }
+      const had = s.kills.get(k) ?? { name: mob, times: [], zones: [] }
+      const zones = (had.zones ??= had.times.map(() => ''))
       had.times.push(at)
-      // Another PC's kills can come before this PC's: times stay in order, the newest last.
-      if (had.times.length > 1 && had.times[had.times.length - 2] > at) had.times.sort((a, b) => a - b)
+      zones.push(where)
+      // Another PC's kills can come before this PC's: times stay in order, the newest last, each zone with its time.
+      if (had.times.length > 1 && had.times[had.times.length - 2] > at) {
+        const order = had.times.map((t, i) => [t, zones[i]] as const).sort((a, b) => a[0] - b[0])
+        had.times = order.map((o) => o[0])
+        had.zones = order.map((o) => o[1])
+      }
       s.kills.set(k, had)
     }
+    s.zoneIn.set(path, zone ?? '')
     return { read, readTo: readTo + read }
   }
 
@@ -569,7 +606,7 @@ export class LiveAchievements implements AppFeature {
   private countSlayer(): void {
     const s = this.slayer
     if (!s) return
-    const got = slayerCounts(s.counters, s.races, s.kills, (m) => this.races.race(m), this.fact, new Set(s.completed.keys()))
+    const got = slayerCounts(s.counters, s.races, s.kills, (m) => this.races.race(m), this.fact, new Set(s.completed.keys()), takpRaceMix)
     if (got.unknown.length)
       void this.races.lookUp(got.unknown).then((learned) => {
         if (!learned || this.slayer !== s) return

@@ -153,6 +153,52 @@ export function mobSpawns(z: TakpZone, timing?: ZoneTiming): Map<string, MobSpaw
   return out
 }
 
+/** A race a mob's name is, and its share of the mob's spawns: "a bandit" in the Western Plains of Karana is Human 62%, Barbarian 23%, Half Elf 16%. */
+export interface RaceShare {
+  race: string
+  share: number
+}
+
+/**
+ * The races a mob's name is in TAKP's tables, each by its share of the mob's spawns there (spots ×
+ * odds): in the zone the kill was in, else over every zone that has it. Null where the tables lack
+ * the name. Classic gives one name several races ("a bandit" Human, Half Elf or Barbarian); the log
+ * names them alike, and only the share says how many counted toward what.
+ */
+export function raceMixer(tables: SpawnTables): (mob: string, zone: string) => RaceShare[] | null {
+  const index = zoneIndex(tables)
+  const cache = new Map<string, RaceShare[] | null>()
+  const add = (into: Map<string, number>, z: TakpZone, k: string) => {
+    for (const [, rolls, flat] of z.groups) {
+      const total = Math.max(
+        100,
+        rolls.reduce((s, [, c]) => s + c, 0)
+      )
+      for (const [i, c] of rolls) if (lower(z.npcs[i][0]) === k) into.set(z.npcs[i][1], (into.get(z.npcs[i][1]) ?? 0) + (flat.length / 3) * (c / total))
+    }
+  }
+  const shares = (m: Map<string, number>) => {
+    const sum = [...m.values()].reduce((s, v) => s + v, 0)
+    return sum > 0 ? [...m].map(([race, v]) => ({ race, share: v / sum })).sort((a, b) => b.share - a.share) : null
+  }
+  return (mob, zone) => {
+    const k = lower(mob)
+    const short = zone ? index(zone) : null
+    const key = `${short ?? ''}|${k}`
+    if (cache.has(key)) return cache.get(key)!
+    const here = new Map<string, number>()
+    if (short) add(here, tables[short], k)
+    let got = shares(here)
+    if (!got) {
+      const everywhere = new Map<string, number>()
+      for (const z of Object.values(tables)) add(everywhere, z, k)
+      got = shares(everywhere)
+    }
+    cache.set(key, got)
+    return got
+  }
+}
+
 /** A spot on the map and what pops there. */
 export interface MapSpot {
   x: number

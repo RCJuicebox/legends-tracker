@@ -26,7 +26,7 @@ import {
   type SlayerPlanChoices,
   type SlayerPlanData
 } from './core'
-import { isMarked, mapMarks, mobSpawns, parseMap, spotsIn, zoneIndex, zoneTimings, type MobSpawn, type SlayerMap, type SlayerMark, type SpawnTables } from './spawns'
+import { isMarked, mapMarks, mobSpawns, parseMap, raceMixer, spotsIn, zoneIndex, zoneTimings, type MobSpawn, type SlayerMap, type SlayerMark, type SpawnTables } from './spawns'
 import type { RespawnRecord } from '../../core/respawns'
 import TAKP from '../../shared/game/takpSpawns.json'
 import { hunterZones } from '../hunter/core'
@@ -277,6 +277,9 @@ export function namedSpawns(timings: ReturnType<typeof zoneTimings>): (zone: str
     return short ? mobSpawns(TABLES[short], timings.get(short)) : null
   }
 }
+
+/** The races a mob's name is in TAKP's tables, by share, in a zone (else everywhere it is): for a kill nothing else places. */
+export const takpRaceMix = raceMixer(TABLES)
 
 /** The spawn tables' timings: each zone's timers against classic, from the Respawns page's records. */
 export const spawnTimings = (records: RespawnRecord[]) => zoneTimings(TABLES, records)

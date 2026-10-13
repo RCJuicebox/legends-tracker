@@ -240,8 +240,36 @@ export function slayerLine(text: string): SlayerLine {
   return null
 }
 
-/** Kills since the export, by mob (lower-cased): its name as the log gave it and when each was. */
-export type SlayerKills = Map<string, { name: string; times: number[] }>
+/** Kills since the export, by mob (lower-cased): its name as the log gave it, when each was, and the zone each was in ('' not known; missing from older counts). */
+export type SlayerKills = Map<string, { name: string; times: number[]; zones?: string[] }>
+
+/** The races a mob's name is in a zone's spawn tables, each by its share of the spawns; null where they lack it (spawns.ts raceMixer). */
+export type RaceMix = (mob: string, zone: string) => { race: string; share: number }[] | null
+
+/**
+ * For a mob nothing else places (no race on eqlwiki or in its name): how many of its kills counted
+ * toward each achievement, by the race mix of the zone each was in. Classic's "a bandit" is Human,
+ * Half Elf or Barbarian under the one name, so a kill counts toward What Keeps Mankind Alive? only as
+ * far as the zone's bandits are Human or Barbarian. Legends may have changed them (its West Karana
+ * bandits all counted, 2026-10-13): a guess, until an export settles the mob whole, as for any other.
+ * Null when the tables do not know the name.
+ */
+export function mixCredits(name: string, zones: readonly string[], races: SlayerRaces, mixOf: RaceMix): number[] | null {
+  const byZone = new Map<string, number>()
+  for (const z of zones) byZone.set(z, (byZone.get(z) ?? 0) + 1)
+  const out = races.keys.map(() => 0)
+  let known = false
+  for (const [zone, n] of byZone) {
+    const mix = mixOf(name, zone)
+    if (!mix) continue
+    known = true
+    for (const { race, share } of mix) {
+      const key = races.place(name, race).key
+      if (key !== null) races.keys.forEach((keys, i) => keys.has(key) && (out[i] += n * share))
+    }
+  }
+  return known ? out : null
+}
 
 /**
  * The counts: each open achievement's export count and the kills since that count toward it. A mob
@@ -255,7 +283,8 @@ export function slayerCounts(
   kills: SlayerKills,
   raceOf: (mob: string) => string | null | undefined,
   facts: SlayerFacts,
-  completed: Set<string>
+  completed: Set<string>,
+  mixOf?: RaceMix
 ): { rows: { counter: SlayerCounter; since: number; guessed: number; last: number; done: boolean }[]; unplaced: { name: string; n: number }[]; unknown: string[] } {
   const since = counters.map(() => 0)
   const guessed = counters.map(() => 0)
@@ -269,19 +298,23 @@ export function slayerCounts(
     const mob = k.name.toLowerCase()
     // Kills are kept in log order: the newest is the last (no spread of a long grind's list, LT-380).
     const newest = k.times.at(-1) ?? 0
+    // Nothing places it: the spawn tables' race mix where it was killed, a share of each kill (a guess).
+    const mix = p.key === null && mixOf ? mixCredits(k.name, k.zones ?? k.times.map(() => ''), races, mixOf) : null
     let any = false
     counters.forEach((c, i) => {
       const fact = facts(mob, c.name.toLowerCase())
-      if (!(fact ?? (p.key !== null && races.keys[i].has(p.key)))) return
+      const n = fact !== undefined ? (fact ? k.times.length : 0) : p.key !== null ? (races.keys[i].has(p.key) ? k.times.length : 0) : (mix?.[i] ?? 0)
+      if (n <= 0) return
       any = true
-      since[i] += k.times.length
-      if (fact === undefined && !p.sure) guessed[i] += k.times.length
+      since[i] += n
+      if (fact === undefined && !p.sure) guessed[i] += n
       last[i] = Math.max(last[i], newest)
     })
-    if (!any && p.key === null && wiki !== undefined) unplaced.push({ name: k.name, n: k.times.length })
+    if (!any && p.key === null && !mix && wiki !== undefined) unplaced.push({ name: k.name, n: k.times.length })
   }
   return {
-    rows: counters.map((counter, i) => ({ counter, since: since[i], guessed: guessed[i], last: last[i], done: completed.has(counter.name.toLowerCase()) })),
+    // A share of a kill is a guess: the counts stay whole kills.
+    rows: counters.map((counter, i) => ({ counter, since: Math.round(since[i]), guessed: Math.round(guessed[i]), last: last[i], done: completed.has(counter.name.toLowerCase()) })),
     unplaced: unplaced.sort((a, b) => b.n - a.n),
     unknown
   }

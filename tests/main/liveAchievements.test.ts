@@ -376,9 +376,13 @@ describe('LiveAchievements counts Slayer kills since the export', () => {
     const otherLog = join(there, 'eqlog_Tester_neriak.txt')
     await fs.mkdir(there, { recursive: true })
     const kill = (stamp: string) => `[${stamp}] You have slain a gnoll!\r\n`
+    const entered = (stamp: string, zone: string) => `[${stamp}] You have entered ${zone}.\r\n`
     // Before the export, then after it on this PC and on the other in turn.
-    await fs.writeFile(here, kill('Wed Sep 30 11:59:00 2026') + kill('Wed Sep 30 12:00:10 2026') + kill('Wed Sep 30 12:05:00 2026'))
-    await fs.writeFile(otherLog, kill('Wed Sep 30 11:58:00 2026') + kill('Wed Sep 30 12:01:40 2026'))
+    await fs.writeFile(
+      here,
+      entered('Wed Sep 30 11:50:00 2026', 'The Western Plains of Karana') + kill('Wed Sep 30 11:59:00 2026') + kill('Wed Sep 30 12:00:10 2026') + kill('Wed Sep 30 12:05:00 2026')
+    )
+    await fs.writeFile(otherLog, entered('Wed Sep 30 11:57:00 2026', 'Lake Rathetear') + kill('Wed Sep 30 11:58:00 2026') + kill('Wed Sep 30 12:01:40 2026'))
     let answers = true
     Object.assign((live as unknown as { ctx: object }).ctx, {
       historyOf: () => ({
@@ -396,7 +400,8 @@ describe('LiveAchievements counts Slayer kills since the export', () => {
       logPath: here,
       readTo: -1,
       others: new Map<string, number>(),
-      kills: new Map<string, { name: string; times: number[] }>(),
+      zoneIn: new Map<string, string>(),
+      kills: new Map<string, { name: string; times: number[]; zones?: string[] }>(),
       pets: new Set<string>(),
       engaged: new Map<string, number>(),
       completed: new Map<string, number>(),
@@ -406,12 +411,16 @@ describe('LiveAchievements counts Slayer kills since the export', () => {
     const at = (hms: string) => new Date(`2026-09-30T${hms}`).getTime()
     await readLog(s)
     expect(s.kills.get('a gnoll')?.times).toEqual([at('12:00:10'), at('12:01:40'), at('12:05:00')])
+    // Each kill in the zone its log was in, found back before the export where the read began, and kept beside its time.
+    expect(s.kills.get('a gnoll')?.zones).toEqual(['The Western Plains of Karana', 'Lake Rathetear', 'The Western Plains of Karana'])
+    expect(s.zoneIn.get(here.toLowerCase())).toBe('The Western Plains of Karana')
     expect(s.readTo).toBe((await fs.stat(here)).size)
     expect(s.others.get(otherLog.toLowerCase())).toBe((await fs.stat(otherLog)).size)
 
-    await fs.appendFile(otherLog, kill('Wed Sep 30 12:06:40 2026'))
+    await fs.appendFile(otherLog, entered('Wed Sep 30 12:06:00 2026', 'The Rathe Mountains') + kill('Wed Sep 30 12:06:40 2026'))
     await readLog(s)
     expect(s.kills.get('a gnoll')?.times).toHaveLength(4)
+    expect(s.kills.get('a gnoll')?.zones?.at(-1)).toBe('The Rathe Mountains')
 
     // That PC off: its log is not touched, and what it counted stands.
     answers = false
