@@ -2,6 +2,10 @@
 
 What changed in each version. The release workflow publishes a version's section as its release notes, and installed copies show them when an update arrives.
 
+## 2.14.1 (2026-10-13)
+
+- **Fix: since the 2026-10-12 game patch, spells read wrongly: DoT timers were amber like debuffs, and spell icons could be wrong.** The patch put a new column into the game's spell file, moving the ones after it. The app took every spell's effects, and its icon, from the old places, so every spell read with no effects: a DoT counted as a debuff, and what goes by a spell's effects (heal over time or buff, mez, charm, focus and worn effects) went wrong with it. The effects are now found by what they are, wherever the game puts them, and a layout no client is known for is refused with a message rather than misread.
+
 ## 2.14.0 (2026-10-13)
 
 - **The Slayer plan on the achievements overlay.** Turn on **On the overlay** at the top of Plan › Slayer (each character its own; off to begin with). The overlay then shows the plan's step for the zone you are in ("Now"), or the one to head to and the way your log has gone there, with its achievements' counts, what to kill and about how long, then the step after. It plans again as your kills come in, when you change zones and when you change something on the page.
