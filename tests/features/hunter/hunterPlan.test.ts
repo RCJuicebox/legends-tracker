@@ -69,4 +69,11 @@ describe('Plan › Hunter', () => {
     expect(hunterHere(zones, 'Ocean of Tears - Group').map((z) => z.achievement)).toEqual(['Hunter of The Ocean of Tears'])
     expect(hunterHere(zones, '')).toEqual([])
   })
+
+  it('gives a named of Legends’ own, which the tables lack, the spots the player found', () => {
+    const karana = parseAchievements(['EverQuest: Hunter', 'I\tHunter of The Western Plains of Karana', 'I\t\ta werewolf bandit'].join('\n')).sections
+    const [z] = hunterZones(karana, () => 0, 0)
+    expect(z.left).toEqual([{ name: 'a werewolf bandit', legends: { spots: 4, ph: ['a bandit'], said: 'the player, 2026-10-13' } }])
+    expect(z.wait).toBeNull()
+  })
 })

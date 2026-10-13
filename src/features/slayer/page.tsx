@@ -351,6 +351,13 @@ export function Slayer() {
               )}
               <span className="spacer" />
               {data.pending > 0 && <span className="faint small">Looking up {num(data.pending)} mobs’ races on eqlwiki…</span>}
+              <ToggleChip
+                on={choices.overlay}
+                onChange={(on) => setChoices({ ...choices, overlay: on })}
+                title="Show the step you are on (the one in your zone, else the one to head to) and the next on the achievements overlay, counting down as you kill"
+              >
+                On the overlay
+              </ToggleChip>
             </div>
 
             {plan.daily.length > 0 && (

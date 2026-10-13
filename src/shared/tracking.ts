@@ -132,7 +132,45 @@ export interface HunterTrackView {
     total: number
     /** Killed since the export, the export not knowing yet. */
     since: string[]
+    /** Where each named left pops, by name, as /waypoints to type (with what is there, where the player said); none for a named of many spots. */
+    waypoints?: Record<string, string[]>
+    /** What a named of Legends' own pops in place of, by name. */
+    ph?: Record<string, string>
   }[]
+}
+
+/** A step of the Slayer plan, as the overlay shows it (slayerPlanView). */
+export interface SlayerPlanStepView {
+  /** Its place in the plan, from 0. */
+  index: number
+  zone: string
+  /** The player is in its zone now. */
+  here: boolean
+  /** The Banestrike tier it works toward: "Progressive". */
+  tier: string
+  /** Killing there, and getting there from the step before, seconds. */
+  seconds: number
+  travel: number
+  /** The zones crossed on the way, as the log has gone. */
+  via?: string[]
+  /** The achievements it is there for, with their counts now. */
+  goals: { name: string; count: number; max: number }[]
+  /** What to kill there and about how many, most first. */
+  mobs: { name: string; n: number }[]
+  /** Where its few-spot mobs pop, as /waypoints to type. */
+  waypoints?: string[]
+}
+
+/** Plan › Slayer on the achievements overlay: made again from the counts as kills come in. */
+export interface SlayerPlanTrackView {
+  steps: number
+  /** Achievements the plan works toward. */
+  goals: number
+  /** About how long the plan takes from here. */
+  secondsLeft: number
+  /** The step whose zone the player is in, else the first, to head to; null when nothing is left to plan. */
+  current: SlayerPlanStepView | null
+  next: SlayerPlanStepView | null
 }
 
 export interface AchievementTrack {
@@ -144,6 +182,8 @@ export interface AchievementTrack {
   skills: SkillTrackView | null
   /** The Hunter named left in the zone the player is in; null outside a Hunter zone. */
   hunter?: HunterTrackView | null
+  /** Plan › Slayer's step, when the player shows it here. */
+  slayerPlan?: SlayerPlanTrackView | null
   /** The achievements the player tracks, in the order tracked. */
   tracked: TrackedAchievement[]
 }

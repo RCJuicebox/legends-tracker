@@ -20,7 +20,7 @@ import {
   type SkillRow
 } from '../../../core/combatView'
 import type { CombatSnapshot, MeterMode, MeterOverlayOptions, MeterSpan, OverlayConfig, Segment, SegmentSummary, TimerView } from '../../../shared/types'
-import type { AchievementTrack, SkillRow as SkillGoalRow, TrackKind, TrackedAchievement } from '../../../shared/tracking'
+import type { AchievementTrack, SkillRow as SkillGoalRow, SlayerPlanTrackView, TrackKind, TrackedAchievement } from '../../../shared/tracking'
 import { itemsSaid } from '../../../shared/tracking'
 import { TimerBars, useNow } from '../components/TimerBars'
 import { DEFAULT_METER_OPTIONS } from '../../../shared/overlays'
@@ -250,6 +250,89 @@ const UNITS: Record<TrackKind, [string, string]> = { kill: ['kill', 'kills'], tu
 const doing = (s: { kind: TrackKind; title: string; npc?: string }) =>
   s.kind === 'kill' ? `Kill ${s.title}` : s.kind === 'turnin' ? `Hand in to ${s.npc ?? s.title}` : s.npc ? `${s.title}: hand in to ${s.npc}` : s.title
 
+/** "a gnoll ×40, a gnoll pup ×12 and 2 more": what a Slayer step kills. */
+const mobsSaid = (mobs: { name: string; n: number }[], shown = 3) =>
+  mobs
+    .slice(0, shown)
+    .map((m) => `${m.name} ×${m.n.toLocaleString()}`)
+    .join(', ') + (mobs.length > shown ? ` and ${mobs.length - shown} more` : '')
+
+/** Plan › Slayer's step: the one in the zone the player is in, else the one to head to; and the one after. */
+function SlayerPlanSection({ plan }: { plan: SlayerPlanTrackView }) {
+  const step = plan.current
+  return (
+    <section className="ach-ov-plan">
+      <div className="ach-ov-head">
+        <span>Slayer plan</span>
+        <span className="ach-ov-faint">
+          {plan.goals} to go{plan.secondsLeft > 0 ? ` · ≈ ${duration(plan.secondsLeft)}` : ''}
+        </span>
+      </div>
+      {step ? (
+        <>
+          <div className="ach-ov-step now">
+            <div className="ach-ov-tag">
+              {step.here ? 'Now' : 'Head to'} · step {step.index + 1} · {step.tier}
+            </div>
+            <div className="ach-ov-title" title={step.zone}>
+              {step.zone}
+            </div>
+            {!step.here && step.via?.length ? (
+              <div className="ach-ov-faint" title="The way your log has gone">
+                by {step.via.join(', ')}
+              </div>
+            ) : null}
+            {step.goals.map((g) => (
+              <div key={g.name} className="ach-ov-count">
+                <div className="ach-ov-goal">
+                  <span>
+                    {g.count >= g.max ? '✓ ' : ''}
+                    {g.name}
+                  </span>
+                  <span className="ach-ov-num">
+                    {g.count.toLocaleString()} / {g.max.toLocaleString()}
+                  </span>
+                </div>
+                <div className="ach-ov-bar thin">
+                  <i style={{ width: `${Math.round((g.count / Math.max(1, g.max)) * 100)}%` }} />
+                </div>
+              </div>
+            ))}
+            {step.mobs.length > 0 && (
+              <div className="ach-ov-items" title={step.mobs.map((m) => `${m.name} ×${m.n.toLocaleString()}`).join('\n')}>
+                Kill {mobsSaid(step.mobs)}
+              </div>
+            )}
+            {(step.waypoints ?? []).map((w) => (
+              <div key={w} className="ach-ov-way" title="Type it in game for an arrow to the spot">
+                {w}
+              </div>
+            ))}
+            <div className="ach-ov-faint">
+              ≈ {duration(step.seconds)} there{!step.here && step.travel > 0 ? `, ${duration(step.travel)} to get there` : ''}
+            </div>
+          </div>
+          {plan.next ? (
+            <div className="ach-ov-step next">
+              <div className="ach-ov-tag">Next · step {plan.next.index + 1}</div>
+              <div className="ach-ov-title" title={plan.next.zone}>
+                {plan.next.zone === step.zone ? `${plan.next.zone}, here too` : plan.next.zone}
+              </div>
+              {plan.next.mobs.length > 0 && <div className="ach-ov-faint">{mobsSaid(plan.next.mobs, 2)}</div>}
+            </div>
+          ) : (
+            <div className="ach-ov-step next">
+              <div className="ach-ov-tag">Last step of the plan</div>
+            </div>
+          )}
+        </>
+      ) : (
+        <div className="ach-ov-line">{plan.goals ? 'Nothing the planner knows feeds what is left.' : 'Every Slayer achievement in the plan is done.'}</div>
+      )}
+    </section>
+  )
+}
+
 /**
  * The achievements overlay: the achievements the player tracks (the star on the Achievements page),
  * the step of the faction plan being followed, counting down as the factions move, the Slayer counts
@@ -262,7 +345,9 @@ function AchievementsRegion({ config, track, arranging }: { config: OverlayConfi
   // Hidden from this overlay at the player's choice; the plan is followed (and spoken) all the same.
   const plan = config.achievements?.factionPlan === false ? null : (track?.faction ?? null)
   const tracked = track?.tracked ?? []
-  const trackedNames = new Set(tracked.map((t) => t.name))
+  const slayerPlan = track?.slayerPlan ?? null
+  // The Slayer plan's step shows its own counts: not again among what moved lately.
+  const trackedNames = new Set([...tracked.map((t) => t.name), ...(slayerPlan?.current?.goals.map((g) => g.name) ?? [])])
   const trackedSkills = new Set(tracked.flatMap((t) => (t.done ? [] : (t.skills ?? []).map((k) => k.skill))))
   // What is tracked shows in its own place, not again among what moved lately.
   const slayer = (track?.slayer?.rows ?? []).filter((r) => r.since > 0 && now - r.last < SLAYER_RECENT_MS && !trackedNames.has(r.name)).sort((a, b) => b.last - a.last)
@@ -281,15 +366,15 @@ function AchievementsRegion({ config, track, arranging }: { config: OverlayConfi
   // The Hunter named left in this zone, at the player's choice; what is tracked shows in its own place.
   const hunter = config.achievements?.hunter === false ? [] : (track?.hunter?.rows ?? []).filter((r) => !trackedNames.has(r.achievement))
   // Shown on purpose and empty would look broken; one faint line says what it waits for.
-  if (!tracked.length && !plan && !slayer.length && !skills.length && !hunter.length)
+  if (!tracked.length && !plan && !slayerPlan && !slayer.length && !skills.length && !hunter.length)
     return (
       <div className="ach-ov" style={style}>
         <div className="ach-ov-empty">
           {arranging
-            ? 'Tracked achievements, the faction plan’s step, the Slayer counts and skills your kills move, and the Hunter named left in your zone show here.'
+            ? 'Tracked achievements, the faction and Slayer plans’ steps, the Slayer counts and skills your kills move, and the Hunter named left in your zone show here.'
             : track?.faction
               ? 'Nothing tracked. The faction plan is hidden from this overlay (Overlays).'
-              : 'Nothing tracked. Track an achievement, or show your faction plan here from Factions › Plan.'}
+              : 'Nothing tracked. Track an achievement, or show your faction plan here from Factions › Plan, or your Slayer plan from Plan › Slayer.'}
         </div>
       </div>
     )
@@ -367,6 +452,7 @@ function AchievementsRegion({ config, track, arranging }: { config: OverlayConfi
           )}
         </section>
       )}
+      {slayerPlan && <SlayerPlanSection plan={slayerPlan} />}
       {hunter.length > 0 && (
         <section className="ach-ov-hunter">
           {hunter.slice(0, 2).map((r) => (
@@ -378,8 +464,16 @@ function AchievementsRegion({ config, track, arranging }: { config: OverlayConfi
                 </span>
               </div>
               {r.left.slice(0, HUNTER_ROWS).map((n) => (
-                <div key={n} className="ach-ov-line">
-                  {n}
+                <div key={n}>
+                  <div className="ach-ov-line">
+                    {n}
+                    {r.ph?.[n] && <span className="ach-ov-faint"> · PH {r.ph[n]}</span>}
+                  </div>
+                  {(r.waypoints?.[n] ?? []).map((w) => (
+                    <div key={w} className="ach-ov-way" title="Type it in game for an arrow to the spot">
+                      {w}
+                    </div>
+                  ))}
                 </div>
               ))}
               {r.left.length > HUNTER_ROWS && <div className="ach-ov-faint">+{r.left.length - HUNTER_ROWS} more</div>}

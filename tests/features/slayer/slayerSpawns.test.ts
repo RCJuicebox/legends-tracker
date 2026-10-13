@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { isMarked, mapMarks, mobSpawns, parseMap, spotsOf, zoneIndex, zoneTimings, type SpawnTables } from '../../../src/features/slayer/spawns'
+import { isMarked, legendsSpawnsOf, mapMarks, mobSpawns, parseMap, spotsIn, spotsOf, waypoint, zoneIndex, zoneTimings, type SpawnTables } from '../../../src/features/slayer/spawns'
+import { waypointsOf } from '../../../src/features/slayer/main'
 import type { RespawnRecord } from '../../../src/core/respawns'
 
 // TAKP's spawn tables in Legends' terms: made-up zones in the tables' shape.
@@ -166,5 +167,27 @@ describe('the game’s maps', () => {
     ])
     expect(isMarked(['P 1, 2, 3, 0, 0, 0, 3, to_Freeport', ...lines].join('\r\n'))).toBe(true)
     expect(isMarked("P -325, -50, 0, 150, 0, 200, 3, to_Dagnor's_Cauldron\r\n")).toBe(false)
+  })
+
+  it('add Legends’ own spawns the tables lack, typed in as /waypoint takes them', () => {
+    const karana = { id: 12, name: 'The Western Plains of Karana', npcs: [['a bandit', 'Human', 9, 11]], groups: [[400, [[0, 100]], [13792, 619, 0]]] } as SpawnTables[string]
+    expect(legendsSpawnsOf('The Western Plains of Karana', ['A Werewolf Bandit']).map((s) => s.ph)).toEqual([['a bandit']])
+    expect(legendsSpawnsOf('The Northern Plains of Karana', ['a werewolf bandit'])).toEqual([])
+    const spots = spotsIn(karana, ['a bandit', 'a werewolf bandit'])
+    // The bandit's spot from the tables, then the four the player found: /waypoint y, x is the map's -y, -x.
+    expect(spots).toHaveLength(5)
+    expect(spots[1]).toMatchObject({ x: 13825, y: 649, mobs: [{ name: 'a werewolf bandit', chance: 100 }], timer: 0 })
+    expect(spots[2].where).toBe('the southern border of the zone')
+    expect(waypoint(spots[1])).toBe('/waypoint -649, -13825')
+    // The tables' spot comes back as the player found it there.
+    expect(waypoint(spots[0])).toBe('/waypoint -619, -13792')
+    expect(waypointsOf('The Western Plains of Karana', 'a werewolf bandit')).toEqual([
+      { at: '/waypoint -649, -13825' },
+      { at: '/waypoint -3969, -10966', where: 'the southern border of the zone' },
+      { at: '/waypoint 882, -6985', where: 'in a group of bandits' },
+      { at: '/waypoint -2783, -10736' }
+    ])
+    // A mob of many spots is everywhere: no waypoints.
+    expect(waypointsOf('The Western Plains of Karana', 'a bandit')).toEqual([])
   })
 })

@@ -1,7 +1,7 @@
 import type { AchSection } from '../../core/achievements'
 import { zoneKey } from '../factions/names'
 import { bareName, campZone } from '../slayer/core'
-import type { MobSpawn } from '../slayer/spawns'
+import { legendsSpawnsOf, type MobSpawn } from '../slayer/spawns'
 
 // Plan › Hunter: the named each Hunter achievement ("Hunter of Befallen") still wants, zone by zone,
 // with what classic's spawn tables say of each (its spots, how often it rolls, its timer: TAKP, in
@@ -14,6 +14,8 @@ export interface HunterNamed {
   spawn?: MobSpawn
   /** Seconds of clearing its spots, on average, before it pops: its timer over how many of it are up at once. */
   wait?: number
+  /** A named of Legends' own, which TAKP's tables lack: the spots the player found, what it pops in place of, who said so. */
+  legends?: { spots: number; ph?: string[]; said: string }
 }
 
 /** A Hunter achievement not done: its place, the named left, how many it wants in all. */
@@ -68,7 +70,9 @@ export function hunterZones(
         .filter((c) => !since.includes(c.t))
         .map((c) => {
           const spawn = known?.get(bareName(c.t))
-          return spawn ? { name: c.t, spawn, wait: namedWait(spawn) } : { name: c.t }
+          if (spawn) return { name: c.t, spawn, wait: namedWait(spawn) }
+          const own = legendsSpawnsOf(zone, [c.t])[0]
+          return own ? { name: c.t, legends: { spots: own.spots.length, ...(own.ph ? { ph: own.ph } : {}), said: own.said } } : { name: c.t }
         })
       if (!left.length) continue
       const waits = left.map((n) => n.wait)

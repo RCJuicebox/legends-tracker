@@ -1,6 +1,7 @@
 import { respawnEstimate, type RespawnRecord } from '../../core/respawns'
 import { baseZone } from '../factions/attribution'
 import { zoneKey } from '../factions/names'
+import { LEGENDS_SPAWNS, type LegendsSpawn } from '../../shared/game/legendsSpawns'
 
 // What a zone's spawns allow: TAKP's classic spawn tables (scripts/takp-spawns.mjs) with each timer
 // put in Legends' terms. Legends is not classic: a zone's spawns come back on one timer of its own,
@@ -158,8 +159,10 @@ export interface MapSpot {
   y: number
   z: number
   mobs: { name: string; chance: number }[]
-  /** Classic timer, seconds. */
+  /** Classic timer, seconds; 0 for a spot of Legends' own. */
   timer: number
+  /** Where it is, in words, as the player put it (a Legends spot). */
+  where?: string
 }
 
 /** The spots in a zone where any of these mobs (any case) can pop. */
@@ -177,6 +180,30 @@ export function spotsOf(z: TakpZone, mobs: string[]): MapSpot[] {
   }
   return out
 }
+
+/** Legends' own spawns of these mobs in a zone (legendsSpawns.ts): what TAKP's tables lack. */
+export function legendsSpawnsOf(zone: string, mobs: string[]): LegendsSpawn[] {
+  const want = new Set(mobs.map(lower))
+  const k = zoneKey(baseZone(zone).replace(/ - (?:Solo|Group)$/, ''))
+  return LEGENDS_SPAWNS.filter((s) => zoneKey(s.zone) === k && want.has(lower(s.name)))
+}
+
+/**
+ * The spots in a zone where any of these mobs can pop: TAKP's, and Legends' own (a /waypoint's y, x
+ * is the map's -y, -x). A Legends spot's odds are not known: it is drawn as a sure one.
+ */
+export function spotsIn(z: TakpZone, mobs: string[]): MapSpot[] {
+  return [...spotsOf(z, mobs), ...legendsSpots(z.name, mobs)]
+}
+
+/** Legends' own spots of these mobs in a zone, as the map draws them. */
+export const legendsSpots = (zone: string, mobs: string[]): MapSpot[] =>
+  legendsSpawnsOf(zone, mobs).flatMap((s) =>
+    s.spots.map(({ at: [y, x, h], where }) => ({ x: -x, y: -y, z: h ?? 0, mobs: [{ name: s.name, chance: 100 }], timer: 0, ...(where ? { where } : {}) }))
+  )
+
+/** A spot as the game's /waypoint takes it, in the /loc order: "/waypoint -649, -13825". */
+export const waypoint = (s: Pick<MapSpot, 'x' | 'y'>) => `/waypoint ${Math.round(-s.y)}, ${Math.round(-s.x)}`
 
 /** A zone's map as the game draws it, with the spots a step's mobs pop at. */
 export interface SlayerMap {

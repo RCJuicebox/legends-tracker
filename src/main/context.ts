@@ -84,6 +84,8 @@ export interface AppContext {
   liveAchievements: LiveAchievements
   /** Plan › Hunter's side: which Hunter achievements the player has said do not work. */
   hunter: HunterPlanner
+  /** Plan › Slayer's side: the plan's data, and the player's choices (the overlay makes the plan from them). */
+  slayer: SlayerPlanner
   /** The parts that register, and flush, themselves (AppFeature): the two above. */
   features: AppFeature[]
   /** Each skill's last value the log gave, for the skill achievements. */
@@ -389,7 +391,8 @@ export function createContext(): AppContext {
   // engine has of its own (registered with the features, below).
   ctx.liveAchievements = new LiveAchievements(ctx)
   ctx.hunter = new HunterPlanner(logHistory, store.dir)
-  ctx.features = [ctx.factions, ctx.liveAchievements, new SlayerPlanner(logHistory, store.dir), ctx.hunter, new GroupHealth()]
+  ctx.slayer = new SlayerPlanner(logHistory, store.dir)
+  ctx.features = [ctx.factions, ctx.liveAchievements, ctx.slayer, ctx.hunter, new GroupHealth()]
 
   ctx.refreshOverlayVisibility = () =>
     ctx.overlays.setShown(

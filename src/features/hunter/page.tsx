@@ -32,6 +32,17 @@ const HOW = (
 
 /** How a named spawns, short: "1 spot · 10% · 6:00 · ≈ 1 h". */
 function NamedSpawn({ n }: { n: HunterNamed }) {
+  if (!n.spawn && n.legends)
+    return (
+      <Tip
+        className="mono sl-spawn"
+        text={`Legends’ own, not in TAKP’s tables: the spots ${n.legends.said.replace(/,.*$/, '')} found${n.legends.ph ? `; it pops in place of ${n.legends.ph.join(' or ')}` : ''}. Its odds and timer are not known; Map shows where.`}
+      >
+        {' '}
+        ({n.legends.spots === 1 ? '1 spot' : `${num(n.legends.spots)} spots`}
+        {n.legends.ph ? ` · PH ${n.legends.ph.join(' or ')}` : ''})
+      </Tip>
+    )
   if (!n.spawn) return <span className="faint small"> (not in TAKP’s tables)</span>
   const s = n.spawn
   const odds = s.up >= 1 ? 'always up' : `${num(Math.round(s.up * 100))}%`

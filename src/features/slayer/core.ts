@@ -10,6 +10,7 @@ import { isCity, zoneKey } from '../factions/names'
 import { SLAYER_CAMPS, type SlayerCamp } from '../../shared/game/slayerCamps'
 import { HUNT } from '../../shared/game/hunt'
 import { num } from '../../core/format'
+import type { SlayerPlanStepView, SlayerPlanTrackView } from '../../shared/tracking'
 
 // The Slayer plan: where to kill what each open Slayer achievement still wants, quickest first. A
 // camp is a zone and what dies there an hour; it is worth every open achievement its races feed, so
@@ -603,9 +604,11 @@ export interface SlayerPlanChoices {
   travelMin: number
   /** Kills an hour where play names a camp without a number. */
   pace: number
+  /** The plan's step shown on the achievements overlay. */
+  overlay: boolean
 }
 
-export const DEFAULT_CHOICES: SlayerPlanChoices = { excluded: [], included: [], outCamps: [], outMobs: [], travelMin: 10, pace: 60 }
+export const DEFAULT_CHOICES: SlayerPlanChoices = { excluded: [], included: [], outCamps: [], outMobs: [], travelMin: 10, pace: 60, overlay: false }
 
 /** A step of the plan: a stretch at one camp. */
 export interface SlayerStep {
@@ -776,4 +779,40 @@ export function planSlayer(data: Pick<SlayerPlanData, 'goals' | 'camps'> & { mov
     }
   })
   return { steps, daily, seconds: steps.reduce((s, st) => s + st.seconds + st.travel, 0), unplanned, goals }
+}
+
+/**
+ * The plan as the achievements overlay shows it: the step whose zone the player is in (the first, where
+ * several are), else the first step, to head to; and the step after it. The plan is made again from
+ * the counts as they are, so a step's kills and time are what is left of it.
+ */
+export function slayerPlanView(plan: SlayerPlan, goals: SlayerGoal[], choices: Pick<SlayerPlanChoices, 'pace'>, zone: string): SlayerPlanTrackView {
+  const z = zone ? zoneKey(campZone(zone)) : ''
+  const at = z ? plan.steps.findIndex((st) => zoneKey(st.camp.zone) === z) : -1
+  const view = (i: number): SlayerPlanStepView => {
+    const st = plan.steps[i]
+    return {
+      index: i,
+      zone: st.camp.zone,
+      here: !!z && zoneKey(st.camp.zone) === z,
+      tier: BANESTRIKE[st.tier] ?? 'Not for Banestrike',
+      seconds: st.seconds,
+      travel: st.travel,
+      ...(st.via?.length ? { via: st.via } : {}),
+      goals: st.focus.map((g) => ({ name: goals[g].name, count: goals[g].count, max: goals[g].max })),
+      mobs: stepKills(st, choices)
+        .map((k) => ({ name: k.name, n: Math.ceil(k.n) }))
+        .sort((a, b) => b.n - a.n)
+    }
+  }
+  const current = plan.steps.length ? Math.max(0, at) : -1
+  // After the step worked on: the plan's first, or the one after it.
+  const next = plan.steps.findIndex((_, i) => i !== current)
+  return {
+    steps: plan.steps.length,
+    goals: plan.goals.length,
+    secondsLeft: plan.seconds,
+    current: current < 0 ? null : view(current),
+    next: next < 0 ? null : view(next)
+  }
 }

@@ -2,10 +2,11 @@ import { useMemo } from 'react'
 import { useInvoke } from '../../renderer/src/hooks'
 import { Pending } from '../../renderer/src/components/ui'
 import { duration } from '../../core/format'
-import type { SlayerMap } from './spawns'
+import { waypoint, type SlayerMap } from './spawns'
 
 // A step's zone as the game's own map files draw it, with a dot at every spot its mobs pop at (TAKP's
-// spawn tables). The game's maps put x to the right and y down, as drawn here.
+// spawn tables, and Legends' own spawns the player found). The game's maps put x to the right and y
+// down, as drawn here.
 
 const PAD = 0.04
 
@@ -45,7 +46,8 @@ function SpawnMapView({ map }: { map: SlayerMap }) {
       {map.spots.map((s, i) => (
         <circle key={i} cx={s.x} cy={s.y} r={r} className="sl-map-spot">
           <title>
-            {s.mobs.map((m) => `${m.name}${m.chance < 100 ? ` ${m.chance}%` : ''}`).join(' or ')} · {duration(s.timer)} classic · /loc {-s.y}, {-s.x}
+            {s.mobs.map((m) => `${m.name}${m.chance < 100 ? ` ${m.chance}%` : ''}`).join(' or ')} · {s.timer ? `${duration(s.timer)} classic` : (s.where ?? 'Legends')} ·{' '}
+            {waypoint(s)}
           </title>
         </circle>
       ))}
@@ -63,7 +65,9 @@ export function SpawnMap({ zone, mobs }: { zone: string; mobs: string[] }) {
     <div className="sl-map-wrap">
       <SpawnMapView map={map} />
       <div className="faint small">
-        {map.spots.length ? `${map.spots.length} spot${map.spots.length === 1 ? '' : 's'} (classic, from TAKP)` : 'No spot of these mobs in TAKP’s tables'}
+        {map.spots.length
+          ? `${map.spots.length} spot${map.spots.length === 1 ? '' : 's'} (${map.spots.some((s) => !s.timer) ? 'TAKP’s classic tables, and Legends’ own as found' : 'classic, from TAKP'})`
+          : 'No spot of these mobs in TAKP’s tables'}
         {!map.lines.length && ' · the game’s map for this zone was not found'}
       </div>
     </div>

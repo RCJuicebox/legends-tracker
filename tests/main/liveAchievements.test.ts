@@ -17,6 +17,7 @@ vi.mock('../../src/main/paths', () => ({ cacheDir: () => h.dir }))
 h.dir = mkdtempSync(join(tmpdir(), 'eql-live-'))
 process.env['EQL_USER_DATA'] = h.dir
 const { LiveAchievements } = await import('../../src/main/liveAchievements')
+const { DEFAULT_CHOICES } = await import('../../src/features/slayer/core')
 
 type Read = 'readMarks' | 'readFaction' | 'readSlayer' | 'readSkills'
 type Reads = Record<Read, (character: string) => Promise<void>> & { marks: { character: string; ticks: string[]; tracked: string[] } | null }
@@ -101,6 +102,113 @@ describe('LiveAchievements tells the Hunter named', () => {
     Object.assign((live as unknown as { ctx: object }).ctx, { hunter: { isBroken: (a: string) => a === 'Hunter of Befallen' } })
     inner.zone = 'Befallen'
     expect(inner.hunterHere()).toBeNull()
+  })
+})
+
+describe('LiveAchievements tells the Hunter named of Legends’ own', () => {
+  it('with the spots the player found, as /waypoints, and what it pops in place of', () => {
+    const { live } = setup()
+    const inner = live as unknown as { character: string; zone: string; exported: unknown; hunterHere: () => { rows: unknown[] } | null }
+    inner.character = 'Tester_neriak'
+    inner.exported = {
+      character: 'Tester_neriak',
+      file: 'x',
+      modified: T0,
+      sections: [{ cat: 'EverQuest', name: 'Hunter', ach: [{ n: 'Hunter of The Western Plains of Karana', c: [{ t: 'a werewolf bandit' }] }] }]
+    }
+    inner.zone = 'The Western Plains of Karana'
+    expect(inner.hunterHere()?.rows).toEqual([
+      {
+        achievement: 'Hunter of The Western Plains of Karana',
+        left: ['a werewolf bandit'],
+        total: 1,
+        since: [],
+        waypoints: {
+          'a werewolf bandit': [
+            '/waypoint -649, -13825',
+            '/waypoint -3969, -10966 · the southern border of the zone',
+            '/waypoint 882, -6985 · in a group of bandits',
+            '/waypoint -2783, -10736'
+          ]
+        },
+        ph: { 'a werewolf bandit': 'a bandit' }
+      }
+    ])
+  })
+})
+
+describe('LiveAchievements makes the Slayer plan again', () => {
+  const goal = (name: string, count: number, max: number) => ({ name, section: 'Slayer: Conquest', races: '', count, max, optional: false, tier: 0 })
+  const data = (exportAt: number) => ({
+    character: 'Tester_neriak',
+    export: { file: 'x', modified: exportAt },
+    goals: [goal('Orc Stomp!', 4900, 5000), goal('A Giant Problem', 900, 1000)],
+    camps: [
+      { id: 'log:Clan Crushbone', zone: 'Clan Crushbone', kinds: [{ name: 'an orc pawn', perHour: 100, goals: [0] }], source: 'log', pace: { 0: 100 } },
+      { id: 'log:Permafrost', zone: 'The Permafrost Caverns', kinds: [{ name: 'a frost giant', perHour: 100, goals: [1] }], source: 'log', pace: { 1: 100 } }
+    ],
+    unplaced: [],
+    pending: 0,
+    moves: [],
+    killSpeed: null,
+    timings: [],
+    hunter: []
+  })
+
+  it('from the counts as they are now, the step in the player’s zone first', async () => {
+    const { live } = setup()
+    const inner = live as unknown as {
+      character: string
+      zone: string
+      slayer: unknown
+      slayerView: unknown
+      ctx: Record<string, unknown>
+      slayerPlan: AchievementTrack['slayerPlan']
+      readSlayerPlan: (c: string) => Promise<void>
+    }
+    const asked: number[] = []
+    inner.ctx.slayer = { forOverlay: async (_c: unknown, _who: string, at: number) => (asked.push(at), { data: data(T0), choices: { ...DEFAULT_CHOICES, overlay: true } }) }
+    inner.character = 'Tester_neriak'
+    inner.slayer = { character: 'Tester_neriak' }
+    // Ninety orcs since the export: ten to go, a quarter hour's kills, against the giants' hour.
+    inner.slayerView = { exportAt: T0, rows: [{ name: 'Orc Stomp!', count: 4900, since: 90, done: false }] }
+    await inner.readSlayerPlan('Tester_neriak')
+    expect(asked).toEqual([T0])
+    expect(inner.slayerPlan?.current).toMatchObject({ index: 0, zone: 'Clan Crushbone', here: false, goals: [{ name: 'Orc Stomp!', count: 4990, max: 5000 }] })
+    expect(inner.slayerPlan?.current?.mobs).toEqual([{ name: 'an orc pawn', n: 10 }])
+    expect(inner.slayerPlan?.next?.zone).toBe('The Permafrost Caverns')
+    inner.zone = 'The Permafrost Caverns'
+    await inner.readSlayerPlan('Tester_neriak')
+    expect(inner.slayerPlan?.current).toMatchObject({ zone: 'The Permafrost Caverns', here: true })
+    // The game said Orc Stomp! was done: only the giants are left.
+    inner.slayerView = { exportAt: T0, rows: [{ name: 'Orc Stomp!', count: 4900, since: 0, done: true }] }
+    await inner.readSlayerPlan('Tester_neriak')
+    expect([inner.slayerPlan?.steps, inner.slayerPlan?.next]).toEqual([1, null])
+    // Data for another export than the counts', or a character that does not show it: nothing.
+    inner.slayerView = { exportAt: T0 + 1, rows: [] }
+    await inner.readSlayerPlan('Tester_neriak')
+    expect(inner.slayerPlan).toBeNull()
+    inner.ctx.slayer = { forOverlay: async () => null }
+    inner.slayerView = { exportAt: T0, rows: [] }
+    await inner.readSlayerPlan('Tester_neriak')
+    expect(inner.slayerPlan).toBeNull()
+  })
+
+  it('on entering a zone, and at once when the choices change', async () => {
+    const s = setup()
+    const made: string[] = []
+    vi.spyOn(s.live as unknown as { readSlayerPlan: (c: string) => Promise<void> }, 'readSlayerPlan').mockImplementation(async (c) => void made.push(c))
+    s.status.zone = 'Clan Crushbone'
+    await s.tick(0)
+    expect(made).toEqual(['Tester_neriak'])
+    await s.tick(1000)
+    expect(made).toHaveLength(1)
+    s.live.slayerChoicesChanged('Someone_else')
+    await s.tick(2000)
+    expect(made).toHaveLength(1)
+    s.live.slayerChoicesChanged('Tester_neriak')
+    await s.tick(3000)
+    expect(made).toHaveLength(2)
   })
 })
 

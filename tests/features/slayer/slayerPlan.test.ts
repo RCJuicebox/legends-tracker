@@ -14,6 +14,7 @@ import {
   planSlayer,
   readKillLine,
   slayerGoals,
+  slayerPlanView,
   slayerRaceLists,
   stepKills,
   type SlayerGoal,
@@ -127,6 +128,9 @@ describe('Slayer plan: the goals', () => {
   it('keeps only well-formed choices', () => {
     expect(sanitizeChoices({ excluded: ['a', 3], travelMin: 900, pace: 'x' })).toEqual({ ...DEFAULT_CHOICES, excluded: ['a'], travelMin: 120 })
     expect(sanitizeChoices(null)).toEqual(DEFAULT_CHOICES)
+    // Shown on the overlay only when said so in so many words.
+    expect(sanitizeChoices({ overlay: true }).overlay).toBe(true)
+    expect(sanitizeChoices({ overlay: 'yes' }).overlay).toBe(false)
   })
 })
 
@@ -234,6 +238,45 @@ describe('Slayer plan: the plan', () => {
     // Ten kedge at five a day, beside the plan.
     expect(plan.daily.map((d) => [d.camp.id, d.days, d.goals])).toEqual([['play:Kedge Keep', 2, [3]]])
     expect(plan.unplanned).toEqual([])
+  })
+
+  it('shows the overlay the step in the zone the player is in, else the first to head to, and the one after', () => {
+    const plan = planSlayer({ goals, camps }, DEFAULT_CHOICES)
+    const away = slayerPlanView(plan, goals, DEFAULT_CHOICES, 'The Northern Plains of Karana')
+    expect(away.steps).toBe(2)
+    expect(away.goals).toBe(4)
+    expect(Math.round(away.secondsLeft)).toBe(7200)
+    expect(away.current).toMatchObject({ index: 0, zone: 'The Permafrost Caverns', here: false, tier: 'Not for Banestrike' })
+    expect(away.current?.goals).toEqual([
+      { name: 'Might They Be Giants?', count: 4950, max: 5000 },
+      { name: 'A Giant Problem', count: 980, max: 1000 }
+    ])
+    expect(away.next).toMatchObject({ index: 1, zone: 'Clan Crushbone', travel: 600 })
+    // At Crushbone (an instance of it counts): that step now, the Permafrost after it.
+    const there = slayerPlanView(plan, goals, DEFAULT_CHOICES, 'Clan Crushbone - Solo')
+    expect([there.current?.index, there.current?.here, there.next?.index]).toEqual([1, true, 0])
+    // Nothing left to plan: no step.
+    expect(slayerPlanView(planSlayer({ goals: [], camps }, DEFAULT_CHOICES), [], DEFAULT_CHOICES, '')).toMatchObject({ steps: 0, current: null, next: null })
+  })
+
+  it('says on the overlay what a step kills, most first, in whole kills', () => {
+    const tiered = [g('Might They Be Giants?', 4950, 5000, 2), g('A Giant Problem', 980, 1000, 1)]
+    const giants: SlayerPlanCamp = {
+      id: 'log:P',
+      zone: 'P',
+      kinds: [
+        { name: 'a frost giant', perHour: 15, goals: [0, 1] },
+        { name: 'a hill giant', perHour: 45, goals: [0, 1] }
+      ],
+      source: 'log',
+      pace: { 0: 60, 1: 60 }
+    }
+    const v = slayerPlanView(planSlayer({ goals: tiered, camps: [giants] }, DEFAULT_CHOICES), tiered, DEFAULT_CHOICES, 'P')
+    expect(v.current?.tier).toBe('Highly Decorated')
+    expect(v.current?.mobs).toEqual([
+      { name: 'a hill giant', n: 15 },
+      { name: 'a frost giant', n: 5 }
+    ])
   })
 
   it('works through Banestrike’s tiers in turn, however much quicker a later one is', () => {

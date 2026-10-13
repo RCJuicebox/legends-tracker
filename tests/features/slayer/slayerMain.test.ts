@@ -104,7 +104,9 @@ const ctx = {
       race: (m: string) => (m.toLowerCase() in races ? races[m.toLowerCase()] : undefined),
       lookUp: async (mobs: string[]) => (asked.push(mobs), learned)
     },
-    fact: () => undefined
+    fact: () => undefined,
+    changed: [] as string[],
+    slayerChoicesChanged: (c: string) => ctx.liveAchievements.changed.push(c)
   },
   factions: {
     causes: {
@@ -197,6 +199,20 @@ describe('the Slayer page', () => {
     expect(JSON.parse(readFileSync(join(h.dir, 'slayer-plan.json'), 'utf8')).Kelwyn_neriak.outCamps).toEqual(['log:Clan Crushbone'])
     await expect(call('slayer:choices', '../x', DEFAULT_CHOICES)).rejects.toThrow()
     await expect(call('slayer:plan', '../x')).rejects.toThrow()
+  })
+
+  it('hands the overlay the plan’s data only for a character that shows it there, and tells the overlay a choice changed', async () => {
+    const exp = await ctx.achievementFiles.exported('Kelwyn_neriak')
+    const c = ctx as unknown as AppContext
+    expect(await planner.forOverlay(c, 'Kelwyn_neriak', exp!.modified)).toBeNull()
+    await call('slayer:choices', 'Kelwyn_neriak', { ...DEFAULT_CHOICES, overlay: true })
+    expect(ctx.liveAchievements.changed.at(-1)).toBe('Kelwyn_neriak')
+    const got = await planner.forOverlay(c, 'Kelwyn_neriak', exp!.modified)
+    expect(got?.choices.overlay).toBe(true)
+    expect(got?.data.goals.map((g) => g.name)).toEqual(['Orc Stomp!', 'Might They Be Giants?'])
+    // The same data again while it is fresh, for the same export.
+    expect((await planner.forOverlay(c, 'Kelwyn_neriak', exp!.modified))?.data).toBe(got?.data)
+    await call('slayer:choices', 'Kelwyn_neriak', { ...DEFAULT_CHOICES, outCamps: ['log:Clan Crushbone'] })
   })
 
   it('reads the choices kept at the next start', async () => {

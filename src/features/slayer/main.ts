@@ -26,7 +26,21 @@ import {
   type SlayerPlanChoices,
   type SlayerPlanData
 } from './core'
-import { isMarked, mapMarks, mobSpawns, parseMap, spotsOf, zoneIndex, zoneTimings, type MobSpawn, type SlayerMap, type SlayerMark, type SpawnTables } from './spawns'
+import {
+  isMarked,
+  legendsSpots,
+  mapMarks,
+  mobSpawns,
+  parseMap,
+  spotsIn,
+  waypoint,
+  zoneIndex,
+  zoneTimings,
+  type MobSpawn,
+  type SlayerMap,
+  type SlayerMark,
+  type SpawnTables
+} from './spawns'
 import type { RespawnRecord } from '../../core/respawns'
 import TAKP from '../../shared/game/takpSpawns.json'
 import { hunterZones } from '../hunter/core'
@@ -56,6 +70,8 @@ const killConsumer: HistoryConsumer<SlayerKillTallies> = {
 export const KILLS_KEY = 'slayerKills'
 /** One plan's data is shared for this long: the page asks every minute, and reading every log takes a while. */
 const SHARED_MS = 30_000
+/** The overlay's plan stands on data this old at most: what the camps' paces come from moves slowly. */
+const OVERLAY_MS = 10 * 60_000
 /** Mobs asked of eqlwiki for one plan at most: fifty a request, in the background. */
 const LOOKUPS = 400
 
@@ -70,7 +86,8 @@ export function sanitizeChoices(v: unknown): SlayerPlanChoices {
     outCamps: names(c.outCamps),
     outMobs: names(c.outMobs).map((m) => m.toLowerCase()),
     travelMin: num(c.travelMin, 0, 120, DEFAULT_CHOICES.travelMin),
-    pace: num(c.pace, 1, 2000, DEFAULT_CHOICES.pace)
+    pace: num(c.pace, 1, 2000, DEFAULT_CHOICES.pace),
+    overlay: c.overlay === true
   }
 }
 
@@ -81,6 +98,8 @@ export class SlayerPlanner implements AppFeature {
   /** What each page last marked on the game's map: the Slayer plan's steps, and Plan › Hunter's named. */
   private readonly marks: JsonFile<Record<MarkSet, SlayerMark[]>>
   private readonly shared = new Map<string, { at: number; data: Promise<SlayerPlanData> }>()
+  /** The data the overlay's plan was last made from, by character: made again when it is old or another export came. */
+  private readonly overlayData = new Map<string, { at: number; exportAt: number; data: Promise<SlayerPlanData>; done?: SlayerPlanData }>()
 
   constructor(
     private readonly history: LogHistory,
@@ -116,6 +135,8 @@ export class SlayerPlanner implements AppFeature {
     handle('slayer:choices', (character, choices) => {
       if (!isCharacterKey(character)) throw new Error('No such character.')
       this.choices.set({ ...this.choices.get(), [character]: sanitizeChoices(choices) })
+      // The overlay's plan follows what was chosen at once.
+      ctx.liveAchievements.slayerChoicesChanged(character)
     })
     handle('slayer:map', async (zone, mobs) => {
       if (typeof zone !== 'string' || !Array.isArray(mobs)) throw new Error('No such zone.')
@@ -128,6 +149,32 @@ export class SlayerPlanner implements AppFeature {
       this.marks.set(next)
       return markMaps(ctx.installDir(), [...next.slayer, ...next.hunter])
     })
+  }
+
+  /**
+   * What the achievements overlay makes the plan from, for a character that shows it there (null for
+   * one that does not): the camps as last read, read again every OVERLAY_MS or for an export written
+   * since (`exportAt`), and the player's choices. The counts the caller puts in as they are now.
+   */
+  async forOverlay(ctx: AppContext, character: string, exportAt: number): Promise<{ data: SlayerPlanData; choices: SlayerPlanChoices } | null> {
+    const choices = this.choices.get()[character]
+    if (!choices?.overlay) {
+      this.overlayData.delete(character)
+      return null
+    }
+    let had = this.overlayData.get(character)
+    if (!had || had.exportAt !== exportAt || Date.now() - had.at >= OVERLAY_MS) {
+      const data = this.data(ctx, character)
+      // Data only old, for the same export, still stands while the new is read: reading every log takes a while.
+      const stale = had?.exportAt === exportAt ? had.done : undefined
+      const entry: { at: number; exportAt: number; data: Promise<SlayerPlanData>; done?: SlayerPlanData } = { at: Date.now(), exportAt, data, done: stale }
+      this.overlayData.set(character, (had = entry))
+      data.then(
+        (d) => (entry.done = d),
+        () => this.overlayData.get(character) === entry && this.overlayData.delete(character)
+      )
+    }
+    return { data: had.done ?? (await had.data), choices }
   }
 
   /** Every kill in this character's logs and the player's other characters', by zone, and their trips between zones. */
@@ -245,6 +292,19 @@ export function namedSpawns(timings: ReturnType<typeof zoneTimings>): (zone: str
   }
 }
 
+/** A mob of more spots than this is everywhere in its zone: its waypoints are no help. */
+const WAYPOINTS = 4
+
+/**
+ * Where a mob pops in a zone, as the game's /waypoint takes it: TAKP's spots and Legends' own (the
+ * player's, for a named the tables lack). None for a mob of more than a few spots.
+ */
+export function waypointsOf(zone: string, mob: string): { at: string; where?: string }[] {
+  const short = tableOf(zone)
+  const spots = short ? spotsIn(TABLES[short], [mob]) : legendsSpots(zone, [mob])
+  return spots.length > WAYPOINTS ? [] : spots.map((s) => ({ at: waypoint(s), ...(s.where ? { where: s.where } : {}) }))
+}
+
 /** The spawn tables' timings: each zone's timers against classic, from the Respawns page's records. */
 export const spawnTimings = (records: RespawnRecord[]) => zoneTimings(TABLES, records)
 
@@ -282,7 +342,7 @@ async function spawnMap(installDir: string, zone: string, mobs: string[]): Promi
   const maps = join(installDir, 'maps')
   const files = await Promise.all([`${short}.txt`, `${short}_1.txt`].map((f) => (installDir ? readText(join(maps, f)) : Promise.resolve(null))))
   const map = parseMap(files.filter((t): t is string => t !== null).join('\n'))
-  return { zone: TABLES[short].name, short, ...map, spots: spotsOf(TABLES[short], mobs) }
+  return { zone: TABLES[short].name, short, ...map, spots: spotsIn(TABLES[short], mobs) }
 }
 
 /**
@@ -310,7 +370,7 @@ export async function markMaps(installDir: string, marks: SlayerMark[]): Promise
   let spots = 0
   const marked = new Set<string>()
   for (const [short, z] of byZone) {
-    const lines = mapMarks(spotsOf(TABLES[short], [...z.mobs]), spotsOf(TABLES[short], [...z.named]))
+    const lines = mapMarks(spotsIn(TABLES[short], [...z.mobs]), spotsIn(TABLES[short], [...z.named]))
     if (!lines.length) continue
     const base = (await readText(join(maps, `${short}_1.txt`))) ?? ''
     await writeFile(join(set, `${short}_1.txt`), (base && !base.endsWith('\n') ? base + '\r\n' : base) + lines.join('\r\n') + '\r\n', 'latin1')

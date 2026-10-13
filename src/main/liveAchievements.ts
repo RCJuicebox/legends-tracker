@@ -10,9 +10,11 @@ import { classIdOf, type ClassId } from '../shared/game/classes'
 import { parseFactionLine } from '../features/factions/core'
 import { standingsNow } from '../features/factions/main'
 import { carryFollow, freshFollow, pickStep, readFollow, sanitizeFollows, sayStep, type FollowEvent, type FollowedPlan, type FollowState } from '../features/factions/tracker'
-import type { AchievementTrack, FactionTrackView, HunterTrackView, SkillRow, SkillTrackView, SlayerTrackView, TrackedAchievement } from '../shared/tracking'
+import type { AchievementTrack, FactionTrackView, HunterTrackView, SkillRow, SkillTrackView, SlayerPlanTrackView, SlayerTrackView, TrackedAchievement } from '../shared/tracking'
 import { hunterHere, hunterZones } from '../features/hunter/core'
-import { bareName } from '../features/slayer/core'
+import { bareName, planSlayer, slayerPlanView } from '../features/slayer/core'
+import { waypointsOf } from '../features/slayer/main'
+import { legendsSpawnsOf } from '../features/slayer/spawns'
 import type { AchievementsExport } from './achievements'
 import type { AppContext } from './context'
 import type { AppFeature } from './appFeature'
@@ -148,6 +150,9 @@ export class LiveAchievements implements AppFeature {
   private slayerView: SlayerTrackView | null = null
   private skillsAt = 0
   private skills: SkillTrackView | null = null
+  /** When the Slayer plan was last asked to be made again (a zone entered, the choices changed), 0 when made since. */
+  private planAt = 0
+  private slayerPlan: SlayerPlanTrackView | null = null
   /** The achievements export as last read, by character and when it was written. */
   private exported: (AchievementsExport & { character: string }) | null = null
   /** The player's marks on the Achievements page: hand ticks, and the achievements tracked. */
@@ -236,6 +241,7 @@ export class LiveAchievements implements AppFeature {
       this.slayerView = null
       this.faction = null
       this.skills = null
+      this.slayerPlan = null
       this.marks = null
       this.byAchievement = null
       this.moved = {}
@@ -243,9 +249,10 @@ export class LiveAchievements implements AppFeature {
     }
     const zone = this.ctx.engine.status.zone
     if (zone !== this.zone) {
-      // The step worked on can be the one in the zone just entered.
+      // The step worked on can be the one in the zone just entered, the faction plan's or the Slayer plan's.
       this.zone = zone
       this.factionAt ||= now - SETTLE_MS
+      this.planAt ||= now - SETTLE_MS
     }
     if (this.reading || !character || !this.ctx.engine.status.watching) return
     const due = (at: number) => at > 0 && now - at >= SETTLE_MS
@@ -254,10 +261,13 @@ export class LiveAchievements implements AppFeature {
     const sweep = now - this.sweptAt >= SWEEP_MS && this.shown(character, now)
     // A completion line clears slayerSince's wait: it is read on the short settle.
     const killsDue = this.slayerAt > 0 && (this.slayerSince ? now - this.slayerAt >= KILLS_SETTLE_MS || now - this.slayerSince >= KILLS_AT_MOST_MS : due(this.slayerAt))
-    if (!sweep && !due(this.factionAt) && !killsDue && !due(this.skillsAt)) return
+    if (!sweep && !due(this.factionAt) && !killsDue && !due(this.skillsAt) && !due(this.planAt)) return
     const faction = sweep || due(this.factionAt)
     const slayer = sweep || killsDue
     const skills = sweep || due(this.skillsAt)
+    // The Slayer plan is made again from the counts each time they are read.
+    const plan = slayer || due(this.planAt)
+    if (plan) this.planAt = 0
     if (faction) this.factionAt = 0
     if (slayer) {
       this.slayerAt = 0
@@ -271,6 +281,7 @@ export class LiveAchievements implements AppFeature {
         if (sweep || !this.marks) await this.readMarks(character)
         if (faction) await this.readFaction(character)
         if (slayer) await this.readSlayer(character)
+        if (plan) await this.readSlayerPlan(character)
         if (skills) await this.readSkills(character)
         if (character === this.character) this.publish()
       } catch (e) {
@@ -586,6 +597,34 @@ export class LiveAchievements implements AppFeature {
     }
   }
 
+  /**
+   * Plan › Slayer's step, for a character that shows it on the overlay: the plan made again with the
+   * counts as they are now (the export's and the kills since), the camps as the page reads them.
+   */
+  private async readSlayerPlan(character: string): Promise<void> {
+    const view = this.slayerView
+    const got = view && this.slayer?.character === character ? await this.ctx.slayer?.forOverlay(this.ctx, character, view.exportAt) : null
+    if (!view || !got || got.data.export?.modified !== view.exportAt) {
+      this.slayerPlan = null
+      return
+    }
+    const live = new Map(view.rows.map((r) => [r.name.toLowerCase(), r]))
+    const goals = got.data.goals.map((g) => {
+      const r = live.get(g.name.toLowerCase())
+      return r ? { ...g, count: r.done ? g.max : Math.min(g.max, r.count + r.since) } : g
+    })
+    const v = slayerPlanView(planSlayer({ ...got.data, goals }, got.choices), goals, got.choices, this.zone)
+    // Where the step's mobs pop, for those of a few spots (a named's camp, a rare): typed in game for an arrow.
+    const ways = v.current ? v.current.mobs.flatMap((m) => waypointsOf(v.current!.zone, m.name).map((w) => `${w.at} · ${m.name}${w.where ? `, ${w.where}` : ''}`)) : []
+    if (v.current && ways.length) v.current.waypoints = ways.slice(0, 4)
+    this.slayerPlan = v
+  }
+
+  /** The player changed Plan › Slayer's choices (or showed it here): the plan is made again at once. */
+  slayerChoicesChanged(character: string): void {
+    if (character === this.character) this.planAt = Date.now() - SETTLE_MS
+  }
+
   // ---- skills ----
 
   /**
@@ -673,7 +712,23 @@ export class LiveAchievements implements AppFeature {
       hunterZones(exp.sections, (bare) => last.get(bare) ?? 0, exp.modified),
       this.zone
     ).filter((r) => !this.ctx.hunter?.isBroken(r.achievement))
-    return rows.length ? { zone: this.zone, rows: rows.map((r) => ({ achievement: r.achievement, left: r.left.map((n) => n.name), total: r.total, since: r.since })) } : null
+    const where = (names: string[]) => {
+      const waypoints: Record<string, string[]> = {}
+      const ph: Record<string, string> = {}
+      for (const n of names) {
+        const at = waypointsOf(this.zone, n)
+        if (at.length) waypoints[n] = at.map((w) => (w.where ? `${w.at} · ${w.where}` : w.at))
+        const own = legendsSpawnsOf(this.zone, [n])[0]
+        if (own?.ph) ph[n] = own.ph.join(' or ')
+      }
+      return { ...(Object.keys(waypoints).length ? { waypoints } : {}), ...(Object.keys(ph).length ? { ph } : {}) }
+    }
+    return rows.length
+      ? {
+          zone: this.zone,
+          rows: rows.map((r) => ({ achievement: r.achievement, left: r.left.map((n) => n.name), total: r.total, since: r.since, ...where(r.left.map((n) => n.name)) }))
+        }
+      : null
   }
 
   // ---- telling ----
@@ -686,9 +741,10 @@ export class LiveAchievements implements AppFeature {
       slayer: this.slayerView,
       skills: this.skills,
       hunter: this.hunterHere(),
+      slayerPlan: this.slayerPlan,
       tracked: this.trackedAchievements()
     }
-    const key = JSON.stringify([track.character, track.faction, track.slayer, track.skills, track.hunter, track.tracked])
+    const key = JSON.stringify([track.character, track.faction, track.slayer, track.skills, track.hunter, track.slayerPlan, track.tracked])
     if (key === this.lastKey) return
     this.lastKey = key
     this.last = track
