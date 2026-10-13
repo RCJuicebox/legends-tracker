@@ -2,8 +2,14 @@
 
 What changed in each version. The release workflow publishes a version's section as its release notes, and installed copies show them when an update arrives.
 
-## Unreleased
+## 2.14.0 (2026-10-13)
 
+- **The Slayer plan on the achievements overlay.** Turn on **On the overlay** at the top of Plan › Slayer (each character its own; off to begin with). The overlay then shows the plan's step for the zone you are in ("Now"), or the one to head to and the way your log has gone there, with its achievements' counts, what to kill and about how long, then the step after. It plans again as your kills come in, when you change zones and when you change something on the page.
+- **Plan › Slayer follows eqlwiki's Slayer guide.** The guide's Skill, Special and Conquest pages (a player's Classic-era "how I would do it") are built in. Each zone it names for an achievement you still have is a camp, paced by the zone's spawns as the players' camps are; your own log's camp in the same zone still comes first, and a city is never one. Hover **guide** beside an achievement in a step for the guide's words; the achievements not planned and the achievement chips show them too. Its one-stop spots go with a step there (Steamfont's NE corner, the Paineel newbie area, the Rathe by the froglok city).
+- **Slayer counts: a mob of several races under one name now counts.** Classic's "a bandit" is Human, Half Elf or Barbarian under the one name, and neither eqlwiki nor the name gives it a race, so its kills counted toward nothing. Each kill now keeps the zone it was in, and such a mob counts by its races' share of that zone's spawns, shown as a guess (`+~N`) until an export settles it. The West Karana bandits turned out to count whole toward What Keeps Mankind Alive?, and the next export teaches the app so.
+- **Plan › Hunter: find a zone.** A search box finds an achievement by any words of its zone, its name or a named it still wants ("west karana", "werewolf"), and a button with the name of the zone you are in shows just that one.
+- **Plan › Hunter knows named the classic tables lack.** The werewolf bandit (West Karana, in place of a bandit) has its four spots on Plan › Hunter, its map and the marks on the game's map. A spot's tooltip on a map gives its `/waypoint`.
+- **Hunter marks on the game's map are deep blue, not gold,** which was hard to read on the map. Mark them again from Plan › Hunter to change ones already made.
 - **Play on more than one PC? Add the other PC's logs.** Settings › Game › **Other PCs' logs** takes the Logs folder of another PC you play on, most often shared over your home network (`\\THATPC\Logs`). Each character's log there counts toward that character here as this PC's does: motes and instance runs, Slayer and Hunter kills, faction standings, AAs, skills, casts and purchases. Where both PCs played the same character, their logs are put together in the order things happened. While the other PC is off, what was read from it before still counts, and nothing waits on it. Its log is only ever read: timers, overlays and the meter stay with this PC's log. Data Sources has a row for it.
 
 ## 2.13.0 (2026-10-12)
