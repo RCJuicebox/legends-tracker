@@ -629,7 +629,7 @@ export function Slayer() {
                 </Tip>
               )}
               <span className="spacer" />
-              <Tip text="Puts a dot at every spot the plan’s mobs (red) and the Hunter named left (gold) pop at, on the game’s own map: in a map set of its own, LegendsTracker (a copy of the game’s maps, so its own stay as they are). Pick it in the map window.">
+              <Tip text="Puts a dot at every spot the plan’s mobs (red) and the Hunter named left (blue) pop at, on the game’s own map: in a map set of its own, LegendsTracker (a copy of the game’s maps, so its own stay as they are). Pick it in the map window.">
                 <button className="btn small" onClick={() => void mark(true)}>
                   Mark on the game’s map
                 </button>

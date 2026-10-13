@@ -147,7 +147,7 @@ export function Hunter() {
                   </button>
                 )}
                 <span className="spacer" />
-                <Tip text="Puts a gold dot at every spot the named left pop at, on the game’s own map: in a map set of its own, LegendsTracker (a copy of the game’s maps, so its own stay as they are). Pick it in the map window.">
+                <Tip text="Puts a blue dot at every spot the named left pop at, on the game’s own map: in a map set of its own, LegendsTracker (a copy of the game’s maps, so its own stay as they are). Pick it in the map window.">
                   <button className="btn small" onClick={() => void mark(true)}>
                     Mark on the game’s map
                   </button>

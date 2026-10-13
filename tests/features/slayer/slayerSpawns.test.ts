@@ -162,7 +162,7 @@ describe('the game’s maps', () => {
     const lines = mapMarks(spotsOf(TABLES.unrest, ['a ghoul', 'lesser blade fiend']).slice(0, 1), spotsOf(TABLES.unrest, ['Khrix Fritchoff']))
     expect(lines).toEqual([
       'P 10.0000, 20.0000, 0.0000, 240, 40, 40, 2, Slayer_a_ghoul_90%_or_lesser_blade_fiend_10%',
-      'P 50.0000, 60.0000, 1.0000, 230, 180, 0, 3, Hunter_Khrix_Fritchoff'
+      'P 50.0000, 60.0000, 1.0000, 0, 60, 220, 3, Hunter_Khrix_Fritchoff'
     ])
     expect(isMarked(['P 1, 2, 3, 0, 0, 0, 3, to_Freeport', ...lines].join('\r\n'))).toBe(true)
     expect(isMarked("P -325, -50, 0, 150, 0, 200, 3, to_Dagnor's_Cauldron\r\n")).toBe(false)

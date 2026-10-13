@@ -297,12 +297,12 @@ const MARKED = /^P .*, (?:Slayer|Hunter)_[^,]*$/m
 export const isMarked = (text: string) => MARKED.test(text)
 
 /**
- * The marks for a zone's label layer: a point at each spot, red for the plan's mobs and gold for
+ * The marks for a zone's label layer: a point at each spot, red for the plan's mobs and deep blue for
  * Hunter named, labelled with what pops there ("Slayer_a_hill_giant_60%").
  */
 export function mapMarks(spots: MapSpot[], named: MapSpot[]): string[] {
   const label = (kind: string, s: MapSpot) =>
     `${kind}_${s.mobs.map((m) => `${m.name}${m.chance < 100 ? ` ${m.chance}%` : ''}`).join(' or ')}`.replace(/[\s,]+/g, '_').replace(/[^\x20-\x7e]/g, '')
   const line = (s: MapSpot, rgb: string, size: number, text: string) => `P ${s.x}.0000, ${s.y}.0000, ${s.z}.0000, ${rgb}, ${size}, ${text}`
-  return [...spots.map((s) => line(s, '240, 40, 40', 2, label('Slayer', s))), ...named.map((s) => line(s, '230, 180, 0', 3, label('Hunter', s)))]
+  return [...spots.map((s) => line(s, '240, 40, 40', 2, label('Slayer', s))), ...named.map((s) => line(s, '0, 60, 220', 3, label('Hunter', s)))]
 }
