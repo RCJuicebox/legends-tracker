@@ -547,7 +547,7 @@ export function Slayer() {
                               key={g}
                               on={inPlay.has(g)}
                               onChange={(on) => toggleGoal(data.goals[g], on)}
-                              title={`${data.goals[g].races} ${num(data.goals[g].count)}/${num(data.goals[g].max)}${guideTip(data.goals[g].name) ? `\neqlwiki’s guide:${guideTip(data.goals[g].name)}` : ''}`}
+                              title={`${data.goals[g].races} ${num(data.goals[g].count)}/${num(data.goals[g].max)}${guideTip(data.goals[g].name) ? `\neqlwiki’s guide: ${guideTip(data.goals[g].name)}` : ''}`}
                             >
                               {data.goals[g].name}
                               {data.goals[g].optional ? ' (optional)' : ''}
