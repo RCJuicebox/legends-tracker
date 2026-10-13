@@ -6,6 +6,7 @@ import {
   buildCamps,
   DEFAULT_CHOICES,
   emptyKillTallies,
+  guideTip,
   joinKillTallies,
   joinMoves,
   optionalSlayer,
@@ -18,7 +19,9 @@ import {
   type SlayerGoal,
   type SlayerPlanCamp
 } from '../../../src/features/slayer/core'
-import { zoneTimings, type SpawnTables } from '../../../src/features/slayer/spawns'
+import { zoneIndex, zoneTimings, type SpawnTables } from '../../../src/features/slayer/spawns'
+import { SLAYER_GUIDE } from '../../../src/shared/game/slayerGuide'
+import TAKP from '../../../src/shared/game/takpSpawns.json'
 
 // The Slayer plan's travel (the log's own trips between zones), the Hunter named left on the way, and
 // the camps TAKP's spawn tables pace: made-up logs, exports and tables.
@@ -134,6 +137,56 @@ const place = (mob: string, race: string) => {
   return goals.flatMap((_, i) => (p.key !== null && races.keys[i].has(p.key) ? [i] : []))
 }
 const timings = zoneTimings(TABLES, [{ zone: 'The Estate of Unrest', name: 'lesser blade fiend', kills: 9, lastDeath: 0, pendingSince: 0, gaps: [467, 470, 480], shared: false }])
+
+describe('Slayer plan: eqlwiki’s Slayer guide', () => {
+  const camps = buildCamps(
+    goals,
+    races,
+    { 'Clan Crushbone': { sec: 3600, kills: 10, last: 0, mobs: { 'an orc pawn': { name: 'an orc pawn', n: 10 } } } },
+    (mob) => place(mob, mob.includes('orc') ? 'Orc' : ''),
+    () => null,
+    slayerRaceLists(sections, GAME),
+    [],
+    { tables: TABLES, timings, place, killSpeed: 100 },
+    [
+      { achievement: 'Orc Stomp!', tip: 'Crushbone, the Rathe, Halas', zones: ['Clan Crushbone', 'The Rathe Mountains', 'Halas'] },
+      { achievement: 'Spin me round.', tip: 'The Rathe', zones: ['The Rathe Mountains'] },
+      { achievement: 'Not Open Here', tip: 'Unrest', zones: ['The Estate of Unrest'] }
+    ]
+  )
+  const ids = camps.map((c) => c.id)
+
+  it('makes a camp of each zone it names for an open achievement, paced by the zone’s spawns, with its words for the spot', () => {
+    const rathe = camps.find((c) => c.id === 'guide:rathemountains')!
+    expect(rathe).toMatchObject({ source: 'play', zone: 'The Rathe Mountains', said: 'eqlwiki’s Slayer guide, 2026-10-12', limit: 'spawns' })
+    expect(rathe.kinds.map((k) => [k.name, Math.round(k.perHour), k.goals])).toEqual([
+      ['an orc scout', 99, [gi('Orc Stomp!')]],
+      ['a rare dervish', 1, [gi('Spin Me Round')]]
+    ])
+    expect(rathe.note).toContain('froglok city')
+    // The tables' own camp there keeps what the guide does not name: the giants.
+    expect(camps.find((c) => c.id === 'spawns:rathemtn')?.kinds.map((k) => k.name)).toEqual(['a hill giant'])
+  })
+
+  it('leaves the log’s camp standing, never sends anyone to a city, and passes over what is done', () => {
+    expect(ids).toContain('log:Clan Crushbone')
+    expect(ids.filter((i) => i.startsWith('guide:'))).toEqual(['guide:rathemountains'])
+  })
+
+  it('says what it says of an achievement, however the game writes its name', () => {
+    expect(guideTip('orc stomp!', [{ achievement: 'Orc Stomp!', tip: 'Crushbone', zones: [] }])).toBe('Crushbone')
+    expect(guideTip('Three Letter Word for Dead…')).toBeUndefined()
+    expect(guideTip('Three letter word for dead...')).toContain('Mistmoore')
+  })
+
+  it('names only zones the game has: in the spawn tables, or Legends’ own New Sebilis Expedition', () => {
+    const known = zoneIndex(TAKP.zones as unknown as SpawnTables)
+    const zones = [...new Set(SLAYER_GUIDE.flatMap((t) => t.zones))]
+    expect(zones.filter((z) => !known(z) && z !== 'New Sebilis Expedition')).toEqual([])
+    // One tip an achievement.
+    expect(new Set(SLAYER_GUIDE.map((t) => t.achievement.toLowerCase())).size).toBe(SLAYER_GUIDE.length)
+  })
+})
 
 describe('Slayer plan: the spawn tables’ camps', () => {
   const camps = buildCamps(

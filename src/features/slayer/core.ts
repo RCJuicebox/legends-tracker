@@ -8,6 +8,7 @@ import type { RaceTable } from '../../core/raceNames'
 import { baseZone } from '../factions/attribution'
 import { isCity, zoneKey } from '../factions/names'
 import { SLAYER_CAMPS, type SlayerCamp } from '../../shared/game/slayerCamps'
+import { SLAYER_GUIDE, SLAYER_GUIDE_SAID, SLAYER_GUIDE_SPOTS, type SlayerGuideTip } from '../../shared/game/slayerGuide'
 import { HUNT } from '../../shared/game/hunt'
 import { num } from '../../core/format'
 import type { SlayerPlanStepView, SlayerPlanTrackView } from '../../shared/tracking'
@@ -436,7 +437,8 @@ export function buildCamps(
   /** Every Slayer achievement's races, done ones too (slayerRaceLists): what eqlwiki's census is keyed by. */
   raceLists: ReadonlyMap<string, ReadonlySet<string>>,
   known: SlayerCamp[] = SLAYER_CAMPS,
-  spawns?: SpawnSource
+  spawns?: SpawnSource,
+  guide: SlayerGuideTip[] = SLAYER_GUIDE
 ): SlayerPlanCamp[] {
   const camps: SlayerPlanCamp[] = []
   const fed = new Set<string>()
@@ -540,6 +542,43 @@ export function buildCamps(
       note: k.note,
       said: k.said
     })
+  }
+  // eqlwiki's Slayer guide: each zone it names for an achievement, a camp for it, paced by the zone's
+  // spawns of what feeds it. The log's camp, or play's, in the same zone for a goal stands; a zone the
+  // tables lack (New Sebilis Expedition) is the guide's words only, on the page.
+  if (spawns) {
+    const at = new Map<string, { zone: string; goals: Set<number> }>()
+    for (const tip of guide) {
+      const g = goals.findIndex((x) => metaName(x.name) === metaName(tip.achievement))
+      if (g < 0) continue
+      for (const zone of tip.zones) {
+        const k = zoneKey(zone)
+        const e = at.get(k) ?? { zone, goals: new Set<number>() }
+        e.goals.add(g)
+        at.set(k, e)
+      }
+    }
+    for (const [k, e] of at) {
+      // A city's people bring its guards down (the guide says faction hit): no camp, the words stand.
+      if (isCity(e.zone)) continue
+      const open = [...e.goals].filter((g) => !fed.has(feeds(e.zone, g)))
+      const kinds = open.length ? spawnKinds(e.zone, (g) => open.includes(g)) : []
+      if (!kinds.length) continue
+      const c = capped(kinds, spawns.killSpeed)
+      for (const x of c.kinds) for (const g of x.goals) fed.add(feeds(e.zone, g))
+      const spot = SLAYER_GUIDE_SPOTS.find((s) => zoneKey(s.zone) === k)
+      camps.push({
+        id: `guide:${k}`,
+        zone: e.zone,
+        kinds: c.kinds,
+        source: 'play',
+        pace: paceOfKinds(c.kinds),
+        limit: c.limit,
+        ceiling: c.ceiling,
+        ...(spot ? { note: spot.tip } : {}),
+        said: SLAYER_GUIDE_SAID
+      })
+    }
   }
   // eqlwiki's census, keyed by the Skill achievements' names: for every goal, the plan offering it only
   // where nothing measured feeds the goal at a fair pace (fallbackOnly), once the player's rule-outs are
@@ -815,4 +854,9 @@ export function slayerPlanView(plan: SlayerPlan, goals: SlayerGoal[], choices: P
     current: current < 0 ? null : view(current),
     next: next < 0 ? null : view(next)
   }
+}
+
+/** What eqlwiki's Slayer guide says of an achievement: where its kills are, in the guide's words; undefined where it says nothing. */
+export function guideTip(achievement: string, guide: SlayerGuideTip[] = SLAYER_GUIDE): string | undefined {
+  return guide.find((t) => metaName(t.achievement) === metaName(achievement))?.tip
 }

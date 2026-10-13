@@ -12,6 +12,7 @@ import {
   clock,
   DEFAULT_CHOICES,
   goalsInPlay,
+  guideTip,
   stepKills,
   planSlayer,
   type CampSource,
@@ -48,9 +49,10 @@ const HOW = (
     <div>
       <b>Pace</b> comes from your own logs first: every kill over your log and its archives (and your other characters’), and the time you spent killing in each zone. Where you
       have not hunted a race, what players have settled on stands in (the raid lockouts, the camps the EQL Discord agrees on), then TAKP’s classic spawn tables: how many spots a
-      zone has for the race and how quickly they pop, at no more than your usual kills an hour. Legends’ respawns are its own: a zone’s spawns come back on one timer, quicker than
-      classic’s, so a zone runs on the respawn your Respawns page has timed there (a spawn of one spot); a zone you have timed nothing in keeps the classic timers. Zones TAKP lacks
-      fall back on eqlwiki’s count of a race’s NPCs, a guess.
+      zone has for the race and how quickly they pop, at no more than your usual kills an hour. The zones eqlwiki’s Slayer guide names for an achievement are camps of their own,
+      paced the same way, with the guide’s words beside each step (“guide”). Legends’ respawns are its own: a zone’s spawns come back on one timer, quicker than classic’s, so a
+      zone runs on the respawn your Respawns page has timed there (a spawn of one spot); a zone you have timed nothing in keeps the classic timers. Zones TAKP lacks fall back on
+      eqlwiki’s count of a race’s NPCs, a guess.
     </div>
     <div>
       <b>Travel</b> is the way your log has seen you go between two zones: from a camp’s last kill to the next zone, then across each zone between, gates and ports included. Where
@@ -134,16 +136,25 @@ function StepWork({ step, goals, choices, onOut }: { step: SlayerStep; goals: Sl
     .filter((g) => !step.focus.includes(g))
   return (
     <div className="small">
-      {step.focus.map((g) => (
-        <div key={g}>
-          <b>{goals[g].name}</b> <span className="mono">+{kills(step.kills[g] ?? 0)}</span>
-          {done.has(g) && <b> done</b>}
-          <span className="faint">
-            {' '}
-            · <Names names={killed.filter((k) => k.goals.includes(g))} onOut={onOut} />
-          </span>
-        </div>
-      ))}
+      {step.focus.map((g) => {
+        const tip = guideTip(goals[g].name)
+        return (
+          <div key={g}>
+            <b>{goals[g].name}</b> <span className="mono">+{kills(step.kills[g] ?? 0)}</span>
+            {done.has(g) && <b> done</b>}
+            <span className="faint">
+              {' '}
+              · <Names names={killed.filter((k) => k.goals.includes(g))} onOut={onOut} />
+            </span>
+            {tip && (
+              <Tip className="faint sl-guide" text={`eqlwiki’s Slayer guide: ${tip}`}>
+                {' '}
+                · guide
+              </Tip>
+            )}
+          </div>
+        )
+      })}
       {besides.length > 0 && (
         <Tip
           className="faint"
@@ -506,6 +517,7 @@ export function Slayer() {
                     <span className="mono">
                       {num(data.goals[g].count)}/{num(data.goals[g].max)}
                     </span>
+                    {guideTip(data.goals[g].name) && <span className="faint"> · eqlwiki’s guide: {guideTip(data.goals[g].name)}</span>}
                   </div>
                 ))}
               </div>
@@ -535,7 +547,7 @@ export function Slayer() {
                               key={g}
                               on={inPlay.has(g)}
                               onChange={(on) => toggleGoal(data.goals[g], on)}
-                              title={`${data.goals[g].races} ${num(data.goals[g].count)}/${num(data.goals[g].max)}`}
+                              title={`${data.goals[g].races} ${num(data.goals[g].count)}/${num(data.goals[g].max)}${guideTip(data.goals[g].name) ? `\neqlwiki’s guide:${guideTip(data.goals[g].name)}` : ''}`}
                             >
                               {data.goals[g].name}
                               {data.goals[g].optional ? ' (optional)' : ''}
