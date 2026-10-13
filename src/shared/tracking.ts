@@ -132,10 +132,6 @@ export interface HunterTrackView {
     total: number
     /** Killed since the export, the export not knowing yet. */
     since: string[]
-    /** Where each named left pops, by name, as /waypoints to type (with what is there, where the player said); none for a named of many spots. */
-    waypoints?: Record<string, string[]>
-    /** What a named of Legends' own pops in place of, by name. */
-    ph?: Record<string, string>
   }[]
 }
 
@@ -157,8 +153,6 @@ export interface SlayerPlanStepView {
   goals: { name: string; count: number; max: number }[]
   /** What to kill there and about how many, most first. */
   mobs: { name: string; n: number }[]
-  /** Where its few-spot mobs pop, as /waypoints to type. */
-  waypoints?: string[]
 }
 
 /** Plan › Slayer on the achievements overlay: made again from the counts as kills come in. */

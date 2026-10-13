@@ -303,11 +303,6 @@ function SlayerPlanSection({ plan }: { plan: SlayerPlanTrackView }) {
                 Kill {mobsSaid(step.mobs)}
               </div>
             )}
-            {(step.waypoints ?? []).map((w) => (
-              <div key={w} className="ach-ov-way" title="Type it in game for an arrow to the spot">
-                {w}
-              </div>
-            ))}
             <div className="ach-ov-faint">
               ≈ {duration(step.seconds)} there{!step.here && step.travel > 0 ? `, ${duration(step.travel)} to get there` : ''}
             </div>
@@ -464,16 +459,8 @@ function AchievementsRegion({ config, track, arranging }: { config: OverlayConfi
                 </span>
               </div>
               {r.left.slice(0, HUNTER_ROWS).map((n) => (
-                <div key={n}>
-                  <div className="ach-ov-line">
-                    {n}
-                    {r.ph?.[n] && <span className="ach-ov-faint"> · PH {r.ph[n]}</span>}
-                  </div>
-                  {(r.waypoints?.[n] ?? []).map((w) => (
-                    <div key={w} className="ach-ov-way" title="Type it in game for an arrow to the spot">
-                      {w}
-                    </div>
-                  ))}
+                <div key={n} className="ach-ov-line">
+                  {n}
                 </div>
               ))}
               {r.left.length > HUNTER_ROWS && <div className="ach-ov-faint">+{r.left.length - HUNTER_ROWS} more</div>}

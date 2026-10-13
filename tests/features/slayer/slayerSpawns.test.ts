@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest'
 import { isMarked, legendsSpawnsOf, mapMarks, mobSpawns, parseMap, spotsIn, spotsOf, waypoint, zoneIndex, zoneTimings, type SpawnTables } from '../../../src/features/slayer/spawns'
-import { waypointsOf } from '../../../src/features/slayer/main'
 import type { RespawnRecord } from '../../../src/core/respawns'
 
 // TAKP's spawn tables in Legends' terms: made-up zones in the tables' shape.
@@ -181,13 +180,5 @@ describe('the game’s maps', () => {
     expect(waypoint(spots[1])).toBe('/waypoint -649, -13825')
     // The tables' spot comes back as the player found it there.
     expect(waypoint(spots[0])).toBe('/waypoint -619, -13792')
-    expect(waypointsOf('The Western Plains of Karana', 'a werewolf bandit')).toEqual([
-      { at: '/waypoint -649, -13825' },
-      { at: '/waypoint -3969, -10966', where: 'the southern border of the zone' },
-      { at: '/waypoint 882, -6985', where: 'in a group of bandits' },
-      { at: '/waypoint -2783, -10736' }
-    ])
-    // A mob of many spots is everywhere: no waypoints.
-    expect(waypointsOf('The Western Plains of Karana', 'a bandit')).toEqual([])
   })
 })

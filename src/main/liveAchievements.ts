@@ -13,8 +13,6 @@ import { carryFollow, freshFollow, pickStep, readFollow, sanitizeFollows, saySte
 import type { AchievementTrack, FactionTrackView, HunterTrackView, SkillRow, SkillTrackView, SlayerPlanTrackView, SlayerTrackView, TrackedAchievement } from '../shared/tracking'
 import { hunterHere, hunterZones } from '../features/hunter/core'
 import { bareName, planSlayer, slayerPlanView } from '../features/slayer/core'
-import { waypointsOf } from '../features/slayer/main'
-import { legendsSpawnsOf } from '../features/slayer/spawns'
 import type { AchievementsExport } from './achievements'
 import type { AppContext } from './context'
 import type { AppFeature } from './appFeature'
@@ -613,11 +611,7 @@ export class LiveAchievements implements AppFeature {
       const r = live.get(g.name.toLowerCase())
       return r ? { ...g, count: r.done ? g.max : Math.min(g.max, r.count + r.since) } : g
     })
-    const v = slayerPlanView(planSlayer({ ...got.data, goals }, got.choices), goals, got.choices, this.zone)
-    // Where the step's mobs pop, for those of a few spots (a named's camp, a rare): typed in game for an arrow.
-    const ways = v.current ? v.current.mobs.flatMap((m) => waypointsOf(v.current!.zone, m.name).map((w) => `${w.at} · ${m.name}${w.where ? `, ${w.where}` : ''}`)) : []
-    if (v.current && ways.length) v.current.waypoints = ways.slice(0, 4)
-    this.slayerPlan = v
+    this.slayerPlan = slayerPlanView(planSlayer({ ...got.data, goals }, got.choices), goals, got.choices, this.zone)
   }
 
   /** The player changed Plan › Slayer's choices (or showed it here): the plan is made again at once. */
@@ -712,23 +706,7 @@ export class LiveAchievements implements AppFeature {
       hunterZones(exp.sections, (bare) => last.get(bare) ?? 0, exp.modified),
       this.zone
     ).filter((r) => !this.ctx.hunter?.isBroken(r.achievement))
-    const where = (names: string[]) => {
-      const waypoints: Record<string, string[]> = {}
-      const ph: Record<string, string> = {}
-      for (const n of names) {
-        const at = waypointsOf(this.zone, n)
-        if (at.length) waypoints[n] = at.map((w) => (w.where ? `${w.at} · ${w.where}` : w.at))
-        const own = legendsSpawnsOf(this.zone, [n])[0]
-        if (own?.ph) ph[n] = own.ph.join(' or ')
-      }
-      return { ...(Object.keys(waypoints).length ? { waypoints } : {}), ...(Object.keys(ph).length ? { ph } : {}) }
-    }
-    return rows.length
-      ? {
-          zone: this.zone,
-          rows: rows.map((r) => ({ achievement: r.achievement, left: r.left.map((n) => n.name), total: r.total, since: r.since, ...where(r.left.map((n) => n.name)) }))
-        }
-      : null
+    return rows.length ? { zone: this.zone, rows: rows.map((r) => ({ achievement: r.achievement, left: r.left.map((n) => n.name), total: r.total, since: r.since })) } : null
   }
 
   // ---- telling ----

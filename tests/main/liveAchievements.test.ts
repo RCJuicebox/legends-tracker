@@ -105,38 +105,6 @@ describe('LiveAchievements tells the Hunter named', () => {
   })
 })
 
-describe('LiveAchievements tells the Hunter named of Legends’ own', () => {
-  it('with the spots the player found, as /waypoints, and what it pops in place of', () => {
-    const { live } = setup()
-    const inner = live as unknown as { character: string; zone: string; exported: unknown; hunterHere: () => { rows: unknown[] } | null }
-    inner.character = 'Tester_neriak'
-    inner.exported = {
-      character: 'Tester_neriak',
-      file: 'x',
-      modified: T0,
-      sections: [{ cat: 'EverQuest', name: 'Hunter', ach: [{ n: 'Hunter of The Western Plains of Karana', c: [{ t: 'a werewolf bandit' }] }] }]
-    }
-    inner.zone = 'The Western Plains of Karana'
-    expect(inner.hunterHere()?.rows).toEqual([
-      {
-        achievement: 'Hunter of The Western Plains of Karana',
-        left: ['a werewolf bandit'],
-        total: 1,
-        since: [],
-        waypoints: {
-          'a werewolf bandit': [
-            '/waypoint -649, -13825',
-            '/waypoint -3969, -10966 · the southern border of the zone',
-            '/waypoint 882, -6985 · in a group of bandits',
-            '/waypoint -2783, -10736'
-          ]
-        },
-        ph: { 'a werewolf bandit': 'a bandit' }
-      }
-    ])
-  })
-})
-
 describe('LiveAchievements makes the Slayer plan again', () => {
   const goal = (name: string, count: number, max: number) => ({ name, section: 'Slayer: Conquest', races: '', count, max, optional: false, tier: 0 })
   const data = (exportAt: number) => ({

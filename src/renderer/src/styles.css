@@ -3808,15 +3808,6 @@ input[aria-invalid='true'] {
   letter-spacing: 0;
   text-transform: none;
 }
-.ach-ov-way {
-  padding-left: 10px;
-  font-family: var(--font-mono);
-  font-size: calc(var(--fs) * 0.85);
-  color: rgb(var(--ink) / 0.72);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
 .ach-ov-title {
   font-weight: 650;
   white-space: nowrap;

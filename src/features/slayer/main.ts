@@ -26,21 +26,7 @@ import {
   type SlayerPlanChoices,
   type SlayerPlanData
 } from './core'
-import {
-  isMarked,
-  legendsSpots,
-  mapMarks,
-  mobSpawns,
-  parseMap,
-  spotsIn,
-  waypoint,
-  zoneIndex,
-  zoneTimings,
-  type MobSpawn,
-  type SlayerMap,
-  type SlayerMark,
-  type SpawnTables
-} from './spawns'
+import { isMarked, mapMarks, mobSpawns, parseMap, spotsIn, zoneIndex, zoneTimings, type MobSpawn, type SlayerMap, type SlayerMark, type SpawnTables } from './spawns'
 import type { RespawnRecord } from '../../core/respawns'
 import TAKP from '../../shared/game/takpSpawns.json'
 import { hunterZones } from '../hunter/core'
@@ -290,19 +276,6 @@ export function namedSpawns(timings: ReturnType<typeof zoneTimings>): (zone: str
     const short = tableOf(zone)
     return short ? mobSpawns(TABLES[short], timings.get(short)) : null
   }
-}
-
-/** A mob of more spots than this is everywhere in its zone: its waypoints are no help. */
-const WAYPOINTS = 4
-
-/**
- * Where a mob pops in a zone, as the game's /waypoint takes it: TAKP's spots and Legends' own (the
- * player's, for a named the tables lack). None for a mob of more than a few spots.
- */
-export function waypointsOf(zone: string, mob: string): { at: string; where?: string }[] {
-  const short = tableOf(zone)
-  const spots = short ? spotsIn(TABLES[short], [mob]) : legendsSpots(zone, [mob])
-  return spots.length > WAYPOINTS ? [] : spots.map((s) => ({ at: waypoint(s), ...(s.where ? { where: s.where } : {}) }))
 }
 
 /** The spawn tables' timings: each zone's timers against classic, from the Respawns page's records. */

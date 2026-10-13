@@ -197,7 +197,7 @@ export function spotsIn(z: TakpZone, mobs: string[]): MapSpot[] {
 }
 
 /** Legends' own spots of these mobs in a zone, as the map draws them. */
-export const legendsSpots = (zone: string, mobs: string[]): MapSpot[] =>
+const legendsSpots = (zone: string, mobs: string[]): MapSpot[] =>
   legendsSpawnsOf(zone, mobs).flatMap((s) =>
     s.spots.map(({ at: [y, x, h], where }) => ({ x: -x, y: -y, z: h ?? 0, mobs: [{ name: s.name, chance: 100 }], timer: 0, ...(where ? { where } : {}) }))
   )
