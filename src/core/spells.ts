@@ -56,10 +56,38 @@ export interface RankedSpell {
   rankedName: string
 }
 
-const F = { id: 0, name: 1, range: 4, ae: 5, resist: 29, cast: 8, recast: 10, formula: 11, mana: 14, cap: 12, good: 28, target: 30, skill: 32, cls: 36, icon: 75, effects: 172 }
+const F = { id: 0, name: 1, range: 4, ae: 5, resist: 29, cast: 8, recast: 10, formula: 11, mana: 14, cap: 12, good: 28, target: 30, skill: 32, cls: 36 }
 /** The fields read; the class levels are taken as one run of 16. */
 const WANTED: boolean[] = []
 for (const i of Object.values(F)) WANTED[i] = true
+
+/**
+ * Where a client keeps the icon, by how far its effect slots stand past field 172 (the 2026-09
+ * client's): the 2026-10-12 patch put a column in at 57, so its effects are at 173 and its icon at
+ * 76, not 75. A move this version does not know is refused, not misread.
+ */
+const ICON_BY_SHIFT: Readonly<Record<number, number>> = { 0: 75, 1: 76 }
+const EFFECTS_AT = 172
+/** An effect slot list: "1|116|8|0|100|0$2|0|-217|0|103|325". */
+const EFFECT_LIST = /^\d+\|-?\d+\|/
+
+/**
+ * The layout of a spell file, from its first row with effects: the effect slots' field (fields added
+ * after them, or before, move nothing else that is read but the icon), whether they end the row, and
+ * the icon's field.
+ */
+function layoutOf(text: string): { effects: number; last: boolean; icon: number } {
+  for (const line of text.split('\n', 2000)) {
+    const cells = line.replace(/\r$/, '').split('^')
+    if (cells.length < 80 || line[0] === '#') continue
+    const effects = cells.findIndex((c, i) => i > F.cls + 15 && EFFECT_LIST.test(c))
+    if (effects < 0) continue
+    const icon = ICON_BY_SHIFT[effects - EFFECTS_AT]
+    if (icon === undefined) throw new Error(`spells_us.txt keeps its effects in field ${effects}, a layout this version does not know: the game may have changed it`)
+    return { effects, last: effects === cells.length - 1, icon }
+  }
+  return { effects: EFFECTS_AT, last: true, icon: ICON_BY_SHIFT[0] }
+}
 
 /**
  * Effect slots, `slot|spa|base|base2|formula|max` joined by `$`. Of some 275,000 effects in the
@@ -151,9 +179,12 @@ export class SpellBook {
     const effectsOf = new EffectReader()
     let rows = 0
     let misread = 0
-    // The wanted fields of a line are found with indexOf rather than by splitting all ~250 of them.
+    // The wanted fields of a line are found with indexOf rather than by splitting all ~170 of them.
     const f: string[] = []
-    let effectsLast: boolean | null = null
+    const layout = layoutOf(spellsText)
+    const wanted = [...WANTED]
+    wanted[layout.icon] = true
+    wanted[layout.effects] = true
     const text = spellsText
     for (let lineStart = 0; lineStart < text.length;) {
       let lineEnd = text.indexOf('\n', lineStart)
@@ -168,20 +199,20 @@ export class SpellBook {
       let count = 0
       let clsFrom = -1
       let clsTo = -1
-      // The effect slots are the last field (173 a line in the 2026-09 client), so the scan stops
-      // after the icon and takes them from the end; the first line checks that the layout holds.
-      const stopAt = effectsLast ? F.icon + 1 : Infinity
+      // Effect slots that end the row are taken from the end, the scan stopping after the icon;
+      // otherwise the scan goes on to them.
+      const stopAt = layout.last ? layout.icon + 1 : layout.effects + 1
       let at = lineStart
       let beyondCap = false
       for (; at <= lineEnd && count < stopAt; count++) {
         let end = text.indexOf('^', at)
         if (end < 0 || end > lineEnd) end = lineEnd
-        if (WANTED[count]) f[count] = text.slice(at, end)
+        if (wanted[count]) f[count] = text.slice(at, end)
         if (count === F.cls) clsFrom = at
         if (count === F.cls + 15) {
           clsTo = end
           // Class levels seen before on a spell not kept (LEVEL_CAP): the rest of the row need not be read.
-          if (effectsLast !== null && levelSets.get(text.slice(clsFrom, clsTo))?.kept === false) {
+          if (levelSets.get(text.slice(clsFrom, clsTo))?.kept === false) {
             beyondCap = true
             break
           }
@@ -193,10 +224,11 @@ export class SpellBook {
         lineStart = next
         continue
       }
-      if (effectsLast === null && count > F.effects) effectsLast = count === F.effects + 1
-      else if (effectsLast && count === stopAt && at <= lineEnd) {
-        f[F.effects] = text.slice(text.lastIndexOf('^', lineEnd - 1) + 1, lineEnd)
-        count = F.effects + 1
+      // Stopped after the icon with more of the row to come: a whole row, its effects the last field.
+      let effectsField = f[layout.effects] ?? ''
+      if (layout.last && count === stopAt && at <= lineEnd) {
+        count = Infinity
+        effectsField = text.slice(text.lastIndexOf('^', lineEnd - 1) + 1, lineEnd)
       }
       lineStart = next
       if (count < 80) continue
@@ -219,13 +251,13 @@ export class SpellBook {
         !f[F.name] ||
         classLevels.length !== 16 ||
         !classLevels.every((l) => Number.isInteger(l) && l >= 0 && l <= 255) ||
-        !Number.isFinite(+f[F.icon])
+        !Number.isFinite(+f[layout.icon])
       ) {
         misread++
         continue
       }
       if (!set.kept) continue
-      const effects = effectsOf.read(f[F.effects])
+      const effects = effectsOf.read(effectsField)
       const msg = messages.get(id)?.replace(/\r$/, '').split('^') ?? []
       const spell: Spell = {
         id,
@@ -243,7 +275,7 @@ export class SpellBook {
         range: +f[F.range] || 0,
         aeRange: +f[F.ae] || 0,
         skill: +f[F.skill] || 0,
-        icon: +f[F.icon],
+        icon: +f[layout.icon],
         effects,
         category: categorize(beneficial, formula !== 0 || cap !== 0, effects),
         // spells_us_str: id ^ caster-me ^ caster-other ^ cast-on-you ^ cast-on-other ^ spell-gone

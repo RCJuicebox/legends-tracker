@@ -40,6 +40,33 @@ describe('SpellBook.parse', () => {
     expect(summary(SpellBook.parse(crlf, strings()))).toEqual(summary(SpellBook.parse(lf, strings())))
   })
 
+  it('reads the 2026-10-12 layout, a column put in at 57: the effects, the icon and the category as before', () => {
+    const plain = SpellBook.parse(spells(), strings())
+    const patched = spells()
+      .split('\n')
+      .map((l) => {
+        const f = l.replace(/\r$/, '').split('^')
+        return f.length > 100 ? [...f.slice(0, 57), '0', ...f.slice(57)].join('^') : l
+      })
+      .join('\n')
+    const book = SpellBook.parse(patched, strings())
+    const full = (b: SpellBook) => [...b.all()].map((s) => [s.id, s.icon, s.category, s.effects.length])
+    expect(full(book)).toEqual(full(plain))
+    // A damage-over-time spell is a DoT, not a debuff (its bar violet, not amber).
+    expect(book.named('Envenomed Bolt')!.category).toBe('dot')
+  })
+
+  it('refuses a layout whose effects stand where no known client keeps them, rather than misread it', () => {
+    const moved = spells()
+      .split('\n')
+      .map((l) => {
+        const f = l.replace(/\r$/, '').split('^')
+        return f.length > 100 ? [...f.slice(0, 57), '0', '0', '0', ...f.slice(57)].join('^') : l
+      })
+      .join('\n')
+    expect(() => SpellBook.parse(moved, strings())).toThrow(/effects in field 175/)
+  })
+
   it('still finds the effects when a client adds fields after them', () => {
     const plain = SpellBook.parse(spells(), strings())
     const longer = spells()
