@@ -432,7 +432,7 @@ export function buildCamps(
   goals: SlayerGoal[],
   races: SlayerRaces,
   zones: SlayerKillTallies['zones'],
-  place: (mob: string) => number[],
+  place: (mob: string, zone?: string) => number[],
   factionPerKill: (zone: string, mob: string) => Record<string, number> | null,
   /** Every Slayer achievement's races, done ones too (slayerRaceLists): what eqlwiki's census is keyed by. */
   raceLists: ReadonlyMap<string, ReadonlySet<string>>,
@@ -469,7 +469,7 @@ export function buildCamps(
     const counted: { name: string; n: number }[] = []
     const moved: Record<string, number> = {}
     for (const m of Object.values(z.mobs)) {
-      const at = place(m.name)
+      const at = place(m.name, zone)
       const hits = factionPerKill(zone, m.name)
       if (hits) for (const [f, v] of Object.entries(hits)) moved[f] = (moved[f] ?? 0) + (v * m.n) / hours
       if (!at.length || lockoutMobs.has(spawnKey(m.name))) continue
@@ -488,7 +488,7 @@ export function buildCamps(
           const found = here?.get(spawnKey(m.name))
           const spawn = found && usable(found) ? found : undefined
           const perHour = m.n / hours
-          return { name: m.name, perHour, goals: place(m.name), ...(spawn ? { spawn, bound: perHour >= spawn.ceiling * BOUND } : {}) }
+          return { name: m.name, perHour, goals: place(m.name, zone), ...(spawn ? { spawn, bound: perHour >= spawn.ceiling * BOUND } : {}) }
         }),
       source: 'log',
       pace,

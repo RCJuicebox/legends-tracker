@@ -196,15 +196,18 @@ export class SlayerPlanner implements AppFeature {
     const unknown = new Set<string>()
     const unplaced = new Map<string, { name: string; n: number }>()
     const placed = new Map<string, number[]>()
-    const place = (mob: string) => {
+    const place = (mob: string, zone = '') => {
       const k = mob.toLowerCase()
-      let at = placed.get(k)
+      // A mob play placed zone by zone (New Sebilis Expedition's undead) is placed for the zone it is in.
+      const key = races.zoned(mob) ? `${k}|${zone}` : k
+      let at = placed.get(key)
       if (at) return at
       const wiki = npc.race(mob)
       if (wiki === undefined) unknown.add(mob)
-      const p = races.place(mob, wiki)
-      at = goals.flatMap((g, i) => ((ctx.liveAchievements.fact(k, g.name.toLowerCase()) ?? (p.key !== null && races.keys[i].has(p.key))) ? [i] : []))
-      placed.set(k, at)
+      const p = races.place(mob, wiki, zone)
+      const fact = (g: string) => (p.by === 'zone' ? undefined : ctx.liveAchievements.fact(k, g))
+      at = goals.flatMap((g, i) => ((fact(g.name.toLowerCase()) ?? (p.key !== null && races.keys[i].has(p.key))) ? [i] : []))
+      placed.set(key, at)
       return at
     }
     // What a kill did to the factions, from the faction lines after kills (this character's log).

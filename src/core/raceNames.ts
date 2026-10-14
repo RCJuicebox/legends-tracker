@@ -288,8 +288,35 @@ export const PLAYABLE_MARK = '(playable)'
 export const MOB_RACES: Record<string, string> = {
   'dervish cutthroat': PLAYABLE_MARK,
   'cutthroat dervish': PLAYABLE_MARK,
-  'dervish thug': 'ogre'
+  'dervish thug': 'ogre',
+  // New Sebilis Expedition's golems: their kills between two exports were the golem achievements' rise to the one (2026-10-14).
+  'failed experiment': 'golem',
+  'abomination of ro': 'golem'
 }
+
+/**
+ * What play settled about the mobs of one zone, where the same name is another race elsewhere: by
+ * the zone (lower-cased, "The" and an instance's " - Solo …" off), then the name as MOB_RACES has it.
+ * New Sebilis Expedition's undead are Kylong Iksars, and count as Iksars: Mostly Kunzar and the
+ * playable races rose with them (2026-10-14). Befallen's skeletons are skeletons.
+ */
+export const ZONE_MOB_RACES: Record<string, Record<string, string>> = {
+  'new sebilis expedition': {
+    skeleton: 'iksar',
+    'decaying skeleton': 'iksar',
+    'withering skeleton': 'iksar',
+    'iksar ghost': 'iksar',
+    'sarnak ghost': 'iksar'
+  }
+}
+
+/** A zone as ZONE_MOB_RACES keys it. */
+export const zoneWords = (zone: string) =>
+  zone
+    .toLowerCase()
+    .replace(/ - (?:solo|group)\b.*$/, '')
+    .replace(/^the\s+/, '')
+    .trim()
 
 /** Words in names for a race in other words: the elves' own names and the adjectives. */
 export const NAME_WORDS: Record<string, string> = {

@@ -12,6 +12,8 @@ import {
   singulars,
   unsureRace,
   wikiRaceKey,
+  ZONE_MOB_RACES,
+  zoneWords,
   type RaceTable
 } from './raceNames'
 
@@ -97,10 +99,10 @@ export function achievementRaces(text: string, game: RaceTable): { keys: Set<str
   return { keys, unnamed, broader }
 }
 
-/** How a mob was given its race: what play settled, eqlwiki's page, or its name. */
+/** How a mob was given its race: what play settled (for the zone it was in, or anywhere), eqlwiki's page, or its name. */
 export interface Placed {
   key: string | null
-  by: 'play' | 'wiki' | 'name' | null
+  by: 'zone' | 'play' | 'wiki' | 'name' | null
   /** Placed by play, or by a wiki race that is the client's name or a settled alias; a name is a guess. */
   sure: boolean
 }
@@ -188,8 +190,19 @@ export class SlayerRaces {
     return last
   }
 
-  /** A mob's race: what play settled, else eqlwiki's (undefined while not looked up), else its name's. */
-  place(mob: string, wikiRace: string | null | undefined): Placed {
+  /** Whether play settled a mob's race for some zone: its kills are placed zone by zone. */
+  zoned(mob: string): boolean {
+    const words = nameWords(mob)
+    return Object.values(ZONE_MOB_RACES).some((z) => words in z)
+  }
+
+  /**
+   * A mob's race: what play settled for the zone it was killed in, else what play settled anywhere,
+   * else eqlwiki's (undefined while not looked up), else its name's.
+   */
+  place(mob: string, wikiRace: string | null | undefined, zone = ''): Placed {
+    const here = zone ? ZONE_MOB_RACES[zoneWords(zone)]?.[nameWords(mob)] : undefined
+    if (here) return { key: here, by: 'zone', sure: true }
     const play = MOB_RACES[nameWords(mob)]
     if (play) return { key: play, by: 'play', sure: true }
     const wiki = wikiRace ? wikiRaceKey(wikiRace) : null
@@ -238,6 +251,19 @@ export function slayerLine(text: string): SlayerLine {
   m = COMPLETED.exec(text)
   if (m) return { completed: m[1] }
   return null
+}
+
+/** A mob's kills split by the zone each was in ('' where not known), each part in log order. */
+function byZone(times: readonly number[], zones: readonly string[]): { zone: string; times: number[]; zones: string[] }[] {
+  const out = new Map<string, { zone: string; times: number[]; zones: string[] }>()
+  times.forEach((t, i) => {
+    const zone = zones[i] ?? ''
+    const part = out.get(zone) ?? { zone, times: [], zones: [] }
+    part.times.push(t)
+    part.zones.push(zone)
+    out.set(zone, part)
+  })
+  return [...out.values()]
 }
 
 /** Kills since the export, by mob (lower-cased): its name as the log gave it, when each was, and the zone each was in ('' not known; missing from older counts). */
@@ -294,23 +320,31 @@ export function slayerCounts(
   for (const k of kills.values()) {
     const wiki = raceOf(k.name)
     if (wiki === undefined) unknown.push(k.name)
-    const p = races.place(k.name, wiki)
     const mob = k.name.toLowerCase()
-    // Kills are kept in log order: the newest is the last (no spread of a long grind's list, LT-380).
-    const newest = k.times.at(-1) ?? 0
-    // Nothing places it: the spawn tables' race mix where it was killed, a share of each kill (a guess).
-    const mix = p.key === null && mixOf ? mixCredits(k.name, k.zones ?? k.times.map(() => ''), races, mixOf) : null
+    // A mob play placed for some zone: its kills there by that, the rest as anywhere.
+    const parts = races.zoned(k.name) && k.zones ? byZone(k.times, k.zones) : [{ zone: '', times: k.times, zones: k.zones ?? k.times.map(() => '') }]
     let any = false
-    counters.forEach((c, i) => {
-      const fact = facts(mob, c.name.toLowerCase())
-      const n = fact !== undefined ? (fact ? k.times.length : 0) : p.key !== null ? (races.keys[i].has(p.key) ? k.times.length : 0) : (mix?.[i] ?? 0)
-      if (n <= 0) return
-      any = true
-      since[i] += n
-      if (fact === undefined && !p.sure) guessed[i] += n
-      last[i] = Math.max(last[i], newest)
-    })
-    if (!any && p.key === null && !mix && wiki !== undefined) unplaced.push({ name: k.name, n: k.times.length })
+    let placedAny = false
+    for (const part of parts) {
+      const p = races.place(k.name, wiki, part.zone)
+      if (p.key !== null) placedAny = true
+      // Kills are kept in log order: the newest is the last (no spread of a long grind's list, LT-380).
+      const newest = part.times.at(-1) ?? 0
+      // Nothing places it: the spawn tables' race mix where it was killed, a share of each kill (a guess).
+      const mix = p.key === null && mixOf ? mixCredits(k.name, part.zones, races, mixOf) : null
+      if (mix) placedAny = true
+      counters.forEach((c, i) => {
+        // What play settled for the zone stands over what the exports settled of the name, which may be another zone's.
+        const fact = p.by === 'zone' ? undefined : facts(mob, c.name.toLowerCase())
+        const n = fact !== undefined ? (fact ? part.times.length : 0) : p.key !== null ? (races.keys[i].has(p.key) ? part.times.length : 0) : (mix?.[i] ?? 0)
+        if (n <= 0) return
+        any = true
+        since[i] += n
+        if (fact === undefined && !p.sure) guessed[i] += n
+        last[i] = Math.max(last[i], newest)
+      })
+    }
+    if (!any && !placedAny && wiki !== undefined) unplaced.push({ name: k.name, n: k.times.length })
   }
   return {
     // A share of a kill is a guess: the counts stay whole kills.
@@ -391,12 +425,14 @@ export function learnFromExport(
   const placed = kills.filter((k) => k.n > 0).map((k) => ({ ...k, mob: k.name.toLowerCase(), p: races.place(k.name, raceOf(k.name)) }))
   const out: SlayerFact[] = []
   const n = new Map(placed.map((k) => [k.mob, k.n]))
+  const zoned = new Set(placed.filter((k) => races.zoned(k.name)).map((k) => k.mob))
   after.forEach((c, i) => {
     const name = c.name.toLowerCase()
     const was = before.get(name)
     if (was === undefined || c.count < was) return
     const rise = c.count - was
-    const add = (f: { mob: string; counts: boolean }) => out.push({ mob: f.mob, achievement: name, counts: f.counts, kills: n.get(f.mob) ?? 0, rise })
+    // A mob play placed zone by zone is not settled by name: what holds in one zone may not in another.
+    const add = (f: { mob: string; counts: boolean }) => !zoned.has(f.mob) && out.push({ mob: f.mob, achievement: name, counts: f.counts, kills: n.get(f.mob) ?? 0, rise })
     // First on the numbers alone: any mob not settled out may have counted.
     const first = forced(
       placed.filter((k) => facts(k.mob, name) !== false).map((k) => ({ mob: k.mob, n: k.n })),
