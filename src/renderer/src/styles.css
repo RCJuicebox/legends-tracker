@@ -3654,9 +3654,18 @@ input[aria-invalid='true'] {
   margin-top: 4px;
   border-top: 1px dashed rgb(var(--ink) / 0.12);
 }
-.sl-substep > .row > .small {
+.sl-sub-head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+.sl-sub-work {
   flex: 1 1 auto;
   min-width: 0;
+}
+.sl-sub-head > :not(.sl-sub-work) {
+  flex: none;
+  white-space: nowrap;
 }
 .fp-step {
   display: grid;

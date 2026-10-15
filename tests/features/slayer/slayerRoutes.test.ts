@@ -7,6 +7,7 @@ import {
   DEFAULT_CHOICES,
   emptyKillTallies,
   guideTip,
+  spotTip,
   joinKillTallies,
   joinMoves,
   optionalSlayer,
@@ -173,19 +174,11 @@ describe('Slayer plan: eqlwiki’s Slayer guide', () => {
     expect(ids.filter((i) => i.startsWith('guide:'))).toEqual(['guide:rathemountains'])
   })
 
-  it('puts where in the zone players say, or the guide, on a camp that has nothing of its own to say', () => {
-    const lfay = buildCamps(
-      goals,
-      races,
-      { 'The Lesser Faydark': { sec: 3600, kills: 60, last: 0, mobs: { 'an orc pawn': { name: 'an orc pawn', n: 60 } } } },
-      (mob) => place(mob, 'Orc'),
-      () => null,
-      slayerRaceLists(sections, GAME),
-      [],
-      undefined,
-      []
-    )
-    expect(lfay.find((c) => c.id === 'log:The Lesser Faydark')?.note).toBe('The faeries, all to the west of the map: the best camp for Shorter People (the player, 2026-10-15)')
+  it('says where in a zone players say to be, for the achievements they said it of alone', () => {
+    expect(spotTip('The Lesser Faydark', 'Shorter People')).toContain('The faeries, all to the west of the map')
+    expect(spotTip('Lesser Faydark', 'legendary creatures')).toContain('(the player, 2026-10-15)')
+    expect(spotTip('The Lesser Faydark', 'Orc Stomp!')).toBeUndefined()
+    expect(spotTip('The Rathe Mountains', 'Shorter People')).toBeUndefined()
   })
 
   it('says what it says of an achievement, however the game writes its name', () => {

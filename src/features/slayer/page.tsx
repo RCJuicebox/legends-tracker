@@ -13,6 +13,7 @@ import {
   DEFAULT_CHOICES,
   goalsInPlay,
   guideTip,
+  spotTip,
   stepKills,
   planSlayer,
   type CampSource,
@@ -468,10 +469,11 @@ export function Slayer() {
                                 const killed = stepKills(st, choices)
                                 return (
                                   <div key={i} className="sl-substep">
-                                    <div className="row tight">
+                                    <div className="sl-sub-head">
                                       {run.length > 1 && <span className="mono faint">{i + 1}.</span>}
-                                      <StepWork step={st} goals={data.goals} choices={choices} onOut={(mob) => ruleOutMob(mob, true)} />
-                                      <span className="spacer" />
+                                      <div className="sl-sub-work">
+                                        <StepWork step={st} goals={data.goals} choices={choices} onOut={(mob) => ruleOutMob(mob, true)} />
+                                      </div>
                                       <Tip className={`chip fp-kind ${st.camp.source === 'log' ? 'kill' : 'quest'}`} text={SOURCE[st.camp.source].tip}>
                                         {SOURCE[st.camp.source].label}
                                       </Tip>
@@ -485,7 +487,9 @@ export function Slayer() {
                                     <div className="row tight fp-effects">
                                       <Limit camp={st.camp} />
                                       <FactionCost camp={st.camp} />
-                                      {st.camp.note && <span className="faint small">{st.camp.note}</span>}
+                                      {(st.camp.note ?? spotTip(zone, data.goals[st.focus[0]]?.name ?? '')) && (
+                                        <span className="faint small">{st.camp.note ?? spotTip(zone, data.goals[st.focus[0]]?.name ?? '')}</span>
+                                      )}
                                       <span className="spacer" />
                                       <span className="faint small">
                                         {st.camp.source === 'log' && st.camp.hours

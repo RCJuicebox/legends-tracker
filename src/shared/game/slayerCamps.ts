@@ -23,11 +23,12 @@ export interface SlayerCamp {
   said: string
 }
 
-/** Where in a zone, as players say: shown with a step there, whatever paces it. */
-export const SLAYER_SPOTS: { zone: string; tip: string; said: string }[] = [
+/** Where in a zone, as players say, for the achievements named: shown with a step there for one of them, whatever paces it. */
+export const SLAYER_SPOTS: { zone: string; for: string[]; tip: string; said: string }[] = [
   {
     zone: 'The Lesser Faydark',
-    tip: 'The faeries, all to the west of the map: the best camp for Shorter People',
+    for: ['Shorter People', 'Legendary Creatures'],
+    tip: 'The faeries, all to the west of the map: the best camp for Shorter People (about 460 an hour), and Legendary Creatures too',
     said: 'the player, 2026-10-15'
   }
 ]

@@ -696,12 +696,6 @@ export function buildCamps(
       if (!c.kinds.some((x) => x.name === kind)) c.kinds.push({ name: kind, perHour: npcs * WIKI_PER_NPC, goals: at })
     }
   }
-  // Where in the zone, as players or the guide say it: with whatever camp has nothing of its own to say.
-  for (const c of camps) {
-    if (c.note) continue
-    const spot = SLAYER_SPOTS.find((s) => zoneKey(s.zone) === zoneKey(c.zone)) ?? SLAYER_GUIDE_SPOTS.find((s) => zoneKey(s.zone) === zoneKey(c.zone))
-    if (spot) c.note = 'said' in spot ? `${spot.tip} (${spot.said})` : spot.tip
-  }
   for (const c of camps.filter((x) => x.source === 'wiki')) {
     c.kinds.sort((a, b) => b.perHour - a.perHour)
     c.pace = {}
@@ -965,6 +959,12 @@ export function slayerPlanView(plan: SlayerPlan, goals: SlayerGoal[], choices: P
     current: current < 0 ? null : view(current),
     next: next < 0 ? null : view(next)
   }
+}
+
+/** Where in a zone players say to be for an achievement (SLAYER_SPOTS), with who said it; undefined where nobody has. */
+export function spotTip(zone: string, achievement: string): string | undefined {
+  const s = SLAYER_SPOTS.find((x) => zoneKey(x.zone) === zoneKey(zone) && x.for.some((a) => metaName(a) === metaName(achievement)))
+  return s && `${s.tip} (${s.said})`
 }
 
 /** What eqlwiki's Slayer guide says of an achievement: where its kills are, in the guide's words; undefined where it says nothing. */
