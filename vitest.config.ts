@@ -24,6 +24,11 @@ export default defineConfig({
         'src/features/**': { lines: 95, statements: 92, functions: 94, branches: 85 }
       }
     },
+    // GitHub's Windows runners are slow some days: tests that take well under a second here timed out at
+    // the default five seconds and failed the 2.14.2 release build (2026-10-15). On CI they get thirty;
+    // here a hung test still fails quickly.
+    testTimeout: process.env['CI'] ? 30_000 : 5_000,
+    hookTimeout: process.env['CI'] ? 60_000 : 10_000,
     // Anything that finds its folders from the environment (the cache folder) gets a scratch one,
     // never the real profile.
     env: { EQL_USER_DATA: join(tmpdir(), 'lt-vitest-profile') }
