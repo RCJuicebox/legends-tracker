@@ -36,9 +36,6 @@ import { hunterZones } from '../hunter/core'
 // counts, eqlwiki's races and what play has settled (core.ts). What the player chooses on the page
 // is kept per character in slayer-plan.json.
 
-/** The pages that mark the game's map. */
-export type MarkSet = 'slayer' | 'hunter'
-
 /** TAKP's classic spawn tables, as scripts/takp-spawns.mjs wrote them. */
 const TABLES = TAKP.zones as unknown as SpawnTables
 const tableOf = zoneIndex(TABLES)
@@ -81,8 +78,10 @@ export class SlayerPlanner implements AppFeature {
   readonly id = 'slayer'
   static readonly consumers: Readonly<Record<string, HistoryConsumer<unknown>>> = { [KILLS_KEY]: killConsumer }
   private readonly choices: JsonFile<Record<string, SlayerPlanChoices>>
-  /** What each page last marked on the game's map: the Slayer plan's steps, and Plan › Hunter's named. */
-  private readonly marks: JsonFile<Record<MarkSet, SlayerMark[]>>
+  /** What Plan › Hunter last marked on the game's map: the named left. The Slayer plan's mobs are never marked there. */
+  private readonly marks: JsonFile<{ hunter: SlayerMark[] }>
+  /** Slayer marks a version before 2.14.3 put on the game's maps: taken off once, at start. */
+  private readonly staleSlayer: boolean
   private readonly shared = new Map<string, { at: number; data: Promise<SlayerPlanData> }>()
   /** The data the overlay's plan was last made from, by character: made again when it is old or another export came. */
   private readonly overlayData = new Map<string, { at: number; exportAt: number; data: Promise<SlayerPlanData>; done?: SlayerPlanData }>()
@@ -100,7 +99,8 @@ export class SlayerPlanner implements AppFeature {
     const kept = readJsonFile(marksPath)
     const sets = (kept.state === 'ok' && kept.value && typeof kept.value === 'object' ? kept.value : {}) as Record<string, unknown>
     const list = (v: unknown) => (Array.isArray(v) ? (v as unknown[]).filter(isMark).slice(0, 200) : [])
-    this.marks = new JsonFile(marksPath, { slayer: list(sets.slayer), hunter: list(sets.hunter) }, { delayMs: 1000 })
+    this.staleSlayer = list(sets.slayer).length > 0
+    this.marks = new JsonFile(marksPath, { hunter: list(sets.hunter) }, { delayMs: 1000 })
   }
 
   flush(): Promise<void> {
@@ -128,13 +128,21 @@ export class SlayerPlanner implements AppFeature {
       if (typeof zone !== 'string' || !Array.isArray(mobs)) throw new Error('No such zone.')
       return spawnMap(ctx.installDir(), zone, mobs.filter((m): m is string => typeof m === 'string').slice(0, 50))
     })
-    handle('slayer:mark', async (marks, set = 'slayer') => {
-      if (!Array.isArray(marks) || (set !== 'slayer' && set !== 'hunter')) throw new Error('Nothing to mark.')
-      // Each page's marks kept, and the map written with both: marking one never takes the other's off.
-      const next = { ...this.marks.get(), [set]: (marks as unknown[]).filter(isMark).slice(0, 200) }
-      this.marks.set(next)
-      return markMaps(ctx.installDir(), [...next.slayer, ...next.hunter])
+    handle('slayer:mark', async (marks, set = 'hunter') => {
+      if (!Array.isArray(marks) || set !== 'hunter') throw new Error('Nothing to mark.')
+      // The Hunter named alone: a Slayer camp's mobs are everywhere in its zone, no help on the game's map.
+      const hunter = (marks as unknown[])
+        .filter(isMark)
+        .slice(0, 200)
+        .map((m) => ({ zone: m.zone, mobs: [], named: m.named ?? [] }))
+      this.marks.set({ hunter })
+      return markMaps(ctx.installDir(), hunter)
     })
+    // The Slayer marks an older version put on the game's maps come off: the maps written again with the Hunter named alone.
+    if (this.staleSlayer && ctx.installDir())
+      void markMaps(ctx.installDir(), this.marks.get().hunter)
+        .then(() => this.marks.set({ hunter: this.marks.get().hunter }))
+        .catch((e: unknown) => log.warn('Could not take the old Slayer marks off the game’s maps:', e))
   }
 
   /**

@@ -396,7 +396,7 @@ export interface Invokes {
   /** A zone's map as the game draws it, with the spots these mobs pop at (TAKP's spawn tables); no short name for a zone they lack. */
   'slayer:map': (zone: string, mobs: string[]) => SlayerMap
   /** Marks these spawns on the game's map, in its own map set (maps\LegendsTracker, a copy of the game's); none clears them. Each page's (`set`) are kept apart and written together. */
-  'slayer:mark': (marks: SlayerMark[], set?: 'slayer' | 'hunter') => { folder: string; zones: number; spots: number }
+  'slayer:mark': (marks: SlayerMark[], set?: 'hunter') => { folder: string; zones: number; spots: number }
   /** What Plan › Hunter shows: each Hunter achievement not done, the named it still wants, and what their spawns allow. */
   'hunter:plan': (character: string) => HunterPlanData
   /** Says a Hunter achievement does not work in Legends (left out of the plans and the overlay), or works again; the list after. */

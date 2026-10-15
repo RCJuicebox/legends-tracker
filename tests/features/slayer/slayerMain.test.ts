@@ -286,41 +286,54 @@ describe('the Slayer page', () => {
     await expect(call('slayer:map', 3, [])).rejects.toThrow()
   })
 
-  it('marks the spawns in a copy of the game’s maps, each page’s kept, and clears them', async () => {
+  it('marks the Hunter named in a copy of the game’s maps, never a Slayer camp’s mobs, and clears them', async () => {
     const set = join(game, 'maps', 'LegendsTracker')
-    const r = await call('slayer:mark', [
-      { zone: 'Clan Crushbone', mobs: ['an orc pawn'] },
-      { zone: 'Lake Nerius', mobs: ['a fish'] }
-    ])
-    expect(r.zones).toBe(1)
-    // The game's maps copied; its own label layer as it was.
-    expect(readFileSync(join(set, 'crushbone.txt'), 'latin1')).toContain('L 0, 0, 0')
-    expect(readFileSync(join(game, 'maps', 'crushbone_1.txt'), 'latin1')).not.toContain('Slayer_')
-    const marked = readFileSync(join(set, 'crushbone_1.txt'), 'latin1')
-    expect(marked).toContain('to_Greater_Faydark\r\nP ')
-    expect(marked).toContain('Slayer_orc_pawn')
-    // Hunter's marks join the Slayer plan's; Unrest has no label layer of the game's.
-    const h2 = await call(
+    const r = await call(
       'slayer:mark',
       [
-        { zone: 'Clan Crushbone', mobs: [], named: ['Ambassador DVinn'] },
-        { zone: 'The Estate of Unrest', mobs: [], named: ['Khrix Fritchoff'] }
+        // Mobs sent with them are left off: a Slayer camp's mobs are everywhere in its zone.
+        { zone: 'Clan Crushbone', mobs: ['an orc pawn'], named: ['Ambassador DVinn'] },
+        { zone: 'The Estate of Unrest', mobs: [], named: ['Khrix Fritchoff'] },
+        { zone: 'Lake Nerius', mobs: [], named: ['a fish'] }
       ],
       'hunter'
     )
-    expect(h2.zones).toBe(2)
-    expect(readFileSync(join(set, 'crushbone_1.txt'), 'latin1')).toMatch(/Slayer_orc_pawn[\s\S]*Hunter_Ambassador_DVinn/)
+    expect(r.zones).toBe(2)
+    // The game's maps copied; its own label layer as it was.
+    expect(readFileSync(join(set, 'crushbone.txt'), 'latin1')).toContain('L 0, 0, 0')
+    expect(readFileSync(join(game, 'maps', 'crushbone_1.txt'), 'latin1')).not.toContain('Hunter_')
+    const marked = readFileSync(join(set, 'crushbone_1.txt'), 'latin1')
+    expect(marked).toContain('to_Greater_Faydark\r\nP ')
+    expect(marked).toContain('Hunter_Ambassador_DVinn')
+    expect(marked).not.toContain('Slayer_')
+    // Unrest has no label layer of the game's: the marks alone.
     expect(readFileSync(join(set, 'unrest_1.txt'), 'latin1')).toContain('Hunter_Khrix_Fritchoff')
-    // Hunter's cleared: Unrest's layer gone, Crushbone's the Slayer plan's alone.
+    // Cleared: Unrest's layer gone, Crushbone's the game's own again.
     await call('slayer:mark', [], 'hunter')
     expect(existsSync(join(set, 'unrest_1.txt'))).toBe(false)
-    expect(readFileSync(join(set, 'crushbone_1.txt'), 'latin1')).not.toContain('Hunter_')
-    await call('slayer:mark', [])
     expect(readFileSync(join(set, 'crushbone_1.txt'), 'latin1')).toBe(readFileSync(join(game, 'maps', 'crushbone_1.txt'), 'latin1'))
-    await expect(call('slayer:mark', 'x')).rejects.toThrow()
-    await expect(call('slayer:mark', [], 'other')).rejects.toThrow()
+    await expect(call('slayer:mark', 'x', 'hunter')).rejects.toThrow()
+    await expect(call('slayer:mark', [], 'slayer')).rejects.toThrow()
     await expect(markMaps('', [])).rejects.toThrow('game folder')
     await planner.flush()
-    expect(JSON.parse(readFileSync(join(h.dir, 'map-marks.json'), 'utf8'))).toEqual({ slayer: [], hunter: [] })
+    expect(JSON.parse(readFileSync(join(h.dir, 'map-marks.json'), 'utf8'))).toEqual({ hunter: [] })
+  })
+
+  it('takes the Slayer marks an older version put on the game’s maps off at start', async () => {
+    const set = join(game, 'maps', 'LegendsTracker')
+    const dir = join(h.dir, 'old-marks')
+    put(
+      join(dir, 'map-marks.json'),
+      JSON.stringify({ slayer: [{ zone: 'Clan Crushbone', mobs: ['an orc pawn'] }], hunter: [{ zone: 'The Estate of Unrest', mobs: [], named: ['Khrix Fritchoff'] }] })
+    )
+    put(join(set, 'crushbone_1.txt'), 'P 10, 10, 0, 0, 0, 0, 3, to_Greater_Faydark\r\nP 1.0000, 2.0000, 0.0000, 240, 40, 40, 2, Slayer_orc_pawn\r\n')
+    const old = new SlayerPlanner(new LogHistory(join(dir, 'log-history.json'), SlayerPlanner.consumers), dir)
+    old.register(ctx as unknown as AppContext)
+    for (let i = 0; i < 50 && readFileSync(join(set, 'crushbone_1.txt'), 'latin1').includes('Slayer_'); i++) await new Promise((r) => setTimeout(r, 20))
+    expect(readFileSync(join(set, 'crushbone_1.txt'), 'latin1')).not.toContain('Slayer_')
+    expect(readFileSync(join(set, 'unrest_1.txt'), 'latin1')).toContain('Hunter_Khrix_Fritchoff')
+    await old.flush()
+    expect(JSON.parse(readFileSync(join(dir, 'map-marks.json'), 'utf8'))).toEqual({ hunter: [{ zone: 'The Estate of Unrest', mobs: [], named: ['Khrix Fritchoff'] }] })
+    planner.register(ctx as unknown as AppContext)
   })
 })

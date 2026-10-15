@@ -202,12 +202,10 @@ it('draws the plan, the lockouts beside it, and keeps a camp ruled out', async (
   await act(async () => button('Zone respawns').click())
   expect(host.textContent).toContain('Clan Crushbone 6:24 · Orc scoutsman 6:24 (classic 10:00), A wanderer 5:00')
   expect(host.textContent).toContain('Kedge Keep no timer · A sailfin 5:00')
-  // Marked on the game's map, then cleared (here, failing).
-  await act(async () => button('Mark on the game’s map').click())
-  expect(host.textContent).toContain('Marked 12 spots in 1 zone')
-  expect(invoke).toHaveBeenLastCalledWith('slayer:mark', [{ zone: 'Clan Crushbone', mobs: ['an orc pawn'], named: ['Lord Darish', 'Ambassador DVinn'] }])
-  await act(async () => button('Clear marks').click())
-  expect(host.textContent).toContain('Could not mark the map: locked')
+  // A step's map shows its own mobs, not the Hunter named there; nothing of the plan goes on the game's map.
+  expect(invoke).toHaveBeenCalledWith('slayer:map', 'Clan Crushbone', ['an orc pawn'])
+  expect([...host.querySelectorAll('button')].some((b) => b.textContent?.includes('Mark on the game'))).toBe(false)
+  expect(invoke.mock.calls.some((c) => c[0] === 'slayer:mark')).toBe(false)
   act(() => root.unmount())
   host.remove()
 })

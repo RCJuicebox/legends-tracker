@@ -252,7 +252,6 @@ export function Slayer() {
   const [openTimes, setOpenTimes] = useState(false)
   /** The steps whose map is shown, by index. */
   const [maps, setMaps] = useState<Set<number>>(new Set())
-  const [marked, setMarked] = useState('')
   // The choices kept for the character, taken once its first answer comes: not on every reload, which would undo a change not yet saved.
   const kept = q.data?.choices
   const [keptFor, setKeptFor] = useState('')
@@ -302,24 +301,6 @@ export function Slayer() {
   const left = plan ? plan.goals.reduce((s, g) => s + (data!.goals[g].max - data!.goals[g].count), 0) : 0
   const hunterAt = (zone: string) => (data?.hunter ?? []).filter((h) => zoneKey(h.zone) === zoneKey(zone))
   const toggleMap = (i: number) => setMaps((m) => (m.has(i) ? new Set([...m].filter((x) => x !== i)) : new Set([...m, i])))
-  // The plan's steps on the game's own map, in a map set of the app's: the game's maps stay as they are.
-  const mark = async (on: boolean) => {
-    const marks =
-      on && plan
-        ? plan.steps.map((st) => ({ zone: st.camp.zone, mobs: stepKills(st, choices).map((k) => k.name), named: hunterAt(st.camp.zone).flatMap((h) => h.left.map((n) => n.name)) }))
-        : []
-    try {
-      const r = await api.invoke('slayer:mark', marks)
-      setMarked(
-        on
-          ? `Marked ${num(r.spots)} spots in ${r.zones} zone${r.zones === 1 ? '' : 's'}: pick the LegendsTracker map set in the game’s map window.`
-          : 'Marks cleared: the LegendsTracker map set is the game’s own again.'
-      )
-    } catch (e) {
-      setMarked(`Could not mark the map: ${e instanceof Error ? e.message : String(e)}`)
-    }
-  }
-
   return (
     <>
       <div className="page-head">
@@ -508,7 +489,7 @@ export function Slayer() {
                                         Rule out
                                       </button>
                                     </div>
-                                    {maps.has(i) && <SpawnMap zone={zone} mobs={[...killed.map((k) => k.name), ...hunterAt(zone).flatMap((h) => h.left.map((n) => n.name))]} />}
+                                    {maps.has(i) && <SpawnMap zone={zone} mobs={killed.map((k) => k.name)} />}
                                   </div>
                                 )
                               })}
@@ -651,20 +632,10 @@ export function Slayer() {
                 </Tip>
               )}
               <span className="spacer" />
-              <Tip text="Puts a dot at every spot the plan’s mobs (red) and the Hunter named left (blue) pop at, on the game’s own map: in a map set of its own, LegendsTracker (a copy of the game’s maps, so its own stay as they are). Pick it in the map window.">
-                <button className="btn small" onClick={() => void mark(true)}>
-                  Mark on the game’s map
-                </button>
-              </Tip>
-              <button className="btn small ghost" onClick={() => void mark(false)} title="Take the marks off the LegendsTracker map set">
-                Clear marks
-              </button>
               <button className="btn small ghost" onClick={() => q.reload()}>
                 Read again
               </button>
             </div>
-
-            {marked && <div className="card mb-16 small">{marked}</div>}
 
             {data.unplaced.length > 0 && (
               <div className="card mb-16 small">
