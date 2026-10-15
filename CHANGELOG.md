@@ -2,6 +2,15 @@
 
 What changed in each version. The release workflow publishes a version's section as its release notes, and installed copies show them when an update arrives.
 
+## 2.14.2 (2026-10-15)
+
+- **Plan › Slayer: one achievement a step, the steps in one zone under one heading.** A step used to work a camp for every achievement it fed at once, as if a zone's giants and dervishes died side by side. Now each step is one achievement and kills only its own mobs, each kill still counting toward all its race feeds (giants for both giant achievements). Within a tier the achievement finished soonest, travel counted, comes first, then the others whose best zone is the same while you are there, listed under that zone's heading.
+- **Plan › Slayer: a race's pace is the time you spent killing it.** A zone's pace for a race was its kills over all the time ever spent killing in the zone, so forty minutes of kejekan in the Stonebrunt Mountains came out at a third of their speed, spread over an old hour of granitebacks. Each stretch of killing is now kept with what died in it, and a race's camp is the stretches where it was a quarter or more of what died, at least fifteen minutes of them. The first time the plan is opened, every log is read again once.
+- **Fix: Plan › Slayer left whole achievements unplanned.** After a step, a sliver of a kill left by rounding counted as still wanted; the plan went back for it until its step limit ran out, and the rest of that Banestrike tier had no steps.
+- **Slayer counts: New Sebilis Expedition.** Its failed experiments and Abominations of Ro count as golems. Its skeletons and ghosts are Kylong Iksars and count as Iksars there (Mostly Kunzar and the playable races), while skeletons anywhere else stay skeletons. A mob whose race depends on its zone is no longer settled by name from an export.
+- **Slayer counts: a faerie is a Fairy,** "a faerie guard" included, which counted toward nothing. Lesser Faydark's faeries are named as the best camp for Shorter People and Legendary Creatures, on those steps.
+- **Fix: Plan › Slayer's step rows** no longer stretch their buttons across the row.
+
 ## 2.14.1 (2026-10-13)
 
 - **Fix: since the 2026-10-12 game patch, spells read wrongly: DoT timers were amber like debuffs, and spell icons could be wrong.** The patch put a new column into the game's spell file, moving the ones after it. The app took every spell's effects, and its icon, from the old places, so every spell read with no effects: a DoT counted as a debuff, and what goes by a spell's effects (heal over time or buff, mez, charm, focus and worn effects) went wrong with it. The effects are now found by what they are, wherever the game puts them, and a layout no client is known for is refused with a message rather than misread.
