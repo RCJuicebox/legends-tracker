@@ -7,7 +7,7 @@ import { achievementRaces, slayerLine, type SlayerCounter, type SlayerRaces } fr
 import type { RaceTable } from '../../core/raceNames'
 import { baseZone } from '../factions/attribution'
 import { isCity, zoneKey } from '../factions/names'
-import { SLAYER_CAMPS, type SlayerCamp } from '../../shared/game/slayerCamps'
+import { SLAYER_CAMPS, SLAYER_SPOTS, type SlayerCamp } from '../../shared/game/slayerCamps'
 import { SLAYER_GUIDE, SLAYER_GUIDE_SAID, SLAYER_GUIDE_SPOTS, type SlayerGuideTip } from '../../shared/game/slayerGuide'
 import { HUNT } from '../../shared/game/hunt'
 import { num } from '../../core/format'
@@ -622,6 +622,12 @@ export function buildCamps(
       if (!c.kinds.some((x) => x.name === kind)) c.kinds.push({ name: kind, perHour: npcs * WIKI_PER_NPC, goals: at })
     }
   }
+  // Where in the zone, as players or the guide say it: with whatever camp has nothing of its own to say.
+  for (const c of camps) {
+    if (c.note) continue
+    const spot = SLAYER_SPOTS.find((s) => zoneKey(s.zone) === zoneKey(c.zone)) ?? SLAYER_GUIDE_SPOTS.find((s) => zoneKey(s.zone) === zoneKey(c.zone))
+    if (spot) c.note = 'said' in spot ? `${spot.tip} (${spot.said})` : spot.tip
+  }
   for (const c of camps.filter((x) => x.source === 'wiki')) {
     c.kinds.sort((a, b) => b.perHour - a.perHour)
     c.pace = {}
@@ -723,6 +729,9 @@ function withoutMobs(c: SlayerPlanCamp, out: string[]): SlayerPlanCamp[] {
   return [{ ...c, kinds, pace }]
 }
 
+/** Kills still wanted below this are rounding, not kills: an achievement with no more than this left is done. */
+const LEFT = 1e-6
+
 /** The goals the plan works toward: open, not left out, and optional ones only when taken in. */
 export function goalsInPlay(goals: SlayerGoal[], choices: SlayerPlanChoices): number[] {
   const out = new Set(choices.excluded)
@@ -774,7 +783,7 @@ export function planSlayer(data: Pick<SlayerPlanData, 'goals' | 'camps'> & { mov
     for (let guard = 0; guard < 500; guard++) {
       let best: { c: SlayerPlanCamp; secs: number; cost: number; work: number } | null = null
       for (const c of hourly) {
-        const fed = goals.filter((g) => tierOf(g) === tier && !onlyDaily.has(g) && (need.get(g) ?? 0) > 0 && paceOf(c, g) > 0)
+        const fed = goals.filter((g) => tierOf(g) === tier && !onlyDaily.has(g) && (need.get(g) ?? 0) > LEFT && paceOf(c, g) > 0)
         if (!fed.length) continue
         // Until the first of this tier's achievements it feeds is done.
         const secs = Math.min(...fed.map((g) => ((need.get(g) ?? 0) / paceOf(c, g)) * 3600))
@@ -786,13 +795,15 @@ export function planSlayer(data: Pick<SlayerPlanData, 'goals' | 'camps'> & { mov
       if (!best) break
       const c: SlayerPlanCamp = best.c
       const secs: number = best.secs
-      const focus = goals.filter((g) => tierOf(g) === tier && !onlyDaily.has(g) && (need.get(g) ?? 0) > 0 && paceOf(c, g) > 0)
+      const focus = goals.filter((g) => tierOf(g) === tier && !onlyDaily.has(g) && (need.get(g) ?? 0) > LEFT && paceOf(c, g) > 0)
       const kills: Record<number, number> = {}
       for (const g of goals) {
         const k = Math.min(need.get(g) ?? 0, (paceOf(c, g) * secs) / 3600)
         if (k <= 0) continue
         kills[g] = k
-        need.set(g, (need.get(g) ?? 0) - k)
+        // What is left of a kill by rounding is none: it would bring the plan back for it, step after step.
+        const left = (need.get(g) ?? 0) - k
+        need.set(g, left > LEFT ? left : 0)
       }
       // Staying on at the same camp is one step.
       const prev = steps.length > from ? steps[steps.length - 1] : null
@@ -804,7 +815,7 @@ export function planSlayer(data: Pick<SlayerPlanData, 'goals' | 'camps'> & { mov
       at = c
     }
   }
-  const unplanned = goals.filter((g) => (need.get(g) ?? 0) > 1e-6 && !onlyDaily.has(g))
+  const unplanned = goals.filter((g) => (need.get(g) ?? 0) > LEFT && !onlyDaily.has(g))
   // What each step finishes, and the travel to it, in the order they are done.
   const left = new Map(goals.map((g) => [g, data.goals[g].max - data.goals[g].count]))
   steps.forEach((st, i) => {

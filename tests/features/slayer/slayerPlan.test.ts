@@ -279,6 +279,25 @@ describe('Slayer plan: the plan', () => {
     ])
   })
 
+  it('takes what rounding leaves of an achievement for done, and plans the rest of its tier', () => {
+    // Monkey Business at 60.626… an hour leaves 5.7e-14 of a kill after its step: once, that brought the
+    // plan back to the camp for it until its step limit ran out, and every later achievement went unplanned.
+    const tiered = [g('Monkey Business', 104, 500, 1), g('Shorter People', 365, 1000, 1)]
+    const plan = planSlayer(
+      {
+        goals: tiered,
+        camps: [
+          { id: 'log:Stonebrunt', zone: 'The Stonebrunt Mountains', kinds: [], source: 'log', pace: { 0: 60.62618595825426 } },
+          { id: 'log:Lesser Faydark', zone: 'The Lesser Faydark', kinds: [], source: 'log', pace: { 1: 70 } }
+        ]
+      },
+      DEFAULT_CHOICES
+    )
+    expect(plan.steps.map((s) => s.camp.id)).toEqual(['log:Stonebrunt', 'log:Lesser Faydark'])
+    expect(plan.unplanned).toEqual([])
+    expect(plan.steps[0].finishes).toEqual([0])
+  })
+
   it('works through Banestrike’s tiers in turn, however much quicker a later one is', () => {
     // Orc Stomp! for Progressive, the giants for Highly Decorated: Crushbone first, slower as it is.
     const tiered = [g('Orc Stomp!', 4900, 5000, 0), g('Might They Be Giants?', 4950, 5000, 1), g('A Giant Problem', 980, 1000, 1)]

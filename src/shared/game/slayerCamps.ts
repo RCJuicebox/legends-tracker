@@ -23,6 +23,15 @@ export interface SlayerCamp {
   said: string
 }
 
+/** Where in a zone, as players say: shown with a step there, whatever paces it. */
+export const SLAYER_SPOTS: { zone: string; tip: string; said: string }[] = [
+  {
+    zone: 'The Lesser Faydark',
+    tip: 'The faeries, all to the west of the map: the best camp for Shorter People',
+    said: 'the player, 2026-10-15'
+  }
+]
+
 export const SLAYER_CAMPS: SlayerCamp[] = [
   {
     zone: 'Kedge Keep',

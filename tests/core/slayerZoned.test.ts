@@ -79,3 +79,14 @@ describe('a race play settled for one zone', () => {
     expect(got.find((f) => f.mob === 'a gnoll' && f.achievement === "doesn't play well with others")?.counts).toBe(false)
   })
 })
+
+describe('a faerie', () => {
+  it('is a fairy by its name, the calling aside', () => {
+    const fae = new SlayerRaces(
+      slayerCounters(parseAchievements(['Slayer: Special', 'I\tShorter People', 'I\t\tBixies, Brownies, Dryads, Fairies, and Pixies.\t365/1000'].join('\n')).sections),
+      parseRaceTable(['25^11^Fairy^0^', '25^12^Fairies^0^', '44^11^Guard^0^'].join('\r\n'))
+    )
+    expect(fae.place('a faerie guard', null)).toMatchObject({ key: 'fairy', by: 'name' })
+    expect(fae.place('a faerie maiden', 'Fairy')).toMatchObject({ key: 'fairy', by: 'wiki' })
+  })
+})

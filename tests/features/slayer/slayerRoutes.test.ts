@@ -173,6 +173,21 @@ describe('Slayer plan: eqlwiki’s Slayer guide', () => {
     expect(ids.filter((i) => i.startsWith('guide:'))).toEqual(['guide:rathemountains'])
   })
 
+  it('puts where in the zone players say, or the guide, on a camp that has nothing of its own to say', () => {
+    const lfay = buildCamps(
+      goals,
+      races,
+      { 'The Lesser Faydark': { sec: 3600, kills: 60, last: 0, mobs: { 'an orc pawn': { name: 'an orc pawn', n: 60 } } } },
+      (mob) => place(mob, 'Orc'),
+      () => null,
+      slayerRaceLists(sections, GAME),
+      [],
+      undefined,
+      []
+    )
+    expect(lfay.find((c) => c.id === 'log:The Lesser Faydark')?.note).toBe('The faeries, all to the west of the map: the best camp for Shorter People (the player, 2026-10-15)')
+  })
+
   it('says what it says of an achievement, however the game writes its name', () => {
     expect(guideTip('orc stomp!', [{ achievement: 'Orc Stomp!', tip: 'Crushbone', zones: [] }])).toBe('Crushbone')
     expect(guideTip('Three Letter Word for Dead…')).toBeUndefined()

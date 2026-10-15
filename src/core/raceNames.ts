@@ -332,7 +332,9 @@ export const NAME_WORDS: Record<string, string> = {
   lizardmen: 'lizard man',
   tigress: 'tiger',
   yellowjacket: 'insect',
-  frogloks: 'froglok'
+  frogloks: 'froglok',
+  // Lesser Faydark's faeries are the client's Fairies ("a faerie guard" has no eqlwiki race).
+  faerie: 'fairy'
 }
 
 /**
