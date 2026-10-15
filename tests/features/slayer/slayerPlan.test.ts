@@ -301,11 +301,13 @@ describe('Slayer plan: the plan', () => {
 
   it('finishes the achievement that can be done soonest first, travel counted, every kill counting toward all its race feeds', () => {
     const plan = planSlayer({ goals, camps }, DEFAULT_CHOICES)
-    // A Giant Problem is done in twenty minutes in the Permafrost, Orc Stomp! in an hour at Crushbone; then the giants
-    // go on where they are (half an hour, no travel) before Crushbone: one visit to the Permafrost.
-    expect(plan.steps.map((s) => [s.camp.id, Math.round(s.seconds), s.travel, s.finishes])).toEqual([
-      ['log:The Permafrost Caverns', 3000, 0, [1, 2]],
-      ['log:Clan Crushbone', 3600, 600, [0]]
+    // A Giant Problem is done in twenty minutes in the Permafrost, Orc Stomp! in an hour at Crushbone; then the
+    // giants, whose best zone it is too, go on there (their twenty kills already counted), a step of their own,
+    // before Crushbone: one visit to the Permafrost.
+    expect(plan.steps.map((s) => [s.camp.id, Math.round(s.seconds), s.travel, s.finishes, s.focus])).toEqual([
+      ['log:The Permafrost Caverns', 1200, 0, [2], [2]],
+      ['log:The Permafrost Caverns', 1800, 0, [1], [1]],
+      ['log:Clan Crushbone', 3600, 600, [0], [0]]
     ])
     expect(Math.round(plan.seconds)).toBe(7200)
     // Ten kedge at five a day, beside the plan.
@@ -316,18 +318,15 @@ describe('Slayer plan: the plan', () => {
   it('shows the overlay the step in the zone the player is in, else the first to head to, and the one after', () => {
     const plan = planSlayer({ goals, camps }, DEFAULT_CHOICES)
     const away = slayerPlanView(plan, goals, DEFAULT_CHOICES, 'The Northern Plains of Karana')
-    expect(away.steps).toBe(2)
+    expect(away.steps).toBe(3)
     expect(away.goals).toBe(4)
     expect(Math.round(away.secondsLeft)).toBe(7200)
     expect(away.current).toMatchObject({ index: 0, zone: 'The Permafrost Caverns', here: false, tier: 'Not for Banestrike' })
-    expect(away.current?.goals).toEqual([
-      { name: 'Might They Be Giants?', count: 4950, max: 5000 },
-      { name: 'A Giant Problem', count: 980, max: 1000 }
-    ])
-    expect(away.next).toMatchObject({ index: 1, zone: 'Clan Crushbone', travel: 600 })
+    expect(away.current?.goals).toEqual([{ name: 'A Giant Problem', count: 980, max: 1000 }])
+    expect(away.next).toMatchObject({ index: 1, zone: 'The Permafrost Caverns', travel: 0, goals: [{ name: 'Might They Be Giants?', count: 4950, max: 5000 }] })
     // At Crushbone (an instance of it counts): that step now, the Permafrost after it.
     const there = slayerPlanView(plan, goals, DEFAULT_CHOICES, 'Clan Crushbone - Solo')
-    expect([there.current?.index, there.current?.here, there.next?.index]).toEqual([1, true, 0])
+    expect([there.current?.index, there.current?.here, there.next?.index]).toEqual([2, true, 0])
     // Nothing left to plan: no step.
     expect(slayerPlanView(planSlayer({ goals: [], camps }, DEFAULT_CHOICES), [], DEFAULT_CHOICES, '')).toMatchObject({ steps: 0, current: null, next: null })
   })
@@ -371,12 +370,39 @@ describe('Slayer plan: the plan', () => {
     expect(plan.steps[0].finishes).toEqual([0])
   })
 
+  it('kills one achievement’s mobs a step, and stays in a zone for the others whose best zone it is', () => {
+    // South Karana has giants and dervishes (seldom near each other): two steps, each only its own mobs.
+    // Orc Stomp!'s orcs elsewhere would be done sooner than the dervishes, but South Karana is the
+    // dervishes' best zone and the player is there.
+    const tiered = [g('A Giant Problem', 970, 1000, 1), g('Spin Me Round', 70, 100, 1), g('Orc Stomp!', 4900, 5000, 1)]
+    const sk: SlayerPlanCamp = {
+      id: 'spawns:southkarana',
+      zone: 'The Southern Plains of Karana',
+      kinds: [
+        { name: 'a hill giant', perHour: 60, goals: [0] },
+        { name: 'a dervish', perHour: 20, goals: [1] }
+      ],
+      source: 'spawns',
+      pace: { 0: 60, 1: 20 }
+    }
+    const cb: SlayerPlanCamp = { id: 'log:Clan Crushbone', zone: 'Clan Crushbone', kinds: [{ name: 'an orc pawn', perHour: 100, goals: [2] }], source: 'log', pace: { 2: 100 } }
+    const plan = planSlayer({ goals: tiered, camps: [sk, cb] }, DEFAULT_CHOICES)
+    expect(plan.steps.map((s) => [s.camp.id, s.focus, Math.round(s.seconds / 60), Object.keys(s.kills).map(Number)])).toEqual([
+      ['spawns:southkarana', [0], 30, [0]],
+      ['spawns:southkarana', [1], 90, [1]],
+      ['log:Clan Crushbone', [2], 60, [2]]
+    ])
+    // What a step kills is its own mobs alone.
+    expect(stepKills(plan.steps[1], DEFAULT_CHOICES)).toEqual([{ name: 'a dervish', n: 30, goals: [1] }])
+  })
+
   it('works through Banestrike’s tiers in turn, however much quicker a later one is', () => {
     // Orc Stomp! for Progressive, the giants for Highly Decorated: Crushbone first, slower as it is.
     const tiered = [g('Orc Stomp!', 4900, 5000, 0), g('Might They Be Giants?', 4950, 5000, 1), g('A Giant Problem', 980, 1000, 1)]
     const plan = planSlayer({ goals: tiered, camps: camps.slice(0, 2) }, DEFAULT_CHOICES)
     expect(plan.steps.map((s) => [s.camp.id, s.tier])).toEqual([
       ['log:Clan Crushbone', 0],
+      ['log:The Permafrost Caverns', 1],
       ['log:The Permafrost Caverns', 1]
     ])
   })
@@ -410,7 +436,7 @@ describe('Slayer plan: the plan', () => {
   it('says what nothing feeds, and leaves out the camps ruled out', () => {
     const plan = planSlayer({ goals, camps }, { ...DEFAULT_CHOICES, outCamps: ['log:Clan Crushbone'] })
     expect(plan.unplanned).toEqual([0])
-    expect(plan.steps.map((s) => s.camp.id)).toEqual(['log:The Permafrost Caverns'])
+    expect(plan.steps.map((s) => s.camp.id)).toEqual(['log:The Permafrost Caverns', 'log:The Permafrost Caverns'])
   })
 
   it('leaves a mob ruled out out of every camp, and finds its kills elsewhere', () => {

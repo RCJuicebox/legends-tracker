@@ -817,10 +817,12 @@ export function goalsInPlay(goals: SlayerGoal[], choices: SlayerPlanChoices): nu
 }
 
 /**
- * The plan: at each step the camp that does the most still-open kills a second, travel counted, kept
- * until the first achievement it feeds is done; a step that stays at the same camp joins the one
- * before. Raid lockouts are not steps: each gives its kills a day beside the plan. Travel is the way
- * the log has seen taken between the two zones, or the player's minutes between camps where it knows none.
+ * The plan: a step an achievement, at the camp and on the way that finish it soonest, travel counted;
+ * then the tier's others whose best zone is the same, one after another while there. A step kills
+ * only the mobs that achievement wants (a zone's races are seldom near each other), each kill still
+ * counting toward whatever else its race feeds. Raid lockouts are not steps: each gives its kills a
+ * day beside the plan. Travel is the way the log has seen taken between the two zones, or the
+ * player's minutes between camps where it knows none.
  */
 export function planSlayer(data: Pick<SlayerPlanData, 'goals' | 'camps'> & { moves?: SlayerMove[] }, choices: SlayerPlanChoices): SlayerPlan {
   const goals = goalsInPlay(data.goals, choices)
@@ -847,46 +849,70 @@ export function planSlayer(data: Pick<SlayerPlanData, 'goals' | 'camps'> & { mov
     return route(a.zone, b.zone) ?? { seconds: travelSec, via: [] }
   }
   const tierOf = (g: number) => data.goals[g].tier ?? BANESTRIKE.length
+  const inPlan = new Set(goals)
+  const scaleOf = (c: SlayerPlanCamp) => (c.assumed ? choices.pace : 1)
+  // A goal's kills an hour at a camp: its own mobs'. A camp that names no mobs is one kind of kill.
+  const rateOf = (c: SlayerPlanCamp, g: number) => (c.kinds.length ? c.kinds.reduce((s, k) => s + (k.goals.includes(g) ? k.perHour * scaleOf(c) : 0), 0) : paceOf(c, g))
+  /** What killing a goal's mobs at a camp for so long does toward every goal: each kill counts toward all its race feeds. */
+  const killsFor = (c: SlayerPlanCamp, g: number, secs: number): Record<number, number> => {
+    const out: Record<number, number> = {}
+    const add = (h: number, n: number) => inPlan.has(h) && n > 0 && (out[h] = (out[h] ?? 0) + n)
+    if (c.kinds.length) {
+      for (const k of c.kinds) if (k.goals.includes(g)) for (const h of new Set(k.goals)) add(h, (k.perHour * scaleOf(c) * secs) / 3600)
+    } else for (const h of Object.keys(c.pace)) add(+h, (paceOf(c, +h) * secs) / 3600)
+    return out
+  }
+  // Each goal's best zone: where it goes quickest, travel aside.
+  const bestZone = new Map<number, string>()
+  for (const g of goals) {
+    let best: { zone: string; rate: number } | null = null
+    for (const c of hourly) {
+      const r = rateOf(c, g)
+      if (r > 0 && (!best || r > best.rate)) best = { zone: zoneKey(c.zone), rate: r }
+    }
+    if (best) bestZone.set(g, best.zone)
+  }
   const steps: SlayerStep[] = []
   let at: SlayerPlanCamp | null = null
   // Banestrike's tiers in turn, each done before the next is begun; within a tier, the achievement
-  // that can be finished soonest, travel counted, first. Every kill still counts toward whatever
-  // else its race feeds, a later tier's too.
+  // that can be finished soonest, travel counted, first, and after it the others best done in the
+  // same zone. Every kill still counts toward whatever else its race feeds, a later tier's too.
   for (const tier of [...new Set(goals.map(tierOf))].sort((a, b) => a - b)) {
-    const from = steps.length
     for (let guard = 0; guard < 500; guard++) {
-      let best: { c: SlayerPlanCamp; secs: number; cost: number; work: number } | null = null
-      for (const c of hourly) {
-        const fed = goals.filter((g) => tierOf(g) === tier && !onlyDaily.has(g) && (need.get(g) ?? 0) > LEFT && paceOf(c, g) > 0)
-        if (!fed.length) continue
-        // Until the first of this tier's achievements it feeds is done.
-        const secs = Math.min(...fed.map((g) => ((need.get(g) ?? 0) / paceOf(c, g)) * 3600))
-        const cost: number = secs + trip(at, c).seconds
-        // As soon: the camp doing more besides.
-        const work = goals.reduce((s, g) => s + Math.min(need.get(g) ?? 0, (paceOf(c, g) * secs) / 3600), 0)
-        if (!best || cost < best.cost - 1e-6 || (Math.abs(cost - best.cost) <= 1e-6 && work > best.work)) best = { c, secs, cost, work }
-      }
+      const open = goals.filter((g) => tierOf(g) === tier && !onlyDaily.has(g) && (need.get(g) ?? 0) > LEFT)
+      if (!open.length) break
+      const here: string | null = at ? zoneKey(at.zone) : null
+      let best: { c: SlayerPlanCamp; g: number; secs: number; cost: number; work: number } | null = null
+      // While in a zone, the tier's goals whose best zone it is come next, at its best camp for each.
+      const stay: number[] = here ? open.filter((g) => bestZone.get(g) === here) : []
+      for (const g of (stay.length ? stay : open) as number[])
+        for (const c of hourly) {
+          if (stay.length && zoneKey(c.zone) !== here) continue
+          const r: number = rateOf(c, g)
+          if (r <= 0) continue
+          const secs: number = ((need.get(g) ?? 0) / r) * 3600
+          const cost: number = secs + trip(at, c).seconds
+          // As soon: the one doing more besides.
+          const work = Object.values(killsFor(c, g, secs)).reduce((s, n) => s + n, 0)
+          if (!best || cost < best.cost - 1e-6 || (Math.abs(cost - best.cost) <= 1e-6 && work > best.work)) best = { c, g, secs, cost, work }
+        }
       if (!best) break
-      const c: SlayerPlanCamp = best.c
-      const secs: number = best.secs
-      const focus = goals.filter((g) => tierOf(g) === tier && !onlyDaily.has(g) && (need.get(g) ?? 0) > LEFT && paceOf(c, g) > 0)
-      const kills: Record<number, number> = {}
-      for (const g of goals) {
-        const k = Math.min(need.get(g) ?? 0, (paceOf(c, g) * secs) / 3600)
-        if (k <= 0) continue
-        kills[g] = k
+      const kills = killsFor(best.c, best.g, best.secs)
+      for (const [h, k] of Object.entries(kills)) {
+        const was = need.get(+h) ?? 0
+        const k2 = Math.min(was, k)
+        if (k2 <= 0) {
+          delete kills[+h]
+          continue
+        }
+        kills[+h] = k2
         // What is left of a kill by rounding is none: it would bring the plan back for it, step after step.
-        const left = (need.get(g) ?? 0) - k
-        need.set(g, left > LEFT ? left : 0)
+        const left = was - k2
+        need.set(+h, left > LEFT ? left : 0)
       }
-      // Staying on at the same camp is one step.
-      const prev = steps.length > from ? steps[steps.length - 1] : null
-      if (prev?.camp.id === c.id) {
-        prev.seconds += secs
-        for (const [g, k] of Object.entries(kills)) prev.kills[+g] = (prev.kills[+g] ?? 0) + k
-        for (const g of focus) if (!prev.focus.includes(g)) prev.focus.push(g)
-      } else steps.push({ camp: c, seconds: secs, travel: 0, kills, finishes: [], tier, focus })
-      at = c
+      need.set(best.g, 0)
+      steps.push({ camp: best.c, seconds: best.secs, travel: 0, kills, finishes: [], tier, focus: [best.g] })
+      at = best.c
     }
   }
   const unplanned = goals.filter((g) => (need.get(g) ?? 0) > LEFT && !onlyDaily.has(g))

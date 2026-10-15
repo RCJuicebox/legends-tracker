@@ -3646,6 +3646,18 @@ input[aria-invalid='true'] {
   margin: 0;
   padding: 0;
 }
+/* Plan › Slayer: the steps done in one zone together, under its heading, each its own row. */
+.sl-substep {
+  padding-top: 4px;
+}
+.sl-substep + .sl-substep {
+  margin-top: 4px;
+  border-top: 1px dashed rgb(var(--ink) / 0.12);
+}
+.sl-substep > .row > .small {
+  flex: 1 1 auto;
+  min-width: 0;
+}
 .fp-step {
   display: grid;
   grid-template-columns: 30px minmax(0, 1fr);

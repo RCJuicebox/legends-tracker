@@ -61,9 +61,10 @@ const HOW = (
     </div>
     <div>
       <b>The plan</b> works through Banestrike’s tiers in turn (Progressive, Highly Decorated, A Force of Nature, then what Megadeath names besides), each done before the next is
-      begun; within a tier, the achievement that can be finished soonest, travel counted, first. A kill counts toward every open achievement its race feeds, a later tier’s too.
-      Raid lockouts (Phinigel, Lady Vox, Lord Nagafen, Innoruuk, Cazic-Thule) are a few kills a day, so they run beside it. Rule out a camp, or a mob with the ✕ beside its name
-      (one that takes a faction to spawn, say), and the plan finds the kills elsewhere.
+      begun; within a tier, the achievement that can be finished soonest, travel counted, first, then the others whose best zone is the same while you are there. Each step is one
+      achievement and kills only its own mobs (a zone’s races are seldom near each other); steps in the same zone sit under one heading. A kill still counts toward every open
+      achievement its race feeds, a later tier’s too. Raid lockouts (Phinigel, Lady Vox, Lord Nagafen, Innoruuk, Cazic-Thule) are a few kills a day, so they run beside it. Rule out
+      a camp, or a mob with the ✕ beside its name (one that takes a faction to spawn, say), and the plan finds the kills elsewhere.
     </div>
   </>
 )
@@ -98,6 +99,17 @@ function SpawnHint({ spawn, bound }: { spawn: MobSpawn; bound?: boolean }) {
       {bound ? ' · spawn-bound' : ''})
     </Tip>
   )
+}
+
+/** The plan's steps from..to, in runs of the same zone, by index: one zone heading for the steps done there together. */
+function zoneRuns(steps: SlayerStep[], from: number, to: number): number[][] {
+  const out: number[][] = []
+  for (let i = from; i < to; i++) {
+    const last = out.at(-1)
+    if (last && zoneKey(steps[last[0]].camp.zone) === zoneKey(steps[i].camp.zone)) last.push(i)
+    else out.push([i])
+  }
+  return out
 }
 
 /** A Banestrike tier's name: the meta whose achievements it is. */
@@ -431,67 +443,72 @@ export function Slayer() {
                       <span className="faint small mono">≈ {duration(seconds)}</span>
                     </h3>
                     <ol className="fp-steps" start={from + 1}>
-                      {plan.steps.slice(from, to).map((st, j) => {
-                        const i = from + j
+                      {zoneRuns(plan.steps, from, to).map((run) => {
+                        const first = plan.steps[run[0]]
+                        const zone = first.camp.zone
+                        const total = run.reduce((t, i) => t + plan.steps[i].seconds + plan.steps[i].travel, 0)
                         return (
-                          <li key={st.camp.id + i} className="fp-step">
-                            <span className="fp-num">{i + 1}</span>
+                          <li key={first.camp.id + run[0]} className="fp-step">
+                            <span className="fp-num">{run[0] + 1}</span>
                             <div className="fp-body">
                               <div className="fp-head">
-                                <span className="fp-zone">{st.camp.zone}</span>
-                                <Tip className={`chip fp-kind ${st.camp.source === 'log' ? 'kill' : 'quest'}`} text={SOURCE[st.camp.source].tip}>
-                                  {SOURCE[st.camp.source].label}
-                                </Tip>
+                                <span className="fp-zone">{zone}</span>
+                                {first.travel > 0 && (
+                                  <Tip className="faint small" text={first.via?.length ? `By ${first.via.join(', ')}, as your log has gone` : 'Your minutes between camps'}>
+                                    {duration(first.travel)} to get there
+                                  </Tip>
+                                )}
                                 <span className="spacer" />
-                                <Tip
-                                  className="mono"
-                                  text={`What you kill there: ${stepKills(st, choices)
-                                    .map((k) => `${k.name} ×${kills(k.n)}`)
-                                    .join(', ')}`}
-                                >
-                                  ×{kills(stepKills(st, choices).reduce((t, k) => t + k.n, 0))}
-                                </Tip>
-                                <Tip
-                                  className="mono fp-time"
-                                  text={
-                                    st.travel
-                                      ? `Including ${duration(st.travel)} to get there${st.via?.length ? `, by ${st.via.join(', ')}, as your log has gone` : ''}`
-                                      : 'Time killing there'
-                                  }
-                                >
-                                  {duration(st.seconds + st.travel)}
+                                <Tip className="mono fp-time" text={run.length > 1 ? 'The steps here together, getting there included' : 'Getting there and killing there'}>
+                                  {duration(total)}
                                 </Tip>
                               </div>
-                              <StepWork step={st} goals={data.goals} choices={choices} onOut={(mob) => ruleOutMob(mob, true)} />
-                              <HunterHere hunter={hunterAt(st.camp.zone)} />
-                              <div className="row tight fp-effects">
-                                <Limit camp={st.camp} />
-                                <FactionCost camp={st.camp} />
-                                {st.camp.note && <span className="faint small">{st.camp.note}</span>}
-                                <span className="spacer" />
-                                <span className="faint small">
-                                  {st.camp.source === 'log' && st.camp.hours
-                                    ? `${num(st.camp.kills ?? 0)} kills in ${duration(st.camp.hours * 3600)} there`
-                                    : st.camp.said && `said by ${st.camp.said}`}
-                                </span>
-                                <button
-                                  className="btn small ghost"
-                                  onClick={() => toggleMap(i)}
-                                  title="Where its mobs spawn, on the game’s own map of the zone"
-                                  aria-expanded={maps.has(i)}
-                                >
-                                  Map
-                                </button>
-                                <button className="btn small ghost" onClick={() => ruleOut(st.camp.id, true)} title="Leave this camp out of the plan">
-                                  Rule out
-                                </button>
-                              </div>
-                              {maps.has(i) && (
-                                <SpawnMap
-                                  zone={st.camp.zone}
-                                  mobs={[...stepKills(st, choices).map((k) => k.name), ...hunterAt(st.camp.zone).flatMap((h) => h.left.map((n) => n.name))]}
-                                />
-                              )}
+                              {run.map((i) => {
+                                const st = plan.steps[i]
+                                const killed = stepKills(st, choices)
+                                return (
+                                  <div key={i} className="sl-substep">
+                                    <div className="row tight">
+                                      {run.length > 1 && <span className="mono faint">{i + 1}.</span>}
+                                      <StepWork step={st} goals={data.goals} choices={choices} onOut={(mob) => ruleOutMob(mob, true)} />
+                                      <span className="spacer" />
+                                      <Tip className={`chip fp-kind ${st.camp.source === 'log' ? 'kill' : 'quest'}`} text={SOURCE[st.camp.source].tip}>
+                                        {SOURCE[st.camp.source].label}
+                                      </Tip>
+                                      <Tip className="mono" text={`What you kill there: ${killed.map((k) => `${k.name} ×${kills(k.n)}`).join(', ')}`}>
+                                        ×{kills(killed.reduce((t, k) => t + k.n, 0))}
+                                      </Tip>
+                                      <Tip className="mono small" text="Time killing for it">
+                                        {duration(st.seconds)}
+                                      </Tip>
+                                    </div>
+                                    <div className="row tight fp-effects">
+                                      <Limit camp={st.camp} />
+                                      <FactionCost camp={st.camp} />
+                                      {st.camp.note && <span className="faint small">{st.camp.note}</span>}
+                                      <span className="spacer" />
+                                      <span className="faint small">
+                                        {st.camp.source === 'log' && st.camp.hours
+                                          ? `${num(st.camp.kills ?? 0)} kills in ${duration(st.camp.hours * 3600)} there`
+                                          : st.camp.said && `said by ${st.camp.said}`}
+                                      </span>
+                                      <button
+                                        className="btn small ghost"
+                                        onClick={() => toggleMap(i)}
+                                        title="Where its mobs spawn, on the game’s own map of the zone"
+                                        aria-expanded={maps.has(i)}
+                                      >
+                                        Map
+                                      </button>
+                                      <button className="btn small ghost" onClick={() => ruleOut(st.camp.id, true)} title="Leave this camp out of the plan">
+                                        Rule out
+                                      </button>
+                                    </div>
+                                    {maps.has(i) && <SpawnMap zone={zone} mobs={[...killed.map((k) => k.name), ...hunterAt(zone).flatMap((h) => h.left.map((n) => n.name))]} />}
+                                  </div>
+                                )
+                              })}
+                              <HunterHere hunter={hunterAt(zone)} />
                             </div>
                           </li>
                         )
