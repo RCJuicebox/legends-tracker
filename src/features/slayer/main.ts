@@ -46,9 +46,9 @@ const tableOf = zoneIndex(TABLES)
 /** The map set the plan's spawns are marked in: a copy of the game's own maps, so its files stay as they are. */
 const MAP_SET = 'LegendsTracker'
 
-/** Each stretch of log's kills by zone, as a LogHistory consumer. Version 2: trips between zones, each mob's last kill. */
+/** Each stretch of log's kills by zone, as a LogHistory consumer. Version 2: trips between zones, each mob's last kill; 3: each stretch of killing. */
 const killConsumer: HistoryConsumer<SlayerKillTallies> = {
-  version: 2,
+  version: 3,
   empty: emptyKillTallies,
   reader: () => readKillLine
 }

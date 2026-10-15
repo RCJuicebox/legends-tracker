@@ -47,12 +47,13 @@ const HOW = (
       them.
     </div>
     <div>
-      <b>Pace</b> comes from your own logs first: every kill over your log and its archives (and your other characters’), and the time you spent killing in each zone. Where you
-      have not hunted a race, what players have settled on stands in (the raid lockouts, the camps the EQL Discord agrees on), then TAKP’s classic spawn tables: how many spots a
-      zone has for the race and how quickly they pop, at no more than your usual kills an hour. The zones eqlwiki’s Slayer guide names for an achievement are camps of their own,
-      paced the same way, with the guide’s words beside each step (“guide”). Legends’ respawns are its own: a zone’s spawns come back on one timer, quicker than classic’s, so a
-      zone runs on the respawn your Respawns page has timed there (a spawn of one spot); a zone you have timed nothing in keeps the classic timers. Zones TAKP lacks fall back on
-      eqlwiki’s count of a race’s NPCs, a guess.
+      <b>Pace</b> comes from your own logs first: every kill over your log and its archives (and your other characters’), and the time you spent killing in each zone, split by what
+      you were killing: a stretch where a race was a quarter or more of what died is that race’s camp, its kills over its own time (an hour of granitebacks once says nothing of how
+      quickly kejekan die now). Where you have not hunted a race, what players have settled on stands in (the raid lockouts, the camps the EQL Discord agrees on), then TAKP’s
+      classic spawn tables: how many spots a zone has for the race and how quickly they pop, at no more than your usual kills an hour. The zones eqlwiki’s Slayer guide names for an
+      achievement are camps of their own, paced the same way, with the guide’s words beside each step (“guide”). Legends’ respawns are its own: a zone’s spawns come back on one
+      timer, quicker than classic’s, so a zone runs on the respawn your Respawns page has timed there (a spawn of one spot); a zone you have timed nothing in keeps the classic
+      timers. Zones TAKP lacks fall back on eqlwiki’s count of a race’s NPCs, a guess.
     </div>
     <div>
       <b>Travel</b> is the way your log has seen you go between two zones: from a camp’s last kill to the next zone, then across each zone between, gates and ports included. Where

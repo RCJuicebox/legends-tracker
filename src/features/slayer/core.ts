@@ -37,14 +37,24 @@ export interface SlayerKillTallies {
   /** The last kill, and its zone: the next kill within KILL_RUN_MS there adds the gap to the zone's time. */
   lastAt: number
   lastZone: string
-  /** By zone (instances folded in), then by mob lower-cased: the name as the log gave it, kills, and the last one's time. */
-  zones: Record<string, { sec: number; kills: number; last: number; mobs: Record<string, { name: string; n: number; at?: number }> }>
+  /**
+   * By zone (instances folded in), then by mob lower-cased: the name as the log gave it, kills, and the
+   * last one's time. And each stretch of killing there (kills KILL_RUN_MS apart at most): its time and
+   * what died, by mob lower-cased, so a race's pace is its own stretches' (runPace), not the zone's.
+   */
+  zones: Record<string, { sec: number; kills: number; last: number; mobs: Record<string, { name: string; n: number; at?: number }>; runs?: KillRun[] }>
   /** When the zone the stretch is in was entered, the kills there since, and whether the player has died since. */
   enteredAt: number
   killsHere: number
   died: boolean
   /** Trips from zone to zone ("from|to"), seconds: across a zone killing nothing there, and from a camp's last kill to the next zone. */
   moves: Record<string, { pass: number[]; leave: number[] }>
+}
+
+/** A stretch of killing in a zone: kills no more than KILL_RUN_MS apart, its seconds and what died (mob lower-cased → kills). */
+export interface KillRun {
+  sec: number
+  mobs: Record<string, number>
 }
 
 export const emptyKillTallies = (): SlayerKillTallies => ({ zone: '', lastAt: 0, lastZone: '', zones: {}, enteredAt: 0, killsHere: 0, died: false, moves: {} })
@@ -92,8 +102,14 @@ export function readKillLine(line: LogLine, into: SlayerKillTallies): void {
   const x = slayerLine(line.text)
   if (!x || !('kill' in x) || !ourSide(x.kill.by)) return
   const zone = (into.zones[into.zone] ??= { sec: 0, kills: 0, last: 0, mobs: {} })
+  const runs = (zone.runs ??= [])
   const gap = line.time - into.lastAt
-  if (into.lastZone === into.zone && gap > 0 && gap <= KILL_RUN_MS) zone.sec += gap / 1000
+  const goesOn = into.lastZone === into.zone && gap >= 0 && gap <= KILL_RUN_MS && runs.length > 0
+  if (goesOn && gap > 0) {
+    zone.sec += gap / 1000
+    runs[runs.length - 1].sec += gap / 1000
+  }
+  if (!goesOn) runs.push({ sec: 0, mobs: {} })
   into.lastAt = line.time
   into.lastZone = into.zone
   into.killsHere++
@@ -102,6 +118,8 @@ export function readKillLine(line: LogLine, into: SlayerKillTallies): void {
   const k = x.kill.mob.replace(/^\*+/, '').toLowerCase()
   const m = (zone.mobs[k] ??= { name: x.kill.mob.replace(/^\*+/, ''), n: 0 })
   m.n++
+  const run = runs[runs.length - 1].mobs
+  run[k] = (run[k] ?? 0) + 1
   m.at = Math.max(m.at ?? 0, line.time)
 }
 
@@ -110,7 +128,8 @@ export function joinKillTallies(stretches: SlayerKillTallies[]): SlayerKillTalli
   const out: SlayerKillTallies['zones'] = {}
   for (const s of stretches)
     for (const [zone, z] of Object.entries(s.zones)) {
-      const had = (out[zone] ??= { sec: 0, kills: 0, last: 0, mobs: {} })
+      const had = (out[zone] ??= { sec: 0, kills: 0, last: 0, mobs: {}, runs: [] })
+      had.runs = [...(had.runs ?? []), ...(z.runs ?? [])]
       had.sec += z.sec
       had.kills += z.kills
       had.last = Math.max(had.last, z.last)
@@ -414,6 +433,57 @@ const paceOfKinds = (kinds: CampKind[]) => {
   return pace
 }
 
+/** A stretch of killing is about an achievement when its races were at least this share of what died in it. */
+const RUN_SHARE = 0.25
+/** The stretches about the same achievements must come to this long to be a camp of their own (as a zone must, MIN_LOG_SEC); else the zone's time stands. */
+const MIN_RUN_SEC = 15 * 60
+
+/** Some of a zone's killing, as one camp: its time, kills, what died (mob lower-cased → kills), and the achievements it was about. */
+export interface KillStretch {
+  sec: number
+  kills: number
+  mobs: Record<string, number>
+  about: number[]
+  /** The zone's time as a whole, for what no stretch was about: it counts toward those alone. */
+  whole?: boolean
+}
+
+/**
+ * A zone's killing, split by what it was about. Each stretch of killing is about the achievements its
+ * races were RUN_SHARE of what died for; the stretches about the same ones are a camp, their kills over
+ * their own time: an hour of granitebacks in September says nothing of how quickly kejekan die now,
+ * nor can the two be killed at once. Stretches about the same achievements coming to under
+ * MIN_RUN_SEC say too little; what no camp of stretches is about (a tiger among the granitebacks),
+ * and tallies kept before stretches were, are the zone's time as a whole.
+ */
+export function killStretches(z: SlayerKillTallies['zones'][string], placeOf: (mob: string) => number[]): KillStretch[] {
+  const groups = new Map<string, KillStretch>()
+  for (const r of z.runs ?? []) {
+    const byGoal = new Map<number, number>()
+    let all = 0
+    for (const [mob, n] of Object.entries(r.mobs)) {
+      all += n
+      for (const g of placeOf(mob)) byGoal.set(g, (byGoal.get(g) ?? 0) + n)
+    }
+    const about = [...byGoal]
+      .filter(([, n]) => all > 0 && n >= all * RUN_SHARE)
+      .map(([g]) => g)
+      .sort((a, b) => a - b)
+    if (!about.length) continue
+    const key = about.join(',')
+    const group = groups.get(key) ?? { sec: 0, kills: 0, mobs: {}, about }
+    group.sec += r.sec
+    group.kills += all
+    for (const [mob, n] of Object.entries(r.mobs)) group.mobs[mob] = (group.mobs[mob] ?? 0) + n
+    groups.set(key, group)
+  }
+  const out = [...groups.values()].filter((g) => g.sec >= MIN_RUN_SEC).sort((a, b) => b.sec - a.sec)
+  const covered = new Set(out.flatMap((x) => x.about))
+  const rest = [...new Set(Object.keys(z.mobs).flatMap((m) => placeOf(m)))].filter((g) => !covered.has(g))
+  if (rest.length) out.push({ sec: z.sec, kills: z.kills, mobs: Object.fromEntries(Object.entries(z.mobs).map(([k, m]) => [k, m.n])), about: rest, whole: true })
+  return out
+}
+
 /** How long a zone must have been hunted, and how many kills it gave, before its pace is taken as the log's. */
 const MIN_LOG_SEC = 15 * 60
 const MIN_LOG_KILLS = 10
@@ -464,40 +534,44 @@ export function buildCamps(
   const feeds = (zone: string, g: number) => `${zoneKey(zone)}|${g}`
   for (const [zone, z] of Object.entries(zones)) {
     if (z.sec < MIN_LOG_SEC || z.kills < MIN_LOG_KILLS) continue
-    const hours = z.sec / 3600
-    const pace: Record<number, number> = {}
-    const counted: { name: string; n: number }[] = []
-    const moved: Record<string, number> = {}
-    for (const m of Object.values(z.mobs)) {
-      const at = place(m.name, zone)
-      const hits = factionPerKill(zone, m.name)
-      if (hits) for (const [f, v] of Object.entries(hits)) moved[f] = (moved[f] ?? 0) + (v * m.n) / hours
-      if (!at.length || lockoutMobs.has(spawnKey(m.name))) continue
-      counted.push(m)
-      for (const g of at) pace[g] = (pace[g] ?? 0) + m.n / hours
-    }
-    if (!counted.length) continue
-    for (const g of Object.keys(pace)) fed.add(feeds(zone, +g))
+    const nameOf = (key: string) => z.mobs[key]?.name ?? key
     const here = spawnsIn(zone)
-    camps.push({
-      id: `log:${zone}`,
-      zone,
-      kinds: counted
-        .sort((a, b) => b.n - a.n)
-        .map((m) => {
-          const found = here?.get(spawnKey(m.name))
-          const spawn = found && usable(found) ? found : undefined
-          const perHour = m.n / hours
-          return { name: m.name, perHour, goals: place(m.name, zone), ...(spawn ? { spawn, bound: perHour >= spawn.ceiling * BOUND } : {}) }
-        }),
-      source: 'log',
-      pace,
-      hours,
-      kills: z.kills,
-      factions: Object.entries(moved)
-        .filter(([, v]) => Math.abs(v) >= 0.5)
-        .map(([faction, perHour]) => ({ faction, perHour }))
-        .sort((a, b) => a.perHour - b.perHour)
+    // Each stretch of what the killing there was about, a camp of its own (the largest first, keeping the zone's id).
+    killStretches(z, (key) => place(nameOf(key), zone)).forEach((st, i) => {
+      if (st.sec <= 0) return
+      const hours = st.sec / 3600
+      const about = new Set(st.about)
+      const pace: Record<number, number> = {}
+      const moved: Record<string, number> = {}
+      const kinds: CampKind[] = []
+      for (const [key, n] of Object.entries(st.mobs).sort((a, b) => b[1] - a[1])) {
+        const name = nameOf(key)
+        const hits = factionPerKill(zone, name)
+        if (hits) for (const [f, v] of Object.entries(hits)) moved[f] = (moved[f] ?? 0) + (v * n) / hours
+        // A stretch's kills count toward all their races feed; the zone's time as a whole only toward what no stretch was about.
+        const goalsHere = place(name, zone).filter((g) => !st.whole || about.has(g))
+        if (!goalsHere.length || lockoutMobs.has(spawnKey(name))) continue
+        const perHour = n / hours
+        const found = here?.get(spawnKey(name))
+        const spawn = found && usable(found) ? found : undefined
+        kinds.push({ name, perHour, goals: goalsHere, ...(spawn ? { spawn, bound: perHour >= spawn.ceiling * BOUND } : {}) })
+        for (const g of goalsHere) pace[g] = (pace[g] ?? 0) + perHour
+      }
+      if (!kinds.length) return
+      for (const g of Object.keys(pace)) fed.add(feeds(zone, +g))
+      camps.push({
+        id: i === 0 ? `log:${zone}` : `log:${zone}#${i + 1}`,
+        zone,
+        kinds,
+        source: 'log',
+        pace,
+        hours,
+        kills: st.kills,
+        factions: Object.entries(moved)
+          .filter(([, v]) => Math.abs(v) >= 0.5)
+          .map(([faction, perHour]) => ({ faction, perHour }))
+          .sort((a, b) => a.perHour - b.perHour)
+      })
     })
   }
   const goalsOf = (keys: string[]) => goals.flatMap((_, i) => (keys.some((k) => races.keys[i].has(k)) ? [i] : []))

@@ -12,11 +12,13 @@ import {
   joinKillTallies,
   optionalSlayer,
   planSlayer,
+  killStretches,
   readKillLine,
   slayerGoals,
   slayerPlanView,
   slayerRaceLists,
   stepKills,
+  type KillRun,
   type SlayerGoal,
   type SlayerPlanCamp
 } from '../../../src/features/slayer/core'
@@ -90,6 +92,11 @@ describe('Slayer plan: the kills in the logs', () => {
     expect(z.sec).toBe(60)
     expect(z.mobs['an orc pawn']).toEqual({ name: 'an orc pawn', n: 2, at: 24 * MIN })
     expect(z.mobs['an orc centurion'].n).toBe(1)
+    // Each stretch of killing, with what died in it.
+    expect(z.runs).toEqual([
+      { sec: 60, mobs: { 'an orc pawn': 1, 'an orc centurion': 1 } },
+      { sec: 0, mobs: { 'an orc pawn': 1 } }
+    ])
     // An instance is its zone's camp.
     expect(t.zones['The Permafrost Caverns'].kills).toBe(1)
     expect(campZone('Befallen 1 (Awakened)')).toBe('Befallen')
@@ -131,6 +138,72 @@ describe('Slayer plan: the goals', () => {
     // Shown on the overlay only when said so in so many words.
     expect(sanitizeChoices({ overlay: true }).overlay).toBe(true)
     expect(sanitizeChoices({ overlay: 'yes' }).overlay).toBe(false)
+  })
+})
+
+describe('Slayer plan: a race’s pace is its own stretches’', () => {
+  // The Stonebrunt Mountains: an hour of granitebacks and kobolds in September, then forty minutes
+  // of nothing but kejekan (2026-10-15). Kejekan feed goal 0, granitebacks 1, kobolds 2, tigers 3.
+  const goalsOf: Record<string, number[]> = { 'a kejekan mamluk': [0], 'a kejekan ghulam': [0], 'an elder graniteback': [1], 'a highland kobold': [2], 'a highland tiger': [3] }
+  const mobs = (o: Record<string, number>) => Object.fromEntries(Object.entries(o).map(([k, n]) => [k, { name: k, n }]))
+  const stonebrunt = {
+    sec: 3600 + 2400,
+    kills: 193 + 60,
+    last: 0,
+    mobs: mobs({ 'an elder graniteback': 70, 'a highland kobold': 63, 'a highland tiger': 16, 'an orc': 44, 'a kejekan mamluk': 30, 'a kejekan ghulam': 30 }),
+    runs: [
+      { sec: 3600, mobs: { 'an elder graniteback': 70, 'a highland kobold': 63, 'a highland tiger': 16, 'an orc': 44 } },
+      { sec: 2400, mobs: { 'a kejekan mamluk': 30, 'a kejekan ghulam': 30 } }
+    ] as KillRun[]
+  }
+  const place = (m: string) => goalsOf[m] ?? []
+
+  it('splits a zone by what its killing was about, each its own kills over its own time', () => {
+    const st = killStretches(stonebrunt, place)
+    // The granitebacks' and kobolds' hour (each a third of it), then the kejekan's forty minutes;
+    // the tigers, 8% of that hour, no stretch's: the zone's time as a whole, toward them alone.
+    expect(st.map((x) => [x.sec, x.kills, x.about.sort(), x.whole ?? false])).toEqual([
+      [3600, 193, [1, 2], false],
+      [2400, 60, [0], false],
+      [6000, 253, [3], true]
+    ])
+  })
+
+  it('keeps a short stretch about something else out of a camp, and a camp of a few minutes from outbidding one of an hour', () => {
+    // Two minutes of kobolds this morning: about kobolds alone, too short to be a camp; the September hour stands alone.
+    const more = { ...stonebrunt, runs: [...stonebrunt.runs, { sec: 120, mobs: { 'a highland kobold': 11 } }] }
+    expect(killStretches(more, place).map((x) => [x.sec, x.about.sort()])).toEqual([
+      [3600, [1, 2]],
+      [2400, [0]],
+      [6000, [3]]
+    ])
+    // Seven minutes of kejekan somewhere: too little to say, the zone's time as a whole instead.
+    expect(killStretches({ ...stonebrunt, runs: [{ sec: 420, mobs: { 'a kejekan mamluk': 17 } }] }, place).every((x) => x.whole)).toBe(true)
+  })
+
+  it('takes the zone as a whole for stretches too short to tell, or tallies kept before stretches were', () => {
+    expect(killStretches({ ...stonebrunt, runs: [{ sec: 120, mobs: { 'a kejekan mamluk': 6 } }] }, place).map((x) => x.whole)).toEqual([true])
+    expect(killStretches({ ...stonebrunt, runs: undefined }, place)).toEqual([expect.objectContaining({ sec: 6000, whole: true, about: expect.arrayContaining([0, 1, 2, 3]) })])
+  })
+
+  it('makes each a camp: kejekan at their own ninety an hour, not sixty over the zone’s hour and forty', () => {
+    const g = (name: string): SlayerGoal => ({ name, section: 'Slayer: Special', races: '', count: 0, max: 1000, optional: false, tier: 1 })
+    const camps = buildCamps(
+      [g('Catnipped In the Bud'), g('Monkey Business'), g("Puttin' On The Dog"), g('Strange Weather')],
+      races,
+      { 'The Stonebrunt Mountains': stonebrunt },
+      place,
+      () => null,
+      new Map(),
+      [],
+      undefined,
+      []
+    ).filter((c) => c.source === 'log')
+    expect(camps.map((c) => [c.id, Math.round((c.hours ?? 0) * 60), Object.fromEntries(Object.entries(c.pace).map(([k, v]) => [k, Math.round(v)]))])).toEqual([
+      ['log:The Stonebrunt Mountains', 60, { 1: 70, 2: 63, 3: 16 }],
+      ['log:The Stonebrunt Mountains#2', 40, { 0: 90 }],
+      ['log:The Stonebrunt Mountains#3', 100, { 3: 10 }]
+    ])
   })
 })
 
