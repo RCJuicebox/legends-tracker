@@ -332,8 +332,10 @@ describe('the Slayer page', () => {
     for (let i = 0; i < 50 && readFileSync(join(set, 'crushbone_1.txt'), 'latin1').includes('Slayer_'); i++) await new Promise((r) => setTimeout(r, 20))
     expect(readFileSync(join(set, 'crushbone_1.txt'), 'latin1')).not.toContain('Slayer_')
     expect(readFileSync(join(set, 'unrest_1.txt'), 'latin1')).toContain('Hunter_Khrix_Fritchoff')
-    await old.flush()
-    expect(JSON.parse(readFileSync(join(dir, 'map-marks.json'), 'utf8'))).toEqual({ hunter: [{ zone: 'The Estate of Unrest', mobs: [], named: ['Khrix Fritchoff'] }] })
+    // The marks kept say so once the maps are written: the Slayer set is gone.
+    const kept = async () => (await old.flush(), JSON.parse(readFileSync(join(dir, 'map-marks.json'), 'utf8')))
+    for (let i = 0; i < 50 && 'slayer' in (await kept()); i++) await new Promise((r) => setTimeout(r, 20))
+    expect(await kept()).toEqual({ hunter: [{ zone: 'The Estate of Unrest', mobs: [], named: ['Khrix Fritchoff'] }] })
     planner.register(ctx as unknown as AppContext)
   })
 })
