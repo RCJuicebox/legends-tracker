@@ -2,6 +2,10 @@
 
 What changed in each version. The release workflow publishes a version's section as its release notes, and installed copies show them when an update arrives.
 
+## 2.14.3 (2026-10-15)
+
+- **Plan › Slayer: a step's Map shows its own mobs, and the plan no longer marks the game's map.** A step's map drew the Hunter named in its zone beside the step's mobs; now it shows the mobs that step kills, nothing else. A Slayer camp's mobs are all over their zone, so **Mark on the game's map** is gone from Plan › Slayer, and Slayer marks an earlier version put on the game's maps come off when the app starts. Plan › Hunter keeps its maps and its marks on the game's map for the named.
+
 ## 2.14.2 (2026-10-15)
 
 - **Plan › Slayer: one achievement a step, the steps in one zone under one heading.** A step used to work a camp for every achievement it fed at once, as if a zone's giants and dervishes died side by side. Now each step is one achievement and kills only its own mobs, each kill still counting toward all its race feeds (giants for both giant achievements). Within a tier the achievement finished soonest, travel counted, comes first, then the others whose best zone is the same while you are there, listed under that zone's heading.
