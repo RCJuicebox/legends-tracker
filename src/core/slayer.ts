@@ -8,6 +8,7 @@ import {
   normalRace,
   PLAYABLE,
   PLAYABLE_MARK,
+  RACE_MIX,
   raceKey,
   singulars,
   unsureRace,
@@ -190,6 +191,13 @@ export class SlayerRaces {
     return last
   }
 
+  /** A race as the spawn tables or eqlwiki name it ("Human", "Half Elf"), placed on its own: no mob's name in it. */
+  raceOf(race: string): string | null {
+    const w = wikiRaceKey(race)
+    if (!w) return null
+    return this.vocab.has(w) ? w : (this.byName(race) ?? w)
+  }
+
   /** Whether play settled a mob's race for some zone: its kills are placed zone by zone. */
   zoned(mob: string): boolean {
     const words = nameWords(mob)
@@ -204,6 +212,8 @@ export class SlayerRaces {
     const here = zone ? ZONE_MOB_RACES[zoneWords(zone)]?.[nameWords(mob)] : undefined
     if (here) return { key: here, by: 'zone', sure: true }
     const play = MOB_RACES[nameWords(mob)]
+    // Several races under the name, as play settled: placed by its zone's race mix, not here.
+    if (play === RACE_MIX) return { key: null, by: 'play', sure: false }
     if (play) return { key: play, by: 'play', sure: true }
     const wiki = wikiRace ? wikiRaceKey(wikiRace) : null
     if (wikiRace && wiki) {
@@ -290,7 +300,7 @@ export function mixCredits(name: string, zones: readonly string[], races: Slayer
     if (!mix) continue
     known = true
     for (const { race, share } of mix) {
-      const key = races.place(name, race).key
+      const key = races.raceOf(race)
       if (key !== null) races.keys.forEach((keys, i) => keys.has(key) && (out[i] += n * share))
     }
   }
@@ -420,19 +430,31 @@ export function learnFromExport(
   races: SlayerRaces,
   kills: { name: string; n: number }[],
   raceOf: (mob: string) => string | null | undefined,
-  facts: SlayerFacts
+  facts: SlayerFacts,
+  mixOf?: RaceMix
 ): SlayerFact[] {
   const placed = kills.filter((k) => k.n > 0).map((k) => ({ ...k, mob: k.name.toLowerCase(), p: races.place(k.name, raceOf(k.name)) }))
   const out: SlayerFact[] = []
   const n = new Map(placed.map((k) => [k.mob, k.n]))
   const zoned = new Set(placed.filter((k) => races.zoned(k.name)).map((k) => k.mob))
+  // A mob nothing places whose name is several races in the spawn tables: the share of it each achievement's races are.
+  const shares = new Map<string, number[]>()
+  if (mixOf)
+    for (const k of placed)
+      if (k.p.key === null) {
+        const m = mixCredits(k.name, [''], races, mixOf)
+        if (m) shares.set(k.mob, m)
+      }
   after.forEach((c, i) => {
     const name = c.name.toLowerCase()
     const was = before.get(name)
     if (was === undefined || c.count < was) return
     const rise = c.count - was
     // A mob play placed zone by zone is not settled by name: what holds in one zone may not in another.
-    const add = (f: { mob: string; counts: boolean }) => !zoned.has(f.mob) && out.push({ mob: f.mob, achievement: name, counts: f.counts, kills: n.get(f.mob) ?? 0, rise })
+    // Nor is a mob of several races ruled out of an achievement some of its races feed: all of them
+    // counting may be more than the rise, a share of them not (422 dervish cutthroats, 48 of them orcs).
+    const add = (f: { mob: string; counts: boolean }) =>
+      !zoned.has(f.mob) && (f.counts || !((shares.get(f.mob)?.[i] ?? 0) > 0)) && out.push({ mob: f.mob, achievement: name, counts: f.counts, kills: n.get(f.mob) ?? 0, rise })
     // First on the numbers alone: any mob not settled out may have counted.
     const first = forced(
       placed.filter((k) => facts(k.mob, name) !== false).map((k) => ({ mob: k.mob, n: k.n })),

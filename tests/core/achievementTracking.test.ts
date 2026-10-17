@@ -224,8 +224,9 @@ describe('Slayer counts', () => {
     expect(races.place('A Grizzly Bear', 'Animal')).toEqual({ key: 'bear', by: 'name', sure: false })
     expect(races.place('a hill giant', undefined)).toEqual({ key: 'giant', by: 'name', sure: false })
     expect(races.place('Terror', null)).toEqual({ key: null, by: null, sure: false })
-    // The Dervish Cutthroats of Ro and the Commonlands are the playable races' bandits; a Dervish Thug is an Ogre.
-    expect(races.place('a dervish cutthroat', 'Dervish')).toEqual({ key: PLAYABLE_MARK, by: 'play', sure: true })
+    // The Dervish Cutthroats of Ro and the Commonlands are several races under one name (orcs among the
+    // playable races): no one race, their zone's mix places them. A Dervish Thug is an Ogre.
+    expect(races.place('a dervish cutthroat', 'Dervish')).toEqual({ key: null, by: 'play', sure: false })
     expect(races.place('a dervish thug', null)).toEqual({ key: 'ogre', by: 'play', sure: true })
     // The Plane of Sky's blade storms are Dervishes, as eqlwiki gives their race.
     expect(races.place('a blade storm', 'Dervish')).toEqual({ key: 'dervish', by: 'wiki', sure: true })

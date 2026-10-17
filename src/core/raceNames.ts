@@ -279,6 +279,8 @@ export const PLAYABLE = [
 ]
 /** One of the playable races, which one not known: only "The playable races." counts it. */
 export const PLAYABLE_MARK = '(playable)'
+/** Several races under one name, as play settled: counted by the race mix of the zone's spawns (slayer.ts mixCredits), never as one race. */
+export const RACE_MIX = '(mix)'
 
 /**
  * What play settled about mobs whose names, or eqlwiki, mislead (names without the article). The
@@ -286,8 +288,10 @@ export const PLAYABLE_MARK = '(playable)'
  * Dervishes, and a Dervish Thug is an Ogre (2026-09-28).
  */
 export const MOB_RACES: Record<string, string> = {
-  'dervish cutthroat': PLAYABLE_MARK,
-  'cutthroat dervish': PLAYABLE_MARK,
+  // Humans, barbarians, erudites, ogres and orcs under one name: 422 of them moved Orc Stomp! 48 and
+  // Doesn't Play Well With Others on (2026-10-17), so neither every one nor none is an orc.
+  'dervish cutthroat': RACE_MIX,
+  'cutthroat dervish': RACE_MIX,
   'dervish thug': 'ogre',
   // New Sebilis Expedition's golems: their kills between two exports were the golem achievements' rise to the one (2026-10-14).
   'failed experiment': 'golem',

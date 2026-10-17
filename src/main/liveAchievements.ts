@@ -592,7 +592,7 @@ export class LiveAchievements implements AppFeature {
    */
   private learn(s: SlayerState, at: number, counters: SlayerCounter[], races: SlayerRaces): void {
     const kills = [...s.kills.values()].map((k) => ({ name: k.name, n: k.times.filter((t) => t <= at).length }))
-    const got = learnFromExport(s.counts, counters, races, kills, (m) => this.races.race(m), this.fact)
+    const got = learnFromExport(s.counts, counters, races, kills, (m) => this.races.race(m), this.fact, takpRaceMix)
     if (!got.length) return
     const mobs = { ...this.facts.get().mobs }
     for (const f of got) {

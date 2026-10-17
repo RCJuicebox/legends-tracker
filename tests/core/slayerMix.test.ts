@@ -95,3 +95,55 @@ describe('a mob of several races under one name', () => {
     expect(slayerCounts(counters, races, kills, () => null, settled, new Set(), mixOf).rows[0]).toMatchObject({ since: 5, guessed: 0 })
   })
 })
+
+describe('a mob play settled is several races (the dervish cutthroats)', () => {
+  const game = parseRaceTable(['1^11^Human^0^', '1^12^Humans^0^', '54^11^Orc^0^', '54^12^Orcs^0^', '100^11^Dervish^0^', '100^12^Dervishes^0^'].join('\r\n'))
+  const cs = slayerCounters(
+    parseAchievements(
+      ['Slayer: Conquest', 'I\tOrc Stomp!', 'I\t\tOrcs and Wereorcs.\t3014/5000', "I\tDoesn't Play Well With Others", 'I\t\tThe playable races.\t9000/10000'].join('\n')
+    ).sections
+  )
+  const r = new SlayerRaces(cs, game)
+  const commons = raceMixer({
+    commons: {
+      id: 21,
+      name: 'West Commonlands',
+      npcs: [
+        ['a Dervish Cutthroat', 'Human', 9, 11],
+        ['a Dervish Cutthroat', 'Orc', 9, 11]
+      ],
+      groups: [
+        [
+          360,
+          [
+            [0, 75],
+            [1, 25]
+          ],
+          [1, 1, 0]
+        ]
+      ]
+    }
+  })
+
+  it('counts each by its zone’s mix, not as a Dervish by its name', () => {
+    expect(r.place('a dervish cutthroat', 'Dervish')).toMatchObject({ key: null, by: 'play' })
+    const kills: SlayerKills = new Map([
+      ['a dervish cutthroat', { name: 'a dervish cutthroat', times: [1, 2, 3, 4], zones: ['West Commonlands', 'West Commonlands', 'West Commonlands', 'West Commonlands'] }]
+    ])
+    expect(slayerCounts(cs, r, kills, () => 'Dervish', noFacts, new Set(), commons).rows.map((x) => [x.counter.name, x.since, x.guessed])).toEqual([
+      ['Orc Stomp!', 1, 1],
+      ["Doesn't Play Well With Others", 3, 3]
+    ])
+  })
+
+  it('is never ruled out of an achievement some of its races feed, though all of them would be more than the rise', () => {
+    // 422 killed, Orc Stomp! up 53: a share of them orcs, not none.
+    const before = new Map([
+      ['orc stomp!', 3014],
+      ["doesn't play well with others", 9000]
+    ])
+    const after = cs.map((c) => ({ ...c, count: c.count + (c.name === 'Orc Stomp!' ? 53 : 374) }))
+    const got = learnFromExport(before, after, r, [{ name: 'a dervish cutthroat', n: 422 }], () => 'Dervish', noFacts, commons)
+    expect(got.some((f) => f.mob === 'a dervish cutthroat' && f.achievement === 'orc stomp!')).toBe(false)
+  })
+})
