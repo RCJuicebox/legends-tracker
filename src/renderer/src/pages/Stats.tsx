@@ -237,7 +237,7 @@ export function Stats() {
           exportedAt={view.modified}
         />
       ) : tab === 'combat' ? (
-        <CombatTab s={s} set={set} setOverride={setOverride} auto={auto} val={val} trio={trio} primary={primary} caps={caps} skill={skill} />
+        <CombatTab s={s} set={set} setOverride={setOverride} auto={auto} val={val} trio={trio} primary={primary} caps={caps} skill={skill} character={character} />
       ) : (
         <AasTab aa={s.aa} status={aaStatus} onRead={() => void readAas(false)} history={aaHistory} error={aaQ.error} retry={aaQ.reload} />
       )}

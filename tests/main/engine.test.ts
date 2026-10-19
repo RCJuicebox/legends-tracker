@@ -183,6 +183,38 @@ describe('Engine', () => {
     expect(engine.unread.top(5)).toEqual([{ shape: 'Your target is too far away, get closer!', n: 2, example: 'Your target is too far away, get closer!' }])
   })
 
+  it('says skill-ups, AA points and your death in the feed, follows a merge in the planner, and starts a timer a feature asks for (LT-726, LT-727, LT-740)', async () => {
+    const logFile = join(logs, 'eqlog_Kelwyn_neriak.txt')
+    await fs.writeFile(logFile, '')
+    const { engine, feed } = makeEngine({ logFile, stock: { counts: {}, item: { name: 'Cloak of Flames +5', lvl: 5, xp: 0, to: 6 }, autoAdd: true } })
+    await engine.startWatching()
+    await tailing(engine)
+    const d = new Date()
+    const at = (offset: number) => {
+      const t = new Date(d.getTime() + offset * 1000)
+      const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+      const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+      const p = (n: number) => String(n).padStart(2, '0')
+      return `[${days[t.getDay()]} ${months[t.getMonth()]} ${p(t.getDate())} ${p(t.getHours())}:${p(t.getMinutes())}:${p(t.getSeconds())} ${t.getFullYear()}]`
+    }
+    await fs.appendFile(
+      logFile,
+      [
+        `${at(0)} You have become better at Kick! (113)`,
+        `${at(0)} You have gained an ability point!  You now have 12 ability points.`,
+        `${at(1)} You have successfully merged two items together to create a new item: Cloak of Flames +7`,
+        `${at(2)} A fetid fiend hits YOU for 500 points of damage.`,
+        `${at(3)} You have been slain by a fetid fiend!`,
+        ''
+      ].join('\r\n')
+    )
+    await waitFor(() => feed.some((f) => f.text.startsWith('You died')), 10_000)
+    expect(feed.map((f) => f.text)).toEqual(expect.arrayContaining(['Kick 113', 'AA point: 12 unspent', 'Merge planner: Cloak of Flames +7 is +7 by your log.']))
+    expect(engine.stock.view().item.lvl).toBe(7)
+    engine.startTimer({ key: 'hunter:gynok', label: 'Gynok Moltor', seconds: 60, overlay: 'respawns', color: '#fff', warnSec: 0, warnSpeech: '', endSpeech: 'up', at: Date.now() })
+    expect(engine.board.get('hunter:gynok')?.label).toBe('Gynok Moltor')
+  })
+
   it('logs the size of the meter push while fighting (README, Measuring)', async () => {
     const logFile = join(logs, 'eqlog_Kelwyn_neriak.txt')
     await fs.writeFile(logFile, '')

@@ -1,14 +1,17 @@
 import { useState } from 'react'
 import { useRemembered } from '../remember'
 
-import { slotLabel } from '../../../core/inventory'
+import { mergeLevel, slotLabel } from '../../../core/inventory'
+import { mergeBill } from '../../../core/mergeValue'
+import { MOTE_RANKS } from '../../../core/motes'
+import { useStock } from './MotePlanner'
 import { DEFAULT_HIDDEN_ERAS, OTHER_ERA, OTHER_OUT_ERA } from '../../../core/gearFinder'
 import { ROLE_LABELS, ROLE_PRESETS, type RoleKey } from '../../../core/statValue'
 import type { CharacterSheet, InventoryView } from '../../../shared/types'
 import { className } from '../../../shared/game/classes'
 import { Ago, ErrorText, Info, PageLink, Pending, Progress, Segmented, ToggleChip, TypedNumber } from '../components/ui'
-import { num, signed, wikiUrl } from '../../../core/format'
-import { AC_OVER_CAP, useGearModel, type GearMode } from '../gear/useGearModel'
+import { num, pct, signed, wikiUrl } from '../../../core/format'
+import { useGearModel, type GearMode } from '../gear/useGearModel'
 import { useCharacterWeights } from '../gear/useCharacterWeights'
 import { ItemIcon, source } from './gearBits'
 import { FocusTab } from './GearFocus'
@@ -44,7 +47,27 @@ function MergeView({ view, sheet, onPlan }: { view: InventoryView; sheet: Charac
 
 function Finder({ view, sheet, mode }: { view: InventoryView; sheet: CharacterSheet | null; mode: GearMode }) {
   const g = useGearModel(view, sheet, mode)
-  const { catalog, model, results, stats, classes, level, role, conv, acState, overCap, secondaryInUse, twoHanders, eraCounts, fociOf, lines, wanted, points, setPoints } = g
+  const {
+    catalog,
+    model,
+    results,
+    stats,
+    classes,
+    level,
+    role,
+    conv,
+    acState,
+    acFactor,
+    overCap,
+    secondaryInUse,
+    twoHanders,
+    eraCounts,
+    fociOf,
+    lines,
+    wanted,
+    points,
+    setPoints
+  } = g
   const {
     ratioFirst,
     setRatioFirst,
@@ -233,7 +256,9 @@ function Finder({ view, sheet, mode }: { view: InventoryView; sheet: CharacterSh
                     ]}
                   />
                   <span className="muted">
-                    {overCap ? `AC counts at ${AC_OVER_CAP * 100}% of its weight: past the soft cap most of it is lost.` : 'AC counts in full: you are under the soft cap.'}
+                    {overCap
+                      ? `AC counts at ${pct(acFactor.gear)} of its weight, what one more point of gear AC is worth past the soft cap; a shield's at ${pct(acFactor.shield)}, since it lifts the cap too.`
+                      : 'AC counts in full: you are under the soft cap.'}
                     {acState && capMode === 'auto' && ` Mitigation ${num(acState.mitigation)} against a soft cap of ${num(acState.cap)}, from ${acState.from}.`}
                   </span>
                 </div>
@@ -276,7 +301,11 @@ function Finder({ view, sheet, mode }: { view: InventoryView; sheet: CharacterSh
                         <TypedNumber
                           step={0.1}
                           value={role[k]}
-                          title={k === 'ac' && overCap ? `Counts as ${Math.round(role.ac * AC_OVER_CAP * 100) / 100} while over the soft cap` : undefined}
+                          title={
+                            k === 'ac' && overCap
+                              ? `Counts as ${Math.round(role.ac * acFactor.gear * 100) / 100} while over the soft cap (a shield's ${Math.round(role.ac * acFactor.shield * 100) / 100})`
+                              : undefined
+                          }
                           onCommit={(v) => {
                             setCustom({ ...role, [k]: v })
                             setPreset('Custom')
@@ -300,7 +329,7 @@ function Finder({ view, sheet, mode }: { view: InventoryView; sheet: CharacterSh
                       .map(([e]) => e)
                       .join(', ') || 'none'
                   }`,
-                scoring && (overCap ? `AC at ${AC_OVER_CAP * 100}%, over the soft cap` : 'AC in full, under the soft cap'),
+                scoring && (overCap ? `AC at ${pct(acFactor.gear)} (a shield's ${pct(acFactor.shield)}), over the soft cap` : 'AC in full, under the soft cap'),
                 scoring && (twoHanders ? 'two-handers in Primary' : 'one-handed Primary'),
                 scoring && `a 10% focus on every spell worth ${num(points)} points, ${wanted.size} of ${lines.length} focus lines wanted`
               ]
@@ -403,6 +432,7 @@ function Finder({ view, sheet, mode }: { view: InventoryView; sheet: CharacterSh
                           {c.item.title}
                         </a>
                         {c.owned && <span className="chip pill gold">you have one</span>}
+                        {!c.owned && compare === 'level' && r.current && mergeLevel(r.current.item.name) > 0 && <MergeBill level={mergeLevel(r.current.item.name)} />}
                         <span
                           className="chip pill"
                           title={
@@ -503,5 +533,23 @@ function FocusPoints({ points, setPoints, wanted, lines }: { points: number; set
         points; a focus counts for the spells it touches, by how often you cast them. {wanted} of the {lines} that touch your spells are wanted (Effects › Focus items).
       </span>
     </div>
+  )
+}
+
+/** What a +0 drop takes to reach the level it is compared at (LT-742): "+6 costs 9 Superior, 3 Greater … · you can make 4". */
+function MergeBill({ level }: { level: number }) {
+  const stock = useStock().data
+  const bill = mergeBill(level, stock?.counts)
+  if (!bill.motes.length) return null
+  const text = bill.motes.map((m) => `${num(m.count)} ${MOTE_RANKS[m.mote].name || 'Potential'}`).join(', ')
+  return (
+    <span
+      className="chip pill"
+      title={`To merge a +0 one up to +${level}: ${text}${bill.canMake !== null ? `. Your motes make ${num(bill.canMake)} ${MOTE_RANKS[bill.top].name || 'Potential'}` : ''}`}
+    >
+      +{level} costs {bill.motes[0].count} {MOTE_RANKS[bill.top].name || 'Potential'}
+      {bill.motes.length > 1 ? ' …' : ''}
+      {bill.canMake !== null ? ` · you can make ${num(bill.canMake)}` : ''}
+    </span>
   )
 }

@@ -357,10 +357,7 @@ export function MoteSpells({ go }: { go?: Go }) {
                             </div>
                           )}
                         </td>
-                        <td
-                          className="mono nowrap"
-                          title="The rank the log last saw you cast. The game writes nothing when a rank is bought, so a new rank shows here after your next cast of it."
-                        >
+                        <td className="mono nowrap" title="The rank it is at: the highest your log saw you cast, or buy with motes">
                           {o.maxed ? 'X' : `${o.rank} → ${o.next}`}
                           {o.maxed ? (
                             <div className="chip">at rank X</div>

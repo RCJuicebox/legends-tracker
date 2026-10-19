@@ -1,6 +1,6 @@
 import { localDay } from '../core/dates'
 import type { LogLine } from '../core/logLine'
-import { CAST_BY_YOU, RESISTED_YOUR } from '../core/phrases'
+import { CAST_BY_YOU, MERGED_ITEM, RESISTED_YOUR } from '../core/phrases'
 import { QUICK_BUFF, QUICK_BUFF_MS } from '../core/spellTracker'
 import { everyStretch, type HistoryConsumer, type HistoryWhere, type LogHistory } from './sources/logHistory'
 
@@ -61,6 +61,18 @@ export const resistCounter = (): DayCounter => (line, into) => {
   if (!m) return
   const day = (into[localDay(line.time)] ??= {})
   day[m[2]] = (day[m[2]] ?? 0) + 1
+}
+
+/**
+ * A spell's rank bought with motes, by the ranked name the log gives: "You have successfully merged two
+ * items together to create a new item: Drain Spirit VI" (LT-756). An item's merge ends "+N" and is left out.
+ */
+export const spellMergeCounter = (): DayCounter => (line, into) => {
+  if (!line.text.startsWith('You have successfully merged ')) return
+  const m = MERGED_ITEM.exec(line.text)
+  if (!m || /\+\d+\s*$/.test(m[1])) return
+  const day = (into[localDay(line.time)] ??= {})
+  day[m[1]] = (day[m[1]] ?? 0) + 1
 }
 
 /** A day-by-day count as a LogHistory consumer. */

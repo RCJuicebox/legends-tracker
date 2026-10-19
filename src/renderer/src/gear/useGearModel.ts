@@ -22,8 +22,6 @@ import { useFinderResults, type GearMode } from './useFinderResults'
 // items, what is owned, focus effects, worn effects and procs, the optimizer's catalog pieces, the
 // finder's results); this puts them together.
 
-export { AC_OVER_CAP } from './useCharacterWeights'
-
 export type { FocusCandidate, GearMode, OwnedFocus }
 
 /** Everything the finder, the focus tab and the optimiser share. */
@@ -88,7 +86,7 @@ export function useGearModel(view: InventoryView, sheet: CharacterSheet | null, 
   const catalog = useCatalog()
   const state = catalog.state
   const character = useCharacterWeights(view, sheet)
-  const { stats, classes, level, role, conv, weights, hands, weaponHands, acState, overCap, secondaryInUse, twoHanders, wearer } = character
+  const { stats, classes, level, role, conv, weights, hands, weaponHands, acState, acFactor, overCap, secondaryInUse, twoHanders, wearer } = character
   const [compare, setCompare] = useRemembered<'drop' | 'level'>('finder.compare', 'drop')
   const [hiddenEras, setHiddenEras] = useRemembered<string[]>('finder.hiddenEras.v3', DEFAULT_HIDDEN_ERAS)
   const [slot, setSlot] = useRemembered<string>('finder.slot', 'all')
@@ -197,10 +195,11 @@ export function useGearModel(view: InventoryView, sheet: CharacterSheet | null, 
     level,
     role,
     conv,
-    /** What a point of each item stat is worth to this character, AC quartered over the soft cap. */
+    /** What a point of each item stat is worth to this character, AC by the AC model's slope over the soft cap. */
     weights,
     hands,
     acState,
+    acFactor,
     overCap,
     secondaryInUse,
     twoHanders,

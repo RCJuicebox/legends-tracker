@@ -2,12 +2,13 @@ import { describe, expect, it } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { defaultStatsInputs, readStatsInputs, type StatsInputs } from '../../src/core/statsInputs'
-import { acInputs, acReport, autoValues, characterAc, classTrio, combatReport, primaryClass, valOf } from '../../src/core/statsModel'
+import { computeAc } from '../../src/core/acModel'
+import { acInputs, acReport, autoValues, characterAcInputs, classTrio, combatReport, primaryClass, valOf } from '../../src/core/statsModel'
 import { statsFor, wornSummary } from '../../src/core/wornGear'
 import type { InventoryView } from '../../src/shared/types'
 
 // The Stats page's own path to the AC figures: a saved sheet, the game's soft cap table for the
-// character's classes, and the worn gear, the way other pages ask for them (characterAc). The same
+// character's classes, and the worn gear, the way other pages ask for them (characterAcInputs). The same
 // in-game reading the AC test pins (stats.test.ts) comes out of it.
 const reading = JSON.parse(readFileSync(join(__dirname, '..', 'fixtures', 'baseline-2026-09-12.json'), 'utf8'))
 const inputs = reading.calculator_check.inputs
@@ -58,7 +59,7 @@ describe('the Stats sheet', () => {
       overrides: { combatStability: inputs.spa_259_pct, evasion: inputs.spa_259_pct }
     }
     const caps = { shd: { cap: inputs.soft_cap_table, mult: inputs.post_cap_multiplier }, mnk: { cap: 360, mult: 0.3 }, shm: { cap: 348, mult: 0.28 } }
-    const r = characterAc(s, caps, { totals: { ac: inputs.worn_ac }, shield: true, shieldAC: inputs.shield_ac })
+    const r = computeAc(characterAcInputs(s, caps, { totals: { ac: inputs.worn_ac }, shield: true, shieldAC: inputs.shield_ac }))
     expect([r.mitigation, r.effCap, r.avoidance]).toEqual(reading.vitals.ac)
   })
 })

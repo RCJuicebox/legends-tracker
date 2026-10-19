@@ -1,7 +1,7 @@
 // The character's own melee, day by day, from their log: what gear effects that act on swings are
 // weighed against. Each day keeps plain counters, so days add up and a window can be taken:
 //   active          milliseconds spent swinging (gaps between swings up to MELEE_GAP_MS)
-//   m|bash|h / |d / |x    a melee skill's hits, damage and misses ("bash", "kick", "punch" …)
+//   m|bash|h / |d / |x / |c    a melee skill's hits, damage, misses and crits ("bash", "kick", "punch" …)
 //   p|Lifebite|n / |d     a proc's firings and damage: spell damage from you with no cast of that
 //                         spell just before it (the meter's rule)
 
@@ -42,6 +42,8 @@ export function meleeCounter(): (line: LogLine, into: Days) => void {
       if (ev.how === 'melee') {
         add(`m|${ev.skill}|h`, 1)
         add(`m|${ev.skill}|d`, ev.amount)
+        // What the Stats page's crit rate is measured from (LT-739): a Crippling Blow or Slay Undead is one.
+        if (ev.mods.includes('critical') || ev.mods.includes('crippling blow') || ev.mods.includes('slay undead')) add(`m|${ev.skill}|c`, 1)
         swing()
       } else if (ev.how === 'spell') {
         const cast = casts.get(spellBase(ev.skill))
@@ -61,6 +63,8 @@ interface SkillUse {
   hits: number
   damage: number
   misses: number
+  /** Hits that crit. */
+  crits: number
 }
 
 export interface MeleeProfile {
@@ -78,6 +82,19 @@ export interface MeleeProfile {
   to: string
 }
 
+/** Every melee skill's hits, crits and misses together: what a crit rate and a hit rate are measured from (LT-739). */
+export function meleeRates(p: MeleeProfile): { hits: number; crits: number; misses: number } {
+  let hits = 0
+  let crits = 0
+  let misses = 0
+  for (const s of Object.values(p.skills)) {
+    hits += s.hits
+    crits += s.crits
+    misses += s.misses
+  }
+  return { hits, crits, misses }
+}
+
 /** Counters summed over a window (as the day tally hands them back) read as a profile. */
 export function meleeProfile(counts: Record<string, number>, window: { from: string; to: string }): MeleeProfile {
   const skills: Record<string, SkillUse> = {}
@@ -86,12 +103,13 @@ export function meleeProfile(counts: Record<string, number>, window: { from: str
   for (const [key, v] of Object.entries(counts)) {
     const [kind, name, what] = key.split('|')
     if (kind === 'm') {
-      const s = (skills[name] ??= { hits: 0, damage: 0, misses: 0 })
+      const s = (skills[name] ??= { hits: 0, damage: 0, misses: 0, crits: 0 })
       if (what === 'h') s.hits += v
       else if (what === 'd') {
         s.damage += v
         damage += v
       } else if (what === 'x') s.misses += v
+      else if (what === 'c') s.crits += v
     } else if (kind === 'p') {
       const p = (procs[name] ??= { count: 0, damage: 0 })
       if (what === 'n') p.count += v

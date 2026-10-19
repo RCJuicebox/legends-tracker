@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { existsSync, promises as fs } from 'node:fs'
 import { join } from 'node:path'
-import { CastHistory, castCounter, dayConsumer, resistCounter } from '../../src/main/castHistory'
+import { CastHistory, castCounter, dayConsumer, resistCounter, spellMergeCounter } from '../../src/main/castHistory'
 import { LogHistory } from '../../src/main/sources/logHistory'
 import { tempDir } from '../tempDir'
 
@@ -21,6 +21,21 @@ afterEach(async () => {
 const cast = (stamp: string, spell: string) => `[${stamp}] You begin casting ${spell}.\r\n`
 
 describe('CastHistory', () => {
+  it('counts a spell rank bought with motes, and leaves an item merged up out (LT-756)', async () => {
+    const logPath = join(dir, 'eqlog_Kelwyn_neriak.txt')
+    await fs.writeFile(
+      logPath,
+      [
+        '[Thu Sep 24 11:03:02 2026] You have successfully merged two items together to create a new item: Drain Spirit VI',
+        '[Thu Sep 24 11:03:09 2026] You have successfully merged two items together to create a new item: Cloak of Flames +7',
+        ''
+      ].join('\r\n')
+    )
+    const history = new LogHistory(join(dir, 'log-history.json'), { spellMerges: dayConsumer(spellMergeCounter) })
+    const r = await new CastHistory(history, 'spellMerges').recent({ logPath, archiveDir: join(dir, 'archive'), stem: 'eqlog_Kelwyn_neriak', days: 0 })
+    expect(r.counts).toEqual({ 'Drain Spirit VI': 1 })
+  })
+
   it("counts your spells resisted by name, and nobody else's (LT-722)", async () => {
     const logPath = join(dir, 'eqlog_Kelwyn_neriak.txt')
     await fs.writeFile(

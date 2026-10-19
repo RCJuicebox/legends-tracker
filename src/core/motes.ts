@@ -356,6 +356,36 @@ export function sessionHours(s: MoteSession, now: number): number {
   return Math.max(0, end - s.startedAt - paused) / 3_600_000
 }
 
+/** A place's runs together (FEAT-035): how many, the hours in them, and the motes they dropped by rank. */
+export interface FarmPlace {
+  name: string
+  runs: number
+  hours: number
+  motes: MoteCounts
+}
+
+/** Every place the runs were in, by name ("The Plane of Hate 4 (Refined)"), runs still open left out. */
+export function farmPlaces(sessions: readonly MoteSession[], now: number): FarmPlace[] {
+  const by = new Map<string, FarmPlace>()
+  for (const s of sessions) {
+    if (s.endedAt === null || s.kind === 'manual') continue
+    const p = by.get(s.name) ?? { name: s.name, runs: 0, hours: 0, motes: {} }
+    p.runs++
+    p.hours += sessionHours(s, now)
+    for (const [k, n] of Object.entries(s.motes) as [MoteKey, number][]) p.motes[k] = (p.motes[k] ?? 0) + n
+    by.set(s.name, p)
+  }
+  return [...by.values()]
+}
+
+/** The places that dropped a rank fastest, two runs or more each: "Plane of Hate 4 (Refined) 2.1 Superior an hour over 9 runs". */
+export function bestFor(places: readonly FarmPlace[], rank: MoteKey): (FarmPlace & { perHour: number })[] {
+  return places
+    .filter((p) => p.runs >= 2 && p.hours > 0 && (p.motes[rank] ?? 0) > 0)
+    .map((p) => ({ ...p, perHour: (p.motes[rank] ?? 0) / p.hours }))
+    .sort((a, b) => b.perHour - a.perHour)
+}
+
 export function pausedHours(s: MoteSession, now: number): number {
   const end = s.endedAt ?? now
   return ((s.pausedMs ?? 0) + (s.pausedSince ? Math.max(0, end - s.pausedSince) : 0)) / 3_600_000

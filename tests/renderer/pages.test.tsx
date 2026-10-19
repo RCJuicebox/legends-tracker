@@ -153,7 +153,7 @@ describe('every page draws', () => {
 
   it('opens a page’s tabs', async () => {
     mode = 'pending'
-    expect((await draw(pages.Motes)).tabs).toEqual(['Motes view/Runs', 'Motes view/Best merge', 'Motes view/Merge planner', 'Motes view/Spell upgrades'])
+    expect((await draw(pages.Motes)).tabs).toEqual(['Motes view/Runs', 'Motes view/Best merge', 'Motes view/Merge planner', 'Motes view/Spell upgrades', 'Motes view/Next'])
     expect((await draw(pages.Settings)).tabs).toEqual([
       'Settings view/General',
       'Settings view/Modules',

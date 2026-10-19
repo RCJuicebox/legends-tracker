@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { fmtCoin, itemWorth, lastSales, LootLedger, mergeLoot, parseCoin, parseLootLine, sessionWorth, type LootEntry, type LootSnapshot } from '../../src/core/loot'
+import { dropRates, fmtCoin, itemWorth, lastSales, LootLedger, mergeLoot, parseCoin, parseLootLine, sessionWorth, type LootEntry, type LootSnapshot } from '../../src/core/loot'
 import { parseOffer } from '../../src/core/tradeskills'
 import { parseItemUse, plainText } from '../../src/core/wikiItem'
 import { parseLogLine } from '../../src/core/logLine'
@@ -218,5 +218,37 @@ describe('what loot is worth (LT-725, LT-744)', () => {
     expect(itemWorth('Rusty Axe', { sales, offers })).toBeNull()
     const kept = [entry({ base: 'Bone Chips', count: 4 }), entry({ base: 'Unknown', count: 1 }), entry({ base: 'Bone Chips', outcome: 'sold', copper: 10 })]
     expect(sessionWorth(kept, (e) => itemWorth(e.base, { sales, offers }))).toEqual({ copper: 40, priced: 1, items: 2 })
+  })
+})
+
+describe('drop rates per mob (FEAT-037)', () => {
+  const e = (at: number, source: string, base: string, count = 1): LootEntry => ({
+    id: at,
+    at,
+    zone: 'Befallen',
+    sessionId: 's',
+    looter: 'You',
+    item: base,
+    base,
+    plus: 0,
+    count,
+    source,
+    outcome: 'kept',
+    copper: 0
+  })
+  it('counts kills from the fights kept and drops from the same span, by the corpse', () => {
+    const fight = (startedAt: number, dead: string[]) => ({
+      startedAt,
+      enemies: Object.fromEntries(dead.map((d) => [d.toLowerCase(), false])),
+      entities: Object.fromEntries(dead.map((d) => [d.toLowerCase(), { name: d } as never]))
+    })
+    const rows = dropRates(
+      [e(50, 'a haunted chest', 'Mote of Major Potential'), e(150, 'a haunted chest', 'Mote of Major Potential', 3), e(160, 'a skeleton', 'Bone Chips')],
+      [fight(100, ['a haunted chest']), fight(140, ['a haunted chest', 'a skeleton']), fight(170, ['a haunted chest']), fight(180, ['a haunted chest'])]
+    )
+    expect(rows).toEqual([
+      { mob: 'a haunted chest', kills: 4, items: [{ item: 'Mote of Major Potential', n: 3, perKill: 0.75 }] },
+      { mob: 'a skeleton', kills: 1, items: [{ item: 'Bone Chips', n: 1, perKill: 1 }] }
+    ])
   })
 })

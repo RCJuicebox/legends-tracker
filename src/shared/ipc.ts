@@ -20,7 +20,7 @@ import type { HunterPlanData } from '../features/hunter/core'
 import type { SkyState } from '../features/sky/core'
 import type { AchievementTrack, PlayerLocation } from './tracking'
 import type { FocusReport } from '../core/itemFocus'
-import type { LootSnapshot } from '../core/loot'
+import type { LootSnapshot, MobDrops } from '../core/loot'
 import type { MeleeProfile } from '../core/meleeTally'
 import type { MoteState } from '../core/motes'
 import type { PetGearReading, PetProfile, PetSpellOption } from '../core/pets'
@@ -292,6 +292,18 @@ export interface AchievementProgress {
   today: string
 }
 
+/** What the log and the worn gear say for Stats › Combat (LT-739). */
+export interface StatsFromLog {
+  /** Your melee hits, crits and misses over the window, every skill together. */
+  melee?: { hits: number; crits: number; misses: number; from: string; to: string }
+  /** Each skill's last value from the log's skill-up lines, by skill id. */
+  skills: Record<number, number>
+  /** The worn Primary's weapon skill id (Hand to Hand with none). */
+  weapon?: number
+  /** ATK the worn items give. */
+  itemATK?: number
+}
+
 // ---- The channels ----
 
 /** Request and answer: api.invoke(channel, ...args) → Promise<result>. */
@@ -361,6 +373,10 @@ export interface Invokes {
   'loot:get': () => LootView
   /** What merchants last offered the character being played, by item name lowercased (LT-725). */
   'loot:offers': () => Record<string, Offer>
+  /** Each mob killed in the fights kept, with what dropped from it and how often (FEAT-037). */
+  'loot:byMob': () => MobDrops[]
+  /** What the starred recipes take, by ingredient's item key: each recipe and how many a batch takes (FEAT-036). */
+  'trade:wanted': () => Record<string, { product: string; count: number }[]>
   /** Whether a wanted Hunter named that dies starts its respawn timer by itself (FEAT-038). */
   'hunter:autoTimers': (on: boolean) => boolean
   'buffs:get': () => BuffView
@@ -483,6 +499,8 @@ export interface Invokes {
   'gear:effects': (names: string[], character: string, days: number) => GearEffects
 
   'stats:caps': (classes: string[], level: number) => Caps
+  /** Crit and hit rates, skills, weapon skill and item ATK from the log and worn gear (LT-739). */
+  'stats:fromLog': (character: string, days: number) => StatsFromLog
   /** The newest /alternateadv list in the character's own log. */
   'stats:readAAs': (character: string) => AaSummary | null
   /** The AAs the character's log and archives saw bought and refunded, and its ability points. */
@@ -624,6 +642,8 @@ const INVOKE_CHANNELS: Record<InvokeChannel, true> = {
   'combat:rebuild': true,
   'loot:get': true,
   'loot:offers': true,
+  'loot:byMob': true,
+  'trade:wanted': true,
   'hunter:autoTimers': true,
   'buffs:get': true,
   'buffs:setWanted': true,
@@ -704,6 +724,7 @@ const INVOKE_CHANNELS: Record<InvokeChannel, true> = {
   'gear:foci': true,
   'gear:effects': true,
   'stats:caps': true,
+  'stats:fromLog': true,
   'stats:readAAs': true,
   'stats:aaHistory': true,
   'stats:readScreen': true,

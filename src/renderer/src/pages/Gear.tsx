@@ -2,6 +2,11 @@ import { useMemo, useState } from 'react'
 import { CharacterPicker } from '../components/CharacterPicker'
 import { api } from '../api'
 import { useRemembered } from '../remember'
+import { useInvoke } from '../hooks'
+import { useCatalog } from '../gear/useCatalog'
+import { OPTIMIZED_KEY, type OptimizedPick } from '../gear/optimized'
+import { judgeOwned } from '../../../core/gearJudge'
+import type { Wearer } from '../../../core/gearFinder'
 import { showError } from '../toast'
 import { Ago, FilterBox, GameCommand, Pending, Segmented, Tabs } from '../components/ui'
 import { numExact as num, who } from '../../../core/format'
@@ -247,7 +252,7 @@ export function Gear({ go, only, onPlan }: { go?: Go; only?: GearMode; onPlan?: 
         />
       )}
       <GearTotals view={view} sheet={sheet} updateSheet={updateSheet} summary={summary} scaled={scaled} setScaled={setScaled} />
-      <Carried view={view} />
+      <Carried view={view} classes={classes} />
       <p className="faint small mt-16">
         Item stats and icon numbers come from{' '}
         <a href="https://eqlwiki.com" target="_blank" rel="noreferrer">
@@ -377,10 +382,21 @@ function CharacterCard({
   )
 }
 
-function Carried({ view }: { view: InventoryView }) {
+function Carried({ view, classes }: { view: InventoryView; classes: string[] }) {
   const [filter, setFilter] = useRemembered<Filter>('gear.filter', 'all')
   const [q, setQ] = useState('')
   const inv = view.inventory!
+  // Keep, sell or merge fodder (FEAT-034): from the wiki's catalog, the optimiser's best set and the starred recipes.
+  const catalog = useCatalog().state?.file?.items
+  const byKey = useMemo(() => new Map((catalog ?? []).map((c) => [itemKey(c.title), c])), [catalog])
+  const [picks] = useRemembered<OptimizedPick[]>(`${OPTIMIZED_KEY}.${view.character}`, [])
+  const pickNames = useMemo(() => new Set(picks.map((p) => p.name)), [picks])
+  const wantedQ = useInvoke('trade:wanted')
+  const wanted = useMemo(() => new Set(Object.keys(wantedQ.data ?? {})), [wantedQ.data])
+  const wornNames = useMemo(() => inv.worn.map((it) => it.name), [inv])
+  const wearer = useMemo<Wearer | null>(() => (classes.length ? { classes, race: '', level: 100 } : null), [classes])
+  const judge = (name: string, kind: Filter) =>
+    kind === 'all' ? null : judgeOwned({ name, kind, worn: wornNames, picks: pickNames, catalog: byKey, wearer, wanted, value: view.items[itemKey(name)]?.use?.value })
   const rows = useMemo(() => {
     const out: { kind: Filter; name: string; where: string; count: number }[] = []
     const add = (kind: Filter, list: InvItem[]) => {
@@ -435,7 +451,18 @@ function Carried({ view }: { view: InventoryView }) {
             <span className="lt-row-name" title={r.name}>
               {r.name}
             </span>
-            <span className="muted small">{r.where}</span>
+            <span className="muted small">
+              {r.where}
+              {(() => {
+                const v = judge(r.name, r.kind)
+                return v ? (
+                  <span className={`chip small ${v.verdict === 'keep' ? 'ok' : v.verdict === 'sell' ? 'warn' : ''}`} title={v.why}>
+                    {' '}
+                    {v.verdict === 'fodder' ? 'merge fodder' : v.verdict}
+                  </span>
+                ) : null
+              })()}
+            </span>
             <span className="mono small">{r.count > 1 ? `×${num(r.count)}` : ''}</span>
           </div>
         ))}

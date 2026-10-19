@@ -1,4 +1,5 @@
 import { MOTE_RANKS, type MoteLoot } from './motes'
+import { itemKey, mergeLevel } from './inventory'
 import { StockCursor, fixItem, levelFromName, plan } from './moteCalc'
 import type { FeedItem, MoteStock } from '../shared/types'
 
@@ -66,6 +67,23 @@ export class MoteStockKeeper {
     const s = this.cell.get()
     if (on) this.cursor = new StockCursor(Date.now(), 0)
     return this.save({ ...s, autoAdd: on, ...(on ? { seenUntil: Date.now(), seenAtSecond: 0 } : {}) })
+  }
+
+  /**
+   * The game says an item is at a level (LT-740): merged up in the log ("… to create a new item: Cloak of
+   * Flames +7", kept as a recent merge), or as the inventory export lists it. The item being planned
+   * follows what the game says, whatever Done or nothing said before.
+   */
+  observed(names: readonly string[], at: number, from: 'merge' | 'export'): MoteStock {
+    let s = this.cell.get()
+    if (from === 'merge') s = { ...s, merges: [...(s.merges ?? []), ...names.map((name) => ({ name, at }))].slice(-50) }
+    const planned = s.item.name ? itemKey(s.item.name) : ''
+    const levels = planned ? names.filter((n) => itemKey(n) === planned).map(mergeLevel) : []
+    const level = levels.length ? Math.max(...levels) : null
+    if (level === null || level === s.item.lvl) return from === 'merge' ? this.save(s) : s
+    const name = levelFromName(s.item.name) !== null ? s.item.name.replace(/\+\d+\s*$/, `+${level}`) : s.item.name
+    this.feed('loot', `Merge planner: ${name} is +${level} ${from === 'merge' ? 'by your log' : 'in your inventory export'}.`)
+    return this.save({ ...s, item: fixItem({ name, lvl: level, xp: 0, to: Math.max(s.item.to, level + 1) }) })
   }
 
   /** "Done": takes the planned motes off the stock and moves the item up to the level reached. */

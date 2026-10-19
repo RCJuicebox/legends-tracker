@@ -11,6 +11,7 @@
 //   avoidance per AGI 8000/36000, raised by melee-avoidance AAs; and AC sum +1 per 20 AGI
 
 import type { Weights } from './gearFinder'
+import { damageBonusPct } from './combatModel'
 
 /** Per class, from the game's Resources/basedata.txt at the character's level. */
 export interface ClassFactors {
@@ -125,7 +126,9 @@ export const ROLE_LABELS: Record<RoleKey, string> = {
  * Weapon ratio is worth per 1% more damage from the hands (0.01 of ratio), as the pet planner weighs
  * it: by EQEmu's d20 damage roll, 1% of damage is about 6 Offense at the Offense of a level-50 melee,
  * so each role's is 6 × its Offense weight. Ranged ratio (the Range slot's) is 0 in every role, so
- * that slot goes to stats.
+ * that slot goes to stats. The Melee role's Offense and haste here are the fallback: with the character's
+ * numbers known they are derived from its weapon damage weight (derivedMelee, LT-738); ATK stays as set,
+ * since where ATK goes in the damage maths is not known.
  */
 export const ROLE_PRESETS: Record<string, RoleWeights> = {
   Balanced: {
@@ -196,6 +199,26 @@ export const ROLE_PRESETS: Record<string, RoleWeights> = {
     ratio: 0,
     rangedRatio: 0
   }
+}
+
+/**
+ * What 1% more melee damage takes at this character's numbers (LT-738): Offense points, from the
+ * EQEmu damage table's slope at its Offense (null under 115, where the table never applies), and
+ * haste %, since damage goes as 100 + haste. Weapon ratio needs 0.01 for 1% by definition.
+ */
+export function meleeSlopes(o: { monk: boolean; offense: number; hastePct: number }): { offense: number | null; haste: number } {
+  const bonus = damageBonusPct(o.monk, o.offense)
+  const slope = (damageBonusPct(o.monk, o.offense + 10) - damageBonusPct(o.monk, Math.max(0, o.offense - 10))) / 20
+  const pctPerOffense = slope > 0 ? (slope / bonus) * 100 : 0
+  return { offense: pctPerOffense > 0 ? 1 / pctPerOffense : null, haste: (100 + Math.max(0, o.hastePct)) / 100 }
+}
+
+/**
+ * The Melee role at this character's numbers (LT-738): Offense and haste valued as the share of melee
+ * damage they add, in the unit weapon damage is weighed in (`ratio`, per 1%), not as tuned constants.
+ */
+export function derivedMelee(role: RoleWeights, slopes: { offense: number | null; haste: number }): RoleWeights {
+  return { ...role, ...(slopes.offense ? { offense: role.ratio / slopes.offense } : {}), haste: role.ratio / slopes.haste }
 }
 
 /** The role's weights turned into what a raw point of each item stat is worth to this character. */

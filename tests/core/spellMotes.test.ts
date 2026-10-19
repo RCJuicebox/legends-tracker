@@ -71,6 +71,11 @@ describe('what a rank gives', () => {
     ])
   })
 
+  it('takes a rank bought with motes as the rank now, though not cast since (LT-756)', () => {
+    const { rows } = castRows(book, { 'Odium IX': 3 }, character, {}, ['Odium X', 'Not A Spell IV'])
+    expect(rows.map((r) => [r.name, r.rank])).toEqual([['Odium', 10]])
+  })
+
   it('tells an ability from a spell by its class levels', () => {
     const levels = (...set: [number, number][]) => Array.from({ length: 16 }, (_, i) => set.find(([c]) => c === i)?.[1] ?? 255)
     // Harm Touch X: Shadow Knight 254. Drain Spirit: Shadow Knight 49, Necromancer 39.

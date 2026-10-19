@@ -13,6 +13,7 @@ import {
   windowOffense
 } from '../../src/core/combatModel'
 import { aaEffects, aaTotal, latestAas } from '../../src/core/aa'
+import { acWorth } from '../../src/core/statsModel'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 
@@ -63,6 +64,19 @@ describe('AC', () => {
     const shield = computeAc({ ...baseline, itemAC: baseline.itemAC + 39, shieldAC: 39 })
     expect([bare.effCap, shield.effCap]).toEqual([439, 478])
     expect(shield.srv.total - bare.srv.total).toBe(52)
+  })
+
+  it('says what one more point of gear AC and of shield AC is worth against a point under the cap (LT-737)', () => {
+    // The baseline reading is over the cap: gear AC is worth the class's post-cap share, a shield's far more.
+    expect(computeAc(baseline).over).toBe(true)
+    const over = acWorth(baseline)
+    expect(over.gear).toBeGreaterThan(0)
+    expect(over.gear).toBeLessThan(0.5)
+    expect(over.shield).toBeGreaterThan(over.gear * 2)
+    // Well under the cap, both count in full.
+    const under = acWorth({ ...baseline, itemAC: 100 })
+    expect(under.gear).toBeCloseTo(1, 1)
+    expect(under.shield).toBeCloseTo(1, 1)
   })
 
   it("gives Dzarn's worked example: displayed 10,480 and mitigation 3,413", () => {

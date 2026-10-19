@@ -162,4 +162,6 @@ export interface MoteStock {
   seenUntil?: number
   /** … and how many loot lines in that second were counted (a reward chest logs several at once). */
   seenAtSecond?: number
+  /** Items the log saw merged up lately, newest last: Best merge moves their rows before the next export (LT-740). */
+  merges?: { name: string; at: number }[]
 }

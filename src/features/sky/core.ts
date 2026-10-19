@@ -1,3 +1,4 @@
+import { MERGED_ITEM } from '../../core/phrases'
 import SKY from '../../shared/game/skyQuests.json'
 import { itemKey } from '../../core/inventory'
 import { parseLootLine } from '../../core/loot'
@@ -86,7 +87,7 @@ export const emptySkyTally = (): SkyTally => ({ items: {}, runs: {} })
 const OFFERED = /^You offered (\d+) (.+) to (.+)\.$/
 const TRADED = /^You complete the trade with (.+)\.$/
 const CANCELLED = 'You have cancelled the trade.'
-const MERGED = /^You have successfully merged two items together to create a new item: (.+)$/
+const MERGED = MERGED_ITEM
 
 function count(into: SkyTally, item: string, got: number, gave: number, at: number): void {
   const k = itemKey(item)

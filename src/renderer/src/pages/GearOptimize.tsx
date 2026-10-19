@@ -1,5 +1,6 @@
-import { useMemo, useState } from 'react'
-import { useRemembered } from '../remember'
+import { useEffect, useMemo, useState } from 'react'
+import { remember, useRemembered } from '../remember'
+import { OPTIMIZED_KEY } from '../gear/optimized'
 import { baseName, slotLabel } from '../../../core/inventory'
 import { canWear, score, weightsForSlot } from '../../../core/gearFinder'
 import { pieceName, SLOT_LAYOUT, type GearLock, type Piece, type PieceSource, type Plan } from '../../../core/gearOptimizer'
@@ -77,6 +78,18 @@ export function OptimizeTab({ m }: { m: GearModel }) {
     [pieces, m.wearer, m.weights, m.twoHanders, m.worth, m.exaltations, m.effects.inputs, m.weaponHands, locks]
   )
   const { plan, stale, error } = useGearPlan(input)
+  // The owned pieces the set would put on, for Best merge to rank beside what is worn (LT-741).
+  const character = m.view.character
+  useEffect(() => {
+    if (!plan || stale) return
+    remember(
+      `${OPTIMIZED_KEY}.${character}`,
+      plan.slots.flatMap((slot, i) => {
+        const p = plan.after[i]
+        return p && !p.exalt && p.from !== 'worn' && p.from !== 'catalog' && p.from !== 'pet' ? [{ slot, name: p.item.name }] : []
+      })
+    )
+  }, [plan, stale, character])
   if (!plan)
     return (
       <div className="card" aria-busy={!error}>

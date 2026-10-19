@@ -3,7 +3,7 @@ import { planTotal } from '../../src/core/finderRound'
 import { optimizeGear, ownedPieces, pieceName, SLOT_LAYOUT } from '../../src/core/gearOptimizer'
 import { mergeLevel, parseInventory, parseStatsBlock, scaledStats } from '../../src/core/inventory'
 import { rawWeights, ROLE_PRESETS, type Conversions } from '../../src/core/statValue'
-import { handWeights, isLore, restrictions, weightsForSlot, type Weights } from '../../src/core/gearFinder'
+import { handWeights, isLore, restrictions, score, weightsForSlot, type Weights } from '../../src/core/gearFinder'
 import { doubleAttackChance, dualWieldChance, handSwings, swingsPerRound, tripleAttackChance } from '../../src/core/combatModel'
 import { parseItemPage } from '../../src/core/wikiItem'
 import { PRESETS } from '../helpers'
@@ -161,6 +161,16 @@ describe('the optimiser and weapon ratio', () => {
     const w = { ...melee, rangedRatio: 7 }
     expect([weightsForSlot(w, 'Primary').ratio, weightsForSlot(w, 'Secondary').ratio, weightsForSlot(w, 'Range').ratio]).toEqual([4000, 4000, 0])
     expect([weightsForSlot(w, 'Primary').rangedRatio, weightsForSlot(w, 'Range').rangedRatio, weightsForSlot(w, 'Any Slot').ratio]).toEqual([0, 700, 0])
+  })
+
+  it("weighs a shield's AC apart, in the secondary hand only, and a weapon's AC there as any AC (LT-737)", () => {
+    const w: Weights = { ...melee, ac: 0.25, shieldAc: 0.8 }
+    expect(weightsForSlot(w, 'Primary').shieldAc).toBeUndefined()
+    const off = weightsForSlot(w, 'Secondary')
+    const shield = parseStatsBlock('Slot: SECONDARY<br>AC: 20')
+    const blade = parseStatsBlock('Slot: PRIMARY SECONDARY<br>Skill: 1H Slashing Atk Delay: 22<br>DMG: 10 AC: 20')
+    expect(score(shield, off)).toBeCloseTo(16)
+    expect(score(blade, { ...off, ratio: 0 })).toBeCloseTo(5)
   })
 })
 

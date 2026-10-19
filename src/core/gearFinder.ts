@@ -209,7 +209,9 @@ export const isTwoHanded = (r: Restrictions) => /^2H\b/i.test(r.skill)
  */
 export function weightsForSlot(w: Weights, slot: string, hands?: HandWeights | null): Weights {
   const hand = slot === 'Primary' ? (hands?.main ?? 1) : slot === 'Secondary' ? (hands?.off ?? 1) : 0
-  return { ...w, ratio: w.ratio * 100 * hand, rangedRatio: slot === 'Range' ? w.rangedRatio * 100 : 0 }
+  const { shieldAc, ...rest } = w
+  // A shield's AC counts as a shield's only in the secondary hand (LT-737).
+  return { ...rest, ratio: w.ratio * 100 * hand, rangedRatio: slot === 'Range' ? w.rangedRatio * 100 : 0, ...(slot === 'Secondary' && shieldAc !== undefined ? { shieldAc } : {}) }
 }
 
 /**
@@ -248,7 +250,8 @@ export type WeightKey =
   | 'ratio'
   | 'rangedRatio'
 
-export type Weights = Record<WeightKey, number>
+/** What a point of each item stat is worth; `shieldAc`, set for the secondary hand, is a shield's AC (LT-737). */
+export type Weights = Record<WeightKey, number> & { shieldAc?: number }
 
 export const WEIGHT_LABELS: Record<WeightKey, string> = {
   ac: 'AC',
@@ -301,7 +304,9 @@ export function statValues(s: ItemStats): Record<WeightKey, number> {
 
 export function score(s: ItemStats, w: Weights): number {
   const v = statValues(s)
-  return (Object.keys(w) as WeightKey[]).reduce((sum, k) => sum + v[k] * w[k], 0)
+  // In the secondary hand an item with AC and no damage is a shield, whose AC lifts the cap too (LT-737).
+  const ac = w.shieldAc !== undefined && !s.damage ? w.shieldAc : w.ac
+  return (Object.keys(w) as (WeightKey | 'shieldAc')[]).reduce((sum, k) => (k === 'shieldAc' ? sum : sum + v[k] * (k === 'ac' ? ac : w[k])), 0)
 }
 
 interface Candidate {

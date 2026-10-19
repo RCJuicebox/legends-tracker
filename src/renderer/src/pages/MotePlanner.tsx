@@ -4,7 +4,7 @@ import { useDebounced, useInvoke } from '../hooks'
 import { showError } from '../toast'
 import { ConfirmButton, Pending, Switch } from '../components/ui'
 import { numExact as num } from '../../../core/format'
-import { MOTE_RANKS } from '../../../core/motes'
+import { bestFor, farmPlaces, MOTE_RANKS } from '../../../core/motes'
 import { countsToArray, fixItem, levelFromName, makeable, plan, MAX_LEVEL } from '../../../core/moteCalc'
 import type { MoteStock } from '../../../shared/types'
 import type { Invokes } from '../../../shared/ipc'
@@ -236,6 +236,7 @@ export function MotePlanner() {
                     {!!st.short && (
                       <div className="notice bad small">
                         You're {num(st.short)} {short(st.m)} short, counting everything you could combine.
+                        <WhereToFarm rank={st.m} />
                       </div>
                     )}
                   </>
@@ -310,5 +311,20 @@ export function MotePlanner() {
         </p>
       </div>
     </div>
+  )
+}
+
+/** Where your runs dropped a rank fastest (FEAT-035): "The Plane of Hate 4 (Refined) dropped 2.1 Superior an hour over 9 runs". */
+function WhereToFarm({ rank }: { rank: number }) {
+  const runs = useInvoke('motes:get').data
+  const best = useMemo(() => (runs ? bestFor(farmPlaces(runs.sessions, Date.now()), MOTE_RANKS[rank].key) : []), [runs, rank])
+  if (!best.length) return null
+  const b = best[0]
+  return (
+    <>
+      {' '}
+      {b.name} dropped {b.perHour.toFixed(1)} {short(rank)} an hour over {num(b.runs)} runs
+      {best[1] ? `; ${best[1].name} ${best[1].perHour.toFixed(1)}` : ''}.
+    </>
   )
 }

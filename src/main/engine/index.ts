@@ -145,7 +145,11 @@ export class Engine {
     })
     this.combat = new CombatFeed(store, out, this.notifier, this.buffs, {
       book: () => this.book,
-      zone: () => this.status.zone
+      zone: () => this.status.zone,
+      // The merge planner follows what the log says was merged, not only its own Done (LT-740).
+      merged: (name, at) => {
+        if (!this.simulating) this.stock.observed([name], at, 'merge')
+      }
     })
     this.petReader = new PetGearReader((gear) => out.pet({ gear }))
     this.motes = new MoteTracker(store.motes.get(), {

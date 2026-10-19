@@ -113,14 +113,27 @@ export function acInputs(s: StatsInputs, trio: string[], primary: string, val: V
 }
 
 /**
- * The AC calculator's result for a character from what the tracker knows: the sheet, worn gear, the
- * game's soft cap table for its classes, and its AAs. For pages other than Stats.
+ * The AC calculator's inputs for a character from what the tracker knows: the sheet, worn gear, the
+ * game's soft cap table for its classes, and its AAs. For pages other than Stats, and for measuring
+ * what one more point is worth (acWorth).
  */
-export function characterAc(s: StatsInputs, acCaps: AcCaps, gear: GearAc | null) {
+export function characterAcInputs(s: StatsInputs, acCaps: AcCaps, gear: GearAc | null): AcInputs {
   const trio = classTrio(s)
   const primary = primaryClass(trio, acCaps)
   const val = valOf(s, autoValues(s, acCaps, primary, gear))
-  return computeAc(acInputs(s, trio, primary, val, (id) => s.skills[id] ?? 0))
+  return acInputs(s, trio, primary, val, (id) => s.skills[id] ?? 0)
+}
+
+/** Worn gear's AC counts 4/3 toward the AC sum: a point under the soft cap is worth this much mitigation. */
+const GEAR_AC_UNDER_CAP = 4 / 3
+
+/**
+ * What one more point of AC on gear, and on a shield, is worth to this character against a point under
+ * the soft cap (LT-737): 1 under the cap, the game's own post-cap multiplier (with every truncation)
+ * over it; a shield's AC lifts the cap as well, so it keeps nearer full worth.
+ */
+export function acWorth(i: AcInputs): { gear: number; shield: number } {
+  return { gear: marginal(i, ['itemAC']) / GEAR_AC_UNDER_CAP, shield: marginal(i, ['shieldAC', 'itemAC']) / GEAR_AC_UNDER_CAP }
 }
 
 /** The AC tab: the result, what it means for this character, and every step. */

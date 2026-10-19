@@ -1,10 +1,10 @@
 import { useMemo, useState } from 'react'
-import { num, timeOfDay, when } from '../../../core/format'
+import { num, pct, timeOfDay, when } from '../../../core/format'
 import { useInvoke, useItemInfo, useLootView, useVisibleInterval } from '../hooks'
 import { useRemembered } from '../remember'
 import { actDone } from '../toast'
 import { wikiUrl } from '../../../core/format'
-import { Ago, Disclosure, FilterBox, Icon, Info, Pending, ToggleChip } from '../components/ui'
+import { Ago, Disclosure, FilterBox, Icon, Info, Pending, Segmented, ToggleChip } from '../components/ui'
 import { describeItem, fmtCoin, itemWorth, lastSales, sessionWorth, type LootEntry, type LootOutcome, type WorthFrom } from '../../../core/loot'
 import { itemKey } from '../../../core/inventory'
 import type { ItemInfo } from '../../../shared/types'
@@ -73,11 +73,14 @@ export function Loot() {
   const sessions = useMemo(() => new Map((view?.sessions ?? []).map((s) => [s.id, s])), [view])
   // What kept loot is worth: the last sale of its name, else a merchant's offer to you, else the wiki (LT-725, LT-744).
   const offersQ = useInvoke('loot:offers')
+  // The drops a starred recipe on Tradeskills takes (FEAT-036).
+  const wanted = useInvoke('trade:wanted').data ?? {}
   useVisibleInterval(offersQ.reload, 60_000)
   const sales = useMemo(() => lastSales(view?.entries ?? []), [view])
   const worthOf = (e: LootEntry) => itemWorth(e.base, { sales, offers: offersQ.data ?? {}, wikiValue: info[itemKey(e.base)]?.use?.value })
 
   const toggle = (k: LootOutcome) => setHidden(hidden.includes(k) ? hidden.filter((x) => x !== k) : [...hidden, k])
+  const [by, setBy] = useRemembered<'sessions' | 'mobs'>('loot.by', 'sessions')
   // One status for the list, not one a row still on its way from eqlwiki (LT-684).
   const lookingUp = shownNames.filter((n) => !info[itemKey(n)]).length
   // Everything hidden by the outcome chips, nothing typed: said so, with a way back (LT-693).
@@ -98,6 +101,15 @@ export function Loot() {
       <NotWatching what="new loot and sales" />
 
       <div className="card row mb-16">
+        <Segmented
+          label="Show loot"
+          value={by}
+          onChange={setBy}
+          options={[
+            ['sessions', 'By session', 'Everything looted, newest first, session by session'],
+            ['mobs', 'By mob', 'What each mob dropped over the fights the meter keeps, and how often a kill']
+          ]}
+        />
         <FilterBox placeholder="Filter by item, mob or looter…" label="Filter loot" value={filter} onChange={setFilter} width={260} />
         <span className="row tight" role="group" aria-label="Outcomes shown">
           {OUTCOMES.map((o) => (
@@ -121,7 +133,9 @@ export function Loot() {
         </button>
       </div>
 
-      {!view ? (
+      {by === 'mobs' ? (
+        <ByMob filter={filter} entries={view?.entries.length ?? 0} />
+      ) : !view ? (
         <Pending error={q.error} retry={q.reload} what="the loot" />
       ) : !groups.length ? (
         <div className="card empty">
@@ -174,12 +188,53 @@ export function Loot() {
                 )}
                 <WorthChip w={sessionWorth(g.entries, worthOf)} />
               </div>
-              {open && g.entries.map((e) => <Row key={e.id} e={e} info={info[itemKey(e.base)]} worth={worthOf(e)} refresh={refresh} />)}
+              {open && g.entries.map((e) => <Row key={e.id} e={e} info={info[itemKey(e.base)]} worth={worthOf(e)} wanted={wanted[itemKey(e.base)]} refresh={refresh} />)}
             </div>
           )
         })
       )}
     </>
+  )
+}
+
+/**
+ * Drop rates per mob (FEAT-037): each mob killed in the fights the meter keeps, with what dropped from
+ * its corpses over the same span (anyone's loot) and how often a kill.
+ */
+function ByMob({ filter, entries }: { filter: string; entries: number }) {
+  const q = useInvoke('loot:byMob', [], [entries])
+  const f = filter.trim().toLowerCase()
+  const rows = (q.data ?? []).filter((m) => !f || m.mob.toLowerCase().includes(f) || m.items.some((i) => i.item.toLowerCase().includes(f)))
+  if (!q.data) return <Pending error={q.error} retry={q.reload} what="the drops by mob" />
+  if (!rows.length)
+    return <div className="card empty">{q.data.length ? 'Nothing matches the filter.' : 'No mob killed in the fights the meter keeps has dropped anything yet.'}</div>
+  return (
+    <div className="card">
+      <p className="faint small m-0 mb-8">Over the fights the damage meter keeps (its last 300): kills from the fights, drops from the corpses in the same time, whoever looted.</p>
+      <table className="table small">
+        <tbody>
+          {rows.map((m) => (
+            <tr key={m.mob}>
+              <td className="nowrap">
+                <b>{m.mob}</b>
+              </td>
+              <td className="mono nowrap">
+                {num(m.kills)} kill{m.kills === 1 ? '' : 's'}
+              </td>
+              <td>
+                {m.items.slice(0, 6).map((i, k) => (
+                  <span key={i.item}>
+                    {k > 0 && ' · '}
+                    {i.item} ×{num(i.n)} <span className="faint">({i.perKill <= 1 ? pct(i.perKill) : `${i.perKill.toFixed(1)} a kill`})</span>
+                  </span>
+                ))}
+                {m.items.length > 6 && <span className="faint"> +{m.items.length - 6} more</span>}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
   )
 }
 
@@ -200,11 +255,13 @@ function Row({
   e,
   info,
   worth,
+  wanted,
   refresh
 }: {
   e: LootEntry
   info: ItemInfo | undefined
   worth: { copper: number; from: WorthFrom } | null
+  wanted: { product: string; count: number }[] | undefined
   refresh: (name: string) => Promise<void>
 }) {
   const [refreshing, setRefreshing] = useState(false)
@@ -227,6 +284,12 @@ function Row({
           {e.outcome === 'merged' && e.into ? ` → ${e.into}` : ''}
         </span>
         {e.looter !== 'You' && <span className="chip">{e.looter}</span>}
+        {wanted?.length ? (
+          <span className="chip ok" title={`A starred recipe on Tradeskills takes it: ${wanted.map((w) => `${w.product} (${w.count} a batch)`).join(', ')}`}>
+            needed by {wanted[0].product} ×{wanted[0].count}
+            {wanted.length > 1 ? ` +${wanted.length - 1}` : ''}
+          </span>
+        ) : null}
         {worth && e.outcome !== 'sold' && e.outcome !== 'currency' && (
           <span className="chip as-is" title={`Sells for this: ${WORTH_FROM[worth.from]}`}>
             sells {fmtCoin(worth.copper)}

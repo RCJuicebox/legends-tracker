@@ -196,6 +196,25 @@ export function parseOffer(text: string, at: number): Offer | null {
   return copper > 0 ? { item: m[3], merchant: m[1], copper, at } : null
 }
 
+/**
+ * What the starred recipes take, by ingredient (FEAT-036): for a drop, which of them it feeds and how
+ * many a batch of each takes ("needed by Tumpy Tonic ×2").
+ */
+export function starredIngredients(
+  recipes: readonly Recipe[],
+  favorites: readonly { key: string; combines: number }[],
+  keyOf: (name: string) => string
+): Record<string, { product: string; count: number }[]> {
+  const byKey = new Map(recipes.map((r) => [recipeKey(r), r]))
+  const out: Record<string, { product: string; count: number }[]> = {}
+  for (const f of favorites) {
+    const r = byKey.get(f.key)
+    if (!r) continue
+    for (const i of r.ingredients) (out[keyOf(i.name)] ??= []).push({ product: r.product, count: i.count * Math.max(1, f.combines) })
+  }
+  return out
+}
+
 /** The price of one, from the last purchase of it. */
 export const unitPrice = (p: Pick<Purchase, 'count' | 'copper'>) => p.copper / p.count
 

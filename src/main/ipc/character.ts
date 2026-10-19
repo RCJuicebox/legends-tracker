@@ -6,7 +6,9 @@ import { aaHistoryView, emptyAaTally } from '../../core/aaHistory'
 import { readMotesFromScreen, readStatsFromScreen } from '../screenRead'
 import { castableSpells, focusReport, focusSpec } from '../../core/itemFocus'
 import { meleeProfile } from '../../core/meleeTally'
-import { craftEras } from '../../core/tradeskills'
+import { statsFromLog } from '../../core/statsFromLog'
+import { craftEras, starredIngredients } from '../../core/tradeskills'
+import { itemKey } from '../../core/inventory'
 import { petSpells, petSummonName } from '../../core/pets'
 import type { EffectSpell } from '../../core/itemEffects'
 import { assertCharacterKey, intArg, isCharacterKey, sanitizeSheet, stringsArg } from '../../core/validate'
@@ -107,6 +109,19 @@ export function registerCharacterIpc(ctx: AppContext): void {
     return { spells, profile: recent ? meleeProfile(recent.counts, recent) : null, loaded: !!book }
   })
 
+  handle('stats:fromLog', async (character, days) => {
+    assertCharacterKey(character)
+    const where = history(character)
+    const [melee, skills, inv] = await Promise.all([
+      ctx.meleeHistory.recent({ ...where, days: intArg(days, 0, 3650, 14) }).catch(() => null),
+      ctx.skills.view(where).catch(() => ({})),
+      ctx.inventoryFiles.exported(character)
+    ])
+    const worn = inv?.inventory.worn ?? []
+    const items = worn.length ? await ctx.inventoryFiles.lookup(worn.map((it) => it.name)) : {}
+    return statsFromLog({ profile: melee ? meleeProfile(melee.counts, melee) : null, skills, worn, items })
+  })
+
   handle('stats:caps', async (rawClasses, rawLevel) => {
     const classes = stringsArg(rawClasses, 16, 40)
     const level = intArg(rawLevel, 1, 100, 50)
@@ -154,6 +169,11 @@ export function registerCharacterIpc(ctx: AppContext): void {
     return ctx.purchases.latest(history(character))
   })
   handle('trade:favorites', () => ctx.tradeFavorites.get())
+  // What the starred recipes take, by ingredient (FEAT-036): Loot marks the drops that feed one.
+  handle('trade:wanted', async () => {
+    const [file, saved] = await Promise.all([ctx.recipeBook.stored(), ctx.tradeFavorites.get()])
+    return file ? starredIngredients(file.recipes, saved.favorites, itemKey) : {}
+  })
   handle('trade:saveFavorites', (input) => ctx.tradeFavorites.set(input))
 
   // The pet: what it wears and which one it is, from the log (read back once a session per

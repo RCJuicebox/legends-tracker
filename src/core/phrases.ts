@@ -31,6 +31,12 @@ export const KILL_RUN_MS = 10 * 60_000
 /** "a ratman warrior resisted your Envenomed Bolt X!": your spell (or a proc of yours) resisted outright. */
 export const RESISTED_YOUR = /^(.+?) resisted your (.+)!$/
 
+/**
+ * "You have successfully merged two items together to create a new item: Cloak of Flames +7": an item
+ * merged up (two copies, or motes into it), and a spell's rank bought with motes ("… Drain Spirit VI").
+ */
+export const MERGED_ITEM = /^You have successfully merged two items together to create a new item: (.+)$/
+
 /** "You gain experience!", "You gain party experience!", and since 2026-09-28 sometimes "(0.013%)" after it. */
 export const EXPERIENCE = /^You gain (?:party )?experience!(?: \(([\d.]+)%\))?$/
 

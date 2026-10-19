@@ -6,6 +6,7 @@ import { LootLedger } from '../../core/loot'
 import { RespawnLog, respawnView, type RespawnFallback, type RespawnView } from '../../core/respawns'
 import { deathText, durationSec } from '../../core/combatView'
 import { skillUp } from '../../core/skillAchievements'
+import { MERGED_ITEM } from '../../core/phrases'
 import { readLines } from '../../core/logReading'
 import { lineStartAfter, offsetBefore } from '../sources/logHistory'
 import { lastZoneLine } from '../game'
@@ -26,6 +27,8 @@ const SEED_MAX_BYTES = 24 * 2 ** 20
 
 export interface CombatHooks {
   book: () => SpellBook | null
+  /** An item merged up, by the log ("… to create a new item: X +7", or looted into it): the merge planner follows (LT-740). */
+  merged?: (name: string, at: number) => void
   /** The zone the status line shows, for a line the meter has not placed. */
   zone: () => string
 }
@@ -69,6 +72,7 @@ export class CombatFeed implements EngineFeature {
       onLoot: (e) => {
         // What was kept or merged is news; what auto-loot sold or stored is not, and history is not.
         if (this.backlog.active || (e.outcome !== 'kept' && e.outcome !== 'merged')) return
+        if (e.outcome === 'merged' && e.into) this.hooks.merged?.(e.into, e.at)
         const who = e.looter === 'You' ? 'Looted' : `${e.looter} looted`
         this.notifier.pushFeed('loot', `${who} ${e.count > 1 ? `${e.count} × ` : ''}${e.item} from ${e.source}${e.into ? ` → ${e.into}` : ''}`)
       }
@@ -168,6 +172,11 @@ export class CombatFeed implements EngineFeature {
     const up = line.text.startsWith('You have become better at ') ? skillUp(line.text) : null
     if (up) {
       if (!this.backlog.active) this.notifier.pushFeed('info', `${up.skill} ${up.value}`)
+      return true
+    }
+    const merged = line.text.startsWith('You have successfully merged ') ? MERGED_ITEM.exec(line.text) : null
+    if (merged) {
+      if (!this.backlog.active) this.hooks.merged?.(merged[1], line.time)
       return true
     }
     const ev = this.meter.handle(line)

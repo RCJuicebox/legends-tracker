@@ -6,7 +6,7 @@ import { act } from '../toast'
 import { useNow } from '../components/TimerBars'
 import { ConfirmButton, FilterBox, Icon, Info, Pending, ShowingSome, type Sort, sortRows, SortTh } from '../components/ui'
 import { useRemembered } from '../remember'
-import { MOTE_RANKS, localDay, moteValue, moteWorth, pausedHours, sessionHours, timeOnDay, totalMotes, type MoteCounts, type MoteSession } from '../../../core/motes'
+import { MOTE_RANKS, farmPlaces, localDay, moteValue, moteWorth, pausedHours, sessionHours, timeOnDay, totalMotes, type MoteCounts, type MoteSession } from '../../../core/motes'
 import type { MoteScan, MoteView } from '../../../shared/ipc'
 
 type Scan = MoteScan
@@ -208,8 +208,54 @@ export function MoteRuns() {
         </div>
       </div>
 
+      <ByPlace sessions={view.sessions} now={now} />
+
       <SessionTable sessions={view.sessions} now={now} />
     </>
+  )
+}
+
+/** Each place's runs together (FEAT-035): what it drops an hour, so you know where to farm what you are short of. */
+function ByPlace({ sessions, now }: { sessions: MoteSession[]; now: number }) {
+  const places = farmPlaces(sessions, now)
+    .filter((p) => p.hours > 0)
+    .sort((a, b) => moteValue(b.motes) / b.hours - moteValue(a.motes) / a.hours)
+  if (places.length < 2) return null
+  return (
+    <div className="card mb-16">
+      <h2>
+        By place <Info label="What value means" text={VALUE_HINT} />
+      </h2>
+      <div className="table-scroll">
+        <table className="table small">
+          <thead>
+            <tr>
+              <th>Place</th>
+              <th>Runs</th>
+              <th>Time</th>
+              <th>Motes an hour</th>
+              <th>Value an hour</th>
+              <th>Most dropped</th>
+            </tr>
+          </thead>
+          <tbody>
+            {places.slice(0, 12).map((p) => {
+              const top = MOTE_RANKS.map((r) => ({ r, n: p.motes[r.key] ?? 0 })).sort((a, b) => b.n - a.n)[0]
+              return (
+                <tr key={p.name}>
+                  <td>{p.name}</td>
+                  <td className="mono">{p.runs}</td>
+                  <td className="mono nowrap">{duration(p.hours * 3600)}</td>
+                  <td className="mono">{perHour(totalMotes(p.motes), p.hours)}</td>
+                  <td className="mono">{perHour(moteValue(p.motes), p.hours)}</td>
+                  <td className="nowrap">{top && top.n > 0 ? `${top.r.name || 'Potential'} ${perHour(top.n, p.hours)}/h` : '—'}</td>
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
+      </div>
+    </div>
   )
 }
 

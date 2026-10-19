@@ -1,8 +1,8 @@
 import { baseName } from './inventory'
 import { SELF } from './combatLines'
-import { displayName } from './combatMeter'
+import { displayName, nameKey } from './combatMeter'
 import type { LogLine } from './logLine'
-import type { ItemInfo } from '../shared/types'
+import type { ItemInfo, Segment } from '../shared/types'
 
 // Loot, as EverQuest Legends prints it. Auto-loot tells you what became of each item:
 //
@@ -245,6 +245,49 @@ export class LootLedger {
     }
     return { entries: [...this.entries].reverse(), coin, reading: this.reading }
   }
+}
+
+// ---- drop rates (FEAT-037) ----
+
+/** A mob's kills and what dropped from them, each item with how many and how often a kill. */
+export interface MobDrops {
+  mob: string
+  kills: number
+  items: { item: string; n: number; perKill: number }[]
+}
+
+/**
+ * Drop rates per mob over the span the meter's kept fights cover (FEAT-037): kills from the fights
+ * (each enemy that died in one), drops from the ledger's entries since the oldest fight, by the corpse
+ * they came from, whoever looted. Mobs with no kill in that span are left out.
+ */
+export function dropRates(entries: readonly LootEntry[], fights: readonly Pick<Segment, 'startedAt' | 'enemies' | 'entities'>[]): MobDrops[] {
+  const since = fights.length ? Math.min(...fights.map((f) => f.startedAt)) : Infinity
+  const kills = new Map<string, { name: string; n: number }>()
+  for (const f of fights)
+    for (const [k, alive] of Object.entries(f.enemies)) {
+      if (alive) continue
+      const had = kills.get(k) ?? { name: f.entities[k]?.name ?? k, n: 0 }
+      had.n++
+      kills.set(k, had)
+    }
+  const drops = new Map<string, Map<string, number>>()
+  for (const e of entries) {
+    if (e.at < since) continue
+    const k = nameKey(e.source)
+    if (!kills.has(k)) continue
+    const items = drops.get(k) ?? new Map<string, number>()
+    items.set(e.base, (items.get(e.base) ?? 0) + e.count)
+    drops.set(k, items)
+  }
+  return [...kills]
+    .map(([k, { name, n }]) => ({
+      mob: name,
+      kills: n,
+      items: [...(drops.get(k) ?? [])].map(([item, c]) => ({ item, n: c, perKill: c / n })).sort((a, b) => b.n - a.n || a.item.localeCompare(b.item))
+    }))
+    .filter((m) => m.items.length)
+    .sort((a, b) => b.kills - a.kills || a.mob.localeCompare(b.mob))
 }
 
 // ---- what loot is worth (LT-725, LT-744) ----

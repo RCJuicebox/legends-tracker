@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { conversions, rawWeights, ROLE_PRESETS, statSlope } from '../../src/core/statValue'
+import { conversions, derivedMelee, meleeSlopes, rawWeights, ROLE_PRESETS, statSlope } from '../../src/core/statValue'
 import { isTwoHanded, restrictions } from '../../src/core/gearFinder'
 
 // Shadowknight / Monk / Shaman at 50, as basedata.txt has them.
@@ -34,5 +34,24 @@ describe('weapons', () => {
   it('knows a two-hander by its skill', () => {
     expect(isTwoHanded(restrictions('Slot: PRIMARY<br>\nSkill: 2H Slashing  Atk Delay: 40<br>'))).toBe(true)
     expect(isTwoHanded(restrictions('Slot: PRIMARY SECONDARY<br>\nSkill: Hand to Hand  Atk Delay: 22<br>'))).toBe(false)
+  })
+})
+
+describe('the Melee role at your numbers (LT-738)', () => {
+  it('needs more Offense for 1% as Offense climbs, none below the table, and more haste as haste climbs', () => {
+    const low = meleeSlopes({ monk: true, offense: 150, hastePct: 0 })
+    const high = meleeSlopes({ monk: true, offense: 300, hastePct: 70 })
+    expect(low.offense).toBeGreaterThan(0)
+    expect(high.offense!).toBeGreaterThan(low.offense!)
+    expect(meleeSlopes({ monk: false, offense: 90, hastePct: 0 }).offense).toBeNull()
+    expect(low.haste).toBe(1)
+    expect(high.haste).toBeCloseTo(1.7)
+  })
+
+  it("values Offense and haste in the weapon damage role's unit", () => {
+    const r = derivedMelee(ROLE_PRESETS.Melee, { offense: 6, haste: 1.5 })
+    expect(r.offense).toBeCloseTo(ROLE_PRESETS.Melee.ratio / 6)
+    expect(r.haste).toBeCloseTo(ROLE_PRESETS.Melee.ratio / 1.5)
+    expect(derivedMelee(ROLE_PRESETS.Melee, { offense: null, haste: 1 }).offense).toBe(ROLE_PRESETS.Melee.offense)
   })
 })

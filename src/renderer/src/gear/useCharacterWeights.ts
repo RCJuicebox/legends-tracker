@@ -2,19 +2,31 @@ import { useCallback, useMemo } from 'react'
 import { useInvoke } from '../hooks'
 import { useRemembered } from '../remember'
 import { readStatsInputs } from '../../../core/statsInputs'
-import { characterAc } from '../../../core/statsModel'
+import { acWorth, characterAcInputs } from '../../../core/statsModel'
+import { computeAc } from '../../../core/acModel'
 import { wornSummary } from '../../../core/wornGear'
 import { handWeights, type HandWeights, type Wearer } from '../../../core/gearFinder'
-import { conversions, rawWeights, ROLE_PRESETS, type RoleWeights } from '../../../core/statValue'
+import { conversions, derivedMelee, meleeSlopes, rawWeights, ROLE_PRESETS, type RoleWeights } from '../../../core/statValue'
 import { aaTotal } from '../../../core/aa'
-import { DOUBLE_ATTACK, DUAL_WIELD, TRIPLE_ATTACK, TRIPLE_CLASSES, doubleAttackChance, dualWieldChance, handSwings, tripleAttackChance } from '../../../core/combatModel'
+import {
+  DOUBLE_ATTACK,
+  DUAL_WIELD,
+  TRIPLE_ATTACK,
+  TRIPLE_CLASSES,
+  WEAPON_SKILLS,
+  doubleAttackChance,
+  dualWieldChance,
+  handSwings,
+  tripleAttackChance,
+  windowOffense
+} from '../../../core/combatModel'
 import type { CharacterSheet, InventoryView } from '../../../shared/types'
 import { useCharacterRecord, withRecord } from '../character'
 
 // Who the character is (classes, level, race, AC against the soft cap, how each hand swings) and what
 // a point of each item stat is worth to them, with the finder's controls that decide it.
 
-/** AC past the soft cap is worth a quarter of AC under it, in every weighting. */
+/** AC past the soft cap, where the AC model cannot say (no classes set): a quarter of AC under it. */
 export const AC_OVER_CAP = 0.25
 
 /** Each hand's weight, and what it came from. */
@@ -54,8 +66,23 @@ export function useCharacterWeights(view: InventoryView, sheet: CharacterSheet |
   const classKey = (stats.classes ?? []).filter(Boolean).join(',')
   const classes = useMemo(() => (classKey ? classKey.split(',') : []), [classKey])
   const level = stats.level ?? 50
-  // Custom weights saved before a weight existed read it as the Balanced role has it.
-  const role = useMemo(() => (preset === 'Custom' ? { ...ROLE_PRESETS.Balanced, ...custom } : (ROLE_PRESETS[preset] ?? ROLE_PRESETS.Balanced)), [preset, custom])
+  // What 1% more melee damage takes in Offense and haste, at this character's numbers (LT-738): the
+  // Stats window's Attack and Attack Speed when read, else its best weapon skill and strength.
+  const slopes = useMemo(() => {
+    const w = sheetStats.window?.values ?? {}
+    const bestWeapon = Math.max(0, ...WEAPON_SKILLS.map(([id]) => sheetStats.skills[id] ?? 0))
+    const offense = w.Attack?.[0] ?? windowOffense(bestWeapon, w.Strength?.[0] ?? (sheetStats.strength || 150))
+    // Attack Speed reads 100 with no haste; a guess until a reading with known haste settles it.
+    const speed = w['Attack Speed']?.[0]
+    return meleeSlopes({ monk: classKey.split(',').includes('mnk'), offense, hastePct: speed && speed > 100 ? speed - 100 : 0 })
+  }, [sheetStats, classKey])
+  // Custom weights saved before a weight existed read it as the Balanced role has it. The Melee role's
+  // Offense and haste are derived from its weapon damage weight at this character's numbers.
+  const role = useMemo(() => {
+    if (preset === 'Custom') return { ...ROLE_PRESETS.Balanced, ...custom }
+    if (preset === 'Melee') return derivedMelee(ROLE_PRESETS.Melee, slopes)
+    return ROLE_PRESETS[preset] ?? ROLE_PRESETS.Balanced
+  }, [preset, custom, slopes])
   // What a point of each stat buys this character: its classes, its current stats (the Stats
   // window's when read, else the sheet's), and its AAs.
   const conv = useMemo(() => {
@@ -78,18 +105,29 @@ export function useCharacterWeights(view: InventoryView, sheet: CharacterSheet |
   }, [sheetStats, factors])
   // Over the soft cap or not: the game's own Stats window when it has been read (mitigation above
   // the soft cap means over), else the AC calculator.
+  const acIn = useMemo(() => (acCaps ? characterAcInputs(sheetStats, acCaps, view.inventory ? wornSummary(view, sheet) : null) : null), [sheetStats, acCaps, view, sheet])
   const acState = useMemo(() => {
     const w = sheetStats.window?.values.AC
     if (w && w.length >= 2) return { over: w[0] > w[1], mitigation: w[0], cap: w[1], from: 'your last Stats window read' }
-    if (!acCaps) return null
-    const r = characterAc(sheetStats, acCaps, view.inventory ? wornSummary(view, sheet) : null)
+    if (!acIn) return null
+    const r = computeAc(acIn)
     return { over: r.over, mitigation: r.mitigation, cap: r.effCap, from: 'the AC calculator' }
-  }, [sheetStats, acCaps, view, sheet])
+  }, [sheetStats, acIn])
   const overCap = capMode === 'auto' ? !!acState?.over : capMode === 'over'
+  // What a point of gear AC and of shield AC is worth, from the AC model with every truncation (LT-737):
+  // 1 under the cap, the class's post-cap multiplier over it, and a shield's lifting the cap too.
+  const acFactor = useMemo(() => {
+    if (capMode === 'under') return { gear: 1, shield: 1 }
+    const m = acIn ? acWorth(acIn) : null
+    if (capMode === 'auto' && !overCap) return { gear: 1, shield: 1 }
+    // Over the cap by the Stats window, though the calculator puts it under: the model's slope past its own cap.
+    if (m && m.gear < 1) return m
+    return { gear: AC_OVER_CAP, shield: m && m.shield > AC_OVER_CAP ? m.shield : 1 }
+  }, [acIn, capMode, overCap])
   const weights = useMemo(() => {
     const w = rawWeights(role, conv)
-    return overCap ? { ...w, ac: w.ac * AC_OVER_CAP } : w
-  }, [role, conv, overCap])
+    return { ...w, ac: w.ac * acFactor.gear, shieldAc: w.ac * acFactor.shield }
+  }, [role, conv, acFactor])
   // How much each hand's weapon counts, from how often it swings: EQEmu's attack rounds (the Stats
   // page's, checked against hour-long parses) on the skills the log's skill-up lines give. Unknown
   // (no Dual Wield skill in the log) counts both hands alike.
@@ -128,6 +166,7 @@ export function useCharacterWeights(view: InventoryView, sheet: CharacterSheet |
     hands,
     weaponHands,
     acState,
+    acFactor,
     overCap,
     secondaryInUse,
     twoHanders,

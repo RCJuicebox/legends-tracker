@@ -2,7 +2,7 @@ import { createContext } from 'react'
 import type { PageId } from './main'
 
 /** The Motes page's tabs: what was looted, and the three ways to spend it. */
-export type MotesTab = 'runs' | 'merge' | 'planner' | 'spells'
+export type MotesTab = 'runs' | 'merge' | 'planner' | 'spells' | 'next'
 
 /** The Settings page's tabs: the app's own settings, then what were pages of their own. */
 export type SettingsTab = 'general' | 'modules' | 'overlays' | 'audio' | 'logs' | 'sources'

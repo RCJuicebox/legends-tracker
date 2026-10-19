@@ -9,12 +9,22 @@ import { combatReport, type Caps } from '../../../core/statsModel'
 import { className } from '../../../shared/game/classes'
 import { avoidanceFromHitRate, hitChance, skillName, stanceAccuracy, WEAPON_SKILLS } from '../../../core/combatModel'
 import { Notes, NumField, Trace, type SetSheet, type TabProps } from './statsBits'
+import { useInvoke } from '../hooks'
+import { isoDays } from '../../../core/format'
+import type { StatsFromLog } from '../../../shared/ipc'
 
-export function CombatTab({ s, set, setOverride, auto, val, trio, primary, caps, skill }: TabProps & { caps: Caps }) {
+/** The days of melee a measured rate is taken over. */
+const LOG_DAYS = 14
+/** A sample this large settles a crit rate to about a point (TODO.md asks for ~3,000 hits of a Warrior trio). */
+const SETTLED_HITS = 3000
+
+export function CombatTab({ s, set, setOverride, auto, val, trio, primary, caps, skill, character }: TabProps & { caps: Caps; character: string }) {
   const { weaponName, offense, acc, dp, crit, swings, notes, rows } = combatReport(s, val, trio, caps, skill)
+  const fromLog = useInvoke(character ? 'stats:fromLog' : null, [character, LOG_DAYS]).data ?? null
 
   return (
     <div className="stack gap-16">
+      {fromLog && <FromLog s={s} set={set} log={fromLog} acc={acc} caps={caps} />}
       <div className="stats-grid">
         <div className="stack gap-16">
           <div className="card">
@@ -113,6 +123,68 @@ export function CombatTab({ s, set, setOverride, auto, val, trio, primary, caps,
   )
 }
 
+/**
+ * What the log and the worn gear measure, which this tab otherwise asks to be typed (LT-739): the crit
+ * and hit rates of your own melee, each skill's last value, the Primary's weapon skill and the ATK
+ * items give. Typed values stay until Use is pressed, and Undo puts them back.
+ */
+function FromLog({ s, set, log, acc, caps }: { s: StatsInputs; set: SetSheet; log: StatsFromLog; acc: number; caps: Caps }) {
+  const m = log.melee
+  const swingsSeen = m ? m.hits + m.misses : 0
+  const critRate = m && m.hits ? (m.crits / m.hits) * 100 : 0
+  const hitRate = swingsSeen ? (m!.hits / swingsSeen) * 100 : 0
+  const capped = new Map(caps.skills.map((x) => [x.id, x.cap]))
+  // A skill the log saw higher than what is typed (GM training prints nothing, so it can also be lower).
+  const higher = Object.entries(log.skills).filter(([id, v]) => capped.has(Number(id)) && v > (s.skills[Number(id)] ?? 0))
+  const use = () => {
+    const before = { measuredCrit: s.measuredCrit, parseHit: s.parseHit, parseAccuracy: s.parseAccuracy, weapon: s.weapon, itemATK: s.itemATK }
+    set({
+      ...(m && m.hits ? { measuredCrit: Math.round(critRate * 10) / 10 } : {}),
+      ...(swingsSeen ? { parseHit: Math.round(hitRate * 100) / 100, parseAccuracy: acc } : {}),
+      ...(log.weapon !== undefined ? { weapon: log.weapon } : {}),
+      ...(log.itemATK !== undefined ? { itemATK: log.itemATK } : {})
+    })
+    showUndo('Filled in from your log and worn gear.', () => set(before))
+  }
+  const fillSkills = () => {
+    const before = s.skills
+    set({ skills: { ...s.skills, ...Object.fromEntries(higher.map(([id, v]) => [Number(id), Math.min(v, capped.get(Number(id)) ?? v)])) } })
+    showUndo(`${higher.length} skill${higher.length === 1 ? '' : 's'} filled in from your log.`, () => set({ skills: before }))
+  }
+  if (!m && !higher.length && log.weapon === undefined && log.itemATK === undefined) return null
+  return (
+    <div className="card row">
+      <div className="grow small">
+        <b>From your log</b>
+        {m ? (
+          <>
+            {' '}
+            · crit {pct(critRate / 100)} of {num(m.hits)} hits, hit {pct(hitRate / 100)} of {num(swingsSeen)} swings ({isoDays(m.from)} to {isoDays(m.to)})
+            {m.hits < SETTLED_HITS && <span className="faint"> · a small sample: about {num(SETTLED_HITS)} hits settle a crit rate</span>}
+          </>
+        ) : (
+          <span className="faint"> · no melee of yours in the last {LOG_DAYS} days</span>
+        )}
+        {log.weapon !== undefined && <> · {skillName(log.weapon)} in your Primary</>}
+        {log.itemATK !== undefined && <> · {num(log.itemATK)} ATK from items</>}
+        <div className="faint">The hit rate is against whatever you fought; for one target, work it out below from a parse of it.</div>
+      </div>
+      <button className="btn small" onClick={use}>
+        Use these
+      </button>
+      {higher.length > 0 && (
+        <button
+          className="btn small"
+          onClick={fillSkills}
+          title="Each skill the log last saw higher than what is typed. A skill raised at a guildmaster prints no line, so the log can be behind: check the Skills window."
+        >
+          Fill {higher.length} skill{higher.length === 1 ? '' : 's'} from your log
+        </button>
+      )}
+    </div>
+  )
+}
+
 function SkillsCard({ s, set, caps, trio }: { s: StatsInputs; set: SetSheet; caps: Caps; trio: string[] }) {
   return (
     <div className="card stack gap-12">
@@ -143,7 +215,7 @@ function SkillsCard({ s, set, caps, trio }: { s: StatsInputs; set: SetSheet; cap
         </span>
       </div>
       <p className="faint small" style={{ margin: 0 }}>
-        Type them from your in-game Skills window. Caps are the best of your classes at level {s.level}.
+        Type them from your in-game Skills window, or fill them from your log above (its skill-up lines). Caps are the best of your classes at level {s.level}.
       </p>
       <div className="stats-skills">
         {[...caps.skills]

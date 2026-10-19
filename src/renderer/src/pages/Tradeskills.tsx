@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { CharacterPicker } from '../components/CharacterPicker'
 import { api, ago } from '../api'
-import { useInvoke, useItemInfo, useVisibleInterval } from '../hooks'
+import { useInvoke, useItemInfo, useLootView, useVisibleInterval } from '../hooks'
 import { useRemembered } from '../remember'
 import { act, showError } from '../toast'
 import { Ago, Disclosure, ErrorText, FilterBox, GameCommand, Info, Pending, Progress, ShowingSome, Tabs } from '../components/ui'
@@ -112,6 +112,22 @@ export function Tradeskills() {
     }
     return m
   }, [inv.view])
+
+  // Kept or stored since the export, by the loot ledger: counted as had, and said so (LT-743, FEAT-036).
+  const lootQ = useLootView()
+  const since = useMemo(() => {
+    const m = new Map<string, number>()
+    const at = inv.view?.modified ?? 0
+    const me = character.split('_')[0].toLowerCase()
+    if (!at) return m
+    for (const e of lootQ.data?.entries ?? []) {
+      if (e.at <= at || (e.looter !== 'You' && e.looter.toLowerCase() !== me)) continue
+      if (e.outcome !== 'kept' && e.outcome !== 'depot' && e.outcome !== 'hoard') continue
+      const k = itemKey(e.base)
+      m.set(k, (m.get(k) ?? 0) + e.count)
+    }
+    return m
+  }, [lootQ.data, inv.view, character])
 
   // Ingredient pages, for who sells them and the wiki's value.
   const names = useMemo(() => [...new Set(favorites.flatMap(({ r }) => r?.ingredients.map((i) => i.name) ?? []))], [favorites])
@@ -308,7 +324,8 @@ export function Tradeskills() {
                     })
                   }
                   unfavorite={() => toggle(r)}
-                  have={(n) => have.get(itemKey(n)) ?? 0}
+                  have={(n) => (have.get(itemKey(n)) ?? 0) + (since.get(itemKey(n)) ?? 0)}
+                  since={(n) => since.get(itemKey(n)) ?? 0}
                   price={price}
                   setPrice={(name, copper) =>
                     void save({
@@ -337,6 +354,7 @@ function RecipeCard({
   setCombines,
   unfavorite,
   have,
+  since,
   price,
   setPrice,
   info,
@@ -350,6 +368,8 @@ function RecipeCard({
   setCombines: (n: number) => void
   unfavorite: () => void
   have: (name: string) => number
+  /** Of what is had, kept since the inventory export (LT-743). */
+  since: (name: string) => number
   price: (name: string) => { unit: number; from: PriceSource }
   setPrice: (name: string, copper: number) => void
   info: Record<string, ItemInfo>
@@ -411,7 +431,7 @@ function RecipeCard({
         )}
       </div>
 
-      {open && <RecipeDetail s={s} combines={combines} info={info} bought={bought} madeBy={madeBy} setPrice={setPrice} />}
+      {open && <RecipeDetail s={s} combines={combines} info={info} bought={bought} madeBy={madeBy} setPrice={setPrice} since={since} />}
     </div>
   )
 }
@@ -423,7 +443,8 @@ function RecipeDetail({
   info,
   bought,
   madeBy,
-  setPrice
+  setPrice,
+  since
 }: {
   s: ReturnType<typeof shopping>
   combines: number
@@ -431,6 +452,7 @@ function RecipeDetail({
   bought: Record<string, Purchase>
   madeBy: Map<string, string>
   setPrice: (name: string, copper: number) => void
+  since: (name: string) => number
 }) {
   const lookingUp = s.lines.filter((l) => !info[itemKey(l.name)]).length
   return (
@@ -473,7 +495,14 @@ function RecipeDetail({
                   </td>
                   <td className="mono">{l.perCombine}</td>
                   <td className="mono">{l.need.toLocaleString()}</td>
-                  <td className="mono">{l.have.toLocaleString()}</td>
+                  <td className="mono">
+                    {l.have.toLocaleString()}
+                    {since(l.name) > 0 && (
+                      <div className="faint small" title="Looted or stored since your inventory export, by your log">
+                        +{since(l.name).toLocaleString()} since the export
+                      </div>
+                    )}
+                  </td>
                   <td className="mono">{l.toBuy ? <b>{l.toBuy.toLocaleString()}</b> : <span className="faint">0</span>}</td>
                   <td className="nowrap">
                     <PriceCell unit={l.unit} from={l.priceFrom} last={last} onSet={(c) => setPrice(l.name, c)} />

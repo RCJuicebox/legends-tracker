@@ -18,6 +18,16 @@ const EMPTY_SHEET: CharacterSheet = { acOverrides: {}, shield: null, stats: {} }
  * Typing /outputfile inventory in game rewrites the export; a short poll notices and sends it again.
  */
 export class InventoryFiles {
+  /** Told each export read with a new time, for the merge planner to follow its levels (LT-740); the context sets it. */
+  onExport: (character: string, inventory: Inventory, modified: number) => void = () => {}
+  private readonly exportSeen = new Map<string, number>()
+
+  private exportRead(character: string, inventory: Inventory, modified: number): void {
+    if (this.exportSeen.get(character) === modified) return
+    this.exportSeen.set(character, modified)
+    this.onExport(character, inventory, modified)
+  }
+
   private readonly watch: ExportWatch
   /** The load under way, per character and refresh: a stalled wiki must not pile up calls from the poll. */
   private readonly loading = new Map<string, Promise<InventoryView>>()
@@ -70,6 +80,7 @@ export class InventoryFiles {
       const read = await this.exports.read(this.exportPath(character))
       this.watch.seen(read.modified)
       inventory = read.value
+      this.exportRead(character, inventory, read.modified)
       base.modified = read.modified
       sources.ok('exports', `${base.file}, written ${new Date(read.modified).toLocaleString()}`)
     } catch (e) {
@@ -90,6 +101,7 @@ export class InventoryFiles {
     if (!isCharacterKey(character)) return null
     try {
       const read = await this.exports.read(this.exportPath(character))
+      this.exportRead(character, read.value, read.modified)
       return { file: `${character}-Inventory.txt`, modified: read.modified, inventory: read.value }
     } catch {
       return null

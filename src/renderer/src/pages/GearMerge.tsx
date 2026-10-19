@@ -1,7 +1,8 @@
 import { Fragment, useMemo } from 'react'
 import { num1 } from '../../../core/format'
 import { api } from '../api'
-import { useLootView } from '../hooks'
+import { useItemInfo, useLootView } from '../hooks'
+import { OPTIMIZED_KEY, type OptimizedPick } from '../gear/optimized'
 import { remember, useRemembered } from '../remember'
 import { showError, showToast } from '../toast'
 import { Ago, GameCommand, Info, Segmented, Tip } from '../components/ui'
@@ -9,7 +10,7 @@ import { num } from '../../../core/format'
 import { useStock } from './MotePlanner'
 import { itemKey, parseStatsBlock, slotLabel, type InvItem } from '../../../core/inventory'
 import type { LootEntry } from '../../../core/loot'
-import { mergeOptions, type MergeOption } from '../../../core/mergeValue'
+import { mergeOptions, wornAfterMerges, type MergeOption } from '../../../core/mergeValue'
 import { MAX_LEVEL } from '../../../core/moteCalc'
 import { MOTE_RANKS } from '../../../core/motes'
 import { ROLE_PRESETS } from '../../../core/statValue'
@@ -80,18 +81,32 @@ export function MergeTab({
   const stockQ = useStock()
   const stock = stockQ.data
   const since = useSinceExport(view)
+  const lootQ = useLootView()
   const [sortBy, setSortBy] = useRemembered<'rate' | 'gain'>('merge.sort', 'rate')
   const [onlyAffordable, setOnlyAffordable] = useRemembered<boolean>('merge.affordable', false)
-  const worn = useMemo(() => view.inventory?.worn ?? [], [view.inventory])
+  // What is worn, with the merges the log has seen since the export (LT-740): looted into an item, or merged in the window.
+  const merged = useMemo(() => {
+    const looted = (lootQ.data?.entries ?? []).filter((e) => e.outcome === 'merged' && e.into).map((e) => ({ name: e.into!, at: e.at }))
+    return wornAfterMerges(view.inventory?.worn ?? [], [...(stock?.merges ?? []), ...looted], view.modified)
+  }, [view.inventory, view.modified, stock, lootQ.data])
+  // Owned pieces the optimiser's best set would put on (the Optimize tab's last run), ranked beside what is worn (LT-741).
+  const [picks] = useRemembered<OptimizedPick[]>(`${OPTIMIZED_KEY}.${view.character}`, [])
+  const extra = useMemo(() => {
+    const wornKeys = new Set(merged.worn.map((it) => itemKey(it.name)))
+    return picks.filter((p) => !wornKeys.has(itemKey(p.name))).map((p): InvItem => ({ location: p.slot, name: p.name, id: 0, count: 1, augs: [] }))
+  }, [picks, merged.worn])
+  const extraInfo = useItemInfo(extra.map((it) => it.name)).info
+  const worn = useMemo(() => [...merged.worn, ...extra], [merged.worn, extra])
+  const fromPlan = useMemo(() => new Set(extra.map((it) => it.name)), [extra])
 
   const options = useMemo(() => {
     const baseStatsOf = (item: InvItem) => {
-      const info = view.items[itemKey(item.name)]
+      const info = view.items[itemKey(item.name)] ?? extraInfo[itemKey(item.name)]
       return info?.found ? parseStatsBlock(info.statsblock) : null
     }
     const all = mergeOptions({ worn, baseStatsOf, weights, hands, stock: stock?.counts, planned: stock?.item })
     return sortBy === 'gain' ? [...all].sort((a, b) => b.gain - a.gain || a.cost - b.cost) : all
-  }, [worn, view.items, weights, hands, stock, sortBy])
+  }, [worn, view.items, extraInfo, weights, hands, stock, sortBy])
   const shown = onlyAffordable ? options.filter((o) => o.affordable) : options
   const unknown = worn.filter((it) => !view.items[itemKey(it.name)]?.found).length
   const maxed = worn.filter((it) => /\+10$/.test(it.name.trim())).length
@@ -145,6 +160,11 @@ export function MergeTab({
         </p>
       </div>
 
+      {merged.moved > 0 && (
+        <div className="notice info">
+          {merged.moved} worn item{merged.moved === 1 ? ' is' : 's are'} shown at the +N your log saw {merged.moved === 1 ? 'it' : 'them'} merged to since that export.
+        </div>
+      )}
       {since.looted > 0 && (
         <div className="notice warn">
           Since that export you looted {since.looted} piece{since.looted === 1 ? '' : 's'} of gear
@@ -181,7 +201,15 @@ export function MergeTab({
                 <tr key={`${o.item.location}#${i}#${o.item.name}`} className={o.affordable ? '' : 'faint'}>
                   <td style={{ minWidth: 200 }}>
                     <div style={{ fontWeight: 600 }}>{o.item.name}</div>
-                    <div className="small muted">{slotLabel(o.item.location)}</div>
+                    <div className="small muted">
+                      {slotLabel(o.item.location)}
+                      {fromPlan.has(o.item.name) && (
+                        <span className="chip small" title="Not worn: the Optimize tab's best set would put it on here">
+                          {' '}
+                          the best set wears it
+                        </span>
+                      )}
+                    </div>
                   </td>
                   <td className="mono nowrap">
                     +{o.level} → +{o.next}

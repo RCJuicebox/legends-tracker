@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { applyMarks, markKey, MoteTracker, moteValue, parseMoteLoot, sessionHours, timeOnDay, totalMotes, type MoteSession } from '../../src/core/motes'
+import { applyMarks, bestFor, farmPlaces, markKey, MoteTracker, moteValue, parseMoteLoot, sessionHours, timeOnDay, totalMotes, type MoteSession } from '../../src/core/motes'
 import { parseLogLine } from '../../src/core/logLine'
 
 function tracker() {
@@ -189,5 +189,40 @@ describe('a time typed for a pause', () => {
   })
   it('refuses what is no time', () => {
     for (const bad of ['25:00', '13:05 PM', '9:61', 'noon', '']) expect(timeOnDay(day, bad)).toBeNull()
+  })
+})
+
+describe('where to farm what you are short of (FEAT-035)', () => {
+  const run = (name: string, hours: number, motes: Record<string, number>, ended = true): MoteSession => ({
+    id: `${name}${hours}`,
+    kind: 'crawl',
+    name,
+    startedAt: 0,
+    endedAt: ended ? hours * 3_600_000 : null,
+    outcome: 'completed',
+    motes,
+    outsideSince: null,
+    outsideMs: 0
+  })
+
+  it("puts each place's runs together and ranks those that dropped a rank fastest, two runs or more", () => {
+    const sessions = [
+      run('The Plane of Hate 4 (Refined)', 1, { superior: 2 }),
+      run('The Plane of Hate 4 (Refined)', 2, { superior: 4, major: 1 }),
+      run('The Plane of Fear 4 (Refined)', 1, { superior: 9 }),
+      run('Befallen 2 (Adaptive)', 1, { superior: 1 }),
+      run('Befallen 2 (Adaptive)', 1, { superior: 1 }),
+      run('Open now', 1, { superior: 50 }, false)
+    ]
+    const places = farmPlaces(sessions, 10 * 3_600_000)
+    expect(places.map((p) => [p.name, p.runs, p.hours])).toEqual([
+      ['The Plane of Hate 4 (Refined)', 2, 3],
+      ['The Plane of Fear 4 (Refined)', 1, 1],
+      ['Befallen 2 (Adaptive)', 2, 2]
+    ])
+    expect(bestFor(places, 'superior').map((p) => [p.name, p.perHour])).toEqual([
+      ['The Plane of Hate 4 (Refined)', 2],
+      ['Befallen 2 (Adaptive)', 1]
+    ])
   })
 })

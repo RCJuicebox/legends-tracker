@@ -1,4 +1,5 @@
 import { handle } from './handle'
+import { dropRates } from '../../core/loot'
 import { isCharacterKey, sanitizeStockCounts, sanitizeStockItem, stringsArg } from '../../core/validate'
 import type { AppContext } from '../context'
 
@@ -29,6 +30,8 @@ export function registerPlayIpc(ctx: AppContext): void {
   handle('combat:rebuild', (minutes) => engine.rebuildCombat(Math.max(1, Math.min(1440, Number(minutes) || 60))))
 
   handle('loot:get', () => engine.combat.lootView())
+  // Drop rates per mob over the span the meter's kept fights cover (FEAT-037).
+  handle('loot:byMob', () => dropRates(engine.combat.loot.snapshot().entries, engine.combat.meter.fights))
   // What merchants last offered the character being played, by item (LT-725): Loot prices kept items with it.
   handle('loot:offers', async () => {
     const key = ctx.characterKey()

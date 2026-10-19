@@ -7,7 +7,7 @@
 // own score of the item's stats at +N+1 less at +N, with the same weights, so a Tank sees AC and
 // HP, a Caster mana and wisdom.
 
-import { mergeLevel, scaledStats, type InvItem, type ItemStats } from './inventory'
+import { itemKey, mergeLevel, scaledStats, type InvItem, type ItemStats } from './inventory'
 import { round } from './format'
 import { countsToArray, makeable, MAX_LEVEL, moteForLevel } from './moteCalc'
 import { MOTE_RANKS, moteWorth, type MoteCounts } from './motes'
@@ -53,6 +53,45 @@ export interface MergeInput {
 }
 
 /** The next merge of every worn item the wiki knows, best boost per mote first. Items at +10 have none. */
+/**
+ * What merging a +0 item up to +`level` takes, mote by mote (LT-742): each level k needs 2^k xp of the
+ * mote its level takes; and how many of the top one the stock could make. "+6 would cost 9 Superior…".
+ */
+export function mergeBill(level: number, stock?: MoteCounts): { motes: { mote: number; count: number }[]; top: number; canMake: number | null } {
+  const by = new Map<number, number>()
+  for (let k = 0; k < Math.min(level, MAX_LEVEL); k++) {
+    const mote = moteForLevel(k)
+    if (mote < 0) continue
+    by.set(mote, (by.get(mote) ?? 0) + Math.ceil(2 ** k / MOTE_RANKS[mote].xp))
+  }
+  const motes = [...by].map(([mote, count]) => ({ mote, count })).sort((a, b) => b.mote - a.mote)
+  const top = motes[0]?.mote ?? -1
+  return { motes, top, canMake: stock && top >= 0 ? makeable(countsToArray(stock), top) : null }
+}
+
+/**
+ * The worn items as the log has merged them since the export (LT-740): an item merged up to a higher
+ * +N ("… to create a new item: Cloak of Flames +7") takes that name, so its row moves before the next
+ * `/outputfile inventory`. `merges` are the names merged and when; only those after `since` count.
+ */
+export function wornAfterMerges(worn: readonly InvItem[], merges: readonly { name: string; at: number }[], since: number): { worn: InvItem[]; moved: number } {
+  const best = new Map<string, string>()
+  for (const m of merges) {
+    if (m.at <= since) continue
+    const k = itemKey(m.name)
+    const had = best.get(k)
+    if (!had || mergeLevel(m.name) > mergeLevel(had)) best.set(k, m.name)
+  }
+  let moved = 0
+  const out = worn.map((it) => {
+    const to = best.get(itemKey(it.name))
+    if (!to || mergeLevel(to) <= mergeLevel(it.name)) return it
+    moved++
+    return { ...it, name: to }
+  })
+  return { worn: out, moved }
+}
+
 export function mergeOptions(o: MergeInput): MergeOption[] {
   const inv = countsToArray(o.stock ?? {})
   const out: MergeOption[] = []
@@ -69,6 +108,7 @@ export function mergeOptions(o: MergeInput): MergeOption[] {
     const then = statValues(scaledStats(base, level + 1))
     const deltas: Partial<Record<WeightKey, number>> = {}
     for (const k of Object.keys(w) as WeightKey[]) {
+      if (!(k in then)) continue
       const d = round(then[k] - now[k], 2)
       if (d && w[k]) deltas[k] = d
     }

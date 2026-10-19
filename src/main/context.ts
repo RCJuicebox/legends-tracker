@@ -20,7 +20,7 @@ import { InventoryFiles } from './inventory'
 import { ItemCatalog } from './items'
 import { GameTables } from './stats'
 import { WikiCatalog } from './wikiCatalog'
-import { CastHistory, castCounter, dayConsumer, resistCounter } from './castHistory'
+import { CastHistory, castCounter, dayConsumer, resistCounter, spellMergeCounter } from './castHistory'
 import { meleeCounter } from '../core/meleeTally'
 import { RecipeBook } from './recipes'
 import { AchievementHistory, completionsConsumer } from './achievementHistory'
@@ -82,6 +82,8 @@ export interface AppContext {
   castHistory: CastHistory
   /** Your spells resisted, per name per day (LT-722). */
   resistHistory: CastHistory
+  /** Spell ranks bought with motes, by ranked name per day (LT-756). */
+  spellMergeHistory: CastHistory
   /** The character's own melee day by day, read the way casts are: what worn effects and procs are weighed against. */
   meleeHistory: CastHistory
   recipeBook: RecipeBook
@@ -186,8 +188,10 @@ export function createContext(): AppContext {
     join(cacheDir(), 'log-history.json'),
     {
       casts: dayConsumer(() => castCounter(() => ctx.engine.quickBuffLandings()), 2),
-      melee: dayConsumer(meleeCounter),
+      // 2: crits counted per skill (LT-739).
+      melee: dayConsumer(meleeCounter, 2),
       resists: dayConsumer(resistCounter),
+      spellMerges: dayConsumer(spellMergeCounter),
       purchases: purchaseConsumer,
       offers: offerConsumer,
       skills: skillConsumer,
@@ -227,6 +231,7 @@ export function createContext(): AppContext {
     castHistory: new CastHistory(logHistory, 'casts'),
     meleeHistory: new CastHistory(logHistory, 'melee'),
     resistHistory: new CastHistory(logHistory, 'resists'),
+    spellMergeHistory: new CastHistory(logHistory, 'spellMerges'),
     recipeBook: new RecipeBook((p) => toMain('state:recipes', p)),
     purchases: new PurchaseHistory(logHistory, 'purchases'),
     offers: new OfferHistory(logHistory, 'offers'),
@@ -251,6 +256,12 @@ export function createContext(): AppContext {
     audioProblems: new Map(),
     installUpdate: async () => undefined
   } as unknown as AppContext
+  // The merge planner's item follows the levels the playing character's inventory export lists (LT-740).
+  ctx.inventoryFiles.onExport = (character, inv, modified) => {
+    if (character !== ctx.characterKey()) return
+    const names = [...inv.worn, ...inv.bags, ...inv.bank, ...inv.sharedBank].map((it) => it.name)
+    ctx.engine.stock.observed(names, modified, 'export')
+  }
   // Each new achievements export is kept small, for Achievements › Progress (FEAT-032).
   ctx.achievementFiles.onRead = (character, sections, modified) => ctx.achievementHistory.add(character, sections, modified)
 

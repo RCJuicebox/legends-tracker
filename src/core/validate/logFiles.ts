@@ -139,6 +139,11 @@ export function sanitizeMoteStock(v: unknown): MoteStock {
   }
   if (typeof o.seenUntil === 'number' && Number.isFinite(o.seenUntil)) out.seenUntil = o.seenUntil
   if (typeof o.seenAtSecond === 'number' && Number.isFinite(o.seenAtSecond)) out.seenAtSecond = Math.max(0, Math.round(o.seenAtSecond))
+  if (Array.isArray(o.merges))
+    out.merges = o.merges
+      .filter((m): m is { name: string; at: number } => isObj(m) && typeof m.name === 'string' && typeof m.at === 'number' && Number.isFinite(m.at))
+      .map((m) => ({ name: m.name.slice(0, 200), at: m.at }))
+      .slice(-50)
   return out
 }
 

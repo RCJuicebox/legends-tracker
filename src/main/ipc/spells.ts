@@ -42,9 +42,14 @@ export function registerSpellIpc(ctx: AppContext): void {
     if (!isCharacterKey(key)) return { rows: [], unknown: [], window: null, mine: [] }
     // Its logs on every PC it is played on.
     const where = { ...ctx.historyOf(key), days: intArg(days, 0, 3650, 14) }
-    const [recent, resists] = await Promise.all([ctx.castHistory.recent(where), ctx.resistHistory.recent(where).catch(() => null)])
+    const [recent, resists, merges] = await Promise.all([
+      ctx.castHistory.recent(where),
+      ctx.resistHistory.recent(where).catch(() => null),
+      // Every rank bought, whenever: the rank is what it is now.
+      ctx.spellMergeHistory.recent({ ...where, days: 0 }).catch(() => null)
+    ])
     return {
-      ...castRows(book, recent.counts, engine.character(), resists?.counts),
+      ...castRows(book, recent.counts, engine.character(), resists?.counts, Object.keys(merges?.counts ?? {})),
       window: { total: recent.total, from: recent.from, to: recent.to },
       mine: engine.myClasses()
     }

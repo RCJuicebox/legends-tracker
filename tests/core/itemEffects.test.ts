@@ -61,11 +61,11 @@ describe('your melee from the log', () => {
     [Fri Sep 25 12:00:06 2026] You begin casting Ice Spear.
     [Fri Sep 25 12:00:08 2026] You hit a forsaken revenant for 207 points of cold damage by Ice Spear.
     [Fri Sep 25 12:00:10 2026] You punch a forsaken revenant for 60 points of damage.
-    [Fri Sep 25 12:01:00 2026] You punch a skeleton for 60 points of damage.`)
+    [Fri Sep 25 12:01:00 2026] You punch a skeleton for 60 points of damage. (Critical)`)
 
   it('counts swings by skill, and the time between swings up to six seconds apart', () => {
-    expect(profile.skills.bash).toEqual({ hits: 1, damage: 40, misses: 1 })
-    expect(profile.skills.punch).toEqual({ hits: 3, damage: 180, misses: 0 })
+    expect(profile.skills.bash).toEqual({ hits: 1, damage: 40, misses: 1, crits: 0 })
+    expect(profile.skills.punch).toEqual({ hits: 3, damage: 180, misses: 0, crits: 1 })
     // 12:00:00 to 12:00:10 in steps of 2, 2, 6 (the gap to 12:00:10 is six seconds); 12:01:00 starts again.
     expect(profile.activeMin).toBeCloseTo(10 / 60, 6)
     expect(profile.dpm).toBeCloseTo(220 / (10 / 60), 6)

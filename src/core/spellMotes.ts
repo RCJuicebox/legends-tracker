@@ -101,8 +101,8 @@ export interface SpellCastRow {
   /** The spell's unranked name. */
   name: string
   /**
-   * The highest rank the log has seen you cast it at: the rank it is at now. Buying a rank prints no
-   * line (LT-756: none in 119 MB of log, across Drain Spirit VII to X), so it moves at the next cast.
+   * The rank it is at now: the highest the log has seen you cast it at, or buy with motes ("… to create
+   * a new item: Drain Spirit VI", LT-756), whichever is higher.
    */
   rank: number
   /** Casts in the window, every rank counted. */
@@ -161,7 +161,9 @@ export function castRows(
   book: SpellBook,
   counts: Record<string, number>,
   character: CharacterSettings,
-  resists: Record<string, number> = {}
+  resists: Record<string, number> = {},
+  /** Ranked names the log saw bought with motes. */
+  merged: readonly string[] = []
 ): { rows: SpellCastRow[]; unknown: { name: string; casts: number }[] } {
   const rows = new Map<string, SpellCastRow>()
   const unknown: { name: string; casts: number }[] = []
@@ -204,6 +206,11 @@ export function castRows(
   for (const [name, n] of Object.entries(resists)) {
     const row = rows.get(book.resolve(name)?.spell.name ?? '')
     if (row) row.resisted += n
+  }
+  for (const name of merged) {
+    const r = book.resolve(name)
+    const row = rows.get(r?.spell.name ?? '')
+    if (r && row) row.rank = Math.max(row.rank, r.rank)
   }
   return { rows: [...rows.values()], unknown: unknown.sort((a, b) => b.casts - a.casts) }
 }

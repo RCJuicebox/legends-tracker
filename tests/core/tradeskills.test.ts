@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { eraOf } from '../../src/core/gearFinder'
-import { craftEras, parseCrafted, parsePurchase, parseSkillPage, recipeIndex, recipeKey, shopping, unitPrice, type Recipe } from '../../src/core/tradeskills'
+import { craftEras, parseCrafted, parsePurchase, parseSkillPage, recipeIndex, recipeKey, shopping, starredIngredients, unitPrice, type Recipe } from '../../src/core/tradeskills'
 import { parseWikiCoin } from '../../src/core/loot'
 import { parseInventory } from '../../src/core/inventory'
 import { parseSources, parseVendors } from '../../src/core/wikiItem'
@@ -322,5 +322,24 @@ describe('crafted items and their eras', () => {
     // One that also drops in a Classic zone can be had there, whatever its recipe needs.
     const dropped = { ...item('Enchanted Dwarven Plate Greaves'), zones: ['Kaladim'] }
     expect(eraOf(dropped, new Map([['Kaladim', 'Classic']]))).toEqual({ era: 'Classic', inferred: true, by: 'zone' })
+  })
+})
+
+describe('the drops a starred recipe takes (FEAT-036)', () => {
+  it('lists each ingredient with the recipes it feeds and how many a batch takes', () => {
+    const tonic: Recipe = {
+      product: 'Tumpy Tonic',
+      skill: 'Brewing',
+      trivial: 20,
+      yields: 1,
+      from: 'page',
+      ingredients: [
+        { name: 'Bone Chips', count: 2 },
+        { name: 'Water Flask', count: 1 }
+      ]
+    }
+    const other: Recipe = { product: 'Bone Bracer', skill: 'Smithing', trivial: 10, yields: 1, from: 'page', ingredients: [{ name: 'Bone Chips', count: 3 }] }
+    const wanted = starredIngredients([tonic, other], [{ key: recipeKey(tonic), combines: 5 }], (n) => n.toLowerCase())
+    expect(wanted).toEqual({ 'bone chips': [{ product: 'Tumpy Tonic', count: 10 }], 'water flask': [{ product: 'Tumpy Tonic', count: 5 }] })
   })
 })
