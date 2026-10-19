@@ -1,5 +1,7 @@
 import { timeOfDay } from '../core/format'
 import { unreadText } from '../core/unreadLines'
+import { diffSpellBooks, spellDiffEmpty, spellDiffSummary, spellDiffText } from '../core/spellDiff'
+import type { SpellBook } from '../core/spells'
 import { app, globalShortcut, nativeTheme, Notification, session } from 'electron'
 import { HOTKEYS } from '../shared/hotkeys'
 import { promises as fs, rmSync } from 'node:fs'
@@ -605,8 +607,24 @@ async function reloadGameData(ctx: AppContext, why: string): Promise<void> {
   ctx.icons.clear()
   // Pages keep icons a day (eqicon:// answers max-age=86400): yesterday's would outlive the patch (LT-421).
   await session.defaultSession.clearCache().catch((e: unknown) => log.warn('Could not clear the icon cache:', e))
+  const before = ctx.engine.book
   await ctx.engine.loadSpells()
-  ctx.engine.pushFeed('info', `${why}: spell data, game tables and icons read again.`)
+  const after = ctx.engine.book
+  // What the patch changed (FEAT-026): the spells you cast or keep a rule for, and the counts.
+  let changed = ''
+  if (before && after && before !== after) {
+    const d = diffSpellBooks(before, after, watchedSpells(ctx, before))
+    changed = ` Spell data: ${spellDiffSummary(d)}.`
+    if (!spellDiffEmpty(d)) sources.report('spells', 'What the update changed', spellDiffText(d))
+  }
+  ctx.engine.pushFeed('info', `${why}: spell data, game tables and icons read again.${changed}`)
+}
+
+/** The base names of the spells any character has cast, and of those with a rule. */
+function watchedSpells(ctx: AppContext, book: SpellBook): Set<string> {
+  const out = new Set(Object.keys(ctx.store.rules.get()))
+  for (const casts of Object.values(ctx.store.casts.get())) for (const c of Object.values(casts)) out.add(book.resolve(c.rankedName)?.spell.name ?? c.rankedName)
+  return out
 }
 
 /** Each step of one version is announced once: an hourly check must not nag. */

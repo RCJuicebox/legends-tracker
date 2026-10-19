@@ -233,6 +233,14 @@ export interface JobView {
 /** `idle`: there, and simply not being read now (the log while not watched). */
 export type SourceStatus = 'ok' | 'stale' | 'error' | 'missing' | 'reading' | 'waiting' | 'idle'
 
+/** A setup file read, before it is applied (FEAT-028): each section in it, and those a newer version wrote. */
+export interface SetupPreview {
+  file: string
+  version: string
+  sections: { id: string; label: string; detail: string }[]
+  newer: string[]
+}
+
 /** Another PC's Logs folder as last looked at (Settings › Log files). */
 export interface LogFolderView {
   dir: string
@@ -319,6 +327,13 @@ export interface Invokes {
   'app:openLogs': () => string
   /** Version, machine, settings summary and the end of the log, for a bug report. */
   'app:diagnostics': () => string
+  /** A zip of the diagnostics, the app's logs, the settings and the end of the game log, names swapped (FEAT-039): false when cancelled. */
+  'app:bugReport': () => boolean
+  /** Share my setup (FEAT-028): the file written (false when cancelled), a file read and listed, the sections ticked applied, and Undo. */
+  'setup:export': () => boolean
+  'setup:open': () => SetupPreview | null
+  'setup:apply': (sections: string[]) => boolean
+  'setup:undo': () => boolean
   /** Whether the group-health worker starts and loads the Windows calls: the packaged smoke test asks (LT-630). */
   'groupHealth:selfTest': () => { pong: boolean; koffi: boolean; error?: string }
   'settings:save': (settings: AppSettings) => AppSettings
@@ -609,6 +624,11 @@ const INVOKE_CHANNELS: Record<InvokeChannel, true> = {
   'app:state': true,
   'app:openLogs': true,
   'app:diagnostics': true,
+  'app:bugReport': true,
+  'setup:export': true,
+  'setup:open': true,
+  'setup:apply': true,
+  'setup:undo': true,
   'groupHealth:selfTest': true,
   'settings:save': true,
   'character:save': true,

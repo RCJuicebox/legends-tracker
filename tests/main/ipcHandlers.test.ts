@@ -180,6 +180,48 @@ describe('the invoke handlers', () => {
   }, 120_000)
 })
 
+/** Values of each kind a channel's check takes, wrong in what they hold: past the checks, into the handler's own (LT-754). */
+const OF_KIND: Record<string, unknown[]> = {
+  string: ['..\\..\\x', 'x'.repeat(100_000), '__proto__', 'Tester_neriak'],
+  number: [-1, 1e12, 0.5, 0],
+  boolean: [true, false, true, false],
+  strings: [['..\\x'], [], ['x'.repeat(10_000)], ['__proto__']],
+  object: [{}, JSON.parse('{"__proto__":{"polluted":true}}'), { a: 1 }, { name: 'x'.repeat(10_000) }],
+  list: [[], [{}], [null, 5], ['x']]
+}
+/** One argument of `kind`, the `i`-th try: an optional one left out and a nullable one null on the first. */
+function ofKind(kind: string, i: number): unknown {
+  if (kind.endsWith('?')) return i === 0 ? undefined : ofKind(kind.slice(0, -1), i)
+  if (kind.endsWith('|null')) return i === 0 ? null : ofKind(kind.slice(0, -5), i)
+  if (kind.startsWith('oneOf:')) {
+    const values = kind.slice(6).split(',')
+    return values[i % values.length]
+  }
+  return OF_KIND[kind][i % OF_KIND[kind].length]
+}
+/** Channels left out here: one runs a program from the skin's folder. */
+const NOT_FUZZED = new Set([...SCREEN_READS, 'skins:build'])
+
+describe('the invoke handlers, past the checks', () => {
+  it('answers every channel sent the right kinds holding the wrong things: refusing is fine, hanging or crashing is not', async () => {
+    const { CHECKS } = await import('../../src/main/ipc/checks')
+    const quiet = [vi.spyOn(console, 'error').mockImplementation(() => {}), vi.spyOn(console, 'log').mockImplementation(() => {})]
+    const bad: string[] = []
+    for (const [channel, fn] of h.handlers) {
+      if (NOT_FUZZED.has(channel)) continue
+      const kinds = CHECKS[channel as keyof typeof CHECKS].kinds
+      for (let i = 0; i < 4; i++) {
+        const args = kinds.map((k) => ofKind(k, i))
+        const r = await outcome(() => fn(OWN, ...args))
+        if (r !== 'ok' && r !== 'error') bad.push(`${channel}(${kinds.join(', ')}) try ${i}: ${r}`)
+      }
+    }
+    expect(bad).toEqual([])
+    expect(({} as { polluted?: boolean }).polluted).toBeUndefined()
+    quiet.forEach((q) => q.mockRestore())
+  }, 120_000)
+})
+
 describe('the send handlers', () => {
   it('every send channel has a listener, and each takes whatever it is sent without throwing', async () => {
     const { isSendChannel } = await import('../../src/shared/ipc')

@@ -4,12 +4,12 @@
 //   node scripts/smoke.mjs                      the built source (out/) under node_modules' Electron
 //   node scripts/smoke.mjs dist/win-unpacked/Legends Tracker.exe   a packaged copy
 //
-// Exits 0 when the app started, answered app:state, had its audio window and its workers up, and quit
-// by itself; 1 otherwise.
+// Exits 0 when the app started, answered app:state, had its audio window and its workers up, saved a
+// switch and a trigger changed by clicking the pages, and quit by itself; 1 otherwise.
 
 import { spawn } from 'node:child_process'
 import { createRequire } from 'node:module'
-import { copyFileSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { setTimeout as sleep } from 'node:timers/promises'
@@ -123,12 +123,54 @@ try {
   else if (!health.koffi) fail(`the group health worker could not load the Windows calls: ${health.error ?? ''}`)
   else console.log('smoke: the group health worker answers, with the Windows calls loaded')
 
+  // Two real save paths, clicked as a player would (LT-755): a page that draws but whose save is broken
+  // is what nothing else here would catch. Settings › General's "Yield CPU to EverQuest" switch turned
+  // off, and a new trigger added on Triggers and saved; both files are read once the app has quit.
+  // Once, not retried: a second try would turn the switch back on.
+  const clicked = await evaluate(
+    page.webSocketDebuggerUrl,
+    `(async () => {
+        const wait = (ms) => new Promise((r) => setTimeout(r, ms))
+        const find = async (what, test) => {
+          for (let i = 0; i < 40; i++) {
+            const el = test()
+            if (el) return el
+            await wait(100)
+          }
+          throw new Error('no ' + what)
+        }
+        const go = (label) => [...document.querySelectorAll('button.nav-item')].find((b) => b.title === label).click()
+        go('Settings')
+        const row = await find('the Yield CPU switch', () => [...document.querySelectorAll('label.row')].find((l) => l.textContent.includes('Yield CPU to EverQuest')))
+        const sw = row.querySelector('[role=switch]')
+        if (sw.getAttribute('aria-checked') !== 'true') throw new Error('the switch was not on to start with')
+        sw.click()
+        await find('the switch to turn off', () => sw.getAttribute('aria-checked') === 'false')
+        go('Triggers')
+        const add = await find('New trigger', () => [...document.querySelectorAll('button')].find((b) => b.textContent.trim() === 'New trigger'))
+        add.click()
+        const save = await find('Save changes', () => [...document.querySelectorAll('button.primary')].find((b) => b.textContent.trim() === 'Save changes' && !b.disabled))
+        save.click()
+        await find('the trigger to save', () => [...document.querySelectorAll('button.primary')].find((b) => b.textContent.trim() === 'Saved'))
+        return true
+      })()`
+  )
+  if (clicked) console.log('smoke: clicked a switch on Settings and saved a new trigger on Triggers')
+
   // A second copy with --quit asks the first to save and close, and exits itself.
   const quitter = spawn(exe, [...appArgs, '--quit'], { env, stdio: 'ignore' })
   await until('the app to quit', 20_000, () => exited !== null)
   quitter.kill()
   console.log(`smoke: the app quit when asked (exit ${exited})`)
   if (exited !== 0) fail(`the app exited with ${exited}`)
+
+  // What the clicks saved, from the files themselves.
+  const saved = JSON.parse(readFileSync(join(profile, 'settings.json'), 'utf8'))
+  if (saved.yieldToGame !== false) fail(`settings.json did not keep the switch turned off (yieldToGame ${saved.yieldToGame})`)
+  const triggers = JSON.parse(readFileSync(join(profile, 'triggers.json'), 'utf8'))
+  const list = Array.isArray(triggers) ? triggers : (triggers.triggers ?? [])
+  if (!list.some((t) => t.name === 'New trigger')) fail('triggers.json does not have the trigger saved on Triggers')
+  else console.log('smoke: settings.json and triggers.json kept what was clicked')
 } catch (e) {
   fail(e instanceof Error ? e.message : String(e))
 } finally {

@@ -57,6 +57,13 @@ What changed in each version. The release workflow publishes a version's section
 - **Ready-again bars.** A spell of yours with a recast of 30 seconds or more (Harm Touch, Lay on Hands, Divine Aura…) gets a bar on the DoTs & Timers overlay until it can be cast again, from the spell file's recast, and "Harm Touch ready" is said as it ends; a fizzle or an interruption takes it back, and a zone does not end it. On Spell Timers › Defaults, under Ready again; your reuse focus is not taken off.
 - **Triggers read lines faster.** A phrase's leading words are looked for before its pattern is run, so a line no trigger could match costs next to nothing however many triggers you keep.
 
+- **What a game update changed in the spells.** When the game rewrites its spell file, the feed says what changed ("12 new spells, 3 of yours changed (Envenomed Bolt…)") and Data Sources' spell-data row opens the whole list, with Copy: the new and gone spells, and for each spell you cast or keep a rule for, its cast, recast, duration, mana, range, effects or messages that moved; a file whose columns moved says so.
+- **Save bug report…** on Settings › General writes one zip to attach to an issue: the diagnostics, the app's logs, your settings, the newest crash dump and the last 2,000 lines of your game log, with player and guild names swapped for made-up ones (Kelwyn, Aldric…), what anyone said cut and your Windows user folder taken out.
+- **Share my setup.** Settings › General can save your triggers, spell rules, overlays (places, sizes, text), voice and volumes and Spell Timers defaults in one file, and use one: what is in it is listed, each part ticked or not, triggers and rules are added to yours (one of the same id or spell replaced), the rest replaces yours, and Undo puts it back. Your audio device stays as it is.
+- **Switch character from the title bar.** With two or more character logs in the game folder, the title bar shows the one followed and switches to another, from any page.
+- **A second player on one PC.** Started with `--profile <name>` (in a shortcut's Target), the app keeps that player's settings, timers and log in a folder of their own and runs beside the first player's copy.
+- **Every call from the window is checked on the way in.** Each of the app's 140-odd channels from its pages to the app has a typed list of what it takes, and anything else is refused before it is acted on.
+
 ## 2.15.1 (2026-10-19)
 
 - **Electron 44.9,** with Chromium 152.0.7977.167 and its security fixes. The app is now built with Vite 8.

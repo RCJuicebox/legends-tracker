@@ -199,6 +199,13 @@ textarea {
 .titlebar .brand b {
   color: var(--accent);
 }
+/* The character followed (FEAT-041): a control in the drag area, so it takes clicks itself. */
+.titlebar-switch {
+  -webkit-app-region: no-drag;
+  font-size: 12px;
+  padding: 2px 6px;
+  max-width: 220px;
+}
 
 .sidebar {
   background: var(--bg-2);

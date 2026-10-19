@@ -80,6 +80,7 @@ describe('the triggers file channels', () => {
     expect(await call('triggers:importGina')).toBeNull()
     h.save = ''
     expect(await call('triggers:exportGina', [TRIGGER])).toBe(false)
-    await expect(call('triggers:exportGina', 'x')).rejects.toThrow('Nothing to export')
+    await expect(call('triggers:exportGina', 'x')).rejects.toThrow('not the arguments it takes')
+    await expect(call('triggers:exportGina', [])).rejects.toThrow('Nothing to export')
   })
 })

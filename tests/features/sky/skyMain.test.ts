@@ -152,7 +152,8 @@ describe('the Plane of Sky page', () => {
     await expect(call('sky:wish', 'Kelwyn_neriak', FISTS, 1, -1)).rejects.toThrow('No more than 99 hand-ins.')
     await expect(call('sky:have', 'Kelwyn_neriak', 'Bone Chips', 1)).rejects.toThrow('Not an item a Test takes.')
     await expect(call('sky:have', 'Kelwyn_neriak', 'Brass Knuckles', -1)).rejects.toThrow('Hold 0 to 9999.')
-    await expect(call('sky:mark', 'Kelwyn_neriak', FISTS, 'hidden', true)).rejects.toThrow('Star a Test or ignore it.')
+    // Neither a star nor ignored: refused before the handler runs (LT-754).
+    await expect(call('sky:mark', 'Kelwyn_neriak', FISTS, 'hidden', true)).rejects.toThrow('not the arguments it takes')
     await expect(call('sky:turnIns', 'Kelwyn_neriak', FISTS, 100)).rejects.toThrow('Add or take away up to 99 hand-ins.')
   })
 

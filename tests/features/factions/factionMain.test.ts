@@ -321,12 +321,16 @@ describe('the Factions page', () => {
   })
 
   it('refuses what is not a character, a faction or a name to look up', async () => {
-    for (const channel of ['factions:get', 'factions:plan', 'factions:moved', 'factions:lookup'])
-      await expect(call(channel, '..\\x', 'Crimson Hands')).rejects.toThrow('Not a character.')
-    for (const f of ['', '  ', 'x'.repeat(101), 5]) {
+    for (const channel of ['factions:get', 'factions:moved', 'factions:lookup']) await expect(call(channel, '..\\x', 'Crimson Hands')).rejects.toThrow('Not a character.')
+    await expect(call('factions:plan', '..\\x')).rejects.toThrow('Not a character.')
+    // A refresh that is not true or false is refused before the handler runs (LT-754).
+    await expect(call('factions:plan', 'Tester_neriak', 'Crimson Hands')).rejects.toThrow('not the arguments it takes')
+    for (const f of ['', '  ', 'x'.repeat(101)]) {
       await expect(call('factions:sources', f)).rejects.toThrow('Not a faction.')
       await expect(call('factions:moved', 'Tester_neriak', f)).rejects.toThrow('Not a faction.')
     }
+    await expect(call('factions:sources', 5)).rejects.toThrow('not the arguments it takes')
+    await expect(call('factions:moved', 'Tester_neriak', 5)).rejects.toThrow('not the arguments it takes')
     await expect(call('factions:lookup', 'Tester_neriak', 'x'.repeat(81))).rejects.toThrow('Not a name to look up.')
     expect(await call('factions:lookup', 'Tester_neriak', ' or ')).toEqual({ results: [] })
   })

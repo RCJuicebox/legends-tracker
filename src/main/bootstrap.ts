@@ -4,13 +4,15 @@ import { release } from 'node:os'
 import { join } from 'node:path'
 import { flushLogSync, initLog, log } from './log'
 import { cacheDir } from './paths'
+import { profileName, settingsFolder } from '../core/profile'
 
 // What has to happen before anything else is built: where settings and the log live, the icon scheme,
 // and whether this copy is the one that runs. Imported first by index.ts, for its side effects.
 
 // Settings live in %APPDATA%\Legends Tracker. EQL_USER_DATA points a development or test run at a
-// separate profile, so a trial never touches real settings.
-app.setPath('userData', process.env['EQL_USER_DATA'] || join(app.getPath('appData'), 'Legends Tracker'))
+// separate profile, so a trial never touches real settings; --profile <name> gives a second player on
+// the PC one of their own under it (FEAT-041).
+app.setPath('userData', settingsFolder(process.argv, app.getPath('appData'), process.env['EQL_USER_DATA'] || undefined))
 
 /**
  * Whether this copy runs the app. A second copy hands its arguments to the first and quits; so does
@@ -67,7 +69,7 @@ process.on('unhandledRejection', (e) => log.error('Unhandled rejection:', e))
 protocol.registerSchemesAsPrivileged([{ scheme: 'eqicon', privileges: { standard: true, secure: true, supportFetchAPI: true } }])
 
 if (!primaryInstance) app.quit()
-else if (!process.env['EQL_USER_DATA']) carryOverSettings(join(app.getPath('appData'), 'EQL Audio Triggers'), app.getPath('userData'))
+else if (!process.env['EQL_USER_DATA'] && !profileName(process.argv)) carryOverSettings(join(app.getPath('appData'), 'EQL Audio Triggers'), app.getPath('userData'))
 
 /** Chromium's caches in a profile from before LT-620: derived, so removed once the session data has its own folder. */
 const CHROMIUM_CACHES = [

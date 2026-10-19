@@ -164,6 +164,8 @@ function categorize(beneficial: boolean, hasDuration: boolean, effects: SpellEff
 export class SpellBook {
   private readonly byId = new Map<number, Spell>()
   private readonly byName = new Map<string, Spell>()
+  /** Where the file kept its effects and icon: a patch that moves the columns shows here (FEAT-026). */
+  layout = { effects: EFFECTS_AT, icon: ICON_BY_SHIFT[0] }
 
   static parse(spellsText: string, stringsText: string): SpellBook {
     const book = new SpellBook()
@@ -182,6 +184,7 @@ export class SpellBook {
     // The wanted fields of a line are found with indexOf rather than by splitting all ~170 of them.
     const f: string[] = []
     const layout = layoutOf(spellsText)
+    book.layout = { effects: layout.effects, icon: layout.icon }
     const wanted = [...WANTED]
     wanted[layout.icon] = true
     wanted[layout.effects] = true

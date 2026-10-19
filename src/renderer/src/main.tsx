@@ -6,6 +6,7 @@ import { Ago, Disclosure, Icon, type IconName } from './components/ui'
 import { GoContext, TAB_KEY, type Go } from './nav'
 import { ErrorBoundary } from './components/ErrorBoundary'
 import { Jobs } from './components/Jobs'
+import { CharacterSwitch } from './components/CharacterSwitch'
 import { pingGearWorker } from './gear/gearRunner'
 // Named apart, so the page list's own test does not take this import for a page.
 import { pingPlanWorker as pingPlan } from '../../features/factions/planRunner'
@@ -181,6 +182,7 @@ function Shell() {
         <span className="brand">
           Legends <b>Tracker</b>
         </span>
+        <CharacterSwitch />
         {muted && <span className="chip warn">Muted</span>}
         {arranging && <span className="chip warn">Arranging overlays</span>}
         {update.status?.state === 'ready' && (

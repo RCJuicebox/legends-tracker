@@ -3,6 +3,8 @@ import { handle } from './handle'
 import { onSend } from '../push'
 import { logDir } from '../log'
 import { diagnostics } from '../diagnostics'
+import { saveBugReport } from '../bugReport'
+import { setupHandlers } from './setup'
 import { sources } from '../sources/registry'
 import { jobs } from '../sources/jobs'
 import { checkGameFolder, findInstall, isGameFolder, resolveGameFolder } from '../game'
@@ -35,6 +37,14 @@ export function registerAppIpc(ctx: AppContext): void {
   }))
   handle('app:openLogs', () => shell.openPath(logDir()))
   handle('app:diagnostics', () => diagnostics(ctx))
+  setupHandlers(ctx)
+  handle('app:bugReport', async () => {
+    const stamp = new Date().toISOString().slice(0, 16).replace(/[-:T]/g, '')
+    const r = await ctx.windows.saveDialog({ defaultPath: `legends-tracker-report-${stamp}.zip`, filters: [{ name: 'Zip files', extensions: ['zip'] }] })
+    if (r.canceled || !r.filePath) return false
+    await saveBugReport(ctx, r.filePath)
+    return true
+  })
   handle('sources:list', () => sources.list())
   handle('sources:refresh', (id) => sources.refresh(String(id)))
   handle('jobs:list', () => jobs.list())

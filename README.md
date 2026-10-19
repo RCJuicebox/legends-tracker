@@ -1046,6 +1046,11 @@ one is ready, and **Quit**.
 Everything the app keeps is in two folders. Setting `EQL_USER_DATA` moves both (see Running from
 source).
 
+**A second player on one PC.** Start the app with `--profile <name>` (a shortcut's Target:
+`"…\Legends Tracker.exe" --profile Second`) and it keeps its own settings, timers, triggers and log in
+`%APPDATA%\Legends Tracker\profiles\<name>`, and runs beside the first player's copy. The cache folder
+is shared. The character a copy follows is in the title bar, which switches between the game folder's logs.
+
 The settings folder, `%APPDATA%\Legends Tracker` (or the `EQL_USER_DATA` folder):
 
 | File | What it holds |

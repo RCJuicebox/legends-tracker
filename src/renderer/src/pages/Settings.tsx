@@ -1,6 +1,7 @@
 import { useActions, useSettled } from '../state'
 import { api } from '../api'
 import { act, showError, showToast } from '../toast'
+import { ShareSetup } from '../components/ShareSetup'
 import { useUpdate, type UpdateState } from '../update'
 import { Ago, Field, Segmented, Switch, Tabs } from '../components/ui'
 import { useContext, type ReactNode } from 'react'
@@ -157,6 +158,15 @@ function General({ openLogs }: { openLogs: () => void }) {
               The version, your PC, the settings that matter and the end of the log, ready to paste into a bug report. No keys, and no Windows user name.
             </span>
           </div>
+          <div className="row">
+            <button className="btn" onClick={() => void act('app:bugReport')}>
+              Save bug report…
+            </button>
+            <span className="faint small">
+              One zip to attach to an issue: the diagnostics, the app&apos;s logs, your settings and the end of your game log, with player and guild names swapped for made-up ones
+              and what anyone said cut.
+            </span>
+          </div>
         </div>
 
         <div className="card stack gap-16">
@@ -175,6 +185,8 @@ function General({ openLogs }: { openLogs: () => void }) {
             <span className="faint small">runs this app below normal priority, so the game wins every tie for a frame; sound stays normal</span>
           </label>
         </div>
+
+        <ShareSetup />
 
         {/* This window's own look and keys, under a heading of their own (LT-457). */}
         <div className="card stack gap-16">

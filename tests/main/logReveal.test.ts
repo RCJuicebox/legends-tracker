@@ -112,10 +112,11 @@ describe('logs:reveal', () => {
     expect(opened).toEqual([archive])
   })
 
-  it('opens the archive folder for anything that is not a path', async () => {
-    for (const p of ['', undefined, null, 42, { path: liveLog }, [liveLog]]) await reveal(p)
+  it('opens the archive folder for no path, and refuses what is not text before it runs (LT-754)', async () => {
+    await reveal('')
+    for (const p of [undefined, null, 42, { path: liveLog }, [liveLog]]) await expect(reveal(p)).rejects.toThrow('not the arguments it takes')
     expect(shown).toEqual([])
-    expect(opened.length).toBe(6)
+    expect(opened.length).toBe(1)
   })
 
   it('allows only the archive folder while no game folder is set', async () => {
