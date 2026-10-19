@@ -1,8 +1,10 @@
 import { parseCombatLine, looksLikeCombat, SELF, type CombatEvent } from './combatLines'
 import { zoneEntered, type LogLine } from './logLine'
-import { ARTICLE, displayName, isFriend, nameKey, Roster } from './combatRoster'
+import { ARTICLE, isFriend, nameKey, Roster } from './combatRoster'
 import { book, stitch } from './combatTimeline'
-import type { CombatSnapshot, DamageHow, Defense, Entity, EntityKind, HealTally, ProcOrigin, Segment, SegmentSummary, SkillStat, Tally, StitchedTimeline } from '../shared/types'
+import { CharmWatch } from './combatCharm'
+import { bookProc, ProcFirings, tapTick } from './combatProcs'
+import type { CombatSnapshot, DamageHow, Defense, Entity, EntityKind, HealTally, Segment, SegmentSummary, SkillStat, Tally, StitchedTimeline } from '../shared/types'
 
 export { displayName, isFriend, nameKey } from './combatRoster'
 
@@ -16,13 +18,7 @@ export { displayName, isFriend, nameKey } from './combatRoster'
 
 /** A gap between an entity's hits counts as combat time up to this long. */
 const ACTIVE_GAP_MS = 3000
-/**
- * A spell effect landing this long after its cast line is the cast; later, or with no cast line at
- * all, it was fired by something else: a weapon, a buff, an ability. Long casts run to ten seconds.
- */
-export const CAST_WINDOW_MS = 20_000
-/** Abilities the game lists as ones you press, whose effect prints like a proc. */
-const ACTIVATED = new Set(['reaving strike', 'harm touch', 'leech touch'])
+export { CAST_WINDOW_MS, spellBase } from './combatProcs'
 const FIGHTS_KEPT = 300
 /** Others' blows held at most on one enemy, while waiting to see whether your side joins in. */
 const HELD_MAX = 2000
@@ -53,10 +49,6 @@ export interface MeterHooks {
   onFightEnd?: (fight: Segment) => void
 }
 
-/** "an ire ghast has been charmed." */
-const RE_CHARMED = /^(.+) has been charmed\.$/
-/** A charm lands within its cast time (Allure's is a few seconds) of the cast beginning. */
-const CHARM_CAST_MS = 15_000
 /** An invite older than this is not the one a "You have joined the group." answers. */
 const INVITE_MS = 60_000
 
@@ -71,11 +63,6 @@ const skillKey = (name: string, how: DamageHow): string => (how === 'dot' ? `dot
 /** The criticals EQEmu's TryCriticalHit makes: a critical, a Crippling Blow, a Slay Undead (LT-518). */
 const isCrit = (mods: string[]): boolean => mods.includes('critical') || mods.includes('crippling blow') || mods.includes('slay undead')
 const defense = (): Defense => ({ swings: 0, hit: 0, miss: 0, dodge: 0, parry: 0, block: 0, riposte: 0, absorb: 0 })
-
-/** "Envenomed Bolt X" and "Envenomed Bolt" are one spell for matching a landing to its cast. */
-export function spellBase(name: string): string {
-  return name.replace(/ (?:[IVXL]+|\d+)$/, '').toLowerCase()
-}
 
 function newEntity(name: string, kind: EntityKind, owner: string | undefined, at: number): Entity {
   return {
@@ -150,22 +137,16 @@ export class CombatMeter {
   private readonly who = new Roster((k) => this.refreshKind(k))
   /** Who last invited you to a group, until you join one or the invite goes stale. */
   private invite: { who: string; at: number } | null = null
-  /** When each entity last began casting each spell: "kelwyn|envenomed bolt" → time. */
-  private lastCast = new Map<string, number>()
-  /** When each entity's proc last did damage, by base name, so its heal line a moment later is the same firing. */
-  private lastProc = new Map<string, number>()
-  /** A proc's heal line counted as its firing before its damage line came (same second): the damage line pairs with it. */
-  private healFiring = new Map<string, number>()
-  /**
-   * Charmed mobs, by the mob's name key. A charm pet has the mob's name, and other mobs may share it,
-   * so its blows are told apart by where they land: on an enemy they are the pet's (mobs do not fight
-   * each other), booked to `label`; on a friend they are an enemy's, and mean the charm has broken.
-   */
-  private charmed = new Map<string, { label: string; owners: string[]; since: number }>()
-  /** The last spell a friend began casting: whoever it was charmed what "has been charmed" next. */
-  private lastFriendCast: { who: string; at: number } | null = null
-  /** Charm spells friends began casting, newest last, each with the line that says it landed. */
-  private charmCasts: { who: string; at: number; land: string }[] = []
+  /** Who cast what when, and the procs' last lines (combatProcs.ts). */
+  private readonly procs = new ProcFirings()
+  /** Charmed mobs followed as their charmers' pets (combatCharm.ts). */
+  private readonly charms = new CharmWatch(this.who, {
+    enabled: () => !!this.config.charmPets,
+    claimed: (k) => {
+      this.refreshKind(k)
+      this.changed()
+    }
+  })
   /**
    * Blows between others, by enemy, held while that fight goes on (no gap longer than a fight's) in
    * case your side joins in on it: a raid's tank pulls well before the rest of it swings.
@@ -187,7 +168,7 @@ export class CombatMeter {
 
   configure(config: MeterConfig): void {
     this.config = config
-    if (!config.charmPets) this.charmed.clear()
+    if (!config.charmPets) this.charms.clear()
   }
 
   get charmPets(): boolean {
@@ -221,12 +202,8 @@ export class CombatMeter {
     this.lastKilled = null
     this.session = null
     this.who.clear()
-    this.lastCast.clear()
-    this.lastProc.clear()
-    this.healFiring.clear()
-    this.charmed.clear()
-    this.lastFriendCast = null
-    this.charmCasts = []
+    this.procs.clear()
+    this.charms.clear(true)
     this.held.clear()
     this.heldPrunedAt = 0
     this.zone = ''
@@ -405,7 +382,7 @@ export class CombatMeter {
     if (this.live) this.closeFight()
     this.lastKilled = null
     // Charm does not survive a zone line.
-    this.charmed.clear()
+    this.charms.clear()
     // An evacuate (Exodus, Succor) into the zone you are in prints the same "You have entered" line;
     // only a different zone is a new session.
     const moved = zone !== this.zone
@@ -423,92 +400,15 @@ export class CombatMeter {
       this.onZone(zone, time)
       return null
     }
-    if (this.charmCasts.length && this.charmLanded(text, time)) return null
-    const charm = text.endsWith(' has been charmed.') ? RE_CHARMED.exec(text) : null
-    if (charm) {
-      const cast = this.lastFriendCast
-      if (cast && time - cast.at <= CHARM_CAST_MS && time >= cast.at) this.onCharm(charm[1], cast.who, time)
-      return null
-    }
+    if (this.charms.line(text, time)) return null
     if (!looksLikeCombat(text)) return null
     const ev = parseCombatLine(text)
     if (ev) this.event(ev, time)
     return ev
   }
 
-  // ---- charm pets ----
-
-  /**
-   * "<mob> moans." after a friend began casting Cajole Undead: the landing of the newest charm cast
-   * whose spell prints that line. A friend's heal begun in between does not take the pet.
-   */
-  private charmLanded(text: string, at: number): boolean {
-    this.charmCasts = this.charmCasts.filter((c) => at - c.at <= CHARM_CAST_MS)
-    for (let i = this.charmCasts.length - 1; i >= 0; i--) {
-      const c = this.charmCasts[i]
-      if (at < c.at || text.length <= c.land.length || !text.endsWith(c.land)) continue
-      this.charmCasts.splice(i, 1)
-      this.onCharm(text.slice(0, -c.land.length), c.who, at)
-      return true
-    }
-    return false
-  }
-
-  /** A charm landed on `mob`: from now it is `who`'s pet. */
-  private onCharm(mob: string, who: string, at: number): void {
-    if (!this.config.charmPets) return
-    // One pet at a time: a new charm ends the charmer's last one.
-    for (const [k, c] of this.charmed) if (c.owners.includes(who) && k !== nameKey(mob)) this.charmed.delete(k)
-    const label = `${displayName(mob)} (charmed)`
-    // Two charmers of mobs with one name: the log cannot tell their pets apart, so the pet is theirs
-    // together, a row of its own rather than a share of either's.
-    const had = this.charmed.get(nameKey(mob))
-    const owners = had && !had.owners.includes(who) ? [...had.owners, who] : [who]
-    this.charmed.set(nameKey(mob), { label, owners, since: at })
-    this.who.pets.set(nameKey(label), owners.join(' or '))
-    this.refreshKind(nameKey(label))
-    this.changed()
-  }
-
-  /**
-   * A blow, miss or heal involving a charmed mob's name, rewritten to its pet label where the pet is
-   * the one meant: its blows on enemies, enemies' blows on it, friends' heals on it. Its blows on a
-   * friend stay an enemy's, and end the charm: the pet has turned.
-   */
-  private charmEvent(ev: CombatEvent): CombatEvent {
-    if (!this.charmed.size || (ev.kind !== 'damage' && ev.kind !== 'miss' && ev.kind !== 'heal')) return ev
-    const src = ev.source ? this.charmed.get(nameKey(ev.source)) : undefined
-    const tgt = this.charmed.get(nameKey(ev.target))
-    if (!src && !tgt) return ev
-    let out = ev
-    if (src && ev.kind !== 'heal') {
-      const side = nameKey(ev.source) === nameKey(ev.target) ? 'enemy' : this.who.sideOf(this.who.norm(ev.target))
-      if (side === 'friend') {
-        this.charmed.delete(nameKey(ev.source))
-        return ev
-      }
-      if (side === 'enemy') out = { ...out, source: src.label }
-    }
-    if (tgt && out.source !== tgt.label) {
-      const side = out.source ? this.who.sideOf(this.who.norm(out.source)) : 'unknown'
-      const same = nameKey(out.source) === nameKey(ev.target)
-      if (!same && (ev.kind === 'heal' ? side === 'friend' : side === 'enemy')) out = { ...out, target: tgt.label }
-    }
-    return out
-  }
-
-  /** A charmed mob dead at an enemy's hand, or of its own accord, was the pet. */
-  private charmDeath(ev: Extract<CombatEvent, { kind: 'kill' }>): Extract<CombatEvent, { kind: 'kill' }> {
-    const c = this.charmed.get(nameKey(ev.target))
-    if (!c) return ev
-    const killer = ev.killer ? this.who.sideOf(this.who.norm(ev.killer)) : 'enemy'
-    if (killer === 'friend') return ev
-    this.charmed.delete(nameKey(ev.target))
-    return { ...ev, target: c.label }
-  }
-
   event(input: CombatEvent, at: number): void {
-    const ev = input.kind === 'kill' ? this.charmDeath(input) : this.charmEvent(input)
+    const ev = this.charms.event(input)
     switch (ev.kind) {
       case 'damage':
         return this.onDamage(ev, at)
@@ -539,53 +439,16 @@ export class CombatMeter {
         return this.onGroup(ev, at)
       case 'cast': {
         const source = this.who.norm(ev.source)
-        this.lastCast.set(`${nameKey(source)}|${spellBase(ev.spell)}`, at)
-        if (this.lastCast.size > 4000) this.lastCast.delete(this.lastCast.keys().next().value!)
+        this.procs.cast(source, ev.spell, at)
         // Anyone not an enemy may be the one a charm that lands next belongs to.
         if (this.who.sideOf(source) !== 'enemy') {
-          this.lastFriendCast = { who: source, at }
-          const land = this.config.charmPets ? this.config.charmLand?.(ev.spell) : undefined
-          if (land) this.charmCasts.push({ who: source, at, land })
+          this.charms.cast(source, at, this.config.charmPets ? this.config.charmLand?.(ev.spell) : undefined)
         }
         if (this.who.sideOf(source) !== 'friend') return
         for (const seg of this.liveSegments(at, false)) this.ent(seg, source, at).casts++
         return
       }
     }
-  }
-
-  /** A spell effect of a friend's with no cast line of theirs within the window was fired by something. */
-  private procOrigin(source: string, spell: string, at: number): ProcOrigin | null {
-    const base = spellBase(spell)
-    const cast = this.lastCast.get(`${nameKey(source)}|${base}`)
-    if (cast !== undefined && at - cast <= CAST_WINDOW_MS && at >= cast) return null
-    return ACTIVATED.has(base) ? 'ability' : 'spell'
-  }
-
-  /**
-   * Books one proc line. A lifetap's damage line carries the rank ("Lifebite III") and its heal line
-   * may not ("Lifebite"): one proc, found by its base name and named as the damage line has it.
-   */
-  private static proc(e: Entity, name: string, origin: ProcOrigin, damage: number, healed: number, firing: boolean): void {
-    const base = spellBase(name)
-    const had = e.procs[name] ? name : Object.keys(e.procs).find((k) => spellBase(k) === base)
-    let p = had ? e.procs[had] : undefined
-    if (p && had !== name && damage > 0) {
-      delete e.procs[had!]
-      p.name = name
-      e.procs[name] = p
-    }
-    p ??= e.procs[name] = { name, origin, count: 0, damage: 0, healed: 0 }
-    if (firing) p.count++
-    p.damage += damage
-    p.healed += healed
-  }
-
-  /** A lifetap's later tick heals into the proc row its first firing opened, without counting another firing. */
-  private static tapTick(e: Entity, spell: string, healed: number): void {
-    const base = spellBase(spell)
-    const had = Object.keys(e.procs).find((k) => spellBase(k) === base)
-    if (had) e.procs[had].healed += healed
   }
 
   /** The segments an event lands in: the session, and the fight (opened if `combat` says the event is one). */
@@ -605,23 +468,16 @@ export class CombatMeter {
     if (!this.admit(ev, at, ss === 'friend' ? source : target, ss === 'enemy' ? source : target)) return
     const closed = this.afterKill(at, ss === 'enemy' ? source : target)
     const crit = isCrit(ev.mods)
-    const proc = ss === 'friend' && ev.how === 'spell' ? this.procOrigin(source, ev.skill, at) : null
-    const procKey = `${nameKey(source)}|${spellBase(ev.skill)}`
+    const proc = ss === 'friend' && ev.how === 'spell' ? this.procs.origin(source, ev.skill, at) : null
     // A lifetap whose heal line came first already counted this firing.
-    const paired = !!proc && Math.abs(at - (this.healFiring.get(procKey) ?? -Infinity)) <= 1000
-    if (paired) this.healFiring.delete(procKey)
-    if (proc) {
-      this.lastProc.set(procKey, at)
-      // Capped as lastCast is: a busy raid zone names hundreds (LT-382).
-      if (this.lastProc.size > 4000) this.lastProc.delete(this.lastProc.keys().next().value!)
-    }
+    const ownFiring = !!proc && this.procs.damage(source, ev.skill, at)
     const finishing = ev.how === 'melee' && ev.mods.includes('finishing blow')
     for (const seg of closed ? [this.ensureSession(at), closed] : this.liveSegments(at, true)) {
       const src = this.ent(seg, source, at)
       const tgt = this.ent(seg, target, at)
       add(src.out, ev.amount, crit)
-      if (proc) CombatMeter.proc(src, ev.skill, proc, ev.amount, 0, !paired)
-      if (finishing) CombatMeter.proc(src, 'Finishing Blow', 'aa', ev.amount, 0, true)
+      if (proc) bookProc(src, ev.skill, proc, ev.amount, 0, ownFiring)
+      if (finishing) bookProc(src, 'Finishing Blow', 'aa', ev.amount, 0, true)
       const skill = (src.skills[skillKey(ev.skill, ev.how)] ??= skillStat(ev.skill, ev.how))
       add(skill, ev.amount, crit)
       for (const m of ev.mods) skill.mods[m] = (skill.mods[m] ?? 0) + 1
@@ -710,13 +566,8 @@ export class CombatMeter {
     const crit = ev.mods.includes('critical')
     // A heal over time ticks long after its cast; only a direct heal can be a proc. A lifetap's heal
     // line follows its damage line: the same firing, not another.
-    const proc = ss === 'friend' && !ev.hot && !tap ? this.procOrigin(source, ev.spell, at) : null
-    const procKey = `${nameKey(source)}|${spellBase(ev.spell)}`
-    const firing = !!proc && Math.abs(at - (this.lastProc.get(procKey) ?? -Infinity)) > 1000
-    if (firing) {
-      this.healFiring.set(procKey, at)
-      if (this.healFiring.size > 4000) this.healFiring.delete(this.healFiring.keys().next().value!)
-    }
+    const proc = ss === 'friend' && !ev.hot && !tap ? this.procs.origin(source, ev.spell, at) : null
+    const firing = !!proc && this.procs.heal(source, ev.spell, at)
     const ours = this.who.ours(source) || this.who.ours(target)
     for (const seg of this.liveSegments(at, false)) {
       // A heal between strangers is no more yours than their fight: it counts once either is in the segment.
@@ -728,8 +579,8 @@ export class CombatMeter {
       }
       const src = this.ent(seg, source, at)
       const tgt = this.ent(seg, target, at)
-      if (proc) CombatMeter.proc(src, ev.spell, proc, 0, ev.amount, firing)
-      if (tap) CombatMeter.tapTick(src, ev.spell, ev.amount)
+      if (proc) bookProc(src, ev.spell, proc, 0, ev.amount, firing)
+      if (tap) tapTick(src, ev.spell, ev.amount)
       addHeal(src.healOut, ev.amount, ev.raw, crit)
       addHeal((src.healSpells[ev.spell] ??= healTally()), ev.amount, ev.raw, crit)
       addHeal((src.healTargets[target] ??= healTally()), ev.amount, ev.raw, crit)
