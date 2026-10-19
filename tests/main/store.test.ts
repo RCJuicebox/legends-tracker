@@ -153,6 +153,17 @@ describe('the settings files on disk', () => {
     expect(readdirSync(dir)).toEqual(['x.json'])
   })
 
+  it('writes at once on flushSync, whole, for Windows ending the session (LT-508)', () => {
+    const path = join(dir, 'y.json')
+    const f = new JsonFile(path, { n: 1 })
+    f.flushSync()
+    expect(existsSync(path)).toBe(false)
+    f.set({ n: 2 })
+    f.flushSync()
+    expect(JSON.parse(readFileSync(path, 'utf8'))).toEqual({ n: 2 })
+    expect(readdirSync(dir).filter((n) => n.startsWith('y.'))).toEqual(['y.json'])
+  })
+
   it('does not reject when the file cannot be written, and tries again at the next flush', async () => {
     const path = join(dir, 'missing-folder', 'x.json')
     const f = new JsonFile(path, { n: 1 })

@@ -111,16 +111,20 @@ export function registerLifecycle(ctx: AppContext): void {
 
   // Windows shutting down or signing out: Electron sends no before-quit then, so everything waiting
   // to be written (settings, motes, faction steps, the log history, where mote tracking got to) would
-  // be lost, and the next start would read the log again from much further back (LT-428). It is
-  // written now, in two seconds at most, and the app ends.
+  // be lost, and the next start would read the log again from much further back (LT-428). The stores
+  // are written at once, on this thread, since Windows may not wait for a promise; the rest in two
+  // seconds at most; then the process ends without the quit event, which would have started a
+  // downloaded update's installer for Windows to kill part-way (LT-508).
   const sessionEnding = () => {
     if (shuttingDown) return
     log.info('Windows is ending the session: saving and quitting')
     ctx.windows.quitting = true
     shuttingDown = true
+    ctx.updater.holdInstall()
+    ctx.store.flushAllSync()
     void stopAndSave(ctx, 2000).then(() => {
       shutDown = true
-      app.quit()
+      app.exit(0)
     })
   }
   app.on('browser-window-created', (_e, win) => {

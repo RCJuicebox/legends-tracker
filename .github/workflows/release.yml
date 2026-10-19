@@ -5,6 +5,11 @@ name: Release
 #
 # Run it by hand (Actions → Release → Run workflow) for a dry run: it builds the installer and attaches it
 # to the run as an artifact, publishing nothing.
+#
+# The token that can write releases goes only to the publish job, which runs no npm: the dependency
+# install and the test toolchain (hundreds of packages' install scripts) build with a read-only token and
+# no credentials left in the checkout, and hand the files over as an artifact (LT-509). Actions are
+# pinned by commit; Dependabot keeps the pins current.
 
 on:
   push:
@@ -12,7 +17,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 # GitHub now and then starts two runs for one tag push (2.3.0 got two). Run side by side they each
 # made a draft, and the publish step found the empty one. A second run for a tag waits for the first
@@ -41,6 +46,7 @@ jobs:
           fi
           echo "published=$published" >> "$GITHUB_OUTPUT"
 
+  # Builds and tests with no token at all: nothing here can touch the repository or its releases.
   build:
     needs: check
     if: needs.check.outputs.published != 'true'
@@ -48,12 +54,13 @@ jobs:
     defaults:
       run:
         shell: bash
-    env:
-      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      PUBLISH: ${{ startsWith(github.ref, 'refs/tags/v') }}
+    outputs:
+      version: ${{ steps.version.outputs.version }}
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-node@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
         with:
           node-version: 24
           cache: npm
@@ -61,45 +68,76 @@ jobs:
       # What CI runs: typecheck, lint, the format check and the tests.
       - run: npm run check
 
-      - name: Check the tag matches package.json
-        if: env.PUBLISH == 'true'
+      - id: version
+        name: Check the tag matches package.json
         run: |
           version=$(node -p "require('./package.json').version")
-          if [ "v$version" != "$GITHUB_REF_NAME" ]; then
+          if [ "${{ startsWith(github.ref, 'refs/tags/v') }}" = true ] && [ "v$version" != "$GITHUB_REF_NAME" ]; then
             echo "::error::Tag $GITHUB_REF_NAME does not match package.json version $version"
             exit 1
           fi
-
-      # The release exists as a draft before electron-builder uploads to it: its uploads run in parallel
-      # and would otherwise race to create the release.
-      - name: Create the draft release
-        if: env.PUBLISH == 'true'
-        run: |
-          version=$(node -p "require('./package.json').version")
-          node scripts/release-notes.mjs "$version" > release-notes.md
-          gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1 || gh release create "$GITHUB_REF_NAME" --draft \
-            --title "$version" \
-            --notes-file release-notes.md
+          echo "version=$version" >> "$GITHUB_OUTPUT"
 
       - run: npx electron-vite build
       # The built app starts on a throwaway profile and quits when asked, before anything is uploaded.
       - run: npm run smoke
 
+      # Never published from here: the installer, its blockmap and latest.yml are handed to the publish job.
       - name: Build the installer
-        run: npx electron-builder --win --publish ${{ env.PUBLISH == 'true' && 'always' || 'never' }}
+        run: npx electron-builder --win --publish never
 
       # The packaged app too (its file list is what tests and the source run never see; 1.2.0 shipped
-      # without koffi's JavaScript). The release is still a draft here: a failure leaves it one.
+      # without koffi's JavaScript).
       - name: Start the packaged app
         run: node scripts/smoke.mjs "dist/win-unpacked/Legends Tracker.exe"
+
+      - name: Keep the installer
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: installer
+          path: |
+            dist/*.exe
+            dist/*.exe.blockmap
+            dist/latest.yml
+          retention-days: 14
+          if-no-files-found: error
+
+  # The one job with a token that can write releases: it checks out only to read the changelog, installs
+  # nothing, and uploads what the build job handed over.
+  publish:
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      VERSION: ${{ needs.build.outputs.version }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
+        with:
+          name: installer
+          path: dist
+
+      # The release exists as a draft before anything is uploaded to it, and stays one until every file is up.
+      - name: Create the draft release
+        run: |
+          node scripts/release-notes.mjs "$VERSION" > release-notes.md
+          gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1 || gh release create "$GITHUB_REF_NAME" --draft \
+            --title "$VERSION" \
+            --notes-file release-notes.md
+
+      - name: Upload the files
+        run: gh release upload "$GITHUB_REF_NAME" dist/latest.yml "dist/Legends-Tracker-Setup-$VERSION.exe" "dist/Legends-Tracker-Setup-$VERSION.exe.blockmap" --clobber
 
       # The release for this tag that has every file, by its id: a stray draft for the same tag (one an
       # earlier run left) is passed over rather than looked at by tag name.
       - name: Publish once every file is up
-        if: env.PUBLISH == 'true'
         run: |
-          version=$(node -p "require('./package.json').version")
-          need="latest.yml Legends-Tracker-Setup-$version.exe Legends-Tracker-Setup-$version.exe.blockmap"
+          need="latest.yml Legends-Tracker-Setup-$VERSION.exe Legends-Tracker-Setup-$VERSION.exe.blockmap"
           id=''
           for rid in $(gh api "repos/$GITHUB_REPOSITORY/releases?per_page=50" --jq ".[] | select(.tag_name == \"$GITHUB_REF_NAME\") | .id"); do
             assets=$(gh api "repos/$GITHUB_REPOSITORY/releases/$rid/assets" --jq '.[].name')
@@ -116,13 +154,3 @@ jobs:
           fi
           gh api -X PATCH "repos/$GITHUB_REPOSITORY/releases/$id" -F draft=false -f make_latest=true >/dev/null
           echo "Published release $id"
-
-      - name: Keep the installer from a dry run
-        if: env.PUBLISH != 'true'
-        uses: actions/upload-artifact@v7
-        with:
-          name: installer
-          path: |
-            dist/*.exe
-            dist/latest.yml
-          retention-days: 14

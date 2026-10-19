@@ -173,10 +173,19 @@ export class Store {
   }
 
   /** Writes whatever changed. Never rejects: a file that cannot be written is logged. */
+  private get files(): JsonFile<unknown>[] {
+    return [this.settings, this.triggers, this.rules, this.casts, this.motes, this.stock, this.respawns, this.buffs]
+  }
+
   async flushAll(): Promise<void> {
-    const files = [this.settings, this.triggers, this.rules, this.casts, this.motes, this.stock, this.respawns, this.buffs]
-    await Promise.allSettled(files.map((f) => f.flush()))
+    await Promise.allSettled(this.files.map((f) => f.flush()))
     // Last, so it never names a schema the files on disk are not yet at.
     await this.schema.flush()
+  }
+
+  /** Every file written now, on this thread: for Windows ending the session (LT-508). */
+  flushAllSync(): void {
+    for (const f of this.files) f.flushSync()
+    this.schema.flushSync()
   }
 }

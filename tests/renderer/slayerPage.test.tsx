@@ -185,6 +185,9 @@ it('draws the plan, the lockouts beside it, and keeps a camp ruled out', async (
     Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(travel, '25')
     travel.dispatchEvent(new Event('input', { bubbles: true }))
   })
+  // Saved when the field is left, not a keystroke at a time (LT-507).
+  expect(invoke).not.toHaveBeenLastCalledWith('slayer:choices', 'Kelwyn_neriak', expect.objectContaining({ travelMin: 25 }))
+  await act(async () => travel.dispatchEvent(new FocusEvent('focusout', { bubbles: true })))
   expect(invoke).toHaveBeenLastCalledWith('slayer:choices', 'Kelwyn_neriak', expect.objectContaining({ travelMin: 25 }))
   await act(async () => button('Read again').click())
   // What the spawns allow beside each mob, what holds the camp back, and the Hunter named on the way.

@@ -71,8 +71,34 @@ export const ZONE_ALIASES: Record<string, string> = {
   westcommons: 'westcommonlands',
   thehole: 'ruinsofoldpaineel',
   // The game's zone table calls it a keep; the zone line, the caverns.
-  permafrostkeep: 'permafrostcaverns'
+  permafrostkeep: 'permafrostcaverns',
+  // eqlwiki's and Allakhazam's names for the Guks, Splitpaw, the Gorge, Runnyeye, the Solusek zones, the catacombs and Cazic-Thule.
+  lowerguk: 'ruinsofoldguk',
+  upperguk: 'cityofguk',
+  splitpaw: 'lairofthesplitpaw',
+  splitpawlair: 'lairofthesplitpaw',
+  beholdersmaze: 'gorgeofkingxorbb',
+  gorgeofkingxorbbbeholdersmaze: 'gorgeofkingxorbb',
+  runnyeyecitadel: 'liberatedcitadelofrunnyeye',
+  solusekseyesoluseka: 'solusekseye',
+  nagafenslairsolusekb: 'nagafenslair',
+  qeynoscatacombs: 'qeynosaqueducts',
+  cazicthule: 'templeofcazicthule',
+  cazicthulezone: 'templeofcazicthule',
+  steamfont: 'steamfontmountains',
+  oldcommonlands: 'westcommonlands',
+  // A page naming the city without its half: the half the game's zone list has first.
+  felwithe: 'northernfelwithe',
+  freeport: 'westfreeport',
+  kaladim: 'northkaladim',
+  qeynos: 'northqeynos'
 }
+
+/**
+ * Zones Legends has that the client's Exploration achievements leave out (the game's zone list is read
+ * from them: "Visit Befallen"): the player's logs have entered each of these.
+ */
+export const LEGENDS_ZONES = ['New Sebilis Expedition', 'North Freeport', 'East Commonlands', 'Kerra Isle']
 
 // ---------- places ----------
 

@@ -1,4 +1,4 @@
-import { promises as fs, readFileSync, renameSync } from 'node:fs'
+import { copyFileSync, promises as fs, readFileSync, renameSync, writeFileSync } from 'node:fs'
 import { basename, dirname, join } from 'node:path'
 import { DEFAULT_TIER_DURATION_PCT, type AppSettings } from '../shared/types'
 import { DEFAULT_OVERLAYS } from '../shared/overlays'
@@ -209,6 +209,33 @@ export class JsonFile<T> {
     // One write at a time, so two never share the .tmp file.
     this.writing = this.writing.then(() => this.write())
     return this.writing
+  }
+
+  /**
+   * Writes the file now, on this thread, if anything changed: for Windows ending the session, which
+   * waits for no promise (LT-508). A write under way is not waited for; the next sync write is whole.
+   */
+  flushSync(): void {
+    if (this.timer) clearTimeout(this.timer)
+    this.timer = null
+    if (!this.dirty || this.frozen) return
+    this.dirty = false
+    if (this.backup) {
+      this.backup = false
+      try {
+        copyFileSync(this.path, this.path.replace(/\.json$/i, '') + '.bak.json')
+      } catch (e) {
+        if ((e as NodeJS.ErrnoException).code !== 'ENOENT') log.warn(`Could not keep a copy of ${this.path} before saving it`, e)
+      }
+    }
+    try {
+      const tmp = this.path + '.tmp'
+      writeFileSync(tmp, this.pretty ? JSON.stringify(this.value, null, 2) : JSON.stringify(this.value), 'utf8')
+      renameSync(tmp, this.path)
+    } catch (e) {
+      log.error(`Could not save ${this.path}`, e)
+      this.dirty = true
+    }
   }
 
   private async write(): Promise<void> {

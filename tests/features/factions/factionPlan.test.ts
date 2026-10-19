@@ -728,7 +728,8 @@ describe("eqlwiki's word on a camp's named mobs", () => {
     // Sergeant Pike has no page of his own, but eqlwiki's faction page lists him: he is Legends'.
     expect(camps(c).map((a) => [a.zone, a.mobs])).toEqual([
       ['Test Keep', ['Sergeant Pike']],
-      ['Test Pass', ['Gate Guard Bram', 'Gate Guard Toll']]
+      ['Test Pass', ['Gate Guard Bram']],
+      ['Test Pass', ['Gate Guard Toll']]
     ])
     expect(c.leftOut).toEqual([
       { name: 'Lord Brute', zone: 'Test Keep', why: 'tough', hp: 300_000 },
@@ -738,12 +739,85 @@ describe("eqlwiki's word on a camp's named mobs", () => {
     ])
   })
 
-  it("takes a page's own amounts and respawn, and Legends' +5 for any smaller gain", () => {
-    const pass = camps(buildCatalog(input({ npcs }))).find((a) => a.zone === 'Test Pass')!
-    // Bram's page gives +5; Toll's gives nothing, and Allakhazam's +1 is +5 in Legends.
-    expect(pass).toMatchObject({ mobs: ['Gate Guard Bram', 'Gate Guard Toll'], hits: { 'Test Rogues': 5, 'Test Miners': -5 }, named: 2, respawnSec: [400] })
-    // Bram back every 6:40 (9 an hour), Toll at the assumed 20 minutes (3 an hour).
-    expect(unitTime(pass, DEFAULT_SETTINGS).seconds).toBeCloseTo(300)
+  it("takes a page's own amounts and respawn, and Legends' +5 for any smaller gain, each named mob a camp of its own (LT-505)", () => {
+    const pass = camps(buildCatalog(input({ npcs }))).filter((a) => a.zone === 'Test Pass')
+    // Bram's page gives +5 and a respawn; Toll's gives nothing, and Allakhazam's +1 is +5 in Legends.
+    expect(pass[0]).toMatchObject({ mobs: ['Gate Guard Bram'], hits: { 'Test Rogues': 5, 'Test Miners': -5 }, named: 1, respawnSec: [400] })
+    expect(pass[1]).toMatchObject({ mobs: ['Gate Guard Toll'], hits: { 'Test Rogues': 5, 'Test Miners': -5 }, named: 1 })
+    expect(pass[1].respawnSec).toBeUndefined()
+    // Bram back every 6:40 (9 an hour); Toll at the assumed 20 minutes.
+    expect(unitTime(pass[0], DEFAULT_SETTINGS).seconds).toBeCloseTo(400)
+    expect(unitTime(pass[1], DEFAULT_SETTINGS).seconds).toBeCloseTo(1200)
+  })
+
+  it('never averages a named mob into the common mobs of its zone (LT-505)', () => {
+    // Allakhazam: a courier at +40 and a priestess at +400 raise the same faction in one zone. One camp
+    // would have 13 courier kills give 1,950 where they give 520.
+    const wood: AllaFaction = {
+      id: 13,
+      name: 'Test Rogues',
+      needs: [],
+      quests: [],
+      mobs: [
+        { name: 'a dark courier', zone: 'Test Wood', amount: 40 },
+        { name: 'a dark scout', zone: 'Test Wood', amount: 20 },
+        { name: 'Priestess Test', zone: 'Test Wood', amount: 400 }
+      ]
+    }
+    const c = buildCatalog(
+      catalogInput({ factions: ['Test Rogues'], targets: ['Test Rogues'], alla: [wood], npcs: { 'priestess test': { found: true, hp: 5000, respawnSec: 1200 } } })
+    )
+    expect(camps(c).map((a) => [a.id, a.mobs, a.hits['Test Rogues'], a.common, a.named])).toEqual([
+      ['alla:testwood|Test Rogues', ['a dark courier', 'a dark scout'], 30, 2, 0],
+      ['alla:testwood|Test Rogues|priestess test', ['Priestess Test'], 400, 0, 1]
+    ])
+  })
+
+  it('leaves out camps and quests in zones the game does not have, once its zones are known (LT-506)', () => {
+    const far: AllaFaction = {
+      id: 14,
+      name: 'Test Rogues',
+      needs: [],
+      quests: [],
+      mobs: [
+        { name: 'an onyx skywing', zone: 'Timorous Deep', amount: 150 },
+        { name: 'a cave bat', zone: 'Test Cave', amount: 5 },
+        // Allakhazam's 1.0 is the plane Legends has; 2.0 is a revamp it does not.
+        { name: 'an ire ghast', zone: 'Plane of Hate 1.0', amount: 5 },
+        { name: 'a hate ghast', zone: 'Plane of Hate 2.0', amount: 5 }
+      ]
+    }
+    const quest = {
+      page: 'Far Quest',
+      givers: ['Someone'],
+      zones: ['Firiona Vie'],
+      level: 1,
+      steps: [{ hits: { 'Test Rogues': 10 }, guessed: [], handIn: [{ item: 'A Thing', count: 1 }], npc: 'Someone', line: '' }]
+    }
+    const base: Partial<CatalogInput> = {
+      factions: ['Test Rogues'],
+      targets: ['Test Rogues'],
+      alla: [far],
+      npcs: {},
+      quests: { 'Far Quest': quest },
+      items: { 'a thing': item({ vendors: [{ zone: 'Test Cave', npc: 'Merchant', note: '' }] }) },
+      pages: [{ page: 'Test Rogues', raise: { mobs: [], quests: ['Far Quest'], zones: [] }, lower: { mobs: [], quests: [], zones: [] } }]
+    }
+    // The game's zones not known: everything but the zone found not in play is planned.
+    const all = buildCatalog(catalogInput(base))
+    expect(camps(all).map((a) => a.zone)).toEqual(['Timorous Deep', 'Test Cave', 'Plane of Hate 1.0', 'Plane of Hate 2.0'])
+    expect(all.activities.some((a) => a.kind === 'quest')).toBe(true)
+    const known = buildCatalog(catalogInput({ ...base, zonesInPlay: ['Test Cave', 'The Plane of Hate'] }))
+    expect(camps(known).map((a) => a.zone)).toEqual(['Test Cave', 'Plane of Hate 1.0'])
+    expect(known.activities.some((a) => a.kind === 'quest')).toBe(false)
+    expect(known.leftOut).toHaveLength(3)
+    expect(known.leftOut).toEqual(
+      expect.arrayContaining([
+        { name: 'an onyx skywing', zone: 'Timorous Deep', why: 'missing' },
+        { name: 'a hate ghast', zone: 'Plane of Hate 2.0', why: 'missing' },
+        { name: 'Far Quest', zone: 'Firiona Vie', why: 'missing' }
+      ])
+    )
   })
 
   it('leaves out an NPC found not in the game in play, though eqlwiki has a page for it', () => {
@@ -790,18 +864,20 @@ describe("eqlwiki's word on a camp's named mobs", () => {
 
   it("plans them all as before while eqlwiki's word is not in", () => {
     const c = buildCatalog(input())
+    // Each named mob its own camp: two in Test Hold, two in Test Pass.
     expect(
       camps(c)
         .map((a) => a.zone)
         .sort()
-    ).toEqual(['Test Fjord', 'Test Hold', 'Test Keep', 'Test Pass'])
+    ).toEqual(['Test Fjord', 'Test Hold', 'Test Hold', 'Test Keep', 'Test Pass', 'Test Pass'])
     expect(c.leftOut).toBeUndefined()
+    // One named mob at the assumed twenty minutes.
     expect(
       unitTime(
         camps(c).find((a) => a.zone === 'Test Pass')!,
         DEFAULT_SETTINGS
       ).seconds
-    ).toBeCloseTo(600)
+    ).toBeCloseTo(1200)
   })
 })
 

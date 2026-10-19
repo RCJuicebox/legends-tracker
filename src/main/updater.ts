@@ -81,6 +81,15 @@ export class Updater {
     if (this.timer) clearInterval(this.timer)
   }
 
+  /**
+   * A downloaded update is not installed as the app ends: Windows signing out or shutting down would
+   * kill the installer part-way (LT-508). It installs at the next ordinary quit, or when asked.
+   */
+  holdInstall(): void {
+    if (!app.isPackaged) return
+    electronUpdater.autoUpdater.autoInstallOnAppQuit = false
+  }
+
   private set(s: UpdateState): void {
     if (s.state === 'ready') log.info(`Update ${s.version} downloaded`)
     else if (s.state === 'downloading' && this.status.state !== 'downloading') log.info(`Downloading update ${s.version}`)

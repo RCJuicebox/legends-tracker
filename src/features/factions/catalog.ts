@@ -176,6 +176,12 @@ export interface CatalogInput {
   swapCons?: Record<string, Record<string, number>>
   /** What eqlwiki's pages say of the named mobs camps would hold, by lower-cased name (npcsToLookUp): whether Legends has them, how tough they are, how soon back. */
   npcs?: Record<string, NpcInfo>
+  /**
+   * The zones the game has: the client's Exploration achievements', Legends' own and those the logs
+   * have entered. A camp or quest in any other zone (live EverQuest's Kunark, a revamp) is left out;
+   * with none given, only ZONES_NOT_IN_PLAY is.
+   */
+  zonesInPlay?: string[]
 }
 
 export interface FactionCatalog {
@@ -455,6 +461,21 @@ export function buildCatalog(input: CatalogInput): FactionCatalog {
   // a kill does where it gives amounts (Legends' own, over Allakhazam's live ones).
   const npcOf = (mob: string): NpcInfo | undefined => (isNamedNpc(mob) ? input.npcs?.[bareNpc(mob).toLowerCase()] : undefined)
   const leftOut: NonNullable<FactionCatalog['leftOut']> = []
+  const goneZones = new Set(Object.keys(ZONES_NOT_IN_PLAY).map(zoneKey))
+  const inPlay = input.zonesInPlay?.length ? new Set(input.zonesInPlay.map(zoneKey)) : null
+  /**
+   * Whether a zone is not the game's: named as not in play, or, with the game's zones known, not among
+   * them. Allakhazam's "Plane of Hate 1.0" is the plane; its 2.0 and 3.0 are revamps Legends lacks. A
+   * zone a page gives only as a question is not known either way.
+   */
+  const zoneGone = (zone: string) => {
+    const k = zoneKey(zone.replace(/\s+1\.0$/, ''))
+    if (!k || zone.includes('?')) return false
+    return goneZones.has(zoneKey(zone)) || goneZones.has(k) || (inPlay !== null && !inPlay.has(k))
+  }
+  const leaveZone = (name: string, zone: string) => {
+    if (!leftOut.some((l) => l.name === name && l.zone === zone)) leftOut.push({ name, zone, why: 'missing' })
+  }
   /** Leaves a camp's mob out where eqlwiki has no page for one of Allakhazam's (not in Legends), or gives one too tough to farm; true when it does. */
   const leave = (mob: string, zone: string, site: 'eqlwiki' | 'Allakhazam') => {
     const info = npcOf(mob)
@@ -654,7 +675,12 @@ export function buildCatalog(input: CatalogInput): FactionCatalog {
   const wikiCamps = new Map<string, WikiMob[]>()
   for (const [k, e] of wikiMobs) {
     // A mob Allakhazam gives amounts for is its camp's, below.
-    if (logged.has(k) || allaMobs.has(k) || ![...e.raise].some((f) => open.has(f)) || leave(e.mob.name, e.mob.zone, 'eqlwiki')) continue
+    if (logged.has(k) || allaMobs.has(k) || ![...e.raise].some((f) => open.has(f))) continue
+    if (zoneGone(e.mob.zone)) {
+      leaveZone(bareNpc(e.mob.name), e.mob.zone)
+      continue
+    }
+    if (leave(e.mob.name, e.mob.zone, 'eqlwiki')) continue
     const ck = `${zoneKey(e.mob.zone)}|${[...e.raise].sort().join('+')}`
     wikiCamps.set(ck, [...(wikiCamps.get(ck) ?? []), e])
   }
@@ -687,16 +713,19 @@ export function buildCatalog(input: CatalogInput): FactionCatalog {
 
   // ---- kill camps from Allakhazam: the mobs its pages give amounts for, that the log has not seen killed ----
   const allaCamps = new Map<string, AllaKill[]>()
-  const goneZones = new Set(Object.keys(ZONES_NOT_IN_PLAY).map(zoneKey))
   for (const m of allaKill) {
     if (logged.has(`${m.name.toLowerCase()}|${zoneKey(m.zone)}`) || !raisesAny(m.hits, open)) continue
-    if (goneZones.has(zoneKey(m.zone))) {
-      if (!leftOut.some((l) => l.name === bareNpc(m.name) && l.zone === m.zone)) leftOut.push({ name: bareNpc(m.name), zone: m.zone, why: 'missing' })
+    if (zoneGone(m.zone)) {
+      leaveZone(bareNpc(m.name), m.zone)
       continue
     }
     if (leave(m.name, m.zone, 'Allakhazam')) continue
     const ck = `${zoneKey(m.zone)}|${positives(m.hits).join('+')}`
-    allaCamps.set(ck, [...(allaCamps.get(ck) ?? []), m])
+    // The many alike of a zone that move the same factions are one camp, a kill the mean of theirs; a
+    // named mob is a camp of its own, with its own amounts and its own respawn, never averaged into a
+    // common mob's kill at the common mob's pace (LT-505).
+    const key = isCommon(m.name) ? ck : `${ck}|${bareNpc(m.name).toLowerCase()}`
+    allaCamps.set(key, [...(allaCamps.get(key) ?? []), m])
   }
   for (const [k, members] of allaCamps) {
     // A kill in the camp does, on average, what its mobs do.
@@ -777,6 +806,8 @@ export function buildCatalog(input: CatalogInput): FactionCatalog {
             } else hits[g] = (hits[g] ?? 0) + legends(v)
           }
         if (!raisesAny(hits, open)) return
+        // A quest of a zone the game does not have (Firiona Vie's) is no way to anything.
+        if (zoneGone(q.zones[0] ?? '')) return leaveZone(q.page, q.zones[0])
         // Whom its line names, else the giver its quest names on a page of several, else the page's.
         const npc = QUEST_NPCS[q.page.toLowerCase()] ?? [s.npc, s.giver, ...q.givers].find((n) => n && !isZone(n)) ?? ''
         // The cons its NPC wants: known from play, and as Allakhazam lists them. The first not met holds it back.

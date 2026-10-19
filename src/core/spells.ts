@@ -345,7 +345,8 @@ export class SpellBook {
   }
 }
 
-function castable(s: Spell): boolean {
+/** Whether some class casts the spell (a level, or an ability): an NPC's or item's row has every class at 255. */
+export function castable(s: Spell): boolean {
   return s.classLevels.some((l) => l > 0 && l < 255)
 }
 

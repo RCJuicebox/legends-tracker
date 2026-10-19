@@ -329,6 +329,25 @@ describe("anyone's casts (a rule with others)", () => {
     expect(plain.spoken).toEqual([])
   })
 
+  it("takes a pet the damage meter knows for no player, and a cast that lands on you for no player's (LT-504)", () => {
+    // A pet's name is one word like a player's: "Vonartik begins casting", and its ticks "by Vonartik".
+    const h = harness({ rules: others, pets: ['Vonartik'] })
+    h.feed(`
+      [Sat Sep 12 23:11:04 2026] Vonartik begins casting Envenomed Bolt X.
+      [Sat Sep 12 23:11:05 2026] A ratman warrior has been poisoned.
+      [Sat Sep 12 23:11:10 2026] A ratman warrior has taken 89 damage from Envenomed Bolt X by Vonartik.`)
+    expect(h.board.list()).toEqual([])
+    expect(h.spoken).toEqual([])
+    // A player never lands a DoT on you: what does is a mob, whatever the log calls it.
+    const you = harness({ rules: others })
+    you.feed(`
+      [Sat Sep 12 23:11:04 2026] Corvin begins casting Envenomed Bolt X.
+      [Sat Sep 12 23:11:05 2026] You have been poisoned.
+      [Sat Sep 12 23:11:10 2026] You have taken 89 damage from Envenomed Bolt X by Corvin.`)
+    expect(you.board.list()).toEqual([])
+    expect(you.spoken).toEqual([])
+  })
+
   it('shares the bar with your own cast: yours replaces theirs on the same target', () => {
     const h = harness({ rules: others })
     h.feed(`
@@ -340,5 +359,37 @@ describe("anyone's casts (a rule with others)", () => {
     expect(list).toHaveLength(1)
     expect(list[0].label).toBe('Envenomed Bolt')
     expect(list[0].startedAt).toBe(at('Sat Sep 12 23:11:21 2026'))
+  })
+})
+
+describe('Quick Buff (LT-503)', () => {
+  // Legends' Quick Buff prints "You activate Quick Buff." and then only the landings: no "You begin casting".
+  const activation = `
+    [Thu Sep 24 11:03:02 2026] You activate Quick Buff.
+    [Thu Sep 24 11:03:05 2026] You begin to snarl as your features become feline.
+    [Thu Sep 24 11:03:05 2026] Vonartik growls with the spirit of the puma.`
+
+  it('times a landing of a buff you cast as your own cast, on you and on others, and counts the cast once', () => {
+    const h = harness({ quickBuffs: ['Spirit of the Puma'] })
+    h.feed(activation)
+    const mine = h.board.get(timerKey('Spirit of the Puma', 'You'))!
+    expect(mine).toBeDefined()
+    expect(mine.label).toBe('Spirit of the Puma')
+    expect(mine.meta?.caster).toBeUndefined()
+    expect(h.board.get(timerKey('Spirit of the Puma', 'Vonartik'))).toBeDefined()
+    expect(h.casts).toEqual(['Spirit of the Puma'])
+  })
+
+  it('takes landings for fifteen seconds only, and only of the buffs you cast', () => {
+    const late = harness({ quickBuffs: ['Spirit of the Puma'] })
+    late.feed(`
+      [Thu Sep 24 11:03:02 2026] You activate Quick Buff.
+      [Thu Sep 24 11:03:30 2026] You begin to snarl as your features become feline.`)
+    expect(late.board.list()).toEqual([])
+    expect(late.casts).toEqual([])
+    // No buff of yours known: someone else's Puma landing on you is theirs.
+    const none = harness()
+    none.feed(activation)
+    expect(none.board.list()).toEqual([])
   })
 })

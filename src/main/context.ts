@@ -168,7 +168,7 @@ export function createContext(): AppContext {
   const logHistory = new LogHistory(
     join(cacheDir(), 'log-history.json'),
     {
-      casts: dayConsumer(castCounter),
+      casts: dayConsumer(() => castCounter(() => ctx.engine.quickBuffLandings()), 2),
       melee: dayConsumer(meleeCounter),
       purchases: purchaseConsumer,
       skills: skillConsumer,

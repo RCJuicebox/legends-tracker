@@ -287,7 +287,9 @@ Every spell you cast is tracked automatically. No trigger needed.
 1. `You begin casting X.` opens a pending cast.
 2. The spell's own landing text, from the client's `spells_us_str.txt`, names the target and starts
    the timer. Only spells *you* are casting are considered, which tells your landing apart from
-   anyone else's identical message.
+   anyone else's identical message. Legends' Quick Buff prints `You activate Quick Buff.` and then
+   only the landings: for fifteen seconds after it, a landing of a buff you cast (the newest rank the
+   app has seen you cast) is your own cast, timed and counted.
 3. A DoT's first tick line (`… has taken N damage from your X.`) pins its end exactly: it wears off
    on its target's tick, `ticks − 1` ticks after the first. Until then the bar shows `~`.
 4. The fade line (`Your X spell has worn off of T.`, or the spell's own fade text on you), the target
@@ -300,7 +302,9 @@ would, with their name on it, and the app says who cast it and how long to hold 
 Touch on a forsaken revenant, do not cast for 36 seconds"; the words are a setting). Its end is
 exact once it ticks, and the usual fade announcement says when it is clear. No "Recast" is said of
 someone else's cast unless the spell has its own warning words. A caster is taken to be a player
-when the log names them in one word.
+when the log names them in one word and the damage meter does not know them as a pet; a spell no
+class casts (a mob's own Harm Touch) is a mob's whatever its name, and a cast that lands on you is
+never another player's. Neither is timed.
 
 **Recast cues.** By default the app says "Recast {spell}" 12 seconds before a DoT or a buff on you
 ends; the time and wording are settings, and any spell can override them. A DoT's cue is exact to the
@@ -702,9 +706,13 @@ really gives and the pace you got through them. A hand-in seen fewer than three 
 be a quest's one-time reward, done. Then eqlwiki, read a week at a time: every faction page's mobs
 and quests, each quest page's hand-ins and faction lines (where a page says only `got better`, your
 log's usual amount stands in), and each hand-in item's page (a merchant, a drop, a recipe). Mobs are
-grouped into camps: the mobs of a zone that move the same factions. A camp of common mobs goes at
+grouped into camps: the common mobs of a zone that move the same factions, a kill doing the mean of
+theirs; a named mob is a camp of its own, with its own amounts. A camp of common mobs goes at
 your kill pace (from the log where you have killed there, else the median of your runs), a named
-mob at one per respawn, so a camp of one or two named mobs loses to a quest. A quest step counts as
+mob at one per respawn, so a camp of one or two named mobs loses to a quest. Camps and quests in
+zones the game does not have (live EverQuest's Kunark, the revamps) are left out: the game's zones
+are the ones its Exploration achievements visit, Legends' own, and every zone your logs have killed
+in; "Mobs left out" under the plan lists what went. A quest step counts as
 repeatable when it wants one kind of item that can be had and that nobody in the walkthrough hands
 you; chain steps, rewards of 50 points or more and hand-ins the walkthrough does not make plain are
 listed, not planned. Hand-ins take the stack at once, so what counts is getting the items: coin and

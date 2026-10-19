@@ -1,3 +1,4 @@
+import { castable } from './spells'
 import { zoneEntered, type LogLine } from './logLine'
 import type { RankedSpell, Spell, SpellBook } from './spells'
 import { isBeneficialCategory, TICK_MS } from './durations'
@@ -18,7 +19,16 @@ export interface TrackerHooks {
   feed: (kind: FeedItem['kind'], text: string) => void
   onZone?: (zone: string) => void
   onCast?: (r: RankedSpell, at: number) => void
+  /** Whether a name the log gives as a caster is a pet the damage meter knows: never another player. */
+  isPet?: (name: string) => boolean
+  /** The buffs the character casts (the newest rank of each, from the casts kept): what Quick Buff can land. */
+  quickBuffs?: () => RankedSpell[]
 }
+
+/** "You activate Quick Buff.": Legends casts the character's buffs with no cast line, only the landings. */
+export const QUICK_BUFF = 'You activate Quick Buff.'
+/** How long after Quick Buff its landings are taken as the character's own casts. */
+export const QUICK_BUFF_MS = 15_000
 
 interface PendingCast {
   r: RankedSpell
@@ -132,6 +142,8 @@ export class SpellTracker {
   /** The last spell you began casting, by both its names, and until when a resist can be of that cast. */
   private lastCast: { names: string[]; until: number } | null = null
   private zone = ''
+  /** Quick Buff was activated: until when its landings are yours, which buffs they may be, and which have been counted as a cast. */
+  private quick: { until: number; spells: RankedSpell[]; counted: Set<string> } | null = null
 
   constructor(
     private readonly book: SpellBook,
@@ -154,6 +166,7 @@ export class SpellTracker {
 
     let m = RE_CAST.exec(text)
     if (m) return this.onCast(m[1], now)
+    if (text === QUICK_BUFF) return this.onQuickBuff(now)
     if (text.includes(' begins ') && (m = CAST_BY_OTHER.exec(text))) return this.onOtherCast(m[1], m[2], now)
 
     if ((m = RE_FAIL_NAMED.exec(text))) return void this.dropPending(m[1])
@@ -172,11 +185,15 @@ export class SpellTracker {
     if (FAIL_PREFIXES.some((p) => text.startsWith(p))) return void this.pending.pop()
 
     if (this.tryLand(text, now)) return
+    if (this.quick) {
+      if (this.quick.until < now) this.quick = null
+      else if (this.tryQuickLand(text, now)) return
+    }
 
     // Each "^(.+) …" pattern backtracks over the whole line, so a cheap look for its fixed words goes first.
     if (text.includes(' damage from ')) {
       if (text.includes(' damage from your ') && (m = RE_DOT_TICK.exec(text))) return this.onDotTick(m[1], m[2], now)
-      if ((m = RE_DOT_TICK_OTHER.exec(text)) && isPlayer(m[3])) return this.onDotTick(m[1], m[2], now, m[3])
+      if ((m = RE_DOT_TICK_OTHER.exec(text)) && this.otherPlayer(m[3])) return this.onDotTick(m[1], m[2], now, m[3])
     }
     if (text.startsWith('Your ')) {
       if ((m = RE_WORN_OFF.exec(text))) return this.onWornOff(m[1], m[2])
@@ -224,11 +241,47 @@ export class SpellTracker {
     if (this.pending.length > MAX_PENDING) this.pending.shift()
   }
 
-  /** Another player's cast of a spell timed for everyone: it waits for its landing text like yours. */
+  /**
+   * Quick Buff: the character's buffs land with no cast line of their own. For a while, a landing of a
+   * buff the character casts is its own cast: timed, counted, with "You" as its caster.
+   */
+  private onQuickBuff(now: number): void {
+    const spells = this.hooks.quickBuffs?.() ?? []
+    this.quick = spells.length ? { until: now + QUICK_BUFF_MS, spells, counted: new Set() } : null
+  }
+
+  private tryQuickLand(text: string, now: number): boolean {
+    const q = this.quick!
+    for (const r of q.spells) {
+      const s = r.spell
+      let target: string | null = null
+      if (s.landSelf && text === s.landSelf) target = SELF
+      else if (s.landOther && text.length > s.landOther.length && text.endsWith(s.landOther)) target = text.slice(0, text.length - s.landOther.length).trim()
+      if (!target) continue
+      // One cast a spell an activation, whoever it lands on (a group buff lands on each).
+      if (!q.counted.has(s.name)) {
+        q.counted.add(s.name)
+        this.hooks.onCast?.(r, now)
+      }
+      this.start(r, target, now)
+      return true
+    }
+    return false
+  }
+
+  /** A caster the log names who is another player: not a mob, and not a pet the damage meter knows (a pet's name is one word too). */
+  private otherPlayer(caster: string): boolean {
+    return isPlayer(caster) && !this.hooks.isPet?.(caster)
+  }
+
+  /**
+   * Another player's cast of a spell timed for everyone: it waits for its landing text like yours. A
+   * spell no class casts (an NPC's own Harm Touch, every class 255) is a mob's, whatever its name.
+   */
   private onOtherCast(caster: string, name: string, now: number): void {
-    if (!isPlayer(caster)) return
+    if (!this.otherPlayer(caster)) return
     const r = this.book.resolve(name)
-    if (!r || !this.config.ruleFor(r.spell.name).others) return
+    if (!r || !castable(r.spell) || !this.config.ruleFor(r.spell.name).others) return
     const d = this.config.durationFor(r.spell, r.rank)
     if (d.ticks === 0 || d.permanent) return
     this.pending.push({ r, at: now, expires: now + r.spell.castMs + CAST_SLACK_MS, targets: new Set(), caster })
@@ -281,6 +334,8 @@ export class SpellTracker {
       }
       if (!target || p.targets.has(targetKey(target))) continue
       p.targets.add(targetKey(target))
+      // Another's cast landing on you is a mob's (a player's never does): not timed as theirs.
+      if (p.caster && target === SELF) continue
       this.start(p.r, target, now, false, p.caster)
       if (s.beneficial) p.expires = Math.min(p.expires, now + GROUP_LAND_MS)
       else this.pending.splice(i, 1)
@@ -351,7 +406,7 @@ export class SpellTracker {
   private onDotTick(target: string, rankedName: string, now: number, caster?: string): void {
     const r = this.book.resolve(rankedName)
     if (!r) return
-    if (caster && !this.config.ruleFor(r.spell.name).others) return
+    if (caster && (!castable(r.spell) || target === SELF || !this.config.ruleFor(r.spell.name).others)) return
     const key = timerKey(r.spell.name, target)
     const t = this.board.get(key)
     if (!t) {

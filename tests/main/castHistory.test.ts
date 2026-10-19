@@ -21,6 +21,26 @@ afterEach(async () => {
 const cast = (stamp: string, spell: string) => `[${stamp}] You begin casting ${spell}.\r\n`
 
 describe('CastHistory', () => {
+  it('counts a buff landing after Quick Buff as one cast of its newest rank (LT-503)', async () => {
+    const logPath = join(dir, 'eqlog_Kelwyn_neriak.txt')
+    const o = { logPath, archiveDir: join(dir, 'archive'), stem: 'eqlog_Kelwyn_neriak', days: 0 }
+    const puma = { self: 'You begin to snarl as your features become feline.', other: ' growls with the spirit of the puma.', rankedName: 'Spirit of the Puma' }
+    await fs.writeFile(
+      logPath,
+      [
+        '[Thu Sep 24 11:03:02 2026] You activate Quick Buff.',
+        '[Thu Sep 24 11:03:05 2026] You begin to snarl as your features become feline.',
+        '[Thu Sep 24 11:03:05 2026] Vonartik growls with the spirit of the puma.',
+        // Too late to be Quick Buff's: someone else's.
+        '[Thu Sep 24 11:03:30 2026] You begin to snarl as your features become feline.',
+        '[Thu Sep 24 11:05:00 2026] You begin casting Spirit of the Puma.',
+        ''
+      ].join('\r\n')
+    )
+    const history = new LogHistory(join(dir, 'log-history.json'), { casts: dayConsumer(() => castCounter(() => [puma]), 2) })
+    expect((await new CastHistory(history, 'casts').recent(o)).counts).toEqual({ 'Spirit of the Puma': 2 })
+  })
+
   it('reads only what the live log has gained, never a line twice, and starts over on a new log', async () => {
     const logPath = join(dir, 'eqlog_Kelwyn_neriak.txt')
     const cacheFile = join(dir, 'log-history.json')

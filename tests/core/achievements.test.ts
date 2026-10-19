@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { AchievementBook, parseAchievements, sourceFromName, type AchMarks } from '../../src/core/achievements'
+import { AchievementBook, explorationZones, parseAchievements, sourceFromName, type AchMarks } from '../../src/core/achievements'
 import { HUNT } from '../../src/shared/game/hunt'
 
 const EXPORT = [
@@ -130,5 +130,25 @@ describe('Slayer hunting grounds', () => {
       // Most NPCs of the race first.
       expect(zones.map((z) => z[1])).toEqual([...zones.map((z) => z[1])].sort((a, b) => b - a))
     }
+  })
+})
+
+describe('the zones the Exploration achievements visit', () => {
+  it('reads each "Visit X" of the Exploration section, and nothing of other sections', () => {
+    const { sections } = parseAchievements(
+      [
+        'EverQuest: Exploration',
+        'C\tFaydwer Explorer',
+        'C\t\tCrushbone Traveler',
+        'C\tCrushbone Traveler',
+        'C\t\tVisit Crushbone',
+        'I\tBefallen Traveler',
+        'I\t\tVisit Befallen',
+        'EverQuest: Hunter',
+        'I\tHunter of Befallen',
+        'I\t\tVisit Nowhere'
+      ].join('\n')
+    )
+    expect(explorationZones(sections).sort()).toEqual(['Befallen', 'Crushbone'])
   })
 })

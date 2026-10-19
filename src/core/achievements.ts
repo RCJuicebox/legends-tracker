@@ -493,3 +493,16 @@ export function compareNames(x: string, y: string): number {
       .replace(/^(?:an?|the)\s+/, '')
   return key(x).localeCompare(key(y), undefined, { numeric: true, sensitivity: 'base' })
 }
+
+/**
+ * The game's zones, as its Exploration achievements name them ("Visit Befallen", in the names the zone
+ * lines use): what Legends has, since the client lists only its own. Empty for an export without them.
+ */
+export function explorationZones(sections: AchSection[]): string[] {
+  const out = new Set<string>()
+  for (const s of sections) {
+    if (s.name !== 'Exploration') continue
+    for (const a of s.ach) for (const o of a.c) if (o.t.startsWith('Visit ')) out.add(o.t.slice('Visit '.length).trim())
+  }
+  return [...out]
+}

@@ -27,6 +27,9 @@ vi.mock('electron', () => ({
     },
     quit: () => {
       h.calls.push('quit')
+    },
+    exit: () => {
+      h.calls.push('exit')
     }
   },
   globalShortcut: {
@@ -66,12 +69,12 @@ function fakeContext(o: { engine?: Engine; flushAll?: () => Promise<unknown>; up
     },
     overlays: { destroy: note('stop overlays'), recover: () => {} },
     engine: o.engine ?? { shutdown: note('stop engine'), board: { endWhere: () => [] }, pushFeed: () => {} },
-    updater: { stop: o.updaterStop ?? note('stop updater'), status: { state: 'idle' }, install: note('install update') },
+    updater: { stop: o.updaterStop ?? note('stop updater'), status: { state: 'idle' }, install: note('install update'), holdInstall: note('hold install') },
     watcher: { stop: note('stop game watcher') },
     achievementFiles: { stop: note('stop achievement poller') },
     inventoryFiles: { stop: note('stop inventory poller') },
     speech: { stop: note('stop speech') },
-    store: { flushAll: o.flushAll ?? (async () => note('save stores')()) },
+    store: { flushAll: o.flushAll ?? (async () => note('save stores')()), flushAllSync: note('save stores now') },
     features: [{ flush: async () => note('save followed plans')() }, {}, { flush: async () => note('save allakhazam pages')() }],
     logHistory: { flush: async () => note('save log history')() },
     petStore: { flush: async () => undefined },
@@ -118,11 +121,15 @@ describe('Quitting', () => {
     const windowEvents = new Map<string, () => void>()
     h.handlers.get('browser-window-created')!({}, { on: (event: string, fn: () => void) => void windowEvents.set(event, fn) })
     windowEvents.get('query-session-end')!()
+    // The stores are written on this thread first, and a downloaded update is held back (LT-508).
+    expect(h.calls.slice(0, 2)).toEqual(['hold install', 'save stores now'])
     // Said twice (query, then the end itself): done once.
     windowEvents.get('session-end')!()
-    await waitFor(() => h.calls.includes('quit'))
+    await waitFor(() => h.calls.includes('exit'))
     expect(h.calls).toContain('save stores')
     expect(h.calls.filter((c) => c === 'stop engine')).toHaveLength(1)
+    // The process ends without the quit event, which would start the installer for Windows to kill.
+    expect(h.calls).not.toContain('quit')
     expect(ctx.windows.quitting).toBe(true)
   })
 

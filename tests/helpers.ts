@@ -57,8 +57,10 @@ export function exampleShaman(book = fixtureBook()): CharacterSettings {
   }
 }
 
-export function harness(opts: { character?: CharacterSettings; rules?: Record<string, SpellRule> } = {}) {
+export function harness(opts: { character?: CharacterSettings; rules?: Record<string, SpellRule>; pets?: string[]; quickBuffs?: string[] } = {}) {
   const book = fixtureBook()
+  /** The ranked names the tracker counted as casts (the engine's casts.json). */
+  const casts: string[] = []
   const character: CharacterSettings = opts.character ?? { level: 50, classLevels: {}, focusSources: [] }
   const spoken: string[] = []
   const feedItems: [string, string][] = []
@@ -83,7 +85,10 @@ export function harness(opts: { character?: CharacterSettings; rules?: Record<st
     },
     {
       notify: (ns) => ns.forEach((n) => n.kind === 'speak' && spoken.push(n.text)),
-      feed: (kind, text) => void feedItems.push([kind, text])
+      feed: (kind, text) => void feedItems.push([kind, text]),
+      onCast: (r) => void casts.push(r.rankedName),
+      isPet: (name) => !!opts.pets?.includes(name),
+      quickBuffs: () => (opts.quickBuffs ?? []).flatMap((n) => book.resolve(n) ?? [])
     }
   )
   const feed = (text: string) => {
@@ -94,7 +99,7 @@ export function harness(opts: { character?: CharacterSettings; rules?: Record<st
       board.tick(line.time)
     }
   }
-  return { book, board, tracker, spoken, feed, feedItems }
+  return { book, board, tracker, spoken, feed, feedItems, casts }
 }
 
 export function at(stamp: string): number {

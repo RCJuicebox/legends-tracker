@@ -2,9 +2,10 @@ import { promises as fs } from 'node:fs'
 import { basename } from 'node:path'
 import { LogClock, parseLogLine, type LogLine } from '../../core/logLine'
 import { LogTailer } from '../../core/tailer'
-import { SpellBook, type Spell } from '../../core/spells'
+import { SpellBook, type RankedSpell, type Spell } from '../../core/spells'
 import { TimerBoard } from '../../core/timers'
 import { SpellTracker } from '../../core/spellTracker'
+import type { QuickBuffLanding } from '../castHistory'
 import { TriggerEngine } from '../../core/triggers'
 import { MoteTracker, moteName } from '../../core/motes'
 import { PetGearReader, petSummonName } from '../../core/pets'
@@ -294,6 +295,27 @@ export class Engine {
     this.emitStatus()
   }
 
+  /**
+   * The buffs the character casts, the newest rank of each (the casts kept in casts.json): what a Quick
+   * Buff activation can land, since Legends prints no cast line for it (LT-503).
+   */
+  private quickBuffs(): RankedSpell[] {
+    if (!this.book) return []
+    const newest = new Map<string, { r: RankedSpell; at: number }>()
+    for (const c of Object.values(this.store.casts.get())) {
+      const r = this.book.resolve(c.rankedName)
+      if (!r || !r.spell.beneficial || (!r.spell.landSelf && !r.spell.landOther)) continue
+      const had = newest.get(r.spell.name)
+      if (!had || c.lastCast > had.at) newest.set(r.spell.name, { r, at: c.lastCast })
+    }
+    return [...newest.values()].map((x) => x.r)
+  }
+
+  /** For the cast counts: each buff Quick Buff can land, by its landing texts and the ranked name it counts as. */
+  quickBuffLandings(): QuickBuffLanding[] {
+    return this.quickBuffs().map((r) => ({ self: r.spell.landSelf, other: r.spell.landOther, rankedName: r.rankedName }))
+  }
+
   async loadSpells(): Promise<void> {
     try {
       const heapBefore = process.memoryUsage().heapUsed
@@ -319,7 +341,9 @@ export class Engine {
           const prev = casts[r.rankedName]
           casts[r.rankedName] = { rankedName: r.rankedName, lastCast: at, count: (prev?.count ?? 0) + 1 }
           this.store.casts.set(casts)
-        }
+        },
+        isPet: (name) => this.combat.meter.kindOf(name).kind === 'pet',
+        quickBuffs: () => this.quickBuffs()
       })
     } catch (e) {
       log.error(`Could not load spells from ${this.settings.installDir}:`, e)

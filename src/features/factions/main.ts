@@ -1,3 +1,4 @@
+import { LEGENDS_ZONES } from '../../shared/game/factions'
 import { promises as fs, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import {
@@ -36,7 +37,7 @@ import { sanitizeFollowedPlan } from './tracker'
 import { FactionAlla } from './allaSource'
 import { FactionNpcs } from './npcSource'
 import type { Purchases } from '../../shared/ipc'
-import type { AchSection } from '../../core/achievements'
+import { explorationZones, type AchSection } from '../../core/achievements'
 import { PLAYABLE_RACES, playableRace } from '../../shared/game/races'
 import { CLASS_NAMES } from '../../shared/game/classes'
 import { itemKey, parseInventory } from '../../core/inventory'
@@ -678,7 +679,17 @@ async function planData(ctx: AppContext, character: string, refresh: boolean, wi
     (f) => standings[f] ?? null
   )
   const races = unlockedRaces(unlocks)
-  const catalog = buildCatalog({ ...input, items, npcs, swapCons: await swapConsFor(ctx, character, exported, view, races) })
+  // The game's zones: the client's Exploration achievements', Legends' own, and every zone the logs killed in.
+  const zonesInPlay = sections
+    ? [
+        ...explorationZones(sections),
+        ...LEGENDS_ZONES,
+        ...Object.keys(tallies.acts)
+          .filter((k) => k.startsWith('kill|'))
+          .map((k) => k.split('|')[1])
+      ]
+    : undefined
+  const catalog = buildCatalog({ ...input, items, npcs, zonesInPlay, swapCons: await swapConsFor(ctx, character, exported, view, races) })
   const acts = Object.values(tallies.acts)
   const theirs = others.flatMap((o) => Object.values(o.tallies.acts))
   return {
