@@ -290,19 +290,18 @@ export interface SlayerMark {
   named?: string[]
 }
 
-/** A label the app wrote: "Slayer_a_hill_giant", "Hunter_Boog_Mudtoe". */
-const MARKED = /^P .*, (?:Slayer|Hunter)_[^,]*$/m
-
-/** Whether a map file holds marks the app wrote. */
-export const isMarked = (text: string) => MARKED.test(text)
-
 /**
  * The marks for a zone's label layer: a point at each spot, red for the plan's mobs and deep blue for
- * Hunter named, labelled with what pops there ("Slayer_a_hill_giant_60%").
+ * Hunter named, labelled with what pops there ("a_hill_giant_60%", "Boog_Mudtoe").
  */
 export function mapMarks(spots: MapSpot[], named: MapSpot[]): string[] {
-  const label = (kind: string, s: MapSpot) =>
-    `${kind}_${s.mobs.map((m) => `${m.name}${m.chance < 100 ? ` ${m.chance}%` : ''}`).join(' or ')}`.replace(/[\s,]+/g, '_').replace(/[^\x20-\x7e]/g, '')
+  // What pops there, and its odds where it is a roll: "Boog_Mudtoe", "Andrew_Pine_25%". The colour says whose mark it is.
+  const label = (s: MapSpot) =>
+    s.mobs
+      .map((m) => `${m.name}${m.chance < 100 ? ` ${m.chance}%` : ''}`)
+      .join(' or ')
+      .replace(/[\s,]+/g, '_')
+      .replace(/[^\x20-\x7e]/g, '')
   const line = (s: MapSpot, rgb: string, size: number, text: string) => `P ${s.x}.0000, ${s.y}.0000, ${s.z}.0000, ${rgb}, ${size}, ${text}`
-  return [...spots.map((s) => line(s, '240, 40, 40', 2, label('Slayer', s))), ...named.map((s) => line(s, '0, 60, 220', 3, label('Hunter', s)))]
+  return [...spots.map((s) => line(s, '240, 40, 40', 2, label(s))), ...named.map((s) => line(s, '0, 60, 220', 3, label(s)))]
 }

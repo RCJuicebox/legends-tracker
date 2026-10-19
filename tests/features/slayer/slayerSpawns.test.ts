@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { isMarked, legendsSpawnsOf, mapMarks, mobSpawns, parseMap, spotsIn, spotsOf, waypoint, zoneIndex, zoneTimings, type SpawnTables } from '../../../src/features/slayer/spawns'
+import { legendsSpawnsOf, mapMarks, mobSpawns, parseMap, spotsIn, spotsOf, waypoint, zoneIndex, zoneTimings, type SpawnTables } from '../../../src/features/slayer/spawns'
 import type { RespawnRecord } from '../../../src/core/respawns'
 
 // TAKP's spawn tables in Legends' terms: made-up zones in the tables' shape.
@@ -160,12 +160,7 @@ describe('the game’s maps', () => {
 
   it('mark the plan’s spots and the Hunter named, as the game’s labels', () => {
     const lines = mapMarks(spotsOf(TABLES.unrest, ['a ghoul', 'lesser blade fiend']).slice(0, 1), spotsOf(TABLES.unrest, ['Khrix Fritchoff']))
-    expect(lines).toEqual([
-      'P 10.0000, 20.0000, 0.0000, 240, 40, 40, 2, Slayer_a_ghoul_90%_or_lesser_blade_fiend_10%',
-      'P 50.0000, 60.0000, 1.0000, 0, 60, 220, 3, Hunter_Khrix_Fritchoff'
-    ])
-    expect(isMarked(['P 1, 2, 3, 0, 0, 0, 3, to_Freeport', ...lines].join('\r\n'))).toBe(true)
-    expect(isMarked("P -325, -50, 0, 150, 0, 200, 3, to_Dagnor's_Cauldron\r\n")).toBe(false)
+    expect(lines).toEqual(['P 10.0000, 20.0000, 0.0000, 240, 40, 40, 2, a_ghoul_90%_or_lesser_blade_fiend_10%', 'P 50.0000, 60.0000, 1.0000, 0, 60, 220, 3, Khrix_Fritchoff'])
   })
 
   it('add Legends’ own spawns the tables lack, typed in as /waypoint takes them', () => {

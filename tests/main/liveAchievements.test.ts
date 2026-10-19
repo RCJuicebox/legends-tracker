@@ -438,6 +438,7 @@ describe('LiveAchievements counts Slayer kills since the export', () => {
     )
     await fs.writeFile(otherLog, entered('Wed Sep 30 11:57:00 2026', 'Lake Rathetear') + kill('Wed Sep 30 11:58:00 2026') + kill('Wed Sep 30 12:01:40 2026'))
     let answers = true
+    const killedNamed: string[] = []
     Object.assign((live as unknown as { ctx: object }).ctx, {
       historyOf: () => ({
         logPath: here,
@@ -445,7 +446,8 @@ describe('LiveAchievements counts Slayer kills since the export', () => {
         stem: 'eqlog_Tester_neriak',
         elsewhere: [{ folder: there, logPath: otherLog, archiveDir: join(there, 'archive') }]
       }),
-      logHistory: { reachable: async () => answers }
+      logHistory: { reachable: async () => answers },
+      slayer: { namedKilled: (mobs: string[]) => killedNamed.push(...mobs) }
     })
     Object.assign((live as unknown as { ctx: { engine: object } }).ctx.engine, { meter: { kindOf: () => ({ kind: 'mob' }) } })
     const s = {
@@ -465,6 +467,8 @@ describe('LiveAchievements counts Slayer kills since the export', () => {
     const at = (hms: string) => new Date(`2026-09-30T${hms}`).getTime()
     await readLog(s)
     expect(s.kills.get('a gnoll')?.times).toEqual([at('12:00:10'), at('12:01:40'), at('12:05:00')])
+    // Each kill is handed on, so a Hunter named killed comes off the game's map.
+    expect(killedNamed).toContain('a gnoll')
     // Each kill in the zone its log was in, found back before the export where the read began, and kept beside its time.
     expect(s.kills.get('a gnoll')?.zones).toEqual(['The Western Plains of Karana', 'Lake Rathetear', 'The Western Plains of Karana'])
     expect(s.zoneIn.get(here.toLowerCase())).toBe('The Western Plains of Karana')

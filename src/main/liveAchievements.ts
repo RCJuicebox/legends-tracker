@@ -584,6 +584,8 @@ export class LiveAchievements implements AppFeature {
       { flushLast: false }
     )
     for (const [k, t] of completed) s.completed.set(k, t)
+    // A Hunter named killed comes off the game's map (Plan › Hunter's marks).
+    if (kills.length) this.ctx.slayer?.namedKilled(kills.map((k) => k.mob))
     for (const { mob, at, zone: where } of kills) {
       const k = mob.toLowerCase()
       const had = s.kills.get(k) ?? { name: mob, times: [], zones: [] }

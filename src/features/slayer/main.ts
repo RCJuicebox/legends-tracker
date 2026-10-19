@@ -27,7 +27,7 @@ import {
   type SlayerPlanChoices,
   type SlayerPlanData
 } from './core'
-import { isMarked, mapMarks, mobSpawns, parseMap, raceMixer, spotsIn, zoneIndex, zoneTimings, type MobSpawn, type SlayerMap, type SlayerMark, type SpawnTables } from './spawns'
+import { mapMarks, mobSpawns, parseMap, raceMixer, spotsIn, zoneIndex, zoneTimings, type MobSpawn, type SlayerMap, type SlayerMark, type SpawnTables } from './spawns'
 import type { RespawnRecord } from '../../core/respawns'
 import TAKP from '../../shared/game/takpSpawns.json'
 import { hunterZones } from '../hunter/core'
@@ -84,6 +84,10 @@ export class SlayerPlanner implements AppFeature {
   private readonly marks: JsonFile<{ hunter: SlayerMark[] }>
   /** Slayer marks a version before 2.14.3 put on the game's maps: taken off once, at start. */
   private readonly staleSlayer: boolean
+  /** The game folder, once registered: a named killed takes its marks off the map then and there. */
+  private installDir: () => string = () => ''
+  /** The maps being written again, one write after another. */
+  private redraw: Promise<unknown> = Promise.resolve()
   private readonly shared = new Map<string, { at: number; data: Promise<SlayerPlanData> }>()
   /** The data the overlay's plan was last made from, by character: made again when it is old or another export came. */
   private readonly overlayData = new Map<string, { at: number; exportAt: number; data: Promise<SlayerPlanData>; done?: SlayerPlanData }>()
@@ -130,6 +134,7 @@ export class SlayerPlanner implements AppFeature {
       if (typeof zone !== 'string' || !Array.isArray(mobs)) throw new Error('No such zone.')
       return spawnMap(ctx.installDir(), zone, mobs.filter((m): m is string => typeof m === 'string').slice(0, 50))
     })
+    this.installDir = () => ctx.installDir()
     handle('slayer:mark', async (marks, set = 'hunter') => {
       if (!Array.isArray(marks) || set !== 'hunter') throw new Error('Nothing to mark.')
       // The Hunter named alone: a Slayer camp's mobs are everywhere in its zone, no help on the game's map.
@@ -140,11 +145,26 @@ export class SlayerPlanner implements AppFeature {
       this.marks.set({ hunter })
       return markMaps(ctx.installDir(), hunter)
     })
-    // The Slayer marks an older version put on the game's maps come off: the maps written again with the Hunter named alone.
-    if (this.staleSlayer && ctx.installDir())
-      void markMaps(ctx.installDir(), this.marks.get().hunter)
+    // The maps written again at start, as this version labels them: the Slayer marks an older version
+    // put there come off, and the Hunter named read as their names alone ("Hunter_" was dropped 2026-10-18).
+    if ((this.staleSlayer || this.marks.get().hunter.length) && ctx.installDir())
+      this.redraw = markMaps(ctx.installDir(), this.marks.get().hunter)
         .then(() => this.marks.set({ hunter: this.marks.get().hunter }))
-        .catch((e: unknown) => log.warn('Could not take the old Slayer marks off the game’s maps:', e))
+        .catch((e: unknown) => log.warn('Could not write the marks on the game’s maps again:', e))
+  }
+
+  /**
+   * Named the player killed (the live counts' kills, lower-cased or not): off the game's map at
+   * once. Plan › Hunter's marks lose them, and the map files are written again with the rest.
+   */
+  namedKilled(mobs: string[]): void {
+    const gone = new Set(mobs.map(bareName))
+    const was = this.marks.get().hunter
+    const hunter = was.map((m) => ({ ...m, named: (m.named ?? []).filter((n) => !gone.has(bareName(n))) })).filter((m) => m.named.length)
+    if (hunter.length === was.length && hunter.every((m, i) => m.named.length === (was[i].named ?? []).length)) return
+    this.marks.set({ hunter })
+    const dir = this.installDir()
+    if (dir) this.redraw = this.redraw.then(() => markMaps(dir, this.marks.get().hunter)).catch((e: unknown) => log.warn('Could not take a killed named off the game’s map:', e))
   }
 
   /**
@@ -388,13 +408,14 @@ export async function markMaps(installDir: string, marks: SlayerMark[]): Promise
     spots += lines.length
   }
   // Zones marked before and not now: the game's own label layer again, or none where the game has none.
+  // The copy is the game's own where nothing is marked: one that differs holds marks.
   for (const short of Object.keys(TABLES)) {
     if (marked.has(short)) continue
     const mine = await readText(join(set, `${short}_1.txt`))
-    if (mine === null || !isMarked(mine)) continue
+    if (mine === null) continue
     const base = await readText(join(maps, `${short}_1.txt`))
     if (base === null) await rm(join(set, `${short}_1.txt`), { force: true })
-    else await writeFile(join(set, `${short}_1.txt`), base, 'latin1')
+    else if (mine !== base) await writeFile(join(set, `${short}_1.txt`), base, 'latin1')
   }
   return { folder: set, zones: marked.size, spots }
 }
