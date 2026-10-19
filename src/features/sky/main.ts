@@ -7,16 +7,32 @@ import { everyStretch, type HistoryConsumer, type LogHistory } from '../../main/
 import { newerBuildWrote } from '../../main/schema'
 import type { AppContext } from '../../main/context'
 import type { AppFeature, FeatureDeps } from '../../main/appFeature'
-import { emptySkyTally, isSkyItem, joinSkyTallies, loggedCounts, readSkyLine, sanitizeSkyCharacter, SKY_QUESTS, type SkyCharacter, type SkyState, type SkyTally } from './core'
+import {
+  emptySkyCharacter,
+  emptySkyTally,
+  exportCounts,
+  isSkyItem,
+  joinSkyTallies,
+  lastLooted,
+  loggedCounts,
+  readSkyLine,
+  sanitizeSkyCharacter,
+  skyAchieved,
+  SKY_NAMES,
+  type SkyCharacter,
+  type SkyState,
+  type SkyTally
+} from './core'
 
 // Plan › Plane of Sky's side of the app (an optional module): the Sky's items counted over each
-// character's logs (a LogHistory consumer), and what the player keeps per character in sky.json: the
-// wish list, and their corrections to the counts. The consumer counts whether the module is on or not,
-// so turning it on finds the counts ready.
+// character's logs (a LogHistory consumer), the inventory and achievements exports as the game last
+// wrote them, and what the player keeps per character in sky.json: the wish list, the Tests starred
+// and ignored, and their corrections to the counts and the hand-ins. The consumer counts whether the
+// module is on or not, so turning it on finds the counts ready.
 
-/** Each stretch of log's Sky items and hand-ins, as a LogHistory consumer. */
+/** Each stretch of log's Sky items and hand-ins, as a LogHistory consumer. Version 2: when each item last came in. */
 const skyConsumer: HistoryConsumer<SkyTally> = {
-  version: 1,
+  version: 2,
   empty: emptySkyTally,
   reader: () => readSkyLine
 }
@@ -53,7 +69,7 @@ export class SkyTracker implements AppFeature {
   }
 
   private kept(character: string): SkyCharacter {
-    return this.file.get().characters[character] ?? { wishes: [], adjust: {} }
+    return this.file.get().characters[character] ?? emptySkyCharacter()
   }
 
   private keep(character: string, next: SkyCharacter): void {
@@ -66,7 +82,7 @@ export class SkyTracker implements AppFeature {
       return character
     }
     const quest = (name: unknown): string => {
-      if (typeof name !== 'string' || !SKY_QUESTS.some((q) => q.name === name)) throw new Error('No such Test.')
+      if (typeof name !== 'string' || !SKY_NAMES.has(name)) throw new Error('No such Test.')
       return name
     }
     handle('sky:state', async (character) => this.state(ctx, check(character)))
@@ -95,6 +111,27 @@ export class SkyTracker implements AppFeature {
       this.keep(c, { ...kept, adjust: have === logged ? adjust : { ...adjust, [k]: have - logged } })
       return this.state(ctx, c)
     })
+    // A Test starred, or ignored (on the Ignored tab alone), or not.
+    handle('sky:mark', async (character, name, mark, on) => {
+      const c = check(character)
+      const q = quest(name)
+      if (mark !== 'favorite' && mark !== 'ignored') throw new Error('Star a Test or ignore it.')
+      const kept = this.kept(c)
+      const list = mark === 'favorite' ? kept.favorites : kept.ignored
+      const next = list.filter((x) => x !== q).concat(on === true ? [q] : [])
+      this.keep(c, mark === 'favorite' ? { ...kept, favorites: next } : { ...kept, ignored: next })
+      return this.state(ctx, c)
+    })
+    // Hand-ins the player adds over what the log saw (another PC, logging off), or takes away (one it took for another).
+    handle('sky:turnIns', async (character, name, hand) => {
+      const c = check(character)
+      const q = quest(name)
+      if (!Number.isInteger(hand) || hand < -99 || hand > 99) throw new Error('Add or take away up to 99 hand-ins.')
+      const kept = this.kept(c)
+      const { [q]: _, ...turnIns } = kept.turnIns
+      this.keep(c, { ...kept, turnIns: hand ? { ...turnIns, [q]: hand } : turnIns })
+      return this.state(ctx, c)
+    })
   }
 
   private async tally(ctx: AppContext, character: string): Promise<SkyTally> {
@@ -102,8 +139,17 @@ export class SkyTracker implements AppFeature {
   }
 
   private async state(ctx: AppContext, character: string): Promise<SkyState> {
-    const t = await this.tally(ctx, character)
+    const [t, inv, ach] = await Promise.all([this.tally(ctx, character), ctx.inventoryFiles.exported(character), ctx.achievementFiles.exported(character)])
     const record = ctx.store.settings.get().characters[character]
-    return { character, ...this.kept(character), logged: loggedCounts(t), runs: t.runs, classes: Object.keys(record?.classLevels ?? {}) }
+    return {
+      character,
+      ...this.kept(character),
+      logged: loggedCounts(t),
+      last: lastLooted(t),
+      runs: t.runs,
+      classes: Object.keys(record?.classLevels ?? {}),
+      exported: inv ? { file: inv.file, modified: inv.modified, counts: exportCounts(inv.inventory) } : null,
+      achieved: ach ? skyAchieved(ach.sections, ach.modified) : null
+    }
   }
 }

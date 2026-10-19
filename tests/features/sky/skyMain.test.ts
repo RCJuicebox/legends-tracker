@@ -34,9 +34,14 @@ writeFileSync(
   ].join('')
 )
 
+const item = (location: string, name: string, count = 1) => ({ location, name, id: 1, count, augs: [] })
+/** The exports, as the game wrote them: none until a test gives one. */
+const exports: { inventory: unknown; achievements: unknown } = { inventory: null, achievements: null }
 const ctx = {
   store: { dir: h.dir, settings: { get: () => ({ characters: { Kelwyn_neriak: { level: 50, classLevels: { Monk: 50 }, focusSources: [] } } }) } },
-  historyOf: (c: string) => ({ logPath: join(logs, `eqlog_${c}.txt`), archiveDir: join(logs, 'Archive'), stem: `eqlog_${c}` })
+  historyOf: (c: string) => ({ logPath: join(logs, `eqlog_${c}.txt`), archiveDir: join(logs, 'Archive'), stem: `eqlog_${c}` }),
+  inventoryFiles: { exported: async () => exports.inventory },
+  achievementFiles: { exported: async () => exports.achievements }
 }
 const sky = SkyTracker.create({ logHistory: new LogHistory(join(h.dir, 'log-history.json'), SkyTracker.consumers), dir: h.dir })
 sky.register(ctx as unknown as AppContext)
@@ -77,6 +82,59 @@ describe('the Plane of Sky page', () => {
     expect(s.adjust).toEqual({ 'brass knuckles': 2 })
   })
 
+  it('stars a Test, ignores one, and keeps the hand-ins the player adds', async () => {
+    let s = await call('sky:mark', 'Kelwyn_neriak', FISTS, 'favorite', true)
+    expect(s.favorites).toEqual([FISTS])
+    s = await call('sky:mark', 'Kelwyn_neriak', 'Monk Test of Sight', 'ignored', true)
+    expect(s.ignored).toEqual(['Monk Test of Sight'])
+    s = await call('sky:mark', 'Kelwyn_neriak', FISTS, 'favorite', false)
+    expect(s.favorites).toEqual([])
+    s = await call('sky:turnIns', 'Kelwyn_neriak', FISTS, 2)
+    expect(s.turnIns).toEqual({ [FISTS]: 2 })
+    s = await call('sky:turnIns', 'Kelwyn_neriak', FISTS, 0)
+    expect(s.turnIns).toEqual({})
+  })
+
+  it('counts the inventory export’s Sky items and reads the class unlocks from the achievements export', async () => {
+    exports.inventory = {
+      file: 'Kelwyn_neriak-Inventory.txt',
+      modified: 5,
+      inventory: {
+        worn: [item('Primary', "Wu's Fist of Mastery +10")],
+        bags: [item('General 1-Slot1', 'Nebulous Sapphire', 2), item('General 1-Slot2', 'Bone Chips', 9)],
+        bank: [item('Bank1-Slot1', 'Nebulous Sapphire')],
+        sharedBank: [],
+        depot: [],
+        keyRing: []
+      }
+    }
+    exports.achievements = {
+      file: 'Kelwyn_neriak-Achievements.txt',
+      modified: 6,
+      sections: [
+        {
+          cat: 'Untapped Potential',
+          name: 'Classes',
+          ach: [
+            { n: 'Primary Class Unlock - Monk', c: [{ t: "Obtain Ton Po's Eye Patch.", d: true }, { t: 'Obtain Back Straps of Mastery.' }] },
+            {
+              n: 'Primary Class Unlock - Bard',
+              d: true,
+              c: [
+                { t: 'Obtain Mask of Song.', d: true },
+                { t: 'This achievement will autocomplete if you chose to confirm your Primary Class as a Bard.', d: true }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+    const s = await call('sky:state', 'Kelwyn_neriak')
+    exports.inventory = exports.achievements = null
+    expect(s.exported).toEqual({ file: 'Kelwyn_neriak-Inventory.txt', modified: 5, counts: { 'wus fist of mastery': 1, 'nebulous sapphire': 3 } })
+    expect(s.achieved).toEqual({ modified: 6, obtained: ['Monk Test of Sight'], unlocked: expect.objectContaining({ Monk: false, Bard: true, Warrior: true }), granted: ['Bard'] })
+  })
+
   it('refuses what a page should never send', async () => {
     await expect(call('sky:state', '../x')).rejects.toThrow('No such character.')
     await expect(call('sky:wish', 'Kelwyn_neriak', 'Monk Test of Nothing', 1)).rejects.toThrow('No such Test.')
@@ -84,6 +142,8 @@ describe('the Plane of Sky page', () => {
     await expect(call('sky:wish', 'Kelwyn_neriak', FISTS, 1, -1)).rejects.toThrow('No more than 99 hand-ins.')
     await expect(call('sky:have', 'Kelwyn_neriak', 'Bone Chips', 1)).rejects.toThrow('Not an item a Test takes.')
     await expect(call('sky:have', 'Kelwyn_neriak', 'Brass Knuckles', -1)).rejects.toThrow('Hold 0 to 9999.')
+    await expect(call('sky:mark', 'Kelwyn_neriak', FISTS, 'hidden', true)).rejects.toThrow('Star a Test or ignore it.')
+    await expect(call('sky:turnIns', 'Kelwyn_neriak', FISTS, 100)).rejects.toThrow('Add or take away up to 99 hand-ins.')
   })
 
   it('reads sky.json back as it was kept', async () => {

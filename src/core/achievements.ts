@@ -511,3 +511,20 @@ export function explorationZones(sections: AchSection[]): string[] {
   }
   return [...out]
 }
+
+/**
+ * Whether an achievement of a kind the export leaves out is done. The achievements window can hide
+ * completed ones, and an export made that way lists only what is open: one it leaves out is done, and
+ * a kind it leaves out entirely is all done. An export that lists completed ones too, but none of this
+ * kind, says nothing about it (a changed layout, a section the game did not write).
+ */
+export function leftOutIsDone(sections: AchSection[], ofKind: (section: AchSection, a: AchSection['ach'][number]) => boolean): boolean {
+  let listsDone = false
+  for (const s of sections) {
+    for (const a of s.ach) {
+      if (ofKind(s, a)) return true
+      if (a.d === true) listsDone = true
+    }
+  }
+  return !listsDone
+}

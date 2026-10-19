@@ -1,7 +1,7 @@
 import type { GameTable } from '../../core/gameTables'
 import { playableRace } from '../../shared/game/races'
 import type { AchSection, Achievement } from '../../core/achievements'
-import { leftOutIsDone } from './core'
+import { leftOutIsDone } from '../../core/achievements'
 import type { UnlockGoal } from './planTypes'
 
 // The race unlocks: Legends' "Untapped Potential: Races" achievements, one a race, each done by

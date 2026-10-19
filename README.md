@@ -855,23 +855,43 @@ of it, under a switch of its own (Overlays).
 ## Plane of Sky
 
 An optional module: off until you turn it on under Settings › Modules, when **Plane of Sky** joins
-Plan in the sidebar. **Tests** lists every class's Test quests, as the eqlwiki's Plane of Sky page
-has them (`scripts/sky-quests.mjs` builds `src/shared/game/skyQuests.json` from it): the reward, the
-giver and what to say, and a chip for each thing it takes (its Wind Rune, from any Plane of Sky mob,
-and the island items) with how many you hold of how many it needs, and where it drops. Your classes
-come first; the Tests you hold everything for are marked Ready, and the rest follow nearest to done.
+Plan in the sidebar. It reads every class's Test quests from the eqlwiki's Plane of Sky page
+(`scripts/sky-quests.mjs` builds `src/shared/game/skyQuests.json` from it), and has eight tabs:
 
-What you hold is counted from your log: every copy you looted (kept, or stored in the depot, the
-currency tab or the Dragon Hoard), less what a completed trade took and what you merged away (two
-become one); one sold as it dropped was never held. A trade with a Test's giver that completes with
-its items in it is that Test handed in. Copies you had before your log began are not in it: on
-**Items**, type what you hold, and the log goes on counting from your number.
+- **Tests**: each Test with its class, reward, giver and what to say, the mobs to kill, and a chip
+  for each thing it takes (its Wind Rune, from any Plane of Sky mob, and the island items) with how
+  many you hold of how many it needs. A row says whether it was handed in (and how often), how many
+  of its items are missing, and which of them other Tests take too (🔗); ☆ stars it. Opened, it shows
+  each item's count from your log and from the inventory export, what eqlwiki says each item and the
+  reward is, the hand-ins (with **+1 hand-in** and **−1** to put the count right) and **Ignore this
+  Test**. Filters: class (your classes first), island, mob, words, and boxes to hide the Tests you
+  hold everything for, hide or show only those handed in, and show only the starred. Sorted nearest
+  to done (the Tests you can hand in now first), most recently looted, by class or by island.
+- **Ready**: the Tests you hold everything for, with a box for those never handed in.
+- **Wish list**: **☆ Want it** on a Test puts its reward here, and + wants it more than once (two
+  Wu's Fists of Mastery to merge is the Monk Test of Fists twice). It counts the hand-ins your log
+  sees from when you added the wish (and any you add by hand), and **What they still take** adds up
+  every wish's items: how many you hold, how many they need, and where each drops.
+- **Targets**: where to hunt, mob by mob and island by island, for what the Tests shown (or every
+  Test never handed in, or the wish list) are missing.
+- **Items**: every item the Tests take, with your log's count and the export's: type what you hold
+  where the log's is wrong, and the log goes on counting from your number.
+- **Cleanup**: what you hold that every Test taking it has been handed in for and no wish wants. A
+  Test can be done again and two rewards merge into a +1, so a row you hold a whole set for says Keep.
+- **Classes**: each class's Tests handed in, and whether it is unlocked as a Primary Class.
+- **Ignored**: the Tests you ignored, out of every other tab, with **Show it again**.
 
-**☆ Want it** puts a reward on the **Wish list**, and + wants it more than once: two Wu's Fists of
-Mastery to merge is the Monk Test of Fists twice. The wish list counts the hand-ins your log sees
-from when you added the wish (and any you add by hand, for another PC or a log turned off), and
-**What they still take** adds up every wish's items: how many you hold, how many they need, and
-where each drops.
+What you hold is counted from your log, from your inventory export (`/outputfile inventory`: bags,
+bank, depot, worn and Storage, but not the currency tab or the Dragon Hoard, where the Wind Runes
+are), or the higher of the two for each item (the default). The log counts every copy you looted
+(kept, or stored in the depot, the currency tab or the Dragon Hoard), less what a completed trade
+took and what you merged away (two become one); one sold as it dropped was never held. A Test is
+handed in when a trade with its giver completes with its items in it, when you add a hand-in, when
+its reward is in your inventory export, or when the achievements export (`/outputfile
+achievements`) says you obtained its reward. That export's Primary Class Unlocks say which classes
+are unlocked; an export made with completed achievements hidden leaves out the classes that are,
+and a class unlocked by confirming it or by a token marks every reward obtained, so its rewards say
+nothing of its Tests.
 
 ## Stats
 
@@ -1033,7 +1053,7 @@ The settings folder, `%APPDATA%\Legends Tracker` (or the `EQL_USER_DATA` folder)
 | `slayer-plan.json` | Per character, what you chose on the Slayer page: achievements left out or taken in, camps and mobs ruled out, minutes between camps and the pace assumed where nothing gives one |
 | `hunter-broken.json` | The Hunter achievements you said do not work in Legends, left out of the plans and the overlay |
 | `slayer-races.json` | The races you said mobs are (Count as… on the Slayer page), for every character, over what eqlwiki says |
-| `sky.json` | Per character, the Plane of Sky wish list (each reward wanted, how many times, since when, and hand-ins you added) and what you said you hold where the log's count was wrong |
+| `sky.json` | Per character, the Plane of Sky wish list (each reward wanted, how many times, since when, and hand-ins you added), the Tests starred and ignored, hand-ins you added or took away, and what you said you hold where the log's count was wrong |
 | `hunter-spots.json` | The spots you found Hunter named at in play (Found it here on the Hunter page), drawn on its maps and marked on the game's map with the built-in ones |
 | `map-marks.json` | What the Slayer and Hunter pages last marked on the game's map (`maps\LegendsTracker`), each page's apart |
 | `faction-follow.json` | Per character, the faction plan the achievements overlay follows: its steps, the step you are on, and what is done |

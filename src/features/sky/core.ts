@@ -3,10 +3,13 @@ import { itemKey } from '../../core/inventory'
 import { parseLootLine } from '../../core/loot'
 import { SELF } from '../../core/combatLines'
 import type { LogLine } from '../../core/logLine'
+import { leftOutIsDone, type AchSection } from '../../core/achievements'
+import type { Inventory } from '../../shared/character'
 
 // Plan › Plane of Sky (an optional module): every class's Test quests as the eqlwiki lists them
-// (scripts/sky-quests.mjs), what the player's log says they hold of each thing a quest takes, and the
-// wish list: the rewards they want, and how many of each.
+// (scripts/sky-quests.mjs), what the player's log says they hold of each thing a quest takes, and what
+// the player keeps (the wish list, favourites, Tests ignored, corrections). What the page draws from
+// them (each Test's view, the targets, the cleanup, the classes) is views.ts.
 //
 // What is held comes from the log alone, as a LogHistory consumer counts it:
 //   --You have looted a Nebulous Sapphire from Sister of the Spire's corpse.--          +1
@@ -62,8 +65,8 @@ const GIVERS: ReadonlySet<string> = new Set(SKY_QUESTS.map((q) => q.giver))
 
 /** One stretch of log's count of the Sky's items, and the Tests it saw handed in. */
 export interface SkyTally {
-  /** By item key: copies that came in, and copies that went (handed over, merged away). */
-  items: Record<string, { got: number; gave: number }>
+  /** By item key: copies that came in, and copies that went (handed over, merged away); when the last came in. */
+  items: Record<string, { got: number; gave: number; last?: number }>
   /** By Test name: when each hand-in was. */
   runs: Record<string, number[]>
   /** The trade open at the end of what was read: its NPC and what was offered, by item as printed. */
@@ -77,12 +80,13 @@ const TRADED = /^You complete the trade with (.+)\.$/
 const CANCELLED = 'You have cancelled the trade.'
 const MERGED = /^You have successfully merged two items together to create a new item: (.+)$/
 
-function count(into: SkyTally, item: string, got: number, gave: number): void {
+function count(into: SkyTally, item: string, got: number, gave: number, at: number): void {
   const k = itemKey(item)
   if (!SKY_KEYS.has(k)) return
   const c = (into.items[k] ??= { got: 0, gave: 0 })
   c.got += got
   c.gave += gave
+  if (got) c.last = at
 }
 
 /** The Test a completed trade with one of the Sky's givers was: the giver's with most of its items in it. */
@@ -112,19 +116,19 @@ export function readSkyLine(line: LogLine, into: SkyTally): void {
     const t = into.trade
     if (!m || !t || t.npc !== m[1]) return
     delete into.trade
-    for (const [item, n] of Object.entries(t.items)) count(into, item, 0, n)
+    for (const [item, n] of Object.entries(t.items)) count(into, item, 0, n, line.time)
     const q = GIVERS.has(t.npc) ? questOfTrade(t.npc, Object.keys(t.items)) : null
     if (q) (into.runs[q.name] ??= []).push(line.time)
   } else if (text === CANCELLED) {
     delete into.trade
   } else if (text.startsWith('You have successfully merged ')) {
     const m = MERGED.exec(text)
-    if (m) count(into, m[1], 0, 1)
+    if (m) count(into, m[1], 0, 1, line.time)
   } else {
     const e = parseLootLine(text)
     // Kept, or put in the depot, the currency tab or the Dragon Hoard: held. Sold as it dropped: never
     // held. Looted into a merge: one in, one out.
-    if (e?.kind === 'loot' && e.looter === SELF && e.outcome !== 'sold' && e.outcome !== 'merged') count(into, e.item, e.count, 0)
+    if (e?.kind === 'loot' && e.looter === SELF && e.outcome !== 'sold' && e.outcome !== 'merged') count(into, e.item, e.count, 0, line.time)
   }
 }
 
@@ -136,6 +140,7 @@ export function joinSkyTallies(stretches: readonly SkyTally[]): SkyTally {
       const o = (out.items[k] ??= { got: 0, gave: 0 })
       o.got += c.got
       o.gave += c.gave
+      if (c.last) o.last = Math.max(o.last ?? 0, c.last)
     }
     for (const [q, ts] of Object.entries(s.runs)) (out.runs[q] ??= []).push(...ts)
   }
@@ -146,6 +151,13 @@ export function joinSkyTallies(stretches: readonly SkyTally[]): SkyTally {
 export function loggedCounts(t: SkyTally): Record<string, number> {
   const out: Record<string, number> = {}
   for (const [k, c] of Object.entries(t.items)) out[k] = Math.max(0, c.got - c.gave)
+  return out
+}
+
+/** When the log last saw each item come in, by item key. */
+export function lastLooted(t: SkyTally): Record<string, number> {
+  const out: Record<string, number> = {}
+  for (const [k, c] of Object.entries(t.items)) if (c.last) out[k] = c.last
   return out
 }
 
@@ -168,17 +180,48 @@ export interface SkyCharacter {
   wishes: SkyWish[]
   /** By item key: what the player said they hold less what the log counted then. */
   adjust: Record<string, number>
+  /** Tests starred, by name. */
+  favorites: string[]
+  /** Tests the player never wants to see, by name: on the Ignored tab alone. */
+  ignored: string[]
+  /** By Test name: hand-ins the player added (or took away) over what the log saw. */
+  turnIns: Record<string, number>
 }
 
-/** What the page shows for a character: the log's counts and hand-ins, and what the player keeps. */
+/** What the inventory export (/outputfile inventory) holds of the Sky's items: bags, bank, depot, worn. Not the currency tab or the Dragon Hoard. */
+export interface SkyExport {
+  file: string
+  modified: number
+  /** By item key, a merged copy's +N ignored; the Tests' rewards too. */
+  counts: Record<string, number>
+}
+
+/** What the achievements export (/outputfile achievements) says of the Primary Class Unlocks. */
+export interface SkyAchieved {
+  modified: number
+  /** Tests whose reward the export says was obtained, by name, under classes unlocked by playing. */
+  obtained: string[]
+  /** By class: unlocked as a Primary Class or not; a class missing the export cannot say of. */
+  unlocked: Record<string, boolean>
+  /** Classes whose unlock was granted (confirmed, or a token): their "Obtain" rows say nothing of the Tests. */
+  granted: string[]
+}
+
+/** What the page shows for a character: the log's counts and hand-ins, the exports, and what the player keeps. */
 export interface SkyState extends SkyCharacter {
   character: string
   /** By item key. */
   logged: Record<string, number>
+  /** By item key: when the log last saw one come in. */
+  last: Record<string, number>
   /** By Test name: when the log saw each hand-in. */
   runs: Record<string, number[]>
   /** The character's classes, from its record, its main one first: the page opens on them. */
   classes: string[]
+  /** Null without an inventory export. */
+  exported: SkyExport | null
+  /** Null without an achievements export. */
+  achieved: SkyAchieved | null
 }
 
 /** Held, by item key: the log's count with the player's correction, never under none. */
@@ -195,91 +238,22 @@ export function wishDone(w: SkyWish, runs: Readonly<Record<string, readonly numb
 /** How many more times a wish wants its Test done. */
 export const wishLeft = (w: SkyWish, runs: Readonly<Record<string, readonly number[]>>): number => Math.max(0, w.want - wishDone(w, runs))
 
-/** A Test as the page shows it: each thing it takes with how many are held and needed, and how near it is. */
-export interface QuestView {
-  quest: SkyQuest
-  /** Times it is wanted still (the wish list); 1 when it is not, or no more. */
-  times: number
-  /** Times the wish list wants it in all; 0 when it is not on it. */
-  want: number
-  needs: { item: SkyItem; have: number; need: number }[]
-  /** Every need met: it can be handed in now. */
-  ready: boolean
-  /** The share of what it takes that is held, 0 to 1. */
-  near: number
-  /** Hand-ins the log saw. */
-  done: number
-}
-
-export function questView(q: SkyQuest, s: Pick<SkyState, 'logged' | 'adjust' | 'runs' | 'wishes'>): QuestView {
-  const w = s.wishes.find((x) => x.quest === q.name)
-  const left = w ? wishLeft(w, s.runs) : 1
-  const times = Math.max(1, left)
-  const needs = questNeeds(q).map((item) => ({ item, have: heldOf(s, item.name), need: times }))
-  const total = needs.reduce((n, x) => n + x.need, 0)
-  const got = needs.reduce((n, x) => n + Math.min(x.have, x.need), 0)
-  return {
-    quest: q,
-    times,
-    want: w?.want ?? 0,
-    needs,
-    ready: needs.every((x) => x.have >= 1),
-    near: total ? got / total : 1,
-    done: s.runs[q.name]?.length ?? 0
-  }
-}
-
-/** Ready first, then nearest to done, then as the wiki lists them. */
-export function byNearest(a: QuestView, b: QuestView): number {
-  return Number(b.ready) - Number(a.ready) || b.near - a.near || SKY_QUESTS.indexOf(a.quest) - SKY_QUESTS.indexOf(b.quest)
-}
-
-/** One line of the wish list's shopping list: an item, what the wishes still take of it, and what is held. */
-export interface ShoppingRow {
-  item: SkyItem
-  need: number
-  have: number
-  /** The Tests on the wish list that take it. */
-  for: string[]
-}
-
-/** What every wish still takes, item by item, by island (the runes first, then what is from elsewhere last). */
-export function shoppingList(s: Pick<SkyState, 'logged' | 'adjust' | 'runs' | 'wishes'>): ShoppingRow[] {
-  const rows = new Map<string, ShoppingRow>()
-  for (const w of s.wishes) {
-    const q = SKY_QUESTS.find((x) => x.name === w.quest)
-    const left = q ? wishLeft(w, s.runs) : 0
-    if (!q || !left) continue
-    for (const item of questNeeds(q)) {
-      const k = itemKey(item.name)
-      const r = rows.get(k) ?? { item, need: 0, have: heldOf(s, item.name), for: [] }
-      r.need += left
-      if (!r.for.includes(q.name)) r.for.push(q.name)
-      rows.set(k, r)
-    }
-  }
-  const rank = (i: SkyItem) => i.island ?? (/^Wind Rune /.test(i.name) ? 0 : 99)
-  return [...rows.values()].sort((a, b) => rank(a.item) - rank(b.item) || a.item.name.localeCompare(b.item.name))
-}
-
-/** A Test whose name, class, giver, reward or items hold every word typed. */
-export function questMatch(q: SkyQuest, filter: string): boolean {
-  const words = filter.toLowerCase().split(/\s+/).filter(Boolean)
-  if (!words.length) return true
-  const hay = [q.name, q.cls, q.giver, ...q.rewards, ...questNeeds(q).flatMap((i) => [i.name, i.from ?? ''])].join(' ').toLowerCase()
-  return words.every((w) => hay.includes(w))
-}
-
 /**
  * The Test that gives a reward, by the reward’s name (a merged one’s +N is ignored).
  * @public
  */
 export const questOfReward = (reward: string): SkyQuest | undefined => SKY_QUESTS.find((q) => q.rewards.some((r) => itemKey(r) === itemKey(reward)))
 
-/** sky.json's character part as read back: wishes for Tests there are, and whole-number corrections. */
+/** The Tests by name. */
+export const SKY_NAMES: ReadonlySet<string> = new Set(SKY_QUESTS.map((q) => q.name))
+
+/** A character with nothing kept yet. */
+export const emptySkyCharacter = (): SkyCharacter => ({ wishes: [], adjust: {}, favorites: [], ignored: [], turnIns: {} })
+
+/** sky.json's character part as read back: wishes, stars and ignores for Tests there are, and whole-number corrections. */
 export function sanitizeSkyCharacter(v: unknown): SkyCharacter {
   const o = v && typeof v === 'object' ? (v as Partial<Record<keyof SkyCharacter, unknown>>) : {}
-  const names = new Set(SKY_QUESTS.map((q) => q.name))
+  const names = SKY_NAMES
   const wishes = (Array.isArray(o.wishes) ? o.wishes : []).flatMap((x): SkyWish[] => {
     const w = x as Partial<SkyWish> | null
     if (!w || typeof w.quest !== 'string' || !names.has(w.quest) || !Number.isInteger(w.want) || typeof w.since !== 'number') return []
@@ -290,8 +264,64 @@ export function sanitizeSkyCharacter(v: unknown): SkyCharacter {
   const adjust: Record<string, number> = {}
   if (o.adjust && typeof o.adjust === 'object')
     for (const [k, n] of Object.entries(o.adjust)) if (SKY_KEYS.has(k) && Number.isInteger(n) && n !== 0 && Math.abs(n as number) < 10_000) adjust[k] = n as number
-  return { wishes: wishes.filter((w, i) => wishes.findIndex((x) => x.quest === w.quest) === i), adjust }
+  const tests = (x: unknown) => [...new Set(Array.isArray(x) ? x.filter((n): n is string => typeof n === 'string' && names.has(n)) : [])]
+  const turnIns: Record<string, number> = {}
+  if (o.turnIns && typeof o.turnIns === 'object')
+    for (const [q, n] of Object.entries(o.turnIns)) if (names.has(q) && Number.isInteger(n) && n !== 0 && Math.abs(n as number) <= 99) turnIns[q] = n as number
+  return {
+    wishes: wishes.filter((w, i) => wishes.findIndex((x) => x.quest === w.quest) === i),
+    adjust,
+    favorites: tests(o.favorites),
+    ignored: tests(o.ignored),
+    turnIns
+  }
 }
 
 /** Whether an item is one a Test takes or gives: the only ones a correction is kept for. */
 export const isSkyItem = (name: string): boolean => SKY_KEYS.has(itemKey(name))
+
+// ---- The exports ----
+
+/** The Sky's items in an inventory export, by item key: every place it lists, but not what is socketed in another item. */
+export function exportCounts(inv: Pick<Inventory, 'worn' | 'bags' | 'bank' | 'sharedBank' | 'depot' | 'keyRing'>): Record<string, number> {
+  const out: Record<string, number> = {}
+  const add = (name: string, n: number) => {
+    const k = itemKey(name)
+    if (SKY_KEYS.has(k) && n > 0) out[k] = (out[k] ?? 0) + n
+  }
+  for (const it of [...inv.worn, ...inv.bags, ...inv.bank, ...inv.sharedBank, ...inv.depot]) add(it.name, it.count || 1)
+  for (const k of inv.keyRing) add(k.name, 1)
+  return out
+}
+
+const CLASS_UNLOCK = /^Primary Class Unlock - (.+?)\s*$/i
+const OBTAIN = /^Obtain (.+?)\.?\s*$/i
+/** The two lines every class unlock carries, each with its own status: done, the unlock was granted (confirmed, or a token). */
+const GRANTED = /will autocomplete|can be bypassed/i
+
+/**
+ * What an achievements export says of the Primary Class Unlocks. Each has an "Obtain <reward>." part
+ * per Test, done once the reward was had; but an unlock granted rather than played marks every part
+ * done, so a class whose autocomplete or bypass line is done says nothing of its Tests. An export made
+ * with completed achievements hidden leaves out a class that is unlocked (leftOutIsDone).
+ */
+export function skyAchieved(sections: readonly AchSection[], modified: number): SkyAchieved {
+  const out: SkyAchieved = { modified, obtained: [], unlocked: {}, granted: [] }
+  for (const s of sections)
+    for (const a of s.ach) {
+      const cls = CLASS_UNLOCK.exec(a.n)?.[1]
+      if (!cls) continue
+      out.unlocked[cls] = a.d === true
+      if (a.c.some((o) => o.d && GRANTED.test(o.t))) {
+        out.granted.push(cls)
+        continue
+      }
+      for (const o of a.c) {
+        const reward = o.d ? OBTAIN.exec(o.t)?.[1] : undefined
+        const q = reward ? SKY_QUESTS.find((x) => x.cls === cls && x.rewards.some((r) => itemKey(r) === itemKey(reward))) : undefined
+        if (q && !out.obtained.includes(q.name)) out.obtained.push(q.name)
+      }
+    }
+  if (leftOutIsDone(sections as AchSection[], (_s, a) => CLASS_UNLOCK.test(a.n))) for (const cls of new Set(SKY_QUESTS.map((q) => q.cls))) out.unlocked[cls] ??= true
+  return out
+}

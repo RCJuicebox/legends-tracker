@@ -1,23 +1,23 @@
 import { describe, expect, it } from 'vitest'
 import { parseLogLine } from '../../../src/core/logLine'
 import {
-  byNearest,
+  emptySkyCharacter,
   emptySkyTally,
   heldOf,
   joinSkyTallies,
+  lastLooted,
   loggedCounts,
   questOfReward,
-  questMatch,
   questOfTrade,
-  questView,
   readSkyLine,
   sanitizeSkyCharacter,
-  shoppingList,
   SKY_QUESTS,
   wishDone,
   wishLeft,
+  type SkyState,
   type SkyTally
 } from '../../../src/features/sky/core'
+import { questMatch, questView, shoppingList, sortViews } from '../../../src/features/sky/views'
 
 // Plan › Plane of Sky: the Tests as the wiki lists them, the Sky's items counted from the log, and the
 // wish list's sums. The loot lines are real ones' wording; the hand-in is the wording every NPC trade has.
@@ -97,6 +97,7 @@ describe('the log', () => {
       at('12:18:30', "You have successfully merged two items together to create a new item: Wu's Fist of Mastery +1")
     ])
     expect(loggedCounts(t)).toEqual({ 'wus fist of mastery': 1 })
+    expect(lastLooted(t)['wus fist of mastery']).toBe(parseLogLine(at('12:00:01', 'x'))!.time)
   })
 
   it('keeps a trade open across reads, and joins stretches in order', () => {
@@ -110,9 +111,22 @@ describe('the log', () => {
   })
 })
 
+/** A character's state with nothing in it but what a test gives. */
+const skyState = (p: Partial<SkyState> = {}): SkyState => ({
+  character: 'Kelwyn_neriak',
+  ...emptySkyCharacter(),
+  logged: {},
+  last: {},
+  runs: {},
+  classes: [],
+  exported: null,
+  achieved: null,
+  ...p
+})
+
 describe('the wish list', () => {
   const runs = { [FISTS]: [100, 300] }
-  const state = { logged: { [SAPPHIRE]: 1, 'wind rune neza': 3 }, adjust: { 'brass knuckles': 1 }, runs, wishes: [{ quest: FISTS, want: 3, since: 200 }] }
+  const state = skyState({ logged: { [SAPPHIRE]: 1, 'wind rune neza': 3 }, adjust: { 'brass knuckles': 1 }, runs, wishes: [{ quest: FISTS, want: 3, since: 200 }] })
 
   it('counts the hand-ins since a wish was made, and those added by hand', () => {
     expect(wishDone(state.wishes[0], runs)).toBe(1)
@@ -123,7 +137,8 @@ describe('the wish list', () => {
   it('needs each item as many times as a wish has left, and adds the wishes up', () => {
     const v = questView(
       SKY_QUESTS.find((q) => q.name === FISTS)!,
-      state
+      state,
+      'log'
     )
     expect(v.times).toBe(2)
     expect(v.want).toBe(3)
@@ -133,8 +148,9 @@ describe('the wish list', () => {
       ['Brass Knuckles', 1, 2]
     ])
     expect(v.ready).toBe(true)
+    expect(v.missing).toBe(0)
     expect(v.near).toBeCloseTo(4 / 6)
-    expect(shoppingList(state).map((r) => [r.item.name, r.have, r.need, r.for])).toEqual([
+    expect(shoppingList(state, 'log').map((r) => [r.item.name, r.have, r.need, r.for])).toEqual([
       ['Wind Rune Neza', 3, 2, [FISTS]],
       ['Nebulous Sapphire', 1, 2, [FISTS]],
       ['Brass Knuckles', 1, 2, [FISTS]]
@@ -143,12 +159,11 @@ describe('the wish list', () => {
 
   it('puts a correction on the log’s count, never under none, and sorts the ready Tests first', () => {
     expect(heldOf({ logged: { [SAPPHIRE]: 1 }, adjust: { [SAPPHIRE]: -4 } }, 'Nebulous Sapphire')).toBe(0)
-    const none = { logged: {}, adjust: {}, runs: {}, wishes: [] }
-    const views = SKY_QUESTS.slice(0, 3).map((q) => questView(q, none))
+    const views = SKY_QUESTS.slice(0, 3).map((q) => questView(q, skyState(), 'log'))
     const rune = SKY_QUESTS[2].runes[0].toLowerCase()
     const sorted = SKY_QUESTS.slice(0, 3)
-      .map((q) => questView(q, { ...none, logged: { [rune]: 1 } }))
-      .sort(byNearest)
+      .map((q) => questView(q, skyState({ logged: { [rune]: 1 } }), 'log'))
+      .sort(sortViews('near'))
     expect(views.every((v) => !v.ready && v.near === 0)).toBe(true)
     expect(sorted[0].quest.name).toBe(SKY_QUESTS[2].name)
   })
@@ -169,8 +184,18 @@ describe('the wish list', () => {
         { quest: FISTS, want: 2, since: 5 },
         { quest: 'Monk Test of Sight', want: 99, since: 1 }
       ],
-      adjust: { [SAPPHIRE]: 2 }
+      adjust: { [SAPPHIRE]: 2 },
+      favorites: [],
+      ignored: [],
+      turnIns: {}
     })
-    expect(sanitizeSkyCharacter(null)).toEqual({ wishes: [], adjust: {} })
+    expect(sanitizeSkyCharacter(null)).toEqual(emptySkyCharacter())
+    expect(
+      sanitizeSkyCharacter({
+        favorites: [FISTS, FISTS, 'Nope', 3],
+        ignored: ['Monk Test of Sight'],
+        turnIns: { [FISTS]: 2, 'Monk Test of Sight': -1, Nope: 1, 'Monk Test of Speed': 500 }
+      })
+    ).toMatchObject({ favorites: [FISTS], ignored: ['Monk Test of Sight'], turnIns: { [FISTS]: 2, 'Monk Test of Sight': -1 } })
   })
 })

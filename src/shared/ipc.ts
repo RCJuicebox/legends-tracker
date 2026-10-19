@@ -428,6 +428,10 @@ export interface Invokes {
   'sky:wish': (character: string, quest: string, want: number, extra?: number) => SkyState
   /** Says how many of an item the character holds: kept as a correction to the log's count; the state after. */
   'sky:have': (character: string, item: string, have: number) => SkyState
+  /** Stars a Test, or ignores it (on the Ignored tab alone), or takes that back; the state after. */
+  'sky:mark': (character: string, quest: string, mark: 'favorite' | 'ignored', on: boolean) => SkyState
+  /** Hand-ins of a Test the player adds over what the log saw (or takes away, below 0); the state after. */
+  'sky:turnIns': (character: string, quest: string, hand: number) => SkyState
   /** Where the character being played is in its faction plan, and its Slayer counts since its achievements export. */
   'achievements:track': (watching?: boolean) => AchievementTrack | null
   /** The player's last /loc, while they are still in its zone; null without one (FEAT-023). */
@@ -650,6 +654,8 @@ const INVOKE_CHANNELS: Record<InvokeChannel, true> = {
   'sky:state': true,
   'sky:wish': true,
   'sky:have': true,
+  'sky:mark': true,
+  'sky:turnIns': true,
   'achievements:track': true,
   'game:location': true,
   'character:exports': true,

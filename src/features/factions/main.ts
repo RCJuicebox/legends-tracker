@@ -15,7 +15,6 @@ import {
   withCons,
   factionView,
   joinFactions,
-  leftOutIsDone,
   parseFactionPageFull,
   parseFactionsExport,
   progressionStatus,
@@ -38,7 +37,7 @@ import { lookUp, moversOf, sourcesOf } from './lookup'
 import { sanitizeFollowedPlan } from './tracker'
 import { FactionAlla } from './allaSource'
 import type { Purchases } from '../../shared/ipc'
-import { explorationZones, type AchSection } from '../../core/achievements'
+import { explorationZones, leftOutIsDone, type AchSection } from '../../core/achievements'
 import { PLAYABLE_RACES, playableRace } from '../../shared/game/races'
 import { CLASS_NAMES } from '../../shared/game/classes'
 import { itemKey, parseInventory } from '../../core/inventory'

@@ -4413,11 +4413,22 @@ input[aria-invalid='true'] {
 .sky-test-head {
   display: flex;
   align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+/* The name and reward wrap; the counts and controls on the right stay one line. */
+.sky-test-title {
+  display: flex;
+  align-items: center;
   gap: 8px;
   flex-wrap: wrap;
+  min-width: 0;
 }
-.sky-test-head .spacer {
-  flex: 1;
+.sky-test-side {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: none;
 }
 .sky-reward {
   font-weight: 650;
@@ -4426,4 +4437,47 @@ input[aria-invalid='true'] {
   display: flex;
   gap: 6px;
   flex-wrap: wrap;
+}
+.sky-star {
+  font-size: 15px;
+  min-width: 28px;
+}
+.sky-star.on {
+  color: var(--accent);
+}
+.sky-bar-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.sky-bar {
+  display: inline-block;
+  width: 90px;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--line);
+  overflow: hidden;
+}
+.sky-bar > span {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+}
+/* A Test opened: its items' counts, the reward, the hand-ins. */
+.sky-details {
+  display: grid;
+  gap: 8px;
+  margin-top: 4px;
+  padding: 8px 10px;
+  border-left: 2px solid var(--line);
+}
+/* Targets: every mob's table has the same columns, so they line up down the page. */
+.sky-target-table {
+  table-layout: fixed;
+}
+.sky-target-table td:first-child {
+  width: 42%;
+}
+.sky-target-table td:nth-child(2) {
+  width: 90px;
 }

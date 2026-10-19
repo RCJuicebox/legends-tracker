@@ -82,6 +82,20 @@ export class InventoryFiles {
     return { ...base, inventory, items: await this.catalog.lookup(names, refresh) }
   }
 
+  /**
+   * The export alone, as last written: no wiki look-ups, and the watch left on the character it follows
+   * (Plan › Plane of Sky counts its items from it). Null without one, or when it cannot be read.
+   */
+  async exported(character: string): Promise<{ file: string; modified: number; inventory: Inventory } | null> {
+    if (!isCharacterKey(character)) return null
+    try {
+      const read = await this.exports.read(this.exportPath(character))
+      return { file: `${character}-Inventory.txt`, modified: read.modified, inventory: read.value }
+    } catch {
+      return null
+    }
+  }
+
   /** Looks up more items on demand (an item in a bag, opened to see what it is). */
   lookup(names: string[], force = false) {
     return this.catalog.lookup(names, force)
