@@ -61,7 +61,8 @@ const PAGE_NAMES = [
   // The feature modules' pages, from the list the shell draws them from (src/features/pages.tsx).
   'Factions',
   'Slayer',
-  'Hunter'
+  'Hunter',
+  'Sky'
 ]
 let pages: Record<string, Page>
 let StateProvider: ComponentType<{ children: React.ReactNode }>
@@ -155,6 +156,7 @@ describe('every page draws', () => {
     expect((await draw(pages.Motes)).tabs).toEqual(['Motes view/Runs', 'Motes view/Best merge', 'Motes view/Merge planner', 'Motes view/Spell upgrades'])
     expect((await draw(pages.Settings)).tabs).toEqual([
       'Settings view/General',
+      'Settings view/Modules',
       'Settings view/Overlays',
       'Settings view/Audio',
       'Settings view/Log files',

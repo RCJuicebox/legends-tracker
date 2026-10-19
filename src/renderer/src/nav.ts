@@ -5,7 +5,7 @@ import type { PageId } from './main'
 export type MotesTab = 'runs' | 'merge' | 'planner' | 'spells'
 
 /** The Settings page's tabs: the app's own settings, then what were pages of their own. */
-export type SettingsTab = 'general' | 'overlays' | 'audio' | 'logs' | 'sources'
+export type SettingsTab = 'general' | 'modules' | 'overlays' | 'audio' | 'logs' | 'sources'
 
 /** The pages another page can open on a given tab, and their tabs. */
 interface TabOf {

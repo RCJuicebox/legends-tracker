@@ -9,3 +9,4 @@ package-lock.json
 # Prose is wrapped by hand.
 *.md
 src/shared/game/takpSpawns.json
+src/shared/game/skyQuests.json

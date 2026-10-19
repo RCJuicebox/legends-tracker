@@ -4388,3 +4388,42 @@ input[aria-invalid='true'] {
   color: var(--accent-2);
   margin: 2px 0 4px;
 }
+
+/* ---------- Plan › Plane of Sky (an optional module) ---------- */
+
+.sky-tests {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+/* A Test: its reward, giver and wish control on one line, the chips of what it takes under them. */
+.sky-test {
+  display: grid;
+  gap: 6px;
+  padding: 10px 8px;
+  border-top: 1px solid var(--line);
+}
+.sky-test:first-child {
+  border-top: 0;
+}
+.sky-test.ready {
+  background: color-mix(in srgb, var(--accent) 6%, transparent);
+  box-shadow: inset 3px 0 0 var(--accent);
+}
+.sky-test-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.sky-test-head .spacer {
+  flex: 1;
+}
+.sky-reward {
+  font-weight: 650;
+}
+.sky-needs {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}

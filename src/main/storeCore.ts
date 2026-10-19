@@ -44,6 +44,7 @@ export function defaultSettings(): AppSettings {
     theme: 'system',
     hotkeys: true,
     achievementCues: true,
+    modules: {},
     combat: { fightGapSec: 10, historyMinutes: 60, newSessionOnZone: true, combinePet: true, charmPets: true },
     groupHealth: { enabled: false, belowPct: 25, speech: '{name} at {pct} percent' },
     factionPlan: { assumptions: {}, choices: {} },

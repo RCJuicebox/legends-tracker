@@ -30,6 +30,7 @@ export const SCHEMAS: Readonly<Record<string, number>> = {
   'skin-commands.json': 1,
   'hunter-broken.json': 1,
   'hunter-spots.json': 1,
+  'sky.json': 1,
   'slayer-races.json': 1
 }
 

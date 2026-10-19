@@ -3,9 +3,10 @@ import { api } from '../api'
 import { act, showError, showToast } from '../toast'
 import { useUpdate, type UpdateState } from '../update'
 import { Ago, Field, Segmented, Switch, Tabs } from '../components/ui'
-import type { ReactNode } from 'react'
+import { useContext, type ReactNode } from 'react'
 import { GameFolderCard, OtherLogFolders } from '../components/GameFolder'
-import { TAB_KEY, type SettingsTab } from '../nav'
+import { GoContext, TAB_KEY, type SettingsTab } from '../nav'
+import { OPTIONAL_MODULES, type FeaturePageId } from '../../../features'
 import { useRemembered } from '../remember'
 import { HOTKEYS, hotkeyLabel } from '../../../shared/hotkeys'
 import { Overlays } from './Overlays'
@@ -54,6 +55,7 @@ function noCheckReason(u: UpdateState | null): string | undefined {
 
 const TABS: [SettingsTab, string][] = [
   ['general', 'General'],
+  ['modules', 'Modules'],
   ['overlays', 'Overlays'],
   ['audio', 'Audio'],
   ['logs', 'Log files'],
@@ -76,7 +78,9 @@ export function Settings() {
       <Tabs className="mb-16" label="Settings view" value={tab} onChange={setTab} tabs={TABS} />
       {/* The panel's own heading, for heading navigation from "Settings" (LT-707). */}
       <h2 className="sr-only">{TABS.find(([id]) => id === tab)?.[1]}</h2>
-      {tab === 'overlays' ? (
+      {tab === 'modules' ? (
+        <Modules />
+      ) : tab === 'overlays' ? (
         <Overlays />
       ) : tab === 'audio' ? (
         <Audio />
@@ -226,6 +230,39 @@ function General({ openLogs }: { openLogs: () => void }) {
             </div>
           )}
         </div>
+      </div>
+    </>
+  )
+}
+
+/** The optional modules: each off until the player turns it on, its page in the sidebar only while it is on. */
+function Modules() {
+  const { patchSettings } = useActions()
+  const modules = useSettled((s) => s.settings.modules)
+  const go = useContext(GoContext)
+  return (
+    <>
+      <div className="page-head">
+        <p>Pages for a part of the game not everyone plays. Each is off until you turn it on; off, its page leaves the sidebar and what it keeps waits for you.</p>
+      </div>
+      <div className="stack">
+        {OPTIONAL_MODULES.map((m) => {
+          const on = modules[m.id] === true
+          return (
+            <div key={m.id} className="card stack gap-8">
+              <div className="row">
+                <Switch on={on} label={m.label} onChange={(v) => patchSettings((x) => ({ ...x, modules: { ...x.modules, [m.id]: v } }))} />
+                <h2 className="grow">{m.label}</h2>
+                {on && go && (
+                  <button className="btn small" onClick={() => go(m.id as FeaturePageId)}>
+                    Open
+                  </button>
+                )}
+              </div>
+              <div className="muted small">{m.optional}</div>
+            </div>
+          )
+        })}
       </div>
     </>
   )

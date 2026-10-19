@@ -26,6 +26,7 @@ import { PurchaseHistory, purchaseConsumer } from './purchases'
 import type { Factions } from '../features/factions/main'
 import type { SlayerPlanner } from '../features/slayer/main'
 import type { HunterPlanner } from '../features/hunter/main'
+import type { SkyTracker } from '../features/sky/main'
 import { createFeatures, FEATURE_CONSUMERS } from '../features/main'
 import { LogHistory, type HistoryWhere } from './sources/logHistory'
 import { TradeFavorites } from './tradeFavorites'
@@ -88,6 +89,8 @@ export interface AppContext {
   npcPages: NpcPages
   /** Plan › Hunter's side: which Hunter achievements the player has said do not work. */
   hunter: HunterPlanner
+  /** Plan › Plane of Sky's side (an optional module): the Sky's items counted over the logs, and each character's wish list. */
+  sky: SkyTracker
   /** Plan › Slayer's side: the plan's data, and the player's choices (the overlay makes the plan from them). */
   slayer: SlayerPlanner
   /** The parts that register, and flush, themselves (AppFeature): the two above. */
@@ -322,7 +325,8 @@ export function createContext(): AppContext {
   ctx.liveAchievements = new LiveAchievements(ctx)
   ctx.hunter = features.hunter
   ctx.slayer = features.slayer
-  ctx.features = [ctx.factions, ctx.slayer, ctx.hunter, ctx.liveAchievements, new GroupHealth()]
+  ctx.sky = features.sky
+  ctx.features = [ctx.factions, ctx.slayer, ctx.hunter, ctx.sky, ctx.liveAchievements, new GroupHealth()]
 
   ctx.refreshOverlayVisibility = () =>
     ctx.overlays.setShown(

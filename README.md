@@ -852,6 +852,27 @@ steps and the overlay, for every character, until **Works again** under Not work
 overlay shows the Hunter named left in the zone you are in, each with what the Respawns records say
 of it, under a switch of its own (Overlays).
 
+## Plane of Sky
+
+An optional module: off until you turn it on under Settings › Modules, when **Plane of Sky** joins
+Plan in the sidebar. **Tests** lists every class's Test quests, as the eqlwiki's Plane of Sky page
+has them (`scripts/sky-quests.mjs` builds `src/shared/game/skyQuests.json` from it): the reward, the
+giver and what to say, and a chip for each thing it takes (its Wind Rune, from any Plane of Sky mob,
+and the island items) with how many you hold of how many it needs, and where it drops. Your classes
+come first; the Tests you hold everything for are marked Ready, and the rest follow nearest to done.
+
+What you hold is counted from your log: every copy you looted (kept, or stored in the depot, the
+currency tab or the Dragon Hoard), less what a completed trade took and what you merged away (two
+become one); one sold as it dropped was never held. A trade with a Test's giver that completes with
+its items in it is that Test handed in. Copies you had before your log began are not in it: on
+**Items**, type what you hold, and the log goes on counting from your number.
+
+**☆ Want it** puts a reward on the **Wish list**, and + wants it more than once: two Wu's Fists of
+Mastery to merge is the Monk Test of Fists twice. The wish list counts the hand-ins your log sees
+from when you added the wish (and any you add by hand, for another PC or a log turned off), and
+**What they still take** adds up every wish's items: how many you hold, how many they need, and
+where each drops.
+
 ## Stats
 
 Your character's record: up to three classes, the level of each, race (one of the sixteen playable
@@ -958,8 +979,10 @@ folder** opens the app's own `logs` folder.
 
 ## Settings
 
-Five tabs: **General** (below), then [Overlays](#overlays), [Audio](#audio), [Log files](#log-files)
-and [Data sources](#data-sources), each of them set once and seldom opened again. What one page
+Six tabs: **General** (below), **Modules**, then [Overlays](#overlays), [Audio](#audio), [Log files](#log-files)
+and [Data sources](#data-sources), each of them set once and seldom opened again. **Modules** turns
+on the optional modules, pages for a part of the game not everyone plays ([Plane of Sky](#plane-of-sky)):
+off, a module's page leaves the sidebar, and what it keeps waits for when it is on again. What one page
 alone uses is set on that page: the damage meter's fights and sessions under the meter, and what
 Spell Timers tracks and says by default on Spell Timers.
 
@@ -1010,6 +1033,7 @@ The settings folder, `%APPDATA%\Legends Tracker` (or the `EQL_USER_DATA` folder)
 | `slayer-plan.json` | Per character, what you chose on the Slayer page: achievements left out or taken in, camps and mobs ruled out, minutes between camps and the pace assumed where nothing gives one |
 | `hunter-broken.json` | The Hunter achievements you said do not work in Legends, left out of the plans and the overlay |
 | `slayer-races.json` | The races you said mobs are (Count as… on the Slayer page), for every character, over what eqlwiki says |
+| `sky.json` | Per character, the Plane of Sky wish list (each reward wanted, how many times, since when, and hand-ins you added) and what you said you hold where the log's count was wrong |
 | `hunter-spots.json` | The spots you found Hunter named at in play (Found it here on the Hunter page), drawn on its maps and marked on the game's map with the built-in ones |
 | `map-marks.json` | What the Slayer and Hunter pages last marked on the game's map (`maps\LegendsTracker`), each page's apart |
 | `faction-follow.json` | Per character, the faction plan the achievements overlay follows: its steps, the step you are on, and what is done |
@@ -1069,12 +1093,12 @@ of JuiceboxUI's Group window, while the game runs.
 | Path | What |
 |---|---|
 | `src/core` | Log parsing and tailing, spell book, duration model, spell tracker, triggers, archiver, log check, the damage meter (`combatLines` reads the lines, `combatRoster` knows who is on which side, `combatMeter` keeps the fights, `combatTimeline` their seconds for the chart, `combatView` sums them for display), the loot ledger (`loot`), motes (`motes` counts them, `moteCalc` plans item upgrades, `mergeValue` picks the best merge, `spellMotes` the best spell to upgrade). Plain TypeScript with no Electron dependency, so it is unit-tested directly |
-| `src/features` | Feature modules, one folder each (factions, slayer, hunter): the feature's logic (`core.ts`; for factions also `attribution.ts`, what caused each change, `questPages.ts`, eqlwiki's quest pages, and the achievement plan: `catalog.ts`, what can raise each faction, `names.ts`, `ways.ts`, one faction's ways to 2000, and `planner.ts` with its `model.ts`, `search.ts` and `steps.ts`; `cities.ts`, the Cities plan's guards), its main-process side (`main.ts`: the log-history consumers and what the page asks for; for slayer also `liveSource.ts`, the kills counted since the achievements export as the game is played, and for factions `followSource.ts`, the plan followed on the achievements overlay) and its pages (`page.tsx`, `planPage.tsx`, with the Plan tab's parts in `plan/`). `index.ts` lists their pages for the sidebar |
-| `src/shared` | What both processes use: the IPC contract (`ipc.ts`), settings and view types, the game's tables and what is known of the game beyond them (`game/`: classes, spell effect numbers, guide bonuses; `factions.ts`, the faction planner's lore from play and Allakhazam; `hunt.ts`, where to hunt each Slayer race), the default overlays and hotkeys |
+| `src/features` | Feature modules, one folder each (factions, slayer, hunter, sky): the feature's logic (`core.ts`; for factions also `attribution.ts`, what caused each change, `questPages.ts`, eqlwiki's quest pages, and the achievement plan: `catalog.ts`, what can raise each faction, `names.ts`, `ways.ts`, one faction's ways to 2000, and `planner.ts` with its `model.ts`, `search.ts` and `steps.ts`; `cities.ts`, the Cities plan's guards), its main-process side (`main.ts`: the log-history consumers and what the page asks for; for slayer also `liveSource.ts`, the kills counted since the achievements export as the game is played, and for factions `followSource.ts`, the plan followed on the achievements overlay) and its pages (`page.tsx`, `planPage.tsx`, with the Plan tab's parts in `plan/`). `index.ts` lists their pages for the sidebar, an optional module's (sky) with what Settings › Modules says of it |
+| `src/shared` | What both processes use: the IPC contract (`ipc.ts`), settings and view types, the game's tables and what is known of the game beyond them (`game/`: classes, spell effect numbers, guide bonuses; `factions.ts`, the faction planner's lore from play and Allakhazam; `hunt.ts`, where to hunt each Slayer race; `skyQuests.json`, the Plane of Sky Tests, built by `scripts/sky-quests.mjs`), the default overlays and hotkeys |
 | `src/main` | Electron main process: windows, tray, overlays, speech, icons, persistence, the engine that joins it all (`engine/`, with the contract its parts keep in `feature.ts`), the data sources and long jobs (`sources/`), IPC handlers by family (`ipc/`) |
 | `src/preload` | The IPC bridge, which lets a page use only the channels in the contract |
 | `src/renderer` | The React UI (`index.html`), the overlays of one monitor (`overlays.html`), one overlay alone while it is arranged (`overlay.html`), the hidden audio mixer (`audio.html`) |
-| `tests` | Vitest, in folders that mirror `src` (`core/`, `shared/`, `main/`, `features/factions/`, `features/slayer/`, `features/hunter/`, `renderer/`), each test named for the module it covers where it covers one; `helpers.ts` and `fixtures/` are shared. `renderer/pages.test.tsx` draws every page in jsdom with a stub bridge, before the main process answers and with every call failing, and opens the tabs it can reach. Fixtures are real rows from the client's spell files and real lines from the test character's log. `*.bench.ts` are timing runs (`npm run bench`), not part of `npm test` |
+| `tests` | Vitest, in folders that mirror `src` (`core/`, `shared/`, `main/`, `features/factions/`, `features/slayer/`, `features/hunter/`, `features/sky/`, `renderer/`), each test named for the module it covers where it covers one; `helpers.ts` and `fixtures/` are shared. `renderer/pages.test.tsx` draws every page in jsdom with a stub bridge, before the main process answers and with every call failing, and opens the tabs it can reach. Fixtures are real rows from the client's spell files and real lines from the test character's log. `*.bench.ts` are timing runs (`npm run bench`), not part of `npm test` |
 | `docs/formulas.md` | The game formulas, how each was measured or confirmed, and where the app implements it |
 | `scripts` | The release push, the release notes from the changelog, the smoke test, the icon renderer |
 | `defaults/triggers.json` | Triggers installed on first run |

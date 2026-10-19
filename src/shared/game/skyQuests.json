@@ -1,0 +1,2029 @@
+{
+ "source": "eqlwiki.com, Plane of Sky, revision 179754, read 2026-10-19",
+ "quests": [
+  {
+   "cls": "Bard",
+   "giver": "Cilin Spellsinger",
+   "name": "Bard Test of Tone",
+   "say": "tone",
+   "rewards": [
+    "Mask of Song"
+   ],
+   "runes": [
+    "Wind Rune Meda"
+   ],
+   "items": [
+    {
+     "name": "Light Woolen Mask",
+     "island": 3,
+     "from": "Gorgalosk",
+     "noDrop": true
+    }
+   ]
+  },
+  {
+   "cls": "Bard",
+   "giver": "Cilin Spellsinger",
+   "name": "Bard Test of Voice",
+   "say": "voice",
+   "rewards": [
+    "Mantle of the Songweaver"
+   ],
+   "runes": [
+    "Wind Rune Kala"
+   ],
+   "items": [
+    {
+     "name": "Light Woolen Mantle",
+     "island": 4,
+     "from": "Keeper of Souls",
+     "noDrop": true
+    }
+   ]
+  },
+  {
+   "cls": "Bard",
+   "giver": "Cilin Spellsinger",
+   "name": "Bard Test of Pitch",
+   "say": "pitch",
+   "rewards": [
+    "Ervaj's Flute of Flight"
+   ],
+   "runes": [
+    "Wind Rune Azia"
+   ],
+   "items": [
+    {
+     "name": "Crude Wooden Flute",
+     "island": 5,
+     "from": "The Spiroc Lord",
+     "noDrop": true
+    }
+   ]
+  },
+  {
+   "cls": "Bard",
+   "giver": "Cilin Spellsinger",
+   "name": "Bard Test of Wind",
+   "say": "wind",
+   "rewards": [
+    "Amulet of the Fae"
+   ],
+   "runes": [
+    "Wind Rune Caza"
+   ],
+   "items": [
+    {
+     "name": "Amulet of Woven Hair",
+     "island": 6,
+     "from": "Bazzt Zzzt",
+     "noDrop": true
+    }
+   ]
+  },
+  {
+   "cls": "Bard",
+   "giver": "Cilin Spellsinger",
+   "name": "Bard Test of Brass",
+   "say": "brass",
+   "rewards": [
+    "Denon's Horn of Disaster"
+   ],
+   "runes": [
+    "Wind Rune Fana"
+   ],
+   "items": [
+    {
+     "name": "Glowing Diamond",
+     "island": 7,
+     "from": "Sister of the Spire",
+     "noDrop": true
+    },
+    {
+     "name": "Efreeti War Horn"
+    }
+   ]
+  },
+  {
+   "cls": "Bard",
+   "giver": "Cilin Spellsinger",
+   "name": "Bard Test of Harmony",
+   "say": "harmony",
+   "rewards": [
+    "Spear of Harmony"
+   ],
+   "runes": [
+    "Wind Rune Heda"
+   ],
+   "items": [
+    {
+     "name": "Nebulous Diamond",
+     "island": 8,
+     "from": "Eye of Veeshan",
+     "noDrop": true
+    },
+    {
+     "name": "Efreeti War Spear"
+    }
+   ]
+  },
+  {
+   "cls": "Beastlord",
+   "giver": "Animist Kratho",
+   "name": "Beastlord Test of Aviak",
+   "say": "aviak",
+   "rewards": [
+    "Spiroc Beak Earcuff"
+   ],
+   "runes": [
+    "Wind Rune Beza"
+   ],
+   "items": [
+    {
+     "name": "Spiroc Elder's Totem",
+     "island": 5,
+     "from": "The Spiroc Lord",
+     "noDrop": true
+    }
+   ]
+  },
+  {
+   "cls": "Beastlord",
+   "giver": "Animist Kratho",
+   "name": "Beastlord Test of Azarack",
+   "say": "azarack",
+   "rewards": [
+    "Azarack Skin Wristwraps"
+   ],
+   "runes": [
+    "Wind Rune Heda"
+   ],
+   "items": [
+    {
+     "name": "Azarack Skin",
+     "island": 2,
+     "from": "Protector of Sky",
+     "noDrop": true
+    }
+   ]
+  },
+  {
+   "cls": "Beastlord",
+   "giver": "Animist Kratho",
+   "name": "Beastlord Test of Claw",
+   "say": "claw",
+   "rewards": [
+    "Windhowl",
+    "Spirit Render"
+   ],
+   "runes": [
+    "Wind Rune Izah"
+   ],
+   "items": [
+    {
+     "name": "Sphinx Claw",
+     "island": 7,
+     "from": "Sister of the Spire",
+     "noDrop": true
+    },
+    {
+     "name": "Mithril Bands",
+     "island": 8,
+     "from": "Eye of Veeshan",
+     "noDrop": true
+    },
+    {
+     "name": "Brass Knuckles"
+    }
+   ]
+  },
+  {
+   "cls": "Beastlord",
+   "giver": "Animist Kratho",
+   "name": "Beastlord Test of Harpy",
+   "say": "harpy",
+   "rewards": [
+    "Griffon-Hide Armguards"
+   ],
+   "runes": [
+    "Wind Rune Kala"
+   ],
+   "items": [
+    {
+     "name": "Leather Cord",
+     "island": 3,
+     "from": "Gorgalosk",
+     "noDrop": true
+    }
+   ]
+  },
+  {
+   "cls": "Beastlord",
+   "giver": "Animist Kratho",
+   "name": "Beastlord Test of Wind",
+   "say": "wind",
+   "rewards": [
+    "Diaphonous Waistband"
+   ],
+   "runes": [
+    "Wind Rune Geza"
+   ],
+   "items": [
+    {
+     "name": "Silken Wrap",
+     "island": 6,
+     "from": "Bazzt Zzzt",
+     "noDrop": true
+    }
+   ]
+  },
+  {
+   "cls": "Berserker",
+   "giver": "Stragen The Hewer",
+   "name": "Berserker Test of Sharpness",
+   "say": "sharpness",
+   "rewards": [
+    "Skycleaver"
+   ],
+   "runes": [
+    "Wind Rune Jaka"
+   ],
+   "items": [
+    {
+     "name": "Djinni War Blade",
+     "island": 7,
+     "from": "Sister of the Spire",
+     "noDrop": true
+    },
+    {
+     "name": "Efreeti Standard"
+    }
+   ]
+  },
+  {
+   "cls": "Berserker",
+   "giver": "Stragen The Hewer",
+   "name": "Berserker Test of Will",
+   "say": "will",
+   "rewards": [
+    "Molten Coil"
+   ],
+   "runes": [
+    "Wind Rune Ena"
+   ],
+   "items": [
+    {
+     "name": "Pulsating Ruby",
+     "island": 6,
+     "from": "Bazzt Zzzt",
+     "noDrop": true
+    }
+   ]
+  },
+  {
+   "cls": "Berserker",
+   "giver": "Stragen The Hewer",
+   "name": "Berserker Test of Ferocity",
+   "say": "ferocity",
+   "rewards": [
+    "Sash of Ferocity"
+   ],
+   "runes": [
+    "Wind Rune Ozah"
+   ],
+   "items": [
+    {
+     "name": "High Quality Raiment",
+     "island": 5,
+     "from": "The Spiroc Lord",
+     "noDrop": true
+    }
+   ]
+  },
+  {
+   "cls": "Berserker",
+   "giver": "Stragen The Hewer",
+   "name": "Berserker Test of Burden",
+   "say": "burden",
+   "rewards": [
+    "Shroud of the Sky"
+   ],
+   "runes": [
+    "Wind Rune Azia"
+   ],
+   "items": [
+    {
+     "name": "Feathered Cape",
+     "island": 3,
+     "from": "Gorgalosk",
+     "noDrop": true
+    }
+   ]
+  },
+  {
+   "cls": "Berserker",
+   "giver": "Stragen The Hewer",
+   "name": "Berserker Test of Blood",
+   "say": "blood",
+   "rewards": [
+    "Blood-Drawn Runes"
+   ],
+   "runes": [
+    "Wind Rune Lena"
+   ],
+   "items": [
+    {
+     "name": "Azarack Blood",
+     "island": 2,
+     "from": "Protector of Sky",
+     "noDrop": true
+    }
+   ]
+  },
+  {
+   "cls": "Berserker",
+   "giver": "Stragen The Hewer",
+   "name": "Berserker Test of Fools Errand",
+   "say": "fools errand",
+   "rewards": [
+    "Cudgel of the Fool"
+   ],
+   "runes": [
+    "Wind Rune Dena"
+   ],
+   "items": [
+    {
+     "name": "Jester's Mask",
+     "island": 4,
+     "from": "Keeper of Souls",
+     "noDrop": true
+    },
+    {
+     "name": "Efreeti Great Staff",
+     "island": 8,
+     "from": "Eye of Veeshan"
+    }
+   ]
+  },
+  {
+   "cls": "Cleric",
+   "giver": "Josin Faithbringer",
+   "name": "Cleric Test of Courage",
+   "say": "courage",
+   "rewards": [
+    "Truewind Earring"
+   ],
+   "runes": [
+    "Wind Rune Lena"
+   ],
+   "items": [
+    {
+     "name": "Silver Hoop",
+     "island": 3,
+     "from": "Gorgalosk",
+     "noDrop": true
+    }
+   ]
+  },
+  {
+   "cls": "Cleric",
+   "giver": "Josin Faithbringer",
+   "name": "Cleric Test of Skill",
+   "say": "skill",
+   "rewards": [
+    "Aegis of the Wind"
+   ],
+   "runes": [
+    "Wind Rune Meda"
+   ],
+   "items": [
+    {
+     "name": "Small Shield",
+     "island": 4,
+     "from": "Keeper of Souls",
+     "noDrop": true
+    }
+   ]
+  },
+  {
+   "cls": "Cleric",
+   "giver": "Josin Faithbringer",
+   "name": "Cleric Test of Protection",
+   "say": "protection",
+   "rewards": [
+    "Pauldrons of Piety"
+   ],
+   "runes": [
+    "Wind Rune Caza"
+   ],
+   "items": [
+    {
+     "name": "Shiny Pauldrons",
+     "island": 5,
+     "from": "The Spiroc Lord",
+     "noDrop": true
+    }
+   ]
+  },
+  {
+   "cls": "Cleric",
+   "giver": "Josin Faithbringer",
+   "name": "Cleric Test of Resolution",
+   "say": "resolution",
+   "rewards": [
+    "Necklace of Resolution"
+   ],
+   "runes": [
+    "Wind Rune Neza"
+   ],
+   "items": [
+    {
+     "name": "Silvered Spiroc Necklace",
+     "island": 6,
+     "from": "Bazzt Zzzt",
+     "noDrop": true
+    }
+   ]
+  },
+  {
+   "cls": "Cleric",
+   "giver": "Josin Faithbringer",
+   "name": "Cleric Test of Theurgy",
+   "say": "theurgy",
+   "rewards": [
+    "Theurgist's Star"
+   ],
+   "runes": [
+    "Wind Rune Kala"
+   ],
+   "items": [
+    {
+     "name": "Djinni Aura",
+     "island": 7,
+     "from": "Sister of the Spire",
+     "noDrop": true
+    },
+    {
+     "name": "Efreeti Mace"
+    }
+   ]
+  },
+  {
+   "cls": "Cleric",
+   "giver": "Josin Faithbringer",
+   "name": "Cleric Test of The Weak",
+   "say": "weak",
+   "rewards": [
+    "Baton of the Sky"
+   ],
+   "runes": [
+    "Wind Rune Ena"
+   ],
+   "items": [
+    {
+     "name": "Mithril Bands",
+     "island": 8,
+     "from": "Eye of Veeshan",
+     "noDrop": true
+    },
+    {
+     "name": "Efreeti Standard"
+    }
+   ]
+  },
+  {
+   "cls": "Druid",
+   "giver": "Strandar Pinemist",
+   "name": "Druid Test of Wolf",
+   "say": "wolf",
+   "rewards": [
+    "Drake-Hide Mask"
+   ],
+   "runes": [
+    "Wind Rune Meda"
+   ],
+   "items": [
+    {
+     "name": "Worn Leather Mask",
+     "island": 3,
+     "from": "Gorgalosk",
+     "noDrop": true
+    }
+   ]
+  },
+  {
+   "cls": "Druid",
+   "giver": "Strandar Pinemist",
+   "name": "Druid Test of Bear",
+   "say": "bear",
+   "rewards": [
+    "Nature Walker's Mantle"
+   ],
+   "runes": [
+    "Wind Rune Kala"
+   ],
+   "items": [
+    {
+     "name": "Mantle of Woven Grass",
+     "island": 4,
+     "from": "Keeper of Souls",
+     "noDrop": true
+    }
+   ]
+  },
+  {
+   "cls": "Druid",
+   "giver": "Strandar Pinemist",
+   "name": "Druid Test of Tree",
+   "say": "tree",
+   "rewards": [
+    "Shillelagh"
+   ],
+   "runes": [
+    "Wind Rune Azia"
+   ],
+   "items": [
+    {
+     "name": "Spiroc Battle Staff",
+     "island": 5,
+     "from": "The Spiroc Lord",
+     "noDrop": true
+    },
+    {
+     "name": "Efreeti Statuette"
+    }
+   ]
+  },
+  {
+   "cls": "Druid",
+   "giver": "Strandar Pinemist",
+   "name": "Druid Test of The Bee",
+   "say": "bee",
+   "rewards": [
+    "Honeycomb Belt"
+   ],
+   "runes": [
+    "Wind Rune Dena"
+   ],
+   "items": [
+    {
+     "name": "Divine Honeycomb",
+     "island": 6,
+     "from": "Bazzt Zzzt",
+     "noDrop": true
+    }
+   ]
+  },
+  {
+   "cls": "Druid",
+   "giver": "Strandar Pinemist",
+   "name": "Druid Test of Eagle",
+   "say": "eagle",
+   "rewards": [
+    "Spiroc Banisher Focus"
+   ],
+   "runes": [
+    "Wind Rune Ena"
+   ],
+   "items": [
+    {
+     "name": "Ethereal Ruby",
+     "island": 7,
+     "from": "Sister of the Spire",
+     "noDrop": true
+    },
+    {
+     "name": "Spiroc Elder's Totem",
+     "island": 5,
+     "from": "The Spiroc Lord",
+     "noDrop": true
+    }
+   ]
+  },
+  {
+   "cls": "Druid",
+   "giver": "Strandar Pinemist",
+   "name": "Druid Test of Nature",
+   "say": "nature",
+   "rewards": [
+    "Espri"
+   ],
+   "runes": [
+    "Wind Rune Izah"
+   ],
+   "items": [
+    {
+     "name": "Storm Sky Opal",
+     "island": 8,
+     "from": "Eye of Veeshan",
+     "noDrop": true
+    },
+    {
+     "name": "Efreeti Scimitar"
+    }
+   ]
+  },
+  {
+   "cls": "Enchanter",
+   "giver": "Enchanter Jolas",
+   "name": "Enchanter Test of Illusion",
+   "say": "illusion",
+   "rewards": [
+    "Sphinx Hair Cord"
+   ],
+   "runes": [
+    "Wind Rune Meda"
+   ],
+   "items": [
+    {
+     "name": "Finely Woven Cloth Cord",
+     "island": 3,
+     "from": "Gorgalosk",
+     "noDrop": true
+    }
+   ]
+  },
+  {
+   "cls": "Enchanter",
+   "giver": "Enchanter Jolas",
+   "name": "Enchanter Test of Metamorphism",
+   "say": "metamorphism",
+   "rewards": [
+    "Wind Walker's Mantle"
+   ],
+   "runes": [
+    "Wind Rune Ozah"
+   ],
+   "items": [
+    {
+     "name": "Light Cloth Mantle",
+     "island": 4,
+     "from": "Keeper of Souls",
+     "noDrop": true
+    }
+   ]
+  },
+  {
+   "cls": "Enchanter",
+   "giver": "Enchanter Jolas",
+   "name": "Enchanter Test of Deception",
+   "say": "deception",
+   "rewards": [
+    "Ivory Mask"
+   ],
+   "runes": [
+    "Wind Rune Beza"
+   ],
+   "items": [
+    {
+     "name": "Silken Mask",
+     "island": 5,
+     "from": "The Spiroc Lord",
+     "noDrop": true
+    }
+   ]
+  },
+  {
+   "cls": "Enchanter",
+   "giver": "Enchanter Jolas",
+   "name": "Enchanter Test of Dislocation",
+   "say": "dislocation",
+   "rewards": [
+    "Earring of Displacement"
+   ],
+   "runes": [
+    "Wind Rune Caza"
+   ],
+   "items": [
+    {
+     "name": "Adamantium Earring",
+     "island": 6,
+     "from": "Bazzt Zzzt",
+     "noDrop": true
+    }
+   ]
+  },
+  {
+   "cls": "Enchanter",
+   "giver": "Enchanter Jolas",
+   "name": "Enchanter Test of Memorization",
+   "say": "memorization",
+   "rewards": [
+    "Necklace of Whispering Winds"
+   ],
+   "runes": [
+    "Wind Rune Fana"
+   ],
+   "items": [
+    {
+     "name": "Glowing Necklace",
+     "island": 7,
+     "from": "Sister of the Spire",
+     "noDrop": true
+    }
+   ]
+  },
+  {
+   "cls": "Enchanter",
+   "giver": "Enchanter Jolas",
+   "name": "Enchanter Test of Incapacitation",
+   "say": "incapacitation",
+   "rewards": [
+    "Rod of the Protecting Winds"
+   ],
+   "runes": [
+    "Wind Rune Izah"
+   ],
+   "items": [
+    {
+     "name": "Large Sky Sapphire",
+     "island": 8,
+     "from": "Eye of Veeshan",
+     "noDrop": true
+    },
+    {
+     "name": "Efreeti Wind Staff"
+    }
+   ]
+  },
+  {
+   "cls": "Magician",
+   "giver": "Magus Frinon",
+   "name": "Magician Test of Clarification",
+   "say": "clarification",
+   "rewards": [
+    "Bracelet of Clarification"
+   ],
+   "runes": [
+    "Wind Rune Lena"
+   ],
+   "items": [
+    {
+     "name": "Feathered Cape",
+     "island": 3,
+     "from": "Gorgalosk",
+     "noDrop": true
+    }
+   ]
+  },
+  {
+   "cls": "Magician",
+   "giver": "Magus Frinon",
+   "name": "Magician Test of Empowerment",
+   "say": "empowerment",
+   "rewards": [
+    "Mask of Empowerment"
+   ],
+   "runes": [
+    "Wind Rune Neza"
+   ],
+   "items": [
+    {
+     "name": "Ceramic Mask",
+     "island": 4,
+     "from": "Keeper of Souls",
+     "noDrop": true
+    }
+   ]
+  },
+  {
+   "cls": "Magician",
+   "giver": "Magus Frinon",
+   "name": "Magician Test of Shielding",
+   "say": "shielding",
+   "rewards": [
+    "Gold White Pendant"
+   ],
+   "runes": [
+    "Wind Rune Azia"
+   ],
+   "items": [
+    {
+     "name": "Golden Coffer",
+     "island": 5,
+     "from": "The Spiroc Lord",
+     "noDrop": true
+    }
+   ]
+  },
+  {
+   "cls": "Magician",
+   "giver": "Magus Frinon",
+   "name": "Magician Test of Summoning",
+   "say": "summoning",
+   "rewards": [
+    "Drake-Hide Amice"
+   ],
+   "runes": [
+    "Wind Rune Dena"
+   ],
+   "items": [
+    {
+     "name": "Large Diamond",
+     "island": 6,
+     "from": "Bazzt Zzzt",
+     "noDrop": true
+    }
+   ]
+  },
+  {
+   "cls": "Magician",
+   "giver": "Magus Frinon",
+   "name": "Magician Test of Interpretation",
+   "say": "interpretation",
+   "rewards": [
+    "Duennan Shielding Ring"
+   ],
+   "runes": [
+    "Wind Rune Ena"
+   ],
+   "items": [
+    {
+     "name": "Golden Efreeti Ring",
+     "island": 7,
+     "from": "Sister of the Spire",
+     "noDrop": true
+    }
+   ]
+  },
+  {
+   "cls": "Magician",
+   "giver": "Magus Frinon",
+   "name": "Magician Test of Gesticulation",
+   "say": "gesticulation",
+   "rewards": [
+    "Staff of The Magister"
+   ],
+   "runes": [
+    "Wind Rune Jaka"
+   ],
+   "items": [
+    {
+     "name": "Hazy Opal",
+     "island": 8,
+     "from": "Eye of Veeshan",
+     "noDrop": true
+    },
+    {
+     "name": "Efreeti Magi Staff"
+    }
+   ]
+  },
+  {
+   "cls": "Magician",
+   "giver": "Magus Frinon",
+   "name": "Magician Test of Displacement",
+   "say": "displacement",
+   "rewards": [
+    "Staff of Elemental Mastery: Air"
+   ],
+   "runes": [
+    "Wind Rune Heda"
+   ],
+   "items": [
+    {
+     "name": "Crown of Elemental Mastery",
+     "island": 7,
+     "from": "any mob on the island",
+     "noDrop": true
+    },
+    {
+     "name": "Large Opal",
+     "island": 8,
+     "from": "Eye of Veeshan",
+     "noDrop": true
+    },
+    {
+     "name": "Djinni Stave",
+     "island": 7,
+     "from": "Sister of the Spire",
+     "noDrop": true
+    }
+   ]
+  },
+  {
+   "cls": "Monk",
+   "giver": "Holwin",
+   "name": "Monk Test of Strength",
+   "say": "strength",
+   "rewards": [
+    "Back Straps of Mastery"
+   ],
+   "runes": [
+    "Wind Rune Caza"
+   ],
+   "items": [
+    {
+     "name": "Silken Strands",
+     "island": 3,
+     "from": "Gorgalosk",
+     "noDrop": true
+    }
+   ]
+  },
+  {
+   "cls": "Monk",
+   "giver": "Holwin",
+   "name": "Monk Test of Sight",
+   "say": "sight",
+   "rewards": [
+    "Ton Po's Eye Patch"
+   ],
+   "runes": [
+    "Wind Rune Geza"
+   ],
+   "items": [
+    {
+     "name": "Cracked Leather Eyepatch",
+     "island": 4,
+     "from": "Keeper of Souls",
+     "noDrop": true
+    }
+   ]
+  },
+  {
+   "cls": "Monk",
+   "giver": "Holwin",
+   "name": "Monk Test of Speed",
+   "say": "speed",
+   "rewards": [
+    "Sandals of Alacrity"
+   ],
+   "runes": [
+    "Wind Rune Jaka"
+   ],
+   "items": [
+    {
+     "name": "Dove Slippers",
+     "island": 5,
+     "from": "The Spiroc Lord",
+     "noDrop": true
+    }
+   ]
+  },
+  {
+   "cls": "Monk",
+   "giver": "Holwin",
+   "name": "Monk Test of Tears",
+   "say": "tears",
+   "rewards": [
+    "Ton Po's Shoulder Wraps"
+   ],
+   "runes": [
+    "Wind Rune Beza"
+   ],
+   "items": [
+    {
+     "name": "Silken Wrap",
+     "island": 6,
+     "from": "Bazzt Zzzt",
+     "noDrop": true
+    }
+   ]
+  },
+  {
+   "cls": "Monk",
+   "giver": "Holwin",
+   "name": "Monk Test of Fists",
+   "say": "fists",
+   "rewards": [
+    "Wu's Fist of Mastery"
+   ],
+   "runes": [
+    "Wind Rune Neza"
+   ],
+   "items": [
+    {
+     "name": "Nebulous Sapphire",
+     "island": 7,
+     "from": "Sister of the Spire",
+     "noDrop": true
+    },
+    {
+     "name": "Brass Knuckles"
+    }
+   ]
+  },
+  {
+   "cls": "Monk",
+   "giver": "Holwin",
+   "name": "Monk Test of Tranquility",
+   "say": "tranquility",
+   "rewards": [
+    "Golden Sash of Tranquility"
+   ],
+   "runes": [
+    "Wind Rune Lena"
+   ],
+   "items": [
+    {
+     "name": "Tear of Quellious",
+     "island": 8,
+     "from": "Eye of Veeshan",
+     "noDrop": true
+    }
+   ]
+  },
+  {
+   "cls": "Necromancer",
+   "giver": "Drakis Bloodcaster",
+   "name": "Necromancer Test of Flight",
+   "say": "flight",
+   "rewards": [
+    "Bloody Griffon-Hide Wrist Guard"
+   ],
+   "runes": [
+    "Wind Rune Lena"
+   ],
+   "items": [
+    {
+     "name": "Griffon's Beak",
+     "island": 3,
+     "from": "Gorgalosk",
+     "noDrop": true
+    }
+   ]
+  },
+  {
+   "cls": "Necromancer",
+   "giver": "Drakis Bloodcaster",
+   "name": "Necromancer Test of Power",
+   "say": "power",
+   "rewards": [
+    "Cloak of Spiroc Feathers"
+   ],
+   "runes": [
+    "Wind Rune Neza"
+   ],
+   "items": [
+    {
+     "name": "Black Silk Cape",
+     "island": 4,
+     "from": "Keeper of Souls",
+     "noDrop": true
+    }
+   ]
+  },
+  {
+   "cls": "Necromancer",
+   "giver": "Drakis Bloodcaster",
+   "name": "Necromancer Test of Mind",
+   "say": "mind",
+   "rewards": [
+    "Bloodsoaked Raiment"
+   ],
+   "runes": [
+    "Wind Rune Ozah"
+   ],
+   "items": [
+    {
+     "name": "Fine Cloth Raiment",
+     "island": 5,
+     "from": "The Spiroc Lord",
+     "noDrop": true
+    }
+   ]
+  },
+  {
+   "cls": "Necromancer",
+   "giver": "Drakis Bloodcaster",
+   "name": "Necromancer Test of Heart",
+   "say": "heart",
+   "rewards": [
+    "Sphinx Heart Amulet"
+   ],
+   "runes": [
+    "Wind Rune Azia"
+   ],
+   "items": [
+    {
+     "name": "Pulsating Ruby",
+     "island": 6,
+     "from": "Bazzt Zzzt",
+     "noDrop": true
+    }
+   ]
+  },
+  {
+   "cls": "Necromancer",
+   "giver": "Drakis Bloodcaster",
+   "name": "Necromancer Test of Finger",
+   "say": "finger",
+   "rewards": [
+    "Band of Wailing Winds"
+   ],
+   "runes": [
+    "Wind Rune Caza"
+   ],
+   "items": [
+    {
+     "name": "Ring of Veeshan",
+     "island": 7,
+     "from": "Sister of the Spire",
+     "noDrop": true
+    }
+   ]
+  },
+  {
+   "cls": "Necromancer",
+   "giver": "Drakis Bloodcaster",
+   "name": "Necromancer Test of Hands",
+   "say": "hands",
+   "rewards": [
+    "Gorgon Head Staff"
+   ],
+   "runes": [
+    "Wind Rune Fana"
+   ],
+   "items": [
+    {
+     "name": "Gorgon Head",
+     "island": 3,
+     "from": "Gorgalosk",
+     "noDrop": true
+    },
+    {
+     "name": "Efreeti Great Staff",
+     "island": 8,
+     "from": "Eye of Veeshan"
+    }
+   ]
+  },
+  {
+   "cls": "Paladin",
+   "giver": "Dason Goldblade",
+   "name": "Paladin Test of Spirit",
+   "say": "spirit",
+   "rewards": [
+    "Girdle of Faith"
+   ],
+   "runes": [
+    "Wind Rune Lena"
+   ],
+   "items": [
+    {
+     "name": "Ivory Sky Diamond",
+     "island": 5,
+     "from": "The Spiroc Lord",
+     "noDrop": true
+    }
+   ]
+  },
+  {
+   "cls": "Paladin",
+   "giver": "Dason Goldblade",
+   "name": "Paladin Test of Sacrifice",
+   "say": "sacrifice",
+   "rewards": [
+    "Aldryn, Blade of the Ocean"
+   ],
+   "runes": [
+    "Wind Rune Ozah"
+   ],
+   "items": [
+    {
+     "name": "Bixie Sword Blade",
+     "island": 6,
+     "from": "Bazzt Zzzt",
+     "noDrop": true
+    }
+   ]
+  },
+  {
+   "cls": "Paladin",
+   "giver": "Dason Goldblade",
+   "name": "Paladin Test of Love",
+   "say": "love",
+   "rewards": [
+    "Thelvorn, Blade of Light"
+   ],
+   "runes": [
+    "Wind Rune Geza"
+   ],
+   "items": [
+    {
+     "name": "Golden Hilt",
+     "island": 7,
+     "from": "any mob on the island",
+     "noDrop": true
+    },
+    {
+     "name": "Sphinx Claw",
+     "island": 7,
+     "from": "Sister of the Spire",
+     "noDrop": true
+    }
+   ]
+  },
+  {
+   "cls": "Paladin",
+   "giver": "Dason Goldblade",
+   "name": "Paladin Test of Compassion",
+   "say": "compassion",
+   "rewards": [
+    "Truvinan"
+   ],
+   "runes": [
+    "Wind Rune Izah"
+   ],
+   "items": [
+    {
+     "name": "Large Sky Diamond",
+     "island": 8,
+     "from": "Eye of Veeshan",
+     "noDrop": true
+    },
+    {
+     "name": "Efreeti Zweihander"
+    }
+   ]
+  },
+  {
+   "cls": "Ranger",
+   "giver": "Ranger Spirit",
+   "name": "Ranger Test of Body",
+   "say": "body",
+   "rewards": [
+    "Griffon Talon Necklace"
+   ],
+   "runes": [
+    "Wind Rune Meda"
+   ],
+   "items": [
+    {
+     "name": "Griffon Talon",
+     "island": 3,
+     "from": "Gorgalosk",
+     "noDrop": true
+    }
+   ]
+  },
+  {
+   "cls": "Ranger",
+   "giver": "Ranger Spirit",
+   "name": "Ranger Test of Defense",
+   "say": "defense",
+   "rewards": [
+    "Dark Cloak of the Sky"
+   ],
+   "runes": [
+    "Wind Rune Neza"
+   ],
+   "items": [
+    {
+     "name": "Fine Velvet Cloak",
+     "island": 4,
+     "from": "Keeper of Souls",
+     "noDrop": true
+    }
+   ]
+  },
+  {
+   "cls": "Ranger",
+   "giver": "Ranger Spirit",
+   "name": "Ranger Test of The Earth",
+   "say": "elemental earth",
+   "rewards": [
+    "Earthshaker's Mantle"
+   ],
+   "runes": [
+    "Wind Rune Kala"
+   ],
+   "items": [
+    {
+     "name": "Spiroc Earth Totem",
+     "island": 5,
+     "from": "The Spiroc Lord",
+     "noDrop": true
+    }
+   ]
+  },
+  {
+   "cls": "Ranger",
+   "giver": "Ranger Spirit",
+   "name": "Ranger Test of Thunder",
+   "say": "elemental thunder",
+   "rewards": [
+    "Thunderforged Earring"
+   ],
+   "runes": [
+    "Wind Rune Azia"
+   ],
+   "items": [
+    {
+     "name": "White Gold Earring",
+     "island": 6,
+     "from": "Bazzt Zzzt",
+     "noDrop": true
+    }
+   ]
+  },
+  {
+   "cls": "Ranger",
+   "giver": "Ranger Spirit",
+   "name": "Ranger Test of Blade",
+   "say": "blade",
+   "rewards": [
+    "Arydryidriyorn"
+   ],
+   "runes": [
+    "Wind Rune Ena"
+   ],
+   "items": [
+    {
+     "name": "Circlet of Brambles",
+     "island": 7,
+     "from": "Sister of the Spire",
+     "noDrop": true
+    },
+    {
+     "name": "Efreeti Long Sword"
+    }
+   ]
+  },
+  {
+   "cls": "Ranger",
+   "giver": "Ranger Spirit",
+   "name": "Ranger Test of Ranged Attack",
+   "say": "ranged attack",
+   "rewards": [
+    "Windstriker"
+   ],
+   "runes": [
+    "Wind Rune Heda"
+   ],
+   "items": [
+    {
+     "name": "Shimmering Pearl",
+     "island": 8,
+     "from": "Eye of Veeshan",
+     "noDrop": true
+    },
+    {
+     "name": "Efreeti War Bow"
+    }
+   ]
+  },
+  {
+   "cls": "Rogue",
+   "giver": "Thalik Silenthand",
+   "name": "Rogue Test of Thievery",
+   "say": "thievery",
+   "rewards": [
+    "Wispy Choker of Vigor"
+   ],
+   "runes": [
+    "Wind Rune Ozah"
+   ],
+   "items": [
+    {
+     "name": "Inlaid Choker",
+     "island": 3,
+     "from": "Gorgalosk",
+     "noDrop": true
+    }
+   ]
+  },
+  {
+   "cls": "Rogue",
+   "giver": "Thalik Silenthand",
+   "name": "Rogue Test of Trickery",
+   "say": "trickery",
+   "rewards": [
+    "Renard's Belt of Quickness"
+   ],
+   "runes": [
+    "Wind Rune Izah"
+   ],
+   "items": [
+    {
+     "name": "Sphinxian Circlet",
+     "island": 7,
+     "from": "Sister of the Spire",
+     "noDrop": true
+    }
+   ]
+  },
+  {
+   "cls": "Rogue",
+   "giver": "Thalik Silenthand",
+   "name": "Rogue Test of Silence",
+   "say": "silence",
+   "rewards": [
+    "Griffon Wing Spauldors"
+   ],
+   "runes": [
+    "Wind Rune Ena"
+   ],
+   "items": [
+    {
+     "name": "Spiroc Sky Totem",
+     "island": 5,
+     "from": "The Spiroc Lord",
+     "noDrop": true
+    }
+   ]
+  },
+  {
+   "cls": "Rogue",
+   "giver": "Thalik Silenthand",
+   "name": "Rogue Test of Cunning",
+   "say": "cunning",
+   "rewards": [
+    "Crystal Mask"
+   ],
+   "runes": [
+    "Wind Rune Dena"
+   ],
+   "items": [
+    {
+     "name": "Jester's Mask",
+     "island": 4,
+     "from": "Keeper of Souls",
+     "noDrop": true
+    }
+   ]
+  },
+  {
+   "cls": "Rogue",
+   "giver": "Thalik Silenthand",
+   "name": "Rogue Test of Stealth",
+   "say": "stealth",
+   "rewards": [
+    "Shimmering Bracer of Protection"
+   ],
+   "runes": [
+    "Wind Rune Geza"
+   ],
+   "items": [
+    {
+     "name": "Fine Wool Cloak",
+     "island": 6,
+     "from": "Bazzt Zzzt",
+     "noDrop": true
+    }
+   ]
+  },
+  {
+   "cls": "Rogue",
+   "giver": "Thalik Silenthand",
+   "name": "Rogue Test of Deception",
+   "say": "deception",
+   "rewards": [
+    "Thornstinger"
+   ],
+   "runes": [
+    "Wind Rune Jaka"
+   ],
+   "items": [
+    {
+     "name": "Bixie Stinger (Bixie God's Stinger)",
+     "island": 6,
+     "from": "Bazzt Zzzt",
+     "noDrop": true
+    },
+    {
+     "name": "Bloodsky Sapphire",
+     "island": 8,
+     "from": "Eye of Veeshan",
+     "noDrop": true
+    }
+   ]
+  },
+  {
+   "cls": "Shadow Knight",
+   "giver": "Sarkis Ebonblade",
+   "name": "Shadow Knight Test of Bash",
+   "say": "bash",
+   "rewards": [
+    "Amulet of the Sphinx Eye"
+   ],
+   "runes": [
+    "Wind Rune Ozah"
+   ],
+   "items": [
+    {
+     "name": "Finely Crafted Amulet",
+     "island": 3,
+     "from": "Gorgalosk",
+     "noDrop": true
+    }
+   ]
+  },
+  {
+   "cls": "Shadow Knight",
+   "giver": "Sarkis Ebonblade",
+   "name": "Shadow Knight Test of Smash",
+   "say": "smash",
+   "rewards": [
+    "Crimson Ring of the Djinni"
+   ],
+   "runes": [
+    "Wind Rune Beza"
+   ],
+   "items": [
+    {
+     "name": "Silvery Ring",
+     "island": 4,
+     "from": "Keeper of Souls",
+     "noDrop": true
+    }
+   ]
+  },
+  {
+   "cls": "Shadow Knight",
+   "giver": "Sarkis Ebonblade",
+   "name": "Shadow Knight Test of Slash",
+   "say": "slash",
+   "rewards": [
+    "Pegasus-Hide Belt"
+   ],
+   "runes": [
+    "Wind Rune Dena"
+   ],
+   "items": [
+    {
+     "name": "Finely Woven Cloth Belt",
+     "island": 5,
+     "from": "The Spiroc Lord",
+     "noDrop": true
+    }
+   ]
+  },
+  {
+   "cls": "Shadow Knight",
+   "giver": "Sarkis Ebonblade",
+   "name": "Shadow Knight Test of Disempowerment",
+   "say": "disempowerment",
+   "rewards": [
+    "Blood Sky Face Plate"
+   ],
+   "runes": [
+    "Wind Rune Fana"
+   ],
+   "items": [
+    {
+     "name": "Rusted Pauldrons",
+     "island": 6,
+     "from": "Bazzt Zzzt",
+     "noDrop": true
+    }
+   ]
+  },
+  {
+   "cls": "Shadow Knight",
+   "giver": "Sarkis Ebonblade",
+   "name": "Shadow Knight Test of Envenoming",
+   "say": "envenoming",
+   "rewards": [
+    "Obtenebrate Mithril Guard"
+   ],
+   "runes": [
+    "Wind Rune Heda"
+   ],
+   "items": [
+    {
+     "name": "Efreeti War Shield"
+    }
+   ]
+  },
+  {
+   "cls": "Shadow Knight",
+   "giver": "Sarkis Ebonblade",
+   "name": "Shadow Knight Raising of the Dead",
+   "say": "raising of the dead",
+   "rewards": [
+    "Pearlescent Pauldrons"
+   ],
+   "runes": [
+    "Wind Rune Izah"
+   ],
+   "items": [
+    {
+     "name": "Sphinxian Ring",
+     "island": 7,
+     "from": "Sister of the Spire",
+     "noDrop": true
+    },
+    {
+     "name": "Fae Pauldrons",
+     "island": 8,
+     "from": "Eye of Veeshan",
+     "noDrop": true
+    }
+   ]
+  },
+  {
+   "cls": "Shadow Knight",
+   "giver": "Sarkis Ebonblade",
+   "name": "Shadow Knight Test of Necropotence",
+   "say": "necropotence",
+   "rewards": [
+    "Khyldorn the Blood Drinker"
+   ],
+   "runes": [
+    "Wind Rune Kala"
+   ],
+   "items": [
+    {
+     "name": "Blood Sky Ruby",
+     "island": 8,
+     "from": "Eye of Veeshan",
+     "noDrop": true
+    },
+    {
+     "name": "Efreeti War Axe"
+    }
+   ]
+  },
+  {
+   "cls": "Shaman",
+   "giver": "Medicine Man Veetra",
+   "name": "Shaman Test of Might",
+   "say": "might",
+   "rewards": [
+    "Amulet of the Fang"
+   ],
+   "runes": [
+    "Wind Rune Meda"
+   ],
+   "items": [
+    {
+     "name": "Leather Cord",
+     "island": 3,
+     "from": "Gorgalosk",
+     "noDrop": true
+    }
+   ]
+  },
+  {
+   "cls": "Shaman",
+   "giver": "Medicine Man Veetra",
+   "name": "Shaman Test of Health",
+   "say": "health",
+   "rewards": [
+    "Bracelet of the Spirits"
+   ],
+   "runes": [
+    "Wind Rune Kala"
+   ],
+   "items": [
+    {
+     "name": "Ceremonial Belt",
+     "island": 5,
+     "from": "The Spiroc Lord",
+     "noDrop": true
+    }
+   ]
+  },
+  {
+   "cls": "Shaman",
+   "giver": "Medicine Man Veetra",
+   "name": "Shaman Test of Sight",
+   "say": "sight",
+   "rewards": [
+    "Fairy-Hide Mantle"
+   ],
+   "runes": [
+    "Wind Rune Beza"
+   ],
+   "items": [
+    {
+     "name": "Light Damask Mantle",
+     "island": 5,
+     "from": "The Spiroc Lord",
+     "noDrop": true
+    }
+   ]
+  },
+  {
+   "cls": "Shaman",
+   "giver": "Medicine Man Veetra",
+   "name": "Shaman Test of Shrink",
+   "say": "shrink",
+   "rewards": [
+    "Warhammer of the Wind"
+   ],
+   "runes": [
+    "Wind Rune Ena"
+   ],
+   "items": [
+    {
+     "name": "Corrosive Venom",
+     "island": 6,
+     "from": "Bazzt Zzzt",
+     "noDrop": true
+    },
+    {
+     "name": "Efreeti War Club"
+    }
+   ]
+  },
+  {
+   "cls": "Shaman",
+   "giver": "Medicine Man Veetra",
+   "name": "Shaman Test of Snake",
+   "say": "snake",
+   "rewards": [
+    "Vermilion Sky Ring"
+   ],
+   "runes": [
+    "Wind Rune Heda"
+   ],
+   "items": [
+    {
+     "name": "Bixie Essence",
+     "island": 6,
+     "noDrop": true
+    },
+    {
+     "name": "Spiritualist`s Ring",
+     "island": 7,
+     "from": "Sister of the Spire",
+     "noDrop": true
+    }
+   ]
+  },
+  {
+   "cls": "Shaman",
+   "giver": "Medicine Man Veetra",
+   "name": "Shaman Test of The Witch Doctor",
+   "say": "witch doctor",
+   "rewards": [
+    "Garduk"
+   ],
+   "runes": [
+    "Wind Rune Geza"
+   ],
+   "items": [
+    {
+     "name": "Symbol of Veeshan",
+     "island": 8,
+     "from": "Eye of Veeshan",
+     "noDrop": true
+    },
+    {
+     "name": "Efreeti War Maul"
+    }
+   ]
+  },
+  {
+   "cls": "Warrior",
+   "giver": "Torgon Blademaster",
+   "name": "Warrior Test of Skill",
+   "say": "skill",
+   "rewards": [
+    "Azure Ruby Ring"
+   ],
+   "runes": [
+    "Wind Rune Neza"
+   ],
+   "items": [
+    {
+     "name": "Azure Ring",
+     "island": 3,
+     "from": "Gorgalosk",
+     "noDrop": true
+    }
+   ]
+  },
+  {
+   "cls": "Warrior",
+   "giver": "Torgon Blademaster",
+   "name": "Warrior Test of Strength",
+   "say": "strength",
+   "rewards": [
+    "Runed Wind Amulet"
+   ],
+   "runes": [
+    "Wind Rune Azia"
+   ],
+   "items": [
+    {
+     "name": "Stone Amulet",
+     "island": 4,
+     "from": "Keeper of Souls",
+     "noDrop": true
+    }
+   ]
+  },
+  {
+   "cls": "Warrior",
+   "giver": "Torgon Blademaster",
+   "name": "Warrior Test of Force",
+   "say": "force",
+   "rewards": [
+    "Pauldrons of the Blue Sky"
+   ],
+   "runes": [
+    "Wind Rune Beza"
+   ],
+   "items": [
+    {
+     "name": "Spiroc Air Totem",
+     "island": 5,
+     "from": "The Spiroc Lord",
+     "noDrop": true
+    }
+   ]
+  },
+  {
+   "cls": "Warrior",
+   "giver": "Torgon Blademaster",
+   "name": "Warrior Test of Think",
+   "say": "think",
+   "rewards": [
+    "Belt of the Four Winds"
+   ],
+   "runes": [
+    "Wind Rune Fana"
+   ],
+   "items": [
+    {
+     "name": "Wind Tablet",
+     "island": 6,
+     "from": "Bazzt Zzzt",
+     "noDrop": true
+    },
+    {
+     "name": "Efreeti Belt"
+    }
+   ]
+  },
+  {
+   "cls": "Warrior",
+   "giver": "Torgon Blademaster",
+   "name": "Warrior Test of Smash",
+   "say": "smash",
+   "rewards": [
+    "Dagas"
+   ],
+   "runes": [
+    "Wind Rune Jaka"
+   ],
+   "items": [
+    {
+     "name": "Djinni War Blade",
+     "island": 7,
+     "from": "Sister of the Spire",
+     "noDrop": true
+    },
+    {
+     "name": "Gem of Invigoration",
+     "island": 7,
+     "from": "any mob on the island",
+     "noDrop": true
+    }
+   ]
+  },
+  {
+   "cls": "Warrior",
+   "giver": "Torgon Blademaster",
+   "name": "Warrior Test of Bash",
+   "say": "bash",
+   "rewards": [
+    "Fangol"
+   ],
+   "runes": [
+    "Wind Rune Dena"
+   ],
+   "items": [
+    {
+     "name": "Ethereal Emerald",
+     "island": 8,
+     "from": "Eye of Veeshan",
+     "noDrop": true
+    },
+    {
+     "name": "Efreeti Battle Axe"
+    }
+   ]
+  },
+  {
+   "cls": "Wizard",
+   "giver": "Wizard Schrock",
+   "name": "Wizard Test of Concentration",
+   "say": "concentration",
+   "rewards": [
+    "Augmentor's Mask"
+   ],
+   "runes": [
+    "Wind Rune Dena"
+   ],
+   "items": [
+    {
+     "name": "Grey Damask Cloak",
+     "island": 3,
+     "from": "Gorgalosk",
+     "noDrop": true
+    }
+   ]
+  },
+  {
+   "cls": "Wizard",
+   "giver": "Wizard Schrock",
+   "name": "Wizard Test of Focus",
+   "say": "focus",
+   "rewards": [
+    "Al`Kabor's Cap of Binding"
+   ],
+   "runes": [
+    "Wind Rune Fana"
+   ],
+   "items": [
+    {
+     "name": "Woven Skull Cap",
+     "island": 4,
+     "from": "Keeper of Souls",
+     "noDrop": true
+    }
+   ]
+  },
+  {
+   "cls": "Wizard",
+   "giver": "Wizard Schrock",
+   "name": "Wizard Test of Meditation",
+   "say": "meditation",
+   "rewards": [
+    "Raiment of Thunder"
+   ],
+   "runes": [
+    "Wind Rune Geza"
+   ],
+   "items": [
+    {
+     "name": "High Quality Raiment",
+     "island": 5,
+     "from": "The Spiroc Lord",
+     "noDrop": true
+    }
+   ]
+  },
+  {
+   "cls": "Wizard",
+   "giver": "Wizard Schrock",
+   "name": "Wizard Test of Conception",
+   "say": "conception",
+   "rewards": [
+    "Solidate Mithril Ring"
+   ],
+   "runes": [
+    "Wind Rune Izah"
+   ],
+   "items": [
+    {
+     "name": "Box of Winds",
+     "island": 6,
+     "from": "Bazzt Zzzt",
+     "noDrop": true
+    },
+    {
+     "name": "Efreeti Statuette"
+    }
+   ]
+  },
+  {
+   "cls": "Wizard",
+   "giver": "Wizard Schrock",
+   "name": "Wizard Test of Visualization",
+   "say": "visualization",
+   "rewards": [
+    "Amulet of the Void"
+   ],
+   "runes": [
+    "Wind Rune Jaka"
+   ],
+   "items": [
+    {
+     "name": "Amethyst Amulet",
+     "island": 7,
+     "from": "Sister of the Spire",
+     "noDrop": true
+    }
+   ]
+  },
+  {
+   "cls": "Wizard",
+   "giver": "Wizard Schrock",
+   "name": "Wizard Test of Preparation",
+   "say": "preparation",
+   "rewards": [
+    "Nargon's Staff"
+   ],
+   "runes": [
+    "Wind Rune Caza"
+   ],
+   "items": [
+    {
+     "name": "Large Sky Lapis",
+     "island": 8,
+     "from": "Eye of Veeshan",
+     "noDrop": true
+    },
+    {
+     "name": "Efreeti War Staff"
+    }
+   ]
+  }
+ ]
+}

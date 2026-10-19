@@ -2,6 +2,11 @@
 
 What changed in each version. The release workflow publishes a version's section as its release notes, and installed copies show them when an update arrives.
 
+## Unreleased
+
+- **Optional modules, and the first: Plane of Sky.** Settings › Modules turns on pages for a part of the game not everyone plays. **Plane of Sky** lists every class's Test quests with a chip for each thing a Test takes, how many you hold of how many it needs (counted from your log: looted, less handed in and merged away) and where it drops, the Tests you can hand in first.
+- **Plane of Sky: a wish list.** **☆ Want it** keeps a reward on a wish list for the character, and + wants it more than once (two Wu's Fists to merge). It counts the hand-ins your log sees since, and adds up what every wish still takes, item by item, with where each drops. Copies you held before your log began are put right on the Items tab.
+
 ## 2.15.1 (2026-10-19)
 
 - **Electron 44.9,** with Chromium 152.0.7977.167 and its security fixes. The app is now built with Vite 8.

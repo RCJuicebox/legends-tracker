@@ -11,5 +11,5 @@
     "noEmit": true,
     "noImplicitAny": false
   },
-  "include": ["scripts/release-notes.mjs", "scripts/release.mjs", "scripts/smoke.mjs", "scripts/takp-spawns.mjs"]
+  "include": ["scripts/release-notes.mjs", "scripts/release.mjs", "scripts/smoke.mjs", "scripts/takp-spawns.mjs", "scripts/sky-quests.mjs"]
 }

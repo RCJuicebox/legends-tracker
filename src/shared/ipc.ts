@@ -17,6 +17,7 @@ import type { FollowedPlan } from '../features/factions/tracker'
 import type { SlayerPlanChoices, SlayerPlanData } from '../features/slayer/core'
 import type { SlayerMap, SlayerMark } from '../features/slayer/spawns'
 import type { HunterPlanData } from '../features/hunter/core'
+import type { SkyState } from '../features/sky/core'
 import type { AchievementTrack, PlayerLocation } from './tracking'
 import type { FocusReport } from '../core/itemFocus'
 import type { LootSnapshot } from '../core/loot'
@@ -421,6 +422,12 @@ export interface Invokes {
   'hunter:unfound': (zone: string, name: string, on: number) => FoundSpot[]
   /** Every spot the player found. */
   'hunter:foundSpots': () => FoundSpot[]
+  /** What Plan › Plane of Sky shows for a character: the Sky's items its logs count, the Tests handed in, its wish list and corrections. */
+  'sky:state': (character: string) => SkyState
+  /** Wants a Test's reward this many times (0 drops the wish), with hand-ins the log did not see; the state after. */
+  'sky:wish': (character: string, quest: string, want: number, extra?: number) => SkyState
+  /** Says how many of an item the character holds: kept as a correction to the log's count; the state after. */
+  'sky:have': (character: string, item: string, have: number) => SkyState
   /** Where the character being played is in its faction plan, and its Slayer counts since its achievements export. */
   'achievements:track': (watching?: boolean) => AchievementTrack | null
   /** The player's last /loc, while they are still in its zone; null without one (FEAT-023). */
@@ -640,6 +647,9 @@ const INVOKE_CHANNELS: Record<InvokeChannel, true> = {
   'hunter:found': true,
   'hunter:unfound': true,
   'hunter:foundSpots': true,
+  'sky:state': true,
+  'sky:wish': true,
+  'sky:have': true,
   'achievements:track': true,
   'game:location': true,
   'character:exports': true,

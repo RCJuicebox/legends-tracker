@@ -57,6 +57,14 @@ export function numbers(v: unknown): number[] {
   return Array.isArray(v) ? v.filter((x): x is number => typeof x === 'number' && Number.isFinite(x)) : []
 }
 
+/** The optional modules turned on or off: a page id to a switch, nothing else. */
+export function modules(v: unknown, fb: Record<string, boolean>): Record<string, boolean> {
+  if (!isObj(v)) return fb
+  const out: Record<string, boolean> = {}
+  for (const [id, on] of Object.entries(v).slice(0, 50)) if (typeof on === 'boolean' && /^[a-z][a-z0-9-]{0,39}$/.test(id)) out[id] = on
+  return out
+}
+
 /** Same kind of value as the fallback: for fields this file does not know by name. */
 export function sameKind(v: unknown, fb: unknown): boolean {
   if (fb === undefined || v === undefined) return false
@@ -366,6 +374,7 @@ export function sanitizeSettings(v: unknown, fb: AppSettings): AppSettings | nul
     theme: oneOf(v.theme, ['system', 'light', 'dark'] as const, fb.theme),
     hotkeys: bool(v.hotkeys, fb.hotkeys),
     achievementCues: bool(v.achievementCues, fb.achievementCues),
+    modules: modules(v.modules, fb.modules),
     combat,
     groupHealth,
     factionPlan,

@@ -1,4 +1,4 @@
-import { memo, useCallback, type ComponentType } from 'react'
+import { memo, useCallback, useMemo, type ComponentType } from 'react'
 import { createRoot } from 'react-dom/client'
 import './styles.css'
 import { StateProvider, useLive, useSettled } from './state'
@@ -26,7 +26,7 @@ import { Respawns } from './pages/Respawns'
 import { Tradeskills } from './pages/Tradeskills'
 import { Buffs } from './pages/Buffs'
 import { DamageMeter } from './pages/DamageMeter'
-import { FEATURE_PAGES, type FeaturePageId } from '../../features'
+import { FEATURE_PAGES, pageShown, type FeaturePageId } from '../../features'
 import { FEATURE_ELEMENTS } from '../../features/pages'
 import { who } from '../../core/format'
 import { characterKey } from '../../core/validate'
@@ -156,10 +156,13 @@ const PageHost = memo(function PageHost({ Page, go }: { Page: PageComponent; go:
 function Shell() {
   const muted = useSettled((s) => s.settings.audio.muted)
   const arranging = useSettled((s) => s.arranging)
+  // The optional modules that are off are not in the sidebar, and a window left on one opens on Live (Settings › Modules).
+  const modules = useSettled((s) => s.settings.modules)
+  const pages = useMemo(() => PAGES.filter((p) => pageShown(p.id, modules)), [modules])
   // Opens where it was left, including across restarts.
   const [saved, setPage] = useRemembered<string>('page', 'dashboard')
-  const page = (PAGES.some((p) => p.id === saved) ? saved : 'dashboard') as PageId
-  const Page = PAGES.find((p) => p.id === page)!.el
+  const page = (pages.some((p) => p.id === saved) ? saved : 'dashboard') as PageId
+  const Page = pages.find((p) => p.id === page)!.el
   const go = useCallback<Go>(
     (to, tab) => {
       const key = tabKey(to)
@@ -188,7 +191,7 @@ function Shell() {
       </div>
       <nav className="sidebar" aria-label="Pages">
         {GROUPS.map((group) => {
-          const own = PAGES.filter((p) => p.group === group)
+          const own = pages.filter((p) => p.group === group)
           const shut = folded.includes(group)
           return [
             <Disclosure key={`g-${group}`} className="nav-group" open={!shut} onToggle={() => setFolded(shut ? folded.filter((g) => g !== group) : [...folded, group])}>
@@ -220,7 +223,7 @@ function Shell() {
       </nav>
       <main className="main">
         <Jobs />
-        <ErrorBoundary key={page} what={`The ${PAGES.find((p) => p.id === page)!.label} page`}>
+        <ErrorBoundary key={page} what={`The ${pages.find((p) => p.id === page)!.label} page`}>
           <GoContext.Provider value={go}>
             <PageHost Page={Page} go={go} />
           </GoContext.Provider>

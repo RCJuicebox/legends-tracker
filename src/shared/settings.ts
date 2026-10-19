@@ -221,6 +221,8 @@ export interface AppSettings {
   hotkeys: boolean
   /** Say when a step of the faction plan being followed is done, and flash each achievement it finishes. */
   achievementCues: boolean
+  /** The optional modules the player turned on (Settings › Modules), by page id; one not named is off. */
+  modules: Record<string, boolean>
   combat: CombatSettings
   groupHealth: GroupHealthSettings
   factionPlan: FactionPlanSettings
