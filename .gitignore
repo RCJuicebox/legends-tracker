@@ -3,3 +3,5 @@ out/
 dist/
 *.log
 coverage/
+# The replay check's reports: the player's own log (npm run replay).
+replay/

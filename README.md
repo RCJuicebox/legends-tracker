@@ -120,6 +120,11 @@ tells you little.
 - **`npm run bench`** prints what each part of the engine costs a line, over the twenty minutes of
   real play in `tests/fixtures/golden-session.txt` (about 3 µs a line in all on 2026-09-30, two
   thirds of it the damage meter).
+- **`npm run replay`** reads the end of your own log (the one Settings follows; `LT_REPLAY_LOG`
+  for another, `LT_REPLAY_MB` for how much, 0 for all) through the spell timers, buff watch, damage
+  meter and respawn log as the app runs them, and writes a report to `replay/`: each spell's fades
+  against its estimate, timers that ran out with no fade line, fade lines with no timer, combat lines
+  nothing parsed, and the shapes of the lines no part reads. Read only, and never in CI.
 - **The log** also records, every five minutes of fighting, the damage meter's push, what goes to
   the windows twice a second (`Meter push: 13 KB, 40 in the session, 10 fights kept`: the fight in
   hand and every fight's and session's totals; the open session goes whole only to a page showing
