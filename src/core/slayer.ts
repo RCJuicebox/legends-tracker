@@ -198,6 +198,11 @@ export class SlayerRaces {
     return this.vocab.has(w) ? w : (this.byName(race) ?? w)
   }
 
+  /** Whether play settled that a mob is several races under one name (a dervish cutthroat): its kills are placed by its zone's race mix. */
+  mixed(mob: string): boolean {
+    return MOB_RACES[nameWords(mob)] === RACE_MIX
+  }
+
   /** Whether play settled a mob's race for some zone: its kills are placed zone by zone. */
   zoned(mob: string): boolean {
     const words = nameWords(mob)

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { CharacterPicker } from '../../renderer/src/components/CharacterPicker'
 import { ago, api } from '../../renderer/src/api'
-import { useSettled } from '../../renderer/src/state'
+import { useLive, useSettled } from '../../renderer/src/state'
 import { useInvoke, useVisibleInterval } from '../../renderer/src/hooks'
 import { usePickedCharacter } from '../../renderer/src/character'
 import { useNow } from '../../renderer/src/components/TimerBars'
@@ -9,6 +9,7 @@ import { Disclosure, GameCommand, Info, NumberInput, Pending, Tip, ToggleChip } 
 import { duration, num, who } from '../../core/format'
 import {
   BANESTRIKE,
+  campZone,
   clock,
   DEFAULT_CHOICES,
   goalsInPlay,
@@ -301,6 +302,13 @@ export function Slayer() {
   }
   const left = plan ? plan.goals.reduce((s, g) => s + (data!.goals[g].max - data!.goals[g].count), 0) : 0
   const hunterAt = (zone: string) => (data?.hunter ?? []).filter((h) => zoneKey(h.zone) === zoneKey(zone))
+  // Where the player is: the steps in that zone are marked, and the first is a click away.
+  const zoneNow = useLive((l) => l.status.zone)
+  const hereKey = zoneNow ? zoneKey(campZone(zoneNow)) : ''
+  const isHere = (zone: string) => !!hereKey && zoneKey(zone) === hereKey
+  const hereStep = plan?.steps.findIndex((st) => isHere(st.camp.zone)) ?? -1
+  const hereDaily = plan?.daily.some((d) => isHere(d.camp.zone)) ?? false
+  const jumpHere = () => document.getElementById(`sl-step-${hereStep + 1}`)?.scrollIntoView?.({ block: 'center', behavior: 'smooth' })
   const toggleMap = (i: number) => setMaps((m) => (m.has(i) ? new Set([...m].filter((x) => x !== i)) : new Set([...m, i])))
   return (
     <>
@@ -356,6 +364,18 @@ export function Slayer() {
                   </span>
                 </>
               )}
+              {zoneNow && (
+                <>
+                  <span className="faint">·</span>
+                  {hereStep >= 0 ? (
+                    <button className="btn small ghost" onClick={jumpHere} title={`You are in ${zoneNow}: go to its step`}>
+                      You are here: step {hereStep + 1}
+                    </button>
+                  ) : (
+                    <span className="faint">{hereDaily ? `You are here: ${zoneNow}, a raid lockout` : `You are in ${zoneNow}: no step there`}</span>
+                  )}
+                </>
+              )}
               <span className="spacer" />
               {data.pending > 0 && <span className="faint small">Looking up {num(data.pending)} mobs’ races on eqlwiki…</span>}
               <ToggleChip
@@ -374,13 +394,14 @@ export function Slayer() {
                 </h2>
                 <ul className="fp-steps">
                   {plan.daily.map((d) => (
-                    <li key={d.camp.id} className="fp-step">
+                    <li key={d.camp.id} className={`fp-step${isHere(d.camp.zone) ? ' now' : ''}`}>
                       <Tip className="fp-num" text="A raid lockout: every day">
                         ↻
                       </Tip>
                       <div className="fp-body">
                         <div className="fp-head">
                           <span className="fp-zone">{d.camp.zone}</span>
+                          {isHere(d.camp.zone) && <span className="chip fp-now-chip">You are here</span>}
                           <span className="small">{d.camp.kinds.map((k) => k.name).join(', ')}</span>
                           <span className="spacer" />
                           <span className="mono fp-time">
@@ -431,11 +452,16 @@ export function Slayer() {
                         const zone = first.camp.zone
                         const total = run.reduce((t, i) => t + plan.steps[i].seconds + plan.steps[i].travel, 0)
                         return (
-                          <li key={first.camp.id + run[0]} className="fp-step">
+                          <li key={first.camp.id + run[0]} id={`sl-step-${run[0] + 1}`} className={`fp-step${isHere(zone) ? ' now' : ''}`}>
                             <span className="fp-num">{run[0] + 1}</span>
                             <div className="fp-body">
                               <div className="fp-head">
                                 <span className="fp-zone">{zone}</span>
+                                {isHere(zone) && (
+                                  <Tip className="chip fp-now-chip" text="The zone you are in">
+                                    You are here
+                                  </Tip>
+                                )}
                                 {first.travel > 0 && (
                                   <Tip className="faint small" text={first.via?.length ? `By ${first.via.join(', ')}, as your log has gone` : 'Your minutes between camps'}>
                                     {duration(first.travel)} to get there

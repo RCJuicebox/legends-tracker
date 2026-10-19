@@ -209,3 +209,30 @@ it('draws the plan, the lockouts beside it, and keeps a camp ruled out', async (
   act(() => root.unmount())
   host.remove()
 })
+
+it('marks the steps in the zone the player is in, and jumps to the first', async () => {
+  appState.status.zone = 'Clan Crushbone'
+  const scrolled = vi.fn()
+  Element.prototype.scrollIntoView = scrolled
+  const host = document.body.appendChild(document.createElement('div'))
+  const root = createRoot(host)
+  await act(async () =>
+    root.render(
+      <StateProvider>
+        <Slayer />
+      </StateProvider>
+    )
+  )
+  for (let i = 0; i < 10 && !host.textContent?.includes('step by step'); i++) await act(async () => new Promise((r) => setTimeout(r, 20)))
+  const now = [...host.querySelectorAll('li.fp-step.now')]
+  expect(now).toHaveLength(1)
+  expect(now[0].textContent).toContain('Clan Crushbone')
+  expect(now[0].textContent).toContain('You are here')
+  const here = [...host.querySelectorAll('button')].find((b) => b.textContent === 'You are here: step 1')!
+  await act(async () => here.click())
+  expect(scrolled).toHaveBeenCalledTimes(1)
+  expect(scrolled.mock.instances[0]).toBe(now[0])
+  act(() => root.unmount())
+  host.remove()
+  appState.status.zone = ''
+})

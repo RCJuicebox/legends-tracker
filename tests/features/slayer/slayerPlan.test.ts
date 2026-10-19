@@ -207,6 +207,54 @@ describe('Slayer plan: a race’s pace is its own stretches’', () => {
   })
 })
 
+describe('Slayer plan: a mob of several races', () => {
+  // West Commonlands' dervish cutthroats, 2026-10-17: 422 in an hour and a half, an orc about a third of the
+  // time as the tables roll them, a playable race the rest. Goal 0 is orcs, goal 1 the playable races.
+  const g = (name: string): SlayerGoal => ({ name, section: 'Slayer: Conquest', races: '', count: 0, max: 5000, optional: false, tier: 0 })
+  const mix = new Map([
+    [0, 0.36],
+    [1, 0.64]
+  ])
+  const commons = {
+    sec: 5400,
+    kills: 422,
+    last: 0,
+    mobs: { 'a dervish cutthroat': { name: 'a dervish cutthroat', n: 422 } },
+    runs: [{ sec: 5400, mobs: { 'a dervish cutthroat': 422 } }]
+  }
+
+  it('is about every achievement its races feed, and gives each its part of the kills', () => {
+    const place = (m: string) => (m === 'a dervish cutthroat' ? mix : [])
+    // Killed whole: the stretch is about both, though orcs are a third of what died.
+    expect(killStretches(commons, place).map((x) => [x.kills, x.about])).toEqual([[422, [0, 1]]])
+    const [camp] = buildCamps([g('Orc Stomp!'), g("Doesn't Play Well With Others")], races, { 'West Commonlands': commons }, place, () => null, new Map(), [], undefined, [])
+    expect(camp.id).toBe('log:West Commonlands')
+    expect(camp.kinds).toEqual([{ name: 'a dervish cutthroat', perHour: 422 / 1.5, goals: [0, 1], share: { 0: 0.36, 1: 0.64 } }])
+    expect(Object.fromEntries(Object.entries(camp.pace).map(([k, v]) => [k, Math.round(v)]))).toEqual({ 0: 101, 1: 180 })
+    // The plan kills cutthroats for the orcs at the part the mix gives them: 5000 orcs is 5000 / 0.36 cutthroats.
+    const plan = planSlayer({ goals: [g('Orc Stomp!'), { ...g("Doesn't Play Well With Others"), count: 5000 }], camps: [camp] }, DEFAULT_CHOICES)
+    expect(plan.steps).toHaveLength(1)
+    expect(Math.round(plan.steps[0].kills[0])).toBe(5000)
+    expect(Math.round(stepKills(plan.steps[0], DEFAULT_CHOICES)[0].n)).toBe(Math.round(5000 / 0.36))
+  })
+
+  it('counts a mob of one race as a whole kill, as before', () => {
+    const [camp] = buildCamps(
+      [g('Orc Stomp!')],
+      races,
+      { 'West Commonlands': commons },
+      () => [0],
+      () => null,
+      new Map(),
+      [],
+      undefined,
+      []
+    )
+    expect(camp.kinds[0].share).toBeUndefined()
+    expect(Math.round(camp.pace[0])).toBe(281)
+  })
+})
+
 describe('Slayer plan: the camps', () => {
   const goals = slayerGoals(counters, new Map(), optionalSlayer(sections))
   const gi = (name: string) => goals.findIndex((g) => g.name === name)

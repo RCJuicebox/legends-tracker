@@ -334,6 +334,8 @@ interface CampKind {
   name: string
   perHour: number
   goals: number[]
+  /** For a mob of several races (a dervish cutthroat): the part of a kill each goal gets, by goal index; a whole kill where unsaid. */
+  share?: Record<number, number>
   /** What its spawns in the zone allow, where TAKP's tables know it; and whether the log's pace is up against that. */
   spawn?: MobSpawn
   bound?: boolean
@@ -429,7 +431,7 @@ export const clock = (sec: number) => {
 
 const paceOfKinds = (kinds: CampKind[]) => {
   const pace: Record<number, number> = {}
-  for (const k of kinds) for (const g of k.goals) pace[g] = (pace[g] ?? 0) + k.perHour
+  for (const k of kinds) for (const g of k.goals) pace[g] = (pace[g] ?? 0) + k.perHour * partOf(k, g)
   return pace
 }
 
@@ -437,6 +439,19 @@ const paceOfKinds = (kinds: CampKind[]) => {
 const RUN_SHARE = 0.25
 /** The stretches about the same achievements must come to this long to be a camp of their own (as a zone must, MIN_LOG_SEC); else the zone's time stands. */
 const MIN_RUN_SEC = 15 * 60
+
+/**
+ * What a kill of a mob counts toward: the goals, a whole kill each; or, for a mob of several races
+ * under one name, the part of a kill each goal gets (a West Commonlands dervish cutthroat is an orc
+ * about a third of the time, as the spawn tables roll them).
+ */
+export type Placing = number[] | ReadonlyMap<number, number>
+
+/** A placing as goal and part-of-a-kill pairs. */
+const sharesOf = (p: Placing): [number, number][] => (Array.isArray(p) ? p.map((g) => [g, 1]) : [...p])
+
+/** The part of a kill of a kind that counts toward a goal: a whole one unless the kind says otherwise. */
+const partOf = (k: CampKind, g: number) => k.share?.[g] ?? 1
 
 /** Some of a zone's killing, as one camp: its time, kills, what died (mob lower-cased → kills), and the achievements it was about. */
 export interface KillStretch {
@@ -456,14 +471,15 @@ export interface KillStretch {
  * MIN_RUN_SEC say too little; what no camp of stretches is about (a tiger among the granitebacks),
  * and tallies kept before stretches were, are the zone's time as a whole.
  */
-export function killStretches(z: SlayerKillTallies['zones'][string], placeOf: (mob: string) => number[]): KillStretch[] {
+export function killStretches(z: SlayerKillTallies['zones'][string], placeOf: (mob: string) => Placing): KillStretch[] {
   const groups = new Map<string, KillStretch>()
   for (const r of z.runs ?? []) {
+    // What a stretch was about is what died in it: a mob of several races was killed whole, whatever part of each kill a goal gets.
     const byGoal = new Map<number, number>()
     let all = 0
     for (const [mob, n] of Object.entries(r.mobs)) {
       all += n
-      for (const g of placeOf(mob)) byGoal.set(g, (byGoal.get(g) ?? 0) + n)
+      for (const [g] of sharesOf(placeOf(mob))) byGoal.set(g, (byGoal.get(g) ?? 0) + n)
     }
     const about = [...byGoal]
       .filter(([, n]) => all > 0 && n >= all * RUN_SHARE)
@@ -479,7 +495,7 @@ export function killStretches(z: SlayerKillTallies['zones'][string], placeOf: (m
   }
   const out = [...groups.values()].filter((g) => g.sec >= MIN_RUN_SEC).sort((a, b) => b.sec - a.sec)
   const covered = new Set(out.flatMap((x) => x.about))
-  const rest = [...new Set(Object.keys(z.mobs).flatMap((m) => placeOf(m)))].filter((g) => !covered.has(g))
+  const rest = [...new Set(Object.keys(z.mobs).flatMap((m) => sharesOf(placeOf(m)).map(([g]) => g)))].filter((g) => !covered.has(g))
   if (rest.length) out.push({ sec: z.sec, kills: z.kills, mobs: Object.fromEntries(Object.entries(z.mobs).map(([k, m]) => [k, m.n])), about: rest, whole: true })
   return out
 }
@@ -502,7 +518,7 @@ export function buildCamps(
   goals: SlayerGoal[],
   races: SlayerRaces,
   zones: SlayerKillTallies['zones'],
-  place: (mob: string, zone?: string) => number[],
+  place: (mob: string, zone?: string) => Placing,
   factionPerKill: (zone: string, mob: string) => Record<string, number> | null,
   /** Every Slayer achievement's races, done ones too (slayerRaceLists): what eqlwiki's census is keyed by. */
   raceLists: ReadonlyMap<string, ReadonlySet<string>>,
@@ -535,7 +551,7 @@ export function buildCamps(
   for (const [zone, z] of Object.entries(zones)) {
     if (z.sec < MIN_LOG_SEC || z.kills < MIN_LOG_KILLS) continue
     const nameOf = (key: string) => z.mobs[key]?.name ?? key
-    const here = spawnsIn(zone)
+    const spawnsHere = spawnsIn(zone)
     // Each stretch of what the killing there was about, a camp of its own (the largest first, keeping the zone's id).
     killStretches(z, (key) => place(nameOf(key), zone)).forEach((st, i) => {
       if (st.sec <= 0) return
@@ -549,13 +565,22 @@ export function buildCamps(
         const hits = factionPerKill(zone, name)
         if (hits) for (const [f, v] of Object.entries(hits)) moved[f] = (moved[f] ?? 0) + (v * n) / hours
         // A stretch's kills count toward all their races feed; the zone's time as a whole only toward what no stretch was about.
-        const goalsHere = place(name, zone).filter((g) => !st.whole || about.has(g))
-        if (!goalsHere.length || lockoutMobs.has(spawnKey(name))) continue
+        const here = sharesOf(place(name, zone)).filter(([g]) => !st.whole || about.has(g))
+        if (!here.length || lockoutMobs.has(spawnKey(name))) continue
+        const goalsHere = here.map(([g]) => g)
+        // A mob of several races gives each goal its part of a kill.
+        const parts = here.filter(([, w]) => w < 1)
         const perHour = n / hours
-        const found = here?.get(spawnKey(name))
+        const found = spawnsHere?.get(spawnKey(name))
         const spawn = found && usable(found) ? found : undefined
-        kinds.push({ name, perHour, goals: goalsHere, ...(spawn ? { spawn, bound: perHour >= spawn.ceiling * BOUND } : {}) })
-        for (const g of goalsHere) pace[g] = (pace[g] ?? 0) + perHour
+        kinds.push({
+          name,
+          perHour,
+          goals: goalsHere,
+          ...(parts.length ? { share: Object.fromEntries(parts) } : {}),
+          ...(spawn ? { spawn, bound: perHour >= spawn.ceiling * BOUND } : {})
+        })
+        for (const [g, w] of here) pace[g] = (pace[g] ?? 0) + perHour * w
       }
       if (!kinds.length) return
       for (const g of Object.keys(pace)) fed.add(feeds(zone, +g))
@@ -778,9 +803,7 @@ function fallbackOnly(camps: SlayerPlanCamp[]): SlayerPlanCamp[] {
     if (c.source !== 'wiki') return [c]
     const kinds = c.kinds.map((k) => ({ ...k, goals: k.goals.filter(wanted) })).filter((k) => k.goals.length)
     if (!kinds.length) return []
-    const pace: Record<number, number> = {}
-    for (const k of kinds) for (const g of k.goals) pace[g] = (pace[g] ?? 0) + k.perHour
-    return [{ ...c, kinds, pace }]
+    return [{ ...c, kinds, pace: paceOfKinds(kinds) }]
   })
 }
 
@@ -792,9 +815,7 @@ function withoutMobs(c: SlayerPlanCamp, out: string[]): SlayerPlanCamp[] {
   const kinds = c.kinds.filter((k) => !gone.has(spawnKey(k.name)))
   if (kinds.length === c.kinds.length) return [c]
   if (!kinds.length) return []
-  const pace: Record<number, number> = {}
-  for (const k of kinds) for (const g of k.goals) pace[g] = (pace[g] ?? 0) + k.perHour
-  return [{ ...c, kinds, pace }]
+  return [{ ...c, kinds, pace: paceOfKinds(kinds) }]
 }
 
 /** Kills still wanted below this are rounding, not kills: an achievement with no more than this left is done. */
@@ -846,13 +867,14 @@ export function planSlayer(data: Pick<SlayerPlanData, 'goals' | 'camps'> & { mov
   const inPlan = new Set(goals)
   const scaleOf = (c: SlayerPlanCamp) => (c.assumed ? choices.pace : 1)
   // A goal's kills an hour at a camp: its own mobs'. A camp that names no mobs is one kind of kill.
-  const rateOf = (c: SlayerPlanCamp, g: number) => (c.kinds.length ? c.kinds.reduce((s, k) => s + (k.goals.includes(g) ? k.perHour * scaleOf(c) : 0), 0) : paceOf(c, g))
+  const rateOf = (c: SlayerPlanCamp, g: number) =>
+    c.kinds.length ? c.kinds.reduce((s, k) => s + (k.goals.includes(g) ? k.perHour * partOf(k, g) * scaleOf(c) : 0), 0) : paceOf(c, g)
   /** What killing a goal's mobs at a camp for so long does toward every goal: each kill counts toward all its race feeds. */
   const killsFor = (c: SlayerPlanCamp, g: number, secs: number): Record<number, number> => {
     const out: Record<number, number> = {}
     const add = (h: number, n: number) => inPlan.has(h) && n > 0 && (out[h] = (out[h] ?? 0) + n)
     if (c.kinds.length) {
-      for (const k of c.kinds) if (k.goals.includes(g)) for (const h of new Set(k.goals)) add(h, (k.perHour * scaleOf(c) * secs) / 3600)
+      for (const k of c.kinds) if (k.goals.includes(g)) for (const h of new Set(k.goals)) add(h, (k.perHour * partOf(k, h) * scaleOf(c) * secs) / 3600)
     } else for (const h of Object.keys(c.pace)) add(+h, (paceOf(c, +h) * secs) / 3600)
     return out
   }

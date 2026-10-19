@@ -127,6 +127,10 @@ describe('a mob play settled is several races (the dervish cutthroats)', () => {
 
   it('counts each by its zone’s mix, not as a Dervish by its name', () => {
     expect(r.place('a dervish cutthroat', 'Dervish')).toMatchObject({ key: null, by: 'play' })
+    expect(r.mixed('a dervish cutthroat')).toBe(true)
+    expect(r.mixed('an orc pawn')).toBe(false)
+    // One kill in the Commonlands: the part of it each achievement gets, for the plan's camps.
+    expect(mixCredits('a dervish cutthroat', ['West Commonlands'], r, commons)).toEqual([0.25, 0.75])
     const kills: SlayerKills = new Map([
       ['a dervish cutthroat', { name: 'a dervish cutthroat', times: [1, 2, 3, 4], zones: ['West Commonlands', 'West Commonlands', 'West Commonlands', 'West Commonlands'] }]
     ])

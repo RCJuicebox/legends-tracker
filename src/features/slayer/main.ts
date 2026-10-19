@@ -1,7 +1,7 @@
 import { join } from 'node:path'
 import { copyFile, mkdir, readdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { RACE_TABLE } from '../../core/raceNames'
-import { SlayerRaces, slayerCounters } from '../../core/slayer'
+import { mixCredits, SlayerRaces, slayerCounters } from '../../core/slayer'
 import { isCharacterKey } from '../../core/validate'
 import { handle } from '../../main/ipc/handle'
 import { log } from '../../main/log'
@@ -21,6 +21,7 @@ import {
   readKillLine,
   slayerGoals,
   slayerRaceLists,
+  type Placing,
   type SlayerKillTallies,
   type SlayerMove,
   type SlayerPlanChoices,
@@ -203,18 +204,30 @@ export class SlayerPlanner implements AppFeature {
     await npc.ready()
     const unknown = new Set<string>()
     const unplaced = new Map<string, { name: string; n: number }>()
-    const placed = new Map<string, number[]>()
-    const place = (mob: string, zone = '') => {
+    const placed = new Map<string, Placing>()
+    const place = (mob: string, zone = ''): Placing => {
       const k = mob.toLowerCase()
-      // A mob play placed zone by zone (New Sebilis Expedition's undead) is placed for the zone it is in.
-      const key = races.zoned(mob) ? `${k}|${zone}` : k
+      // A mob play placed zone by zone (New Sebilis Expedition's undead), or one of several races placed
+      // by its zone's mix (a dervish cutthroat), is placed for the zone it is in.
+      const key = races.zoned(mob) || races.mixed(mob) ? `${k}|${zone}` : k
       let at = placed.get(key)
       if (at) return at
       const wiki = npc.race(mob)
       if (wiki === undefined) unknown.add(mob)
       const p = races.place(mob, wiki, zone)
       const fact = (g: string) => (p.by === 'zone' ? undefined : ctx.liveAchievements.fact(k, g))
-      at = goals.flatMap((g, i) => ((fact(g.name.toLowerCase()) ?? (p.key !== null && races.keys[i].has(p.key))) ? [i] : []))
+      // Several races under one name: each goal gets the part of a kill the spawn tables' mix for the
+      // zone gives it (as the live counts count them), unless an export has settled the mob whole.
+      const mix = p.key === null && races.mixed(mob) ? mixCredits(mob, [zone], races, takpRaceMix) : null
+      if (mix) {
+        const shares = new Map<number, number>()
+        goals.forEach((g, i) => {
+          const f = fact(g.name.toLowerCase())
+          const w = f === undefined ? mix[i] : f ? 1 : 0
+          if (w > 0) shares.set(i, w)
+        })
+        at = shares
+      } else at = goals.flatMap((g, i) => ((fact(g.name.toLowerCase()) ?? (p.key !== null && races.keys[i].has(p.key))) ? [i] : []))
       placed.set(key, at)
       return at
     }
@@ -243,11 +256,11 @@ export class SlayerPlanner implements AppFeature {
     })
     // Less the Hunter achievements the player has said do not work.
     const hunter = hunterZones(exp.sections, lastKills(zones), exp.modified, namedSpawns(timings)).filter((z) => !ctx.hunter?.isBroken(z.achievement))
-    // Kills no race was found for: the wiki answered, and neither it nor the name places them.
-    for (const z of Object.values(zones))
+    // Kills no race was found for: the wiki answered, and neither it, the name nor a zone's race mix places them.
+    for (const [zone, z] of Object.entries(zones))
       for (const m of Object.values(z.mobs)) {
         const wiki = npc.race(m.name)
-        if (wiki === undefined || races.place(m.name, wiki).key !== null) continue
+        if (wiki === undefined || races.place(m.name, wiki).key !== null || (races.mixed(m.name) && takpRaceMix(m.name, zone))) continue
         const had = unplaced.get(m.name.toLowerCase()) ?? { name: m.name, n: 0 }
         had.n += m.n
         unplaced.set(m.name.toLowerCase(), had)
