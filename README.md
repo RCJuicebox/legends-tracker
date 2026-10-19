@@ -1075,7 +1075,7 @@ The settings folder, `%APPDATA%\Legends Tracker` (or the `EQL_USER_DATA` folder)
 | `azure-speech.json` | The Azure region, the key encrypted with Windows' data protection, and the voice list |
 | `app-icon.ico` | Running from source only: the icon for the "Legends Tracker (source)" Start menu shortcut |
 | `catchup.json` | How far into which log mote tracking had read when the app closed, so the next start carries on from there |
-| `mote-others.json` | For each character log on another PC (Settings › Game): how far mote tracking has read it, the run it is in, and the motes it held per day |
+| `mote-others.json` | For each character log on another PC (Settings › Log files): how far mote tracking has read it, the run it is in, and the motes it held per day |
 | `sounds\` | Sound files of your own for triggers, beside the game's `AudioTriggers` folders |
 | `characters\` | One file per character: the Stats page's inputs, AC typed in per item and the shield choice from the Gear page |
 | `achievements\` | One file per character: your ticks on the Achievements page |

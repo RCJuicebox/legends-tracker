@@ -4,7 +4,7 @@ import type { LogFileInfo } from '../shared/types'
 import { listLogsIn } from './game'
 import { sources } from './sources/registry'
 
-// Other PCs' Logs folders (Settings › Game): read for the record, never followed live or written to.
+// Other PCs' Logs folders (Settings › Log files): read for the record, never followed live or written to.
 // Most are network shares, and a look at a share whose PC is off can take the network's timeout (half
 // a minute or more), holding one of Node's four file threads all that time. So each folder has one
 // look at a time, no more often than every LOOK_MS, and nobody waits on a look longer than WAIT_MS:
@@ -101,7 +101,7 @@ export class LogFolders {
 
 /** The Data Sources row: what each folder answered. */
 function report(looks: LogFolderLook[]): void {
-  if (!looks.length) return sources.missing('logFolders', 'None chosen (Settings › Game).')
+  if (!looks.length) return sources.missing('logFolders', 'None chosen (Settings › Log files).')
   const out = looks.filter((l) => !l.reachable)
   const n = looks.reduce((sum, l) => sum + (l.reachable ? l.logs.length : 0), 0)
   const logs = `${n} character log${n === 1 ? '' : 's'}`

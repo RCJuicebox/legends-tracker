@@ -233,7 +233,7 @@ export interface JobView {
 /** `idle`: there, and simply not being read now (the log while not watched). */
 export type SourceStatus = 'ok' | 'stale' | 'error' | 'missing' | 'reading' | 'waiting' | 'idle'
 
-/** Another PC's Logs folder as last looked at (Settings › Game). */
+/** Another PC's Logs folder as last looked at (Settings › Log files). */
 export interface LogFolderView {
   dir: string
   /** It answered at the last look. */

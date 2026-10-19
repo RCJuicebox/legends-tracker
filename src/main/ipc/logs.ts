@@ -9,7 +9,7 @@ import type { LogFolderLook } from '../logFolders'
 import { MAX_LOG_FOLDERS } from '../../shared/types'
 import type { LogFolderView } from '../../shared/ipc'
 
-// The Log Files page: the character logs, their archives, and archiving. Settings › Game: other PCs'
+// The Log Files page: the character logs, their archives, and archiving. Settings › Log files: other PCs'
 // Logs folders.
 
 const folderView = (l: LogFolderLook): LogFolderView => ({

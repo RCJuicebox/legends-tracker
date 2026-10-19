@@ -72,7 +72,7 @@ export class MoteCatchUp implements EngineFeature {
   private scan: { stop: () => void } | null = null
   scanning = ''
   scanProgress = 0
-  /** Motes looted on other PCs, from their logs (Settings › Game). */
+  /** Motes looted on other PCs, from their logs (Settings › Log files). */
   readonly others: OtherMotes
 
   constructor(

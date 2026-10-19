@@ -10,7 +10,7 @@ import { identityOf } from '../sources/logHistory'
 import { otherArchiveDir } from '../logFolders'
 import type { OtherLogFolders } from './contracts'
 
-// Motes looted on another PC (Settings › Game). That PC's character logs are read on from where they
+// Motes looted on another PC (Settings › Log files). That PC's character logs are read on from where they
 // were last read, each by a mote tracker of its own, and what they add goes to the history kept here:
 // the motes per day as they come, and each run once it is over. mote-others.json keeps how far each
 // log was read and the run it is in. The stock on the Upgrade planner is not topped up from them: it

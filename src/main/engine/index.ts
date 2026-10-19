@@ -675,7 +675,7 @@ export class Engine {
   }
 
   /** Reads what was logged while the app was closed (see MoteCatchUp.catchUp). */
-  /** Motes looted on other PCs since the last look at their logs (Settings › Game). */
+  /** Motes looted on other PCs since the last look at their logs (Settings › Log files). */
   checkOtherLogs(): Promise<void> {
     return this.moteHistory.others.check()
   }

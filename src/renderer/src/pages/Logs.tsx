@@ -7,6 +7,7 @@ import { act, showError, showToast } from '../toast'
 import { who } from '../../../core/format'
 import { Ago, ConfirmButton, Field, LoadError, NumberInput, SortTh, sortRows, Switch, Pending, type Sort } from '../components/ui'
 import { useRemembered } from '../remember'
+import { OtherLogFolders } from '../components/GameFolder'
 
 export function Logs() {
   const [sort, setSort] = useRemembered<Sort<'log' | 'size' | 'written'>>('logs.sort', { key: 'written', dir: -1 })
@@ -191,6 +192,11 @@ export function Logs() {
           <Switch on={settings.autoStart} onChange={(v) => patchSettings((x) => ({ ...x, autoStart: v }))} />
           Start watching the followed log as soon as the app opens
         </label>
+      </div>
+
+      <div className="card mb-16">
+        <h2>Other PCs&apos; logs</h2>
+        <OtherLogFolders />
       </div>
 
       <div className="card">

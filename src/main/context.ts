@@ -76,7 +76,7 @@ export interface AppContext {
   wikiCatalog: WikiCatalog
   /** Every consumer's counts over each character's log history, in one cache file (log-history.json). */
   logHistory: LogHistory
-  /** Other PCs' Logs folders (Settings › Game), and whether each answers. */
+  /** Other PCs' Logs folders (Settings › Log files), and whether each answers. */
   logFolders: LogFolders
   castHistory: CastHistory
   /** Your spells resisted, per name per day (LT-722). */
@@ -508,7 +508,7 @@ function registerSources(ctx: AppContext): void {
   sources.add('logFolders', {
     label: "Other PCs' logs",
     kind: 'log',
-    what: "The Logs folders of other PCs you play on (Settings › Game), usually shared over your network. Their logs count toward each character's history; while one is off, what was read from it before still counts.",
+    what: "The Logs folders of other PCs you play on (Settings › Log files), usually shared over your network. Their logs count toward each character's history; while one is off, what was read from it before still counts.",
     refresh: () => ctx.logFolders.lookAll(true)
   })
   sources.add('motes', {

@@ -155,7 +155,7 @@ export function GameFolderPrompt() {
 const FOLDER_LOOK_MS = 30_000
 
 /**
- * Settings › Game: the Logs folders of other PCs the player plays on, whether each answers and whose
+ * Settings › Log files: the Logs folders of other PCs the player plays on, whether each answers and whose
  * logs it holds, and adding or taking one off. Added only through the folder picker (logs:addFolder).
  */
 export function OtherLogFolders() {
@@ -205,7 +205,6 @@ export function OtherLogFolders() {
   return (
     <div className="stack gap-12">
       <div className="field">
-        <span>Other PCs&apos; logs</span>
         <p className="hint">
           Play on another PC too? Add its Logs folder and each character&apos;s log there counts toward that character here: motes, Slayer and Hunter kills, factions, AAs, skills,
           casts and purchases. Share the folder on that PC (right-click EverQuest Legends\Logs, Properties, Sharing; reading is enough), then add it here as{' '}

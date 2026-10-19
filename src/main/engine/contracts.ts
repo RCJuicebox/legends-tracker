@@ -51,7 +51,7 @@ export interface EngineEnv {
   dataDir: string
   /** Reads mote history in place of the worker thread; for tests. */
   scanMotes?: MoteScanner
-  /** Other PCs' Logs folders (Settings › Game), for the motes looted there. */
+  /** Other PCs' Logs folders (Settings › Log files), for the motes looted there. */
   logFolders?: OtherLogFolders
   /** How often the log is looked at, game or no game; for tests, which would wait a second a poll (LT-642). */
   pollMs?: number

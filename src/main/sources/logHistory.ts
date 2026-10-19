@@ -237,7 +237,7 @@ export interface HistoryWhere {
   archiveDir: string
   /** "eqlog_Kelwyn_neriak": only archives named for it are read. */
   stem: string
-  /** The same character's logs on other PCs (Settings › Game). */
+  /** The same character's logs on other PCs (Settings › Log files). */
   elsewhere?: ElsewhereLog[]
 }
 
