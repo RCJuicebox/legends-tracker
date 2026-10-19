@@ -1,4 +1,4 @@
-import { HKEY_CURRENT_USER, HKEY_LOCAL_MACHINE, isFixedDrive, isProcessRunning, registryString } from './win32'
+import { findProcess, HKEY_CURRENT_USER, HKEY_LOCAL_MACHINE, isFixedDrive, registryString } from './win32'
 import { existsSync, promises as fs } from 'node:fs'
 import { dirname, join } from 'node:path'
 import type { ArchiveInfo, GameFolderCheck, LogFileInfo } from '../shared/types'
@@ -182,7 +182,8 @@ function quietIfMissing(e: unknown, what: string): void {
 
 /** Whether the game is running. Unknown counts as running, so nothing (the archiver) acts on a log the game may hold. */
 export async function isGameRunning(): Promise<boolean> {
-  return isProcessRunning('eqgame.exe') ?? true
+  const pid = findProcess('eqgame.exe')
+  return pid === null || pid > 0
 }
 
 /**

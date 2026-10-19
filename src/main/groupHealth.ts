@@ -29,7 +29,11 @@ export interface ScreenArea {
   height: number
 }
 
-export type GroupHealthToWorker = { kind: 'config'; on: boolean; areas: ScreenArea[]; belowPct: number; rearmPct: number; front: boolean } | { kind: 'search' } | { kind: 'ping' }
+/** How long a worker told to stop has to end itself before it is ended. */
+const STOP_WAIT_MS = 1000
+
+export type GroupHealthToWorker =
+  { kind: 'config'; on: boolean; areas: ScreenArea[]; belowPct: number; rearmPct: number; front: boolean } | { kind: 'search' } | { kind: 'ping' } | { kind: 'stop' }
 
 export type GroupHealthFromWorker =
   { kind: 'bars'; bars: GroupBar[] } | ({ kind: 'low' } & LowHealth) | { kind: 'error'; message: string } | { kind: 'pong'; koffi: boolean; error?: string }
@@ -162,11 +166,16 @@ export class GroupHealth implements AppFeature {
     })
   }
 
+  /** Asks the worker to free what it holds and end; ended outright if it has not in a second (LT-559). */
   private stop(): void {
     const w = this.worker
     this.worker = null
     this.bars = []
-    void w?.terminate()
+    if (!w) return
+    let ended = false
+    w.on('exit', () => (ended = true))
+    w.postMessage({ kind: 'stop' })
+    setTimeout(() => ended || void w.terminate(), STOP_WAIT_MS).unref?.()
   }
 
   private message(m: GroupHealthFromWorker): void {

@@ -188,6 +188,8 @@ describe('Engine', () => {
     await sleep(600)
     lap()
     expect(info.mock.calls.some((c) => String(c[0]).startsWith('Meter push:'))).toBe(true)
+    // With the live fight's own size, and who is in it (LT-557).
+    expect(info.mock.calls.find((c) => String(c[0]).startsWith('Meter push:'))![0]).toMatch(/the live fight \d+ KB with \d+ in it/)
     // Once in five minutes, not every push.
     const pushLines = () => info.mock.calls.filter((c) => String(c[0]).startsWith('Meter push:')).length
     const logged = pushLines()

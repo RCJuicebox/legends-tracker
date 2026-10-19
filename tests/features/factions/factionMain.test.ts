@@ -361,6 +361,29 @@ describe('the Factions page', () => {
       mods: { 'Wood Elf': { 'Emerald Warriors': 50, 'Crimson Hands': -500 }, Human: { 'Emerald Warriors': -50 }, 'Half Elf': { 'Emerald Warriors': 150 } }
     })
     expect(plan.noAchievementList).toBeUndefined()
+    // A stamp of what it says, which the page compares answers by.
+    expect(plan.stamp).toMatch(/^[\w-]{27}$/)
+  })
+
+  it('builds the catalog again only when what it is built from changed, and stamps the answer by what it says (LT-553)', () => {
+    const input = {
+      factions: ['Crimson Hands'],
+      targets: ['Crimson Hands'],
+      sources: { acts: {}, zones: {}, unexplained: 0 },
+      pages: [],
+      quests: {},
+      bought: {},
+      have: {},
+      wide: false,
+      alla: [],
+      cons: {}
+    }
+    const first = m.catalogFor('Tester_neriak|false', input as never, 1)
+    expect(m.catalogFor('Tester_neriak|false', { ...input } as never, 1)).toBe(first)
+    // A different character or goal, the book read again, or a changed input: built afresh.
+    expect(m.catalogFor('Tester_qeynos|false', input as never, 1)).not.toBe(first)
+    expect(m.catalogFor('Tester_neriak|false', input as never, 2)).not.toBe(first)
+    expect(m.catalogFor('Tester_neriak|false', { ...input, have: { 'crushbone belt': 3 } } as never, 2)).not.toBe(first)
   })
 
   it('of the race and class pairs, keeps the best for each faction a quest wants that no race or swap alone does as well', () => {

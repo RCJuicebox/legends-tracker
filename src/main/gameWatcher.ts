@@ -1,8 +1,13 @@
-import { foregroundPid, isProcessRunning, processName, win32Available } from './win32'
+import { findProcess, foregroundPid, processName, watchProcess, win32Available, type ProcessWatch } from './win32'
 
 // Which process owns the foreground window (checked four times a second, reported only when it
-// changes) and whether eqgame.exe is running (every 3s), asked of Windows directly. It used to be a
-// resident PowerShell loop; a direct call costs well under a millisecond and launches nothing.
+// changes) and whether eqgame.exe is running, asked of Windows directly. The game is noticed in front
+// (its name is looked up then anyway) or by a walk of the process list every 30 s; once found it is
+// held by a handle that says when it ends. A walk every 3 s was half or more of the main process's
+// idle CPU, ~9 ms each over some 500 processes (LT-558).
+
+/** Laps (a quarter second each) between walks of the process list while the game is not held. */
+const WALK_LAPS = 120
 
 export interface GameState {
   /** Process id owning the foreground window. */
@@ -17,6 +22,8 @@ export class GameWatcher {
   state: GameState = { foregroundPid: 0, foregroundName: '', gameRunning: false }
   /** Whether the process list has been looked at yet: until then `gameRunning` is only a default. */
   private looked = false
+  /** The game, held while it runs. */
+  private game: ProcessWatch | null = null
 
   /** The game running, as the last look (at most three seconds ago) found; null before the first look. */
   get gameRunning(): boolean | null {
@@ -42,13 +49,30 @@ export class GameWatcher {
 
   private check(): void {
     const pid = foregroundPid()
-    const looking = this.ticks++ % 12 === 0
-    const running = looking ? (isProcessRunning('eqgame.exe') ?? true) : this.state.gameRunning
-    if (looking) this.looked = true
     const previous = this.state
-    if (pid === previous.foregroundPid && running === previous.gameRunning) return
     // The name is only looked up when the foreground process changes.
     const name = pid === previous.foregroundPid ? previous.foregroundName : processName(pid)
+    let running = previous.gameRunning
+    if (this.game?.ended()) {
+      this.game.close()
+      this.game = null
+      running = false
+    }
+    if (!this.game) {
+      // In front: the game is that process. Else a walk now and then, for a game started behind.
+      const found = name === 'eqgame' ? pid : this.ticks % WALK_LAPS === 0 ? findProcess('eqgame.exe') : undefined
+      if (found !== undefined) {
+        this.looked = true
+        // Windows could not be asked: assumed running, as before.
+        if (found === null) running = true
+        else if (found) {
+          this.game = watchProcess(found)
+          running = true
+        } else running = false
+      }
+    }
+    this.ticks++
+    if (pid === previous.foregroundPid && running === previous.gameRunning) return
     this.state = { foregroundPid: pid, foregroundName: name, gameRunning: running }
     this.onChange(this.state, previous)
   }
@@ -56,5 +80,7 @@ export class GameWatcher {
   stop(): void {
     if (this.timer) clearInterval(this.timer)
     this.timer = null
+    this.game?.close()
+    this.game = null
   }
 }

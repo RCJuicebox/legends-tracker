@@ -11,7 +11,7 @@ import { join } from 'node:path'
 // Error. And every channel the contract in shared/ipc.ts names must have a handler.
 
 type Handler = (e: unknown, ...args: unknown[]) => unknown
-const h = vi.hoisted(() => ({ handlers: new Map<string, Handler>(), dir: '' }))
+const h = vi.hoisted(() => ({ handlers: new Map<string, Handler>(), sends: new Map<string, Handler>(), dir: '' }))
 
 /** Anything: callable, any property is another, and never a promise (so an await of it returns it). */
 function stub(): unknown {
@@ -37,7 +37,7 @@ vi.mock('electron', () => {
       whenReady: () => Promise.resolve(),
       isReady: () => false
     },
-    ipcMain: { handle: (channel: string, fn: Handler) => void h.handlers.set(channel, fn), on: () => {} },
+    ipcMain: { handle: (channel: string, fn: Handler) => void h.handlers.set(channel, fn), on: (channel: string, fn: Handler) => void h.sends.set(channel, fn) },
     BrowserWindow: any,
     Menu: any,
     Notification: any,
@@ -183,4 +183,19 @@ describe('the invoke handlers', () => {
     expect(({} as { polluted?: boolean }).polluted).toBeUndefined()
     quiet.forEach((q) => q.mockRestore())
   }, 120_000)
+})
+
+describe('the send handlers', () => {
+  it('every send channel has a listener, and each takes whatever it is sent without throwing', async () => {
+    const { isSendChannel } = await import('../../src/shared/ipc')
+    for (const c of ['views:watch', 'audio:problem', 'audio:devices', 'overlay:mouse', 'overlay:meter']) expect(h.sends.has(c), c).toBe(true)
+    expect([...h.sends.keys()].filter((c) => !isSendChannel(c))).toEqual([])
+    const good: unknown[][] = [
+      ['state:respawns', true],
+      ['', false],
+      ['play', 'NotAllowedError: play() failed'],
+      ['device', '']
+    ]
+    for (const [channel, fn] of h.sends) for (const args of [...BAD_ARGS, ...good]) expect(() => fn(OWN, ...args), channel).not.toThrow()
+  })
 })

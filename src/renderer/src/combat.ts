@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { api } from './api'
 import { useInvoke } from './hooks'
 import type { CombatSnapshot, MeterSpan, Segment } from '../../shared/types'
+import { mergeCombat } from '../../shared/combat'
 
 /** How often a page showing the open session fetches it again while it changes. */
 const SESSION_REFRESH_MS = 2000
@@ -13,7 +14,8 @@ const SESSION_REFRESH_MS = 2000
 export function useCombat(): CombatSnapshot | null {
   const q = useInvoke('combat:get')
   const setData = q.setData
-  useEffect(() => api.on('state:combat', (v: CombatSnapshot) => setData(v)), [setData])
+  // A push may carry only the open fights: the closed ones are kept from the last (LT-554).
+  useEffect(() => api.on('state:combat', (v: CombatSnapshot) => setData((had) => mergeCombat(had, v))), [setData])
   return q.data
 }
 

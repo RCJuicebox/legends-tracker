@@ -32,7 +32,8 @@ const LINE_ORDER: BuffLine[] = ['hpac', 'haste', 'spellHaste', 'manaRegen', 'hpR
 function useBuffs() {
   const q = useInvoke('buffs:get')
   const setData = q.setData
-  useEffect(() => api.on('state:buffs', (v: BuffView) => setData(v)), [setData])
+  // A push without the offers keeps the ones the page has (LT-555).
+  useEffect(() => api.on('state:buffs', (v: BuffView) => setData((had) => (v.offersKept ? { ...v, offers: had?.offers ?? [] } : v))), [setData])
   return q
 }
 

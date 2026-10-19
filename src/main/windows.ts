@@ -3,8 +3,9 @@ import { join } from 'node:path'
 import { JsonFile, readJsonFile } from './storeCore'
 import { push } from './push'
 import { log, logDir } from './log'
-import type { AudioSettings } from '../shared/types'
-import type { AudioCommand, PushChannel, Pushes } from '../shared/ipc'
+import type { AudioSettings, CombatSnapshot } from '../shared/types'
+import { closedKey } from '../shared/combat'
+import { WATCHED_PUSHES, type AudioCommand, type PushChannel, type Pushes } from '../shared/ipc'
 
 // The main window, the hidden audio window and the tray icon: creating them, remembering where the
 // main window was, and sending them things.
@@ -100,7 +101,10 @@ export class Windows {
    * newest of each kind plus every feed line, and go out when it shows again.
    */
   private mainHidden = false
-  private readonly held = new Map<string, () => void>()
+  /** The held pushes by key (a channel, or a pet's channel and character), each with its channel. */
+  private readonly held = new Map<string, { channel: PushChannel; send: () => void }>()
+  /** The live views a page of the main window listens to (WATCHED_PUSHES); the others are held (LT-556). */
+  private readonly watched = new Set<string>()
   private readonly heldFeed: Parameters<Pushes['state:feed']>[] = []
 
   constructor(private readonly opts: { preload: string; icon: string; audioSettings: () => AudioSettings; uiScale: () => number; setUiScale?: (scale: number) => void }) {
@@ -171,7 +175,11 @@ export class Windows {
       if (place?.maximized) w.maximize()
       w.show()
     })
-    w.webContents.on('did-finish-load', () => this.applyScale())
+    w.webContents.on('did-finish-load', () => {
+      this.applyScale()
+      // A page loaded afresh has no closed fights: the next meter push is whole (LT-554).
+      this.mainClosed = ''
+    })
     // Ctrl and + or - steps the UI size, Ctrl+0 puts it back to 100%, as browsers do (LT-492).
     w.webContents.on('before-input-event', (e, input) => {
       if (input.type !== 'keyDown' || !input.control || input.alt || input.meta) return
@@ -319,7 +327,7 @@ export class Windows {
   toMain<K extends PushChannel>(channel: K, ...args: Parameters<Pushes[K]>): void {
     const w = this.main
     if (!w || w.isDestroyed()) return
-    if (!this.mainHidden) return push(w.webContents, channel, ...args)
+    if (this.mainWatches(channel)) return push(w.webContents, channel, ...args)
     if (channel === 'state:feed') {
       this.heldFeed.push(args as Parameters<Pushes['state:feed']>)
       if (this.heldFeed.length > HELD_FEED_MAX) this.heldFeed.shift()
@@ -328,7 +336,30 @@ export class Windows {
     // A pet update is per character; the rest replace what the page shows.
     const key = channel === 'state:pet' ? `${channel}:${(args[0] as { character?: string } | undefined)?.character}` : channel
     this.held.delete(key)
-    this.held.set(key, () => this.main && !this.main.isDestroyed() && push(this.main.webContents, channel, ...args))
+    this.held.set(key, { channel, send: () => this.main && !this.main.isDestroyed() && push(this.main.webContents, channel, ...args) })
+  }
+
+  /** Whether a push on this channel goes to the main window now: it shows, and a page there listens to it if it is a live view. */
+  mainWatches(channel: PushChannel): boolean {
+    return this.mainShown && (!WATCHED_PUSHES.has(channel) || this.watched.has(channel))
+  }
+
+  /** A page of the main window started or stopped listening to a live view ('' at a page load: none). What was held for it goes now. */
+  watch(channel: string, on: boolean): void {
+    if (channel === '') return this.watched.clear()
+    if (!WATCHED_PUSHES.has(channel)) return
+    if (!on) return void this.watched.delete(channel)
+    this.watched.add(channel)
+    this.sendHeld()
+  }
+
+  /** Sends what is held for the main window that it now takes, the feed last as before. */
+  private sendHeld(): void {
+    for (const [key, h] of this.held)
+      if (this.mainWatches(h.channel)) {
+        this.held.delete(key)
+        h.send()
+      }
   }
 
   /** The main window is open, not in the tray or minimised. */
@@ -340,10 +371,28 @@ export class Windows {
     this.mainHidden = hidden
     const w = this.main
     if (hidden || !w || w.isDestroyed()) return
-    for (const send of this.held.values()) send()
+    // The live views no page listens to stay held until one does.
+    this.sendHeld()
     for (const args of this.heldFeed) push(w.webContents, 'state:feed', ...args)
-    this.held.clear()
     this.heldFeed.length = 0
+  }
+
+  /** The closed fights and sessions the main window has (closedKey); '' when it may lack them. */
+  private mainClosed = ''
+
+  /**
+   * A meter snapshot to the main window: whole when it lacks the closed fights and sessions, else the
+   * open ones alone, as the overlay hosts get them; twice a second the closed ones were 88 KB a push
+   * (LT-554). While the window is hidden every push is whole, so the one held for it is.
+   */
+  combatToMain(snap: CombatSnapshot): void {
+    const key = closedKey(snap)
+    if (this.mainWatches('state:combat') && this.mainClosed === key) {
+      this.toMain('state:combat', { ...snap, fights: snap.fights.filter((s) => s.open), sessions: snap.sessions.filter((s) => s.open), openOnly: true })
+      return
+    }
+    this.mainClosed = this.mainWatches('state:combat') ? key : ''
+    this.toMain('state:combat', snap)
   }
 
   /** Whether a page lists the output devices; kept, so an audio window made afresh is told too. */

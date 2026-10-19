@@ -361,6 +361,36 @@ export interface RespawnRow extends RespawnRecord {
 export interface RespawnView {
   zone: string
   rows: RespawnRow[]
+  /** A push of the rows that changed alone, with the keys of those gone: merged into the page's (LT-555). */
+  removed?: string[]
+}
+
+/**
+ * The rows of `next` that differ from what was sent (`sent`, each row's JSON by key, updated here), and
+ * the keys gone; null when nothing changed. A kill changes a row or two of four hundred.
+ */
+export function respawnChanges(next: RespawnView, sent: Map<string, string>): RespawnView | null {
+  const rows: RespawnRow[] = []
+  const seen = new Set<string>()
+  for (const r of next.rows) {
+    seen.add(r.key)
+    const json = JSON.stringify(r)
+    if (sent.get(r.key) !== json) {
+      sent.set(r.key, json)
+      rows.push(r)
+    }
+  }
+  const removed = [...sent.keys()].filter((k) => !seen.has(k))
+  for (const k of removed) sent.delete(k)
+  return rows.length || removed.length ? { zone: next.zone, rows, removed } : null
+}
+
+/** A page's view with a push applied: whole, or its changed rows put in and the gone ones taken out, newest death first. */
+export function mergeRespawns(had: RespawnView | null, next: RespawnView): RespawnView {
+  if (!next.removed || !had) return next
+  const gone = new Set([...next.removed, ...next.rows.map((r) => r.key)])
+  const rows = [...had.rows.filter((r) => !gone.has(r.key)), ...next.rows].sort((a, b) => b.lastDeath - a.lastDeath)
+  return { zone: next.zone, rows }
 }
 
 export function respawnView(records: RespawnRecords, triggers: Trigger[], zone: string): RespawnView {

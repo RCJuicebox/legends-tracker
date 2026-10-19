@@ -51,6 +51,7 @@ import { cacheDir } from './paths'
 import { perf } from './perf'
 import { characterLogFile, logStem } from './storeCore'
 import { sweepScreenCaptures } from './ocr'
+import { respawnChanges } from '../core/respawns'
 
 /**
  * Everything the main process runs, built once. The IPC handlers, the lifecycle and the start-up all
@@ -102,6 +103,8 @@ export interface AppContext {
   petScanned: Set<string>
   /** The audio window's output devices, as it last reported them. */
   audioDevices: AudioDevice[]
+  /** What the audio window could not do, by kind and words, with how often (LT-618). */
+  audioProblems: Map<string, number>
 
   installDir(): string
   /** The character being played: `Name_server`, or '' with no log chosen. */
@@ -226,6 +229,7 @@ export function createContext(): AppContext {
     petWiki: new PetWiki(),
     petScanned: new Set<string>(),
     audioDevices: [],
+    audioProblems: new Map(),
     installUpdate: async () => undefined
   } as unknown as AppContext
 
@@ -312,6 +316,8 @@ export function createContext(): AppContext {
     }
   })
 
+  /** The respawn rows the main window has, by key (respawnChanges). */
+  const respawnSent = new Map<string, string>()
   ctx.engine = new Engine(
     store,
     new VoiceRouter(speech, azure),
@@ -333,18 +339,29 @@ export function createContext(): AppContext {
       stock: (s) => toMain('state:stock', s),
       combat: (snap) => {
         ctx.overlays.combat(snap)
-        toMain('state:combat', snap)
+        windows.combatToMain(snap)
       },
       loot: (view) => {
         // The main window has the entries up to the newest it was sent: only those after go (LT-369).
-        // Hidden, it is sent the whole list, as only the last push is kept for it.
+        // Hidden, or with no page listening, it is sent the whole list, as only the last push is kept for it.
         const newest = view.entries[0]?.id ?? 0
         const oldest = view.entries.at(-1)?.id ?? 0
-        const push = windows.mainShown && lootSent > 0 && newest >= lootSent ? { ...view, entries: view.entries.filter((e) => e.id > lootSent), addedOnly: { oldest } } : view
-        lootSent = windows.mainShown ? newest : 0
+        const sent = windows.mainWatches('state:loot')
+        const push = sent && lootSent > 0 && newest >= lootSent ? { ...view, entries: view.entries.filter((e) => e.id > lootSent), addedOnly: { oldest } } : view
+        lootSent = sent ? newest : 0
         toMain('state:loot', push)
       },
-      respawns: (view) => toMain('state:respawns', view),
+      // The rows that changed, while the window shows; the whole view while it is hidden, so the one held for it is whole (LT-555).
+      respawns: (view) => {
+        if (!windows.mainWatches('state:respawns')) {
+          respawnSent.clear()
+          return toMain('state:respawns', view)
+        }
+        const first = !respawnSent.size
+        const changes = respawnChanges(view, respawnSent)
+        if (first) toMain('state:respawns', view)
+        else if (changes) toMain('state:respawns', changes)
+      },
       pet: (update) => {
         const character = ctx.characterKey()
         if (!character) return

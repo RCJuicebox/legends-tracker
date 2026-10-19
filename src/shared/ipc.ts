@@ -462,6 +462,13 @@ export interface Sends {
   'overlay:meter': (id: string, patch: Partial<MeterOverlayOptions>) => void
   /** The audio window's list of output devices. */
   'audio:devices': (devices: AudioDevice[]) => void
+  /**
+   * The main window's page started (on) or stopped listening to a live view's channel (WATCHED_PUSHES);
+   * the preload sends it, counting listeners, and '' at each page load forgets them all (LT-556).
+   */
+  'views:watch': (channel: string, on: boolean) => void
+  /** Something the audio window could not do: a saved device gone (playing on the default), a phrase or sound that would not decode or play (LT-618). */
+  'audio:problem': (kind: 'device' | 'decode' | 'play', detail: string) => void
 }
 
 /** One way, main to a window: api.on(channel, listener). */
@@ -644,7 +651,23 @@ const INVOKE_CHANNELS: Record<InvokeChannel, true> = {
   'jobs:list': true,
   'jobs:cancel': true
 }
-const SEND_CHANNELS: Record<SendChannel, true> = { 'overlay:mouse': true, 'overlay:meter': true, 'audio:devices': true }
+const SEND_CHANNELS: Record<SendChannel, true> = { 'overlay:mouse': true, 'overlay:meter': true, 'audio:devices': true, 'audio:problem': true, 'views:watch': true }
+
+/**
+ * The live views the main window is sent only while a page there listens (LT-556): the rest of the
+ * time main keeps the latest of each and sends it when a page starts listening, as it does while the
+ * window is hidden. Each was cloned and decoded several times a second while Settings showed.
+ */
+export const WATCHED_PUSHES: ReadonlySet<string> = new Set<PushChannel>([
+  'state:combat',
+  'state:respawns',
+  'state:buffs',
+  'state:loot',
+  'state:motes',
+  'state:stock',
+  'state:pet',
+  'state:achievementTrack'
+])
 const PUSH_CHANNELS: Record<PushChannel, true> = {
   'state:settings': true,
   'state:character': true,

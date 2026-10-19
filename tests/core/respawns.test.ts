@@ -10,6 +10,8 @@ import {
   respawnTimerSpec,
   respawnTrigger,
   respawnTriggerId,
+  mergeRespawns,
+  respawnChanges,
   respawnView,
   type RespawnRecords
 } from '../../src/core/respawns'
@@ -332,5 +334,25 @@ describe('respawn timers', () => {
       ['Fippy Darkpaw', 400]
     ])
     expect(v.rows[1]).toMatchObject({ zone: '', kills: 0, key: `timer|${respawnTriggerId('Fippy Darkpaw')}` })
+  })
+})
+
+describe('the Respawns push (LT-555)', () => {
+  const rec = (name: string, lastDeath: number) => ({ zone: ZONE, name, kills: 1, lastDeath, pendingSince: 0, gaps: [], shared: false })
+  it('sends the rows that changed and the keys gone, and the page merges them, newest death first', () => {
+    const sent = new Map<string, string>()
+    const first = respawnView({ a: rec('a goblin', 10), b: rec('a gnoll', 20) }, [], ZONE)
+    expect(respawnChanges(first, sent)?.rows.map((r) => r.key)).toEqual(['b', 'a'])
+    expect(respawnChanges(first, sent)).toBeNull()
+    const later = respawnView({ a: rec('a goblin', 30), c: rec('a bat', 5) }, [], ZONE)
+    const changes = respawnChanges(later, sent)!
+    expect(changes.rows.map((r) => r.key)).toEqual(['a', 'c'])
+    expect(changes.removed).toEqual(['b'])
+    expect(mergeRespawns(first, changes).rows.map((r) => [r.key, r.lastDeath])).toEqual([
+      ['a', 30],
+      ['c', 5]
+    ])
+    // A whole view replaces what the page had.
+    expect(mergeRespawns(first, later)).toBe(later)
   })
 })

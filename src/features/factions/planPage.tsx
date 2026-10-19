@@ -132,7 +132,8 @@ export function PlanTab({ character, view }: { character: string; view: FactionV
   const cities = aim === 'cities'
   // Most factions positive and the Cities plan want the ways to raise every faction, not only the achievements'.
   const wide = aim !== 'fastest'
-  const q = useInvoke(character ? 'factions:plan' : null, [character, false, wide])
+  // Some 700 KB: compared by the stamp main puts on it, so an unchanged answer keeps the plan as it is (LT-553).
+  const q = useInvoke(character ? 'factions:plan' : null, [character, false, wide], [], { same: (a, b) => a.stamp === b.stamp })
   const data = q.data
   // Every ten seconds brings a new view: the plan is worked out again only when what it is for changed.
   const liveKey = useMemo(() => (view ? JSON.stringify(planFor(view)) : ''), [view])

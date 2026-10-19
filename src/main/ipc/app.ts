@@ -134,6 +134,10 @@ export function registerAppIpc(ctx: AppContext): void {
 
   handle('overlays:arrange', (on) => ctx.setArranging(on === true))
   handle('overlay:hostState', (display) => ctx.overlays.hostState(Number(display)))
+  // Which live views a page of the main window listens to (LT-556).
+  onSend('views:watch', (channel, on) => {
+    if (typeof channel === 'string') windows.watch(channel, on === true)
+  })
   onSend('overlay:mouse', (id, interactive) => {
     if (typeof id === 'string') ctx.overlays.setMouse(id, interactive === true)
   })

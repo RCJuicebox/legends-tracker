@@ -128,6 +128,8 @@ export function diagnostics(ctx: AppContext): string {
   lines.push(...processMetrics())
   lines.push('Performance (since the last ten-minute line in main.log):', ...perf.report({ tailer: ctx.engine.tailerStats, lineFailures: ctx.engine.failures }))
   lines.push(crashLine())
+  const audio = [...ctx.audioProblems].map(([k, n]) => `${k.replace('|', ': ')}${n > 1 ? ` (×${n})` : ''}`)
+  lines.push(`Audio: ${audio.length ? audio.join('; ') : 'no trouble this run'}`)
   if (filesSetAside().length)
     lines.push(
       `Set aside this run (unreadable or the wrong shape): ${filesSetAside()

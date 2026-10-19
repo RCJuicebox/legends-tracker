@@ -72,7 +72,7 @@ export class BuffCoordinator implements EngineFeature {
     private readonly notifier: Notifier,
     private readonly hooks: BuffHooks
   ) {
-    this.viewOut = new Throttled(1000, () => this.out.push('state:buffs', this.view()), {
+    this.viewOut = new Throttled(1000, () => this.out.push('state:buffs', this.pushView()), {
       everyMs: 5000,
       beat: (now) => {
         this.watch.prune(now)
@@ -215,6 +215,17 @@ export class BuffCoordinator implements EngineFeature {
       planAnyone: anyone,
       spellsLoaded: !!this.hooks.book()
     }
+  }
+
+  /** The offers last pushed whole: pushes after leave them out until they change (LT-555: 105 KB of 141 a push). */
+  private offersPushed: BuffOffer[] | null = null
+
+  /** The view as pushed: without the offers while they are the ones pushed before; buffs:get always has them. */
+  private pushView(): BuffView {
+    const v = this.view()
+    if (v.offers === this.offersPushed) return { ...v, offers: [], offersKept: true }
+    this.offersPushed = v.offers
+    return v
   }
 
   /** The buffs the character wants; null goes back to the defaults. */

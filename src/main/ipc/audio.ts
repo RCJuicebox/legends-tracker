@@ -2,6 +2,7 @@ import { isAbsolute } from 'node:path'
 import { handle } from './handle'
 import { textArg } from '../../core/validate'
 import { onSend } from '../push'
+import { log } from '../log'
 import type { AppContext } from '../context'
 
 // Speech, sounds and the output device.
@@ -33,6 +34,17 @@ export function registerAudioIpc(ctx: AppContext): void {
     const v = { voices: speech.voices, error: speech.failed }
     ctx.windows.toMain('state:voices', v)
     return v
+  })
+
+  // What the audio window could not do, logged once each and counted for Copy diagnostics (LT-618):
+  // "I hear nothing" reports carried nothing before.
+  onSend('audio:problem', (kind, detail) => {
+    if (kind !== 'device' && kind !== 'decode' && kind !== 'play') return
+    const text = typeof detail === 'string' ? detail.slice(0, 300) : ''
+    const key = `${kind}|${text}`
+    const n = (ctx.audioProblems.get(key) ?? 0) + 1
+    ctx.audioProblems.set(key, n)
+    if (n === 1) log.warn(`Audio: ${kind === 'device' ? 'the saved output device is gone; playing on the default' : `could not ${kind}`}${text ? `: ${text}` : ''}`)
   })
 
   onSend('audio:devices', (devices) => {

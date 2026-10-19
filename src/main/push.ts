@@ -62,7 +62,9 @@ export function fromOwnPage(e: IpcMainEvent | IpcMainInvokeEvent, channel: strin
 const SEND_PAGES: Record<SendChannel, readonly PageName[]> = {
   'overlay:mouse': ['index', 'overlay', 'overlays'],
   'overlay:meter': ['index', 'overlay', 'overlays'],
-  'audio:devices': ['audio']
+  'audio:devices': ['audio'],
+  'audio:problem': ['audio'],
+  'views:watch': ['index']
 }
 
 /** Listens for a page's send. The arguments are whatever the page sent: check them before use. */

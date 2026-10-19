@@ -13,6 +13,7 @@ interface Api {
   OpenProcess: (access: number, inherit: boolean, pid: number) => unknown
   QueryFullProcessImageNameW: (h: unknown, flags: number, buf: Buffer, size: number[]) => boolean
   CloseHandle: (h: unknown) => boolean
+  WaitForSingleObject: (h: unknown, ms: number) => number
   CreateToolhelp32Snapshot: (flags: number, pid: number) => unknown
   Process32FirstW: (snap: unknown, entry: Record<string, unknown>) => boolean
   Process32NextW: (snap: unknown, entry: Record<string, unknown>) => boolean
@@ -49,6 +50,7 @@ function load(): Api | null {
       OpenProcess: kernel32.func('void* __stdcall OpenProcess(uint32 access, bool inherit, uint32 pid)'),
       QueryFullProcessImageNameW: kernel32.func('bool __stdcall QueryFullProcessImageNameW(void *h, uint32 flags, _Out_ uint8_t *buf, _Inout_ uint32 *size)'),
       CloseHandle: kernel32.func('bool __stdcall CloseHandle(void *h)'),
+      WaitForSingleObject: kernel32.func('uint32 __stdcall WaitForSingleObject(void *h, uint32 ms)'),
       CreateToolhelp32Snapshot: kernel32.func('void* __stdcall CreateToolhelp32Snapshot(uint32 flags, uint32 pid)'),
       Process32FirstW: kernel32.func('bool __stdcall Process32FirstW(void *snap, _Inout_ PROCESSENTRY32W *entry)'),
       Process32NextW: kernel32.func('bool __stdcall Process32NextW(void *snap, _Inout_ PROCESSENTRY32W *entry)'),
@@ -70,6 +72,8 @@ export function win32Available(): boolean {
 }
 
 const PROCESS_QUERY_LIMITED_INFORMATION = 0x1000
+const SYNCHRONIZE = 0x00100000
+const WAIT_OBJECT_0 = 0
 const TH32CS_SNAPPROCESS = 0x2
 const INVALID_HANDLE = -1n
 
@@ -144,11 +148,11 @@ export function processName(pid: number): string {
   })
 }
 
-/** Whether a process with this executable name ("eqgame.exe") is running; null when Windows cannot be asked. */
-export function isProcessRunning(exe: string): boolean | null {
+/** The id of a running process with this executable name ("eqgame.exe"): 0 for none, null when Windows cannot be asked. */
+export function findProcess(exe: string): number | null {
   const w = load()
   if (!w) return null
-  return safely<boolean | null>('process list', null, () => {
+  return safely<number | null>('process list', null, () => {
     const snap = w.CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0)
     if (isNull(snap)) return null
     const want = exe.toLowerCase()
@@ -156,12 +160,39 @@ export function isProcessRunning(exe: string): boolean | null {
       const entry: Record<string, unknown> = { dwSize: w.entrySize }
       let ok = w.Process32FirstW(snap, entry)
       while (ok) {
-        if (String(entry.szExeFile).toLowerCase() === want) return true
+        if (String(entry.szExeFile).toLowerCase() === want) return Number(entry.th32ProcessID) || 0
         ok = w.Process32NextW(snap, entry)
       }
-      return false
+      return 0
     } finally {
       w.CloseHandle(snap)
+    }
+  })
+}
+
+/**
+ * A process held to learn when it ends, without walking the process list (LT-558): a SYNCHRONIZE
+ * handle, asked with a zero wait. Null when it cannot be opened (gone already, or not ours to ask).
+ */
+export interface ProcessWatch {
+  /** Whether the process has ended. */
+  ended(): boolean
+  close(): void
+}
+
+export function watchProcess(pid: number): ProcessWatch | null {
+  const w = load()
+  if (!w || !pid) return null
+  return safely<ProcessWatch | null>('process watch', null, () => {
+    const h = w.OpenProcess(SYNCHRONIZE, false, pid)
+    if (isNull(h)) return null
+    let open = true
+    return {
+      ended: () => !open || safely('process wait', true, () => w.WaitForSingleObject(h, 0) === WAIT_OBJECT_0),
+      close: () => {
+        if (open) w.CloseHandle(h)
+        open = false
+      }
     }
   })
 }

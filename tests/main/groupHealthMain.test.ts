@@ -65,6 +65,7 @@ afterEach(() => {
 
 describe('GroupHealth', () => {
   it('starts the worker as the game runs, with the monitor the game is on and the line, and stops it when turned off', () => {
+    vi.useFakeTimers({ toFake: ['Date', 'setTimeout'] })
     const { workers, settings, tick } = setup()
     tick()
     expect(workers).toHaveLength(1)
@@ -78,8 +79,23 @@ describe('GroupHealth', () => {
     expect(workers[0].posted.at(-1)).toMatchObject({ belowPct: 40, rearmPct: 50 })
     settings.groupHealth.enabled = false
     tick()
+    // Told to stop, so it frees its screen copies (LT-559); ended outright when it has not in a second.
+    expect(workers[0].posted.at(-1)).toEqual({ kind: 'stop' })
+    expect(workers[0].ended).toBe(false)
+    vi.advanceTimersByTime(1000)
     expect(workers[0].ended).toBe(true)
     expect(workers).toHaveLength(1)
+  })
+
+  it('leaves a worker that ends itself when told to stop', () => {
+    vi.useFakeTimers({ toFake: ['Date', 'setTimeout'] })
+    const { workers, settings, tick } = setup()
+    tick()
+    settings.groupHealth.enabled = false
+    tick()
+    workers[0].emit('exit', 0)
+    vi.advanceTimersByTime(1000)
+    expect(workers[0].ended).toBe(false)
   })
 
   it('says a member who is low, cutting in only well under the line, and reports the rows it watches', () => {

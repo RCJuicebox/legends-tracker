@@ -22,7 +22,7 @@ import {
   Switch,
   ToggleChip
 } from '../components/ui'
-import { parseClock, SHARED_SEC, type RespawnRow, type RespawnTimerSpec, type RespawnView } from '../../../core/respawns'
+import { mergeRespawns, parseClock, SHARED_SEC, type RespawnRow, type RespawnTimerSpec, type RespawnView } from '../../../core/respawns'
 import { NotWatching } from '../components/NotWatching'
 
 // How long mobs take to come back, measured from the log, and a timer on an overlay for any of them.
@@ -31,7 +31,8 @@ import { NotWatching } from '../components/NotWatching'
 function useRespawns() {
   const q = useInvoke('respawns:get')
   const setData = q.setData
-  useEffect(() => api.on('state:respawns', (v: RespawnView) => setData(v)), [setData])
+  // A push may be the rows that changed alone (LT-555).
+  useEffect(() => api.on('state:respawns', (v: RespawnView) => setData((had) => mergeRespawns(had, v))), [setData])
   return q
 }
 

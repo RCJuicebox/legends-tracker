@@ -23,6 +23,8 @@ import { planSteps } from './steps'
  * the catalog was built; the page follows the Standings tab's own view for it (planFor).
  */
 export interface FactionPlanData extends PlanFor {
+  /** A hash of the rest of the answer: two answers with the same stamp draw the same (LT-553). */
+  stamp: string
   catalog: FactionCatalog
   /** The factions export the standings come from; null without one, and then they start from 0. */
   export: { file: string; modified: number } | null

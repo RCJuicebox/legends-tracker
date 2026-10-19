@@ -60,30 +60,79 @@ function bitmapInfo(width: number, height: number): Buffer {
   return b
 }
 
-/** The screen's pixels in this rectangle: blue, green, red and an unused byte each. Throws when Windows will not copy them. */
 /** Whether the Windows calls (koffi, gdi32) load here: inside the worker, from app.asar.unpacked in a packaged build. */
 export function gdiAvailable(): boolean {
   return load() !== null
 }
 
+/** A copy's own memory DC, bitmap and pixels, kept for the next copy of the same size. */
+interface Surface {
+  mem: unknown
+  bmp: unknown
+  info: Buffer
+  data: Buffer
+}
+
+/**
+ * The screen DC and a surface per copy size, made once rather than on every copy: five copies a second
+ * each made and freed a DC, a bitmap and a zeroed buffer (LT-559). The sizes are the bars' area and a
+ * monitor or two, so a handful at most; the oldest goes past MAX_SURFACES.
+ */
+let screenDc: unknown = null
+const surfaces = new Map<string, Surface>()
+const MAX_SURFACES = 4
+
+function surface(w: Gdi, width: number, height: number): Surface {
+  const key = `${width}x${height}`
+  const had = surfaces.get(key)
+  if (had) return had
+  const mem = w.CreateCompatibleDC(screenDc)
+  const bmp = w.CreateCompatibleBitmap(screenDc, width, height)
+  if (!mem || !bmp) {
+    if (bmp) w.DeleteObject(bmp)
+    if (mem) w.DeleteDC(mem)
+    throw new Error('Windows would not make a bitmap to copy into')
+  }
+  // Every byte is written by GetDIBits before it is read, so the buffer need not be zeroed.
+  const s = { mem, bmp, info: bitmapInfo(width, height), data: Buffer.allocUnsafe(width * height * 4) }
+  surfaces.set(key, s)
+  if (surfaces.size > MAX_SURFACES) freeSurface(w, surfaces.keys().next().value!)
+  return s
+}
+
+function freeSurface(w: Gdi, key: string): void {
+  const s = surfaces.get(key)
+  surfaces.delete(key)
+  if (!s) return
+  w.DeleteObject(s.bmp)
+  w.DeleteDC(s.mem)
+}
+
+/**
+ * The screen's pixels in this rectangle: blue, green, red and an unused byte each. Throws when Windows
+ * will not copy them. The frame's pixels are the surface's own: the next copy of the same size writes
+ * over them, so a frame is read before the next copy is asked.
+ */
 export function captureRect(x: number, y: number, width: number, height: number): Frame {
   const w = load()
-  const screen = w.GetDC(null)
-  if (!screen) throw new Error('Windows gave no screen to copy from')
-  const mem = w.CreateCompatibleDC(screen)
-  const bmp = w.CreateCompatibleBitmap(screen, width, height)
-  const old = w.SelectObject(mem, bmp)
+  screenDc ||= w.GetDC(null)
+  if (!screenDc) throw new Error('Windows gave no screen to copy from')
+  const s = surface(w, width, height)
+  const old = w.SelectObject(s.mem, s.bmp)
   try {
-    if (!w.BitBlt(mem, 0, 0, width, height, screen, x, y, SRCCOPY)) throw new Error('Windows would not copy the screen')
-    // GetDIBits wants the bitmap out of the DC it reads.
-    w.SelectObject(mem, old)
-    const data = Buffer.alloc(width * height * 4)
-    if (w.GetDIBits(mem, bmp, 0, height, data, bitmapInfo(width, height), DIB_RGB_COLORS) !== height) throw new Error('Windows would not hand over the copied pixels')
-    return { data, width, height, x, y }
+    if (!w.BitBlt(s.mem, 0, 0, width, height, screenDc, x, y, SRCCOPY)) throw new Error('Windows would not copy the screen')
   } finally {
-    w.SelectObject(mem, old)
-    w.DeleteObject(bmp)
-    w.DeleteDC(mem)
-    w.ReleaseDC(null, screen)
+    // GetDIBits wants the bitmap out of the DC it reads.
+    w.SelectObject(s.mem, old)
   }
+  if (w.GetDIBits(s.mem, s.bmp, 0, height, s.data, s.info, DIB_RGB_COLORS) !== height) throw new Error('Windows would not hand over the copied pixels')
+  return { data: s.data, width, height, x, y }
+}
+
+/** Frees the screen DC and every surface: the worker does so when told to stop. */
+export function releaseCapture(): void {
+  if (!gdi) return
+  for (const key of [...surfaces.keys()]) freeSurface(gdi, key)
+  if (screenDc) gdi.ReleaseDC(null, screenDc)
+  screenDc = null
 }

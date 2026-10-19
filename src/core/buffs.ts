@@ -618,7 +618,9 @@ export interface BuffsFile {
 }
 
 export interface BuffView {
+  /** Every class's buffs: static once the spell data is read, so a push leaves them out (offersKept) after the first (LT-555). */
   offers: BuffOffer[]
+  offersKept?: true
   wanted: string[]
   /** True while the wanted list is the defaults. */
   defaults: boolean

@@ -29,6 +29,21 @@ const SOUNDS_KEPT = 32
 const queue: { play: () => Promise<void>; expiresAt?: number }[] = []
 let speaking: { stop: () => void } | null = null
 let busy = false
+/** Sounds and phrases playing now. */
+let playing = 0
+/**
+ * With nothing playing or waiting this long, the AudioContext is suspended: running idle it was a
+ * third of the app's idle CPU (~0.45% of a core); suspended, none. handle() resumes it (LT-561).
+ */
+const IDLE_SUSPEND_MS = 30_000
+let idleTimer: ReturnType<typeof setTimeout> | null = null
+function idleLater(): void {
+  if (idleTimer) clearTimeout(idleTimer)
+  idleTimer = setTimeout(() => {
+    idleTimer = null
+    if (!busy && !queue.length && !playing && ctx.state === 'running') void ctx.suspend()
+  }, IDLE_SUSPEND_MS)
+}
 
 /** Everything said or waiting stops. */
 function hush(): void {
@@ -49,8 +64,9 @@ async function applyConfig(c: AudioSettings): Promise<void> {
   if (withSink.setSinkId && withSink.sinkId !== sink) {
     try {
       await withSink.setSinkId(sink)
-    } catch {
-      // A saved device that has been unplugged: keep playing on the default rather than going silent.
+    } catch (e) {
+      // A saved device that has been unplugged: keep playing on the default rather than going silent, and say so.
+      api.send('audio:problem', 'device', e instanceof Error ? e.message : String(e))
       await withSink.setSinkId('').catch(() => {})
     }
   }
@@ -67,7 +83,15 @@ function playBuffer(buffer: AudioBuffer, out: GainNode, volume = 1): { done: Pro
   gain.gain.value = volume
   src.buffer = buffer
   src.connect(gain).connect(out)
-  const done = new Promise<void>((r) => (src.onended = () => r()))
+  playing++
+  const done = new Promise<void>(
+    (r) =>
+      (src.onended = () => {
+        playing--
+        idleLater()
+        r()
+      })
+  )
   src.start()
   return { done, stop: () => src.stop() }
 }
@@ -81,8 +105,9 @@ async function pump(): Promise<void> {
     if (next.expiresAt !== undefined && Date.now() > next.expiresAt) continue
     try {
       await next.play()
-    } catch {
-      // A phrase that fails to play must not block the ones behind it.
+    } catch (e) {
+      // A phrase that fails to play must not block the ones behind it; it is said in main.log (LT-618).
+      api.send('audio:problem', 'play', e instanceof Error ? e.message : String(e))
     }
   }
   busy = false
@@ -97,11 +122,19 @@ function enqueueSpeech(play: () => Promise<void>, interrupt: boolean, expiresAt?
 }
 
 async function handle(cmd: Play): Promise<void> {
+  if (idleTimer) clearTimeout(idleTimer)
   if (ctx.state === 'suspended') await ctx.resume()
+  idleLater()
   if (cmd.kind === 'sound') {
     let buf = soundCache.get(cmd.name)
     if (buf) soundCache.delete(cmd.name)
-    else buf = await decode(cmd.data)
+    else
+      try {
+        buf = await decode(cmd.data)
+      } catch (e) {
+        api.send('audio:problem', 'decode', `${cmd.name}: ${e instanceof Error ? e.message : String(e)}`)
+        return
+      }
     soundCache.set(cmd.name, buf)
     if (soundCache.size > SOUNDS_KEPT) soundCache.delete(soundCache.keys().next().value!)
     playBuffer(buf, soundGain, cmd.volume)
@@ -155,3 +188,6 @@ api.on('audio:watchDevices', (on: boolean) => {
   navigator.mediaDevices.addEventListener('devicechange', onDeviceChange)
   void reportDevices()
 })
+
+// Suspended until the first sound if nothing plays at start (LT-561).
+idleLater()

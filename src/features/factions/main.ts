@@ -1,6 +1,7 @@
 import { LEGENDS_ZONES } from '../../shared/game/factions'
 import { promises as fs, readFileSync } from 'node:fs'
 import { join } from 'node:path'
+import { createHash } from 'node:crypto'
 import { sinceStart } from '../../main/sources/sinceExport'
 import {
   addFactionLine,
@@ -30,7 +31,7 @@ import {
 import { emptySources, joinSources, shareSources, sourceReader, type FactionSourceTallies } from './attribution'
 import { parseQuestPage, type QuestPage } from './questPages'
 import { classSwapName, classSwapOf, factionNamer, unmatchedNames } from './names'
-import { buildCatalog, craftMaterials, guessesFrom, itemsToLookUp, npcsToLookUp, type CatalogInput } from './catalog'
+import { buildCatalog, craftMaterials, guessesFrom, itemsToLookUp, npcsToLookUp, type CatalogInput, type FactionCatalog } from './catalog'
 import { planFor, type FactionPlanData } from './planner'
 import { RACE_UNLOCK_DEFS, raceUnlocks, unlockedRaces, type RaceUnlockDef } from './unlocks'
 import { lookUp, moversOf, sourcesOf } from './lookup'
@@ -638,6 +639,28 @@ async function holdings(dir: string, character: string): Promise<{ have: Record<
 }
 
 /** Everything the Plan tab plans from, for one character. */
+/** A short hash of a JSON text: what an input or an answer was, without keeping it. */
+function digest(json: string): string {
+  return createHash('sha1').update(json).digest('base64url')
+}
+
+/**
+ * The catalog last built for a character and goal, by what it was built from: the Plan tab asks every
+ * minute, and a build is 100–170 ms of the main thread from inputs that rarely change between asks
+ * (LT-553). The book's pages and quests stand in by their read time; the rest is hashed as JSON
+ * (a few ms), which is what the build reads.
+ */
+const catalogs = new Map<string, { stamp: string; catalog: FactionCatalog }>()
+
+export function catalogFor(key: string, input: CatalogInput, bookRead: number): FactionCatalog {
+  const stamp = digest(`${bookRead}|${input.pages.length}|${JSON.stringify(input, (k, v) => (k === 'pages' || k === 'quests' ? undefined : v))}`)
+  const had = catalogs.get(key)
+  if (had?.stamp === stamp) return had.catalog
+  const catalog = buildCatalog(input)
+  catalogs.set(key, { stamp, catalog })
+  return catalog
+}
+
 async function planData(ctx: AppContext, character: string, refresh: boolean, wide: boolean): Promise<FactionPlanData> {
   const dir = ctx.installDir()
   const where = ctx.historyOf(character)
@@ -709,10 +732,14 @@ async function planData(ctx: AppContext, character: string, refresh: boolean, wi
           .map((k) => k.split('|')[1])
       ]
     : undefined
-  const catalog = buildCatalog({ ...input, items, npcs, zonesInPlay, swapCons: await swapConsFor(ctx, character, exported, view, races) })
+  const catalog = catalogFor(
+    `${character}|${wide}`,
+    { ...input, items, npcs, zonesInPlay, swapCons: await swapConsFor(ctx, character, exported, view, races) },
+    book.book.fetchedAt
+  )
   const acts = Object.values(tallies.acts)
   const theirs = others.flatMap((o) => Object.values(o.tallies.acts))
-  return {
+  const data: Omit<FactionPlanData, 'stamp'> = {
     targets,
     maxed,
     achievementsExport,
@@ -751,6 +778,7 @@ async function planData(ctx: AppContext, character: string, refresh: boolean, wi
     }),
     ...(achievements ? {} : { noAchievementList: true })
   }
+  return { ...data, stamp: digest(JSON.stringify(data)) }
 }
 
 /**
