@@ -19,4 +19,6 @@ if %tries% geq 30 (
 timeout /t 1 /nobreak >nul
 goto wait
 :start
+rem Electron 44.7 and later fetch their program on first use, not at npm install: fetched here if missing.
+if not exist "%root%\node_modules\electron\dist\electron.exe" node "%root%\node_modules\electron\install.js"
 start "" "%root%\node_modules\electron\dist\electron.exe" "%root%"

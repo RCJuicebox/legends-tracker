@@ -8,13 +8,16 @@
 // by itself; 1 otherwise.
 
 import { spawn } from 'node:child_process'
+import { createRequire } from 'node:module'
 import { copyFileSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { setTimeout as sleep } from 'node:timers/promises'
 
 const root = resolve(import.meta.dirname, '..')
-const exe = process.argv[2] ? resolve(process.argv[2]) : join(root, 'node_modules', 'electron', 'dist', 'electron.exe')
+// The electron package's own path, which fetches the program first when it is missing: Electron 44.7
+// and later do so on first use rather than at npm install.
+const exe = process.argv[2] ? resolve(process.argv[2]) : String(createRequire(import.meta.url)('electron'))
 const appArgs = process.argv[2] ? [] : [root]
 const port = 9400 + Math.floor(Math.random() * 400)
 const profile = mkdtempSync(join(tmpdir(), 'lt-smoke-'))

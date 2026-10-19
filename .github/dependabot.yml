@@ -11,7 +11,8 @@ updates:
       build-tooling:
         patterns: ['vite', 'vitest', '@vitejs/*', 'electron-vite', 'typescript', '@types/*']
     # electron-vite 5 accepts Vite 7 at most, and plugin-react 6 needs Vite 8, so `npm ci` fails on
-    # either. Remove both entries once electron-vite 6 is a stable release (only 6.0.0-beta.1 on 2026-09-25).
+    # either. electron-vite 6.0.0 is out (seen 2026-10-19): moving to it, Vite 8 and plugin-react 6
+    # together is a change of its own; remove both entries with it.
     ignore:
       - dependency-name: 'vite'
         versions: ['>= 8']
