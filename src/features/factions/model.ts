@@ -118,7 +118,8 @@ export interface Opening {
 }
 
 /** The model of a plan for these choices; `covered()` is the units the stock covered in the last `timeFor`. */
-export function buildModel(input: PlanInput, settings: PlanSettings, choices: PlanChoices) {
+/** The plan's factions and targets, where each starts, and the activities' factions added (LT-638). */
+function modelSetup(input: PlanInput, settings: PlanSettings, choices: PlanChoices) {
   const { activities } = input
   const known = input.standings ?? {}
   // A race unlock's factions are to do too; nearly all of them are achievements anyway.
@@ -164,8 +165,12 @@ export function buildModel(input: PlanInput, settings: PlanSettings, choices: Pl
   const F = names.length
   const start = Float64Array.from(names, (f, i) => clamp(i < T ? targets[i].standing : (known[f] ?? (maxedNow.has(f) ? STANDING_MAX : 0)), STANDING_MIN, STANDING_MAX))
   const lockedIds = new Set(Object.values(choices.locks))
+  return { input, settings, choices, activities, known, openGoals, targets, travel, T, aim, floor, W, names, index, add, maxedNow, races, gateWanted, F, start, lockedIds }
+}
 
-  // ---- races: the character's own (0), and the others it could be ----
+/** The races: the character's own (0), and the others it could be, with what each adds to the cons. */
+function modelRaces(cx: ReturnType<typeof modelSetup>) {
+  const { F, T, W, activities, choices, gateWanted, index, lockedIds, races, settings, targets } = cx
   const raceNames = races
     ? [
         races.own,
@@ -283,8 +288,12 @@ export function buildModel(input: PlanInput, settings: PlanSettings, choices: Pl
   })
   const staleLocks = targets.filter((t, i) => choices.locks[t.faction] !== undefined && lockOf[i] < 0).map((t) => t.faction)
   const credits = (k: number, i: number) => lockOf[i] < 0 || lockOf[i] === k
+  return { ...cx, raceNames, RN, modOf, raceOf, races0, swapSec, acts, zones, slots, held, times, timeOf, K, stock0, amt, amount, raisers, actIndex, lockOf, staleLocks, credits }
+}
 
-  // ---- which race an activity is done as ----
+/** Which race an activity is done as. */
+function modelRaceFor(cx: ReturnType<typeof modelRaces>) {
+  const { acts, races, swapSec, travel } = cx
   /** Whether race r is one the character can be at this point: its own, or one unlocked. */
   const can = (r: number, st: State) => r === 0 || ((st.races >>> r) & 1) === 1
   const meets = (g: Gate, r: number, s: Float64Array) => {
@@ -311,8 +320,12 @@ export function buildModel(input: PlanInput, settings: PlanSettings, choices: Pl
   /** Starting on k as race r: the trip there from another zone, and a race swap there and back unless swapped to it already. */
   const setup = (k: number, st: State, r: number) =>
     (acts[k].zone === st.zone ? 0 : travel) + (r > 0 ? (races ? (st.race === r ? 0 : swapSec) : st.act === k ? 0 : acts[k].swap) : 0)
+  return { ...cx, can, meets, raceFor, setup }
+}
 
-  // ---- race unlocks ----
+/** The race unlocks, the plan's state, which activities can come to be done, and what a step costs. */
+function modelUnlocks(cx: ReturnType<typeof modelRaceFor>) {
+  const { F, K, RN, T, W, acts, aim, amount, credits, floor, index, meets, openGoals, raceOf, races0, raisers, settings, start, stock0, travel } = cx
   // Each is done once its factions have all been at 2000 (Half Elf's once one of its others is), and
   // its race is then one more the character can be. Those done by others go last, so one pass sees them.
   const goals = [...openGoals].sort((p, q) => (p.anyOf?.length ? 1 : 0) - (q.anyOf?.length ? 1 : 0))
@@ -522,7 +535,103 @@ export function buildModel(input: PlanInput, settings: PlanSettings, choices: Pl
     }
     return cost
   }
+  return {
+    ...cx,
+    goals,
+    G,
+    goalNames,
+    members,
+    anyOf,
+    anyDone,
+    goalRaces,
+    checkGoals,
+    base,
+    satisfied,
+    need,
+    openAtStart,
+    fresh,
+    reset,
+    hope,
+    openTo,
+    mayOpen,
+    worth,
+    reachable,
+    back,
+    usual,
+    maxedPoint,
+    below,
+    doable,
+    counted,
+    first,
+    memberOf,
+    boost,
+    covered,
+    timeFor,
+    apply,
+    onHand,
+    toDone,
+    blockUnits,
+    ending,
+    coveredNow: () => covered
+  }
+}
 
+export function buildModel(input: PlanInput, settings: PlanSettings, choices: PlanChoices) {
+  const cx = modelUnlocks(modelRaceFor(modelRaces(modelSetup(input, settings, choices))))
+  const {
+    F,
+    K,
+    RN,
+    T,
+    W,
+    actIndex,
+    activities,
+    acts,
+    aim,
+    amount,
+    apply,
+    base,
+    below,
+    blockUnits,
+    boost,
+    can,
+    checkGoals,
+    counted,
+    coveredNow,
+    credits,
+    ending,
+    first,
+    floor,
+    fresh,
+    goalNames,
+    index,
+    lockOf,
+    lockedIds,
+    maxedPoint,
+    mayOpen,
+    modOf,
+    names,
+    need,
+    onHand,
+    openAtStart,
+    raceFor,
+    raceNames,
+    races,
+    raisers,
+    reachable,
+    reset,
+    satisfied,
+    setup,
+    staleLocks,
+    start,
+    swapSec,
+    targets,
+    timeFor,
+    timeOf,
+    travel,
+    usual,
+    worth
+  } = cx
   // ---- greedy: the achievements ----
   /**
    * What n units of k do for the plan, in seconds of work: points on targets still to do (a race unlock's
@@ -641,7 +750,7 @@ export function buildModel(input: PlanInput, settings: PlanSettings, choices: Pl
     below,
     counted,
     first,
-    covered: () => covered,
+    covered: coveredNow,
     timeFor,
     apply,
     blockUnits,
