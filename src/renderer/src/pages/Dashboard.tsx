@@ -46,6 +46,7 @@ export function Dashboard({ go }: { go: Go }) {
   const character = useLive((l) => l.status.character)
   const elsewherePath = useLive((l) => l.status.elsewhere?.path ?? '')
   const elsewhereCharacter = useLive((l) => l.status.elsewhere?.character ?? '')
+  const remote = useLive((l) => l.status.remote ?? null)
   // Shared with the Triggers page's Test panel: lines pasted in either are waiting in the other.
   const [sim, setSim] = useRemembered<string>(TRY_LINES, '')
   const [simOpen, setSimOpen] = useState(() => !!sim)
@@ -93,6 +94,22 @@ export function Dashboard({ go }: { go: Go }) {
       <GameFolderPrompt />
       <SetupChecklist go={go} />
       <QuietLogNotice go={go} />
+      {remote && (
+        <div className="notice info mb-16">
+          Following <b>{remote.character}</b> on another PC ({remote.folder}): this PC&apos;s game is closed. The timers, the meter and the overlays follow that log, and this
+          PC&apos;s log is followed again as soon as its game starts.{' '}
+          <button
+            className="btn small"
+            onClick={async () => {
+              await patchSettings((s) => ({ ...s, followOtherPcs: false }))
+              void act('watch:start')
+            }}
+            title="Settings › Log files turns it back on"
+          >
+            Stop following other PCs
+          </button>
+        </div>
+      )}
       {elsewherePath && (
         <div className="notice mb-16">
           {elsewhereCharacter}&apos;s log is being written while {character || 'this character'}&apos;s is quiet.{' '}

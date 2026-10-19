@@ -74,6 +74,11 @@ export class MoteCatchUp implements EngineFeature {
   scanProgress = 0
   /** Motes looted on other PCs, from their logs (Settings › Log files). */
   readonly others: OtherMotes
+  /**
+   * Another PC's log is being followed (while this PC's game is closed): its motes are that log's, which
+   * `others` counts from it already, so the live lines are not counted again, nor its place kept.
+   */
+  remote = false
 
   constructor(
     private readonly store: EngineStore,
@@ -102,17 +107,19 @@ export class MoteCatchUp implements EngineFeature {
 
   /** A live line: held while history is read, else counted now. */
   line(line: LogLine): boolean {
+    if (this.remote) return false
     if (this.backlog.hold(line)) return false
     return this.motes.handle(line)
   }
 
   /** The tailer handed over lines up to `end`: all of that has been through mote tracking, unless history is still being read. */
   linesRead(logFile: string, end: number): void {
-    if (!this.backlog.active) this.linePos = { logFile, offset: end }
+    if (!this.backlog.active && !this.remote) this.linePos = { logFile, offset: end }
   }
 
   /** The tailer took its first look: if history is being read, it stops here. */
   attached(logFile: string, size: number): void {
+    if (this.remote) return
     if (this.backlog.active && this.backlogFrom < 0) {
       this.backlogFrom = size
       this.backlogLog = logFile
@@ -121,7 +128,7 @@ export class MoteCatchUp implements EngineFeature {
 
   /** The log was truncated or replaced under the tailer. */
   tailReset(logFile: string, reason: string): void {
-    if (this.backlog.active && samePath(this.backlogLog, logFile)) {
+    if (!this.remote && this.backlog.active && samePath(this.backlogLog, logFile)) {
       // Where history reading was to stop is in the old file; the waiting lines are the new one's.
       log.warn(`The log was ${reason} while mote history was being read; lines around the switch may be counted twice.`)
       this.backlogFrom = -1

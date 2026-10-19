@@ -4,7 +4,7 @@ import { useActions, useLive, useSettled } from '../state'
 import { whoList as who } from '../../../core/format'
 import { MAX_LOG_FOLDERS, type GameFolderCheck } from '../../../shared/types'
 import type { LogFolderView } from '../../../shared/ipc'
-import { WithCommands } from './ui'
+import { Switch, WithCommands } from './ui'
 
 /** Finds the game folder again, or lets the player point at it. Reports what happened in a line under the buttons. */
 function useFolderActions() {
@@ -161,6 +161,7 @@ const FOLDER_LOOK_MS = 30_000
 export function OtherLogFolders() {
   const { patchSettings } = useActions()
   const dirs = useSettled((s) => s.settings.logFolders)
+  const follow = useSettled((s) => s.settings.followOtherPcs)
   const [looks, setLooks] = useState<LogFolderView[] | null>(null)
   const [busy, setBusy] = useState(false)
   const [message, setMessage] = useState('')
@@ -208,9 +209,20 @@ export function OtherLogFolders() {
         <p className="hint">
           Play on another PC too? Add its Logs folder and each character&apos;s log there counts toward that character here: motes, Slayer and Hunter kills, factions, AAs, skills,
           casts and purchases. Share the folder on that PC (right-click EverQuest Legends\Logs, Properties, Sharing; reading is enough), then add it here as{' '}
-          <span className="mono">{'\\\\THATPC\\Logs'}</span>. It is only ever read. Timers, overlays and the meter stay with this PC&apos;s log.
+          <span className="mono">{'\\\\THATPC\\Logs'}</span>. It is only ever read.
         </p>
       </div>
+      <label className="row">
+        <Switch on={follow} label="Follow another PC's log while this PC's game is closed" onChange={(v) => patchSettings((x) => ({ ...x, followOtherPcs: v }))} />
+        <span>
+          Follow another PC&apos;s log while this PC&apos;s game is closed
+          <span className="faint small">
+            {' '}
+            — when a log there is being written, the Live page, the timers, the meter and the overlays follow it (the overlays show while this window is in front), and this
+            PC&apos;s log is followed again when its game starts
+          </span>
+        </span>
+      </label>
       {dirs.length > 0 && (
         <div className="table-scroll">
           <table className="table small">

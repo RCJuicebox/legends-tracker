@@ -11,11 +11,13 @@ import { characterKey } from '../../core/validate'
 export class SpellQueries {
   constructor(
     private readonly store: EngineStore,
-    private readonly book: () => SpellBook | null
+    private readonly book: () => SpellBook | null,
+    /** The log being followed: another PC's while this one's game is closed, else the settings' one. */
+    private readonly playedLog: () => string = () => store.settings.get().logFile
   ) {}
 
   character(): CharacterSettings {
-    return this.store.characterOf(this.store.settings.get().logFile)
+    return this.store.characterOf(this.playedLog())
   }
 
   ruleFor(name: string): SpellRule {
@@ -44,7 +46,7 @@ export class SpellQueries {
     const book = this.book()
     if (!book) return []
     // The character being played's own casts: an alt's spells, worked out at this one's level and focus, are not its (LT-525).
-    const casts = this.store.casts.get()[characterKey(this.store.settings.get().logFile)] ?? {}
+    const casts = this.store.casts.get()[characterKey(this.playedLog())] ?? {}
     const rules = this.store.rules.get()
     const byBase = new Map<string, { rankedName: string; lastCast: number }>()
     for (const c of Object.values(casts)) {

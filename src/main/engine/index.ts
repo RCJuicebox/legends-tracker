@@ -36,6 +36,21 @@ import type { TailerStats } from '../../core/tailer'
 
 export type { EngineEnv, EngineOutputs, EngineStore, MoteView, Speaker } from './contracts'
 
+/** This PC's log quiet this long, its game closed, before another PC's is followed. */
+const MAIN_QUIET_MS = 60_000
+/** Another PC's log written this recently is being played. */
+const REMOTE_FRESH_MS = 60_000
+/** Another PC's log followed and quiet this long: back to this PC's. */
+const REMOTE_IDLE_MS = 15 * 60_000
+
+/** Another PC's log being followed, and since when. */
+interface RemoteFollow {
+  path: string
+  character: string
+  folder: string
+  since: number
+}
+
 /** The engine's clock: timers, cues and pushes go on its laps. */
 const TICK_MS = 200
 export type { EngineFeature } from './feature'
@@ -83,6 +98,8 @@ export class Engine {
   /** Bumped by every start and stop, so a start overtaken while it waited gives up. */
   private watchGen = 0
   private starting = false
+  /** Another PC's log being followed while this PC's game is closed; null while this PC's is. */
+  private remote: RemoteFollow | null = null
   /** The log last watched, to tell a switch of character from a restart of the same log. */
   private watchedLog = ''
   private tickTimer: NodeJS.Timeout | null = null
@@ -101,7 +118,11 @@ export class Engine {
     private readonly env: EngineEnv
   ) {
     this.notifier = new Notifier(speech, out, () => this.settings, env.soundDirs)
-    this.queries = new SpellQueries(store, () => this.book)
+    this.queries = new SpellQueries(
+      store,
+      () => this.book,
+      () => this.playedLog
+    )
     this.timersOut = new Throttled(0, () => this.out.timers(this.board.views()))
     this.motesOut = new Throttled(1000, () => this.out.motes(this.moteView()))
     this.statusOut = new Throttled(1000, () => this.out.status({ ...this.status }))
@@ -132,6 +153,7 @@ export class Engine {
       readingHistory: () => this.combat.backlog.active,
       live: () => !this.simulating && this.status.watching,
       self: () => this.status.character,
+      logFile: () => this.playedLog,
       // Your own /who: the zone when the watch does not know it yet, and your race and classes for the
       // record. Those only from a /who typed now: one read back from the log may be from before a change.
       onSelf: (p) => {
@@ -285,6 +307,8 @@ export class Engine {
     this.archiveTimer = setInterval(() => {
       void this.archiveCheck()
       void this.lookElsewhere()
+      // Another PC's log, while this PC's game is closed (Settings › Log files).
+      void this.followOtherPc()
       // Motes looted on other PCs since the last look.
       void this.moteHistory.others.check()
     }, 30_000)
@@ -311,7 +335,7 @@ export class Engine {
   private quickBuffs(): RankedSpell[] {
     if (!this.book) return []
     const newest = new Map<string, { r: RankedSpell; at: number }>()
-    for (const c of Object.values(this.store.casts.get()[characterKey(this.settings.logFile)] ?? {})) {
+    for (const c of Object.values(this.store.casts.get()[characterKey(this.playedLog)] ?? {})) {
       const r = this.book.resolve(c.rankedName)
       if (!r || !r.spell.beneficial || (!r.spell.landSelf && !r.spell.landOther)) continue
       const had = newest.get(r.spell.name)
@@ -348,7 +372,7 @@ export class Engine {
           onCast: (r, at) => {
             // Changed in place: the file needs only a mark, not a copy of every known cast per cast (LT-384).
             const all = this.store.casts.get()
-            const casts = (all[characterKey(this.settings.logFile)] ??= {})
+            const casts = (all[characterKey(this.playedLog)] ??= {})
             const prev = casts[r.rankedName]
             casts[r.rankedName] = { rankedName: r.rankedName, lastCast: at, count: (prev?.count ?? 0) + 1 }
             this.store.casts.set(all)
@@ -395,17 +419,21 @@ export class Engine {
     this.tracker?.configure(this.trackerConfig())
     // Charm pets on or off changes whose every past blow was: the fights on record are read again.
     if (this.combat.applySettings() && this.status.watching) void this.rebuildCombat(this.settings.combat.historyMinutes)
-    this.triggers.load(this.store.triggers.get(), characterName(this.settings.logFile))
+    this.triggers.load(this.store.triggers.get(), characterName(this.playedLog))
     for (const f of this.features) f.reconfigure?.()
     this.emitStatus()
   }
 
   // ---- watching ----
 
-  async startWatching(): Promise<void> {
+  /** Follows the settings' log, or with `remote` another PC's while this one's game is closed (followOtherPc). */
+  async startWatching(remote: RemoteFollow | null = null): Promise<void> {
     const gen = ++this.watchGen
     this.stopTail()
-    const logFile = this.settings.logFile
+    this.remote = remote
+    this.moteHistory.remote = !!remote
+    this.status.remote = remote ? { path: remote.path, character: remote.character, folder: remote.folder } : null
+    const logFile = remote?.path ?? this.settings.logFile
     if (!logFile) return
     this.starting = true
     const zone = await lastZone(logFile)
@@ -430,7 +458,12 @@ export class Engine {
     this.status.watching = true
     // Until a line comes, the last one is the file's last write: "Last line 5m ago", not "never".
     this.status.lastLineAt = (await fs.stat(logFile).catch(() => null))?.mtimeMs ?? 0
-    this.pushFeed('info', `Watching ${basename(logFile)}${zone ? ` in ${zone}` : ''}`)
+    this.pushFeed(
+      'info',
+      remote
+        ? `Following ${remote.character}'s log on ${remote.folder}${zone ? ` in ${zone}` : ''}: this PC's game is closed.`
+        : `Watching ${basename(logFile)}${zone ? ` in ${zone}` : ''}`
+    )
     this.emitStatus()
     void this.seedCombat()
   }
@@ -665,7 +698,7 @@ export class Engine {
    * was written in the last minute. The Live page offers to switch; the feed says so once per log.
    */
   private async lookElsewhere(now = Date.now()): Promise<void> {
-    const quiet = this.status.watching && now - this.status.lastLineAt > 120_000
+    const quiet = !this.remote && this.status.watching && now - this.status.lastLineAt > 120_000
     let found: WatchStatus['elsewhere'] = null
     if (quiet && this.settings.installDir) {
       const other = (await listLogs(this.settings.installDir)).find((l) => !samePath(l.path, this.settings.logFile) && now - l.modified < 60_000)
@@ -692,6 +725,8 @@ export class Engine {
 
   gameStarted(): void {
     this.archives.set({ gameRunning: true })
+    // This PC's game is played again: its own log, not another PC's.
+    if (this.remote) void this.startWatching()
     this.follower.setPollMs(this.env.pollMs ?? LIVE_POLL_MS)
     this.pushFeed('info', 'The game is running.')
   }
@@ -725,7 +760,52 @@ export class Engine {
     this.moteHistory.shutdown()
   }
 
+  /** The character being played: another PC's while its log is followed, else the settings' log's. */
   characterKey(): string {
-    return characterKey(this.settings.logFile)
+    return characterKey(this.playedLog)
+  }
+
+  /** The log being followed: another PC's while this PC's game is closed, else the one the settings name. */
+  get playedLog(): string {
+    return this.remote?.path ?? this.settings.logFile
+  }
+
+  /**
+   * Another PC's log, followed live while this PC's game is closed and its log quiet (the second PC a
+   * player leaves killing): the newest log in the other PCs' folders written in the last minute, the
+   * same character's first. Back to this PC's log as soon as its game starts or its log is written, or
+   * once the other one has been quiet a quarter hour.
+   */
+  private async followOtherPc(now = Date.now()): Promise<void> {
+    if (this.starting) return
+    const s = this.settings
+    if (this.remote) {
+      const main = s.logFile ? await fs.stat(s.logFile).catch(() => null) : null
+      const mainWritten = !!main && main.mtimeMs > this.remote.since
+      const gone = now - this.status.lastLineAt > REMOTE_IDLE_MS
+      if (!s.followOtherPcs || this.archive.gameRunning || mainWritten || gone) {
+        this.pushFeed(
+          'info',
+          mainWritten || this.archive.gameRunning
+            ? "Back to this PC's log: its game is being played."
+            : `${this.remote.character}'s log on the other PC has gone quiet; back to this PC's log.`
+        )
+        await this.startWatching()
+      }
+      return
+    }
+    if (!s.followOtherPcs || !s.logFolders.length || !this.status.watching || this.archive.gameRunning) return
+    if (now - this.status.lastLineAt < MAIN_QUIET_MS) return
+    const looks = (await this.env.logFolders?.lookAll().catch(() => [])) ?? []
+    const fresh = looks
+      .filter((l) => l.reachable)
+      .flatMap((l) => l.logs.map((x) => ({ ...x, folder: l.dir })))
+      .filter((x) => now - x.modified < REMOTE_FRESH_MS)
+      .sort((a, b) => b.modified - a.modified)
+    const mine = characterKey(s.logFile).toLowerCase()
+    const pick = fresh.find((x) => characterKey(x.path).toLowerCase() === mine) ?? fresh[0]
+    // A start or a stop may have come while the folders were looked at.
+    if (!pick || this.remote || !this.status.watching || this.archive.gameRunning) return
+    await this.startWatching({ path: pick.path, character: characterName(pick.path), folder: pick.folder, since: now })
   }
 }

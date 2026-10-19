@@ -42,6 +42,8 @@ export interface BuffHooks {
   live: () => boolean
   /** The character being played, as the log names them. */
   self?: () => string
+  /** The log being followed (another PC's while this one's game is closed); the settings' one without it. */
+  logFile?: () => string
   /** A /who line about the character being played. */
   onSelf?: (p: Person) => void
 }
@@ -93,7 +95,7 @@ export class BuffCoordinator implements EngineFeature {
   }
 
   private characterKey(): string {
-    return characterKey(this.settings.logFile)
+    return characterKey(this.hooks.logFile?.() ?? this.settings.logFile)
   }
 
   /** A new spell book: the buffs on offer are read from it. */
@@ -145,7 +147,7 @@ export class BuffCoordinator implements EngineFeature {
 
   /** You: what /who last said, or failing that the classes and levels on the character sheet. */
   me(): Person | null {
-    const name = characterName(this.settings.logFile)
+    const name = characterName(this.hooks.logFile?.() ?? this.settings.logFile)
     if (!name) return null
     const c = this.queries.character()
     // In the character record's order (the player's own, main class first), as every other page

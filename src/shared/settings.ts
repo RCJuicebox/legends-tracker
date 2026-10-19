@@ -207,10 +207,15 @@ export interface AppSettings {
   logFile: string
   /**
    * Logs folders of other PCs the player plays on, most often a network share ("\\Laptop\EverQuest Legends\Logs"):
-   * their character logs count toward each character's history as this PC's do. Only ever read: never
-   * followed live, archived or written to.
+   * their character logs count toward each character's history as this PC's do. Only ever read, never
+   * archived or written to; followed live only while this PC's game is closed (`followOtherPcs`).
    */
   logFolders: string[]
+  /**
+   * While this PC's game is closed and its log quiet, follow a log on another PC (`logFolders`) that is
+   * being written: the Live page, the timers and the overlays follow what is played there.
+   */
+  followOtherPcs: boolean
   autoStart: boolean
   /** Restart into a downloaded update as soon as it arrives, without asking; off, it installs when the app closes. */
   autoRestartUpdates: boolean

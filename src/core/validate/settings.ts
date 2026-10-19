@@ -367,6 +367,7 @@ export function sanitizeSettings(v: unknown, fb: AppSettings): AppSettings | nul
     // The tailer reads whatever this names: only a character log.
     logFile: logFilePath(v.logFile, fb.logFile),
     logFolders: logFolders(v.logFolders, fb.logFolders),
+    followOtherPcs: bool(v.followOtherPcs, fb.followOtherPcs ?? true),
     autoStart: bool(v.autoStart, fb.autoStart),
     autoRestartUpdates: bool(v.autoRestartUpdates, fb.autoRestartUpdates),
     characters,

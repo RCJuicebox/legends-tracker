@@ -55,6 +55,8 @@ export interface WatchStatus {
   logError?: string
   /** Another character's log that is being written while the watched one is quiet: likely who is being played now. */
   elsewhere?: { path: string; character: string } | null
+  /** Another PC's log, followed while this PC's game is closed (Settings › Log files); null while this PC's is. */
+  remote?: { path: string; character: string; folder: string } | null
 }
 
 export interface LogFileInfo {
