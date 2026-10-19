@@ -338,7 +338,10 @@ export const NAME_WORDS: Record<string, string> = {
   yellowjacket: 'insect',
   frogloks: 'froglok',
   // Lesser Faydark's faeries are the client's Fairies ("a faerie guard" has no eqlwiki race).
-  faerie: 'fairy'
+  faerie: 'fairy',
+  // Stonebrunt's pandas are the client's Walrus Man (eqlwiki; TAKP's Ulthork): "a giant panda" is a
+  // panda, not a Giant, though "giant" is the only other race word in its name (2026-10-19).
+  panda: 'walrus'
 }
 
 /**

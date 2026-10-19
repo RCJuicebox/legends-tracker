@@ -90,3 +90,15 @@ describe('a faerie', () => {
     expect(fae.place('a faerie maiden', 'Fairy')).toMatchObject({ key: 'fairy', by: 'wiki' })
   })
 })
+
+describe('a panda', () => {
+  it('is the Walrus Man its kin are on eqlwiki, a giant one too, never a Giant', () => {
+    const zoo = new SlayerRaces(
+      slayerCounters(parseAchievements(['Slayer: Conquest', 'I\tMight They Be Giants?', 'I\t\tGiants\t100/5000'].join('\n')).sections),
+      parseRaceTable(['18^11^Giant^0^', '18^12^Giants^0^', '102^11^Walrus^0^', '102^12^Walruses^0^'].join('\r\n'))
+    )
+    expect(zoo.place('a giant panda', undefined)).toMatchObject({ key: 'walrus', by: 'name' })
+    expect(zoo.place('a young panda', 'Walrus Man').key).toBe('walrus')
+    expect(zoo.place('a hill giant', undefined).key).toBe('giant')
+  })
+})
