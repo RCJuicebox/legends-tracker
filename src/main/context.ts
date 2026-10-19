@@ -41,7 +41,6 @@ import { LogFolders, otherArchiveDir } from './logFolders'
 import { Windows, loadPage } from './windows'
 import { appIcon, preloadPath, resources } from './bootstrap'
 import { log } from './log'
-import { describeClasses, recordFromWho } from '../core/selfWho'
 import { sources } from './sources/registry'
 import { jobs } from './sources/jobs'
 import { settingsSummary } from '../core/diagnosticsText'
@@ -52,7 +51,7 @@ import { cacheDir } from './paths'
 import { perf } from './perf'
 import { characterLogFile, logStem } from './storeCore'
 import { sweepScreenCaptures } from './ocr'
-import { respawnChanges } from '../core/respawns'
+import { engineOutputs, updateListener } from './contextParts'
 
 /**
  * Everything the main process runs, built once. The IPC handlers, the lifecycle and the start-up all
@@ -132,9 +131,6 @@ export interface AppContext {
   /** Restarts into a downloaded update; `unasked` when the player did not press for it. */
   installUpdate(unasked?: boolean): Promise<void>
 }
-
-/** The newest loot entry the main window was sent whole or added to; 0 when it should get the whole list. */
-let lootSent = 0
 
 export function createContext(): AppContext {
   const store = new Store(join(resources, 'defaults', 'triggers.json'))
@@ -255,136 +251,45 @@ export function createContext(): AppContext {
     if (state.foregroundPid !== previous.foregroundPid) ctx.overlays.reassertTop()
   })
 
-  let lastUpdate = 'idle'
-  let lastUpdateCheck = 0
-  ctx.updater = new Updater((s) => {
-    toMain('state:update', s)
-    const was = lastUpdate
-    lastUpdate = s.state
-    if (s.state === 'idle' && s.checkedAt) lastUpdateCheck = s.checkedAt
-    // Offline is not a fault of the updater: said plainly, with when it last got through, rather than
-    // a red error first in every diagnostics paste all evening (LT-444).
-    if (s.state === 'error' && /could not reach GitHub/.test(s.message))
-      sources.missing(
-        'updates',
-        `Offline: GitHub could not be reached; ${lastUpdateCheck ? `last checked ${new Date(lastUpdateCheck).toLocaleString()}` : 'not checked yet this run'}. Tried again within the hour.`
-      )
-    else if (s.state === 'error') sources.fail('updates', new Error(s.message))
-    else if (s.state === 'idle') sources.ok('updates', s.checkedAt ? `Up to date, checked ${new Date(s.checkedAt).toLocaleTimeString()}` : 'Up to date')
-    else if (s.state === 'ready') sources.ok('updates', `${s.version} downloaded; installs at restart`)
-    else if (s.state === 'downloading') sources.reading('updates', `Downloading ${s.version}, ${s.percent}%`)
-    else if (s.state === 'dev') sources.missing('updates', 'Running from source: only the installed app updates.')
-    if (s.state === 'error' && was === 'downloading') {
-      // A download that failed is said once; the next hourly check tries again.
-      ctx.engine.pushFeed('warn', `The update could not be downloaded: ${s.message}. It will be tried again within the hour.`)
-      announceUpdate(
-        `failed:${Date.now() - (Date.now() % 86_400_000)}`,
-        'Legends Tracker could not download its update',
-        `${s.message}. It will be tried again within the hour.`,
-        () => windows.showMain()
-      )
-    } else if (s.state === 'downloading') {
-      announceUpdate(`found:${s.version}`, `Legends Tracker ${s.version} is available`, 'Downloading it now. You can restart into it once it has arrived.', () =>
-        windows.showMain()
-      )
-    } else if (s.state === 'ready' && store.settings.get().autoRestartUpdates && ctx.updater.heldBack(s.version)) {
-      // Its install was started last time and did not take: not again by itself (LT-597).
-      ctx.engine.pushFeed('warn', `Version ${s.version} has downloaded again, but its install did not take last time: Restart and update on Settings › General tries once more.`)
-    } else if (s.state === 'ready' && store.settings.get().autoRestartUpdates) {
-      // The player chose not to be asked: restart into it at the first lull in play, so no fight's
-      // timers are lost to it (LT-430): never mid-fight, and otherwise with the log quiet a minute or
-      // the game not in front (alt-tabbed mid-pull is still mid-fight, LT-598), looked at every half
-      // minute, and at most two hours on.
-      ctx.engine.pushFeed('info', `Version ${s.version} has downloaded: restarting into it at the next lull in play.`)
-      log.info(`Restarting into ${s.version} by itself at the next lull (Restart into updates by itself is on)`)
-      const readyAt = Date.now()
-      const atLull = () => {
-        const fighting = ctx.engine.meter.fighting
-        const quiet = Date.now() - ctx.engine.status.lastLineAt > 60_000
-        const away = ctx.watcher.state.foregroundName !== 'eqgame'
-        if ((!fighting && (quiet || away)) || !ctx.engine.status.watching || Date.now() - readyAt > 2 * 3600_000) void ctx.installUpdate(true)
-        else setTimeout(atLull, 30_000).unref()
-      }
-      setTimeout(atLull, 2000).unref()
-    } else if (s.state === 'ready') {
-      ctx.engine.pushFeed('info', `Version ${s.version} is ready: restart to update.`)
-      announceUpdate(
-        `ready:${s.version}`,
-        `Legends Tracker ${s.version} is ready`,
-        'Click to restart and update. Your settings and overlays stay as they are.',
-        () => void ctx.installUpdate()
-      )
-    }
-  })
+  ctx.updater = new Updater(
+    updateListener({
+      toMain,
+      pushFeed: (kind, text) => ctx.engine.pushFeed(kind, text),
+      announce: announceUpdate,
+      showMain: () => windows.showMain(),
+      install: (unasked) => void ctx.installUpdate(unasked),
+      autoRestart: () => store.settings.get().autoRestartUpdates,
+      heldBack: (v) => ctx.updater.heldBack(v),
+      play: () => ({
+        fighting: ctx.engine.meter.fighting,
+        lastLineAt: ctx.engine.status.lastLineAt,
+        watching: ctx.engine.status.watching,
+        gameInFront: ctx.watcher.state.foregroundName === 'eqgame'
+      })
+    })
+  )
 
-  /** The respawn rows the main window has, by key (respawnChanges). */
-  const respawnSent = new Map<string, string>()
   ctx.engine = new Engine(
     store,
     new VoiceRouter(speech, azure),
-    {
-      timers: (views) => {
-        ctx.overlays.timers(views)
-        toMain('state:timers', views)
-      },
-      alert: (p) => ctx.overlays.alert(p),
-      audio: (cmd) => windows.toAudio(cmd),
-      status: (s) => {
-        toMain('state:status', s)
-        reportStatus(s, store.settings.get().logFile)
-      },
-      feed: (item) => toMain('state:feed', item),
-      archive: (a) => toMain('state:archive', a),
-      motes: (m) => toMain('state:motes', m),
-      moteScan: (s) => toMain('state:moteScan', s),
-      stock: (s) => toMain('state:stock', s),
-      combat: (snap) => {
-        ctx.overlays.combat(snap)
-        windows.combatToMain(snap)
-      },
-      loot: (view) => {
-        // The main window has the entries up to the newest it was sent: only those after go (LT-369).
-        // Hidden, or with no page listening, it is sent the whole list, as only the last push is kept for it.
-        const newest = view.entries[0]?.id ?? 0
-        const oldest = view.entries.at(-1)?.id ?? 0
-        const sent = windows.mainWatches('state:loot')
-        const push = sent && lootSent > 0 && newest >= lootSent ? { ...view, entries: view.entries.filter((e) => e.id > lootSent), addedOnly: { oldest } } : view
-        lootSent = sent ? newest : 0
-        toMain('state:loot', push)
-      },
-      // The rows that changed, while the window shows; the whole view while it is hidden, so the one held for it is whole (LT-555).
-      respawns: (view) => {
-        if (!windows.mainWatches('state:respawns')) {
-          respawnSent.clear()
-          return toMain('state:respawns', view)
+    engineOutputs({
+      toMain,
+      mainWatches: (c) => windows.mainWatches(c),
+      overlays: () => ctx.overlays,
+      toAudio: (cmd) => windows.toAudio(cmd),
+      combatToMain: (snap) => windows.combatToMain(snap),
+      reportStatus: (st) => reportStatus(st, store.settings.get().logFile),
+      characterKey: () => ctx.characterKey(),
+      pet: ctx.petStore,
+      record: {
+        get: (key) => store.characterByKey(key),
+        set: (key, rec) => {
+          const st = store.settings.get()
+          store.settings.set({ ...st, characters: { ...st.characters, [key]: rec } })
         }
-        const first = !respawnSent.size
-        const changes = respawnChanges(view, respawnSent)
-        if (first) toMain('state:respawns', view)
-        else if (changes) toMain('state:respawns', changes)
       },
-      pet: (update) => {
-        const character = ctx.characterKey()
-        if (!character) return
-        void ctx.petStore.merge(character, update).then(async (changed) => changed && toMain('state:pet', { character, ...(await ctx.petStore.get(character)) }))
-      },
-      push: toMain,
-      // A /who of yourself names your race and classes: the character record follows them, so a change
-      // of either reaches the faction cons, the AC sums, spell durations and the gear you can wear.
-      selfSeen: (who) => {
-        const key = ctx.characterKey()
-        const rec = key ? store.characterByKey(key) : null
-        const next = rec ? recordFromWho(rec, who) : null
-        if (!key || !rec || !next) return
-        if (next.race !== rec.race) log.info(`Race for ${key}: ${rec.race || 'none'} → ${next.race} (from /who).`)
-        const [was, now] = [describeClasses(rec.classLevels), describeClasses(next.classLevels)]
-        if (was !== now) log.info(`Classes for ${key}: ${was} → ${now} (from /who).`)
-        const s = store.settings.get()
-        store.settings.set({ ...s, characters: { ...s.characters, [key]: next } })
-        ctx.engine.reconfigure()
-        toMain('state:character', next)
-      }
-    },
+      reconfigure: () => ctx.engine.reconfigure()
+    }),
     appEngineEnv({
       dataDir,
       soundDirs: () => [join(dataDir, 'sounds'), join(installDir(), 'AudioTriggers', 'default'), join(installDir(), 'AudioTriggers', 'shared')],
