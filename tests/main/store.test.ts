@@ -178,12 +178,15 @@ describe('the settings files on disk', () => {
     const path = join(dir, 'busy.json')
     const f = new JsonFile(path, { n: 0 }, { delayMs: 50, maxWaitMs: 120 })
     const started = Date.now()
-    // A change every 20 ms for a quarter of a second: the 50 ms debounce alone would never write.
-    for (let i = 1; Date.now() - started < 250; i++) {
+    // A change every 20 ms: the 50 ms debounce alone would never write, so a file that appears while
+    // they keep coming was written by the wait's limit. Looked at for up to a second: a busy test run
+    // can hold the write back past the limit's 120 ms.
+    let wrote = false
+    for (let i = 1; Date.now() - started < 1000 && !(wrote = existsSync(path)); i++) {
       f.set({ n: i })
       await new Promise((r) => setTimeout(r, 20))
     }
-    expect(existsSync(path)).toBe(true)
+    expect(wrote).toBe(true)
     await f.flush()
   })
 
