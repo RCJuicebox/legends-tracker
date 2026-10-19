@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { existsSync, promises as fs } from 'node:fs'
 import { join } from 'node:path'
-import { CastHistory, castCounter, dayConsumer } from '../../src/main/castHistory'
+import { CastHistory, castCounter, dayConsumer, resistCounter } from '../../src/main/castHistory'
 import { LogHistory } from '../../src/main/sources/logHistory'
 import { tempDir } from '../tempDir'
 
@@ -21,6 +21,22 @@ afterEach(async () => {
 const cast = (stamp: string, spell: string) => `[${stamp}] You begin casting ${spell}.\r\n`
 
 describe('CastHistory', () => {
+  it("counts your spells resisted by name, and nobody else's (LT-722)", async () => {
+    const logPath = join(dir, 'eqlog_Kelwyn_neriak.txt')
+    await fs.writeFile(
+      logPath,
+      [
+        '[Thu Sep 24 11:03:02 2026] A ratman warrior resisted your Envenomed Bolt X!',
+        '[Thu Sep 24 11:03:09 2026] A ratman warrior resisted your Envenomed Bolt X!',
+        "[Thu Sep 24 11:03:12 2026] A decrepit warder resisted Dorran's Malaria!",
+        ''
+      ].join('\r\n')
+    )
+    const history = new LogHistory(join(dir, 'log-history.json'), { resists: dayConsumer(resistCounter) })
+    const r = await new CastHistory(history, 'resists').recent({ logPath, archiveDir: join(dir, 'archive'), stem: 'eqlog_Kelwyn_neriak', days: 0 })
+    expect(r.counts).toEqual({ 'Envenomed Bolt X': 2 })
+  })
+
   it('counts a buff landing after Quick Buff as one cast of its newest rank (LT-503)', async () => {
     const logPath = join(dir, 'eqlog_Kelwyn_neriak.txt')
     const o = { logPath, archiveDir: join(dir, 'archive'), stem: 'eqlog_Kelwyn_neriak', days: 0 }

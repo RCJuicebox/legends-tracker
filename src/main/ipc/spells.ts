@@ -41,7 +41,31 @@ export function registerSpellIpc(ctx: AppContext): void {
     const key = character || ctx.characterKey()
     if (!isCharacterKey(key)) return { rows: [], unknown: [], window: null, mine: [] }
     // Its logs on every PC it is played on.
-    const recent = await ctx.castHistory.recent({ ...ctx.historyOf(key), days: intArg(days, 0, 3650, 14) })
-    return { ...castRows(book, recent.counts, engine.character()), window: { total: recent.total, from: recent.from, to: recent.to }, mine: engine.myClasses() }
+    const where = { ...ctx.historyOf(key), days: intArg(days, 0, 3650, 14) }
+    const [recent, resists] = await Promise.all([ctx.castHistory.recent(where), ctx.resistHistory.recent(where).catch(() => null)])
+    return {
+      ...castRows(book, recent.counts, engine.character(), resists?.counts),
+      window: { total: recent.total, from: recent.from, to: recent.to },
+      mine: engine.myClasses()
+    }
+  })
+
+  // Your casts and resists of each spell over the last two weeks of play, by the spell's name, for Spell Timers' Resisted column (LT-722).
+  handle('spells:resists', async () => {
+    const book = engine.book
+    const key = ctx.characterKey()
+    if (!book || !isCharacterKey(key)) return {}
+    const where = { ...ctx.historyOf(key), days: 14 }
+    const [casts, resists] = await Promise.all([ctx.castHistory.recent(where), ctx.resistHistory.recent(where)])
+    const out: Record<string, { casts: number; resisted: number }> = {}
+    const add = (counts: Record<string, number>, field: 'casts' | 'resisted') => {
+      for (const [name, n] of Object.entries(counts)) {
+        const base = book.resolve(name)?.spell.name
+        if (base) (out[base] ??= { casts: 0, resisted: 0 })[field] += n
+      }
+    }
+    add(casts.counts, 'casts')
+    add(resists.counts, 'resisted')
+    return out
   })
 }

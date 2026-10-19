@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { at, harness, exampleShaman } from '../helpers'
 import { timerKey } from '../../src/core/spellTracker'
+import { parseLogLine } from '../../src/core/logLine'
 
 // Every sequence below is copied from Kelwyn's real log.
 
@@ -76,6 +77,8 @@ describe('DoT tracking', () => {
     const t = h.board.get(timerKey('Envenomed Bolt', 'Bazzt Zzzt'))!
     expect(t.exact).toBe(true)
     expect(t.endsAt).toBe(at('Tue Sep 01 12:16:08 2026'))
+    // The bar says what a tick does (LT-728).
+    expect(h.board.views()[0].tickDamage).toBe(1534)
   })
 
   it('drops a cast the target resisted, the way Legends prints it, and says so', () => {
@@ -205,6 +208,51 @@ describe('self buff tracking', () => {
     expect(h.tracker.currentZone).toBe('Neriak - Commons')
   })
 
+  it('says when one target resists three of your spells in a row, once until it dies (LT-722)', () => {
+    const h = harness()
+    const resist = (t: string) => `
+      [${t}] You begin casting Envenomed Bolt X.
+      [${t}] A ratman warrior resisted your Envenomed Bolt X!`
+    h.feed(resist('Sat Sep 12 23:11:04 2026') + resist('Sat Sep 12 23:11:08 2026'))
+    // A landing between starts the count again.
+    h.feed(`
+      [Sat Sep 12 23:11:12 2026] You begin casting Envenomed Bolt X.
+      [Sat Sep 12 23:11:13 2026] A ratman warrior has been poisoned.`)
+    h.feed(resist('Sat Sep 12 23:11:20 2026') + resist('Sat Sep 12 23:11:24 2026'))
+    expect(h.spoken).toEqual([])
+    h.feed(resist('Sat Sep 12 23:11:28 2026') + resist('Sat Sep 12 23:11:32 2026'))
+    expect(h.spoken).toEqual(['Three resists in a row on A ratman warrior'])
+    h.feed('[Sat Sep 12 23:11:40 2026] You have slain a ratman warrior!')
+    h.feed(resist('Sat Sep 12 23:12:04 2026') + resist('Sat Sep 12 23:12:08 2026') + resist('Sat Sep 12 23:12:12 2026'))
+    expect(h.spoken).toEqual(['Three resists in a row on A ratman warrior', 'Three resists in a row on A ratman warrior'])
+  })
+
+  it('says which lines it read, a pet recourse fading with no timer among them (FEAT-025, LT-729)', () => {
+    const h = harness()
+    const read = (text: string) => h.tracker.handle(parseLogLine(`[Tue Oct 06 12:10:01 2026] ${text}`)!)
+    expect(read("Your pet's Oathbreaker's Curse Recourse spell has worn off.")).toBe(true)
+    expect(read('You begin casting Spirit of the Puma X.')).toBe(true)
+    expect(read('You begin to snarl as your features become feline.')).toBe(true)
+    expect(read('The spirit of the puma departs.')).toBe(true)
+    expect(read('Your target is too far away, get closer!')).toBe(false)
+  })
+
+  it('holds a buff still while the zone loads: the silence before "You have entered" (LT-718)', () => {
+    const h = harness()
+    h.feed(`
+      [Tue Oct 06 12:10:01 2026] You begin casting Spirit of the Puma X.
+      [Tue Oct 06 12:10:02 2026] You begin to snarl as your features become feline.
+      [Tue Oct 06 12:10:38 2026] Kelwyn says, 'ready'`)
+    const before = h.board.get(timerKey('Spirit of the Puma', 'You'))!.endsAt
+    h.feed('[Tue Oct 06 12:10:52 2026] You have entered The Ruins of Old Paineel.')
+    expect(h.board.get(timerKey('Spirit of the Puma', 'You'))!.endsAt - before).toBe(14_000)
+    // An idle hour then a zone is not an hour's load.
+    h.feed(`
+      [Tue Oct 06 12:11:52 2026] Kelwyn says, 'back'
+      [Tue Oct 06 12:12:58 2026] You have entered Neriak - Commons.`)
+    expect(h.board.get(timerKey('Spirit of the Puma', 'You'))!.endsAt - before).toBe(74_000)
+  })
+
   it('tracks a buff cast on another player and ends it on the worn-off line', () => {
     const h = harness()
     h.feed(`
@@ -321,7 +369,8 @@ describe("anyone's casts (a rule with others)", () => {
       [Sat Sep 12 23:11:04 2026] Corvin begins casting Envenomed Bolt X.
       [Sat Sep 12 23:11:05 2026] A ratman warrior has been poisoned.`)
     const t = h.board.get(timerKey('Envenomed Bolt', 'A ratman warrior'))!
-    expect(t.label).toBe('Envenomed Bolt (Corvin)')
+    expect(t.label).toBe('Envenomed Bolt')
+    expect(t.caster).toBe('Corvin')
     expect(t.rank).toBe(10)
     expect(t.endsAt - at('Sat Sep 12 23:11:05 2026')).toBe(54_000)
     expect(h.spoken).toEqual(['Corvin cast Envenomed Bolt on A ratman warrior, do not cast for 54 seconds'])
@@ -334,6 +383,7 @@ describe("anyone's casts (a rule with others)", () => {
     // Joined at a tick: the end is the last tick's, 9 ticks on, held as an estimate as your own joined DoT is.
     expect(t.endsAt).toBe(at('Sat Sep 12 23:12:04 2026'))
     expect(t.warnSec).toBe(0)
+    expect(h.board.views()[0]).toMatchObject({ caster: 'Corvin', tickDamage: 489 })
     expect(h.spoken).toEqual(['Corvin cast Envenomed Bolt on A ratman warrior, do not cast for 54 seconds'])
     h.feed('[Sat Sep 12 23:12:20 2026] A ratman warrior hits Kelwyn for 10 points of damage.')
     expect(h.board.list()).toEqual([])

@@ -1,7 +1,7 @@
-import { clock, num, pct } from './format'
+import { clock, duration, num, num1, pct } from './format'
 import { SELF } from './combatLines'
 import { durationMs, isFriend, nameKey } from './combatMeter'
-import type { Defense, Entity, EntityKind, HealTally, MeterMode, MeterScope, ProcOrigin, Segment, SkillStat } from '../shared/types'
+import type { Defense, Entity, EntityKind, HealTally, MeterMode, MeterScope, ProcOrigin, Segment, SegmentSummary, SkillStat } from '../shared/types'
 
 // What the damage meter shows, worked out from a segment: the same sums for the Live page and the
 // overlay. Pure functions of the data, so they run in any window.
@@ -322,7 +322,7 @@ export function takenRows(seg: Segment, scope: MeterScope): Row[] {
 
 /** Swings aimed at the rows in scope, summed. */
 export function defenseOf(seg: Segment, scope: MeterScope): Defense {
-  const d: Defense = { swings: 0, hit: 0, miss: 0, dodge: 0, parry: 0, block: 0, riposte: 0, absorb: 0 }
+  const d: Defense = { swings: 0, hit: 0, miss: 0, dodge: 0, parry: 0, block: 0, riposte: 0, absorb: 0, spellsResisted: 0 }
   for (const e of scoped(seg, scope)) for (const k of Object.keys(d) as (keyof Defense)[]) d[k] += e.defense[k]
   return d
 }
@@ -397,6 +397,8 @@ export interface ProcRow {
   ppm: number | null
   /** Of the most frequent row. */
   fill: number
+  /** The worn item whose exaltation fired with it (LT-721). */
+  item?: string
 }
 
 export interface ProcSummary {
@@ -421,7 +423,8 @@ export function procRows(seg: Segment, scope: MeterScope): ProcRow[] {
         damage: p.damage,
         healed: p.healed,
         ppm: perMinute(p.count, e.activeMs),
-        fill: 0
+        fill: 0,
+        ...(p.item ? { item: p.item } : {})
       })
     }
   }
@@ -431,6 +434,14 @@ export function procRows(seg: Segment, scope: MeterScope): ProcRow[] {
   return rows
 }
 
+/** Your worn items' exaltations that fired, most first, with a rate over your active time (LT-721). */
+export function exaltRows(seg: Segment): { item: string; count: number; ppm: number | null }[] {
+  const you = seg.entities[nameKey(SELF)]
+  return Object.entries(you?.exalts ?? {})
+    .map(([item, count]) => ({ item, count, ppm: perMinute(count, you!.activeMs) }))
+    .sort((a, b) => b.count - a.count || a.item.localeCompare(b.item))
+}
+
 export function procSummary(seg: Segment, scope: MeterScope, rows: ProcRow[]): ProcSummary {
   const sources = new Set(rows.map((r) => nameKey(r.source)))
   const activeMs = scoped(seg, scope)
@@ -438,6 +449,50 @@ export function procSummary(seg: Segment, scope: MeterScope, rows: ProcRow[]): P
     .reduce((s, e) => s + e.activeMs, 0)
   const count = rows.reduce((s, r) => s + r.count, 0)
   return { count, ppm: perMinute(count, activeMs), activeSec: activeMs / 1000 }
+}
+
+/**
+ * A session's pace, as the Live card says it (LT-752, FEAT-027): kills an hour over the session from its
+ * first blow to now (an idle hour of selling counts against it, as it should), the same over the time
+ * spent fighting, how many kills gave experience, ability points an hour, and when the next is due
+ * from the spacing of the session's points.
+ */
+export function sessionPace(s: SegmentSummary, now: number): string[] {
+  const end = s.open ? Math.max(now, s.endedAt) : s.endedAt
+  const hours = Math.max((end - s.startedAt) / 3_600_000, 1 / 60)
+  const out = [`${num(s.kills / hours)} kills/hour`]
+  if (s.activeMs >= 60_000) out[0] += `, ${num(s.kills / (s.activeMs / 3_600_000))} while fighting`
+  const xp = s.xp
+  if (!xp) return out
+  if (xp.gains) out.push(`${num(Math.min(xp.gains, s.kills || xp.gains))} of ${num(s.kills)} gave experience`)
+  if (xp.points) {
+    out.push(`${num1(xp.points / hours)} AA/h`)
+    if (xp.points >= 2 && s.open) {
+      const every = (xp.lastPointAt - xp.firstPointAt) / (xp.points - 1)
+      const due = xp.lastPointAt + every - now
+      out.push(due > 0 ? `next point in ≈ ${duration(due / 1000)}` : 'a point is due')
+    }
+  }
+  return out
+}
+
+/**
+ * Your death, for the feed (LT-726): "You died to a fetid fiend after 0:48 · 1,240 taken in the last
+ * 10 s · Scorching Arrow 640", from the fight's per-second damage to you and your biggest hit taken.
+ */
+export function deathText(fight: Segment | null, killer: string | null, at: number): string {
+  const to = killer ? ` to ${killer}` : ''
+  if (!fight) return `You died${to}.`
+  const parts = [`You died${to} after ${clock((at - fight.startedAt) / 1000)}`]
+  const inc = fight.timeline?.inc ?? []
+  const b = Math.floor((at - fight.startedAt) / 1000)
+  let last10 = 0
+  for (let i = Math.max(0, b - 9); i <= b; i++) last10 += inc[i] ?? 0
+  if (last10 > 0) parts.push(`${num(last10)} taken in the last 10 s`)
+  const you = fight.entities[nameKey(SELF)]
+  const worst = Object.values(you?.takenBy ?? {}).sort((x, y) => y.max - x.max)[0]
+  if (worst?.max) parts.push(`${worst.name} ${num(worst.max)}`)
+  return parts.join(' · ')
 }
 
 const PROC_ORIGIN_LABEL: Record<ProcOrigin, string> = { spell: 'proc', ability: 'ability', aa: 'AA' }
@@ -453,9 +508,12 @@ export function procText(seg: Segment, scope: MeterScope, name: string): string 
   const lines = [`${name} · Procs · ${sum.count} firing${sum.count === 1 ? '' : 's'}${sum.ppm === null ? '' : ` · ${sum.ppm.toFixed(1)}/min`} · ${scope}`]
   for (const r of rows) {
     const who = r.sourceKind === 'you' ? '' : ` (${r.source})`
-    lines.push(`${r.name}${who}  ×${r.count}  ${r.ppm === null ? '-' : `${r.ppm.toFixed(1)}/min`}  ${procAmount(r)}  ${PROC_ORIGIN_LABEL[r.origin]}`)
+    const item = r.item ? `  (${r.item})` : ''
+    lines.push(`${r.name}${who}  ×${r.count}  ${r.ppm === null ? '-' : `${r.ppm.toFixed(1)}/min`}  ${procAmount(r)}  ${PROC_ORIGIN_LABEL[r.origin]}${item}`)
   }
   if (rows.length === 0) lines.push('Nothing fired on its own.')
+  const exalts = exaltRows(seg)
+  if (exalts.length) lines.push('Exaltations:', ...exalts.map((x) => `${x.item}  ×${x.count}  ${x.ppm === null ? '-' : `${x.ppm.toFixed(1)}/min`}`))
   return lines.join('\n')
 }
 

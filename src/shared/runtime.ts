@@ -24,6 +24,10 @@ export interface TimerView {
   rule?: string
   /** An invisibility: it ends when you act, so the bar shows no clock and cues no recast (LT-717). */
   untilActed?: true
+  /** Another player whose cast this is: the bar's name is the spell's, and this a line of its own (LT-750). */
+  caster?: string
+  /** A DoT's last tick, once one is seen: with its exact end, "3 ticks · 451 a tick" (LT-728). */
+  tickDamage?: number
 }
 
 export type Notification =

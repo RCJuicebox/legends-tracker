@@ -111,28 +111,34 @@ export class LiveAchievements implements AppFeature {
     return this.loc && this.loc.zone === this.ctx.engine.status.zone ? this.loc : null
   }
 
-  private line(text: string): void {
+  /** Whether the line was one it reads: a /loc, a standing moved, an achievement done (FEAT-025). */
+  private line(text: string): boolean {
     const now = Date.now()
     const loc = parseLoc(text)
     if (loc) {
       this.loc = { ...loc, zone: this.ctx.engine.status.zone, at: now }
       // The overlay's Hunter rows say how far each named's nearest spot is: told at once.
       if (this.character) this.publish()
-      return
+      return true
     }
     if (text.startsWith('Your faction standing with ')) {
       const f = parseFactionLine(text)
       if (f && 'amount' in f) this.moved[f.faction] = (this.moved[f.faction] ?? 0) + f.amount
       this.factionAt = now
-    } else if (COMPLETED_ACHIEVEMENT.test(text)) {
+      return !!f
+    }
+    if (COMPLETED_ACHIEVEMENT.test(text)) {
       this.factionAt = now
       this.slayerAt = now
       this.slayerSince = 0
-    } else if (text.startsWith('You have become better at ')) this.skillsAt = now
+      return true
+    }
+    if (text.startsWith('You have become better at ')) this.skillsAt = now
     else if (text.startsWith('You have slain ') || text.includes(' has been slain by ') || text.endsWith(' died.')) {
       this.slayerAt = now
       this.slayerSince ||= now
     }
+    return false
   }
 
   private tick(now: number): void {

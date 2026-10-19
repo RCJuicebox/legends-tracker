@@ -1,7 +1,21 @@
 import { describe, expect, it } from 'vitest'
 import { parseCombatLine, parseMods, SELF } from '../../src/core/combatLines'
 import { CombatMeter, durationMs, fightName, spellBase, summarize } from '../../src/core/combatMeter'
-import { attackerRows, copyText, damageRows, defenseOf, healerRows, procRows, procSummary, procText, rolling, skillRows, targetRows, totalsOf } from '../../src/core/combatView'
+import {
+  attackerRows,
+  copyText,
+  sessionPace,
+  damageRows,
+  defenseOf,
+  healerRows,
+  procRows,
+  procSummary,
+  procText,
+  rolling,
+  skillRows,
+  targetRows,
+  totalsOf
+} from '../../src/core/combatView'
 import { parseLogLine } from '../../src/core/logLine'
 import { at } from '../helpers'
 
@@ -75,8 +89,20 @@ describe('combat lines', () => {
     expect(p("You try to bash a loathling lich, but a loathling lich's magical skin absorbs the blow!")).toMatchObject({ outcome: 'absorb' })
     expect(p('A snow orc trooper tries to hit YOU, but misses!')).toMatchObject({ outcome: 'miss' })
     expect(p('Merik tries to pierce Cleric of Innoruuk, but Cleric of Innoruuk dodges!')).toMatchObject({ source: 'Merik', target: 'Cleric of Innoruuk', outcome: 'dodge' })
-    // A spell being shrugged off is not a swing.
-    expect(p('Malrik tries to cast a spell on you, but you are protected.')).toBeNull()
+    // A spell being shrugged off is not a swing: a cast at you that never landed (LT-723).
+    expect(p('Malrik tries to cast a spell on you, but you are protected.')).toEqual({ kind: 'protected', source: 'Malrik' })
+    expect(p("You resist Innoruuk, the Prince of Hate's Immobilize!")).toEqual({ kind: 'resist', source: 'Innoruuk, the Prince of Hate', target: SELF, spell: 'Immobilize' })
+    expect(p("You resist a fire beetle's Ro's Fiery Sundering!")).toMatchObject({ source: 'a fire beetle', spell: "Ro's Fiery Sundering" })
+    expect(p("Phinigel Autropos's magical skin absorbs the damage of YOUR thorns.")).toEqual({
+      kind: 'dsAbsorb',
+      source: SELF,
+      target: 'Phinigel Autropos',
+      skill: 'Damage shield (thorns)'
+    })
+    expect(p("Dorran's magical skin absorbs the damage of a gloomwater mermaid's thorns.")).toMatchObject({ source: 'a gloomwater mermaid', target: 'Dorran' })
+    expect(p('You mend your wounds and heal some damage.')).toEqual({ kind: 'ability', source: SELF, name: 'Mend' })
+    expect(p('You magically mend your wounds and heal considerable damage.')).toEqual({ kind: 'ability', source: SELF, name: 'Mend' })
+    expect(p('Your Mithril-Runed Tunic (Exaltation) shimmers briefly.')).toEqual({ kind: 'exalt', item: 'Mithril-Runed Tunic' })
   })
   it('reads direct spells, yours, theirs and on you', () => {
     expect(p('You hit a fetid fiend for 444 points of magic damage by Drain Spirit.')).toEqual({
@@ -165,7 +191,6 @@ describe('combat lines', () => {
   })
   it('leaves other lines alone', () => {
     for (const t of [
-      'Your Mithril-Runed Tunic (Exaltation) shimmers briefly.',
       'You have entered The Plane of Fear 4 (Refined).',
       'Jobarab is torn between life and death.',
       'Your target is too far away, get closer!',
@@ -279,7 +304,7 @@ describe('CombatMeter', () => {
     expect(you.kills).toBe(1)
     expect(you.in.total).toBe(74)
     expect(you.attackers['A fetid fiend'].total).toBe(74)
-    expect(you.defense).toEqual({ swings: 2, hit: 1, miss: 0, dodge: 1, parry: 0, block: 0, riposte: 0, absorb: 0 })
+    expect(you.defense).toEqual({ swings: 2, hit: 1, miss: 0, dodge: 1, parry: 0, block: 0, riposte: 0, absorb: 0, spellsResisted: 0 })
     expect(you.healIn).toMatchObject({ total: 150, raw: 200, count: 1 })
     // Jobarab was a stranger until the pet claim; the claim rewrites what it already did.
     const pet = f.entities['jobarab']
@@ -289,7 +314,7 @@ describe('CombatMeter', () => {
     const mob = f.entities['a fetid fiend']
     expect(mob.kind).toBe('npc')
     expect(mob.in.total).toBe(643)
-    expect(mob.defense).toEqual({ swings: 4, hit: 3, miss: 1, dodge: 0, parry: 0, block: 0, riposte: 0, absorb: 0 })
+    expect(mob.defense).toEqual({ swings: 4, hit: 3, miss: 1, dodge: 0, parry: 0, block: 0, riposte: 0, absorb: 0, spellsResisted: 0 })
     expect(f.entities['aldric'].kind).toBe('player')
     expect(f.entities['aldric'].healOut).toMatchObject({ total: 150, raw: 200 })
     // The session holds the same fight, and stays open.
@@ -947,5 +972,99 @@ describe("a session's DPS over time", () => {
 
   it('has nothing for an id that is not a session', () => {
     expect(meter().m.sessionTimeline('nope')).toBeNull()
+  })
+})
+
+describe('what the meter reads besides blows', () => {
+  const lines = (m: CombatMeter, text: string) => {
+    for (const raw of text.trim().split('\n')) {
+      const line = parseLogLine(raw.trim())!
+      if (!m.progress(line)) m.handle(line)
+    }
+  }
+
+  it('files experience and ability points under the session (LT-720)', () => {
+    const m = new CombatMeter({ fightGapSec: 10, newSessionOnZone: true })
+    lines(
+      m,
+      `[Mon Oct 19 12:40:00 2026] You have entered Neriak - Commons.
+      [Mon Oct 19 12:41:48 2026] You gain experience!
+      [Mon Oct 19 12:43:04 2026] You gain experience! (0.013%)
+      [Mon Oct 19 12:50:42 2026] You have gained an ability point!  You now have 12 ability points.
+      [Mon Oct 19 12:50:42 2026] You gain party experience!
+      [Mon Oct 19 13:10:31 2026] You have gained an ability point!  You now have 13 ability points.`
+    )
+    const s = summarize(m.liveSession!)
+    expect(s.xp).toEqual({ gains: 3, pct: 0.013, points: 2, firstPointAt: at('Mon Oct 19 12:50:42 2026'), lastPointAt: at('Mon Oct 19 13:10:31 2026'), unspent: 13 })
+  })
+
+  it('counts spells resisted at you as defence, a mob\'s "protected" too but not a player\'s (LT-723)', () => {
+    const m = new CombatMeter({ fightGapSec: 10, newSessionOnZone: true })
+    m.setSelf('Kelwyn')
+    lines(
+      m,
+      `[Thu Sep 24 20:00:00 2026] You have entered The Plane of Fear 4 (Refined).
+      [Thu Sep 24 20:00:05 2026] A fetid fiend hits YOU for 50 points of damage.
+      [Thu Sep 24 20:00:06 2026] You resist a fetid fiend's Scorching Arrow!
+      [Thu Sep 24 20:00:07 2026] A fetid fiend tries to cast a spell on you, but you are protected.
+      [Thu Sep 24 20:00:08 2026] Malrik tries to cast a spell on you, but you are protected.`
+    )
+    expect(m.liveSession!.entities['you'].defense.spellsResisted).toBe(2)
+  })
+
+  it('counts Mend as an ability, every exaltation by item, and tags the proc in its second with the item (LT-721, LT-724)', () => {
+    const m = new CombatMeter({ fightGapSec: 10, newSessionOnZone: true })
+    m.setSelf('Kelwyn')
+    lines(
+      m,
+      `[Thu Sep 24 20:00:00 2026] You have entered The Plane of Fear 4 (Refined).
+      [Thu Sep 24 20:00:05 2026] You punch a fetid fiend for 100 points of damage.
+      [Thu Sep 24 20:00:06 2026] Your Bone-Clasped Girdle (Exaltation) feels alive with power.
+      [Thu Sep 24 20:00:06 2026] You hit a fetid fiend for 300 points of magic damage by Lifebite.
+      [Thu Sep 24 20:00:09 2026] Your Bone-Clasped Girdle (Exaltation) feels alive with power.
+      [Thu Sep 24 20:00:12 2026] You mend your wounds and heal some damage.`
+    )
+    const you = m.liveSession!.entities['you']
+    expect(you.exalts).toEqual({ 'Bone-Clasped Girdle': 2 })
+    expect(you.procs['Lifebite']).toMatchObject({ count: 1, item: 'Bone-Clasped Girdle' })
+    expect(you.procs['Mend']).toMatchObject({ origin: 'ability', count: 1 })
+  })
+
+  it('says when you die, with the fight it happened in (LT-726)', () => {
+    const deaths: [string | null, string | null][] = []
+    const m = new CombatMeter({ fightGapSec: 10, newSessionOnZone: true }, { onDeath: (f, killer) => deaths.push([f?.id ?? null, killer]) })
+    m.setSelf('Kelwyn')
+    lines(
+      m,
+      `[Thu Sep 24 20:00:00 2026] You have entered The Plane of Fear 4 (Refined).
+      [Thu Sep 24 20:00:05 2026] A fetid fiend hits YOU for 500 points of damage.
+      [Thu Sep 24 20:00:06 2026] You have been slain by a fetid fiend!`
+    )
+    expect(deaths).toEqual([[m.fights[0].id, 'A fetid fiend']])
+  })
+})
+
+describe('the Live card and the feed', () => {
+  it("says a session's pace over its whole span and while fighting, with experience and ability points (LT-752, FEAT-027)", () => {
+    const from = at('Mon Oct 19 12:00:00 2026')
+    const s = {
+      id: 's1',
+      kind: 'session' as const,
+      name: 'Neriak',
+      zone: 'Neriak',
+      startedAt: from,
+      endedAt: from + 3_000_000,
+      open: true,
+      total: 0,
+      dps: 0,
+      yours: 0,
+      kills: 42,
+      deaths: 0,
+      mine: true,
+      activeMs: 30 * 60_000,
+      xp: { gains: 38, pct: 0, points: 3, firstPointAt: from + 600_000, lastPointAt: from + 3_000_000, unspent: 14 }
+    }
+    // An hour since the first blow, ten idle minutes of it after the last.
+    expect(sessionPace(s, from + 3_600_000)).toEqual(['42 kills/hour, 84 while fighting', '38 of 42 gave experience', '3 AA/h', 'next point in ≈ 10 min'])
   })
 })

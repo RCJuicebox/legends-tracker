@@ -9,20 +9,16 @@ import { RespawnLog } from '../../src/core/respawns'
 import { BuffWatch, buffOffers } from '../../src/core/buffs'
 import { SpellTracker, timerKey } from '../../src/core/spellTracker'
 import { TimerBoard, type BoardTimer } from '../../src/core/timers'
-import type { SpellBook } from '../../src/core/spells'
+import type { RankedSpell, SpellBook } from '../../src/core/spells'
 import type { CharacterSettings, SpellRule, TrackingSettings } from '../../src/shared/types'
+import { CHAT, shapeOf, type Shape } from '../../src/core/unreadLines'
+import { skillUp } from '../../src/core/skillAchievements'
 
 // The replay check (FEAT-019): the player's own log through the parts the app runs live, the
 // SpellTracker, BuffWatch, the damage meter and the respawn log, reporting where they and the game
 // disagree: a spell's fades against its estimate, timers that ran out with no fade line, fade lines
 // with no timer, combat lines nothing parsed, and the shapes of the lines no part takes, names and
 // numbers stripped. Every accuracy row of the 10-12 review came out of such a replay done by hand.
-
-export interface Shape {
-  shape: string
-  n: number
-  example: string
-}
 
 export interface ReplayReport {
   lines: number
@@ -44,20 +40,8 @@ export interface ReplayReport {
   buffs: { landed: number }
 }
 
-const CHAT = /^(?:You (?:say|tell|shout|auction)\b|\S+ (?:says|tells|shouts|auctions|told you|says out of character)\b|\S+ tells (?:the group|the guild|the raid|you)|\[\d+ )/
 const FADE = /^Your (.+?) spell has worn off of (.+)\.$/
 const SHAPES_KEPT = 60
-
-/** A line's shape: numbers, quoted words and a leading name stripped, so like lines count together. */
-export function shapeOf(text: string): string {
-  return (
-    text
-      // What someone says, to the end of the line ("I'll give you…" has a quote of its own).
-      .replace(/, '.*'\.?$/, ", '…'")
-      .replace(/\d[\d,.]*/g, 'N')
-      .replace(/^(?!You\b|Your\b)[A-Z][a-z`']+(?: [A-Z][a-z`']+)?\b/, 'X')
-  )
-}
 
 class Shapes {
   private readonly by = new Map<string, Shape>()
@@ -79,6 +63,8 @@ export class ReplayCheck {
   private readonly respawns = new RespawnLog({}, { onChange: () => {}, kindOf: (n) => this.meter.kindOf(n).kind })
   private readonly buffs: BuffWatch
   private readonly observed = new Map<string, number[]>()
+  /** The newest rank of each buff cast so far: what Quick Buff can land, as casts.json gives the engine. */
+  private readonly casted = new Map<string, RankedSpell>()
   private readonly expiredBy = new Map<string, number>()
   private readonly fadeNoTimer = new Map<string, number>()
   private readonly combat = new Shapes()
@@ -104,6 +90,10 @@ export class ReplayCheck {
         const name = String(t.meta?.rankedName ?? t.label)
         if (reason === 'faded' && !t.meta?.joined) this.observed.set(name, [...(this.observed.get(name) ?? []), (this.now - t.startedAt) / 1000])
         if (reason === 'expired') this.expiredBy.set(name, (this.expiredBy.get(name) ?? 0) + 1)
+        if (process.env['LT_TRACE'] && name.includes(process.env['LT_TRACE']))
+          process.stdout.write(
+            `${reason} ${t.target} ${new Date(t.startedAt).toTimeString().slice(0, 8)}→${new Date(this.now).toTimeString().slice(0, 8)} ${new Date(t.startedAt).toDateString()}\n`
+          )
       }
     })
     const tracking = { ...o.tracking, enabled: true, selfBuffs: true, otherBuffs: true, groupBuffs: true, dots: true, debuffs: true }
@@ -111,7 +101,17 @@ export class ReplayCheck {
       book,
       this.board,
       { tracking, ruleFor: (n) => o.rules[n] ?? {}, durationFor: (spell, rank) => this.duration(spell, rank) },
-      { notify: () => {}, feed: () => {} }
+      {
+        notify: () => {},
+        feed: () => {},
+        // As the engine wires it: the meter says who is a pet, and Quick Buff lands the buffs cast so far.
+        onCast: (r) => {
+          if (r.spell.beneficial && (r.spell.landSelf || r.spell.landOther)) this.casted.set(r.spell.name, r)
+        },
+        isPet: (name) => this.meter.kindOf(name).kind === 'pet',
+        isYourPet: (name) => this.meter.isYourPet(name),
+        quickBuffs: () => [...this.casted.values()]
+      }
     )
     this.meter.setSelf(o.self)
     this.buffs = new BuffWatch([], { seconds: (spell, rank) => this.duration(spell, rank).seconds, onChange: () => {}, onLand: () => void this.landed++ })
@@ -138,9 +138,11 @@ export class ReplayCheck {
         this.fadeNoTimer.set(r.spell.name, (this.fadeNoTimer.get(r.spell.name) ?? 0) + 1)
     }
     const timersBefore = this.board.list().length
-    this.tracker.handle(line)
+    const tracked = this.tracker.handle(line)
     const wasFighting = this.meter.fighting
-    const ev = this.meter.handle(line)
+    // Experience and ability points, as the live combat feed reads them before the meter (LT-720).
+    const progress = this.meter.progress(line)
+    const ev = progress ? null : this.meter.handle(line)
     if (this.meter.fighting && !wasFighting) this.fights++
     const live = this.meter.liveFight
     if (live) this.mostEntities = Math.max(this.mostEntities, Object.keys(live.entities).length)
@@ -152,6 +154,9 @@ export class ReplayCheck {
     }
     // What took the line: the tracker (a timer started, moved or ended), the meter, the loot, a cast or a zone.
     const took =
+      tracked ||
+      progress ||
+      skillUp(text) ||
       ev ||
       zone ||
       this.board.list().length !== timersBefore ||

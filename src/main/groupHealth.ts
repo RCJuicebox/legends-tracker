@@ -83,7 +83,9 @@ export class GroupHealth implements AppFeature {
     const feature: EngineFeature = {
       id: 'groupHealth',
       line: (l) => {
-        if (l.text.includes(' group') && RE_GROUP_CHANGE.test(l.text)) this.worker?.postMessage({ kind: 'search' } satisfies GroupHealthToWorker)
+        if (!l.text.includes(' group') || !RE_GROUP_CHANGE.test(l.text)) return false
+        this.worker?.postMessage({ kind: 'search' } satisfies GroupHealthToWorker)
+        return true
       },
       // Five times a second: cheap, and it starts or stops the watch as the game opens and closes.
       tick: () => this.apply(),

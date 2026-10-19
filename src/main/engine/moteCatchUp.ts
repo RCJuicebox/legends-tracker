@@ -101,8 +101,9 @@ export class MoteCatchUp implements EngineFeature {
   }
 
   /** A live line: held while history is read, else counted now. */
-  line(line: LogLine): void {
-    if (!this.backlog.hold(line)) this.motes.handle(line)
+  line(line: LogLine): boolean {
+    if (this.backlog.hold(line)) return false
+    return this.motes.handle(line)
   }
 
   /** The tailer handed over lines up to `end`: all of that has been through mote tracking, unless history is still being read. */

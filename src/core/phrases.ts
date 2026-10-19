@@ -28,6 +28,12 @@ export const PET_ATTACKING = /^(.+?) told you, 'Attacking (.+) Master\.'$/
 export const KILL_RUN_MS = 10 * 60_000
 
 /** "You have completed achievement: Bear With Me": the achievement. */
+/** "a ratman warrior resisted your Envenomed Bolt X!": your spell (or a proc of yours) resisted outright. */
+export const RESISTED_YOUR = /^(.+?) resisted your (.+)!$/
+
+/** "You gain experience!", "You gain party experience!", and since 2026-09-28 sometimes "(0.013%)" after it. */
+export const EXPERIENCE = /^You gain (?:party )?experience!(?: \(([\d.]+)%\))?$/
+
 export const COMPLETED_ACHIEVEMENT = /^You have completed achievement: (.+?)\.?$/
 /** How far apart an export's file time and its "Outputfile Complete" line may be, and how far before an export a read of what came after it starts. */
 export const EXPORT_SLACK_MS = 3000

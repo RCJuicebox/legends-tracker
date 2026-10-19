@@ -855,12 +855,13 @@ export class Factions implements AppFeature {
     ctx.engine.use({
       id: 'factions',
       line: (line) => {
-        if (!line.text.startsWith('Your faction standing with ') && !line.text.startsWith('Outputfile Complete:')) return
+        if (!line.text.startsWith('Your faction standing with ') && !line.text.startsWith('Outputfile Complete:')) return false
         if (told) clearTimeout(told)
         told = setTimeout(() => {
           told = null
           ctx.windows.toMain('state:factionsChanged')
         }, 2000)
+        return true
       }
     })
     sources.add('factionWiki', {

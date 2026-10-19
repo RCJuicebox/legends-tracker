@@ -1,5 +1,5 @@
 import { basename } from 'node:path'
-import { LogClock } from '../../core/logLine'
+import { LogClock, type LogLine } from '../../core/logLine'
 import { LogTailer } from '../../core/tailer'
 import { log } from '../log'
 import type { EngineFeature } from './feature'
@@ -37,6 +37,8 @@ export interface FollowHost {
   lines(): void
   /** Every part has had the lines: a new timer's bar goes out with its line. */
   linesDone(): void
+  /** A line no part took (FEAT-025). */
+  unread(line: LogLine): void
   /** The tailer attached at `size`; the log was cut short or replaced. */
   attached(logFile: string, size: number): void
   reset(logFile: string, reason: 'truncated' | 'replaced'): void
@@ -162,14 +164,18 @@ export class LogFollower {
     for (const raw of lines) {
       const line = t.clock.parse(raw)
       if (!line) continue
+      let took = false
       for (const f of this.host.features) {
         if (!f.line) continue
         try {
-          f.line(line)
+          if (f.line(line)) took = true
         } catch (e) {
+          // A part that threw on a line read it, as far as the report goes: the failure is said on its own.
+          took = true
           this.failed(f, 'a line', e)
         }
       }
+      if (!took) this.host.unread(line)
     }
     for (const f of this.host.features) {
       try {

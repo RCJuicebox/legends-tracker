@@ -87,16 +87,18 @@ export class PetGearReader {
 
   constructor(private readonly done: (r: PetGearReading) => void) {}
 
-  handle(text: string, time: number): void {
+  /** Whether the line was the pet's gear list or one of its items. */
+  handle(text: string, time: number): boolean {
     if (text === PET_GEAR_HEAD) {
       this.flush()
       this.open = { at: time, items: [] }
-      return
+      return true
     }
-    if (!this.open) return
+    if (!this.open) return false
     const item = time - this.open.at <= 2000 ? parsePetGearItem(text) : null
     if (item) this.open.items.push(item)
     else this.flush()
+    return !!item
   }
 
   /** Ends a list the log has stopped adding to. */

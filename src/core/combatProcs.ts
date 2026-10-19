@@ -11,7 +11,7 @@ import { nameKey } from './combatRoster'
  */
 export const CAST_WINDOW_MS = 20_000
 /** Abilities the game lists as ones you press, whose effect prints like a proc. */
-const ACTIVATED = new Set(['reaving strike', 'harm touch', 'leech touch'])
+const ACTIVATED = new Set(['reaving strike', 'harm touch', 'leech touch', 'mend'])
 /** Names kept in each map at most: a busy raid zone names hundreds (LT-382). */
 const KEPT = 4000
 /** A lifetap's damage and heal lines this close are one firing. */
@@ -77,7 +77,7 @@ export class ProcFirings {
  * Books one proc line. A lifetap's damage line carries the rank ("Lifebite III") and its heal line
  * may not ("Lifebite"): one proc, found by its base name and named as the damage line has it.
  */
-export function bookProc(e: Entity, name: string, origin: ProcOrigin, damage: number, healed: number, firing: boolean): void {
+export function bookProc(e: Entity, name: string, origin: ProcOrigin, damage: number, healed: number, firing: boolean): Entity['procs'][string] {
   const base = spellBase(name)
   const had = e.procs[name] ? name : Object.keys(e.procs).find((k) => spellBase(k) === base)
   let p = had ? e.procs[had] : undefined
@@ -90,6 +90,7 @@ export function bookProc(e: Entity, name: string, origin: ProcOrigin, damage: nu
   if (firing) p.count++
   p.damage += damage
   p.healed += healed
+  return p
 }
 
 /** A lifetap's later tick heals into the proc row its first firing opened, without counting another firing. */

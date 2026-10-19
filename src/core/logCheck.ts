@@ -46,6 +46,7 @@ export async function checkAgainstLog(opts: {
     ccWarnSec: 0,
     ccWarnSpeech: '',
     ccBreakSpeech: '',
+    resistStreakSpeech: '',
     buffWarnSec: 0,
     dotWarnSec: 0,
     buffWarnSpeech: '',

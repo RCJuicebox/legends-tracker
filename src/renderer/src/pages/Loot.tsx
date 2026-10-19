@@ -1,11 +1,11 @@
 import { useMemo, useState } from 'react'
 import { num, timeOfDay, when } from '../../../core/format'
-import { useItemInfo, useLootView } from '../hooks'
+import { useInvoke, useItemInfo, useLootView, useVisibleInterval } from '../hooks'
 import { useRemembered } from '../remember'
 import { actDone } from '../toast'
 import { wikiUrl } from '../../../core/format'
 import { Ago, Disclosure, FilterBox, Icon, Info, Pending, ToggleChip } from '../components/ui'
-import { describeItem, fmtCoin, type LootEntry, type LootOutcome } from '../../../core/loot'
+import { describeItem, fmtCoin, itemWorth, lastSales, sessionWorth, type LootEntry, type LootOutcome, type WorthFrom } from '../../../core/loot'
 import { itemKey } from '../../../core/inventory'
 import type { ItemInfo } from '../../../shared/types'
 import { NotWatching } from '../components/NotWatching'
@@ -30,6 +30,13 @@ const SHOWN = 400
 const OPEN_KEPT = 50
 
 const useLoot = useLootView
+
+/** Where a row's price came from, as its chip says it (LT-744). */
+const WORTH_FROM: Record<WorthFrom, string> = {
+  sold: 'what auto-loot last sold one for',
+  offer: 'what a merchant last offered you for one, your charisma and faction in',
+  wiki: "the wiki's merchant value, before charisma and faction"
+}
 
 export function Loot() {
   const q = useLoot()
@@ -64,6 +71,11 @@ export function Loot() {
   const shownNames = useMemo(() => [...new Set(groups.filter((g) => filtering || opened.includes(g.id)).flatMap((g) => g.entries.map((e) => e.base)))], [groups, filtering, opened])
   const { info, refresh } = useItemInfo(shownNames)
   const sessions = useMemo(() => new Map((view?.sessions ?? []).map((s) => [s.id, s])), [view])
+  // What kept loot is worth: the last sale of its name, else a merchant's offer to you, else the wiki (LT-725, LT-744).
+  const offersQ = useInvoke('loot:offers')
+  useVisibleInterval(offersQ.reload, 60_000)
+  const sales = useMemo(() => lastSales(view?.entries ?? []), [view])
+  const worthOf = (e: LootEntry) => itemWorth(e.base, { sales, offers: offersQ.data ?? {}, wikiValue: info[itemKey(e.base)]?.use?.value })
 
   const toggle = (k: LootOutcome) => setHidden(hidden.includes(k) ? hidden.filter((x) => x !== k) : [...hidden, k])
   // One status for the list, not one a row still on its way from eqlwiki (LT-684).
@@ -160,8 +172,9 @@ export function Loot() {
                     {fmtCoin(coin.sales)} sold
                   </span>
                 )}
+                <WorthChip w={sessionWorth(g.entries, worthOf)} />
               </div>
-              {open && g.entries.map((e) => <Row key={e.id} e={e} info={info[itemKey(e.base)]} refresh={refresh} />)}
+              {open && g.entries.map((e) => <Row key={e.id} e={e} info={info[itemKey(e.base)]} worth={worthOf(e)} refresh={refresh} />)}
             </div>
           )
         })
@@ -170,7 +183,30 @@ export function Loot() {
   )
 }
 
-function Row({ e, info, refresh }: { e: LootEntry; info: ItemInfo | undefined; refresh: (name: string) => Promise<void> }) {
+/** What a session's kept loot would sell for, of the items a price is known for (LT-744). */
+function WorthChip({ w }: { w: { copper: number; priced: number; items: number } }) {
+  if (!w.copper) return null
+  return (
+    <span
+      className="chip as-is"
+      title={`What the items kept would sell for: ${w.priced} of ${w.items} priced, by the last sale of their name, a merchant's offer to you, or the wiki's merchant value for those looked up (open the session to look up the rest)`}
+    >
+      ≈ {fmtCoin(w.copper)} worth
+    </span>
+  )
+}
+
+function Row({
+  e,
+  info,
+  worth,
+  refresh
+}: {
+  e: LootEntry
+  info: ItemInfo | undefined
+  worth: { copper: number; from: WorthFrom } | null
+  refresh: (name: string) => Promise<void>
+}) {
   const [refreshing, setRefreshing] = useState(false)
   const [iconOk, setIconOk] = useState(true)
   const d = describeItem(info)
@@ -191,6 +227,12 @@ function Row({ e, info, refresh }: { e: LootEntry; info: ItemInfo | undefined; r
           {e.outcome === 'merged' && e.into ? ` → ${e.into}` : ''}
         </span>
         {e.looter !== 'You' && <span className="chip">{e.looter}</span>}
+        {worth && e.outcome !== 'sold' && e.outcome !== 'currency' && (
+          <span className="chip as-is" title={`Sells for this: ${WORTH_FROM[worth.from]}`}>
+            sells {fmtCoin(worth.copper)}
+            {worth.from === 'wiki' ? ' (wiki)' : ''}
+          </span>
+        )}
       </div>
       <div className="loot-side">
         <span>

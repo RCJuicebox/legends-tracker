@@ -12,6 +12,7 @@ import { ReplayCheck, reportText } from './replayCheck'
 // written to replay/ (FEAT-019). Read only, never in CI: the log is the player's.
 //   LT_REPLAY_LOG   another log than the one followed
 //   LT_REPLAY_MB    how much of the log's end to read (default 50; 0 for all of it)
+//   LT_TRACE        print how each timer of a spell whose name holds this text ended ("Puma")
 
 it('replays the log', async () => {
   const profile = process.env['LT_REPLAY_PROFILE'] ?? join(process.env['APPDATA'] ?? '', 'Legends Tracker')

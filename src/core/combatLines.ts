@@ -21,7 +21,7 @@
 //   You have slain a forsaken revenant!  /  A skeleton has been slain by Gabartik!
 //   Jobarab told you, 'Attacking a forsaken revenant Master.'
 
-import { CAST_BY_OTHER, CAST_BY_YOU, DIED, PET_ATTACKING, SLAIN_BY, SLAIN_BY_YOU, YOU_DIED } from './phrases'
+import { CAST_BY_OTHER, CAST_BY_YOU, DIED, PET_ATTACKING, RESISTED_YOUR, SLAIN_BY, SLAIN_BY_YOU, YOU_DIED } from './phrases'
 
 /** The player, however the log spells it: You, YOU, you, YOUR, or the character's own name. */
 export const SELF = 'You'
@@ -38,6 +38,14 @@ export type CombatEvent =
   | { kind: 'pet'; pet: string; owner: string }
   | { kind: 'group'; who: string; action: 'joined' | 'left' | 'invited' | 'youJoined' | 'youLeft' }
   | { kind: 'cast'; source: string; spell: string }
+  /** "X tries to cast a spell on you, but you are protected.": a cast at you that never landed (LT-723). */
+  | { kind: 'protected'; source: string }
+  /** "X's magical skin absorbs the damage of YOUR thorns.": a damage shield's hit that did nothing. */
+  | { kind: 'dsAbsorb'; source: string; target: string; skill: string }
+  /** An ability that prints no amount ("You mend your wounds and heal some damage."): a firing to count (LT-724). */
+  | { kind: 'ability'; source: string; name: string }
+  /** "Your Bone-Clasped Girdle (Exaltation) feels alive with power.": a worn item's exaltation fired (LT-721). */
+  | { kind: 'exalt'; item: string }
 
 const VERBS_1ST =
   'hit|slash|punch|kick|bash|pierce|crush|bite|claw|strike|shoot|backstab|frenzy|maul|gore|sting|slice|cleave|reave|smash|rake|lacerate|sweep|stomp|whip|burn|impale|gouge|blast|smite'
@@ -82,8 +90,15 @@ const RE_SLAIN_BY = SLAIN_BY
 const RE_DIED = DIED
 const RE_YOU_DIED = YOU_DIED
 const RE_YOU_SLAIN = /^You have been slain by (.+)!$/
-const RE_RESIST_YOU = /^(.+?) resisted your (.+)!$/
+const RE_RESIST_YOU = RESISTED_YOUR
 const RE_RESIST = /^(.+?) resisted (.+?)'s (.+)!$/
+/** "You resist Innoruuk, the Prince of Hate's Immobilize!": present tense, and the caster first (LT-723). */
+const RE_RESIST_BY_YOU = /^You resist (.+?)'s (.+)!$/
+const RE_PROTECTED = /^(.+) tries to cast a spell on you, but you are protected\.$/
+const RE_SKIN_ABSORBS = /^(.+?)'s magical skin absorbs the damage of (YOUR|.+?'s) (\w+)\.$/
+/** "You mend your wounds and heal some damage." and the AA's "You magically mend your wounds and heal considerable damage." */
+const RE_MEND = /^You (?:magically )?mend your wounds and heal /
+const RE_EXALT = /^Your (.+?) \(Exaltation\) .+\.$/
 // "<pet> told you, 'Attacking a fetid fiend Master.'" — only a pet of yours says this; a player's
 // tell is present tense ("tells you").
 const RE_PET_LEADER = /^(.+?) says, 'My leader is (.+?)\.'$/
@@ -163,7 +178,11 @@ export function parseCombatLine(text: string): CombatEvent | null {
     if (RE_YOU_LEFT.test(text)) return { kind: 'group', who: SELF, action: 'youLeft' }
     if ((m = RE_YOU_REMOVE.exec(text))) return { kind: 'group', who: m[1], action: 'left' }
     if ((m = RE_CAST_YOU.exec(text))) return { kind: 'cast', source: SELF, spell: m[1] }
+    if (text.startsWith('You resist ') && (m = RE_RESIST_BY_YOU.exec(text))) return { kind: 'resist', source: m[1], target: SELF, spell: m[2] }
+    if (RE_MEND.test(text)) return { kind: 'ability', source: SELF, name: 'Mend' }
+    if (text.startsWith('Your ') && text.includes(' (Exaltation) ') && (m = RE_EXALT.exec(text))) return { kind: 'exalt', item: m[1] }
   }
+  if (text.endsWith(', but you are protected.') && (m = RE_PROTECTED.exec(text))) return { kind: 'protected', source: m[1] }
   // Each pattern below is looked for only when the line has its fixed words: the lazy prefixes
   // backtrack over the whole line, and most lines that get this far are chat.
   const damage = text.includes(' of damage')
@@ -184,6 +203,10 @@ export function parseCombatLine(text: string): CombatEvent | null {
   const shield = text.includes(' non-melee damage')
   if (shield && (m = RE_DS_YOU.exec(text))) return { kind: 'damage', source: SELF, target: self(m[1]), amount: num(m[3]), how: 'ds', skill: `Damage shield (${m[2]})`, mods: [] }
   if (shield && (m = RE_DS.exec(text))) return { kind: 'damage', source: self(m[2]), target: self(m[1]), amount: num(m[4]), how: 'ds', skill: `Damage shield (${m[3]})`, mods: [] }
+  if (text.includes(' magical skin absorbs the damage of ') && (m = RE_SKIN_ABSORBS.exec(text))) {
+    const source = m[2] === 'YOUR' ? SELF : self(m[2].slice(0, -2))
+    return { kind: 'dsAbsorb', source, target: self(m[1]), skill: `Damage shield (${m[3]})` }
+  }
   if (text.includes(' healed ') && (m = RE_HEAL.exec(text))) {
     const source = self(m[1])
     const target = reflexive(m[2]) ? source : self(m[2])
@@ -216,6 +239,9 @@ export function looksLikeCombat(text: string): boolean {
     text.includes('slain') ||
     text.includes(' died.') ||
     text.includes(' resisted ') ||
+    text.startsWith('You resist ') ||
+    text.includes('mend your wounds') ||
+    text.includes(' (Exaltation) ') ||
     text.includes(' told you, ') ||
     text.includes('My leader is') ||
     text.includes('the group') ||

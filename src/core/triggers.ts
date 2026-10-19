@@ -93,18 +93,21 @@ export class TriggerEngine {
     }
   }
 
-  handle(line: LogLine): void {
-    this.checkEndEarly(line.text)
+  /** Whether a trigger's phrase matched the line (FEAT-025): the player's own triggers read it. */
+  handle(line: LogLine): boolean {
+    let matched = this.checkEndEarly(line.text)
     for (const c of this.compiled) {
       for (const re of c.patterns) {
         const m = re.exec(line.text)
         if (!m) continue
+        matched = true
         if (c.trigger.cooldownSec > 0 && line.time - c.lastFired < c.trigger.cooldownSec * 1000) break
         c.lastFired = line.time
         this.fire(c.trigger, { ...(m.groups ?? {}) }, line)
         break
       }
     }
+    return matched
   }
 
   private fire(trigger: Trigger, captures: Record<string, string>, line: LogLine): void {
@@ -152,11 +155,15 @@ export class TriggerEngine {
     if (out.length) this.hooks.notify(out, trigger)
   }
 
-  private checkEndEarly(text: string): void {
+  private checkEndEarly(text: string): boolean {
+    let ended = false
     for (const t of this.board.values()) {
       const phrases = t.meta?.endEarly as RegExp[] | undefined
-      if (phrases?.some((re) => re.test(text))) this.board.end(t.key, 'cleared')
+      if (!phrases?.some((re) => re.test(text))) continue
+      this.board.end(t.key, 'cleared')
+      ended = true
     }
+    return ended
   }
 }
 

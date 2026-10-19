@@ -110,10 +110,10 @@ export class BuffCoordinator implements EngineFeature {
     this.viewOut.mark()
   }
 
-  /** A line, from the combat feed: live, or read back from the log's recent history. */
-  handle(text: string, time: number): void {
+  /** A line, from the combat feed: live, or read back from the log's recent history. Whether it was a buff's. */
+  handle(text: string, time: number): boolean {
     const book = this.hooks.book()
-    this.watch.handle(text, time, (name) => book?.resolve(name))
+    return this.watch.handle(text, time, (name) => book?.resolve(name))
   }
 
   /** Settings changed: group buffs switched off take their timers off the overlay; switched on, the reminder shows again. */

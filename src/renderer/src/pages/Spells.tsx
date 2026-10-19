@@ -4,7 +4,7 @@ import { useActions, useLive, useSettled } from '../state'
 import { api, clock } from '../api'
 import { SEARCH_MIN, useInvoke, useSearch } from '../hooks'
 import { showError, showUndo } from '../toast'
-import { duration, who } from '../../../core/format'
+import { duration, pct, who } from '../../../core/format'
 import { Ago, CategoryChip, Disclosure, Field, FilterBox, Info, LoadError, NumberInput, PageLink, Pending, type Sort, sortRows, SortTh, SpellIcon, Switch } from '../components/ui'
 import { CATEGORY_LABELS, DEFAULT_TIER_DURATION_PCT, type ClassName, type KnownSpell, type SpellCategory, type SpellRule } from '../../../shared/types'
 import type { Go } from '../nav'
@@ -15,7 +15,13 @@ import { LogCheck } from './SpellsLogCheck'
 import { NotWatching } from '../components/NotWatching'
 import { takeHandOff } from '../handoff'
 
-type SpellKey = 'name' | 'type' | 'window' | 'wears' | 'last'
+type SpellKey = 'name' | 'type' | 'resisted' | 'window' | 'wears' | 'last'
+
+/** A spell's casts and resists over the last two weeks (LT-722). */
+type ResistCount = { casts: number; resisted: number }
+
+/** The share of casts resisted, once there are casts to go by; null for none. */
+const resistRate = (r: ResistCount | undefined): number | null => (r && r.casts > 0 ? Math.min(1, r.resisted / r.casts) : null)
 
 export function Spells({ go }: { go?: Go }) {
   const character = useSettled((s) => s.character)
@@ -29,6 +35,8 @@ export function Spells({ go }: { go?: Go }) {
   const q = useInvoke('spells:known', [], [deps, spellsLoaded])
   const known = q.data ?? []
   const setKnown = q.setData
+  const resistsQ = useInvoke('spells:resists', [], [spellsLoaded])
+  const resists = resistsQ.data ?? {}
   // Sent here from a timer on Live: its row open (LT-691).
   const [open, setOpen] = useState<string | null>(() => takeHandOff('spells') ?? null)
   const [filter, setFilter] = useState('')
@@ -40,6 +48,7 @@ export function Spells({ go }: { go?: Go }) {
     {
       name: (k) => k.rankedName,
       type: (k) => k.category,
+      resisted: (k) => (k.beneficial ? null : resistRate(resists[k.name])),
       window: (k) => (k.duration.permanent ? Infinity : k.duration.spellWindowSec),
       wears: (k) => (k.duration.permanent ? Infinity : k.duration.seconds),
       last: (k) => k.lastCast || null
@@ -91,6 +100,14 @@ export function Spells({ go }: { go?: Go }) {
                       Type
                     </SortTh>
                     <SortTh
+                      k="resisted"
+                      sort={sort}
+                      onSort={setSort}
+                      after={<Info label="About Resisted" text="Of your casts of it over the last two weeks of play, the share a target resisted outright" />}
+                    >
+                      Resisted
+                    </SortTh>
+                    <SortTh
                       k="window"
                       sort={sort}
                       onSort={setSort}
@@ -115,7 +132,7 @@ export function Spells({ go }: { go?: Go }) {
                 </thead>
                 <tbody>
                   {shown.map((k) => (
-                    <SpellRow key={k.name} k={k} open={open === k.name} toggle={() => setOpen(open === k.name ? null : k.name)} onSaved={setKnown} />
+                    <SpellRow key={k.name} k={k} resist={resists[k.name]} open={open === k.name} toggle={() => setOpen(open === k.name ? null : k.name)} onSaved={setKnown} />
                   ))}
                 </tbody>
               </table>
@@ -192,7 +209,20 @@ function trackLabel(rule: SpellRule): string {
   return rule.track === undefined ? 'Default' : rule.track ? 'Always' : 'Off'
 }
 
-function SpellRow({ k, open, toggle, onSaved }: { k: KnownSpell; open: boolean; toggle: () => void; onSaved: (list: KnownSpell[]) => void }) {
+function SpellRow({
+  k,
+  resist,
+  open,
+  toggle,
+  onSaved
+}: {
+  k: KnownSpell
+  resist: ResistCount | undefined
+  open: boolean
+  toggle: () => void
+  onSaved: (list: KnownSpell[]) => void
+}) {
+  const rate = k.beneficial ? null : resistRate(resist)
   const d = k.duration
   const unsaved = useSpellDrafts().has(k.name)
   return (
@@ -223,6 +253,9 @@ function SpellRow({ k, open, toggle, onSaved }: { k: KnownSpell; open: boolean; 
               </span>
             )}
           </span>
+        </td>
+        <td className="nowrap" title={resist && rate !== null ? `${resist.resisted} of ${resist.casts} casts in the last two weeks` : undefined}>
+          {rate === null ? <span className="faint">—</span> : pct(rate)}
         </td>
         <td className="mono nowrap">{d.permanent ? 'Permanent' : `${clock(d.baseSec)} (${clock(d.spellWindowSec)})`}</td>
         <td className="nowrap muted">{d.permanent ? '—' : `${clock(d.earliestSec)}–${clock(d.latestSec)}`}</td>
@@ -263,7 +296,7 @@ function SpellRow({ k, open, toggle, onSaved }: { k: KnownSpell; open: boolean; 
       </tr>
       {open && (
         <tr>
-          <td colSpan={9} style={{ background: 'var(--bg-2)' }}>
+          <td colSpan={10} style={{ background: 'var(--bg-2)' }}>
             <RuleEditor k={k} onSaved={onSaved} />
           </td>
         </tr>

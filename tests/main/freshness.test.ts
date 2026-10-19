@@ -67,3 +67,14 @@ describe('a source that is there and simply not read now', () => {
     expect(sources.list().find((r) => r.id === 'idle-test')).toMatchObject({ status: 'idle', detail: 'eqlog_Kelwyn_neriak.txt is not being watched.', error: '' })
   })
 })
+
+describe("a source's report", () => {
+  it('carries a report the row opens, leaves its status alone, and drops it when empty (FEAT-025)', () => {
+    sources.add('report-test', { label: 'Report test', what: 'a test row', kind: 'log' })
+    sources.ok('report-test', 'read')
+    sources.report('report-test', 'Lines nothing read', '3  X begins to regenerate.')
+    expect(sources.list().find((r) => r.id === 'report-test')).toMatchObject({ status: 'ok', report: { title: 'Lines nothing read', text: '3  X begins to regenerate.' } })
+    sources.report('report-test', 'Lines nothing read', '')
+    expect(sources.list().find((r) => r.id === 'report-test')?.report).toBeUndefined()
+  })
+})

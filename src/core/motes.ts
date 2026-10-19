@@ -165,27 +165,32 @@ export class MoteTracker {
 
   private lastTime = 0
 
-  handle(line: LogLine): void {
-    this.dispatch(line)
+  /** Whether the line was a mote's, a login, or an instance's making or end (FEAT-025). */
+  handle(line: LogLine): boolean {
+    const took = this.dispatch(line)
     this.lastTime = line.time
     this.state.seenUntil = line.time
+    return took
   }
 
-  private dispatch(line: LogLine): void {
+  private dispatch(line: LogLine): boolean {
     const { text, time } = line
     const loot = parseMoteLoot(text)
-    if (loot) return this.onLoot(loot, time)
+    if (loot) {
+      this.onLoot(loot, time)
+      return true
+    }
 
     // A fresh login: whatever crawl was open ended when the last session did.
     if (text === 'Welcome to EverQuest Legends!') {
       const a = this.state.active
       if (a && a.kind !== 'manual' && this.lastTime) this.end('game closed', a.outsideSince ?? this.lastTime)
-      return
+      return true
     }
 
     if (RE_CREATING.test(text)) {
       this.newInstancePending = true
-      return
+      return true
     }
     if (RE_COMPLETED.test(text)) {
       const a = this.state.active
@@ -193,10 +198,11 @@ export class MoteTracker {
         a.kind = 'crawl'
         this.end('completed', time)
       }
-      return
+      return true
     }
     const zone = zoneEntered(text)
     if (zone) this.onZone(zone, time)
+    return !!zone
   }
 
   private onZone(zone: string, time: number): void {

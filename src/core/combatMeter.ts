@@ -4,6 +4,8 @@ import { ARTICLE, isFriend, nameKey, Roster } from './combatRoster'
 import { book, stitch } from './combatTimeline'
 import { CharmWatch } from './combatCharm'
 import { bookProc, ProcFirings, tapTick } from './combatProcs'
+import { EXPERIENCE } from './phrases'
+import { parseAaLine } from './aaHistory'
 import type { CombatSnapshot, DamageHow, Defense, Entity, EntityKind, HealTally, Segment, SegmentSummary, SkillStat, Tally, StitchedTimeline } from '../shared/types'
 
 export { displayName, isFriend, nameKey } from './combatRoster'
@@ -47,6 +49,8 @@ export interface MeterHooks {
   onChange?: () => void
   onFightStart?: (fight: Segment) => void
   onFightEnd?: (fight: Segment) => void
+  /** You died: the fight it happened in (null outside one) and who the log says did it (LT-726). */
+  onDeath?: (fight: Segment | null, killer: string | null, at: number) => void
 }
 
 /** An invite older than this is not the one a "You have joined the group." answers. */
@@ -62,7 +66,9 @@ const skillStat = (name: string, how: DamageHow): SkillStat => ({ ...tally(), na
 const skillKey = (name: string, how: DamageHow): string => (how === 'dot' ? `dot:${name}` : name)
 /** The criticals EQEmu's TryCriticalHit makes: a critical, a Crippling Blow, a Slay Undead (LT-518). */
 const isCrit = (mods: string[]): boolean => mods.includes('critical') || mods.includes('crippling blow') || mods.includes('slay undead')
-const defense = (): Defense => ({ swings: 0, hit: 0, miss: 0, dodge: 0, parry: 0, block: 0, riposte: 0, absorb: 0 })
+const defense = (): Defense => ({ swings: 0, hit: 0, miss: 0, dodge: 0, parry: 0, block: 0, riposte: 0, absorb: 0, spellsResisted: 0 })
+/** An exaltation and a proc in the same second are taken as one firing (LT-721). */
+const EXALT_PAIR_MS = 1000
 
 function newEntity(name: string, kind: EntityKind, owner: string | undefined, at: number): Entity {
   return {
@@ -160,6 +166,8 @@ export class CombatMeter {
   private readonly summaries = new WeakMap<Segment, SegmentSummary>()
   /** A note shown while the log's history is being read. */
   reading = ''
+  /** Your last exaltation line, for the proc booked in its second. */
+  private exalted: { item: string; at: number } | null = null
 
   constructor(
     private config: MeterConfig,
@@ -392,6 +400,37 @@ export class CombatMeter {
 
   // ---- lines ----
 
+  /**
+   * Experience and ability points, filed under the session (LT-720): which the line was, if either. Kills
+   * that gave experience, the percent the newer clients print, and the points with their times.
+   */
+  progress(line: LogLine): 'experience' | 'point' | null {
+    const { text, time } = line
+    if (!text.startsWith('You ')) return null
+    const m = EXPERIENCE.exec(text)
+    if (m) {
+      const xp = this.xpOf(time)
+      xp.gains++
+      if (m[1]) xp.pct += Number(m[1])
+      this.changed()
+      return 'experience'
+    }
+    if (!text.startsWith('You have gained ')) return null
+    const aa = parseAaLine(text)
+    if (aa?.kind !== 'points') return null
+    const xp = this.xpOf(time)
+    xp.points++
+    xp.firstPointAt ||= time
+    xp.lastPointAt = time
+    xp.unspent = aa.total
+    this.changed()
+    return 'point'
+  }
+
+  private xpOf(at: number): NonNullable<Segment['xp']> {
+    return (this.ensureSession(at).xp ??= { gains: 0, pct: 0, points: 0, firstPointAt: 0, lastPointAt: 0, unspent: null })
+  }
+
   /** Reads one line; returns the combat event in it, if any, for others that follow the same lines. */
   handle(line: LogLine): CombatEvent | null {
     const { text, time } = line
@@ -437,6 +476,33 @@ export class CombatMeter {
       }
       case 'group':
         return this.onGroup(ev, at)
+      case 'protected': {
+        // Players' buffs a level cap turns away print it too: only a mob's cast is a spell avoided.
+        if (this.who.sideOf(this.who.norm(ev.source)) !== 'enemy') return
+        for (const seg of this.liveSegments(at, false)) this.ent(seg, SELF, at).defense.spellsResisted++
+        return this.changed()
+      }
+      case 'dsAbsorb': {
+        const source = this.who.norm(ev.source)
+        const target = this.who.norm(ev.target)
+        if (this.who.sideOf(source) !== 'friend') return
+        for (const seg of this.liveSegments(at, false)) {
+          if (!(nameKey(target) in seg.enemies)) continue
+          ;(this.ent(seg, source, at).skills[ev.skill] ??= skillStat(ev.skill, 'ds')).misses++
+        }
+        return this.changed()
+      }
+      case 'ability':
+        for (const seg of this.liveSegments(at, false)) bookProc(this.ent(seg, this.who.norm(ev.source), at), ev.name, 'ability', 0, 0, true)
+        return this.changed()
+      case 'exalt':
+        this.exalted = { item: ev.item, at }
+        for (const seg of this.liveSegments(at, false)) {
+          const e = this.ent(seg, SELF, at)
+          e.exalts ??= {}
+          e.exalts[ev.item] = (e.exalts[ev.item] ?? 0) + 1
+        }
+        return this.changed()
       case 'cast': {
         const source = this.who.norm(ev.source)
         this.procs.cast(source, ev.spell, at)
@@ -476,7 +542,7 @@ export class CombatMeter {
       const src = this.ent(seg, source, at)
       const tgt = this.ent(seg, target, at)
       add(src.out, ev.amount, crit)
-      if (proc) bookProc(src, ev.skill, proc, ev.amount, 0, ownFiring)
+      if (proc) this.exaltOf(bookProc(src, ev.skill, proc, ev.amount, 0, ownFiring), source, at)
       if (finishing) bookProc(src, 'Finishing Blow', 'aa', ev.amount, 0, true)
       const skill = (src.skills[skillKey(ev.skill, ev.how)] ??= skillStat(ev.skill, ev.how))
       add(skill, ev.amount, crit)
@@ -582,7 +648,7 @@ export class CombatMeter {
       }
       const src = this.ent(seg, source, at)
       const tgt = this.ent(seg, target, at)
-      if (proc) bookProc(src, ev.spell, proc, 0, ev.amount, firing)
+      if (proc) this.exaltOf(bookProc(src, ev.spell, proc, 0, ev.amount, firing), source, at)
       if (tap) tapTick(src, ev.spell, ev.amount)
       addHeal(src.healOut, ev.amount, ev.raw, crit)
       addHeal((src.healSpells[ev.spell] ??= healTally()), ev.amount, ev.raw, crit)
@@ -616,6 +682,7 @@ export class CombatMeter {
         else if (seg.kind === 'session' || target === SELF) this.ent(seg, target, at).deaths++
       }
     }
+    if (target === SELF) this.hooks.onDeath?.(this.live, killer, at)
     // The fight is over when nothing it engaged still stands, unless another of a name it engaged
     // strikes or is struck soon after (sameName).
     if (side === 'enemy' && this.live && k in this.live.enemies && !Object.values(this.live.enemies).some(Boolean)) {
@@ -654,10 +721,22 @@ export class CombatMeter {
     return null
   }
 
+  /** A proc of yours booked in the second of an exaltation line: that item fired it. */
+  private exaltOf(p: { item?: string }, source: string, at: number): void {
+    if (source !== SELF || !this.exalted || at - this.exalted.at > EXALT_PAIR_MS || at < this.exalted.at) return
+    p.item = this.exalted.item
+    this.exalted = null
+  }
+
   private onResist(ev: Extract<CombatEvent, { kind: 'resist' }>, at: number): void {
     const source = this.who.norm(ev.source)
     const target = this.who.norm(ev.target)
     const [ss, ts] = this.who.place(source, target, true)
+    if (ss === 'enemy' && ts === 'friend') {
+      // A spell at your side resisted outright: a defence, though not a swing (LT-723).
+      for (const seg of this.liveSegments(at, false)) this.ent(seg, target, at).defense.spellsResisted++
+      return this.changed()
+    }
     if (ss !== 'friend' || ts !== 'enemy') return
     for (const seg of this.liveSegments(at, false)) {
       const src = this.ent(seg, source, at)
@@ -812,6 +891,8 @@ export function summarize(seg: Segment): SegmentSummary {
     yours,
     kills: seg.kills,
     deaths: seg.deaths,
-    mine: seg.mine
+    mine: seg.mine,
+    activeMs: seg.activeMs,
+    ...(seg.xp ? { xp: { ...seg.xp } } : {})
   }
 }

@@ -1,4 +1,4 @@
-import { parsePurchase, type Purchase } from '../core/tradeskills'
+import { parseOffer, parsePurchase, type Offer, type Purchase } from '../core/tradeskills'
 import { zoneEntered } from '../core/logLine'
 import { everyStretch, type HistoryConsumer, type HistoryWhere, type LogHistory } from './sources/logHistory'
 import type { Purchases } from '../shared/ipc'
@@ -34,6 +34,35 @@ export const purchaseConsumer: HistoryConsumer<PurchaseLog> = {
       const p = parsePurchase(line.text, line.time)
       if (p) keep(into.bought, into.zone ? { ...p, zone: into.zone } : p)
     }
+  }
+}
+
+export type Offers = Record<string, Offer>
+
+/** The newest merchant offer for each item, as a LogHistory consumer (LT-725). */
+export const offerConsumer: HistoryConsumer<Offers> = {
+  version: 1,
+  empty: () => ({}),
+  reader: () => (line, into) => {
+    const o = parseOffer(line.text, line.time)
+    if (!o) return
+    const k = o.item.toLowerCase()
+    if (!into[k] || o.at >= into[k].at) into[k] = o
+  }
+}
+
+/** What merchants last offered this character, by item, over the live log and its archives. */
+export class OfferHistory {
+  constructor(
+    private readonly history: LogHistory,
+    private readonly key: string
+  ) {}
+
+  async latest(o: HistoryWhere): Promise<Offers> {
+    const slice = await this.history.get<Offers>(this.key, o)
+    const all: Offers = {}
+    for (const stretch of everyStretch(slice)) for (const [k, v] of Object.entries(stretch)) if (!all[k] || v.at >= all[k].at) all[k] = v
+    return all
   }
 }
 

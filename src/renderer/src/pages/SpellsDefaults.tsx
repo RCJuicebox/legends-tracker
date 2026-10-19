@@ -86,6 +86,15 @@ export function SpellDefaults() {
             <input value={t.ccBreakSpeech} onChange={(e) => setT({ ccBreakSpeech: e.target.value }, TYPING_MS)} />
           </Field>
         </div>
+        <div className="card stack gap-12">
+          <h2>Resists</h2>
+          <Field
+            label="When a target resists three in a row"
+            hint="Said once for that target until it dies, when three of your spells in a row are resisted by it and none lands between. {spell} (the third) and {target} are filled in. Blank for silence."
+          >
+            <input value={t.resistStreakSpeech} onChange={(e) => setT({ resistStreakSpeech: e.target.value }, TYPING_MS)} />
+          </Field>
+        </div>
       </div>
     </>
   )

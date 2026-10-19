@@ -54,6 +54,7 @@ class Perf {
   /** The tailer's counts at the last report to main.log, so each report says its own ten minutes (LT-607). */
   private tailerAt: TailerStats | null = null
   private failuresAt = 0
+  private unreadAt = 0
 
   /** A push went out; every tenth is measured (unless `measure` is false), the rest counted. */
   push(channel: string, value: unknown, measure = true): void {
@@ -66,7 +67,7 @@ class Perf {
   }
 
   /** Lines of text: what Copy diagnostics shows and main.log is given. */
-  report(o: { tailer?: TailerStats | null; lineFailures: number }): string[] {
+  report(o: { tailer?: TailerStats | null; lineFailures: number; unreadLines?: number }): string[] {
     const minutes = Math.max(1 / 60, (Date.now() - this.since) / 60_000)
     const ms = (s: { p99: number; max: number } | null) => (s ? `p99 ${s.p99} ms, worst ${s.max} ms` : 'none yet')
     // The tailer's counts since the last report; all of them when it started again since (another log).
@@ -93,6 +94,8 @@ class Perf {
         ? `  Log reading: ${t.polls} polls, ${t.slices} slices, ${(t.bytes / 1048576).toFixed(1)} MB, ${t.lines} lines; longest slice ${Math.round(t.maxSliceMs)} ms; ${t.failures} failed reads`
         : '  Log reading: not watching',
       `  Lines a part failed on: ${Math.max(0, o.lineFailures - this.failuresAt)} (${o.lineFailures} this run)`,
+      // Lines no part took, chat left out (FEAT-025): a jump after a game patch is a wording that changed.
+      `  Lines nothing read: ${Math.max(0, (o.unreadLines ?? 0) - this.unreadAt)} (${o.unreadLines ?? 0} this run)`,
       `  Pushes over ${Math.round(minutes)} min: ${pushes || 'none'}`,
       `  Main heap: ${Math.round(heap.heapUsed / 1048576)} of ${Math.round(heap.heapTotal / 1048576)} MB`
     ]
@@ -102,7 +105,7 @@ class Perf {
    * Starts the counts afresh after each report to main.log: the pushes, the cue and lap samples, and
    * the tailer's counts and longest slice from here (LT-607).
    */
-  restart(o: { tailer?: TailerStats | null; lineFailures?: number } = {}): void {
+  restart(o: { tailer?: TailerStats | null; lineFailures?: number; unreadLines?: number } = {}): void {
     this.pushes = new Map()
     this.since = Date.now()
     this.cue.clear()
@@ -112,6 +115,7 @@ class Perf {
       this.tailerAt = { ...o.tailer }
     }
     this.failuresAt = o.lineFailures ?? this.failuresAt
+    this.unreadAt = o.unreadLines ?? this.unreadAt
   }
 }
 

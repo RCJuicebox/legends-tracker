@@ -4,7 +4,8 @@ import { zoneEntered, type LogLine } from '../../core/logLine'
 import { CombatMeter, SAME_NAME_MS, summarize as summarizeFight } from '../../core/combatMeter'
 import { LootLedger } from '../../core/loot'
 import { RespawnLog, respawnView, type RespawnView } from '../../core/respawns'
-import { durationSec } from '../../core/combatView'
+import { deathText, durationSec } from '../../core/combatView'
+import { skillUp } from '../../core/skillAchievements'
 import { readLines } from '../../core/logReading'
 import { lineStartAfter, offsetBefore } from '../sources/logHistory'
 import { lastZoneLine } from '../game'
@@ -82,6 +83,9 @@ export class CombatFeed implements EngineFeature {
           const sum = summarizeFight(f)
           this.notifier.pushFeed('fight', `${sum.name} · ${clock(durationSec(f))} · ${num(sum.dps)} DPS (yours ${num(sum.yours / durationSec(f))})`)
         }, SAME_NAME_MS + 250).unref?.()
+      },
+      onDeath: (fight, killer, at) => {
+        if (!this.backlog.active) this.notifier.pushFeed('fight', deathText(fight, killer, at))
       }
     })
     this.respawns = new RespawnLog(store.respawns.get(), {
@@ -141,21 +145,35 @@ export class CombatFeed implements EngineFeature {
     return charmWas !== this.meter.charmPets
   }
 
-  /** A live line: held while history is read, else through the meter and the rest. */
-  line(line: LogLine): void {
-    if (!this.backlog.hold(line)) this.read(line)
+  /** A live line: held while history is read, else through the meter and the rest. Whether one of them took it. */
+  line(line: LogLine): boolean {
+    if (this.backlog.hold(line)) return true
+    return this.read(line)
   }
 
   /**
    * A line through the damage meter, then the loot ledger, which files loot under the meter's
-   * session, and the respawn log, which goes by the meter's idea of who is a mob.
+   * session, and the respawn log, which goes by the meter's idea of who is a mob. Experience, skill-ups
+   * and ability points are the session's too, and news (LT-720, LT-727).
    */
-  private read(line: LogLine): void {
+  private read(line: LogLine): boolean {
+    const progress = this.meter.progress(line)
+    if (progress) {
+      const unspent = this.meter.liveSession?.xp?.unspent
+      if (progress === 'point' && !this.backlog.active) this.notifier.pushFeed('info', `AA point: ${unspent ?? '?'} unspent`)
+      return true
+    }
+    const up = line.text.startsWith('You have become better at ') ? skillUp(line.text) : null
+    if (up) {
+      if (!this.backlog.active) this.notifier.pushFeed('info', `${up.skill} ${up.value}`)
+      return true
+    }
     const ev = this.meter.handle(line)
-    this.buffs.handle(line.text, line.time)
+    const buff = this.buffs.handle(line.text, line.time)
     this.respawns.handle(line, this.meter.currentZone || this.hooks.zone(), ev)
     const c = line.text.charCodeAt(0)
-    if (c === 89 || c === 45) this.loot.handle(line, this.meter.currentZone, this.meter.sessionAt(line.time).id)
+    const loot = (c === 89 || c === 45) && this.loot.handle(line, this.meter.currentZone, this.meter.sessionAt(line.time).id)
+    return !!ev || buff || loot
   }
 
   /**

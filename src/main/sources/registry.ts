@@ -63,6 +63,15 @@ class SourceRegistry {
     this.set(id, 'missing', { detail, error: '' })
   }
 
+  /** A report the row opens, or none (`text` empty); its status is left as it is. */
+  report(id: string, title: string, text: string): void {
+    const row = this.rows.get(id)
+    if (!row || (row.report?.text ?? '') === text) return
+    const { report: _old, ...rest } = row
+    this.rows.set(id, text ? { ...rest, report: { title, text } } : rest)
+    this.changed()
+  }
+
   /** Being read now. */
   reading(id: string, detail = ''): void {
     const row = this.rows.get(id)

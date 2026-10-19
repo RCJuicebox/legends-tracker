@@ -79,6 +79,8 @@ export class TimerBoard {
         warnSec: t.warnSec,
         rank: t.rank,
         ...(t.untilActed ? { untilActed: true as const } : {}),
+        ...(t.caster ? { caster: t.caster } : {}),
+        ...(t.tickDamage ? { tickDamage: t.tickDamage } : {}),
         ...ruleOf(t)
       }))
   }
@@ -98,6 +100,26 @@ export class TimerBoard {
     t.endsAt = endsAt
     t.exact = exact
     this.events.onChange()
+  }
+
+  /** A DoT's tick: what it did, for the bar. */
+  ticked(key: string, damage: number): void {
+    const t = this.timers.get(key)
+    if (!t || t.tickDamage === damage) return
+    t.tickDamage = damage
+    this.events.onChange()
+  }
+
+  /** Moves the ends of the timers `pred` picks `ms` later, a cue already said staying said: time that did not count. */
+  delay(pred: (t: BoardTimer) => boolean, ms: number): void {
+    if (ms <= 0) return
+    let moved = false
+    for (const t of this.timers.values()) {
+      if (!pred(t)) continue
+      t.endsAt += ms
+      moved = true
+    }
+    if (moved) this.events.onChange()
   }
 
   end(key: string, reason: EndReason): BoardTimer | undefined {

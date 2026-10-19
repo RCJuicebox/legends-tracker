@@ -11,8 +11,11 @@ import type { SpellBook } from '../../core/spells'
 export interface EngineFeature {
   /** A short name, for reading the list. */
   readonly id: string
-  /** A line from the watched log. */
-  line?(line: LogLine): void
+  /**
+   * A line from the watched log; true when the part took it (read something from it). A line no part
+   * takes goes to the unread-line report (FEAT-025), chat left out.
+   */
+  line?(line: LogLine): boolean | void
   /** Every lap of the engine's clock (a fifth of a second), with the time now. */
   tick?(now: number): void
   /** Another character is being watched: nothing the last one had running applies any more. */

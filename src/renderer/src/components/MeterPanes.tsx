@@ -13,6 +13,7 @@ import {
   healedRows,
   MIN_PROC_ACTIVE_SEC,
   procAmount,
+  exaltRows,
   procRows,
   procSummary,
   procText,
@@ -284,6 +285,7 @@ export function TargetsCard({ seg, scope, drill, setDrill }: { seg: Segment; sco
 export function ProcsCard({ seg, scope, name }: { seg: Segment; scope: MeterScope; name: string }) {
   const rows = useMemo(() => procRows(seg, scope), [seg, scope])
   const sum = useMemo(() => procSummary(seg, scope, rows), [seg, scope, rows])
+  const exalts = useMemo(() => exaltRows(seg), [seg])
   const copy = () =>
     navigator.clipboard.writeText(procText(seg, scope, name)).then(
       () => showToast('Copied to the clipboard'),
@@ -323,6 +325,11 @@ export function ProcsCard({ seg, scope, name }: { seg: Segment; scope: MeterScop
             <em className="dm-tag" style={{ color: PROC_TEXT[r.origin] }}>
               {PROC_WORD[r.origin]}
             </em>
+            {r.item && (
+              <em className="dm-tag" title="Its exaltation fired in the same second, the last time it did">
+                {r.item}
+              </em>
+            )}
           </span>
           <span className="dm-right">
             {r.ppm === null ? '–' : `${num1(round(r.ppm, 1))}/min`} · <b>×{r.count}</b> · {procAmount(r)}
@@ -330,6 +337,20 @@ export function ProcsCard({ seg, scope, name }: { seg: Segment; scope: MeterScop
         </div>
       ))}
       {rows.length > 12 && <div className="faint small">+{rows.length - 12} more</div>}
+      {exalts.length > 0 && (
+        <div className="dm-exalts small">
+          <span className="faint" title="Your worn items' exaltation lines, counted whatever they did: most are foci, some fire a proc">
+            Exaltations:
+          </span>{' '}
+          {exalts.map((x, i) => (
+            <span key={x.item}>
+              {i > 0 && ' · '}
+              {x.item} ×{num(x.count)}
+              {x.ppm !== null && <span className="faint"> ({num1(round(x.ppm, 1))}/min)</span>}
+            </span>
+          ))}
+        </div>
+      )}
     </div>
   )
 }
@@ -345,6 +366,11 @@ export function DefenseCard({ d, scope }: { d: Defense; scope: MeterScope }) {
     ['Absorbed', d.absorb, 'a rune or magical skin took it']
   ]
   const avoided = d.swings - d.hit
+  const spells = d.spellsResisted > 0 && (
+    <div className="faint small" title="Spells cast at you that you resisted outright, or that a mob's cast never landed on you: not swings, so not in the bars">
+      {num(d.spellsResisted)} spell{d.spellsResisted === 1 ? '' : 's'} resisted
+    </div>
+  )
   return (
     <div className="dm-aux">
       <div className="dm-aux-head">
@@ -352,6 +378,7 @@ export function DefenseCard({ d, scope }: { d: Defense; scope: MeterScope }) {
         <span className="faint small">{d.swings ? `${d.swings} swings · ${pct(avoided / d.swings)} avoided` : ''}</span>
       </div>
       {!d.swings && <div className="faint small">Nothing has swung at {scope === 'you' ? 'you' : 'your side'} yet.</div>}
+      {spells}
       {d.swings > 0 &&
         rows
           .filter(([, n]) => n > 0)

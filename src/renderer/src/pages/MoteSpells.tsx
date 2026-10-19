@@ -351,8 +351,16 @@ export function MoteSpells({ go }: { go?: Go }) {
                         <td className="mono num" title={`${pct(o.share, 1)} of your casts`}>
                           {num(o.row.casts)}
                           <div className="faint small">{pct(o.share, 1)}</div>
+                          {o.row.resistable && o.row.resisted > 0 && (
+                            <div className="faint small" title="Casts a target resisted outright in this window: what the resist modifier a rank takes off works on">
+                              {pct(o.row.resisted / Math.max(1, o.row.casts))} resisted
+                            </div>
+                          )}
                         </td>
-                        <td className="mono nowrap">
+                        <td
+                          className="mono nowrap"
+                          title="The rank the log last saw you cast. The game writes nothing when a rank is bought, so a new rank shows here after your next cast of it."
+                        >
                           {o.maxed ? 'X' : `${o.rank} → ${o.next}`}
                           {o.maxed ? (
                             <div className="chip">at rank X</div>

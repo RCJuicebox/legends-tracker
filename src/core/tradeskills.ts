@@ -152,17 +152,6 @@ export function recipeIndex(lists: Recipe[][]): Recipe[] {
 
 // ---- prices ----
 
-/** The wiki's shorthand coin, "4g 7s 6c" or "35p" or "1.2pp", in copper; 0 when there is none. */
-export function parseWikiCoin(text: string): number {
-  let copper = 0
-  for (const m of text.matchAll(/(\d+(?:\.\d+)?)\s*(pp|p|gp|g|sp|s|cp|c)\b/gi)) {
-    const n = Number(m[1])
-    const u = m[2][0].toLowerCase()
-    copper += n * (u === 'p' ? 1000 : u === 'g' ? 100 : u === 's' ? 10 : 1)
-  }
-  return Math.round(copper)
-}
-
 // ---- what the player paid ----
 
 export interface Purchase {
@@ -185,6 +174,26 @@ export function parsePurchase(text: string, at: number): Purchase | null {
   const copper = parseCoin(m[4])
   const count = Number(m[1] ?? 1) || 1
   return { item: m[2].replace(/^an? /i, ''), count, merchant: m[3], copper, at }
+}
+
+/** What a merchant offered this character for an item: CHA and faction applied, which the wiki's value is not (LT-725). */
+export interface Offer {
+  item: string
+  merchant: string
+  /** For one, in copper. */
+  copper: number
+  at: number
+}
+
+/** "McNeal Jocub told you, 'I'll give you 1 silver 4 copper for the Dark Shield of Ebon.'" */
+const RE_OFFER = /^(.+?) told you, 'I'll give you (.+?) for (?:the |an? )?(.+?)\.'$/
+
+export function parseOffer(text: string, at: number): Offer | null {
+  if (!text.includes(" told you, 'I'll give you ")) return null
+  const m = RE_OFFER.exec(text)
+  if (!m) return null
+  const copper = parseCoin(m[2])
+  return copper > 0 ? { item: m[3], merchant: m[1], copper, at } : null
 }
 
 /** The price of one, from the last purchase of it. */

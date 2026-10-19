@@ -1,6 +1,6 @@
 import { localDay } from '../core/dates'
 import type { LogLine } from '../core/logLine'
-import { CAST_BY_YOU } from '../core/phrases'
+import { CAST_BY_YOU, RESISTED_YOUR } from '../core/phrases'
 import { QUICK_BUFF, QUICK_BUFF_MS } from '../core/spellTracker'
 import { everyStretch, type HistoryConsumer, type HistoryWhere, type LogHistory } from './sources/logHistory'
 
@@ -48,6 +48,19 @@ export const castCounter = (quick?: () => QuickBuffLanding[]): DayCounter => {
     window.counted.add(b.rankedName)
     count(into, line.time, b.rankedName)
   }
+}
+
+/**
+ * Your spells resisted, by the name the log gives ("a ratman warrior resisted your Envenomed Bolt X!"):
+ * beside the casts, the share of them a target shrugged off (LT-722). A proc of yours resisted counts
+ * under its own name, which no cast of yours shares.
+ */
+export const resistCounter = (): DayCounter => (line, into) => {
+  if (!line.text.includes(' resisted your ')) return
+  const m = RESISTED_YOUR.exec(line.text)
+  if (!m) return
+  const day = (into[localDay(line.time)] ??= {})
+  day[m[2]] = (day[m[2]] ?? 0) + 1
 }
 
 /** A day-by-day count as a LogHistory consumer. */

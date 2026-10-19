@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { fmtCoin, LootLedger, mergeLoot, parseCoin, parseLootLine, type LootEntry, type LootSnapshot } from '../../src/core/loot'
+import { fmtCoin, itemWorth, lastSales, LootLedger, mergeLoot, parseCoin, parseLootLine, sessionWorth, type LootEntry, type LootSnapshot } from '../../src/core/loot'
+import { parseOffer } from '../../src/core/tradeskills'
 import { parseItemUse, plainText } from '../../src/core/wikiItem'
 import { parseLogLine } from '../../src/core/logLine'
 
@@ -176,5 +177,46 @@ describe('loot pushed to a page (LT-369)', () => {
     expect(mergeLoot(null, view([9], { oldest: 1 })).entries.map((x) => x.id)).toEqual([9])
     // An entry sent again is not doubled.
     expect(mergeLoot(view([6, 5]), view([6], { oldest: 5 })).entries.map((x) => x.id)).toEqual([6, 5])
+  })
+})
+
+describe('what loot is worth (LT-725, LT-744)', () => {
+  const entry = (o: Partial<LootEntry>): LootEntry => ({
+    id: 1,
+    at: 0,
+    zone: 'Plane of Fear',
+    sessionId: 's1',
+    looter: 'You',
+    item: 'Bone Chips',
+    base: 'Bone Chips',
+    plus: 0,
+    count: 1,
+    source: 'a skeleton',
+    outcome: 'kept',
+    copper: 0,
+    ...o
+  })
+
+  it("reads a merchant's offer, with this character's price", () => {
+    expect(parseOffer("McNeal Jocub told you, 'I'll give you 1 silver 4 copper for the Dark Shield of Ebon.'", 5)).toEqual({
+      item: 'Dark Shield of Ebon',
+      merchant: 'McNeal Jocub',
+      copper: 14,
+      at: 5
+    })
+    expect(parseOffer("Aldric told you, 'thanks'", 5)).toBeNull()
+  })
+
+  it('prices by the last sale of the name, else the offer, else the wiki; a session sums what it kept', () => {
+    const entries = [entry({ id: 3, base: 'Bone Chips', outcome: 'sold', copper: 30, count: 3 }), entry({ id: 2, base: 'Bone Chips', outcome: 'sold', copper: 99 })]
+    const sales = lastSales(entries)
+    expect(sales.get('bone chips')).toBe(10)
+    const offers = { 'dark shield of ebon': { copper: 14 } }
+    expect(itemWorth('Bone Chips', { sales, offers, wikiValue: '5s' })).toEqual({ copper: 10, from: 'sold' })
+    expect(itemWorth('Dark Shield of Ebon', { sales, offers, wikiValue: '5s' })).toEqual({ copper: 14, from: 'offer' })
+    expect(itemWorth('Rusty Axe', { sales, offers, wikiValue: '2g 8s 6c' })).toEqual({ copper: 286, from: 'wiki' })
+    expect(itemWorth('Rusty Axe', { sales, offers })).toBeNull()
+    const kept = [entry({ base: 'Bone Chips', count: 4 }), entry({ base: 'Unknown', count: 1 }), entry({ base: 'Bone Chips', outcome: 'sold', copper: 10 })]
+    expect(sessionWorth(kept, (e) => itemWorth(e.base, { sales, offers }))).toEqual({ copper: 40, priced: 1, items: 2 })
   })
 })

@@ -100,7 +100,10 @@ function bonusFor(category: SpellCategory, section: SectionKey): RankBonus {
 export interface SpellCastRow {
   /** The spell's unranked name. */
   name: string
-  /** The highest rank the log has seen you cast it at: the rank it is at now. */
+  /**
+   * The highest rank the log has seen you cast it at: the rank it is at now. Buying a rank prints no
+   * line (LT-756: none in 119 MB of log, across Drain Spirit VII to X), so it moves at the next cast.
+   */
   rank: number
   /** Casts in the window, every rank counted. */
   casts: number
@@ -117,6 +120,8 @@ export interface SpellCastRow {
   pet: boolean
   /** Whether a resist modifier applies: a detrimental spell. */
   resistable: boolean
+  /** Casts in the window a target resisted outright, every rank counted (LT-722). */
+  resisted: number
   /** The classes that cast it, for showing. */
   classes: string
   /** The level each class gets it at, by class name, for the class filter (abilities' 254 left out). */
@@ -152,7 +157,12 @@ export function isAbility(spell: { classLevels: number[] }): boolean {
  * or clicky no class casts, or an ability granted outside the spell book (Harm Touch, Life Burn:
  * class level 254).
  */
-export function castRows(book: SpellBook, counts: Record<string, number>, character: CharacterSettings): { rows: SpellCastRow[]; unknown: { name: string; casts: number }[] } {
+export function castRows(
+  book: SpellBook,
+  counts: Record<string, number>,
+  character: CharacterSettings,
+  resists: Record<string, number> = {}
+): { rows: SpellCastRow[]; unknown: { name: string; casts: number }[] } {
   const rows = new Map<string, SpellCastRow>()
   const unknown: { name: string; casts: number }[] = []
   for (const [name, casts] of Object.entries(counts)) {
@@ -183,12 +193,17 @@ export function castRows(book: SpellBook, counts: Record<string, number>, charac
       song: isSong(s),
       pet,
       resistable: !s.beneficial,
+      resisted: 0,
       classes: s.classLevels
         .map((l, i) => (l > 0 && l < 255 ? `${CLASS_NAMES[i]} ${l === 254 ? '(ability)' : l}` : ''))
         .filter(Boolean)
         .join(', '),
       classLevels: Object.fromEntries(s.classLevels.flatMap((l, i) => (l > 0 && l < 254 ? [[CLASS_NAMES[i], l]] : [])))
     })
+  }
+  for (const [name, n] of Object.entries(resists)) {
+    const row = rows.get(book.resolve(name)?.spell.name ?? '')
+    if (row) row.resisted += n
   }
   return { rows: [...rows.values()], unknown: unknown.sort((a, b) => b.casts - a.casts) }
 }

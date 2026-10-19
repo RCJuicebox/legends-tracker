@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { api } from '../api'
 import { useInvoke } from '../hooks'
-import { act, showError } from '../toast'
+import { act, showError, showToast } from '../toast'
 import { Ago, ErrorText, Pending, WithCommands } from '../components/ui'
 import type { SourceView } from '../../../shared/ipc'
 
@@ -31,6 +31,24 @@ const KIND_TITLE: Record<SourceView['kind'], string> = {
   wiki: 'eqlwiki.com',
   screen: 'The screen',
   app: 'The app'
+}
+
+/** A row's longer report (the log's unread lines, what a patch changed), opened on a click, with Copy. */
+function SourceReport({ report }: { report: NonNullable<SourceView['report']> }) {
+  const copy = () =>
+    navigator.clipboard.writeText(report.text).then(
+      () => showToast('Copied to the clipboard'),
+      (e: unknown) => showError('Could not copy it', e)
+    )
+  return (
+    <details className="source-report small">
+      <summary>{report.title}</summary>
+      <pre>{report.text}</pre>
+      <button type="button" className="btn small" onClick={() => void copy()}>
+        Copy
+      </button>
+    </details>
+  )
 }
 
 export function DataSources() {
@@ -104,6 +122,7 @@ export function DataSources() {
                             </div>
                           )}
                           {r.error && <ErrorText block>{r.error}</ErrorText>}
+                          {r.report && <SourceReport report={r.report} />}
                         </td>
                         <td className="small">{r.lastOk ? <Ago t={r.lastOk} /> : '—'}</td>
                         <td>

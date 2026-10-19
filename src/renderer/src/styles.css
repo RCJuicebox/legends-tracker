@@ -1233,6 +1233,32 @@ table.table {
   color: var(--bar-text, #fff);
   text-shadow: var(--bar-shadow, var(--ov-shadow, 0 1px 2px rgba(0, 0, 0, 0.9)));
 }
+.timer .label .caster,
+.timer .label .ticks {
+  font-weight: 500;
+  opacity: 0.8;
+  margin-left: 6px;
+  font-size: 0.8em;
+}
+/* Grouped by target, another's cast is a line of its own under the spell (LT-750). */
+.timer-group .timer.has-caster {
+  height: auto;
+  min-height: calc(var(--fs) * 1.95);
+  padding-block: 2px;
+}
+.timer-group .timer.has-caster .label {
+  line-height: 1.15;
+}
+.timer-group .timer .label .caster {
+  display: block;
+  margin-left: 0;
+}
+.timer .time .cue {
+  opacity: 0.6;
+  font-weight: 500;
+  font-size: 0.75em;
+  margin-right: 6px;
+}
 .timer .time .approx {
   opacity: 0.6;
   font-weight: 500;
@@ -1255,6 +1281,26 @@ table.table {
   50% {
     opacity: 1;
   }
+}
+
+/* A Data Sources row's report: the log's unread lines, what a patch changed (FEAT-025, FEAT-026). */
+.source-report {
+  margin-top: 4px;
+}
+.source-report summary {
+  cursor: pointer;
+}
+.source-report pre {
+  max-height: 240px;
+  overflow: auto;
+  margin: 6px 0;
+  padding: 6px 8px;
+  border-radius: 4px;
+  background: rgb(var(--ink) / 0.05);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  white-space: pre-wrap;
+  word-break: break-word;
 }
 
 /* ---------- overlay windows ---------- */
@@ -3050,6 +3096,11 @@ button.tree-item {
 }
 .dm-procrow:last-child {
   border-bottom: none;
+}
+/* Your exaltations under the proc rows (LT-721). */
+.dm-exalts {
+  padding: 6px 4px 0;
+  line-height: 1.5;
 }
 .dm-dot {
   width: 7px;

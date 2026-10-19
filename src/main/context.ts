@@ -1,4 +1,5 @@
 import { timeOfDay } from '../core/format'
+import { unreadText } from '../core/unreadLines'
 import { app, globalShortcut, nativeTheme, Notification, session } from 'electron'
 import { HOTKEYS } from '../shared/hotkeys'
 import { promises as fs, rmSync } from 'node:fs'
@@ -19,10 +20,10 @@ import { InventoryFiles } from './inventory'
 import { ItemCatalog } from './items'
 import { GameTables } from './stats'
 import { WikiCatalog } from './wikiCatalog'
-import { CastHistory, castCounter, dayConsumer } from './castHistory'
+import { CastHistory, castCounter, dayConsumer, resistCounter } from './castHistory'
 import { meleeCounter } from '../core/meleeTally'
 import { RecipeBook } from './recipes'
-import { PurchaseHistory, purchaseConsumer } from './purchases'
+import { OfferHistory, PurchaseHistory, offerConsumer, purchaseConsumer } from './purchases'
 import type { Factions } from '../features/factions/main'
 import type { SlayerPlanner } from '../features/slayer/main'
 import type { HunterPlanner } from '../features/hunter/main'
@@ -78,10 +79,14 @@ export interface AppContext {
   /** Other PCs' Logs folders (Settings › Game), and whether each answers. */
   logFolders: LogFolders
   castHistory: CastHistory
+  /** Your spells resisted, per name per day (LT-722). */
+  resistHistory: CastHistory
   /** The character's own melee day by day, read the way casts are: what worn effects and procs are weighed against. */
   meleeHistory: CastHistory
   recipeBook: RecipeBook
   purchases: PurchaseHistory
+  /** What merchants last offered the character for each item (LT-725). */
+  offers: OfferHistory
   /** The Factions page's side: faction changes and their causes over the logs, and the wiki pages behind the plan. */
   factions: Factions
   /** The faction plan followed and the Slayer counts, for the achievements overlay. */
@@ -179,7 +184,9 @@ export function createContext(): AppContext {
     {
       casts: dayConsumer(() => castCounter(() => ctx.engine.quickBuffLandings()), 2),
       melee: dayConsumer(meleeCounter),
+      resists: dayConsumer(resistCounter),
       purchases: purchaseConsumer,
+      offers: offerConsumer,
       skills: skillConsumer,
       aas: aaConsumer,
       zones: zoneConsumer,
@@ -215,8 +222,10 @@ export function createContext(): AppContext {
     logFolders,
     castHistory: new CastHistory(logHistory, 'casts'),
     meleeHistory: new CastHistory(logHistory, 'melee'),
+    resistHistory: new CastHistory(logHistory, 'resists'),
     recipeBook: new RecipeBook((p) => toMain('state:recipes', p)),
     purchases: new PurchaseHistory(logHistory, 'purchases'),
+    offers: new OfferHistory(logHistory, 'offers'),
     npcPages: new NpcPages(),
     factions: features.factions,
     skills: new SkillHistory(logHistory, 'skills'),
@@ -462,6 +471,9 @@ function reportStatus(s: WatchStatus, chosenLog: string): void {
   else if (s.spellsLoaded) sources.ok('spells', `${s.spellsLoaded.toLocaleString()} spells`)
 }
 
+/** The unread shapes the chat log's row shows (FEAT-025). */
+const UNREAD_SHOWN = 40
+
 /** Every source the Data Sources page lists, with what it is and how to refresh it. */
 function registerSources(ctx: AppContext): void {
   sources.add('log', {
@@ -560,9 +572,13 @@ function registerSources(ctx: AppContext): void {
   // How the app kept up over the last ten minutes, while a log is watched (FEAT-018).
   setInterval(() => {
     if (!ctx.engine.status.watching) return
-    log.info(['Performance, the last ten minutes:', ...perf.report({ tailer: ctx.engine.tailerStats, lineFailures: ctx.engine.failures })].join('\n'))
-    perf.restart({ tailer: ctx.engine.tailerStats, lineFailures: ctx.engine.failures })
+    const counts = { tailer: ctx.engine.tailerStats, lineFailures: ctx.engine.failures, unreadLines: ctx.engine.unread.total }
+    log.info(['Performance, the last ten minutes:', ...perf.report(counts)].join('\n'))
+    perf.restart(counts)
   }, 10 * 60_000).unref()
+
+  // The lines no part read, on the chat log's row (FEAT-025): looked at each minute, sent only when changed.
+  setInterval(() => sources.report('log', 'Lines nothing read', unreadText(ctx.engine.unread, UNREAD_SHOWN)), 60_000).unref()
 }
 
 /** Reads the spell data, game tables and icons again. */

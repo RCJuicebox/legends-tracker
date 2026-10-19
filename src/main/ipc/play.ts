@@ -1,5 +1,5 @@
 import { handle } from './handle'
-import { sanitizeStockCounts, sanitizeStockItem, stringsArg } from '../../core/validate'
+import { isCharacterKey, sanitizeStockCounts, sanitizeStockItem, stringsArg } from '../../core/validate'
 import type { AppContext } from '../context'
 
 // What happens in play: the damage meter, loot, buffs, respawns, motes and the mote stock.
@@ -29,6 +29,11 @@ export function registerPlayIpc(ctx: AppContext): void {
   handle('combat:rebuild', (minutes) => engine.rebuildCombat(Math.max(1, Math.min(1440, Number(minutes) || 60))))
 
   handle('loot:get', () => engine.combat.lootView())
+  // What merchants last offered the character being played, by item (LT-725): Loot prices kept items with it.
+  handle('loot:offers', async () => {
+    const key = ctx.characterKey()
+    return isCharacterKey(key) ? ctx.offers.latest(ctx.historyOf(key)) : {}
+  })
   handle('respawns:get', () => engine.combat.respawnView())
   handle('respawns:forget', (key) => {
     if (typeof key === 'string') engine.respawns.forget(key)

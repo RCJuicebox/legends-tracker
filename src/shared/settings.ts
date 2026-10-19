@@ -102,6 +102,8 @@ export interface TrackingSettings {
   ccWarnSpeech: string
   /** Said, cutting in, when a mez or charm ends before its time (LT-714). */
   ccBreakSpeech: string
+  /** Said when one target resists three of your spells in a row, once until it dies (LT-722); blank for silence. */
+  resistStreakSpeech: string
   announceOtherBuffFades: boolean
   tierDurationPct: Record<SpellCategory, number>
 }

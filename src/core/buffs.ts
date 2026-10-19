@@ -358,29 +358,39 @@ export class BuffWatch {
     }
   }
 
-  handle(text: string, at: number, resolve: (ranked: string) => { spell: Spell; rank: number } | undefined): void {
+  /** Whether the line was one of the buffs' (a /who, a buff's cast, landing or fade, your death). */
+  handle(text: string, at: number, resolve: (ranked: string) => { spell: Spell; rank: number } | undefined): boolean {
     const who = text.startsWith('[') || WHO_FLAG.test(text) ? parseWho(text, at) : null
-    if (who) return this.hooks.onWho?.(who)
+    if (who) {
+      this.hooks.onWho?.(who)
+      return true
+    }
     // The regex tries every split of the line, so it runs only on lines that could match.
     const cast = text.includes(' begin') ? CAST_BEGINS.exec(text) : null
     if (cast) {
       const caster = cast[1]
       const r = resolve(cast[2])
-      if (r && this.offers.has(r.spell.name)) this.casts.set(caster, { ranked: cast[2], spell: r.spell, rank: r.rank, at })
-      return
+      if (!r || !this.offers.has(r.spell.name)) return false
+      this.casts.set(caster, { ranked: cast[2], spell: r.spell, rank: r.rank, at })
+      return true
     }
     if (text === 'You died.' || text.startsWith('You have been slain by ')) {
       const gone = this.active
-      if (!gone.length) return
+      if (!gone.length) return false
       this.active = []
       for (const b of gone) this.hooks.onFade?.(b, 'died')
       this.hooks.onChange()
-      return
+      return false
     }
     const landing = this.landIndex.get(text)
-    if (landing) return this.land(landing, at)
+    if (landing) {
+      this.land(landing, at)
+      return true
+    }
     const fading = this.fadeIndex.get(text)
-    if (fading) this.fade(fading)
+    if (!fading) return false
+    this.fade(fading)
+    return true
   }
 
   /** Someone's buff took hold on you: the most recent cast of a spell with this landing text. */

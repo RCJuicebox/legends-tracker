@@ -26,6 +26,7 @@ import { MoteCatchUp } from './moteCatchUp'
 import { readSpellBook } from './spellBookLoad'
 import { IDLE_POLL_MS, LIVE_POLL_MS, LogFollower } from './logFollower'
 import { Throttled } from '../../core/throttle'
+import { UnreadLines } from '../../core/unreadLines'
 import type { EngineFeature } from './feature'
 import type { AppSettings, ArchiveStatus, CharacterSettings, FeedItem, Notification, SpellRule, WatchStatus } from '../../shared/types'
 import type { EngineEnv, EngineOutputs, EngineStore, MoteView, Speaker } from './contracts'
@@ -72,6 +73,8 @@ export class Engine {
   private readonly motesOut: Throttled
   /** Size and last-line time change with every write; they go out at most once a second. */
   private readonly statusOut: Throttled
+  /** The lines no part took, by shape, since the app started or the character changed (FEAT-025). */
+  readonly unread = new UnreadLines()
   /** What follows the log, in the order each line, tick and change of character reaches it (see buildFeatures). */
   private readonly features: EngineFeature[]
 
@@ -181,6 +184,7 @@ export class Engine {
       lines: () => this.notifier.playing(Date.now()),
       // A new timer's bar goes out with its line, not at the next lap of the clock (LT-353).
       linesDone: () => this.timersOut.tick(Date.now()),
+      unread: (line) => this.unread.add(line.text),
       attached: (logFile, size) => this.moteHistory.attached(logFile, size),
       reset: (logFile, reason) => this.moteHistory.tailReset(logFile, reason),
       archiving: () => this.archive.busy
@@ -199,7 +203,14 @@ export class Engine {
   private buildFeatures(): EngineFeature[] {
     const output = (id: string, out: Throttled): EngineFeature => ({ id, tick: (now) => out.tick(now) })
     return [
-      { id: 'timers', tick: (now) => this.board.tick(now), reset: () => this.board.clear() },
+      {
+        id: 'timers',
+        tick: (now) => this.board.tick(now),
+        reset: () => {
+          this.board.clear()
+          this.unread.clear()
+        }
+      },
       // The tracker is made when spell data loads, and made again when it reloads: this entry follows the current one.
       { id: 'spells', line: (line) => this.tracker?.handle(line) },
       { id: 'triggers', line: (line) => this.triggers.handle(line) },
@@ -466,14 +477,15 @@ export class Engine {
     this.emitStatus()
   }
 
-  /** What the pet wears and which pet it is, as the log tells it. */
-  private petLine(line: LogLine): void {
-    this.petReader.handle(line.text, line.time)
+  /** What the pet wears and which pet it is, as the log tells it. Whether the line was the pet's gear. */
+  private petLine(line: LogLine): boolean {
+    const took = this.petReader.handle(line.text, line.time)
     const cast = this.book && line.text.startsWith('You begin ') ? CAST_BY_YOU.exec(line.text) : null
     if (cast) {
       const spell = petSummonName(this.book!, cast[1])
       if (spell) this.out.pet({ summon: { spell, at: line.time } })
     }
+    return took
   }
 
   /** Feeds pasted log lines through the live pipeline, with their times shifted to now. */

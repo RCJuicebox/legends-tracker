@@ -4,7 +4,7 @@ import type { RankedSpell, Spell, SpellBook } from './spells'
 import { isBeneficialCategory, TICK_MS } from './durations'
 import type { BoardTimer, TimerBoard } from './timers'
 import type { DurationBreakdown, FeedItem, Notification, SpellCategory, SpellRule, TrackingSettings } from '../shared/types'
-import { CAST_BY_OTHER, CAST_BY_YOU, DIED, SLAIN_BY, SLAIN_BY_YOU, YOU_DIED, YOU_WERE_SLAIN } from './phrases'
+import { CAST_BY_OTHER, CAST_BY_YOU, DIED, RESISTED_YOUR, SLAIN_BY, SLAIN_BY_YOU, YOU_DIED, YOU_WERE_SLAIN } from './phrases'
 import { SPA } from '../shared/game/spa'
 
 export type TimerKind = 'selfBuff' | 'otherBuff' | 'dot' | 'debuff'
@@ -70,6 +70,8 @@ const GROUP_LAND_MS = 1500
 const CAST_SLACK_MS = 6000
 /** Casts still waiting to land, at most; the oldest is dropped past this. */
 const MAX_PENDING = 6
+/** The longest silence before a zone line taken as its loading screen (seen 7 to 23 s); longer was idling first. */
+const ZONE_LOAD_MAX_MS = 60_000
 
 const RE_CAST = CAST_BY_YOU
 const RE_FAIL_NAMED = /^Your (.+?) spell (?:is interrupted|fizzles)[.!]$/
@@ -80,7 +82,9 @@ const RE_NO_HOLD_NAMED = /^Your (.+?) spell did not take hold(?: on (.+?))?\.(?:
 const RE_OVERWRITTEN = /^Your (.+?) spell on (.+) has been overwritten\.$/
 // Older clients: "Your target resisted the X spell." Legends: "a ratman warrior resisted your Envenomed Bolt X!"
 const RE_RESIST = /^Your target resisted the (.+) spell\.$/
-const RE_RESISTED_YOUR = /^(.+?) resisted your (.+)!$/
+const RE_RESISTED_YOUR = RESISTED_YOUR
+/** Resists in a row on one target, of spells you cast, before it is said (LT-722). */
+const RESIST_STREAK = 3
 const FAIL_PREFIXES = [
   'Your spell did not take hold',
   'Your spell would not have taken hold',
@@ -96,9 +100,9 @@ const REFUSALS = ['Insufficient Mana', "You can't cast spells while stunned"]
 const SONG_SKILLS = new Set([12, 41, 49, 54, 70])
 const isSong = (s: Spell) => SONG_SKILLS.has(s.skill)
 // A tick that crits ends "(Critical)", as combatLines reads it.
-const RE_DOT_TICK = /^(.+?) has taken [\d,]+ damage from your (.+?)\.(?: \((.+)\))?$/
+const RE_DOT_TICK = /^(.+?) has taken ([\d,]+) damage from your (.+?)\.(?: \((.+)\))?$/
 /** "A forsaken revenant has taken 451 damage from Harm Touch X by Fenwick.": another player's DoT ticking. */
-const RE_DOT_TICK_OTHER = /^(.+?) has taken [\d,]+ damage from (.+?) by (.+?)\.(?: \((.+)\))?$/
+const RE_DOT_TICK_OTHER = /^(.+?) has taken ([\d,]+) damage from (.+?) by (.+?)\.(?: \((.+)\))?$/
 const RE_WORN_OFF = /^Your (.+) spell has worn off of (.+)\.$/
 const RE_PET_WORN_OFF = /^Your pet's (.+) spell has worn off\.$/
 const RE_SLAIN_BY = SLAIN_BY
@@ -155,6 +159,10 @@ export class SpellTracker {
   private quick: { until: number; spells: RankedSpell[]; counted: Set<string> } | null = null
   /** Songs running on you, by their landing text: each pulse lands again and runs the timer on (LT-521). */
   private songs = new Map<string, { key: string; seconds: number }>()
+  /** Your spells resisted in a row, by target, until one lands on it; -1 once said, until it dies (LT-722). */
+  private readonly resists = new Map<string, number>()
+  /** The time of the last line read: a zone line's gap from it is the load, when buffs stand still. */
+  private lastLineAt = 0
 
   constructor(
     private readonly book: SpellBook,
@@ -171,58 +179,65 @@ export class SpellTracker {
     return this.zone
   }
 
-  handle(line: LogLine): void {
+  /** Whether the line was one the tracker reads (FEAT-025): a cast, a landing, a tick, a fade, a death, a zone. */
+  handle(line: LogLine): boolean {
     const { text, time: now } = line
+    const prevAt = this.lastLineAt || now
+    this.lastLineAt = now
     if (this.pending.length) this.pending = this.pending.filter((p) => p.expires >= now)
 
     let m = RE_CAST.exec(text)
-    if (m) return this.onCast(m[1], now)
-    if (text === QUICK_BUFF) return this.onQuickBuff(now)
-    if (text.includes(' begins ') && (m = CAST_BY_OTHER.exec(text))) return this.onOtherCast(m[1], m[2], now)
+    if (m) return took(this.onCast(m[1], now))
+    if (text === QUICK_BUFF) return took(this.onQuickBuff(now))
+    if (text.includes(' begins ') && (m = CAST_BY_OTHER.exec(text))) return took(this.onOtherCast(m[1], m[2], now))
 
-    if ((m = RE_FAIL_NAMED.exec(text))) return void this.dropPending(m[1])
-    if (RE_FAIL.test(text)) return void this.dropOwn()
+    if ((m = RE_FAIL_NAMED.exec(text))) return took(this.dropPending(m[1]))
+    if (RE_FAIL.test(text)) return took(this.dropOwn())
     if (text.startsWith('Your ')) {
-      if ((m = RE_NO_HOLD_NAMED.exec(text))) return this.onNoHold(m[1])
-      if ((m = RE_OVERWRITTEN.exec(text))) return this.onOverwritten(m[1], m[2], now)
+      if ((m = RE_NO_HOLD_NAMED.exec(text))) return took(this.onNoHold(m[1]))
+      if ((m = RE_OVERWRITTEN.exec(text))) return took(this.onOverwritten(m[1], m[2], now))
     }
-    const resisted = RE_RESIST.exec(text)?.[1] ?? (text.includes(' resisted your ') ? RE_RESISTED_YOUR.exec(text)?.[2] : undefined)
+    const yours = text.includes(' resisted your ') ? RE_RESISTED_YOUR.exec(text) : null
+    const resisted = RE_RESIST.exec(text)?.[1] ?? yours?.[2]
     if (resisted) {
       // Said only of a spell you cast: a weapon's proc resisted is not worth a warning.
       const cast = this.lastCast && now <= this.lastCast.until && this.lastCast.names.includes(resisted)
       // A game event, not the app's trouble: info, so main.log's WARN lines are the app's own (LT-606).
-      if (this.dropPending(resisted) || cast) this.hooks.feed('info', `${resisted} resisted`)
-      return
+      if (this.dropPending(resisted) || cast) {
+        this.hooks.feed('info', `${resisted} resisted`)
+        if (yours) this.resistedOn(yours[1], resisted)
+      }
+      return true
     }
-    if (FAIL_PREFIXES.some((p) => text.startsWith(p))) return void this.dropOwn()
-    if (REFUSALS.some((p) => text.startsWith(p))) return void this.dropOwn(now)
+    if (FAIL_PREFIXES.some((p) => text.startsWith(p))) return took(this.dropOwn())
+    if (REFUSALS.some((p) => text.startsWith(p))) return took(this.dropOwn(now))
 
-    if (this.tryLand(text, now)) return
-    if (this.songs.size && this.onSongPulse(text, now)) return
+    if (this.tryLand(text, now)) return true
+    if (this.songs.size && this.onSongPulse(text, now)) return true
     if (this.quick) {
       if (this.quick.until < now) this.quick = null
-      else if (this.tryQuickLand(text, now)) return
+      else if (this.tryQuickLand(text, now)) return true
     }
 
     // Each "^(.+) …" pattern backtracks over the whole line, so a cheap look for its fixed words goes first.
     if (text.includes(' damage from ')) {
-      if (text.includes(' damage from your ') && (m = RE_DOT_TICK.exec(text))) return this.onDotTick(m[1], m[2], now)
-      if ((m = RE_DOT_TICK_OTHER.exec(text)) && this.otherPlayer(m[3])) return this.onDotTick(m[1], m[2], now, m[3])
+      if (text.includes(' damage from your ') && (m = RE_DOT_TICK.exec(text))) return took(this.onDotTick(m[1], m[3], now, undefined, amount(m[2])))
+      if ((m = RE_DOT_TICK_OTHER.exec(text)) && this.otherPlayer(m[4])) return took(this.onDotTick(m[1], m[3], now, m[4], amount(m[2])))
     }
     if (text.startsWith('Your ')) {
-      if ((m = RE_WORN_OFF.exec(text))) return this.onWornOff(m[1], m[2], now)
-      if ((m = RE_PET_WORN_OFF.exec(text))) return this.onPetWornOff(m[1])
+      if ((m = RE_WORN_OFF.exec(text))) return took(this.onWornOff(m[1], m[2], now))
+      if ((m = RE_PET_WORN_OFF.exec(text))) return took(this.onPetWornOff(m[1]))
     }
 
     // Invisibility is about to drop: its bar ends here, in silence (the shipped "Invis dropping" trigger speaks); its fade line follows (LT-717).
     if (text === APPEARING) {
-      for (const t of this.board.endWhere((t) => t.source === 'spell' && t.target === SELF && !!t.untilActed, 'faded')) this.hooks.feed('fade', `${t.label} is dropping`)
-      return
+      for (const t of this.board.endWhere((t) => t.source === 'spell' && t.target === SELF && !!t.untilActed, 'faded')) this.hooks.feed('fade', `${named(t)} is dropping`)
+      return true
     }
     // Your own death first: "You died." would otherwise be read as a target called "You" dying.
     if (text.startsWith('You ') && youDied(text)) {
       this.board.endWhere((t) => t.source === 'spell' && t.target === SELF, 'died')
-      return
+      return true
     }
     if (
       (text.includes(' has been slain by ') && (m = RE_SLAIN_BY.exec(text))) ||
@@ -231,18 +246,23 @@ export class SpellTracker {
     ) {
       const k = targetKey(m[1])
       this.board.endWhere((t) => t.source === 'spell' && targetKey(t.target) === k, 'died')
-      return
+      this.resists.delete(k)
+      return true
     }
     const zone = zoneEntered(text)
     if (zone) {
       this.zone = zone
       this.pending = []
-      // Mobs do not follow you; buffs do.
+      this.resists.clear()
+      // Mobs do not follow you; buffs do, and stand still while the zone loads: the log's silence
+      // before "You have entered" (LT-718: 53 of 60 Puma bars that ran out with no fade had zoned, and
+      // with the load taken off their fades fall on the unzoned median).
       this.board.endWhere((t) => t.source === 'spell' && !isBeneficialTimer(t), 'zoned')
+      this.board.delay((t) => t.source === 'spell' && isBeneficialTimer(t) && t.startedAt <= prevAt, Math.min(Math.max(0, now - prevAt), ZONE_LOAD_MAX_MS))
       this.hooks.onZone?.(zone)
-      return
+      return true
     }
-    this.onSelfFade(text)
+    return this.onSelfFade(text)
   }
 
   setZone(zone: string): void {
@@ -365,7 +385,7 @@ export class SpellTracker {
     const t = this.board.get(key)
     if (!t || t.startedAt >= now) return
     this.board.end(key, 'replaced')
-    this.hooks.feed('fade', `${t.label} on ${target} was overwritten`)
+    this.hooks.feed('fade', `${named(t)} on ${target} was overwritten`)
   }
 
   private tryLand(text: string, now: number): boolean {
@@ -379,6 +399,7 @@ export class SpellTracker {
       }
       if (!target || p.targets.has(targetKey(target))) continue
       p.targets.add(targetKey(target))
+      if (!p.caster) this.resists.delete(targetKey(target))
       // Another's cast landing on you is a mob's (a player's never does): not timed as theirs.
       if (p.caster && target === SELF) continue
       this.start(p.r, target, now, false, p.caster)
@@ -411,7 +432,6 @@ export class SpellTracker {
     if (d.ticks <= 0) return
     const t = this.config.tracking
     const name = rule.alias || s.name
-    const label = caster ? `${name} (${caster})` : name
     const cc = isCrowdControl(s)
     // An invisibility ends when you act: no clock to cue on, and the bar says so (LT-717).
     const untilActed = s.effects.some((e) => e.spa === SPA.INVISIBILITY)
@@ -427,8 +447,9 @@ export class SpellTracker {
     const timer: BoardTimer = {
       key,
       id: this.board.get(key)?.id ?? this.board.nextId(),
-      label,
+      label: name,
       target,
+      ...(caster ? { caster } : {}),
       source: 'spell',
       spell: s.name,
       category: s.category,
@@ -457,7 +478,7 @@ export class SpellTracker {
     }
   }
 
-  private onDotTick(target: string, rankedName: string, now: number, caster?: string): void {
+  private onDotTick(target: string, rankedName: string, now: number, caster: string | undefined, damage: number): void {
     const r = this.book.resolve(rankedName)
     if (!r) return
     if (caster && (!castable(r.spell) || target === SELF || !this.config.ruleFor(r.spell.name).others)) return
@@ -466,8 +487,10 @@ export class SpellTracker {
     if (!t) {
       // Landed before we were watching, or its landing text was missed.
       this.start(r, target, now, true, caster)
+      this.board.ticked(key, damage)
       return
     }
+    this.board.ticked(key, damage)
     if (t.meta?.firstTick) return
     t.meta = { ...t.meta, firstTick: true }
     const ticks = Number(t.meta.ticks)
@@ -495,7 +518,18 @@ export class SpellTracker {
     if (candidates[0]) this.board.end(candidates[0].key, 'faded')
   }
 
-  private onSelfFade(text: string): void {
+  /** One more of your spells resisted by `target`: the third in a row is said, once until it dies (LT-722). */
+  private resistedOn(target: string, spell: string): void {
+    const k = targetKey(target)
+    const n = this.resists.get(k) ?? 0
+    if (n < 0) return
+    if (n + 1 < RESIST_STREAK) return void this.resists.set(k, n + 1)
+    this.resists.set(k, -1)
+    const words = this.config.tracking.resistStreakSpeech
+    if (words) this.hooks.notify([{ kind: 'speak', text: renderSpeech(words, spell, target), interrupt: false }])
+  }
+
+  private onSelfFade(text: string): boolean {
     // Most lines reach here, so the board is walked without copying it.
     for (const t of this.board.values()) {
       if (t.source !== 'spell' || t.target !== SELF || !t.spell) continue
@@ -505,9 +539,10 @@ export class SpellTracker {
       if (s?.fade && s.fade === text) {
         this.board.end(t.key, 'faded')
         this.announceFade(t)
-        return
+        return true
       }
     }
+    return false
   }
 
   /** `now`: the fade line's time, when one ended it; a mez or charm gone a tick or more early broke (LT-714). */
@@ -515,10 +550,10 @@ export class SpellTracker {
     const rule = this.config.ruleFor(t.spell ?? '')
     const cfg = this.config.tracking
     const kind = t.meta?.kind as TimerKind
-    // Spoken by the spell's name: a bar of another's cast carries the caster too.
-    const name = (t.meta?.name as string | undefined) ?? t.label
+    // Spoken by the spell's name; the feed names another's cast's caster too.
+    const name = t.label
     const broke = now !== undefined && (t.category === 'mez' || t.category === 'charm') && now < t.endsAt - TICK_MS
-    this.hooks.feed('fade', broke ? `${t.label} broke on ${t.target}` : `${t.label} faded from ${t.target}`)
+    this.hooks.feed('fade', broke ? `${named(t)} broke on ${t.target}` : `${named(t)} faded from ${t.target}`)
     if (rule.fadeCue === false) return
     if (broke) {
       // The one thing to hear at once: it cuts in, goes to the front of the queue, and is never dropped.
@@ -534,6 +569,17 @@ export class SpellTracker {
     if (template) this.hooks.notify([{ kind: 'speak', text: renderSpeech(template, name, t.target), interrupt: false }])
   }
 }
+
+/** A line a branch of `handle` read: whatever the branch made of it, the line was the tracker's (FEAT-025). */
+const took = (_done: unknown): true => true
+
+/** A bar as the feed names it: "Harm Touch (Fenwick)" for another's cast. */
+function named(t: BoardTimer): string {
+  return t.caster ? `${t.label} (${t.caster})` : t.label
+}
+
+/** "1,534" as 1534. */
+const amount = (s: string) => +s.replace(/,/g, '')
 
 /** A mez or a charm: the crowd control an enchanter times, with cues of its own (LT-713). */
 function isCrowdControl(s: Spell): boolean {

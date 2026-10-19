@@ -153,7 +153,7 @@ describe('Engine', () => {
         throw new Error('broken part')
       }
     })
-    engine.use({ id: 'after', line: (l) => seen.push(l.text) })
+    engine.use({ id: 'after', line: (l) => void seen.push(l.text) })
     await engine.startWatching()
     await tailing(engine)
     await fs.appendFile(logFile, LOOT('Thu Sep 24 16:23:16 2026') + '[Thu Sep 24 16:23:17 2026] One more line.\r\n')
@@ -163,6 +163,24 @@ describe('Engine', () => {
     expect(engine.failures).toBeGreaterThanOrEqual(2)
     // Said in main.log once, not once a line.
     expect(warn.mock.calls.filter((c) => String(c[0]).startsWith('The broken part')).length).toBe(1)
+  })
+
+  it('counts the lines no part took by shape, and leaves out what a part read and chat (FEAT-025)', async () => {
+    const logFile = join(logs, 'eqlog_Kelwyn_neriak.txt')
+    await fs.writeFile(logFile, '')
+    const { engine } = makeEngine({ logFile })
+    await engine.startWatching()
+    await tailing(engine)
+    await fs.appendFile(
+      logFile,
+      LOOT('Thu Sep 24 16:23:16 2026') +
+        "[Thu Sep 24 16:23:17 2026] Dorran says, 'ready'\r\n" +
+        '[Thu Sep 24 16:23:18 2026] Your target is too far away, get closer!\r\n' +
+        '[Thu Sep 24 16:23:19 2026] Your target is too far away, get closer!\r\n'
+    )
+    await waitFor(() => engine.unread.total >= 2)
+    // The mote loot is read; the talk is chat.
+    expect(engine.unread.top(5)).toEqual([{ shape: 'Your target is too far away, get closer!', n: 2, example: 'Your target is too far away, get closer!' }])
   })
 
   it('logs the size of the meter push while fighting (README, Measuring)', async () => {

@@ -14,7 +14,8 @@ const seg = (id: string, open = false): SegmentSummary => ({
   yours: 0,
   kills: 0,
   deaths: 0,
-  mine: false
+  mine: false,
+  activeMs: 0
 })
 
 const snap = (fights: SegmentSummary[], sessions: SegmentSummary[] = []): CombatSnapshot => ({

@@ -5,7 +5,7 @@ import { useAchievementTrack, useLootView } from '../hooks'
 import { remember } from '../remember'
 import { useCombat } from '../combat'
 import { useNow } from './TimerBars'
-import { durationSec } from '../../../core/combatView'
+import { durationSec, sessionPace } from '../../../core/combatView'
 import { fmtCoin } from '../../../core/loot'
 import type { PageId } from '../main'
 import type { Go, SettingsTab } from '../nav'
@@ -138,7 +138,6 @@ export function FightSummary({ go }: { go: Go }) {
   if (!snap || (!fight && !last && !session)) return null
   const fightsInSession = session ? snap.fights.filter((f) => f.startedAt >= session.startedAt).length : 0
   const coin = session ? lootQ.data?.coin[session.id] : undefined
-  const sessionHours = session ? Math.max(durationSec(session) / 3600, 1 / 60) : 0
   return (
     <div className="grid two mb-16">
       <button className="card stat card-button" onClick={() => go('meter')}>
@@ -159,7 +158,7 @@ export function FightSummary({ go }: { go: Go }) {
         </span>
         <span className="sub">
           {session
-            ? `${clock(durationSec(session))} · coin ${fmtCoin((coin?.corpse ?? 0) + (coin?.sales ?? 0))} · ${Math.round((session.kills ?? 0) / sessionHours)} kills/hour`
+            ? [`${clock(durationSec(session))}`, `coin ${fmtCoin((coin?.corpse ?? 0) + (coin?.sales ?? 0))}`, ...sessionPace(session, Date.now())].join(' · ')
             : 'no session yet'}
         </span>
       </button>

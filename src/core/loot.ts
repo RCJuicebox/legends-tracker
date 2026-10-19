@@ -65,6 +65,17 @@ export function parseCoin(text: string): number {
   return copper
 }
 
+/** The wiki's shorthand coin, "4g 7s 6c" or "35p" or "1.2pp", in copper; 0 when there is none. */
+export function parseWikiCoin(text: string): number {
+  let copper = 0
+  for (const m of text.matchAll(/(\d+(?:\.\d+)?)\s*(pp|p|gp|g|sp|s|cp|c)\b/gi)) {
+    const n = Number(m[1])
+    const u = m[2][0].toLowerCase()
+    copper += n * (u === 'p' ? 1000 : u === 'g' ? 100 : u === 's' ? 10 : 1)
+  }
+  return Math.round(copper)
+}
+
 /** "1 platinum, 2 gold, 8 silver and 6 copper" → "1p 2g 8s 6c"; 0 → "nothing". */
 export function fmtCoin(copper: number): string {
   if (copper <= 0) return 'nothing'
@@ -184,17 +195,18 @@ export class LootLedger {
     this.hooks.onChange?.()
   }
 
-  handle(line: LogLine, zone: string, sessionId: string): void {
+  /** Whether the line was loot or coin. */
+  handle(line: LogLine, zone: string, sessionId: string): boolean {
     const c = line.text.charCodeAt(0)
     // "You looted", "You receive", "--You have looted"; the cheap check first.
-    if (c !== 89 && c !== 45) return
+    if (c !== 89 && c !== 45) return false
     const ev = parseLootLine(line.text)
-    if (!ev) return
+    if (!ev) return false
     if (ev.kind === 'coin') {
       this.coins.push({ at: line.time, sessionId, copper: ev.copper, from: ev.from, bag: ev.bag })
       if (this.coins.length > COIN_KEPT) this.coins.shift()
       this.hooks.onChange?.()
-      return
+      return true
     }
     const plus = Number(/\+(\d+)$/.exec(ev.item)?.[1] ?? 0)
     const entry: LootEntry = {
@@ -216,6 +228,7 @@ export class LootLedger {
     if (this.entries.length > KEPT) this.entries.shift()
     this.hooks.onLoot?.(entry)
     this.hooks.onChange?.()
+    return true
   }
 
   snapshot(): LootSnapshot {
@@ -234,7 +247,56 @@ export class LootLedger {
   }
 }
 
-/** What the wiki says an item is, in a line or two. */
+// ---- what loot is worth (LT-725, LT-744) ----
+
+/** Where a price came from: auto-loot selling one, a merchant's offer to this character, the wiki. */
+export type WorthFrom = 'sold' | 'offer' | 'wiki'
+
+/** What one of each base name last sold for, from the ledger's auto-loot sales (newest first, as the snapshot gives them). */
+export function lastSales(entries: readonly LootEntry[]): Map<string, number> {
+  const out = new Map<string, number>()
+  for (const e of entries) {
+    if (e.outcome !== 'sold' || e.copper <= 0) continue
+    const k = e.base.toLowerCase()
+    if (!out.has(k)) out.set(k, e.copper / Math.max(1, e.count))
+  }
+  return out
+}
+
+/**
+ * What one of an item fetches: the last time one of its name sold, else what a merchant last offered
+ * this character for it (charisma and faction in), else the wiki's merchant value ("238p 9s 5c").
+ */
+export function itemWorth(
+  base: string,
+  o: { sales: Map<string, number>; offers: Record<string, { copper: number }>; wikiValue?: string }
+): { copper: number; from: WorthFrom } | null {
+  const k = base.toLowerCase()
+  const sold = o.sales.get(k)
+  if (sold) return { copper: sold, from: 'sold' }
+  const offer = o.offers[k]?.copper
+  if (offer) return { copper: offer, from: 'offer' }
+  const wiki = o.wikiValue ? parseWikiCoin(o.wikiValue) : 0
+  return wiki > 0 ? { copper: wiki, from: 'wiki' } : null
+}
+
+/** What a session's kept loot is worth, of the rows a price is known for: sold, merged and currency rows left out. */
+export function sessionWorth(entries: readonly LootEntry[], worthOf: (e: LootEntry) => { copper: number } | null): { copper: number; priced: number; items: number } {
+  let copper = 0
+  let priced = 0
+  let items = 0
+  for (const e of entries) {
+    if (e.outcome !== 'kept' && e.outcome !== 'depot' && e.outcome !== 'hoard') continue
+    items++
+    const w = worthOf(e)
+    if (!w) continue
+    priced++
+    copper += w.copper * e.count
+  }
+  return { copper, priced, items }
+}
+
+/** What the wiki says an item is, in a line or two. Its merchant value is left to the caller, which prices it beside a sale or an offer. */
 export function describeItem(info: ItemInfo | undefined): { head: string; body: string[] } {
   if (!info) return { head: '', body: [] }
   if (!info.found) return { head: 'Not on eqlwiki', body: [] }
@@ -264,6 +326,5 @@ export function describeItem(info: ItemInfo | undefined): { head: string; body: 
   if (u?.notes) body.push(u.notes)
   if (u?.quests.length) body.push(`Quests: ${u.quests.slice(0, 4).join(', ')}${u.quests.length > 4 ? ` +${u.quests.length - 4}` : ''}`)
   if (u?.recipes.length) body.push(`Recipes: ${u.recipes.slice(0, 4).join(', ')}${u.recipes.length > 4 ? ` +${u.recipes.length - 4}` : ''}`)
-  if (u?.value) body.push(`Sells for ${u.value}`)
   return { head: head.join(' · '), body }
 }

@@ -281,6 +281,7 @@ export function sanitizeSettings(v: unknown, fb: AppSettings): AppSettings | nul
     dotFadeSpeech: str(t.dotFadeSpeech, fb.tracking.dotFadeSpeech),
     ccWarnSpeech: str(t.ccWarnSpeech, fb.tracking.ccWarnSpeech),
     ccBreakSpeech: str(t.ccBreakSpeech, fb.tracking.ccBreakSpeech),
+    resistStreakSpeech: str(t.resistStreakSpeech, fb.tracking.resistStreakSpeech),
     announceOtherBuffFades: bool(t.announceOtherBuffFades, fb.tracking.announceOtherBuffFades),
     tierDurationPct
   })

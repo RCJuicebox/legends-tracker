@@ -31,6 +31,7 @@ export const TRACKING: TrackingSettings = {
   dotFadeSpeech: '{spell} off',
   ccWarnSpeech: 'Recast {spell} on {target}',
   ccBreakSpeech: '{spell} broke on {target}',
+  resistStreakSpeech: 'Three resists in a row on {target}',
   announceOtherBuffFades: false,
   tierDurationPct: DEFAULT_TIER_DURATION_PCT
 }

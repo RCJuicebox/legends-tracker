@@ -27,7 +27,7 @@ import type { PetGearReading, PetProfile, PetSpellOption } from '../core/pets'
 import type { RespawnTimerSpec, RespawnView, SpawnLink } from '../core/respawns'
 import type { MyClass, SpellCastRow } from '../core/spellMotes'
 import type { BagLayoutView, SkinBuild, SkinBuildResult } from '../core/skinBuild'
-import type { Purchase, Recipe } from '../core/tradeskills'
+import type { Offer, Purchase, Recipe } from '../core/tradeskills'
 import type { CatalogItem } from '../core/wikiItem'
 import type { AchMarks, AchievementsView, CharacterSheet, GameFolderCheck, InventoryView, ItemInfo, MoteStock } from './character'
 import type { CombatSnapshot, Segment, SegmentSummary, StitchedTimeline } from './combat'
@@ -260,6 +260,8 @@ export interface SourceView {
   lastOk: number
   lastTried: number
   refreshable: boolean
+  /** A longer report the row can open, with Copy: the log's unread lines (FEAT-025), what a patch changed (FEAT-026). */
+  report?: { title: string; text: string }
 }
 
 /** `expiresAt`: past this time (epoch ms) a phrase still queued is dropped, not said late. */
@@ -304,6 +306,8 @@ export interface Invokes {
   'spells:search': (query: string) => SpellSummary[]
   'spells:rule': (name: string, rule: SpellRule | null) => KnownSpell[]
   'spells:checkLog': (megabytes: number) => LogCheckRow[]
+  /** The character's casts and resists of each spell over the last two weeks of play, by its name (LT-722). */
+  'spells:resists': () => Record<string, { casts: number; resisted: number }>
   'focus:search': (query: string) => FocusSource[]
 
   'logs:list': () => LogFileInfo[]
@@ -333,6 +337,8 @@ export interface Invokes {
   'combat:rebuild': (minutes: number) => void
 
   'loot:get': () => LootView
+  /** What merchants last offered the character being played, by item name lowercased (LT-725). */
+  'loot:offers': () => Record<string, Offer>
   'buffs:get': () => BuffView
   'buffs:setWanted': (spells: string[] | null) => BuffView
 
@@ -570,6 +576,7 @@ const INVOKE_CHANNELS: Record<InvokeChannel, true> = {
   'spells:search': true,
   'spells:rule': true,
   'spells:checkLog': true,
+  'spells:resists': true,
   'focus:search': true,
   'logs:list': true,
   'logs:overview': true,
@@ -590,6 +597,7 @@ const INVOKE_CHANNELS: Record<InvokeChannel, true> = {
   'combat:clearGroup': true,
   'combat:rebuild': true,
   'loot:get': true,
+  'loot:offers': true,
   'buffs:get': true,
   'buffs:setWanted': true,
   'respawns:get': true,

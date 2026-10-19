@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { eraOf } from '../../src/core/gearFinder'
-import { craftEras, parseCrafted, parsePurchase, parseSkillPage, parseWikiCoin, recipeIndex, recipeKey, shopping, unitPrice, type Recipe } from '../../src/core/tradeskills'
+import { craftEras, parseCrafted, parsePurchase, parseSkillPage, recipeIndex, recipeKey, shopping, unitPrice, type Recipe } from '../../src/core/tradeskills'
+import { parseWikiCoin } from '../../src/core/loot'
 import { parseInventory } from '../../src/core/inventory'
 import { parseSources, parseVendors } from '../../src/core/wikiItem'
 

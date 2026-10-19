@@ -49,6 +49,8 @@ export interface Defense {
   block: number
   riposte: number
   absorb: number
+  /** Spells cast at it that it resisted outright ("You resist X's Y!"): not swings, counted apart (LT-723). */
+  spellsResisted: number
 }
 
 /**
@@ -66,6 +68,8 @@ interface ProcStat {
   damage: number
   /** Hit points the firings healed: a lifetap proc prints a damage line and a heal line for one firing. */
   healed: number
+  /** The worn item whose exaltation fired in the same second as it, the last time (LT-721). */
+  item?: string
 }
 
 export interface Entity {
@@ -96,6 +100,8 @@ export interface Entity {
   casts: number
   /** Spells of this entity that a target resisted. */
   resisted: number
+  /** Your worn items' exaltations that fired, by item (LT-721); yours alone. */
+  exalts?: Record<string, number>
   kills: number
   deaths: number
   firstAt: number
@@ -147,6 +153,22 @@ export interface Segment {
   mine: boolean
   /** Fights only. */
   timeline?: Timeline
+  /** Sessions only: the experience the log reported in it (LT-720). */
+  xp?: SessionXp
+}
+
+/** A session's experience lines: kills that gave any, and the ability points they made. */
+export interface SessionXp {
+  /** "You gain experience!" and "You gain party experience!" lines. */
+  gains: number
+  /** The percent the newer clients print, summed: "(0.013%)". */
+  pct: number
+  /** Ability points gained, and when the first and last came. */
+  points: number
+  firstPointAt: number
+  lastPointAt: number
+  /** Unspent points after the last one, as the log says. */
+  unspent: number | null
 }
 
 export interface SegmentSummary {
@@ -166,6 +188,9 @@ export interface SegmentSummary {
   /** Deaths on your side. */
   deaths: number
   mine: boolean
+  /** Time in combat: the blows' gaps capped at 3 s. */
+  activeMs: number
+  xp?: SessionXp
 }
 
 export interface RosterMember {
@@ -227,4 +252,4 @@ export function overlayFight(seg: Segment): Segment {
   return { ...seg, entities }
 }
 
-const NO_DEFENSE: Defense = { swings: 0, hit: 0, miss: 0, dodge: 0, parry: 0, block: 0, riposte: 0, absorb: 0 }
+const NO_DEFENSE: Defense = { swings: 0, hit: 0, miss: 0, dodge: 0, parry: 0, block: 0, riposte: 0, absorb: 0, spellsResisted: 0 }

@@ -1,6 +1,8 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import type { TimerView } from '../../../shared/types'
 import { clock, iconUrl, roman } from '../api'
+import { num } from '../../../core/format'
+import { TICK_MS } from '../../../core/durations'
 import { usePageVisible } from '../hooks'
 
 /** The time, ticking every `intervalMs` while active and the window can be seen. */
@@ -104,6 +106,7 @@ function TimerBar({ t, showTarget, onOpen }: { t: TimerView; showTarget: boolean
   const fill = useRef<HTMLDivElement>(null)
   const edge = useRef<HTMLDivElement>(null)
   const time = useRef<HTMLSpanElement>(null)
+  const ticks = useRef<HTMLSpanElement>(null)
   const [iconOk, setIconOk] = useState(true)
   const overdue = phase === 'over'
   const warning = phase === 'warn' || phase === 'end-warn'
@@ -117,6 +120,7 @@ function TimerBar({ t, showTarget, onOpen }: { t: TimerView; showTarget: boolean
       setPhase(next)
       if (next === 'over') return
       if (time.current) time.current.textContent = clock(Math.max(0, left) / 1000)
+      if (ticks.current) ticks.current.textContent = ticksLeft(t, left)
       const part = Math.max(0, Math.min(1, Math.max(0, left) / Math.max(1, t.endsAt - t.startedAt)))
       if (fill.current) fill.current.style.transform = `scaleX(${part})`
       if (edge.current) edge.current.style.transform = `translateX(${(part - 1) * 100}%)`
@@ -131,7 +135,7 @@ function TimerBar({ t, showTarget, onOpen }: { t: TimerView; showTarget: boolean
   }, [t, reduced, phase])
 
   return (
-    <div className={`timer${warning ? ' warning' : ''}${overdue ? ' overdue' : ''}`} style={{ ['--c' as string]: t.color }}>
+    <div className={`timer${warning ? ' warning' : ''}${overdue ? ' overdue' : ''}${t.caster ? ' has-caster' : ''}`} style={{ ['--c' as string]: t.color }}>
       <div className="track" ref={track}>
         <div className="fill" ref={fill} />
         <div className="edge" ref={edge} />
@@ -152,6 +156,12 @@ function TimerBar({ t, showTarget, onOpen }: { t: TimerView; showTarget: boolean
         )}
         {t.rank ? <span className="rank">{roman(t.rank)}</span> : null}
         {showTarget && t.target ? <span className="tgt">{t.target === 'You' ? '' : `· ${t.target}`}</span> : null}
+        {t.caster ? <span className="caster">by {t.caster}</span> : null}
+        {t.tickDamage ? (
+          <span className="ticks" title="Ticks still to come, and what the last one did">
+            <span ref={ticks}>{ticksLeft(t, t.endsAt - Date.now())}</span> · {num(t.tickDamage)} a tick
+          </span>
+        ) : null}
       </div>
       <div className="time">
         {t.untilActed ? (
@@ -160,6 +170,11 @@ function TimerBar({ t, showTarget, onOpen }: { t: TimerView; showTarget: boolean
           'fading…'
         ) : (
           <>
+            {t.warnSec > 0 && !warning && (
+              <span className="cue" title={`The recast cue is said ${t.warnSec} seconds before the end`}>
+                cue {t.warnSec}s
+              </span>
+            )}
             {!t.exact && <span className="approx">~</span>}
             <span ref={time}>{clock(Math.max(0, t.endsAt - Date.now()) / 1000)}</span>
           </>
@@ -167,6 +182,13 @@ function TimerBar({ t, showTarget, onOpen }: { t: TimerView; showTarget: boolean
       </div>
     </div>
   )
+}
+
+/** A DoT's ticks still to come: it wears off on a tick, so the time left in whole ticks, rounded up. */
+function ticksLeft(t: TimerView, left: number): string {
+  if (!t.exact) return ''
+  const n = Math.max(0, Math.ceil(left / TICK_MS))
+  return n === 1 ? '1 tick' : `${n} ticks`
 }
 
 /**
