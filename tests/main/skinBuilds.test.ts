@@ -55,6 +55,11 @@ describe('runSkinBuild', () => {
     expect([...ok.set]).toEqual([JSON.stringify(command)])
   })
 
+  it("runs the command in the skin's own folder, where its script is (LT-608)", async () => {
+    const dir = gameFolder({ Mine: { command: [node, '-e', 'console.log(require("path").basename(process.cwd()))'] } })
+    expect(await runSkinBuild(dir, 'Mine', '', agreed(true))).toMatchObject({ ok: true, output: 'Mine' })
+  })
+
   it('says what went wrong when the command fails', async () => {
     const dir = gameFolder({ Mine: { command: [node, '-e', 'console.error("no export"); process.exit(2)'] } })
     const r = await runSkinBuild(dir, 'Mine', '', agreed(true))

@@ -6,7 +6,7 @@ import { join } from 'node:path'
 import { DEFAULT_CHARACTER, type AppSettings, type CharacterSettings, type FocusSource, type MoteStock, type SpellRule, type Trigger } from '../shared/types'
 import { sanitizeBuffs, sanitizeCasts, sanitizeMoteStock, sanitizeMotes, sanitizeRespawns, sanitizeSettings, sanitizeSpellRule, sanitizeTriggers } from '../core/validate'
 import { SCHEMAS, upgrade } from './schema'
-import { DEFAULT_OVERLAYS, JsonFile, characterKey, defaultSettings, mergeDefaults, readJsonFile, type ReadResult } from './storeCore'
+import { DEFAULT_OVERLAYS, JsonFile, characterKey, defaultSettings, mergeDefaults, readJsonFile, setAside, type ReadResult } from './storeCore'
 
 export interface KnownCast {
   rankedName: string
@@ -85,8 +85,16 @@ export class Store {
     const firstRun = triggersRead.state === 'missing'
     const triggers = firstRun ? readJsonFile(defaultTriggersPath, { setAside: false }) : triggersRead
     // Checked as it is read, as the settings are: a null entry would throw in the engine's start and
-    // end the app on every launch (LT-432).
-    const list: Trigger[] = triggers.state === 'ok' ? (sanitizeTriggers(triggers.value) ?? []) : []
+    // end the app on every launch (LT-432). The import format ({ "triggers": [...] }) is taken too; any
+    // other shape is set aside and said, not read as no triggers and written over (LT-611).
+    const raw = triggers.state === 'ok' ? triggers.value : undefined
+    const inner = raw && typeof raw === 'object' && !Array.isArray(raw) && 'triggers' in raw ? (raw as { triggers: unknown }).triggers : raw
+    let list: Trigger[] = []
+    if (triggers.state === 'ok') {
+      const read = sanitizeTriggers(inner)
+      if (read) list = read
+      else if (!firstRun) this.recovered.push(setAside(p('triggers.json'), new Date(), 'wrong-shape').movedTo)
+    }
     this.triggers = new JsonFile(p('triggers.json'), list, { backup: true })
     if (firstRun) this.triggers.markDirty()
 

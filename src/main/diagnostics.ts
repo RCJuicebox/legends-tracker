@@ -1,12 +1,12 @@
 import { app, BrowserWindow, screen } from 'electron'
-import { readFileSync, statSync } from 'node:fs'
+import { readdirSync, readFileSync, statSync } from 'node:fs'
 import { homedir, release } from 'node:os'
 import { basename, join } from 'node:path'
 import { logDir } from './log'
 import { cacheDir } from './paths'
 import { sources } from './sources/registry'
 import { win32Available } from './win32'
-import { characterKey } from './storeCore'
+import { characterKey, filesSetAside } from './storeCore'
 import type { AppContext } from './context'
 import { redact, settingsSummary } from '../core/diagnosticsText'
 import { perf } from './perf'
@@ -37,13 +37,30 @@ function processMetrics(): string[] {
   return [`Processes (${mb(total)} in all; main heap ${Math.round(heap.heapUsed / 1048576)} of ${Math.round(heap.heapTotal / 1048576)} MB):`, ...rows]
 }
 
-/** The last `n` lines of the diagnostic log. */
+/** The last `n` lines of the diagnostic log, topped up from the one before when it was just rolled over (LT-605). */
 function logTail(n: number): string {
+  const read = (name: string) => {
+    try {
+      return readFileSync(join(logDir(), name), 'utf8').trimEnd().split('\n')
+    } catch {
+      return []
+    }
+  }
+  let lines = read('main.log')
+  if (lines.length < n) lines = [...read('main.old.log'), ...lines]
+  return lines.length ? lines.slice(-n).join('\n') : '(no log yet)'
+}
+
+/** The crash dumps kept (Crashpad's reports folder): how many, and when the newest was written (LT-619). */
+function crashLine(): string {
   try {
-    const lines = readFileSync(join(logDir(), 'main.log'), 'utf8').trimEnd().split('\n')
-    return lines.slice(-n).join('\n')
+    const dir = join(app.getPath('crashDumps'), 'reports')
+    const dumps = readdirSync(dir).filter((f) => f.endsWith('.dmp'))
+    if (!dumps.length) return 'Crash dumps: none'
+    const newest = Math.max(...dumps.map((f) => statSync(join(dir, f)).mtimeMs))
+    return `Crash dumps: ${dumps.length}, the newest ${new Date(newest).toLocaleString()} (in ${dir})`
   } catch {
-    return '(no log yet)'
+    return 'Crash dumps: none'
   }
 }
 
@@ -110,7 +127,13 @@ export function diagnostics(ctx: AppContext): string {
   lines.push('Data sources:', ...sourceLines())
   lines.push(...processMetrics())
   lines.push('Performance (since the last ten-minute line in main.log):', ...perf.report({ tailer: ctx.engine.tailerStats, lineFailures: ctx.engine.failures }))
-  if (ctx.store.recovered.length) lines.push(`Set aside at start (unreadable): ${ctx.store.recovered.map((f) => basename(f)).join(', ')}`)
+  lines.push(crashLine())
+  if (filesSetAside().length)
+    lines.push(
+      `Set aside this run (unreadable or the wrong shape): ${filesSetAside()
+        .map((f) => basename(f))
+        .join(', ')}`
+    )
   if (ctx.store.unreadable.length) lines.push(`Could not be opened at start (left as they are): ${ctx.store.unreadable.join(', ')}`)
   if (ctx.store.newer.length) lines.push(`Written by a newer version: ${ctx.store.newer.join(', ')}`)
   lines.push('', '--- main.log, last 300 lines ---', logTail(300))

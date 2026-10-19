@@ -2,6 +2,7 @@ import { captureScreens, discardScreens, ocrImage } from './ocr'
 import { sources } from './sources/registry'
 import { composeRows, countsFromComposite, findMoteRows, rows as ocrRows, statsWindowFromScreen } from '../core/screenText'
 import type { Windows } from './windows'
+import { log } from './log'
 import type { MoteScreenRead, StatsScreenRead } from '../shared/ipc'
 
 // Reading the game's windows off the screen with Windows' OCR. The main window steps aside for a
@@ -27,6 +28,16 @@ async function withScreens<T>(windows: Windows, read: (shots: string[]) => Promi
   }
 }
 
+/** A monitor's first read; nothing, said in the log, when it fails, so the other monitors still count. */
+async function readOrNothing(path: string, scale: number): Promise<Awaited<ReturnType<typeof ocrImage>>> {
+  try {
+    return await ocrImage(path, scale)
+  } catch (e) {
+    log.warn(`A monitor's picture could not be read; the others still are`, e)
+    return []
+  }
+}
+
 /**
  * Reads the in-game Inventory window's Stats tab: a first read of each monitor finds the window, a
  * second reads just that area at four times the size, where the small font's slashes survive better.
@@ -36,7 +47,8 @@ export function readStatsFromScreen(windows: Windows): Promise<StatsScreenRead> 
     // Only the monitor the window is on counts: other windows can carry a stray "AC" or "Luck".
     let best: { path: string; first: ReturnType<typeof statsWindowFromScreen> } | null = null
     for (const path of shots) {
-      const first = statsWindowFromScreen(await ocrImage(path, 2))
+      // One monitor that will not read is passed over, not the end of the read (LT-602).
+      const first = statsWindowFromScreen(await readOrNothing(path, 2))
       if (first.area && Object.keys(first.values).length > Object.keys(best?.first.values ?? {}).length) best = { path, first }
     }
     if (!best) return { values: {}, rows: [], screens: shots.length }
@@ -57,7 +69,7 @@ export function readMotesFromScreen(windows: Windows): Promise<MoteScreenRead> {
     const rowsRead: string[] = []
     let sample: string[] = []
     for (const path of shots) {
-      const words = await ocrImage(path, 2)
+      const words = await readOrNothing(path, 2)
       const moteRows = findMoteRows(words)
       if (moteRows.length) {
         const layout = composeRows(moteRows)

@@ -5,8 +5,8 @@ import { parseJson } from './json'
 //
 //   uifiles/<skin>/legends-tracker.json   { "label": "Rebuild bag sizes", "command": ["C:/…/python.exe", "build.py", "--install"] }
 //
-// The app shows a button for each skin that has one and runs the command, with no shell, when it is
-// pressed. A skin without the file shows nothing.
+// The app shows a button for each skin that has one and runs the command, with no shell, in the
+// skin's own folder (so "build.py" is the skin's), when it is pressed. A skin without the file shows nothing.
 
 /** The file a skin folder holds to ask for a rebuild button. */
 export const SKIN_BUILD_FILE = 'legends-tracker.json'

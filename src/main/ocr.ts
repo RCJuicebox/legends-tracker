@@ -35,7 +35,10 @@ if ($Compose) {
   }
   $cg.Dispose(); $src.Dispose(); $src = $comp
 }
-$w = $src.Width * $Scale; $h = $src.Height * $Scale
+# Windows OCR takes no image over 10,000 pixels a side: a 5120-wide monitor at x2 threw (LT-602).
+# A variable of its own: $Scale is an [int], and 1.95 put back into it is 2 again.
+$f = [Math]::Min([double]$Scale, 9999 / [Math]::Max($src.Width, $src.Height))
+$w = [int]($src.Width * $f); $h = [int]($src.Height * $f)
 $bmp = New-Object System.Drawing.Bitmap $w, $h
 $g = [System.Drawing.Graphics]::FromImage($bmp)
 $g.InterpolationMode = [System.Drawing.Drawing2D.InterpolationMode]::HighQualityBicubic
@@ -51,7 +54,7 @@ $decoder = Await ([Windows.Graphics.Imaging.BitmapDecoder]::CreateAsync($stream)
 $sb = Await ($decoder.GetSoftwareBitmapAsync()) ([Windows.Graphics.Imaging.SoftwareBitmap])
 $engine = [Windows.Media.Ocr.OcrEngine]::TryCreateFromUserProfileLanguages()
 $r = Await ($engine.RecognizeAsync($sb)) ([Windows.Media.Ocr.OcrResult])
-$words = foreach ($line in $r.Lines) { foreach ($wd in $line.Words) { $b = $wd.BoundingRect; @{ t = $wd.Text; x = [int]($b.X / $Scale); y = [int]($b.Y / $Scale); w = [int]($b.Width / $Scale); h = [int]($b.Height / $Scale) } } }
+$words = foreach ($line in $r.Lines) { foreach ($wd in $line.Words) { $b = $wd.BoundingRect; @{ t = $wd.Text; x = [int]($b.X / $f); y = [int]($b.Y / $f); w = [int]($b.Width / $f); h = [int]($b.Height / $f) } } }
 $stream.Dispose(); Remove-Item $prepared -ErrorAction SilentlyContinue
 [Console]::Out.Write((ConvertTo-Json -Compress -Depth 3 -InputObject @($words)))
 `

@@ -15,7 +15,13 @@ vi.mock('../../src/main/sources/wiki', () => ({
       h.wikiCalls++
       return new Map()
     },
-    search: async () => []
+    search: async () => [],
+    // A whole catalog download that brings back a page with no item on it.
+    categorySize: async () => 1,
+    category: async (_name: string, onBatch: (pages: { title: string; content: string; revid: number }[]) => void) => {
+      h.wikiCalls++
+      onBatch([{ title: 'Not An Item', content: '', revid: 1 }])
+    }
   }
 }))
 
@@ -108,6 +114,24 @@ describe('item-catalog.json and its meta file', () => {
     expect(await next.stamp()).toEqual({ fetchedAt: now, format: CATALOG_FORMAT, count: 1 })
     expect(next.isStale(await next.stamp())).toBe(false)
     expect(next.isStale({ fetchedAt: now, format: CATALOG_FORMAT - 1 })).toBe(true)
+  })
+})
+
+describe('an item catalog download that comes back far smaller', () => {
+  it('keeps the catalog it has and says why (LT-621)', async () => {
+    const kept = {
+      fetchedAt: Date.now() - 30 * DAY,
+      format: CATALOG_FORMAT - 1,
+      items: Array.from({ length: 10 }, (_, i) => ({ name: `Item ${i}`, title: `Item ${i}` })),
+      revs: {}
+    }
+    await fs.writeFile(join(h.dir, 'item-catalog.json'), JSON.stringify(kept))
+    const c = new WikiCatalog(() => {})
+    const file = await c.refresh()
+    expect(h.wikiCalls).toBe(1)
+    expect(file?.items).toHaveLength(10)
+    expect(c.progress.error).toMatch(/had 0 items where 10 are kept/)
+    expect(JSON.parse(await fs.readFile(join(h.dir, 'item-catalog.json'), 'utf8')).items).toHaveLength(10)
   })
 })
 

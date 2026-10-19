@@ -85,7 +85,7 @@ describe('DoT tracking', () => {
       [Fri Sep 25 21:00:03 2026] A ratman warrior resisted your Envenomed Bolt X!
       [Fri Sep 25 21:00:04 2026] A ratman warrior has been poisoned.`)
     expect(h.board.list()).toHaveLength(0)
-    expect(h.feedItems).toContainEqual(['warn', 'Envenomed Bolt X resisted'])
+    expect(h.feedItems).toContainEqual(['info', 'Envenomed Bolt X resisted'])
   })
 
   it('says nothing of a resist of a spell you did not cast: a proc', () => {
@@ -95,7 +95,7 @@ describe('DoT tracking', () => {
       [Fri Sep 25 21:00:10 2026] You begin casting Envenomed Bolt X.
       [Fri Sep 25 21:00:30 2026] A ratman warrior resisted your Envenomed Bolt X!`)
     // The second: the cast was twenty seconds before, long since landed or not.
-    expect(h.feedItems.filter(([k]) => k === 'warn')).toEqual([])
+    expect(h.feedItems.filter(([k, t]) => k === 'info' && t.endsWith('resisted'))).toEqual([])
   })
 
   it('drops a cast that is interrupted or resisted', () => {

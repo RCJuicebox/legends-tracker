@@ -1,5 +1,8 @@
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process'
+import { mkdirSync, writeFileSync } from 'node:fs'
+import { join } from 'node:path'
 import { log } from './log'
+import { cacheDir } from './paths'
 import { yieldPriority } from './priority'
 
 // A PowerShell process driving Windows speech, started on first use and stopped when idle. Speech is rendered to WAV and handed to
@@ -86,6 +89,19 @@ const TIMEOUTS_TO_RESTART = 2
 /** With nothing said for this long the process is stopped; the next phrase, or warm(), starts it again. */
 const IDLE_MS = 5 * 60_000
 
+/** The speech engine's script, written to the cache folder for -File (LT-615); again at each start, so a new build's script is the one run. */
+function speechScript(): string {
+  const dir = cacheDir()
+  const path = join(dir, 'speech.ps1')
+  try {
+    mkdirSync(dir, { recursive: true })
+    writeFileSync(path, SCRIPT, 'utf8')
+  } catch (e) {
+    log.warn('Could not write the speech script', e)
+  }
+  return path
+}
+
 export class SpeechWorker {
   private proc: ChildProcessWithoutNullStreams | null = null
   private buffer = ''
@@ -104,6 +120,14 @@ export class SpeechWorker {
   }
   private ready: Promise<void> | null = null
   private idle: NodeJS.Timeout | null = null
+  /** "Yield CPU to EverQuest": below normal when on, as the app's other processes are (LT-614). */
+  private yieldToGame = true
+
+  /** Follows the setting, on the running process too: with it off, phrases no longer lose every contest with the game. */
+  setYield(on: boolean): void {
+    this.yieldToGame = on
+    yieldPriority(this.proc?.pid, on)
+  }
 
   /**
    * Starts the process if it is not running, so the next phrase comes quickly, and keeps it for
@@ -129,13 +153,14 @@ export class SpeechWorker {
   start(): Promise<void> {
     if (this.ready) return this.ready
     this.ready = new Promise((resolve) => {
-      const encoded = Buffer.from(SCRIPT, 'utf16le').toString('base64')
-      const proc = spawn('powershell.exe', ['-NoLogo', '-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-EncodedCommand', encoded], {
+      // From a script file, as OCR is, not -EncodedCommand: the encoded form is the launcher pattern
+      // antivirus flags or kills (LT-615).
+      const proc = spawn('powershell.exe', ['-NoLogo', '-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', speechScript()], {
         windowsHide: true
       })
       this.proc = proc
       this.buffer = ''
-      yieldPriority(proc.pid)
+      yieldPriority(proc.pid, this.yieldToGame)
       // Not up in 15 s: said to have failed, and whoever waits goes on. A cold first start (WinRT's
       // Add-Type) can take longer and still come up, so it is given a minute before it is stopped and
       // the next phrase starts another.

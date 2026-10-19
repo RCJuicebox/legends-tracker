@@ -147,8 +147,14 @@ export class AzureSpeech {
     const path = join(this.cacheDir, `${id}.wav`)
     try {
       const wav = await fs.readFile(path)
-      this.remember(id, wav)
-      return wav
+      // A file cut short (a full disk, a crash mid-write) is no phrase: rendered again (LT-603).
+      if (isWav(wav)) {
+        this.remember(id, wav)
+        // Used: the trim takes the phrases not heard for longest, not the cues said most.
+        const now = new Date()
+        void fs.utimes(path, now, now).catch(() => undefined)
+        return wav
+      }
     } catch {
       // Not rendered yet.
     }
@@ -189,7 +195,7 @@ export class AzureSpeech {
   private async store(path: string, wav: Buffer): Promise<void> {
     try {
       await fs.mkdir(this.cacheDir, { recursive: true })
-      await fs.writeFile(path, wav)
+      await writeFileAtomic(path, wav)
       if (++this.writes % 100 === 0) await this.trim()
     } catch (e) {
       log.warn('Could not keep a spoken phrase on disk:', e)
@@ -205,6 +211,9 @@ export class AzureSpeech {
     for (const { n } of aged.slice(0, names.length - CACHE_MAX)) await fs.rm(join(this.cacheDir, n), { force: true })
   }
 }
+
+/** Whether a phrase file is a whole WAV: its RIFF header and more than a header's length. */
+const isWav = (b: Buffer) => b.length > 44 && b.toString('latin1', 0, 4) === 'RIFF' && b.toString('latin1', 8, 12) === 'WAVE'
 
 /** A phrase Azure has not answered in this long is raced against the Windows voice. */
 const AZURE_SLOW_MS = 1000

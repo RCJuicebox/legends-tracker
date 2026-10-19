@@ -153,7 +153,9 @@ describe('twenty minutes of real play, read by the Engine', () => {
     // Each timer started (with its window), faded, overwritten or resisted, counted.
     const said = new Map<string, number>()
     for (const f of engine.feed.slice(before))
-      if (f.kind === 'timer' || f.kind === 'fade' || f.kind === 'warn') said.set(`${f.kind}: ${f.text}`, (said.get(`${f.kind}: ${f.text}`) ?? 0) + 1)
+      // A resist is a game event, fed as info since LT-606: still counted here.
+      if (f.kind === 'timer' || f.kind === 'fade' || f.kind === 'warn' || (f.kind === 'info' && f.text.endsWith(' resisted')))
+        said.set(`${f.kind}: ${f.text}`, (said.get(`${f.kind}: ${f.text}`) ?? 0) + 1)
     expect([...said].map(([t, n]) => (n > 1 ? `${t} ×${n}` : t)).sort()).toMatchSnapshot()
   })
 

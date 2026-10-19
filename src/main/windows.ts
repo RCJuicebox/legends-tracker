@@ -1,4 +1,4 @@
-import { app, BrowserWindow, dialog, Menu, nativeImage, nativeTheme, Notification, screen, Tray, type Rectangle } from 'electron'
+import { app, BrowserWindow, dialog, Menu, nativeImage, nativeTheme, Notification, type Rectangle, screen, Tray } from 'electron'
 import { join } from 'node:path'
 import { JsonFile, readJsonFile } from './storeCore'
 import { push } from './push'
@@ -129,6 +129,9 @@ export class Windows {
   }
 
   createMain(): void {
+    // Electron's default menu brings Ctrl+R (a reload throws away a trigger draft), Ctrl+Shift+I and F11
+    // to the installed app; none of it is wanted. The edit keys stay with the inputs themselves (LT-617).
+    if (app.isPackaged) Menu.setApplicationMenu(null)
     const place = this.savedPlace()
     // After a restart into an update nobody asked for, the window comes back only if it was in use:
     // over the game it would take the player's focus mid-fight. The app carries on from the tray.
@@ -235,7 +238,7 @@ export class Windows {
     if (!Notification.isSupported()) return
     new Notification({
       title: `Legends Tracker updated to ${app.getVersion()}`,
-      body: 'It restarted in the tray, so your game kept the screen. Your settings, timers and overlays are as they were.',
+      body: 'It restarted in the tray, so your game kept the screen. Your settings and overlays are as they were; timers running then start again with your next casts.',
       icon: this.opts.icon
     }).show()
   }

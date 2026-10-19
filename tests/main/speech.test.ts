@@ -1,5 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { EventEmitter } from 'node:events'
+import { existsSync, mkdtempSync, readFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 
 // No PowerShell is started: spawn hands back a stand-in process that answers like the speech
 // script does (a voices line on start, a wav line per phrase), or stays silent when told to.
@@ -59,6 +62,9 @@ vi.mock('node:child_process', () => ({
   })
 }))
 vi.mock('../../src/main/log', () => ({ log: { info: vi.fn(), warn: vi.fn(), error: vi.fn() } }))
+// The script is written to the cache folder: this test's own, never the player's.
+const cache = mkdtempSync(join(tmpdir(), 'lt-speech-'))
+vi.mock('../../src/main/paths', () => ({ cacheDir: () => cache }))
 
 const { spawn } = await import('node:child_process')
 const { SpeechWorker } = await import('../../src/main/speech')
@@ -82,6 +88,13 @@ describe('the Windows speech engine starting', () => {
     expect(wav.toString()).toBe('wav:Recast Tester Spell')
     expect(spawn).toHaveBeenCalledOnce()
     expect(vi.mocked(spawn).mock.calls[0][0]).toBe('powershell.exe')
+    // From a script file, not -EncodedCommand (LT-615).
+    const args = vi.mocked(spawn).mock.calls[0][1] as string[]
+    expect(args).toContain('-File')
+    expect(args).not.toContain('-EncodedCommand')
+    const script = args[args.indexOf('-File') + 1]
+    expect(script).toBe(join(cache, 'speech.ps1'))
+    expect(existsSync(script) && readFileSync(script, 'utf8').length).toBeGreaterThan(100)
     w.stop()
   })
 

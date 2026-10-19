@@ -61,6 +61,8 @@ exports[`twenty minutes of real play, read by the Engine > respawns: the mobs ki
 exports[`twenty minutes of real play, read by the Engine > spell timers: what the tracker made of the twenty minutes, timer by timer 1`] = `
 [
   "fade: Envenomed Bolt faded from Lord of Ire",
+  "info: Envenomed Bolt X resisted ×5",
+  "info: Plague X resisted ×3",
   "timer: Envenomed Bolt X on Innoruuk, the Prince of Hate: 54–60s ×2",
   "timer: Envenomed Bolt X on Lord of Ire: 54–60s",
   "timer: Harm Touch X on Innoruuk, the Prince of Hate: 36–42s ×2",
@@ -68,8 +70,6 @@ exports[`twenty minutes of real play, read by the Engine > spell timers: what th
   "timer: Odium X on Lord of Ire: 48–54s ×2",
   "timer: Plague X on Innoruuk, the Prince of Hate: 120–126s ×2",
   "timer: Plague X on Lord of Ire: 120–126s",
-  "warn: Envenomed Bolt X resisted ×5",
-  "warn: Plague X resisted ×3",
 ]
 `;
 

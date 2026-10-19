@@ -317,7 +317,6 @@ export function createContext(): AppContext {
     new VoiceRouter(speech, azure),
     {
       timers: (views) => {
-        perf.push('timers', views)
         ctx.overlays.timers(views)
         toMain('state:timers', views)
       },
@@ -333,7 +332,6 @@ export function createContext(): AppContext {
       moteScan: (s) => toMain('state:moteScan', s),
       stock: (s) => toMain('state:stock', s),
       combat: (snap) => {
-        perf.push('combat', snap)
         ctx.overlays.combat(snap)
         toMain('state:combat', snap)
       },
@@ -344,7 +342,6 @@ export function createContext(): AppContext {
         const oldest = view.entries.at(-1)?.id ?? 0
         const push = windows.mainShown && lootSent > 0 && newest >= lootSent ? { ...view, entries: view.entries.filter((e) => e.id > lootSent), addedOnly: { oldest } } : view
         lootSent = windows.mainShown ? newest : 0
-        perf.push('loot', push)
         toMain('state:loot', push)
       },
       respawns: (view) => toMain('state:respawns', view),
@@ -432,6 +429,8 @@ export function createContext(): AppContext {
   // the audio window and Chromium's audio service stay normal so alerts never stutter.
   ctx.applyPriority = () => {
     const on = store.settings.get().yieldToGame
+    // The speech engine is no Electron process: told on its own (LT-614).
+    speech.setYield(on)
     const keep = new Set([windows.audioPid()])
     for (const m of app.getAppMetrics()) {
       if (keep.has(m.pid) || /audio/i.test(m.serviceName ?? '')) continue
@@ -578,13 +577,13 @@ function registerSources(ctx: AppContext): void {
   sources.add('catalog', {
     label: 'Item catalog',
     kind: 'wiki',
-    what: 'Every piece of equipment on eqlwiki, for the upgrade finder and optimizer. Refreshed weekly, reading only pages edited since.',
+    what: 'Every piece of equipment on eqlwiki, for the upgrade finder and optimizer. Due again weekly, and refreshed when you ask, reading only pages edited since.',
     refresh: () => ctx.wikiCatalog.refresh()
   })
   sources.add('recipes', {
     label: 'Recipes',
     kind: 'wiki',
-    what: "Every player-crafted recipe on eqlwiki, for the Tradeskills page and crafted items' eras.",
+    what: "Every player-crafted recipe on eqlwiki, for the Tradeskills page and crafted items' eras. Due again weekly, and refreshed when you ask.",
     refresh: () => ctx.recipeBook.refresh()
   })
   sources.add('petWiki', { label: 'Pet pages', kind: 'wiki', what: "eqlwiki's Pet Guide and each pet's summon page, for the pet gear planner." })
@@ -630,7 +629,7 @@ function registerSources(ctx: AppContext): void {
   setInterval(() => {
     if (!ctx.engine.status.watching) return
     log.info(['Performance, the last ten minutes:', ...perf.report({ tailer: ctx.engine.tailerStats, lineFailures: ctx.engine.failures })].join('\n'))
-    perf.restart()
+    perf.restart({ tailer: ctx.engine.tailerStats, lineFailures: ctx.engine.failures })
   }, 10 * 60_000).unref()
 }
 
@@ -646,6 +645,11 @@ async function reloadGameData(ctx: AppContext, why: string): Promise<void> {
 
 /** Each step of one version is announced once: an hourly check must not nag. */
 const announced = new Set<string>()
+/**
+ * Notifications shown and not yet clicked or closed: held, since one left to the garbage collector
+ * loses its click handler, and a click from the Action Center later only starts a second copy (LT-616).
+ */
+const shownNotes = new Set<Notification>()
 
 /** A Windows notification about an update, said once per key. Clicking it runs `onClick`. */
 function announceUpdate(key: string, title: string, body: string, onClick: () => void): void {
@@ -654,13 +658,18 @@ function announceUpdate(key: string, title: string, body: string, onClick: () =>
   if (!Notification.isSupported()) return
   try {
     const n = new Notification({ title, body, icon: appIcon })
+    shownNotes.add(n)
+    const done = () => void shownNotes.delete(n)
     n.on('click', () => {
+      done()
       try {
         onClick()
       } catch (e) {
         log.warn("The update notification's action failed:", e)
       }
     })
+    n.on('close', done)
+    n.on('failed', done)
     n.show()
   } catch (e) {
     log.warn('Could not show the update notification:', e)

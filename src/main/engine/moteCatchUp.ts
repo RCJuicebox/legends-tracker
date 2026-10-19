@@ -241,6 +241,8 @@ export class MoteCatchUp implements EngineFeature {
    * it into the history kept, then carries on live. Only progress goes out while it reads.
    */
   rebuild(installDir: string, watched: string, view: () => Parameters<EngineOutputs['motes']>[0]): Promise<void> {
+    // A second Rescan waits for the one running (LT-609), and says so.
+    if (jobs.isRunning('motes')) this.notifier.pushFeed('info', 'Already reading your logs.')
     return jobs.run('motes', 'Rebuilding mote history from your logs', (job) => this.rebuildAs(job, installDir, watched, view))
   }
 

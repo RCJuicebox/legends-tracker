@@ -12,6 +12,8 @@ export interface Job {
 
 class JobRegistry {
   private readonly jobs = new Map<string, JobView & { abort: AbortController }>()
+  /** Each job running, by id: a second start of it is handed this (LT-609). */
+  private readonly running = new Map<string, Promise<unknown>>()
   private sink: ((jobs: JobView[]) => void) | null = null
   private timer: NodeJS.Timeout | null = null
 
@@ -20,7 +22,19 @@ class JobRegistry {
   }
 
   /** Runs `work` as a job; a second start of the same id waits for the first instead. */
-  async run<T>(id: string, label: string, work: (job: Job) => Promise<T>): Promise<T> {
+  run<T>(id: string, label: string, work: (job: Job) => Promise<T>): Promise<T> {
+    const had = this.running.get(id)
+    if (had) return had as Promise<T>
+    const p = this.start(id, label, work)
+    this.running.set(id, p)
+    void p.then(
+      () => this.running.delete(id),
+      () => this.running.delete(id)
+    )
+    return p
+  }
+
+  private async start<T>(id: string, label: string, work: (job: Job) => Promise<T>): Promise<T> {
     const abort = new AbortController()
     this.jobs.set(id, { id, label, fraction: null, detail: '', abort })
     this.changed()
@@ -39,6 +53,11 @@ class JobRegistry {
       this.jobs.delete(id)
       this.changed()
     }
+  }
+
+  /** Whether a job of this id is running. */
+  isRunning(id: string): boolean {
+    return this.running.has(id)
   }
 
   cancel(id: string): void {

@@ -3,6 +3,7 @@ import { promises as fs } from 'node:fs'
 import { join } from 'node:path'
 import { JsonFile, readJsonFile, writeFileAtomic } from './storeCore'
 import { isCharacterKey } from '../core/validate'
+import { parseJson } from '../core/json'
 import {
   BAG_LAYOUT_FILE,
   SKIN_BUILD_FILE,
@@ -74,7 +75,9 @@ export async function runSkinBuild(
   }
   const env = { ...process.env, ...(isCharacterKey(character) ? { EQL_CHARACTER: character } : {}) }
   return new Promise((resolve) => {
-    execFile(build.command[0], build.command.slice(1), { env, windowsHide: true, timeout: TIMEOUT_MS, maxBuffer: 4 * 1024 * 1024 }, (err, stdout, stderr) => {
+    // In the skin's own folder, where its script is ("build.py" in the format's example, LT-608).
+    const cwd = join(gameDir, 'uifiles', build.skin)
+    execFile(build.command[0], build.command.slice(1), { cwd, env, windowsHide: true, timeout: TIMEOUT_MS, maxBuffer: 4 * 1024 * 1024 }, (err, stdout, stderr) => {
       const output = tailOutput(`${stdout}\n${stderr}`)
       if (err) log.warn(`Rebuilding the ${skin} skin failed`, err)
       resolve({ skin, ok: !err, output: err && !output ? err.message : output })
@@ -88,6 +91,23 @@ async function layoutSkin(gameDir: string, skin: unknown): Promise<(SkinBuild & 
   return build?.bagLayout ? { ...build, bagLayout: build.bagLayout } : null
 }
 
+/** A JSON file in a skin's folder, or null when it is missing or will not parse (said in the log, left where it is). */
+async function readSkinJson(path: string): Promise<unknown> {
+  let text: string
+  try {
+    text = await fs.readFile(path, 'utf8')
+  } catch (e) {
+    if ((e as NodeJS.ErrnoException).code !== 'ENOENT') log.warn(`Could not read ${path}`, e)
+    return null
+  }
+  try {
+    return parseJson(text)
+  } catch (e) {
+    log.warn(`${path} does not read as JSON; the skin's defaults are used`, e)
+    return null
+  }
+}
+
 /**
  * A skin's bag layout (src/core/skinBuild.ts): its rules, the choices saved in its folder, and the
  * bags the character's inventory export holds, read from `exportPath` ('' for no character).
@@ -96,8 +116,10 @@ export async function readBagLayout(gameDir: string, skin: string, exportPath: s
   const build = await layoutSkin(gameDir, skin)
   if (!build) return null
   const spec = build.bagLayout
-  const saved = readJsonFile(join(gameDir, 'uifiles', build.skin, BAG_LAYOUT_FILE))
-  const columns = saved.state === 'ok' && saved.value && typeof saved.value === 'object' ? sanitizeColumns((saved.value as { columns?: unknown }).columns, spec) : {}
+  // Read as it is, not with the start-up reader: that waits on a held file with the main thread
+  // stopped, and would set a bad file aside inside the game's folder (LT-610).
+  const saved = await readSkinJson(join(gameDir, 'uifiles', build.skin, BAG_LAYOUT_FILE))
+  const columns = saved && typeof saved === 'object' ? sanitizeColumns((saved as { columns?: unknown }).columns, spec) : {}
   let text = ''
   let exportedAt = 0
   let error = exportPath ? '' : 'No character chosen.'

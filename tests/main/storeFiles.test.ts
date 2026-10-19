@@ -19,7 +19,7 @@ vi.mock('electron', () => ({
 }))
 
 const { Store } = await import('../../src/main/store')
-const { DEFAULT_OVERLAYS, defaultSettings, retrySchedule } = await import('../../src/main/storeCore')
+const { DEFAULT_OVERLAYS, defaultSettings, filesSetAside, retrySchedule } = await import('../../src/main/storeCore')
 const { SCHEMAS } = await import('../../src/main/schema')
 
 const DEFAULT_TRIGGER: Trigger = {
@@ -356,6 +356,19 @@ describe('files read back through the sanitisers', () => {
   it('fill mote stock fields an older build did not save', () => {
     writeFileSync(file('mote-stock.json'), JSON.stringify({ counts: { minor: 2 } }))
     expect(new Store(defaultTriggers).stock.get()).toEqual({ counts: { minor: 2 }, item: { name: '', lvl: 0, xp: 0, to: 1 }, autoAdd: true })
+  })
+})
+
+describe('a triggers file of another shape', () => {
+  it('reads the import format, and sets anything else aside rather than writing over it (LT-611)', () => {
+    writeFileSync(file('triggers.json'), JSON.stringify({ triggers: [{ id: 'a', name: 'Tell', phrases: [{ text: 'tells you', regex: false }] }] }))
+    expect(new Store(defaultTriggers).triggers.get().map((t) => t.name)).toEqual(['Tell'])
+    writeFileSync(file('triggers.json'), JSON.stringify({ nothing: 'here' }))
+    const store = new Store(defaultTriggers)
+    expect(store.triggers.get()).toEqual([])
+    expect(store.recovered.some((f) => /triggers\.wrong-shape-.+\.json$/.test(f))).toBe(true)
+    expect(existsSync(file('triggers.json'))).toBe(false)
+    expect(filesSetAside().some((f) => f.includes('triggers.wrong-shape-'))).toBe(true)
   })
 })
 

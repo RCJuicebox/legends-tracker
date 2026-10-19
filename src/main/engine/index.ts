@@ -632,10 +632,20 @@ export class Engine {
   }
 
   private lastTickAt = 0
+  /** When a lap last came so late it was logged: at most one line a minute. */
+  private lateLoggedAt = 0
 
   private tick(): void {
     const now = Date.now()
-    if (this.lastTickAt) perf.tickLate.add(Math.max(0, now - this.lastTickAt - TICK_MS))
+    if (this.lastTickAt) {
+      const late = Math.max(0, now - this.lastTickAt - TICK_MS)
+      perf.tickLate.add(late)
+      // A lap a quarter of a second late, with when and whether the game ran: what LT-350's long laps need (LT-607).
+      if (late > 250 && now - this.lateLoggedAt > 60_000) {
+        this.lateLoggedAt = now
+        log.info(`Engine clock: a lap came ${late} ms late (the game ${this.archive.gameRunning ? 'running' : 'closed'})`)
+      }
+    }
     this.lastTickAt = now
     for (const f of this.features) {
       try {

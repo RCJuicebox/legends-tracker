@@ -28,6 +28,9 @@ export type CatalogProgress = WikiProgress
  */
 const KEEP_MS = 10 * 60_000
 
+/** A download with fewer than this share of the kept catalog's items is held to be a wiki fault, not news. */
+const SHRINK_FLOOR = 0.8
+
 export class WikiCatalog {
   // The catalog (some 10 MB parsed) is wanted only by the Gear pages and a download, so it is read
   // from disk when asked for and let go a minute later; what the status needs is kept on its own.
@@ -130,6 +133,15 @@ export class WikiCatalog {
     try {
       const old = await this.stored()
       const file = (old?.revs && (old.format ?? 1) >= FORMAT ? await this.update(old, job.signal) : null) ?? (await this.whole(job.signal))
+      // A download with far fewer items than the one kept (a wiki template edit dropping the category
+      // from many pages, say) does not replace it: the finder would quietly stop suggesting them (LT-621).
+      if (old && file.items.length < old.items.length * SHRINK_FLOOR) {
+        const why = `The new download had ${file.items.length.toLocaleString()} items where ${old.items.length.toLocaleString()} are kept; the kept catalog is used`
+        log.warn(`Item catalog: ${why}`)
+        this.forgetLater()
+        this.report({ busy: false, error: why })
+        return this.file
+      }
       file.eraStatus = (await this.eraStatus()) ?? old?.eraStatus
       await writeFileAtomic(this.path, JSON.stringify(file))
       this.hold(file)

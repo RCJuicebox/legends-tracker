@@ -17,6 +17,7 @@ import { appUserModelId, ensureSourceShortcut } from './appIdentity'
 import { isOwnPage } from './push'
 import { log, logDir } from './log'
 import { defaultPlacement, overlayScale } from '../shared/overlays'
+import { filesSetAside } from './storeCore'
 
 if (primaryInstance) {
   // Building the context reads every settings file; a throw there must end this copy, not leave a
@@ -84,8 +85,11 @@ async function start(ctx: AppContext): Promise<void> {
   windows.createMain()
   await engine.init()
   ctx.logSettings()
-  if (store.recovered.length) {
-    const names = store.recovered.map((f) => basename(f)).join(', ')
+  // Every file set aside at start, the features' own as well as the Store's (LT-612).
+  if (filesSetAside().length) {
+    const names = filesSetAside()
+      .map((f) => basename(f))
+      .join(', ')
     engine.pushFeed('warn', `Some saved settings could not be read and were set aside (${names}, in the app's data folder); defaults are in use for them.`)
   }
   if (store.unreadable.length) {

@@ -1,4 +1,4 @@
-import { app, dialog, protocol } from 'electron'
+import { app, crashReporter, dialog, protocol } from 'electron'
 import { cpSync, existsSync, mkdirSync, renameSync, rmSync } from 'node:fs'
 import { release } from 'node:os'
 import { join } from 'node:path'
@@ -11,9 +11,23 @@ import { cacheDir } from './paths'
 // Settings live in %APPDATA%\Legends Tracker. EQL_USER_DATA points a development or test run at a
 // separate profile, so a trial never touches real settings.
 app.setPath('userData', process.env['EQL_USER_DATA'] || join(app.getPath('appData'), 'Legends Tracker'))
+
+/**
+ * Whether this copy runs the app. A second copy hands its arguments to the first and quits; so does
+ * --quit with nothing running, since there is nothing to quit and a restart script must not wait on
+ * it. Neither builds anything, so neither can write over the running copy's files, nor its log: a
+ * second copy's start line in the running copy's log read as a restart that never was, and could roll
+ * the file under it (LT-605).
+ */
+export const primaryInstance = app.requestSingleInstanceLock() && !process.argv.includes('--quit')
 // Each profile keeps its own diagnostic log beside its settings.
-initLog(join(app.getPath('userData'), 'logs'))
-log.info(`Legends Tracker ${app.getVersion()}${app.isPackaged ? '' : ' (development)'} on Windows ${release()} ${process.arch}, Electron ${process.versions.electron}`)
+if (primaryInstance) {
+  initLog(join(app.getPath('userData'), 'logs'))
+  log.info(`Legends Tracker ${app.getVersion()}${app.isPackaged ? '' : ' (development)'} on Windows ${release()} ${process.arch}, Electron ${process.versions.electron}`)
+  // A native crash (koffi, the GPU, a page) leaves a dump in the profile's Crashpad folder, sent nowhere;
+  // Copy diagnostics says how many there are and the newest (LT-619).
+  crashReporter.start({ uploadToServer: false })
+}
 // Something unexpected: logged, and shown once with where the log is, since the app may now be in a
 // state nobody meant. A second one ends it rather than carry on further. The box does not wait to be
 // closed: timers, the log and the overlays carry on behind it.
@@ -52,16 +66,46 @@ process.on('unhandledRejection', (e) => log.error('Unhandled rejection:', e))
 
 protocol.registerSchemesAsPrivileged([{ scheme: 'eqicon', privileges: { standard: true, secure: true, supportFetchAPI: true } }])
 
-/**
- * Whether this copy runs the app. A second copy hands its arguments to the first and quits; so does
- * --quit with nothing running, since there is nothing to quit and a restart script must not wait on
- * it. Neither builds anything, so neither can write over the running copy's files.
- */
-export const primaryInstance = app.requestSingleInstanceLock() && !process.argv.includes('--quit')
 if (!primaryInstance) app.quit()
 else if (!process.env['EQL_USER_DATA']) carryOverSettings(join(app.getPath('appData'), 'EQL Audio Triggers'), app.getPath('userData'))
 
+/** Chromium's caches in a profile from before LT-620: derived, so removed once the session data has its own folder. */
+const CHROMIUM_CACHES = [
+  'Cache',
+  'Code Cache',
+  'GPUCache',
+  'GPUPersistentCache',
+  'GrShaderCache',
+  'ShaderCache',
+  'DawnCache',
+  'DawnGraphiteCache',
+  'DawnWebGPUCache',
+  'Shared Dictionary'
+]
+
 if (primaryInstance) moveCaches(app.getPath('userData'), cacheDir())
+// Chromium's own caches (GPU, shaders, the HTTP cache) are derived data too: out of the roaming
+// profile with the rest, the remembered page state (Local Storage) brought across once (LT-620).
+if (primaryInstance) app.setPath('sessionData', chromiumData(app.getPath('userData'), cacheDir()))
+
+/** Where Chromium keeps its session data: the cache folder's own, with Local Storage carried over from the profile the first time. */
+function chromiumData(profile: string, cache: string): string {
+  const to = join(cache, 'chromium')
+  try {
+    if (!existsSync(to)) {
+      mkdirSync(to, { recursive: true })
+      const ls = join(profile, 'Local Storage')
+      if (existsSync(ls)) cpSync(ls, join(to, 'Local Storage'), { recursive: true })
+      // What is left in the profile is fetched or built again by Chromium, and goes.
+      for (const name of CHROMIUM_CACHES) rmSync(join(profile, name), { recursive: true, force: true })
+      log.info(`Chromium's session data now kept in ${to}`)
+    }
+    return to
+  } catch (e) {
+    log.warn(`Could not move Chromium's session data to ${to}; it stays in the profile`, e)
+    return profile
+  }
+}
 
 /** Caches used to live beside the settings; they move once, and a copy that cannot move is left to be fetched again. */
 function moveCaches(from: string, to: string): void {

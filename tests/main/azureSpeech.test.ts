@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { mkdtempSync, readFileSync } from 'node:fs'
+import { mkdtempSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
@@ -22,7 +22,8 @@ const VOICES = [
   { ShortName: 'en-US-JennyNeural', DisplayName: 'Jenny', LocaleName: 'English (United States)', Locale: 'en-US', Gender: 'Female', VoiceType: 'Neural' },
   { ShortName: 'de-DE-KatjaNeural', DisplayName: 'Katja', LocaleName: 'German (Germany)', Locale: 'de-DE', Gender: 'Female', VoiceType: 'Neural' }
 ]
-const WAV = Buffer.from('RIFF....WAVEfmt fake')
+// A header's worth and a little sound: under 45 bytes is no whole WAV.
+const WAV = Buffer.concat([Buffer.from('RIFF\x00\x00\x00\x00WAVEfmt ', 'latin1'), Buffer.alloc(40, 1)])
 
 let calls: { url: string; init?: RequestInit }[] = []
 beforeEach(() => {
@@ -64,6 +65,26 @@ describe('Azure voices', () => {
     expect(init!.body).toBe(
       '<speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" xml:lang="en-US"><voice name="en-US-JennyNeural"><prosody rate="+30%">Recast &lt;Odium&gt; &amp; friends</prosody></voice></speak>'
     )
+  })
+})
+
+describe('the phrases kept on disk', () => {
+  it('renders a phrase again whose file was cut short, and keeps the whole one (LT-603)', async () => {
+    const az = new AzureSpeech()
+    await az.configure('eastus', 'good-key')
+    await az.synthesize('Odium off', 'en-US-JennyNeural', 1)
+    const cache = join(dir, 'local', 'speech-cache')
+    await new Promise((r) => setTimeout(r, 50))
+    const files = readdirSync(cache).filter((n) => n.endsWith('.wav'))
+    expect(files.length).toBeGreaterThan(0)
+    for (const f of files) writeFileSync(join(cache, f), Buffer.alloc(0))
+    calls = []
+    // A new reader (as after a start): nothing in memory, a 0-byte file on disk.
+    const fresh = new AzureSpeech()
+    await fresh.configure('eastus', 'good-key')
+    calls = []
+    expect((await fresh.synthesize('Odium off', 'en-US-JennyNeural', 1)).equals(WAV)).toBe(true)
+    expect(calls).toHaveLength(1)
   })
 })
 

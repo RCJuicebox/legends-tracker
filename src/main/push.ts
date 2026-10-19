@@ -3,11 +3,15 @@ import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { log } from './log'
 import type { PushChannel, Pushes, SendChannel, Sends } from '../shared/ipc'
+import { perf } from './perf'
 
 // Typed ends of the one-way channels in shared/ipc.ts: what main pushes to a window, and what a
 // window sends main without waiting for an answer.
 
 export function push<K extends PushChannel>(wc: WebContents, channel: K, ...args: Parameters<Pushes[K]>): void {
+  // Counted as sent, after routing: a push held for a hidden window, or a list the hosts never get,
+  // is not counted (LT-607). The sound player's audio is counted, not measured.
+  perf.push(channel, args[0], !channel.startsWith('audio:'))
   wc.send(channel, ...args)
 }
 

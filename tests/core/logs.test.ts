@@ -69,6 +69,25 @@ describe('LogTailer', () => {
     expect(resets).toEqual(['replaced'])
   })
 
+  it('reads the lines written just before the log was archived, through the handle it still holds (LT-613)', async () => {
+    const path = join(dir, 'eqlog_Aldric_neriak.txt')
+    await fs.writeFile(path, '')
+    const got: string[] = []
+    const t = new LogTailer(path, { startAtEnd: false, onLines: (l) => got.push(...l) })
+    await fs.appendFile(path, 'one\r\n')
+    await t.readOnce()
+    // Written after that poll, then the log is moved away before the next one: missing, then a new one.
+    await fs.appendFile(path, 'two\r\nthree')
+    await fs.rename(path, join(dir, 'archived-aldric.txt'))
+    await t.readOnce()
+    expect(got).toEqual(['one', 'two', 'three'])
+    await fs.writeFile(path, 'four\r\n')
+    await t.readOnce()
+    await t.readOnce()
+    await t.release()
+    expect(got).toEqual(['one', 'two', 'three', 'four'])
+  })
+
   it('holds partial lines, skips existing content at start, and survives truncation and replacement', async () => {
     const path = join(dir, 'eqlog_Test_x.txt')
     await fs.writeFile(path, 'old line\r\n')

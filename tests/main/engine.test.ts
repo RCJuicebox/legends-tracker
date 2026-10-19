@@ -189,7 +189,8 @@ describe('Engine', () => {
     lap()
     expect(info.mock.calls.some((c) => String(c[0]).startsWith('Meter push:'))).toBe(true)
     // Once in five minutes, not every push.
-    const logged = info.mock.calls.length
+    const pushLines = () => info.mock.calls.filter((c) => String(c[0]).startsWith('Meter push:')).length
+    const logged = pushLines()
     await sleep(600)
     await fs.appendFile(
       logFile,
@@ -198,7 +199,7 @@ describe('Engine', () => {
     )
     await sleep(600)
     lap()
-    expect(info.mock.calls.length).toBe(logged)
+    expect(pushLines()).toBe(logged)
     expect(engine.meter.fighting).toBe(true)
     info.mockRestore()
   })

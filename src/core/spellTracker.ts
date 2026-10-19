@@ -186,7 +186,8 @@ export class SpellTracker {
     if (resisted) {
       // Said only of a spell you cast: a weapon's proc resisted is not worth a warning.
       const cast = this.lastCast && now <= this.lastCast.until && this.lastCast.names.includes(resisted)
-      if (this.dropPending(resisted) || cast) this.hooks.feed('warn', `${resisted} resisted`)
+      // A game event, not the app's trouble: info, so main.log's WARN lines are the app's own (LT-606).
+      if (this.dropPending(resisted) || cast) this.hooks.feed('info', `${resisted} resisted`)
       return
     }
     if (FAIL_PREFIXES.some((p) => text.startsWith(p))) return void this.dropOwn()

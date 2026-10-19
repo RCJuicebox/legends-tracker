@@ -139,12 +139,20 @@ export function readJsonFile(path: string, opts: { setAside?: boolean; now?: Dat
   }
 }
 
-function setAside(path: string, now: Date): ReadResult {
+/** Every file set aside this run, the Store's and the features' side files alike (LT-612). */
+const setAsideThisRun: string[] = []
+
+/** The files set aside this run, where they were moved to: for the feed and diagnostics. */
+export const filesSetAside = (): readonly string[] => setAsideThisRun
+
+/** Moves a file that cannot be used aside to `<name>.corrupt-<time>.json` (or `.<why>-<time>`), kept and named to the player. */
+export function setAside(path: string, now: Date = new Date(), why = 'corrupt'): ReadResult & { state: 'corrupt' } {
   const stamp = now.toISOString().replace(/[:.]/g, '-')
-  const movedTo = join(dirname(path), `${basename(path, '.json')}.corrupt-${stamp}.json`)
+  const movedTo = join(dirname(path), `${basename(path, '.json')}.${why}-${stamp}.json`)
   try {
     renameSync(path, movedTo)
     log.warn(`Moved ${path} aside to ${movedTo}`)
+    setAsideThisRun.push(movedTo)
   } catch (e) {
     log.error(`Could not move ${path} aside`, e)
   }
@@ -291,14 +299,14 @@ export class JsonFile<T> {
  * retry schedule while another program (a virus scanner, a backup tool) holds either. Throws the last
  * error once the tries run out. Every file the app keeps is written this way, through JsonFile or not.
  */
-export async function writeFileAtomic(path: string, text: string): Promise<void> {
+export async function writeFileAtomic(path: string, text: string | Uint8Array): Promise<void> {
   const tmp = path + '.tmp'
   for (let attempt = 0; ; attempt++) {
     try {
       // Flushed to the disk before the rename: a power cut just after a save otherwise leaves a file of NULs (LT-599).
       const fh = await fs.open(tmp, 'w')
       try {
-        await fh.writeFile(text, 'utf8')
+        await (typeof text === 'string' ? fh.writeFile(text, 'utf8') : fh.writeFile(text))
         await fh.sync()
       } finally {
         await fh.close()

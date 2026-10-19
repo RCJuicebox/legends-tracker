@@ -134,6 +134,7 @@ export class LogTailer {
       stat = await fs.stat(this.path, { bigint: true })
     } catch (e) {
       if ((e as NodeJS.ErrnoException).code === 'ENOENT') {
+        await this.drainOld()
         await this.release()
         if (!this.missing) this.opts.onMissing?.()
         this.missing = true
@@ -150,6 +151,7 @@ export class LogTailer {
       this.identity = identity
       this.pos = this.opts.startAtEnd ? size : 0
     } else if (identity !== this.identity) {
+      await this.drainOld()
       await this.release()
       this.identity = identity
       const skip = size > REPLAY_MAX
@@ -205,6 +207,31 @@ export class LogTailer {
       // A handle that went bad (the file swapped under it) is dropped; the next poll reopens.
       if (this.handle === h) await this.release()
       throw e
+    }
+  }
+
+  /**
+   * The lines the open handle still holds past where reading got to: the old file's last ~100 ms,
+   * written after the last poll and before it was archived or replaced. Node opens with
+   * FILE_SHARE_DELETE, so the handle still reads a file moved away (LT-613).
+   */
+  private async drainOld(): Promise<void> {
+    const h = this.handle
+    if (!h) return
+    try {
+      const end = Number((await h.stat()).size)
+      const buf = Buffer.allocUnsafe(SLICE)
+      while (this.pos < end) {
+        const { bytesRead } = await h.read(buf, 0, Math.min(SLICE, end - this.pos), this.pos)
+        if (bytesRead <= 0) break
+        this.pos += bytesRead
+        this.stats.bytes += bytesRead
+        this.emit(decodeCp1252(buf.subarray(0, bytesRead)))
+      }
+      // The old file's last line is whole: it will get no more.
+      if (this.partial) this.emit('\n')
+    } catch {
+      // Gone altogether: nothing more to read from it.
     }
   }
 
