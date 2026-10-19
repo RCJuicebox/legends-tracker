@@ -99,7 +99,7 @@ function makeEngine(o: { logFile: string; motes?: MoteState; stock?: MoteStock }
 
 /** Until the engine's tailer has looked at the log once: a line written after it is read as new. */
 function tailing(engine: Engine): Promise<void> {
-  const tailer = () => (engine as unknown as { tail?: { tailer: { stats: { polls: number } } } }).tail?.tailer
+  const tailer = () => (engine as unknown as { follower: { tail?: { tailer: { stats: { polls: number } } } } }).follower.tail?.tailer
   return waitFor(() => (tailer()?.stats.polls ?? 0) > 0)
 }
 

@@ -1,8 +1,7 @@
 import type { SimulateResult } from '../../shared/ipc'
 import { promises as fs } from 'node:fs'
 import { basename } from 'node:path'
-import { LogClock, parseLogLine, type LogLine } from '../../core/logLine'
-import { LogTailer } from '../../core/tailer'
+import { parseLogLine, type LogLine } from '../../core/logLine'
 import { SpellBook, type RankedSpell, type Spell } from '../../core/spells'
 import { TimerBoard } from '../../core/timers'
 import { SpellTracker } from '../../core/spellTracker'
@@ -24,6 +23,7 @@ import { SpellQueries } from './spellQueries'
 import { BuffCoordinator } from './buffs'
 import { CombatFeed } from './combat'
 import { MoteCatchUp } from './moteCatchUp'
+import { IDLE_POLL_MS, LIVE_POLL_MS, LogFollower } from './logFollower'
 import { Throttled } from '../../core/throttle'
 import type { EngineFeature } from './feature'
 import type { AppSettings, ArchiveStatus, CharacterSettings, FeedItem, Notification, SpellRule, WatchStatus } from '../../shared/types'
@@ -34,23 +34,9 @@ import type { TailerStats } from '../../core/tailer'
 
 export type { EngineEnv, EngineOutputs, EngineStore, MoteView, Speaker } from './contracts'
 
-/** How often the log is looked at: while the game runs, and while it does not. */
-const LIVE_POLL_MS = 100
-const IDLE_POLL_MS = 1000
 /** The engine's clock: timers, cues and pushes go on its laps. */
 const TICK_MS = 200
 export type { EngineFeature } from './feature'
-
-interface Tail {
-  tailer: LogTailer
-  logFile: string
-  /** The size when the tailer attached: it reads on from there. -1 until its first look. */
-  start: number
-  /** Just past the last line it gave. -1 until it has given one. */
-  end: number
-  /** Keeps the lines' times in order across the hour the clocks go back. */
-  clock: LogClock
-}
 
 /**
  * Everything that follows the log: it watches the character's log and hands each line to the spell
@@ -88,20 +74,13 @@ export class Engine {
   /** What follows the log, in the order each line, tick and change of character reaches it (see buildFeatures). */
   private readonly features: EngineFeature[]
 
-  private tail: Tail | null = null
+  /** The watched log, followed (logFollower.ts). */
+  private readonly follower: LogFollower
   /** Bumped by every start and stop, so a start overtaken while it waited gives up. */
   private watchGen = 0
   private starting = false
   /** The log last watched, to tell a switch of character from a restart of the same log. */
   private watchedLog = ''
-  private missing = false
-  /** The tailer has said the log keeps failing to read, and has not said it reads again. */
-  private readFailing = false
-  /** Lines (or laps) a part threw on this run, and when each part was last said in main.log. */
-  private lineFailures = 0
-  private readonly featureWarned = new Map<string, number>()
-  /** When a part last threw: its error leaves the status a minute after. */
-  private lineErrorAt = 0
   private tickTimer: NodeJS.Timeout | null = null
   private archiveTimer: NodeJS.Timeout | null = null
   /** Pasted test lines must not add to the real mote history or stock. */
@@ -180,18 +159,31 @@ export class Engine {
       motes: () => this.motes,
       stock: this.stock,
       tail: {
-        logFile: () => this.tail?.logFile ?? '',
+        logFile: () => this.follower.tail?.logFile ?? '',
         position: () => {
-          const t = this.tail
+          const t = this.follower.tail
           return !t ? -1 : t.end >= 0 ? t.end : t.start
         },
-        settling: () => this.starting || (!!this.tail && this.tail.start < 0)
+        settling: () => this.starting || (!!this.follower.tail && this.follower.tail.start < 0)
       },
       archiveDir: () => this.archives.archiveDir(),
       gameRunning: () => this.archive.gameRunning,
       changed: () => this.motesOut.mark()
     })
     this.features = this.buildFeatures()
+    this.follower = new LogFollower({
+      status: this.status,
+      features: this.features,
+      pushFeed: (kind, text) => this.pushFeed(kind, text),
+      emitStatus: () => this.emitStatus(),
+      statusChanged: () => this.statusOut.mark(),
+      lines: () => this.notifier.playing(Date.now()),
+      // A new timer's bar goes out with its line, not at the next lap of the clock (LT-353).
+      linesDone: () => this.timersOut.tick(Date.now()),
+      attached: (logFile, size) => this.moteHistory.attached(logFile, size),
+      reset: (logFile, reason) => this.moteHistory.tailReset(logFile, reason),
+      archiving: () => this.archive.busy
+    })
   }
 
   /**
@@ -416,25 +408,7 @@ export class Engine {
     this.triggers.load(this.store.triggers.get(), this.status.character)
     this.status.zone = zone
     this.tracker?.setZone(zone)
-    this.missing = false
-    const tail: Tail = {
-      logFile,
-      start: -1,
-      end: -1,
-      clock: new LogClock(Date.now),
-      tailer: new LogTailer(logFile, {
-        startAtEnd: true,
-        pollMs: this.env.pollMs ?? (this.archive.gameRunning ? LIVE_POLL_MS : IDLE_POLL_MS),
-        onLines: (lines, end) => this.tail === tail && this.onLines(tail, lines, end),
-        onReset: (reason, skipped) => this.tail === tail && this.onTailReset(tail, reason, skipped),
-        onMissing: () => this.tail === tail && this.onTailMissing(tail),
-        onSize: (size) => this.tail === tail && this.onTailSize(tail, size),
-        onError: (e, where) => this.tail === tail && this.onTailError(e, where),
-        onRecovered: () => this.tail === tail && this.onTailRecovered()
-      })
-    }
-    this.tail = tail
-    tail.tailer.start()
+    this.follower.follow(logFile, this.env.pollMs ?? (this.archive.gameRunning ? LIVE_POLL_MS : IDLE_POLL_MS))
     this.status.watching = true
     // Until a line comes, the last one is the file's last write: "Last line 5m ago", not "never".
     this.status.lastLineAt = (await fs.stat(logFile).catch(() => null))?.mtimeMs ?? 0
@@ -445,7 +419,7 @@ export class Engine {
 
   /** Recent fights from the log (see CombatFeed.seed). */
   async seedCombat(minutes = this.settings.combat.historyMinutes): Promise<void> {
-    const t = this.tail
+    const t = this.follower.tail
     if (!t) return
     const gen = this.watchGen
     const after = this.startupRead
@@ -464,7 +438,7 @@ export class Engine {
     if (this.combat.backlog.active) return Promise.resolve()
     return jobs.run('combat', `Reading the last ${minutes} minutes of the log into the meter`, async (job) => {
       this.combat.reset()
-      const t = this.tail
+      const t = this.follower.tail
       if (!t) return
       const gen = this.watchGen
       await this.combat.seed(
@@ -483,111 +457,9 @@ export class Engine {
 
   private stopTail(): void {
     this.starting = false
-    this.tail?.tailer.stop()
-    this.tail = null
+    this.follower.stop()
     if (this.status.watching) this.pushFeed('info', 'Stopped watching')
     this.status.watching = false
-    this.emitStatus()
-  }
-
-  private onTailSize(t: Tail, size: number): void {
-    if (t.start < 0) {
-      t.start = size
-      this.moteHistory.attached(t.logFile, size)
-    }
-    if (this.missing) {
-      this.missing = false
-      this.status.watching = true
-      this.pushFeed('info', `${basename(t.logFile)} is back; watching it again.`)
-      this.statusOut.mark()
-    }
-    if (size !== this.status.logSize) this.statusOut.mark()
-    this.status.logSize = size
-  }
-
-  private onTailReset(t: Tail, reason: 'truncated' | 'replaced', skipped: boolean): void {
-    t.end = skipped ? -1 : 0
-    this.moteHistory.tailReset(t.logFile, reason)
-    if (skipped) {
-      // Old play, not new: replayed, every trigger in it would speak and every cast start a timer.
-      this.pushFeed('info', `${reason === 'replaced' ? 'Another file took the log’s place' : 'The log was cut short'}, already holding earlier play; reading on from its end.`)
-      return
-    }
-    this.pushFeed('info', reason === 'replaced' ? 'A new log file was started.' : 'The log was truncated; reading from the top.')
-  }
-
-  private onTailMissing(t: Tail): void {
-    this.missing = true
-    this.status.watching = false
-    const text = `${basename(t.logFile)} is gone (moved or deleted). Waiting for the game to write it again.`
-    // Archiving moves the log away on purpose; the game starts a new one at its next line.
-    this.pushFeed(this.archive.busy ? 'info' : 'warn', text)
-    this.emitStatus()
-  }
-
-  private onLines(t: Tail, lines: string[], end: number): void {
-    t.end = end
-    this.notifier.playing(Date.now())
-    for (const raw of lines) {
-      const line = t.clock.parse(raw)
-      if (!line) continue
-      for (const f of this.features) {
-        if (!f.line) continue
-        try {
-          f.line(line)
-        } catch (e) {
-          this.featureFailed(f, 'a line', e)
-        }
-      }
-    }
-    for (const f of this.features) {
-      try {
-        f.linesRead?.(t.logFile, end)
-      } catch (e) {
-        this.featureFailed(f, 'where the log is read to', e)
-      }
-    }
-    // A new timer's bar goes out with its line, not at the next lap of the clock (LT-353).
-    this.timersOut.tick(Date.now())
-  }
-
-  /**
-   * One part that throws loses that line (or lap) to itself only: every other part still gets it
-   * (LT-340). Said in main.log at most once a minute a part, and on the chat log's Data Sources row
-   * until a minute goes by without another.
-   */
-  private featureFailed(f: EngineFeature, what: string, e: unknown): void {
-    const now = Date.now()
-    this.lineFailures++
-    if (now - (this.featureWarned.get(f.id) ?? 0) >= 60_000) {
-      this.featureWarned.set(f.id, now)
-      log.warn(`The ${f.id} part failed on ${what} (${this.lineFailures} failure${this.lineFailures === 1 ? '' : 's'} this run):`, e)
-    }
-    this.lineErrorAt = now
-    const text = `The ${f.id} part failed on ${what}: ${e instanceof Error ? e.message : String(e)}`
-    if (this.status.logError !== text && !this.readFailing) {
-      this.status.logError = text
-      this.emitStatus()
-    }
-  }
-
-  private onTailError(e: unknown, where: 'read' | 'lines'): void {
-    if (where === 'lines') {
-      // Each part's own failures are caught in onLines; this is the wiring itself.
-      log.warn('Handling log lines failed:', e)
-      return
-    }
-    this.readFailing = true
-    log.warn('Reading the log keeps failing:', e)
-    this.status.logError = `Reading the log keeps failing: ${e instanceof Error ? e.message : String(e)}`
-    this.pushFeed('warn', `${this.status.logError}. Still trying.`)
-    this.emitStatus()
-  }
-
-  private onTailRecovered(): void {
-    this.readFailing = false
-    this.status.logError = undefined
-    this.pushFeed('info', 'The log reads again.')
     this.emitStatus()
   }
 
@@ -651,24 +523,20 @@ export class Engine {
       try {
         f.tick?.(now)
       } catch (e) {
-        this.featureFailed(f, 'a lap of the clock', e)
+        this.follower.failed(f, 'a lap of the clock', e)
       }
     }
-    if (this.lineErrorAt && !this.readFailing && now - this.lineErrorAt > 60_000) {
-      this.lineErrorAt = 0
-      this.status.logError = undefined
-      this.emitStatus()
-    }
+    this.follower.tick(now)
   }
 
   /** Lines or laps a part threw on this run (diagnostics). */
   get failures(): number {
-    return this.lineFailures
+    return this.follower.failures
   }
 
   /** The watched log's tailer's counts, or null when none is watched. */
   get tailerStats(): TailerStats | null {
-    return this.tail?.tailer.stats ?? null
+    return this.follower.tail?.tailer.stats ?? null
   }
 
   /**
@@ -775,13 +643,13 @@ export class Engine {
     this.board.clear()
     this.motes.gameClosed(Date.now())
     this.archives.set({ gameRunning: false })
-    this.tail?.tailer.setPollMs(this.env.pollMs ?? IDLE_POLL_MS)
+    this.follower.setPollMs(this.env.pollMs ?? IDLE_POLL_MS)
     this.pushFeed('info', n ? `The game closed; cleared ${n} timer${n === 1 ? '' : 's'}.` : 'The game closed.')
   }
 
   gameStarted(): void {
     this.archives.set({ gameRunning: true })
-    this.tail?.tailer.setPollMs(this.env.pollMs ?? LIVE_POLL_MS)
+    this.follower.setPollMs(this.env.pollMs ?? LIVE_POLL_MS)
     this.pushFeed('info', 'The game is running.')
   }
 
