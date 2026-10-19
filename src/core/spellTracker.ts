@@ -440,6 +440,8 @@ export class SpellTracker {
     // Most lines reach here, so the board is walked without copying it.
     for (const t of this.board.values()) {
       if (t.source !== 'spell' || t.target !== SELF || !t.spell) continue
+      // Another's buff on you (BuffWatch's `buff:` bar) ends with BuffWatch's own fade, and is not spoken as a DoT's (LT-511).
+      if (t.key.startsWith('buff:')) continue
       const s = this.book.named(t.spell)
       if (s?.fade && s.fade === text) {
         this.board.end(t.key, 'faded')

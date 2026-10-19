@@ -119,6 +119,12 @@ describe('Slayer plan: the goals', () => {
   it('leaves out what the metas hold only as optional, and counts the kills since the export', () => {
     expect([...optionalSlayer(sections)]).toEqual(['sarnak slayer'])
     const goals = slayerGoals(counters, new Map([['orc stomp!', 30]]), optionalSlayer(sections))
+    // The game said it was done: the count is the total, whatever the kills since add up to (LT-529).
+    expect(slayerGoals(counters, new Map([['orc stomp!', 30]]), optionalSlayer(sections), new Map(), new Set(['orc stomp!']))[0]).toMatchObject({
+      name: 'Orc Stomp!',
+      count: 5000,
+      max: 5000
+    })
     expect(goals.find((g) => g.name === 'Orc Stomp!')).toMatchObject({ count: 4930, max: 5000, optional: false })
     expect(goals.find((g) => g.name === 'Sarnak Slayer')?.optional).toBe(true)
     const names = (ids: number[]) => ids.map((i) => goals[i].name)
@@ -185,6 +191,30 @@ describe('Slayer plan: a race’s pace is its own stretches’', () => {
   it('takes the zone as a whole for stretches too short to tell, or tallies kept before stretches were', () => {
     expect(killStretches({ ...stonebrunt, runs: [{ sec: 120, mobs: { 'a kejekan mamluk': 6 } }] }, place).map((x) => x.whole)).toEqual([true])
     expect(killStretches({ ...stonebrunt, runs: undefined }, place)).toEqual([expect.objectContaining({ sec: 6000, whole: true, about: expect.arrayContaining([0, 1, 2, 3]) })])
+  })
+
+  it('sets no pace on a mob killed once or twice: a named kill in a stretch of others is no camp for its race (LT-528)', () => {
+    // Forty minutes of kejekan with one Trooper Kraer among them (goal 4): the kejekan's camp, nothing for the trooper's race.
+    const g = (name: string): SlayerGoal => ({ name, section: 'Slayer: Special', races: '', count: 0, max: 1000, optional: false, tier: 1 })
+    const withNamed = {
+      ...stonebrunt,
+      mobs: mobs({ 'a kejekan mamluk': 30, 'a kejekan ghulam': 30, 'Trooper Kraer': 1 }),
+      runs: [{ sec: 2400, mobs: { 'a kejekan mamluk': 30, 'a kejekan ghulam': 30, 'Trooper Kraer': 1 } }] as KillRun[]
+    }
+    const placeAll = (m: string) => (m === 'Trooper Kraer' ? [4] : (goalsOf[m] ?? []))
+    const camps = buildCamps(
+      [g('Catnipped In the Bud'), g('Monkey Business'), g("Puttin' On The Dog"), g('Strange Weather'), g('Mostly Kunzar')],
+      races,
+      { 'The Stonebrunt Mountains': withNamed },
+      placeAll,
+      () => null,
+      new Map(),
+      [],
+      undefined,
+      []
+    ).filter((c) => c.source === 'log')
+    expect(camps.map((c) => [c.id, Object.keys(c.pace).map(Number)])).toEqual([['log:The Stonebrunt Mountains', [0]]])
+    expect(camps[0].kinds.map((k) => k.name)).toEqual(['a kejekan mamluk', 'a kejekan ghulam'])
   })
 
   it('makes each a camp: kejekan at their own ninety an hour, not sixty over the zone’s hour and forty', () => {

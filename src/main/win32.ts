@@ -8,6 +8,7 @@ import { log } from './log'
 
 interface Api {
   GetForegroundWindow: () => unknown
+  GetWindowRect: (hwnd: unknown, rect: Record<string, number>) => boolean
   GetWindowThreadProcessId: (hwnd: unknown, pid: number[]) => number
   OpenProcess: (access: number, inherit: boolean, pid: number) => unknown
   QueryFullProcessImageNameW: (h: unknown, flags: number, buf: Buffer, size: number[]) => boolean
@@ -28,6 +29,7 @@ function load(): Api | null {
     const user32 = koffi.load('user32.dll')
     const kernel32 = koffi.load('kernel32.dll')
     const advapi32 = koffi.load('advapi32.dll')
+    koffi.struct('RECT', { left: 'int32', top: 'int32', right: 'int32', bottom: 'int32' })
     const ENTRY = koffi.struct('PROCESSENTRY32W', {
       dwSize: 'uint32',
       cntUsage: 'uint32',
@@ -42,6 +44,7 @@ function load(): Api | null {
     })
     api = {
       GetForegroundWindow: user32.func('void* __stdcall GetForegroundWindow()'),
+      GetWindowRect: user32.func('bool __stdcall GetWindowRect(void *hwnd, _Out_ RECT *rect)'),
       GetWindowThreadProcessId: user32.func('uint32 __stdcall GetWindowThreadProcessId(void *hwnd, _Out_ uint32 *pid)'),
       OpenProcess: kernel32.func('void* __stdcall OpenProcess(uint32 access, bool inherit, uint32 pid)'),
       QueryFullProcessImageNameW: kernel32.func('bool __stdcall QueryFullProcessImageNameW(void *h, uint32 flags, _Out_ uint8_t *buf, _Inout_ uint32 *size)'),
@@ -108,6 +111,19 @@ export function foregroundPid(): number {
     const pid = [0]
     w.GetWindowThreadProcessId(hwnd, pid)
     return pid[0]
+  })
+}
+
+/** Where the foreground window is, in physical screen pixels; null when there is none or Windows will not say. */
+export function foregroundWindowRect(): { x: number; y: number; width: number; height: number } | null {
+  const w = load()
+  if (!w) return null
+  return safely<{ x: number; y: number; width: number; height: number } | null>('foreground window rect', null, () => {
+    const hwnd = w.GetForegroundWindow()
+    if (isNull(hwnd)) return null
+    const r: Record<string, number> = {}
+    if (!w.GetWindowRect(hwnd, r)) return null
+    return { x: r.left, y: r.top, width: r.right - r.left, height: r.bottom - r.top }
   })
 }
 

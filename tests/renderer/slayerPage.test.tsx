@@ -148,6 +148,8 @@ it('draws the plan, the lockouts beside it, and keeps a camp ruled out', async (
   for (let i = 0; i < 10 && !host.textContent?.includes('step by step'); i++) await act(async () => new Promise((r) => setTimeout(r, 20)))
   const text = host.textContent ?? ''
   expect(text).toContain('The plan, step by step')
+  // The headline's kills are the steps' own, the lockouts' beside them (LT-563).
+  expect(text).toContain('2 achievements to go, 100 kills in the steps, 10 by the lockouts')
   expect(text).toContain('Clan Crushbone')
   // What the step is there for, and what to kill for it.
   expect(text).toContain('Orc Stomp! 4,900 / 5,000+100 done · an orc pawn ×100')

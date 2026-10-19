@@ -160,7 +160,8 @@ interface SlotState {
  * re-arm point before it is said for them again, so a rez at low health is not taken for a fall.
  */
 export class GroupHealthAlarm {
-  private slots: SlotState[] = []
+  /** Each row's state by its key: its top edge on the screen where the rows are known, else its index. */
+  private slots = new Map<number, SlotState>()
 
   constructor(
     private belowPct: number,
@@ -174,16 +175,23 @@ export class GroupHealthAlarm {
 
   /** The group window is gone or changed: everyone starts over. */
   reset(): void {
-    this.slots = []
+    this.slots.clear()
   }
 
-  /** Each row's fill (0 to 1, or null when it could not be read) → the members to say. */
-  update(fills: (number | null)[]): LowHealth[] {
+  /**
+   * Each row's fill (0 to 1, or null when it could not be read) → the members to say. With `keys`
+   * (each row's top edge), a row keeps its state while it stays where it was, through a window over
+   * it or a row added below (LT-550); rows no longer there are forgotten.
+   */
+  update(fills: (number | null)[], keys?: number[]): LowHealth[] {
     const out: LowHealth[] = []
+    const keyOf = (i: number) => keys?.[i] ?? i
+    if (keys) for (const k of [...this.slots.keys()]) if (!keys.includes(k)) this.slots.delete(k)
     fills.forEach((fill, i) => {
       if (fill === null) return
       const pct = Math.round(fill * 100)
-      const s = (this.slots[i] ??= { fired: pct === 0, below: 0 })
+      let s = this.slots.get(keyOf(i))
+      if (!s) this.slots.set(keyOf(i), (s = { fired: pct === 0, below: 0 }))
       if (pct === 0) {
         s.fired = true
         s.below = 0

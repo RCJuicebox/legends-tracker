@@ -61,7 +61,7 @@ function shiftColours(): { amber: string; red: string } {
   return { amber: s.getPropertyValue('--amber').trim() || '#e0a03a', red: s.getPropertyValue('--red').trim() || '#ef5a4f' }
 }
 
-/** The system's "show fewer animations": the bars then step with the clock to the very end. */
+/** The system's "show fewer animations": the bars then step four times a second to the very end, never ten. */
 function useReducedMotion(): boolean {
   const [reduced, setReduced] = useState(() => matchMedia('(prefers-reduced-motion: reduce)').matches)
   useEffect(() => {
@@ -79,7 +79,7 @@ type Phase = 'run' | 'near' | 'warn' | 'end' | 'end-warn' | 'over'
 function phaseOf(t: TimerView, now: number, reduced: boolean): Phase {
   const left = t.endsAt - now
   if (left < 0) return 'over'
-  // A warning pulses; the last twelve seconds glide, unless fewer animations are asked for.
+  // A warning pulses; the last twelve seconds step at 10 Hz, unless fewer animations are asked for.
   const warning = t.warnSec > 0 && left <= t.warnSec * 1000
   if (!reduced && left <= SHIFT_MS) return warning ? 'end-warn' : 'end'
   if (warning) return 'warn'
@@ -90,11 +90,12 @@ function phaseOf(t: TimerView, now: number, reduced: boolean): Phase {
 /**
  * The bar drains in steps, set where it stands at each tick of the clock: a bar that moves a third
  * of a pixel a second is not worth an animation frame (LT-339: a sixth of the cost with five bars
- * up). Its last twelve seconds glide: one animation of the fill and edge to the end, and the bar's
- * colour (the track's `color`, which the fill and edge paint with) running to amber and then red.
+ * up). Its last twelve seconds step ten times a second, and the bar's colour (the track's `color`,
+ * which the fill and edge paint with) turns amber at six seconds and red at the end: a glide at the
+ * display's rate cost a third of a core whenever any bar was in its last twelve seconds (LT-548).
  * The fill is scaled and its bright edge slid, rather than resized, so neither costs layout. With
- * fewer animations asked for, the bar steps to the very end, turning amber and then red in two
- * steps. An overdue bar is full, striped.
+ * fewer animations asked for, the bar steps four times a second to the very end. An overdue bar is
+ * full, striped.
  */
 function TimerBar({ t, showTarget }: { t: TimerView; showTarget: boolean }) {
   const reduced = useReducedMotion()
@@ -105,11 +106,10 @@ function TimerBar({ t, showTarget }: { t: TimerView; showTarget: boolean }) {
   const time = useRef<HTMLSpanElement>(null)
   const [iconOk, setIconOk] = useState(true)
   const overdue = phase === 'over'
-  const glide = phase === 'end' || phase === 'end-warn'
   const warning = phase === 'warn' || phase === 'end-warn'
 
-  // Each tick: the time, the fill where it stands (unless it glides), and the phase, which renders
-  // only when it changes. Set before the first paint, so a new bar never flashes full.
+  // Each tick: the time, the fill where it stands, and the phase, which renders only when it
+  // changes. Set before the first paint, so a new bar never flashes full.
   useLayoutEffect(() => {
     const step = (now: number) => {
       const left = t.endsAt - now
@@ -117,7 +117,6 @@ function TimerBar({ t, showTarget }: { t: TimerView; showTarget: boolean }) {
       setPhase(next)
       if (next === 'over') return
       if (time.current) time.current.textContent = clock(Math.max(0, left) / 1000)
-      if (next === 'end' || next === 'end-warn') return
       const part = Math.max(0, Math.min(1, Math.max(0, left) / Math.max(1, t.endsAt - t.startedAt)))
       if (fill.current) fill.current.style.transform = `scaleX(${part})`
       if (edge.current) edge.current.style.transform = `translateX(${(part - 1) * 100}%)`
@@ -127,23 +126,9 @@ function TimerBar({ t, showTarget }: { t: TimerView; showTarget: boolean }) {
       }
     }
     step(Date.now())
-    return onClock(phase === 'run' ? 500 : 250, step)
+    // The last twelve seconds step at 10 Hz; close to the warning, four times a second, so it lands on time.
+    return onClock(phase === 'run' ? 500 : phase === 'end' || phase === 'end-warn' ? 100 : 250, step)
   }, [t, reduced, phase])
-
-  useEffect(() => {
-    if (!glide) return
-    const timing: KeyframeAnimationOptions = { duration: Math.max(1, t.endsAt - t.startedAt), easing: 'linear', fill: 'forwards' }
-    const runs = [
-      fill.current?.animate([{ transform: 'scaleX(1)' }, { transform: 'scaleX(0)' }], timing),
-      edge.current?.animate([{ transform: 'translateX(0)' }, { transform: 'translateX(-100%)' }], timing)
-    ]
-    const at = Date.now()
-    for (const r of runs) if (r) r.currentTime = Math.max(0, at - t.startedAt)
-    const { amber, red } = shiftColours()
-    const shift = track.current?.animate([{ color: t.color }, { color: amber }, { color: red }], { duration: SHIFT_MS, easing: 'linear', fill: 'both' })
-    if (shift) shift.currentTime = Math.max(0, at - (t.endsAt - SHIFT_MS))
-    return () => [...runs, shift].forEach((r) => r?.cancel())
-  }, [glide, t.startedAt, t.endsAt, t.color])
 
   return (
     <div className={`timer${warning ? ' warning' : ''}${overdue ? ' overdue' : ''}`} style={{ ['--c' as string]: t.color }}>

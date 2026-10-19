@@ -68,6 +68,14 @@
   "build": {
     "appId": "com.rcjuicebox.legendstracker",
     "productName": "Legends Tracker",
+    "electronFuses": {
+      "runAsNode": false,
+      "enableCookieEncryption": true,
+      "enableNodeOptionsEnvironmentVariable": false,
+      "enableNodeCliInspectArguments": false,
+      "enableEmbeddedAsarIntegrityValidation": true,
+      "onlyLoadAppFromAsar": true
+    },
     "copyright": "Copyright © 2026 RCJuicebox",
     "directories": {
       "output": "dist",

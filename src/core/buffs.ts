@@ -15,6 +15,8 @@
 // Offers are keyed by the spell file's own names: Rune I to Rune IV are four enchanter spells, not
 // ranks of one (Legends prints its ranks after the name: "Rune I III").
 
+import type { CharacterSettings } from '../shared/types'
+import { CLASS_NAMES } from '../shared/game/classes'
 import { LEVEL_CAP } from '../shared/game/levels'
 import { CLASS_NUMBER, type ClassId } from '../shared/game/classes'
 import { isSong } from './spellKinds'
@@ -301,6 +303,20 @@ interface Cast {
   spell: Spell
   rank: number
   at: number
+}
+
+/**
+ * How long a buff lasts when nobody was seen casting it (out of range, or the log missed it): as the
+ * character's own cast when one of its classes casts the spell, else unknown (null), so the buff stays
+ * until its fade line rather than being dropped twelve seconds after an unfocused level-50 guess, which
+ * ran forty minutes short of the real fade for two buffs in three (LT-510).
+ */
+export function unseenBuffSeconds(spell: Spell, character: Pick<CharacterSettings, 'classLevels'>, own: (spell: Spell) => number | null): number | null {
+  const casts = CLASS_NAMES.some((name, i) => {
+    const req = spell.classLevels[i]
+    return req > 0 && req < 255 && (character.classLevels[name] ?? 0) >= req
+  })
+  return casts ? own(spell) : null
 }
 
 /** A cast lands within its cast time plus this: lag, and the tick it lands in. */

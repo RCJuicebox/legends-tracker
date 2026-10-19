@@ -183,14 +183,14 @@ export class LiveAchievements implements AppFeature {
     const read = readJsonFile(path)
     // Checked as it is read: a plan kept in an older shape would otherwise throw on every faction line.
     const value: Record<string, Followed> = read.state === 'ok' ? sanitizeFollows(read.value) : {}
-    this.follows = new JsonFile(path, value, { delayMs: 3000, pretty: false })
+    this.follows = new JsonFile(path, value, { delayMs: 3000, pretty: false, backup: true })
     if (read.state === 'unreadable') this.follows.freeze('could not be read at start')
     const keptPath = join(cacheDir(), 'slayer-since.json')
     const kept = readJsonFile(keptPath)
     this.keptSlayer = new JsonFile<KeptSlayer | null>(keptPath, kept.state === 'ok' ? keptSlayer(kept.value) : null, { delayMs: 10_000, pretty: false })
     const factsPath = join(ctx.store.dir, 'slayer-facts.json')
     const facts = readJsonFile(factsPath)
-    this.facts = new JsonFile(factsPath, factsFile(facts.state === 'ok' ? facts.value : null), { delayMs: 3000, pretty: false })
+    this.facts = new JsonFile(factsPath, factsFile(facts.state === 'ok' ? facts.value : null), { delayMs: 3000, pretty: false, backup: true })
     if (facts.state === 'unreadable') this.facts.freeze('could not be read at start')
     void this.races.ready()
   }

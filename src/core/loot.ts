@@ -12,12 +12,13 @@ import type { ItemInfo } from '../shared/types'
 //   You looted a Fetid Skin from a fetid fiend's corpse and sold it for 6 gold, 7 silver and 9 copper.
 //   You looted a Crystallized Sulfur from an ire ghast's corpse and stored it in your tradeskill depot
 //   You looted a Mote of Major Potential from a loathling lich's corpse and stored it in your currency
+//   You looted an Apothic Crown +4 from a spite golem's corpse and stored it in your Dragon Hoard
 //   You looted an Indicolite Bracer +4 from Reward Chest to create an Indicolite Bracer +6
 //   You receive 4 platinum, 2 gold, 9 silver and 8 copper from the corpse.
 //   You receive 6 gold from Zok Zribb.                                      (a sale)
 //   You receive 2 gold and 3 silver as your split.     (EQEmu's group split; none in months of EQL group play)
 
-export type LootOutcome = 'kept' | 'sold' | 'depot' | 'currency' | 'merged'
+export type LootOutcome = 'kept' | 'sold' | 'depot' | 'currency' | 'hoard' | 'merged'
 
 export interface LootEvent {
   kind: 'loot'
@@ -44,11 +45,13 @@ export interface CoinEvent {
   bag: boolean
 }
 
-const RE_AUTO = /^You looted (a|an|\d+) (.+?) from (.+?) and (?:sold it for (.+?)\.|stored it in your (tradeskill depot|currency)\.?)$/
+const RE_AUTO = /^You looted (a|an|\d+) (.+?) from (.+?) and (?:sold it for (.+?)\.|stored it in your (tradeskill depot|currency|Dragon Hoard)\.?)$/
 const RE_MERGE = /^You looted (a|an|\d+) (.+?) from (.+?) to create (?:a|an) (.+?)\.?$/
 const RE_KEPT = /^--(You have|(.+?) has) looted (a|an|\d+) (.+?) from (.+?)\.--$/
 const RE_COIN_CORPSE = /^You receive (.+?) from the corpse\.$/
 const RE_COIN_BAG = /^You receive\s+(.+?) from (.+?) for the contents of your bag\.$/
+/** "You receive 4 gold 7 silver 6 copper from Melixis for the Large Cloth Shirt(s).": a stack sold, the merchant before "for the". */
+const RE_COIN_STACK = /^You receive (.+?) from (.+?) for the (.+?)\.$/
 const RE_COIN_SALE = /^You receive (.+?) from (.+?)\.$/
 const RE_COIN_SPLIT = /^You receive (.+?) as your split\.$/
 
@@ -88,7 +91,7 @@ export function parseLootLine(text: string): LootEvent | CoinEvent | null {
   let m: RegExpExecArray | null
   if (text.startsWith('You looted ')) {
     if ((m = RE_AUTO.exec(text))) {
-      const outcome: LootOutcome = m[5] === 'tradeskill depot' ? 'depot' : m[5] === 'currency' ? 'currency' : 'sold'
+      const outcome: LootOutcome = m[5] === 'tradeskill depot' ? 'depot' : m[5] === 'currency' ? 'currency' : m[5] === 'Dragon Hoard' ? 'hoard' : 'sold'
       return { kind: 'loot', looter: SELF, item: m[2], count: count(m[1]), source: sourceName(m[3]), outcome, copper: m[4] && m[4] !== 'free' ? parseCoin(m[4]) : 0 }
     }
     if ((m = RE_MERGE.exec(text))) return { kind: 'loot', looter: SELF, item: m[2], count: count(m[1]), source: sourceName(m[3]), outcome: 'merged', copper: 0, into: m[4] }
@@ -101,6 +104,7 @@ export function parseLootLine(text: string): LootEvent | CoinEvent | null {
   if (text.startsWith('You receive ')) {
     if ((m = RE_COIN_CORPSE.exec(text)) || (m = RE_COIN_SPLIT.exec(text))) return { kind: 'coin', copper: parseCoin(m[1]), from: 'corpse', bag: false }
     if ((m = RE_COIN_BAG.exec(text))) return { kind: 'coin', copper: parseCoin(m[1]), from: m[2], bag: true }
+    if ((m = RE_COIN_STACK.exec(text)) && /\d+ (?:platinum|gold|silver|copper)/.test(m[1])) return { kind: 'coin', copper: parseCoin(m[1]), from: m[2], bag: false }
     if ((m = RE_COIN_SALE.exec(text)) && /\d+ (?:platinum|gold|silver|copper)/.test(m[1])) return { kind: 'coin', copper: parseCoin(m[1]), from: m[2], bag: false }
   }
   return null

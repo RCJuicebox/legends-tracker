@@ -1,5 +1,7 @@
 import { app } from 'electron'
 import electronUpdater from 'electron-updater'
+import { promises as fs, writeFileSync } from 'node:fs'
+import { join } from 'node:path'
 import { log } from './log'
 import type { UpdateState } from '../shared/runtime'
 import { notesText } from '../core/releaseNotes'
@@ -18,6 +20,10 @@ const CHECK_EVERY_MS = 60 * 60 * 1000
 export class Updater {
   status: UpdateState = app.isPackaged ? { state: 'idle', checkedAt: 0 } : { state: 'dev' }
   private timer: NodeJS.Timeout | null = null
+  /** The installer electron-updater downloaded, as update-downloaded named it; '' when none is. */
+  private downloadedFile = ''
+  /** A version whose install was started last time and did not take: not restarted into by itself again (LT-597). */
+  private held = ''
 
   constructor(private readonly onStatus: (s: UpdateState) => void) {}
 
@@ -39,7 +45,11 @@ export class Updater {
       const s = this.status.state === 'downloading' ? this.status : { version: '', notes: undefined }
       this.set({ state: 'downloading', version: s.version, percent: Math.round(p.percent), notes: s.notes })
     })
-    autoUpdater.on('update-downloaded', (info) => this.set({ state: 'ready', version: info.version, notes: notesText(info.releaseNotes) }))
+    autoUpdater.on('update-downloaded', (info) => {
+      this.downloadedFile = info.downloadedFile ?? ''
+      this.set({ state: 'ready', version: info.version, notes: notesText(info.releaseNotes) })
+    })
+    void this.checkPending()
     autoUpdater.on('error', (e) => {
       this.failed('Update failed:', e)
       this.set({ state: 'error', message: friendly(e) })
@@ -70,10 +80,61 @@ export class Updater {
     log.warn(what, e)
   }
 
-  /** Restarts into the downloaded version. */
+  /**
+   * Whether the downloaded installer is still where electron-updater put it: a virus scanner may have
+   * taken it, and electron-updater quits before it learns the spawn failed, which ended the app for good
+   * (LT-597). When it is gone the state says so, and the next check downloads it again.
+   */
+  async installerPresent(): Promise<boolean> {
+    if (!this.downloadedFile) return true
+    try {
+      await fs.access(this.downloadedFile)
+      return true
+    } catch {
+      log.warn(`The downloaded installer is gone: ${this.downloadedFile}`)
+      this.downloadedFile = ''
+      this.set({ state: 'error', message: 'The downloaded installer is gone (a virus scanner may have removed it). It will be downloaded again at the next check.' })
+      return false
+    }
+  }
+
+  /** Whether restarting into this version by itself is held off: its install was started before and the app came back on the old version. */
+  heldBack(version: string): boolean {
+    return !!version && version === this.held
+  }
+
+  private pendingPath(): string {
+    return join(app.getPath('userData'), 'pending-install.json')
+  }
+
+  /** The install started last time, if any: when the app is still the old version, it did not take. */
+  private async checkPending(): Promise<void> {
+    let path: string
+    let pending: { version?: unknown } | null = null
+    try {
+      path = this.pendingPath()
+      pending = JSON.parse(await fs.readFile(path, 'utf8')) as { version?: unknown }
+    } catch {
+      return
+    }
+    await fs.rm(path, { force: true }).catch(() => undefined)
+    const version = typeof pending?.version === 'string' ? pending.version : ''
+    if (!version || version === app.getVersion()) return
+    this.held = version
+    log.warn(
+      `The install of ${version} was started last time and did not take (this is ${app.getVersion()}): it is not restarted into by itself again; Restart and update in Settings tries once more`
+    )
+  }
+
+  /** Restarts into the downloaded version. A marker says so, for the next start to know whether it took. */
   install(): void {
     if (this.status.state !== 'ready') return
     log.info(`Restarting to install ${this.status.version}`)
+    try {
+      writeFileSync(this.pendingPath(), JSON.stringify({ version: this.status.version, at: Date.now() }), 'utf8')
+    } catch (e) {
+      log.warn('Could not note the pending install', e)
+    }
     electronUpdater.autoUpdater.quitAndInstall(true, true)
   }
 

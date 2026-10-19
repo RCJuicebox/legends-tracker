@@ -13,14 +13,14 @@ export function Effects({ step, labels }: { step: PlanStep; labels?: Record<stri
   return (
     <>
       {step.unlocks.map((u) => (
-        <Tip key={u} className="chip ok fp-unlock" text={`${u}: done here, so you can pick the race in Loadouts, and the plan may swap to it after`}>
+        <Tip key={u} className="chip will fp-unlock" text={`${u}: done here, so you can pick the race in Loadouts, and the plan may swap to it after`}>
           {u.replace(/^Race Unlock - /, '')} unlocked
         </Tip>
       ))}
       {step.finishes.map((f) => (
         <span
           key={f}
-          className="chip ok"
+          className="chip will"
           title={
             step.onTheWay[f]
               ? `Done here on the way: you locked it in to ${step.onTheWay[f]}, but this step gets it to 2000 first, so that is not needed for it`
@@ -56,8 +56,8 @@ export function Effects({ step, labels }: { step: PlanStep; labels?: Record<stri
         </Tip>
       ))}
       {step.lifts.map((f) => (
-        <Tip key={`up ${f}`} className="chip ok" text="Brought back from below zero here">
-          {f} back to 0+
+        <Tip key={`up ${f}`} className="chip will" text="Brought back from below zero here">
+          {f} → 0+
         </Tip>
       ))}
       {step.sinks.map((f) => (

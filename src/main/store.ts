@@ -108,8 +108,9 @@ export class Store {
     this.motesFresh = !motes
     this.motes = new JsonFile<MoteState>(p('motes.json'), motes ?? { active: null, sessions: [], daily: {} }, often)
     this.stock = new JsonFile<MoteStock>(p('mote-stock.json'), sanitizeMoteStock(read('mote-stock.json')), { delayMs: 3000 })
-    this.respawns = new JsonFile(p('respawns.json'), sanitizeRespawns(read('respawns.json')), often)
-    this.buffs = new JsonFile(p('buffs.json'), sanitizeBuffs(read('buffs.json')), often)
+    // What the log taught, kept in a copy too: respawns timed and buffs seen are not had again (LT-599).
+    this.respawns = new JsonFile(p('respawns.json'), sanitizeRespawns(read('respawns.json')), { ...often, backup: true })
+    this.buffs = new JsonFile(p('buffs.json'), sanitizeBuffs(read('buffs.json')), { ...often, backup: true })
 
     const byName: Record<string, JsonFile<unknown>> = {
       'settings.json': this.settings,

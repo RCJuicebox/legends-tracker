@@ -111,6 +111,16 @@ describe('the settings files on disk', () => {
     expect(existsSync(path)).toBe(true)
   })
 
+  it('reads the copy kept before the last run’s first write when the file itself will not read (LT-599)', () => {
+    const path = join(dir, 'respawns.json')
+    writeFileSync(path, '\0\0\0\0')
+    writeFileSync(join(dir, 'respawns.bak.json'), '{"kept": true}')
+    const r = readJsonFile(path, { now: new Date('2026-09-25T10:11:12.345Z') })
+    expect(r).toEqual({ state: 'ok', value: { kept: true }, restoredFrom: join(dir, 'respawns.bak.json') })
+    // The torn file is still set aside, not overwritten.
+    expect(existsSync(join(dir, 'respawns.corrupt-2026-09-25T10-11-12-345Z.json'))).toBe(true)
+  })
+
   it('moves an unreadable file aside rather than letting defaults overwrite it', () => {
     const path = join(dir, 'settings.json')
     writeFileSync(path, '{"installDir": "C:\\\\EQ", trunc')
@@ -162,6 +172,19 @@ describe('the settings files on disk', () => {
     f.flushSync()
     expect(JSON.parse(readFileSync(path, 'utf8'))).toEqual({ n: 2 })
     expect(readdirSync(dir).filter((n) => n.startsWith('y.'))).toEqual(['y.json'])
+  })
+
+  it('writes at the latest a while after the first change, however the changes keep coming (LT-599)', async () => {
+    const path = join(dir, 'busy.json')
+    const f = new JsonFile(path, { n: 0 }, { delayMs: 50, maxWaitMs: 120 })
+    const started = Date.now()
+    // A change every 20 ms for a quarter of a second: the 50 ms debounce alone would never write.
+    for (let i = 1; Date.now() - started < 250; i++) {
+      f.set({ n: i })
+      await new Promise((r) => setTimeout(r, 20))
+    }
+    expect(existsSync(path)).toBe(true)
+    await f.flush()
   })
 
   it('does not reject when the file cannot be written, and tries again at the next flush', async () => {

@@ -12,28 +12,63 @@ export interface Sheet {
   pixels: Buffer
 }
 
-/** A DXT5 (BC3) DDS, top-down RGBA. The game's item icon sheets are all this format. */
+/** The DDS pixel-format flags: a four-character code names a compressed format; RGB with masks is uncompressed. */
+const DDPF_ALPHAPIXELS = 0x1
+const DDPF_FOURCC = 0x4
+const DDPF_RGB = 0x40
+
+/**
+ * A DDS as the game's item icon sheets come, top-down RGBA: DXT5 (BC3), which 376 of the 379 sheets
+ * are; DXT3 (BC2, dragitem323); or uncompressed 32- or 24-bit RGB by its channel masks (dragitem9's
+ * A8R8G8B8, dragitem302's RGBA). Anything else is null (LT-600).
+ */
 export function decodeDds(d: Buffer): Sheet | null {
-  if (d.toString('latin1', 0, 4) !== 'DDS ' || d.toString('latin1', 84, 88) !== 'DXT5') return null
+  if (d.toString('latin1', 0, 4) !== 'DDS ') return null
   const height = d.readUInt32LE(12)
   const width = d.readUInt32LE(16)
+  const flags = d.readUInt32LE(80)
   const pixels = Buffer.alloc(width * height * 4)
+  // The code names a compressed format (whatever the flags say; a sheet written without them still reads).
+  const fourCC = d.toString('latin1', 84, 88)
+  if (fourCC === 'DXT5') decodeBlocks(d, width, height, pixels, bc3Alphas)
+  else if (fourCC === 'DXT3') decodeBlocks(d, width, height, pixels, bc2Alphas)
+  else if (flags & DDPF_FOURCC) return null
+  else if (flags & DDPF_RGB) {
+    if (!decodeMasked(d, width, height, pixels, !!(flags & DDPF_ALPHAPIXELS))) return null
+  } else return null
+  return { width, height, bpp: 4, topDown: true, pixels }
+}
+
+/** DXT5's alpha block: two endpoints and sixteen three-bit indices into their interpolation. */
+function bc3Alphas(d: Buffer, p: number): (i: number) => number {
+  const a0 = d[p]
+  const a1 = d[p + 1]
+  const alphas = [a0, a1]
+  if (a0 > a1) for (let i = 1; i < 7; i++) alphas.push(Math.round(((7 - i) * a0 + i * a1) / 7))
+  else {
+    for (let i = 1; i < 5; i++) alphas.push(Math.round(((5 - i) * a0 + i * a1) / 5))
+    alphas.push(0, 255)
+  }
+  let abits = 0n
+  for (let i = 0; i < 6; i++) abits |= BigInt(d[p + 2 + i]) << BigInt(8 * i)
+  return (i) => alphas[Number((abits >> BigInt(3 * i)) & 7n)]
+}
+
+/** DXT3's alpha block: sixteen four-bit values as they are. */
+function bc2Alphas(d: Buffer, p: number): (i: number) => number {
+  return (i) => {
+    const byte = d[p + (i >> 1)]
+    return ((i & 1 ? byte >> 4 : byte & 15) * 255) / 15
+  }
+}
+
+/** 4×4 blocks of eight alpha bytes then a four-colour block: two 5:6:5 endpoints and sixteen two-bit indices. */
+function decodeBlocks(d: Buffer, width: number, height: number, pixels: Buffer, alphasOf: (d: Buffer, p: number) => (i: number) => number): void {
   let p = 128
   const rgb565 = (c: number) => [(((c >> 11) & 31) * 255) / 31, (((c >> 5) & 63) * 255) / 63, ((c & 31) * 255) / 31]
   for (let by = 0; by < height; by += 4) {
     for (let bx = 0; bx < width; bx += 4) {
-      // Alpha: two endpoints and 16 three-bit indices.
-      const a0 = d[p]
-      const a1 = d[p + 1]
-      const alphas = [a0, a1]
-      if (a0 > a1) for (let i = 1; i < 7; i++) alphas.push(Math.round(((7 - i) * a0 + i * a1) / 7))
-      else {
-        for (let i = 1; i < 5; i++) alphas.push(Math.round(((5 - i) * a0 + i * a1) / 5))
-        alphas.push(0, 255)
-      }
-      let abits = 0n
-      for (let i = 0; i < 6; i++) abits |= BigInt(d[p + 2 + i]) << BigInt(8 * i)
-      // Colour: two 5:6:5 endpoints, always the four-colour mode in DXT5.
+      const alpha = alphasOf(d, p)
       const c0 = rgb565(d.readUInt16LE(p + 8))
       const c1 = rgb565(d.readUInt16LE(p + 10))
       const colours = [c0, c1, c0.map((v, i) => (2 * v + c1[i]) / 3), c0.map((v, i) => (v + 2 * c1[i]) / 3)]
@@ -47,12 +82,38 @@ export function decodeDds(d: Buffer): Sheet | null {
         pixels[o] = Math.round(c[0])
         pixels[o + 1] = Math.round(c[1])
         pixels[o + 2] = Math.round(c[2])
-        pixels[o + 3] = alphas[Number((abits >> BigInt(3 * i)) & 7n)]
+        pixels[o + 3] = Math.round(alpha(i))
       }
       p += 16
     }
   }
-  return { width, height, bpp: 4, topDown: true, pixels }
+}
+
+/** Uncompressed pixels, 24 or 32 bits each, the channels where the header's masks put them; false for another depth. */
+function decodeMasked(d: Buffer, width: number, height: number, pixels: Buffer, hasAlpha: boolean): boolean {
+  const bits = d.readUInt32LE(88)
+  if (bits !== 24 && bits !== 32) return false
+  const masks = [d.readUInt32LE(92), d.readUInt32LE(96), d.readUInt32LE(100), hasAlpha ? d.readUInt32LE(104) : 0]
+  const channel = (v: number, mask: number) => {
+    if (!mask) return 255
+    const shift = 31 - Math.clz32(mask & -mask)
+    let n = 0
+    for (let m = mask >>> 0; m; m >>>= 1) n += m & 1
+    return Math.round((((v & mask) >>> shift) * 255) / ((1 << n) - 1))
+  }
+  const bytes = bits / 8
+  let p = 128
+  for (let y = 0; y < height; y++)
+    for (let x = 0; x < width; x++) {
+      const v = bytes === 4 ? d.readUInt32LE(p) : d.readUIntLE(p, 3)
+      const o = (y * width + x) * 4
+      pixels[o] = channel(v, masks[0])
+      pixels[o + 1] = channel(v, masks[1])
+      pixels[o + 2] = channel(v, masks[2])
+      pixels[o + 3] = channel(v, masks[3])
+      p += bytes
+    }
+  return true
 }
 
 /** Uncompressed (type 2) and run-length (type 10) true-colour TGA. */

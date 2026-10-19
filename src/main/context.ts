@@ -278,17 +278,22 @@ export function createContext(): AppContext {
       announceUpdate(`found:${s.version}`, `Legends Tracker ${s.version} is available`, 'Downloading it now. You can restart into it once it has arrived.', () =>
         windows.showMain()
       )
+    } else if (s.state === 'ready' && store.settings.get().autoRestartUpdates && ctx.updater.heldBack(s.version)) {
+      // Its install was started last time and did not take: not again by itself (LT-597).
+      ctx.engine.pushFeed('warn', `Version ${s.version} has downloaded again, but its install did not take last time: Restart and update in Settings tries once more.`)
     } else if (s.state === 'ready' && store.settings.get().autoRestartUpdates) {
       // The player chose not to be asked: restart into it at the first lull in play, so no fight's
-      // timers are lost to it (LT-430): out of combat with the log quiet a minute, or the game not in
-      // front, looked at every half minute, and at most two hours on.
+      // timers are lost to it (LT-430): never mid-fight, and otherwise with the log quiet a minute or
+      // the game not in front (alt-tabbed mid-pull is still mid-fight, LT-598), looked at every half
+      // minute, and at most two hours on.
       ctx.engine.pushFeed('info', `Version ${s.version} has downloaded: restarting into it at the next lull in play.`)
       log.info(`Restarting into ${s.version} by itself at the next lull (Restart into updates by itself is on)`)
       const readyAt = Date.now()
       const atLull = () => {
-        const quiet = !ctx.engine.meter.fighting && Date.now() - ctx.engine.status.lastLineAt > 60_000
+        const fighting = ctx.engine.meter.fighting
+        const quiet = Date.now() - ctx.engine.status.lastLineAt > 60_000
         const away = ctx.watcher.state.foregroundName !== 'eqgame'
-        if (quiet || away || !ctx.engine.status.watching || Date.now() - readyAt > 2 * 3600_000) void ctx.installUpdate(true)
+        if ((!fighting && (quiet || away)) || !ctx.engine.status.watching || Date.now() - readyAt > 2 * 3600_000) void ctx.installUpdate(true)
         else setTimeout(atLull, 30_000).unref()
       }
       setTimeout(atLull, 2000).unref()

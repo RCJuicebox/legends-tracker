@@ -407,6 +407,30 @@ function twoSteps(): FollowedPlan {
 }
 
 describe('following a faction plan', () => {
+  it('follows a faction raised past 0 to the standing the plan wants, not to 0 (LT-527)', () => {
+    const plan = planFactions(
+      {
+        targets: [
+          { faction: 'A', achievement: 'The A Achievement', standing: 1900 },
+          { faction: 'B', achievement: 'B', standing: 1950 }
+        ],
+        maxed: [],
+        activities: [act('camp', { A: 5 }, 60, 'West Freeport'), act('Mojax', { B: 10 }, 600, 'West Commonlands', 'turnin')]
+      },
+      S
+    )
+    // As the planner marks a step that brings a faction back past 0 for a later step to spend: Mojax's B to 400.
+    plan.steps[0].above = [{ faction: 'B', to: 400 }]
+    const f = followedPlan(plan, [{ faction: 'A', achievement: 'The A Achievement', standing: 1900 }])
+    expect(f.steps[0].reach).toEqual([{ faction: 'B', to: 400, label: 'B back to 400' }])
+    expect(f.steps[0].per).toEqual({ B: 10 })
+    // B's achievement done and B at 0: the step is not done until B is at 400.
+    let r = readFollow(f, freshFollow(), { A: 1900, B: 0 }, new Set(['B']))
+    expect(r.view.current).toMatchObject({ index: 0, unitsLeft: 40 })
+    r = readFollow(f, r.state, { A: 1900, B: 400 }, new Set(['B']))
+    expect(r.view.current).toMatchObject({ index: 1 })
+  })
+
   it('takes the plan as the Plan tab shows it', () => {
     const f = twoSteps()
     expect(f.steps.map((s) => [s.id, s.finish, s.per, s.units])).toEqual([
@@ -531,6 +555,21 @@ describe('following a faction plan', () => {
     expect(r.view.secondsLeft).toBe(5 * 6 + 10 * 60)
     // Never more than planned.
     expect(readFollow(f, freshFollow(), { A: 1000, B: 1950 }, new Set()).view.secondsLeft).toBe(5 * 6 + 20 * 60)
+  })
+
+  it('counts getting there and a swap into the time left, until a step’s first unit lands (LT-562)', () => {
+    const f = plan(
+      { ...step('hand-ins', { finish: ['B'] }, { B: 10 }, 5, 6), travelSec: 600 },
+      { ...step('camp', { finish: ['A'] }, { A: 5 }, 20, 60), travelSec: 300, swapSec: 120 }
+    )
+    // Nothing landed yet: the current step's trip counts, and the next step's trip and swap.
+    let r = readFollow(f, freshFollow(), { A: 1900, B: 1950 }, new Set())
+    expect(r.view.current).toMatchObject({ index: 0, unitsLeft: 5, secondsLeft: 5 * 6 + 600 })
+    expect(r.view.secondsLeft).toBe(5 * 6 + 600 + 20 * 60 + 300 + 120)
+    // The first hand-in landed: the way there is behind.
+    r = readFollow(f, r.state, { A: 1900, B: 1960 }, new Set())
+    expect(r.view.current).toMatchObject({ index: 0, unitsLeft: 4, secondsLeft: 4 * 6 })
+    expect(r.view.secondsLeft).toBe(4 * 6 + 20 * 60 + 300 + 120)
   })
 
   it('works on the step whose own amounts the faction lines match, then the one worked on before', () => {

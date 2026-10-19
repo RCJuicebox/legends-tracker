@@ -33,6 +33,9 @@ export interface FollowStep {
   /** As planned: kills or hand-ins, and seconds each (the trip there left out). */
   units: number
   unitSec: number
+  /** Getting there, and a race or class swap on the way, in seconds: counted until the step's first unit lands (LT-562). */
+  travelSec?: number
+  swapSec?: number
 }
 
 export interface FollowedPlan {
@@ -104,6 +107,9 @@ export const pickStep = (state: FollowState, index: number): FollowState => ({ .
 /** What a read finds worth saying: an achievement done, a step done (with the one to go on to). */
 export type FollowEvent = { kind: 'achievement'; faction: string; name: string } | { kind: 'step'; index: number; step: FollowStep; next: FollowStep | null }
 
+/** A step's seconds before its first unit: the trip there and any swap. */
+const onTheWay = (s: FollowStep) => (s.travelSec ?? 0) + (s.swapSec ?? 0)
+
 /** A plan as the Plan tab shows it, to follow. A city's guards, done at a standing of their own rather than 2000, are followed as factions to raise there. */
 export function followedPlan(plan: FactionPlan, targets: PlanTarget[], at = Date.now()): FollowedPlan {
   const names: Record<string, string> = {}
@@ -118,9 +124,11 @@ export function followedPlan(plan: FactionPlan, targets: PlanTarget[], at = Date
     steps: plan.steps.map((s) => {
       const a = s.activity
       const per: Record<string, number> = {}
-      for (const f of [...s.finishes, ...s.lifts, ...s.reaches.map((r) => r.faction)]) if (a.hits[f]) per[f] = a.hits[f]
+      for (const f of [...s.finishes, ...s.lifts, ...s.reaches.map((r) => r.faction), ...(s.above ?? []).map((r) => r.faction)]) if (a.hits[f]) per[f] = a.hits[f]
+      // A faction raised past 0 (to what another step takes back off it) is followed to that standing, not to 0 (LT-527).
       const reach = [
         ...s.reaches.map((r) => ({ faction: r.faction, to: r.to, label: `${r.faction} for ${r.opens}` })),
+        ...(s.above ?? []).filter((r) => r.to > 0).map((r) => ({ faction: r.faction, to: r.to, label: `${r.faction} back to ${r.to}` })),
         ...s.finishes.flatMap((f) => {
           const t = guards.get(f)
           return t ? [{ faction: f, to: Math.ceil((t.to ?? 0) - 1e-9), label: t.achievement, city: true }] : []
@@ -138,7 +146,9 @@ export function followedPlan(plan: FactionPlan, targets: PlanTarget[], at = Date
         ...(reach.length ? { reach } : {}),
         per,
         units: s.units,
-        unitSec: s.units > 0 ? Math.max(0, s.seconds - s.travel - s.swap) / s.units : 0
+        unitSec: s.units > 0 ? Math.max(0, s.seconds - s.travel - s.swap) / s.units : 0,
+        ...(s.travel > 0 ? { travelSec: s.travel } : {}),
+        ...(s.swap > 0 ? { swapSec: s.swap } : {})
       }
     })
   }
@@ -185,7 +195,9 @@ export function sanitizeFollowedPlan(v: unknown): FollowedPlan | null {
       ...(reach.length ? { reach } : {}),
       per,
       units: Math.round(finite(s.units, 0, 1e7)),
-      unitSec: finite(s.unitSec, 0, 86_400)
+      unitSec: finite(s.unitSec, 0, 86_400),
+      ...(s.travelSec ? { travelSec: finite(s.travelSec, 0, 86_400) } : {}),
+      ...(s.swapSec ? { swapSec: finite(s.swapSec, 0, 86_400) } : {})
     })
   }
   const names: Record<string, string> = {}
@@ -356,18 +368,19 @@ export function readFollow(
       ...(s.npc ? { npc: s.npc } : {}),
       ...(s.items?.length ? { items: s.items } : {}),
       unitsLeft: left,
-      secondsLeft: left * s.unitSec,
+      // The way there and a swap count until the first unit lands, as the plan counts them (LT-562).
+      secondsLeft: left * s.unitSec + (left >= start ? onTheWay(s) : 0),
       progress: Math.max(0, Math.min(1, 1 - left / start)),
       goals
     }
     secondsLeft += current.secondsLeft
   } else state.startUnits = {}
   state.active = active
-  // Each step still to do at what it still wants, never more than planned; a step that brings factions
-  // back from below 0 at what was planned, since the lowering comes first.
+  // Each step still to do at what it still wants, never more than planned, plus getting there; a step
+  // that brings factions back from below 0 at what was planned, since the lowering comes first.
   for (const i of order) {
     const s = plan.steps[i]
-    if (i !== active) secondsLeft += (s.lift.length ? s.units : Math.min(s.units, unitsLeft(s))) * s.unitSec
+    if (i !== active) secondsLeft += (s.lift.length ? s.units : Math.min(s.units, unitsLeft(s))) * s.unitSec + onTheWay(s)
   }
   const n = nextOf(active)
   const ns = n === null ? null : plan.steps[n]

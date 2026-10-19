@@ -506,7 +506,16 @@ export function buildCatalog(input: CatalogInput): FactionCatalog {
     const own = npcOf(m.name)?.hits
     return { ...m, hits: legendsHits({ ...m.hits, ...(own ? Object.fromEntries(Object.entries(own).map(([f, v]) => [name(f), v])) : {}) }) }
   })
-  const allaMobs = new Set(allaKill.map((m) => `${m.name.toLowerCase()}|${zoneKey(m.zone)}`))
+  /**
+   * A camp's mob, the same whoever names it: the log's "A gnoll", eqlwiki's "Gnoll" and Allakhazam's
+   * "a gnoll - Blackburrow" are one key, so a measured camp is never doubled by a live-era one (LT-526).
+   */
+  const mobKey = (mob: string, zone: string) =>
+    `${bareNpc(mob)
+      .toLowerCase()
+      .replace(/^\*/, '')
+      .replace(/^(?:an?|the)\s+/, '')}|${zoneKey(zone)}`
+  const allaMobs = new Set(allaKill.map((m) => mobKey(m.name, m.zone)))
   const activities: PlanActivity[] = []
   const entries = Object.entries(input.sources.acts)
   const acts = entries.map(([, t]) => t)
@@ -608,7 +617,7 @@ export function buildCatalog(input: CatalogInput): FactionCatalog {
     camps.set(k, [...(camps.get(k) ?? []), t])
   }
   // Mobs the log saw killed: the wiki's and Allakhazam's word on them is not needed (nor on a round's part).
-  const logged = new Set(acts.flatMap((t) => (t.kind === 'kill' && isPart(t) ? [`${t.name.replace(/^\*/, '').toLowerCase()}|${zoneKey(t.zone)}`] : [])))
+  const logged = new Set(acts.flatMap((t) => (t.kind === 'kill' && isPart(t) ? [mobKey(t.name, t.zone)] : [])))
   const zoneKills = new Map<string, number>()
   for (const t of acts) if (t.kind === 'kill') zoneKills.set(zoneKey(t.zone), (zoneKills.get(zoneKey(t.zone)) ?? 0) + t.n)
   for (const [k, members] of camps) {
@@ -620,7 +629,7 @@ export function buildCatalog(input: CatalogInput): FactionCatalog {
       const h = tallyHits(m, name, guesses.killUp, guesses.killDown)
       for (const [f, v] of Object.entries(h.hits)) sum[f] = (sum[f] ?? 0) + v * m.n
       h.guessed.forEach((f) => guessed.add(f))
-      logged.add(`${m.name.toLowerCase()}|${zoneKey(m.zone)}`)
+      logged.add(mobKey(m.name, m.zone))
     }
     const hits = Object.fromEntries(Object.entries(sum).map(([f, v]) => [f, Math.round((v / kills) * 10) / 10]))
     const zone = members[0].zone
@@ -662,7 +671,7 @@ export function buildCatalog(input: CatalogInput): FactionCatalog {
       for (const m of list) {
         // Where a page has no mob to list, some write "none" or "unknown" (and a cached page may still have it).
         if (NO_MOB.test(m.name)) continue
-        const k = `${m.name.toLowerCase()}|${zoneKey(m.zone)}`
+        const k = mobKey(m.name, m.zone)
         const e = wikiMobs.get(k) ?? { mob: m, raise: new Set<string>(), lower: new Set<string>(), page: '' }
         if (side === 'raise') {
           e.raise.add(f)
@@ -701,8 +710,8 @@ export function buildCatalog(input: CatalogInput): FactionCatalog {
       hits,
       guessed: Object.keys(hits),
       source: 'wiki',
-      common: members.filter((m) => isCommon(m.mob.name, m.mob.note)).length,
-      named: members.filter((m) => !isCommon(m.mob.name, m.mob.note)).length,
+      common: members.filter((m) => isCommon(m.mob.name, m.mob.note) || common(m.mob.name)).length,
+      named: members.filter((m) => !isCommon(m.mob.name, m.mob.note) && !common(m.mob.name)).length,
       ...fewOf(members.map((m) => m.mob.name)),
       ...respawnsOf(members.map((m) => m.mob)),
       page: members[0].page,
@@ -714,7 +723,7 @@ export function buildCatalog(input: CatalogInput): FactionCatalog {
   // ---- kill camps from Allakhazam: the mobs its pages give amounts for, that the log has not seen killed ----
   const allaCamps = new Map<string, AllaKill[]>()
   for (const m of allaKill) {
-    if (logged.has(`${m.name.toLowerCase()}|${zoneKey(m.zone)}`) || !raisesAny(m.hits, open)) continue
+    if (logged.has(mobKey(m.name, m.zone)) || !raisesAny(m.hits, open)) continue
     if (zoneGone(m.zone)) {
       leaveZone(bareNpc(m.name), m.zone)
       continue
@@ -754,7 +763,7 @@ export function buildCatalog(input: CatalogInput): FactionCatalog {
   for (const c of CAMPS) {
     const hits = Object.fromEntries(Object.entries(c.hits).map(([f, v]) => [name(f), legends(v)]))
     const known = c.mobs.some((m) => {
-      const k = `${m.toLowerCase()}|${zoneKey(c.zone)}`
+      const k = mobKey(m, c.zone)
       return logged.has(k) || wikiMobs.has(k) || allaMobs.has(k)
     })
     if (known || !raisesAny(hits, open)) continue

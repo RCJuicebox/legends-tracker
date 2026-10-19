@@ -310,13 +310,15 @@ export function slayerGoals(
   counters: SlayerCounter[],
   since: ReadonlyMap<string, number>,
   optional: ReadonlySet<string>,
-  tiers: ReadonlyMap<string, number> = new Map()
+  tiers: ReadonlyMap<string, number> = new Map(),
+  /** Achievements (lower-cased) the game said were completed since the export: done, whatever the counts since add up to (LT-529). */
+  done: ReadonlySet<string> = new Set()
 ): SlayerGoal[] {
   return counters.map((c) => ({
     name: c.name,
     section: c.section,
     races: c.races,
-    count: Math.min(c.max, c.count + (since.get(c.name.toLowerCase()) ?? 0)),
+    count: done.has(c.name.toLowerCase()) ? c.max : Math.min(c.max, c.count + (since.get(c.name.toLowerCase()) ?? 0)),
     max: c.max,
     optional: optional.has(metaName(c.name)),
     tier: tiers.get(metaName(c.name)) ?? BANESTRIKE.length
@@ -441,6 +443,8 @@ const paceOfKinds = (kinds: CampKind[]) => {
 
 /** A stretch of killing is about an achievement when its races were at least this share of what died in it. */
 const RUN_SHARE = 0.25
+/** A mob killed fewer times than this in a stretch sets no pace: one named kill said Trooper Kraer came 0.38 an hour (LT-528). */
+const MIN_KIND_KILLS = 3
 /** The stretches about the same achievements must come to this long to be a camp of their own (as a zone must, MIN_LOG_SEC); else the zone's time stands. */
 const MIN_RUN_SEC = 15 * 60
 
@@ -570,7 +574,7 @@ export function buildCamps(
         if (hits) for (const [f, v] of Object.entries(hits)) moved[f] = (moved[f] ?? 0) + (v * n) / hours
         // A stretch's kills count toward all their races feed; the zone's time as a whole only toward what no stretch was about.
         const here = sharesOf(place(name, zone)).filter(([g]) => !st.whole || about.has(g))
-        if (!here.length || lockoutMobs.has(spawnKey(name))) continue
+        if (!here.length || lockoutMobs.has(spawnKey(name)) || n < MIN_KIND_KILLS) continue
         const goalsHere = here.map(([g]) => g)
         // A mob of several races gives each goal its part of a kill.
         const parts = here.filter(([, w]) => w < 1)

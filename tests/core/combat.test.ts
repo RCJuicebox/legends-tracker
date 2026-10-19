@@ -35,6 +35,10 @@ describe('combat lines', () => {
     })
     expect(p('A forsaken revenant hits YOU for 122 points of damage.')).toMatchObject({ source: 'A forsaken revenant', target: SELF, amount: 122 })
     expect(p('Grandmaster R`tal pet slashes Jobarab for 14 points of damage.')).toMatchObject({ source: 'Grandmaster R`tal pet', target: 'Jobarab' })
+    // A paladin's smite, the one verb the grammar lacked (LT-512): yours, another's, and the miss under the same skill.
+    expect(p('You smite a revultant rat for 70 points of damage.')).toMatchObject({ kind: 'damage', how: 'melee', skill: 'smite', amount: 70 })
+    expect(p('Fenwick smites a revultant rat for 70 points of damage.')).toMatchObject({ kind: 'damage', source: 'Fenwick', skill: 'smite', amount: 70 })
+    expect(p('You try to smite a revultant rat, but miss!')).toMatchObject({ kind: 'miss', skill: 'smite' })
     expect(p('An ire ghast hits YOU for 67 points of damage. (Riposte)')).toMatchObject({ mods: ['riposte'] })
     expect(p('Innoruuk`s Chosen punches YOU for 93 points of damage.')).toMatchObject({ source: 'Innoruuk`s Chosen' })
   })

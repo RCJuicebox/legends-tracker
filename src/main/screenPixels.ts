@@ -2,8 +2,9 @@ import koffi from 'koffi'
 import type { Frame } from '../core/groupHealth'
 
 // A small piece of the screen, copied straight from Windows (GDI's BitBlt), for the group health
-// watch: a few hundred pixels four times a second costs a millisecond, where desktopCapturer pictures
-// every monitor whole. It reads what is on the screen, as a player looks at it; it never touches the
+// watch, where desktopCapturer pictures every monitor whole. A copy is not free: a 204×320 piece takes
+// 4–6 ms of wall time (0.2–1 ms of CPU), most of it waiting on the desktop compositor, and a whole
+// 3440×1440 monitor some 25 ms (LT-551; what it costs the game's frames is not yet measured). It reads what is on the screen, as a player looks at it; it never touches the
 // game's process. Coordinates are physical pixels of the whole desktop, as Electron's
 // dipToScreenRect gives them. No Electron or log import, so the group health worker can use it.
 

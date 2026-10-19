@@ -11,7 +11,8 @@ import {
   type BuffOffer,
   type BuffPlan,
   type BuffView,
-  type Person
+  type Person,
+  unseenBuffSeconds
 } from '../../core/buffs'
 import { CATEGORY_COLORS } from '../../core/spellTracker'
 import { characterKey, characterName } from '../storeCore'
@@ -191,7 +192,9 @@ export class BuffCoordinator implements EngineFeature {
     const wanted = this.wanted
     const me = this.me()
     const people = group.flatMap((g) => (g.person ? [g.person] : []))
-    const key = JSON.stringify([wanted, people, active, me])
+    // Keyed on what the plan depends on: which buffs are on and who cast them, not when each lands or
+    // ends, so a refresh of a buff does not search the plan again (LT-552: 257 searches a session, 48 ms each).
+    const key = JSON.stringify([wanted, people, active.map((b) => [b.spell, b.caster]), me])
     if (!this.plans || this.plans.offers !== this.offers || this.plans.key !== key)
       this.plans = {
         offers: this.offers,
@@ -228,12 +231,17 @@ export class BuffCoordinator implements EngineFeature {
     return this.view()
   }
 
-  /** How long a buff lasts from this caster: yours with your focus, anyone else's at their /who level, unfocused. */
+  /**
+   * How long a buff lasts from this caster: yours with your focus, anyone else's at their /who level,
+   * unfocused; one nobody was seen casting as yours when a class of yours casts it, else unknown (LT-510).
+   */
   private buffSeconds(spell: Spell, rank: number, caster: string): number | null {
-    if (caster === 'You') {
-      const d = this.queries.durationFor(spell, rank)
+    const own = (s: Spell, r: number) => {
+      const d = this.queries.durationFor(s, r)
       return d.permanent ? null : d.seconds
     }
+    if (caster === 'You') return own(spell, rank)
+    if (!caster) return unseenBuffSeconds(spell, this.queries.character(), (s) => own(s, 0))
     const level = this.store.buffs.get().people[caster.toLowerCase()]?.level ?? 50
     const d = computeDuration({ spell, rank, level, tierPct: this.settings.tracking.tierDurationPct, focusPct: 0 })
     return d.permanent ? null : d.seconds

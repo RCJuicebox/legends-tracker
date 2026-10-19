@@ -32,8 +32,9 @@ said once per version. The update installs silently, with no installer window, a
 by itself; if you just quit instead, it installs on the way out. Settings live in `%APPDATA%\Legends Tracker`, outside the install folder, so
 they survive updates and uninstalls.
 
-**Restart into updates by itself** in Settings (off unless you turn it on) skips the asking: as soon
-as an update has downloaded, the app restarts into it, even mid-game. The overlays blink and come
+**Restart into updates by itself** in Settings (off unless you turn it on) skips the asking: once an
+update has downloaded, the app restarts into it at the next lull, never mid-fight: out of combat with
+the log quiet a minute or the game not in front, and two hours on at the latest. The overlays blink and come
 back. The main window comes back too if you were using it (open and in front); otherwise the app
 restarts in the tray, so the game keeps the screen, and a Windows notification says it updated.
 
@@ -106,10 +107,7 @@ tells you little.
   example `Spell data: 41472 spells in 250 ms; the heap grew 40 MB reading it`. That is the
   largest thing the app reads; about 23 MB of it stays once the garbage is collected (the spells
   no class gets by level 50 are left out; abilities granted outside the spell book, Harm Touch
-  among them, stay). Every five
-  minutes of fighting it also records the damage meter's push, what goes to the windows twice a
-  second (`Meter push: 13 KB, 40 in the session, 10 fights kept`): the fight in hand and every
-  fight's and session's totals. The open session goes whole only to a page showing it.
+  among them, stay).
 - **Task Manager**, Details tab, with the *Command line* column added: each `electron.exe` or
   `Legends Tracker.exe` is one of the processes above. Its `--type=renderer` processes are the
   windows.
@@ -122,9 +120,11 @@ tells you little.
 - **`npm run bench`** prints what each part of the engine costs a line, over the twenty minutes of
   real play in `tests/fixtures/golden-session.txt` (about 3 µs a line in all on 2026-09-30, two
   thirds of it the damage meter).
-- **The log** also records, while fighting, the size of the damage meter's push every five minutes
-  (`Meter push: 14 KB, 23 in the session…`), and any read or save of the log history cache that
-  takes over a quarter of a second, with its size. A source run's Plan tab logs each faction
+- **The log** also records, every five minutes of fighting, the damage meter's push, what goes to
+  the windows twice a second (`Meter push: 13 KB, 40 in the session, 10 fights kept`: the fight in
+  hand and every fight's and session's totals; the open session goes whole only to a page showing
+  it), and any read or save of the log history cache that takes over a quarter of a second, with
+  its size. A source run's Plan tab logs each faction
   plan's time to the window's console.
 
 ## Live
@@ -280,6 +280,17 @@ something a vendor sells, which is what a vendor asks at best. Where to buy is t
 last bought from, else the vendors on the ingredient's eqlwiki page; an ingredient no vendor sells
 says which tradeskill makes it. Each ingredient links to eqlwiki and to EQ Traders Corner.
 
+**Bag layout.** For a UI skin that draws each bag as a block of cells (JuiceboxUI does), the Bag
+layout tab sets how many cells go on a line, bag by bag, for your bags, bank and shared bank, from
+your inventory export's bag sizes. **Save and rebuild** writes the layout to `uifiles\<skin>\bag-layout.json`
+and runs the skin's rebuild, so the game draws the bags that way at its next `/loadskin`.
+
+**Rebuild.** A skin that is built by a script can ask for a button: a `legends-tracker.json` in its
+folder names the command (a program by its full path, and its arguments). Tradeskills shows a
+**Rebuild** button for each such skin and runs the command for the character shown. The first time
+a skin's button would run a program, the page shows the whole command and asks: a skin from anywhere
+could name any program, and nothing runs until you agree.
+
 ## Spell timers
 
 Every spell you cast is tracked automatically. No trigger needed.
@@ -384,6 +395,15 @@ match, the captures and exactly what it would do.
 
 The sound library is the game's own `AudioTriggers\default` and `shared` folders plus the app's
 `sounds` folder.
+
+**Group health** (at the foot of Triggers, off until you turn it on) says a word when a group member's
+health falls to a line you set (25% unless you change it). The log never prints anyone's health, so
+the app watches the health bars of JuiceboxUI's Group window on the screen while the game runs and is
+in front: the window has to be in view, and the stock window's textured bars do not read. Each member
+is said once as they fall to the line, two samples in a row, and again only after they are back ten
+points over it; one at 0 (dead, or in another zone) is never said. The members' names are read off the
+window once its rows are found. What it costs is small and is logged (Settings › Data sources shows what
+it watches).
 
 ## Audio
 
@@ -946,8 +966,8 @@ dark one.
   keys and no Windows user name.
 - **Game**: the game folder (the character log is chosen on the Log files tab) and **Yield CPU to
   EverQuest** (the app runs below normal priority, so the game wins every tie; sound stays normal).
-  **UI size** scales this window from 90% to 150%; overlays have their own text sizes, on the
-  Overlays tab.
+  **UI size** scales this window from 90% to 200% (`Ctrl` `+`, `Ctrl` `-` and `Ctrl` `0` as in a
+  browser); overlays have their own text sizes, on the Overlays tab.
 - **Hotkeys**, which work with the game in front: `Ctrl+Shift+F9` mutes or unmutes,
   `Ctrl+Shift+F10` starts a new damage meter session, and `Ctrl+Shift+F11` arranges or locks the
   overlays. A key another program already holds is flagged.
@@ -1004,7 +1024,7 @@ roaming profile:
 
 | File | What it holds |
 |---|---|
-| `item-catalog.json` | Every piece of equipment on eqlwiki, for the upgrade finder, focus items and optimizer; refreshed at most weekly |
+| `item-catalog.json` | Every piece of equipment on eqlwiki, for the upgrade finder, focus items and optimiser; refreshed at most weekly |
 | `item-cache.json` | eqlwiki pages for the items you wear and look at (Gear, Loot, Tradeskills), kept a week |
 | `tradeskill-recipes.json` | Every player-crafted recipe on eqlwiki, with the era of each product and ingredient; refreshed at most weekly |
 | `pet-wiki.json` | eqlwiki's pet summon pages and Pet Guide, for the Pet tab |
@@ -1022,24 +1042,29 @@ deleted safely: the wiki downloads come back from their pages (or **Refresh** on
 history is counted again from your logs and archives, and Azure phrases are fetched again as they
 are spoken.
 
-The app reads what the game writes and changes none of it, apart from the archiver on Settings ›
-Log files, which moves logs into `Logs\archive` or a folder you choose. It reads the chat logs in `Logs`
-(`eqlog_<name>_<server>.txt`), the `/outputfile inventory` and `/outputfile achievements` exports
-in the game folder, `spells_us.txt` and `spells_us_str.txt`, the game tables in `Resources`
-(`basedata.txt`, `skillcaps.txt`, `ACMitigation.txt`), the icon sheets in `uifiles\default`, and
-the sounds in `AudioTriggers`.
+The app reads what the game writes and changes none of it, with three exceptions you ask for: the
+archiver on Settings › Log files moves logs into `Logs\archive` or a folder you choose; Tradeskills ›
+Bag layout writes `uifiles\<skin>\bag-layout.json` into the UI skin's own folder; and a skin's
+**Rebuild** runs the command that skin's `legends-tracker.json` names, once you have agreed to it.
+It reads the chat logs in `Logs` (`eqlog_<name>_<server>.txt`), the `/outputfile inventory`,
+`/outputfile achievements` and `/outputfile faction` exports in the game folder, `spells_us.txt`,
+`spells_us_str.txt` and `dbstr_us.txt`, the game tables in `Resources` (`basedata.txt`,
+`skillcaps.txt`, `ACMitigation.txt`, `Faction\FactionAssociations.txt`, `Achievements\*.txt`), the
+icon sheets in `uifiles\default`, each skin's `legends-tracker.json`, and the sounds in
+`AudioTriggers`. The group health alert, when you turn it on, also reads the screen: the health bars
+of JuiceboxUI's Group window, while the game runs.
 
 ## Layout
 
 | Path | What |
 |---|---|
 | `src/core` | Log parsing and tailing, spell book, duration model, spell tracker, triggers, archiver, log check, the damage meter (`combatLines` reads the lines, `combatRoster` knows who is on which side, `combatMeter` keeps the fights, `combatTimeline` their seconds for the chart, `combatView` sums them for display), the loot ledger (`loot`), motes (`motes` counts them, `moteCalc` plans item upgrades, `mergeValue` picks the best merge, `spellMotes` the best spell to upgrade). Plain TypeScript with no Electron dependency, so it is unit-tested directly |
-| `src/features` | Feature modules, one folder each (factions): the feature's logic (`core.ts`; for factions also `attribution.ts`, what caused each change, `questPages.ts`, eqlwiki's quest pages, and the achievement plan: `catalog.ts`, what can raise each faction, `names.ts`, `ways.ts`, one faction's ways to 2000, and `planner.ts` with its `model.ts`, `search.ts` and `steps.ts`; `cities.ts`, the Cities plan's guards), its main-process side (`main.ts`: the log-history consumers and what the page asks for) and its pages (`page.tsx`, `planPage.tsx`, with the Plan tab's parts in `plan/`). `index.ts` lists their pages for the sidebar |
+| `src/features` | Feature modules, one folder each (factions, slayer, hunter): the feature's logic (`core.ts`; for factions also `attribution.ts`, what caused each change, `questPages.ts`, eqlwiki's quest pages, and the achievement plan: `catalog.ts`, what can raise each faction, `names.ts`, `ways.ts`, one faction's ways to 2000, and `planner.ts` with its `model.ts`, `search.ts` and `steps.ts`; `cities.ts`, the Cities plan's guards), its main-process side (`main.ts`: the log-history consumers and what the page asks for) and its pages (`page.tsx`, `planPage.tsx`, with the Plan tab's parts in `plan/`). `index.ts` lists their pages for the sidebar |
 | `src/shared` | What both processes use: the IPC contract (`ipc.ts`), settings and view types, the game's tables and what is known of the game beyond them (`game/`: classes, spell effect numbers, guide bonuses; `factions.ts`, the faction planner's lore from play and Allakhazam; `hunt.ts`, where to hunt each Slayer race), the default overlays and hotkeys |
 | `src/main` | Electron main process: windows, tray, overlays, speech, icons, persistence, the engine that joins it all (`engine/`, with the contract its parts keep in `feature.ts`), the data sources and long jobs (`sources/`), IPC handlers by family (`ipc/`) |
 | `src/preload` | The IPC bridge, which lets a page use only the channels in the contract |
 | `src/renderer` | The React UI (`index.html`), the overlays of one monitor (`overlays.html`), one overlay alone while it is arranged (`overlay.html`), the hidden audio mixer (`audio.html`) |
-| `tests` | Vitest, in folders that mirror `src` (`core/`, `shared/`, `main/`, `features/factions/`, `renderer/`), each test named for the module it covers where it covers one; `helpers.ts` and `fixtures/` are shared. `renderer/pages.test.tsx` draws every page in jsdom with a stub bridge, before the main process answers and with every call failing, and opens the tabs it can reach. Fixtures are real rows from the client's spell files and real lines from the test character's log. `*.bench.ts` are timing runs (`npm run bench`), not part of `npm test` |
+| `tests` | Vitest, in folders that mirror `src` (`core/`, `shared/`, `main/`, `features/factions/`, `features/slayer/`, `features/hunter/`, `renderer/`), each test named for the module it covers where it covers one; `helpers.ts` and `fixtures/` are shared. `renderer/pages.test.tsx` draws every page in jsdom with a stub bridge, before the main process answers and with every call failing, and opens the tabs it can reach. Fixtures are real rows from the client's spell files and real lines from the test character's log. `*.bench.ts` are timing runs (`npm run bench`), not part of `npm test` |
 | `docs/formulas.md` | The game formulas, how each was measured or confirmed, and where the app implements it |
 | `scripts` | The release push, the release notes from the changelog, the smoke test, the icon renderer |
 | `defaults/triggers.json` | Triggers installed on first run |

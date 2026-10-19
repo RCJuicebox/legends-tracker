@@ -1,3 +1,4 @@
+import { foregroundWindowRect } from './win32'
 import { Worker } from 'node:worker_threads'
 import { join } from 'node:path'
 import { app, screen } from 'electron'
@@ -27,7 +28,7 @@ export interface ScreenArea {
   height: number
 }
 
-export type GroupHealthToWorker = { kind: 'config'; on: boolean; areas: ScreenArea[]; belowPct: number; rearmPct: number } | { kind: 'search' }
+export type GroupHealthToWorker = { kind: 'config'; on: boolean; areas: ScreenArea[]; belowPct: number; rearmPct: number; front: boolean } | { kind: 'search' }
 
 export type GroupHealthFromWorker = { kind: 'bars'; bars: GroupBar[] } | ({ kind: 'low' } & LowHealth) | { kind: 'error'; message: string }
 
@@ -40,6 +41,8 @@ export class GroupHealth implements AppFeature {
   private ctx!: AppContext
   private bars: GroupBar[] = []
   private names: string[] = []
+  /** Each row's name by its top edge, kept while the window stays put, so rows seen before are not read again (LT-550). */
+  private namesByTop = new Map<number, string>()
   /** Bumped by each new set of rows, so names read for an older set are dropped. */
   private rowsSeen = 0
   /** What the watch was last set to, or why it is not running: a tick that changes neither does nothing. */
@@ -85,14 +88,20 @@ export class GroupHealth implements AppFeature {
       this.lastConfig = why
       return
     }
-    const key = `${s.belowPct}`
+    // Only the monitor the game's window is on is searched, and only while the game is in front: the
+    // watch read whole monitors every four seconds for as long as the game ran, in front or not (LT-549).
+    const front = this.ctx.watcher.state.foregroundName === 'eqgame'
+    const rect = front ? foregroundWindowRect() : null
+    const all = screen.getAllDisplays().map((d) => screen.dipToScreenRect(null, d.bounds))
+    const overlaps = (a: ScreenArea) => !!rect && a.x < rect.x + rect.width && rect.x < a.x + a.width && a.y < rect.y + rect.height && rect.y < a.y + a.height
+    const areas = rect && all.some(overlaps) ? all.filter(overlaps) : all
+    const key = `${s.belowPct}|${front}|${areas.map((a) => `${a.x},${a.y}`).join(';')}`
     if (this.worker && !force && key === this.lastConfig) return
     // A watch that ended badly is started again, but not more than twice a minute.
     if (!this.worker && Date.now() < this.retryAt) return
     this.lastConfig = key
     if (!this.worker) this.start()
-    const areas = screen.getAllDisplays().map((d) => screen.dipToScreenRect(null, d.bounds))
-    this.worker!.postMessage({ kind: 'config', on: true, areas, belowPct: s.belowPct, rearmPct: s.belowPct + REARM_ABOVE } satisfies GroupHealthToWorker)
+    this.worker!.postMessage({ kind: 'config', on: true, areas, belowPct: s.belowPct, rearmPct: s.belowPct + REARM_ABOVE, front } satisfies GroupHealthToWorker)
   }
 
   private start(): void {
@@ -123,12 +132,16 @@ export class GroupHealth implements AppFeature {
     if (m.kind === 'error') sources.fail('groupHealth', new Error(m.message))
     else if (m.kind === 'bars') {
       this.bars = m.bars
-      this.names = []
+      this.names = m.bars.map((b) => this.namesByTop.get(b.top) ?? '')
       const n = m.bars.length
-      if (!n) sources.ok('groupHealth', 'No group members in the Group window, or it is not on the screen.')
-      else {
-        sources.ok('groupHealth', `Watching ${n} group member${n === 1 ? '' : 's'}.`)
-        void this.readNames(++this.rowsSeen)
+      if (!n) {
+        this.namesByTop.clear()
+        sources.ok('groupHealth', 'No group members in the Group window, or it is not on the screen.')
+      } else {
+        const read = this.names.filter(Boolean)
+        sources.ok('groupHealth', `Watching ${n} group member${n === 1 ? '' : 's'}${read.length ? `: ${read.join(', ')}` : ''}.`)
+        // Only rows without a name yet are read (an OCR run takes a third of a second).
+        if (this.names.some((x) => !x)) void this.readNames(++this.rowsSeen)
       }
     } else if (m.kind === 'low') this.say(m)
   }
@@ -137,7 +150,8 @@ export class GroupHealth implements AppFeature {
     const name = this.names[low.slot - 1] || `Group member ${low.slot}`
     const s = this.ctx.store.settings.get().groupHealth
     this.ctx.engine.notify([
-      { kind: 'speak', text: groupHealthPhrase(s.speech, name, low.pct), interrupt: true },
+      // Cuts in only when the member is well under the line: above half of it, a queued recast cue is not dropped for it (LT-550).
+      { kind: 'speak', text: groupHealthPhrase(s.speech, name, low.pct), interrupt: low.pct <= s.belowPct / 2 },
       { kind: 'text', text: `${name} ${low.pct}%`, color: '#ef5a4f', durationSec: 4 }
     ])
     this.ctx.engine.pushFeed('trigger', `Group health: ${name} at ${low.pct}%`)
@@ -157,7 +171,9 @@ export class GroupHealth implements AppFeature {
       await writeBmp(path, width, height, Buffer.from(f.data.buffer, f.data.byteOffset, f.data.byteLength))
       const words = (await ocrImage(path, 4)).map((w) => ({ ...w, x: w.x + x, y: w.y + y }))
       if (seen !== this.rowsSeen) return
-      this.names = namesFromWords(bars, words)
+      const found = namesFromWords(bars, words)
+      this.names = bars.map((_, i) => found[i] || this.names[i] || '')
+      bars.forEach((b, i) => this.names[i] && this.namesByTop.set(b.top, this.names[i]))
       const read = this.names.filter(Boolean)
       sources.ok('groupHealth', `Watching ${bars.length} group member${bars.length === 1 ? '' : 's'}${read.length ? `: ${read.join(', ')}` : ''}.`)
     } catch (e) {

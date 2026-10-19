@@ -293,6 +293,8 @@ textarea {
   overflow: auto;
   min-height: 0;
   padding: 22px 26px 40px;
+  /* Pages lay out by the pane's own width (viewport less the sidebar), not the viewport's (LT-565). */
+  container: main / inline-size;
 }
 
 .page-head {
@@ -694,6 +696,11 @@ p.hint {
 /* A mark as well as a colour, for anyone who cannot tell the colours apart. */
 .chip.ok::before {
   content: '✓ ';
+}
+/* What a plan's step will do (finish, unlock, bring back): green, with no tick, which is for what is done (LT-564). */
+.chip.will {
+  background: color-mix(in srgb, var(--green) 15%, transparent);
+  color: var(--green-text);
 }
 .chip.warn::before {
   content: '! ';
@@ -2511,7 +2518,7 @@ details:not(.info) > summary::before {
 .lt-focus-row.lt-effect-row {
   grid-template-columns: minmax(220px, 1.3fr) minmax(150px, 0.7fr) minmax(240px, 1.3fr);
 }
-@media (max-width: 900px) {
+@container main (max-width: 900px) {
   .lt-focus-row {
     grid-template-columns: 26px 1fr;
   }

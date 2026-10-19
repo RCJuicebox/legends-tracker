@@ -40,9 +40,9 @@ export type CombatEvent =
   | { kind: 'cast'; source: string; spell: string }
 
 const VERBS_1ST =
-  'hit|slash|punch|kick|bash|pierce|crush|bite|claw|strike|shoot|backstab|frenzy|maul|gore|sting|slice|cleave|reave|smash|rake|lacerate|sweep|stomp|whip|burn|impale|gouge|blast'
+  'hit|slash|punch|kick|bash|pierce|crush|bite|claw|strike|shoot|backstab|frenzy|maul|gore|sting|slice|cleave|reave|smash|rake|lacerate|sweep|stomp|whip|burn|impale|gouge|blast|smite'
 const VERBS_3RD =
-  'hits|slashes|punches|kicks|bashes|pierces|crushes|bites|claws|strikes|shoots|backstabs|frenzies|mauls|gores|stings|slices|cleaves|reaves|smashes|rakes|lacerates|sweeps|stomps|whips|burns|impales|gouges|blasts'
+  'hits|slashes|punches|kicks|bashes|pierces|crushes|bites|claws|strikes|shoots|backstabs|frenzies|mauls|gores|stings|slices|cleaves|reaves|smashes|rakes|lacerates|sweeps|stomps|whips|burns|impales|gouges|blasts|smites'
 const TAG = String.raw`(?: \((.+)\))?`
 /**
  * "slashes" as "slash": a swing is one skill whoever makes it and whether it lands. The log names

@@ -322,7 +322,12 @@ export function Slayer() {
     const m = mob.toLowerCase()
     setChoices({ ...choices, outMobs: out ? [...choices.outMobs.filter((x) => x !== m), m] : choices.outMobs.filter((x) => x !== m) })
   }
-  const left = plan ? plan.goals.reduce((s, g) => s + (data!.goals[g].max - data!.goals[g].count), 0) : 0
+  // The headline's kills are the steps' own (a kill feeding two achievements once), the lockouts' beside them;
+  // what the plan leaves out is said apart (LT-563).
+  const stepTotal = plan ? plan.steps.reduce((s, st) => s + stepKills(st, choices).reduce((t, k) => t + k.n, 0), 0) : 0
+  const lockoutKills = plan ? [...new Set(plan.daily.flatMap((d) => d.goals))].reduce((s, g) => s + (data!.goals[g].max - data!.goals[g].count), 0) : 0
+  const unplannedKills = plan ? plan.unplanned.reduce((s, g) => s + (data!.goals[g].max - data!.goals[g].count), 0) : 0
+  const optionalOut = data ? data.goals.filter((g) => g.optional && g.count < g.max && !choices.included.includes(g.name.toLowerCase())).length : 0
   const hunterAt = (zone: string) => (data?.hunter ?? []).filter((h) => zoneKey(h.zone) === zoneKey(zone))
   // Where the player is: the steps in that zone are marked, and the first is a click away.
   const zoneNow = useLive((l) => l.status.zone)
@@ -385,12 +390,23 @@ export function Slayer() {
           <>
             <div className="card row mb-16">
               <span>
-                <b>{plan.goals.length}</b> achievement{plan.goals.length === 1 ? '' : 's'} to go, <b>{num(left)}</b> kills
+                <b>{plan.goals.length}</b> achievement{plan.goals.length === 1 ? '' : 's'} to go, <b>{kills(stepTotal)}</b> kills in the steps
+                {lockoutKills > 0 && `, ${num(lockoutKills)} by the lockouts`}
               </span>
               <span className="faint">·</span>
               <span>
                 about <b>{duration(plan.seconds)}</b> of hunting
               </span>
+              {(unplannedKills > 0 || optionalOut > 0) && (
+                <Tip
+                  className="faint small"
+                  text={`${unplannedKills > 0 ? `${num(unplannedKills)} kills for achievements nothing known feeds (Not planned, below). ` : ''}${
+                    optionalOut > 0 ? `${optionalOut} optional achievement${optionalOut === 1 ? '' : 's'} (out of era) left out: take them in under Achievements in the plan.` : ''
+                  }`}
+                >
+                  {[unplannedKills > 0 ? `${num(unplannedKills)} not planned` : '', optionalOut > 0 ? `${optionalOut} optional left out` : ''].filter(Boolean).join(' · ')}
+                </Tip>
+              )}
               {plan.daily.length > 0 && (
                 <>
                   <span className="faint">·</span>

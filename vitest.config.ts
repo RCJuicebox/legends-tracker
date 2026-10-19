@@ -11,17 +11,21 @@ export default defineConfig({
     // npm run coverage: what the tests reach, for the code that is not the pages.
     coverage: {
       provider: 'v8',
-      include: ['src/core/**', 'src/main/**', 'src/shared/**', 'src/features/**/*.ts'],
+      include: ['src/core/**', 'src/main/**', 'src/shared/**', 'src/features/**/*.ts', 'src/renderer/src/**/*.ts'],
       reporter: ['text-summary', 'html'],
       reportsDirectory: 'coverage',
-      // Where coverage stood when these were last set (2026-09-30, after the untested core files got tests), a point under: a change that drops a
+      // Where coverage stood when these were last set (2026-10-18, LT-629; before that 2026-09-30), a point under: a change that drops a
       // folder below its floor fails `npm run coverage`, which CI runs. Raise them as tests are added.
       thresholds: {
-        'src/core/**': { lines: 92, statements: 89, functions: 89, branches: 78 },
-        'src/shared/**': { lines: 95, statements: 94, functions: 95, branches: 89 },
-        'src/main/engine/**': { lines: 74, statements: 71, functions: 67, branches: 61 },
-        'src/main/**': { lines: 43, statements: 40, functions: 39, branches: 32 },
-        'src/features/**': { lines: 95, statements: 92, functions: 94, branches: 85 }
+        'src/core/**': { lines: 93, statements: 90, functions: 90, branches: 80 },
+        'src/shared/**': { lines: 99, statements: 98, functions: 96, branches: 89 },
+        'src/main/engine/**': { lines: 80, statements: 76, functions: 72, branches: 65 },
+        'src/main/ipc/**': { lines: 78, statements: 74, functions: 75, branches: 50 },
+        'src/main/sources/**': { lines: 80, statements: 78, functions: 77, branches: 72 },
+        'src/main/**': { lines: 58, statements: 55, functions: 54, branches: 46 },
+        'src/features/**': { lines: 96, statements: 94, functions: 93, branches: 86 },
+        // The renderer's own TypeScript (hooks, state, the overlay's maths), not the pages: measured since 2026-10-18 (LT-629).
+        'src/renderer/src/**/*.ts': { lines: 33, statements: 31, functions: 28, branches: 21 }
       }
     },
     // GitHub's Windows runners are slow some days: tests that take well under a second here timed out at

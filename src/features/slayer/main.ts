@@ -99,7 +99,7 @@ export class SlayerPlanner implements AppFeature {
     const path = join(dir, 'slayer-plan.json')
     const read = readJsonFile(path)
     const value = read.state === 'ok' && read.value && typeof read.value === 'object' ? (read.value as Record<string, unknown>) : {}
-    this.choices = new JsonFile(path, Object.fromEntries(Object.entries(value).map(([k, v]) => [k, sanitizeChoices(v)])), { delayMs: 1000 })
+    this.choices = new JsonFile(path, Object.fromEntries(Object.entries(value).map(([k, v]) => [k, sanitizeChoices(v)])), { delayMs: 1000, backup: true })
     if (read.state === 'unreadable') this.choices.freeze('could not be read at start')
     const marksPath = join(dir, 'map-marks.json')
     const kept = readJsonFile(marksPath)
@@ -216,8 +216,13 @@ export class SlayerPlanner implements AppFeature {
     // The live counts, while the export they count on is the one read here.
     const track = ctx.liveAchievements.view
     const since = new Map<string, number>()
-    if (track?.character === character && track.slayer?.exportAt === exp.modified) for (const r of track.slayer.rows) since.set(r.name.toLowerCase(), r.since)
-    const goals = slayerGoals(counters, since, optionalSlayer(exp.sections), banestrikeTiers(exp.sections))
+    const done = new Set<string>()
+    if (track?.character === character && track.slayer?.exportAt === exp.modified)
+      for (const r of track.slayer.rows) {
+        since.set(r.name.toLowerCase(), r.since)
+        if (r.done) done.add(r.name.toLowerCase())
+      }
+    const goals = slayerGoals(counters, since, optionalSlayer(exp.sections), banestrikeTiers(exp.sections), done)
     const game = await ctx.gameTables.get(RACE_TABLE)
     const races = new SlayerRaces(counters, game)
     const { zones, moves } = await this.kills(ctx, character)

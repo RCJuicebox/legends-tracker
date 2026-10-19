@@ -17,6 +17,7 @@ const OUTCOMES: { key: LootOutcome; label: string; hint: string }[] = [
   { key: 'merged', label: 'Merged', hint: 'Merged into an item you own, raising its +N' },
   { key: 'sold', label: 'Sold', hint: 'Auto-loot sold it on the spot' },
   { key: 'depot', label: 'Depot', hint: 'Stored in your tradeskill depot' },
+  { key: 'hoard', label: 'Hoard', hint: 'Stored in your Dragon Hoard' },
   { key: 'currency', label: 'Currency', hint: 'Motes and runes, stored as currency; the Motes page counts them' }
 ]
 

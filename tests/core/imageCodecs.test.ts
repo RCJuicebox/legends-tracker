@@ -101,3 +101,45 @@ describe('writing PNG', () => {
     expect(png.toString('ascii', png.length - 8, png.length - 4)).toBe('IEND')
   })
 })
+
+/** A DDS header: the magic, the size, the pixel format's flags, four-character code, bit count and masks. */
+function ddsHeader(width: number, height: number, pf: { flags: number; fourCC?: string; bits?: number; masks?: number[] }): Buffer {
+  const h = Buffer.alloc(128)
+  h.write('DDS ', 0, 'latin1')
+  h.writeUInt32LE(124, 4)
+  h.writeUInt32LE(height, 12)
+  h.writeUInt32LE(width, 16)
+  h.writeUInt32LE(32, 76)
+  h.writeUInt32LE(pf.flags, 80)
+  if (pf.fourCC) h.write(pf.fourCC, 84, 'latin1')
+  if (pf.bits) h.writeUInt32LE(pf.bits, 88)
+  pf.masks?.forEach((m, i) => h.writeUInt32LE(m >>> 0, 92 + 4 * i))
+  return h
+}
+
+describe('reading the item icon sheets (DDS)', () => {
+  it('reads an uncompressed A8R8G8B8 sheet by its masks (dragitem9), and 24-bit RGB with no alpha', () => {
+    // Two pixels: opaque red, half-transparent green; the bytes are B G R A.
+    const argb = Buffer.concat([ddsHeader(2, 1, { flags: 0x41, bits: 32, masks: [0x00ff0000, 0x0000ff00, 0x000000ff, 0xff000000] }), Buffer.from([0, 0, 255, 255, 0, 255, 0, 128])])
+    const s = decodeDds(argb)!
+    expect([s.width, s.height, s.bpp, s.topDown]).toEqual([2, 1, 4, true])
+    expect([...s.pixels]).toEqual([255, 0, 0, 255, 0, 255, 0, 128])
+    const rgb = Buffer.concat([ddsHeader(1, 1, { flags: 0x40, bits: 24, masks: [0xff0000, 0xff00, 0xff] }), Buffer.from([0, 0, 255])])
+    expect([...decodeDds(rgb)!.pixels]).toEqual([255, 0, 0, 255])
+    // Sixteen-bit pixels are not a format the sheets come in.
+    expect(decodeDds(Buffer.concat([ddsHeader(1, 1, { flags: 0x40, bits: 16, masks: [0xf800, 0x7e0, 0x1f] }), Buffer.alloc(2)]))).toBeNull()
+  })
+
+  it('reads a DXT3 sheet (dragitem323): four-bit alphas as they are, the colour block as DXT5’s', () => {
+    // One 4×4 block: alphas 0xF (opaque) in the first row and 0x8 in the rest; both colour endpoints pure red.
+    const block = Buffer.alloc(16)
+    block.writeUInt16LE(0xffff, 0)
+    for (let i = 2; i < 8; i++) block[i] = 0x88
+    block.writeUInt16LE(0xf800, 8)
+    block.writeUInt16LE(0xf800, 10)
+    const s = decodeDds(Buffer.concat([ddsHeader(4, 4, { flags: 0x4, fourCC: 'DXT3' }), block]))!
+    expect([...s.pixels.subarray(0, 4)]).toEqual([255, 0, 0, 255])
+    expect([...s.pixels.subarray(4 * 4, 4 * 4 + 4)]).toEqual([255, 0, 0, 136])
+    expect(decodeDds(Buffer.concat([ddsHeader(4, 4, { flags: 0x4, fourCC: 'DXT1' }), block]))).toBeNull()
+  })
+})

@@ -75,6 +75,8 @@ export interface PlanStep {
    * Factions it raises to the con a later step's NPC wants: the standing to reach, that con's word, and
    * that step's activity. A step there only for this finishes nothing itself: it opens a quicker way.
    */
+  /** Factions it raises past 0, to what the plan wants of them (the Most factions positive goal): the standing each is taken to. */
+  above?: { faction: string; to: number }[]
   reaches: { faction: string; to: number; band: string; opens: string }[]
   /** The race it is done as, swapped to in Loadouts, when not the character's own. */
   race?: string

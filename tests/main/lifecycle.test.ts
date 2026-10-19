@@ -54,7 +54,7 @@ async function waitFor(check: () => boolean, ms = 3000): Promise<void> {
 }
 
 /** A context whose parts note, in `h.calls`, when each is stopped or saved. */
-function fakeContext(o: { engine?: Engine; flushAll?: () => Promise<unknown>; updaterStop?: () => void } = {}) {
+function fakeContext(o: { engine?: Engine; flushAll?: () => Promise<unknown>; updaterStop?: () => void; installerPresent?: boolean } = {}) {
   const note = (what: string) => () => {
     h.calls.push(what)
   }
@@ -69,7 +69,14 @@ function fakeContext(o: { engine?: Engine; flushAll?: () => Promise<unknown>; up
     },
     overlays: { destroy: note('stop overlays'), recover: () => {} },
     engine: o.engine ?? { shutdown: note('stop engine'), board: { endWhere: () => [] }, pushFeed: () => {} },
-    updater: { stop: o.updaterStop ?? note('stop updater'), status: { state: 'idle' }, install: note('install update'), holdInstall: note('hold install') },
+    updater: {
+      stop: o.updaterStop ?? note('stop updater'),
+      status: { state: 'idle' },
+      install: note('install update'),
+      holdInstall: note('hold install'),
+      installerPresent: async () => o.installerPresent ?? true,
+      heldBack: () => false
+    },
     watcher: { stop: note('stop game watcher') },
     achievementFiles: { stop: note('stop achievement poller') },
     inventoryFiles: { stop: note('stop inventory poller') },
@@ -177,6 +184,15 @@ describe('Quitting', () => {
     expect(h.calls).not.toContain('quit')
     await vi.advanceTimersByTimeAsync(200)
     expect(h.calls.at(-1)).toBe('quit')
+  })
+
+  it('stays running when the downloaded installer is gone, rather than stopping everything for an install that cannot start (LT-597)', async () => {
+    const ctx = fakeContext({ installerPresent: false })
+    ctx.updater.status.state = 'ready'
+    registerLifecycle(ctx)
+    await ctx.installUpdate()
+    expect(h.calls).toEqual([])
+    expect(ctx.windows.quitting).toBe(false)
   })
 
   it('restarts into an update only after everything is saved, without a second shutdown', async () => {

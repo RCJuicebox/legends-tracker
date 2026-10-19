@@ -127,6 +127,21 @@ describe('GroupHealthAlarm', () => {
     expect(alarm.update([0.2])).toEqual([{ slot: 1, pct: 20 }])
   })
 
+  it('keeps a row’s state by its place on the screen: a row added above moves it down, a window over it changes nothing (LT-550)', () => {
+    const alarm = new GroupHealthAlarm(25, 35)
+    // Rows at 100 and 120: the second falls to the line and is said.
+    alarm.update([0.9, 0.2], [100, 120])
+    expect(alarm.update([0.9, 0.2], [100, 120])).toEqual([{ slot: 2, pct: 20 }])
+    // Unreadable for a moment, then a row joins above: the same row is now third, still said once.
+    expect(alarm.update([null, null], [100, 120])).toEqual([])
+    expect(alarm.update([0.8, 0.9, 0.2], [80, 100, 120])).toEqual([])
+    expect(alarm.update([0.8, 0.9, 0.2], [80, 100, 120])).toEqual([])
+    // Gone and back where it was: forgotten rows start over.
+    alarm.update([0.8], [80])
+    alarm.update([0.8, 0.2], [80, 120])
+    expect(alarm.update([0.8, 0.2], [80, 120])).toEqual([{ slot: 2, pct: 20 }])
+  })
+
   it('skips a sample that could not be read, and a single low frame', () => {
     const alarm = new GroupHealthAlarm(25, 35)
     alarm.update([0.2])

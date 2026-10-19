@@ -137,6 +137,8 @@ export function registerLifecycle(ctx: AppContext): void {
   // for (Restart into updates by itself) notes first whether the window should come back after it.
   ctx.installUpdate = async (unasked = false) => {
     if (ctx.updater.status.state !== 'ready' || shuttingDown) return
+    // The installer must still be there: electron-updater quits before it learns the spawn failed (LT-597).
+    if (!(await ctx.updater.installerPresent())) return
     ctx.windows.quitting = true
     shuttingDown = true
     if (unasked) await ctx.windows.noteRelaunch().catch((e: unknown) => log.warn('Could not note the window before updating', e))

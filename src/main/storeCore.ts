@@ -1,4 +1,4 @@
-import { copyFileSync, promises as fs, readFileSync, renameSync, writeFileSync } from 'node:fs'
+import { closeSync, copyFileSync, fsyncSync, openSync, promises as fs, readFileSync, renameSync, writeSync } from 'node:fs'
 import { basename, dirname, join } from 'node:path'
 import { DEFAULT_TIER_DURATION_PCT, type AppSettings } from '../shared/types'
 import { DEFAULT_OVERLAYS } from '../shared/overlays'
@@ -86,7 +86,7 @@ export function mergeDefaults<T>(base: T, saved: unknown, addDefault: (id: strin
  * `unreadable`: the file is there but could not be opened (a virus scanner or backup tool holding it).
  * Its contents may be fine, so it is left where it is and must not be written over this run.
  */
-export type ReadResult = { state: 'missing' } | { state: 'ok'; value: unknown } | { state: 'corrupt'; movedTo: string } | { state: 'unreadable' }
+export type ReadResult = { state: 'missing' } | { state: 'ok'; value: unknown; restoredFrom?: string } | { state: 'corrupt'; movedTo: string } | { state: 'unreadable' }
 
 /**
  * Waits before trying a file again when another program (a virus scanner, a backup tool) holds it.
@@ -125,7 +125,17 @@ export function readJsonFile(path: string, opts: { setAside?: boolean; now?: Dat
     return { state: 'ok', value: parseJson(text) }
   } catch (e) {
     log.error(`${path} is not valid JSON`, e)
-    return aside()
+    const moved = aside()
+    // The copy kept before this run's first write (backup: true) stands in for a torn file (LT-599).
+    if (opts.setAside === false) return moved
+    const bak = path.replace(/\.json$/i, '') + '.bak.json'
+    try {
+      const value = parseJson(readFileSync(bak, 'utf8'))
+      log.warn(`${bak} is used in its place`)
+      return { state: 'ok', value, restoredFrom: bak }
+    } catch {
+      return moved
+    }
   }
 }
 
@@ -150,9 +160,12 @@ export interface JsonFileOptions {
   pretty?: boolean
   /**
    * Keeps the file as this run found it in `<name>.bak.json`, copied before the run's first write: the
-   * atomic write guards against a torn file, not against wrong content saved whole (LT-441).
+   * atomic write guards against a torn file, not against wrong content saved whole (LT-441); and a
+   * file that will not read is read from the copy (LT-599).
    */
   backup?: boolean
+  /** Written this long after the first unsaved change at the latest, however the changes keep coming (LT-599). */
+  maxWaitMs?: number
 }
 
 /** A JSON file held in memory. Changes are written a little after the last one, or at flush(). */
@@ -162,6 +175,9 @@ export class JsonFile<T> {
   private writing: Promise<void> = Promise.resolve()
   private frozen = ''
   private readonly delayMs: number
+  private readonly maxWaitMs: number
+  /** When the first unsaved change was made; 0 while nothing waits. */
+  private dirtySince = 0
   private readonly pretty: boolean
   /** Still to copy the file as found to its .bak.json, before this run first writes it. */
   private backup: boolean
@@ -172,6 +188,7 @@ export class JsonFile<T> {
     opts: JsonFileOptions = {}
   ) {
     this.delayMs = opts.delayMs ?? 400
+    this.maxWaitMs = opts.maxWaitMs ?? 60_000
     this.pretty = opts.pretty ?? true
     this.backup = opts.backup ?? false
   }
@@ -183,8 +200,11 @@ export class JsonFile<T> {
   set(value: T): void {
     this.value = value
     this.dirty = true
+    const now = Date.now()
+    this.dirtySince ||= now
     if (this.timer) clearTimeout(this.timer)
-    this.timer = setTimeout(() => void this.flush(), this.delayMs)
+    // After the last change, but a long busy stretch does not put the write off for good.
+    this.timer = setTimeout(() => void this.flush(), Math.min(this.delayMs, Math.max(0, this.dirtySince + this.maxWaitMs - now)))
   }
 
   /** Counts the value as changed, to be written at the next flush, without a timed write of its own. */
@@ -220,6 +240,7 @@ export class JsonFile<T> {
     this.timer = null
     if (!this.dirty || this.frozen) return
     this.dirty = false
+    this.dirtySince = 0
     if (this.backup) {
       this.backup = false
       try {
@@ -230,7 +251,13 @@ export class JsonFile<T> {
     }
     try {
       const tmp = this.path + '.tmp'
-      writeFileSync(tmp, this.pretty ? JSON.stringify(this.value, null, 2) : JSON.stringify(this.value), 'utf8')
+      const fd = openSync(tmp, 'w')
+      try {
+        writeSync(fd, this.pretty ? JSON.stringify(this.value, null, 2) : JSON.stringify(this.value), null, 'utf8')
+        fsyncSync(fd)
+      } finally {
+        closeSync(fd)
+      }
       renameSync(tmp, this.path)
     } catch (e) {
       log.error(`Could not save ${this.path}`, e)
@@ -241,6 +268,7 @@ export class JsonFile<T> {
   private async write(): Promise<void> {
     if (!this.dirty) return
     this.dirty = false
+    this.dirtySince = 0
     if (this.frozen) return
     if (this.backup) {
       this.backup = false
@@ -267,7 +295,14 @@ export async function writeFileAtomic(path: string, text: string): Promise<void>
   const tmp = path + '.tmp'
   for (let attempt = 0; ; attempt++) {
     try {
-      await fs.writeFile(tmp, text, 'utf8')
+      // Flushed to the disk before the rename: a power cut just after a save otherwise leaves a file of NULs (LT-599).
+      const fh = await fs.open(tmp, 'w')
+      try {
+        await fh.writeFile(text, 'utf8')
+        await fh.sync()
+      } finally {
+        await fh.close()
+      }
       await fs.rename(tmp, path)
       return
     } catch (e) {

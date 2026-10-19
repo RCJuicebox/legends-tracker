@@ -99,6 +99,7 @@ export function planSteps(m: Model, best: { blocks: Block[]; cost: number }, kep
         const j = g ? g.i.indexOf(q.i) : -1
         return { faction: names[q.i], to: Math.ceil(q.v - EPS), band: g && j >= 0 ? g.bands[j] : '', opens: acts[q.for].a.title }
       })
+      const above = (b.above ?? []).map((q) => ({ faction: names[q.i], to: Math.ceil(q.v - EPS) }))
       const race = r > 0 ? (races ? raceNames[r] : x.a.swap?.[0]) : undefined
       st.zone = x.zone
       st.act = b.act
@@ -112,6 +113,7 @@ export function planSteps(m: Model, best: { blocks: Block[]; cost: number }, kep
         last.finishes.push(...finishes)
         last.unlocks.push(...unlocks)
         last.reaches.push(...reaches)
+        if (above.length) last.above = [...(last.above ?? []).filter((a) => !above.some((q) => q.faction === a.faction)), ...above]
         last.restores &&= !b.finish.length && !b.reach.length && !b.use
         for (const [f, v] of Object.entries(raises)) last.raises[f] = (last.raises[f] ?? 0) + v
         for (const [f, v] of Object.entries(lowers)) last.lowers[f] = (last.lowers[f] ?? 0) + v
@@ -130,6 +132,7 @@ export function planSteps(m: Model, best: { blocks: Block[]; cost: number }, kep
           finishes,
           unlocks,
           reaches,
+          ...(above.length ? { above } : {}),
           raises,
           lowers,
           maxedLowered,

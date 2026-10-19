@@ -30,6 +30,13 @@ describe('loot lines', () => {
       outcome: 'depot'
     })
     expect(p("You looted 2 Giant Bat Wing from a sonic bat's corpse and stored it in your tradeskill depot")).toMatchObject({ count: 2, outcome: 'depot' })
+    // Stored in the Dragon Hoard (LT-513).
+    expect(p("You looted an Apothic Crown +4 from a spite golem's corpse and stored it in your Dragon Hoard")).toMatchObject({
+      item: 'Apothic Crown +4',
+      source: 'A spite golem',
+      outcome: 'hoard',
+      copper: 0
+    })
     expect(p("You looted a Mote of Major Potential from a loathling lich's corpse and stored it in your currency")).toMatchObject({ outcome: 'currency' })
     expect(p('You looted 4 Mote of Major Potential from Reward Chest and stored it in your currency')).toMatchObject({ count: 4, source: 'Reward Chest', outcome: 'currency' })
     expect(p('You looted an Indicolite Bracer +4 from Reward Chest to create an Indicolite Bracer +6')).toEqual({
@@ -62,6 +69,8 @@ describe('loot lines', () => {
     expect(p('You receive 3 copper from the corpse.')).toMatchObject({ copper: 3 })
     expect(p('You receive 2 gold and 3 silver as your split.')).toEqual({ kind: 'coin', copper: 230, from: 'corpse', bag: false })
     expect(p('You receive 6 gold from Zok Zribb.')).toEqual({ kind: 'coin', copper: 600, from: 'Zok Zribb', bag: false })
+    // A stack sold: the merchant's name stops before "for the" (LT-513).
+    expect(p('You receive 4 gold 7 silver 6 copper from Melixis for the Large Cloth Shirt(s).')).toEqual({ kind: 'coin', copper: 476, from: 'Melixis', bag: false })
     expect(p('You receive  52 platinum 2 gold 8 silver 5 copper from Melixis for the contents of your bag.')).toEqual({ kind: 'coin', copper: 52_285, from: 'Melixis', bag: true })
     expect(p('You receive no experience for defeating this creature as you are in a raid.')).toBeNull()
     expect(parseCoin('1 platinum and 8 silver')).toBe(1080)

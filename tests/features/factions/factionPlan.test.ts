@@ -910,6 +910,16 @@ describe('the catalog', () => {
     const activities = buildCatalog(catalogInput({ sources: settled(read(lines)) })).activities.filter((a) => a.kind === 'kill')
     expect(activities).toHaveLength(1)
     expect(activities[0]).toMatchObject({ kind: 'kill', zone: 'Blackburrow', mobs: ['A gnoll', 'A gnoll guardsman'], seen: 3, common: 2, named: 0, hits: { 'Steel Warriors': 5 } })
+    // Allakhazam's "a gnoll - Blackburrow" and eqlwiki's "Gnoll" are the log's gnoll: no second camp with live-era amounts (LT-526).
+    const steel: AllaFaction = { id: 20, name: 'Steel Warriors', needs: [], quests: [], mobs: [{ name: 'a gnoll - Blackburrow', zone: 'Blackburrow', amount: 1 }] }
+    const doubled = buildCatalog(
+      catalogInput({
+        sources: settled(read(lines)),
+        alla: [steel],
+        pages: [{ page: 'Steel Warriors', raise: { mobs: [{ name: 'Gnoll', zone: 'Blackburrow', note: '' }], quests: [], zones: [] }, lower: { mobs: [], quests: [], zones: [] } }]
+      })
+    ).activities.filter((a) => a.kind === 'kill')
+    expect(doubled.map((a) => a.source)).toEqual(['log'])
   })
 
   it("plans a wiki quest step as repeatable only with one kind of item that can be had, not a chain's, and under 50 points", () => {
