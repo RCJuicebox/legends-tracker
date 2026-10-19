@@ -11,7 +11,7 @@ beforeEach(async () => {
   dir = tempDir('eqlcheck-')
 })
 afterEach(async () => {
-  await fs.rm(dir, { recursive: true, force: true })
+  await fs.rm(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 50 })
 })
 
 // Two Spirit of the Puma X casts, each fading 196s after landing, as Kelwyn's log shows.

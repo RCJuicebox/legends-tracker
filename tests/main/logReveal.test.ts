@@ -24,7 +24,7 @@ const { isInside } = await import('../../src/core/paths')
 const { rendererUrl } = await import('../../src/main/push')
 
 const root = tempDir('lt-reveal-')
-afterAll(() => rmSync(root, { recursive: true, force: true }))
+afterAll(() => rmSync(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 50 }))
 
 const game = join(root, 'EverQuest Legends')
 const logs = join(game, 'Logs')

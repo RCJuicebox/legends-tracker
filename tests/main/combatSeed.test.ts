@@ -66,7 +66,7 @@ beforeEach(async () => {
 afterEach(async () => {
   for (const e of engines) e.shutdown()
   await sleep(50)
-  await fs.rm(dir, { recursive: true, force: true })
+  await fs.rm(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 50 })
 })
 
 function makeEngine(historyMinutes: number) {

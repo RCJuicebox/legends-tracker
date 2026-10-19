@@ -110,7 +110,7 @@ beforeAll(async () => {
 afterAll(async () => {
   engine?.shutdown()
   await sleep(50)
-  await fs.rm(dir, { recursive: true, force: true })
+  await fs.rm(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 50 })
 })
 
 describe('twenty minutes of real play, read by the Engine', () => {

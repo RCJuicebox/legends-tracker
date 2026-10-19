@@ -170,7 +170,7 @@ describe('PurchaseHistory', () => {
       dir = tempDir('lt-purchases-')
     })
     afterEach(async () => {
-      await fs.rm(dir, { recursive: true, force: true })
+      await fs.rm(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 50 })
     })
 
     it('reads purchases from the live log and picks up new ones', async () => {

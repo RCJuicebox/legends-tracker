@@ -12,7 +12,7 @@ const readFlushed = async (path: string, enc: BufferEncoding) => {
 
 // The log module keeps its folder in module state; every test here that names one names its own.
 const root = tempDir('lt-log-')
-afterAll(() => rmSync(root, { recursive: true, force: true }))
+afterAll(() => rmSync(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 50 }))
 afterEach(() => vi.restoreAllMocks())
 
 const TWO_MB = 2 * 1024 * 1024

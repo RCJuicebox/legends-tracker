@@ -15,7 +15,7 @@ beforeEach(async () => {
   dir = tempDir('lt-casts-')
 })
 afterEach(async () => {
-  await fs.rm(dir, { recursive: true, force: true })
+  await fs.rm(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 50 })
 })
 
 const cast = (stamp: string, spell: string) => `[${stamp}] You begin casting ${spell}.\r\n`

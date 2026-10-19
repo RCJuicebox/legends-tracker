@@ -47,7 +47,7 @@ beforeEach(() => {
   fake.ids = {}
   fake.pixels = false
 })
-afterEach(() => rmSync(fake.dir, { recursive: true, force: true }))
+afterEach(() => rmSync(fake.dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 50 }))
 
 const pictures = (paths: string[]) => paths.map((p) => readFileSync(p, 'utf8')).sort()
 

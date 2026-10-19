@@ -56,7 +56,7 @@ beforeEach(async () => {
 afterEach(async () => {
   vi.restoreAllMocks()
   await sleep(50)
-  await fs.rm(dir, { recursive: true, force: true })
+  await fs.rm(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 50 })
 })
 
 function makeStore(logFile: string, motes: MoteState) {

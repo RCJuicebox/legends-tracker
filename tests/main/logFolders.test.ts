@@ -11,7 +11,7 @@ beforeEach(async () => {
   dir = tempDir('lt-folders-')
 })
 afterEach(async () => {
-  await fs.rm(dir, { recursive: true, force: true })
+  await fs.rm(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 50 })
 })
 
 const quick = { lookMs: 1000, awayMs: 1000, waitMs: 50 }

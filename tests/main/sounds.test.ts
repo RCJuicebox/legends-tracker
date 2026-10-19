@@ -7,7 +7,7 @@ import type { AudioCommand } from '../../src/main/engine/contracts'
 import { tempDir } from '../tempDir'
 
 const root = tempDir('lt-sounds-')
-afterAll(() => rmSync(root, { recursive: true, force: true }))
+afterAll(() => rmSync(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 50 }))
 
 // The folders in the order the app searches them: the profile's own, then the game's default and shared.
 const mine = join(root, 'profile', 'sounds')

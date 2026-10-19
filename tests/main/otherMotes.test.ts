@@ -14,7 +14,7 @@ beforeEach(async () => {
   dir = tempDir('lt-other-motes-')
 })
 afterEach(async () => {
-  await fs.rm(dir, { recursive: true, force: true })
+  await fs.rm(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 50 })
 })
 
 const lines = (...l: string[]) => l.map((x) => x + '\r\n').join('')

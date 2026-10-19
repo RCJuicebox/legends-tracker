@@ -21,7 +21,7 @@ describe('finding the game folder from what the player picked', () => {
     writeFileSync(join(game, 'Kelwyn_neriak-WAR-Factions.txt'), '')
     writeFileSync(join(game, 'Kelwyn_neriak_LO1.ini'), '')
   })
-  afterAll(() => rmSync(root, { recursive: true, force: true }))
+  afterAll(() => rmSync(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 50 }))
 
   it('accepts the game folder, its Logs folder, or a folder above it', () => {
     expect(isGameFolder(game)).toBe(true)
@@ -34,7 +34,7 @@ describe('finding the game folder from what the player picked', () => {
   it('rejects a folder with no game files', () => {
     const elsewhere = tempDir('lt-other-')
     expect(resolveGameFolder(elsewhere)).toBe('')
-    rmSync(elsewhere, { recursive: true, force: true })
+    rmSync(elsewhere, { recursive: true, force: true, maxRetries: 5, retryDelay: 50 })
   })
 
   it('reports the logs, inventory, achievement and faction files it holds', async () => {
@@ -67,6 +67,6 @@ describe('reading the spell data from the game folder', () => {
   it('fails when the folder has no spell data', async () => {
     const empty = tempDir('lt-nospells-')
     await expect(loadSpellBook(empty)).rejects.toThrow()
-    rmSync(empty, { recursive: true, force: true })
+    rmSync(empty, { recursive: true, force: true, maxRetries: 5, retryDelay: 50 })
   })
 })

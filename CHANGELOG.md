@@ -4,6 +4,7 @@ What changed in each version. The release workflow publishes a version's section
 
 ## Unreleased
 
+- **Slayer: the step you are at, at your pace now.** While you kill there, the overlay's step and the Slayer page's say how long it takes at the pace of your last twenty minutes ("At your pace now (120/h) ≈ 1 h 40 min; the plan assumed 84/h").
 - **Slayer: say what a mob is.** Kills no race was found for each have a **Count as…** list on the Slayer page and the Achievements page's Slayer category: what you pick is kept for every character, outranks eqlwiki, counts at once (the overlay's guesses too), and is listed with an Undo.
 - **Hunter: keep the spots you find.** **Found it here** beside a named on the Hunter page keeps where you found it (your `/loc` at a click, or as the game prints it, and a few words). It goes on the zone's map, in the marks on the game's map, and the named no longer says it is not in TAKP's tables.
 - **Type `/loc` and the app knows where you are.** The Slayer and Hunter maps put a "you" where you last typed it in their zone, and the achievements overlay's Hunter rows say how far each named left is and which way ("≈ 320 to the north-east"), from its nearest spot.

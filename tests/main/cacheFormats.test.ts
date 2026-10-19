@@ -37,7 +37,8 @@ beforeEach(async () => {
   h.wikiCalls = 0
 })
 afterEach(async () => {
-  await fs.rm(h.dir, { recursive: true, force: true })
+  // A timed write can still land as the folder goes (ENOTEMPTY under a full run): tried again.
+  await fs.rm(h.dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 50 })
 })
 
 const DAY = 86_400_000

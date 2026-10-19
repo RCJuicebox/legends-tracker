@@ -94,7 +94,7 @@ describe('LiveAchievements makes the Slayer plan again', () => {
   it('from the counts as they are now, the step in the player’s zone first', async () => {
     const { live } = setup()
     // The Slayer feature's live counts, as the overlay reads them (LT-623).
-    const slayer = { character: 'Tester_neriak', view: null as unknown }
+    const slayer = { character: 'Tester_neriak', view: null as unknown, kills: () => undefined }
     const inner = live as unknown as {
       character: string
       zone: string
@@ -135,7 +135,7 @@ describe('LiveAchievements makes the Slayer plan again', () => {
   it('says an achievement of the step is done, and the step to go on to, as the faction plan’s steps are said (LT-655)', async () => {
     const { live } = setup()
     // The Slayer feature's live counts, as the overlay reads them (LT-623).
-    const slayer = { character: 'Tester_neriak', view: null as unknown }
+    const slayer = { character: 'Tester_neriak', view: null as unknown, kills: () => undefined }
     const inner = live as unknown as {
       character: string
       zone: string

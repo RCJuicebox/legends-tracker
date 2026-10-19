@@ -100,7 +100,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
   engine?.stopWatching()
-  await fs.rm(dir, { recursive: true, force: true })
+  await fs.rm(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 50 })
 })
 
 /** The median µs a line of twenty runs of every line through `fs`, after two to warm up. */

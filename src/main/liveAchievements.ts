@@ -6,7 +6,7 @@ import { classIdOf, type ClassId } from '../shared/game/classes'
 import { parseFactionLine } from '../features/factions/core'
 import { FACTION_SECTION } from '../features/factions/followSource'
 import type { AchievementTrack, SkillRow, SkillTrackView, SlayerPlanTrackView, TrackedAchievement, PlayerLocation } from '../shared/tracking'
-import { planSlayer, slayerPlanView } from '../features/slayer/core'
+import { paceNow, planSlayer, slayerPlanView } from '../features/slayer/core'
 import type { AchievementsExport } from './achievements'
 import type { AppContext } from './context'
 import type { AppFeature, TrackContext } from './appFeature'
@@ -238,7 +238,10 @@ export class LiveAchievements implements AppFeature {
       return r ? { ...g, count: r.done ? g.max : Math.min(g.max, r.count + r.since) } : g
     })
     const before = this.slayerPlan
-    this.slayerPlan = slayerPlanView(planSlayer({ ...got.data, goals }, got.choices), goals, got.choices, this.zone)
+    const plan = slayerPlanView(planSlayer({ ...got.data, goals }, got.choices), goals, got.choices, this.zone)
+    // While killing at the step here: its time at the pace of the last twenty minutes (FEAT-022).
+    const now = plan.current?.here ? paceNow(plan.current, live?.kills(character), Date.now()) : undefined
+    this.slayerPlan = now && plan.current ? { ...plan, current: { ...plan.current, now } } : plan
     this.cueSlayer(before, this.slayerPlan, goals)
   }
 

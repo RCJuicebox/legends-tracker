@@ -15,7 +15,7 @@ beforeEach(async () => {
   dir = tempDir('lt-npc-')
 })
 afterEach(async () => {
-  await fs.rm(dir, { recursive: true, force: true })
+  await fs.rm(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 50 })
 })
 
 function fakeWiki(pages: Record<string, string>) {

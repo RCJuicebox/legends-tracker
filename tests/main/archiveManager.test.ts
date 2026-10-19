@@ -59,7 +59,7 @@ beforeEach(async () => {
   vi.mocked(archiver.archiveLog).mockReset().mockImplementation(realArchiveLog)
 })
 afterEach(async () => {
-  await fs.rm(game, { recursive: true, force: true })
+  await fs.rm(game, { recursive: true, force: true, maxRetries: 5, retryDelay: 50 })
 })
 
 describe('archiving logs past the size limit', () => {

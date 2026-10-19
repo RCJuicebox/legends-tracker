@@ -50,7 +50,7 @@ vi.mock('electron', async () => {
 const { Windows } = await import('../../src/main/windows')
 
 h.dir = tempDir('lt-main-pushes-')
-afterAll(() => rmSync(h.dir, { recursive: true, force: true }))
+afterAll(() => rmSync(h.dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 50 }))
 
 function setup() {
   h.sent.length = 0

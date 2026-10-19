@@ -3,7 +3,7 @@ import { mobSpawns, spawnKey, zoneIndex, type MobSpawn, type SpawnTables, type Z
 import type { HunterZone } from '../hunter/core'
 import type { LogLine } from '../../core/logLine'
 import { zoneEntered } from '../../core/logLine'
-import { achievementRaces, slayerLine, type SlayerCounter, type SlayerRaces } from '../../core/slayer'
+import { achievementRaces, slayerLine, type SlayerCounter, type SlayerKills, type SlayerRaces } from '../../core/slayer'
 import type { RaceTable } from '../../core/raceNames'
 import { baseZone, isCity, zoneKey } from '../../core/zones'
 import { KILL_RUN_MS } from '../../core/phrases'
@@ -1023,4 +1023,33 @@ export const spotFor = (zone: string, achievement: string) =>
 /** What eqlwiki's Slayer guide says of an achievement: where its kills are, in the guide's words; undefined where it says nothing. */
 export function guideTip(achievement: string, guide: SlayerGuideTip[] = SLAYER_GUIDE): string | undefined {
   return guide.find((t) => metaName(t.achievement) === metaName(achievement))?.tip
+}
+
+/** How far back the pace now looks, and the fewest kills in that time that make one (FEAT-022). */
+const PACE_WINDOW_MS = 20 * 60_000
+const PACE_MIN_KILLS = 5
+/** The shortest stretch a pace is taken over: five kills in a minute is not 300 an hour. */
+const PACE_MIN_MS = 5 * 60_000
+
+/**
+ * The player's pace now at a step: its mobs killed in its zone over the last twenty minutes, an hour's
+ * worth; with the step's time at that pace and the pace the plan assumed. Undefined with too few kills.
+ */
+export function paceNow(step: Pick<SlayerPlanStepView, 'zone' | 'seconds' | 'mobs'>, kills: SlayerKills | undefined, now: number): SlayerPlanStepView['now'] {
+  if (!kills || !step.mobs.length) return undefined
+  const want = new Set(step.mobs.map((m) => bareName(m.name)))
+  const z = zoneKey(campZone(step.zone))
+  const times: number[] = []
+  for (const k of kills.values()) {
+    if (!want.has(bareName(k.name))) continue
+    k.times.forEach((t, i) => {
+      const at = k.zones?.[i]
+      if (t > now - PACE_WINDOW_MS && t <= now && (!at || zoneKey(campZone(at)) === z)) times.push(t)
+    })
+  }
+  if (times.length < PACE_MIN_KILLS) return undefined
+  const span = Math.max(PACE_MIN_MS, now - Math.min(...times))
+  const perHour = Math.round((times.length / span) * 3_600_000)
+  const left = step.mobs.reduce((n, m) => n + m.n, 0)
+  return { perHour, seconds: Math.round((left / perHour) * 3600), planPerHour: step.seconds > 0 ? Math.round((left / step.seconds) * 3600) : 0 }
 }

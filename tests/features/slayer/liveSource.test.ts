@@ -127,7 +127,7 @@ describe('SlayerLive counts the kills since the export', () => {
     answers = true
     await readLog(s)
     expect(s.kills.get('a gnoll')?.times).toHaveLength(5)
-    await fs.rm(root, { recursive: true, force: true })
+    await fs.rm(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 50 })
   })
 
   it('credits the player’s, its pet’s and its group’s kills, a mob it was hurting that died, never a player; and keeps the achievements the game said were done', async () => {
@@ -189,6 +189,6 @@ describe('SlayerLive counts the kills since the export', () => {
     expect([l.kills('Someone_else'), l.completed('Someone_else'), l.killsSince('Someone_else', ['a bat'], 0)]).toEqual([undefined, undefined, 0])
     l.reset()
     expect([l.character, l.view]).toEqual([null, null])
-    await fs.rm(root, { recursive: true, force: true })
+    await fs.rm(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 50 })
   })
 })

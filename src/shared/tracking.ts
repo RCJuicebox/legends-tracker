@@ -159,6 +159,11 @@ export interface SlayerPlanStepView {
   goals: { name: string; count: number; max: number }[]
   /** What to kill there and about how many, most first. */
   mobs: { name: string; n: number }[]
+  /**
+   * While the player kills there: their pace over the last twenty minutes of its mobs, and the step's
+   * time at that pace, beside the pace the plan assumed (FEAT-022).
+   */
+  now?: { perHour: number; seconds: number; planPerHour: number }
 }
 
 /** Plan › Slayer on the achievements overlay: made again from the counts as kills come in. */

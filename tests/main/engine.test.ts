@@ -42,7 +42,7 @@ afterEach(async () => {
   for (const e of engines) e.shutdown()
   // Let tailers close their handles before the folder goes.
   await sleep(50)
-  await fs.rm(dir, { recursive: true, force: true })
+  await fs.rm(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 50 })
 })
 
 function makeEngine(o: { logFile: string; motes?: MoteState; stock?: MoteStock }) {

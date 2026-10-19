@@ -50,8 +50,8 @@ beforeEach(() => {
 afterEach(async () => {
   await Promise.all(opened.splice(0).map((s) => s.settled))
   vi.restoreAllMocks()
-  rmSync(profile.dir, { recursive: true, force: true })
-  rmSync(defaultsDir, { recursive: true, force: true })
+  rmSync(profile.dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 50 })
+  rmSync(defaultsDir, { recursive: true, force: true, maxRetries: 5, retryDelay: 50 })
 })
 
 describe('a profile saved at an older schema', () => {

@@ -56,7 +56,7 @@ function wire(follow: InstanceType<typeof FactionFollow>) {
 }
 
 afterAll(async () => {
-  await fs.rm(h.dir, { recursive: true, force: true })
+  await fs.rm(h.dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 50 })
 })
 
 describe('the faction plan followed', () => {

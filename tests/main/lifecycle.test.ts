@@ -231,7 +231,7 @@ describe('Quitting with the real engine', () => {
   })
   afterEach(async () => {
     await sleep(50)
-    await fs.rm(dir, { recursive: true, force: true })
+    await fs.rm(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 50 })
   })
 
   it('has stopped watching and written the mote mark before the hotkeys go and the stores are saved', async () => {

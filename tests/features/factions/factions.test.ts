@@ -411,7 +411,7 @@ describe('FactionHistory over a real log', () => {
     dir = tempDir('lt-factions-')
   })
   afterEach(async () => {
-    await fs.rm(dir, { recursive: true, force: true })
+    await fs.rm(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 50 })
   })
 
   const line = (stamp: string, text: string) => `[${stamp}] ${text}\r\n`

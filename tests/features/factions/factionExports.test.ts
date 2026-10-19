@@ -14,7 +14,7 @@ beforeEach(async () => {
 })
 afterEach(async () => {
   vi.restoreAllMocks()
-  await fs.rm(dir, { recursive: true, force: true })
+  await fs.rm(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 50 })
 })
 
 const lines = (...rows: [number, string, number][]) => ['ID\tName\tStandingValue\tPointsToMax', ...rows.map(([id, n, v]) => `${id}\t${n}\t${v}\t${2000 - v}`)].join('\r\n')

@@ -94,7 +94,7 @@ describe('the settings files on disk', () => {
   afterEach(() => {
     Object.assign(retrySchedule, realRetries)
     vi.restoreAllMocks()
-    rmSync(dir, { recursive: true, force: true })
+    rmSync(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 50 })
   })
 
   it('tells a missing file from a readable one', () => {
@@ -218,7 +218,7 @@ describe('schema versions', () => {
   beforeEach(() => {
     dir = tempDir('lt-schema-')
   })
-  afterEach(() => rmSync(dir, { recursive: true, force: true }))
+  afterEach(() => rmSync(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 50 }))
 
   it('brings an older file forward through each migration in turn, keeping a backup of it', () => {
     const path = join(dir, 'settings.json')

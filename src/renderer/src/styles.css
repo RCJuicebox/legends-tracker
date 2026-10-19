@@ -4382,3 +4382,9 @@ input[aria-invalid='true'] {
 .sl-say select {
   font-size: 12px;
 }
+
+/* Slayer: the step here at the player's pace now (FEAT-022). */
+.sl-pace-now {
+  color: var(--accent-2);
+  margin: 2px 0 4px;
+}

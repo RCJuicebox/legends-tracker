@@ -304,7 +304,9 @@ function SlayerPlanSection({ plan }: { plan: SlayerPlanTrackView }) {
               </div>
             )}
             <div className="ach-ov-faint">
-              ≈ {duration(step.seconds)} there{!step.here && step.travel > 0 ? `, ${duration(step.travel)} to get there` : ''}
+              {step.now
+                ? `At your pace now (${num(step.now.perHour)}/h) ≈ ${duration(step.now.seconds)}; the plan assumed ${num(step.now.planPerHour)}/h`
+                : `≈ ${duration(step.seconds)} there${!step.here && step.travel > 0 ? `, ${duration(step.travel)} to get there` : ''}`}
             </div>
           </div>
           {plan.next ? (

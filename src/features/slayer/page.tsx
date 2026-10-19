@@ -4,7 +4,7 @@ import { remember } from '../../renderer/src/remember'
 import { CharacterPicker } from '../../renderer/src/components/CharacterPicker'
 import { ago, api } from '../../renderer/src/api'
 import { useLive } from '../../renderer/src/state'
-import { useInvoke, useVisibleInterval } from '../../renderer/src/hooks'
+import { useAchievementTrack, useInvoke, useVisibleInterval } from '../../renderer/src/hooks'
 import { useCharacterChoice } from '../../renderer/src/character'
 import { useNow } from '../../renderer/src/components/TimerBars'
 import { Disclosure, FilterBox, GameCommand, Info, NumberInput, Pending, SettingsLink, Tip, ToggleChip } from '../../renderer/src/components/ui'
@@ -421,6 +421,9 @@ export function Slayer() {
     [plan, data, choices, words]
   )
   const jumpHere = () => jumpTo(hereStep)
+  // The overlay's step at the player's pace now, while they kill there (FEAT-022): the same under the zone's step here.
+  const track = useAchievementTrack()
+  const paceHere = track && track.character.toLowerCase() === character.toLowerCase() && track.slayerPlan?.current?.here ? track.slayerPlan.current : null
   // Sent here from another page for a step (the Achievements page's "Step 4 · Lake Rathetear"): shown once the plan is drawn.
   useEffect(() => {
     if (!plan) return
@@ -659,6 +662,12 @@ export function Slayer() {
                                   {duration(total)}
                                 </Tip>
                               </div>
+                              {paceHere?.now && isHere(zone) && zoneKey(paceHere.zone) === zoneKey(zone) && (
+                                <div className="small sl-pace-now">
+                                  At your pace now ({num(paceHere.now.perHour)}/h, the last twenty minutes) ≈ {duration(paceHere.now.seconds)}; the plan assumed{' '}
+                                  {num(paceHere.now.planPerHour)}/h
+                                </div>
+                              )}
                               {run.map((i) => {
                                 const st = plan.steps[i]
                                 const killed = stepKills(st, choices)
