@@ -244,7 +244,7 @@ export function Achievements() {
             </span>
           </div>
         </div>
-        <div className="ach-track">
+        <div className="bar">
           <i style={{ width: `${pct}%` }} />
         </div>
         <div className="small muted">

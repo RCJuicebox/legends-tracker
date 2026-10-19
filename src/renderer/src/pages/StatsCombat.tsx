@@ -153,7 +153,7 @@ function SkillsCard({ s, set, caps, trio }: { s: StatsInputs; set: SetSheet; cap
             return (
               <div key={x.id} className="stats-skill">
                 <span className="small">{skillName(x.id)}</span>
-                <span className="stats-skillbar">
+                <span className="bar thin teal">
                   <i style={{ width: `${x.cap ? Math.min(100, (have / x.cap) * 100) : 0}%` }} />
                 </span>
                 <span className={`small ${have >= x.cap && have > 0 ? 'ok-text' : 'faint'}`} title={`${className(x.from)} has the best cap`}>

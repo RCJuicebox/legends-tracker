@@ -165,7 +165,7 @@ export function MoteRuns() {
             </span>
             <b>{scanPct}%</b>
           </div>
-          <div className="bar-meter" role="progressbar" aria-label="Rebuilding from logs" aria-valuemin={0} aria-valuemax={100} aria-valuenow={scanPct}>
+          <div className="bar teal" role="progressbar" aria-label="Rebuilding from logs" aria-valuemin={0} aria-valuemax={100} aria-valuenow={scanPct}>
             <div style={{ width: `${scanPct}%` }} />
           </div>
         </div>

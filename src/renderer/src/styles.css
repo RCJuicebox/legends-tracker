@@ -918,18 +918,42 @@ table.table {
   font-weight: 600;
 }
 
-.bar-meter {
+/*
+ * One progress bar (LT-686): the track, and its fill as its one child, the accent unless a modifier
+ * says otherwise. The meter's rows, the timers, the jobs and the overlays keep bars of their own.
+ */
+.bar {
+  display: block;
   height: 6px;
-  background: var(--bg-2);
-  border-radius: 6px;
+  border-radius: 4px;
+  background: var(--line);
   overflow: hidden;
 }
-.bar-meter > div {
+.bar > * {
+  display: block;
   height: 100%;
+  border-radius: inherit;
+  background: var(--accent);
+}
+.bar.thin {
+  height: 5px;
+}
+.bar.thick {
+  height: 7px;
+}
+.bar.teal > * {
   background: var(--teal);
 }
-.bar-meter.over > div {
+.bar.over > * {
   background: var(--amber);
+}
+/* The merge planner's, accent to accent. */
+.bar.merge > * {
+  background: linear-gradient(90deg, var(--accent), var(--accent-2));
+}
+/* A share of a whole (the meter's breakdowns, Gear's totals): fading in from the left. */
+.bar.soft > * {
+  background: linear-gradient(90deg, color-mix(in srgb, var(--accent) 55%, transparent), var(--accent));
 }
 
 /* ---------- feed ---------- */
@@ -1330,20 +1354,6 @@ table.table {
   display: grid;
   gap: 12px;
   margin-bottom: 14px;
-}
-.ach-track,
-.ach-bar {
-  height: 6px;
-  border-radius: 4px;
-  background: var(--line);
-  overflow: hidden;
-}
-.ach-track i,
-.ach-bar i {
-  display: block;
-  height: 100%;
-  background: var(--accent);
-  border-radius: 4px;
 }
 .ach-tabs,
 .ach-chips {
@@ -1925,17 +1935,6 @@ details:not(.info) > summary::before {
 .stats-skill input {
   padding: 3px 6px;
 }
-.stats-skillbar {
-  height: 5px;
-  border-radius: 3px;
-  background: var(--line);
-  overflow: hidden;
-}
-.stats-skillbar i {
-  display: block;
-  height: 100%;
-  background: var(--teal);
-}
 .bad-text {
   color: var(--red);
 }
@@ -2242,17 +2241,6 @@ details:not(.info) > summary::before {
   gap: 6px;
   text-align: left;
 }
-.lt-mergebar {
-  height: 7px;
-  border-radius: 4px;
-  background: var(--line);
-  overflow: hidden;
-}
-.lt-mergebar i {
-  display: block;
-  height: 100%;
-  background: linear-gradient(90deg, var(--accent), var(--accent-2));
-}
 .lt-panel {
   margin-bottom: 14px;
   border-color: color-mix(in srgb, var(--accent) 40%, transparent);
@@ -2299,18 +2287,6 @@ details:not(.info) > summary::before {
   text-align: right;
   color: var(--text);
   font-variant-numeric: tabular-nums;
-}
-.lt-bar-track {
-  height: 6px;
-  border-radius: 3px;
-  background: var(--line);
-  overflow: hidden;
-}
-.lt-bar-track i {
-  display: block;
-  height: 100%;
-  border-radius: 3px;
-  background: linear-gradient(90deg, color-mix(in srgb, var(--accent) 55%, transparent), var(--accent));
 }
 .lt-kv {
   display: grid;
@@ -4230,26 +4206,18 @@ input[aria-invalid='true'] {
   .dm-fill,
   .job-bar > span,
   .fp-now-bar i,
-  .ach-bar > *,
+  .bar > *,
   .ach-ov-bar i,
   .stats-bar > *,
-  .stats-skillbar > *,
-  .lt-mergebar > *,
-  .lt-bar-track > *,
-  .bar-meter > div,
   .lt-pips i.on,
   .sl-count-bar i {
     forced-color-adjust: none;
     background: Highlight;
   }
   .fp-now-bar,
-  .ach-bar,
+  .bar,
   .ach-ov-bar,
   .stats-bar,
-  .stats-skillbar,
-  .lt-mergebar,
-  .lt-bar-track,
-  .bar-meter,
   .sl-count-bar,
   .lt-pips i,
   .bag-preview i {

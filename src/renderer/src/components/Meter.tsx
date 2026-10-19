@@ -540,7 +540,7 @@ function DefenseCard({ d, scope }: { d: Defense; scope: MeterScope }) {
           .map(([label, n, hint]) => (
             <div key={label} className="lt-bar" title={hint}>
               <span>{label}</span>
-              <span className="lt-bar-track">
+              <span className="bar soft">
                 <i style={{ width: `${(n / d.swings) * 100}%`, background: label === 'Hit' ? 'var(--red)' : undefined }} />
               </span>
               <b>

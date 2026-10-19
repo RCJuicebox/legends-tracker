@@ -408,7 +408,7 @@ function CharacterCard({
             {maxed ? ` · ${maxed} at +${MAX_MERGE}` : ''}
           </span>
         </div>
-        <div className="lt-mergebar">
+        <div className="bar thick merge">
           <i style={{ width: `${(levels.reduce((a, b) => a + b, 0) / Math.max(1, worn.length * MAX_MERGE)) * 100}%` }} />
         </div>
       </div>
@@ -443,7 +443,7 @@ function GearTotals({
   const bar = (label: string, v: number, most: number) => (
     <div key={label} className="lt-bar">
       <span>{label}</span>
-      <span className="lt-bar-track">
+      <span className="bar soft">
         <i style={{ width: `${Math.min(100, (v / most) * 100)}%` }} />
       </span>
       <b>{num(v)}</b>

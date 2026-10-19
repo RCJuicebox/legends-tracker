@@ -250,7 +250,7 @@ function Block({ book, r, rows, query, ctx }: { book: AchievementBook; r: AchRef
           )}
         </Disclosure>
         <span className="ach-count">{count}</span>
-        <span className="ach-bar">
+        <span className="bar">
           <i style={{ width: `${pct}%` }} />
         </span>
         <TrackStar k={achKey(s, a)} name={a.n} ctx={ctx} />

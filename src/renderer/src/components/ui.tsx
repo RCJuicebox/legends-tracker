@@ -321,7 +321,7 @@ export function Progress({ done, total, label, unit = 'pages', small }: { done: 
       <span className="sr-only" role="status">
         {label}
       </span>
-      <span className="lt-mergebar grow" role="progressbar" aria-label={label} aria-valuemin={0} aria-valuemax={100} aria-valuenow={pctDone}>
+      <span className="bar thick merge grow" role="progressbar" aria-label={label} aria-valuemin={0} aria-valuemax={100} aria-valuenow={pctDone}>
         <i style={{ width: `${pctDone}%` }} />
       </span>
       <span className="muted nowrap">

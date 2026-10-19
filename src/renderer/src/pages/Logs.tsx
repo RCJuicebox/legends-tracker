@@ -143,7 +143,7 @@ export function Logs() {
                         {a.autoEnabled && <span className="faint small">of {a.thresholdMB} MB</span>}
                       </div>
                       {a.autoEnabled && (
-                        <div className={`bar-meter${l.size >= threshold ? ' over' : ''}`}>
+                        <div className={`bar teal${l.size >= threshold ? ' over' : ''}`}>
                           <div style={{ width: `${Math.min(100, (l.size / threshold) * 100)}%` }} />
                         </div>
                       )}
