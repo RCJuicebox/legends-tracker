@@ -1,6 +1,6 @@
 import { BrowserWindow, screen, type WebContents } from 'electron'
 import type { CombatSnapshot, OverlayConfig, TimerView } from '../shared/types'
-import { closedKey } from '../shared/combat'
+import { closedKey, overlayFight } from '../shared/combat'
 import type { AchievementTrack } from '../shared/tracking'
 import type { PushChannel } from '../shared/ipc'
 import { push } from './push'
@@ -489,8 +489,10 @@ export class OverlayManager {
   }
 
   combat(snapshot: CombatSnapshot): void {
-    this.last.combat = snapshot
-    this.toPages('meter', (wc) => this.pushCombat(wc, snapshot))
+    // The live fight without what the overlays never draw: half a raid's push (LT-557).
+    const forHosts = snapshot.liveFight ? { ...snapshot, liveFight: overlayFight(snapshot.liveFight) } : snapshot
+    this.last.combat = forHosts
+    this.toPages('meter', (wc) => this.pushCombat(wc, forHosts))
   }
 
   /** The faction plan's step and the Slayer counts, for the achievements overlays. */

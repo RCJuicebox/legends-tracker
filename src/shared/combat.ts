@@ -215,3 +215,16 @@ export function closedKey(s: CombatSnapshot): string {
   const ss = s.sessions.filter((x) => !x.open)
   return `${f.length}|${f[0]?.id ?? ''}|${ss.length}|${ss[0]?.id ?? ''}`
 }
+
+/**
+ * The live fight as a meter overlay draws it: without what only the main window's panes read (damage
+ * taken by skill, defence, heals by target and by healer). Measured on a Plane of Hate raid, 32 in the
+ * fight: 182 KB a push, half of it damage taken by skill, twice a second to every host (LT-557).
+ */
+export function overlayFight(seg: Segment): Segment {
+  const entities: Segment['entities'] = {}
+  for (const [k, e] of Object.entries(seg.entities)) entities[k] = { ...e, takenBy: {}, healTargets: {}, healers: {}, defense: NO_DEFENSE }
+  return { ...seg, entities }
+}
+
+const NO_DEFENSE: Defense = { swings: 0, hit: 0, miss: 0, dodge: 0, parry: 0, block: 0, riposte: 0, absorb: 0 }
