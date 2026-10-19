@@ -95,6 +95,8 @@ const data: SlayerPlanData = {
   ]
 }
 
+let answer: SlayerPlanData = data
+
 const invoke = vi.fn((channel: string, ...args: unknown[]) => {
   switch (channel) {
     case 'app:state':
@@ -104,7 +106,7 @@ const invoke = vi.fn((channel: string, ...args: unknown[]) => {
     case 'character:exports':
       return Promise.resolve({ current: 'Kelwyn_neriak', achievements: ['Kelwyn_neriak'], inventory: [], factions: [] })
     case 'slayer:plan':
-      return Promise.resolve({ data, choices: DEFAULT_CHOICES })
+      return Promise.resolve({ data: answer, choices: DEFAULT_CHOICES })
     case 'slayer:choices':
       return Promise.resolve(args.length)
     case 'slayer:map':
@@ -198,7 +200,7 @@ it('draws the plan, the lockouts beside it, and keeps a camp ruled out', async (
   expect(invoke).toHaveBeenCalledWith('slayer:plan', 'Kelwyn_neriak', true)
   // What the spawns allow beside each mob, what holds the camp back, and the Hunter named on the way.
   expect(host.textContent).toContain('(12 spots · 6:24 · spawn-bound)')
-  expect(host.textContent).toContain('Hunter of Clan Crushbone · Lord Darish, Ambassador DVinn')
+  expect(host.textContent).toContain('Hunter of Clan Crushbone · Lord Darish (1 spot · 25% · 6:24), Ambassador DVinn')
   expect(host.textContent).toContain('your usual pace 90/h')
   // The step's map.
   await act(async () => button('Map').click())
@@ -253,4 +255,60 @@ it('marks the steps in the zone the player is in, and jumps to the first', async
   act(() => root.unmount())
   host.remove()
   appState.status.zone = ''
+})
+
+it('draws what the plan leaves out, finds a step, and turns the overlay on once the choices are in (LT-662 to LT-667)', async () => {
+  answer = {
+    ...data,
+    sinceKills: true,
+    goals: [
+      ...data.goals,
+      { name: 'A Giant Problem', section: 'Slayer: Conquest', races: 'Giants', count: 10, max: 500, optional: false, tier: 0 },
+      { name: 'Done Deal', section: 'Slayer: Conquest', races: 'Gnolls', count: 500, max: 500, optional: false, tier: 0 }
+    ]
+  }
+  const host = document.body.appendChild(document.createElement('div'))
+  const root = createRoot(host)
+  await act(async () =>
+    root.render(
+      <StateProvider>
+        <Slayer />
+      </StateProvider>
+    )
+  )
+  for (let i = 0; i < 10 && !host.textContent?.includes('step by step'); i++) await act(async () => new Promise((r) => setTimeout(r, 20)))
+  const text = host.textContent ?? ''
+  // The counts have the kills since, for the character being played.
+  expect(text).toContain('plus your kills since')
+  // An achievement nothing feeds, and the kills no race was found for.
+  expect(text).toContain('Not planned')
+  expect(text).toContain('A Giant Problem (Giants) 10/500')
+  expect(text).toContain('Kills no race was found for')
+  expect(text).toContain('a mystery ×3')
+  const button = (t: string) => [...host.querySelectorAll('button')].find((b) => b.textContent?.trim().startsWith(t))!
+  // The achievement chips: a count each, a done one ticked, a jump to the step.
+  await act(async () => button('Achievements in the plan').click())
+  expect(host.textContent).toContain('✓ Done Deal500/500')
+  expect(host.textContent).toContain('Orc Stomp!4,900/5,000step 1')
+  // A search dims the steps it does not find.
+  const input = host.querySelector<HTMLInputElement>('input[type="search"]')!
+  const type = async (v: string) =>
+    act(async () => {
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(input, v)
+      input.dispatchEvent(new Event('input', { bubbles: true }))
+    })
+  await type('kedge')
+  expect(host.textContent).toContain('0 of 1 steps match')
+  expect(host.querySelector('#sl-step-1')?.classList.contains('sl-dim')).toBe(true)
+  await type('orc pawn')
+  expect(host.textContent).toContain('1 of 1 steps match')
+  expect(host.querySelector('#sl-step-1')?.classList.contains('sl-dim')).toBe(false)
+  // The overlay chip, once the saved choices are in.
+  const chip = [...host.querySelectorAll('button')].find((b) => b.textContent === 'On the overlay')!
+  expect(chip.classList.contains('waiting')).toBe(false)
+  await act(async () => chip.click())
+  expect(invoke).toHaveBeenLastCalledWith('slayer:choices', 'Kelwyn_neriak', expect.objectContaining({ overlay: true }))
+  answer = data
+  act(() => root.unmount())
+  host.remove()
 })

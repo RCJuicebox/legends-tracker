@@ -1,4 +1,6 @@
+import { useContext } from 'react'
 import { useActions, useSettled } from '../state'
+import { GoContext } from '../nav'
 import { act } from '../toast'
 import { BUILTIN_OVERLAYS } from '../constants'
 import { ConfirmButton, Field, Icon, NumberInput, Switch } from '../components/ui'
@@ -73,6 +75,7 @@ function MeterOptions({ o, onChange }: { o: OverlayConfig; onChange: (m: Partial
 }
 
 export function Overlays() {
+  const go = useContext(GoContext)
   const { patchSettings } = useActions()
   const arranging = useSettled((s) => s.arranging)
   const achievementCues = useSettled((s) => s.settings.achievementCues)
@@ -183,8 +186,19 @@ export function Overlays() {
                       label="Show the Hunter named in your zone"
                     />
                     Show the Hunter named in your zone
-                    <span className="faint small">the named each Hunter achievement of the zone you are in still wants (Plan › Hunter)</span>
+                    <span className="faint small">the named each Hunter achievement of the zone you are in still wants; the same switch is on Plan › Hunter</span>
                   </label>
+                  <div className="row small">
+                    <span>The Slayer plan’s step</span>
+                    <span className="faint small">is turned on for each character on its own, with On the overlay at the top of</span>
+                    {go ? (
+                      <button className="link-button inline small" onClick={() => go('slayer')}>
+                        Plan › Slayer
+                      </button>
+                    ) : (
+                      <span className="faint small">Plan › Slayer</span>
+                    )}
+                  </div>
                   <label className="check">
                     <input type="checkbox" checked={achievementCues} onChange={(e) => patchSettings((s) => ({ ...s, achievementCues: e.target.checked }))} />
                     Say when a step is done
@@ -193,9 +207,9 @@ export function Overlays() {
                     </span>
                   </label>
                   <p className="faint small m-0">
-                    The step of the faction plan you follow (Factions › Plan), counting down as your factions move; the Slayer achievements your last half hour of kills counted
-                    toward, on top of your achievements export; and the skills your skill achievements want that went up in that time. It shows nothing when there is nothing to
-                    show.
+                    The step of the faction plan you follow (Factions › Plan), counting down as your factions move; the Slayer plan’s step for the zone you are in, or the one to
+                    head to (Plan › Slayer); the Hunter named left in your zone (Plan › Hunter); the Slayer achievements your last half hour of kills counted toward, on top of your
+                    achievements export; and the skills your skill achievements want that went up in that time. It shows nothing when there is nothing to show.
                   </p>
                 </>
               )}

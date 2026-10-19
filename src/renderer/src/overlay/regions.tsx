@@ -309,7 +309,8 @@ function SlayerPlanSection({ plan }: { plan: SlayerPlanTrackView }) {
           </div>
           {plan.next ? (
             <div className="ach-ov-step next">
-              <div className="ach-ov-tag">Next · step {plan.next.index + 1}</div>
+              {/* In a later step's zone, what comes next is the plan's first again: said so, not as if it ran backwards (LT-676). */}
+              <div className="ach-ov-tag">{plan.next.index < step.index ? `Then back to step ${plan.next.index + 1}` : `Next · step ${plan.next.index + 1}`}</div>
               <div className="ach-ov-title" title={plan.next.zone}>
                 {plan.next.zone === step.zone ? `${plan.next.zone}, here too` : plan.next.zone}
               </div>

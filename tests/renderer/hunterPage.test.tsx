@@ -78,12 +78,14 @@ const invoke = vi.fn((channel: string, ...args: unknown[]) => {
 
 let Hunter: ComponentType
 let StateProvider: ComponentType<{ children: React.ReactNode }>
+let Toasts: ComponentType
 
 beforeAll(async () => {
   Object.assign(window, { eql: { invoke, send: vi.fn(), on: vi.fn(() => () => {}) }, matchMedia: () => ({ matches: false, addEventListener() {}, removeEventListener() {} }) })
   Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true })
   ;({ StateProvider } = await import('../../src/renderer/src/state'))
   ;({ Hunter } = await import('../../src/features/hunter/page'))
+  ;({ Toasts } = await import('../../src/renderer/src/toast'))
 })
 
 async function draw() {
@@ -93,6 +95,7 @@ async function draw() {
     root.render(
       <StateProvider>
         <Hunter />
+        <Toasts />
       </StateProvider>
     )
   )
@@ -115,7 +118,7 @@ it('lists the named left, zone by zone, with what their spawns allow', async () 
   for (let i = 0; i < 10 && !host.textContent?.includes('do not have'); i++) await act(async () => new Promise((r) => setTimeout(r, 20)))
   expect(host.textContent).toContain('TAKP’s spawn tables do not have Clan Crushbone')
   await act(async () => button('Map').click())
-  await act(async () => button('Mark on the game’s map').click())
+  await act(async () => button('Mark every zone').click())
   expect(host.textContent).toContain('Marked 3 spots in 2 zones')
   expect(invoke).toHaveBeenLastCalledWith(
     'slayer:mark',
@@ -127,6 +130,9 @@ it('lists the named left, zone by zone, with what their spawns allow', async () 
   )
   await act(async () => button('Clear marks').click())
   expect(host.textContent).toContain('Could not mark the map: locked')
+  // A zone's own Mark marks that zone alone (LT-674).
+  await act(async () => [...host.querySelectorAll('button')].find((b) => b.textContent === 'Mark')!.click())
+  expect(invoke).toHaveBeenCalledWith('slayer:mark', [{ zone: 'Clan Crushbone', mobs: [], named: ['Lord Darish', 'Emperor Crush'] }], 'hunter')
   // One that does not work in Legends, said so; one said not to work, working again (here, failing).
   expect(host.textContent).toContain('Hunter of BefallenWorks again')
   await act(async () => button('Doesn’t work').click())
@@ -172,10 +178,12 @@ it('finds a zone by any of its words, its achievement or a named, and the zone t
   await type('karana')
   expect(zones()).toEqual([])
   expect(host.textContent).toContain('Nothing to go matches “karana”.')
-  const here = [...host.querySelectorAll('button')].find((b) => b.textContent === 'Kedge Keep')!
-  await act(async () => here.click())
-  expect(input.value).toBe('Kedge Keep')
-  expect(zones()).toEqual(['Kedge Keep'])
+  // The zone the player is in is marked and comes first, keeping its number (LT-672).
+  await type('')
+  expect(zones()).toEqual(['Kedge Keep', 'Clan Crushbone'])
+  expect(host.querySelector('.fp-step.now .fp-zone')?.textContent).toBe('Kedge Keep')
+  expect(host.querySelector('.fp-step.now')?.textContent).toContain('You are here')
+  expect(host.querySelector('.fp-num')?.textContent).toBe('2')
   appState.status.zone = ''
   done()
 })

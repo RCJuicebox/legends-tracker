@@ -2,9 +2,11 @@ import { useMemo, useState } from 'react'
 import { CharacterPicker } from '../../renderer/src/components/CharacterPicker'
 import { ago, api } from '../../renderer/src/api'
 import { useInvoke, useVisibleInterval } from '../../renderer/src/hooks'
-import { useLive } from '../../renderer/src/state'
+import { useActions, useLive, useSettled } from '../../renderer/src/state'
+import { DEFAULT_ACHIEVEMENT_OPTIONS } from '../../shared/overlays'
 import { useNow } from '../../renderer/src/components/TimerBars'
-import { FilterBox, GameCommand, Info, Pending, Tip } from '../../renderer/src/components/ui'
+import { FilterBox, GameCommand, Info, Pending, Tip, ToggleChip } from '../../renderer/src/components/ui'
+import { showToast } from '../../renderer/src/toast'
 import { duration, num, who } from '../../core/format'
 import { usePlanCharacter } from '../slayer/page'
 import { clock } from '../slayer/core'
@@ -87,23 +89,41 @@ export function Hunter() {
   useVisibleInterval(q.reload, 60_000)
   const now = useNow(30_000)
   const [maps, setMaps] = useState<Set<string>>(new Set())
-  const [marked, setMarked] = useState('')
   const [filter, setFilter] = useState('')
   const zoneNow = useLive((l) => l.status.zone)
+  // The achievements overlay's Hunter rows: the switch under Settings › Overlays, here too (LT-677).
+  const { patchSettings } = useActions()
+  const achOverlay = useSettled((s) => s.settings.overlays.find((o) => o.kind === 'achievements'))
+  const onOverlay = (achOverlay?.achievements ?? DEFAULT_ACHIEVEMENT_OPTIONS).hunter ?? true
+  const setOnOverlay = (on: boolean) =>
+    void patchSettings((s) => ({
+      ...s,
+      overlays: s.overlays.map((o) => (o.kind === 'achievements' ? { ...o, achievements: { ...DEFAULT_ACHIEVEMENT_OPTIONS, ...o.achievements, hunter: on } } : o))
+    }))
   const data = q.data
-  const shown = useMemo(() => (data?.zones ?? []).map((z, i) => ({ z, i })).filter(({ z }) => hunterMatch(z, filter)), [data, filter])
-  // The zone the player is in, when it has a Hunter achievement here: a click finds it.
-  const here = data && zoneNow ? hunterHere(data.zones, zoneNow)[0]?.zone : undefined
+  // The achievements of the zone the player is in: marked, and lifted to the top while there (LT-672).
+  const hereSet = useMemo(() => new Set(data && zoneNow ? hunterHere(data.zones, zoneNow).map((z) => z.achievement) : []), [data, zoneNow])
+  const shown = useMemo(
+    () =>
+      (data?.zones ?? [])
+        .map((z, i) => ({ z, i }))
+        .filter(({ z }) => hunterMatch(z, filter))
+        .sort((a, b) => Number(hereSet.has(b.z.achievement)) - Number(hereSet.has(a.z.achievement)) || a.i - b.i),
+    [data, filter, hereSet]
+  )
   const toggleMap = (a: string) => setMaps((m) => (m.has(a) ? new Set([...m].filter((x) => x !== a)) : new Set([...m, a])))
-  const mark = async (on: boolean) => {
-    const marks = on && data ? data.zones.map((z) => ({ zone: z.zone, mobs: [], named: z.left.map((n) => n.name) })) : []
+  /** Marks the named of these zones on the game's map (the Hunter set holds only these); none clears it. Said in a toast (LT-674). */
+  const mark = async (zones: NonNullable<typeof data>['zones']) => {
+    const marks = zones.map((z) => ({ zone: z.zone, mobs: [], named: z.left.map((n) => n.name) }))
     try {
       const r = await api.invoke('slayer:mark', marks, 'hunter')
-      setMarked(
-        on ? `Marked ${num(r.spots)} spots in ${r.zones} zone${r.zones === 1 ? '' : 's'}: pick the LegendsTracker map set in the game’s map window.` : 'Hunter marks cleared.'
+      showToast(
+        marks.length
+          ? `Marked ${num(r.spots)} spot${r.spots === 1 ? '' : 's'} in ${marks.length === 1 ? zones[0].zone : `${r.zones} zones`}: pick the LegendsTracker map set in the game’s map window.`
+          : 'Hunter marks cleared from the LegendsTracker map set.'
       )
     } catch (e) {
-      setMarked(`Could not mark the map: ${e instanceof Error ? e.message : String(e)}`)
+      showToast(`Could not mark the map: ${e instanceof Error ? e.message : String(e)}`, { tone: 'bad' })
     }
   }
   const left = data ? data.zones.reduce((s, z) => s + z.left.length, 0) : 0
@@ -112,7 +132,7 @@ export function Hunter() {
       await api.invoke('hunter:broken', achievement, broken)
       q.reload()
     } catch (e) {
-      setMarked(`Could not save that: ${e instanceof Error ? e.message : String(e)}`)
+      showToast(`Could not save that: ${e instanceof Error ? e.message : String(e)}`, { tone: 'bad' })
     }
   }
 
@@ -161,31 +181,39 @@ export function Hunter() {
                   <b>{data.zones.length}</b> Hunter achievement{data.zones.length === 1 ? '' : 's'} to go, <b>{num(left)}</b> named
                 </span>
                 <FilterBox placeholder="Find a zone or named…" label="Find a zone, achievement or named" value={filter} onChange={setFilter} width={240} />
-                {here && filter !== here && (
-                  <button className="btn small ghost" onClick={() => setFilter(here)} title="Show only the zone you are in">
-                    {here}
-                  </button>
-                )}
                 <span className="spacer" />
-                <Tip text="Puts a blue dot at every spot the named left pop at, on the game’s own map: in a map set of its own, LegendsTracker (a copy of the game’s maps, so its own stay as they are). Pick it in the map window.">
-                  <button className="btn small" onClick={() => void mark(true)}>
-                    Mark on the game’s map
+                {achOverlay && (
+                  <ToggleChip
+                    on={onOverlay}
+                    onChange={setOnOverlay}
+                    title="Show the named left in the zone you are in on the achievements overlay, for every character (the switch under Settings › Overlays)"
+                  >
+                    On the overlay
+                  </ToggleChip>
+                )}
+                <Tip text="Puts a blue dot at every spot the named left pop at, every zone’s, on the game’s own map: in a map set of its own, LegendsTracker (a copy of the game’s maps, so its own stay as they are). Pick it in the map window. A zone’s Mark marks that zone alone.">
+                  <button className="btn small" onClick={() => void mark(data.zones)}>
+                    Mark every zone on the game’s map
                   </button>
                 </Tip>
-                <button className="btn small ghost" onClick={() => void mark(false)} title="Take the Hunter marks off the LegendsTracker map set">
+                <button className="btn small ghost" onClick={() => void mark([])} title="Take the Hunter marks off the LegendsTracker map set">
                   Clear marks
                 </button>
               </div>
-              {marked && <div className="card mb-16 small">{marked}</div>}
               <div className="card mb-16">
                 {!shown.length && <div className="faint small">Nothing to go matches “{filter.trim()}”.</div>}
                 <ol className="fp-steps">
                   {shown.map(({ z, i }) => (
-                    <li key={z.achievement} className="fp-step">
+                    <li key={z.achievement} className={`fp-step${hereSet.has(z.achievement) ? ' now' : ''}`}>
                       <span className="fp-num">{i + 1}</span>
                       <div className="fp-body">
                         <div className="fp-head">
                           <span className="fp-zone">{z.zone}</span>
+                          {hereSet.has(z.achievement) && (
+                            <Tip className="chip fp-now-chip" text="The zone you are in">
+                              You are here
+                            </Tip>
+                          )}
                           <span className="small">{z.achievement}</span>
                           <span className="spacer" />
                           <span className="mono small">
@@ -197,6 +225,24 @@ export function Hunter() {
                           >
                             {z.wait === null ? '—' : `≈ ${duration(z.wait)}`}
                           </Tip>
+                          <button
+                            className="btn small ghost"
+                            onClick={() => toggleMap(z.achievement)}
+                            aria-expanded={maps.has(z.achievement)}
+                            title="Where the named left spawn, on the game’s own map of the zone"
+                          >
+                            Map
+                          </button>
+                          <button className="btn small ghost" onClick={() => void mark([z])} title="Mark this zone’s named alone on the game’s map (the LegendsTracker map set)">
+                            Mark
+                          </button>
+                          <button
+                            className="btn small ghost"
+                            onClick={() => void setBroken(z.achievement, true)}
+                            title="It does not work in Legends: leave it out of the plans and the overlay until you say it works again"
+                          >
+                            Doesn’t work
+                          </button>
                         </div>
                         <div className="small">
                           {z.left.map((n) => (
@@ -208,24 +254,6 @@ export function Hunter() {
                           ))}
                         </div>
                         {z.since.length > 0 && <div className="faint small">Killed since your export: {z.since.join(', ')}</div>}
-                        <div className="row tight fp-effects">
-                          <span className="spacer" />
-                          <button
-                            className="btn small ghost"
-                            onClick={() => void setBroken(z.achievement, true)}
-                            title="It does not work in Legends: leave it out of the plans and the overlay until you say it works again"
-                          >
-                            Doesn’t work
-                          </button>
-                          <button
-                            className="btn small ghost"
-                            onClick={() => toggleMap(z.achievement)}
-                            aria-expanded={maps.has(z.achievement)}
-                            title="Where the named left spawn, on the game’s own map of the zone"
-                          >
-                            Map
-                          </button>
-                        </div>
                         {maps.has(z.achievement) && <SpawnMap zone={z.zone} mobs={z.left.map((n) => n.name)} />}
                       </div>
                     </li>

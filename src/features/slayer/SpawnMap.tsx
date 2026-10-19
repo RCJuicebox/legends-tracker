@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react'
 import { useInvoke } from '../../renderer/src/hooks'
 import { Pending } from '../../renderer/src/components/ui'
 import { duration } from '../../core/format'
@@ -6,9 +6,16 @@ import { waypoint, type SlayerMap } from './spawns'
 
 // A step's zone as the game's own map files draw it, with a dot at every spot its mobs pop at (TAKP's
 // spawn tables, and Legends' own spawns the player found). The game's maps put x to the right and y
-// down, as drawn here.
+// down, as drawn here. The wheel zooms where the pointer is and a drag moves the map; a spot hovered or
+// focused says what pops there and its /waypoint under the map (LT-675).
 
 const PAD = 0.04
+/** The map's tallest, in CSS pixels: its width follows from the zone's shape. */
+const MAX_H = 420
+/** Zoomed in no further than this many times. */
+const MAX_ZOOM = 12
+
+type View = [number, number, number, number]
 
 /** The map's extent: its lines and its spots, a little room around. */
 function box(map: SlayerMap): [number, number, number, number] {
@@ -30,39 +37,113 @@ interface Stand {
   label: string
 }
 
+/** What pops at a spot, its timer and its /waypoint, as one line. */
+const spotText = (s: SlayerMap['spots'][number]) =>
+  `${s.mobs.map((m) => `${m.name}${m.chance < 100 ? ` ${m.chance}%` : ''}`).join(' or ')} · ${s.timer ? `${duration(s.timer)} classic` : (s.where ?? 'Legends')} · ${waypoint(s)}`
+
 function SpawnMapView({ map, stand }: { map: SlayerMap; stand?: Stand }) {
-  const [x, y, w, h] = useMemo(() => box(stand ? { ...map, spots: [...map.spots, { x: -stand.at[1], y: -stand.at[0], z: 0, mobs: [], timer: 0 }] } : map), [map, stand])
+  const whole = useMemo<View>(() => box(stand ? { ...map, spots: [...map.spots, { x: -stand.at[1], y: -stand.at[0], z: 0, mobs: [], timer: 0 }] } : map), [map, stand])
+  const [view, setView] = useState<View>(whole)
+  useEffect(() => setView(whole), [whole])
+  const [x, y, w, h] = view
+  const [hot, setHot] = useState<number | null>(null)
+  const svg = useRef<SVGSVGElement>(null)
+  const drag = useRef<{ px: number; py: number; view: View } | null>(null)
   const path = useMemo(() => {
     const out: string[] = []
     for (let i = 0; i + 3 < map.lines.length; i += 4) out.push(`M${map.lines[i]} ${map.lines[i + 1]}L${map.lines[i + 2]} ${map.lines[i + 3]}`)
     return out.join('')
   }, [map])
+  // The wheel zooms about the pointer. Listened to by hand: React's wheel listener cannot stop the page scrolling.
+  useEffect(() => {
+    const el = svg.current
+    if (!el) return
+    const onWheel = (e: WheelEvent) => {
+      e.preventDefault()
+      const rect = el.getBoundingClientRect()
+      setView(([vx, vy, vw, vh]) => {
+        const k = Math.exp(e.deltaY * 0.0015)
+        const nw = Math.min(whole[2], Math.max(whole[2] / MAX_ZOOM, vw * k))
+        const nh = (nw / vw) * vh
+        const fx = rect.width ? (e.clientX - rect.left) / rect.width : 0.5
+        const fy = rect.height ? (e.clientY - rect.top) / rect.height : 0.5
+        return [vx + (vw - nw) * fx, vy + (vh - nh) * fy, nw, nh]
+      })
+    }
+    el.addEventListener('wheel', onWheel, { passive: false })
+    return () => el.removeEventListener('wheel', onWheel)
+  }, [whole])
+  const down = (e: ReactPointerEvent<SVGSVGElement>) => {
+    if (e.button !== 0) return
+    drag.current = { px: e.clientX, py: e.clientY, view }
+    e.currentTarget.setPointerCapture?.(e.pointerId)
+  }
+  const move = (e: ReactPointerEvent<SVGSVGElement>) => {
+    const d = drag.current
+    const rect = svg.current?.getBoundingClientRect()
+    if (!d || !rect?.width) return
+    const scale = d.view[2] / rect.width
+    setView([d.view[0] - (e.clientX - d.px) * scale, d.view[1] - (e.clientY - d.py) * scale, d.view[2], d.view[3]])
+  }
+  const up = () => (drag.current = null)
+  const zoomed = w < whole[2] - 1e-6
+  // Spots and labels keep their size on screen as the map zooms.
   const r = Math.max(w, h) / 140
   const font = Math.max(w, h) / 70
   return (
-    <svg className="sl-map" viewBox={`${x} ${y} ${w} ${h}`} role="img" aria-label={`Map of ${map.zone} with ${map.spots.length} spawn spots`}>
-      <path d={path} className="sl-map-line" vectorEffect="non-scaling-stroke" />
-      {map.labels
-        .filter((l) => /^to /i.test(l.text))
-        .map((l, i) => (
-          <text key={i} x={l.x} y={l.y} fontSize={font} className="sl-map-label">
-            {l.text}
-          </text>
+    <>
+      <svg
+        ref={svg}
+        className={`sl-map${zoomed ? ' zoomed' : ''}`}
+        style={{ maxWidth: `${Math.round((MAX_H * whole[2]) / whole[3])}px` }}
+        viewBox={`${x} ${y} ${w} ${h}`}
+        role="img"
+        aria-label={`Map of ${map.zone} with ${map.spots.length} spawn spots: the wheel zooms, a drag moves it`}
+        onPointerDown={down}
+        onPointerMove={move}
+        onPointerUp={up}
+        onPointerCancel={up}
+        onDoubleClick={() => setView(whole)}
+      >
+        <path d={path} className="sl-map-line" vectorEffect="non-scaling-stroke" />
+        {map.labels
+          .filter((l) => /^to /i.test(l.text))
+          .map((l, i) => (
+            <text key={i} x={l.x} y={l.y} fontSize={font} className="sl-map-label">
+              {l.text}
+            </text>
+          ))}
+        {map.spots.map((s, i) => (
+          <circle
+            key={i}
+            cx={s.x}
+            cy={s.y}
+            r={r}
+            className={`sl-map-spot${hot === i ? ' hot' : ''}`}
+            tabIndex={0}
+            aria-label={spotText(s)}
+            onPointerEnter={() => setHot(i)}
+            onFocus={() => setHot(i)}
+          >
+            <title>{spotText(s)}</title>
+          </circle>
         ))}
-      {map.spots.map((s, i) => (
-        <circle key={i} cx={s.x} cy={s.y} r={r} className="sl-map-spot">
-          <title>
-            {s.mobs.map((m) => `${m.name}${m.chance < 100 ? ` ${m.chance}%` : ''}`).join(' or ')} · {s.timer ? `${duration(s.timer)} classic` : (s.where ?? 'Legends')} ·{' '}
-            {waypoint(s)}
-          </title>
-        </circle>
-      ))}
-      {stand && (
-        <circle cx={-stand.at[1]} cy={-stand.at[0]} r={r * 2.2} className="sl-map-stand">
-          <title>{stand.label}</title>
-        </circle>
-      )}
-    </svg>
+        {stand && (
+          <circle cx={-stand.at[1]} cy={-stand.at[0]} r={r * 2.2} className="sl-map-stand">
+            <title>{stand.label}</title>
+          </circle>
+        )}
+      </svg>
+      <div className="row tight small sl-map-hot" aria-live="polite">
+        <span className="mono">{hot !== null && map.spots[hot] ? spotText(map.spots[hot]) : 'Point at a spot for what pops there and its /waypoint'}</span>
+        <span className="spacer" />
+        {zoomed && (
+          <button className="btn small ghost" onClick={() => setView(whole)}>
+            Whole zone
+          </button>
+        )}
+      </div>
+    </>
   )
 }
 

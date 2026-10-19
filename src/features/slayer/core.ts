@@ -69,7 +69,10 @@ const ourSide = (by: string) => by === 'You' || /^[A-Z][a-z']+$/.test(by)
  * Reads one stretch of log: zones entered, and kills the player's side made ("You have slain a gnoll!",
  * "A gnoll has been slain by Vonartik!"), each put to the zone it was in. A kill's credit cannot be
  * told as the live counts tell it (the damage meter's roster is not kept with the history), so any
- * named killer is taken for the player's side: near enough for where kills come from.
+ * named killer is taken for the player's side: near enough for where kills come from. Measured on
+ * 2026-10-19 over the player's live log (LT-668): such killers, not the player or a pet of theirs,
+ * were 3.2% of 25,371 kills, 0–1% at the main camps, 8% in the Estate of Unrest and 44% in the Plane
+ * of Hate, a raid's kills that the group shares; so the rule stays.
  */
 export function readKillLine(line: LogLine, into: SlayerKillTallies): void {
   const z = zoneEntered(line.text)

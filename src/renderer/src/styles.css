@@ -3189,12 +3189,26 @@ button.tree-item {
   background: color-mix(in srgb, var(--accent) 10%, transparent);
   color: var(--accent-2);
 }
+/* A chip's off state: muted and outlined, not struck through (struck reads as "disabled", LT-665, LT-579). */
 .toggle-chip.off {
   background: none;
   border: 1px dashed var(--line-2);
   color: var(--text-3);
-  text-decoration: line-through;
-  text-decoration-color: rgb(var(--ink) / 0.25);
+}
+/* Waiting for what was kept: drawn neither on nor off (LT-665). */
+.toggle-chip.waiting {
+  visibility: hidden;
+}
+/* An achievement done: ticked and quiet, still there to turn off (LT-664). */
+.toggle-chip.done {
+  color: var(--text-3);
+}
+/* Plan › Slayer: steps the search does not find, dimmed rather than gone (LT-662). */
+.sl-dim {
+  opacity: 0.4;
+}
+.sl-goal {
+  gap: 2px;
 }
 /* A small trend line beside a number (respawn gaps). */
 .sparkline {
@@ -4210,43 +4224,69 @@ input[aria-invalid='true'] {
 }
 
 /* Plan › Slayer: the rule-out cross beside a mob a step kills. */
+/* A mob's rule-out, after the whole kind: a 20 px target in a colour that reads as a control (LT-660). */
 .btn.small.ghost.sl-out {
-  padding: 0 4px;
+  padding: 0;
   margin-left: 2px;
-  min-height: 0;
-  line-height: 1.2;
-  font-size: 10px;
-  opacity: 0.5;
-  vertical-align: baseline;
+  min-width: 20px;
+  min-height: 20px;
+  line-height: 18px;
+  font-size: 11px;
+  color: var(--text-3);
+  vertical-align: middle;
+}
+.sl-substep:hover .btn.small.ghost.sl-out,
+.sl-substep:focus-within .btn.small.ghost.sl-out {
+  color: var(--text-2);
 }
 .btn.small.ghost.sl-out:hover,
 .btn.small.ghost.sl-out:focus-visible {
-  opacity: 1;
+  color: var(--text);
+}
+/* One kind of mob: its name, count, spawns and ✕ wrap as one (LT-660). */
+.sl-kind {
+  white-space: nowrap;
+}
+/* A step's notes (what limits it, what it costs, the camp's own words), a dot between (LT-659). */
+.sl-note + .sl-note::before {
+  content: '· ';
 }
 
-/* Plan › Slayer: what a mob's spawns allow, beside its kills, and a step's map. */
+/* Plan › Slayer: what a mob's spawns allow, beside its kills, and a step's map. No extra fading inside
+   the faint line: it read under AA in the light theme (LT-661). */
 .sl-spawn {
-  font-size: 11px;
-  opacity: 0.8;
+  font-size: 12px;
 }
 
 .sl-map-wrap {
   margin-top: 6px;
 }
 
+/* As wide as the zone's shape allows at 420 px tall (a max-width set from the viewBox), not a strip in a slab (LT-675). */
 .sl-map {
   display: block;
   width: 100%;
+  height: auto;
   max-height: 420px;
   background: var(--well);
   border-radius: var(--radius-sm);
   box-shadow: var(--shadow);
+  cursor: grab;
+  touch-action: none;
+}
+.sl-map:active {
+  cursor: grabbing;
 }
 
 .sl-map-line {
   fill: none;
-  stroke: rgb(var(--ink) / 0.3);
+  stroke: rgb(var(--ink) / 0.5);
   stroke-width: 1;
+}
+
+.sl-map-hot {
+  min-height: 24px;
+  color: var(--text-2);
 }
 
 .sl-map-label {
@@ -4265,4 +4305,11 @@ input[aria-invalid='true'] {
   stroke: var(--bg);
   stroke-width: 1;
   vector-effect: non-scaling-stroke;
+  cursor: pointer;
+}
+.sl-map-spot.hot,
+.sl-map-spot:focus-visible {
+  stroke: var(--text);
+  stroke-width: 2.5;
+  outline: none;
 }
