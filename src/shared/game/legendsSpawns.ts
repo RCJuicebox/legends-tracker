@@ -14,6 +14,15 @@ export interface LegendsSpawn {
   said: string
 }
 
+/** A spot the player found a named at in play (hunter-spots.json, FEAT-020): /loc order, and when it was said. */
+export interface FoundSpot {
+  zone: string
+  name: string
+  at: [number, number, number?]
+  where?: string
+  on: number
+}
+
 export const LEGENDS_SPAWNS: LegendsSpawn[] = [
   {
     zone: 'The Western Plains of Karana',

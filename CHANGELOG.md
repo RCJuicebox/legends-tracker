@@ -4,6 +4,7 @@ What changed in each version. The release workflow publishes a version's section
 
 ## Unreleased
 
+- **Hunter: keep the spots you find.** **Found it here** beside a named on the Hunter page keeps where you found it (your `/loc` at a click, or as the game prints it, and a few words). It goes on the zone's map, in the marks on the game's map, and the named no longer says it is not in TAKP's tables.
 - **Type `/loc` and the app knows where you are.** The Slayer and Hunter maps put a "you" where you last typed it in their zone, and the achievements overlay's Hunter rows say how far each named left is and which way ("≈ 320 to the north-east"), from its nearest spot.
 - **Spell timers: a bard song stays up while you sing it.** Each pulse of a song landing on you runs its timer on, so Selo's no longer runs out (and cues its recast) halfway through a song.
 - **Spell timers: your pet's buff fading ends the timer on your pet,** not a groupmate's timer for the same buff. A fixed duration set on a DoT now holds after its first tick (it ended a tick early), "did not take hold" is read as Legends prints it (with what blocked it), and running out of mana or being stunned no longer throws away a cast already on its way.

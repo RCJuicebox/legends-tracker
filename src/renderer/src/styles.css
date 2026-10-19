@@ -4358,3 +4358,14 @@ input[aria-invalid='true'] {
   stroke-width: 2.5;
   outline: none;
 }
+
+/* Plan › Hunter: a spot the player found a named at, and the form that keeps one (FEAT-020). */
+.hu-found .chip button {
+  margin-left: 4px;
+  color: inherit;
+}
+.hu-found-form {
+  display: inline-flex;
+  flex-wrap: wrap;
+  margin: 4px 0 4px 6px;
+}

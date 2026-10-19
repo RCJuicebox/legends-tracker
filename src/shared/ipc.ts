@@ -32,6 +32,7 @@ import type { AchMarks, AchievementsView, CharacterSheet, GameFolderCheck, Inven
 import type { CombatSnapshot, Segment, SegmentSummary, StitchedTimeline } from './combat'
 import type { AppSettings, AudioSettings, CharacterSettings, FocusSource, MeterOverlayOptions, OverlayConfig, SpellRule } from './settings'
 import type { Trigger, TriggerTestResult } from './triggers'
+import type { FoundSpot } from './game/legendsSpawns'
 import type {
   ArchiveInfo,
   ArchiveOutcome,
@@ -410,6 +411,12 @@ export interface Invokes {
   'hunter:plan': (character: string) => HunterPlanData
   /** Says a Hunter achievement does not work in Legends (left out of the plans and the overlay), or works again; the list after. */
   'hunter:broken': (achievement: string, broken: boolean) => string[]
+  /** Keeps a spot the player found a named at (as /loc or /waypoint gives it) with a few words; every spot kept after (FEAT-020). */
+  'hunter:found': (zone: string, name: string, spot: string, words: string) => FoundSpot[]
+  /** Forgets one found spot, by when it was said; every spot kept after. */
+  'hunter:unfound': (zone: string, name: string, on: number) => FoundSpot[]
+  /** Every spot the player found. */
+  'hunter:foundSpots': () => FoundSpot[]
   /** Where the character being played is in its faction plan, and its Slayer counts since its achievements export. */
   'achievements:track': (watching?: boolean) => AchievementTrack | null
   /** The player's last /loc, while they are still in its zone; null without one (FEAT-023). */
@@ -624,6 +631,9 @@ const INVOKE_CHANNELS: Record<InvokeChannel, true> = {
   'slayer:mark': true,
   'hunter:plan': true,
   'hunter:broken': true,
+  'hunter:found': true,
+  'hunter:unfound': true,
+  'hunter:foundSpots': true,
   'achievements:track': true,
   'game:location': true,
   'character:exports': true,

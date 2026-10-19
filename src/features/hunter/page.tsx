@@ -12,6 +12,7 @@ import { useCharacterChoice } from '../../renderer/src/character'
 import { clock } from '../slayer/core'
 import { SpawnMap } from '../slayer/SpawnMap'
 import { hunterHere, hunterMatch, type HunterNamed } from './core'
+import { FoundHere } from './FoundHere'
 
 // Plan › Hunter: each Hunter achievement not done, the named it still wants, and what classic's spawn
 // tables say of each (core.ts), the zones quickest to finish first. The achievements overlay shows
@@ -39,7 +40,7 @@ function NamedSpawn({ n }: { n: HunterNamed }) {
     return (
       <Tip
         className="mono sl-spawn"
-        text={`Legends’ own, not in TAKP’s tables: the spots ${n.legends.said.replace(/,.*$/, '')} found${n.legends.ph ? `; it pops in place of ${n.legends.ph.join(' or ')}` : ''}. Its odds and timer are not known; Map shows where.`}
+        text={`Legends’ own, not in TAKP’s tables: the spots found in play (${n.legends.said})${n.legends.ph ? `; it pops in place of ${n.legends.ph.join(' or ')}` : ''}. Its odds and timer are not known; Map shows where.`}
       >
         {' '}
         ({n.legends.spots === 1 ? '1 spot' : `${num(n.legends.spots)} spots`}
@@ -87,6 +88,14 @@ export function Hunter() {
   const character = chars.character
   const q = useInvoke(character ? 'hunter:plan' : null, [character])
   useVisibleInterval(q.reload, 60_000)
+  // The spots the player found (FEAT-020), and their last /loc for "Use my /loc".
+  const foundQ = useInvoke('hunter:foundSpots')
+  const where = useInvoke('game:location')
+  useVisibleInterval(where.reload, 30_000)
+  const setFound = (all: NonNullable<typeof foundQ.data>) => {
+    foundQ.setData(all)
+    q.reload()
+  }
   const now = useNow(30_000)
   const [maps, setMaps] = useState<Set<string>>(new Set())
   const [filter, setFilter] = useState('')
@@ -252,6 +261,13 @@ export function Hunter() {
                               <b>{n.name}</b>
                               <NamedSpawn n={n} />
                               <Seen n={n} />
+                              <FoundHere
+                                zone={z.zone}
+                                name={n.name}
+                                spots={(foundQ.data ?? []).filter((s) => s.name === n.name && s.zone === z.zone)}
+                                location={where.data ?? null}
+                                onChange={setFound}
+                              />
                             </div>
                           ))}
                         </div>

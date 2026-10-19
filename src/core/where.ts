@@ -54,3 +54,15 @@ export function nearText(n: { dist: number; dir: string }, locAt: number, now: n
   const mins = Math.max(0, Math.round((now - locAt) / 60_000))
   return `≈ ${num(n.dist)} to the ${n.dir} (your /loc ${mins ? `${mins} min ago` : 'just now'})`
 }
+
+/**
+ * A spot as the player gives it, in the /loc order: the game's "Your Location is y, x, z", a
+ * "/waypoint y, x", or the numbers alone ("661, -301" or "661.88, -301.44, -40.42"); null otherwise.
+ */
+export function parseSpot(text: string): [number, number, number?] | null {
+  const t = text.trim().replace(/^Your Location is\s+|^\/(?:waypoint|loc)\s+/i, '')
+  const m = /^(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)(?:\s*,\s*(-?\d+(?:\.\d+)?))?$/.exec(t)
+  if (!m) return null
+  const [y, x] = [Math.round(Number(m[1])), Math.round(Number(m[2]))]
+  return m[3] === undefined ? [y, x] : [y, x, Math.round(Number(m[3]))]
+}

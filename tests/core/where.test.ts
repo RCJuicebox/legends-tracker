@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { bearing, locPoint, nearest, nearText, parseLoc } from '../../src/core/where'
+import { bearing, locPoint, nearest, nearText, parseLoc, parseSpot } from '../../src/core/where'
 
 // The game's /loc (FEAT-023): y, x, z as printed; on the map north is up and east is right.
 
@@ -24,5 +24,15 @@ describe('where the player is', () => {
   it('says it with the age of the /loc', () => {
     expect(nearText({ dist: 1320, dir: 'north-east' }, 0, 4 * 60_000)).toBe('≈ 1,320 to the north-east (your /loc 4 min ago)')
     expect(nearText({ dist: 5, dir: 'west' }, 0, 10_000)).toBe('≈ 5 to the west (your /loc just now)')
+  })
+})
+
+describe('a spot as the player gives it (FEAT-020)', () => {
+  it('takes /loc as printed, a /waypoint, or the numbers, rounded, in the /loc order', () => {
+    expect(parseSpot('Your Location is 661.88, -301.44, -40.42')).toEqual([662, -301, -40])
+    expect(parseSpot('/waypoint -649, -13825')).toEqual([-649, -13825])
+    expect(parseSpot(' 882 , -6985 ')).toEqual([882, -6985])
+    expect(parseSpot('by the bridge')).toBeNull()
+    expect(parseSpot('1, 2, 3, 4')).toBeNull()
   })
 })

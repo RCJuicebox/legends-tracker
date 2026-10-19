@@ -226,11 +226,27 @@ export function spotsOf(z: TakpZone, mobs: string[]): MapSpot[] {
   return out
 }
 
-/** Legends' own spawns of these mobs in a zone (legendsSpawns.ts): what TAKP's tables lack. */
+/** The spots the player found in play (hunter-spots.json, FEAT-020), beside the built-in ones; main sets them as it reads and saves them. */
+let found: LegendsSpawn[] = []
+
+export function setFoundSpawns(list: LegendsSpawn[]): void {
+  found = list
+}
+
+/**
+ * Legends' own spawns of these mobs in a zone (legendsSpawns.ts, and the player's): what TAKP's tables
+ * lack. One a named both lists have is one, with every spot and both sayings.
+ */
 export function legendsSpawnsOf(zone: string, mobs: string[]): LegendsSpawn[] {
   const want = new Set(mobs.map(lower))
   const k = zoneKey(zone)
-  return LEGENDS_SPAWNS.filter((s) => zoneKey(s.zone) === k && want.has(lower(s.name)))
+  const by = new Map<string, LegendsSpawn>()
+  for (const s of [...LEGENDS_SPAWNS, ...found]) {
+    if (zoneKey(s.zone) !== k || !want.has(lower(s.name))) continue
+    const had = by.get(lower(s.name))
+    by.set(lower(s.name), had ? { ...had, spots: [...had.spots, ...s.spots], said: `${had.said}; ${s.said}`, ...(had.ph || s.ph ? { ph: had.ph ?? s.ph } : {}) } : s)
+  }
+  return [...by.values()]
 }
 
 /**
