@@ -17,5 +17,5 @@
     "isolatedModules": true,
     "types": ["node"]
   },
-  "include": ["src", "tests", "scripts", "electron.vite.config.ts", "vitest.config.ts"]
+  "include": ["src", "tests", "scripts", "electron.vite.config.ts", "vitest.config.mts", "vitest.bench.config.mts", "vitest.replay.config.mts"]
 }

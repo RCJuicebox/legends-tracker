@@ -2,6 +2,10 @@
 
 What changed in each version. The release workflow publishes a version's section as its release notes, and installed copies show them when an update arrives.
 
+## Unreleased
+
+- **Electron 44.9,** with Chromium 152.0.7977.167 and its security fixes. The app is now built with Vite 8.
+
 ## 2.15.0 (2026-10-19)
 
 - **Slayer: the step you are at, at your pace now.** While you kill there, the overlay's step and the Slayer page's say how long it takes at the pace of your last twenty minutes ("At your pace now (120/h) ≈ 1 h 40 min; the plan assumed 84/h").

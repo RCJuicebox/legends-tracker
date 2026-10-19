@@ -15,7 +15,7 @@ quotes, 180 columns, LF line ends), knip (no export, file or package that nothin
 points are in `knip.json`), knip again leaving the tests out (an export only a test uses is dead
 code: tag it `@public` if it is there for the tests on purpose) and the tests. `npm run format` fixes the
 formatting. `npm run coverage` runs the tests with coverage and fails when a folder falls below its
-floor in `vitest.config.ts`; raise a floor when you add tests, never lower one to get a change in.
+floor in `vitest.config.mts`; raise a floor when you add tests, never lower one to get a change in.
 After `npm run build`, `npm run smoke` starts the built app on a throwaway profile. CI runs all of it.
 
 A change a player would notice gets a line in `CHANGELOG.md` under **Unreleased**: a bold lead
