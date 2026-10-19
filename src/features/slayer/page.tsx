@@ -13,6 +13,7 @@ import {
   DEFAULT_CHOICES,
   goalsInPlay,
   guideTip,
+  spotFor,
   spotTip,
   stepKills,
   planSlayer,
@@ -489,7 +490,16 @@ export function Slayer() {
                                         Rule out
                                       </button>
                                     </div>
-                                    {maps.has(i) && <SpawnMap zone={zone} mobs={killed.map((k) => k.name)} />}
+                                    {maps.has(i) && (
+                                      <SpawnMap
+                                        zone={zone}
+                                        mobs={killed.map((k) => k.name)}
+                                        stand={(() => {
+                                          const s = spotFor(zone, data.goals[st.focus[0]]?.name ?? '')
+                                          return s?.at ? { at: s.at, label: `${s.tip} (${s.said})` } : undefined
+                                        })()}
+                                      />
+                                    )}
                                   </div>
                                 )
                               })}

@@ -24,8 +24,14 @@ function box(map: SlayerMap): [number, number, number, number] {
   return [x0 - pad, y0 - pad, x1 - x0 + 2 * pad, y1 - y0 + 2 * pad]
 }
 
-function SpawnMapView({ map }: { map: SlayerMap }) {
-  const [x, y, w, h] = useMemo(() => box(map), [map])
+/** Where players say to stand, as /waypoint takes it (y, x), and what they say of it. */
+interface Stand {
+  at: [number, number]
+  label: string
+}
+
+function SpawnMapView({ map, stand }: { map: SlayerMap; stand?: Stand }) {
+  const [x, y, w, h] = useMemo(() => box(stand ? { ...map, spots: [...map.spots, { x: -stand.at[1], y: -stand.at[0], z: 0, mobs: [], timer: 0 }] } : map), [map, stand])
   const path = useMemo(() => {
     const out: string[] = []
     for (let i = 0; i + 3 < map.lines.length; i += 4) out.push(`M${map.lines[i]} ${map.lines[i + 1]}L${map.lines[i + 2]} ${map.lines[i + 3]}`)
@@ -51,23 +57,29 @@ function SpawnMapView({ map }: { map: SlayerMap }) {
           </title>
         </circle>
       ))}
+      {stand && (
+        <circle cx={-stand.at[1]} cy={-stand.at[0]} r={r * 2.2} className="sl-map-stand">
+          <title>{stand.label}</title>
+        </circle>
+      )}
     </svg>
   )
 }
 
 /** A step's map, asked of main when shown. */
-export function SpawnMap({ zone, mobs }: { zone: string; mobs: string[] }) {
+export function SpawnMap({ zone, mobs, stand }: { zone: string; mobs: string[]; stand?: Stand }) {
   const q = useInvoke('slayer:map', [zone, mobs], [zone, mobs.join('|')])
   if (!q.data) return <Pending error={q.error} retry={q.reload} what="the map" />
   const map = q.data
   if (!map.short) return <div className="faint small">TAKP’s spawn tables do not have {zone}.</div>
   return (
     <div className="sl-map-wrap">
-      <SpawnMapView map={map} />
+      <SpawnMapView map={map} stand={stand} />
       <div className="faint small">
         {map.spots.length
           ? `${map.spots.length} spot${map.spots.length === 1 ? '' : 's'} (${map.spots.some((s) => !s.timer) ? 'TAKP’s classic tables, and Legends’ own as found' : 'classic, from TAKP'})`
           : 'No spot of these mobs in TAKP’s tables'}
+        {stand && ` · the ring: where to stand, /waypoint ${stand.at[0]}, ${stand.at[1]}`}
         {!map.lines.length && ' · the game’s map for this zone was not found'}
       </div>
     </div>

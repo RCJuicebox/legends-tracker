@@ -963,9 +963,13 @@ export function slayerPlanView(plan: SlayerPlan, goals: SlayerGoal[], choices: P
 
 /** Where in a zone players say to be for an achievement (SLAYER_SPOTS), with who said it; undefined where nobody has. */
 export function spotTip(zone: string, achievement: string): string | undefined {
-  const s = SLAYER_SPOTS.find((x) => zoneKey(x.zone) === zoneKey(zone) && x.for.some((a) => metaName(a) === metaName(achievement)))
+  const s = spotFor(zone, achievement)
   return s && `${s.tip} (${s.said})`
 }
+
+/** The spot players name in a zone for an achievement (SLAYER_SPOTS), where to stand among it; undefined where nobody has. */
+export const spotFor = (zone: string, achievement: string) =>
+  SLAYER_SPOTS.find((x) => zoneKey(x.zone) === zoneKey(zone) && x.for.some((a) => metaName(a) === metaName(achievement)))
 
 /** What eqlwiki's Slayer guide says of an achievement: where its kills are, in the guide's words; undefined where it says nothing. */
 export function guideTip(achievement: string, guide: SlayerGuideTip[] = SLAYER_GUIDE): string | undefined {

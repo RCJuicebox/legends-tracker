@@ -7,6 +7,7 @@ import {
   DEFAULT_CHOICES,
   emptyKillTallies,
   guideTip,
+  spotFor,
   spotTip,
   joinKillTallies,
   joinMoves,
@@ -179,6 +180,10 @@ describe('Slayer plan: eqlwiki’s Slayer guide', () => {
     expect(spotTip('Lesser Faydark', 'legendary creatures')).toContain('(the player, 2026-10-15)')
     expect(spotTip('The Lesser Faydark', 'Orc Stomp!')).toBeUndefined()
     expect(spotTip('The Rathe Mountains', 'Shorter People')).toBeUndefined()
+    // Where to stand, as /waypoint takes it, for the step's map.
+    expect(spotTip('The Stonebrunt Mountains', 'Monkey Business')).toContain('/waypoint 3370, -70')
+    expect(spotFor('Stonebrunt Mountains', 'monkey business')?.at).toEqual([3370, -70])
+    expect(spotFor('The Lesser Faydark', 'Shorter People')?.at).toBeUndefined()
   })
 
   it('says what it says of an achievement, however the game writes its name', () => {

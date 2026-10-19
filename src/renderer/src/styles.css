@@ -4215,6 +4215,12 @@ input[aria-invalid='true'] {
   opacity: 0.8;
 }
 
+.sl-map-stand {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 2.5;
+  vector-effect: non-scaling-stroke;
+}
 .sl-map-spot {
   fill: var(--red);
   stroke: var(--bg);

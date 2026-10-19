@@ -23,8 +23,18 @@ export interface SlayerCamp {
   said: string
 }
 
-/** Where in a zone, as players say, for the achievements named: shown with a step there for one of them, whatever paces it. */
-export const SLAYER_SPOTS: { zone: string; for: string[]; tip: string; said: string }[] = [
+/**
+ * Where in a zone, as players say, for the achievements named: shown with a step there for one of
+ * them, whatever paces it; `at`, where to stand, as /waypoint takes it (y, x), marked on its map.
+ */
+export const SLAYER_SPOTS: { zone: string; for: string[]; tip: string; said: string; at?: [number, number] }[] = [
+  {
+    zone: 'The Stonebrunt Mountains',
+    for: ['Monkey Business'],
+    tip: 'Stand at /waypoint 3370, -70: three graniteback spots within 50 of it, three more a short pull; about 34 gorillas an hour, with tigers, pandas and kejekan between',
+    said: 'the player, 2026-10-18',
+    at: [3370, -70]
+  },
   {
     zone: 'The Lesser Faydark',
     for: ['Shorter People', 'Legendary Creatures'],
