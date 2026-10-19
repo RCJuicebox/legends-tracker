@@ -6,7 +6,7 @@ import { useInvoke, useVisibleInterval } from '../../renderer/src/hooks'
 import { useRemembered } from '../../renderer/src/remember'
 import { usePickedCharacter } from '../../renderer/src/character'
 import { useNow } from '../../renderer/src/components/TimerBars'
-import { Disclosure, ErrorText, FilterBox, GameCommand, Info, Pending, Segmented, SortTh, Tabs, Tip, ToggleChip, type Sort } from '../../renderer/src/components/ui'
+import { Disclosure, ErrorText, FilterBox, GameCommand, Info, Pending, Segmented, SettingsLink, SortTh, Tabs, Tip, ToggleChip, type Sort } from '../../renderer/src/components/ui'
 import { duration, num, when, who, wikiUrl } from '../../core/format'
 import {
   STANDING_MAX,
@@ -218,7 +218,8 @@ export function Factions() {
           <Pending error={chars.error} retry={chars.reload} what="your characters" />
         ) : !character ? (
           <div className="card empty">
-            No character yet. Choose the game folder on the Settings page, then play with logging on (/log on) or type <GameCommand cmd="/outputfile faction" /> in game.
+            No character yet. Choose the game folder on <SettingsLink tab="general">Settings › General</SettingsLink>, then play with logging on (/log on) or type{' '}
+            <GameCommand cmd="/outputfile faction" /> in game.
           </div>
         ) : (
           <PlanTab key={character} character={character} view={view ?? null} />
@@ -266,7 +267,8 @@ export function Factions() {
             <Pending error={chars.error} retry={chars.reload} what="your characters" />
           ) : !character ? (
             <div className="card empty">
-              No character yet. Choose the game folder on the Settings page, then play with logging on (/log on) or type <GameCommand cmd="/outputfile faction" /> in game.
+              No character yet. Choose the game folder on <SettingsLink tab="general">Settings › General</SettingsLink>, then play with logging on (/log on) or type{' '}
+              <GameCommand cmd="/outputfile faction" /> in game.
             </div>
           ) : !view ? (
             <Pending error={q.error} retry={q.reload} what="the factions" hint="The first look reads the whole log and its archives." />
@@ -410,7 +412,7 @@ function AchievementCell({ a, s }: { a: FactionRowAchievement | null; s: Faction
   return (
     <Tip className="row tight" text={`${a.name}: open, ${why}. Done at ${STANDING_MAX}.`}>
       <span className="chip warn">open</span>
-      <span className="faint small">{STANDING_MAX - s.value} to go</span>
+      <span className="faint small">{num(STANDING_MAX - s.value)} to go</span>
     </Tip>
   )
 }
@@ -434,7 +436,7 @@ function Standing({ s, basis }: { s: FactionStandingNow | null; basis: ConBasis 
       <span className={`chip${band.tone === 'plain' ? '' : ` ${band.tone}`}`}>{band.word}</span>
       {band.next && (
         <span className="faint small">
-          {band.next.points} to {band.next.word}
+          {num(band.next.points)} to {band.next.word}
         </span>
       )}
     </Tip>

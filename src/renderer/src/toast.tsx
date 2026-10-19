@@ -14,12 +14,13 @@ interface Toast {
 
 let toasts: Toast[] = []
 let nextId = 0
-/** The pointer is on the toasts: none goes while someone may be reading it. */
+/** The pointer is on the toasts, or focus is in them (an Undo tabbed to): none goes while someone may be reading it (LT-578). */
 let hovering = false
+let focused = false
 
 /** Takes a toast down when its time is up, or a moment later while the pointer rests on the toasts. */
 function expire(id: number): void {
-  if (hovering) setTimeout(() => expire(id), 1000)
+  if (hovering || focused) setTimeout(() => expire(id), 1000)
   else dismissToast(id)
 }
 const listeners = new Set<() => void>()
@@ -31,7 +32,7 @@ function emit(): void {
 function dismissToast(id: number): void {
   toasts = toasts.filter((t) => t.id !== id)
   // The last one gone from under the pointer: no leave event comes, so the next toasts must not wait on it.
-  if (!toasts.length) hovering = false
+  if (!toasts.length) hovering = focused = false
   emit()
 }
 
@@ -93,7 +94,14 @@ function subscribe(l: () => void): () => void {
 export function Toasts() {
   const list = useSyncExternalStore(subscribe, () => toasts)
   return (
-    <div className="toasts" aria-live="polite" onMouseEnter={() => (hovering = true)} onMouseLeave={() => (hovering = false)}>
+    <div
+      className="toasts"
+      aria-live="polite"
+      onMouseEnter={() => (hovering = true)}
+      onMouseLeave={() => (hovering = false)}
+      onFocus={() => (focused = true)}
+      onBlur={(e) => (focused = e.currentTarget.contains(e.relatedTarget as Node | null))}
+    >
       {list.map((t) => (
         <div key={t.id} className={`toast ${t.tone}`} role={t.tone === 'bad' ? 'alert' : undefined}>
           <span className="grow">{t.text}</span>

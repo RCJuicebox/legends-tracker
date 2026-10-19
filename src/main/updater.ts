@@ -122,7 +122,7 @@ export class Updater {
     if (!version || version === app.getVersion()) return
     this.held = version
     log.warn(
-      `The install of ${version} was started last time and did not take (this is ${app.getVersion()}): it is not restarted into by itself again; Restart and update in Settings tries once more`
+      `The install of ${version} was started last time and did not take (this is ${app.getVersion()}): it is not restarted into by itself again; Restart and update on Settings › General tries once more`
     )
   }
 

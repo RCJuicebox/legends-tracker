@@ -1,6 +1,7 @@
 import { Tip } from '../../../renderer/src/components/ui'
 import type { PlanStep } from '../planTypes'
 import { plain, signed } from './parts'
+import { num } from '../../../core/format'
 
 /**
  * What a step does to the achievements: done here, raised on the way, lowered, and what it takes off
@@ -18,10 +19,10 @@ export function Effects({ step, labels }: { step: PlanStep; labels?: Record<stri
         </Tip>
       ))}
       {step.finishes.map((f) => (
-        <span
+        <Tip
           key={f}
           className="chip will"
-          title={
+          text={
             step.onTheWay[f]
               ? `Done here on the way: you locked it in to ${step.onTheWay[f]}, but this step gets it to 2000 first, so that is not needed for it`
               : labels?.[f]
@@ -34,16 +35,16 @@ export function Effects({ step, labels }: { step: PlanStep; labels?: Record<stri
           {f}
           {labels?.[f] ? ` (${labels[f]})` : ''}
           {step.onTheWay[f] ? ' (on the way)' : step.locked.includes(f) ? ' (locked)' : ''}
-        </span>
+        </Tip>
       ))}
       {step.reaches.map((r) => (
-        <span
+        <Tip
           key={`reach ${r.faction} ${r.opens}`}
           className="chip fp-reach"
-          title={`Raised to ${r.to.toLocaleString()}, where ${r.opens}'s NPC takes it (${r.band}): a quicker way than going on with this`}
+          text={`Raised to ${plain(r.to)}, where ${r.opens}'s NPC takes it (${r.band}): a quicker way than going on with this`}
         >
           {r.faction} to {plain(r.to)} → opens {r.opens}
-        </span>
+        </Tip>
       ))}
       {also.map(([f, v]) => (
         <Tip key={f} className="chip" text="Raised on the way; finished in a later step">
@@ -66,17 +67,17 @@ export function Effects({ step, labels }: { step: PlanStep; labels?: Record<stri
         </Tip>
       ))}
       {maxed.length > 0 && (
-        <span
+        <Tip
           className="faint small"
-          title={maxed
+          text={`Points taken off factions at 2000: ${maxed
             .sort((a, b) => b[1] - a[1])
             .map(([f, v]) => `${f} ${signed(-v)}`)
-            .join('\n')}
+            .join(', ')}`}
         >
           {maxed.length <= 2
-            ? `takes ${maxed.map(([f, v]) => `${Math.round(v).toLocaleString()} off ${f}`).join(' and ')} (maxed)`
-            : `takes ${Math.round(maxed.reduce((n, [, v]) => n + v, 0)).toLocaleString()} off ${maxed.length} maxed factions`}
-        </span>
+            ? `takes ${maxed.map(([f, v]) => `${num(v)} off ${f}`).join(' and ')} (maxed)`
+            : `takes ${num(maxed.reduce((n, [, v]) => n + v, 0))} off ${maxed.length} maxed factions`}
+        </Tip>
       )}
     </>
   )

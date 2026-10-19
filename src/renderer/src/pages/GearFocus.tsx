@@ -3,7 +3,7 @@ import { restrictions } from '../../../core/gearFinder'
 import { focusValue, KIND_LABELS, KIND_ORDER, KIND_WORTH, type FocusInfo, type FocusLine } from '../../../core/itemFocus'
 import { type FocusCandidate, type GearModel, type OwnedFocus } from '../gear/useGearModel'
 import { DAY_WINDOWS, Info, Pending, Segmented } from '../components/ui'
-import { num, pct as pctOf, wikiUrl } from '../../../core/format'
+import { isoDays, num, pct as pctOf, wikiUrl } from '../../../core/format'
 
 /** A focus figure, given as a percentage already (10.5), to one place. */
 export const pct = (n: number) => pctOf(n / 100, 1)
@@ -52,7 +52,7 @@ export function FocusTab({ m }: { m: GearModel }) {
   if (!m.report) {
     return (
       <div className="card">
-        <Pending what="focus effects" hint="If this stays, check the game folder in Settings: focus effects come from its spells_us.txt." />
+        <Pending what="focus effects" hint="If this stays, check the game folder on Settings › General: focus effects come from its spells_us.txt." />
       </div>
     )
   }
@@ -101,7 +101,7 @@ export function FocusTab({ m }: { m: GearModel }) {
           <Segmented label="Judged on what you cast" value={m.days} onChange={m.setDays} options={DAY_WINDOWS} />
           <span className="muted">
             {r.basis === 'casts' && r.window
-              ? `${num(r.window.total)} casts from ${r.window.from} to ${r.window.to}: ${top.join(' · ')}${r.uses.length > 6 ? '…' : ''}`
+              ? `${num(r.window.total)} casts from ${isoDays(r.window.from)} to ${isoDays(r.window.to)}: ${top.join(' · ')}${r.uses.length > 6 ? '…' : ''}`
               : 'No casts in your log for this window, so every spell your classes get counts alike.'}
           </span>
         </div>

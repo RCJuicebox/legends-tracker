@@ -5,7 +5,7 @@ import { useAchievementTrack, useInvoke, useLatest, useSameContents, useVisibleI
 import { useActions, useSettled } from '../../renderer/src/state'
 import { useCharacterRecord } from '../../renderer/src/character'
 import { useNow } from '../../renderer/src/components/TimerBars'
-import { ConfirmButton, Disclosure, GameCommand, Info, Pending, Segmented, Switch, Tip } from '../../renderer/src/components/ui'
+import { ConfirmButton, Disclosure, GameCommand, Info, Pending, Segmented, SettingsLink, Switch, Tip } from '../../renderer/src/components/ui'
 import { duration, num, who, wikiUrl } from '../../core/format'
 import { STANDING_MAX, standingBand, type FactionView } from './core'
 import { runPlan, Superseded } from './planRunner'
@@ -331,8 +331,8 @@ export function PlanTab({ character, view }: { character: string; view: FactionV
   if (data.noAchievementList)
     return (
       <div className="card empty">
-        No faction achievements to plan: the game folder set on the Settings page has no achievement list (Resources/Achievements/AchievementsClient.txt). Check that it is the
-        EverQuest Legends folder.
+        No faction achievements to plan: the game folder set on <SettingsLink tab="general">Settings › General</SettingsLink> has no achievement list
+        (Resources/Achievements/AchievementsClient.txt). Check that it is the EverQuest Legends folder.
       </div>
     )
   if (!cities && !targets.length)

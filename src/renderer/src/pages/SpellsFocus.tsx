@@ -72,7 +72,7 @@ export function FocusSources() {
                 <th>From</th>
                 <th>Bonus</th>
                 <th>Spells</th>
-                <th title="Spells above this level get less; 0 = no cap">Level cap</th>
+                <th title="Spells above this level get less; empty for no cap">Level cap</th>
                 <th title="Percent of the focus lost per level over the cap">Decay / level</th>
                 <th />
               </tr>
@@ -112,7 +112,14 @@ export function FocusSources() {
                     </select>
                   </td>
                   <td>
-                    <NumberInput value={f.maxLevel} width={64} min={0} label={`${f.name} level cap`} onChange={(v) => update(f.id, { maxLevel: v ?? 0 })} />
+                    <NumberInput
+                      value={f.maxLevel || undefined}
+                      placeholder="none"
+                      width={64}
+                      min={0}
+                      label={`${f.name} level cap`}
+                      onChange={(v) => update(f.id, { maxLevel: v ?? 0 })}
+                    />
                   </td>
                   <td className="nowrap">
                     <NumberInput value={f.decayPct} width={56} min={0} label={`${f.name} decay per level %`} onChange={(v) => update(f.id, { decayPct: v ?? 0 })} /> %

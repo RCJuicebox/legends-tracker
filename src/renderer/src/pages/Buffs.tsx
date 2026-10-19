@@ -1,14 +1,14 @@
 import { useEffect, useMemo, useState } from 'react'
-import { duration } from '../../../core/format'
+import { duration, num, wikiUrl } from '../../../core/format'
 import { api, clock } from '../api'
 import { useInvoke } from '../hooks'
 import { useRemembered } from '../remember'
 import { act } from '../toast'
 import { useNow } from '../components/TimerBars'
-import { ConfirmButton, Disclosure, FilterBox, Info, Pending, Segmented, Switch, Tip } from '../components/ui'
+import { ConfirmButton, Disclosure, FilterBox, Info, Pending, Segmented, SettingsLink, Switch, Tip } from '../components/ui'
 import { useActions, useSettled } from '../state'
-import { wikiUrl } from '../../../core/format'
 import { CLASSES, className } from '../../../shared/game/classes'
+import { NotWatching } from '../components/NotWatching'
 import {
   askText,
   canCast,
@@ -36,7 +36,8 @@ function useBuffs() {
   return q
 }
 
-const code = (c: string) => c.toUpperCase()
+/** A character's classes as words, " / " between: "Monk / Shadow Knight / Shaman" (LT-573). */
+const classesSaid = (classes: string[]) => classes.map(className).join(' / ')
 const effectText = (o: BuffOffer) => o.effects.map((e) => `${e.label}${e.value ? ` ${e.value}` : ''}`).join(', ')
 
 const casters = (o: BuffOffer) =>
@@ -129,7 +130,12 @@ export function Buffs() {
         </label>
       </div>
 
-      {!v.spellsLoaded && <div className="notice bad mb-16">The spell file is not loaded yet: set the game folder in Settings.</div>}
+      <NotWatching what="buffs landing on you and your group" />
+      {!v.spellsLoaded && (
+        <div className="notice bad mb-16">
+          The spell file is not loaded yet: set the game folder on <SettingsLink tab="general">Settings › General</SettingsLink>.
+        </div>
+      )}
 
       <div className="grid two mb-16" style={{ alignItems: 'start' }}>
         <div className="card stack gap-8">
@@ -151,7 +157,7 @@ export function Buffs() {
               <b>You</b>
               {v.me ? (
                 <span className="small muted">
-                  {v.me.classes.map(code).join('/')} {v.me.level}
+                  {classesSaid(v.me.classes)} {v.me.level}
                 </span>
               ) : (
                 <span className="small lt-chip warn">
@@ -182,7 +188,7 @@ export function Buffs() {
                     <b>{g.name}</b>
                     {g.person ? (
                       <span className="small muted">
-                        {g.person.classes.map(code).join('/')} {g.person.level}
+                        {classesSaid(g.person.classes)} {g.person.level}
                       </span>
                     ) : (
                       <span className="small lt-chip warn">
@@ -198,7 +204,9 @@ export function Buffs() {
           <div className="small mt-4">
             {v.needs.length ? (
               <>
-                <b>To ask for:</b> {askText(v.needs, false)}.{v.needs.some((n) => n.after.length > 0) && ' In the order under Best combination.'}
+                {/* Solo, or every need your own: nothing to ask anyone (LT-588). */}
+                <b>{v.needs.every((n) => n.from === YOU) ? 'To do:' : 'To ask for:'}</b> {askText(v.needs, false)}.
+                {v.needs.some((n) => n.after.length > 0) && ' In the order under Best combination.'}
                 {v.needs.some((n) => n.replaces || n.clickOff.length) && (
                   <span className="muted">
                     {' '}
@@ -224,7 +232,7 @@ export function Buffs() {
         <div className="card stack gap-8">
           <h2 className="m-0">On you</h2>
           {!v.active.length ? (
-            <p className="muted m-0">No buffs from others seen on you.</p>
+            <p className="muted m-0">No buffs seen on you.</p>
           ) : (
             v.active
               .slice()
@@ -347,7 +355,7 @@ function BestCombination({ view, unpick }: { view: BuffView; unpick: (spell: str
         />
         <span className="small muted">
           {scope === 'group' ? 'From what your group and you can cast, and what is on you.' : 'From every class at level 50, and your own self-only buffs, to plan with.'} Worth{' '}
-          {total.toLocaleString()} in all.
+          {num(total)} in all.
         </span>
       </div>
       {order.length > 1 && (
@@ -362,7 +370,7 @@ function BestCombination({ view, unpick }: { view: BuffView; unpick: (spell: str
           const rows = plan.chosen.filter((c) => c.line === line)
           if (!rows.length) return null
           return (
-            <div key={line} className="stack gap-2">
+            <div key={line} className="stack gap-2 bc-rows">
               <b className="small">{LINE_LABELS[line]}</b>
               {rows.map((c) => {
                 const o = byName.get(c.spell)
@@ -383,12 +391,12 @@ function BestCombination({ view, unpick }: { view: BuffView; unpick: (spell: str
                     {c.on ? (
                       <span className="lt-chip good">on you</span>
                     ) : c.from === YOU ? (
-                      <span className="lt-chip warn">cast it yourself</span>
+                      <span className="lt-chip">cast it yourself</span>
                     ) : (
                       <span className="lt-chip warn">ask {c.from}</span>
                     )}
                     <span className="spacer" />
-                    <span className="faint mono">{c.value.toLocaleString()}</span>
+                    <span className="faint mono">{num(c.value)}</span>
                   </div>
                 )
               })}

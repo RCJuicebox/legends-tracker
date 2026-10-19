@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { day, timeOfDay } from '../../../core/format'
+import { timeOfDay, when } from '../../../core/format'
 import { useItemInfo, useLootView } from '../hooks'
 import { useRemembered } from '../remember'
 import { actDone } from '../toast'
@@ -8,6 +8,7 @@ import { Ago, Disclosure, FilterBox, Icon, Info, Pending, ToggleChip } from '../
 import { describeItem, fmtCoin, type LootEntry, type LootOutcome } from '../../../core/loot'
 import { itemKey } from '../../../core/inventory'
 import type { ItemInfo } from '../../../shared/types'
+import { NotWatching } from '../components/NotWatching'
 
 // What has dropped, session by session, with a line on what each item is for and a link to its
 // page. The looking-up is the Gear page's: eqlwiki, cached a week.
@@ -78,6 +79,8 @@ export function Loot() {
         </div>
       </div>
 
+      <NotWatching what="new loot and sales" />
+
       <div className="card row mb-16">
         <FilterBox placeholder="Filter by item, mob or looter…" label="Filter loot" value={filter} onChange={setFilter} width={260} />
         <span className="row tight" role="group" aria-label="Outcomes shown">
@@ -102,7 +105,7 @@ export function Loot() {
       {!view ? (
         <Pending error={q.error} retry={q.reload} what="the loot" />
       ) : !groups.length ? (
-        <div className="card empty">{view.entries.length ? 'Nothing matches the filter.' : 'Nothing looted yet. Loot something while watching and it appears here.'}</div>
+        <div className="card empty">{view.entries.length ? 'Nothing matches the filter.' : 'Nothing looted yet.'}</div>
       ) : (
         groups.map((g) => {
           const s = sessions.get(g.id)
@@ -120,19 +123,19 @@ export function Loot() {
                   </Disclosure>
                 </h2>
                 <span className="faint small">
-                  {day(first.at)} · {timeOfDay(first.at)}
+                  {when(first.at)}
                   {last.at - first.at > 60_000 ? ` – ${timeOfDay(last.at)}` : ''}
                 </span>
                 <span className="chip">
                   {g.entries.length} item{g.entries.length === 1 ? '' : 's'}
                 </span>
                 {coin && coin.corpse > 0 && (
-                  <span className="chip" title="Coin picked up from corpses">
+                  <span className="chip as-is" title="Coin picked up from corpses">
                     {fmtCoin(coin.corpse)} looted
                   </span>
                 )}
                 {coin && coin.sales > 0 && (
-                  <span className="chip" title="Coin from items sold, by auto-loot or at a merchant">
+                  <span className="chip as-is" title="Coin from items sold, by auto-loot or at a merchant">
                     {fmtCoin(coin.sales)} sold
                   </span>
                 )}

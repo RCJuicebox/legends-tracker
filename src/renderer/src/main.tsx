@@ -30,6 +30,8 @@ import { FEATURE_PAGES, type FeaturePageId } from '../../features'
 import { Factions } from '../../features/factions/page'
 import { Slayer } from '../../features/slayer/page'
 import { Hunter } from '../../features/hunter/page'
+import { who } from '../../core/format'
+import { characterKey } from '../../core/validate'
 
 /**
  * The pages that are not feature modules, in sidebar order, grouped by the player's day: Play for
@@ -123,11 +125,14 @@ function UnsavedMark() {
 /** Who is being watched, where, and when the log last spoke. */
 function WatchFoot() {
   const s = useLive((l) => l.status)
+  const logFile = useSettled((x) => x.settings.logFile)
+  // Not watching, the log that would be: not "No character" while one is followed (LT-569).
+  const followed = logFile ? who(characterKey(logFile)) : ''
   return (
     <div className="sidebar-foot">
       <div className="row tight">
         <span className={`status-dot${s.watching ? ' live' : ''}`} />
-        <span className="who">{s.character || 'No character'}</span>
+        <span className="who">{s.character || followed || 'No character'}</span>
       </div>
       <div>{s.zone || 'Zone unknown'}</div>
       {/* Ticks by itself: status comes only with a line, so a quiet log would freeze it (LT-450). */}
@@ -192,20 +197,28 @@ function Shell() {
           const shut = folded.includes(group)
           return [
             <Disclosure key={`g-${group}`} className="nav-group" open={!shut} onToggle={() => setFolded(shut ? folded.filter((g) => g !== group) : [...folded, group])}>
-              <span>{group}</span>
+              <span className="nav-label">{group}</span>
+              {/* What a fold holds, for a screen reader: "Setup, 3 pages" (LT-689). */}
+              <span className="sr-only">, {own.length} pages</span>
               {/* Edits waiting on a page that is folded away still show. */}
               {shut && own.some((p) => p.id !== page && unsaved.has(p.id)) && <UnsavedMark />}
             </Disclosure>,
-            ...own
-              .filter((p) => !shut || p.id === page)
-              .map((p) => (
-                <button key={p.id} className={`nav-item${page === p.id ? ' active' : ''}`} aria-current={page === p.id ? 'page' : undefined} onClick={() => setPage(p.id)}>
-                  <Icon name={p.icon} />
-                  {p.label}
-                  {p.id === 'dashboard' && <TimerCount />}
-                  {unsaved.has(p.id) && <UnsavedMark />}
-                </button>
-              ))
+            // A folded group's pages stay in the page, hidden, but the open one (LT-689).
+            ...own.map((p) => (
+              <button
+                key={p.id}
+                hidden={shut && p.id !== page}
+                className={`nav-item${page === p.id ? ' active' : ''}`}
+                aria-current={page === p.id ? 'page' : undefined}
+                title={p.label}
+                onClick={() => setPage(p.id)}
+              >
+                <Icon name={p.icon} />
+                <span className="nav-label">{p.label}</span>
+                {p.id === 'dashboard' && <TimerCount />}
+                {unsaved.has(p.id) && <UnsavedMark />}
+              </button>
+            ))
           ]
         })}
         <WatchFoot />

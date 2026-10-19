@@ -14,7 +14,14 @@ const STATUS: Record<SourceView['status'], { chip: string; word: string }> = {
   error: { chip: 'bad', word: 'Failed' },
   missing: { chip: '', word: 'Not there' },
   reading: { chip: '', word: 'Reading…' },
-  waiting: { chip: '', word: 'Not read yet' }
+  waiting: { chip: '', word: 'Not read yet' },
+  idle: { chip: '', word: 'Not watched' }
+}
+
+/** A row's button, by what it does: the log is watched, a file is read again, the web refreshed (LT-570). */
+function verb(r: SourceView): [string, string] {
+  if (r.id === 'log' && r.status === 'idle') return ['Start watching', 'Starting…']
+  return r.kind === 'wiki' ? ['Refresh', 'Refreshing…'] : ['Read again', 'Reading…']
 }
 
 const KINDS: SourceView['kind'][] = ['log', 'game file', 'wiki', 'screen', 'app']
@@ -102,7 +109,7 @@ export function DataSources() {
                         <td>
                           {r.refreshable && (
                             <button className="btn small" disabled={busy === r.id || r.status === 'reading'} onClick={() => void refresh(r.id)}>
-                              {busy === r.id ? 'Refreshing…' : 'Refresh'}
+                              {verb(r)[busy === r.id ? 1 : 0]}
                             </button>
                           )}
                         </td>

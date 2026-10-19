@@ -717,7 +717,7 @@ describe('following a faction plan', () => {
         { name: 'Lizard Tail', count: 2 },
         { name: 'Gold', count: 1 }
       ])
-    ).toBe('2 Lizard Tail + Gold')
+    ).toBe('2 Lizard Tail + 1 Gold')
   })
 
   it('says a step aloud', () => {

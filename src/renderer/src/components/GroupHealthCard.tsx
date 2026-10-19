@@ -1,4 +1,5 @@
 import { useActions, useSettled } from '../state'
+import { act } from '../toast'
 import { Field, NumberInput, Switch } from './ui'
 import type { GroupHealthSettings } from '../../../shared/types'
 
@@ -14,6 +15,8 @@ export function GroupHealthCard() {
       <label className="row">
         <Switch on={g.enabled} onChange={(v) => void set({ enabled: v })} label="Say when a group member's health is low" />
         <b>Say when a group member&apos;s health is low</b>
+        {/* Unlike the triggers below, which wait for Save (LT-592). */}
+        <span className="faint small">saved as you change it</span>
       </label>
       <p className="muted small m-0">
         The log never prints anyone&apos;s health, so this watches the health bars in JuiceboxUI&apos;s Group window on the screen, while the game runs. The window has to be in
@@ -25,7 +28,12 @@ export function GroupHealthCard() {
             <NumberInput value={g.belowPct} min={5} max={80} width={80} onChange={(v) => void set({ belowPct: v ?? 25 })} label="Health line, percent" />
           </Field>
           <Field label="Say" hint="{name} and {pct} are filled in; names are read off the window." style={{ flex: 1, minWidth: 260 }}>
-            <input value={g.speech} onChange={(e) => void set({ speech: e.target.value }, TYPING_MS)} />
+            <div className="row tight">
+              <input className="grow" value={g.speech} onChange={(e) => void set({ speech: e.target.value }, TYPING_MS)} />
+              <button type="button" className="btn small" onClick={() => void act('audio:test', g.speech.replace(/\{name\}/gi, 'Aldric').replace(/\{pct\}/gi, String(g.belowPct)))}>
+                Hear
+              </button>
+            </div>
           </Field>
         </div>
       )}

@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
-import { Switch } from '../../../renderer/src/components/ui'
-import { duration, who } from '../../../core/format'
+import { Switch, Tip } from '../../../renderer/src/components/ui'
+import { duration, num, who } from '../../../core/format'
 import { STANDING_MAX } from '../core'
 import type { PlanActivity } from '../catalog'
 import type { FactionTrackView } from '../../../shared/tracking'
@@ -86,15 +86,23 @@ export function NowCard({
             </span>
           ) : null}
           {hint}
-          <div className="fp-now-bar" title={`${Math.round(step.progress * 100)}% of the way since you started this step`}>
+          <div
+            className="fp-now-bar"
+            role="progressbar"
+            aria-label="This step, since you started it"
+            aria-valuemin={0}
+            aria-valuemax={100}
+            aria-valuenow={Math.round(step.progress * 100)}
+            title={`${Math.round(step.progress * 100)}% of the way since you started this step`}
+          >
             <i style={{ width: `${Math.round(step.progress * 100)}%` }} />
           </div>
           <div className="row tight fp-effects">
             {step.goals.map((g) => (
-              <span
+              <Tip
                 key={g.faction}
                 className={`chip ${g.done ? 'ok' : ''}`.trim()}
-                title={
+                text={
                   g.city
                     ? `Its guards con you Indifferent from ${g.to.toLocaleString()}`
                     : g.to === STANDING_MAX
@@ -104,8 +112,8 @@ export function NowCard({
                         : 'Raised to where a later step’s NPC takes it'
                 }
               >
-                {g.achievement ?? g.faction} {signedPlain(Math.round(g.standing))} / {g.to.toLocaleString()}
-              </span>
+                {g.achievement ?? g.faction} {signedPlain(Math.round(g.standing))} / {num(g.to)}
+              </Tip>
             ))}
             <span className="spacer" />
             {track.next && (

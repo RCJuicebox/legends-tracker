@@ -1,5 +1,5 @@
 import { useContext, useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore, type CSSProperties, type HTMLAttributes, type ReactNode } from 'react'
-import { GoContext } from '../nav'
+import { GoContext, type SettingsTab } from '../nav'
 import type { SpellCategory } from '../../../shared/types'
 import type { IconName } from '../../../shared/icons'
 import { CATEGORY_LABELS } from '../../../shared/types'
@@ -53,8 +53,19 @@ export function Countdown({ until, done }: { until: number; done: ReactNode }) {
 }
 
 /** An on/off switch. Give it a `label` unless a wrapping <label> already names it. */
-export function Switch({ on, onChange, title, label }: { on: boolean; onChange: (v: boolean) => void; title?: string; label?: string }) {
-  return <button type="button" role="switch" aria-checked={on} aria-label={label} title={title} className={`switch${on ? ' on' : ''}`} onClick={() => onChange(!on)} />
+export function Switch({ on, onChange, title, label, disabled }: { on: boolean; onChange: (v: boolean) => void; title?: string; label?: string; disabled?: boolean }) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={on}
+      aria-label={label}
+      title={title}
+      disabled={disabled}
+      className={`switch${on ? ' on' : ''}`}
+      onClick={() => onChange(!on)}
+    />
+  )
 }
 
 export function Field({ label, hint, children, style }: { label: string; hint?: ReactNode; children: ReactNode; style?: CSSProperties }) {
@@ -309,6 +320,18 @@ export function ErrorText({ children, block }: { children: ReactNode; block?: bo
   )
 }
 
+/** "Settings › General" and the like, as a link to that tab where the page can go there (LT-571). */
+export function SettingsLink({ tab, children }: { tab: SettingsTab; children: ReactNode }) {
+  const go = useContext(GoContext)
+  return go ? (
+    <button type="button" className="link-button inline" onClick={() => go('settings', tab)}>
+      {children}
+    </button>
+  ) : (
+    <>{children}</>
+  )
+}
+
 /** A failed load, said plainly, with a retry. */
 export function LoadError({ error, retry, what = 'this' }: { error: string; retry?: () => void; what?: string }) {
   const go = useContext(GoContext)
@@ -460,7 +483,9 @@ export function Tip({
   const [at, setAt] = useState<CSSProperties | null>(null)
   const self = useRef<HTMLSpanElement>(null)
   const [inRows, setInRows] = useState(false)
-  useLayoutEffect(() => setInRows(!!self.current?.closest('tbody, .ach-obj')), [])
+  // In a list of rows (a table, a plan's steps, the focus and buff lists) a Tip is read in place, not
+  // a Tab stop each: a 30-step plan was ~120 stops before the next control (LT-576, LT-712).
+  useLayoutEffect(() => setInRows(!!self.current?.closest(ROW_LISTS)), [])
   useEffect(() => {
     if (!at) return
     const hide = () => setAt(null)
@@ -491,6 +516,9 @@ export function Tip({
     </span>
   )
 }
+
+/** Where a Tip is one of many in rows: tables, objective lists, the plans' step lists and the row lists of Spell Timers, the meter and Buffs. */
+const ROW_LISTS = 'tbody, .ach-obj, .fp-steps li, .lt-focus-row, .dm-aux, .bc-rows'
 
 /** The widest a Tip's words are drawn. */
 const TIP_WIDTH = 320

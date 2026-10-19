@@ -1,7 +1,8 @@
-import { useEffect, useMemo, useState, type ReactNode } from 'react'
+import { type ReactNode, useContext, useEffect, useMemo, useState } from 'react'
 import { CharacterPicker } from '../components/CharacterPicker'
 import { api } from '../api'
 import { useRemembered } from '../remember'
+import { GoContext } from '../nav'
 import { usePickedCharacter } from '../character'
 import { useAchievementTrack, useInvoke } from '../hooks'
 import { planSlayer, type CampSource } from '../../../features/slayer/core'
@@ -43,6 +44,7 @@ function useAchievements() {
 const SLAYER_SOURCE: Record<CampSource, string> = { log: 'your log', play: 'players', spawns: 'spawn table', wiki: 'eqlwiki guess' }
 
 export function Achievements() {
+  const go = useContext(GoContext)
   const { chars, character, setCharacter, view, setView, error, retry } = useAchievements()
   const [cat, setCat] = useRemembered<string>('ach.cat', '')
   const [sec, setSec] = useRemembered<string>('ach.sec', '')
@@ -303,13 +305,32 @@ export function Achievements() {
         <button className={`btn${remaining ? ' on' : ' ghost'}`} aria-pressed={remaining} onClick={() => setRemaining(!remaining)}>
           Remaining only
         </button>
-        <button className="btn ghost" onClick={() => cur && setOpen({ ...open, ...Object.fromEntries(cur.s.ach.map((a) => [`${secKey(cur.s)} > ${a.n}`, true])) })}>
-          Expand all
+        <button
+          className="btn ghost"
+          disabled={query.length >= 2}
+          title={query.length >= 2 ? 'Showing what the search finds: clear it to open or close a section' : undefined}
+          onClick={() => cur && setOpen({ ...open, ...Object.fromEntries(cur.s.ach.map((a) => [`${secKey(cur.s)} > ${a.n}`, true])) })}
+        >
+          Expand section
         </button>
-        <button className="btn ghost" onClick={() => cur && setOpen({ ...open, ...Object.fromEntries(cur.s.ach.map((a) => [`${secKey(cur.s)} > ${a.n}`, false])) })}>
-          Collapse all
+        <button
+          className="btn ghost"
+          disabled={query.length >= 2}
+          title={query.length >= 2 ? 'Showing what the search finds: clear it to open or close a section' : undefined}
+          onClick={() => cur && setOpen({ ...open, ...Object.fromEntries(cur.s.ach.map((a) => [`${secKey(cur.s)} > ${a.n}`, false])) })}
+        >
+          Collapse section
         </button>
       </div>
+
+      {curCat === 'Slayer' && go && (
+        <div className="notice row mb-16">
+          <span className="grow">Where to kill for these quickest, step by step, with the raid lockouts beside: Plan › Slayer.</span>
+          <button className="btn small" onClick={() => go('slayer')}>
+            Plan these on Slayer
+          </button>
+        </div>
+      )}
 
       <TrackedBar book={book} tracked={view.marks.tracked ?? []} onUntrack={(k) => setTracked(k, false)} goTo={goTo} />
 

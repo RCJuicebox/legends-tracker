@@ -140,11 +140,13 @@ export function Logs() {
                     <td>
                       <div className="row tight mb-4">
                         <b>{mb(l.size)}</b>
-                        <span className="faint small">of {a.thresholdMB} MB</span>
+                        {a.autoEnabled && <span className="faint small">of {a.thresholdMB} MB</span>}
                       </div>
-                      <div className={`bar-meter${l.size >= threshold ? ' over' : ''}`}>
-                        <div style={{ width: `${Math.min(100, (l.size / threshold) * 100)}%` }} />
-                      </div>
+                      {a.autoEnabled && (
+                        <div className={`bar-meter${l.size >= threshold ? ' over' : ''}`}>
+                          <div style={{ width: `${Math.min(100, (l.size / threshold) * 100)}%` }} />
+                        </div>
+                      )}
                     </td>
                     <td className="muted small">
                       <Ago t={l.modified} />

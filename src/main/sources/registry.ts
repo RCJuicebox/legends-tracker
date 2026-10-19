@@ -53,6 +53,11 @@ class SourceRegistry {
     this.set(id, 'stale', { detail })
   }
 
+  /** There, and not being read now: the log while it is not watched (LT-570). */
+  idle(id: string, detail: string): void {
+    this.set(id, 'idle', { detail, error: '' })
+  }
+
   /** Not there (no game folder, no export yet): expected, not an error. */
   missing(id: string, detail: string): void {
     this.set(id, 'missing', { detail, error: '' })

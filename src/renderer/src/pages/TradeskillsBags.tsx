@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { markUnsaved } from '../unsaved'
 import { useInvoke } from '../hooks'
 import { act } from '../toast'
 import { Ago, ErrorText, GameCommand, Pending } from '../components/ui'
@@ -69,11 +70,24 @@ function BagPreview({ cells, columns }: { cells: number; columns: number }) {
   )
 }
 
+/**
+ * Bag layout changes not saved yet, by skin and character: kept across a tab switch (the tab's state
+ * goes with it), and marked on the sidebar (LT-587).
+ */
+const draftEdits = new Map<string, Record<string, number | null>>()
+
 export function BagLayout({ build, character }: { build: SkinBuild; character: string }) {
   const layout = useInvoke('skins:layout', [build.skin, character])
   const rebuild = useSkinBuild(character)
+  const draftKey = `${build.skin}|${character}`
   /** Changes not saved yet: a number, or null for back to the skin's default. */
-  const [edits, setEdits] = useState<Record<string, number | null>>({})
+  const [edits, setEditsState] = useState<Record<string, number | null>>(() => draftEdits.get(draftKey) ?? {})
+  const setEdits = (next: Record<string, number | null>) => {
+    if (Object.keys(next).length) draftEdits.set(draftKey, next)
+    else draftEdits.delete(draftKey)
+    markUnsaved('tradeskills', draftEdits.size > 0)
+    setEditsState(next)
+  }
   const [saving, setSaving] = useState(false)
   const view = layout.data
   if (!view) return <Pending what="the bag layout" error={layout.error} retry={layout.reload} />

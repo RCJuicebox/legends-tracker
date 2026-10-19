@@ -10,6 +10,13 @@ import type { HunterPlanData } from '../../src/features/hunter/core'
 // Plan › Hunter with named to draw: each zone's named left with what their spawns allow, a zone's
 // map, and the marks on the game's map.
 
+/** The text as drawn: a Tip in a list of rows carries its words for screen readers in a hidden span, left out here. */
+const seen = (el: Element) => {
+  const c = el.cloneNode(true) as Element
+  c.querySelectorAll('.sr-only').forEach((n) => n.remove())
+  return c.textContent ?? ''
+}
+
 const appState: AppState = {
   settings: defaultSettings(),
   status: { watching: false, logFile: '', character: '', zone: '', spellsLoaded: 0, spellError: '', lastLineAt: 0, logSize: 0 },
@@ -105,7 +112,7 @@ async function draw() {
 
 it('lists the named left, zone by zone, with what their spawns allow', async () => {
   const { host, done } = await draw()
-  const text = host.textContent ?? ''
+  const text = seen(host)
   expect(text).toContain('2 Hunter achievements to go, 4 named')
   expect(text).toContain('Lord Darish (1 spot · 25% · 10:00 · ≈ 40 min) · died 6 min ago; back in ~2 min as you timed it')
   expect(text).toContain('Emperor Crush (2 spots · always up · 6:24 · up now, then every 6:24) · not seen die in your log')
@@ -115,11 +122,11 @@ it('lists the named left, zone by zone, with what their spawns allow', async () 
   expect(text).toContain('2 of 4 left')
   const button = (t: string) => [...host.querySelectorAll('button')].find((b) => b.textContent?.trim().startsWith(t))!
   await act(async () => button('Map').click())
-  for (let i = 0; i < 10 && !host.textContent?.includes('do not have'); i++) await act(async () => new Promise((r) => setTimeout(r, 20)))
-  expect(host.textContent).toContain('TAKP’s spawn tables do not have Clan Crushbone')
+  for (let i = 0; i < 10 && !seen(host).includes('do not have'); i++) await act(async () => new Promise((r) => setTimeout(r, 20)))
+  expect(seen(host)).toContain('TAKP’s spawn tables do not have Clan Crushbone')
   await act(async () => button('Map').click())
   await act(async () => button('Mark every zone').click())
-  expect(host.textContent).toContain('Marked 3 spots in 2 zones')
+  expect(seen(host)).toContain('Marked 3 spots in 2 zones')
   expect(invoke).toHaveBeenLastCalledWith(
     'slayer:mark',
     [
@@ -129,32 +136,32 @@ it('lists the named left, zone by zone, with what their spawns allow', async () 
     'hunter'
   )
   await act(async () => button('Clear marks').click())
-  expect(host.textContent).toContain('Could not mark the map: locked')
+  expect(seen(host)).toContain('Could not mark the map: locked')
   // A zone's own Mark marks that zone alone (LT-674).
   await act(async () => [...host.querySelectorAll('button')].find((b) => b.textContent === 'Mark')!.click())
   expect(invoke).toHaveBeenCalledWith('slayer:mark', [{ zone: 'Clan Crushbone', mobs: [], named: ['Lord Darish', 'Emperor Crush'] }], 'hunter')
   // One that does not work in Legends, said so; one said not to work, working again (here, failing).
-  expect(host.textContent).toContain('Hunter of BefallenWorks again')
+  expect(seen(host)).toContain('Hunter of BefallenWorks again')
   await act(async () => button('Doesn’t work').click())
   expect(invoke).toHaveBeenCalledWith('hunter:broken', 'Hunter of Clan Crushbone', true)
   await act(async () => button('Works again').click())
   expect(invoke).toHaveBeenLastCalledWith('hunter:broken', 'Hunter of Befallen', false)
-  expect(host.textContent).toContain('Could not save that: read-only')
+  expect(seen(host)).toContain('Could not save that: read-only')
   done()
 })
 
 it('says when every Hunter achievement is done, and when there is no export', async () => {
   answer = { ...data, zones: [] }
   let d = await draw()
-  expect(d.host.textContent).toContain('Every Hunter achievement that works is done.')
+  expect(seen(d.host)).toContain('Every Hunter achievement that works is done.')
   d.done()
   answer = { ...data, zones: [], broken: [] }
   d = await draw()
-  expect(d.host.textContent).toContain('Every Hunter achievement is done.')
+  expect(seen(d.host)).toContain('Every Hunter achievement is done.')
   d.done()
   answer = { ...data, export: null, zones: [] }
   d = await draw()
-  expect(d.host.textContent).toContain('No achievements export for')
+  expect(seen(d.host)).toContain('No achievements export for')
   d.done()
 })
 
@@ -177,7 +184,7 @@ it('finds a zone by any of its words, its achievement or a named, and the zone t
   expect(host.querySelector('.fp-num')?.textContent).toBe('2')
   await type('karana')
   expect(zones()).toEqual([])
-  expect(host.textContent).toContain('Nothing to go matches “karana”.')
+  expect(seen(host)).toContain('Nothing to go matches “karana”.')
   // The zone the player is in is marked and comes first, keeping its number (LT-672).
   await type('')
   expect(zones()).toEqual(['Kedge Keep', 'Clan Crushbone'])

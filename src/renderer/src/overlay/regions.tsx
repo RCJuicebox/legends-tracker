@@ -254,7 +254,7 @@ const doing = (s: { kind: TrackKind; title: string; npc?: string }) =>
 const mobsSaid = (mobs: { name: string; n: number }[], shown = 3) =>
   mobs
     .slice(0, shown)
-    .map((m) => `${m.name} ×${m.n.toLocaleString()}`)
+    .map((m) => `${m.name} ×${num(m.n)}`)
     .join(', ') + (mobs.length > shown ? ` and ${mobs.length - shown} more` : '')
 
 /** Plan › Slayer's step: the one in the zone the player is in, else the one to head to; and the one after. */
@@ -290,7 +290,7 @@ function SlayerPlanSection({ plan }: { plan: SlayerPlanTrackView }) {
                     {g.name}
                   </span>
                   <span className="ach-ov-num">
-                    {g.count.toLocaleString()} / {g.max.toLocaleString()}
+                    {num(g.count)} / {num(g.max)}
                   </span>
                 </div>
                 <div className="ach-ov-bar thin">
@@ -299,7 +299,7 @@ function SlayerPlanSection({ plan }: { plan: SlayerPlanTrackView }) {
               </div>
             ))}
             {step.mobs.length > 0 && (
-              <div className="ach-ov-items" title={step.mobs.map((m) => `${m.name} ×${m.n.toLocaleString()}`).join('\n')}>
+              <div className="ach-ov-items" title={step.mobs.map((m) => `${m.name} ×${num(m.n)}`).join('\n')}>
                 Kill {mobsSaid(step.mobs)}
               </div>
             )}
@@ -369,7 +369,7 @@ function AchievementsRegion({ config, track, arranging }: { config: OverlayConfi
           {arranging
             ? 'Tracked achievements, the faction and Slayer plans’ steps, the Slayer counts and skills your kills move, and the Hunter named left in your zone show here.'
             : track?.faction
-              ? 'Nothing tracked. The faction plan is hidden from this overlay (Overlays).'
+              ? 'Nothing tracked. The faction plan is hidden from this overlay (Settings › Overlays).'
               : 'Nothing tracked. Track an achievement, or show your faction plan here from Factions › Plan, or your Slayer plan from Plan › Slayer.'}
         </div>
       </div>
@@ -405,7 +405,7 @@ function AchievementsRegion({ config, track, arranging }: { config: OverlayConfi
                 {step.items?.length ? (
                   <div className="ach-ov-items" title="What goes into each hand-in">
                     {itemsSaid(step.items)} each
-                    {step.items.length === 1 && step.unitsLeft > 1 && <span className="ach-ov-faint"> · {(step.items[0].count * step.unitsLeft).toLocaleString()} in all</span>}
+                    {step.items.length === 1 && step.unitsLeft > 1 && <span className="ach-ov-faint"> · {num(step.items[0].count * step.unitsLeft)} in all</span>}
                   </div>
                 ) : null}
                 <div className="ach-ov-faint">{step.zone}</div>
@@ -413,7 +413,7 @@ function AchievementsRegion({ config, track, arranging }: { config: OverlayConfi
                   <i style={{ width: `${Math.round(step.progress * 100)}%` }} />
                 </div>
                 <div className="ach-ov-line">
-                  <b>{step.unitsLeft.toLocaleString()}</b> {UNITS[step.kind][step.unitsLeft === 1 ? 0 : 1]} left
+                  <b>{num(step.unitsLeft)}</b> {UNITS[step.kind][step.unitsLeft === 1 ? 0 : 1]} left
                   {step.secondsLeft > 0 && <span className="ach-ov-faint"> · ≈ {duration(step.secondsLeft)}</span>}
                 </div>
                 {step.goals
@@ -423,7 +423,7 @@ function AchievementsRegion({ config, track, arranging }: { config: OverlayConfi
                     <div key={g.faction} className="ach-ov-goal">
                       <span>{g.achievement ?? g.faction}</span>
                       <span className="ach-ov-num">
-                        {Math.round(g.standing).toLocaleString()} / {g.to.toLocaleString()}
+                        {num(Math.round(g.standing))} / {num(g.to)}
                       </span>
                     </div>
                   ))}
@@ -487,8 +487,8 @@ function AchievementsRegion({ config, track, arranging }: { config: OverlayConfi
               <div
                 key={r.name}
                 className="ach-ov-count"
-                title={`${r.races}: ${r.count.toLocaleString()} at your achievements export, +${r.since.toLocaleString()} since${
-                  r.guessed ? ` (${r.guessed.toLocaleString()} placed by the mob's name alone; your next export settles them)` : ''
+                title={`${r.races}: ${num(r.count)} at your achievements export, +${num(r.since)} since${
+                  r.guessed ? ` (${num(r.guessed)} placed by the mob's name alone; your next export settles them)` : ''
                 }`}
               >
                 <div className="ach-ov-goal">
@@ -497,10 +497,10 @@ function AchievementsRegion({ config, track, arranging }: { config: OverlayConfi
                     {r.name}
                   </span>
                   <span className="ach-ov-num">
-                    {n.toLocaleString()} / {r.max.toLocaleString()}{' '}
+                    {num(n)} / {num(r.max)}{' '}
                     <span className="ach-ov-plus">
                       +{r.guessed ? '~' : ''}
-                      {r.since.toLocaleString()}
+                      {num(r.since)}
                     </span>
                   </span>
                 </div>
@@ -528,7 +528,7 @@ function AchievementsRegion({ config, track, arranging }: { config: OverlayConfi
                     {r.skill}
                   </span>
                   <span className="ach-ov-num">
-                    {(r.value ?? 0).toLocaleString()} / {r.target.toLocaleString()}
+                    {num(r.value ?? 0)} / {num(r.target)}
                   </span>
                 </div>
                 <div className="ach-ov-bar thin">
@@ -560,8 +560,8 @@ function TrackedRow({ t, now }: { t: TrackedAchievement; now: number }) {
         <div className="ach-ov-goal">
           <span>{t.name}</span>
           <span className="ach-ov-num">
-            {c.value.toLocaleString()} / {c.max.toLocaleString()}
-            {!!c.since && <span className="ach-ov-plus"> +{c.since.toLocaleString()}</span>}
+            {num(c.value)} / {num(c.max)}
+            {!!c.since && <span className="ach-ov-plus"> +{num(c.since)}</span>}
           </span>
         </div>
         <div className="ach-ov-bar thin">
@@ -584,7 +584,7 @@ function TrackedRow({ t, now }: { t: TrackedAchievement; now: number }) {
           <div key={k.skill} className="ach-ov-sub">
             <div className="ach-ov-goal">
               <span>{k.skill}</span>
-              <span className="ach-ov-num">{k.value === null ? 'not in your logs' : `${k.value.toLocaleString()} / ${k.target.toLocaleString()}`}</span>
+              <span className="ach-ov-num">{k.value === null ? 'not in your logs' : `${num(k.value)} / ${num(k.target)}`}</span>
             </div>
             {k.value !== null && (
               <div className="ach-ov-bar thin skill">

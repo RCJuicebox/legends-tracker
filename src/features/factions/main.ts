@@ -894,7 +894,7 @@ export class Factions implements AppFeature {
     const plans = new Map<string, { at: number; data: ReturnType<typeof planData> }>()
     handle('factions:plan', async (character, refresh, wide) => {
       assertCharacterKey(character)
-      if (!ctx.installDir()) throw new Error('Choose the game folder on the Settings page first.')
+      if (!ctx.installDir()) throw new Error('Choose the game folder on Settings › General first.')
       const key = `${character}|${wide === true}`
       const had = plans.get(key)
       if (!refresh && had && Date.now() - had.at < PLAN_SHARED_MS) return had.data

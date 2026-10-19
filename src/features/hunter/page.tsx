@@ -5,7 +5,7 @@ import { useInvoke, useVisibleInterval } from '../../renderer/src/hooks'
 import { useActions, useLive, useSettled } from '../../renderer/src/state'
 import { DEFAULT_ACHIEVEMENT_OPTIONS } from '../../shared/overlays'
 import { useNow } from '../../renderer/src/components/TimerBars'
-import { FilterBox, GameCommand, Info, Pending, Tip, ToggleChip } from '../../renderer/src/components/ui'
+import { FilterBox, GameCommand, Info, Pending, SettingsLink, Tip, ToggleChip } from '../../renderer/src/components/ui'
 import { showToast } from '../../renderer/src/toast'
 import { duration, num, who } from '../../core/format'
 import { usePlanCharacter } from '../slayer/page'
@@ -162,7 +162,9 @@ export function Hunter() {
       {!chars.ready ? (
         <Pending error={chars.error} retry={chars.reload} what="your characters" />
       ) : !character ? (
-        <div className="card empty">No character yet. Choose the game folder on the Settings page, then play with logging on (/log on).</div>
+        <div className="card empty">
+          No character yet. Choose the game folder on <SettingsLink tab="general">Settings › General</SettingsLink>, then play with logging on (/log on).
+        </div>
       ) : !data ? (
         <Pending error={q.error} retry={q.reload} doing="Reading your kills" />
       ) : !data.export ? (

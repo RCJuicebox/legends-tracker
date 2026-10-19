@@ -1,6 +1,6 @@
 import type { SimulateResult } from '../../../shared/ipc'
 import { useMemo, useState } from 'react'
-import { timeOfDay } from '../../../core/format'
+import { timeOfDay, who } from '../../../core/format'
 import { useRemembered } from '../remember'
 import { useActions, useLive, useSettled } from '../state'
 import { ago, mb } from '../api'
@@ -13,6 +13,7 @@ import { FactionNowCard, FightSummary, QuietLogNotice, SetupChecklist } from '..
 import type { Go } from '../nav'
 import { perHour, useMotes } from './MoteRuns'
 import { localDay, sessionHours, totalMotes } from '../../../core/motes'
+import { characterKey } from '../../../core/validate'
 
 const SAMPLE = `[Tue Sep 01 12:15:08 2026] You begin casting Envenomed Bolt X.
 [Tue Sep 01 12:15:09 2026] A ratman warrior has been poisoned.
@@ -155,6 +156,8 @@ function StatCards({ go }: { go: Go }) {
   const zone = useLive((l) => l.status.zone)
   const logSize = useLive((l) => l.status.logSize)
   const status = { watching, lastLineAt, character, zone, logSize }
+  const logFile = useSettled((s) => s.settings.logFile)
+  const followed = logFile ? who(characterKey(logFile)) : ''
   useNow(5000)
   const motes = useMotes()
   const crawl = motes?.active
@@ -171,7 +174,7 @@ function StatCards({ go }: { go: Go }) {
       </div>
       <div className="card stat">
         <span className="label">Character</span>
-        <span className="value">{status.character || '—'}</span>
+        <span className="value">{status.character || followed || '—'}</span>
         <span className="sub">{status.zone || 'zone unknown'}</span>
       </div>
       <button className="card stat card-button" onClick={() => go('motes', 'runs')}>
@@ -201,7 +204,12 @@ function LiveTimers() {
         <h2>
           Buffs <span className="chip">{buffs.length}</span>
         </h2>
-        <TimerBars timers={buffs} grouped fontSize={15} empty={<div className="empty">No buffs running. Cast one and it appears here.</div>} />
+        <TimerBars
+          timers={buffs}
+          grouped
+          fontSize={15}
+          empty={<div className="empty">No buff timers running. Cast one and it appears here; the Buffs page lists every buff on you.</div>}
+        />
       </div>
       <div className="card">
         <h2>

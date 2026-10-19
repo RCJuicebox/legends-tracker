@@ -357,9 +357,16 @@ export function pausedHours(s: MoteSession, now: number): number {
 
 /** "13:05" on the session's day → a timestamp. */
 export function timeOnDay(day: number, hhmm: string): number | null {
-  const m = /^(\d{1,2}):(\d{2})(?::(\d{2}))?$/.exec(hhmm.trim())
+  // As timeOfDay writes it in either clock: "13:05", "1:05:00 PM" (a 12-hour clock's time read back, LT-695).
+  const m = /^(\d{1,2}):(\d{2})(?::(\d{2}))?(?:\s*([AaPp])\.?[Mm]\.?)?$/.exec(hhmm.trim())
   if (!m) return null
+  let h = +m[1]
+  if (m[4]) {
+    if (h < 1 || h > 12) return null
+    h = (h % 12) + (/p/i.test(m[4]) ? 12 : 0)
+  } else if (h > 23) return null
+  if (+m[2] > 59 || +(m[3] ?? 0) > 59) return null
   const d = new Date(day)
-  d.setHours(+m[1], +m[2], +(m[3] ?? 0), 0)
+  d.setHours(h, +m[2], +(m[3] ?? 0), 0)
   return d.getTime()
 }

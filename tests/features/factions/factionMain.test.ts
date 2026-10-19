@@ -317,7 +317,7 @@ describe('the Factions page', () => {
     expect(bad.export).toBeNull()
     setting.installDir = ''
     expect(await call('factions:get', 'Tester_neriak')).toEqual({ factions: [], export: null, exportError: '' })
-    await expect(call('factions:plan', 'Tester_neriak')).rejects.toThrow('Choose the game folder on the Settings page first.')
+    await expect(call('factions:plan', 'Tester_neriak')).rejects.toThrow('Choose the game folder on Settings › General first.')
   })
 
   it('refuses what is not a character, a faction or a name to look up', async () => {

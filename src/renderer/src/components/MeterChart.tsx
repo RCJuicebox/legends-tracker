@@ -40,8 +40,8 @@ export function DpsChart({ seg }: { seg: Segment }) {
   const max = Math.max(1, ...shown.flatMap((s) => s.values))
   const W = 520
   const H = 140
-  const L = 36
-  const B = 18
+  const L = 46
+  const B = 22
   const x = (i: number) => L + (i / Math.max(1, seconds - 1)) * (W - L - 6)
   const y = (v: number) => 6 + (1 - v / max) * (H - B - 6)
   const path = (vals: number[]) => vals.map((v, i) => `${i ? 'L' : 'M'}${x(i).toFixed(1)},${y(v).toFixed(1)}`).join(' ')
@@ -54,7 +54,7 @@ export function DpsChart({ seg }: { seg: Segment }) {
         DPS over time{' '}
         <span className="faint small">
           {session ? `${marks.length} fight${marks.length === 1 ? '' : 's'} end to end · ` : ''}
-          {WINDOW_SEC}s rolling
+          {WINDOW_SEC} s rolling
         </span>
       </div>
       <svg

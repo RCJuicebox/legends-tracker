@@ -8,7 +8,7 @@ import { ROLE_LABELS, ROLE_PRESETS, type RoleKey } from '../../../core/statValue
 import type { CharacterSheet, InventoryView } from '../../../shared/types'
 import { className } from '../../../shared/game/classes'
 import { Ago, ErrorText, Info, Pending, Segmented, ToggleChip } from '../components/ui'
-import { num, wikiUrl } from '../../../core/format'
+import { num, signed, wikiUrl } from '../../../core/format'
 import { AC_OVER_CAP, useGearModel, type CatalogState, type GearMode } from '../gear/useGearModel'
 import { useCharacterWeights } from '../gear/useCharacterWeights'
 import { ItemIcon, source } from './gearBits'
@@ -437,8 +437,7 @@ function Finder({ view, sheet, mode }: { view: InventoryView; sheet: CharacterSh
                       <div className="lt-diffs">
                         {c.diffs.slice(0, 7).map((d) => (
                           <span key={d.key} className={d.delta > 0 ? 'up' : 'down'}>
-                            {d.delta > 0 ? '+' : ''}
-                            {Number.isInteger(d.delta) ? d.delta : d.delta.toFixed(2)} {d.label}
+                            {signed(d.delta, 2)} {d.label}
                           </span>
                         ))}
                       </div>

@@ -23,9 +23,11 @@ export interface TrackItem {
   makes?: string
 }
 
-/** A hand-in's items in a few words: "2 Lizard Tail", "10 Fire Beetle Eye made into a Box of Beetle Eyes", "2 Rusty Dagger + 2 Gold". */
-export const itemsSaid = (items: TrackItem[]) =>
-  items.map((it) => `${it.count > 1 ? `${it.count.toLocaleString()} ` : ''}${it.name}${it.makes ? ` made into ${it.makes}` : ''}`).join(' + ')
+/**
+ * A hand-in's items in a few words: "2 Lizard Tail", "10 Fire Beetle Eye made into a Box of Beetle
+ * Eyes", "2 Rusty Dagger + 1 Gold". A count of one is said too: "(1 Ruby each)", not "(Ruby each)" (LT-596).
+ */
+export const itemsSaid = (items: TrackItem[]) => items.map((it) => `${it.count.toLocaleString()} ${it.name}${it.makes ? ` made into ${it.makes}` : ''}`).join(' + ')
 
 interface FactionTrackStep {
   /** Its place in the plan, from 0, and its activity's id. */

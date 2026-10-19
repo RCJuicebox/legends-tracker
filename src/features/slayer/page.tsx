@@ -1,12 +1,14 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useContext, useEffect, useMemo, useState } from 'react'
+import { GoContext } from '../../renderer/src/nav'
+import { remember } from '../../renderer/src/remember'
 import { CharacterPicker } from '../../renderer/src/components/CharacterPicker'
 import { ago, api } from '../../renderer/src/api'
 import { useLive, useSettled } from '../../renderer/src/state'
 import { useInvoke, useVisibleInterval } from '../../renderer/src/hooks'
 import { usePickedCharacter } from '../../renderer/src/character'
 import { useNow } from '../../renderer/src/components/TimerBars'
-import { Disclosure, FilterBox, GameCommand, Info, NumberInput, Pending, Tip, ToggleChip } from '../../renderer/src/components/ui'
-import { duration, num, who } from '../../core/format'
+import { Disclosure, FilterBox, GameCommand, Info, NumberInput, Pending, SettingsLink, Tip, ToggleChip } from '../../renderer/src/components/ui'
+import { duration, isoDays, num, who } from '../../core/format'
 import {
   BANESTRIKE,
   campZone,
@@ -323,6 +325,7 @@ function FactionCost({ camp, raising }: { camp: SlayerPlanCamp; raising: readonl
 }
 
 export function Slayer() {
+  const goTo = useContext(GoContext)
   const chars = usePlanCharacter()
   const character = chars.character
   const q = useInvoke(character ? 'slayer:plan' : null, [character])
@@ -474,6 +477,21 @@ export function Slayer() {
               </>
             )}{' '}
             <Info label="How it is planned" text={HOW} />
+            {goTo && (
+              <>
+                {' '}
+                <button
+                  type="button"
+                  className="link-button inline"
+                  onClick={() => {
+                    remember('ach.cat', 'Slayer')
+                    goTo('achievements')
+                  }}
+                >
+                  Their counts on the Achievements page
+                </button>
+              </>
+            )}
           </div>
         </div>
         <div className="actions">
@@ -484,7 +502,9 @@ export function Slayer() {
       {!chars.ready ? (
         <Pending error={chars.error} retry={chars.reload} what="your characters" />
       ) : !character ? (
-        <div className="card empty">No character yet. Choose the game folder on the Settings page, then play with logging on (/log on).</div>
+        <div className="card empty">
+          No character yet. Choose the game folder on <SettingsLink tab="general">Settings › General</SettingsLink>, then play with logging on (/log on).
+        </div>
       ) : !q.data ? (
         <Pending error={q.error} retry={q.reload} doing="Reading every kill in your logs" />
       ) : !data?.export ? (
@@ -690,7 +710,7 @@ export function Slayer() {
                                       <span className="faint small">
                                         {st.camp.source === 'log' && st.camp.hours
                                           ? `${num(st.camp.kills ?? 0)} kills in ${duration(st.camp.hours * 3600)} there`
-                                          : st.camp.said && `said by ${st.camp.said}`}
+                                          : st.camp.said && `said by ${isoDays(st.camp.said)}`}
                                       </span>
                                       <button
                                         className="btn small ghost"

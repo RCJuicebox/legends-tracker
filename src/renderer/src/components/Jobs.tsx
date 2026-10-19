@@ -44,7 +44,7 @@ export function Jobs() {
               <span style={{ width: `${Math.round(j.fraction * 100)}%` }} />
             </span>
           )}
-          <button className="btn small ghost" onClick={() => void act('jobs:cancel', j.id)}>
+          <button className="btn small ghost" aria-label={`Cancel ${j.label}`} onClick={() => void act('jobs:cancel', j.id)}>
             Cancel
           </button>
         </div>

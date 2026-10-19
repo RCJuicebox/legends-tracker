@@ -22,6 +22,7 @@ import {
   type Sort
 } from '../components/ui'
 import { parseClock, SHARED_SEC, type RespawnRow, type RespawnTimerSpec, type RespawnView } from '../../../core/respawns'
+import { NotWatching } from '../components/NotWatching'
 
 // How long mobs take to come back, measured from the log, and a timer on an overlay for any of them.
 // A timer is an ordinary trigger in the Respawns folder, so the Triggers page can change it too.
@@ -75,15 +76,19 @@ export function Respawns() {
   const zone = view?.zone ?? ''
   const rows = useMemo(() => {
     const f = filter.trim().toLowerCase()
-    return (view?.rows ?? [])
-      .filter((r) => !hereOnly || !zone || !r.zone || r.zone === zone || !!r.timer)
-      .filter((r) => showShared || !r.shared || !!r.timer || !!r.names)
-      .filter((r) => !f || [r.name, r.zone, ...(r.names ?? [])].some((x) => x.toLowerCase().includes(f)))
-      .sort(bySort(sort))
+    return (
+      (view?.rows ?? [])
+        // This zone's alone: a timed mob of another zone is counted beside the switch, not pinned here (LT-568).
+        .filter((r) => !hereOnly || !zone || !r.zone || r.zone === zone)
+        .filter((r) => showShared || !r.shared || !!r.timer || !!r.names)
+        .filter((r) => !f || [r.name, r.zone, ...(r.names ?? [])].some((x) => x.toLowerCase().includes(f)))
+        .sort(bySort(sort))
+    )
   }, [view, filter, hereOnly, showShared, zone, sort])
   const hiddenShared = (view?.rows ?? []).filter((r) => r.shared && !r.timer && !r.names).length
   // What the zone switch hides: kills elsewhere, which after zoning is every one on record.
   const elsewhere = hereOnly && zone ? (view?.rows ?? []).filter((r) => r.zone && r.zone !== zone && !r.timer).length : 0
+  const timedElsewhere = hereOnly && zone ? (view?.rows ?? []).filter((r) => r.zone && r.zone !== zone && !!r.timer).length : 0
 
   const saved = (v: RespawnView | undefined) => {
     if (v) q.setData(v)
@@ -101,12 +106,19 @@ export function Respawns() {
         </div>
       </div>
 
+      <NotWatching what="kills and respawn gaps" />
+
       <div className="card row mb-16">
         <FilterBox placeholder="Filter by mob or zone…" label="Filter mobs" value={filter} onChange={setFilter} width={240} />
         {/* The words beside a switch are part of it: clicking them flips it too (LT-462). */}
         <label className="row tight">
-          <Switch on={hereOnly} onChange={setHereOnly} label={zone ? `Only ${zone}` : 'Only this zone'} />
-          <span className="small muted">{zone ? `Only ${zone}` : 'Only this zone'}</span>
+          <Switch on={hereOnly && !!zone} disabled={!zone} onChange={setHereOnly} label={zone ? `Only ${zone}` : 'Only this zone'} />
+          <span className="small muted">{zone ? `Only ${zone}` : 'Zone not known: every zone shown'}</span>
+          {timedElsewhere > 0 && (
+            <button type="button" className="link-button inline small" onClick={() => setHereOnly(false)} title="Mobs with a timer in other zones: show every zone">
+              +{timedElsewhere} with timers elsewhere
+            </button>
+          )}
         </label>
         <label className="row tight">
           <Switch on={showShared} onChange={setShowShared} label="Show names several mobs share" />
@@ -293,7 +305,7 @@ function Row({
       <td onClick={(e) => e.stopPropagation()}>
         {r.timer ? (
           <button className="chip ok" onClick={toggle} title={`On the ${overlayName} overlay. Click to change it.`}>
-            {clock(r.timer.seconds)} · {overlayName}
+            {clock(r.timer.seconds)} on {overlayName}
           </button>
         ) : (
           <button className="btn small" onClick={toggle}>

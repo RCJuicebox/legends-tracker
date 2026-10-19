@@ -25,8 +25,12 @@ export const round = (v: number, places: number) => Math.round(v * 10 ** places)
 /** A whole number with thousands separators, anything else to one place: 1,415 or 12.5. */
 export const num1 = (n: number) => minus(Number.isInteger(n) ? n.toLocaleString() : n.toFixed(1))
 
-/** A change, with its sign always shown: "+12", "−3.5", "0". */
-export const signed = (n: number) => (n > 0 ? `+${num1(n)}` : n < 0 ? num1(n) : '0')
+/** A change, with its sign always shown: "+12", "−3.5", "0"; a fraction to `places` (one by default). */
+export function signed(n: number, places = 1): string {
+  const a = Math.abs(n)
+  const s = Number.isInteger(a) ? a.toLocaleString() : a.toFixed(places)
+  return n > 0 ? `+${s}` : n < 0 ? `−${s}` : '0'
+}
 
 /**
  * A fraction as a percentage, to so many places with the trailing zeros left off: 0.1234 → "12%",
@@ -47,7 +51,10 @@ export function clock(sec: number): string {
   return h ? `${h}:${String(m % 60).padStart(2, '0')}:${ss}` : `${m}:${ss}`
 }
 
-/** A length of time in words: "40 s", "12 min", "3 h 20 min", "3 h"; "permanent" for no end. */
+/**
+ * A length of time in words: "40 s", "12 min", "3 h 20 min", "3 h"; from ten hours whole hours,
+ * "3,888 h (≈ 162 days)" past a hundred (LT-566); "permanent" for no end.
+ */
 export function duration(sec: number): string {
   if (!Number.isFinite(sec)) return 'permanent'
   const s = Math.max(0, Math.round(sec))
@@ -55,11 +62,13 @@ export function duration(sec: number): string {
   const m = Math.round(s / 60)
   if (m < 90) return `${m} min`
   const h = Math.floor(m / 60)
+  if (h >= 100) return `${num(m / 60)} h (≈ ${num(m / 60 / 24)} days)`
+  if (h >= 10) return `${num(m / 60)} h`
   return m % 60 ? `${h} h ${m % 60} min` : `${h} h`
 }
 
-/** The time of day, in the viewer's own clock: "21:05" or "9:05 PM", with the seconds when asked. */
-export const timeOfDay = (t: number, seconds = false) => new Date(t).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', ...(seconds ? { second: '2-digit' } : {}) })
+/** The time of day, in the viewer's own clock: "21:05" or "9:05 PM", with the seconds when asked; no leading zero on the hour (LT-582). */
+export const timeOfDay = (t: number, seconds = false) => new Date(t).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', ...(seconds ? { second: '2-digit' } : {}) })
 
 /** A day: "Fri, Sep 25", with the year when it is not this one ("Thu, Aug 7, 2025"). */
 export function day(t: number, now = Date.now()): string {
@@ -67,6 +76,10 @@ export function day(t: number, now = Date.now()): string {
   const year = d.getFullYear() !== new Date(now).getFullYear()
   return d.toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric', ...(year ? { year: 'numeric' } : {}) })
 }
+
+/** Each "2026-09-24" in a text as day() writes it ("Thu, Sep 24"): a window of days, or when a source said something (LT-582). */
+export const isoDays = (text: string, now = Date.now()) =>
+  text.replace(/\b(\d{4})-(\d{2})-(\d{2})\b/g, (_, y: string, m: string, d: string) => day(new Date(+y, +m - 1, +d).getTime(), now))
 
 /** A day and the time of day: "Fri, Sep 25, 21:05". */
 export const when = (t: number, now = Date.now()) => `${day(t, now)}, ${timeOfDay(t)}`

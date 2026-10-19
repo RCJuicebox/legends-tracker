@@ -284,7 +284,7 @@ export function createContext(): AppContext {
       )
     } else if (s.state === 'ready' && store.settings.get().autoRestartUpdates && ctx.updater.heldBack(s.version)) {
       // Its install was started last time and did not take: not again by itself (LT-597).
-      ctx.engine.pushFeed('warn', `Version ${s.version} has downloaded again, but its install did not take last time: Restart and update in Settings tries once more.`)
+      ctx.engine.pushFeed('warn', `Version ${s.version} has downloaded again, but its install did not take last time: Restart and update on Settings › General tries once more.`)
     } else if (s.state === 'ready' && store.settings.get().autoRestartUpdates) {
       // The player chose not to be asked: restart into it at the first lull in play, so no fight's
       // timers are lost to it (LT-430): never mid-fight, and otherwise with the log quiet a minute or
@@ -525,8 +525,8 @@ function reportStatus(s: WatchStatus, chosenLog: string): void {
   const log = s.logFile || chosenLog
   if (s.watching && s.logError) sources.fail('log', new Error(s.logError), basename(s.logFile))
   else if (s.watching) sources.ok('log', `${basename(s.logFile)}${s.lastLineAt ? `, last line at ${timeOfDay(s.lastLineAt)}` : ''}`)
-  else if (log) sources.missing('log', `${basename(log)} is not being watched. Start watching on the Live page.`)
-  else sources.missing('log', 'No character log chosen (Settings).')
+  else if (log) sources.idle('log', `${basename(log)} is not being watched.`)
+  else sources.missing('log', 'No character log chosen (Settings › Log files).')
   if (s.spellError) sources.fail('spells', new Error(s.spellError))
   else if (s.spellsLoaded) sources.ok('spells', `${s.spellsLoaded.toLocaleString()} spells`)
 }

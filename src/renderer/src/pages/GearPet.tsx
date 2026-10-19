@@ -1,7 +1,7 @@
 import { useMemo } from 'react'
 import { useInvoke } from '../hooks'
 import { useRemembered } from '../remember'
-import { Ago, ErrorText, Info, Pending, Segmented, Switch } from '../components/ui'
+import { Ago, ErrorText, Info, Pending, Segmented, SettingsLink, Switch } from '../components/ui'
 import { num, signed, wikiUrl } from '../../../core/format'
 import { className } from '../../../shared/game/classes'
 import { itemKey, mergeLevel, parseStatsBlock, scaledStats, slotLabel, type InvItem } from '../../../core/inventory'
@@ -139,7 +139,13 @@ export function PetTab({ m }: { m: GearModel }) {
 
         {!spell ? (
           <p className="muted m-0">
-            {state.spellsLoaded ? 'None of your classes summons a pet by this level.' : 'The spell file is not loaded yet; set the game folder in Settings.'}
+            {state.spellsLoaded ? (
+              'None of your classes summons a pet by this level.'
+            ) : (
+              <>
+                The spell file is not loaded yet: set the game folder on <SettingsLink tab="general">Settings › General</SettingsLink>.
+              </>
+            )}
           </p>
         ) : profileQ.error && loading ? (
           <ErrorText block>
@@ -161,7 +167,7 @@ export function PetTab({ m }: { m: GearModel }) {
               <b>{capacity}</b> slots <span className="faint">(4{bonuses.length ? ` + ${bonuses.join(' + ')}` : ''})</span>
             </span>
             <span>
-              Wears gear for <b>{wearer.classes.map(code).join(' ')}</b>
+              Wears gear for <b>{wearer.classes.map(code).join(' / ')}</b>
             </span>
             <span>
               {profile.melee ? (

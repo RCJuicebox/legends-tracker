@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { applyMarks, markKey, MoteTracker, moteValue, parseMoteLoot, sessionHours, totalMotes, type MoteSession } from '../../src/core/motes'
+import { applyMarks, markKey, MoteTracker, moteValue, parseMoteLoot, sessionHours, timeOnDay, totalMotes, type MoteSession } from '../../src/core/motes'
 import { parseLogLine } from '../../src/core/logLine'
 
 function tracker() {
@@ -175,5 +175,19 @@ describe('time outside a run', () => {
     expect(t.setKind(run.id, 'instance')).toBe(true)
     expect(run.kind).toBe('instance')
     expect(t.setKind('no-such-run', 'crawl')).toBe(false)
+  })
+})
+
+describe('a time typed for a pause', () => {
+  const day = new Date(2026, 9, 12, 8, 0).getTime()
+  const at = (h: number, m: number, s = 0) => new Date(2026, 9, 12, h, m, s).getTime()
+  it('reads either clock, as timeOfDay writes it (LT-695)', () => {
+    expect(timeOnDay(day, '13:05')).toBe(at(13, 5))
+    expect(timeOnDay(day, '1:05:30 PM')).toBe(at(13, 5, 30))
+    expect(timeOnDay(day, '12:22:05 AM')).toBe(at(0, 22, 5))
+    expect(timeOnDay(day, '12:00 pm')).toBe(at(12, 0))
+  })
+  it('refuses what is no time', () => {
+    for (const bad of ['25:00', '13:05 PM', '9:61', 'noon', '']) expect(timeOnDay(day, bad)).toBeNull()
   })
 })

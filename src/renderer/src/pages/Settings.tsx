@@ -128,14 +128,15 @@ function General({ openLogs }: { openLogs: () => void }) {
               </button>
             )}
           </div>
-          <label className="row">
-            <Switch on={s.autoRestartUpdates} onChange={(v) => patchSettings((x) => ({ ...x, autoRestartUpdates: v }))} />
-            Restart into updates by itself
-            <span className="faint small">
-              once one has downloaded, without asking, at the first lull in play (out of combat, or the game not in front): the overlays blink and come back, and the window stays
-              in the tray unless you were using it. Timers running then do not survive it. Off, an update installs when the app closes, or when you choose Restart and update.
-            </span>
-          </label>
+          <div className="row">
+            <Switch on={s.autoRestartUpdates} label="Restart into updates by itself" onChange={(v) => patchSettings((x) => ({ ...x, autoRestartUpdates: v }))} />
+            <span>Restart into updates by itself</span>
+          </div>
+          <div className="faint small mb-8">
+            Once an update has downloaded, the app restarts into it without asking, at the first lull in play (out of combat, or the game not in front): the overlays blink and come
+            back, and the window stays in the tray unless you were using it. Timers running then do not survive it. Off, an update installs when the app closes, or when you choose
+            Restart and update.
+          </div>
           <div className="row">
             <button className="btn" onClick={() => void act('app:openLogs')}>
               Open log folder

@@ -1,6 +1,7 @@
 import type { WikiProgress } from '../../shared/ipc'
 import type { Job } from './jobs'
 import { sources } from './registry'
+import { num } from '../../core/format'
 
 // What the app keeps from eqlwiki (the item catalog, the recipes, items looked up, pet pages, faction
 // pages) serves a week before it is fetched again; Allakhazam's faction pages a month.
@@ -23,7 +24,7 @@ export function downloadStale(file: { fetchedAt: number; format?: number } | nul
  * error, or what is kept (stale once due again).
  */
 export function reportDownload(id: string, progress: WikiProgress, job: Job | null, kept: { what: string; stale: boolean } | null): void {
-  const pages = `${progress.pages} of ${progress.total || '?'} pages`
+  const pages = `${num(progress.pages)} of ${progress.total ? num(progress.total) : '?'} pages`
   if (progress.busy) {
     job?.progress(progress.total ? progress.pages / progress.total : null, pages)
     sources.reading(id, pages)

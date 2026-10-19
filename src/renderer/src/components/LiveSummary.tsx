@@ -146,7 +146,7 @@ export function FightSummary({ go }: { go: Go }) {
           {fight
             ? `${clock(durationSec(fight))} · ${num(fight.kills)} killed`
             : last
-              ? `${clock((last.endedAt - last.startedAt) / 1000)} · ${num(last.dps)} DPS, yours ${num(last.yours / Math.max(1, (last.endedAt - last.startedAt) / 1000))}`
+              ? `${clock(durationSec(last))} · ${num(last.dps)} DPS, yours ${num(last.yours / durationSec(last))}`
               : ''}
         </span>
       </button>

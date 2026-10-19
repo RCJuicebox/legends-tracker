@@ -39,6 +39,9 @@ describe('lengths of time', () => {
     expect(duration(89 * 60)).toBe('89 min')
     expect(duration(3 * 3600 + 20 * 60)).toBe('3 h 20 min')
     expect(duration(3 * 3600)).toBe('3 h')
+    // From ten hours whole hours, with days beside past a hundred (LT-566).
+    expect(duration(12 * 3600 + 20 * 60)).toBe('12 h')
+    expect(duration(3888 * 3600 + 13 * 60)).toBe(`${(3888).toLocaleString()} h (≈ 162 days)`)
     expect(duration(Infinity)).toBe('permanent')
   })
 })
@@ -52,8 +55,8 @@ describe('days and times', () => {
   })
 
   it('the time of day, with seconds when asked, and both together', () => {
-    expect(timeOfDay(t)).toBe(new Date(t).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }))
-    expect(timeOfDay(t, true)).toBe(new Date(t).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }))
+    expect(timeOfDay(t)).toBe(new Date(t).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }))
+    expect(timeOfDay(t, true)).toBe(new Date(t).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', second: '2-digit' }))
     expect(when(t, t)).toBe(`${day(t, t)}, ${timeOfDay(t)}`)
   })
 })

@@ -12,6 +12,7 @@ import { FocusSources } from './SpellsFocus'
 import { SpellDefaults } from './SpellsDefaults'
 import { RuleEditor, useSpellDrafts } from './SpellRule'
 import { LogCheck } from './SpellsLogCheck'
+import { NotWatching } from '../components/NotWatching'
 
 type SpellKey = 'name' | 'type' | 'window' | 'wears' | 'last'
 
@@ -54,6 +55,8 @@ export function Spells({ go }: { go?: Go }) {
           </p>
         </div>
       </div>
+
+      <NotWatching what="your casts and their timers" />
 
       <div className="stack">
         {q.error && <LoadError what="your spells" error={q.error} retry={q.reload} />}
@@ -229,18 +232,20 @@ function SpellRow({ k, open, toggle, onSaved }: { k: KnownSpell; open: boolean; 
         <td onClick={(e) => e.stopPropagation()}>
           <span className="row tight nowrap">
             <Switch
-              on={k.rule.recastCue !== false}
-              title="Recast warning"
+              on={k.rule.recastCue !== false && k.rule.track !== false}
+              disabled={k.rule.track === false}
+              title={k.rule.track === false ? 'Not timed: no cues' : 'Recast warning'}
               label={`Recast warning for ${k.rankedName}`}
               onChange={(v) => void setCue(k, { recastCue: v ? undefined : false }, onSaved)}
             />
-            {k.rule.recastCue !== false && <span className="faint small">{k.rule.warnSec !== undefined ? duration(k.rule.warnSec) : 'default'}</span>}
+            {k.rule.recastCue !== false && k.rule.track !== false && <span className="faint small">{k.rule.warnSec !== undefined ? duration(k.rule.warnSec) : 'default'}</span>}
           </span>
         </td>
         <td onClick={(e) => e.stopPropagation()}>
           <Switch
-            on={k.rule.fadeCue !== false}
-            title="Fade announcement"
+            on={k.rule.fadeCue !== false && k.rule.track !== false}
+            disabled={k.rule.track === false}
+            title={k.rule.track === false ? 'Not timed: no cues' : 'Fade announcement'}
             label={`Fade announcement for ${k.rankedName}`}
             onChange={(v) => void setCue(k, { fadeCue: v ? undefined : false }, onSaved)}
           />

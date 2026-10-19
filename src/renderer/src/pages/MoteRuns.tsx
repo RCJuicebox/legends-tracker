@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { num1, round, timeOfDay, when } from '../../../core/format'
+import { duration, num1, round, timeOfDay, when } from '../../../core/format'
 import { api, clock } from '../api'
 import { useInvoke } from '../hooks'
 import { act } from '../toast'
@@ -175,7 +175,7 @@ export function MoteRuns() {
             <div className="stat">
               <span className="label">Completed crawls</span>
               <span className="value">{crawls.length}</span>
-              <span className="sub">{clock(crawlHours * 3600)} in all</span>
+              <span className="sub">{duration(crawlHours * 3600)} in all</span>
             </div>
             <div className="stat">
               <span className="label">Crawl average</span>

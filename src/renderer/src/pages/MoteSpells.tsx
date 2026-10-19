@@ -6,7 +6,7 @@ import { roman } from '../api'
 import { useInvoke } from '../hooks'
 import type { Go } from '../nav'
 import { useRemembered } from '../remember'
-import { CategoryChip, DAY_WINDOWS, Info, NumberInput, Pending, Segmented, SpellIcon } from '../components/ui'
+import { CategoryChip, DAY_WINDOWS, Info, NumberInput, Pending, Segmented, SettingsLink, SpellIcon } from '../components/ui'
 import { num, num1, pct } from '../../../core/format'
 import { useStock } from './MotePlanner'
 import { classCode, classIdOf } from '../../../shared/game/classes'
@@ -126,7 +126,12 @@ export function MoteSpells({ go }: { go?: Go }) {
 
   // Main answers null without the spell file, which reads the same here as no answer yet: the
   // watch status says which it is (LT-343).
-  if (!spellsLoaded) return <div className="card empty">The spell file is not loaded yet: check the game folder in Settings.</div>
+  if (!spellsLoaded)
+    return (
+      <div className="card empty">
+        The spell file is not loaded yet: check the game folder on <SettingsLink tab="general">Settings › General</SettingsLink>.
+      </div>
+    )
   if (!q.data) return q.error ? <Pending what="your casts" error={q.error} retry={q.reload} /> : <Pending what="your casts" />
 
   // The section chips count what the checkboxes leave, so a chip's number is its table's.
@@ -347,19 +352,34 @@ export function MoteSpells({ go }: { go?: Go }) {
                           {num(o.row.casts)}
                           <div className="faint small">{pct(o.share, 1)}</div>
                         </td>
-                        <td className="mono nowrap">{o.maxed ? 'X' : `${o.rank} → ${o.next}`}</td>
-                        <td>
-                          <Parts o={o} />
-                          <div className="faint small">{num1(o.benefit)} points per cast</div>
+                        <td className="mono nowrap">
+                          {o.maxed ? 'X' : `${o.rank} → ${o.next}`}
+                          {o.maxed ? (
+                            <div className="chip">at rank X</div>
+                          ) : isIgnored(o) ? (
+                            <div className="chip">ignored</div>
+                          ) : !o.affordable && stock ? (
+                            <div className="chip">can’t afford</div>
+                          ) : null}
                         </td>
-                        <td className="mono num">{num(o.worth)}</td>
+                        <td>
+                          {o.maxed ? (
+                            <span className="faint">—</span>
+                          ) : (
+                            <>
+                              <Parts o={o} />
+                              <div className="faint small">{num1(o.benefit)} points per cast</div>
+                            </>
+                          )}
+                        </td>
+                        <td className="mono num">{o.maxed ? '—' : num(o.worth)}</td>
                         <td className="mono num">{o.maxed ? '—' : num(o.need)}</td>
                         <td className="mono num">{o.maxed ? '—' : num1(o.rate)}</td>
                         <td className="small">
                           <PayWith o={o} />
                         </td>
                         <td>
-                          {isIgnored(o) ? (
+                          {o.maxed ? null : isIgnored(o) ? (
                             <button className="btn ghost small" onClick={() => ignore(o.row.name, false)} title="Put it back in the list">
                               Restore
                             </button>

@@ -10,6 +10,13 @@ import { DEFAULT_CHOICES, type SlayerPlanData } from '../../src/features/slayer/
 // The Slayer page with a plan to draw: its steps, the raid lockouts beside them, and a camp ruled out
 // from its step's button kept as a choice.
 
+/** The text as drawn: a Tip in a list of rows carries its words for screen readers in a hidden span, left out here. */
+const seen = (el: Element) => {
+  const c = el.cloneNode(true) as Element
+  c.querySelectorAll('.sr-only').forEach((n) => n.remove())
+  return c.textContent ?? ''
+}
+
 const appState: AppState = {
   settings: defaultSettings(),
   status: { watching: false, logFile: '', character: '', zone: '', spellsLoaded: 0, spellError: '', lastLineAt: 0, logSize: 0 },
@@ -147,8 +154,8 @@ it('draws the plan, the lockouts beside it, and keeps a camp ruled out', async (
       </StateProvider>
     )
   )
-  for (let i = 0; i < 10 && !host.textContent?.includes('step by step'); i++) await act(async () => new Promise((r) => setTimeout(r, 20)))
-  const text = host.textContent ?? ''
+  for (let i = 0; i < 10 && !seen(host).includes('step by step'); i++) await act(async () => new Promise((r) => setTimeout(r, 20)))
+  const text = seen(host)
   expect(text).toContain('The plan, step by step')
   // The headline's kills are the steps' own, the lockouts' beside them (LT-563).
   expect(text).toContain('2 achievements to go, 100 kills in the steps, 10 by the lockouts')
@@ -168,13 +175,13 @@ it('draws the plan, the lockouts beside it, and keeps a camp ruled out', async (
   expect(invoke).toHaveBeenLastCalledWith('slayer:choices', 'Kelwyn_neriak', expect.objectContaining({ outMobs: ['an orc pawn'] }))
   const toggle = () => [...host.querySelectorAll('button')].find((b) => b.textContent?.startsWith('Ruled out'))!
   await act(async () => toggle().click())
-  expect(host.textContent).toContain('an orc pawn, wherever it is')
+  expect(seen(host)).toContain('an orc pawn, wherever it is')
   await act(async () => [...host.querySelectorAll('button')].find((b) => b.textContent === 'Bring back')!.click())
   expect(invoke).toHaveBeenLastCalledWith('slayer:choices', 'Kelwyn_neriak', expect.objectContaining({ outMobs: [] }))
   const out = [...host.querySelectorAll('button')].find((b) => b.textContent === 'Rule out')!
   await act(async () => out.click())
   expect(invoke).toHaveBeenCalledWith('slayer:choices', 'Kelwyn_neriak', expect.objectContaining({ outCamps: ['log:Clan Crushbone'] }))
-  expect(host.textContent).toContain('Ruled out')
+  expect(seen(host)).toContain('Ruled out')
   const button = (text: string) => [...host.querySelectorAll('button')].find((b) => b.textContent?.trim().startsWith(text))!
   // Brought back from the list of camps ruled out, still open from the mob's.
   await act(async () => button('Bring back').click())
@@ -199,20 +206,20 @@ it('draws the plan, the lockouts beside it, and keeps a camp ruled out', async (
   // Built afresh, not the shared build of the last 30 s (LT-537).
   expect(invoke).toHaveBeenCalledWith('slayer:plan', 'Kelwyn_neriak', true)
   // What the spawns allow beside each mob, what holds the camp back, and the Hunter named on the way.
-  expect(host.textContent).toContain('(12 spots · 6:24 · spawn-bound)')
-  expect(host.textContent).toContain('Hunter of Clan Crushbone · Lord Darish (1 spot · 25% · 6:24), Ambassador DVinn')
-  expect(host.textContent).toContain('your usual pace 90/h')
+  expect(seen(host)).toContain('(12 spots · 6:24 · spawn-bound)')
+  expect(seen(host)).toContain('Hunter of Clan Crushbone · Lord Darish (1 spot · 25% · 6:24), Ambassador DVinn')
+  expect(seen(host)).toContain('your usual pace 90/h')
   // The step's map.
   await act(async () => button('Map').click())
   for (let i = 0; i < 10 && !host.querySelector('svg.sl-map'); i++) await act(async () => new Promise((r) => setTimeout(r, 20)))
   expect(host.querySelectorAll('circle.sl-map-spot')).toHaveLength(1)
-  expect(host.textContent).toContain('to Greater Faydark')
-  expect(host.textContent).not.toContain('Throne')
+  expect(seen(host)).toContain('to Greater Faydark')
+  expect(seen(host)).not.toContain('Throne')
   await act(async () => button('Map').click())
   // Timed respawns against classic.
   await act(async () => button('Zone respawns').click())
-  expect(host.textContent).toContain('Clan Crushbone 6:24 · Orc scoutsman 6:24 (classic 10:00), A wanderer 5:00')
-  expect(host.textContent).toContain('Kedge Keep no timer · A sailfin 5:00')
+  expect(seen(host)).toContain('Clan Crushbone 6:24 · Orc scoutsman 6:24 (classic 10:00), A wanderer 5:00')
+  expect(seen(host)).toContain('Kedge Keep no timer · A sailfin 5:00')
   // A step's map shows its own mobs, not the Hunter named there; nothing of the plan goes on the game's map.
   expect(invoke).toHaveBeenCalledWith('slayer:map', 'Clan Crushbone', ['an orc pawn'])
   expect([...host.querySelectorAll('button')].some((b) => b.textContent?.includes('Mark on the game'))).toBe(false)
@@ -234,7 +241,7 @@ it('marks the steps in the zone the player is in, and jumps to the first', async
       </StateProvider>
     )
   )
-  for (let i = 0; i < 10 && !host.textContent?.includes('step by step'); i++) await act(async () => new Promise((r) => setTimeout(r, 20)))
+  for (let i = 0; i < 10 && !seen(host).includes('step by step'); i++) await act(async () => new Promise((r) => setTimeout(r, 20)))
   const now = [...host.querySelectorAll('li.fp-step.now')]
   expect(now).toHaveLength(1)
   expect(now[0].textContent).toContain('Clan Crushbone')
@@ -250,8 +257,8 @@ it('marks the steps in the zone the player is in, and jumps to the first', async
   await act(async () => avoid.click())
   expect(invoke).toHaveBeenLastCalledWith('slayer:choices', 'Kelwyn_neriak', expect.objectContaining({ avoidPlanFactions: true }))
   await act(async () => [...host.querySelectorAll('button')].find((b) => b.textContent?.startsWith('Ruled out'))!.click())
-  expect(host.textContent).toContain('Clan Crushbone: an orc pawn')
-  expect(host.textContent).toContain('costs Kaladim Residents, which your faction plan raises')
+  expect(seen(host)).toContain('Clan Crushbone: an orc pawn')
+  expect(seen(host)).toContain('costs Kaladim Residents, which your faction plan raises')
   act(() => root.unmount())
   host.remove()
   appState.status.zone = ''
@@ -276,8 +283,8 @@ it('draws what the plan leaves out, finds a step, and turns the overlay on once 
       </StateProvider>
     )
   )
-  for (let i = 0; i < 10 && !host.textContent?.includes('step by step'); i++) await act(async () => new Promise((r) => setTimeout(r, 20)))
-  const text = host.textContent ?? ''
+  for (let i = 0; i < 10 && !seen(host).includes('step by step'); i++) await act(async () => new Promise((r) => setTimeout(r, 20)))
+  const text = seen(host)
   // The counts have the kills since, for the character being played.
   expect(text).toContain('plus your kills since')
   // An achievement nothing feeds, and the kills no race was found for.
@@ -288,8 +295,8 @@ it('draws what the plan leaves out, finds a step, and turns the overlay on once 
   const button = (t: string) => [...host.querySelectorAll('button')].find((b) => b.textContent?.trim().startsWith(t))!
   // The achievement chips: a count each, a done one ticked, a jump to the step.
   await act(async () => button('Achievements in the plan').click())
-  expect(host.textContent).toContain('✓ Done Deal500/500')
-  expect(host.textContent).toContain('Orc Stomp!4,900/5,000step 1')
+  expect(seen(host)).toContain('✓ Done Deal500/500')
+  expect(seen(host)).toContain('Orc Stomp!4,900/5,000step 1')
   // A search dims the steps it does not find.
   const input = host.querySelector<HTMLInputElement>('input[type="search"]')!
   const type = async (v: string) =>
@@ -298,10 +305,10 @@ it('draws what the plan leaves out, finds a step, and turns the overlay on once 
       input.dispatchEvent(new Event('input', { bubbles: true }))
     })
   await type('kedge')
-  expect(host.textContent).toContain('0 of 1 steps match')
+  expect(seen(host)).toContain('0 of 1 steps match')
   expect(host.querySelector('#sl-step-1')?.classList.contains('sl-dim')).toBe(true)
   await type('orc pawn')
-  expect(host.textContent).toContain('1 of 1 steps match')
+  expect(seen(host)).toContain('1 of 1 steps match')
   expect(host.querySelector('#sl-step-1')?.classList.contains('sl-dim')).toBe(false)
   // The overlay chip, once the saved choices are in.
   const chip = [...host.querySelectorAll('button')].find((b) => b.textContent === 'On the overlay')!

@@ -12,6 +12,8 @@
   --well: #0a0d10;
   --line: #26303a;
   --line-2: #354250;
+  /* A control's edge (inputs, check boxes, an off chip): 3.2:1 on --panel, where --line-2 is 1.67:1 (LT-580). */
+  --line-3: #5f6c7a;
   /* Bevel: the lit top edge and the shadowed bottom edge of a panel. */
   --hi: #2b343e;
   --lo: #06080a;
@@ -71,6 +73,7 @@
     --well: #e3e8ec;
     --line: #c8d0d7;
     --line-2: #aeb9c3;
+    --line-3: #7d8893;
     --hi: #ffffff;
     --lo: #b9c2ca;
     --text: #141a20;
@@ -224,6 +227,10 @@ textarea {
   letter-spacing: 0.04em;
   font-size: 14px;
 }
+/* A folded group's pages, kept in the page (LT-689): the item's own display would show them. */
+.nav-item[hidden] {
+  display: none;
+}
 .nav-item:hover {
   background: var(--panel);
   color: var(--text);
@@ -289,6 +296,45 @@ textarea {
   font-size: 13px;
 }
 
+/* A narrow window, or a large UI size (a 1920 screen at 200% is 960 CSS px), folds the sidebar to its
+   icons: the names stay for screen readers and in the tooltips (LT-595). */
+@media (max-width: 1000px) {
+  .shell {
+    grid-template-columns: 60px 1fr;
+  }
+  .sidebar {
+    padding: 12px 6px;
+  }
+  .nav-item {
+    position: relative;
+    justify-content: center;
+    gap: 0;
+    padding: 9px 0;
+  }
+  .nav-item .count,
+  .nav-item .unsaved-mark {
+    position: absolute;
+    top: 1px;
+    right: 1px;
+    margin: 0;
+  }
+  .nav-label,
+  .sidebar-foot .who,
+  .sidebar-foot > div:not(:first-child) {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
+  .sidebar-foot {
+    padding: 10px 0;
+    display: flex;
+    justify-content: center;
+  }
+}
+
 .main {
   overflow: auto;
   min-height: 0;
@@ -352,6 +398,16 @@ textarea {
 }
 .card h2 .spacer {
   flex: 1;
+}
+/* Times and figures keep their case in a heading ("≈ 4 h 40 min", not "≈ 4 H 40 MIN"), as do coin and file
+   names on chips and buttons ("1s 9c", "alert.wav"): uppercase they read as other words (LT-581). */
+.card h2 .mono,
+.card h2 .faint,
+.card h3 .mono,
+.chip.as-is,
+.btn.as-is {
+  text-transform: none;
+  letter-spacing: normal;
 }
 /* A card's own heading that folds the card away (Damage Meter › Fights and sessions) keeps the heading's look. */
 .card h2 > .disclosure.head {
@@ -505,7 +561,7 @@ input:not([type]),
 select,
 textarea {
   background: var(--bg-2);
-  border: 1px solid var(--line-2);
+  border: 1px solid var(--line-3);
   border-radius: var(--radius-sm);
   padding: 7px 10px;
   outline: none;
@@ -596,6 +652,11 @@ p.hint {
 .switch.on::after {
   transform: translateX(14px);
   background: var(--on-accent);
+}
+/* A switch that does nothing here (a spell not timed has no cues, LT-586). */
+.switch:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
 }
 
 .chip-btn {
@@ -744,12 +805,11 @@ p.hint {
   font-family: var(--font-display);
   font-variant-numeric: tabular-nums;
 }
+/* A stat's sub-line wraps rather than cutting off with no way to read the rest (LT-584). */
 .stat .sub {
   font-size: 12px;
   color: var(--text-2);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
 }
 
 table.table {
@@ -859,7 +919,8 @@ table.table {
 }
 .feed-item {
   display: grid;
-  grid-template-columns: 62px 70px 1fr;
+  /* As wide as the time is in the viewer's clock ("10:05:56 AM" on one line, LT-584). */
+  grid-template-columns: max-content 70px 1fr;
   gap: 8px;
   padding: 5px 6px;
   border-radius: 5px;
@@ -949,8 +1010,10 @@ table.table {
   color: var(--text);
   box-shadow: inset 3px 0 0 var(--accent);
 }
-.tree-item.disabled {
-  opacity: 0.5;
+/* Dimmed rows are drawn in the quiet text colour, readable at 4.5:1, not faded under it (LT-579). */
+.tree-item.disabled,
+.tree-item.disabled * {
+  color: var(--text-3);
 }
 .tree-item .name {
   flex: 1;
@@ -1484,7 +1547,7 @@ details:not(.info) > summary::before {
   width: 15px;
   height: 15px;
   border-radius: 4px;
-  border: 1.5px solid var(--line-2);
+  border: 1.5px solid var(--line-3);
   flex: none;
   display: grid;
   place-items: center;
@@ -1507,8 +1570,13 @@ details:not(.info) > summary::before {
 .ach-obj.linked .ach-box {
   border-style: dashed;
 }
-.ach-obj.ign {
-  opacity: 0.55;
+.ach-obj.ign,
+.ach-obj.ign * {
+  color: var(--text-3);
+}
+.ach-obj.ign .ach-objname {
+  text-decoration: line-through;
+  text-decoration-color: var(--text-3);
 }
 .ach-obj input:focus-visible + .ach-box {
   outline: 2px solid var(--accent);
@@ -2431,8 +2499,9 @@ details:not(.info) > summary::before {
 .lt-focus-row:last-child {
   border-bottom: none;
 }
-.lt-focus-row.off > :not(.lt-focus-toggle) {
-  opacity: 0.45;
+.lt-focus-row.off > :not(.lt-focus-toggle),
+.lt-focus-row.off > :not(.lt-focus-toggle) * {
+  color: var(--text-3);
 }
 .lt-focus-toggle input {
   margin-top: 3px;
@@ -3002,6 +3071,11 @@ button.tree-item {
 .dm-chart {
   margin-top: 2px;
 }
+/* 520 units drawn some 420 px wide: 15 units is about 12 px on screen, where 11 drew at 9 (LT-589). */
+.stats-chart.dm-chart text,
+.stats-chart.stats-hit-chart text {
+  font-size: 15px;
+}
 .dm-proc {
   font-style: normal;
   font-weight: 600;
@@ -3081,8 +3155,9 @@ button.tree-item {
 .loot-row:last-child {
   border-bottom: none;
 }
-.loot-row.dim {
-  opacity: 0.6;
+.loot-row.dim,
+.loot-row.dim * {
+  color: var(--text-3);
 }
 .loot-icon {
   width: 28px;
@@ -3192,7 +3267,7 @@ button.tree-item {
 /* A chip's off state: muted and outlined, not struck through (struck reads as "disabled", LT-665, LT-579). */
 .toggle-chip.off {
   background: none;
-  border: 1px dashed var(--line-2);
+  border: 1px dashed var(--line-3);
   color: var(--text-3);
 }
 /* Waiting for what was kept: drawn neither on nor off (LT-665). */
@@ -3563,16 +3638,30 @@ input[aria-invalid='true'] {
 }
 
 /* Long jobs under way, above the page. */
+/* Over the page's foot, not a row of its own: a download starting and ending no longer moves every page (LT-593). */
 .jobs {
+  position: fixed;
+  left: 240px;
+  right: 22px;
+  bottom: 14px;
+  z-index: 35;
   display: grid;
   gap: 6px;
-  margin-bottom: 14px;
+  max-width: 640px;
+  pointer-events: none;
 }
 .job {
   padding: 8px 12px;
   border-radius: var(--radius-sm);
   background: var(--panel);
-  border: 1px solid var(--line);
+  border: 1px solid var(--line-2);
+  box-shadow: var(--shadow);
+  pointer-events: auto;
+}
+@media (max-width: 1000px) {
+  .jobs {
+    left: 76px;
+  }
 }
 .job-bar {
   width: 160px;
@@ -4159,9 +4248,32 @@ input[aria-invalid='true'] {
   }
   .timer .fill,
   .dm-fill,
-  .job-bar > span {
+  .job-bar > span,
+  .fp-now-bar i,
+  .ach-bar > *,
+  .ach-ov-bar i,
+  .stats-bar > *,
+  .stats-skillbar > *,
+  .lt-mergebar > *,
+  .lt-bar-track > *,
+  .bar-meter > div,
+  .lt-pips i.on,
+  .sl-count-bar i {
     forced-color-adjust: none;
     background: Highlight;
+  }
+  .fp-now-bar,
+  .ach-bar,
+  .ach-ov-bar,
+  .stats-bar,
+  .stats-skillbar,
+  .lt-mergebar,
+  .lt-bar-track,
+  .bar-meter,
+  .sl-count-bar,
+  .lt-pips i,
+  .bag-preview i {
+    border: 1px solid CanvasText;
   }
   .lt-seg [aria-pressed='true'] {
     outline: 2px solid Highlight;

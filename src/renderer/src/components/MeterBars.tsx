@@ -114,7 +114,8 @@ export function EntityBar({ r, rank, onClick, selected, activeDps }: { r: Row; r
       stat={r.hits ? `${pct(r.share)}` : r.misses ? `${r.misses} swing${r.misses === 1 ? '' : 's'}, all missed` : undefined}
       right={
         <>
-          <b>{fmtRate(activeDps ? r.activeDps : r.dps)}</b> · {num(r.total)}
+          {/* What the figures are, on the row (LT-589): "59 DPS · 1,234". */}
+          <b>{fmtRate(activeDps ? r.activeDps : r.dps)}</b> DPS · {num(r.total)}
         </>
       }
       onClick={onClick}
@@ -160,7 +161,7 @@ export function SkillBar({ s, rank, onClick, per }: { s: SkillRow; rank?: number
       stat={bits.join(' · ')}
       right={
         <>
-          <b>{fmtRate(s.dps)}</b> · {num(s.total)}
+          <b>{fmtRate(s.dps)}</b> DPS · {num(s.total)}
           {per ? ` ${per}` : ''}
         </>
       }

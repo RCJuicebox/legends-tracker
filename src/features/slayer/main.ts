@@ -2,7 +2,7 @@ import { join } from 'node:path'
 import { copyFile, mkdir, readdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { RACE_TABLE } from '../../core/raceNames'
 import { mixCredits, SlayerRaces, slayerCounters } from '../../core/slayer'
-import { isCharacterKey } from '../../core/validate'
+import { characterKey, isCharacterKey } from '../../core/validate'
 import { handle } from '../../main/ipc/handle'
 import { log } from '../../main/log'
 import { JsonFile, readJsonFile } from '../../main/storeCore'
@@ -317,7 +317,8 @@ export class SlayerPlanner implements AppFeature {
     return {
       character,
       export: { file: exp.file, modified: exp.modified },
-      sinceKills: live?.exportAt === exp.modified,
+      // The kills since count for the character whose log is followed; a moment after a start they are on their way (LT-539).
+      sinceKills: characterKey(ctx.store.settings.get().logFile) === character,
       goals,
       camps,
       unplaced: [...unplaced.values()].sort((a, b) => b.n - a.n).slice(0, 20),
@@ -397,7 +398,7 @@ async function spawnMap(installDir: string, zone: string, mobs: string[]): Promi
  * A zone no longer marked goes back to the game's copy. The game's own files are only read.
  */
 export async function markMaps(installDir: string, marks: SlayerMark[]): Promise<{ folder: string; zones: number; spots: number }> {
-  if (!installDir) throw new Error('Choose the game folder on the Settings page first.')
+  if (!installDir) throw new Error('Choose the game folder on Settings › General first.')
   const maps = join(installDir, 'maps')
   const set = join(maps, MAP_SET)
   await mkdir(set, { recursive: true })

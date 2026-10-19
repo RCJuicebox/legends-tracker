@@ -278,7 +278,7 @@ function StanceCard({ s, set, baseAcc, weaponName }: { s: StatsInputs; set: SetS
 function HitChart({ stances, avoidance }: { stances: { name: string; acc: number }[]; avoidance: number }) {
   const W = 640
   const H = 240
-  const m = { l: 44, r: 16, t: 16, b: 34 }
+  const m = { l: 50, r: 16, t: 16, b: 38 }
   const maxAcc = Math.max(avoidance * 2.2, ...stances.map((s) => s.acc * 1.15), 100)
   const x = (a: number) => m.l + (a / maxAcc) * (W - m.l - m.r)
   const y = (p: number) => m.t + (1 - p) * (H - m.t - m.b)
@@ -294,7 +294,7 @@ function HitChart({ stances, avoidance }: { stances: { name: string; acc: number
   const groups = new Map<number, string[]>()
   for (const s of stances) groups.set(s.acc, [...(groups.get(s.acc) ?? []), s.name])
   return (
-    <svg viewBox={`0 0 ${W} ${H}`} className="stats-chart" role="img" aria-label="Chance to hit against Accuracy">
+    <svg viewBox={`0 0 ${W} ${H}`} className="stats-chart stats-hit-chart" role="img" aria-label="Chance to hit against Accuracy">
       {[0, 0.25, 0.5, 0.75, 1].map((p) => (
         <g key={p}>
           <line x1={m.l} x2={W - m.r} y1={y(p)} y2={y(p)} className="grid" />

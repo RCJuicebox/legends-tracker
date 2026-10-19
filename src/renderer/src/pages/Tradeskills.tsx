@@ -5,7 +5,7 @@ import { useInvoke, useItemInfo, useVisibleInterval } from '../hooks'
 import { useRemembered } from '../remember'
 import { act, showError } from '../toast'
 import { Ago, Disclosure, ErrorText, FilterBox, GameCommand, Info, Pending, Tabs } from '../components/ui'
-import { wikiUrl } from '../../../core/format'
+import { num, wikiUrl } from '../../../core/format'
 import { fmtCoin } from '../../../core/loot'
 import { itemKey } from '../../../core/inventory'
 import { parseWikiCoin, recipeKey, shopping, unitPrice, type PriceSource, type Purchase } from '../../../core/tradeskills'
@@ -167,7 +167,8 @@ export function Tradeskills() {
               }
             />
           </div>
-          <SkinRebuilds character={character} />
+          {/* On Bag layout its own Save and rebuild does it, with the edits waiting (LT-587). */}
+          {!showBags && <SkinRebuilds character={character} />}
         </div>
         <div className="actions">
           <CharacterPicker character={character} available={exp.available} onPick={exp.setCharacter} />
@@ -219,7 +220,7 @@ export function Tradeskills() {
                   </span>
                   {p?.busy ? (
                     <span className="small">
-                      Reading {p.pages}/{p.total}
+                      Reading {num(p.pages)} of {num(p.total)}
                     </span>
                   ) : (
                     <button className="btn ghost small" onClick={() => void recipes.refresh()}>

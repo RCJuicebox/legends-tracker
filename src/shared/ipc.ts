@@ -228,7 +228,8 @@ export interface JobView {
 }
 
 /** How a source of information last fared (see the Data Sources page). */
-export type SourceStatus = 'ok' | 'stale' | 'error' | 'missing' | 'reading' | 'waiting'
+/** `idle`: there, and simply not being read now (the log while not watched). */
+export type SourceStatus = 'ok' | 'stale' | 'error' | 'missing' | 'reading' | 'waiting' | 'idle'
 
 /** Another PC's Logs folder as last looked at (Settings › Game). */
 export interface LogFolderView {

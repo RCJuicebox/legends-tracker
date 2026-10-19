@@ -57,7 +57,7 @@ export function Audio() {
         </div>
         <div className="actions">
           <label className="row tight">
-            <Switch on={!a.muted} label="Sound on" onChange={(v) => set({ muted: !v })} /> {a.muted ? 'Muted' : 'Sound on'}
+            <Switch on={a.muted} label="Mute all sound" onChange={(v) => set({ muted: v })} /> Mute all sound
           </label>
         </div>
       </div>
@@ -164,7 +164,7 @@ export function Audio() {
           </p>
           <div className="row">
             {sounds.map((s) => (
-              <button key={s} className="btn small" onClick={() => void act('audio:sound', s)}>
+              <button key={s} className="btn small as-is" onClick={() => void act('audio:sound', s)}>
                 ▶ {s}
               </button>
             ))}
