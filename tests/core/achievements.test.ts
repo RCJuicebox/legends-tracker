@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { AchievementBook, explorationZones, parseAchievements, sourceFromName, type AchMarks } from '../../src/core/achievements'
+import { AchievementBook, explorationZones, parseAchievements, type AchMarks } from '../../src/core/achievements'
 import { HUNT } from '../../src/shared/game/hunt'
 
 const EXPORT = [
@@ -34,7 +34,6 @@ describe('reading the achievements export', () => {
     expect(stats).toMatchObject({ sections: 3, ach: 6, achDone: 0, comp: 11, compDone: 1 })
     expect(sections[1]).toMatchObject({ cat: 'EverQuest', name: 'Keys' })
     expect(sections[1].ach[0].c[1]).toEqual({ t: 'Say thanks', o: true, p: [2, 5] })
-    expect(sourceFromName('Kelwyn_neriak-Achievements.txt')).toEqual({ character: 'Kelwyn', server: 'neriak' })
   })
 
   it('refuses a file with no achievements in it', () => {

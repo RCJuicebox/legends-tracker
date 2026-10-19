@@ -1,14 +1,14 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { promises as fs } from 'node:fs'
-import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { checkAgainstLog } from '../../src/core/logCheck'
 import { fixtureBook } from '../helpers'
 import { DEFAULT_TIER_DURATION_PCT } from '../../src/shared/types'
+import { tempDir } from '../tempDir'
 
 let dir: string
 beforeEach(async () => {
-  dir = await fs.mkdtemp(join(tmpdir(), 'eqlcheck-'))
+  dir = tempDir('eqlcheck-')
 })
 afterEach(async () => {
   await fs.rm(dir, { recursive: true, force: true })

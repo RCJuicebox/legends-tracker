@@ -1,5 +1,5 @@
 import type { AchSection } from '../shared/character'
-import { COMPLETED_ACHIEVEMENT, DIED, SLAIN_BY, SLAIN_BY_YOU } from './phrases'
+import { COMPLETED_ACHIEVEMENT, DIED, PET_ATTACKING, SLAIN_BY, SLAIN_BY_YOU } from './phrases'
 import {
   ACHIEVEMENT_RACES,
   MOB_RACES,
@@ -246,8 +246,6 @@ export class SlayerRaces {
 /** What the exports settled: whether a mob (lower-cased) counts toward an achievement (lower-cased), undefined where nothing has. */
 export type SlayerFacts = (mob: string, achievement: string) => boolean | undefined
 
-/** "Vonartik told you, 'Attacking a minotaur slaver Master.'": the pet's name, and what it goes for. */
-const PET_TELL = /^(\S+) told you, 'Attacking (.+) Master\.'$/
 /** "You punch a lion for 75 points of damage.", "You hit a bixie for 45 points of poison damage by Envenomed Bolt.". */
 const YOU_HIT = /^You \w+ (.+?) for \d+ points? of /
 /** "A samhain has taken 100 damage by Rotting Flesh.": the player's damage over time. */
@@ -269,8 +267,9 @@ export function slayerLine(text: string): SlayerLine {
   if (m) return /^(?:an?|the)\s/i.test(m[2]) ? null : { kill: { mob: m[1], by: m[2] } }
   m = DIED.exec(text)
   if (m) return { died: m[1] }
-  m = PET_TELL.exec(text)
-  if (m) return { pet: m[1], engaged: m[2] }
+  // A pet of one word: a charmed mob's name ("a gnoll") is every other gnoll's too.
+  m = PET_ATTACKING.exec(text)
+  if (m && !m[1].includes(' ')) return { pet: m[1], engaged: m[2] }
   m = YOU_HIT.exec(text) ?? TAKEN_BY.exec(text)
   if (m) return { engaged: m[1] }
   m = COMPLETED_ACHIEVEMENT.exec(text)

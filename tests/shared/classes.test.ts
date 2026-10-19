@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { CLASSES, CLASS_NAMES, CLASS_NUMBER, CLASS_TABLE, classCode, classColumn, classIdOf, className, isClassId } from '../../src/shared/game/classes'
+import { CLASSES, CLASS_NAMES, CLASS_NUMBER, CLASS_TABLE, classCode, classColumn, classIdOf, className } from '../../src/shared/game/classes'
 
 describe('the class table', () => {
   it('numbers classes the way the game files do, and names each one once', () => {
@@ -19,7 +19,5 @@ describe('the class table', () => {
     expect(classIdOf('Paladin')).toBe('pal')
     expect(classIdOf('Pirate')).toBeNull()
     expect(classCode('bst')).toBe('BST')
-    expect(isClassId('mnk')).toBe(true)
-    expect(isClassId('Monk')).toBe(false)
   })
 })

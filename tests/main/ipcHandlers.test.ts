@@ -1,8 +1,6 @@
 import { EventEmitter } from 'node:events'
 import { beforeAll, describe, expect, it, vi } from 'vitest'
-import { mkdtempSync } from 'node:fs'
-import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { tempDir } from '../tempDir'
 
 // Every invoke handler, registered as index.ts and the context's features register them, against a stand-in context in which
 // every part answers anything with another stand-in. Each channel is then called with arguments a page
@@ -92,7 +90,7 @@ const HUNG = Symbol('hung')
 const SCREEN_READS = new Set(['stats:readScreen', 'stock:readScreen'])
 
 beforeAll(async () => {
-  h.dir = mkdtempSync(join(tmpdir(), 'lt-ipc-'))
+  h.dir = tempDir('lt-ipc-')
   process.env['EQL_USER_DATA'] = h.dir
   const { rendererUrl } = await import('../../src/main/push')
   OWN = { senderFrame: { url: rendererUrl() + 'index.html' } }

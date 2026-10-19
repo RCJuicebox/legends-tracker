@@ -1,8 +1,8 @@
 import { afterAll, afterEach, describe, expect, it, vi } from 'vitest'
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { flushLog, initLog, log, logDir } from '../../src/main/log'
+import { tempDir } from '../tempDir'
 
 /** A file the log writes, once what it holds back is written. */
 const readFlushed = async (path: string, enc: BufferEncoding) => {
@@ -11,7 +11,7 @@ const readFlushed = async (path: string, enc: BufferEncoding) => {
 }
 
 // The log module keeps its folder in module state; every test here that names one names its own.
-const root = mkdtempSync(join(tmpdir(), 'lt-log-'))
+const root = tempDir('lt-log-')
 afterAll(() => rmSync(root, { recursive: true, force: true }))
 afterEach(() => vi.restoreAllMocks())
 

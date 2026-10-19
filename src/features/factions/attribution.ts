@@ -1,5 +1,5 @@
 import { zoneEntered, type LogLine } from '../../core/logLine'
-import { DIED, SLAIN_BY, SLAIN_BY_YOU } from '../../core/phrases'
+import { DIED, KILL_RUN_MS, SLAIN_BY, SLAIN_BY_YOU } from '../../core/phrases'
 import { parseFactionLine } from './core'
 import { baseZone } from '../../core/zones'
 
@@ -95,8 +95,7 @@ export interface FactionSourceTallies {
 
 export const emptySources = (): FactionSourceTallies => ({ acts: {}, zones: {}, unexplained: 0 })
 
-/** Kills further apart than this are separate outings; hand-ins, separate visits. */
-const KILL_RUN_MS = 10 * 60_000
+/** Hand-ins further apart than this are separate visits (kills, KILL_RUN_MS: separate outings). */
 const TURNIN_RUN_MS = 2 * 60_000
 /** How far back an offer or an NPC's line can be and still be what a change came from. */
 const OFFER_MS = 8_000

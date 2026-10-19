@@ -87,12 +87,6 @@ export function parseAchievements(text: string): { sections: AchSection[]; stats
   return { sections, stats }
 }
 
-/** "Kelwyn_neriak-Achievements.txt" → { character: 'Kelwyn', server: 'neriak' } */
-export function sourceFromName(name: string): { character: string; server: string } {
-  const m = /^(.+?)_(.+?)-Achievements\.txt$/i.exec(name)
-  return m ? { character: m[1], server: m[2] } : { character: '', server: '' }
-}
-
 export const norm = (s: string) => String(s).toLowerCase().replace(/\s+/g, ' ').trim()
 export const secKey = (sec: AchSection) => (sec.cat ? `${sec.cat}: ${sec.name}` : sec.name)
 export const achKey = (sec: AchSection, a: Achievement) => `${secKey(sec)} > ${norm(a.n)}`

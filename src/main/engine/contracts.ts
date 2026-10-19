@@ -53,6 +53,8 @@ export interface EngineEnv {
   scanMotes?: MoteScanner
   /** Other PCs' Logs folders (Settings › Game), for the motes looted there. */
   logFolders?: OtherLogFolders
+  /** How often the log is looked at, game or no game; for tests, which would wait a second a poll (LT-642). */
+  pollMs?: number
 }
 
 /** Other PCs' Logs folders as last looked at (LogFolders). */

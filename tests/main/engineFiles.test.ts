@@ -1,6 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { promises as fs } from 'node:fs'
-import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { Readable } from 'node:stream'
 import { readLines } from '../../src/main/moteHistory'
@@ -8,10 +7,11 @@ import { lineStartAfter, offsetBefore } from '../../src/main/sources/logHistory'
 import { lastZone, lastZoneLine } from '../../src/main/game'
 import { newestAas, readAasFromLog } from '../../src/core/aaLog'
 import type { LogLine } from '../../src/core/logLine'
+import { tempDir } from '../tempDir'
 
 let dir: string
 beforeEach(async () => {
-  dir = await fs.mkdtemp(join(tmpdir(), 'lt-files-'))
+  dir = tempDir('lt-files-')
 })
 afterEach(async () => {
   await fs.rm(dir, { recursive: true, force: true })

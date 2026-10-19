@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { mkdtempSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import {
   optimizePetGear,
@@ -20,6 +19,7 @@ import { parseWikiTables } from '../../src/core/wikiTable'
 import { parseStatsBlock, type ItemStats } from '../../src/core/inventory'
 import { restrictions } from '../../src/core/gearFinder'
 import { scanPetLog } from '../../src/main/pets'
+import { tempDir } from '../tempDir'
 
 // The gear list is the log's own (Kelwyn's, 2026-09-25). The wiki snippets are made up, in the
 // layout the eqlwiki pet pages use; no wiki text is kept in this repo.
@@ -61,7 +61,7 @@ describe('what the pet wears', () => {
   })
 
   it('finds the last list and the last pet summoned, reading the log backwards', async () => {
-    const dir = mkdtempSync(join(tmpdir(), 'lt-pet-'))
+    const dir = tempDir('lt-pet-')
     const log = join(dir, 'eqlog_Kelwyn_test.txt')
     const text = [
       '[Fri Sep 25 11:00:00 2026] You begin casting Frenzied Spirit X.',

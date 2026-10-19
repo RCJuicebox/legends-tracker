@@ -5,6 +5,13 @@ import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { resolve } from 'node:path'
 
+/**
+ * The notes for `version`: its section's body, its `###` headings made `##`; null when there is no
+ * such section or it is empty.
+ * @param {string} changelog
+ * @param {string} version
+ * @returns {string | null}
+ */
 export function releaseNotes(changelog, version) {
   const lines = changelog.split(/\r?\n/)
   const heading = `## ${version}`

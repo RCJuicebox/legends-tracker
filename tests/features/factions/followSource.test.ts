@@ -1,10 +1,10 @@
 import { afterAll, describe, expect, it, vi } from 'vitest'
-import { mkdtempSync, promises as fs, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { promises as fs, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import type { Notification } from '../../../src/shared/runtime'
 import type { AppContext } from '../../../src/main/context'
 import type { FollowedPlan, FollowStep } from '../../../src/features/factions/tracker'
+import { tempDir } from '../../tempDir'
 
 // The faction plan followed on the achievements overlay (followSource.ts): the Plan tab hands a plan
 // over, each read sets the standings against it, a step done is said, a step picked is the one worked
@@ -13,7 +13,7 @@ import type { FollowedPlan, FollowStep } from '../../../src/features/factions/tr
 
 const h = vi.hoisted(() => ({ dir: '' }))
 vi.mock('electron', () => ({ app: { getPath: () => h.dir }, ipcMain: { handle: () => {}, on: () => {} } }))
-h.dir = mkdtempSync(join(tmpdir(), 'eql-faction-follow-'))
+h.dir = tempDir('eql-faction-follow-')
 const { FactionFollow } = await import('../../../src/features/factions/followSource')
 
 const WHO = 'Tester_neriak'

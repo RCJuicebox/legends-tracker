@@ -1,11 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
+import { tempDir } from '../../tempDir'
 
 // The Allakhazam reader (allaSource.ts) with the site stood in for: fetch is replaced and the clock
 // is faked, so the twenty seconds between pages pass at once.
-const dir = mkdtempSync(join(tmpdir(), 'lt-alla-'))
+const dir = tempDir('lt-alla-')
 process.env['EQL_USER_DATA'] = dir
 vi.mock('electron', () => ({ app: { getPath: () => dir, getVersion: () => 'test' } }))
 

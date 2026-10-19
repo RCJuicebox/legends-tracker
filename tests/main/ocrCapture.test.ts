@@ -1,7 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { readFileSync, rmSync } from 'node:fs'
+import { tempDir } from '../tempDir'
 
 // The screen capture for the mote and Stats reads: each monitor at its own size, never stretched to
 // the largest one's.
@@ -43,7 +42,7 @@ vi.mock('../../src/main/paths', () => ({ cacheDir: () => fake.dir }))
 const { bmpHeader, captureScreens } = await import('../../src/main/ocr')
 
 beforeEach(() => {
-  fake.dir = mkdtempSync(join(tmpdir(), 'lt-capture-'))
+  fake.dir = tempDir('lt-capture-')
   fake.asked = []
   fake.ids = {}
   fake.pixels = false

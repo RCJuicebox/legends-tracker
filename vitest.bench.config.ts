@@ -6,6 +6,7 @@ import { defineConfig } from 'vitest/config'
 export default defineConfig({
   test: {
     include: ['tests/**/*.bench.ts'],
+    setupFiles: ['tests/setup.ts'],
     environment: 'node',
     fileParallelism: false,
     env: { EQL_USER_DATA: join(tmpdir(), 'lt-vitest-profile') }

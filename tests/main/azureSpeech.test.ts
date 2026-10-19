@@ -1,10 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { mkdtempSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { readdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
+import { tempDir } from '../tempDir'
 
 // Azure itself is not called: fetch is replaced, and Electron's app and safeStorage with stand-ins.
-const dir = mkdtempSync(join(tmpdir(), 'lt-azure-'))
+const dir = tempDir('lt-azure-')
 // Spoken phrases are cached under the profile's cache folder: this test's own, so no run finds another's.
 process.env['EQL_USER_DATA'] = dir
 vi.mock('electron', () => ({

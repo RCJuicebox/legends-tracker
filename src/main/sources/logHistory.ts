@@ -68,6 +68,7 @@ export async function readBackward(
         const raw = lines[i].replace(/\r$/, '')
         if (raw && visit(raw, offset)) return true
       }
+      return false
     },
     opts
   )

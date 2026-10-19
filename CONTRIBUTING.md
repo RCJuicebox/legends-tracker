@@ -9,9 +9,11 @@ says what each folder holds; this says how to work in them.
 npm run check
 ```
 
-That is the type-check, the lint (oxlint, with the layer rules below), the format check (Prettier:
-no semicolons, single quotes, 180 columns, LF line ends), knip (no export, file or package that
-nothing uses; the entry points are in `knip.json`) and the tests. `npm run format` fixes the
+That is the type-check (the scripts too, as checked JavaScript), the lint (oxlint, with the layer
+rules below and the accessibility rules that hold), the format check (Prettier: no semicolons, single
+quotes, 180 columns, LF line ends), knip (no export, file or package that nothing uses; the entry
+points are in `knip.json`), knip again leaving the tests out (an export only a test uses is dead
+code: tag it `@public` if it is there for the tests on purpose) and the tests. `npm run format` fixes the
 formatting. `npm run coverage` runs the tests with coverage and fails when a folder falls below its
 floor in `vitest.config.ts`; raise a floor when you add tests, never lower one to get a change in.
 After `npm run build`, `npm run smoke` starts the built app on a throwaway profile. CI runs all of it.
@@ -31,8 +33,11 @@ Release workflow does the rest.
 | `src/renderer` | `core`, `shared`, types from `main` | Node modules, Electron, `main`, `preload` |
 
 A feature module (`src/features/<name>/`) keeps one feature whole; its files follow their layer's
-rules by name: every `.tsx` the renderer's, `main.ts` and any `*Source.ts` main's, every other `.ts`
-core's. The lint enforces all of it (`.oxlintrc.json`). Core code runs in tests and workers, so it
+rules by name: every `.tsx` and the page's Web Workers and their clients (`*Worker.ts`, `*Runner.ts`)
+the renderer's, `main.ts` and any `*Source.ts` main's, every other `.ts` core's. One feature imports
+no other: what two share goes in core (Hunter, built on Slayer's spawns and map, is the one
+exception). `tests/layers.test.ts` checks every import against this table, whatever folder it is in;
+the lint (`.oxlintrc.json`) catches the usual slips as you type. Core code runs in tests and workers, so it
 takes what it needs as arguments rather than reaching for Electron or the disk.
 
 A new feature module:

@@ -40,10 +40,6 @@ const CLASS_IDS_BY_ROLE: readonly ClassId[] = ['war', 'pal', 'shd', 'rng', 'mnk'
 /** [id, name] pairs in picker order. */
 export const CLASSES: readonly (readonly [ClassId, ClassName])[] = CLASS_IDS_BY_ROLE.map((id) => [id, className(id) as ClassName] as const)
 
-export function isClassId(v: unknown): v is ClassId {
-  return typeof v === 'string' && CLASS_TABLE.some((c) => c.id === v)
-}
-
 /** `shd` → "Shadow Knight"; anything else comes back as given. */
 export function className(id: string): string {
   return CLASS_TABLE.find((c) => c.id === id)?.name ?? id

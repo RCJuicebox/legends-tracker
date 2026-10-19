@@ -10,7 +10,8 @@ import { fmtCoin } from '../../../core/loot'
 import { itemKey } from '../../../core/inventory'
 import { parseWikiCoin, recipeKey, shopping, unitPrice, type PriceSource, type Purchase } from '../../../core/tradeskills'
 import type { ItemInfo } from '../../../shared/types'
-import { useExportCharacter, useInventory } from '../gear/model'
+import { useInventory } from '../gear/model'
+import { useCharacterChoice } from '../character'
 import { ItemIcon } from './gearBits'
 import type { BookRecipe, TradeSaved } from '../../../shared/ipc'
 import { BagLayout, SkinBuildOutcome, useSkinBuild } from './TradeskillsBags'
@@ -56,7 +57,7 @@ function useRecipes() {
 }
 
 export function Tradeskills() {
-  const exp = useExportCharacter('inventory')
+  const exp = useCharacterChoice('inventory')
   const character = exp.character
   const inv = useInventory(character, !!exp.exports, exp.available.join(','))
   const recipes = useRecipes()

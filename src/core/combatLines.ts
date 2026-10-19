@@ -21,7 +21,7 @@
 //   You have slain a forsaken revenant!  /  A skeleton has been slain by Gabartik!
 //   Jobarab told you, 'Attacking a forsaken revenant Master.'
 
-import { CAST_BY_OTHER, CAST_BY_YOU, DIED, SLAIN_BY, SLAIN_BY_YOU, YOU_DIED } from './phrases'
+import { CAST_BY_OTHER, CAST_BY_YOU, DIED, PET_ATTACKING, SLAIN_BY, SLAIN_BY_YOU, YOU_DIED } from './phrases'
 
 /** The player, however the log spells it: You, YOU, you, YOUR, or the character's own name. */
 export const SELF = 'You'
@@ -86,7 +86,6 @@ const RE_RESIST_YOU = /^(.+?) resisted your (.+)!$/
 const RE_RESIST = /^(.+?) resisted (.+?)'s (.+)!$/
 // "<pet> told you, 'Attacking a fetid fiend Master.'" — only a pet of yours says this; a player's
 // tell is present tense ("tells you").
-const RE_PET_ATTACK = /^(.+?) told you, 'Attacking .+ Master\.'$/
 const RE_PET_LEADER = /^(.+?) says, 'My leader is (.+?)\.'$/
 const RE_JOINED = /^(.+) has joined the group\.$/
 const RE_LEFT = /^(.+) has left the group\.$/
@@ -197,7 +196,7 @@ export function parseCombatLine(text: string): CombatEvent | null {
   const resisted = text.includes(' resisted ')
   if (resisted && (m = RE_RESIST_YOU.exec(text))) return { kind: 'resist', source: SELF, target: self(m[1]), spell: m[2] }
   if (resisted && (m = RE_RESIST.exec(text))) return { kind: 'resist', source: self(m[2]), target: self(m[1]), spell: m[3] }
-  if (text.includes(' told you, ') && (m = RE_PET_ATTACK.exec(text))) return { kind: 'pet', pet: m[1], owner: SELF }
+  if (text.includes(' told you, ') && (m = PET_ATTACKING.exec(text))) return { kind: 'pet', pet: m[1], owner: SELF }
   if (text.includes('My leader is') && (m = RE_PET_LEADER.exec(text))) return { kind: 'pet', pet: m[1], owner: self(m[2]) }
   const group = text.endsWith(' the group.')
   if (group && (m = RE_JOINED.exec(text))) return { kind: 'group', who: m[1], action: 'joined' }

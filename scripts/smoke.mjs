@@ -65,13 +65,22 @@ async function evaluate(wsUrl, expression) {
   return m.result?.result?.value
 }
 
+/**
+ * The pages the app's DevTools port lists.
+ * @returns {Promise<{ type: string; url: string; webSocketDebuggerUrl: string }[]>}
+ */
+async function debugTargets() {
+  return /** @type {Promise<{ type: string; url: string; webSocketDebuggerUrl: string }[]>} */ ((await fetch(`http://127.0.0.1:${port}/json`)).json())
+}
+
 const app = spawn(exe, [...appArgs, `--remote-debugging-port=${port}`], { env, stdio: 'ignore' })
+/** @type {number | null} */
 let exited = null
 app.on('exit', (code) => (exited = code ?? 0))
 
 try {
   const page = await until('the main window', 45_000, async () => {
-    const targets = await (await fetch(`http://127.0.0.1:${port}/json`)).json()
+    const targets = await debugTargets()
     return targets.find((t) => t.type === 'page' && /index\.html/.test(t.url))
   })
   const state = await until('app:state', 20_000, () =>
@@ -96,7 +105,7 @@ try {
   else console.log('smoke: the Windows calls (koffi) loaded')
 
   // The audio window (the hidden mixer, whose CSP the build tightens) is up beside the main one (LT-630).
-  const targets = await (await fetch(`http://127.0.0.1:${port}/json`)).json()
+  const targets = await debugTargets()
   if (!targets.some((t) => /audio\.html/.test(t.url))) fail(`the audio window is not up (targets: ${targets.map((t) => t.url).join(', ')})`)
   else console.log('smoke: the audio window is up')
 
@@ -118,7 +127,7 @@ try {
   console.log(`smoke: the app quit when asked (exit ${exited})`)
   if (exited !== 0) fail(`the app exited with ${exited}`)
 } catch (e) {
-  fail(e.message)
+  fail(e instanceof Error ? e.message : String(e))
 } finally {
   if (exited === null) app.kill()
   await sleep(500)

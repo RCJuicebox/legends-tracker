@@ -1,6 +1,5 @@
 import { afterAll, beforeAll, describe, it } from 'vitest'
 import { promises as fs, readFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { Engine, type EngineEnv, type EngineStore } from '../../src/main/engine'
 import type { EngineFeature } from '../../src/main/engine/feature'
@@ -9,6 +8,7 @@ import { defaultSettings } from '../../src/main/storeCore'
 import { LogClock, type LogLine } from '../../src/core/logLine'
 import type { MoteState } from '../../src/core/motes'
 import type { MoteStock } from '../../src/shared/types'
+import { tempDir } from '../tempDir'
 
 // What each part of the engine costs a line, on the twenty minutes of real play the golden test reads
 // (9,757 lines of a group in the Plane of Hate). `npm run bench` prints each feature's µs a line, the
@@ -45,7 +45,7 @@ let engine: Engine
 let features: EngineFeature[] = []
 
 beforeAll(async () => {
-  dir = await fs.mkdtemp(join(tmpdir(), 'lt-bench-'))
+  dir = tempDir('lt-bench-')
   await fs.mkdir(join(dir, 'game', 'Logs'), { recursive: true })
   const logFile = join(dir, 'game', 'Logs', 'eqlog_Kelwyn_neriak.txt')
   await fs.writeFile(logFile, '', 'latin1')

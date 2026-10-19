@@ -1,8 +1,8 @@
 import { describe, expect, it, vi } from 'vitest'
-import { mkdtempSync, promises as fs } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { promises as fs } from 'node:fs'
 import { join } from 'node:path'
 import type { AppContext } from '../../../src/main/context'
+import { tempDir } from '../../tempDir'
 
 // How the Slayer feature's live counts read the log (liveSource.ts), apart from when the overlay asks
 // (main/liveAchievements.test.ts) and the counts end to end (main/liveSlayer.test.ts): a log replaced
@@ -12,7 +12,7 @@ const h = vi.hoisted(() => ({ dir: '' }))
 vi.mock('electron', () => ({ app: { getPath: () => h.dir }, ipcMain: { handle: () => {}, on: () => {} } }))
 vi.mock('../../../src/main/paths', () => ({ cacheDir: () => h.dir }))
 
-h.dir = mkdtempSync(join(tmpdir(), 'eql-slayer-live-'))
+h.dir = tempDir('eql-slayer-live-')
 const { SlayerLive } = await import('../../../src/features/slayer/liveSource')
 
 const T0 = new Date(2026, 8, 30, 12, 0, 0).getTime()
@@ -24,7 +24,7 @@ function live(ctx: object) {
 
 describe('SlayerLive counts the kills since the export', () => {
   it('reads a log replaced at its path from the export again, not from the old offset into the new file (LT-625)', async () => {
-    const root = mkdtempSync(join(tmpdir(), 'eql-slayer-'))
+    const root = tempDir('eql-slayer-')
     const here = join(root, 'eqlog_Tester_neriak.txt')
     const kill = (stamp: string, mob = 'a gnoll') => `[${stamp}] You have slain ${mob}!\r\n`
     await fs.writeFile(here, kill('Wed Sep 30 11:59:00 2026') + kill('Wed Sep 30 12:00:10 2026'))
@@ -64,7 +64,7 @@ describe('SlayerLive counts the kills since the export', () => {
   })
 
   it("in the character's log on another PC too: in time order, each log read on from where it got to, one out of reach left alone", async () => {
-    const root = mkdtempSync(join(tmpdir(), 'eql-slayer-'))
+    const root = tempDir('eql-slayer-')
     const here = join(root, 'eqlog_Tester_neriak.txt')
     const there = join(root, 'there', 'Logs')
     const otherLog = join(there, 'eqlog_Tester_neriak.txt')
@@ -131,7 +131,7 @@ describe('SlayerLive counts the kills since the export', () => {
   })
 
   it('credits the player’s, its pet’s and its group’s kills, a mob it was hurting that died, never a player; and keeps the achievements the game said were done', async () => {
-    const root = mkdtempSync(join(tmpdir(), 'eql-slayer-'))
+    const root = tempDir('eql-slayer-')
     const here = join(root, 'eqlog_Tester_neriak.txt')
     const line = (stamp: string, text: string) => `[Wed Sep 30 ${stamp} 2026] ${text}
 `

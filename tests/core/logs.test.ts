@@ -1,12 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { promises as fs } from 'node:fs'
-import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import yauzl from 'yauzl'
 import { decodeCp1252, parseLogLine } from '../../src/core/logLine'
 import type { FileHandle } from 'node:fs/promises'
 import { LogTailer } from '../../src/core/tailer'
 import { archiveLog, compressLoose, findStaging, finishStaged, stagingOriginalName } from '../../src/core/archiver'
+import { tempDir } from '../tempDir'
 
 /** A sleep that runs `step` on its first call instead of waiting: the game acting while the archiver polls. */
 function actOnFirstSleep(step: () => Promise<unknown>) {
@@ -20,7 +20,7 @@ function actOnFirstSleep(step: () => Promise<unknown>) {
 
 let dir: string
 beforeEach(async () => {
-  dir = await fs.mkdtemp(join(tmpdir(), 'eqlat-'))
+  dir = tempDir('eqlat-')
 })
 afterEach(async () => {
   await fs.rm(dir, { recursive: true, force: true })

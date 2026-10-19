@@ -1,8 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { promises as fs } from 'node:fs'
-import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { readFactionExport } from '../../../src/features/factions/main'
+import { tempDir } from '../../tempDir'
 
 // Finding a character's factions export in the game folder: the folder holds thousands of files and
 // the Factions page asks every few seconds, so it is listed again only when its entries change, and a
@@ -10,7 +10,7 @@ import { readFactionExport } from '../../../src/features/factions/main'
 
 let dir: string
 beforeEach(async () => {
-  dir = await fs.mkdtemp(join(tmpdir(), 'lt-fexport-'))
+  dir = tempDir('lt-fexport-')
 })
 afterEach(async () => {
   vi.restoreAllMocks()

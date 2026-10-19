@@ -3,7 +3,7 @@ import { CharacterPicker } from '../components/CharacterPicker'
 import { api } from '../api'
 import { useRemembered } from '../remember'
 import { GoContext } from '../nav'
-import { usePickedCharacter } from '../character'
+import { useCharacterChoice } from '../character'
 import { useAchievementTrack, useInvoke } from '../hooks'
 import { planSlayer, type CampSource } from '../../../features/slayer/core'
 import type { SlayerStepHint } from './AchievementRows'
@@ -18,26 +18,20 @@ import { SectionView, SearchResults, TrackedBar } from './AchievementRows'
 const OPEN_KEEP = 1000
 
 function useAchievements() {
-  const charsQ = useInvoke('achievements:characters')
-  const chars = charsQ.data
-  const reloadChars = charsQ.reload
-  const [picked, setPicked] = usePickedCharacter()
-  const character = picked && chars?.available.includes(picked) ? picked : chars?.current || chars?.available[0] || ''
-  const viewQ = useInvoke(chars ? 'achievements:load' : null, [character])
+  // A character's first export joins the list as the game writes it (useCharacterChoice listens).
+  const chars = useCharacterChoice('achievements')
+  const { character, ready } = chars
+  const viewQ = useInvoke(ready ? 'achievements:load' : null, [character])
   const setView = viewQ.setData
   useEffect(() => {
-    if (!chars) return
-    return api.on('state:achievements', (v: AchievementsView) => {
-      if (v.character === character) setView(v)
-      // A character's first export: it joins the list.
-      if (!chars.available.includes(v.character)) reloadChars()
-    })
-  }, [character, chars, setView, reloadChars])
+    if (!ready) return
+    return api.on('state:achievements', (v: AchievementsView) => v.character === character && setView(v))
+  }, [character, ready, setView])
   const retry = () => {
-    reloadChars()
+    chars.reload()
     viewQ.reload()
   }
-  return { chars, character, setCharacter: setPicked, view: viewQ.data, setView, error: charsQ.error || viewQ.error, retry }
+  return { chars: ready ? chars : null, character, setCharacter: chars.setCharacter, view: viewQ.data, setView, error: chars.error || viewQ.error, retry }
 }
 
 /** Where a step's pace comes from, as Plan › Slayer labels it. */
@@ -353,7 +347,7 @@ export function Achievements() {
 
       {curCat === 'Slayer' && go && (
         <div className="notice row mb-16">
-          <span className="grow">Where to kill for these quickest, step by step, with the raid lockouts beside: Plan › Slayer.</span>
+          <span className="grow">Where to kill for these quickest, step by step, with the raid lockouts beside: the Slayer page.</span>
           <button className="btn small" onClick={() => go('slayer')}>
             Plan these on Slayer
           </button>

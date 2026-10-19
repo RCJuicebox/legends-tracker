@@ -1,9 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { existsSync, mkdtempSync, promises as fs } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { existsSync, promises as fs } from 'node:fs'
 import { join } from 'node:path'
 import type { ArchiveOutcome } from '../../src/shared/runtime'
 import type { ArchiveStatus, FeedItem } from '../../src/shared/types'
+import { tempDir } from '../tempDir'
 
 // The archiver itself runs for real on a scratch game folder while the game counts as closed; where
 // the test needs what only a running game can cause (a deferral, a live handoff), its answer is
@@ -52,7 +52,7 @@ async function zips(): Promise<string[]> {
 }
 
 beforeEach(async () => {
-  game = mkdtempSync(join(tmpdir(), 'lt141-d-archive-'))
+  game = tempDir('lt141-d-archive-')
   logs = join(game, 'Logs')
   await fs.mkdir(logs)
   running = false

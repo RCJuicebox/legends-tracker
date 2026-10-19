@@ -1,14 +1,14 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { promises as fs } from 'node:fs'
-import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { LogFolders } from '../../src/main/logFolders'
 import { listLogsIn, logsFolderOf } from '../../src/main/game'
 import type { LogFileInfo } from '../../src/shared/types'
+import { tempDir } from '../tempDir'
 
 let dir: string
 beforeEach(async () => {
-  dir = await fs.mkdtemp(join(tmpdir(), 'lt-folders-'))
+  dir = tempDir('lt-folders-')
 })
 afterEach(async () => {
   await fs.rm(dir, { recursive: true, force: true })

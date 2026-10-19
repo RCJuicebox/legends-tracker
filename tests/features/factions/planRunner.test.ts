@@ -1,9 +1,12 @@
-import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import type { PlanReply, PlanRequest } from '../../../src/features/factions/planWorker'
 import type { FactionPlan } from '../../../src/features/factions/planTypes'
 
 // The page's side of the planner worker, with a worker that answers when told to: a lane runs one ask
 // at a time and keeps only the newest waiting behind it (LT-547).
+
+// Once the worker has failed, plans are worked out on the page: planner.ts stood in here.
+vi.mock('../../../src/features/factions/planner', () => ({ planFactions: () => ({ steps: [], seconds: -1 }) }))
 
 const posted: PlanRequest[] = []
 const workers: FakeWorker[] = []
@@ -18,6 +21,10 @@ class FakeWorker {
     posted.push(r)
   }
   terminate() {}
+  /** Fails as a worker that would not load does. */
+  fail() {
+    this.onerror?.({ message: 'it could not be loaded', preventDefault: () => {} } as unknown as ErrorEvent)
+  }
   /** Answers the ask with this id, as the worker does when its search is done. */
   answer(id: number) {
     this.onmessage?.({ data: { id, plan: { steps: [], seconds: id } as unknown as FactionPlan, ms: 1 } } as MessageEvent<PlanReply>)
@@ -54,5 +61,17 @@ describe('runPlan', () => {
     void runPlan({} as never, {} as never, {} as never)
     void runPlan({} as never, {} as never, {} as never)
     expect(posted).toHaveLength(4)
+  })
+})
+
+describe('a planner worker that fails', () => {
+  it('works the plans out on the page from then on, the one waiting included, and makes no worker again (LT-637)', async () => {
+    const { runPlan } = await import('../../../src/features/factions/planRunner')
+    const made = workers.length
+    const waiting = runPlan({} as never, {} as never, {} as never)
+    workers.at(-1)!.fail()
+    expect((await waiting).seconds).toBe(-1)
+    expect((await runPlan({} as never, {} as never, {} as never)).seconds).toBe(-1)
+    expect(workers.length).toBe(made)
   })
 })

@@ -1,15 +1,15 @@
 import { describe, expect, it } from 'vitest'
-import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { listSkinBuilds, readBagLayout, runSkinBuild, saveBagLayout } from '../../src/main/skinBuilds'
 import { BAG_LAYOUT_FILE, SKIN_BUILD_FILE } from '../../src/core/skinBuild'
+import { tempDir } from '../tempDir'
 
 // Skins in the game's uifiles folder that ask for a rebuild button, and running one: the command
 // comes from the skin's own file, and the character goes to it as EQL_CHARACTER.
 
 function gameFolder(skins: Record<string, unknown>): string {
-  const dir = mkdtempSync(join(tmpdir(), 'lt-skins-'))
+  const dir = tempDir('lt-skins-')
   for (const [skin, build] of Object.entries(skins)) {
     mkdirSync(join(dir, 'uifiles', skin), { recursive: true })
     if (build !== undefined) writeFileSync(join(dir, 'uifiles', skin, SKIN_BUILD_FILE), typeof build === 'string' ? build : JSON.stringify(build))
@@ -28,7 +28,7 @@ describe('listSkinBuilds', () => {
 
   it('finds nothing without a game folder or a uifiles folder', async () => {
     expect(await listSkinBuilds('')).toEqual([])
-    expect(await listSkinBuilds(mkdtempSync(join(tmpdir(), 'lt-skins-')))).toEqual([])
+    expect(await listSkinBuilds(tempDir('lt-skins-'))).toEqual([])
   })
 })
 

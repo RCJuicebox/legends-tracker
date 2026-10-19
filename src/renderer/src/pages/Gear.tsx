@@ -9,7 +9,8 @@ import { itemKey, mergeLevel, parseStatsBlock, placeLabel, slotLabel, storageTab
 import type { CharacterSheet, InventoryView, ItemInfo } from '../../../shared/types'
 import { className } from '../../../shared/game/classes'
 import { MAX_LEVEL } from '../../../core/moteCalc'
-import { useExportCharacter, useInventory } from '../gear/model'
+import { useInventory } from '../gear/model'
+import { useCharacterChoice } from '../character'
 import { wornSummary, statsFor, type WornSummary } from '../../../core/wornGear'
 import { ItemIcon } from './gearBits'
 import { GearFinder, type GearMode } from './GearFinder'
@@ -83,7 +84,7 @@ const EFFECTS: [EffectsKind, string][] = [
  * way). `onPlan` is where a merge's Plan button goes.
  */
 export function Gear({ go, only, onPlan }: { go?: Go; only?: GearMode; onPlan?: () => void }) {
-  const exp = useExportCharacter('inventory')
+  const exp = useCharacterChoice('inventory')
   const { exports, available, character, setCharacter } = exp
   const inv = useInventory(character, !!exports, available.join(','))
   const { view, setView, sheet, updateSheet } = inv

@@ -261,6 +261,34 @@ Settled findings, 2026-09-12 to 2026-09-15:
 
 Implemented in `src/core/combatModel.ts` `classicCritChance`, kept for comparison only. The measured rate overrides it in `src/core/statsModel.ts` `combatReport`.
 
+## Spell durations
+
+Settled 2026-09-23 against a level-50 Shaman's in-game Spell windows, and 2026-09-24 in play (the log's landing-to-fade times).
+
+```
+ticks = round(formula ticks × (1 + tier% × rank) × (1 + focus%))
+```
+
+That is the bracketed number in the in-game Spell window. The effect then runs on into the partial tick it landed in, so it wears off between `ticks × 6` and `(ticks + 1) × 6` seconds after landing.
+
+- **Formula ticks:** the client's duration formula (field 11 of `spells_us.txt`) at the caster's level, capped by field 12.
+- **Rank:** the roman numeral in the cast line is the tier count (rank X has ten); an unranked spell has none. A spell whose own name ends in the numeral has no rank: Harm Touch X (13540, a Shadowknight ability at class level 254) is its formula's 6 ticks, 36 s, with no tier bonus (2026-10-18).
+- **Tier bonus per category:** DoT +5%, buff, debuff, mez and charm +10%, from the EQL spell upgrade (mote) guide. Heal over time is **7%, fitted** (2026-09-24): the guide's "+5% (?)" does not match Slugs Healing V (Spell window 0:24 (0:48) with only the AA; 9 ticks in the log with the ring too).
+- **Focus:** an item's focus is read from its focus spell: SPA 128 the bonus, 134 the level cap and the decay (percent *of the focus* lost per spell level over the cap), 138 beneficial or detrimental, 140 a minimum duration, 137 excluded effect types. Only the best item focus applies; AAs such as Spell Casting Reinforcement add on top. The Spell window's bracket includes item focus.
+- **Rounding:** to the nearest tick.
+- **A DoT's first tick pins its end:** it wears off on its target's tick, `ticks` ticks (the Spell window's count) after the first tick line. Odium X, 8 ticks: the fade line came 48-49 s after the first tick in 44 of 76 casts in the logs (2026-10-19).
+
+| Spell | Base | Calculation | Spell window |
+|---|---|---|---|
+| Envenomed Bolt X | 6 ticks | 6 × 1.5 = 9 | 0:36 (0:54) |
+| Odium X | 5 | 5 × 1.5 = 7.5 → 8 | 0:30 (0:48) |
+| Plague X | 13 | 13 × 1.5 = 19.5 → 20 | 1:18 (2:00) |
+| Spirit of the Puma X | 10 | 10 × 2.0 × (1 + 0.50 + 0.105) = 32.1 → 32 | 1:00 (3:12) |
+
+Puma's focus is Spell Casting Reinforcement (AA, 50%) plus Extended Enhancement II (the Engineer's Ring's exaltation, +15%, cap 44) decayed six levels to 10.5%. In play on 2026-09-24 Puma X faded 194 s after landing with the ring on (32 ticks) and 184 s with it off (30 ticks: 10 × 2.0 × 1.5); with the ring off the Spell window reads 1:00 (3:00). The decayed focus applies although the ring never prints its "sparkles" message on a Puma cast, so the absence of a focus message is no evidence either way.
+
+Implemented in `src/core/durations.ts` (`computeDuration`, its `ticks` counting the partial tick, so `wholeTicks + 1`) and `src/core/spellTracker.ts` (the first tick's pin, `(ticks − 1) × 6` s on in those terms); every rank of the four spells above is checked against the log in `tests/core/durations.test.ts`.
+
 ## Pets
 
 Settled 2026-09-15 on Test Sixty.
@@ -294,6 +322,12 @@ The readings that settled it:
 A /con while invisible reads "regards you indifferently" whatever the standing: it proves nothing.
 
 Implemented in `src/features/factions/core.ts`: `STANDINGS` and `standingBand` (the bands), `RACE_KEYS`, `conBasis` and `conOf` (the sum, best class by `clsIndex`), `withCons` for the Standings tab; the Plan tab plans every character as Agnostic (`consFor` in `main.ts`). Standings since an export are the export plus every change the log wrote after its "Outputfile Complete" line (`SinceExports`).
+
+**In play** (Legends, beyond the client's files):
+
+- **A gain is at least 5.** Of some 2,200 faction gains in the logs none was smaller, except where 2000 cut one short, and Allakhazam's and the walkthroughs' +1s and +3s came as +5; losses are as listed (2026-10-04). Implemented as `MIN_GAIN` in `src/features/factions/catalog.ts`.
+- **A game day is 72 minutes:** `/time` moves an hour every 3 minutes in the log (2026-10-06). A once-a-day spawn is costed on it (Lyda Nasin's head, `sec` in `src/shared/game/factions.ts`).
+- **A raid boss is one kill a difficulty a day:** difficulties 0 to 4, so five a day (EQL Discord, 2026-09-21, of Innoruuk; the app takes the other raid bosses it plans, Phinigel Autropos and Cazic-Thule, to be the same). `perDay` on a camp in `src/shared/game/slayerCamps.ts`.
 
 ## Slayer races
 

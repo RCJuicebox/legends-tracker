@@ -3,9 +3,9 @@ import { GoContext } from '../../renderer/src/nav'
 import { remember } from '../../renderer/src/remember'
 import { CharacterPicker } from '../../renderer/src/components/CharacterPicker'
 import { ago, api } from '../../renderer/src/api'
-import { useLive, useSettled } from '../../renderer/src/state'
+import { useLive } from '../../renderer/src/state'
 import { useInvoke, useVisibleInterval } from '../../renderer/src/hooks'
-import { usePickedCharacter } from '../../renderer/src/character'
+import { useCharacterChoice } from '../../renderer/src/character'
 import { useNow } from '../../renderer/src/components/TimerBars'
 import { Disclosure, FilterBox, GameCommand, Info, NumberInput, Pending, SettingsLink, Tip, ToggleChip } from '../../renderer/src/components/ui'
 import { duration, isoDays, num, who } from '../../core/format'
@@ -75,19 +75,6 @@ const HOW = (
     </div>
   </>
 )
-
-/** The character a Plan page is for: picked, or the one being played; any with a log or an achievements export. */
-export function usePlanCharacter() {
-  const characterKey = useSettled((s) => s.characterKey)
-  const installDir = useSettled((s) => s.settings.installDir)
-  const logFile = useSettled((s) => s.settings.logFile)
-  const logsQ = useInvoke('logs:list', [], [installDir, logFile])
-  const exportsQ = useInvoke('character:exports', [], [installDir])
-  const [picked, setPicked] = usePickedCharacter()
-  const available = useMemo(() => [...new Set([...(logsQ.data ?? []).map((l) => l.character), ...(exportsQ.data?.achievements ?? [])])].sort(), [logsQ.data, exportsQ.data])
-  const character = picked && available.includes(picked) ? picked : characterKey || available[0] || ''
-  return { available, character, setCharacter: setPicked, ready: !!logsQ.data, error: logsQ.error, reload: logsQ.reload }
-}
 
 const kills = (n: number) => num(Math.ceil(n))
 
@@ -274,7 +261,7 @@ function HunterHere({ hunter }: { hunter: HunterZone[] }) {
                   {i > 0 && ', '}
                   {n.name}
                   {n.spawn && (
-                    <Tip className="mono sl-spawn" text={`Classic (TAKP), as Plan › Hunter has it, with the respawn ${TIMED[n.spawn.timerFrom]}`}>
+                    <Tip className="mono sl-spawn" text={`Classic (TAKP), as the Hunter page has it, with the respawn ${TIMED[n.spawn.timerFrom]}`}>
                       {' '}
                       ({namedSpawn(n)})
                     </Tip>
@@ -326,7 +313,7 @@ function FactionCost({ camp, raising }: { camp: SlayerPlanCamp; raising: readonl
 
 export function Slayer() {
   const goTo = useContext(GoContext)
-  const chars = usePlanCharacter()
+  const chars = useCharacterChoice('achievements', { withLogs: true })
   const character = chars.character
   const q = useInvoke(character ? 'slayer:plan' : null, [character])
   useVisibleInterval(q.reload, 60_000)

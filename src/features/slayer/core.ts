@@ -5,8 +5,8 @@ import type { LogLine } from '../../core/logLine'
 import { zoneEntered } from '../../core/logLine'
 import { achievementRaces, slayerLine, type SlayerCounter, type SlayerRaces } from '../../core/slayer'
 import type { RaceTable } from '../../core/raceNames'
-import { baseZone, zoneKey } from '../../core/zones'
-import { isCity } from '../factions/names'
+import { baseZone, isCity, zoneKey } from '../../core/zones'
+import { KILL_RUN_MS } from '../../core/phrases'
 import { SLAYER_CAMPS, SLAYER_SPOTS, type SlayerCamp } from '../../shared/game/slayerCamps'
 import { SLAYER_GUIDE, SLAYER_GUIDE_SAID, SLAYER_GUIDE_SPOTS, type SlayerGuideTip } from '../../shared/game/slayerGuide'
 import { HUNT } from '../../shared/game/hunt'
@@ -23,8 +23,6 @@ import type { SlayerPlanStepView, SlayerPlanTrackView } from '../../shared/track
 // no more than the player's own usual pace. The plan takes the camp that finishes something soonest,
 // travel counted (the log's own trips between zones), and again; raid lockouts go beside it.
 
-/** A run of kills: within this of the one before, the time between counts as time spent killing there. */
-const KILL_RUN_MS = 10 * 60_000
 /** A trip between zones takes no longer than this: a longer stay is not travel. */
 const MOVE_SEC = 30 * 60
 /** Trips kept for each way between two zones. */

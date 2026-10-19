@@ -579,11 +579,6 @@ export function castOrder(chosen: { spell: string; after: string[] }[]): string[
   return out.filter((s) => tied.has(s))
 }
 
-/** What to ask the group for: the best combination's buffs that are not on you. */
-export function buffNeeds(o: { offers: BuffOffer[]; wanted: string[]; group: Person[]; active: ActiveBuff[]; me?: Person | null }): BuffNeed[] {
-  return buffPlan(o).needs
-}
-
 /**
  * "Cast Yaulp; ask Kelwyn for Temperance and Clarity; ask Aldric for Swift Like the Wind." A buff
  * that needs one clicked off first says so, and one that must land after another too ("Harnessing of

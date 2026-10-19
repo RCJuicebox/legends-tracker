@@ -57,6 +57,7 @@ export async function scanPetLog(logPath: string, isSummon: (name: string) => st
         }
         if (out.gear && out.summon) return true
         after = [raw, ...after.slice(0, 24)]
+        return false
       },
       { maxBytes: opts.maxBytes ?? PET_SCAN_MAX, stopAt: opts.stopAt }
     )

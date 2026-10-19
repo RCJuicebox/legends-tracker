@@ -18,6 +18,15 @@ export const YOU_DIED = /^You died\.$/
 /** "You have been slain by a fetid fiend!": the killer. */
 export const YOU_WERE_SLAIN = /^You have been slain by (.+)!$/
 
+/**
+ * "Jobarab told you, 'Attacking a fetid fiend Master.'": the pet, and what it goes for. Only a pet of
+ * yours says it; a charmed mob's name is its own, several words ("a gnoll").
+ */
+export const PET_ATTACKING = /^(.+?) told you, 'Attacking (.+) Master\.'$/
+
+/** Kills no further apart than this are one run of killing, the time between them time spent killing there: Slayer's pace and the faction plan's outings. */
+export const KILL_RUN_MS = 10 * 60_000
+
 /** "You have completed achievement: Bear With Me": the achievement. */
 export const COMPLETED_ACHIEVEMENT = /^You have completed achievement: (.+?)\.?$/
 /** How far apart an export's file time and its "Outputfile Complete" line may be, and how far before an export a read of what came after it starts. */

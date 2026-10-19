@@ -370,7 +370,7 @@ function AchievementsRegion({ config, track, arranging }: { config: OverlayConfi
             ? 'Tracked achievements, the faction and Slayer plans’ steps, the Slayer counts and skills your kills move, and the Hunter named left in your zone show here.'
             : track?.faction
               ? 'Nothing tracked. The faction plan is hidden from this overlay (Settings › Overlays).'
-              : 'Nothing tracked. Track an achievement, or show your faction plan here from Factions › Plan, or your Slayer plan from Plan › Slayer.'}
+              : 'Nothing tracked. Track an achievement, or show your faction plan here from Factions › Plan, or your Slayer plan from the Slayer page.'}
         </div>
       </div>
     )

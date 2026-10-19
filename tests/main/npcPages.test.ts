@@ -1,9 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { existsSync, promises as fs } from 'node:fs'
-import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { NpcPages } from '../../src/main/sources/npcPages'
 import type { WikiPage } from '../../src/main/sources/wiki'
+import { tempDir } from '../tempDir'
 
 // One eqlwiki NPC-page source for the Slayer counts (a mob's race) and the faction plan (what a camp's
 // named mob's page says), with one cache: a fake wiki answers by title (LT-624).
@@ -12,7 +12,7 @@ const PAGE = (race: string, hp: string) => `{{Namedmobpage\n| name = X\n| race =
 
 let dir: string
 beforeEach(async () => {
-  dir = await fs.mkdtemp(join(tmpdir(), 'lt-npc-'))
+  dir = tempDir('lt-npc-')
 })
 afterEach(async () => {
   await fs.rm(dir, { recursive: true, force: true })

@@ -1,8 +1,7 @@
-import { mkdtempSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { rmSync } from 'node:fs'
 import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { CombatSnapshot } from '../../src/shared/types'
+import { tempDir } from '../tempDir'
 
 // What the main window is sent and what is held for it: everything waits while it is hidden, and the
 // live views wait too while no page there listens to them (LT-556), going out when one starts to.
@@ -50,7 +49,7 @@ vi.mock('electron', async () => {
 
 const { Windows } = await import('../../src/main/windows')
 
-h.dir = mkdtempSync(join(tmpdir(), 'lt-main-pushes-'))
+h.dir = tempDir('lt-main-pushes-')
 afterAll(() => rmSync(h.dir, { recursive: true, force: true }))
 
 function setup() {

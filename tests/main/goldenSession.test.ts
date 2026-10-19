@@ -1,27 +1,19 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { promises as fs, readFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { Engine, type EngineEnv, type EngineStore } from '../../src/main/engine'
 import { scanMoteHistory } from '../../src/main/moteHistory'
 import { defaultSettings } from '../../src/main/storeCore'
 import type { MoteState } from '../../src/core/motes'
 import type { FeedItem, MoteStock } from '../../src/shared/types'
+import { tempDir } from '../tempDir'
+import { sleep, waitFor } from '../helpers'
 
 // Twenty minutes of real play (a Plane of Hate instance with a group, the test character's log of
 // 25 September, chat taken out and every player renamed) read by the whole Engine as it reads a log
 // when watching starts. What the meter, loot, respawns and motes make of it is compared with the
 // snapshot beside this file: a change to any of them shows up here as a diff to look at.
 // If a change is meant, update the snapshot with `npx vitest run tests/main/goldenSession.test.ts -u`.
-
-const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
-async function waitFor(check: () => boolean, ms = 20_000): Promise<void> {
-  const until = Date.now() + ms
-  while (!check()) {
-    if (Date.now() > until) throw new Error('timed out waiting')
-    await sleep(25)
-  }
-}
 
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
@@ -57,7 +49,7 @@ let dir: string
 let engine: Engine
 
 beforeAll(async () => {
-  dir = await fs.mkdtemp(join(tmpdir(), 'lt-golden-'))
+  dir = tempDir('lt-golden-')
   const logs = join(dir, 'game', 'Logs')
   await fs.mkdir(logs, { recursive: true })
   const logFile = join(logs, 'eqlog_Kelwyn_neriak.txt')
@@ -80,6 +72,7 @@ beforeAll(async () => {
   const env: EngineEnv = {
     moteWorkerPath: '',
     isGameRunning: async () => false,
+    pollMs: 10,
     findInstall: async () => '',
     soundDirs: () => [],
     dataDir: dir,
@@ -110,7 +103,7 @@ beforeAll(async () => {
   )
   await engine.loadSpells()
   await engine.startWatching()
-  await waitFor(() => engine.meter.reading === '')
+  await waitFor(() => engine.meter.reading === '', 20_000)
   await engine.rebuildMoteHistory()
 }, 60_000)
 

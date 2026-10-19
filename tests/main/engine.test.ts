@@ -1,6 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { existsSync, promises as fs } from 'node:fs'
-import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { Engine, type EngineEnv, type EngineFeature, type EngineStore } from '../../src/main/engine'
 import { scanMoteHistory } from '../../src/main/moteHistory'
@@ -9,16 +8,8 @@ import { log } from '../../src/main/log'
 import type { BoardTimer } from '../../src/core/timers'
 import type { MoteSession, MoteState } from '../../src/core/motes'
 import type { FeedItem, MoteStock } from '../../src/shared/types'
-
-const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
-
-async function waitFor(check: () => boolean, ms = 3000): Promise<void> {
-  const until = Date.now() + ms
-  while (!check()) {
-    if (Date.now() > until) throw new Error('timed out waiting')
-    await sleep(20)
-  }
-}
+import { tempDir } from '../tempDir'
+import { sleep, waitFor } from '../helpers'
 
 const LOOT = (stamp: string, n = 4, rank = 'Major') => `[${stamp}] You looted ${n} Mote of ${rank} Potential from Reward Chest and stored it in your currency.\r\n`
 
@@ -40,7 +31,7 @@ let logs: string
 let engines: Engine[] = []
 
 beforeEach(async () => {
-  dir = await fs.mkdtemp(join(tmpdir(), 'lt-engine-'))
+  dir = tempDir('lt-engine-')
   game = join(dir, 'game')
   logs = join(game, 'Logs')
   await fs.mkdir(logs, { recursive: true })
@@ -75,9 +66,12 @@ function makeEngine(o: { logFile: string; motes?: MoteState; stock?: MoteStock }
     soundDirs: () => [],
     dataDir: dir,
     // In-process in place of the worker thread: the same scan, without a built worker script.
-    scanMotes: (job, progress) => ({ done: scanMoteHistory(job, progress), stop: () => {} })
+    scanMotes: (job, progress) => ({ done: scanMoteHistory(job, progress), stop: () => {} }),
+    // The log looked at every 10 ms, not every second as with the game closed (LT-642).
+    pollMs: 10
   }
   const noop = () => {}
+  let combatPushes = 0
   const engine = new Engine(
     store,
     { synthesize: async () => Buffer.alloc(0) },
@@ -91,7 +85,7 @@ function makeEngine(o: { logFile: string; motes?: MoteState; stock?: MoteStock }
       motes: noop,
       moteScan: noop,
       stock: noop,
-      combat: noop,
+      combat: () => void combatPushes++,
       loot: noop,
       respawns: noop,
       pet: noop,
@@ -100,7 +94,13 @@ function makeEngine(o: { logFile: string; motes?: MoteState; stock?: MoteStock }
     env
   )
   engines.push(engine)
-  return { engine, store, feed }
+  return { engine, store, feed, combatPushes: () => combatPushes }
+}
+
+/** Until the engine's tailer has looked at the log once: a line written after it is read as new. */
+function tailing(engine: Engine): Promise<void> {
+  const tailer = () => (engine as unknown as { tail?: { tailer: { stats: { polls: number } } } }).tail?.tailer
+  return waitFor(() => (tailer()?.stats.polls ?? 0) > 0)
 }
 
 function timer(key: string): BoardTimer {
@@ -130,11 +130,11 @@ describe('Engine', () => {
     await fs.writeFile(logFile, '[Thu Sep 24 16:00:00 2026] You have entered The Plane of Fear 4 (Refined).\r\n')
     const { engine, feed } = makeEngine({ logFile })
     await Promise.all([engine.startWatching(), engine.startWatching()])
-    await sleep(250)
+    await tailing(engine)
     await fs.appendFile(logFile, LOOT('Thu Sep 24 16:23:16 2026'))
     await waitFor(() => engine.motes.state.daily['2026-09-24']?.major !== undefined)
-    // A second tailer would count it again on its next poll.
-    await sleep(400)
+    // A second tailer would count it again on its next poll: five polls on.
+    await sleep(50)
     expect(engine.motes.state.daily['2026-09-24']).toEqual({ major: 4 })
     expect(feed.filter((f) => f.text.startsWith('Watching')).length).toBe(1)
   })
@@ -155,7 +155,7 @@ describe('Engine', () => {
     })
     engine.use({ id: 'after', line: (l) => seen.push(l.text) })
     await engine.startWatching()
-    await sleep(250)
+    await tailing(engine)
     await fs.appendFile(logFile, LOOT('Thu Sep 24 16:23:16 2026') + '[Thu Sep 24 16:23:17 2026] One more line.\r\n')
     await waitFor(() => seen.includes('One more line.'))
     expect(engine.motes.state.daily['2026-09-24']).toEqual({ major: 4 })
@@ -169,9 +169,9 @@ describe('Engine', () => {
     const logFile = join(logs, 'eqlog_Kelwyn_neriak.txt')
     await fs.writeFile(logFile, '')
     const info = vi.spyOn(log, 'info')
-    const { engine } = makeEngine({ logFile })
+    const { engine, combatPushes } = makeEngine({ logFile })
     await engine.startWatching()
-    await sleep(250)
+    await tailing(engine)
     const d = new Date()
     const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
     const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
@@ -183,9 +183,13 @@ describe('Engine', () => {
 `
     )
     await waitFor(() => engine.meter.fighting)
-    // The engine's own clock starts in init(), which these tests leave out: its lap, by hand.
-    const lap = () => (engine as unknown as { tick(): void }).tick()
-    await sleep(600)
+    // The engine's own clock starts in init(), which these tests leave out: its lap, by hand. The first
+    // push goes at once; the next only half a second after it, so that lap is told it is later.
+    const lap = (later = 0) => {
+      const now = vi.spyOn(Date, 'now').mockReturnValue(Date.now() + later)
+      ;(engine as unknown as { tick(): void }).tick()
+      now.mockRestore()
+    }
     lap()
     expect(info.mock.calls.some((c) => String(c[0]).startsWith('Meter push:'))).toBe(true)
     // With the live fight's own size, and who is in it (LT-557).
@@ -193,14 +197,15 @@ describe('Engine', () => {
     // Once in five minutes, not every push.
     const pushLines = () => info.mock.calls.filter((c) => String(c[0]).startsWith('Meter push:')).length
     const logged = pushLines()
-    await sleep(600)
+    const pushes = combatPushes()
     await fs.appendFile(
       logFile,
       `[${now}] You punch a fetid fiend for 50 points of damage.
 `
     )
-    await sleep(600)
-    lap()
+    await waitFor(() => Object.values(engine.meter.liveFight?.entities ?? {}).reduce((n, e) => n + e.out.total, 0) >= 150)
+    lap(600)
+    expect(combatPushes()).toBe(pushes + 1)
     expect(pushLines()).toBe(logged)
     expect(engine.meter.fighting).toBe(true)
     info.mockRestore()
@@ -263,7 +268,7 @@ describe('Engine', () => {
     await fs.writeFile(logFile, '')
     const { engine, feed } = makeEngine({ logFile })
     await engine.startWatching()
-    await sleep(150)
+    await tailing(engine)
     await fs.rm(logFile)
     await waitFor(() => !engine.status.watching)
     expect(feed.some((f) => f.kind === 'warn' && f.text.includes('is gone'))).toBe(true)
@@ -288,7 +293,7 @@ describe('Engine', () => {
     await fs.writeFile(logFile, '[Thu Sep 24 16:00:00 2026] You have entered Neriak.\r\n')
     const first = makeEngine({ logFile })
     await first.engine.startWatching()
-    await sleep(250)
+    await tailing(first.engine)
     await fs.appendFile(logFile, LOOT('Thu Sep 24 16:23:16 2026', 4) + LOOT('Thu Sep 24 16:23:16 2026', 2))
     await waitFor(() => first.engine.motes.state.daily['2026-09-24']?.major === 6)
     first.engine.shutdown()
@@ -377,14 +382,15 @@ describe('Engine', () => {
     await fs.writeFile(logFile, '[Thu Sep 24 09:00:00 2026] You have entered Neriak.\r\n')
     const { engine } = makeEngine({ logFile })
     await engine.startWatching()
-    await sleep(250)
+    await tailing(engine)
     await fs.appendFile(logFile, LOOT('Thu Sep 24 10:05:00 2026', 1))
     await waitFor(() => engine.motes.state.daily['2026-09-24']?.major === 1)
     await engine.rebuildMoteHistory()
     expect(engine.motes.state.daily['2026-09-24']).toEqual({ major: 1 })
     await fs.appendFile(logFile, LOOT('Thu Sep 24 10:05:00 2026', 2))
     await waitFor(() => engine.motes.state.daily['2026-09-24']?.major !== 1)
-    await sleep(300)
+    // A few polls on, nothing counted twice.
+    await sleep(50)
     expect(engine.motes.state.daily['2026-09-24']).toEqual({ major: 3 })
   })
 

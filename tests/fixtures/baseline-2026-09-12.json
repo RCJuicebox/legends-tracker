@@ -29,7 +29,7 @@
     ],
     "attack_speed_pct": 150,
     "velocity": 0,
-    "_attack_reading": "Attack = Offense / chance to hit. 368 = Offense (strength rule, confirmed at scale). 781 = Accuracy in Offensive Stance (625 × 1.25). Not heroic dexterity: heroic stats don't exist in EQL (Dan, 2026-09-13). Base source unknown. Compare Accuracy readings only within one stance."
+    "_attack_reading": "Attack = Offense / chance to hit. 368 = Offense (strength rule, confirmed at scale). 781 = Accuracy in Offensive Stance (625 × 1.25). Not heroic dexterity: heroic stats don't exist in EQL (the player, 2026-09-13). Base source unknown. Compare Accuracy readings only within one stance."
   },
   "regen": {
     "combat_hp": 34,
@@ -295,7 +295,7 @@
       "attack_second_figure": {
         "screenshot_change": -119,
         "explained": true,
-        "cause": "a stance change in that screenshot, not the ring (Dan confirmed switching stance moves Accuracy)",
+        "cause": "a stance change in that screenshot, not the ring (the player confirmed switching stance moves Accuracy)",
         "note": "Offense still matched the ring removal exactly, so that stance change moved Accuracy but not Offense."
       }
     }
@@ -650,7 +650,7 @@
     }
   },
   "weapon_tests_2026_09_14": {
-    "_about": "Striker Stance (Dan, 2026-09-14), no buffs. Striker shows no Accuracy bonus in the window. Offhand Wu's Fist unless noted. Other gear had changed since baseline (STR 230, STA 262, INT 219, AGI 179, DEX 160, CHA 150 bare-fisted).",
+    "_about": "Striker Stance (the player, 2026-09-14), no buffs. Striker shows no Accuracy bonus in the window. Offhand Wu's Fist unless noted. Other gear had changed since baseline (STR 230, STA 262, INT 219, AGI 179, DEX 160, CHA 150 bare-fisted).",
     "tests": [
       {
         "primary": "1H Piercing weapon (skill 250), WIS +21 (likely Garduk +4)",
@@ -834,7 +834,7 @@
     "verdict": "crit ignores stats, gear and stance; hit rates and swings unchanged by gear, as the formulas say"
   },
   "three_melee_crit_2026_09_15": {
-    "trio": "Paladin / Shadowknight / Monk (Dan)",
+    "trio": "Paladin / Shadowknight / Monk (the player's)",
     "target": "Test Sixty",
     "window": "15 Sep 10:00-11:59 (no stance change logged)",
     "crit": "1046/9419 = 11.11%",
@@ -853,7 +853,7 @@
     "exaltation_lines": "none during the parse; no heals to the test character",
     "verdict": "the focus does not apply to the pet's spells - a 1-25% random bonus would have moved almost every cast off 61/105",
     "control_suggested": "The test character casting Lifedraw with the exaltation on: damage should vary above base if the focus works at all",
-    "without_exaltation": "superseded: the 'without exaltation' window was parse 2, which Dan says to ignore",
+    "without_exaltation": "superseded: the 'without exaltation' window was parse 2, which the player says to ignore",
     "without_weapon": {
       "removed": "~13:45-13:46",
       "pet_melee_with_weapon": "slash avg 108 (54.7%), cleave 111, bash 42, kick 41",
@@ -883,7 +883,7 @@
         "procs": "Winter's Roar (cold 246) x25 - wiki lists Tagar's Insects for Garduk and Winter's Roar on Barbarian Spiritist's Hammer",
         "will_not_sufficient": 0
       },
-      "5_earthshaker": "ignore (Dan)"
+      "5_earthshaker": "ignore (the player)"
     },
     "pet_weapon_speed": {
       "main_swings_per_s": {
@@ -898,7 +898,7 @@
         "Garduk": "0.571 x 57.4 x 55.6% = 18.2"
       }
     },
-    "_status": "IGNORE ALL - Dan restarted the pet tests on 15 Sep with a level 49 pet (Kareker) so procs work; see pet_tests_2026_09_15"
+    "_status": "IGNORE ALL - the player restarted the pet tests on 15 Sep with a level 49 pet (Kareker) so procs work; see pet_tests_2026_09_15"
   },
   "pet_tests_2026_09_15": {
     "pet": {

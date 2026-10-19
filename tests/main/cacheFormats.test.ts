@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { existsSync, promises as fs } from 'node:fs'
-import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { tempDir } from '../tempDir'
 
 // The cache files' formats and their migrations, each round-tripped through a temp folder (LT-628):
 // an older format read, brought forward, saved and read again.
@@ -33,7 +33,7 @@ const { InventoryFiles } = await import('../../src/main/inventory')
 const { CATALOG_FORMAT } = await import('../../src/core/wikiItem')
 
 beforeEach(async () => {
-  h.dir = await fs.mkdtemp(join(tmpdir(), 'lt-cache-'))
+  h.dir = tempDir('lt-cache-')
   h.wikiCalls = 0
 })
 afterEach(async () => {

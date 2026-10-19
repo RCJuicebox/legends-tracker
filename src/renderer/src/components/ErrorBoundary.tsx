@@ -10,17 +10,17 @@ interface State {
 }
 
 export class ErrorBoundary extends Component<{ what: string; children: ReactNode }, State> {
-  state: State = { error: null }
+  override state: State = { error: null }
 
   static getDerivedStateFromError(error: Error): State {
     return { error }
   }
 
-  componentDidCatch(error: Error, info: ErrorInfo): void {
+  override componentDidCatch(error: Error, info: ErrorInfo): void {
     console.error(`${this.props.what} failed to draw: ${error.stack ?? error.message}${info.componentStack ?? ''}`)
   }
 
-  render(): ReactNode {
+  override render(): ReactNode {
     const { error } = this.state
     if (!error) return this.props.children
     return (

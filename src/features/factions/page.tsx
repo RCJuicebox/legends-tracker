@@ -1,10 +1,9 @@
 import { Fragment, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { CharacterPicker } from '../../renderer/src/components/CharacterPicker'
 import { ago, api } from '../../renderer/src/api'
-import { useSettled } from '../../renderer/src/state'
 import { useInvoke, useVisibleInterval } from '../../renderer/src/hooks'
 import { useRemembered } from '../../renderer/src/remember'
-import { usePickedCharacter } from '../../renderer/src/character'
+import { useCharacterChoice } from '../../renderer/src/character'
 import { useNow } from '../../renderer/src/components/TimerBars'
 import {
   Disclosure,
@@ -136,21 +135,8 @@ function standingNote(s: FactionStandingNow, basis: ConBasis | null): string {
   return `${from}${con}${next}${part}`
 }
 
-/** Characters with a log in the game's Logs folder or a factions export, and the one picked on the character pages. */
-function useFactionCharacter() {
-  const characterKey = useSettled((s) => s.characterKey)
-  const installDir = useSettled((s) => s.settings.installDir)
-  const logFile = useSettled((s) => s.settings.logFile)
-  const logsQ = useInvoke('logs:list', [], [installDir, logFile])
-  const exportsQ = useInvoke('character:exports', [], [installDir])
-  const [picked, setPicked] = usePickedCharacter()
-  const available = useMemo(() => [...new Set([...(logsQ.data ?? []).map((l) => l.character), ...(exportsQ.data?.factions ?? [])])].sort(), [logsQ.data, exportsQ.data])
-  const character = picked && available.includes(picked) ? picked : characterKey || available[0] || ''
-  return { available, character, setCharacter: setPicked, ready: !!logsQ.data, error: logsQ.error, reload: logsQ.reload }
-}
-
 export function Factions() {
-  const chars = useFactionCharacter()
+  const chars = useCharacterChoice('factions', { withLogs: true })
   const character = chars.character
   const q = useInvoke(character ? 'factions:get' : null, [character])
   const view = q.data

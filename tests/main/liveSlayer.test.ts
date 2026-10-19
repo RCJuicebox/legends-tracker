@@ -1,11 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { mkdtempSync, promises as fs } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { promises as fs } from 'node:fs'
 import { join } from 'node:path'
 import type { AppContext } from '../../src/main/context'
 import type { AchievementTrack } from '../../src/shared/tracking'
 import { parseAchievements } from '../../src/core/achievements'
 import { parseRaceTable } from '../../src/core/raceNames'
+import { tempDir } from '../tempDir'
 
 // The Slayer counts since the achievements export, through the real LiveAchievements and the Slayer
 // feature that holds them (LT-626, LT-623): a temp log, two exports, a restart that reads on from
@@ -81,7 +81,7 @@ const at = (sec: number) => new Date(T0.getTime() + sec * 1000)
 const kill = (sec: number, mob: string) => `[${stamp(at(sec))}] You have slain ${mob}!\r\n`
 
 beforeEach(async () => {
-  h.dir = mkdtempSync(join(tmpdir(), 'lt-slayer-'))
+  h.dir = tempDir('lt-slayer-')
   root = h.dir
   await fs.mkdir(join(root, 'cache'), { recursive: true })
   log = join(root, 'eqlog_Kelwyn_neriak.txt')

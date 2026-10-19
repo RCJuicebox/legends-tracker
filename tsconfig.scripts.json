@@ -1,0 +1,15 @@
+// The scripts, plain JavaScript checked as TypeScript would check it (LT-645): a misspelt name, a
+// wrong call or a missing import fails `npm run typecheck`, which runs it last. Untyped parameters are
+// allowed (JSDoc types them where it matters: `releaseNotes()` is all that stands between a release
+// and no notes).
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "lib": ["ES2023"],
+    "allowJs": true,
+    "checkJs": true,
+    "noEmit": true,
+    "noImplicitAny": false
+  },
+  "include": ["scripts/release-notes.mjs", "scripts/release.mjs", "scripts/smoke.mjs", "scripts/takp-spawns.mjs"]
+}

@@ -1,4 +1,4 @@
-import { ZONE_ALIASES } from '../shared/game/factions'
+import { CITY_ZONES, ZONE_ALIASES } from '../shared/game/factions'
 
 // One zone as one place, whatever the log, the wiki or an achievement calls it. Used by the faction
 // plan, Slayer, Hunter and the tracked achievements alike.
@@ -21,3 +21,9 @@ export function zoneKey(zone: string): string {
     .replace(/[^a-z0-9]/g, '')
   return ZONE_ALIASES[k] ?? k
 }
+
+/** The cities, where killing the people brings the guards down on you. */
+const CITIES = new Set(CITY_ZONES.map(zoneKey))
+
+/** Whether a zone is a city: never a faction or Slayer camp. */
+export const isCity = (zone: string) => CITIES.has(zoneKey(zone))

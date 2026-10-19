@@ -424,7 +424,7 @@ export class Engine {
       clock: new LogClock(Date.now),
       tailer: new LogTailer(logFile, {
         startAtEnd: true,
-        pollMs: this.archive.gameRunning ? LIVE_POLL_MS : IDLE_POLL_MS,
+        pollMs: this.env.pollMs ?? (this.archive.gameRunning ? LIVE_POLL_MS : IDLE_POLL_MS),
         onLines: (lines, end) => this.tail === tail && this.onLines(tail, lines, end),
         onReset: (reason, skipped) => this.tail === tail && this.onTailReset(tail, reason, skipped),
         onMissing: () => this.tail === tail && this.onTailMissing(tail),
@@ -775,13 +775,13 @@ export class Engine {
     this.board.clear()
     this.motes.gameClosed(Date.now())
     this.archives.set({ gameRunning: false })
-    this.tail?.tailer.setPollMs(IDLE_POLL_MS)
+    this.tail?.tailer.setPollMs(this.env.pollMs ?? IDLE_POLL_MS)
     this.pushFeed('info', n ? `The game closed; cleared ${n} timer${n === 1 ? '' : 's'}.` : 'The game closed.')
   }
 
   gameStarted(): void {
     this.archives.set({ gameRunning: true })
-    this.tail?.tailer.setPollMs(LIVE_POLL_MS)
+    this.tail?.tailer.setPollMs(this.env.pollMs ?? LIVE_POLL_MS)
     this.pushFeed('info', 'The game is running.')
   }
 

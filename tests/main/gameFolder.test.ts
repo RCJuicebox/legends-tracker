@@ -1,15 +1,15 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { mkdirSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { checkGameFolder, isGameFolder, loadSpellBook, logIsIn, resolveGameFolder } from '../../src/main/game'
 import { fixtureBook } from '../helpers'
+import { tempDir } from '../tempDir'
 
 describe('finding the game folder from what the player picked', () => {
   let root: string
   let game: string
   beforeAll(() => {
-    root = mkdtempSync(join(tmpdir(), 'lt-game-'))
+    root = tempDir('lt-game-')
     game = join(root, 'Daybreak Game Company', 'Installed Games', 'EverQuest Legends')
     mkdirSync(join(game, 'Logs'), { recursive: true })
     writeFileSync(join(game, 'spells_us.txt'), '')
@@ -32,7 +32,7 @@ describe('finding the game folder from what the player picked', () => {
   })
 
   it('rejects a folder with no game files', () => {
-    const elsewhere = mkdtempSync(join(tmpdir(), 'lt-other-'))
+    const elsewhere = tempDir('lt-other-')
     expect(resolveGameFolder(elsewhere)).toBe('')
     rmSync(elsewhere, { recursive: true, force: true })
   })
@@ -65,7 +65,7 @@ describe('reading the spell data from the game folder', () => {
   })
 
   it('fails when the folder has no spell data', async () => {
-    const empty = mkdtempSync(join(tmpdir(), 'lt-nospells-'))
+    const empty = tempDir('lt-nospells-')
     await expect(loadSpellBook(empty)).rejects.toThrow()
     rmSync(empty, { recursive: true, force: true })
   })

@@ -1,6 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { promises as fs } from 'node:fs'
-import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import {
   addFactionLine,
@@ -13,7 +12,6 @@ import {
   parseFactionsExport,
   progressionStatus,
   exportClass,
-  modifierOf,
   parseFactionModifiers,
   RACE_KEYS,
   RECENT_KEPT,
@@ -26,6 +24,7 @@ import { parseAchievements } from '../../../src/core/achievements'
 import { factionConsumer, FactionHistory } from '../../../src/features/factions/main'
 import { purchaseConsumer } from '../../../src/main/purchases'
 import { LogHistory } from '../../../src/main/sources/logHistory'
+import { tempDir } from '../../tempDir'
 
 const T0 = Date.UTC(2026, 8, 27, 12, 0, 0)
 
@@ -249,9 +248,10 @@ describe('FACTIONS_FILE', () => {
 describe('what a faction cons at', () => {
   it("reads the client's modifiers and adds up a character's race and class", () => {
     const mods = parseFactionModifiers(['316^7^0^', '316^178^-750^', '316^54^100^', 'not a line', '220^178^-500^'].join(String.fromCharCode(13, 10)))
-    expect(modifierOf(mods, 316, [RACE_KEYS.iksar, CLASS_NUMBER.mnk])).toBe(-750)
-    expect(modifierOf(mods, 316, [RACE_KEYS['wood elf']])).toBe(100)
-    expect(modifierOf(mods, 999, [RACE_KEYS.iksar])).toBe(0)
+    expect(mods.get(316)?.get(RACE_KEYS.iksar)).toBe(-750)
+    expect(mods.get(316)?.get(CLASS_NUMBER.mnk)).toBe(0)
+    expect(mods.get(316)?.get(RACE_KEYS['wood elf'])).toBe(100)
+    expect(mods.get(999)).toBeUndefined()
     expect(exportClass('Kelwyn_neriak-MNK-Factions.txt')).toBe('MNK')
     expect(exportClass('Kelwyn_neriak-Factions.txt')).toBe('')
   })
@@ -408,7 +408,7 @@ describe('SinceExports', () => {
 describe('FactionHistory over a real log', () => {
   let dir: string
   beforeEach(async () => {
-    dir = await fs.mkdtemp(join(tmpdir(), 'lt-factions-'))
+    dir = tempDir('lt-factions-')
   })
   afterEach(async () => {
     await fs.rm(dir, { recursive: true, force: true })

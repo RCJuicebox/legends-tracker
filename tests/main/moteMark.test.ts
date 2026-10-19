@@ -1,6 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { existsSync, promises as fs, readFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { MoteCatchUp } from '../../src/main/engine/moteCatchUp'
 import { Notifier } from '../../src/main/engine/notifier'
@@ -12,20 +11,12 @@ import { log } from '../../src/main/log'
 import { MoteTracker, type MoteState } from '../../src/core/motes'
 import { parseLogLine, type LogLine } from '../../src/core/logLine'
 import type { FeedItem, MoteStock } from '../../src/shared/types'
+import { tempDir } from '../tempDir'
+import { sleep, waitFor } from '../helpers'
 
 // Where mote tracking got to (catchup.json, written by saveMark on the way out) while the start-up
 // catch-up holds live lines in its backlog, and what a tail reset in the middle of that backlog does.
 // MoteCatchUp is driven with a stand-in for the live tailer, so each step lands exactly when wanted.
-
-const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
-
-async function waitFor(check: () => boolean, ms = 3000): Promise<void> {
-  const until = Date.now() + ms
-  while (!check()) {
-    if (Date.now() > until) throw new Error('timed out waiting')
-    await sleep(10)
-  }
-}
 
 const ZONE = '[Thu Sep 24 16:00:00 2026] You have entered Neriak.\r\n'
 const LOOT = (stamp: string, n: number, rank = 'Major') => `[${stamp}] You looted ${n} Mote of ${rank} Potential from Reward Chest and stored it in your currency.\r\n`
@@ -56,7 +47,7 @@ let logFile: string
 let markFile: string
 
 beforeEach(async () => {
-  dir = await fs.mkdtemp(join(tmpdir(), 'lt141c-mark-'))
+  dir = tempDir('lt141c-mark-')
   await fs.mkdir(join(dir, 'game', 'Logs'), { recursive: true })
   logFile = join(dir, 'game', 'Logs', 'eqlog_Kelwyn_neriak.txt')
   markFile = join(dir, 'catchup.json')
@@ -86,6 +77,7 @@ function makeStore(logFile: string, motes: MoteState) {
 const env = (): EngineEnv => ({
   moteWorkerPath: '',
   isGameRunning: async () => false,
+  pollMs: 10,
   findInstall: async () => '',
   soundDirs: () => [],
   dataDir: dir,

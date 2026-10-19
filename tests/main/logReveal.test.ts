@@ -1,8 +1,8 @@
 import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { mkdirSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import type { AppContext } from '../../src/main/context'
+import { tempDir } from '../tempDir'
 
 // The handler is caught as registerLogIpc hands it to ipcMain; the shell only records what it was asked to show.
 const handlers = new Map<string, (e: unknown, ...args: unknown[]) => unknown>()
@@ -23,7 +23,7 @@ const { registerLogIpc } = await import('../../src/main/ipc/logs')
 const { isInside } = await import('../../src/core/paths')
 const { rendererUrl } = await import('../../src/main/push')
 
-const root = mkdtempSync(join(tmpdir(), 'lt-reveal-'))
+const root = tempDir('lt-reveal-')
 afterAll(() => rmSync(root, { recursive: true, force: true }))
 
 const game = join(root, 'EverQuest Legends')

@@ -134,8 +134,9 @@ function isPlayer(caster: string): boolean {
  * 1. `You begin casting X.` opens a pending cast.
  * 2. The spell's own landing text (from spells_us_str) names the target and starts the timer. Only
  *    spells you are casting are considered, which tells your landing apart from anyone else's.
- * 3. A DoT's first tick line pins its end exactly: it wears off on its target's tick, (ticks − 1)
- *    ticks after the first one.
+ * 3. A DoT's first tick line pins its end exactly: it wears off on its target's tick, the Spell
+ *    window's whole ticks after the first one: (ticks − 1) here, `ticks` counting the partial tick
+ *    (docs/formulas.md, Spell durations).
  * 4. The fade line, the target dying, or a zone change ends it.
  *
  * A spell whose rule has `others` is timed for other players' casts too, on the same bar: their

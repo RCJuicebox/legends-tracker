@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { api } from '../api'
 import { useDebounced, useInvoke } from '../hooks'
-import { usePickedCharacter } from '../character'
 import { showError } from '../toast'
 import type { CharacterSheet, InventoryView } from '../../../shared/types'
 
@@ -10,26 +9,6 @@ import type { CharacterSheet, InventoryView } from '../../../shared/types'
 
 /** How long typing into the character sheet waits before it is written to disk. */
 const SHEET_SAVE_MS = 300
-
-/**
- * The character whose exports a page shows: the one being played, unless another was picked. Looks
- * again when the game writes an export, and every few seconds while the character has none yet, so
- * a page waiting for one fills in on its own.
- */
-export function useExportCharacter(kind: 'inventory' | 'achievements') {
-  const q = useInvoke('character:exports')
-  const reload = q.reload
-  const [picked, setPicked] = usePickedCharacter()
-  const exports = q.data
-  const available = exports?.[kind] ?? []
-  const character = picked && available.includes(picked) ? picked : exports?.current || available[0] || ''
-  // A new export is pushed as the game writes it (ExportWatch): no polling for one (LT-398).
-  useEffect(() => {
-    const offs = [api.on('state:inventory', reload), api.on('state:achievements', reload)]
-    return () => offs.forEach((off) => off())
-  }, [reload])
-  return { exports, available, character, setCharacter: setPicked, error: q.error, reload }
-}
 
 /**
  * A character's inventory and its sheet. Sheet changes show at once and are written to disk once

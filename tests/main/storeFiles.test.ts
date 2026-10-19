@@ -1,11 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import type { AppSettings, Trigger } from '../../src/shared/types'
 import type { BuffsFile } from '../../src/core/buffs'
 import type { RespawnRecords } from '../../src/core/respawns'
 import type { MoteState } from '../../src/core/motes'
+import { tempDir } from '../tempDir'
 
 // The Store finds its folder from Electron's userData path: each test gets its own scratch folder.
 const profile = vi.hoisted(() => ({ dir: '' }))
@@ -39,8 +39,8 @@ const file = (f: string) => join(profile.dir, f)
 const readJson = (f: string): unknown => JSON.parse(readFileSync(file(f), 'utf8'))
 
 beforeEach(() => {
-  profile.dir = mkdtempSync(join(tmpdir(), 'lt141b-store-'))
-  defaultsDir = mkdtempSync(join(tmpdir(), 'lt141b-defaults-'))
+  profile.dir = tempDir('lt141b-store-')
+  defaultsDir = tempDir('lt141b-defaults-')
   defaultTriggers = join(defaultsDir, 'triggers.json')
   writeFileSync(defaultTriggers, JSON.stringify([DEFAULT_TRIGGER]))
   // Corrupt-file and save messages go to the console until the app log is set up.

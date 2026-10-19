@@ -302,7 +302,8 @@ Every spell you cast is tracked automatically. No trigger needed.
    only the landings: for fifteen seconds after it, a landing of a buff you cast (the newest rank the
    app has seen you cast) is your own cast, timed and counted.
 3. A DoT's first tick line (`… has taken N damage from your X.`) pins its end exactly: it wears off
-   on its target's tick, `ticks − 1` ticks after the first. Until then the bar shows `~`.
+   on its target's tick, `ticks` ticks (the Spell window's count) after the first. Until then the bar
+   shows `~`.
 4. The fade line (`Your X spell has worn off of T.`, or the spell's own fade text on you), the target
    dying, or a zone change (DoTs only) ends it.
 
@@ -324,6 +325,8 @@ second once it has ticked. A buff on you shows no ticks, so its end is only know
 12-second cue is a floor, never fewer; at zero it shows "fading…" until the game's fade line arrives.
 
 ### The duration model
+
+How each part was measured, and when, is in [`docs/formulas.md`](docs/formulas.md#spell-durations).
 
 ```
 ticks = round(formula ticks × (1 + tier% × rank) × (1 + focus%))
@@ -764,7 +767,7 @@ moves on by itself as achievements are done, and follows the order the tab showe
 
 ## Slayer
 
-Plan › Slayer plans the Slayer achievements still open: where to kill for them quickest, step by
+The **Slayer** page (under Plan in the sidebar) plans the Slayer achievements still open: where to kill for them quickest, step by
 step. Counts are the achievements export (`/outputfile achievements`) plus the kills the log has shown
 since, as on the Achievements page.
 
@@ -827,7 +830,7 @@ are listed at the foot. Your choices are kept per character.
 
 ## Hunter
 
-Plan › Hunter lists each Hunter achievement not done ("Hunter of Befallen") with the named it still
+The **Hunter** page (under Plan in the sidebar) lists each Hunter achievement not done ("Hunter of Befallen") with the named it still
 wants: the achievements export, less the named your log has shown you killing since. Beside each
 named, what TAKP's spawn tables say of it: its spots, how often it is up against its placeholders,
 its timer (the zone's respawn as your log timed it, as on the Slayer page), and the wait, how long

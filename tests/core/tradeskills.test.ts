@@ -1,20 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { eraOf } from '../../src/core/gearFinder'
-import {
-  craftEras,
-  parseCrafted,
-  parsePurchase,
-  parseSkillPage,
-  parseVendors,
-  parseWikiCoin,
-  recipeIndex,
-  recipeKey,
-  shopping,
-  unitPrice,
-  type Recipe
-} from '../../src/core/tradeskills'
+import { craftEras, parseCrafted, parsePurchase, parseSkillPage, parseWikiCoin, recipeIndex, recipeKey, shopping, unitPrice, type Recipe } from '../../src/core/tradeskills'
 import { parseInventory } from '../../src/core/inventory'
-import { parseSources } from '../../src/core/wikiItem'
+import { parseSources, parseVendors } from '../../src/core/wikiItem'
 
 // Purchase and inventory lines are the game's own (Kelwyn's, September 2026). Wiki snippets are made
 // up in the layout eqlwiki's pages use; no wiki text is kept in this repo.

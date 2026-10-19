@@ -8,7 +8,6 @@
 // merchant value, which is what a vendor asks at best.
 
 import { linkTexts, field } from './wikiItem'
-export { parseVendors } from './wikiItem'
 import { parseWikiTables } from './wikiTable'
 import { parseCoin } from './loot'
 

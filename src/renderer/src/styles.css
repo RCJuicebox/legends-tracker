@@ -2059,14 +2059,6 @@ details:not(.info) > summary::before {
   grid-template-columns: 1fr 1fr;
   gap: 8px;
 }
-.lt-grid3 {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 8px;
-}
-.lt-grid3 .lt-pips {
-  display: none;
-}
 .lt-subhead {
   margin: 6px 2px 0;
   font-size: 12px;
@@ -3732,17 +3724,12 @@ input[aria-invalid='true'] {
   gap: 12px 20px;
   margin-top: 10px;
 }
-.fp-assume-grid label,
-.fp-assume-wide {
+.fp-assume-grid label {
   display: grid;
   gap: 4px;
   align-content: start;
   font-size: 12.5px;
   color: var(--text-2);
-}
-.fp-assume-wide {
-  grid-column: 1 / -1;
-  justify-items: start;
 }
 .fp-steps {
   list-style: none;

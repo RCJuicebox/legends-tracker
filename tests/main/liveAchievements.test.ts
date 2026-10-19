@@ -1,11 +1,9 @@
 import type { Notification } from '../../src/shared/runtime'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { mkdtempSync } from 'node:fs'
-import { tmpdir } from 'node:os'
-import { join } from 'node:path'
 import type { AppContext } from '../../src/main/context'
 import type { AchievementTrack } from '../../src/shared/tracking'
 import type { LogLine } from '../../src/core/logLine'
+import { tempDir } from '../tempDir'
 
 // When the achievements overlay reads: a moment after the lines that move something, each half for
 // its own lines, never two reads at once, and everything every half minute only while something
@@ -17,7 +15,7 @@ const h = vi.hoisted(() => ({ dir: '' }))
 vi.mock('electron', () => ({ app: { getPath: () => h.dir }, ipcMain: { handle: () => {}, on: () => {} } }))
 vi.mock('../../src/main/paths', () => ({ cacheDir: () => h.dir }))
 
-h.dir = mkdtempSync(join(tmpdir(), 'eql-live-'))
+h.dir = tempDir('eql-live-')
 process.env['EQL_USER_DATA'] = h.dir
 const { LiveAchievements } = await import('../../src/main/liveAchievements')
 const { DEFAULT_CHOICES } = await import('../../src/features/slayer/core')

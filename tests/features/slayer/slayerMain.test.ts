@@ -1,9 +1,9 @@
 import { describe, expect, it, vi } from 'vitest'
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import type { AppContext } from '../../../src/main/context'
 import { listLogs } from '../../../src/main/game'
+import { tempDir } from '../../tempDir'
 
 // The Slayer page's main side against a game folder on disk: the achievements export, the client's
 // race table and two characters' logs, read as the app reads them. eqlwiki's races, the faction
@@ -14,7 +14,7 @@ type Handler = (e: unknown, ...args: unknown[]) => unknown
 const h = vi.hoisted(() => ({ dir: '', handlers: new Map<string, Handler>() }))
 vi.mock('electron', () => ({ app: { getPath: () => h.dir }, ipcMain: { handle: (channel: string, fn: Handler) => void h.handlers.set(channel, fn), on: () => {} } }))
 
-h.dir = mkdtempSync(join(tmpdir(), 'lt-slayer-main-'))
+h.dir = tempDir('lt-slayer-main-')
 process.env['EQL_USER_DATA'] = h.dir
 mkdirSync(join(h.dir, 'local'), { recursive: true })
 const { SlayerPlanner, markMaps, usualPace } = await import('../../../src/features/slayer/main')

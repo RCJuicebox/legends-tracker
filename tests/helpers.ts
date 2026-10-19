@@ -195,3 +195,15 @@ export const PRESETS: Record<string, Weights> = {
     rangedRatio: 0
   }
 }
+
+/** Waits `ms` of real time. */
+export const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
+
+/** Waits until `check` is true, looking every 20 ms; fails after `ms`. */
+export async function waitFor(check: () => boolean, ms = 3000): Promise<void> {
+  const until = Date.now() + ms
+  while (!check()) {
+    if (Date.now() > until) throw new Error('timed out waiting')
+    await sleep(20)
+  }
+}

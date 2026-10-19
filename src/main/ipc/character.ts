@@ -25,7 +25,6 @@ export function registerCharacterIpc(ctx: AppContext): void {
   /** A character's live log alone. */
   const liveLog = (character: string) => characterLogFile(character, ctx.characterKey(), store.settings.get().logFile, ctx.installDir())
 
-  handle('achievements:characters', async () => ({ current: ctx.characterKey(), available: (await checkGameFolder(ctx.installDir())).achievements }))
   handle('achievements:load', (character) => ctx.achievementFiles.load(character))
   handle('achievements:marks', async (character, marks) => {
     await ctx.achievementFiles.saveMarks(character, marks)

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { bareNpc, isNamedNpc, npcTitles, parseHp, parseNpcPage, parseRespawn } from '../../../src/features/factions/npcPages'
+import { bareNpc, isNamedNpc, parseHp, parseNpcPage, parseRespawn } from '../../../src/features/factions/npcPages'
+import { wikiTitles } from '../../../src/core/slayer'
 
 // A named NPC's eqlwiki page, made up in {{Namedmobpage}}'s shape.
 const PAGE = `{{Classic Era}}
@@ -84,9 +85,9 @@ describe("eqlwiki's NPC pages", () => {
   it('tells a named NPC from one of many alike, and asks under each title eqlwiki may keep it', () => {
     expect(['Gate Guard Bram', 'Lord Brute - Test Keep', 'a pass bandit', 'pass rat', 'A Pass Bandit', 'An Ogre'].map(isNamedNpc)).toEqual([true, true, false, false, false, false])
     expect(bareNpc('Lord Brute - Test Keep')).toBe('Lord Brute')
-    expect(npcTitles('Ambassador D`Vinn')).toEqual(['Ambassador D`Vinn', 'Ambassador DVinn', "Ambassador D'Vinn"])
+    expect(wikiTitles(bareNpc('Ambassador D`Vinn'))).toEqual(['Ambassador D`Vinn', 'Ambassador DVinn', "Ambassador D'Vinn"])
     // The Slayer's rule too: each word capitalised (LT-624).
-    expect(npcTitles('lesser blade fiend - The Estate of Unrest')).toEqual(['Lesser blade fiend', 'Lesser Blade Fiend'])
-    expect(npcTitles('Gate Guard Bram')).toEqual(['Gate Guard Bram'])
+    expect(wikiTitles(bareNpc('lesser blade fiend - The Estate of Unrest'))).toEqual(['Lesser blade fiend', 'Lesser Blade Fiend'])
+    expect(wikiTitles(bareNpc('Gate Guard Bram'))).toEqual(['Gate Guard Bram'])
   })
 })

@@ -1,9 +1,7 @@
 import { beforeAll, describe, expect, it, vi } from 'vitest'
-import { mkdtempSync } from 'node:fs'
-import { tmpdir } from 'node:os'
-import { join } from 'node:path'
 import { defaultSettings } from '../../src/main/storeCore'
 import type { AppSettings, CharacterSettings } from '../../src/shared/types'
+import { tempDir } from '../tempDir'
 
 // settings:save (ipc/app.ts) against a stand-in context: what a page sends is checked, and what it
 // cannot know as well as the main process does is kept from the settings already saved.
@@ -40,7 +38,7 @@ let own = { senderFrame: { url: '' } }
 const save = (s: unknown) => h.handlers.get('settings:save')!(own, s)
 
 beforeAll(async () => {
-  h.dir = mkdtempSync(join(tmpdir(), 'lt-settings-'))
+  h.dir = tempDir('lt-settings-')
   process.env['EQL_USER_DATA'] = h.dir
   const { rendererUrl } = await import('../../src/main/push')
   own = { senderFrame: { url: rendererUrl() + 'index.html' } }

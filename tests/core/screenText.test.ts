@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { composeRows, countsFromComposite, findMoteRows, moteCountsFromScreen, readCount, splitPair, statsWindowFromScreen, type OcrWord } from '../../src/core/screenText'
+import { composeRows, countsFromComposite, findMoteRows, readCount, splitPair, statsWindowFromScreen, type OcrWord } from '../../src/core/screenText'
 
 /** Lays words out as a window would: each [text, x] on one row at height y. */
 function line(y: number, ...parts: [string, number][]): OcrWord[] {
@@ -15,7 +15,8 @@ describe('reading mote counts off the screen', () => {
       ...line(160, ['Void-Touched', 10], ['Potential', 100], ['3', 300]),
       ...line(180, ['Mote', 10], ['of', 45], ['Grand', 62], ['Potential', 104], ['1', 301])
     ].reverse()
-    expect(moteCountsFromScreen(words).counts).toEqual({ major: 60, potential: 15, superior: 11, grand: 1 })
+    const counts = Object.fromEntries(findMoteRows(words).flatMap((r) => (r.count === null ? [] : [[r.rank, r.count]])))
+    expect(counts).toEqual({ major: 60, potential: 15, superior: 11, grand: 1 })
   })
 
   it('repairs the usual OCR digit slips and rejects words', () => {

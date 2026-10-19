@@ -1,6 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { promises as fs } from 'node:fs'
-import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { Engine, type EngineEnv, type EngineStore } from '../../src/main/engine'
 import { CombatFeed } from '../../src/main/engine/combat'
@@ -10,19 +9,11 @@ import { jobs } from '../../src/main/sources/jobs'
 import type { MoteState } from '../../src/core/motes'
 import type { FeedItem, MoteStock } from '../../src/shared/types'
 import type { SelfWho } from '../../src/core/selfWho'
+import { tempDir } from '../tempDir'
+import { sleep, waitFor } from '../helpers'
 
 // The meter's read of recent fights (Engine.seedCombat, and rebuildCombat as a cancellable job). The
 // log is written with stamps relative to now, since the read goes back a number of minutes from now.
-
-const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
-
-async function waitFor(check: () => boolean, ms = 3000): Promise<void> {
-  const until = Date.now() + ms
-  while (!check()) {
-    if (Date.now() > until) throw new Error('timed out waiting')
-    await sleep(20)
-  }
-}
 
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
@@ -60,7 +51,7 @@ let logFile: string
 let engines: Engine[] = []
 
 beforeEach(async () => {
-  dir = await fs.mkdtemp(join(tmpdir(), 'lt141c-combat-'))
+  dir = tempDir('lt141c-combat-')
   logs = join(dir, 'game', 'Logs')
   await fs.mkdir(logs, { recursive: true })
   logFile = join(logs, 'eqlog_Kelwyn_neriak.txt')
@@ -97,6 +88,7 @@ function makeEngine(historyMinutes: number) {
   const env: EngineEnv = {
     moteWorkerPath: '',
     isGameRunning: async () => false,
+    pollMs: 10,
     findInstall: async () => '',
     soundDirs: () => [],
     dataDir: dir,

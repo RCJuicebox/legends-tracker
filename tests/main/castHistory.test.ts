@@ -1,9 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { existsSync, promises as fs } from 'node:fs'
-import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { CastHistory, castCounter, dayConsumer } from '../../src/main/castHistory'
 import { LogHistory } from '../../src/main/sources/logHistory'
+import { tempDir } from '../tempDir'
 
 const casts = (cacheFile: string) => {
   const history = new LogHistory(cacheFile, { casts: dayConsumer(castCounter) })
@@ -12,7 +12,7 @@ const casts = (cacheFile: string) => {
 
 let dir: string
 beforeEach(async () => {
-  dir = await fs.mkdtemp(join(tmpdir(), 'lt-casts-'))
+  dir = tempDir('lt-casts-')
 })
 afterEach(async () => {
   await fs.rm(dir, { recursive: true, force: true })

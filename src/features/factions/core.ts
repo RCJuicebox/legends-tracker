@@ -249,9 +249,6 @@ export function parseFactionModifiers(text: string): Map<number, Map<number, num
 /** The faction modifiers, as GameTables reads them (main/stats.ts). */
 export const FACTION_MODIFIERS: GameTable<Map<number, Map<number, number>>> = { files: ['Faction/FactionAssociations.txt'], parse: ([t]) => parseFactionModifiers(t) }
 
-/** What the keys a character has (its race's, its class's) add to one faction's con. */
-export const modifierOf = (mods: Map<number, Map<number, number>>, factionId: number, keys: number[]) => keys.reduce((n, k) => n + (mods.get(factionId)?.get(k) ?? 0), 0)
-
 /** The class the factions export is named for (Kelwyn_neriak-MNK-Factions.txt → MNK); '' without one. */
 export const exportClass = (file: string) => /-([A-Z]{3})-Factions\.txt$/i.exec(file)?.[1].toUpperCase() ?? ''
 

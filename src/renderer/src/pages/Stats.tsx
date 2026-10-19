@@ -7,7 +7,8 @@ import { Pending, Tabs } from '../components/ui'
 import { who } from '../../../core/format'
 import { parseLogLine } from '../../../core/logLine'
 import { readStatsInputs, type StatsInputs } from '../../../core/statsInputs'
-import { useExportCharacter, useInventory } from '../gear/model'
+import { useInventory } from '../gear/model'
+import { useCharacterChoice } from '../character'
 import { wornSummary } from '../../../core/wornGear'
 import { autoValues, classTrio, primaryClass, valOf } from '../../../core/statsModel'
 import { CLASSES, className, type ClassName } from '../../../shared/game/classes'
@@ -35,7 +36,7 @@ const TABS: [Tab, string][] = [
 const AA_RELOAD_MS = 30_000
 
 export function Stats() {
-  const exp = useExportCharacter('inventory')
+  const exp = useCharacterChoice('inventory')
   const { exports, available, character, setCharacter } = exp
   const inv = useInventory(character, !!exports, available.join(','))
   const { view, sheet: charSheet, updateSheet } = inv

@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest'
-import { mkdirSync, mkdtempSync, utimesSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { mkdirSync, utimesSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { acCapsOf, classFactorsOf, parseGameTables, skillCapsOf, type GameTable } from '../../src/core/gameTables'
 import { GameTables } from '../../src/main/stats'
 import { sources } from '../../src/main/sources/registry'
+import { tempDir } from '../tempDir'
 
 // Rows as the game's Resources folder has them (skillcaps.txt, ACMitigation.txt, basedata.txt, read
 // 2026-09-30). Class numbers are classic EverQuest's: 5 Shadow Knight, 7 Monk, 10 Shaman; skill 0 is
@@ -75,7 +75,7 @@ describe('GameTables, reading them from the game folder', () => {
   const row = () => sources.list().find((r) => r.id === 'tables')
 
   it('reads a table once, again when one of its files changes, and says how on the Data Sources page', async () => {
-    const game = mkdtempSync(join(tmpdir(), 'lt-tables-'))
+    const game = tempDir('lt-tables-')
     const lines = join(game, 'Resources', 'Faction', 'Lines.txt')
     let folder = ''
     let parsed = 0

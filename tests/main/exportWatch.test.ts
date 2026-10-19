@@ -1,15 +1,15 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { mkdtempSync, statSync, utimesSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { statSync, utimesSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { ExportWatch } from '../../src/main/exportWatch'
 import { log } from '../../src/main/log'
+import { tempDir } from '../tempDir'
 
 // The look the Achievements and Gear pages take at their export every few seconds: a call back once
 // the game has written it again and the file has settled, and nothing otherwise.
 
 describe('ExportWatch, noticing an export written again', () => {
-  const game = mkdtempSync(join(tmpdir(), 'lt-export-watch-'))
+  const game = tempDir('lt-export-watch-')
   const path = (c: string) => join(game, `${c}-Inventory.txt`)
   /** Writes a character's export as written `ago` ms ago, and says when that is to the file. */
   const write = (c: string, ago: number) => {

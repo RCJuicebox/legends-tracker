@@ -292,7 +292,7 @@ function PlanStep({ step }: { step: SlayerStepHint }) {
             requestSlayerStep(step.index)
             go('slayer')
           }}
-          title="Open Plan › Slayer at this step"
+          title="Open the Slayer page at this step"
         >
           {text}
         </button>

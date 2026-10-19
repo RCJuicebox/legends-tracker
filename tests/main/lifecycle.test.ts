@@ -1,6 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { existsSync, promises as fs } from 'node:fs'
-import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { registerLifecycle } from '../../src/main/lifecycle'
 import { Engine, type EngineEnv, type EngineStore } from '../../src/main/engine'
@@ -9,6 +8,8 @@ import { defaultSettings } from '../../src/main/storeCore'
 import type { AppContext } from '../../src/main/context'
 import type { MoteState } from '../../src/core/motes'
 import type { MoteStock } from '../../src/shared/types'
+import { tempDir } from '../tempDir'
+import { sleep, waitFor } from '../helpers'
 
 // How the app ends (lifecycle.ts), with Electron stood in for: the handlers registerLifecycle hands to
 // app.on are kept, and before-quit is fired by hand.
@@ -42,16 +43,6 @@ vi.mock('electron', () => ({
   shell: { openExternal: async () => {} },
   ipcMain: { on: () => {}, handle: () => {} }
 }))
-
-const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
-
-async function waitFor(check: () => boolean, ms = 3000): Promise<void> {
-  const until = Date.now() + ms
-  while (!check()) {
-    if (Date.now() > until) throw new Error('timed out waiting')
-    await sleep(10)
-  }
-}
 
 /** A context whose parts note, in `h.calls`, when each is stopped or saved. */
 function fakeContext(o: { engine?: Engine; flushAll?: () => Promise<unknown>; updaterStop?: () => void; installerPresent?: boolean } = {}) {
@@ -236,7 +227,7 @@ describe('Quitting', () => {
 describe('Quitting with the real engine', () => {
   let dir: string
   beforeEach(async () => {
-    dir = await fs.mkdtemp(join(tmpdir(), 'lt141c-quit-'))
+    dir = tempDir('lt141c-quit-')
   })
   afterEach(async () => {
     await sleep(50)
@@ -264,6 +255,7 @@ describe('Quitting with the real engine', () => {
     const env: EngineEnv = {
       moteWorkerPath: '',
       isGameRunning: async () => false,
+      pollMs: 10,
       findInstall: async () => '',
       soundDirs: () => [],
       dataDir: dir,

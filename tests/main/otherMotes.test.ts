@@ -1,17 +1,17 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { promises as fs } from 'node:fs'
-import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { OtherMotes } from '../../src/main/engine/otherMotes'
 import { MoteTracker, type MoteSession, type MoteState } from '../../src/core/motes'
 import { absorbOther } from '../../src/core/moteMerge'
+import { tempDir } from '../tempDir'
 
 // Motes looted on another PC: its log read on from where it was last read, motes handed over as they
 // come and runs once they are over, never twice.
 
 let dir: string
 beforeEach(async () => {
-  dir = await fs.mkdtemp(join(tmpdir(), 'lt-other-motes-'))
+  dir = tempDir('lt-other-motes-')
 })
 afterEach(async () => {
   await fs.rm(dir, { recursive: true, force: true })

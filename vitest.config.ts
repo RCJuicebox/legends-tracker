@@ -5,6 +5,8 @@ import { defineConfig } from 'vitest/config'
 export default defineConfig({
   test: {
     include: ['tests/**/*.test.{ts,tsx}'],
+    // Each test file's tempDir folders are removed after it (LT-643).
+    setupFiles: ['tests/setup.ts'],
     environment: 'node',
     // Transformed modules are kept between runs (in node_modules/.vitest-cache): a cold run is quicker.
     fsModuleCache: true,

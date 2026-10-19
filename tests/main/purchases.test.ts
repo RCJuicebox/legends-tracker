@@ -1,10 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { promises as fs } from 'node:fs'
-import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { purchaseConsumer, PurchaseHistory, type PurchaseLog, type Purchases } from '../../src/main/purchases'
 import { LogHistory, type HistorySlice } from '../../src/main/sources/logHistory'
 import type { Purchase } from '../../src/core/tradeskills'
+import { tempDir } from '../tempDir'
 
 const T0 = Date.UTC(2026, 8, 24, 16, 0, 0)
 
@@ -167,7 +167,7 @@ describe('PurchaseHistory', () => {
   describe('over a real log', () => {
     let dir: string
     beforeEach(async () => {
-      dir = await fs.mkdtemp(join(tmpdir(), 'lt-purchases-'))
+      dir = tempDir('lt-purchases-')
     })
     afterEach(async () => {
       await fs.rm(dir, { recursive: true, force: true })

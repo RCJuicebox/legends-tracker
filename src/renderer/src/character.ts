@@ -1,8 +1,9 @@
-import { useCallback, useEffect, useRef } from 'react'
+import { useCallback, useEffect, useMemo, useRef } from 'react'
 import { api } from './api'
 import { useInvoke } from './hooks'
 import { recall, useRemembered } from './remember'
 import { showError } from './toast'
+import { useSettled } from './state'
 import { classIdOf, className, type ClassName } from '../../shared/game/classes'
 import type { CharacterSettings } from '../../shared/types'
 import type { StatsInputs } from '../../core/statsInputs'
@@ -16,6 +17,48 @@ const PICK_KEY = 'character'
 export function usePickedCharacter(): [string, (key: string) => void] {
   // Each page used to remember its own; the Gear page's choice carries over.
   return useRemembered<string>(PICK_KEY, recall<string>(PICK_KEY, '') || recall<string>('inv.character', ''))
+}
+
+/**
+ * The character a page is for (LT-636): the one picked on any character page, else the one being
+ * played, else the first. The choice is among the characters with this kind of export, and with
+ * `withLogs` those with a log too (the Plan pages plan from the log alone). The list is looked at
+ * again when the game writes an export, so a character's first one adds it at once.
+ */
+export function useCharacterChoice(kind: 'inventory' | 'achievements' | 'factions', o: { withLogs?: boolean } = {}) {
+  const characterKey = useSettled((s) => s.characterKey)
+  const installDir = useSettled((s) => s.settings.installDir)
+  const logFile = useSettled((s) => s.settings.logFile)
+  const exportsQ = useInvoke('character:exports', [], [installDir])
+  const logsQ = useInvoke(o.withLogs ? 'logs:list' : null, [], [installDir, logFile])
+  const [picked, setPicked] = usePickedCharacter()
+  const exports = exportsQ.data
+  const logs = logsQ.data
+  const available = useMemo(
+    () => (o.withLogs ? [...new Set([...(logs ?? []).map((l) => l.character), ...(exports?.[kind] ?? [])])].sort() : (exports?.[kind] ?? [])),
+    [o.withLogs, logs, exports, kind]
+  )
+  const character = picked && available.includes(picked) ? picked : characterKey || exports?.current || available[0] || ''
+  const reloadExports = exportsQ.reload
+  const reloadLogs = logsQ.reload
+  // A new export is pushed as the game writes it (ExportWatch): no polling for one (LT-398).
+  useEffect(() => {
+    const offs = [api.on('state:inventory', reloadExports), api.on('state:achievements', reloadExports)]
+    return () => offs.forEach((off) => off())
+  }, [reloadExports])
+  const reload = useCallback(() => {
+    reloadExports()
+    if (o.withLogs) reloadLogs()
+  }, [reloadExports, reloadLogs, o.withLogs])
+  return {
+    exports,
+    available,
+    character,
+    setCharacter: setPicked,
+    ready: o.withLogs ? !!logs : !!exports,
+    error: logsQ.error || exportsQ.error,
+    reload
+  }
 }
 
 /** A character's record, and a way to change it; changes save at once. */

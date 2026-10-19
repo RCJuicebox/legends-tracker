@@ -1,9 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { DEFAULT_OVERLAYS, JsonFile, characterKey, characterName, defaultSettings, mergeDefaults, readJsonFile, retrySchedule, writeFileAtomic } from '../../src/main/storeCore'
 import { upgrade } from '../../src/main/schema'
+import { tempDir } from '../tempDir'
 
 describe('merging saved settings over the defaults', () => {
   it('fills fields an older build did not save, and keeps what was saved', () => {
@@ -87,7 +87,7 @@ describe('the settings files on disk', () => {
   beforeEach(() => {
     // The real waits add up to seconds; the order of events is what is tested.
     Object.assign(retrySchedule, { readMs: [1, 1], writeMs: [1, 1, 1] })
-    dir = mkdtempSync(join(tmpdir(), 'lt-store-'))
+    dir = tempDir('lt-store-')
     vi.spyOn(console, 'error').mockImplementation(() => {})
     vi.spyOn(console, 'log').mockImplementation(() => {})
   })
@@ -216,7 +216,7 @@ describe('the settings files on disk', () => {
 describe('schema versions', () => {
   let dir: string
   beforeEach(() => {
-    dir = mkdtempSync(join(tmpdir(), 'lt-schema-'))
+    dir = tempDir('lt-schema-')
   })
   afterEach(() => rmSync(dir, { recursive: true, force: true }))
 

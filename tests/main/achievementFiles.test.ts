@@ -1,10 +1,10 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { mkdirSync, mkdtempSync, utimesSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { mkdirSync, utimesSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { AchievementFiles } from '../../src/main/achievements'
 import { log } from '../../src/main/log'
 import { sources } from '../../src/main/sources/registry'
+import { tempDir } from '../tempDir'
 
 // The one reader of a character's achievements export, for the Achievements page, the achievements
 // overlay and the Factions page: read once each time the game writes it, and what the page shows when
@@ -17,7 +17,7 @@ describe('AchievementFiles, reading the achievements export', () => {
   let files: AchievementFiles | null = null
   function setup(folder: string) {
     files = new AchievementFiles(
-      mkdtempSync(join(tmpdir(), 'lt-ach-data-')),
+      tempDir('lt-ach-data-'),
       () => folder,
       () => {}
     )
@@ -30,7 +30,7 @@ describe('AchievementFiles, reading the achievements export', () => {
   })
 
   it('reads the export once each time the game writes it', async () => {
-    const game = mkdtempSync(join(tmpdir(), 'lt-ach-game-'))
+    const game = tempDir('lt-ach-game-')
     const files = setup(game)
     const path = join(game, 'Tester_neriak-Achievements.txt')
 
@@ -62,7 +62,7 @@ describe('AchievementFiles, reading the achievements export', () => {
   })
 
   it('says why when there is no export to read', async () => {
-    const game = mkdtempSync(join(tmpdir(), 'lt-ach-game-'))
+    const game = tempDir('lt-ach-game-')
     // No game folder chosen.
     expect(await setup('').exported('Tester_neriak')).toBeNull()
     const files = setup(game)

@@ -111,7 +111,11 @@ function drain(): Promise<void> {
   return writing
 }
 
-/** Everything logged so far, written (tests, and a clean quit). */
+/**
+ * Everything logged so far, written: for the tests, which wait on the writes (a quit writes what waits
+ * on its own thread, flushLogSync).
+ * @public
+ */
 export function flushLog(): Promise<void> {
   return pending ? drain() : (writing ?? Promise.resolve())
 }

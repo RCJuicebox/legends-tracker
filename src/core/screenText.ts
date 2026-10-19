@@ -184,21 +184,6 @@ export function countsFromComposite(words: OcrWord[], found: MoteRow[], layout: 
 }
 
 /**
- * The single-pass read: each mote row and the count the first OCR saw on it. Kept for when the
- * rebuilt read is not possible; it misses lone single-digit counts.
- */
-export function moteCountsFromScreen(words: OcrWord[]): { counts: Partial<Record<MoteKey, number>>; rows: string[] } {
-  const counts: Partial<Record<MoteKey, number>> = {}
-  const seen: string[] = []
-  for (const r of findMoteRows(words)) {
-    if (r.count === null) continue
-    counts[r.rank] = r.count
-    seen.push(r.text)
-  }
-  return { counts, rows: seen }
-}
-
-/**
  * The in-game Inventory window's Stats tab, line by line, in one place: each label as it lays them
  * out (a left column of vitals, regen, stats and resists, a right column of heroic, spell and skill
  * damage mods, on the same lines), with the most a line can show where it prints "value / most",

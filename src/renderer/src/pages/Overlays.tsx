@@ -188,17 +188,17 @@ export function Overlays() {
                       label="Show the Hunter named in your zone"
                     />
                     Show the Hunter named in your zone
-                    <span className="faint small">the named each Hunter achievement of the zone you are in still wants; the same switch is on Plan › Hunter</span>
+                    <span className="faint small">the named each Hunter achievement of the zone you are in still wants; the same switch is on the Hunter page</span>
                   </label>
                   <div className="row small">
                     <span>The Slayer plan’s step</span>
                     <span className="faint small">is turned on for each character on its own, with On the overlay at the top of</span>
                     {go ? (
                       <button className="link-button inline small" onClick={() => go('slayer')}>
-                        Plan › Slayer
+                        the Slayer page
                       </button>
                     ) : (
-                      <span className="faint small">Plan › Slayer</span>
+                      <span className="faint small">the Slayer page</span>
                     )}
                   </div>
                   <label className="check">
@@ -210,8 +210,8 @@ export function Overlays() {
                   </label>
                   <p className="faint small m-0">
                     The step of the faction plan you follow (Factions › Plan), counting down as your factions move; the Slayer plan’s step for the zone you are in, or the one to
-                    head to (Plan › Slayer); the Hunter named left in your zone (Plan › Hunter); the Slayer achievements your last half hour of kills counted toward, on top of your
-                    achievements export; and the skills your skill achievements want that went up in that time. It shows nothing when there is nothing to show.
+                    head to (the Slayer page); the Hunter named left in your zone (the Hunter page); the Slayer achievements your last half hour of kills counted toward, on top of
+                    your achievements export; and the skills your skill achievements want that went up in that time. It shows nothing when there is nothing to show.
                   </p>
                 </>
               )}

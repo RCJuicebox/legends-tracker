@@ -1,6 +1,5 @@
 import { factionKey } from './core'
-import { zoneKey } from '../../core/zones'
-import { CITY_ZONES, FACTION_ALIASES } from '../../shared/game/factions'
+import { FACTION_ALIASES } from '../../shared/game/factions'
 
 // Names written more than one way, put one way: a faction as the game writes it, whatever the wiki
 // calls it; a zone as one place, whatever the log or the wiki calls it; and a Loadouts swap that puts
@@ -35,12 +34,6 @@ export function unmatchedNames(pages: string[], gameNames: string[]): { pages: s
   const abc = (a: string, b: string) => a.localeCompare(b)
   return { pages: left.sort(abc), factions: gameNames.filter((f) => !joined.has(f)).sort(abc) }
 }
-
-/** The cities, where killing the people brings the guards down on you. */
-const CITIES = new Set(CITY_ZONES.map(zoneKey))
-
-/** Whether a zone is a city. */
-export const isCity = (zone: string) => CITIES.has(zoneKey(zone))
 
 /**
  * A Loadouts swap that puts one more class in the trio ("Wood Elf + Bard"), keeping the race or with

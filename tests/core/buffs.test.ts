@@ -1,20 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
-import {
-  askText,
-  BuffWatch,
-  castOrder,
-  buffNeeds,
-  buffOffers,
-  buffPlan,
-  defaultWanted,
-  parseWho,
-  PROC_VALUE,
-  type ActiveBuff,
-  type BuffOffer,
-  type Person
-} from '../../src/core/buffs'
+import { askText, BuffWatch, castOrder, buffOffers, buffPlan, defaultWanted, parseWho, PROC_VALUE, type ActiveBuff, type BuffOffer, type Person } from '../../src/core/buffs'
 import { SpellBook, type Spell } from '../../src/core/spells'
 import { effectValue } from '../../src/core/effectValue'
 import { DEFAULT_TIER_DURATION_PCT } from '../../src/shared/types'
@@ -165,27 +152,27 @@ describe('what to ask for', () => {
   const HP = [temperance, blessing, symbol]
 
   it('asks the cleric when a cleric and a paladin are both in the group', () => {
-    expect(buffNeeds({ offers: HP, wanted: ['Temperance', 'Symbol of Pinzarn'], group: [paladin, cleric], active: [] })).toEqual([
+    expect(buffPlan({ offers: HP, wanted: ['Temperance', 'Symbol of Pinzarn'], group: [paladin, cleric], active: [] }).needs).toEqual([
       { line: 'hpac', spell: 'Temperance', from: 'Brenna', replaces: '', after: [], clickOff: [] }
     ])
   })
 
   it('asks the paladin for the symbol when the paladin is the only one who can', () => {
-    expect(buffNeeds({ offers: HP, wanted: ['Temperance', 'Symbol of Pinzarn'], group: [paladin], active: [] })).toEqual([
+    expect(buffPlan({ offers: HP, wanted: ['Temperance', 'Symbol of Pinzarn'], group: [paladin], active: [] }).needs).toEqual([
       { line: 'hpac', spell: 'Symbol of Pinzarn', from: 'Aldric', replaces: '', after: [], clickOff: [] }
     ])
   })
 
   it('asks for the better buff over one on you it blocks, and nothing once the best there is is on', () => {
-    expect(buffNeeds({ offers: HP, wanted: ['Temperance', 'Symbol of Pinzarn'], group: [paladin, cleric], active: [on('Symbol of Pinzarn')] })).toEqual([
+    expect(buffPlan({ offers: HP, wanted: ['Temperance', 'Symbol of Pinzarn'], group: [paladin, cleric], active: [on('Symbol of Pinzarn')] }).needs).toEqual([
       { line: 'hpac', spell: 'Temperance', from: 'Brenna', replaces: 'Symbol of Pinzarn', after: [], clickOff: [] }
     ])
-    expect(buffNeeds({ offers: HP, wanted: ['Temperance', 'Symbol of Pinzarn'], group: [paladin, cleric], active: [on('Temperance')] })).toEqual([])
-    expect(buffNeeds({ offers: HP, wanted: ['Temperance', 'Symbol of Pinzarn'], group: [paladin], active: [on('Symbol of Pinzarn')] })).toEqual([])
+    expect(buffPlan({ offers: HP, wanted: ['Temperance', 'Symbol of Pinzarn'], group: [paladin, cleric], active: [on('Temperance')] }).needs).toEqual([])
+    expect(buffPlan({ offers: HP, wanted: ['Temperance', 'Symbol of Pinzarn'], group: [paladin], active: [on('Symbol of Pinzarn')] }).needs).toEqual([])
   })
 
   it('never asks for a buff’s twin over it: Temperance on, Blessing of Temperance wanted', () => {
-    expect(buffNeeds({ offers: HP, wanted: ['Blessing of Temperance'], group: [cleric], active: [on('Temperance')] })).toEqual([])
+    expect(buffPlan({ offers: HP, wanted: ['Blessing of Temperance'], group: [cleric], active: [on('Temperance')] }).needs).toEqual([])
   })
 
   it('picks the combination that stacks for the most over the single biggest buff', () => {
@@ -216,7 +203,7 @@ describe('what to ask for', () => {
     expect(plan.leftOut).toEqual([{ spell: 'Harnessing of Spirit', line: 'hpac', value: 368, reason: 'stack', blockedBy: ['Talisman of Altuna', 'Infusion of Spirit'] }])
     // With Harnessing on you, the combination is still the better one, but none of it lands over Harnessing
     // (Infusion's slot-4 STR is the weaker; the log shows it blocked): it must be clicked off first.
-    const needs = buffNeeds({ offers, wanted: offers.map((o) => o.spell), group: [shaman], active: [on('Harnessing of Spirit')] })
+    const needs = buffPlan({ offers, wanted: offers.map((o) => o.spell), group: [shaman], active: [on('Harnessing of Spirit')] }).needs
     expect(needs.find((n) => n.spell === 'Infusion of Spirit')).toMatchObject({ replaces: '', clickOff: ['Harnessing of Spirit'] })
     expect(needs.find((n) => n.spell === 'Strength')).toMatchObject({ replaces: '', clickOff: ['Harnessing of Spirit'] })
     expect(needs.find((n) => n.spell === 'Talisman of Altuna')).toMatchObject({ replaces: '', clickOff: ['Harnessing of Spirit'] })
@@ -243,7 +230,7 @@ describe('what to ask for', () => {
     expect(castOrder([{ spell: 'Clarity', after: [] }])).toEqual([])
     // Strength on already: only Harnessing to ask for. Harnessing on: Strength cannot go on.
     expect(
-      buffNeeds({ offers: [harnessing, strength], wanted: ['Harnessing of Spirit', 'Strength'], group: [shaman], active: [on('Strength', 'stats')] }).map((n) => n.spell)
+      buffPlan({ offers: [harnessing, strength], wanted: ['Harnessing of Spirit', 'Strength'], group: [shaman], active: [on('Strength', 'stats')] }).needs.map((n) => n.spell)
     ).toEqual(['Harnessing of Spirit'])
     const blocked = buffPlan({ offers: [harnessing, strength], wanted: ['Harnessing of Spirit', 'Strength'], group: [shaman], active: [on('Harnessing of Spirit')] })
     expect(blocked.needs).toEqual([])
@@ -290,7 +277,7 @@ describe('what to ask for', () => {
     expect(askText(plan.needs)).toBe('Cast Yaulp IV')
     expect(buffPlan({ offers: [yaulp], wanted: ['Yaulp IV'], group: 'anyone', active: [], me: stranger }).leftOut.map((l) => l.reason)).toEqual(['nobody'])
     // Nothing to do once it is on you.
-    expect(buffNeeds({ offers: [yaulp], wanted: ['Yaulp IV'], group: [cleric], active: [{ ...on('Yaulp IV', 'attack'), caster: 'You' }], me })).toEqual([])
+    expect(buffPlan({ offers: [yaulp], wanted: ['Yaulp IV'], group: [cleric], active: [{ ...on('Yaulp IV', 'attack'), caster: 'You' }], me }).needs).toEqual([])
   })
 
   it('has you cast what you can, group or no group, and asks the group for the rest', () => {

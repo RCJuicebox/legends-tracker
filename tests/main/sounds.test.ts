@@ -1,12 +1,12 @@
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { mkdirSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { Notifier } from '../../src/main/engine/notifier'
 import type { AppSettings, FeedItem } from '../../src/shared/types'
 import type { AudioCommand } from '../../src/main/engine/contracts'
+import { tempDir } from '../tempDir'
 
-const root = mkdtempSync(join(tmpdir(), 'lt-sounds-'))
+const root = tempDir('lt-sounds-')
 afterAll(() => rmSync(root, { recursive: true, force: true }))
 
 // The folders in the order the app searches them: the profile's own, then the game's default and shared.

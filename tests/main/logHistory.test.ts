@@ -1,6 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { promises as fs } from 'node:fs'
-import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import yazl from 'yazl'
 import { createWriteStream } from 'node:fs'
@@ -8,10 +7,11 @@ import { everyStretch, LogHistory, readBackward, type HistoryConsumer, type Hist
 import { castCounter, CastHistory, dayConsumer, type Days } from '../../src/main/castHistory'
 import { purchaseConsumer, PurchaseHistory } from '../../src/main/purchases'
 import { fileIdentity, sameFile } from '../../src/core/fileIdentity'
+import { tempDir } from '../tempDir'
 
 let dir: string
 beforeEach(async () => {
-  dir = await fs.mkdtemp(join(tmpdir(), 'lt-history-'))
+  dir = tempDir('lt-history-')
 })
 afterEach(async () => {
   await fs.rm(dir, { recursive: true, force: true })

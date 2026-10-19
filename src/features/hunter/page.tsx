@@ -8,7 +8,7 @@ import { useNow } from '../../renderer/src/components/TimerBars'
 import { FilterBox, GameCommand, Info, Pending, SettingsLink, Tip, ToggleChip } from '../../renderer/src/components/ui'
 import { showToast } from '../../renderer/src/toast'
 import { duration, num, who } from '../../core/format'
-import { usePlanCharacter } from '../slayer/page'
+import { useCharacterChoice } from '../../renderer/src/character'
 import { clock } from '../slayer/core'
 import { SpawnMap } from '../slayer/SpawnMap'
 import { hunterHere, hunterMatch, type HunterNamed } from './core'
@@ -83,7 +83,7 @@ function Seen({ n }: { n: HunterNamed }) {
 }
 
 export function Hunter() {
-  const chars = usePlanCharacter()
+  const chars = useCharacterChoice('achievements', { withLogs: true })
   const character = chars.character
   const q = useInvoke(character ? 'hunter:plan' : null, [character])
   useVisibleInterval(q.reload, 60_000)

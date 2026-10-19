@@ -1,11 +1,49 @@
 {
   "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": ["typescript", "react", "import"],
+  "plugins": ["typescript", "react", "import", "jsx-a11y"],
   "categories": { "correctness": "error" },
   "rules": {
     "react-hooks/rules-of-hooks": "error",
     "react-hooks/exhaustive-deps": "error",
     "import/no-cycle": "error",
+
+    // The accessibility rules that came up clean when tried (2026-10-19, LT-647), so they stay so. Off:
+    // label-has-associated-control and prefer-tag-over-role (the Switch and the tablists are built so on
+    // purpose), click-events-have-key-events and the two element-interactions rules (a row behind its own
+    // button, a click-off shade, a card's key handler), control-has-associated-label (the empty header over
+    // a column of buttons) and no-autofocus (a dialog's first field). The suspicious category was tried
+    // too: its finds were deliberate effect dependencies and React's JSX scope, which react-jsx makes moot.
+    "jsx-a11y/label-has-associated-control": "off",
+    "jsx-a11y/prefer-tag-over-role": "off",
+    "jsx-a11y/click-events-have-key-events": "off",
+    "jsx-a11y/no-static-element-interactions": "off",
+    "jsx-a11y/no-noninteractive-element-interactions": "off",
+    "jsx-a11y/control-has-associated-label": "off",
+    "jsx-a11y/no-autofocus": "off",
+    "jsx-a11y/alt-text": "error",
+    "jsx-a11y/anchor-ambiguous-text": "error",
+    "jsx-a11y/anchor-has-content": "error",
+    "jsx-a11y/anchor-is-valid": "error",
+    "jsx-a11y/aria-props": "error",
+    "jsx-a11y/aria-proptypes": "error",
+    "jsx-a11y/aria-role": "error",
+    "jsx-a11y/aria-unsupported-elements": "error",
+    "jsx-a11y/autocomplete-valid": "error",
+    "jsx-a11y/heading-has-content": "error",
+    "jsx-a11y/html-has-lang": "error",
+    "jsx-a11y/iframe-has-title": "error",
+    "jsx-a11y/img-redundant-alt": "error",
+    "jsx-a11y/lang": "error",
+    "jsx-a11y/media-has-caption": "error",
+    "jsx-a11y/mouse-events-have-key-events": "error",
+    "jsx-a11y/no-access-key": "error",
+    "jsx-a11y/no-distracting-elements": "error",
+    "jsx-a11y/no-noninteractive-tabindex": "error",
+    "jsx-a11y/no-redundant-roles": "error",
+    "jsx-a11y/role-has-required-aria-props": "error",
+    "jsx-a11y/role-supports-aria-props": "error",
+    "jsx-a11y/scope": "error",
+    "jsx-a11y/tabindex-no-positive": "error",
 
     // The five below are React Compiler rules:
     // they flag what the compiler could not auto-memoize.
@@ -16,11 +54,10 @@
     "react/preserve-manual-memoization": "off",
     "react/use-memo": "off"
   },
-  // The layers (README › Layout): core is plain logic that runs anywhere; shared is the tables and
-  // types both processes use; main is Electron's main process; the renderer is the pages. Type
-  // imports cross freely, since they vanish at build. A feature module (src/features/<name>/) has one
-  // file per layer, and each follows its layer's rules: core.ts core's, main.ts main's, page.tsx and
-  // the list of pages (index.ts) the renderer's.
+  // The layers (CONTRIBUTING › The layers): core is plain logic that runs anywhere; shared is the
+  // tables and types both processes use; main is Electron's main process; the renderer is the pages.
+  // A feature module's files follow their layer's rules by name. These patterns catch the usual slips
+  // in the editor; tests/layers.test.ts checks every import of every file, whatever its folder.
   "overrides": [
     {
       "files": ["src/core/**"],
@@ -50,6 +87,26 @@
               {
                 "group": ["../../main", "../../main/**", "../../renderer/**", "../../preload/**", "./main", "./*Source", "./page", "./*Page", "../*/main", "../*/page"],
                 "message": "core may not import main, the renderer or the preload."
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      // A feature's page workers and their clients run in the page: the renderer's rules (LT-637).
+      "files": ["src/features/*/*Worker.ts", "src/features/*/*Runner.ts"],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "paths": [{ "name": "electron", "message": "The renderer reaches Electron through the preload bridge (api.ts)." }],
+            "patterns": [
+              { "group": ["node:*", "fs", "path", "os", "child_process"], "allowTypeImports": true, "message": "The renderer is a browser page: ask the main process." },
+              {
+                "group": ["../../main", "../../main/**", "../../preload/**", "./main", "./*Source", "../*/main"],
+                "allowTypeImports": true,
+                "message": "The renderer may not import the main process or the preload."
               }
             ]
           }

@@ -1,8 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { EventEmitter } from 'node:events'
-import { existsSync, mkdtempSync, readFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
+import { tempDir } from '../tempDir'
 
 // No PowerShell is started: spawn hands back a stand-in process that answers like the speech
 // script does (a voices line on start, a wav line per phrase), or stays silent when told to.
@@ -63,7 +63,7 @@ vi.mock('node:child_process', () => ({
 }))
 vi.mock('../../src/main/log', () => ({ log: { info: vi.fn(), warn: vi.fn(), error: vi.fn() } }))
 // The script is written to the cache folder: this test's own, never the player's.
-const cache = mkdtempSync(join(tmpdir(), 'lt-speech-'))
+const cache = tempDir('lt-speech-')
 vi.mock('../../src/main/paths', () => ({ cacheDir: () => cache }))
 
 const { spawn } = await import('node:child_process')

@@ -1,9 +1,9 @@
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
-import { promises as fs, mkdirSync, mkdtempSync, utimesSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { promises as fs, mkdirSync, utimesSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import type { AppContext } from '../../../src/main/context'
 import { listLogs } from '../../../src/main/game'
+import { tempDir } from '../../tempDir'
 
 // The factions feature's main side against a game folder on disk: the book of eqlwiki's faction pages
 // (kept a week, served old while the wiki cannot be reached, read once however many ask), and each
@@ -33,7 +33,7 @@ vi.mock('../../../src/main/sources/wiki', () => ({
   }
 }))
 
-h.dir = mkdtempSync(join(tmpdir(), 'lt-faction-main-'))
+h.dir = tempDir('lt-faction-main-')
 process.env['EQL_USER_DATA'] = h.dir
 // The app makes its cache folder at start; the book is written into it.
 mkdirSync(join(h.dir, 'local'), { recursive: true })
