@@ -45,8 +45,9 @@ A new feature module, and every file outside its folder it touches (LT-632):
 1. Its logic in `core.ts` (and more core files as it grows), tested directly.
 2. Its main side in `main.ts`: a class implementing `AppFeature` (`src/main/appFeature.ts`), with
    `register(ctx)` for its channels, Data Sources rows and engine feature, `flush()` for what it keeps
-   and a static `consumers` for its log-history counts. In `src/main/context.ts`: a field for it on
-   `AppContext`, built and listed in `ctx.features`, its `consumers` spread into the `LogHistory`'s.
+   a static `consumers` for its log-history counts and a static `create(deps: FeatureDeps)`. A line in
+   each of `src/features/main.ts`'s `FEATURE_CONSUMERS` and `createFeatures`, and in
+   `src/main/context.ts` its field on `AppContext` and its place in `ctx.features`.
    Anything it keeps is listed in the README's "Your data" and in `SCHEMAS` (`src/main/schema.ts`).
 3. Its page in `page.tsx`: listed in `src/features/index.ts` (id, group, label, icon) and drawn from
    `src/features/pages.tsx`. A new icon is one line of `src/shared/icons.ts`.
@@ -56,8 +57,8 @@ A new feature module, and every file outside its folder it touches (LT-632):
    `stringsArg`). A new channel answers the main window only unless `handle.ts` lists another page
    for it.
 5. If it shows on the achievements overlay, its part of the track in `src/main/liveAchievements.ts`.
-6. In the tests: its page in `PAGE_NAMES` (`tests/renderer/pages.test.tsx`), and its class built in
-   `tests/main/ipcHandlers.test.ts`, so its channels are called with what a page should never send.
+6. In the tests: its page in `PAGE_NAMES` (`tests/renderer/pages.test.tsx`). `tests/main/ipcHandlers.test.ts`
+   builds it from `createFeatures` and calls its channels with what a page should never send.
 
 ## Conventions
 

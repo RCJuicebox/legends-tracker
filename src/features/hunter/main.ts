@@ -5,7 +5,7 @@ import { JsonFile, readJsonFile } from '../../main/storeCore'
 import { everyStretch, type LogHistory } from '../../main/sources/logHistory'
 import type { AppContext } from '../../main/context'
 import type { AchievementTrack } from '../../shared/tracking'
-import type { AppFeature, TrackContext } from '../../main/appFeature'
+import type { AppFeature, FeatureDeps, TrackContext } from '../../main/appFeature'
 import { joinKillTallies, type SlayerKillTallies } from '../slayer/core'
 import { seenFromRecords } from './core'
 import { KILLS_KEY, lastKills, namedSpawns, spawnTimings } from '../slayer/main'
@@ -21,6 +21,11 @@ export class HunterPlanner implements AppFeature {
   readonly id = 'hunter'
   private readonly brokenFile: JsonFile<{ broken: string[] }>
   private ctx: AppContext | null = null
+
+  /** Built as every feature module is (src/features/main.ts). */
+  static create(d: FeatureDeps): HunterPlanner {
+    return new HunterPlanner(d.logHistory, d.dir)
+  }
 
   constructor(
     private readonly history: LogHistory,

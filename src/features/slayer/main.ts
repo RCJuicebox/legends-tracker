@@ -8,7 +8,7 @@ import { log } from '../../main/log'
 import { JsonFile, readJsonFile } from '../../main/storeCore'
 import { everyStretch, type HistoryConsumer, type LogHistory } from '../../main/sources/logHistory'
 import type { AppContext } from '../../main/context'
-import type { AppFeature, TrackContext } from '../../main/appFeature'
+import type { AppFeature, FeatureDeps, TrackContext } from '../../main/appFeature'
 import type { AchievementTrack } from '../../shared/tracking'
 import { SlayerLive } from './liveSource'
 import {
@@ -96,6 +96,11 @@ export class SlayerPlanner implements AppFeature {
   private readonly shared = new Map<string, { at: number; data: Promise<SlayerPlanData> }>()
   /** The data the overlay's plan was last made from, by character: made again when it is old or another export came. */
   private readonly overlayData = new Map<string, { at: number; exportAt: number; data: Promise<SlayerPlanData>; done?: SlayerPlanData }>()
+
+  /** Built as every feature module is (src/features/main.ts). */
+  static create(d: FeatureDeps): SlayerPlanner {
+    return new SlayerPlanner(d.logHistory, d.dir)
+  }
 
   constructor(
     private readonly history: LogHistory,

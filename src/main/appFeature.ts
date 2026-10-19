@@ -1,3 +1,4 @@
+import type { LogHistory } from './sources/logHistory'
 import type { AppContext } from './context'
 import type { AchievementsExport } from './achievements'
 import type { AchievementTrack } from '../shared/tracking'
@@ -28,4 +29,10 @@ export interface AppFeature {
    * publishes, LT-623): the faction plan's step, the Slayer counts, the Hunter named in the zone.
    */
   track?(at: TrackContext): Partial<Pick<AchievementTrack, 'faction' | 'slayer' | 'hunter'>>
+}
+
+/** What every feature module is built from (LT-632): the log history its counts come from, and the settings folder its files are kept in. */
+export interface FeatureDeps {
+  logHistory: LogHistory
+  dir: string
 }

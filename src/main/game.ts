@@ -8,6 +8,7 @@ import { readBackward } from './sources/logHistory'
 import { log } from './log'
 import { isCharacterKey } from '../core/validate'
 import { FACTIONS_FILE } from '../features/factions/core'
+import { gameFolderNames } from './exportFiles'
 
 const INSTALL_SUFFIXES = [
   '\\Daybreak Game Company\\Installed Games\\EverQuest Legends',
@@ -92,7 +93,7 @@ export async function checkGameFolder(dir: string): Promise<GameFolderCheck> {
   if (!dir) return empty
   let names: string[]
   try {
-    names = await fs.readdir(dir)
+    names = await gameFolderNames(dir)
   } catch (e) {
     quietIfMissing(e, `Could not list the game folder ${dir}:`)
     return empty

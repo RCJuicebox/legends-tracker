@@ -37,3 +37,17 @@ export class SettledReads<T> {
     return read
   }
 }
+
+/** The game folder's names as last listed, and the folder's time then (its entries' last change). */
+let listing: { dir: string; mtime: number; names: string[] } | null = null
+
+/**
+ * The names in the game folder, listed again only when its entries change (a new export is a new
+ * entry; one written over keeps its name, and its own time says so). The folder holds some three
+ * thousand files and the pages ask every few seconds (LT-633). Throws as fs does (ENOENT for none).
+ */
+export async function gameFolderNames(dir: string): Promise<string[]> {
+  const mtime = (await fs.stat(dir)).mtimeMs
+  if (!listing || listing.dir !== dir || listing.mtime !== mtime) listing = { dir, mtime, names: await fs.readdir(dir) }
+  return listing.names
+}

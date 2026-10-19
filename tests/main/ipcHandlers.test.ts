@@ -108,16 +108,13 @@ beforeAll(async () => {
     import('../../src/main/demo')
   ])
   for (const m of modules) for (const [name, fn] of Object.entries(m)) if (/^register\w*Ipc$/.test(name)) (fn as (c: unknown) => void)(ctx)
-  const { Factions } = await import('../../src/features/factions/main')
+  const { createFeatures } = await import('../../src/features/main')
   const { LiveAchievements } = await import('../../src/main/liveAchievements')
-  const { SlayerPlanner } = await import('../../src/features/slayer/main')
-  const { HunterPlanner } = await import('../../src/features/hunter/main')
   const { GroupHealth } = await import('../../src/main/groupHealth')
   for (const f of [
-    new Factions(stub() as never),
+    // Every feature module, as the context builds them (src/features/main.ts).
+    ...Object.values(createFeatures({ logHistory: stub() as never, dir: h.dir })),
     new LiveAchievements({ store: { dir: h.dir } } as never),
-    new SlayerPlanner(stub() as never, h.dir),
-    new HunterPlanner(stub() as never, h.dir),
     // Its worker is stood in by one that answers the ping: the self-test channel is what is registered.
     new GroupHealth(() => {
       const w = new EventEmitter() as EventEmitter & { postMessage(m: unknown): void; terminate(): void }

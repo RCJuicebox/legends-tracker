@@ -23,9 +23,10 @@ import { CastHistory, castCounter, dayConsumer } from './castHistory'
 import { meleeCounter } from '../core/meleeTally'
 import { RecipeBook } from './recipes'
 import { PurchaseHistory, purchaseConsumer } from './purchases'
-import { Factions } from '../features/factions/main'
-import { SlayerPlanner } from '../features/slayer/main'
-import { HunterPlanner } from '../features/hunter/main'
+import type { Factions } from '../features/factions/main'
+import type { SlayerPlanner } from '../features/slayer/main'
+import type { HunterPlanner } from '../features/hunter/main'
+import { createFeatures, FEATURE_CONSUMERS } from '../features/main'
 import { LogHistory, type HistoryWhere } from './sources/logHistory'
 import { TradeFavorites } from './tradeFavorites'
 import { LiveAchievements } from './liveAchievements'
@@ -179,12 +180,12 @@ export function createContext(): AppContext {
       purchases: purchaseConsumer,
       skills: skillConsumer,
       aas: aaConsumer,
-      ...Factions.consumers,
-      ...SlayerPlanner.consumers
+      ...FEATURE_CONSUMERS
     },
     (folder) => logFolders.reachable(folder)
   )
 
+  const features = createFeatures({ logHistory, dir: store.dir })
   const ctx = {
     store,
     windows,
@@ -214,7 +215,7 @@ export function createContext(): AppContext {
     recipeBook: new RecipeBook((p) => toMain('state:recipes', p)),
     purchases: new PurchaseHistory(logHistory, 'purchases'),
     npcPages: new NpcPages(),
-    factions: new Factions(logHistory),
+    factions: features.factions,
     skills: new SkillHistory(logHistory, 'skills'),
     aaHistory: new AaHistory(logHistory, 'aas'),
     tradeFavorites: new TradeFavorites(join(dataDir, 'tradeskills.json')),
@@ -414,8 +415,8 @@ export function createContext(): AppContext {
   // engine has of its own (registered with the features, below), and after the features whose parts
   // of the track it reads and publishes (LT-623).
   ctx.liveAchievements = new LiveAchievements(ctx)
-  ctx.hunter = new HunterPlanner(logHistory, store.dir)
-  ctx.slayer = new SlayerPlanner(logHistory, store.dir)
+  ctx.hunter = features.hunter
+  ctx.slayer = features.slayer
   ctx.features = [ctx.factions, ctx.slayer, ctx.hunter, ctx.liveAchievements, new GroupHealth()]
 
   ctx.refreshOverlayVisibility = () =>

@@ -53,10 +53,10 @@ import { cacheDir } from '../../main/paths'
 import { log } from '../../main/log'
 import { everyStretch, readForward, type HistoryConsumer, type HistoryWhere, type LogHistory } from '../../main/sources/logHistory'
 import type { AppContext } from '../../main/context'
-import type { AppFeature, TrackContext } from '../../main/appFeature'
+import type { AppFeature, FeatureDeps, TrackContext } from '../../main/appFeature'
 import type { AchievementTrack } from '../../shared/tracking'
 import { FactionFollow } from './followSource'
-import { SettledReads } from '../../main/exportFiles'
+import { gameFolderNames, SettledReads } from '../../main/exportFiles'
 
 // A character's faction changes, from "Your faction standing with X has been adjusted by N." and
 // the cap lines, over the log and its archives, for the Factions page. The reading is LogHistory's.
@@ -261,13 +261,8 @@ export class FactionSourceHistory {
   }
 }
 
-/**
- * The factions exports in the game folder by character (lower-cased), listed again only when the
- * folder's entries change: the folder holds some three thousand files, and the Factions page asks
- * every few seconds. A new export is a new entry; one written over keeps its name, and its own time
- * says so below.
- */
-let exportNames: { dir: string; mtime: number; byWho: Map<string, string[]> } | null = null
+/** The factions exports in the game folder by character (lower-cased), worked out again only when the folder's listing changes (gameFolderNames). */
+let exportNames: { names: string[]; byWho: Map<string, string[]> } | null = null
 /** Each factions export read, by path, once a write and once settled (exportFiles.ts). */
 const exportsRead = new SettledReads(parseFactionsExport)
 
@@ -276,20 +271,20 @@ const exportsRead = new SettledReads(parseFactionsExport)
  * puts the class in the name (Kelwyn_neriak-MNK-Factions.txt), so a character can have one per class.
  */
 export async function readFactionExport(dir: string, character: string): Promise<FactionExport | null> {
-  let folder
+  let names
   try {
-    folder = await fs.stat(dir)
+    names = await gameFolderNames(dir)
   } catch (e) {
     if ((e as NodeJS.ErrnoException).code === 'ENOENT') return null
     throw e
   }
-  if (!exportNames || exportNames.dir !== dir || exportNames.mtime !== folder.mtimeMs) {
+  if (exportNames?.names !== names) {
     const byWho = new Map<string, string[]>()
-    for (const n of await fs.readdir(dir)) {
+    for (const n of names) {
       const who = FACTIONS_FILE.exec(n)?.[1].toLowerCase()
       if (who) byWho.set(who, [...(byWho.get(who) ?? []), n])
     }
-    exportNames = { dir, mtime: folder.mtimeMs, byWho }
+    exportNames = { names, byWho }
   }
   const mine = exportNames.byWho.get(character.toLowerCase()) ?? []
   const dated = (await Promise.all(mine.map(async (file) => ({ file, modified: (await fs.stat(join(dir, file)).catch(() => null))?.mtimeMs })))).flatMap((d) =>
@@ -831,6 +826,11 @@ export class Factions implements AppFeature {
   readonly alla = new FactionAlla()
   /** The plan the player follows on the achievements overlay (followSource.ts): made when the feature is registered. */
   follow!: FactionFollow
+
+  /** Built as every feature module is (src/features/main.ts). */
+  static create(d: FeatureDeps): Factions {
+    return new Factions(d.logHistory)
+  }
 
   constructor(logHistory: LogHistory) {
     this.history = new FactionHistory(logHistory, HISTORY_KEY, join(cacheDir(), 'faction-since.json'))
