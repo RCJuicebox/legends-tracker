@@ -420,6 +420,17 @@ points over it; one at 0 (dead, or in another zone) is never said. The members' 
 window once its rows are found. What it costs is small and is logged (Settings › Data sources shows what
 it watches).
 
+It reads JuiceboxUI's flat bars by their colours and shape. Another skin whose bars are flat colour in
+a 1-pixel outline can say how it draws them in a `groupHealth` section of its `legends-tracker.json`
+(colours as `[r, g, b]` or `"#rrggbb"`, the health bar's inside height, the bars under it, the Player
+window's bar height and spacing; whatever it leaves out is JuiceboxUI's). Pick the skin the game shows
+on the card; **Calibrate from the screen** samples the colours off the Group window instead (press it,
+then show the game with a member or two in the group) and keeps them for that skin.
+
+**Your own mana** (the same card, off until you turn it on) says when your mana falls to a line (20%
+unless you change it), read off the Player window's mana bar, solo or grouped. A cast bar drawn over
+the mana bar hides it until the cast ends.
+
 ## Audio
 
 A tab of Settings. Speech is rendered by Windows' own speech engine (a PowerShell process driving WinRT and
@@ -1126,7 +1137,7 @@ It reads the chat logs in `Logs` (`eqlog_<name>_<server>.txt`), the `/outputfile
 `skillcaps.txt`, `ACMitigation.txt`, `Faction\FactionAssociations.txt`, `Achievements\*.txt`), the
 icon sheets in `uifiles\default`, each skin's `legends-tracker.json`, and the sounds in
 `AudioTriggers`. The group health alert, when you turn it on, also reads the screen: the health bars
-of JuiceboxUI's Group window, while the game runs.
+of the skin's Group window (and the Player window's mana bar for your own mana cue), while the game runs.
 
 ## Layout
 

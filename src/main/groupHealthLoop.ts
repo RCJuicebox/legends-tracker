@@ -1,11 +1,25 @@
-import { barFill, barsArea, findGroupBars, GroupHealthAlarm, manaFill, type Frame, type GroupBar } from '../core/groupHealth'
+import {
+  barFill,
+  barsArea,
+  findGroupBars,
+  findPlayerMana,
+  GroupHealthAlarm,
+  JUICEBOX_PROFILE,
+  manaFill,
+  playerArea,
+  playerManaFill,
+  type Frame,
+  type GroupBar,
+  type GroupHealthProfile
+} from '../core/groupHealth'
 import type { GroupHealthFromWorker, GroupHealthToWorker, ScreenArea } from './groupHealth'
 
 // The group health watch's loop, as the worker runs it (groupHealthWorker.ts), with the screen, the
 // clock and the post back to the main process handed in, so a test can drive it with frames of its
 // own (LT-627). Until the Group window is found, one monitor is searched every few seconds, backing
 // off to a minute, and only while the game is in front; found, its bars are copied five times a
-// second and each member going low is posted to say.
+// second and each member going low is posted to say. With your own mana cue on (FEAT-043), each search
+// also looks for the Player window's mana bar, which is sampled with the rows, or alone when solo.
 
 /** Between samples of the bars once found. */
 const SAMPLE_MS = 200
@@ -27,9 +41,11 @@ export interface LoopDeps {
   /** Runs `fn` after `ms`; the loop asks for its next step this way. */
   later: (fn: () => void, ms: number) => void
   /** The bars in a frame, and how full one is: the real readers unless a test stands in. */
-  find?: (f: Frame) => GroupBar[]
-  fill?: (f: Frame, b: GroupBar) => number | null
-  mana?: (f: Frame, b: GroupBar) => number | null
+  find?: (f: Frame, p: GroupHealthProfile) => GroupBar[]
+  fill?: (f: Frame, b: GroupBar, p: GroupHealthProfile) => number | null
+  mana?: (f: Frame, b: GroupBar, p: GroupHealthProfile) => number | null
+  findPlayer?: (f: Frame, p: GroupHealthProfile) => GroupBar | null
+  playerFill?: (f: Frame, b: GroupBar, p: GroupHealthProfile) => number | null
 }
 
 const same = (a: GroupBar[], b: GroupBar[]) => a.length === b.length && a.every((x, i) => x.left === b[i].left && x.right === b[i].right && x.top === b[i].top)
@@ -53,14 +69,40 @@ export class GroupHealthLoop {
   private manaOn = false
   /** A health line of their own for some rows, by each row's top edge: named members (LT-751). */
   private rowLines: Record<number, number> = {}
-  private readonly find: (f: Frame) => GroupBar[]
-  private readonly fill: (f: Frame, b: GroupBar) => number | null
-  private readonly mana: (f: Frame, b: GroupBar) => number | null
+  /** How the skin draws its bars (FEAT-040). */
+  private profile: GroupHealthProfile = JUICEBOX_PROFILE
+  /** Your own mana bar in the Player window, while your mana cue is on and it is found (FEAT-043). */
+  player: GroupBar | null = null
+  readonly myManaAlarm = new GroupHealthAlarm(0, 10)
+  private myManaOn = false
+  /** The Group window is watched: off while only your own mana cue is on. */
+  private groupOn = true
+  private readonly find: NonNullable<LoopDeps['find']>
+  private readonly fill: NonNullable<LoopDeps['fill']>
+  private readonly mana: NonNullable<LoopDeps['mana']>
+  private readonly findPlayer: NonNullable<LoopDeps['findPlayer']>
+  private readonly playerFill: NonNullable<LoopDeps['playerFill']>
 
   constructor(private readonly deps: LoopDeps) {
     this.find = deps.find ?? findGroupBars
     this.fill = deps.fill ?? barFill
     this.mana = deps.mana ?? manaFill
+    this.findPlayer = deps.findPlayer ?? findPlayerMana
+    this.playerFill = deps.playerFill ?? playerManaFill
+  }
+
+  /** Something to sample: the Group window's rows or your mana bar. */
+  private get watching(): boolean {
+    return this.bars.length > 0 || this.player !== null
+  }
+
+  /** Your mana bar found, moved or gone: the main process told, so the sources page can say. */
+  private setPlayer(bar: GroupBar | null): void {
+    const was = this.player
+    if (was === bar || (was && bar && same([was], [bar]))) return
+    this.player = bar
+    this.myManaAlarm.reset()
+    this.deps.post({ kind: 'player', bar })
   }
 
   /** Looks for the window on one monitor, or on monitor `only` when given; true when it is there. */
@@ -69,9 +111,15 @@ export class GroupHealthLoop {
     if (!this.areas.length) return false
     const i = only ?? this.nextArea % this.areas.length
     const a = this.areas[i]
-    const found = this.find(this.deps.capture(a.x, a.y, a.width, a.height))
+    const frame = this.deps.capture(a.x, a.y, a.width, a.height)
+    const found = this.groupOn ? this.find(frame, this.profile) : []
+    this.setPlayer(this.myManaOn ? this.findPlayer(frame, this.profile) : null)
+    if (this.player) {
+      this.nextArea = i
+      this.searchWait = SEARCH_MS
+    }
     if (!found.length) {
-      if (only === undefined) {
+      if (only === undefined && !this.player) {
         this.nextArea = i + 1
         // Every monitor looked at and nothing: wait longer before the next round.
         if (this.nextArea % this.areas.length === 0) this.searchWait = Math.min(SEARCH_MAX_MS, this.searchWait * 2)
@@ -91,9 +139,18 @@ export class GroupHealthLoop {
   }
 
   private sample(): void {
-    const area = barsArea(this.bars)
+    if (this.bars.length) this.sampleRows()
+    if (!this.player) return
+    // Read alone, a small piece of its own: the Player window is seldom near the Group window.
+    const a = playerArea(this.player, this.profile)
+    const fill = this.playerFill(this.deps.capture(a.x, a.y, a.width, a.height), this.player, this.profile)
+    for (const low of this.myManaAlarm.update([fill], [this.player.top])) this.deps.post({ kind: 'low', ...low, what: 'myMana' })
+  }
+
+  private sampleRows(): void {
+    const area = barsArea(this.bars, this.profile)
     const frame = this.deps.capture(area.x, area.y, area.width, area.height)
-    const fills = this.bars.map((b) => this.fill(frame, b))
+    const fills = this.bars.map((b) => this.fill(frame, b, this.profile))
     if (fills.some((f) => f === null)) {
       this.lost++
       this.lostSince ||= this.deps.now()
@@ -104,7 +161,7 @@ export class GroupHealthLoop {
     const tops = this.bars.map((b) => b.top)
     for (const low of this.alarm.update(fills, tops, (i) => this.rowLines[tops[i]])) this.deps.post({ kind: 'low', ...low })
     if (!this.manaOn) return
-    const manas = this.bars.map((b) => this.mana(frame, b))
+    const manas = this.bars.map((b) => this.mana(frame, b, this.profile))
     for (const low of this.manaAlarm.update(manas, tops)) this.deps.post({ kind: 'low', ...low, what: 'mana' })
   }
 
@@ -114,13 +171,13 @@ export class GroupHealthLoop {
     if (!this.on) return
     try {
       const now = this.deps.now()
-      if (!this.bars.length) {
+      if (!this.watching) {
         // Searched only while the game is in front: its window is nowhere else.
         if (this.front && now - this.lastSearch >= this.searchWait) this.search()
-      } else if (this.lost >= LOST_SAMPLES || now - this.lastSearch >= RECHECK_MS) {
+      } else if ((this.bars.length && this.lost >= LOST_SAMPLES) || now - this.lastSearch >= RECHECK_MS) {
         // Gone from where it was: it is looked for on its own monitor, then the others in turn. Rows
         // unreadable for a moment (a window over them) are kept; given up after ten seconds.
-        if (!this.search(this.nextArea % Math.max(1, this.areas.length)) && this.lost >= LOST_SAMPLES && this.lostSince && now - this.lostSince >= GONE_MS) {
+        if (!this.search(this.nextArea % Math.max(1, this.areas.length)) && this.bars.length && this.lost >= LOST_SAMPLES && this.lostSince && now - this.lostSince >= GONE_MS) {
           this.bars = []
           this.alarm.reset()
           this.deps.post({ kind: 'bars', bars: this.bars })
@@ -129,9 +186,10 @@ export class GroupHealthLoop {
     } catch (e) {
       this.deps.post({ kind: 'error', message: e instanceof Error ? e.message : String(e) })
       this.bars = []
+      this.player = null
     }
     this.scheduled = true
-    this.deps.later(() => this.step(), this.bars.length ? SAMPLE_MS : 500)
+    this.deps.later(() => this.step(), this.watching ? SAMPLE_MS : 500)
   }
 
   /** What the main process sends: the monitors and the line, whether the game is in front, or a group change. */
@@ -142,12 +200,37 @@ export class GroupHealthLoop {
       this.manaOn = (m.manaPct ?? 0) > 0
       this.manaAlarm.setLine(m.manaPct ?? 0, (m.manaPct ?? 0) + 10)
       this.rowLines = m.rowLines ?? {}
+      this.groupOn = m.group ?? true
+      if (!this.groupOn && this.bars.length) {
+        this.bars = []
+        this.alarm.reset()
+        this.deps.post({ kind: 'bars', bars: this.bars })
+      }
+      const myMana = m.myManaPct ?? 0
+      this.myManaAlarm.setLine(myMana, myMana + 10)
+      const profile = m.profile ?? JUICEBOX_PROFILE
+      const wasMyMana = this.myManaOn
+      this.myManaOn = myMana > 0
+      if (!this.myManaOn) this.setPlayer(null)
+      // Another skin's bars, or your mana cue just on: looked for afresh.
+      const newProfile = JSON.stringify(profile) !== JSON.stringify(this.profile)
+      const fresh = newProfile || (this.myManaOn && !wasMyMana)
+      if (newProfile) {
+        this.profile = profile
+        this.alarm.reset()
+        this.manaAlarm.reset()
+        this.setPlayer(null)
+        if (this.bars.length) {
+          this.bars = []
+          this.deps.post({ kind: 'bars', bars: this.bars })
+        }
+      }
       const was = this.on
       const wasFront = this.front
       this.on = m.on
       this.front = m.front
       // The game back in front, or the monitors changed: looked for soon, from the short wait again.
-      if ((this.on && !was) || (this.front && !wasFront)) {
+      if ((this.on && !was) || (this.front && !wasFront) || fresh) {
         this.lastSearch = 0
         this.searchWait = SEARCH_MS
         if (!this.scheduled) this.step()

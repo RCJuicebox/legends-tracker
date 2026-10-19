@@ -423,3 +423,20 @@ describe('achievements overlay options', () => {
     expect(others.filter((x) => x.achievements).map((x) => x.kind)).toEqual(['achievements'])
   })
 })
+
+describe('group health settings (FEAT-040, FEAT-043)', () => {
+  const fb = defaultSettings()
+  const gh = (groupHealth: Record<string, unknown>) => sanitizeSettings({ ...fb, groupHealth: { ...fb.groupHealth, ...groupHealth } }, fb)!.groupHealth
+
+  it('keeps a skin name, sampled colours by skin and your mana line, and drops what is not one', () => {
+    expect(fb.groupHealth).toMatchObject({ skin: 'JuiceboxUI', calibrated: {}, myManaPct: 0 })
+    const g = gh({ skin: 'JuiceboxUI2', calibrated: { JuiceboxUI2: { hp: '#dc3c6e' }, '../x': {}, Other: 'red' }, myManaPct: 95.4, myManaSpeech: 'Low {pct}' })
+    expect(g.skin).toBe('JuiceboxUI2')
+    expect(Object.keys(g.calibrated)).toEqual(['JuiceboxUI2'])
+    expect(g.calibrated.JuiceboxUI2.hp).toEqual([220, 60, 110])
+    expect(g.calibrated.JuiceboxUI2.mana).toEqual([91, 117, 174])
+    expect(g.myManaPct).toBe(80)
+    expect(g.myManaSpeech).toBe('Low {pct}')
+    expect(gh({ skin: '../up', calibrated: [], myManaPct: 'x' })).toMatchObject({ skin: 'JuiceboxUI', calibrated: {}, myManaPct: 0 })
+  })
+})

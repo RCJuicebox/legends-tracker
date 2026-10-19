@@ -11,6 +11,8 @@ import {
   type PlanSettings
 } from '../../shared/types'
 import { DEFAULT_ACHIEVEMENT_OPTIONS, DEFAULT_METER_OPTIONS, minOpacity } from '../../shared/overlays'
+import { parseColours } from '../groupHealth'
+import { isSkinName } from '../skinBuild'
 import { Obj, isCharacterKey, isFullPath, isObj, isRecordKey, stringsArg } from './args'
 
 // settings.json: every page's settings, the character records and the faction plan's choices, and the field checks the other files share.
@@ -328,7 +330,18 @@ export function sanitizeSettings(v: unknown, fb: AppSettings): AppSettings | nul
           .map((n) => n.trim().slice(0, 40))
           .slice(0, 6)
       : (fb.groupHealth.watchNames ?? []),
-    watchPct: Math.round(num(gh.watchPct, fb.groupHealth.watchPct ?? 40, 5, 90))
+    watchPct: Math.round(num(gh.watchPct, fb.groupHealth.watchPct ?? 40, 5, 90)),
+    skin: isSkinName(gh.skin) ? gh.skin : (fb.groupHealth.skin ?? 'JuiceboxUI'),
+    calibrated: isObj(gh.calibrated)
+      ? Object.fromEntries(
+          Object.entries(gh.calibrated)
+            .filter(([k, c]) => isSkinName(k) && isObj(c))
+            .slice(0, 20)
+            .map(([k, c]) => [k, parseColours(c)])
+        )
+      : (fb.groupHealth.calibrated ?? {}),
+    myManaPct: Math.round(num(gh.myManaPct, fb.groupHealth.myManaPct ?? 0, 0, 80)),
+    myManaSpeech: str(gh.myManaSpeech, fb.groupHealth.myManaSpeech ?? 'Mana at {pct} percent').slice(0, 200)
   })
 
   let overlays = fb.overlays

@@ -9,6 +9,7 @@ import {
   SKIN_BUILD_FILE,
   isSkinName,
   parseSkinBuild,
+  parseSkinGroupHealth,
   readBagSlots,
   sanitizeColumns,
   tailOutput,
@@ -16,6 +17,7 @@ import {
   type SkinBuild,
   type SkinBuildResult
 } from '../core/skinBuild'
+import type { GroupHealthProfile } from '../core/groupHealth'
 import { log } from './log'
 import { newerBuildWrote } from './schema'
 
@@ -43,6 +45,30 @@ export async function listSkinBuilds(gameDir: string): Promise<SkinBuild[]> {
   }
   const found = await Promise.all(names.filter(isSkinName).map((skin) => readSkinBuild(root, skin)))
   return found.filter((b): b is SkinBuild => b !== null).sort((a, b) => a.skin.localeCompare(b.skin))
+}
+
+/** Every skin folder in the game's uifiles, and whether its file says how it draws the group health bars (FEAT-040). */
+export async function listSkins(gameDir: string): Promise<{ skin: string; profile: boolean }[]> {
+  if (!gameDir) return []
+  const root = join(gameDir, 'uifiles')
+  let names: string[]
+  try {
+    names = (await fs.readdir(root, { withFileTypes: true })).filter((d) => d.isDirectory()).map((d) => d.name)
+  } catch {
+    return []
+  }
+  const skins = names.filter(isSkinName).sort((a, b) => a.localeCompare(b))
+  return Promise.all(skins.map(async (skin) => ({ skin, profile: !!(await readSkinGroupHealth(gameDir, skin)) })))
+}
+
+/** How a skin draws the group health bars, as its own file says (FEAT-040); null when it says nothing. */
+export async function readSkinGroupHealth(gameDir: string, skin: string): Promise<GroupHealthProfile | null> {
+  if (!gameDir || !isSkinName(skin)) return null
+  try {
+    return parseSkinGroupHealth(await fs.readFile(join(gameDir, 'uifiles', skin, SKIN_BUILD_FILE), 'utf8')) ?? null
+  } catch {
+    return null
+  }
 }
 
 async function readSkinBuild(root: string, skin: string): Promise<SkinBuild | null> {

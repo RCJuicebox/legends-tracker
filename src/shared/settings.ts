@@ -2,6 +2,7 @@
 
 import type { ClassName } from './game/classes'
 import type { SpellCategory } from './game/guide'
+import type { GroupColours } from '../core/groupHealth'
 
 /**
  * One spell duration focus: an item's focus effect (read from its focus spell in spells_us.txt) or
@@ -208,6 +209,14 @@ export interface GroupHealthSettings {
   /** Members with a health line of their own (the tank), by name as the window shows it, and that line. */
   watchNames: string[]
   watchPct: number
+  /** The skin the game shows, whose bars are read: its legends-tracker.json can say how it draws them (FEAT-040). */
+  skin: string
+  /** Colours sampled off the screen ("Calibrate from the screen"), by skin: they take the place of the skin's own. */
+  calibrated: Record<string, GroupColours>
+  /** Your own mana, read off the Player window: said at this or under; 0 off (FEAT-043). */
+  myManaPct: number
+  /** What is said for your mana: {pct}. */
+  myManaSpeech: string
 }
 
 /** Other PCs' Logs folders the settings hold at most. */

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { listSkinBuilds, readBagLayout, runSkinBuild, saveBagLayout } from '../../src/main/skinBuilds'
+import { listSkinBuilds, listSkins, readBagLayout, readSkinGroupHealth, runSkinBuild, saveBagLayout } from '../../src/main/skinBuilds'
 import { BAG_LAYOUT_FILE, SKIN_BUILD_FILE } from '../../src/core/skinBuild'
 import { tempDir } from '../tempDir'
 
@@ -94,5 +94,29 @@ describe('bag layout files', () => {
     expect((await readBagLayout(dir, 'Mine', ''))?.error).toBe('No character chosen.')
     expect(await readBagLayout(dir, 'Plain', '')).toBeNull()
     await expect(saveBagLayout(dir, 'Plain', {})).rejects.toThrow(/does not keep a bag layout/)
+  })
+})
+
+describe('group health profiles (FEAT-040)', () => {
+  it("lists every skin, saying which one's file has a groupHealth section, with or without a command", async () => {
+    const dir = gameFolder({
+      default: undefined,
+      JuiceboxUI: { label: 'Rebuild bags', command: [node, '-e', '1'] },
+      Arcane: { groupHealth: { hpInner: 12 } },
+      Broken: 'not json'
+    })
+    expect(await listSkins(dir)).toEqual([
+      { skin: 'Arcane', profile: true },
+      { skin: 'Broken', profile: false },
+      { skin: 'default', profile: false },
+      { skin: 'JuiceboxUI', profile: false }
+    ])
+    expect((await readSkinGroupHealth(dir, 'Arcane'))?.hpInner).toBe(12)
+    expect(await readSkinGroupHealth(dir, 'JuiceboxUI')).toBeNull()
+    expect(await readSkinGroupHealth(dir, 'default')).toBeNull()
+    expect(await readSkinGroupHealth(dir, '../x')).toBeNull()
+    expect(await readSkinGroupHealth('', 'Arcane')).toBeNull()
+    expect(await listSkins('')).toEqual([])
+    expect(await listSkins(tempDir('lt-skins-'))).toEqual([])
   })
 })

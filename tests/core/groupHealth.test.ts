@@ -1,5 +1,26 @@
 import { describe, expect, it } from 'vitest'
-import { barFill, barsArea, findGroupBars, GROUP_COLOURS, GroupHealthAlarm, groupHealthPhrase, manaFill, namesFromWords, type Frame } from '../../src/core/groupHealth'
+import {
+  barFill,
+  barsArea,
+  calibrateColours,
+  findGroupBars,
+  findPlayerMana,
+  GROUP_COLOURS,
+  GroupHealthAlarm,
+  groupHealthPhrase,
+  JUICEBOX_PROFILE,
+  manaFill,
+  namesFromWords,
+  parseColours,
+  parseGroupHealthProfile,
+  playerArea,
+  playerManaFill,
+  rgbOf,
+  type Frame,
+  type GroupColours,
+  type GroupHealthProfile
+} from '../../src/core/groupHealth'
+import { parseSkinGroupHealth } from '../../src/core/skinBuild'
 import { RE_GROUP_CHANGE } from '../../src/core/combatLines'
 
 // The group health watch reads JuiceboxUI's Group window off the screen. These frames are drawn the
@@ -216,5 +237,196 @@ describe('RE_GROUP_CHANGE', () => {
     ])
       expect(RE_GROUP_CHANGE.test(l)).toBe(true)
     expect(RE_GROUP_CHANGE.test('Aldric tells the group, hi')).toBe(false)
+  })
+})
+
+// Another skin's bars (FEAT-040): the colours of a theme like JuiceboxUI2's, and a shape of its own.
+const ARCANE: GroupColours = { outline: [60, 40, 90], empty: [40, 20, 50], hp: [220, 60, 110], mana: [70, 140, 230], end: [230, 180, 70] }
+
+/** As bar(), in a skin's colours. */
+function barIn(f: Frame, c: GroupColours, x: number, y: number, w: number, h: number, ink: Rgb, pct: number): void {
+  fill(f, x, y, w, h, c.outline)
+  fill(f, x + 1, y + 1, w - 2, h - 2, c.empty)
+  fill(f, x + 1, y + 1, Math.floor((w - 2) * pct), h - 2, ink)
+}
+
+/** As member(), in a skin's colours: each bar's fill given. */
+function memberIn(f: Frame, c: GroupColours, x: number, t: number, hp: number, mana: number, end: number): void {
+  barIn(f, c, x, t, 204, 18, c.hp, hp)
+  barIn(f, c, x, t + 20, 204, 12, c.mana, mana)
+  barIn(f, c, x, t + 34, 204, 12, c.end, end)
+  fill(f, x + 6, t + 4, 40, 10, WHITE)
+}
+
+/** JuiceboxUI's Player window: health, mana and endurance 16 tall (14 inside), 20 apart, the top one's outline at (x, t). */
+function playerWindow(f: Frame, x: number, t: number, mana: number, o: { end?: boolean } = {}): void {
+  bar(f, x, t, 266, 16, GROUP_COLOURS.hp, 0.8)
+  bar(f, x, t + 20, 266, 16, GROUP_COLOURS.mana, mana)
+  if (o.end !== false) bar(f, x, t + 40, 266, 16, GROUP_COLOURS.end, 1)
+  // "Mana" on the bar's left, its numbers on its right.
+  fill(f, x + 6, t + 24, 30, 8, WHITE)
+  fill(f, x + 200, t + 24, 50, 8, WHITE)
+}
+
+describe('parseGroupHealthProfile', () => {
+  it("reads a skin's section, colours as [r, g, b] or #rrggbb, and takes JuiceboxUI's for whatever it leaves out or gets wrong", () => {
+    expect(parseGroupHealthProfile(undefined)).toBeUndefined()
+    expect(parseGroupHealthProfile([1, 2])).toBeUndefined()
+    expect(parseGroupHealthProfile({})).toEqual(JUICEBOX_PROFILE)
+    const p = parseGroupHealthProfile({
+      colours: { outline: '#3c285a', hp: [220, 60, 110], mana: 'blue', end: [1, 2, 300] },
+      hpInner: 12,
+      below: [{ at: 16, height: 8, ink: 'mana' }, { at: 0, height: 8, ink: 'end' }, { at: 30, height: 8, ink: 'pet' }, 'x'],
+      minWidth: 5,
+      playerInner: 12,
+      playerStep: 18
+    })
+    expect(p).toEqual({
+      colours: { ...GROUP_COLOURS, outline: [60, 40, 90], hp: [220, 60, 110] },
+      hpInner: 12,
+      below: [{ at: 16, height: 8, ink: 'mana' }],
+      minWidth: 80,
+      playerInner: 12,
+      playerStep: 18
+    })
+    // No bar under it worth keeping: JuiceboxUI's.
+    expect(parseGroupHealthProfile({ below: [{ at: 1, height: 8, ink: 'mana' }] })!.below).toEqual(JUICEBOX_PROFILE.below)
+  })
+
+  it('reads the section out of the whole legends-tracker.json, with or without a rebuild command', () => {
+    expect(parseSkinGroupHealth(JSON.stringify({ groupHealth: { hpInner: 12 } }))!.hpInner).toBe(12)
+    expect(parseSkinGroupHealth(JSON.stringify({ label: 'Rebuild', command: ['C:/x.exe'] }))).toBeUndefined()
+    expect(parseSkinGroupHealth('not json')).toBeUndefined()
+    expect(parseSkinGroupHealth('null')).toBeUndefined()
+  })
+
+  it('keeps colours given for the settings, each one wrong taken from JuiceboxUI', () => {
+    expect(parseColours({ hp: '#DC3C6E', mana: [1, 2] })).toEqual({ ...GROUP_COLOURS, hp: [220, 60, 110] })
+    expect(parseColours(null)).toEqual(GROUP_COLOURS)
+    expect(rgbOf(' #000000 ')).toEqual([0, 0, 0])
+    expect(rgbOf([0.5, 1, 2])).toBeNull()
+  })
+})
+
+describe("another skin's profile (FEAT-040)", () => {
+  const profile: GroupHealthProfile = { ...JUICEBOX_PROFILE, colours: ARCANE }
+
+  it('finds and reads its bars by its own colours, and JuiceboxUI’s find nothing there', () => {
+    const f = frame(400, 200)
+    memberIn(f, ARCANE, 50, 20, 0.5, 0.3, 1)
+    memberIn(f, ARCANE, 50, 80, 1, 0.8, 1)
+    expect(findGroupBars(f)).toEqual([])
+    const bars = findGroupBars(f, profile)
+    expect(bars).toHaveLength(2)
+    expect(barFill(f, bars[0], profile)).toBeCloseTo(0.5, 2)
+    expect(manaFill(f, bars[1], profile)).toBeCloseTo(0.8, 2)
+  })
+
+  it('finds bars of another shape: a shorter health bar with the mana bar nearer under it', () => {
+    const shape: GroupHealthProfile = { ...JUICEBOX_PROFILE, hpInner: 12, below: [{ at: 16, height: 8, ink: 'mana' }] }
+    const f = frame(400, 120)
+    bar(f, 50, 20, 204, 14, GROUP_COLOURS.hp, 0.7)
+    bar(f, 50, 36, 204, 10, GROUP_COLOURS.mana, 0.4)
+    expect(findGroupBars(f)).toEqual([])
+    const bars = findGroupBars(f, shape)
+    expect(bars).toEqual([{ left: 51, right: 252, top: 21 }])
+    expect(manaFill(f, bars[0], shape)).toBeCloseTo(0.4, 2)
+    expect(barsArea(bars, shape)).toEqual({ x: 49, y: 19, width: 206, height: 28 })
+    // With no mana bar under it, there is no mana to read and a sample stops at the health bar.
+    const noMana: GroupHealthProfile = { ...JUICEBOX_PROFILE, below: [{ at: 34, height: 10, ink: 'end' }] }
+    expect(manaFill(f, bars[0], noMana)).toBeNull()
+    expect(barsArea(bars, noMana).height).toBe(20)
+  })
+
+  it("takes a name off a shorter health bar by the profile's height", () => {
+    const bars = [{ left: 100, right: 301, top: 50 }]
+    const words = [{ text: 'Kelwyn', x: 105, y: 62, w: 40, h: 8 }]
+    expect(namesFromWords(bars, words)).toEqual(['Kelwyn'])
+    expect(namesFromWords(bars, words, { ...JUICEBOX_PROFILE, hpInner: 8 })).toEqual([''])
+  })
+})
+
+describe('findPlayerMana (FEAT-043)', () => {
+  it('finds your mana bar in the Player window, between its health and endurance bars, and reads it past its words', () => {
+    const f = frame(400, 200, 2000, 100)
+    playerWindow(f, 30, 40, 0.35)
+    const bar = findPlayerMana(f)
+    expect(bar).toEqual({ left: 2031, right: 2294, top: 161 })
+    expect(playerManaFill(f, bar!)).toBeCloseTo(0.35, 2)
+    // A sample of just the bar reads the same.
+    const a = playerArea(bar!)
+    expect(a).toEqual({ x: 2029, y: 159, width: 268, height: 18 })
+    const piece = frame(a.width, a.height, a.x, a.y)
+    playerWindow(piece, 2030 - a.x, 140 - a.y, 0.35)
+    expect(playerManaFill(piece, bar!)).toBeCloseTo(0.35, 2)
+  })
+
+  it('reads an empty bar (a class without mana) as 0, and a cast bar over it as nothing', () => {
+    const f = frame(400, 120)
+    playerWindow(f, 30, 20, 0)
+    const bar = findPlayerMana(f)!
+    expect(playerManaFill(f, bar)).toBe(0)
+    // The cast bar drawn over the mana bar while casting: not a reading.
+    fill(f, 31, 41, 264, 14, [224, 90, 180])
+    expect(playerManaFill(f, bar)).toBeNull()
+  })
+
+  it("does not take the Group window's mana bars, or a mana-coloured bar without the Player window's around it", () => {
+    const f = frame(400, 300)
+    member(f, 50, 20, 0.9)
+    member(f, 50, 80, 0.5)
+    expect(findPlayerMana(f)).toBeNull()
+    const g = frame(400, 120)
+    playerWindow(g, 30, 20, 0.5, { end: false })
+    expect(findPlayerMana(g)).toBeNull()
+    // And the Player window is not taken for the Group window.
+    playerWindow(g, 30, 20, 0.5)
+    expect(findGroupBars(g)).toEqual([])
+  })
+})
+
+describe('calibrateColours (FEAT-040)', () => {
+  it("samples every colour off a Group window with bars partly full, and the window's rows read with them", () => {
+    const f = frame(500, 260, 300, 400)
+    memberIn(f, ARCANE, 60, 20, 0.5, 0.3, 0.9)
+    memberIn(f, ARCANE, 60, 80, 0.8, 0.6, 0.2)
+    memberIn(f, ARCANE, 60, 140, 0.2, 0.9, 0.5)
+    const r = calibrateColours(f)
+    expect(r.rows).toBe(3)
+    expect(r.seen).toEqual(['outline', 'empty', 'hp', 'mana', 'end'])
+    expect(r.colours).toEqual(ARCANE)
+    expect(findGroupBars(f, { ...JUICEBOX_PROFILE, colours: r.colours })).toHaveLength(3)
+  })
+
+  it('tells empty from full when every bar is whole: a colour whole in bars of two kinds is empty', () => {
+    const f = frame(400, 200)
+    // A warrior at full health with no mana, and a member dead with full mana.
+    memberIn(f, ARCANE, 50, 20, 1, 0, 1)
+    memberIn(f, ARCANE, 50, 80, 0, 1, 1)
+    const r = calibrateColours(f)
+    expect(r.rows).toBe(2)
+    expect(r.colours).toEqual(ARCANE)
+    expect(r.seen).toHaveLength(5)
+  })
+
+  it('judges whole bars by the colours it had when nothing shows empty, and keeps what it never saw', () => {
+    const f = frame(400, 200)
+    memberIn(f, ARCANE, 50, 20, 1, 1, 1)
+    const r = calibrateColours(f)
+    expect(r.rows).toBe(1)
+    expect(r.seen).toEqual(['outline', 'hp', 'mana', 'end'])
+    expect(r.colours).toEqual({ ...ARCANE, empty: GROUP_COLOURS.empty })
+    // A member at 0 health alone: nearer the old empty than the old health colour, so taken for empty.
+    const g = frame(400, 120)
+    memberIn(g, ARCANE, 50, 20, 0, 1, 1)
+    expect(calibrateColours(g).colours.empty).toEqual(ARCANE.empty)
+  })
+
+  it('finds nothing where there is no Group window: the Player window, flat patches, a lone bar', () => {
+    const f = frame(600, 200)
+    playerWindow(f, 20, 20, 0.5)
+    fill(f, 320, 20, 200, 60, [41, 48, 57])
+    bar(f, 320, 100, 204, 18, GROUP_COLOURS.hp, 0.4)
+    expect(calibrateColours(f)).toEqual({ colours: GROUP_COLOURS, seen: [], rows: 0 })
   })
 })

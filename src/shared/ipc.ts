@@ -27,6 +27,7 @@ import type { PetGearReading, PetProfile, PetSpellOption } from '../core/pets'
 import type { RespawnTimerSpec, RespawnView, SpawnLink } from '../core/respawns'
 import type { MyClass, SpellCastRow } from '../core/spellMotes'
 import type { BagLayoutView, SkinBuild, SkinBuildResult } from '../core/skinBuild'
+import type { Calibration } from '../core/groupHealth'
 import type { Offer, Purchase, Recipe } from '../core/tradeskills'
 import type { CatalogItem } from '../core/wikiItem'
 import type { AchMarks, AchievementsView, CharacterSheet, GameFolderCheck, InventoryView, ItemInfo, MoteStock } from './character'
@@ -336,6 +337,8 @@ export interface Invokes {
   'setup:undo': () => boolean
   /** Whether the group-health worker starts and loads the Windows calls: the packaged smoke test asks (LT-630). */
   'groupHealth:selfTest': () => { pong: boolean; koffi: boolean; error?: string }
+  /** The Group window's colours sampled off the screen, waiting a while for the game to come to the front (FEAT-040). */
+  'groupHealth:calibrate': () => Calibration
   'settings:save': (settings: AppSettings) => AppSettings
   'character:save': (character: CharacterSettings) => void
   /** Any character's record (classes, levels, race, focus), by key; the character being played is the one app:state carries. */
@@ -533,6 +536,8 @@ export interface Invokes {
   'game:choose': () => { canceled: boolean; picked: string; dir: string }
   /** The UI skins in the game folder that ask for a rebuild button (src/core/skinBuild.ts). */
   'skins:builds': () => SkinBuild[]
+  /** Every UI skin in the game folder, and whether its file says how it draws the group health bars (FEAT-040). */
+  'skins:list': () => { skin: string; profile: boolean }[]
   /** Runs a skin's rebuild, for a character's export. */
   /** `approve`: the player has seen the command and agreed to it; needed the first time a command runs. */
   'skins:build': (skin: string, character: string, approve?: boolean) => SkinBuildResult
@@ -630,6 +635,7 @@ const INVOKE_CHANNELS: Record<InvokeChannel, true> = {
   'setup:apply': true,
   'setup:undo': true,
   'groupHealth:selfTest': true,
+  'groupHealth:calibrate': true,
   'settings:save': true,
   'character:save': true,
   'character:get': true,
@@ -761,6 +767,7 @@ const INVOKE_CHANNELS: Record<InvokeChannel, true> = {
   'game:find': true,
   'game:choose': true,
   'skins:builds': true,
+  'skins:list': true,
   'skins:build': true,
   'skins:layout': true,
   'skins:saveLayout': true,

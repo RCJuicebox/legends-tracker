@@ -1,4 +1,5 @@
 import { parseJson } from './json'
+import { parseGroupHealthProfile, type GroupHealthProfile } from './groupHealth'
 
 // A UI skin can ask for a rebuild button. A skin made by a script (one that sizes its windows from
 // the inventory export, say) leaves a file in its folder naming the command that rebuilds it:
@@ -7,6 +8,14 @@ import { parseJson } from './json'
 //
 // The app shows a button for each skin that has one and runs the command, with no shell, in the
 // skin's own folder (so "build.py" is the skin's), when it is pressed. A skin without the file shows nothing.
+//
+// The same file can say how the skin draws its Group and Player windows' bars, for the group health
+// alert (src/core/groupHealth.ts, FEAT-040), with or without a command: every part is optional, and
+// what it leaves out is JuiceboxUI's.
+//
+//   "groupHealth": { "colours": { "outline": [41, 48, 57], "empty": [13, 15, 19], "hp": "#c14b42", "mana": [91, 117, 174], "end": [181, 131, 50] },
+//                    "hpInner": 16, "below": [{ "at": 20, "height": 10, "ink": "mana" }, { "at": 34, "height": 10, "ink": "end" }],
+//                    "minWidth": 80, "playerInner": 14, "playerStep": 20 }
 
 /** The file a skin folder holds to ask for a rebuild button. */
 export const SKIN_BUILD_FILE = 'legends-tracker.json'
@@ -165,6 +174,16 @@ export function parseSkinBuild(skin: string, text: string): SkinBuild | null {
   const named = typeof label === 'string' ? label.trim().slice(0, 60) : ''
   const layout = parseBagLayoutSpec(bagLayout)
   return { skin, label: named || `Rebuild ${skin}`, command, ...(layout ? { bagLayout: layout } : {}) }
+}
+
+/** A skin file's `groupHealth` section (FEAT-040), or undefined when it has none or will not parse. */
+export function parseSkinGroupHealth(text: string): GroupHealthProfile | undefined {
+  try {
+    const data = parseJson(text) as { groupHealth?: unknown } | null
+    return data && typeof data === 'object' ? parseGroupHealthProfile(data.groupHealth) : undefined
+  } catch {
+    return undefined
+  }
 }
 
 /** The end of what a command printed, enough to show what went wrong. */

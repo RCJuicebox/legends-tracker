@@ -2,12 +2,22 @@ import { foregroundWindowRect } from './win32'
 import { Worker } from 'node:worker_threads'
 import { join } from 'node:path'
 import { app, screen } from 'electron'
-import { groupHealthPhrase, namesFromWords, type GroupBar, type LowHealth } from '../core/groupHealth'
+import {
+  calibrateColours,
+  groupHealthPhrase,
+  JUICEBOX_PROFILE,
+  namesFromWords,
+  type Calibration,
+  type GroupBar,
+  type GroupHealthProfile,
+  type LowHealth
+} from '../core/groupHealth'
 import { RE_GROUP_CHANGE } from '../core/combatLines'
 import type { AppContext } from './context'
 import type { AppFeature } from './appFeature'
 import type { EngineFeature } from './engine'
-import { captureRect } from './screenPixels'
+import { captureRect, releaseCapture } from './screenPixels'
+import { readSkinGroupHealth } from './skinBuilds'
 import { discardScreens, ocrImage, writeBmp } from './ocr'
 import { cacheDir } from './paths'
 import { sources } from './sources/registry'
@@ -17,9 +27,11 @@ import { handle } from './ipc/handle'
 import groupHealthWorkerPath from './groupHealthWorker?modulePath'
 
 // Says when a group member's health drops to the line set on the Triggers page (25% unless changed).
-// The log never prints anyone's health, so it is read off the screen: the worker finds JuiceboxUI's
+// The log never prints anyone's health, so it is read off the screen: the worker finds the skin's
 // Group window and watches its bars; this side says who, by reading the names off the window with
-// OCR whenever the rows change. It runs only while the game does and the switch is on.
+// OCR whenever the rows change. It runs only while the game does and the switch is on, or your own
+// mana cue is (FEAT-043). How the skin draws its bars is JuiceboxUI's unless the skin's file says,
+// or its colours were sampled off the screen (FEAT-040).
 
 /** A monitor, in physical pixels of the whole desktop. */
 export interface ScreenArea {
@@ -44,13 +56,23 @@ export type GroupHealthToWorker =
       manaPct?: number
       /** A health line of their own for rows by their top edge: the named members' (LT-751). */
       rowLines?: Record<number, number>
+      /** How the skin draws its bars (FEAT-040); JuiceboxUI's when left out. */
+      profile?: GroupHealthProfile
+      /** Your own mana's line, off the Player window; 0 off (FEAT-043). */
+      myManaPct?: number
+      /** Whether the Group window is watched at all: false while only your own mana cue is on. */
+      group?: boolean
     }
   | { kind: 'search' }
   | { kind: 'ping' }
   | { kind: 'stop' }
 
 export type GroupHealthFromWorker =
-  { kind: 'bars'; bars: GroupBar[] } | ({ kind: 'low' } & LowHealth) | { kind: 'error'; message: string } | { kind: 'pong'; koffi: boolean; error?: string }
+  | { kind: 'bars'; bars: GroupBar[] }
+  | { kind: 'player'; bar: GroupBar | null }
+  | ({ kind: 'low' } & LowHealth)
+  | { kind: 'error'; message: string }
+  | { kind: 'pong'; koffi: boolean; error?: string }
 
 /** What the watch needs of its worker thread: node's Worker, or a stand-in in tests (LT-627). */
 export interface WorkerLike {
@@ -71,6 +93,10 @@ export interface GroupHealthSelfTest {
 /** Back over the line by this much before a member is said again. */
 const REARM_ABOVE = 10
 
+/** How long "Calibrate from the screen" waits for the game to come to the front, and then for its windows to be drawn. */
+const CALIBRATE_WAIT_MS = 20_000
+const CALIBRATE_SETTLE_MS = 400
+
 export class GroupHealth implements AppFeature {
   readonly id = 'groupHealth'
   private worker: WorkerLike | null = null
@@ -85,15 +111,21 @@ export class GroupHealth implements AppFeature {
   /** What the watch was last set to, or why it is not running: a tick that changes neither does nothing. */
   private lastConfig = ''
   private retryAt = 0
+  /** The skin's own profile as last read, by game folder and skin, and the one being read now. */
+  private skinRead: { key: string; profile: GroupHealthProfile } | null = null
+  private reading = ''
+  /** Your mana bar is in view (FEAT-043), for what the sources page says. */
+  private playerSeen = false
 
   register(ctx: AppContext): void {
     this.ctx = ctx
     sources.add('groupHealth', {
       label: 'Group health',
       kind: 'screen',
-      what: "Your group's health bars in JuiceboxUI's Group window, watched on the screen while the game runs, for the Triggers page's group health alert."
+      what: "Your group's health bars in the skin's Group window, and your own mana in its Player window when that cue is on, watched on the screen while the game runs, for the Triggers page's group health alert."
     })
     handle('groupHealth:selfTest', () => this.selfTest())
+    handle('groupHealth:calibrate', () => this.calibrate())
     const feature: EngineFeature = {
       id: 'groupHealth',
       line: (l) => {
@@ -103,7 +135,11 @@ export class GroupHealth implements AppFeature {
       },
       // Five times a second: cheap, and it starts or stops the watch as the game opens and closes.
       tick: () => this.apply(),
-      reconfigure: () => this.apply()
+      // Settings saved: the skin's file is read again too, in case it was rebuilt.
+      reconfigure: () => {
+        this.readSkin()
+        this.apply()
+      }
     }
     ctx.engine.use(feature)
     // Electron's screen module cannot be touched before the app is ready, and the context is built before.
@@ -120,10 +156,11 @@ export class GroupHealth implements AppFeature {
   private apply(force = false): void {
     if (!app.isReady()) return
     const s = this.ctx.store.settings.get().groupHealth
-    const on = s.enabled && this.ctx.watcher.gameRunning === true
+    const wanted = s.enabled || s.myManaPct > 0
+    const on = wanted && this.ctx.watcher.gameRunning === true
     if (!on) {
       if (this.worker) this.stop()
-      const why = s.enabled ? 'Waiting for the game.' : 'Off: switch it on on the Triggers page.'
+      const why = wanted ? 'Waiting for the game.' : 'Off: switch it on on the Triggers page.'
       if (why !== this.lastConfig) sources.missing('groupHealth', why)
       this.lastConfig = why
       return
@@ -136,7 +173,8 @@ export class GroupHealth implements AppFeature {
     const overlaps = (a: ScreenArea) => !!rect && a.x < rect.x + rect.width && rect.x < a.x + a.width && a.y < rect.y + rect.height && rect.y < a.y + a.height
     const areas = rect && all.some(overlaps) ? all.filter(overlaps) : all
     const rowLines = this.rowLines(s.watchNames, s.watchPct)
-    const key = `${s.belowPct}|${s.manaPct}|${JSON.stringify(rowLines)}|${front}|${areas.map((a) => `${a.x},${a.y}`).join(';')}`
+    const profile = this.profile()
+    const key = `${s.enabled}|${s.belowPct}|${s.manaPct}|${s.myManaPct}|${JSON.stringify(rowLines)}|${front}|${areas.map((a) => `${a.x},${a.y}`).join(';')}|${JSON.stringify(profile)}`
     if (this.worker && !force && key === this.lastConfig) return
     // A watch that ended badly is started again, but not more than twice a minute.
     if (!this.worker && Date.now() < this.retryAt) return
@@ -150,8 +188,85 @@ export class GroupHealth implements AppFeature {
       rearmPct: s.belowPct + REARM_ABOVE,
       front,
       manaPct: s.manaPct,
-      rowLines
+      rowLines,
+      profile,
+      myManaPct: s.myManaPct,
+      group: s.enabled
     } satisfies GroupHealthToWorker)
+  }
+
+  /** The game folder and skin the profile is read for. */
+  private skinKey(): { key: string; dir: string; skin: string } {
+    const dir = this.ctx.installDir()
+    const skin = this.ctx.store.settings.get().groupHealth.skin
+    return { key: `${dir}|${skin}`, dir, skin }
+  }
+
+  /** Reads the skin's file for its profile, in the background; the watch is set again once it is read. */
+  private readSkin(): void {
+    const { key, dir, skin } = this.skinKey()
+    if (this.reading === key) return
+    this.reading = key
+    void readSkinGroupHealth(dir, skin)
+      .catch(() => null)
+      .then((p) => {
+        this.skinRead = { key, profile: p ?? JUICEBOX_PROFILE }
+        if (this.reading === key) this.reading = ''
+        this.apply()
+      })
+  }
+
+  /** The skin's own profile (JuiceboxUI's until its file is read), without colours sampled off the screen. */
+  private skinProfile(): GroupHealthProfile {
+    const { key } = this.skinKey()
+    if (this.skinRead?.key !== key) this.readSkin()
+    return this.skinRead?.key === key ? this.skinRead.profile : JUICEBOX_PROFILE
+  }
+
+  /** How the bars are read: the skin's profile, with the colours sampled for it if there are any (FEAT-040). */
+  private profile(): GroupHealthProfile {
+    const s = this.ctx.store.settings.get().groupHealth
+    const p = this.skinProfile()
+    const sampled = s.calibrated[s.skin]
+    return sampled ? { ...p, colours: sampled } : p
+  }
+
+  /**
+   * "Calibrate from the screen" (FEAT-040): the colours sampled off the Group window, wherever it is
+   * on a monitor. Asked from the app's own window, which may cover the game: when nothing is found at
+   * once, the game is waited for to come to the front (twenty seconds at most) and the screen read
+   * again. Said aloud too, as the player is in the game by then. The page keeps what comes back.
+   */
+  async calibrate(): Promise<Calibration> {
+    const base = this.skinProfile()
+    const areas = screen.getAllDisplays().map((d) => screen.dipToScreenRect(null, d.bounds))
+    const look = (): Calibration | null => {
+      for (const a of areas) {
+        const r = calibrateColours(captureRect(a.x, a.y, a.width, a.height), base)
+        if (r.rows) return r
+      }
+      return null
+    }
+    const wait = (ms: number) => new Promise((r) => setTimeout(r, ms))
+    const inFront = () => this.ctx.watcher.state.foregroundName === 'eqgame'
+    try {
+      let found = look()
+      if (!found) {
+        const until = Date.now() + CALIBRATE_WAIT_MS
+        while (!inFront() && Date.now() < until) await wait(250)
+        if (inFront()) {
+          await wait(CALIBRATE_SETTLE_MS)
+          found = look()
+        }
+      }
+      const r = found ?? { colours: base.colours, seen: [], rows: 0 }
+      log.info(`Group health colours sampled: ${r.rows} rows, ${r.seen.join(', ') || 'nothing'} seen`)
+      this.ctx.engine.notify([{ kind: 'speak', text: r.rows ? 'Group colours sampled' : 'No group window found', interrupt: false }])
+      return r
+    } finally {
+      // A whole monitor's copy is kept for the next of its size: none comes from this thread soon.
+      releaseCapture()
+    }
   }
 
   /** The named members' own health line, by the top of the row their name was read on (LT-751). */
@@ -215,13 +330,16 @@ export class GroupHealth implements AppFeature {
 
   private message(m: GroupHealthFromWorker): void {
     if (m.kind === 'error') sources.fail('groupHealth', new Error(m.message))
-    else if (m.kind === 'bars') {
+    else if (m.kind === 'player') {
+      this.playerSeen = m.bar !== null
+      if (!this.bars.length) sources.ok('groupHealth', this.nobody())
+    } else if (m.kind === 'bars') {
       this.bars = m.bars
       this.names = m.bars.map((b) => this.namesByTop.get(b.top) ?? '')
       const n = m.bars.length
       if (!n) {
         this.namesByTop.clear()
-        sources.ok('groupHealth', 'No group members in the Group window, or it is not on the screen.')
+        sources.ok('groupHealth', this.nobody())
       } else {
         const read = this.names.filter(Boolean)
         sources.ok('groupHealth', `Watching ${n} group member${n === 1 ? '' : 's'}${read.length ? `: ${read.join(', ')}` : ''}.`)
@@ -231,9 +349,22 @@ export class GroupHealth implements AppFeature {
     } else if (m.kind === 'low') this.say(m)
   }
 
+  /** What the sources page says with no rows to watch. */
+  private nobody(): string {
+    return this.playerSeen ? 'Watching your mana; no group members in the Group window.' : 'No group members in the Group window, or it is not on the screen.'
+  }
+
   private say(low: LowHealth): void {
     const name = this.names[low.slot - 1] || `Group member ${low.slot}`
     const s = this.ctx.store.settings.get().groupHealth
+    if (low.what === 'myMana') {
+      this.ctx.engine.notify([
+        { kind: 'speak', text: groupHealthPhrase(s.myManaSpeech, 'You', low.pct), interrupt: false },
+        { kind: 'text', text: `Mana ${low.pct}%`, color: '#5b75ae', durationSec: 4 }
+      ])
+      this.ctx.engine.pushFeed('trigger', `Your mana at ${low.pct}%`)
+      return
+    }
     if (low.what === 'mana') {
       this.ctx.engine.notify([
         { kind: 'speak', text: groupHealthPhrase(s.manaSpeech, name, low.pct), interrupt: false },
@@ -258,14 +389,14 @@ export class GroupHealth implements AppFeature {
     const x = Math.min(...bars.map((b) => b.left)) - 2
     const y = Math.min(...bars.map((b) => b.top)) - 2
     const width = Math.max(...bars.map((b) => b.right)) + 3 - x
-    const height = Math.max(...bars.map((b) => b.top)) + 20 - y
+    const height = Math.max(...bars.map((b) => b.top)) + this.profile().hpInner + 4 - y
     const path = join(cacheDir(), `screen-group-${Date.now().toString(36)}.bmp`)
     try {
       const f = captureRect(x, y, width, height)
       await writeBmp(path, width, height, Buffer.from(f.data.buffer, f.data.byteOffset, f.data.byteLength))
       const words = (await ocrImage(path, 4)).map((w) => ({ ...w, x: w.x + x, y: w.y + y }))
       if (seen !== this.rowsSeen) return
-      const found = namesFromWords(bars, words)
+      const found = namesFromWords(bars, words, this.profile())
       this.names = bars.map((_, i) => found[i] || this.names[i] || '')
       bars.forEach((b, i) => this.names[i] && this.namesByTop.set(b.top, this.names[i]))
       const read = this.names.filter(Boolean)

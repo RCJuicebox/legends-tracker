@@ -87,7 +87,7 @@ async function outcome(fn: () => unknown, ms = 2000): Promise<'ok' | 'error' | '
   }
 }
 const HUNG = Symbol('hung')
-const SCREEN_READS = new Set(['stats:readScreen', 'stock:readScreen'])
+const SCREEN_READS = new Set(['stats:readScreen', 'stock:readScreen', 'groupHealth:calibrate'])
 
 beforeAll(async () => {
   h.dir = tempDir('lt-ipc-')

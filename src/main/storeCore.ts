@@ -53,7 +53,19 @@ export function defaultSettings(): AppSettings {
     achievementCues: true,
     modules: {},
     combat: { fightGapSec: 10, historyMinutes: 60, newSessionOnZone: true, combinePet: true, charmPets: true },
-    groupHealth: { enabled: false, belowPct: 25, speech: '{name} at {pct} percent', manaPct: 0, manaSpeech: '{name} is low on mana', watchNames: [], watchPct: 40 },
+    groupHealth: {
+      enabled: false,
+      belowPct: 25,
+      speech: '{name} at {pct} percent',
+      manaPct: 0,
+      manaSpeech: '{name} is low on mana',
+      watchNames: [],
+      watchPct: 40,
+      skin: 'JuiceboxUI',
+      calibrated: {},
+      myManaPct: 0,
+      myManaSpeech: 'Mana at {pct} percent'
+    },
     factionPlan: { assumptions: {}, choices: {} },
     setup: { hidden: false, accepted: [], arranged: false }
   }

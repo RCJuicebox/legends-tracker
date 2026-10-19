@@ -4,11 +4,20 @@ import type { AppContext } from '../../src/main/context'
 import type { EngineFeature } from '../../src/main/engine'
 import type { GroupHealthFromWorker, GroupHealthToWorker } from '../../src/main/groupHealth'
 import { sources } from '../../src/main/sources/registry'
+import { mkdirSync, writeFileSync } from 'node:fs'
+import { join } from 'node:path'
+import { tempDir } from '../tempDir'
 
 // The group health watch's main side with its worker stood in (LT-627): started and configured as the
 // game runs, what its messages do, and a worker that dies started again after a while.
 
-const h = vi.hoisted(() => ({ dir: '', ready: true }))
+const h = vi.hoisted(() => ({
+  dir: '',
+  game: '',
+  ready: true,
+  capture: (() => ({ x: 0, y: 0, width: 1, height: 1, data: new Uint8Array(4) })) as (x: number, y: number, w: number, h: number) => unknown,
+  released: 0
+}))
 vi.mock('electron', () => ({
   app: { isReady: () => h.ready, getPath: () => h.dir, whenReady: () => Promise.resolve() },
   screen: { getAllDisplays: () => [{ bounds: { x: 0, y: 0, width: 1000, height: 800 } }], dipToScreenRect: (_w: unknown, b: unknown) => b, on: () => {} },
@@ -16,11 +25,16 @@ vi.mock('electron', () => ({
 }))
 vi.mock('../../src/main/win32', () => ({ foregroundWindowRect: () => ({ x: 10, y: 10, width: 500, height: 400 }) }))
 vi.mock('../../src/main/paths', () => ({ cacheDir: () => h.dir }))
-vi.mock('../../src/main/screenPixels', () => ({ captureRect: () => ({ x: 0, y: 0, width: 1, height: 1, data: new Uint8Array(4) }), gdiAvailable: () => true }))
+vi.mock('../../src/main/screenPixels', () => ({
+  captureRect: (x: number, y: number, w: number, hh: number) => h.capture(x, y, w, hh),
+  gdiAvailable: () => true,
+  releaseCapture: () => void h.released++
+}))
 vi.mock('../../src/main/ocr', () => ({ writeBmp: async () => undefined, ocrImage: async () => [], discardScreens: async () => undefined }))
 vi.mock('../../src/main/groupHealthWorker?modulePath', () => ({ default: 'worker.js' }))
 
 const { GroupHealth } = await import('../../src/main/groupHealth')
+const { JUICEBOX_PROFILE } = await import('../../src/core/groupHealth')
 
 class FakeWorker extends EventEmitter {
   posted: GroupHealthToWorker[] = []
@@ -33,7 +47,7 @@ class FakeWorker extends EventEmitter {
   }
 }
 
-function setup(o: { enabled?: boolean } = {}) {
+function setup(o: { enabled?: boolean; myManaPct?: number; skin?: string } = {}) {
   const workers: FakeWorker[] = []
   const notified: unknown[] = []
   const settings = {
@@ -44,7 +58,11 @@ function setup(o: { enabled?: boolean } = {}) {
       manaPct: 0,
       manaSpeech: '{name} is low on mana',
       watchNames: [] as string[],
-      watchPct: 40
+      watchPct: 40,
+      skin: o.skin ?? 'JuiceboxUI',
+      calibrated: {} as Record<string, unknown>,
+      myManaPct: o.myManaPct ?? 0,
+      myManaSpeech: 'Mana at {pct} percent'
     },
     overlays: []
   }
@@ -52,6 +70,7 @@ function setup(o: { enabled?: boolean } = {}) {
   let feature: EngineFeature | null = null
   const ctx = {
     store: { settings: { get: () => settings } },
+    installDir: () => h.game,
     watcher,
     engine: { use: (f: EngineFeature) => (feature = f), notify: (ns: unknown[]) => notified.push(...ns), pushFeed: () => {} }
   } as unknown as AppContext
@@ -81,7 +100,19 @@ describe('GroupHealth', () => {
     tick()
     expect(workers).toHaveLength(1)
     expect(workers[0].posted).toEqual([
-      { kind: 'config', on: true, areas: [{ x: 0, y: 0, width: 1000, height: 800 }], belowPct: 25, rearmPct: 35, front: true, manaPct: 0, rowLines: {} }
+      {
+        kind: 'config',
+        on: true,
+        areas: [{ x: 0, y: 0, width: 1000, height: 800 }],
+        belowPct: 25,
+        rearmPct: 35,
+        front: true,
+        manaPct: 0,
+        rowLines: {},
+        profile: JUICEBOX_PROFILE,
+        myManaPct: 0,
+        group: true
+      }
     ])
     // The same settings again: nothing more is sent.
     tick()
@@ -156,5 +187,75 @@ describe('GroupHealth', () => {
     w.emit('message', { kind: 'pong', koffi: true } satisfies GroupHealthFromWorker)
     expect(await asked).toEqual({ pong: true, koffi: true })
     expect(w.ended).toBe(true)
+  })
+
+  it('watches your own mana with the group alert off, and says it in its own words (FEAT-043)', () => {
+    const { workers, notified, tick, row } = setup({ enabled: false, myManaPct: 20 })
+    tick()
+    expect(workers).toHaveLength(1)
+    expect(workers[0].posted[0]).toMatchObject({ kind: 'config', myManaPct: 20, group: false })
+    workers[0].emit('message', { kind: 'player', bar: { left: 31, right: 294, top: 61 } } satisfies GroupHealthFromWorker)
+    expect(row().detail).toContain('Watching your mana')
+    workers[0].emit('message', { kind: 'bars', bars: [] } satisfies GroupHealthFromWorker)
+    expect(row().detail).toContain('Watching your mana')
+    workers[0].emit('message', { kind: 'low', slot: 1, pct: 17, what: 'myMana' } satisfies GroupHealthFromWorker)
+    expect(notified.slice(-2)).toEqual([
+      { kind: 'speak', text: 'Mana at 17 percent', interrupt: false },
+      { kind: 'text', text: 'Mana 17%', color: '#5b75ae', durationSec: 4 }
+    ])
+    workers[0].emit('message', { kind: 'player', bar: null } satisfies GroupHealthFromWorker)
+    expect(row().detail).toContain('No group members')
+  })
+
+  it("reads the skin's profile from its file, and puts the colours sampled for it in its place (FEAT-040)", async () => {
+    h.game = tempDir('lt-gh-skin-')
+    mkdirSync(join(h.game, 'uifiles', 'Arcane'), { recursive: true })
+    writeFileSync(join(h.game, 'uifiles', 'Arcane', 'legends-tracker.json'), JSON.stringify({ groupHealth: { hpInner: 12 } }))
+    try {
+      const { workers, settings, tick, feature } = setup({ skin: 'Arcane' })
+      tick()
+      // JuiceboxUI's until the file is read, then the skin's.
+      expect(workers[0].posted.at(-1)).toMatchObject({ profile: JUICEBOX_PROFILE })
+      await vi.waitFor(() => expect(workers[0].posted.at(-1)).toMatchObject({ profile: { hpInner: 12 } }))
+      const sampled = { ...JUICEBOX_PROFILE.colours, hp: [220, 60, 110] }
+      settings.groupHealth.calibrated = { Arcane: sampled }
+      feature().reconfigure!()
+      expect(workers[0].posted.at(-1)).toMatchObject({ profile: { hpInner: 12, colours: sampled } })
+    } finally {
+      h.game = ''
+    }
+  })
+
+  it('samples the colours off a Group window on the screen, says so, and frees its copies (FEAT-040)', async () => {
+    const { gh, notified } = setup()
+    // One member row in JuiceboxUI's colours: health half full, mana and endurance under it.
+    const f = { x: 0, y: 0, width: 300, height: 80, data: new Uint8Array(300 * 80 * 4) }
+    const put = (x: number, y: number, w: number, hh: number, c: readonly number[]) => {
+      for (let r = y; r < y + hh; r++) for (let col = x; col < x + w; col++) f.data.set([c[2], c[1], c[0], 0], (r * f.width + col) * 4)
+    }
+    const c = JUICEBOX_PROFILE.colours
+    for (const [top, hh, ink, pct] of [
+      [10, 18, c.hp, 0.5],
+      [30, 12, c.mana, 0.4],
+      [44, 12, c.end, 0.7]
+    ] as const) {
+      put(20, top, 204, hh, c.outline)
+      put(21, top + 1, 202, hh - 2, c.empty)
+      put(21, top + 1, Math.floor(202 * pct), hh - 2, ink)
+    }
+    h.capture = () => f
+    const released = h.released
+    try {
+      const r = await gh.calibrate()
+      expect(r).toEqual({ colours: c, seen: ['outline', 'empty', 'hp', 'mana', 'end'], rows: 1 })
+      expect(notified.at(-1)).toMatchObject({ kind: 'speak', text: 'Group colours sampled' })
+      expect(h.released).toBe(released + 1)
+      // Nothing there, the game in front: looked at once more, then said.
+      h.capture = () => ({ x: 0, y: 0, width: 1, height: 1, data: new Uint8Array(4) })
+      expect((await gh.calibrate()).rows).toBe(0)
+      expect(notified.at(-1)).toMatchObject({ kind: 'speak', text: 'No group window found' })
+    } finally {
+      h.capture = () => ({ x: 0, y: 0, width: 1, height: 1, data: new Uint8Array(4) })
+    }
   })
 })
