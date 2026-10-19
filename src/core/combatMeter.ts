@@ -489,7 +489,10 @@ export class CombatMeter {
         tgt.defense.swings++
         tgt.defense.hit++
       }
-      active(src, at)
+      // A striker's active time is the swings and the spells they cast: a DoT ticking or a damage
+      // shield burning goes on while they stand still, so neither counts (LT-716). The fight's own
+      // time goes on with every blow.
+      if (ev.how === 'melee' || ev.how === 'spell') active(src, at)
       active(seg, at)
       const enemy = ss === 'enemy' ? source : target
       if (seg !== closed) seg.enemies[nameKey(enemy)] = true

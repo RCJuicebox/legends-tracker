@@ -169,7 +169,8 @@ fighting near you, and everything hitting your side.
   from the same list, newest first, and the meter keeps showing the last fight until the next
   begins.
 - **Damage, Incoming, Healing.** Damage lists who dealt what, with DPS over the fight, share, and
-  active DPS (damage over the time actually spent striking, gaps between hits capped at 3 s). Click a
+  active DPS (damage over the time actually spent striking: the swings and the spells cast, gaps
+  between them capped at 3 s; a DoT ticking or a damage shield burning adds no time). Click a
   row for its skills and spells: hits, crit rate, landed rate, resists, average and best hit, and
   the pet's lane when pets are folded into their owners. Incoming lists who hit your side, with
   **Your defence** (hit, miss, dodge, parry, block, riposte, absorb rates over the swings aimed at

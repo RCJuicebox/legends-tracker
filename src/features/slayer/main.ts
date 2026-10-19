@@ -239,20 +239,26 @@ export class SlayerPlanner implements AppFeature {
     return { data: had.done ?? (await had.data), choices }
   }
 
-  /** Every kill in this character's logs and the player's other characters', by zone, and their trips between zones. */
-  private async kills(ctx: AppContext, character: string): Promise<{ zones: SlayerKillTallies['zones']; moves: SlayerMove[] }> {
+  /**
+   * Every kill in this character's logs and the player's other characters', by zone, and their trips
+   * between zones; and this character's own kills apart (`own`), for what counts for it alone (LT-715).
+   */
+  private async kills(ctx: AppContext, character: string): Promise<{ zones: SlayerKillTallies['zones']; own: SlayerKillTallies['zones']; moves: SlayerMove[] }> {
     const who = [character, ...(await ctx.logCharacters()).filter((c) => c.toLowerCase() !== character.toLowerCase())]
     const stretches: SlayerKillTallies[] = []
+    let own: SlayerKillTallies[] = []
     // One at a time: LogHistory reads one log at a time anyway, and a log that fails is left out.
     for (const c of who) {
       try {
         const slice = await this.history.get<SlayerKillTallies>(KILLS_KEY, ctx.historyOf(c))
-        stretches.push(...everyStretch(slice))
+        const read = everyStretch(slice)
+        if (c === character) own = read
+        stretches.push(...read)
       } catch (e) {
         log.warn(`${c}'s log could not be read for the Slayer plan:`, e)
       }
     }
-    return { zones: joinKillTallies(stretches), moves: joinMoves(stretches) }
+    return { zones: joinKillTallies(stretches), own: joinKillTallies(own), moves: joinMoves(stretches) }
   }
 
   private async data(ctx: AppContext, character: string): Promise<SlayerPlanData> {
@@ -271,7 +277,7 @@ export class SlayerPlanner implements AppFeature {
     const goals = slayerGoals(counters, since, optionalSlayer(exp.sections), banestrikeTiers(exp.sections), done)
     const game = await ctx.gameTables.get(RACE_TABLE)
     const races = new SlayerRaces(counters, game)
-    const { zones, moves } = await this.kills(ctx, character)
+    const { zones, own, moves } = await this.kills(ctx, character)
     const npc = ctx.npcPages
     await npc.ready()
     const unknown = new Set<string>()
@@ -334,8 +340,9 @@ export class SlayerPlanner implements AppFeature {
       const mobs = c.kinds.flatMap((k) => k.name.split(', '))
       c.today = this.live.killsSince(character, mobs, midnight.getTime())
     }
+    // A named counts for the character that killed it: its own log alone, as on Plan › Hunter (LT-715).
     // Less the Hunter achievements the player has said do not work.
-    const hunter = hunterZones(exp.sections, lastKills(zones), exp.modified, namedSpawns(timings)).filter((z) => !ctx.hunter?.isBroken(z.achievement))
+    const hunter = hunterZones(exp.sections, lastKills(own), exp.modified, namedSpawns(timings)).filter((z) => !ctx.hunter?.isBroken(z.achievement))
     // Kills no race was found for: the wiki answered, and neither it, the name nor a zone's race mix places them.
     for (const [zone, z] of Object.entries(zones))
       for (const m of Object.values(z.mobs)) {

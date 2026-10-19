@@ -315,6 +315,9 @@ describe('CombatMeter', () => {
     expect(combined).toHaveLength(1)
     expect(combined[0].total).toBe(643)
     expect(combined[0].pets?.[0].name).toBe('Jobarab')
+    // Your striking time: the punch at 05 counts a second, the crit at 07 two more; the miss at 07, the
+    // DoT tick and the thorns at 11 add nothing, since neither is a swing or a cast (LT-716).
+    expect(f.entities['you'].activeMs).toBe(3000)
     // Active DPS folds too: the pair's damage over the longer of their combat times.
     const activeMs = Math.max(f.entities['you'].activeMs, f.entities['jobarab'].activeMs)
     expect(combined[0].activeDps).toBeCloseTo(643 / (activeMs / 1000))
@@ -751,12 +754,13 @@ describe('CombatMeter', () => {
     // gap capped at three: 1+1+1+1+1+1+2+3+2 = 13 s. Two Puma Maws in 13 s is 9.2 a minute.
     expect(you.activeMs).toBe(13_000)
     expect(rows[0].ppm).toBeCloseTo(2 / (13 / 60), 5)
-    // The pet struck twice a second apart: 2 s of active time is too little for a rate.
+    // The pet's Puma Maw at 12 is a second of striking; its Malaria tick at 13 is none (LT-716): too little for a rate.
+    expect(f.entities['jobarab'].activeMs).toBe(1000)
     expect(rows[3].ppm).toBeNull()
     const sum = procSummary(f, 'everyone', rows)
     expect(sum.count).toBe(6)
-    expect(sum.activeSec).toBe(15)
-    expect(sum.ppm).toBeCloseTo(6 / (15 / 60), 5)
+    expect(sum.activeSec).toBe(14)
+    expect(sum.ppm).toBeCloseTo(6 / (14 / 60), 5)
     expect(procRows(f, 'you').map((r) => r.source)).toEqual(['You', 'You', 'You', 'Jobarab', 'You'])
     // The skill lane says which of the row's spells fired on their own.
     const skills = skillRows(f, damageRows(f, 'you', false)[0])
@@ -764,7 +768,7 @@ describe('CombatMeter', () => {
     expect(skills.find((s) => s.name === 'Puma Maw V')?.proc?.ppm).toBeCloseTo(2 / (13 / 60), 5)
     expect(skills.find((s) => s.name === 'Envenomed Bolt X')?.proc).toBeUndefined()
     const text = procText(f, 'you', 'A fetid fiend').split('\n')
-    expect(text[0]).toBe('A fetid fiend · Procs · 6 firings · 24.0/min · you')
+    expect(text[0]).toBe('A fetid fiend · Procs · 6 firings · 25.7/min · you')
     expect(text[1]).toBe('Puma Maw V  ×2  9.2/min  400  proc')
     expect(text[3]).toBe('Lifebite  ×1  4.6/min  42 + 42 healed  proc')
   })
