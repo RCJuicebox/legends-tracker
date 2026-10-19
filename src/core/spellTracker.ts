@@ -79,7 +79,7 @@ const FAIL_PREFIXES = [
 ]
 // A tick that crits ends "(Critical)", as combatLines reads it.
 const RE_DOT_TICK = /^(.+?) has taken [\d,]+ damage from your (.+?)\.(?: \((.+)\))?$/
-/** "A forsaken revenant has taken 451 damage from Harm Touch X by Rathor.": another player's DoT ticking. */
+/** "A forsaken revenant has taken 451 damage from Harm Touch X by Fenwick.": another player's DoT ticking. */
 const RE_DOT_TICK_OTHER = /^(.+?) has taken [\d,]+ damage from (.+?) by (.+?)\.(?: \((.+)\))?$/
 const RE_WORN_OFF = /^Your (.+) spell has worn off of (.+)\.$/
 const RE_PET_WORN_OFF = /^Your pet's (.+) spell has worn off\.$/

@@ -1,6 +1,7 @@
 import { promises as fs } from 'node:fs'
 import { writeFileAtomic } from './storeCore'
 import { log } from './log'
+import { parseJson } from '../core/json'
 import { sanitizeTradeSaved } from '../core/validate'
 import type { TradeSaved } from '../shared/ipc'
 
@@ -19,7 +20,7 @@ export class TradeFavorites {
   async get(): Promise<TradeSaved> {
     if (this.data) return this.data
     try {
-      this.data = sanitizeTradeSaved(JSON.parse(await fs.readFile(this.path, 'utf8'))) ?? { ...EMPTY }
+      this.data = sanitizeTradeSaved(parseJson(await fs.readFile(this.path, 'utf8'))) ?? { ...EMPTY }
     } catch (e) {
       if ((e as NodeJS.ErrnoException).code !== 'ENOENT') log.warn(`${this.path} unreadable; starting empty:`, e)
       this.data = { ...EMPTY }

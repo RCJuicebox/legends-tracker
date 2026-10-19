@@ -4,6 +4,7 @@ import { handle } from './handle'
 import { log } from '../log'
 import { testTrigger } from '../../core/triggers'
 import { respawnTimerSpec, respawnTrigger, respawnTriggerId, type RespawnTimerSpec } from '../../core/respawns'
+import { parseJson } from '../../core/json'
 import { sanitizeRespawnTimer, sanitizeSpawnLink, sanitizeTrigger, sanitizeTriggers } from '../../core/validate'
 import type { AppContext } from '../context'
 
@@ -31,7 +32,7 @@ export function registerTriggerIpc(ctx: AppContext): void {
     if (r.canceled || !file) return null
     let parsed: unknown
     try {
-      parsed = JSON.parse(await fs.readFile(file, 'utf8'))
+      parsed = parseJson(await fs.readFile(file, 'utf8'))
     } catch (e) {
       log.warn(`Trigger import: could not read ${file}`, e)
       windows.showError(`${basename(file)} could not be imported.`, e instanceof SyntaxError ? `It is not valid JSON: ${e.message}` : (e as Error).message)

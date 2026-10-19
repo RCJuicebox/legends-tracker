@@ -242,7 +242,9 @@ export class SpellBook {
       if (!set) {
         const levels = levelKey.split('^').map(Number)
         const lowest = Math.min(...levels)
-        levelSets.set(levelKey, (set = { levels, kept: lowest <= LEVEL_CAP || lowest >= 255 }))
+        // Kept: a spell some class gets by the cap; an ability granted outside the spell book (254:
+        // Harm Touch X, the disciplines); an NPC's or item's spell (every class 255).
+        levelSets.set(levelKey, (set = { levels, kept: lowest <= LEVEL_CAP || lowest >= ABILITY }))
       }
       const classLevels = set.levels
       // The row as this layout expects it: a whole id, a name, sixteen class levels 0-255, an icon.
@@ -284,8 +286,9 @@ export class SpellBook {
         fade: msg[5] ?? ''
       }
       book.byId.set(id, spell)
+      // One spell a name: a class's spell over an ability of the name, either over an NPC's row.
       const existing = book.byName.get(spell.name)
-      if (!existing || (!castable(existing) && castable(spell))) book.byName.set(spell.name, spell)
+      if (!existing || castRank(spell) > castRank(existing)) book.byName.set(spell.name, spell)
     }
     // A game patch that moves the columns shows as rows that no longer read right: say so, rather
     // than time every spell from the wrong fields.
@@ -344,6 +347,15 @@ export class SpellBook {
 
 function castable(s: Spell): boolean {
   return s.classLevels.some((l) => l > 0 && l < 255)
+}
+
+/** The class level that marks an ability granted outside the spell book (Harm Touch X), not a level. */
+const ABILITY = 254
+
+/** Which row a name should mean: a spell a class gets by level (2), an ability (1), an NPC's or item's (0). */
+function castRank(s: Spell): number {
+  if (s.classLevels.some((l) => l > 0 && l < ABILITY)) return 2
+  return s.classLevels.some((l) => l === ABILITY) ? 1 : 0
 }
 
 export function summarize(s: Spell): SpellSummary {

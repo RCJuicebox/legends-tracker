@@ -3,6 +3,7 @@ import { basename, dirname, join } from 'node:path'
 import { DEFAULT_TIER_DURATION_PCT, type AppSettings } from '../shared/types'
 import { DEFAULT_OVERLAYS } from '../shared/overlays'
 import { log } from './log'
+import { parseJson } from '../core/json'
 import { characterKey } from '../core/validate'
 
 // The pure half of the settings store: defaults, merging, and the JSON files themselves. No Electron
@@ -121,7 +122,7 @@ export function readJsonFile(path: string, opts: { setAside?: boolean; now?: Dat
     }
   }
   try {
-    return { state: 'ok', value: JSON.parse(text) }
+    return { state: 'ok', value: parseJson(text) }
   } catch (e) {
     log.error(`${path} is not valid JSON`, e)
     return aside()

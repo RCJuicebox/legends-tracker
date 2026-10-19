@@ -103,6 +103,14 @@ describe('the settings files on disk', () => {
     expect(readJsonFile(join(dir, 'ok.json'))).toEqual({ state: 'ok', value: { a: 1 } })
   })
 
+  it('reads a file that starts with a byte-order mark, as PowerShell and Notepad write them', () => {
+    // 2026-10-06: spell-rules.json saved with one was set aside as corrupt and the rules ran on defaults.
+    const path = join(dir, 'spell-rules.json')
+    writeFileSync(path, '﻿{"Harm Touch": {"others": true}}', 'utf8')
+    expect(readJsonFile(path)).toEqual({ state: 'ok', value: { 'Harm Touch': { others: true } } })
+    expect(existsSync(path)).toBe(true)
+  })
+
   it('moves an unreadable file aside rather than letting defaults overwrite it', () => {
     const path = join(dir, 'settings.json')
     writeFileSync(path, '{"installDir": "C:\\\\EQ", trunc')

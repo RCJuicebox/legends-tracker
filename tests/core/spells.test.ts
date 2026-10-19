@@ -91,11 +91,24 @@ describe('SpellBook.parse', () => {
       as(90001, 'At the Cap', (c) => (c === 3 ? LEVEL_CAP : 255)),
       as(90002, 'Past the Cap', (c) => (c === 3 ? LEVEL_CAP + 1 : c === 5 ? 65 : 255)),
       as(90003, 'Past the Cap Too', (c) => (c === 3 ? LEVEL_CAP + 1 : c === 5 ? 65 : 255)),
-      as(90004, 'An Item Effect', () => 255)
+      as(90004, 'An Item Effect', () => 255),
+      // An ability granted outside the spell book: 254 for the class, no level.
+      as(90005, 'An Ability', (c) => (c === 3 ? 254 : 255))
     ].join(NL)
     const book = SpellBook.parse(text, strings())
-    expect([...book.all()].map((s) => s.name)).toEqual(['At the Cap', 'An Item Effect'])
+    expect([...book.all()].map((s) => s.name)).toEqual(['At the Cap', 'An Item Effect', 'An Ability'])
     expect(book.get(90002)).toBeUndefined()
+  })
+
+  it('times Harm Touch X from its own ability row, not an NPC’s Harm Touch at rank ten', () => {
+    // Rows 88 (the shadowknight's Harm Touch, an ability: 254), 13540 (Harm Touch X, 254, six ticks) and
+    // 17042 (an NPC's Harm Touch, every class 255, six ticks). Dropping the ability rows (LT-215) sent
+    // "Harm Touch X" to the NPC row at rank 10, nine ticks with the DoT tier bonus: 54 s for a 36 s spell.
+    const book = fixtureBook()
+    expect(book.resolve('Harm Touch X')).toMatchObject({ spell: { id: 13540, formula: 6, cap: 6 }, rank: 0 })
+    // The name alone is the class's ability, over the NPC's row of the same name.
+    expect(book.resolve('Harm Touch')?.spell.id).toBe(88)
+    expect(book.get(17042)?.name).toBe('Harm Touch')
   })
 
   it('holds identical class levels and effects once', () => {

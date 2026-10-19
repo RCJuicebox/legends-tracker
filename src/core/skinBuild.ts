@@ -1,3 +1,5 @@
+import { parseJson } from './json'
+
 // A UI skin can ask for a rebuild button. A skin made by a script (one that sizes its windows from
 // the inventory export, say) leaves a file in its folder naming the command that rebuilds it:
 //
@@ -151,7 +153,7 @@ export function parseSkinBuild(skin: string, text: string): SkinBuild | null {
   if (!isSkinName(skin)) return null
   let data: unknown
   try {
-    data = JSON.parse(text)
+    data = parseJson(text)
   } catch {
     return null
   }

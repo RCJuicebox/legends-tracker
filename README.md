@@ -104,8 +104,9 @@ tells you little.
   process. It also gives the main process's JavaScript heap.
 - **The log** (`main.log` in the log folder) records the spell data's load on each start, for
   example `Spell data: 41472 spells in 250 ms; the heap grew 40 MB reading it`. That is the
-  largest thing the app reads; about 23 MB of it stays once the garbage is collected (the 32,000
-  spells no class gets by level 50 are left out). Every five
+  largest thing the app reads; about 23 MB of it stays once the garbage is collected (the spells
+  no class gets by level 50 are left out; abilities granted outside the spell book, Harm Touch
+  among them, stay). Every five
   minutes of fighting it also records the damage meter's push, what goes to the windows twice a
   second (`Meter push: 13 KB, 40 in the session, 10 fights kept`): the fight in hand and every
   fight's and session's totals. The open session goes whole only to a page showing it.
@@ -295,8 +296,8 @@ Every spell you cast is tracked automatically. No trigger needed.
 **Anyone's casts.** A spell's settings can time other players' casts of it too (Harm Touch: a mob
 carries one at a time, so nobody should cast over another's). Their `Name begins casting X.` and the
 landing text, or their ticks (`… has taken N damage from X by Name.`), start the same bar as yours
-would, with their name on it, and the app says who cast it and how long to hold ("Rathor cast Harm
-Touch on a forsaken revenant, do not cast for 54 seconds"; the words are a setting). Its end is
+would, with their name on it, and the app says who cast it and how long to hold ("Fenwick cast Harm
+Touch on a forsaken revenant, do not cast for 36 seconds"; the words are a setting). Its end is
 exact once it ticks, and the usual fade announcement says when it is clear. No "Recast" is said of
 someone else's cast unless the spell has its own warning words. A caster is taken to be a player
 when the log names them in one word.

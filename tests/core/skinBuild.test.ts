@@ -16,6 +16,10 @@ describe('parseSkinBuild', () => {
     })
   })
 
+  it('reads a file written with a byte-order mark, as PowerShell writes them', () => {
+    expect(parseSkinBuild('MySkin', '﻿' + file({ command: [PY] }))?.command).toEqual([PY])
+  })
+
   it('names the button after the skin when the file gives no label', () => {
     expect(parseSkinBuild('MySkin', file({ command: [PY] }))?.label).toBe('Rebuild MySkin')
     expect(parseSkinBuild('MySkin', file({ label: '   ', command: [PY] }))?.label).toBe('Rebuild MySkin')
