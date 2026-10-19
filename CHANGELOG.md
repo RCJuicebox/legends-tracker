@@ -2,7 +2,7 @@
 
 What changed in each version. The release workflow publishes a version's section as its release notes, and installed copies show them when an update arrives.
 
-## Unreleased
+## 2.15.1 (2026-10-19)
 
 - **Electron 44.9,** with Chromium 152.0.7977.167 and its security fixes. The app is now built with Vite 8.
 
