@@ -80,8 +80,15 @@ export function Options({
             {a.line && a.kind === 'quest' && <div className="faint small">“{a.line}”</div>}
             <div className="row tight">
               <span className="faint small">
-                {sourceNote(a)}; {o.rateFrom === 'yours' ? 'your pace' : o.rateFrom === 'log' ? 'the pace from your log' : 'an estimated pace'}, {duration(o.unitSeconds)} a{' '}
-                {a.kind === 'kill' ? 'kill' : 'hand-in'}
+                {sourceNote(a)};{' '}
+                {o.rateFrom === 'yours'
+                  ? 'your pace'
+                  : o.rateFrom === 'log'
+                    ? 'the pace from your log'
+                    : o.rateFrom === 'zone'
+                      ? 'your usual pace in the zone'
+                      : 'an estimated pace'}
+                , {duration(o.unitSeconds)} a {a.kind === 'kill' ? 'kill' : 'hand-in'}
                 {a.once ? `; once only? ${a.once}` : ''}
                 {a.blocked ? `; ${a.blocked}` : ''}
                 {a.note ? `; ${a.note}` : ''}

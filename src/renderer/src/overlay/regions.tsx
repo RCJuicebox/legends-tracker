@@ -379,8 +379,25 @@ function AchievementsRegion({ config, track, arranging }: { config: OverlayConfi
         </div>
       </div>
     )
+  const here = config.achievements?.alsoHere === false ? undefined : track?.here
   return (
     <div className="ach-ov" style={style}>
+      {here && (
+        <section className="ach-ov-here">
+          <div className="ach-ov-head">
+            <span>Also here</span>
+            <span className="ach-ov-faint">
+              {here.zone}
+              {here.seconds > 0 ? ` · ≈ ${duration(here.seconds)}` : ''}
+            </span>
+          </div>
+          {here.parts.slice(0, 4).map((p) => (
+            <div key={`${p.planner}|${p.title}`} className="ach-ov-line" title={p.title}>
+              {p.title}
+            </div>
+          ))}
+        </section>
+      )}
       {tracked.length > 0 && (
         <section className="ach-ov-tracked">
           <div className="ach-ov-head">

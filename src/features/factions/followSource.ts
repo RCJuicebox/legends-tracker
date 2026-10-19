@@ -5,6 +5,7 @@ import { log } from '../../main/log'
 import { JsonFile, readJsonFile } from '../../main/storeCore'
 import { carryFollow, freshFollow, pickStep, readFollow, sanitizeFollows, sayStep, type FollowEvent, type FollowedPlan, type FollowState } from './tracker'
 import { newerBuildWrote } from '../../main/schema'
+import type { RoutePart } from '../../core/route'
 
 // The faction plan the player follows, as the game is played: the Plan tab hands the plan over
 // (factions:follow), the standings are read a moment after each faction line, and the step the plan is
@@ -66,6 +67,22 @@ export class FactionFollow {
   /** The view, when it is the character's. */
   viewFor_(character: string): FactionTrackView | null {
     return this.viewFor === character ? this.view : null
+  }
+
+  /**
+   * The steps of the plan the character follows not done yet, as one zone view puts them (FEAT-031):
+   * from the step being worked on, each with its zone and about how long it takes there.
+   */
+  stepsLeft(character: string): RoutePart[] {
+    const f = this.follows.get()[character]
+    if (!f) return []
+    const from = this.viewFor === character ? (this.view?.current?.index ?? f.plan.steps.length) : 0
+    return f.plan.steps.slice(from).map((s, i) => ({
+      planner: 'faction' as const,
+      zone: s.zone,
+      title: `Faction step ${from + i + 1}: ${s.title}`,
+      seconds: s.units * s.unitSec + (s.travelSec ?? 0)
+    }))
   }
 
   /** The factions the plan the character follows is raising (its steps' hits), for Plan › Slayer's faction costs; none without a plan. */

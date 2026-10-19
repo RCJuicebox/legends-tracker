@@ -51,10 +51,37 @@ export interface SpawnLink {
   names: string[]
 }
 
-/** The shortest gap that could be a respawn, in seconds; null before any. */
+/** Gaps a record's estimate can go by: past SHARED_SEC, and with three or more, none under half their median (LT-736). */
+function trustedGaps(gaps: readonly number[]): { kept: number[]; dropped: number } {
+  const real = gaps.filter((g) => g >= SHARED_SEC)
+  if (real.length < 3) return { kept: real, dropped: 0 }
+  const sorted = [...real].sort((a, b) => a - b)
+  const mid = sorted.length / 2
+  const median = sorted.length % 2 ? sorted[Math.floor(mid)] : (sorted[mid - 1] + sorted[mid]) / 2
+  // One of the name wandering past 45 s after a kill is not a 45-second respawn.
+  const kept = real.filter((g) => g >= median / 2)
+  return { kept, dropped: real.length - kept.length }
+}
+
+/** The shortest gap that could be a respawn, in seconds; null before any. A gap far under the rest is left out (LT-736). */
 export function respawnEstimate(r: Pick<RespawnRecord, 'gaps'>): number | null {
-  const real = r.gaps.filter((g) => g >= SHARED_SEC)
-  return real.length ? Math.min(...real) : null
+  const { kept } = trustedGaps(r.gaps)
+  return kept.length ? Math.min(...kept) : null
+}
+
+/** How many of a record's gaps its estimate leaves out as too short to be a respawn. */
+export function respawnDropped(r: Pick<RespawnRecord, 'gaps'>): number {
+  return trustedGaps(r.gaps).dropped
+}
+
+/**
+ * What else says how long a mob takes, where its record does not: the spawn tables' timer for it in
+ * Legends' terms (its own, timed, or classic's), and the zone's median of the timers the records make
+ * (LT-736). Main hands it in from the Slayer tables.
+ */
+export interface RespawnFallback {
+  mob: { seconds: number; from: 'timed' | 'zone' | 'classic' } | null
+  zone: number | null
 }
 
 export interface RespawnHooks {
@@ -355,6 +382,17 @@ export interface RespawnRow extends RespawnRecord {
   estimate: number | null
   /** The timer made for this name, wherever it was killed; null when there is none. */
   timer: RespawnTimerInfo | null
+  /** Gaps the estimate leaves out as far too short: another of the name wandering past (LT-736). */
+  dropped?: number
+  /** The spawn tables' timer for it, in Legends' terms, where they have it. */
+  tables?: RespawnFallback['mob'] & {}
+  /** The middle of the zone's timers the records make. */
+  zoneTimer?: number
+}
+
+/** How long a row's mob takes, best first: your timer, what the log timed, the tables', the zone's; null when nothing says. */
+export function respawnLength(r: Pick<RespawnRow, 'timer' | 'estimate' | 'tables' | 'zoneTimer'>): number | null {
+  return r.timer?.seconds ?? r.estimate ?? r.tables?.seconds ?? r.zoneTimer ?? null
 }
 
 /** What the Respawns page shows: every record, most recent death first, and the zone you are in. */
@@ -393,7 +431,12 @@ export function mergeRespawns(had: RespawnView | null, next: RespawnView): Respa
   return { zone: next.zone, rows }
 }
 
-export function respawnView(records: RespawnRecords, triggers: Trigger[], zone: string): RespawnView {
+export function respawnView(
+  records: RespawnRecords,
+  triggers: Trigger[],
+  zone: string,
+  fallback: (zone: string, name: string) => RespawnFallback | null = () => null
+): RespawnView {
   const mine = triggers.filter((t) => t.id.startsWith('respawn-'))
   const timers = new Map(mine.map((t) => [t.id, respawnTimerOf(t)]))
   const rows = Object.entries(records)
@@ -403,7 +446,8 @@ export function respawnView(records: RespawnRecords, triggers: Trigger[], zone: 
       ...(r.names ? { names: [...r.names] } : {}),
       key,
       estimate: respawnEstimate(r),
-      timer: timers.get(respawnTriggerId(r.name)) ?? null
+      timer: timers.get(respawnTriggerId(r.name)) ?? null,
+      ...withFallback(r, fallback)
     }))
     .sort((a, b) => b.lastDeath - a.lastDeath)
   // A timer added by name, for a mob not killed since: listed so it can be changed here too.
@@ -414,6 +458,13 @@ export function respawnView(records: RespawnRecords, triggers: Trigger[], zone: 
     rows.push({ zone: '', name: a.name, kills: 0, lastDeath: 0, pendingSince: 0, gaps: [], shared: false, key: `timer|${t.id}`, estimate: null, timer: respawnTimerOf(t) })
   }
   return { zone, rows }
+}
+
+/** A row's dropped gaps and what else times it, left off when there is nothing to say. */
+function withFallback(r: RespawnRecord, fallback: (zone: string, name: string) => RespawnFallback | null): Pick<RespawnRow, 'dropped' | 'tables' | 'zoneTimer'> {
+  const dropped = respawnDropped(r)
+  const f = fallback(r.zone, r.name)
+  return { ...(dropped ? { dropped } : {}), ...(f?.mob ? { tables: f.mob } : {}), ...(f?.zone ? { zoneTimer: f.zone } : {}) }
 }
 
 function respawnTimerOf(t: Trigger): RespawnTimerInfo | null {

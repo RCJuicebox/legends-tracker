@@ -761,6 +761,15 @@ describe("eqlwiki's word on a camp's named mobs", () => {
     expect(unitTime(pass[1], DEFAULT_SETTINGS).seconds).toBeCloseTo(1200)
   })
 
+  it('puts a camp the log has not measured at your pace in its zone, from the Slayer history (LT-734)', () => {
+    const pass = camps(buildCatalog(input({ npcs, zonePace: { [zoneKey('Test Pass')]: 30 } }))).filter((a) => a.zone === 'Test Pass')
+    expect(pass[1].zonePace).toBe(30)
+    // Toll: one named at the assumed 20 minutes is 3 an hour, under your 30 in the zone; the named's respawn still holds it.
+    expect(unitTime(pass[1], DEFAULT_SETTINGS)).toMatchObject({ seconds: 1200, from: 'zone' })
+    const common: PlanActivity = { ...pass[1], common: 2, named: 0 }
+    expect(unitTime(common, DEFAULT_SETTINGS)).toMatchObject({ seconds: 120, from: 'zone' })
+  })
+
   it('never averages a named mob into the common mobs of its zone (LT-505)', () => {
     // Allakhazam: a courier at +40 and a priestess at +400 raise the same faction in one zone. One camp
     // would have 13 courier kills give 1,950 where they give 520.

@@ -564,6 +564,30 @@ export class Engine {
 
   // ---- output ----
 
+  /**
+   * A countdown a feature starts, as a trigger's timer would run (FEAT-038: a wanted Hunter named's
+   * respawn). Started again from now if one of `key` runs; `endSpeech` said when it ends.
+   */
+  startTimer(t: { key: string; label: string; seconds: number; overlay: string; color: string; warnSec: number; warnSpeech: string; endSpeech: string; at: number }): void {
+    this.board.upsert({
+      key: t.key,
+      id: this.board.get(t.key)?.id ?? this.board.nextId(),
+      label: t.label,
+      target: '',
+      source: 'trigger',
+      color: t.color,
+      overlay: t.overlay,
+      startedAt: t.at,
+      endsAt: t.at + t.seconds * 1000,
+      exact: true,
+      warnSec: t.warnSec,
+      onWarn: t.warnSpeech ? [{ kind: 'speak', text: t.warnSpeech, interrupt: false }] : [],
+      onExpire: t.endSpeech ? [{ kind: 'speak', text: t.endSpeech, interrupt: false }] : [],
+      warned: false,
+      graceMs: 0
+    })
+  }
+
   /** Alerts, speech and sounds, as a trigger's would go: muting and the settings apply. */
   notify(ns: Notification[]): void {
     this.notifier.notify(ns)

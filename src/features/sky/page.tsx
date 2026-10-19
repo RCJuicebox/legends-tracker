@@ -154,7 +154,7 @@ export function Sky() {
           ) : view === 'wishes' ? (
             <Wishes s={s} from={counted} onWant={act.want} onHave={act.have} />
           ) : view === 'targets' ? (
-            <Targets views={views} shown={shown} />
+            <Targets views={views} shown={shown} respawns={s.respawns} />
           ) : view === 'items' ? (
             <>
               <div className="card row mb-16">

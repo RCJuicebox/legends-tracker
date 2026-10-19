@@ -190,6 +190,17 @@ export function Overlays() {
                     Show the Hunter named in your zone
                     <span className="faint small">the named each Hunter achievement of the zone you are in still wants; the same switch is on the Hunter page</span>
                   </label>
+                  <label className="row">
+                    <Switch
+                      on={(o.achievements ?? DEFAULT_ACHIEVEMENT_OPTIONS).alsoHere ?? true}
+                      onChange={(v) => update(o.id, { achievements: { ...DEFAULT_ACHIEVEMENT_OPTIONS, ...o.achievements, alsoHere: v } })}
+                      label="Show what the planners want in your zone"
+                    />
+                    Show &ldquo;Also here&rdquo;
+                    <span className="faint small">
+                      where the faction plan, the Slayer plan and the Hunter achievements meet in the zone you are in, one block saying what each wants there
+                    </span>
+                  </label>
                   <div className="row small">
                     <span>The Slayer plan’s step</span>
                     <span className="faint small">is turned on for each character on its own, with On the overlay at the top of</span>

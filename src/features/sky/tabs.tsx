@@ -185,7 +185,7 @@ export function Items({ s, filter, onHave }: { s: SkyState; filter: string; onHa
 type TargetScope = 'shown' | 'open' | 'wishes'
 
 /** Where to hunt: each mob, and what it drops that the Tests in scope are missing. */
-export function Targets({ views, shown }: { views: readonly QuestView[]; shown: readonly QuestView[] }) {
+export function Targets({ views, shown, respawns }: { views: readonly QuestView[]; shown: readonly QuestView[]; respawns: Readonly<Record<string, string>> }) {
   const [scope, setScope] = useState<TargetScope>('shown')
   const list = useMemo(() => {
     const pick = scope === 'shown' ? shown : scope === 'wishes' ? views.filter((v) => v.want > 0 && v.times > 0 && !v.ignored) : views.filter((v) => !v.ignored && !v.turnIn.any)
@@ -215,6 +215,12 @@ export function Targets({ views, shown }: { views: readonly QuestView[]; shown: 
               <h2>
                 {t.mob}
                 {t.island ? <span className="faint small"> Island {t.island}</span> : null}
+                {respawns[t.mob] && (
+                  <span className="faint small" title="What your Respawns records say of it">
+                    {' '}
+                    · {respawns[t.mob]}
+                  </span>
+                )}
                 <span className="spacer" />
                 <span className="faint small">
                   {t.items.length} item{t.items.length === 1 ? '' : 's'}

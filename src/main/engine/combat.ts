@@ -3,7 +3,7 @@ import { createReadStream } from 'node:fs'
 import { zoneEntered, type LogLine } from '../../core/logLine'
 import { CombatMeter, SAME_NAME_MS, summarize as summarizeFight } from '../../core/combatMeter'
 import { LootLedger } from '../../core/loot'
-import { RespawnLog, respawnView, type RespawnView } from '../../core/respawns'
+import { RespawnLog, respawnView, type RespawnFallback, type RespawnView } from '../../core/respawns'
 import { deathText, durationSec } from '../../core/combatView'
 import { skillUp } from '../../core/skillAchievements'
 import { readLines } from '../../core/logReading'
@@ -44,6 +44,8 @@ export class CombatFeed implements EngineFeature {
   /** How long mobs take to respawn, from kills and sightings. */
   readonly respawns: RespawnLog
   readonly backlog = new Backlog<LogLine>()
+  /** What the spawn tables say of a mob's respawn where its record says nothing (LT-736): the Slayer feature sets it. */
+  respawnFallback: ((zone: string, name: string) => RespawnFallback | null) | undefined
   private readonly combatOut: Throttled
   private readonly lootOut: Throttled
   private readonly respawnsOut: Throttled
@@ -251,7 +253,7 @@ export class CombatFeed implements EngineFeature {
   }
 
   respawnView(): RespawnView {
-    return respawnView(this.respawns.records, this.store.triggers.get(), this.hooks.zone())
+    return respawnView(this.respawns.records, this.store.triggers.get(), this.hooks.zone(), this.respawnFallback)
   }
 
   lootView(): LootView {

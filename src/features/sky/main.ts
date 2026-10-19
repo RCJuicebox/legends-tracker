@@ -1,5 +1,6 @@
 import { join } from 'node:path'
 import { isCharacterKey } from '../../core/validate'
+import { seenFromRecords } from '../../core/respawnSeen'
 import { itemKey } from '../../core/inventory'
 import { handle } from '../../main/ipc/handle'
 import { JsonFile, readJsonFile } from '../../main/storeCore'
@@ -18,12 +19,15 @@ import {
   readSkyLine,
   sanitizeSkyCharacter,
   skyAchieved,
+  skyMobs,
   SKY_NAMES,
   type SkyCharacter,
   type SkyState,
   type SkyTally
 } from './core'
 
+/** The zone as the log names it, for the Respawns records. */
+const SKY_ZONE = 'The Plane of Sky'
 // Plan › Plane of Sky's side of the app (an optional module): the Sky's items counted over each
 // character's logs (a LogHistory consumer), the inventory and achievements exports as the game last
 // wrote them, and what the player keeps per character in sky.json: the wish list, the Tests starred
@@ -149,7 +153,19 @@ export class SkyTracker implements AppFeature {
       runs: t.runs,
       classes: Object.keys(record?.classLevels ?? {}),
       exported: inv ? { file: inv.file, modified: inv.modified, counts: exportCounts(inv.inventory) } : null,
-      achieved: ach ? skyAchieved(ach.sections, ach.modified) : null
+      achieved: ach ? skyAchieved(ach.sections, ach.modified) : null,
+      respawns: this.respawns(ctx)
     }
+  }
+
+  /** What the Respawns records say of each Sky mob a Test's item drops from (LT-735). */
+  private respawns(ctx: AppContext): Record<string, string> {
+    const seenOf = seenFromRecords(ctx.store.respawns?.get() ?? {}, Date.now())
+    const out: Record<string, string> = {}
+    for (const mob of skyMobs()) {
+      const s = seenOf(SKY_ZONE, mob, undefined)
+      if (s) out[mob] = s.text
+    }
+    return out
   }
 }

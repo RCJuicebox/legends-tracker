@@ -10,10 +10,12 @@ import { RaceSayer } from '../../../features/slayer/RaceSayer'
 import type { SlayerStepHint } from './AchievementRows'
 import { showError, showToast } from '../toast'
 import { Ago, FilterBox, GameCommand, Pending } from '../components/ui'
-import { numExact as num, who } from '../../../core/format'
+import { duration, numExact as num, who } from '../../../core/format'
+import type { RoutePlanner, RouteZone } from '../../../core/route'
 import { AchievementBook, norm, secKey, type AchMarks, type AchRef, type ObjRef } from '../../../core/achievements'
 import type { AchievementsView } from '../../../shared/types'
 import { SectionView, SearchResults, TrackedBar } from './AchievementRows'
+import { Progress } from './AchievementProgress'
 
 /** Open and closed blocks are remembered by name; at most this many, the newest kept. */
 const OPEN_KEEP = 1000
@@ -256,6 +258,9 @@ export function Achievements() {
         </div>
       </div>
 
+      {track?.route && track.character.toLowerCase() === view.character.toLowerCase() && <Tonight route={track.route} />}
+      <Progress character={view.character} />
+
       {/* Tabs, as every other page's views are: one Tab stop, the arrows between them (LT-697). */}
       <div className="ach-tabs" role="tablist" aria-label="Category">
         {cats.map((c, i) => {
@@ -384,5 +389,48 @@ export function Achievements() {
         there. Your ticks are kept when the game writes a new export.
       </p>
     </div>
+  )
+}
+
+const PLANNER: Record<RoutePlanner, string> = { faction: 'Faction plan', slayer: 'Slayer', hunter: 'Hunter' }
+
+/**
+ * Where to go tonight (FEAT-031): the zones the faction plan you follow, the Slayer plan on your
+ * overlay and the open Hunter achievements want, the zones more of them want first, with what each
+ * wants there and about how long. Each planner keeps its own order: this is where they meet.
+ */
+function Tonight({ route }: { route: RouteZone[] }) {
+  const [open, setOpen] = useRemembered('ach.tonight', false)
+  const shared = route.filter((z) => z.planners > 1).length
+  return (
+    <details className="card mb-16" open={open} onToggle={(e) => setOpen((e.currentTarget as HTMLDetailsElement).open)}>
+      <summary>
+        <b>Where to go</b>{' '}
+        <span className="faint small">
+          {route.length} zone{route.length === 1 ? '' : 's'} your plans want{shared ? `, ${shared} by more than one` : ''}
+        </span>
+      </summary>
+      <table className="table mt-8">
+        <tbody>
+          {route.map((z) => (
+            <tr key={z.zone}>
+              <td className="nowrap">
+                <b>{z.zone}</b>
+                {z.planners > 1 && <span className="chip ok small">{z.planners} plans</span>}
+              </td>
+              <td className="small">
+                {z.parts.slice(0, 4).map((p) => (
+                  <div key={`${p.planner}|${p.title}`}>
+                    <span className="faint">{PLANNER[p.planner]}</span> · {p.title}
+                  </div>
+                ))}
+                {z.parts.length > 4 && <div className="faint">+{z.parts.length - 4} more</div>}
+              </td>
+              <td className="mono nowrap faint">{z.seconds > 0 ? `≈ ${duration(z.seconds)}` : ''}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </details>
   )
 }

@@ -28,9 +28,10 @@ export interface AchievementsExport {
  */
 export class AchievementFiles {
   private readonly watch: ExportWatch
-  /** Each export read, by path, kept while the file is unchanged. */
   /** The exports read, by path, once a write (exportFiles.ts). */
   private readonly read = new SettledReads((text) => parseAchievements(text).sections)
+  /** Told each export read, for the snapshots kept over time (FEAT-032); the context sets it. */
+  onRead: (character: string, sections: AchSection[], modified: number) => void = () => {}
 
   constructor(
     /** The app's data folder (userData): the player's marks go in its achievements folder. */
@@ -92,6 +93,7 @@ export class AchievementFiles {
     // cut-off Progression section's tail as done (LT-417); read once a write (exportFiles.ts).
     try {
       const { modified, value } = await this.read.read(path)
+      this.onRead(character, value, modified)
       return { file, modified, sections: value }
     } catch (e) {
       if ((e as NodeJS.ErrnoException).code === 'ENOENT') return null

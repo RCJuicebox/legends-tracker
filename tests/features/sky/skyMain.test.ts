@@ -38,7 +38,16 @@ const item = (location: string, name: string, count = 1) => ({ location, name, i
 /** The exports, as the game wrote them: none until a test gives one. */
 const exports: { inventory: unknown; achievements: unknown } = { inventory: null, achievements: null }
 const ctx = {
-  store: { dir: h.dir, settings: { get: () => ({ characters: { Kelwyn_neriak: { level: 50, classLevels: { Monk: 50 }, focusSources: [] } } }) } },
+  store: {
+    dir: h.dir,
+    settings: { get: () => ({ characters: { Kelwyn_neriak: { level: 50, classLevels: { Monk: 50 }, focusSources: [] } } }) },
+    // One Sky named the Respawns records saw die and come back (LT-735).
+    respawns: {
+      get: () => ({
+        'the plane of sky|noble dojorn': { zone: 'The Plane of Sky', name: 'Noble Dojorn', kills: 2, lastDeath: Date.now() - 40 * 60_000, pendingSince: 0, gaps: [], shared: false }
+      })
+    }
+  },
   historyOf: (c: string) => ({ logPath: join(logs, `eqlog_${c}.txt`), archiveDir: join(logs, 'Archive'), stem: `eqlog_${c}` }),
   inventoryFiles: { exported: async () => exports.inventory },
   achievementFiles: { exported: async () => exports.achievements }
@@ -56,6 +65,7 @@ describe('the Plane of Sky page', () => {
     expect(s.runs[FISTS]).toHaveLength(1)
     expect(s.classes).toEqual(['Monk'])
     expect(s.wishes).toEqual([])
+    expect(s.respawns).toEqual({ 'Noble Dojorn': 'died 40 min ago, seen since' })
   })
 
   it('keeps a wish, changes how many times it is wanted, and drops it at none', async () => {

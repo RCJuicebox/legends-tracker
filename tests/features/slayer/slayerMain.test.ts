@@ -262,7 +262,7 @@ describe('the Slayer page', () => {
     expect(data.zones.map((z: { zone: string; left: { name: string }[]; total: number }) => [z.zone, z.left.map((n) => n.name), z.total])).toEqual([
       ['Clan Crushbone', ['Ambassador DVinn'], 2]
     ])
-    expect(await call('hunter:plan', 'Aldric_neriak')).toEqual({ character: 'Aldric_neriak', export: null, zones: [], broken: [] })
+    expect(await call('hunter:plan', 'Aldric_neriak')).toEqual({ character: 'Aldric_neriak', export: null, zones: [], broken: [], autoTimers: false })
     await expect(call('hunter:plan', '../x')).rejects.toThrow()
     // Said not to work: out of Plan › Hunter and the Slayer plan's steps, for every character, until it works again.
     expect(await call('hunter:broken', 'Hunter of Clan Crushbone', true)).toEqual(['Hunter of Clan Crushbone'])

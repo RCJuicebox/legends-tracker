@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import { parseAchievements } from '../../../src/core/achievements'
-import { hunterHere, hunterLive, hunterMatch, hunterZones, namedWait, seenFromRecords, seenText } from '../../../src/features/hunter/core'
+import { hunterHere, hunterLive, hunterMatch, hunterZones, namedWait } from '../../../src/features/hunter/core'
+import { seenFromRecords, seenOf } from '../../../src/core/respawnSeen'
+
+const seenText = (...a: Parameters<typeof seenOf>) => seenOf(...a)?.text
 import type { MobSpawn } from '../../../src/features/slayer/spawns'
 
 // Plan › Hunter: the named each Hunter achievement still wants, with what the spawn tables say of
@@ -125,8 +128,8 @@ describe('Plan › Hunter: what the Respawns records say of a named (LT-670)', (
       }
     }
     const seenOf = seenFromRecords(records, now)
-    expect(seenOf('Befallen 2 (Adaptive)', 'Andrew Pine', 600)).toBe('died 6 min ago; back in ~2 min as you timed it')
-    expect(seenOf('Befallen', 'Skeletal Orc', 600)).toBe('died 2 min ago, seen since')
+    expect(seenOf('Befallen 2 (Adaptive)', 'Andrew Pine', 600)).toEqual({ text: 'died 6 min ago; back in ~2 min as you timed it', dueIn: 120 })
+    expect(seenOf('Befallen', 'Skeletal Orc', 600)).toEqual({ text: 'died 2 min ago, seen since', dueIn: 0 })
     expect(seenOf('Befallen', 'Nobody', 600)).toBeUndefined()
     const zones = hunterZones(
       sections,
@@ -143,6 +146,25 @@ describe('Plan › Hunter: what the Respawns records say of a named (LT-670)', (
     // The orc is always up: it waits nothing, and the zone takes as long as Andrew Pine.
     expect(befallen.left[0].wait).toBe(0)
     expect(befallen.wait).toBe(2400)
+    // The orc is up, so the zone is due now.
+    expect(befallen.dueIn).toBe(0)
+  })
+
+  it('sinks a zone whose every named left is down until it is due, whatever its wait (LT-733)', () => {
+    const two = parseAchievements(['EverQuest: Hunter', 'I\tHunter of Befallen', 'I\t\tAndrew Pine', 'I\tHunter of The Ocean of Tears', 'I\t\tBoog Mudtoe'].join('\n')).sections
+    // The Ocean of Tears is quicker by the tables, but Boog died two minutes ago.
+    const down = (zone: string) => (zone === 'The Ocean of Tears' ? { text: 'died 2 min ago; back in ~22 min by the tables', dueIn: 22 * 60 } : undefined)
+    const zones = hunterZones(
+      two,
+      () => 0,
+      0,
+      (zone) => TABLES[zone.toLowerCase()] ?? null,
+      down
+    )
+    expect(zones.map((z) => [z.zone, z.dueIn])).toEqual([
+      ['Befallen', 0],
+      ['The Ocean of Tears', 22 * 60]
+    ])
   })
 })
 

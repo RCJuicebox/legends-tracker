@@ -7,6 +7,7 @@ import { parseFactionLine } from '../features/factions/core'
 import { FACTION_SECTION } from '../features/factions/followSource'
 import type { AchievementTrack, SkillRow, SkillTrackView, SlayerPlanTrackView, TrackedAchievement, PlayerLocation } from '../shared/tracking'
 import { paceNow, planSlayer, slayerPlanView } from '../features/slayer/core'
+import { routeByZone, routeHere, type RoutePart } from '../core/route'
 import type { AchievementsExport } from './achievements'
 import type { AppContext } from './context'
 import type { AppFeature, TrackContext } from './appFeature'
@@ -61,6 +62,9 @@ export class LiveAchievements implements AppFeature {
   /** When the Slayer plan was last asked to be made again (a zone entered, the choices changed), 0 when made since. */
   private planAt = 0
   private slayerPlan: SlayerPlanTrackView | null = null
+  /** Plan › Slayer's steps and the open Hunter achievements, as one zone view puts them (FEAT-031). */
+  private slayerParts: RoutePart[] = []
+  private hunterParts: RoutePart[] = []
   /** The achievements export as last read, by character and when it was written. */
   private exported: (AchievementsExport & { character: string }) | null = null
   /** The player's marks on the Achievements page: hand ticks, and the achievements tracked. */
@@ -151,6 +155,8 @@ export class LiveAchievements implements AppFeature {
       this.skills = null
       this.visits = null
       this.slayerPlan = null
+      this.slayerParts = []
+      this.hunterParts = []
       this.marks = null
       this.moved = {}
       this.sweptAt = 0
@@ -235,6 +241,8 @@ export class LiveAchievements implements AppFeature {
   private async readSlayer(character: string): Promise<void> {
     await this.achievementsExport(character)
     await this.ctx.slayer?.live?.read(character)
+    // The Hunter named left move with the kills too: the zone view's Hunter part (FEAT-031).
+    this.hunterParts = (await this.ctx.hunter?.routeParts(this.ctx, character).catch(() => null)) ?? []
   }
 
   /**
@@ -255,7 +263,14 @@ export class LiveAchievements implements AppFeature {
       return r ? { ...g, count: r.done ? g.max : Math.min(g.max, r.count + r.since) } : g
     })
     const before = this.slayerPlan
-    const plan = slayerPlanView(planSlayer({ ...got.data, goals }, got.choices), goals, got.choices, this.zone)
+    const made = planSlayer({ ...got.data, goals }, got.choices)
+    this.slayerParts = made.steps.map((st, i) => ({
+      planner: 'slayer' as const,
+      zone: st.camp.zone,
+      title: `Slayer step ${i + 1}: ${st.focus.map((g) => goals[g].name).join(', ')}`,
+      seconds: st.seconds
+    }))
+    const plan = slayerPlanView(made, goals, got.choices, this.zone)
     // While killing at the step here: its time at the pace of the last twenty minutes (FEAT-022).
     const now = plan.current?.here ? paceNow(plan.current, live?.kills(character), Date.now()) : undefined
     this.slayerPlan = now && plan.current ? { ...plan, current: { ...plan.current, now } } : plan
@@ -422,7 +437,11 @@ export class LiveAchievements implements AppFeature {
       visited: this.visitedSinceExport()
     }
     for (const f of this.ctx.features ?? []) if (f !== this && f.track) Object.assign(track, f.track(at))
-    const key = JSON.stringify([track.character, track.faction, track.slayer, track.skills, track.hunter, track.slayerPlan, track.tracked, track.visited])
+    const route = routeByZone([...(this.ctx.factions?.follow?.stepsLeft(this.character) ?? []), ...(this.slayerPlan ? this.slayerParts : []), ...this.hunterParts])
+    if (route.length) track.route = route
+    const here = routeHere(route, this.zone)
+    if (here && here.planners > 1) track.here = here
+    const key = JSON.stringify([track.character, track.faction, track.slayer, track.skills, track.hunter, track.slayerPlan, track.tracked, track.visited, track.route, track.here])
     if (key === this.lastKey) return
     this.lastKey = key
     this.last = track

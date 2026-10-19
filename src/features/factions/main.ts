@@ -1,4 +1,5 @@
 import { LEGENDS_ZONES } from '../../shared/game/factions'
+import { localDay } from '../../core/dates'
 import { promises as fs, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { createHash } from 'node:crypto'
@@ -15,6 +16,7 @@ import {
   withCons,
   factionView,
   joinFactions,
+  parseFactionLine,
   parseFactionPageFull,
   parseFactionsExport,
   progressionStatus,
@@ -683,7 +685,9 @@ async function planData(ctx: AppContext, character: string, refresh: boolean, wi
     wide,
     // Allakhazam's pages, as far as they are read: the achievements' factions first, then the character's others.
     alla: await ctx.factions.alla.factions([...new Set([...targets.map((t) => t.faction), ...view.factions.map((r) => r.name)])]),
-    cons: await consFor(ctx, character, exported, view)
+    cons: await consFor(ctx, character, exported, view),
+    // Your pace in each zone you have hunted, for camps the log has not measured (LT-734).
+    zonePace: await ctx.slayer?.zonePaces(ctx, character).catch(() => undefined)
   }
   // What the wiki says of the items hand-ins want: a merchant, a drop, a recipe. Kept a week, like the Gear page's.
   const items = await ctx.inventoryFiles.lookup(itemsToLookUp(input))
@@ -806,6 +810,22 @@ async function otherCharacters(ctx: AppContext, character: string): Promise<{ ch
 /** The keys its consumers' values go under in log-history.json. */
 const HISTORY_KEY = 'factions'
 const CAUSES_KEY = 'factionSources'
+const DAYS_KEY = 'factionDays'
+
+/** Each day's faction moves, by faction: the net of the day (FEAT-032). */
+type FactionDays = Record<string, Record<string, number>>
+
+/** The standings' moves per day, as a LogHistory consumer. */
+const factionDaysConsumer: HistoryConsumer<FactionDays> = {
+  version: 1,
+  empty: () => ({}),
+  reader: () => (line, into) => {
+    const f = parseFactionLine(line.text)
+    if (!f || !('amount' in f)) return
+    const day = (into[localDay(line.time)] ??= {})
+    day[f.faction] = (day[f.faction] ?? 0) + f.amount
+  }
+}
 
 /**
  * The Factions page's side of the app, whole: what it counts over the logs, the pages it reads, its
@@ -814,7 +834,11 @@ const CAUSES_KEY = 'factionSources'
 export class Factions implements AppFeature {
   readonly id = 'factions'
   /** What it counts over each character's log and archives, under these names in log-history.json. */
-  static readonly consumers: Readonly<Record<string, HistoryConsumer<unknown>>> = { [HISTORY_KEY]: factionConsumer, [CAUSES_KEY]: factionSourceConsumer }
+  static readonly consumers: Readonly<Record<string, HistoryConsumer<unknown>>> = {
+    [HISTORY_KEY]: factionConsumer,
+    [CAUSES_KEY]: factionSourceConsumer,
+    [DAYS_KEY]: factionDaysConsumer
+  }
   /** Faction changes over the character's log and archives, for the Factions page. */
   readonly history: FactionHistory
   /** What caused each faction change, kill or hand-in, for the plan. */
@@ -831,7 +855,18 @@ export class Factions implements AppFeature {
     return new Factions(d.logHistory)
   }
 
-  constructor(logHistory: LogHistory) {
+  /** The standings' moves per day over the character's logs, by day then faction (FEAT-032). */
+  async daysMoved(where: HistoryWhere): Promise<FactionDays> {
+    const out: FactionDays = {}
+    for (const stretch of everyStretch(await this.logHistory.get<FactionDays>(DAYS_KEY, where)))
+      for (const [day, moves] of Object.entries(stretch)) {
+        const d = (out[day] ??= {})
+        for (const [faction, n] of Object.entries(moves)) d[faction] = (d[faction] ?? 0) + n
+      }
+    return out
+  }
+
+  constructor(private readonly logHistory: LogHistory) {
     this.history = new FactionHistory(logHistory, HISTORY_KEY, join(cacheDir(), 'faction-since.json'))
     this.causes = new FactionSourceHistory(logHistory, CAUSES_KEY)
   }

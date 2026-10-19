@@ -97,7 +97,8 @@ const data: SlayerPlanData = {
       ],
       total: 3,
       since: [],
-      wait: null
+      wait: null,
+      dueIn: 0
     }
   ]
 }

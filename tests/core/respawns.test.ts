@@ -5,6 +5,7 @@ import { compilePhrase } from '../../src/core/triggers'
 import {
   RespawnLog,
   respawnEstimate,
+  respawnLength,
   respawnKey,
   respawnPhrase,
   respawnTimerSpec,
@@ -354,5 +355,24 @@ describe('the Respawns push (LT-555)', () => {
     ])
     // A whole view replaces what the page had.
     expect(mergeRespawns(first, later)).toBe(later)
+  })
+})
+
+describe('an estimate one stray gap does not set (LT-736)', () => {
+  const rec = (gaps: number[]) => ({ zone: 'Befallen', name: 'A skeleton', kills: gaps.length + 1, lastDeath: 1, pendingSince: 0, gaps, shared: false })
+
+  it('leaves out a gap under half the rest once there are three, and says so on the row', () => {
+    // One of the name wandering past 45 s after a kill, against a six-minute respawn.
+    expect(respawnEstimate(rec([360, 45, 372, 365]))).toBe(360)
+    expect(respawnEstimate(rec([360, 45]))).toBe(45)
+    const view = respawnView({ k: rec([360, 45, 372, 365]) }, [], 'Befallen', () => ({ mob: { seconds: 400, from: 'classic' }, zone: 420 }))
+    expect(view.rows[0]).toMatchObject({ estimate: 360, dropped: 1, tables: { seconds: 400, from: 'classic' }, zoneTimer: 420 })
+  })
+
+  it("takes the tables' timer, then the zone's, where the record has no gap", () => {
+    expect(respawnLength({ timer: null, estimate: null, tables: { seconds: 400, from: 'classic' }, zoneTimer: 420 })).toBe(400)
+    expect(respawnLength({ timer: null, estimate: null, zoneTimer: 420 })).toBe(420)
+    expect(respawnLength({ timer: null, estimate: 360, zoneTimer: 420 })).toBe(360)
+    expect(respawnLength({ timer: null, estimate: null })).toBeNull()
   })
 })

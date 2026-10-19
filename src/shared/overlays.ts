@@ -5,7 +5,7 @@ import type { AchievementOverlayOptions, MeterOverlayOptions, OverlayConfig } fr
 
 export const DEFAULT_METER_OPTIONS: MeterOverlayOptions = { mode: 'damage', span: 'fight', scope: 'everyone', rows: 8, combinePet: true, header: true }
 
-export const DEFAULT_ACHIEVEMENT_OPTIONS: AchievementOverlayOptions = { factionPlan: true, hunter: true }
+export const DEFAULT_ACHIEVEMENT_OPTIONS: AchievementOverlayOptions = { factionPlan: true, hunter: true, alsoHere: true }
 
 /**
  * A new trigger's colours: a timer bar's and an alert's. Colours over the game, so one value for both

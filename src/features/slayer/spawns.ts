@@ -1,3 +1,4 @@
+import { mobKey } from '../../core/respawnSeen'
 import { respawnEstimate, type RespawnRecord } from '../../core/respawns'
 import { zoneKey } from '../../core/zones'
 import { LEGENDS_SPAWNS, type LegendsSpawn } from '../../shared/game/legendsSpawns'
@@ -37,12 +38,7 @@ export function zoneIndex(tables: SpawnTables): (zone: string) => string | null 
 }
 
 /** A mob's name as the tables and the log both have it: no article, no marks, lower-cased ("an orc pawn" and TAKP's "orc pawn"). */
-export const spawnKey = (name: string) =>
-  name
-    .toLowerCase()
-    .replace(/^[*#]+/, '')
-    .replace(/^(?:an?|the)\s+/, '')
-    .trim()
+export const spawnKey = mobKey
 const lower = spawnKey
 
 /**

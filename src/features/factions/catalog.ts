@@ -88,6 +88,8 @@ export interface PlanActivity {
   seen?: number
   /** Log: kills or hand-ins an hour while the player was at it. */
   measured?: number
+  /** Kill camps the log has not measured: your kills an hour in its zone, from the Slayer history (LT-734). */
+  zonePace?: number
   /** Kill camps: kinds of common mob, and named or single ones. */
   common?: number
   named?: number
@@ -183,6 +185,8 @@ export interface CatalogInput {
    * with none given, only ZONES_NOT_IN_PLAY is.
    */
   zonesInPlay?: string[]
+  /** The character's kills an hour in each zone it hunted a quarter hour, by zoneKey (LT-734): a camp's pace where the log has not measured the camp itself. */
+  zonePace?: Record<string, number>
 }
 
 export interface FactionCatalog {
@@ -1034,6 +1038,12 @@ export function buildCatalog(input: CatalogInput): FactionCatalog {
   wikiQuests(cx, loggedNpcs)
   playCycles(cx)
   const { activities, guesses, leftOut } = cx
+  // A camp the log has not measured goes at your pace in its zone, where you have one (LT-734).
+  if (input.zonePace)
+    for (const a of activities) {
+      const pace = a.kind === 'kill' && a.measured === undefined ? input.zonePace[zoneKey(a.zone)] : undefined
+      if (pace) a.zonePace = Math.round(clamp(pace, 10, 400))
+    }
   // The player's pace at killing things that move factions, over every zone with enough runs.
   const rates: number[] = []
   for (const z of Object.values(input.sources.zones)) if (z.runN >= 10 && z.runMs > 0) for (let i = 0; i < Math.min(z.runN, 200); i++) rates.push(z.runN / (z.runMs / 3_600_000))

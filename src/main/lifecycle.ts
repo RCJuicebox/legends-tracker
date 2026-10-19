@@ -177,7 +177,14 @@ async function stopAndSave(ctx: AppContext, limitMs = 3000): Promise<void> {
   }
   const limit = new Promise<'timeout'>((r) => setTimeout(() => r('timeout'), limitMs))
   const r = await Promise.race([
-    Promise.allSettled([ctx.store.flushAll(), ctx.windows.flush(), ctx.logHistory.flush(), ctx.petStore.flush(), ...ctx.features.map((f) => f.flush?.())]),
+    Promise.allSettled([
+      ctx.store.flushAll(),
+      ctx.windows.flush(),
+      ctx.logHistory.flush(),
+      ctx.petStore.flush(),
+      ctx.achievementHistory.flush(),
+      ...ctx.features.map((f) => f.flush?.())
+    ]),
     limit
   ])
   if (r === 'timeout') log.warn(`Saving settings took over ${limitMs / 1000}s; quitting anyway`)

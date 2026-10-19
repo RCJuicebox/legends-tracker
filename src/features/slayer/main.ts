@@ -1,6 +1,7 @@
 import { join } from 'node:path'
 import { copyFile, mkdir, readdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { RACE_TABLE } from '../../core/raceNames'
+import { zoneKey } from '../../core/zones'
 import { mixCredits, sayKey, setSaidRaces, SlayerRaces, slayerCounters } from '../../core/slayer'
 import { characterKey, isCharacterKey, isRecordKey } from '../../core/validate'
 import { handle } from '../../main/ipc/handle'
@@ -30,7 +31,7 @@ import {
   type SlayerPlanData
 } from './core'
 import { mapMarks, mobSpawns, parseMap, raceMixer, spotsIn, zoneIndex, zoneTimings, type MobSpawn, type SlayerMap, type SlayerMark, type SpawnTables } from './spawns'
-import type { RespawnRecord } from '../../core/respawns'
+import type { RespawnFallback, RespawnRecord, RespawnRecords } from '../../core/respawns'
 import TAKP from '../../shared/game/takpSpawns.json'
 import { hunterZones } from '../hunter/core'
 import { newerBuildWrote } from '../../main/schema'
@@ -139,8 +140,17 @@ export class SlayerPlanner implements AppFeature {
     return { slayer: this.live?.character === at.character ? this.live.view : null }
   }
 
+  /** The character's own kills an hour in each zone it has hunted a quarter hour, by zoneKey: the faction plan's pace where a camp has none (LT-734). */
+  async zonePaces(ctx: AppContext, character: string): Promise<Record<string, number>> {
+    const slice = await this.history.get<SlayerKillTallies>(KILLS_KEY, ctx.historyOf(character))
+    return zonePaces(joinKillTallies(everyStretch(slice)))
+  }
+
   register(ctx: AppContext): void {
     this.live = new SlayerLive(ctx, takpRaceMix)
+    // The Respawns page's rows the log has not timed take the tables' timer, or the zone's (LT-736).
+    const combat = ctx.engine?.combat
+    if (combat) combat.respawnFallback = respawnFallback(() => ctx.store.respawns.get())
     handle('slayer:plan', async (character, refresh) => {
       if (!isCharacterKey(character)) throw new Error('No such character.')
       const had = this.shared.get(character)
@@ -395,8 +405,40 @@ export function namedSpawns(timings: ReturnType<typeof zoneTimings>): (zone: str
 /** The races a mob's name is in TAKP's tables, by share, in a zone (else everywhere it is): for a kill nothing else places. */
 const takpRaceMix = raceMixer(TABLES)
 
+/**
+ * What the spawn tables say of a mob's respawn, for a Respawns row the log has not timed: its timer in
+ * Legends' terms and its zone's median. The timings are worked out again at most each half minute.
+ */
+export function respawnFallback(records: () => RespawnRecords): (zone: string, name: string) => RespawnFallback | null {
+  let made = 0
+  let timings = spawnTimings([])
+  let spawnsOf = namedSpawns(timings)
+  return (zone, name) => {
+    const now = Date.now()
+    if (now - made > 30_000) {
+      made = now
+      timings = spawnTimings(Object.values(records()))
+      spawnsOf = namedSpawns(timings)
+    }
+    const short = tableOf(zone)
+    if (!short) return null
+    const spawn = spawnsOf(zone)?.get(bareName(name))
+    return { mob: spawn ? { seconds: spawn.timer, from: spawn.timerFrom } : null, zone: timings.get(short)?.timer ?? null }
+  }
+}
+
 /** The spawn tables' timings: each zone's timers against classic, from the Respawns page's records. */
 export const spawnTimings = (records: RespawnRecord[]) => zoneTimings(TABLES, records)
+
+/** A zone hunted at least this long has a pace of its own for the faction plan (LT-734). */
+const ZONE_PACE_SEC = 15 * 60
+
+/** Kills an hour while killing, in every zone hunted a quarter hour or more, by zoneKey: kills that moved no faction counted too. */
+export function zonePaces(zones: SlayerKillTallies['zones']): Record<string, number> {
+  const out: Record<string, number> = {}
+  for (const [zone, z] of Object.entries(zones)) if (z.sec >= ZONE_PACE_SEC && z.kills > 0) out[zoneKey(zone)] = z.kills / (z.sec / 3600)
+  return out
+}
 
 /** A zone hunted at least this long counts toward the player's usual pace. */
 const USUAL_SEC = 3600

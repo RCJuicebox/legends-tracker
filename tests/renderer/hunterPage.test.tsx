@@ -47,7 +47,8 @@ const data: HunterPlanData = {
       ],
       total: 4,
       since: ['Ambassador DVinn'],
-      wait: 2400
+      wait: 2400,
+      dueIn: 0
     },
     {
       zone: 'Kedge Keep',
@@ -55,10 +56,12 @@ const data: HunterPlanData = {
       left: [{ name: 'Seahorse Patriarch' }, { name: 'Cauldron Hammerhead', spawn: { ...spawn('x', 0.5, 900), timerFrom: 'zone' }, wait: 1800 }],
       total: 2,
       since: [],
-      wait: null
+      wait: null,
+      dueIn: 0
     }
   ],
-  broken: ['Hunter of Befallen']
+  broken: ['Hunter of Befallen'],
+  autoTimers: false
 }
 let answer: HunterPlanData = data
 

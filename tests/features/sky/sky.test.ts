@@ -133,6 +133,7 @@ const skyState = (p: Partial<SkyState> = {}): SkyState => ({
   classes: [],
   exported: null,
   achieved: null,
+  respawns: {},
   ...p
 })
 

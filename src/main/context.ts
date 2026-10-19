@@ -23,6 +23,7 @@ import { WikiCatalog } from './wikiCatalog'
 import { CastHistory, castCounter, dayConsumer, resistCounter } from './castHistory'
 import { meleeCounter } from '../core/meleeTally'
 import { RecipeBook } from './recipes'
+import { AchievementHistory, completionsConsumer } from './achievementHistory'
 import { OfferHistory, PurchaseHistory, offerConsumer, purchaseConsumer } from './purchases'
 import type { Factions } from '../features/factions/main'
 import type { SlayerPlanner } from '../features/slayer/main'
@@ -107,6 +108,8 @@ export interface AppContext {
   aaHistory: AaHistory
   /** The zones each character's log has entered, for the Exploration achievements (LT-732). */
   zoneVisits: ZoneHistory
+  /** Achievements over time: the log's completions and a snapshot of each export (FEAT-032). */
+  achievementHistory: AchievementHistory
   tradeFavorites: TradeFavorites
   petStore: PetStore
   petWiki: PetWiki
@@ -190,6 +193,7 @@ export function createContext(): AppContext {
       skills: skillConsumer,
       aas: aaConsumer,
       zones: zoneConsumer,
+      completions: completionsConsumer,
       ...FEATURE_CONSUMERS
     },
     (folder) => logFolders.reachable(folder)
@@ -231,6 +235,7 @@ export function createContext(): AppContext {
     skills: new SkillHistory(logHistory, 'skills'),
     aaHistory: new AaHistory(logHistory, 'aas'),
     zoneVisits: new ZoneHistory(logHistory, 'zones'),
+    achievementHistory: new AchievementHistory(store.dir, logHistory, 'completions'),
     tradeFavorites: new TradeFavorites(join(dataDir, 'tradeskills.json')),
     inventoryFiles: new InventoryFiles(
       dataDir,
@@ -246,6 +251,8 @@ export function createContext(): AppContext {
     audioProblems: new Map(),
     installUpdate: async () => undefined
   } as unknown as AppContext
+  // Each new achievements export is kept small, for Achievements › Progress (FEAT-032).
+  ctx.achievementFiles.onRead = (character, sections, modified) => ctx.achievementHistory.add(character, sections, modified)
 
   ctx.overlays = new OverlayManager({
     preload: preloadPath,

@@ -5,7 +5,7 @@ import { useInvoke, useVisibleInterval } from '../../renderer/src/hooks'
 import { useActions, useLive, useSettled } from '../../renderer/src/state'
 import { DEFAULT_ACHIEVEMENT_OPTIONS } from '../../shared/overlays'
 import { useNow } from '../../renderer/src/components/TimerBars'
-import { FilterBox, GameCommand, Info, Pending, SettingsLink, Tip, ToggleChip } from '../../renderer/src/components/ui'
+import { FilterBox, GameCommand, Info, Pending, SettingsLink, Switch, Tip, ToggleChip } from '../../renderer/src/components/ui'
 import { showToast } from '../../renderer/src/toast'
 import { duration, num, who } from '../../core/format'
 import { useCharacterChoice } from '../../renderer/src/character'
@@ -145,6 +145,15 @@ export function Hunter() {
     }
   }
 
+  const setAutoTimers = async (on: boolean) => {
+    try {
+      await api.invoke('hunter:autoTimers', on)
+      q.reload()
+    } catch (e) {
+      showToast(`Could not save that: ${e instanceof Error ? e.message : String(e)}`, { tone: 'bad' })
+    }
+  }
+
   return (
     <>
       <div className="page-head">
@@ -194,6 +203,13 @@ export function Hunter() {
                 </span>
                 <FilterBox placeholder="Find a zone or named…" label="Find a zone, achievement or named" value={filter} onChange={setFilter} width={240} />
                 <span className="spacer" />
+                <label
+                  className="row tight small"
+                  title="When a named still wanted here dies in the zone you are in, a respawn timer starts by itself on the Respawns overlay: as your log timed it, else by the tables. A named with a timer of your own on the Respawns page keeps that one."
+                >
+                  <Switch on={data.autoTimers} label="Start a respawn timer when a wanted named dies" onChange={(v) => void setAutoTimers(v)} />
+                  Time each kill
+                </label>
                 {achOverlay && (
                   <ToggleChip
                     on={onOverlay}

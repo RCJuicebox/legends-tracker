@@ -270,6 +270,28 @@ export type AudioCommand =
   | { kind: 'speech-fallback'; text: string; interrupt: boolean; expiresAt?: number; urgent?: boolean }
   | { kind: 'sound'; data: Uint8Array; volume: number; name: string }
 
+/** One achievements export, kept small (FEAT-032): achievements done in all and by section, and each Slayer achievement's count. */
+export interface ExportSnapshot {
+  /** When the game wrote it. */
+  at: number
+  total: number
+  /** By "Category › Section": achievements done. */
+  done: Record<string, number>
+  /** By achievement: its count (the most, once done). */
+  slayer: Record<string, number>
+}
+
+/** Achievements over time, for Achievements › Progress (FEAT-032). */
+export interface AchievementProgress {
+  /** "You have completed achievement: X" lines in the character's logs, oldest first. */
+  completions: { name: string; at: number }[]
+  /** Each export read, oldest first. */
+  snapshots: ExportSnapshot[]
+  /** Faction standings moved, by day ("2026-10-19"), then by faction: the net of the day. */
+  factionDays: Record<string, Record<string, number>>
+  today: string
+}
+
 // ---- The channels ----
 
 /** Request and answer: api.invoke(channel, ...args) → Promise<result>. */
@@ -339,6 +361,8 @@ export interface Invokes {
   'loot:get': () => LootView
   /** What merchants last offered the character being played, by item name lowercased (LT-725). */
   'loot:offers': () => Record<string, Offer>
+  /** Whether a wanted Hunter named that dies starts its respawn timer by itself (FEAT-038). */
+  'hunter:autoTimers': (on: boolean) => boolean
   'buffs:get': () => BuffView
   'buffs:setWanted': (spells: string[] | null) => BuffView
 
@@ -391,6 +415,8 @@ export interface Invokes {
 
   'achievements:load': (character: string) => AchievementsView
   'achievements:marks': (character: string, marks: AchMarks) => void
+  /** Achievements done over time, export snapshots and factions moved per day (FEAT-032). */
+  'achievements:progress': (character: string) => AchievementProgress
 
   /** Faction changes the character's log and its archives recorded. */
   'factions:get': (character: string) => FactionView
@@ -598,6 +624,7 @@ const INVOKE_CHANNELS: Record<InvokeChannel, true> = {
   'combat:rebuild': true,
   'loot:get': true,
   'loot:offers': true,
+  'hunter:autoTimers': true,
   'buffs:get': true,
   'buffs:setWanted': true,
   'respawns:get': true,
@@ -641,6 +668,7 @@ const INVOKE_CHANNELS: Record<InvokeChannel, true> = {
   'audio:voices': true,
   'achievements:load': true,
   'achievements:marks': true,
+  'achievements:progress': true,
   'factions:get': true,
   'factions:sources': true,
   'factions:plan': true,

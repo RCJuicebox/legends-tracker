@@ -1,3 +1,5 @@
+import type { RouteZone } from '../core/route'
+
 // What the achievements overlay and the pages are told as the game is played: where the character is
 // in the faction plan it follows, and its Slayer counts since its achievements export.
 
@@ -195,6 +197,10 @@ export interface AchievementTrack {
   tracked: TrackedAchievement[]
   /** Places entered since the achievements export, by zoneKey, with when last: the Exploration objectives the log ticks before the next export (LT-732). */
   visited?: Record<string, number>
+  /** The zones the faction plan, Plan › Slayer and the Hunter achievements want, most-wanted first (FEAT-031). */
+  route?: RouteZone[]
+  /** Of those, the zone the player is in, when two or more planners want something there: the overlay's "Also here". */
+  here?: RouteZone
 }
 
 /** The player's last /loc, in the zone it was typed in (FEAT-023). */

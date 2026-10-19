@@ -1,8 +1,7 @@
 import { placeZones, type AchSection } from '../../core/achievements'
 import type { SlayerKills } from '../../core/slayer'
 import type { HunterTrackView } from '../../shared/tracking'
-import { duration } from '../../core/format'
-import { respawnEstimate, type RespawnRecord } from '../../core/respawns'
+import type { Seen } from '../../core/respawnSeen'
 import { zoneKey } from '../../core/zones'
 import { bareName, campZone } from '../slayer/core'
 import { legendsSpawnsOf, type MobSpawn } from '../slayer/spawns'
@@ -20,8 +19,10 @@ export interface HunterNamed {
   wait?: number
   /** A named of Legends' own, which TAKP's tables lack: the spots the player found, what it pops in place of, who said so. */
   legends?: { spots: number; ph?: string[]; said: string }
-  /** What the Respawns records say of it: when it last died and whether it is back (seenText); undefined where the log never saw it die. */
+  /** What the Respawns records say of it: when it last died and whether it is back (seenOf); undefined where the log never saw it die. */
   seen?: string
+  /** Seconds until it is due back by those records: 0 when it is (LT-733); undefined where they say nothing. */
+  dueIn?: number
 }
 
 /** A Hunter achievement not done: its place, the named left, how many it wants in all. */
@@ -34,6 +35,8 @@ export interface HunterZone {
   since: string[]
   /** The longest wait of the named left (they pop side by side); null when any is not in the tables. */
   wait: number | null
+  /** Seconds until the first named left is up, by the Respawns records: 0 when one is up or nothing says it is down (LT-733). */
+  dueIn: number
 }
 
 export interface HunterPlanData {
@@ -43,6 +46,22 @@ export interface HunterPlanData {
   zones: HunterZone[]
   /** The Hunter achievements the player has said do not work in Legends: left out until they say they do. */
   broken: string[]
+  /** A named still wanted that dies in your zone starts its respawn timer by itself (FEAT-038). */
+  autoTimers: boolean
+}
+
+/**
+ * The named a kill should start a timer for (FEAT-038): each one still wanted in the zone, by bare
+ * name, with how long it takes, what the log timed before the tables. One with no length is left out.
+ */
+export function wantedTimers(rows: readonly { left: readonly string[] }[], length: (name: string) => number | null): Map<string, { name: string; seconds: number }> {
+  const out = new Map<string, { name: string; seconds: number }>()
+  for (const r of rows)
+    for (const name of r.left) {
+      const seconds = length(name)
+      if (seconds && seconds > 0) out.set(bareName(name), { name, seconds })
+    }
+  return out
 }
 
 /**
@@ -51,23 +70,6 @@ export interface HunterPlanData {
  * taking, and only the next waits a timer (LT-671).
  */
 export const namedWait = (spawn: MobSpawn) => (spawn.up >= 1 ? 0 : spawn.timer / Math.max(spawn.up, 1e-6))
-
-/**
- * What the Respawns records say of a named, in a few words: "died 6 min ago; back in ~2 min as you
- * timed it" while it is still down, "down 11 min, due" past its time, "died 40 min ago, seen since"
- * once the log saw it again. `timer` is the tables' respawn, where the log has not timed it (LT-670).
- */
-export function seenText(r: Pick<RespawnRecord, 'lastDeath' | 'pendingSince' | 'gaps'> | undefined, timer: number | undefined, now: number): string | undefined {
-  if (!r || !r.lastDeath) return undefined
-  const ago = `died ${duration(Math.max(0, now - r.lastDeath) / 1000)} ago`
-  if (!r.pendingSince) return `${ago}, seen since`
-  const down = Math.max(0, now - r.pendingSince) / 1000
-  const timed = respawnEstimate(r)
-  const due = timed ?? timer
-  if (due === undefined) return `${ago}, still down`
-  if (down >= due) return `down ${duration(down)}, due`
-  return `${ago}; back in ~${duration(due - down)} ${timed !== null ? 'as you timed it' : 'by the tables'}`
-}
 
 /** An objective that is another achievement: "Complete the achievement …", or a region's "Hunter of Crushbone". */
 const LINK = /^(?:\(Optional\)\s*)?(?:Complete the achievement |(?:Hunter|Conqueror) of )/i
@@ -89,8 +91,8 @@ export function hunterZones(
   killedAt: (bare: string) => number,
   exportAt: number,
   spawnsOf: (zone: string) => ReadonlyMap<string, MobSpawn> | null = () => null,
-  /** What the Respawns records say of a named in a zone, in a few words (seenText); none without records. */
-  seenOf: (zone: string, name: string, timer: number | undefined) => string | undefined = () => undefined
+  /** What the Respawns records say of a named in a zone (seenOf); none without records. */
+  seenOf: (zone: string, name: string, timer: number | undefined) => Seen | undefined = () => undefined
 ): HunterZone[] {
   const out: HunterZone[] = []
   for (const sec of sections)
@@ -106,7 +108,7 @@ export function hunterZones(
         .map((c): HunterNamed => {
           const spawn = known?.get(bareName(c.t))
           const seen = seenOf(zone, c.t, spawn?.timer)
-          const with_ = seen ? { seen } : {}
+          const with_ = seen ? { seen: seen.text, ...(seen.dueIn !== undefined ? { dueIn: seen.dueIn } : {}) } : {}
           if (spawn) return { name: c.t, spawn, wait: namedWait(spawn), ...with_ }
           const own = legendsSpawnsOf(zone, [c.t])[0]
           return own ? { name: c.t, legends: { spots: own.spots.length, ...(own.ph ? { ph: own.ph } : {}), said: own.said }, ...with_ } : { name: c.t, ...with_ }
@@ -114,10 +116,13 @@ export function hunterZones(
       if (!left.length) continue
       // The zone takes as long as its longest wait: the named not up pop side by side, those up wait nothing.
       const waits = left.map((n) => n.wait)
-      out.push({ zone, achievement: a.n, left, total: named.length, since, wait: waits.every((w) => w !== undefined) ? Math.max(0, ...(waits as number[])) : null })
+      // Up now unless the records say it died and is not back: the zone is due when its first named is.
+      const dueIn = Math.min(...left.map((n) => n.dueIn ?? 0))
+      out.push({ zone, achievement: a.n, left, total: named.length, since, wait: waits.every((w) => w !== undefined) ? Math.max(0, ...(waits as number[])) : null, dueIn })
     }
-  // The quickest to finish first; those the tables cannot time after, the fewest left first.
-  return out.sort((a, b) => (a.wait ?? Infinity) - (b.wait ?? Infinity) || a.left.length - b.left.length || a.zone.localeCompare(b.zone))
+  // What is up now first (a zone whose named died two minutes ago sinks until it is due, LT-733); then
+  // the quickest to finish; those the tables cannot time after, the fewest left first.
+  return out.sort((a, b) => a.dueIn - b.dueIn || (a.wait ?? Infinity) - (b.wait ?? Infinity) || a.left.length - b.left.length || a.zone.localeCompare(b.zone))
 }
 
 /** The Hunter achievements of the zone the player is in, for the overlay. */
@@ -137,16 +142,6 @@ export function hunterMatch(z: Pick<HunterZone, 'zone' | 'achievement' | 'left'>
   return words.every((w) => text.includes(w))
 }
 
-/** seenText over the Respawns records (by zone and name, as respawnKey keys them), for hunterZones. */
-export function seenFromRecords(records: Readonly<Record<string, RespawnRecord>>, now: number): (zone: string, name: string, timer: number | undefined) => string | undefined {
-  const byKey = new Map<string, RespawnRecord>()
-  for (const r of Object.values(records)) {
-    byKey.set(`${zoneKey(r.zone)}|${bareName(r.name)}`, r)
-    for (const n of r.names ?? []) byKey.set(`${zoneKey(r.zone)}|${bareName(n)}`, r)
-  }
-  return (zone, name, timer) => seenText(byKey.get(`${zoneKey(zone)}|${bareName(name)}`), timer, now)
-}
-
 /**
  * The Hunter named left in the zone the player is in, for the achievements overlay: the export's, less
  * those the live counts have seen killed since (`kills`, by lower-cased mob), each with what the
@@ -158,7 +153,7 @@ export function hunterLive(
   exportAt: number,
   zone: string,
   kills: SlayerKills | undefined,
-  seenOf: (zone: string, name: string, timer: number | undefined) => string | undefined,
+  seenOf: (zone: string, name: string, timer: number | undefined) => Seen | undefined,
   isBroken: (achievement: string) => boolean,
   /** How far and which way the nearest spot of a named is, from the player's last /loc here; undefined without one. */
   near: (name: string) => string | undefined = () => undefined

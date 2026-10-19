@@ -230,6 +230,13 @@ export interface SkyState extends SkyCharacter {
   exported: SkyExport | null
   /** Null without an achievements export. */
   achieved: SkyAchieved | null
+  /** What your Respawns records say of each mob the Tests' items drop from, by mob name: "died 40 min ago, seen since" (LT-735). */
+  respawns: Record<string, string>
+}
+
+/** Every mob the Tests' items drop from, by name. */
+export function skyMobs(): string[] {
+  return [...new Set(SKY_QUESTS.flatMap((q) => q.items.flatMap((i) => i.drops.flatMap((d) => (d.mob && !/^any mob/i.test(d.mob) ? [d.mob] : [])))))]
 }
 
 /** Held, by item key: the log's count with the player's correction, never under none. */

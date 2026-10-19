@@ -14,6 +14,7 @@ const state = (p: Partial<SkyState> = {}): SkyState => ({
   classes: ['Monk'],
   exported: null,
   achieved: null,
+  respawns: {},
   ...p
 })
 const quest = (name: string) => SKY_QUESTS.find((q) => q.name === name)!

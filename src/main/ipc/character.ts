@@ -26,6 +26,11 @@ export function registerCharacterIpc(ctx: AppContext): void {
   const liveLog = (character: string) => characterLogFile(character, ctx.characterKey(), store.settings.get().logFile, ctx.installDir())
 
   handle('achievements:load', (character) => ctx.achievementFiles.load(character))
+  handle('achievements:progress', (character) => {
+    assertCharacterKey(character)
+    const where = ctx.historyOf(character)
+    return ctx.achievementHistory.progress(character, where, ctx.factions?.daysMoved(where) ?? Promise.resolve({}))
+  })
   handle('achievements:marks', async (character, marks) => {
     await ctx.achievementFiles.saveMarks(character, marks)
     // What the player tracks goes on the achievements overlay at once.

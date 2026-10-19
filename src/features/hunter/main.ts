@@ -7,9 +7,17 @@ import type { AppContext } from '../../main/context'
 import type { AchievementTrack } from '../../shared/tracking'
 import type { AppFeature, FeatureDeps, TrackContext } from '../../main/appFeature'
 import { joinKillTallies, type SlayerKillTallies } from '../slayer/core'
-import { seenFromRecords } from './core'
+import { seenFromRecords } from '../../core/respawnSeen'
 import { KILLS_KEY, lastKills, namedSpawns, namedSpots, spawnTimings } from '../slayer/main'
-import { hunterLive, hunterZones, type HunterPlanData } from './core'
+import { hunterLive, hunterZones, wantedTimers, type HunterPlanData } from './core'
+import { bareName } from '../slayer/core'
+import { respawnEstimate, respawnKey, respawnTriggerId } from '../../core/respawns'
+import { DIED, SLAIN_BY, SLAIN_BY_YOU } from '../../core/phrases'
+import { clock } from '../../core/format'
+import type { RoutePart } from '../../core/route'
+
+/** A named's respawn bar, as the Respawns page's timers are coloured. */
+const HUNTER_COLOR = '#6cc3ff'
 import { locPoint, nearest, nearText } from '../../core/where'
 import { parseSpot } from '../../core/where'
 import { setFoundSpawns } from '../slayer/spawns'
@@ -24,7 +32,9 @@ import type { FoundSpot, LegendsSpawn } from '../../shared/game/legendsSpawns'
 
 export class HunterPlanner implements AppFeature {
   readonly id = 'hunter'
-  private readonly brokenFile: JsonFile<{ broken: string[] }>
+  private readonly brokenFile: JsonFile<{ broken: string[]; autoTimers?: boolean }>
+  /** The named a kill starts a timer for, in the zone the overlay track was last made for (FEAT-038). */
+  private wanted: { character: string; zone: string; names: Map<string, { name: string; seconds: number }> } | null = null
   /** The spots the player found named at in play (FEAT-020), drawn and marked as Legends' own are. */
   private readonly foundFile: JsonFile<{ spots: FoundSpot[] }>
   private ctx: AppContext | null = null
@@ -40,9 +50,9 @@ export class HunterPlanner implements AppFeature {
   ) {
     const path = join(dir, 'hunter-broken.json')
     const read = readJsonFile(path)
-    const v = (read.state === 'ok' && read.value && typeof read.value === 'object' ? read.value : {}) as { broken?: unknown }
+    const v = (read.state === 'ok' && read.value && typeof read.value === 'object' ? read.value : {}) as { broken?: unknown; autoTimers?: unknown }
     const broken = Array.isArray(v.broken) ? v.broken.filter((s): s is string => typeof s === 'string' && s.length < 200).slice(0, 500) : []
-    this.brokenFile = new JsonFile(path, { broken }, { delayMs: 1000 })
+    this.brokenFile = new JsonFile(path, { broken, ...(v.autoTimers === true ? { autoTimers: true } : {}) }, { delayMs: 1000 })
     if (read.state === 'unreadable') this.brokenFile.freeze('could not be read at start')
     if (newerBuildWrote(path)) this.brokenFile.freeze('written by a newer version')
     const foundPath = join(dir, 'hunter-spots.json')
@@ -82,11 +92,59 @@ export class HunterPlanner implements AppFeature {
       const n = loc && spots ? nearest(locPoint(loc), spots) : null
       return loc && n ? nearText(n, loc.at, Date.now()) : undefined
     }
-    return { hunter: hunterLive(at.exported.sections, at.exported.modified, at.zone, ctx.slayer?.live?.kills(at.character), seenOf, (a) => this.isBroken(a), near) }
+    const hunter = hunterLive(at.exported.sections, at.exported.modified, at.zone, ctx.slayer?.live?.kills(at.character), seenOf, (a) => this.isBroken(a), near)
+    this.wanted = hunter ? { character: at.character, zone: at.zone, names: wantedTimers(hunter.rows, this.lengthIn(ctx, at.zone)) } : null
+    return { hunter }
+  }
+
+  /** How long a named in a zone takes to come back: what your Respawns record timed, else the tables'. */
+  private lengthIn(ctx: AppContext, zone: string): (name: string) => number | null {
+    const records = ctx.store.respawns?.get() ?? {}
+    const tables = namedSpawns(spawnTimings(Object.values(records)))(zone)
+    return (name) => {
+      const r = records[respawnKey(zone, name)]
+      return (r ? respawnEstimate(r) : null) ?? tables?.get(bareName(name))?.timer ?? null
+    }
+  }
+
+  /**
+   * A kill in the zone the player is in: a named still wanted starts its respawn timer, on the overlay
+   * respawn timers go on, unless the player has made a respawn timer of their own for it (FEAT-038).
+   */
+  private killed(ctx: AppContext, text: string, at: number): boolean {
+    const m = SLAIN_BY_YOU.exec(text) ?? SLAIN_BY.exec(text) ?? DIED.exec(text)
+    const w = this.wanted
+    if (!m || !w || !this.brokenFile.get().autoTimers || w.zone !== ctx.engine.status.zone) return false
+    const named = w.names.get(bareName(m[1]))
+    if (!named) return false
+    if (ctx.store.triggers.get().some((t) => t.id === respawnTriggerId(named.name) && t.enabled)) return true
+    const overlays = ctx.store.settings.get().overlays
+    const overlay = overlays.some((o) => o.id === 'respawns') ? 'respawns' : 'targets'
+    const say = named.name.replace(/`/g, '')
+    ctx.engine.startTimer({
+      key: `hunter:${bareName(named.name)}`,
+      label: named.name,
+      seconds: named.seconds,
+      overlay,
+      color: HUNTER_COLOR,
+      warnSec: 0,
+      warnSpeech: '',
+      endSpeech: `${say} is up`,
+      at
+    })
+    ctx.engine.pushFeed('timer', `${named.name}: respawn timer started, ${clock(named.seconds)} (Plan › Hunter)`)
+    return true
   }
 
   register(ctx: AppContext): void {
     this.ctx = ctx
+    ctx.engine?.use({ id: 'hunter', line: (line) => this.killed(ctx, line.text, line.time) })
+    handle('hunter:autoTimers', (on) => {
+      if (typeof on !== 'boolean') throw new Error('On or off.')
+      const { autoTimers: _was, ...rest } = this.brokenFile.get()
+      this.brokenFile.set(on ? { ...rest, autoTimers: true } : rest)
+      return on
+    })
     handle('hunter:plan', async (character) => {
       if (!isCharacterKey(character)) throw new Error('No such character.')
       return this.data(ctx, character)
@@ -107,22 +165,34 @@ export class HunterPlanner implements AppFeature {
       if (typeof achievement !== 'string' || !achievement || achievement.length >= 200) throw new Error('No such achievement.')
       const k = achievement.toLowerCase()
       const others = this.brokenFile.get().broken.filter((b) => b.toLowerCase() !== k)
-      this.brokenFile.set({ broken: broken ? [...others, achievement] : others })
+      this.brokenFile.set({ ...this.brokenFile.get(), broken: broken ? [...others, achievement] : others })
       return this.brokenFile.get().broken
     })
+  }
+
+  /** The Hunter achievements still open, as one zone view puts them (FEAT-031): the named left and the longest wait. */
+  async routeParts(ctx: AppContext, character: string): Promise<RoutePart[]> {
+    const { zones } = await this.data(ctx, character)
+    return zones.map((z) => ({
+      planner: 'hunter' as const,
+      zone: z.zone,
+      title: `${z.achievement}: ${z.left.length} named`,
+      seconds: z.wait ?? 0
+    }))
   }
 
   private async data(ctx: AppContext, character: string): Promise<HunterPlanData> {
     const broken = this.brokenFile.get().broken
     const exp = await ctx.achievementFiles.exported(character)
-    if (!exp) return { character, export: null, zones: [], broken }
+    const autoTimers = !!this.brokenFile.get().autoTimers
+    if (!exp) return { character, export: null, zones: [], broken, autoTimers }
     // A named counts for the character that killed it: its own log alone.
     const slice = await this.history.get<SlayerKillTallies>(KILLS_KEY, ctx.historyOf(character))
     const zones = joinKillTallies(everyStretch(slice))
     const records = ctx.store.respawns.get()
     const spawns = namedSpawns(spawnTimings(Object.values(records)))
     const all = hunterZones(exp.sections, lastKills(zones), exp.modified, spawns, seenFromRecords(records, Date.now()))
-    return { character, export: { file: exp.file, modified: exp.modified }, zones: all.filter((z) => !this.isBroken(z.achievement)), broken }
+    return { character, export: { file: exp.file, modified: exp.modified }, zones: all.filter((z) => !this.isBroken(z.achievement)), broken, autoTimers }
   }
 }
 

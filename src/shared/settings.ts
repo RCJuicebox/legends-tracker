@@ -151,6 +151,8 @@ export interface AchievementOverlayOptions {
   factionPlan: boolean
   /** Show the Hunter named still to kill in the zone you are in (Plan › Hunter). */
   hunter: boolean
+  /** Show what two or more planners want in the zone you are in, in one block (FEAT-031). */
+  alsoHere?: boolean
 }
 
 export interface OverlayConfig {

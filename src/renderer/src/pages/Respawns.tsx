@@ -22,7 +22,7 @@ import {
   Switch,
   ToggleChip
 } from '../components/ui'
-import { mergeRespawns, parseClock, SHARED_SEC, type RespawnRow, type RespawnTimerSpec, type RespawnView } from '../../../core/respawns'
+import { mergeRespawns, parseClock, respawnLength, SHARED_SEC, type RespawnRow, type RespawnTimerSpec, type RespawnView } from '../../../core/respawns'
 import { NotWatching } from '../components/NotWatching'
 
 // How long mobs take to come back, measured from the log, and a timer on an overlay for any of them.
@@ -217,7 +217,7 @@ export function Respawns() {
                         <td colSpan={8} style={{ background: 'var(--bg-2)' }}>
                           <TimerEditor
                             initialName={r.name}
-                            initialSeconds={r.timer?.seconds ?? r.estimate ?? r.gaps[r.gaps.length - 1] ?? null}
+                            initialSeconds={respawnLength(r) ?? r.gaps[r.gaps.length - 1] ?? null}
                             measured={r.estimate ?? r.gaps[r.gaps.length - 1] ?? null}
                             timer={r.timer}
                             names={r.names}
@@ -269,7 +269,11 @@ function Row({
   onSaved: (v: RespawnView | undefined) => void
 }) {
   const last = r.gaps[r.gaps.length - 1]
-  const length = r.timer?.seconds ?? r.estimate
+  const length = respawnLength(r)
+  const others = [
+    r.tables ? `the tables say ${clock(r.tables.seconds)} for it${r.tables.from === 'classic' ? ' (classic’s timer)' : ''}` : '',
+    r.zoneTimer ? `the zone’s timers run ${clock(r.zoneTimer)} in the middle` : ''
+  ].filter(Boolean)
   const backAt = r.pendingSince && length ? r.pendingSince + length * 1000 : null
   const overlayName = r.timer ? (overlays.find((o) => o.id === r.timer!.overlay)?.name ?? r.timer.overlay) : ''
   return (
@@ -292,9 +296,25 @@ function Row({
         )}
       </td>
       <td className="mono">{r.kills || '—'}</td>
-      <td className="mono nowrap" title={r.gaps.length ? `Gaps seen: ${r.gaps.map(clock).join(', ')}` : 'Not seen back yet'}>
-        {r.estimate !== null ? `≤ ${clock(r.estimate)}` : <span className="faint">{r.pendingSince ? 'watching…' : '—'}</span>}
+      <td
+        className="mono nowrap"
+        title={[
+          r.gaps.length ? `Gaps seen: ${r.gaps.map(clock).join(', ')}` : 'Not seen back yet',
+          r.dropped ? `${r.dropped} gap${r.dropped === 1 ? '' : 's'} under half the rest left out: another of the name passing by, not a respawn` : '',
+          others.length ? `Besides: ${others.join('; ')}` : ''
+        ]
+          .filter(Boolean)
+          .join('. ')}
+      >
+        {r.estimate !== null ? (
+          `≤ ${clock(r.estimate)}`
+        ) : r.tables || r.zoneTimer ? (
+          <span className="faint">~{clock((r.tables?.seconds ?? r.zoneTimer)!)} by the tables</span>
+        ) : (
+          <span className="faint">{r.pendingSince ? 'watching…' : '—'}</span>
+        )}
         {r.gaps.length > 1 && <span className="faint small"> ({r.gaps.length})</span>}
+        {r.estimate !== null && r.zoneTimer ? <span className="faint small"> · zone {clock(r.zoneTimer)}</span> : null}
       </td>
       <td className="mono nowrap">
         {last !== undefined ? clock(last) : '—'}

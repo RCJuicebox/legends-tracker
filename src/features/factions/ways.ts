@@ -36,7 +36,7 @@ export interface UnitTime {
   seconds: number
   /** Seconds while what goes in is on hand: just the hand-in. */
   handSeconds: number
-  from: 'yours' | 'log' | 'estimate'
+  from: 'yours' | 'log' | 'zone' | 'estimate'
 }
 
 /** How long one kill or hand-in takes, and where the figure comes from. */
@@ -48,11 +48,13 @@ export function unitTime(a: PlanActivity, s: PlanSettings, choices: PlanChoices 
     // The named come back each at its own respawn where eqlwiki gives it, the rest at the assumed one.
     const known = a.respawnSec ?? []
     const named = known.reduce((sum, r) => sum + 3600 / Math.max(1, r), 0) + respawn(Math.max(known.length ? 0 : 1, (a.named ?? 0) - known.length))
-    const pace = a.measured ?? (a.common ? s.killsPerHour : Math.min(s.killsPerHour, named))
+    // Unmeasured, a camp goes at your pace in its zone (LT-734), else the pace assumed.
+    const usual = a.zonePace ?? s.killsPerHour
+    const pace = a.measured ?? (a.common ? usual : Math.min(usual, named))
     // A few spawns go at their respawn once killed, however quickly the log saw the first of them go.
     const perHour = a.few ? Math.min(pace, respawn(a.few)) : pace
     const sec = 3600 / Math.max(0.1, perHour)
-    return { seconds: sec, handSeconds: sec, from: a.measured ? 'log' : 'estimate' }
+    return { seconds: sec, handSeconds: sec, from: a.measured ? 'log' : a.zonePace ? 'zone' : 'estimate' }
   }
   const hand = (a.measured ? Math.max(0.05, 3600 / a.measured) : s.handInSec) * (a.handIns ?? 1)
   const from = a.measured ? 'log' : 'estimate'

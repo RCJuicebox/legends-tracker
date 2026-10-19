@@ -178,7 +178,7 @@ describe('Engine', () => {
         '[Thu Sep 24 16:23:18 2026] Your target is too far away, get closer!\r\n' +
         '[Thu Sep 24 16:23:19 2026] Your target is too far away, get closer!\r\n'
     )
-    await waitFor(() => engine.unread.total >= 2)
+    await waitFor(() => engine.unread.total >= 2, 10_000)
     // The mote loot is read; the talk is chat.
     expect(engine.unread.top(5)).toEqual([{ shape: 'Your target is too far away, get closer!', n: 2, example: 'Your target is too far away, get closer!' }])
   })

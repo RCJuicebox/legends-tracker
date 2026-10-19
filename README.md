@@ -1065,9 +1065,10 @@ The settings folder, `%APPDATA%\Legends Tracker` (or the `EQL_USER_DATA` folder)
 | `pets.json` | Per character, the newest pet gear list (`/pet inventory check`) and summoning cast the log showed, and how far back it was read |
 | `tradeskills.json` | Starred recipes, the combines planned of each, and prices typed in |
 | `slayer-plan.json` | Per character, what you chose on the Slayer page: achievements left out or taken in, camps and mobs ruled out, minutes between camps and the pace assumed where nothing gives one |
-| `hunter-broken.json` | The Hunter achievements you said do not work in Legends, left out of the plans and the overlay |
+| `hunter-broken.json` | The Hunter achievements you said do not work in Legends, left out of the plans and the overlay, and whether a wanted named that dies starts its respawn timer by itself (Time each kill) |
 | `slayer-races.json` | The races you said mobs are (Count as… on the Slayer page), for every character, over what eqlwiki says |
 | `sky.json` | Per character, the Plane of Sky wish list (each reward wanted, how many times, since when, and hand-ins you added), the Tests starred and ignored, hand-ins you added or took away, and what you said you hold where the log's count was wrong |
+| `achievements-history.json` | Each achievements export kept small, for Achievements › Progress over time: how many achievements were done, by section, and each Slayer achievement's count, one entry an export |
 | `hunter-spots.json` | The spots you found Hunter named at in play (Found it here on the Hunter page), drawn on its maps and marked on the game's map with the built-in ones |
 | `map-marks.json` | What the Slayer and Hunter pages last marked on the game's map (`maps\LegendsTracker`), each page's apart |
 | `faction-follow.json` | Per character, the faction plan the achievements overlay follows: its steps, the step you are on, and what is done |
