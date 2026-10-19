@@ -284,6 +284,8 @@ export function sanitizeSettings(v: unknown, fb: AppSettings): AppSettings | nul
     ccWarnSpeech: str(t.ccWarnSpeech, fb.tracking.ccWarnSpeech),
     ccBreakSpeech: str(t.ccBreakSpeech, fb.tracking.ccBreakSpeech),
     resistStreakSpeech: str(t.resistStreakSpeech, fb.tracking.resistStreakSpeech),
+    cooldowns: bool(t.cooldowns, fb.tracking.cooldowns ?? true),
+    cooldownReadySpeech: str(t.cooldownReadySpeech, fb.tracking.cooldownReadySpeech ?? '{spell} ready'),
     announceOtherBuffFades: bool(t.announceOtherBuffFades, fb.tracking.announceOtherBuffFades),
     tierDurationPct
   })
@@ -317,7 +319,16 @@ export function sanitizeSettings(v: unknown, fb: AppSettings): AppSettings | nul
   const groupHealth = shape(gh, fb.groupHealth, {
     enabled: bool(gh.enabled, fb.groupHealth.enabled),
     belowPct: Math.round(num(gh.belowPct, fb.groupHealth.belowPct, 5, 80)),
-    speech: str(gh.speech, fb.groupHealth.speech).slice(0, 200)
+    speech: str(gh.speech, fb.groupHealth.speech).slice(0, 200),
+    manaPct: Math.round(num(gh.manaPct, fb.groupHealth.manaPct ?? 0, 0, 80)),
+    manaSpeech: str(gh.manaSpeech, fb.groupHealth.manaSpeech ?? '{name} is low on mana').slice(0, 200),
+    watchNames: Array.isArray(gh.watchNames)
+      ? gh.watchNames
+          .filter((n): n is string => typeof n === 'string' && n.trim().length > 0)
+          .map((n) => n.trim().slice(0, 40))
+          .slice(0, 6)
+      : (fb.groupHealth.watchNames ?? []),
+    watchPct: Math.round(num(gh.watchPct, fb.groupHealth.watchPct ?? 40, 5, 90))
   })
 
   let overlays = fb.overlays

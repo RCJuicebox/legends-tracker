@@ -145,5 +145,26 @@
         "durationSec": 6
       }
     ]
+  },
+  {
+    "id": "a1f0c9d2-4e3b-4a71-9c58-7d21b8e40043",
+    "name": "Out of mana",
+    "folder": "Spells",
+    "enabled": true,
+    "comment": "Said when a cast is refused for want of mana, at most every 30 seconds.",
+    "phrases": [
+      {
+        "text": "Insufficient Mana to cast this spell!",
+        "regex": false
+      }
+    ],
+    "cooldownSec": 30,
+    "actions": [
+      {
+        "type": "speak",
+        "text": "Out of mana",
+        "interrupt": false
+      }
+    ]
   }
 ]

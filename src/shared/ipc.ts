@@ -335,6 +335,12 @@ export interface Invokes {
   'triggers:test': (trigger: Trigger, line: string) => TriggerTestResult
   'triggers:import': () => Trigger[] | null
   'triggers:export': (triggers: Trigger[]) => boolean
+  /** The triggers this build ships (FEAT-043). */
+  'triggers:defaults': () => Trigger[]
+  /** A GINA package's triggers, after a file dialog; null when cancelled or unreadable (FEAT-029). */
+  'triggers:importGina': () => Trigger[] | null
+  /** The triggers as a GINA package, after a save dialog; false when cancelled (FEAT-029). */
+  'triggers:exportGina': (triggers: Trigger[]) => boolean
 
   'spells:known': () => KnownSpell[]
   'spells:search': (query: string) => SpellSummary[]
@@ -616,6 +622,9 @@ const INVOKE_CHANNELS: Record<InvokeChannel, true> = {
   'triggers:test': true,
   'triggers:import': true,
   'triggers:export': true,
+  'triggers:defaults': true,
+  'triggers:importGina': true,
+  'triggers:exportGina': true,
   'spells:known': true,
   'spells:search': true,
   'spells:rule': true,

@@ -123,7 +123,8 @@ export class Engine {
       () => this.book,
       () => this.playedLog
     )
-    this.timersOut = new Throttled(0, () => this.out.timers(this.board.views()))
+    // The buffs overlay's "Missing: …" line goes with the bars, as a note (LT-749).
+    this.timersOut = new Throttled(0, () => this.out.timers([...this.board.views(), ...(this.buffs?.notes() ?? [])]))
     this.motesOut = new Throttled(1000, () => this.out.motes(this.moteView()))
     this.statusOut = new Throttled(1000, () => this.out.status({ ...this.status }))
     this.board = new TimerBoard({
@@ -133,7 +134,9 @@ export class Engine {
     })
     this.triggers = new TriggerEngine(this.board, {
       notify: (ns) => this.notifier.notify(ns),
-      feed: (kind, text) => this.pushFeed(kind, text)
+      feed: (kind, text) => this.pushFeed(kind, text),
+      // What a trigger's conditions read (FEAT-030); the meter is made after this, so asked for late.
+      state: () => ({ zone: this.status.zone, fighting: this.combat?.meter.fighting ?? false })
     })
     this.archives = new ArchiveManager({
       settings: () => this.settings,
@@ -151,6 +154,7 @@ export class Engine {
       group: () => this.combat.meter.groupMembers,
       fighting: () => this.combat.meter.fighting,
       readingHistory: () => this.combat.backlog.active,
+      notesChanged: () => this.timersOut.mark(),
       live: () => !this.simulating && this.status.watching,
       self: () => this.status.character,
       logFile: () => this.playedLog,

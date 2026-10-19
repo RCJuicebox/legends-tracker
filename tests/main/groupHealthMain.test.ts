@@ -36,7 +36,18 @@ class FakeWorker extends EventEmitter {
 function setup(o: { enabled?: boolean } = {}) {
   const workers: FakeWorker[] = []
   const notified: unknown[] = []
-  const settings = { groupHealth: { enabled: o.enabled ?? true, belowPct: 25, speech: '{name} is at {pct}' }, overlays: [] }
+  const settings = {
+    groupHealth: {
+      enabled: o.enabled ?? true,
+      belowPct: 25,
+      speech: '{name} is at {pct}',
+      manaPct: 0,
+      manaSpeech: '{name} is low on mana',
+      watchNames: [] as string[],
+      watchPct: 40
+    },
+    overlays: []
+  }
   const watcher = { gameRunning: true as boolean | null, state: { foregroundName: 'eqgame', foregroundPid: 1, gameRunning: true } }
   let feature: EngineFeature | null = null
   const ctx = {
@@ -69,7 +80,9 @@ describe('GroupHealth', () => {
     const { workers, settings, tick } = setup()
     tick()
     expect(workers).toHaveLength(1)
-    expect(workers[0].posted).toEqual([{ kind: 'config', on: true, areas: [{ x: 0, y: 0, width: 1000, height: 800 }], belowPct: 25, rearmPct: 35, front: true }])
+    expect(workers[0].posted).toEqual([
+      { kind: 'config', on: true, areas: [{ x: 0, y: 0, width: 1000, height: 800 }], belowPct: 25, rearmPct: 35, front: true, manaPct: 0, rowLines: {} }
+    ])
     // The same settings again: nothing more is sent.
     tick()
     expect(workers[0].posted).toHaveLength(1)
@@ -115,6 +128,9 @@ describe('GroupHealth', () => {
     expect(notified[0]).toEqual({ kind: 'speak', text: 'Group member 2 is at 20', interrupt: false, urgent: true })
     w.emit('message', { kind: 'low', slot: 1, pct: 10 } satisfies GroupHealthFromWorker)
     expect(notified[2]).toMatchObject({ kind: 'speak', interrupt: true })
+    // Low mana: its own words, not urgent (LT-751).
+    w.emit('message', { kind: 'low', slot: 2, pct: 12, what: 'mana' } satisfies GroupHealthFromWorker)
+    expect(notified.at(-2)).toEqual({ kind: 'speak', text: 'Group member 2 is low on mana', interrupt: false })
     w.emit('message', { kind: 'bars', bars: [] } satisfies GroupHealthFromWorker)
     expect(row().detail).toContain('No group members')
   })

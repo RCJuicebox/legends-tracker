@@ -40,7 +40,7 @@ export class Store {
   /** Settles once what start-up writes (files brought to a new schema) is on disk. */
   readonly settled: Promise<void> = Promise.resolve()
 
-  constructor(defaultTriggersPath: string) {
+  constructor(readonly defaultTriggersPath: string) {
     const p = (f: string) => join(this.dir, f)
     // Files from before schema.json existed are at schema 1.
     const schemaRead = readJsonFile(p('schema.json'))

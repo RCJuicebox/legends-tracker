@@ -1,10 +1,12 @@
 import { computeDuration } from '../../core/durations'
 import {
+  addLast,
   askText,
   BuffWatch,
   buffOffers,
   buffPlan,
   defaultWanted,
+  learnedSeconds,
   LEVEL_CAP,
   YOU,
   type ActiveBuff,
@@ -19,6 +21,7 @@ import { characterKey, characterName } from '../storeCore'
 import { CLASS_NAMES, CLASS_NUMBER, type ClassId } from '../../shared/game/classes'
 import type { Spell, SpellBook } from '../../core/spells'
 import type { TimerBoard } from '../../core/timers'
+import type { TimerView } from '../../shared/types'
 import type { MyClass } from '../../core/spellMotes'
 import type { EngineOutputs, EngineStore } from './contracts'
 import type { EngineFeature } from './feature'
@@ -46,6 +49,8 @@ export interface BuffHooks {
   logFile?: () => string
   /** A /who line about the character being played. */
   onSelf?: (p: Person) => void
+  /** The buffs overlay's footer changed (LT-749): the timers go out again. */
+  notesChanged?: () => void
 }
 
 /**
@@ -74,7 +79,7 @@ export class BuffCoordinator implements EngineFeature {
     private readonly notifier: Notifier,
     private readonly hooks: BuffHooks
   ) {
-    this.viewOut = new Throttled(1000, () => this.out.push('state:buffs', this.pushView()), {
+    this.viewOut = new Throttled(1000, () => this.publish(), {
       everyMs: 5000,
       beat: (now) => {
         this.watch.prune(now)
@@ -85,7 +90,10 @@ export class BuffCoordinator implements EngineFeature {
       seconds: (spell, rank, caster) => this.buffSeconds(spell, rank, caster),
       onChange: () => this.changed(),
       onLand: (b) => this.landed(b),
-      onFade: (b) => this.board.end(`buff:${b.spell}`, 'faded'),
+      onFade: (b, why, at) => {
+        this.board.end(`buff:${b.spell}`, 'faded')
+        if (why === 'faded' && at !== undefined) this.learnLast(b, at)
+      },
       onWho: (p) => this.learnPerson(p)
     })
   }
@@ -222,6 +230,42 @@ export class BuffCoordinator implements EngineFeature {
   /** The offers last pushed whole: pushes after leave them out until they change (LT-555: 105 KB of 141 a push). */
   private offersPushed: BuffOffer[] | null = null
 
+  /** The buffs still to get, said under the buffs overlay's bars; '' for none (LT-749). */
+  private missing = ''
+
+  private publish(): void {
+    const v = this.pushView()
+    this.out.push('state:buffs', v)
+    const missing = this.settings.tracking.groupBuffs && v.needs.length ? `Missing: ${askText(v.needs, false)}` : ''
+    if (missing !== this.missing) {
+      this.missing = missing
+      this.hooks.notesChanged?.()
+    }
+  }
+
+  /**
+   * The buffs overlay's footer, as a note among the timers (LT-749): what the plan still wants, kept in
+   * view where the six-second reminder is gone. None with group buffs off or nothing missing.
+   */
+  notes(): TimerView[] {
+    if (!this.missing) return []
+    return [
+      {
+        id: 'note:buffs',
+        label: this.missing,
+        target: '',
+        source: 'spell',
+        color: CATEGORY_COLORS.buff,
+        overlay: 'buffs',
+        startedAt: 0,
+        endsAt: Infinity,
+        exact: true,
+        warnSec: 0,
+        note: true
+      }
+    ]
+  }
+
   /** The view as pushed: without the offers while they are the ones pushed before; buffs:get always has them. */
   private pushView(): BuffView {
     const v = this.view()
@@ -255,9 +299,22 @@ export class BuffCoordinator implements EngineFeature {
     }
     if (caster === 'You') return own(spell, rank)
     if (!caster) return unseenBuffSeconds(spell, this.queries.character(), (s) => own(s, 0))
+    // What their last fades on you said, with two or more of them (LT-748); else their /who level, unfocused.
+    const learned = learnedSeconds(this.store.buffs.get().lasts?.[caster.toLowerCase()]?.[spell.name])
+    if (learned !== null) return learned
     const level = this.store.buffs.get().people[caster.toLowerCase()]?.level ?? 50
     const d = computeDuration({ spell, rank, level, tierPct: this.settings.tracking.tierDurationPct, focusPct: 0 })
     return d.permanent ? null : d.seconds
+  }
+
+  /** Another caster's buff faded on you: how long it lasted, for the next one of theirs (LT-748). Not from history. */
+  private learnLast(b: ActiveBuff, at: number): void {
+    if (b.caster === 'You' || !b.caster || this.hooks.readingHistory()) return
+    const f = this.store.buffs.get()
+    const k = b.caster.toLowerCase()
+    const next = addLast(f.lasts?.[k]?.[b.spell], (at - b.landedAt) / 1000)
+    if (!next) return
+    this.store.buffs.set({ ...f, lasts: { ...f.lasts, [k]: { ...f.lasts?.[k], [b.spell]: next } } })
   }
 
   private changed(): void {

@@ -37,6 +37,8 @@ export function defaultSettings(): AppSettings {
       ccWarnSpeech: 'Recast {spell} on {target}',
       ccBreakSpeech: '{spell} broke on {target}',
       resistStreakSpeech: 'Three resists in a row on {target}',
+      cooldowns: true,
+      cooldownReadySpeech: '{spell} ready',
       announceOtherBuffFades: false,
       tierDurationPct: { ...DEFAULT_TIER_DURATION_PCT }
     },
@@ -51,7 +53,7 @@ export function defaultSettings(): AppSettings {
     achievementCues: true,
     modules: {},
     combat: { fightGapSec: 10, historyMinutes: 60, newSessionOnZone: true, combinePet: true, charmPets: true },
-    groupHealth: { enabled: false, belowPct: 25, speech: '{name} at {pct} percent' },
+    groupHealth: { enabled: false, belowPct: 25, speech: '{name} at {pct} percent', manaPct: 0, manaSpeech: '{name} is low on mana', watchNames: [], watchPct: 40 },
     factionPlan: { assumptions: {}, choices: {} },
     setup: { hidden: false, accepted: [], arranged: false }
   }

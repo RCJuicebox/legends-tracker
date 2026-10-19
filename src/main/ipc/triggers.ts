@@ -7,6 +7,56 @@ import { respawnTimerSpec, respawnTrigger, respawnTriggerId, type RespawnTimerSp
 import { parseJson } from '../../core/json'
 import { sanitizeRespawnTimer, sanitizeSpawnLink, sanitizeTrigger, sanitizeTriggers } from '../../core/validate'
 import type { AppContext } from '../context'
+import { ginaToTriggers, triggersToGina } from '../../core/gina'
+import { readJsonFile } from '../storeCore'
+import yauzl from 'yauzl'
+import yazl from 'yazl'
+import { createWriteStream } from 'node:fs'
+
+/** GINA's package: a zip holding ShareData.xml (FEAT-029). */
+const SHARE_DATA = 'sharedata.xml'
+
+/** ShareData.xml out of a .gtp file, as text. */
+function readGtp(file: string): Promise<string> {
+  return new Promise((resolve, reject) => {
+    yauzl.open(file, { lazyEntries: true }, (err, zip) => {
+      if (err || !zip) return reject(err ?? new Error('could not open the package'))
+      const fail = (e: unknown) => {
+        zip.close()
+        reject(e)
+      }
+      zip.on('error', fail)
+      zip.on('end', () => reject(new Error('there is no ShareData.xml in it')))
+      zip.on('entry', (entry: yauzl.Entry) => {
+        if (entry.fileName.toLowerCase().split('/').pop() !== SHARE_DATA) return zip.readEntry()
+        zip.openReadStream(entry, (e2, stream) => {
+          if (e2 || !stream) return fail(e2 ?? new Error('could not read ShareData.xml'))
+          const parts: Buffer[] = []
+          stream.on('data', (c: Buffer) => parts.push(c))
+          stream.on('error', fail)
+          stream.on('end', () => {
+            zip.close()
+            resolve(Buffer.concat(parts).toString('utf8').replace(/^﻿/, ''))
+          })
+        })
+      })
+      zip.readEntry()
+    })
+  })
+}
+
+/** A .gtp file holding `xml` as its ShareData.xml. */
+function writeGtp(file: string, xml: string): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const zip = new yazl.ZipFile()
+    zip.addBuffer(Buffer.from(xml, 'utf8'), 'ShareData.xml')
+    zip.end()
+    const out = createWriteStream(file)
+    out.on('close', () => resolve())
+    out.on('error', reject)
+    zip.outputStream.on('error', reject).pipe(out)
+  })
+}
 
 // Triggers, and the respawn timers that are triggers under the hood.
 
@@ -45,6 +95,38 @@ export function registerTriggerIpc(ctx: AppContext): void {
       return null
     }
     return list
+  })
+  // The triggers this build ships, for those a profile is missing (FEAT-043: a new one reaches an old profile this way).
+  handle('triggers:defaults', () => {
+    const read = readJsonFile(store.defaultTriggersPath, { setAside: false })
+    return (read.state === 'ok' ? sanitizeTriggers(read.value) : null) ?? []
+  })
+  // GINA's packages (FEAT-029): a .gtp (or its ShareData.xml) in, a .gtp out.
+  handle('triggers:importGina', async () => {
+    const r = await windows.openDialog({ filters: [{ name: 'GINA packages', extensions: ['gtp', 'xml'] }], properties: ['openFile'] })
+    const file = r.filePaths[0]
+    if (r.canceled || !file) return null
+    try {
+      const xml = file.toLowerCase().endsWith('.xml') ? await fs.readFile(file, 'utf8') : await readGtp(file)
+      const list = sanitizeTriggers(ginaToTriggers(xml)) ?? []
+      if (!list.length) {
+        windows.showError(`${basename(file)} could not be imported.`, 'It holds no GINA triggers.')
+        return null
+      }
+      return list
+    } catch (e) {
+      log.warn(`GINA import: could not read ${file}`, e)
+      windows.showError(`${basename(file)} could not be imported.`, (e as Error).message)
+      return null
+    }
+  })
+  handle('triggers:exportGina', async (input) => {
+    const list = sanitizeTriggers(input)
+    if (!list?.length) throw new Error('Nothing to export: not a list of triggers.')
+    const r = await windows.saveDialog({ defaultPath: 'legends-tracker.gtp', filters: [{ name: 'GINA packages', extensions: ['gtp'] }] })
+    if (r.canceled || !r.filePath) return false
+    await writeGtp(r.filePath, triggersToGina(list))
+    return true
   })
   handle('triggers:export', async (input) => {
     const list = sanitizeTriggers(input)

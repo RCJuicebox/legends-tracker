@@ -221,6 +221,17 @@ export function RuleEditor({ k, onSaved }: { k: KnownSpell; onSaved: (list: Know
           >
             Hear warning
           </button>
+          <button
+            className="btn"
+            onClick={() =>
+              void act(
+                'audio:test',
+                (rule.fadeSpeech ?? (beneficial ? t.buffFadeSpeech : t.dotFadeSpeech)).replace(/\{spell\}/gi, rule.alias || k.name).replace(/\{target\}/gi, 'a gnoll')
+              )
+            }
+          >
+            Hear fade
+          </button>
           <span className="grow" />
           <ConfirmButton className="btn ghost" question="Clear every setting for this spell?" onConfirm={() => void save(null)}>
             Reset to defaults

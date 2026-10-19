@@ -1,4 +1,4 @@
-import { barFill, barsArea, findGroupBars, GroupHealthAlarm, type Frame, type GroupBar } from '../core/groupHealth'
+import { barFill, barsArea, findGroupBars, GroupHealthAlarm, manaFill, type Frame, type GroupBar } from '../core/groupHealth'
 import type { GroupHealthFromWorker, GroupHealthToWorker, ScreenArea } from './groupHealth'
 
 // The group health watch's loop, as the worker runs it (groupHealthWorker.ts), with the screen, the
@@ -29,6 +29,7 @@ export interface LoopDeps {
   /** The bars in a frame, and how full one is: the real readers unless a test stands in. */
   find?: (f: Frame) => GroupBar[]
   fill?: (f: Frame, b: GroupBar) => number | null
+  mana?: (f: Frame, b: GroupBar) => number | null
 }
 
 const same = (a: GroupBar[], b: GroupBar[]) => a.length === b.length && a.every((x, i) => x.left === b[i].left && x.right === b[i].right && x.top === b[i].top)
@@ -47,12 +48,19 @@ export class GroupHealthLoop {
   private lastSearch = 0
   private scheduled = false
   readonly alarm = new GroupHealthAlarm(25, 35)
+  /** Low mana, said apart from health; off (0) unless set (LT-751). */
+  readonly manaAlarm = new GroupHealthAlarm(0, 10)
+  private manaOn = false
+  /** A health line of their own for some rows, by each row's top edge: named members (LT-751). */
+  private rowLines: Record<number, number> = {}
   private readonly find: (f: Frame) => GroupBar[]
   private readonly fill: (f: Frame, b: GroupBar) => number | null
+  private readonly mana: (f: Frame, b: GroupBar) => number | null
 
   constructor(private readonly deps: LoopDeps) {
     this.find = deps.find ?? findGroupBars
     this.fill = deps.fill ?? barFill
+    this.mana = deps.mana ?? manaFill
   }
 
   /** Looks for the window on one monitor, or on monitor `only` when given; true when it is there. */
@@ -93,11 +101,11 @@ export class GroupHealthLoop {
       this.lost = 0
       this.lostSince = 0
     }
-    for (const low of this.alarm.update(
-      fills,
-      this.bars.map((b) => b.top)
-    ))
-      this.deps.post({ kind: 'low', ...low })
+    const tops = this.bars.map((b) => b.top)
+    for (const low of this.alarm.update(fills, tops, (i) => this.rowLines[tops[i]])) this.deps.post({ kind: 'low', ...low })
+    if (!this.manaOn) return
+    const manas = this.bars.map((b) => this.mana(frame, b))
+    for (const low of this.manaAlarm.update(manas, tops)) this.deps.post({ kind: 'low', ...low, what: 'mana' })
   }
 
   /** One turn of the loop: a search or a sample, and the next turn asked for. */
@@ -131,6 +139,9 @@ export class GroupHealthLoop {
     if (m.kind === 'config') {
       this.areas = m.areas
       this.alarm.setLine(m.belowPct, m.rearmPct)
+      this.manaOn = (m.manaPct ?? 0) > 0
+      this.manaAlarm.setLine(m.manaPct ?? 0, (m.manaPct ?? 0) + 10)
+      this.rowLines = m.rowLines ?? {}
       const was = this.on
       const wasFront = this.front
       this.on = m.on

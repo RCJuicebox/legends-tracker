@@ -214,7 +214,9 @@ export function TimerBars({
   const box = useRef<HTMLDivElement>(null)
   const [hidden, setHidden] = useState(0)
   // The order and the groups change only when the timers do.
-  const sorted = useMemo(() => [...timers].sort((a, b) => a.endsAt - b.endsAt), [timers])
+  const sorted = useMemo(() => timers.filter((t) => !t.note).sort((a, b) => a.endsAt - b.endsAt), [timers])
+  // Lines under the bars, not bars: the buffs overlay's "Missing: …" (LT-749).
+  const notes = useMemo(() => timers.filter((t) => t.note), [timers])
   const ordered = useMemo(() => {
     if (!grouped) return []
     const groups = new Map<string, TimerView[]>()
@@ -241,7 +243,7 @@ export function TimerBars({
     watch.observe(frame)
     return () => watch.disconnect()
   }, [sorted, ordered, fontSize])
-  if (!sorted.length) return <>{empty ?? null}</>
+  if (!sorted.length && !notes.length) return <>{empty ?? null}</>
   const style = { ['--fs' as string]: `${fontSize}px` }
   return (
     <div className="timers" style={style} ref={box}>
@@ -256,6 +258,11 @@ export function TimerBars({
           ))
         : sorted.map((t) => <TimerBar key={t.id} t={t} showTarget onOpen={onOpen} />)}
       {hidden > 0 && <div className="timers-more">+{hidden} more</div>}
+      {notes.map((n) => (
+        <div key={n.id} className="timers-note" title={n.label}>
+          {n.label}
+        </div>
+      ))}
     </div>
   )
 }

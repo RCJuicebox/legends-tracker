@@ -28,6 +28,8 @@ export interface TimerView {
   caster?: string
   /** A DoT's last tick, once one is seen: with its exact end, "3 ticks · 451 a tick" (LT-728). */
   tickDamage?: number
+  /** Not a bar: a line under its overlay's bars, as the buffs overlay's "Missing: …" (LT-749). */
+  note?: true
 }
 
 export type Notification =

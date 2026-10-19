@@ -13,7 +13,7 @@ const ROWS: GroupBar[] = [
   { left: 20, right: 200, top: 120 }
 ]
 
-function loop(o: { bars?: (area: { x: number; y: number }) => GroupBar[]; fills?: () => (number | null)[] } = {}) {
+function loop(o: { bars?: (area: { x: number; y: number }) => GroupBar[]; fills?: () => (number | null)[]; manas?: () => (number | null)[] } = {}) {
   const posted: GroupHealthFromWorker[] = []
   const captured: { x: number; y: number; width: number; height: number }[] = []
   let now = 1_000_000
@@ -27,7 +27,8 @@ function loop(o: { bars?: (area: { x: number; y: number }) => GroupBar[]; fills?
     now: () => now,
     later: (fn) => steps.push(fn),
     find: (f) => o.bars?.({ x: f.x, y: f.y }) ?? [],
-    fill: (_, b) => (o.fills?.() ?? [0.9, 0.9])[ROWS.findIndex((r) => r.top === b.top)]
+    fill: (_, b) => (o.fills?.() ?? [0.9, 0.9])[ROWS.findIndex((r) => r.top === b.top)],
+    mana: (_, b) => (o.manas?.() ?? [0.9, 0.9])[ROWS.findIndex((r) => r.top === b.top)]
   })
   /** Runs the step scheduled last, `ms` later. */
   const tick = (ms: number) => {
@@ -40,6 +41,26 @@ function loop(o: { bars?: (area: { x: number; y: number }) => GroupBar[]; fills?
 }
 
 describe('GroupHealthLoop', () => {
+  it('says low mana apart from health once switched on, and a named row at its own line (LT-751)', () => {
+    let fills: (number | null)[] = [0.9, 0.9]
+    let manas: (number | null)[] = [0.9, 0.9]
+    const { l, posted, tick } = loop({ bars: () => ROWS, fills: () => fills, manas: () => manas })
+    l.message({ kind: 'config', on: true, areas: [AREA], belowPct: 25, rearmPct: 35, front: true })
+    manas = [0.1, 0.9]
+    tick(200)
+    tick(200)
+    // Mana off: nothing.
+    expect(posted.filter((m) => m.kind === 'low')).toEqual([])
+    l.message({ kind: 'config', on: true, areas: [AREA], belowPct: 25, rearmPct: 35, front: true, manaPct: 15, rowLines: { 120: 40 } })
+    fills = [0.9, 0.38]
+    tick(200)
+    tick(200)
+    expect(posted.filter((m) => m.kind === 'low')).toEqual([
+      { kind: 'low', slot: 2, pct: 38 },
+      { kind: 'low', slot: 1, pct: 10, what: 'mana' }
+    ])
+  })
+
   it('searches one monitor at a time only while the game is in front, backing off to a minute when nothing is found (LT-549)', () => {
     const { l, captured, tick, steps } = loop()
     l.message({ kind: 'config', on: true, areas: [AREA, OTHER], belowPct: 25, rearmPct: 35, front: true })

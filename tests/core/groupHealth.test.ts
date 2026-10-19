@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { barFill, barsArea, findGroupBars, GROUP_COLOURS, GroupHealthAlarm, groupHealthPhrase, namesFromWords, type Frame } from '../../src/core/groupHealth'
+import { barFill, barsArea, findGroupBars, GROUP_COLOURS, GroupHealthAlarm, groupHealthPhrase, manaFill, namesFromWords, type Frame } from '../../src/core/groupHealth'
 import { RE_GROUP_CHANGE } from '../../src/core/combatLines'
 
 // The group health watch reads JuiceboxUI's Group window off the screen. These frames are drawn the
@@ -101,7 +101,38 @@ describe('barFill', () => {
   })
 })
 
+describe('manaFill', () => {
+  it('reads the mana bar under each health bar, from a sample of the bars alone (LT-751)', () => {
+    const whole = frame(400, 200)
+    member(whole, 50, 20, 0.9)
+    member(whole, 50, 80, 0.9, { mana: false })
+    const bars = findGroupBars(whole)
+    expect(manaFill(whole, bars[0])).toBeCloseTo(0.6, 2)
+    // No mana bar (a warrior's row): nothing to read, never said.
+    expect(manaFill(whole, bars[1])).toBeNull()
+    const a = barsArea(bars)
+    const piece = frame(a.width, a.height, a.x, a.y)
+    member(piece, 50 - a.x, 20 - a.y, 0.9)
+    member(piece, 50 - a.x, 80 - a.y, 0.9)
+    expect(manaFill(piece, bars[1])).toBeCloseTo(0.6, 2)
+  })
+})
+
 describe('GroupHealthAlarm', () => {
+  it('gives a named member a line of their own, re-armed as far over it (LT-751)', () => {
+    const alarm = new GroupHealthAlarm(25, 35)
+    const lineOf = (i: number) => (i === 0 ? 40 : undefined)
+    alarm.update([0.38, 0.38], [100, 120], lineOf)
+    expect(alarm.update([0.38, 0.38], [100, 120], lineOf)).toEqual([{ slot: 1, pct: 38 }])
+    // Back to 45: under their 50 re-arm, so not said again yet.
+    alarm.update([0.45, 0.38], [100, 120], lineOf)
+    alarm.update([0.39, 0.38], [100, 120], lineOf)
+    expect(alarm.update([0.39, 0.38], [100, 120], lineOf)).toEqual([])
+    alarm.update([0.55, 0.38], [100, 120], lineOf)
+    alarm.update([0.39, 0.38], [100, 120], lineOf)
+    expect(alarm.update([0.39, 0.38], [100, 120], lineOf)).toEqual([{ slot: 1, pct: 39 }])
+  })
+
   it('says a member once as they fall to the line, two samples in a row, and again only after they are back 10 over', () => {
     const alarm = new GroupHealthAlarm(25, 35)
     expect(alarm.update([0.9, 0.8])).toEqual([])

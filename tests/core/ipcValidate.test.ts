@@ -245,3 +245,21 @@ describe('the preload channel list', () => {
     expect(channelAllowed(undefined, 'invoke')).toBe(false)
   })
 })
+
+describe("a trigger's conditions and its timer's target as kept (FEAT-030, LT-745)", () => {
+  it('keeps each condition that says something, drops the rest, and keeps a timer target', () => {
+    const [t] = sanitizeTriggers([
+      {
+        id: 'a',
+        name: 'A',
+        phrases: ['x'],
+        actions: [{ type: 'timer', name: 'T', durationSec: 10, target: '{S1}' }],
+        when: { zone: ' Fear ', fighting: true, characters: ['Kelwyn', '', 5], count: { n: 3, withinSec: 20 }, compare: { snippet: 'n1', op: '>=', value: 300 }, junk: 1 }
+      },
+      { id: 'b', name: 'B', phrases: ['y'], when: { zone: '', count: { n: 1 }, compare: { snippet: 'S1' } } }
+    ])!
+    expect(t.when).toEqual({ zone: 'Fear', fighting: true, characters: ['Kelwyn'], count: { n: 3, withinSec: 20 }, compare: { snippet: 'N1', op: '>=', value: 300 } })
+    expect(t.actions[0]).toMatchObject({ type: 'timer', target: '{S1}' })
+    expect(sanitizeTriggers([{ id: 'b', name: 'B', phrases: ['y'], when: { zone: '', count: { n: 1 } } }])![0].when).toBeUndefined()
+  })
+})

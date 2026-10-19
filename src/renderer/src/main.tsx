@@ -104,7 +104,7 @@ function carryPage(): void {
 
 /** How many timers run, beside Live in the sidebar. */
 function TimerCount() {
-  const n = useLive((l) => l.timers.length)
+  const n = useLive((l) => l.timers.filter((t) => !t.note).length)
   return n > 0 ? <span className="count">{n}</span> : null
 }
 

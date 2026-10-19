@@ -47,6 +47,16 @@ What changed in each version. The release workflow publishes a version's section
 - **Plane of Sky: count from your inventory export too.** Items are counted from your log, your `/outputfile inventory` export, or the higher of the two (the default: the export has no currency tab, where the Wind Runes are). A Test counts as handed in from your log, your own +1, its reward in your inventory, or the achievements export saying you obtained it.
 - **Plane of Sky: find and sort the Tests.** Filter by class, island and mob, hide the Tests you hold everything for or have handed in, star Tests and show only those, and sort by nearest to done, most recently looted, class or island. A Test opens on each item's two counts, what eqlwiki says of it and the reward, and its hand-ins, which you can put right.
 
+- **Triggers: only when, and the n-th time.** A trigger's **Only when** card limits it to a zone, to fighting or not, to some of your characters, to the n-th match within so many seconds ("the third Gaze in 10 s"), or to a number it caught over or under a value ("{N1} over 300"). A timer's **About** says what its bar is grouped under (its mob) when the phrase's own catch is not it.
+- **GINA packages.** Triggers has **Import GINA…** and **Export GINA…**: a .gtp (or its ShareData.xml) comes in with its groups as folders, its text, speech and timers with their ending and ended speech; yours go out the same way.
+- **Hear it before you save.** Every speech box on a trigger (the phrase, a timer's warning and its end) and a spell rule's fade has **Hear**.
+- **Shipped triggers reach an old profile.** Triggers offers **Add N shipped** for triggers this version ships that your list does not have, the new one first: "Out of mana" is said (once in 30 s) on the game's "Insufficient Mana to cast this spell!".
+- **Others' buffs last as long as they did.** Once another player's buff has faded on you twice, its bar runs as long as theirs really last (the middle of the last few), rather than the spell file's length at their level with no focus.
+- **The buffs overlay says what is missing.** With group buffs on, a line under the bars lists the buffs your plan still wants ("Missing: Spirit of Wolf, Clarity"), where the reminder that said it was gone in six seconds.
+- **Group health: mana, and the tank's own line.** The group health alert can also say a member's low mana ("Aldric is low on mana", off until a line is set) and give named members (the tank) a health line of their own, both on the Triggers page's group health card.
+- **Ready-again bars.** A spell of yours with a recast of 30 seconds or more (Harm Touch, Lay on Hands, Divine Aura…) gets a bar on the DoTs & Timers overlay until it can be cast again, from the spell file's recast, and "Harm Touch ready" is said as it ends; a fizzle or an interruption takes it back, and a zone does not end it. On Spell Timers › Defaults, under Ready again; your reuse focus is not taken off.
+- **Triggers read lines faster.** A phrase's leading words are looked for before its pattern is run, so a line no trigger could match costs next to nothing however many triggers you keep.
+
 ## 2.15.1 (2026-10-19)
 
 - **Electron 44.9,** with Chromium 152.0.7977.167 and its security fixes. The app is now built with Vite 8.

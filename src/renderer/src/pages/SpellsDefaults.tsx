@@ -95,6 +95,21 @@ export function SpellDefaults() {
             <input value={t.resistStreakSpeech} onChange={(e) => setT({ resistStreakSpeech: e.target.value }, TYPING_MS)} />
           </Field>
         </div>
+        <div className="card stack gap-12">
+          <h2>Ready again</h2>
+          <label className="row">
+            <Switch on={t.cooldowns} onChange={(v) => setT({ cooldowns: v })} /> A bar until a spell with a long recast can be cast again
+          </label>
+          <p className="muted small m-0">
+            From the spell file&apos;s recast, for spells of 30 seconds or more (Harm Touch, Lay on Hands, Divine Aura…), on the DoTs &amp; Timers overlay. Your reuse focus is not
+            taken off. Legends&apos; ranked abilities have no recast there: time those with a trigger.
+          </p>
+          {t.cooldowns && (
+            <Field label="When one is ready" hint="{spell} is filled in. Blank for silence.">
+              <input value={t.cooldownReadySpeech} onChange={(e) => setT({ cooldownReadySpeech: e.target.value }, TYPING_MS)} />
+            </Field>
+          )}
+        </div>
       </div>
     </>
   )

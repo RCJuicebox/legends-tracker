@@ -1,7 +1,21 @@
 import { describe, expect, it } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { askText, BuffWatch, castOrder, buffOffers, buffPlan, defaultWanted, parseWho, PROC_VALUE, type ActiveBuff, type BuffOffer, type Person } from '../../src/core/buffs'
+import {
+  addLast,
+  askText,
+  BuffWatch,
+  learnedSeconds,
+  castOrder,
+  buffOffers,
+  buffPlan,
+  defaultWanted,
+  parseWho,
+  PROC_VALUE,
+  type ActiveBuff,
+  type BuffOffer,
+  type Person
+} from '../../src/core/buffs'
 import { SpellBook, type Spell } from '../../src/core/spells'
 import { effectValue } from '../../src/core/effectValue'
 import { DEFAULT_TIER_DURATION_PCT } from '../../src/shared/types'
@@ -367,5 +381,18 @@ describe('offers from the spell file', () => {
     ])
     expect(named('Guard of Vie')).toMatchObject({ line: 'rune', value: 350, effects: [{ label: 'melee ward', value: '700 (10%)' }] })
     expect(named('Blessing of the Knight')).toMatchObject({ line: 'hpRegen', effects: [{ label: 'heal per hit', value: '+4' }] })
+  })
+})
+
+describe("others' buffs learn how long they last (LT-748)", () => {
+  it('keeps the last nine samples of a minute-scale run, and takes the middle of two or more', () => {
+    expect(addLast(undefined, 12)).toBeNull()
+    let s = addLast(undefined, 2400)!
+    expect(learnedSeconds(s)).toBeNull()
+    s = addLast(s, 2460)!
+    expect(learnedSeconds(s)).toBe(2430)
+    for (let i = 0; i < 10; i++) s = addLast(s, 2500)!
+    expect(s).toHaveLength(9)
+    expect(learnedSeconds(s)).toBe(2500)
   })
 })

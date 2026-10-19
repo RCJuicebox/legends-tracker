@@ -64,6 +64,14 @@ export const DEFAULT_OTHERS_SPEECH = '{caster} cast {spell} on {target}, do not 
  * this has passed as well.
  */
 const GRACE_MS = 14000
+/**
+ * A recast at least this long gets a "ready again" bar (FEAT-024). The spell file's field 10 is the recast
+ * (Harm Touch 72 min, Lay on Hands 70, Divine Aura 15, Gate 8 s); shorter ones would only crowd the bars.
+ * Legends' ranked abilities (Harm Touch X) have none there, so they stay trigger timers.
+ */
+export const COOLDOWN_MIN_MS = 30_000
+/** A ready-again bar's colour: grey, apart from the spell categories'. */
+const COOLDOWN_COLOR = '#8d939c'
 /** How long after a beneficial spell first lands other targets may still report it: group buffs land in the same second. */
 const GROUP_LAND_MS = 1500
 /** A cast stays open this long past its cast time for its landing line: lag, and the tick it lands in. */
@@ -191,8 +199,8 @@ export class SpellTracker {
     if (text === QUICK_BUFF) return took(this.onQuickBuff(now))
     if (text.includes(' begins ') && (m = CAST_BY_OTHER.exec(text))) return took(this.onOtherCast(m[1], m[2], now))
 
-    if ((m = RE_FAIL_NAMED.exec(text))) return took(this.dropPending(m[1]))
-    if (RE_FAIL.test(text)) return took(this.dropOwn())
+    if ((m = RE_FAIL_NAMED.exec(text))) return took(this.dropPending(m[1]), this.takeBackCooldown(now))
+    if (RE_FAIL.test(text)) return took(this.dropOwn(), this.takeBackCooldown(now))
     if (text.startsWith('Your ')) {
       if ((m = RE_NO_HOLD_NAMED.exec(text))) return took(this.onNoHold(m[1]))
       if ((m = RE_OVERWRITTEN.exec(text))) return took(this.onOverwritten(m[1], m[2], now))
@@ -209,8 +217,8 @@ export class SpellTracker {
       }
       return true
     }
-    if (FAIL_PREFIXES.some((p) => text.startsWith(p))) return took(this.dropOwn())
-    if (REFUSALS.some((p) => text.startsWith(p))) return took(this.dropOwn(now))
+    if (FAIL_PREFIXES.some((p) => text.startsWith(p))) return took(this.dropOwn(), this.takeBackCooldown(now))
+    if (REFUSALS.some((p) => text.startsWith(p))) return took(this.dropOwn(now), this.takeBackCooldown(now))
 
     if (this.tryLand(text, now)) return true
     if (this.songs.size && this.onSongPulse(text, now)) return true
@@ -257,7 +265,8 @@ export class SpellTracker {
       // Mobs do not follow you; buffs do, and stand still while the zone loads: the log's silence
       // before "You have entered" (LT-718: 53 of 60 Puma bars that ran out with no fade had zoned, and
       // with the load taken off their fades fall on the unzoned median).
-      this.board.endWhere((t) => t.source === 'spell' && !isBeneficialTimer(t), 'zoned')
+      // A recast runs on through a zone (FEAT-024).
+      this.board.endWhere((t) => t.source === 'spell' && !isBeneficialTimer(t) && !isCooldown(t), 'zoned')
       this.board.delay((t) => t.source === 'spell' && isBeneficialTimer(t) && t.startedAt <= prevAt, Math.min(Math.max(0, now - prevAt), ZONE_LOAD_MAX_MS))
       this.hooks.onZone?.(zone)
       return true
@@ -269,10 +278,14 @@ export class SpellTracker {
     this.zone = zone
   }
 
+  /** The cooldown the cast begun last started, until its cast is over: a fizzle or an interruption takes it back. */
+  private castCooldown: { key: string; until: number } | null = null
+
   private onCast(name: string, now: number): void {
     const r = this.book.resolve(name)
     if (!r) return
     this.hooks.onCast?.(r, now)
+    this.startCooldown(r, now)
     this.lastCast = { names: [r.spell.name, r.rankedName], until: now + r.spell.castMs + CAST_SLACK_MS }
     const d = this.config.durationFor(r.spell, r.rank)
     if (d.ticks === 0 || d.permanent) return
@@ -335,6 +348,46 @@ export class SpellTracker {
       if (at === undefined || p.at === at) this.pending.splice(i, 1)
       return
     }
+  }
+
+  /**
+   * Your spell with a long recast: a bar until it can be cast again, from the end of its cast (FEAT-024).
+   * Its reuse focus and mote rank are not taken off, so it may be ready a little before the bar ends.
+   */
+  private startCooldown(r: RankedSpell, now: number): void {
+    const t = this.config.tracking
+    const s = r.spell
+    if (!t.enabled || !t.cooldowns || s.recastMs < COOLDOWN_MIN_MS) return
+    const key = `cooldown:${s.name}`
+    const words = t.cooldownReadySpeech
+    this.board.upsert({
+      key,
+      id: this.board.get(key)?.id ?? this.board.nextId(),
+      label: `${r.rankedName} ready in`,
+      target: '',
+      source: 'spell',
+      spell: s.name,
+      icon: s.icon,
+      color: COOLDOWN_COLOR,
+      overlay: 'targets',
+      startedAt: now,
+      endsAt: now + s.castMs + s.recastMs,
+      exact: true,
+      warnSec: 0,
+      onWarn: [],
+      onExpire: words ? [{ kind: 'speak', text: renderSpeech(words, r.rankedName, ''), interrupt: false }] : [],
+      warned: false,
+      graceMs: 0,
+      meta: { kind: 'cooldown', rankedName: r.rankedName }
+    })
+    this.castCooldown = { key, until: now + s.castMs + CAST_SLACK_MS }
+  }
+
+  /** The cast did not go off: no recast to wait for. */
+  private takeBackCooldown(now: number): void {
+    const c = this.castCooldown
+    this.castCooldown = null
+    if (c && now <= c.until) this.board.end(c.key, 'cleared')
   }
 
   /** A song's pulse landing on you again: its timer runs on from now, without a feed line each pulse. */
@@ -513,7 +566,7 @@ export class SpellTracker {
     const yours = this.hooks.isYourPet
     const candidates = this.board
       .list()
-      .filter((t) => t.source === 'spell' && t.spell === spell && t.target !== SELF && !t.meta?.caster && (!yours || yours(t.target)))
+      .filter((t) => t.source === 'spell' && t.spell === spell && t.target !== SELF && !t.meta?.caster && !isCooldown(t) && (!yours || yours(t.target)))
       .sort((a, b) => b.startedAt - a.startedAt)
     if (candidates[0]) this.board.end(candidates[0].key, 'faded')
   }
@@ -571,7 +624,7 @@ export class SpellTracker {
 }
 
 /** A line a branch of `handle` read: whatever the branch made of it, the line was the tracker's (FEAT-025). */
-const took = (_done: unknown): true => true
+const took = (..._done: unknown[]): true => true
 
 /** A bar as the feed names it: "Harm Touch (Fenwick)" for another's cast. */
 function named(t: BoardTimer): string {
@@ -584,6 +637,11 @@ const amount = (s: string) => +s.replace(/,/g, '')
 /** A mez or a charm: the crowd control an enchanter times, with cues of its own (LT-713). */
 function isCrowdControl(s: Spell): boolean {
   return s.category === 'mez' || s.category === 'charm'
+}
+
+/** A "ready again" bar (FEAT-024), not a spell running on someone. */
+function isCooldown(t: BoardTimer): boolean {
+  return t.key.startsWith('cooldown:')
 }
 
 function isBeneficialTimer(t: BoardTimer): boolean {

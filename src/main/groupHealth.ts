@@ -33,7 +33,21 @@ export interface ScreenArea {
 const STOP_WAIT_MS = 1000
 
 export type GroupHealthToWorker =
-  { kind: 'config'; on: boolean; areas: ScreenArea[]; belowPct: number; rearmPct: number; front: boolean } | { kind: 'search' } | { kind: 'ping' } | { kind: 'stop' }
+  | {
+      kind: 'config'
+      on: boolean
+      areas: ScreenArea[]
+      belowPct: number
+      rearmPct: number
+      front: boolean
+      /** Low mana's line; 0 off (LT-751). */
+      manaPct?: number
+      /** A health line of their own for rows by their top edge: the named members' (LT-751). */
+      rowLines?: Record<number, number>
+    }
+  | { kind: 'search' }
+  | { kind: 'ping' }
+  | { kind: 'stop' }
 
 export type GroupHealthFromWorker =
   { kind: 'bars'; bars: GroupBar[] } | ({ kind: 'low' } & LowHealth) | { kind: 'error'; message: string } | { kind: 'pong'; koffi: boolean; error?: string }
@@ -121,13 +135,32 @@ export class GroupHealth implements AppFeature {
     const all = screen.getAllDisplays().map((d) => screen.dipToScreenRect(null, d.bounds))
     const overlaps = (a: ScreenArea) => !!rect && a.x < rect.x + rect.width && rect.x < a.x + a.width && a.y < rect.y + rect.height && rect.y < a.y + a.height
     const areas = rect && all.some(overlaps) ? all.filter(overlaps) : all
-    const key = `${s.belowPct}|${front}|${areas.map((a) => `${a.x},${a.y}`).join(';')}`
+    const rowLines = this.rowLines(s.watchNames, s.watchPct)
+    const key = `${s.belowPct}|${s.manaPct}|${JSON.stringify(rowLines)}|${front}|${areas.map((a) => `${a.x},${a.y}`).join(';')}`
     if (this.worker && !force && key === this.lastConfig) return
     // A watch that ended badly is started again, but not more than twice a minute.
     if (!this.worker && Date.now() < this.retryAt) return
     this.lastConfig = key
     if (!this.worker) this.start()
-    this.worker!.postMessage({ kind: 'config', on: true, areas, belowPct: s.belowPct, rearmPct: s.belowPct + REARM_ABOVE, front } satisfies GroupHealthToWorker)
+    this.worker!.postMessage({
+      kind: 'config',
+      on: true,
+      areas,
+      belowPct: s.belowPct,
+      rearmPct: s.belowPct + REARM_ABOVE,
+      front,
+      manaPct: s.manaPct,
+      rowLines
+    } satisfies GroupHealthToWorker)
+  }
+
+  /** The named members' own health line, by the top of the row their name was read on (LT-751). */
+  private rowLines(watch: string[], pct: number): Record<number, number> {
+    const out: Record<number, number> = {}
+    const wanted = new Set(watch.map((n) => n.toLowerCase()))
+    if (!wanted.size) return out
+    for (const [top, name] of this.namesByTop) if (wanted.has(name.toLowerCase())) out[top] = pct
+    return out
   }
 
   /** Starts a worker of its own, asks it a ping and ends it: whether it loads at all, koffi included (the smoke test asks, LT-630). */
@@ -201,6 +234,14 @@ export class GroupHealth implements AppFeature {
   private say(low: LowHealth): void {
     const name = this.names[low.slot - 1] || `Group member ${low.slot}`
     const s = this.ctx.store.settings.get().groupHealth
+    if (low.what === 'mana') {
+      this.ctx.engine.notify([
+        { kind: 'speak', text: groupHealthPhrase(s.manaSpeech, name, low.pct), interrupt: false },
+        { kind: 'text', text: `${name} mana ${low.pct}%`, color: '#5b75ae', durationSec: 4 }
+      ])
+      this.ctx.engine.pushFeed('trigger', `Group mana: ${name} at ${low.pct}%`)
+      return
+    }
     this.ctx.engine.notify([
       // Cuts in only when the member is well under the line: above half of it, a queued recast cue is not dropped for it (LT-550).
       // Urgent either way: to the front of the queue, and never the phrase dropped when it is full (LT-719).
@@ -228,6 +269,8 @@ export class GroupHealth implements AppFeature {
       this.names = bars.map((_, i) => found[i] || this.names[i] || '')
       bars.forEach((b, i) => this.names[i] && this.namesByTop.set(b.top, this.names[i]))
       const read = this.names.filter(Boolean)
+      // A named member's own line follows their row now it is known.
+      if (this.ctx.store.settings.get().groupHealth.watchNames.length) this.apply()
       sources.ok('groupHealth', `Watching ${bars.length} group member${bars.length === 1 ? '' : 's'}${read.length ? `: ${read.join(', ')}` : ''}.`)
     } catch (e) {
       log.warn('Could not read the group members’ names:', e)

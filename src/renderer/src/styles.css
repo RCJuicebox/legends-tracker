@@ -1241,6 +1241,16 @@ table.table {
   font-size: 0.8em;
 }
 /* Grouped by target, another's cast is a line of its own under the spell (LT-750). */
+.timers-note {
+  font-size: calc(var(--fs) * 0.8);
+  color: var(--bar-text, #fff);
+  text-shadow: var(--bar-shadow, var(--ov-shadow, 0 1px 2px rgba(0, 0, 0, 0.9)));
+  opacity: 0.85;
+  padding: 2px 4px 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 .timer-group .timer.has-caster {
   height: auto;
   min-height: calc(var(--fs) * 1.95);

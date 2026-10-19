@@ -32,6 +32,8 @@ export const TRACKING: TrackingSettings = {
   ccWarnSpeech: 'Recast {spell} on {target}',
   ccBreakSpeech: '{spell} broke on {target}',
   resistStreakSpeech: 'Three resists in a row on {target}',
+  cooldowns: true,
+  cooldownReadySpeech: '{spell} ready',
   announceOtherBuffFades: false,
   tierDurationPct: DEFAULT_TIER_DURATION_PCT
 }

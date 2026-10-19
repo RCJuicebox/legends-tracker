@@ -328,7 +328,8 @@ export interface BuffWatchHooks {
   onChange: () => void
   /** A buff landed on you or faded from you. */
   onLand?: (b: ActiveBuff) => void
-  onFade?: (b: ActiveBuff, why: 'faded' | 'died') => void
+  /** `at`: the fade line's time, when a fade line ended it. */
+  onFade?: (b: ActiveBuff, why: 'faded' | 'died', at?: number) => void
   onWho?: (p: Person) => void
 }
 
@@ -389,7 +390,7 @@ export class BuffWatch {
     }
     const fading = this.fadeIndex.get(text)
     if (!fading) return false
-    this.fade(fading)
+    this.fade(fading, at)
     return true
   }
 
@@ -418,12 +419,12 @@ export class BuffWatch {
   }
 
   /** A fade text: the buff with it that was due to end first is the one that ended. */
-  private fade(spells: string[]): void {
+  private fade(spells: string[], at: number): void {
     const mine = this.active.filter((b) => spells.includes(b.spell)).sort((a, b) => (a.endsAt ?? Infinity) - (b.endsAt ?? Infinity))
     const b = mine[0]
     if (!b) return
     this.active = this.active.filter((x) => x !== b)
-    this.hooks.onFade?.(b, 'faded')
+    this.hooks.onFade?.(b, 'faded', at)
     this.hooks.onChange()
   }
 
@@ -615,8 +616,29 @@ const list = (xs: string[]) => (xs.length < 2 ? xs[0] : `${xs.slice(0, -1).join(
 // ---- stored, and shown ----
 
 /** buffs.json: who is who (from /who, by lower-cased name), what each character wants, what is on them. */
+/** Samples of how long one caster's buff lasted, kept at most (LT-748). */
+const LASTS_KEPT = 9
+/** A buff gone in under this was clicked off or dispelled, not a run to learn from. */
+const LAST_MIN_SEC = 30
+
+/** One more landing-to-fade sample of a caster's buff, the oldest dropped past LASTS_KEPT; a short one is not taken. */
+export function addLast(samples: readonly number[] | undefined, seconds: number): number[] | null {
+  if (!(seconds >= LAST_MIN_SEC)) return null
+  return [...(samples ?? []), Math.round(seconds)].slice(-LASTS_KEPT)
+}
+
+/** How long a caster's buff lasts by what the log saw: the middle of two or more samples, else null (LT-748). */
+export function learnedSeconds(samples: readonly number[] | undefined): number | null {
+  if (!samples || samples.length < 2) return null
+  const s = [...samples].sort((a, b) => a - b)
+  const mid = s.length / 2
+  return s.length % 2 ? s[Math.floor(mid)] : (s[mid - 1] + s[mid]) / 2
+}
+
 export interface BuffsFile {
   people: Record<string, Person>
+  /** How long each caster's buffs lasted on you, by caster (lower-cased) then spell: landing-to-fade seconds (LT-748). */
+  lasts?: Record<string, Record<string, number[]>>
   /** Wanted spells by character key; absent means the defaults. */
   wanted: Record<string, string[]>
   active: Record<string, ActiveBuff[]>

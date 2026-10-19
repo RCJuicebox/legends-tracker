@@ -594,3 +594,28 @@ describe('invisibility (LT-717)', () => {
     expect(h.spoken).toEqual([])
   })
 })
+
+describe('ready again (FEAT-024)', () => {
+  it('times a long recast from the end of its cast, through a zone, and says it ready', () => {
+    const h = harness()
+    h.feed('[Tue Sep 01 12:40:00 2026] You begin casting Harm Touch.')
+    const t = h.board.get('cooldown:Harm Touch')
+    // Harm Touch's 72 minutes, from a cast with no cast time; exact, on the timers overlay.
+    expect(t).toMatchObject({ label: 'Harm Touch ready in', overlay: 'targets', exact: true, endsAt: at('Tue Sep 01 12:40:00 2026') + 1_200_000 })
+    h.feed('[Tue Sep 01 12:41:00 2026] You have entered The Feerrott.')
+    expect(h.board.get('cooldown:Harm Touch')).toBeDefined()
+    h.board.tick(at('Tue Sep 01 12:40:00 2026') + 1_200_000)
+    expect(h.board.get('cooldown:Harm Touch')).toBeUndefined()
+    expect(h.spoken).toContain('Harm Touch ready')
+  })
+
+  it('takes it back when the cast fizzles or is interrupted, and has none for a short recast', () => {
+    const h = harness()
+    h.feed(`
+      [Tue Sep 01 12:40:00 2026] You begin casting Harm Touch.
+      [Tue Sep 01 12:40:01 2026] Your spell is interrupted.`)
+    expect(h.board.get('cooldown:Harm Touch')).toBeUndefined()
+    h.feed('[Tue Sep 01 12:41:00 2026] You begin casting Harm Touch X.')
+    expect(h.board.list().filter((t) => t.key.startsWith('cooldown:'))).toEqual([])
+  })
+})

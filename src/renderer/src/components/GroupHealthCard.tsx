@@ -37,6 +37,48 @@ export function GroupHealthCard() {
           </Field>
         </div>
       )}
+      {g.enabled && (
+        <div className="row gap-12" style={{ alignItems: 'flex-start', flexWrap: 'wrap' }}>
+          <Field label="Tank's line" hint="Members said at a line of their own: names as the window shows them, commas between.">
+            <div className="row tight">
+              <input
+                style={{ width: 180 }}
+                value={g.watchNames.join(', ')}
+                placeholder="none"
+                onChange={(e) =>
+                  void set(
+                    {
+                      watchNames: e.target.value
+                        .split(',')
+                        .map((n) => n.trim())
+                        .filter(Boolean)
+                    },
+                    TYPING_MS
+                  )
+                }
+              />
+              <NumberInput value={g.watchPct} min={5} max={90} width={70} onChange={(v) => void set({ watchPct: v ?? 40 })} label="Their health line, percent" />
+            </div>
+          </Field>
+          <Field label="Low mana at" hint="Percent of their mana; 0 off. Members without mana are never said.">
+            <NumberInput value={g.manaPct} min={0} max={80} width={70} onChange={(v) => void set({ manaPct: v ?? 0 })} label="Mana line, percent" />
+          </Field>
+          {g.manaPct > 0 && (
+            <Field label="Say for mana" hint="{name} and {pct}." style={{ flex: 1, minWidth: 220 }}>
+              <div className="row tight">
+                <input className="grow" value={g.manaSpeech} onChange={(e) => void set({ manaSpeech: e.target.value }, TYPING_MS)} />
+                <button
+                  type="button"
+                  className="btn small"
+                  onClick={() => void act('audio:test', g.manaSpeech.replace(/\{name\}/gi, 'Aldric').replace(/\{pct\}/gi, String(g.manaPct)))}
+                >
+                  Hear
+                </button>
+              </div>
+            </Field>
+          )}
+        </div>
+      )}
     </div>
   )
 }

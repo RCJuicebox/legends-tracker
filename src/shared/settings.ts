@@ -104,6 +104,10 @@ export interface TrackingSettings {
   ccBreakSpeech: string
   /** Said when one target resists three of your spells in a row, once until it dies (LT-722); blank for silence. */
   resistStreakSpeech: string
+  /** A "ready again" bar for each of your spells with a long recast, from the spell file (FEAT-024). */
+  cooldowns: boolean
+  /** Said as one is ready again: {spell}; blank for silence. */
+  cooldownReadySpeech: string
   announceOtherBuffFades: boolean
   tierDurationPct: Record<SpellCategory, number>
 }
@@ -197,6 +201,13 @@ export interface GroupHealthSettings {
   belowPct: number
   /** What is said: {name} the member, {pct} their health. */
   speech: string
+  /** Said at this mana or under; 0 off (LT-751). */
+  manaPct: number
+  /** What is said for mana: {name} and {pct}. */
+  manaSpeech: string
+  /** Members with a health line of their own (the tank), by name as the window shows it, and that line. */
+  watchNames: string[]
+  watchPct: number
 }
 
 /** Other PCs' Logs folders the settings hold at most. */

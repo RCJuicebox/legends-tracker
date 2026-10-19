@@ -2,6 +2,7 @@ import { ranLines } from './Dashboard'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { api, errorMessage } from '../api'
 import { useSettled } from '../state'
+import { useInvoke } from '../hooks'
 import { act, showError, showToast, actDone } from '../toast'
 import { OVERLAY_TARGETS, TRY_LINES } from '../constants'
 import { TRIGGER_TEXT_COLOR, TRIGGER_TIMER_COLOR } from '../../../shared/overlays'
@@ -9,7 +10,7 @@ import { recall, remember, useRemembered } from '../remember'
 import { markUnsaved } from '../unsaved'
 import { GroupHealthCard } from '../components/GroupHealthCard'
 import { ConfirmButton, Field, FilterBox, Icon, LoadError, NumberInput, Pending, Switch } from '../components/ui'
-import type { Phrase, Trigger, TriggerAction, TriggerTestResult } from '../../../shared/types'
+import type { Phrase, Trigger, TriggerAction, TriggerCompare, TriggerTestResult, TriggerWhen } from '../../../shared/types'
 import type { TriggerError } from '../../../shared/ipc'
 import { takeHandOff } from '../handoff'
 
@@ -81,6 +82,7 @@ const NO_TRIGGERS: Trigger[] = []
 export function Triggers() {
   const triggerErrors = useSettled((s) => s.triggerErrors)
   const [draft, setDraft] = useState<Draft | null>(kept)
+  const shipped = useInvoke('triggers:defaults').data
   const [loadError, setLoadError] = useState('')
   const [attempt, setAttempt] = useState(0)
   const [query, setQuery] = useState('')
@@ -160,6 +162,21 @@ export function Triggers() {
 
   if (!draft) return loadError ? <LoadError what="your triggers" error={loadError} retry={() => setAttempt((n) => n + 1)} /> : <Pending what="your triggers" />
 
+  // The shipped triggers this profile does not have (FEAT-043): a new default reaches an old profile here.
+  const have = new Set(list.map((t) => t.id))
+  const missing = (shipped ?? []).filter((t) => !have.has(t.id))
+  const importFrom = async (channel: 'triggers:import' | 'triggers:importGina', what: string) => {
+    try {
+      const imported = await api.invoke(channel)
+      if (imported) {
+        setList((l) => [...l, ...imported.map((t) => ({ ...blankTrigger(''), ...t, id: newId() }))])
+        showToast(`Imported ${imported.length} trigger${imported.length === 1 ? '' : 's'} into the list; Save changes keeps them.`)
+      }
+    } catch (e) {
+      showError(`Could not import that ${what}`, e)
+    }
+  }
+
   return (
     <>
       <div className="page-head">
@@ -168,20 +185,19 @@ export function Triggers() {
           <p>Your own alerts for any log line. Spell durations don't need a trigger: Spell Timers times every spell you cast.</p>
         </div>
         <div className="actions">
-          <button
-            className="btn"
-            onClick={async () => {
-              try {
-                const imported = await api.invoke('triggers:import')
-                if (imported) {
-                  setList((l) => [...l, ...imported.map((t) => ({ ...blankTrigger(''), ...t, id: newId() }))])
-                  showToast(`Imported ${imported.length} trigger${imported.length === 1 ? '' : 's'} into the list; Save changes keeps them.`)
-                }
-              } catch (e) {
-                showError('Could not import that file', e)
-              }
-            }}
-          >
+          {missing.length > 0 && (
+            <button
+              className="btn"
+              title={`Triggers this version ships that your list does not have: ${missing.map((t) => t.name).join(', ')}`}
+              onClick={() => {
+                setList((l) => [...l, ...missing])
+                showToast(`Added ${missing.length} shipped trigger${missing.length === 1 ? '' : 's'}; Save changes keeps them.`)
+              }}
+            >
+              Add {missing.length} shipped
+            </button>
+          )}
+          <button className="btn" onClick={() => void importFrom('triggers:import', 'file')}>
             Import…
           </button>
           <button
@@ -189,6 +205,16 @@ export function Triggers() {
             onClick={() => void actDone((saved) => (saved ? `Exported ${list.length} trigger${list.length === 1 ? '' : 's'}.` : null), 'triggers:export', list)}
           >
             Export…
+          </button>
+          <button className="btn" title="A GINA package (.gtp), as guilds share triggers" onClick={() => void importFrom('triggers:importGina', 'GINA package')}>
+            Import GINA…
+          </button>
+          <button
+            className="btn"
+            title="As a GINA package (.gtp): speech, text and timers go across; sounds do not"
+            onClick={() => void actDone((saved) => (saved ? `Exported ${list.length} trigger${list.length === 1 ? '' : 's'} for GINA.` : null), 'triggers:exportGina', list)}
+          >
+            Export GINA…
           </button>
           <button
             className="btn"
@@ -366,6 +392,8 @@ function TriggerEditor({
         </p>
       </div>
 
+      <Conditions t={t} set={set} />
+
       <div className="card">
         <div className="card-head">
           <h2>Then</h2>
@@ -388,6 +416,117 @@ function TriggerEditor({
 
       <TestPanel t={t} />
     </div>
+  )
+}
+
+/** Says words as a phrase would be said, its snippets filled with "something": the chosen voice and rate. */
+const hear = (text: string) => void act('audio:test', text.replace(/\{\w+\}|\$\{\w+\}/g, 'something'))
+
+/** A Hear button beside words to be spoken, off while there are none (LT-747). */
+function HearButton({ text }: { text: string }) {
+  return (
+    <button type="button" className="btn small" disabled={!text.trim()} onClick={() => hear(text)}>
+      Hear
+    </button>
+  )
+}
+
+const OPS: TriggerCompare['op'][] = ['>', '>=', '<', '<=', '=']
+
+/**
+ * When it may fire beyond its phrases (FEAT-030): a zone, in or out of a fight, which characters, the
+ * n-th match in so many seconds, and a number snippet against a value. Each left empty holds always.
+ */
+function Conditions({ t, set }: { t: Trigger; set: (patch: Partial<Trigger>) => void }) {
+  const w = t.when ?? {}
+  const setWhen = (patch: Partial<TriggerWhen>) => {
+    const next: TriggerWhen = { ...w, ...patch }
+    for (const k of Object.keys(next) as (keyof TriggerWhen)[]) if (next[k] === undefined) delete next[k]
+    set({ when: Object.keys(next).length ? next : undefined })
+  }
+  const set_ = Object.keys(w).length
+  return (
+    <details className="card" open={set_ > 0}>
+      <summary>
+        <b>Only when</b> <span className="faint small">{set_ ? `${set_} condition${set_ === 1 ? '' : 's'}` : 'always, as it is'}</span>
+      </summary>
+      <div className="grid three mt-8">
+        <Field label="In a zone" hint="Its name holds this text, any case. Blank: anywhere.">
+          <input value={w.zone ?? ''} onChange={(e) => setWhen({ zone: e.target.value || undefined })} placeholder="Plane of Fear" />
+        </Field>
+        <Field label="Fighting">
+          <select
+            value={w.fighting === undefined ? 'any' : w.fighting ? 'yes' : 'no'}
+            onChange={(e) => setWhen({ fighting: e.target.value === 'any' ? undefined : e.target.value === 'yes' })}
+          >
+            <option value="any">In a fight or not</option>
+            <option value="yes">Only in a fight</option>
+            <option value="no">Only out of a fight</option>
+          </select>
+        </Field>
+        <Field label="Characters" hint="Their names, with commas. Blank: every character.">
+          <input
+            value={(w.characters ?? []).join(', ')}
+            onChange={(e) => {
+              const names = e.target.value
+                .split(',')
+                .map((x) => x.trim())
+                .filter(Boolean)
+              setWhen({ characters: names.length ? names : undefined })
+            }}
+            placeholder="Kelwyn, Aldric"
+          />
+        </Field>
+        <Field label="Only on the n-th match" hint="Fires on that many matches within the seconds after the first, then counts again. 0: every match.">
+          <div className="row tight">
+            <NumberInput
+              value={w.count?.n ?? 0}
+              min={0}
+              max={100}
+              width={64}
+              label="Matches"
+              onChange={(v) => setWhen({ count: v && v >= 2 ? { n: v, withinSec: w.count?.withinSec ?? 20 } : undefined })}
+            />
+            <span className="small muted">within</span>
+            <NumberInput
+              value={w.count?.withinSec ?? 20}
+              min={1}
+              width={64}
+              label="Seconds"
+              onChange={(v) => w.count && setWhen({ count: { n: w.count.n, withinSec: v ?? 20 } })}
+            />
+            <span className="small muted">s</span>
+          </div>
+        </Field>
+        <Field label="A number it caught" hint="A number snippet against a value, as {N1} over 300. Blank: any number.">
+          <div className="row tight">
+            <select
+              value={w.compare?.snippet ?? ''}
+              aria-label="Number snippet"
+              onChange={(e) => setWhen({ compare: e.target.value ? { snippet: e.target.value, op: w.compare?.op ?? '>', value: w.compare?.value ?? 0 } : undefined })}
+            >
+              <option value="">—</option>
+              {['N', 'N1', 'N2', 'N3'].map((n) => (
+                <option key={n} value={n}>{`{${n}}`}</option>
+              ))}
+            </select>
+            <select
+              value={w.compare?.op ?? '>'}
+              aria-label="Compared how"
+              disabled={!w.compare}
+              onChange={(e) => w.compare && setWhen({ compare: { ...w.compare, op: e.target.value as TriggerCompare['op'] } })}
+            >
+              {OPS.map((op) => (
+                <option key={op} value={op}>
+                  {op}
+                </option>
+              ))}
+            </select>
+            <NumberInput value={w.compare?.value ?? 0} width={80} label="Value" onChange={(v) => w.compare && setWhen({ compare: { ...w.compare, value: v ?? 0 } })} />
+          </div>
+        </Field>
+      </div>
+    </details>
   )
 }
 
@@ -421,9 +560,7 @@ function ActionEditor({ a, onChange, onRemove }: { a: TriggerAction; onChange: (
           <label className="check small">
             <input type="checkbox" checked={a.interrupt} onChange={(e) => onChange({ ...a, interrupt: e.target.checked })} /> Interrupt other speech
           </label>
-          <button className="btn small" onClick={() => void act('audio:test', a.text.replace(/\{\w+\}|\$\{\w+\}/g, 'something'))}>
-            Hear
-          </button>
+          <HearButton text={a.text} />
         </div>
       )}
       {a.type === 'sound' && (
@@ -473,10 +610,19 @@ function ActionEditor({ a, onChange, onRemove }: { a: TriggerAction; onChange: (
             <NumberInput value={a.warnSec} min={0} onChange={(v) => onChange({ ...a, warnSec: v ?? 0 })} />
           </Field>
           <Field label="Warning speech">
-            <input value={a.warnSpeech} onChange={(e) => onChange({ ...a, warnSpeech: e.target.value })} placeholder="Mez ending" />
+            <div className="row tight">
+              <input className="grow" value={a.warnSpeech} onChange={(e) => onChange({ ...a, warnSpeech: e.target.value })} placeholder="Mez ending" />
+              <HearButton text={a.warnSpeech} />
+            </div>
           </Field>
           <Field label="Ended speech">
-            <input value={a.endSpeech} onChange={(e) => onChange({ ...a, endSpeech: e.target.value })} placeholder="Mez off" />
+            <div className="row tight">
+              <input className="grow" value={a.endSpeech} onChange={(e) => onChange({ ...a, endSpeech: e.target.value })} placeholder="Mez off" />
+              <HearButton text={a.endSpeech} />
+            </div>
+          </Field>
+          <Field label="About" hint="What the bar is about, so a grouped overlay puts it under that mob. Blank: what the phrase caught as ${Target}, {S1} or {S}.">
+            <input value={a.target ?? ''} onChange={(e) => onChange({ ...a, target: e.target.value || undefined })} placeholder="{S1}" />
           </Field>
           <Field label="If already running">
             <select value={a.restart} onChange={(e) => onChange({ ...a, restart: e.target.value as 'restart' | 'ignore' })}>

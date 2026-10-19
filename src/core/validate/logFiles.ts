@@ -76,6 +76,18 @@ export function sanitizeBuffs(v: unknown): BuffsFile {
       out.people[k.toLowerCase()] = person
     }
   }
+  if (isObj(v.lasts)) {
+    const lasts: NonNullable<BuffsFile['lasts']> = {}
+    for (const [caster, spells] of Object.entries(v.lasts)) {
+      if (!isObj(spells)) continue
+      for (const [spell, list] of Object.entries(spells)) {
+        if (!Array.isArray(list)) continue
+        const kept = list.filter((n): n is number => typeof n === 'number' && Number.isFinite(n) && n > 0).slice(-9)
+        if (kept.length) (lasts[caster.toLowerCase()] ??= {})[spell] = kept
+      }
+    }
+    if (Object.keys(lasts).length) out.lasts = lasts
+  }
   if (isObj(v.wanted)) {
     for (const [k, list] of Object.entries(v.wanted)) {
       if (isCharacterKey(k) && Array.isArray(list)) out.wanted[k] = list.filter((x): x is string => typeof x === 'string')

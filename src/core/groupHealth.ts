@@ -117,15 +117,28 @@ function group(bars: GroupBar[]): GroupBar[] {
  * on either is the fill's end, so a name or a cursor over one row does not cut it short.
  */
 export function barFill(f: Frame, bar: GroupBar): number | null {
+  return inkFill(f, bar, 0, HP_INNER, GROUP_COLOURS.hp)
+}
+
+/**
+ * A member's mana, 0 to 1, from the bar 20 under the health bar's top (LT-751); null where there is none
+ * to read. A member with no mana shows an empty bar: 0, which is never said.
+ */
+export function manaFill(f: Frame, bar: GroupBar): number | null {
+  return inkFill(f, bar, BELOW[0].at, BELOW[0].height, GROUP_COLOURS.mana)
+}
+
+/** How full one of a row's bars is: the one `offset` under the health bar's inside top, `height` tall inside, filled with `ink`. */
+function inkFill(f: Frame, bar: GroupBar, offset: number, height: number, ink: Rgb): number | null {
   const left = bar.left - f.x
   const right = bar.right - f.x
-  const top = bar.top - f.y
+  const top = bar.top - f.y + offset
   if (!is(f, left - 1, top, GROUP_COLOURS.outline) || !is(f, right + 1, top, GROUP_COLOURS.outline) || !is(f, left, top - 1, GROUP_COLOURS.outline)) return null
-  if (!hpOrEmpty(f, left, top)) return null
+  if (!is(f, left, top, ink) && !is(f, left, top, GROUP_COLOURS.empty)) return null
   let end = left - 1
-  for (const y of [top, top + HP_INNER - 1]) {
+  for (const y of [top, top + height - 1]) {
     for (let x = right; x > end; x--) {
-      if (is(f, x, y, GROUP_COLOURS.hp)) {
+      if (is(f, x, y, ink)) {
         end = x
         break
       }
@@ -138,13 +151,16 @@ export function barFill(f: Frame, bar: GroupBar): number | null {
 export function barsArea(bars: GroupBar[]): { x: number; y: number; width: number; height: number } {
   const x = Math.min(...bars.map((b) => b.left)) - 2
   const y = Math.min(...bars.map((b) => b.top)) - 2
-  return { x, y, width: Math.max(...bars.map((b) => b.right)) + 3 - x, height: Math.max(...bars.map((b) => b.top)) + HP_INNER + 2 - y }
+  // Down to the mana bar's bottom, so a sample can read it too (LT-751).
+  return { x, y, width: Math.max(...bars.map((b) => b.right)) + 3 - x, height: Math.max(...bars.map((b) => b.top)) + BELOW[0].at + BELOW[0].height + 2 - y }
 }
 
 /** One member going low: the row (1 at the top) and their health, rounded to a whole percent. */
 export interface LowHealth {
   slot: number
   pct: number
+  /** The bar that went low: health, or mana (LT-751). */
+  what?: 'mana'
 }
 
 interface SlotState {
@@ -183,7 +199,7 @@ export class GroupHealthAlarm {
    * (each row's top edge), a row keeps its state while it stays where it was, through a window over
    * it or a row added below (LT-550); rows no longer there are forgotten.
    */
-  update(fills: (number | null)[], keys?: number[]): LowHealth[] {
+  update(fills: (number | null)[], keys?: number[], lineOf?: (i: number) => number | undefined): LowHealth[] {
     const out: LowHealth[] = []
     const keyOf = (i: number) => keys?.[i] ?? i
     if (keys) for (const k of [...this.slots.keys()]) if (!keys.includes(k)) this.slots.delete(k)
@@ -192,13 +208,16 @@ export class GroupHealthAlarm {
       const pct = Math.round(fill * 100)
       let s = this.slots.get(keyOf(i))
       if (!s) this.slots.set(keyOf(i), (s = { fired: pct === 0, below: 0 }))
+      // A row with a line of its own (a named member's, LT-751) re-arms as far over it as the others do.
+      const below = lineOf?.(i) ?? this.belowPct
+      const rearm = below + (this.rearmPct - this.belowPct)
       if (pct === 0) {
         s.fired = true
         s.below = 0
-      } else if (pct >= this.rearmPct) {
+      } else if (pct >= rearm) {
         s.fired = false
         s.below = 0
-      } else if (pct <= this.belowPct) {
+      } else if (pct <= below) {
         s.below++
         if (!s.fired && s.below >= 2) {
           s.fired = true

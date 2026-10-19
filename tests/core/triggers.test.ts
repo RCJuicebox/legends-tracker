@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { compilePhrase, testTrigger, TriggerEngine } from '../../src/core/triggers'
+import { compilePhrase, conditionsHold, phraseGuard, testTrigger, TriggerEngine } from '../../src/core/triggers'
 import { TimerBoard } from '../../src/core/timers'
 import { parseLogLine } from '../../src/core/logLine'
 import type { Notification, Trigger } from '../../src/shared/types'
@@ -187,5 +187,64 @@ describe('compilePhrase edge cases', () => {
     engine.load([trig({ name: 'Broken', phrases: [{ text: '(unclosed', regex: true }] }), trig({ id: 'ok', phrases: [{ text: 'fine', regex: false }] })], 'Kelwyn')
     expect(engine.errors.map((e) => e.trigger)).toEqual(['Broken'])
     expect(testTrigger(trig({ phrases: [{ text: '(unclosed', regex: true }] }), 'x', 'Kelwyn').error).not.toBe('')
+  })
+})
+
+describe('the cheap look before a phrase runs (LT-746)', () => {
+  it("takes a phrase's leading literal text, stopping at a snippet or a regex's special character", () => {
+    expect(phraseGuard({ text: 'You feel yourself starting to appear.', regex: false })).toBe('you feel yourself starting to appear.')
+    expect(phraseGuard({ text: '{S1} tells you, {S2}', regex: false })).toBe('')
+    expect(phraseGuard({ text: 'Your target resisted the {S1} spell', regex: false })).toBe('your target resisted the ')
+    expect(phraseGuard({ text: '^(?<S1>\\w+) tells you', regex: true })).toBe('')
+    expect(phraseGuard({ text: 'You have slain (.+)!', regex: true })).toBe('you have slain ')
+    // "s?" makes the s optional: the guard stops before it.
+    expect(phraseGuard({ text: 'Bones? crack', regex: true })).toBe('bone')
+    expect(phraseGuard({ text: 'ab', regex: false })).toBe('')
+  })
+})
+
+describe('trigger conditions and counters (FEAT-030)', () => {
+  const state = { zone: 'The Plane of Fear 4 (Refined)', fighting: true }
+
+  it('holds a zone, a fight, a character and a number compare', () => {
+    expect(conditionsHold(undefined, {}, 'Kelwyn', null)).toBe(true)
+    expect(conditionsHold({ zone: 'plane of fear' }, {}, 'Kelwyn', state)).toBe(true)
+    expect(conditionsHold({ zone: 'befallen' }, {}, 'Kelwyn', state)).toBe(false)
+    expect(conditionsHold({ fighting: false }, {}, 'Kelwyn', state)).toBe(false)
+    expect(conditionsHold({ characters: ['Aldric'] }, {}, 'Kelwyn', state)).toBe(false)
+    expect(conditionsHold({ characters: ['kelwyn'] }, {}, 'Kelwyn', state)).toBe(true)
+    expect(conditionsHold({ compare: { snippet: 'N1', op: '>', value: 300 } }, { N1: '1,200' }, 'Kelwyn', state)).toBe(true)
+    expect(conditionsHold({ compare: { snippet: 'N1', op: '>', value: 300 } }, { N1: '120' }, 'Kelwyn', state)).toBe(false)
+    expect(conditionsHold({ compare: { snippet: 'N1', op: '>', value: 300 } }, {}, 'Kelwyn', state)).toBe(false)
+  })
+
+  it('fires on the third match within the window, then counts again, and puts the capture on its timer (LT-745)', () => {
+    const notes: Notification[] = []
+    const board = new TimerBoard({ onChange: () => {}, onNotify: () => {} })
+    const engine = new TriggerEngine(board, { notify: (n) => notes.push(...n), feed: () => {}, state: () => state })
+    engine.load(
+      [
+        trig({
+          id: 'resists',
+          phrases: [{ text: '{S1} resisted your {S2}!', regex: false }],
+          when: { count: { n: 3, withinSec: 20 } },
+          actions: [
+            { type: 'speak', text: 'Resists on {S1}', interrupt: false },
+            { type: 'timer', name: 'Watch {S1}', durationSec: 30, color: '#fff', overlay: 'targets', warnSec: 0, warnSpeech: '', endSpeech: '', restart: 'restart', endEarly: [] }
+          ]
+        })
+      ],
+      'Kelwyn'
+    )
+    const line = (t: string) => engine.handle(parseLogLine(`[Sat Sep 12 23:11:${t} 2026] A ratman warrior resisted your Envenomed Bolt X!`)!)
+    line('00')
+    line('05')
+    expect(notes).toEqual([])
+    line('10')
+    expect(notes.map((n) => (n.kind === 'speak' ? n.text : ''))).toEqual(['Resists on A ratman warrior'])
+    expect(board.list()[0].target).toBe('A ratman warrior')
+    line('11')
+    line('12')
+    expect(notes).toHaveLength(1)
   })
 })
