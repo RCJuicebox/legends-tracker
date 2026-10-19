@@ -61,9 +61,12 @@ function RankChips({ counts }: { counts: MoteCounts }) {
 
 function PauseControl({ s, now }: { s: MoteSession; now: number }) {
   const [since, setSince] = useState('')
+  const [bad, setBad] = useState(false)
   useEffect(() => setSince(s.pausedSince ? timeOfDay(s.pausedSince, true) : ''), [s.pausedSince])
+  // A time it cannot read is said, not swallowed (LT-695).
   const apply = () => {
     const t = timeOnDay(s.startedAt, since)
+    setBad(t === null)
     if (t !== null) void act('motes:pause', t)
   }
   if (!s.pausedSince) {
@@ -83,13 +86,24 @@ function PauseControl({ s, now }: { s: MoteSession; now: number }) {
       <input
         value={since}
         aria-label="Paused since (hh:mm:ss)"
-        onChange={(e) => setSince(e.target.value)}
+        aria-invalid={bad || undefined}
+        aria-describedby={bad ? 'pause-time-bad' : undefined}
+        onChange={(e) => {
+          setSince(e.target.value)
+          setBad(false)
+        }}
         onBlur={apply}
         onKeyDown={(e) => e.key === 'Enter' && apply()}
         style={{ width: 96 }}
         className="mono"
       />
-      <span className="muted">({clock((now - s.pausedSince) / 1000)} so far; not counted)</span>
+      {bad ? (
+        <span id="pause-time-bad" className="small bad-text" role="alert">
+          Type a time like 13:05:00 or 1:05:00 PM
+        </span>
+      ) : (
+        <span className="muted">({clock((now - s.pausedSince) / 1000)} so far; not counted)</span>
+      )}
       <span className="grow" />
       <button className="btn primary" onClick={() => void act('motes:resume')}>
         <Icon name="play" /> Resume
