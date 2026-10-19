@@ -2,7 +2,7 @@
 
 What changed in each version. The release workflow publishes a version's section as its release notes, and installed copies show them when an update arrives.
 
-## Unreleased
+## 2.16.0 (2026-10-19)
 
 - **Another PC's game on the Live page.** While this PC's game is closed and its log quiet, a character log in one of Settings › Log files' other PCs' folders that is being written is followed: the Live page, the timers, the meter and the overlays (which show while this window is in front) follow what is played on that PC, the same character's log first. This PC's log is followed again as soon as its game starts or its log is written, or when the other goes quiet for a quarter hour; motes looted there are still counted once. A switch under Other PCs' logs turns it off, and the Live page's notice has **Stop following other PCs**.
 - **Mez and charm cues.** A mez or charm is warned of 12 seconds before it ends ("Recast Mesmerize on a gnoll pup"; the time and words are on Spell Timers › Defaults, under Mez and charm announcements), where before only a DoT or a buff on you got a cue. One that ends a tick or more early has broken: "Mesmerize broke on a gnoll pup" is said at once, cutting in.
