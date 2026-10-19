@@ -20,7 +20,7 @@ const FOUND_FRESH_MS = 30 * 24 * 3600_000
 const MISSING_FRESH_MS = 7 * 24 * 3600_000
 /** After the wiki could not be reached, a while before asking again. */
 const FAIL_WAIT_MS = 10 * 60_000
-const VERSION = 1
+const CACHE_VERSION = 1
 
 interface Entry {
   at: number
@@ -68,7 +68,7 @@ export class NpcPages {
     this.loading ??= (async () => {
       try {
         const f = JSON.parse(await fs.readFile(this.path, 'utf8')) as PageFile
-        if (f.version === VERSION && f.npcs && typeof f.npcs === 'object') return (this.file = f)
+        if (f.version === CACHE_VERSION && f.npcs && typeof f.npcs === 'object') return (this.file = f)
       } catch (e) {
         if ((e as NodeJS.ErrnoException).code !== 'ENOENT') log.warn('Could not read npc-pages.json; asking eqlwiki again', e)
       }
@@ -79,7 +79,7 @@ export class NpcPages {
 
   /** The two files the readers kept before (npc-races.json, faction-npcs.json), as one; each side's entries lack the other's half until asked again. */
   private async migrated(): Promise<PageFile> {
-    const file: PageFile = { version: VERSION, npcs: {} }
+    const file: PageFile = { version: CACHE_VERSION, npcs: {} }
     const dir = this.dir ?? cacheDir()
     const old = [join(dir, 'npc-races.json'), join(dir, 'faction-npcs.json')]
     try {

@@ -17,7 +17,7 @@ import { downloadStale, reportDownload } from './sources/freshness'
 // refreshed at most once a week.
 
 /** Bumped when what a download keeps changes, so an older file is fetched again. */
-const FORMAT = CATALOG_FORMAT
+const CACHE_VERSION = CATALOG_FORMAT
 
 export type { CatalogFile }
 export type CatalogProgress = WikiProgress
@@ -106,7 +106,7 @@ export class WikiCatalog {
   }
 
   isStale(file: Pick<CatalogFile, 'fetchedAt' | 'format'> | null): boolean {
-    return downloadStale(file, FORMAT)
+    return downloadStale(file, CACHE_VERSION)
   }
 
   /** Downloads the catalog again. One download at a time; a second call waits for the first. */
@@ -132,7 +132,7 @@ export class WikiCatalog {
     this.report({ busy: true, pages: 0, total: 0, error: '' })
     try {
       const old = await this.stored()
-      const file = (old?.revs && (old.format ?? 1) >= FORMAT ? await this.update(old, job.signal) : null) ?? (await this.whole(job.signal))
+      const file = (old?.revs && (old.format ?? 1) >= CACHE_VERSION ? await this.update(old, job.signal) : null) ?? (await this.whole(job.signal))
       // A download with far fewer items than the one kept (a wiki template edit dropping the category
       // from many pages, say) does not replace it: the finder would quietly stop suggesting them (LT-621).
       if (old && file.items.length < old.items.length * SHRINK_FLOOR) {
@@ -182,7 +182,7 @@ export class WikiCatalog {
       'background',
       signal
     )
-    return { fetchedAt: Date.now(), items, revs, format: FORMAT }
+    return { fetchedAt: Date.now(), items, revs, format: CACHE_VERSION }
   }
 
   /**
@@ -210,7 +210,7 @@ export class WikiCatalog {
     }
     this.report({ pages: changed.length })
     log.info(`Item catalog: ${changed.length} page${changed.length === 1 ? '' : 's'} changed since the last download`)
-    return { fetchedAt: Date.now(), items, revs, format: FORMAT }
+    return { fetchedAt: Date.now(), items, revs, format: CACHE_VERSION }
   }
 
   /** The wiki's own list of which eras are live on EverQuest Legends; null to keep the last one (or the built-in list). */

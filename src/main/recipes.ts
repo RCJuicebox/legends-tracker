@@ -17,7 +17,7 @@ import { downloadStale, reportDownload } from './sources/freshness'
 // the app's data and refreshed at most once a week, like the item catalog.
 // 2: the era tag of every page read (products and their ingredients), for crafted items' eras.
 // 3: a page listing one ingredient a line is one recipe, not one a line (Tumpy Tonic's).
-const FORMAT = 3
+const CACHE_VERSION = 3
 const ERA_TAG = /\{\{\s*([A-Za-z][A-Za-z ]*?)\s+Era\s*\}\}/
 
 export type { BookRecipe, RecipeFile }
@@ -49,7 +49,7 @@ export class RecipeBook {
   }
 
   isStale(file: RecipeFile | null): boolean {
-    return downloadStale(file, FORMAT)
+    return downloadStale(file, CACHE_VERSION)
   }
 
   refresh(): Promise<RecipeFile | null> {
@@ -125,7 +125,7 @@ export class RecipeBook {
       this.report({ pages: pages + 1 })
       const recipes = recipeIndex([fromPages, fromTable]) as BookRecipe[]
       await this.ingredientEras(recipes, eras)
-      const file: RecipeFile = { fetchedAt: Date.now(), format: FORMAT, recipes, eras }
+      const file: RecipeFile = { fetchedAt: Date.now(), format: CACHE_VERSION, recipes, eras }
       await writeFileAtomic(this.path, JSON.stringify(file))
       this.file = file
       this.report({ busy: false })

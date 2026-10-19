@@ -23,7 +23,7 @@ interface Cached extends ItemInfo {
  * bumps it, and an older file's entries are fetched again as they are asked for. A file from before
  * the format was written is the bare record, and counts as 1.
  */
-const ITEM_FORMAT = 2
+const CACHE_VERSION = 2
 /** An entry not asked for in this long (its last fetch is older, as any asked for is fetched weekly) goes at the next save. */
 const UNUSED_MS = 90 * 86_400_000
 /** A name the wiki could not be asked about is not asked about again for this long (LT-412). */
@@ -56,7 +56,7 @@ export class ItemCatalog {
       const items = (shaped ? raw.items : raw) as Record<string, Cached>
       const format = shaped ? (raw.format as number) : 1
       // Entries kept in an older shape count as never fetched: each is fetched again as it is asked for.
-      this.cache = format >= ITEM_FORMAT || format === 1 ? items : Object.fromEntries(Object.entries(items).map(([k, v]) => [k, { ...v, fetchedAt: 0 }]))
+      this.cache = format >= CACHE_VERSION || format === 1 ? items : Object.fromEntries(Object.entries(items).map(([k, v]) => [k, { ...v, fetchedAt: 0 }]))
     } catch (e) {
       if ((e as NodeJS.ErrnoException).code !== 'ENOENT') log.warn('The item cache could not be read; starting it afresh', e)
       this.cache = {}
@@ -69,7 +69,7 @@ export class ItemCatalog {
       const cache = this.cache ?? {}
       const old = Date.now() - UNUSED_MS
       for (const [k, v] of Object.entries(cache)) if (v.fetchedAt < old) delete cache[k]
-      return writeFileAtomic(this.path, JSON.stringify({ format: ITEM_FORMAT, items: cache }))
+      return writeFileAtomic(this.path, JSON.stringify({ format: CACHE_VERSION, items: cache }))
     })
     this.saving = run.catch(() => undefined)
     return run

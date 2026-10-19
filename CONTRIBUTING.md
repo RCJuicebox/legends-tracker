@@ -65,6 +65,10 @@ A new feature module, and every file outside its folder it touches (LT-632):
 - **Log lines**: a pattern more than one reader needs goes in `src/core/phrases.ts`, one regular
   expression per wording, anchored. A pattern that starts `^(.+)` gets a cheap `includes`/
   `startsWith` look before it runs: most lines are not it.
+- **Files kept**: one in the settings folder is listed in `SCHEMAS` (`src/main/schema.ts`) with a
+  migration when its shape changes, and one a newer build wrote is never written (`newerBuildWrote`).
+  One in the cache folder holds only what can be fetched or read again: it names its shape
+  `CACHE_VERSION`, and a file at another number is thrown away or refreshed, never migrated (LT-639).
 - **Numbers, times and days** go through `src/core/format.ts` (`num`, `num1`, `pct`, `clock`,
   `duration`, `timeOfDay`, `day`, `when`), never a page's own helper.
 - **Pages**: waits use `Pending` (`doing=` for anything but "Loading …"), errors `LoadError` or

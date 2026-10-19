@@ -160,7 +160,7 @@ interface WikiCache {
  * pet-wiki.json's shape (LT-415): bumped when what a page or the guide keeps changes, so an older file
  * is read again from the wiki rather than taken as it is. A file from before has none, and counts as 1.
  */
-const PET_WIKI_FORMAT = 1
+const CACHE_VERSION = 1
 
 /** Pet pages from eqlwiki: "<spell> Summon" for the pet, and the Pet Guide for its base melee. */
 export class PetWiki {
@@ -174,7 +174,7 @@ export class PetWiki {
     if (this.cache) return this.cache
     try {
       const read = JSON.parse(await fs.readFile(this.path, 'utf8')) as WikiCache & { format?: number }
-      this.cache = (read.format ?? 1) === PET_WIKI_FORMAT ? read : { pages: {} }
+      this.cache = (read.format ?? 1) === CACHE_VERSION ? read : { pages: {} }
       if (!this.cache.pages) this.cache.pages = {}
     } catch {
       this.cache = { pages: {} }
@@ -184,7 +184,7 @@ export class PetWiki {
 
   private async save(): Promise<void> {
     try {
-      await writeFileAtomic(this.path, JSON.stringify({ format: PET_WIKI_FORMAT, ...this.cache }))
+      await writeFileAtomic(this.path, JSON.stringify({ format: CACHE_VERSION, ...this.cache }))
     } catch (e) {
       log.warn('Could not save pet-wiki.json:', e)
     }
