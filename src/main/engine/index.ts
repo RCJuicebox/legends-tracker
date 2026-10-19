@@ -13,7 +13,7 @@ import type { BuffView } from '../../core/buffs'
 import type { MyClass } from '../../core/spellMotes'
 import { CAST_BY_YOU } from '../../core/phrases'
 import { characterKey, characterName } from '../storeCore'
-import { isGameFolder, lastZone, listLogs, loadSpellBook } from '../game'
+import { isGameFolder, lastZone, listLogs } from '../game'
 import { ArchiveManager } from '../archiveManager'
 import { MoteStockKeeper } from '../../core/moteStock'
 import { samePath } from '../../core/moteMerge'
@@ -23,6 +23,7 @@ import { SpellQueries } from './spellQueries'
 import { BuffCoordinator } from './buffs'
 import { CombatFeed } from './combat'
 import { MoteCatchUp } from './moteCatchUp'
+import { readSpellBook } from './spellBookLoad'
 import { IDLE_POLL_MS, LIVE_POLL_MS, LogFollower } from './logFollower'
 import { Throttled } from '../../core/throttle'
 import type { EngineFeature } from './feature'
@@ -310,43 +311,45 @@ export class Engine {
   }
 
   async loadSpells(): Promise<void> {
-    try {
-      const heapBefore = process.memoryUsage().heapUsed
-      const started = performance.now()
-      this.book = await loadSpellBook(this.settings.installDir)
-      // The largest thing the app reads; its cost is logged so a change to it shows (see README, Measuring).
-      log.info(
-        `Spell data: ${this.book.size} spells in ${Math.round(performance.now() - started)} ms; the heap grew ${Math.round((process.memoryUsage().heapUsed - heapBefore) / 1048576)} MB reading it`
-      )
-      this.status.spellsLoaded = this.book.size
-      for (const f of this.features) f.spellsLoaded?.(this.book)
-      this.status.spellError = ''
-      this.tracker = new SpellTracker(this.book, this.board, this.trackerConfig(), {
-        notify: (ns) => this.notifier.notify(ns),
-        feed: (kind, text) => this.pushFeed(kind, text),
-        onZone: (zone) => {
-          this.status.zone = zone
-          this.emitStatus()
-        },
-        onCast: (r, at) => {
-          // Changed in place: the file needs only a mark, not a copy of every known cast per cast (LT-384).
-          const all = this.store.casts.get()
-          const casts = (all[characterKey(this.settings.logFile)] ??= {})
-          const prev = casts[r.rankedName]
-          casts[r.rankedName] = { rankedName: r.rankedName, lastCast: at, count: (prev?.count ?? 0) + 1 }
-          this.store.casts.set(all)
-        },
-        isPet: (name) => this.combat.meter.kindOf(name).kind === 'pet',
-        isYourPet: (name) => this.combat.meter.isYourPet(name),
-        quickBuffs: () => this.quickBuffs()
-      })
-    } catch (e) {
-      log.error(`Could not load spells from ${this.settings.installDir}:`, e)
+    const read = await readSpellBook(this.settings.installDir)
+    if ('error' in read) {
       this.book = null
       this.tracker = null
       this.status.spellsLoaded = 0
-      this.status.spellError = `Could not read the spell files: ${(e as Error).message}`
-    }
+      this.status.spellError = read.error
+    } else
+      try {
+        this.book = read.book
+        this.status.spellsLoaded = this.book.size
+        for (const f of this.features) f.spellsLoaded?.(this.book)
+        this.status.spellError = ''
+        this.tracker = new SpellTracker(this.book, this.board, this.trackerConfig(), {
+          notify: (ns) => this.notifier.notify(ns),
+          feed: (kind, text) => this.pushFeed(kind, text),
+          onZone: (zone) => {
+            this.status.zone = zone
+            this.emitStatus()
+          },
+          onCast: (r, at) => {
+            // Changed in place: the file needs only a mark, not a copy of every known cast per cast (LT-384).
+            const all = this.store.casts.get()
+            const casts = (all[characterKey(this.settings.logFile)] ??= {})
+            const prev = casts[r.rankedName]
+            casts[r.rankedName] = { rankedName: r.rankedName, lastCast: at, count: (prev?.count ?? 0) + 1 }
+            this.store.casts.set(all)
+          },
+          isPet: (name) => this.combat.meter.kindOf(name).kind === 'pet',
+          isYourPet: (name) => this.combat.meter.isYourPet(name),
+          quickBuffs: () => this.quickBuffs()
+        })
+      } catch (e) {
+        // A part that cannot take the spells leaves them unloaded, as a file that would not read does.
+        log.error('Could not set up the spells:', e)
+        this.book = null
+        this.tracker = null
+        this.status.spellsLoaded = 0
+        this.status.spellError = `Could not read the spell files: ${(e as Error).message}`
+      }
     this.emitStatus()
   }
 
