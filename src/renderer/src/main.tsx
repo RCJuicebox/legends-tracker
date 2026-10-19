@@ -27,9 +27,7 @@ import { Tradeskills } from './pages/Tradeskills'
 import { Buffs } from './pages/Buffs'
 import { DamageMeter } from './pages/DamageMeter'
 import { FEATURE_PAGES, type FeaturePageId } from '../../features'
-import { Factions } from '../../features/factions/page'
-import { Slayer } from '../../features/slayer/page'
-import { Hunter } from '../../features/hunter/page'
+import { FEATURE_ELEMENTS } from '../../features/pages'
 import { who } from '../../core/format'
 import { characterKey } from '../../core/validate'
 
@@ -60,9 +58,6 @@ const SHELL_PAGES = [
 export type PageId = (typeof SHELL_PAGES)[number]['id'] | FeaturePageId
 
 type PageComponent = ComponentType<{ go: Go }>
-
-/** Each feature module's page (src/features/<name>/page.tsx), by id. */
-const FEATURE_ELEMENTS: Record<FeaturePageId, PageComponent> = { factions: Factions, slayer: Slayer, hunter: Hunter }
 
 interface PageEntry {
   id: PageId

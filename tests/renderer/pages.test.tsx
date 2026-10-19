@@ -58,6 +58,7 @@ const PAGE_NAMES = [
   'Spells',
   'Triggers',
   'Settings',
+  // The feature modules' pages, from the list the shell draws them from (src/features/pages.tsx).
   'Factions',
   'Slayer',
   'Hunter'
@@ -84,9 +85,7 @@ beforeAll(async () => {
     Spells: (await import('../../src/renderer/src/pages/Spells')).Spells,
     Triggers: (await import('../../src/renderer/src/pages/Triggers')).Triggers,
     Settings: (await import('../../src/renderer/src/pages/Settings')).Settings,
-    Factions: (await import('../../src/features/factions/page')).Factions,
-    Slayer: (await import('../../src/features/slayer/page')).Slayer,
-    Hunter: (await import('../../src/features/hunter/page')).Hunter
+    ...Object.fromEntries(Object.values((await import('../../src/features/pages')).FEATURE_ELEMENTS).map((el) => [el.name, el as unknown as Page]))
   }
 })
 
@@ -142,8 +141,11 @@ const nextTab = (host: HTMLElement, opened: Set<string>) => [...host.querySelect
 
 describe('every page draws', () => {
   it('covers every page the window has', () => {
-    const shell = readFileSync(join(__dirname, '../../src/renderer/src/main.tsx'), 'utf8')
-    const drawn = [...shell.matchAll(/^import \{ (\w+) \} from '[./\w]+\/(?:pages|features\/\w+)\/\w+'$/gm)].map((m) => m[1])
+    // The shell's own pages as main.tsx imports them, and the feature modules' as features/pages.tsx does.
+    const read = (f: string) => readFileSync(join(__dirname, '../../src', f), 'utf8')
+    const shellPages = [...read('renderer/src/main.tsx').matchAll(/^import \{ (\w+) \} from '\.\/pages\/\w+'$/gm)].map((m) => m[1])
+    const featurePages = [...read('features/pages.tsx').matchAll(/^import \{ (\w+) \} from '\.\/\w+\/page'$/gm)].map((m) => m[1])
+    const drawn = [...shellPages, ...featurePages]
     expect(drawn.sort()).toEqual([...PAGE_NAMES].sort())
     expect(Object.keys(pages).sort()).toEqual([...PAGE_NAMES].sort())
   })

@@ -40,18 +40,24 @@ exception). `tests/layers.test.ts` checks every import against this table, whate
 the lint (`.oxlintrc.json`) catches the usual slips as you type. Core code runs in tests and workers, so it
 takes what it needs as arguments rather than reaching for Electron or the disk.
 
-A new feature module:
+A new feature module, and every file outside its folder it touches (LT-632):
 
 1. Its logic in `core.ts` (and more core files as it grows), tested directly.
 2. Its main side in `main.ts`: a class implementing `AppFeature` (`src/main/appFeature.ts`), with
    `register(ctx)` for its channels, Data Sources rows and engine feature, `flush()` for what it keeps
-   and a static `consumers` for its log-history counts; built in `src/main/context.ts` and listed in
-   `ctx.features`. Anything it keeps is listed in the README's "Your data".
-3. Its page in `page.tsx`, listed in `src/features/index.ts` (id, group, label, icon).
-4. Its channels in `src/shared/ipc.ts`, each with its argument and result types; a handler checks
-   every argument it stores or builds a path from (`src/core/validate.ts` has the helpers:
-   `isCharacterKey`, `isRecordKey`, `textArg`, `intArg`, `stringsArg`). A new channel answers the
-   main window only unless `handle.ts` lists another page for it.
+   and a static `consumers` for its log-history counts. In `src/main/context.ts`: a field for it on
+   `AppContext`, built and listed in `ctx.features`, its `consumers` spread into the `LogHistory`'s.
+   Anything it keeps is listed in the README's "Your data" and in `SCHEMAS` (`src/main/schema.ts`).
+3. Its page in `page.tsx`: listed in `src/features/index.ts` (id, group, label, icon) and drawn from
+   `src/features/pages.tsx`. A new icon is one line of `src/shared/icons.ts`.
+4. Its channels in `src/shared/ipc.ts`, each with its argument and result types and a line in the
+   channel table; a handler checks every argument it stores or builds a path from
+   (`src/core/validate.ts` has the helpers: `isCharacterKey`, `isRecordKey`, `textArg`, `intArg`,
+   `stringsArg`). A new channel answers the main window only unless `handle.ts` lists another page
+   for it.
+5. If it shows on the achievements overlay, its part of the track in `src/main/liveAchievements.ts`.
+6. In the tests: its page in `PAGE_NAMES` (`tests/renderer/pages.test.tsx`), and its class built in
+   `tests/main/ipcHandlers.test.ts`, so its channels are called with what a page should never send.
 
 ## Conventions
 

@@ -1,35 +1,43 @@
-// The app's icons by name: the sidebar's feature list (data only) names them, the renderer draws them.
+// The app's icons by name, each one path on a 24-unit square: the sidebar's feature list (data only)
+// names them, the renderer draws them (ui.tsx Icon). A new icon is one line here (LT-632).
 
-export type IconName =
-  | 'dashboard'
-  | 'spells'
-  | 'triggers'
-  | 'overlays'
-  | 'audio'
-  | 'logs'
-  | 'settings'
-  | 'play'
-  | 'stop'
-  | 'move'
-  | 'mute'
-  | 'plus'
-  | 'motes'
-  | 'upgrade'
-  | 'trophy'
-  | 'stats'
-  | 'bag'
-  | 'sparkle'
-  | 'meter'
-  | 'flag'
-  | 'check'
-  | 'copy'
-  | 'back'
-  | 'flask'
-  | 'respawn'
-  | 'loot'
-  | 'link'
-  | 'sources'
-  | 'pin'
-  | 'unlock'
-  | 'sword'
-  | 'crosshair'
+export const ICON_PATHS = {
+  dashboard: 'M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z',
+  spells: 'M7 2v11h3v9l7-12h-4l4-8z',
+  triggers: 'M12 22a2.5 2.5 0 0 0 2.5-2.5h-5A2.5 2.5 0 0 0 12 22zm7-6V11c0-3.1-1.6-5.6-4.5-6.3V4a2.5 2.5 0 0 0-5 0v.7C6.6 5.4 5 7.9 5 11v5l-2 2v1h18v-1l-2-2z',
+  overlays: 'M4 4h16v12H4zm2 2v8h12V6zM8 18h8v2H8z',
+  audio: 'M3 9v6h4l5 5V4L7 9H3zm13.5 3A4.5 4.5 0 0 0 14 8v8a4.5 4.5 0 0 0 2.5-4zM14 3.2v2.1a7 7 0 0 1 0 13.4v2.1a9 9 0 0 0 0-17.6z',
+  logs: 'M20 6h-8l-2-2H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2zm-6 10h-4v-2h4zm4-4H6v-2h12z',
+  settings:
+    'M19.4 13a7.6 7.6 0 0 0 0-2l2.1-1.6-2-3.5-2.5 1a7.4 7.4 0 0 0-1.7-1L15 3h-4l-.4 2.9a7.4 7.4 0 0 0-1.7 1l-2.5-1-2 3.5L6.6 11a7.6 7.6 0 0 0 0 2l-2.1 1.6 2 3.5 2.5-1a7.4 7.4 0 0 0 1.7 1L11 21h4l.4-2.9a7.4 7.4 0 0 0 1.7-1l2.5 1 2-3.5zM13 15.5a3.5 3.5 0 1 1 0-7 3.5 3.5 0 0 1 0 7z',
+  play: 'M8 5v14l11-7z',
+  stop: 'M6 6h12v12H6z',
+  move: 'M10 9h4V6h3l-5-5-5 5h3v3zm-1 1H6V7l-5 5 5 5v-3h3v-4zm14 2-5-5v3h-3v4h3v3l5-5zm-9 3h-4v3H7l5 5 5-5h-3v-3z',
+  mute: 'M16.5 12A4.5 4.5 0 0 0 14 8v2.2l2.5 2.5V12zM19 12a7 7 0 0 1-.6 2.8l1.5 1.5A9 9 0 0 0 14 3.2v2.1a7 7 0 0 1 5 6.7zM4.3 3 3 4.3 7.7 9H3v6h4l5 5v-6.7l4.3 4.3a7 7 0 0 1-2.3 1.2v2.1a9 9 0 0 0 3.7-1.8l2 2 1.3-1.3L4.3 3zM12 4 9.9 6.1 12 8.2z',
+  plus: 'M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6z',
+  motes: 'M12 2 4 7v10l8 5 8-5V7l-8-5zm0 2.3 5.6 3.5L12 11.3 6.4 7.8 12 4.3zM6 9.6l5 3.1v6.1l-5-3.1V9.6zm7 9.2v-6.1l5-3.1v6.1l-5 3.1z',
+  upgrade: 'M16 18v2H8v-2h8zM11 7.99V16h2V7.99h3L12 4 8 7.99h3z',
+  trophy:
+    'M19 4h-2V2H7v2H5a2 2 0 0 0-2 2v1a5 5 0 0 0 4.4 5A5 5 0 0 0 11 15v3H7v2h10v-2h-4v-3a5 5 0 0 0 3.6-3A5 5 0 0 0 21 7V6a2 2 0 0 0-2-2zM5 7V6h2v4a3 3 0 0 1-2-3zm14 0a3 3 0 0 1-2 3V6h2z',
+  stats: 'M4 20h4V10H4v10zm6 0h4V4h-4v16zm6 0h4v-7h-4v7z',
+  bag: 'M18 7h-2a4 4 0 0 0-8 0H6a2 2 0 0 0-2 2v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2zm-6-2a2 2 0 0 1 2 2h-4a2 2 0 0 1 2-2zm6 15H6V9h2v2h2V9h4v2h2V9h2z',
+  sparkle: 'M12 2l2.4 7.4H22l-6.2 4.5 2.4 7.4L12 16.8l-6.2 4.5 2.4-7.4L2 9.4h7.6z',
+  meter: 'M3 4h18v3H3zm0 6.5h12v3H3zm0 6.5h7v3H3z',
+  flag: 'M5 2h2v20H5zm4 1h10l-2.5 4L19 11H9z',
+  sword: 'M21 3h-4l-9.5 9.5 4 4L21 7zM4.5 12.5 6 11l7 7-1.5 1.5zM7.2 16l1.5 1.5-4 4-1.5-1.5z',
+  crosshair:
+    'M11 2h2v3.07A7 7 0 0 1 18.93 11H22v2h-3.07A7 7 0 0 1 13 18.93V22h-2v-3.07A7 7 0 0 1 5.07 13H2v-2h3.07A7 7 0 0 1 11 5.07zm1 5a5 5 0 1 0 0 10 5 5 0 0 0 0-10zm0 3a2 2 0 1 1 0 4 2 2 0 0 1 0-4z',
+  pin: 'M16 3v2h-1v6l3 3v2h-5v6l-1 1-1-1v-6H6v-2l3-3V5H8V3z',
+  unlock: 'M17 9h-7V6.5a2 2 0 0 1 4 0V7h2v-.5a4 4 0 0 0-8 0V9H7a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-9a2 2 0 0 0-2-2zm0 11H7v-9h10zm-5-2a2 2 0 1 0 0-4 2 2 0 0 0 0 4z',
+  check: 'M9 16.2 4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4z',
+  copy: 'M8 2h10a2 2 0 0 1 2 2v12h-2V4H8zm-4 4h10a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2zm0 2v12h10V8z',
+  back: 'M20 11H7.8l5.6-5.6L12 4l-8 8 8 8 1.4-1.4L7.8 13H20z',
+  flask: 'M19.8 18.4 14 10.67V6.5l1.35-1.69c.26-.33.03-.81-.39-.81H9.04c-.42 0-.65.48-.39.81L10 6.5v4.17L4.2 18.4c-.49.66-.02 1.6.8 1.6h14c.82 0 1.29-.94.8-1.6z',
+  respawn: 'M12 6v3l4-4-4-4v3a8 8 0 0 0-6.76 12.26l1.46-1.46A6 6 0 0 1 12 6zm6.76 1.74-1.46 1.46A6 6 0 0 1 12 18v-3l-4 4 4 4v-3a8 8 0 0 0 6.76-12.26z',
+  loot: 'M4 7a3 3 0 0 1 3-3h10a3 3 0 0 1 3 3v3H4zm0 5h6v2h4v-2h6v7a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1zm7-1h2v3h-2z',
+  link: 'M10 13a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-1.5 1.5 1.4 1.4L14.4 4.5a3 3 0 0 1 4.2 4.2l-3 3a3 3 0 0 1-4.2 0zm4-2a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l1.5-1.5-1.4-1.4L9.6 19.5a3 3 0 0 1-4.2-4.2l3-3a3 3 0 0 1 4.2 0z',
+  sources:
+    'M12 2C7.6 2 4 3.3 4 5v14c0 1.7 3.6 3 8 3s8-1.3 8-3V5c0-1.7-3.6-3-8-3zm0 2c3.3 0 5.4.8 5.9 1-.5.2-2.6 1-5.9 1s-5.4-.8-5.9-1c.5-.2 2.6-1 5.9-1zM6 7.6C7.6 8.2 9.7 8.5 12 8.5s4.4-.3 6-.9V12c-.4.3-2.6 1-6 1s-5.6-.7-6-1zm0 7c1.6.6 3.7.9 6 .9s4.4-.3 6-.9V19c-.4.3-2.6 1-6 1s-5.6-.7-6-1z'
+} as const satisfies Record<string, string>
+
+export type IconName = keyof typeof ICON_PATHS
