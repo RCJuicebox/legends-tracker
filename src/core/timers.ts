@@ -78,6 +78,7 @@ export class TimerBoard {
         exact: t.exact,
         warnSec: t.warnSec,
         rank: t.rank,
+        ...(t.untilActed ? { untilActed: true as const } : {}),
         ...ruleOf(t)
       }))
   }

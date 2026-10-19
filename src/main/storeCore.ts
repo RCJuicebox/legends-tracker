@@ -28,10 +28,13 @@ export function defaultSettings(): AppSettings {
       debuffs: true,
       buffWarnSec: 12,
       dotWarnSec: 12,
+      ccWarnSec: 12,
       buffWarnSpeech: 'Recast {spell}',
       buffFadeSpeech: '{spell} down',
       dotWarnSpeech: 'Recast {spell}',
       dotFadeSpeech: '{spell} off',
+      ccWarnSpeech: 'Recast {spell} on {target}',
+      ccBreakSpeech: '{spell} broke on {target}',
       announceOtherBuffFades: false,
       tierDurationPct: { ...DEFAULT_TIER_DURATION_PCT }
     },

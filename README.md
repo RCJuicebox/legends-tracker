@@ -325,10 +325,16 @@ class casts (a mob's own Harm Touch) is a mob's whatever its name, and a cast th
 never another player's. Neither is timed.
 
 **Recast cues.** By default the app says "Recast {spell}" 12 seconds before a DoT or a buff on you
-ends; the time and wording are settings, and any spell can override them. A DoT's cue is exact to the
+ends, and "Recast {spell} on {target}" before a mez or a charm; the times and wording are settings,
+and any spell can override them. A DoT's cue is exact to the
 second once it has ticked. A buff on you shows no ticks, so its end is only known to within its last
 6-second tick. Its bar aims at the earliest it could end, so it never runs longer than the buff and the
 12-second cue is a floor, never fewer; at zero it shows "fading…" until the game's fade line arrives.
+A mez or charm that ends a tick or more before its time has broken: "{spell} broke on {target}" is
+said at once, ahead of every phrase waiting, and is never the one dropped when the queue is full
+(a group member's low health is said the same way). An invisibility ends when you act, so its bar
+shows "until you act" in place of a clock, cues no recast, and ends on the game's own "You feel
+yourself starting to appear." (the shipped "Invis dropping" trigger speaks there).
 
 ### The duration model
 

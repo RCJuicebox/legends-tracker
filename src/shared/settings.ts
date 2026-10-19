@@ -92,10 +92,16 @@ export interface TrackingSettings {
   /** Seconds before a self buff ends to warn, unless the spell's rule says otherwise. 0 = off. */
   buffWarnSec: number
   dotWarnSec: number
+  /** Seconds before a mez or charm ends to warn (LT-713). 0 = off. */
+  ccWarnSec: number
   buffWarnSpeech: string
   buffFadeSpeech: string
   dotWarnSpeech: string
   dotFadeSpeech: string
+  /** The mez or charm warning: {spell} and {target}. */
+  ccWarnSpeech: string
+  /** Said, cutting in, when a mez or charm ends before its time (LT-714). */
+  ccBreakSpeech: string
   announceOtherBuffFades: boolean
   tierDurationPct: Record<SpellCategory, number>
 }

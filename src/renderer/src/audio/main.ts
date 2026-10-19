@@ -1,5 +1,6 @@
 import { api } from '../api'
 import type { AudioSettings } from '../../../shared/types'
+import { queueSpeech } from '../../../core/speechQueue'
 
 // Runs in a hidden window for the life of the app. One AudioContext, routed to the chosen output
 // device, carries both alert sounds and speech. Speech is strictly one phrase at a time — two
@@ -7,8 +8,8 @@ import type { AudioSettings } from '../../../shared/types'
 // are worse than losing them.
 
 type Play =
-  | { kind: 'speech'; wav: Uint8Array; interrupt: boolean; expiresAt?: number }
-  | { kind: 'speech-fallback'; text: string; interrupt: boolean; expiresAt?: number }
+  | { kind: 'speech'; wav: Uint8Array; interrupt: boolean; expiresAt?: number; urgent?: boolean }
+  | { kind: 'speech-fallback'; text: string; interrupt: boolean; expiresAt?: number; urgent?: boolean }
   | { kind: 'sound'; data: Uint8Array; volume: number; name: string }
 
 const MAX_QUEUE = 6
@@ -25,8 +26,8 @@ let config: AudioSettings | null = null
 /** Decoded sounds by path, the most recently played last; at most SOUNDS_KEPT. */
 const soundCache = new Map<string, AudioBuffer>()
 const SOUNDS_KEPT = 32
-/** Phrases waiting their turn, each with when it is too late to say. */
-const queue: { play: () => Promise<void>; expiresAt?: number }[] = []
+/** Phrases waiting their turn, each with when it is too late to say; an urgent one goes to the front (LT-719). */
+const queue: { play: () => Promise<void>; expiresAt?: number; urgent?: boolean }[] = []
 let speaking: { stop: () => void } | null = null
 let busy = false
 /** Sounds and phrases playing now. */
@@ -113,11 +114,10 @@ async function pump(): Promise<void> {
   busy = false
 }
 
-function enqueueSpeech(play: () => Promise<void>, interrupt: boolean, expiresAt?: number): void {
+function enqueueSpeech(play: () => Promise<void>, interrupt: boolean, expiresAt?: number, urgent = false): void {
   if (config?.muted) return
   if (interrupt) hush()
-  if (queue.length >= MAX_QUEUE) queue.shift()
-  queue.push({ play, expiresAt })
+  queueSpeech(queue, { play, expiresAt, urgent }, MAX_QUEUE)
   void pump()
 }
 
@@ -148,7 +148,8 @@ async function handle(cmd: Play): Promise<void> {
         speaking = null
       },
       cmd.interrupt,
-      cmd.expiresAt
+      cmd.expiresAt,
+      cmd.urgent
     )
   } else {
     // The speech engine is unavailable: Chromium's own voice, on the default device.
@@ -164,7 +165,8 @@ async function handle(cmd: Play): Promise<void> {
           window.speechSynthesis.speak(u)
         }),
       cmd.interrupt,
-      cmd.expiresAt
+      cmd.expiresAt,
+      cmd.urgent
     )
   }
 }

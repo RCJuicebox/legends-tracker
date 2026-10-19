@@ -13,7 +13,7 @@ describe('SpellBook.search', () => {
       fixtureBook()
         .search('e', 2, true)
         .map((s) => s.name)
-    ).toEqual(['Elixir of Clarity VI', 'Envenomed Bolt'])
+    ).toEqual(['Allure', 'Elixir of Clarity VI'])
   })
 })
 

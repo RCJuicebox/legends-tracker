@@ -24,10 +24,13 @@ export const TRACKING: TrackingSettings = {
   debuffs: true,
   buffWarnSec: 12,
   dotWarnSec: 12,
+  ccWarnSec: 12,
   buffWarnSpeech: 'Recast {spell}',
   buffFadeSpeech: '{spell} down',
   dotWarnSpeech: 'Recast {spell}',
   dotFadeSpeech: '{spell} off',
+  ccWarnSpeech: 'Recast {spell} on {target}',
+  ccBreakSpeech: '{spell} broke on {target}',
   announceOtherBuffFades: false,
   tierDurationPct: DEFAULT_TIER_DURATION_PCT
 }
@@ -63,10 +66,12 @@ export function harness(opts: { character?: CharacterSettings; rules?: Record<st
   const casts: string[] = []
   const character: CharacterSettings = opts.character ?? { level: 50, classLevels: {}, focusSources: [] }
   const spoken: string[] = []
+  /** Every phrase as notified, with how it was to be said. */
+  const notified: Extract<Notification, { kind: 'speak' }>[] = []
   const feedItems: [string, string][] = []
   const board = new TimerBoard({
     onChange: () => {},
-    onNotify: (ns: Notification[]) => ns.forEach((n) => n.kind === 'speak' && spoken.push(n.text))
+    onNotify: (ns: Notification[]) => ns.forEach((n) => n.kind === 'speak' && (spoken.push(n.text), notified.push(n)))
   })
   const tracker = new SpellTracker(
     book,
@@ -85,7 +90,7 @@ export function harness(opts: { character?: CharacterSettings; rules?: Record<st
         })
     },
     {
-      notify: (ns) => ns.forEach((n) => n.kind === 'speak' && spoken.push(n.text)),
+      notify: (ns) => ns.forEach((n) => n.kind === 'speak' && (spoken.push(n.text), notified.push(n))),
       feed: (kind, text) => void feedItems.push([kind, text]),
       onCast: (r) => void casts.push(r.rankedName),
       isPet: (name) => !!opts.pets?.includes(name) || !!opts.yourPets?.includes(name),
@@ -101,7 +106,7 @@ export function harness(opts: { character?: CharacterSettings; rules?: Record<st
       board.tick(line.time)
     }
   }
-  return { book, board, tracker, spoken, feed, feedItems, casts }
+  return { book, board, tracker, spoken, notified, feed, feedItems, casts }
 }
 
 export function at(stamp: string): number {

@@ -5,6 +5,7 @@ import { isBeneficialCategory, TICK_MS } from './durations'
 import type { BoardTimer, TimerBoard } from './timers'
 import type { DurationBreakdown, FeedItem, Notification, SpellCategory, SpellRule, TrackingSettings } from '../shared/types'
 import { CAST_BY_OTHER, CAST_BY_YOU, DIED, SLAIN_BY, SLAIN_BY_YOU, YOU_DIED, YOU_WERE_SLAIN } from './phrases'
+import { SPA } from '../shared/game/spa'
 
 export type TimerKind = 'selfBuff' | 'otherBuff' | 'dot' | 'debuff'
 
@@ -29,6 +30,8 @@ export interface TrackerHooks {
 
 /** "You activate Quick Buff.": Legends casts the character's buffs with no cast line, only the landings. */
 export const QUICK_BUFF = 'You activate Quick Buff.'
+/** The game's own warning that invisibility is about to end. */
+const APPEARING = 'You feel yourself starting to appear.'
 /** How long after Quick Buff its landings are taken as the character's own casts. */
 export const QUICK_BUFF_MS = 15_000
 
@@ -207,10 +210,15 @@ export class SpellTracker {
       if ((m = RE_DOT_TICK_OTHER.exec(text)) && this.otherPlayer(m[3])) return this.onDotTick(m[1], m[2], now, m[3])
     }
     if (text.startsWith('Your ')) {
-      if ((m = RE_WORN_OFF.exec(text))) return this.onWornOff(m[1], m[2])
+      if ((m = RE_WORN_OFF.exec(text))) return this.onWornOff(m[1], m[2], now)
       if ((m = RE_PET_WORN_OFF.exec(text))) return this.onPetWornOff(m[1])
     }
 
+    // Invisibility is about to drop: its bar ends here, in silence (the shipped "Invis dropping" trigger speaks); its fade line follows (LT-717).
+    if (text === APPEARING) {
+      for (const t of this.board.endWhere((t) => t.source === 'spell' && t.target === SELF && !!t.untilActed, 'faded')) this.hooks.feed('fade', `${t.label} is dropping`)
+      return
+    }
     // Your own death first: "You died." would otherwise be read as a target called "You" dying.
     if (text.startsWith('You ') && youDied(text)) {
       this.board.endWhere((t) => t.source === 'spell' && t.target === SELF, 'died')
@@ -404,9 +412,16 @@ export class SpellTracker {
     const t = this.config.tracking
     const name = rule.alias || s.name
     const label = caster ? `${name} (${caster})` : name
-    // "Recast …" is not said of another's cast unless the rule has its own words for the warning.
-    const warnSec = rule.recastCue === false || (caster && !rule.warnSpeech) ? 0 : (rule.warnSec ?? (kind === 'selfBuff' ? t.buffWarnSec : kind === 'dot' ? t.dotWarnSec : 0))
-    const warnTemplate = rule.warnSpeech ?? (s.beneficial ? t.buffWarnSpeech : t.dotWarnSpeech)
+    const cc = isCrowdControl(s)
+    // An invisibility ends when you act: no clock to cue on, and the bar says so (LT-717).
+    const untilActed = s.effects.some((e) => e.spa === SPA.INVISIBILITY)
+    // "Recast …" is not said of another's cast unless the rule has its own words for the warning. A
+    // mez or charm has its own default: the one cue an enchanter needs (LT-713).
+    const warnSec =
+      rule.recastCue === false || untilActed || (caster && !rule.warnSpeech)
+        ? 0
+        : (rule.warnSec ?? (kind === 'selfBuff' ? t.buffWarnSec : kind === 'dot' ? t.dotWarnSec : cc ? t.ccWarnSec : 0))
+    const warnTemplate = rule.warnSpeech ?? (cc ? t.ccWarnSpeech : s.beneficial ? t.buffWarnSpeech : t.dotWarnSpeech)
     const endsAt = joinedAtTick ? now + (d.ticks - 1) * TICK_MS : now + d.seconds * 1000
     const key = timerKey(s.name, target)
     const timer: BoardTimer = {
@@ -429,12 +444,13 @@ export class SpellTracker {
       onExpire: [],
       warned: false,
       graceMs: GRACE_MS,
+      ...(untilActed ? { untilActed: true as const } : {}),
       meta: { kind, ticks: d.ticks, firstTick: joinedAtTick, joined: joinedAtTick, rankedName: r.rankedName, name, caster }
     }
     this.board.upsert(timer)
     if (target === SELF && !caster && s.landSelf && isSong(s)) this.songs.set(s.landSelf, { key, seconds: d.seconds })
     const by = caster ? ` by ${caster}` : ''
-    this.hooks.feed('timer', `${r.rankedName}${by} on ${target}: ${d.earliestSec}–${d.latestSec}s${joinedAtTick ? ' (joined at a tick)' : ''}`)
+    this.hooks.feed('timer', `${r.rankedName}${by} on ${target}: ${untilActed ? 'until you act' : `${d.earliestSec}–${d.latestSec}s`}${joinedAtTick ? ' (joined at a tick)' : ''}`)
     if (caster) {
       const seconds = Math.round((endsAt - now) / 1000)
       this.hooks.notify([{ kind: 'speak', text: renderSpeech(rule.othersSpeech ?? DEFAULT_OTHERS_SPEECH, name, target, caster, seconds), interrupt: false }])
@@ -458,10 +474,10 @@ export class SpellTracker {
     this.board.reschedule(key, now + (ticks - 1) * TICK_MS, true)
   }
 
-  private onWornOff(name: string, target: string): void {
+  private onWornOff(name: string, target: string, now: number): void {
     const r = this.book.resolve(name)
     const t = this.board.end(timerKey(r?.spell.name ?? name, target), 'faded')
-    if (t) this.announceFade(t)
+    if (t) this.announceFade(t, now)
   }
 
   /**
@@ -494,14 +510,21 @@ export class SpellTracker {
     }
   }
 
-  private announceFade(t: BoardTimer): void {
+  /** `now`: the fade line's time, when one ended it; a mez or charm gone a tick or more early broke (LT-714). */
+  private announceFade(t: BoardTimer, now?: number): void {
     const rule = this.config.ruleFor(t.spell ?? '')
     const cfg = this.config.tracking
     const kind = t.meta?.kind as TimerKind
     // Spoken by the spell's name: a bar of another's cast carries the caster too.
     const name = (t.meta?.name as string | undefined) ?? t.label
-    this.hooks.feed('fade', `${t.label} faded from ${t.target}`)
+    const broke = now !== undefined && (t.category === 'mez' || t.category === 'charm') && now < t.endsAt - TICK_MS
+    this.hooks.feed('fade', broke ? `${t.label} broke on ${t.target}` : `${t.label} faded from ${t.target}`)
     if (rule.fadeCue === false) return
+    if (broke) {
+      // The one thing to hear at once: it cuts in, goes to the front of the queue, and is never dropped.
+      if (cfg.ccBreakSpeech) this.hooks.notify([{ kind: 'speak', text: renderSpeech(cfg.ccBreakSpeech, name, t.target), interrupt: true, urgent: true }])
+      return
+    }
     let template = rule.fadeSpeech
     if (template === undefined) {
       if (kind === 'selfBuff') template = cfg.buffFadeSpeech
@@ -510,6 +533,11 @@ export class SpellTracker {
     }
     if (template) this.hooks.notify([{ kind: 'speak', text: renderSpeech(template, name, t.target), interrupt: false }])
   }
+}
+
+/** A mez or a charm: the crowd control an enchanter times, with cues of its own (LT-713). */
+function isCrowdControl(s: Spell): boolean {
+  return s.category === 'mez' || s.category === 'charm'
 }
 
 function isBeneficialTimer(t: BoardTimer): boolean {

@@ -201,7 +201,8 @@ export class GroupHealth implements AppFeature {
     const s = this.ctx.store.settings.get().groupHealth
     this.ctx.engine.notify([
       // Cuts in only when the member is well under the line: above half of it, a queued recast cue is not dropped for it (LT-550).
-      { kind: 'speak', text: groupHealthPhrase(s.speech, name, low.pct), interrupt: low.pct <= s.belowPct / 2 },
+      // Urgent either way: to the front of the queue, and never the phrase dropped when it is full (LT-719).
+      { kind: 'speak', text: groupHealthPhrase(s.speech, name, low.pct), interrupt: low.pct <= s.belowPct / 2, urgent: true },
       { kind: 'text', text: `${name} ${low.pct}%`, color: '#ef5a4f', durationSec: 4 }
     ])
     this.ctx.engine.pushFeed('trigger', `Group health: ${name} at ${low.pct}%`)

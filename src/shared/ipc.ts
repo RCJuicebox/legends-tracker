@@ -264,8 +264,8 @@ export interface SourceView {
 
 /** `expiresAt`: past this time (epoch ms) a phrase still queued is dropped, not said late. */
 export type AudioCommand =
-  | { kind: 'speech'; wav: Uint8Array; interrupt: boolean; expiresAt?: number }
-  | { kind: 'speech-fallback'; text: string; interrupt: boolean; expiresAt?: number }
+  | { kind: 'speech'; wav: Uint8Array; interrupt: boolean; expiresAt?: number; urgent?: boolean }
+  | { kind: 'speech-fallback'; text: string; interrupt: boolean; expiresAt?: number; urgent?: boolean }
   | { kind: 'sound'; data: Uint8Array; volume: number; name: string }
 
 // ---- The channels ----

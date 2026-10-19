@@ -461,3 +461,86 @@ describe('a fixed duration on a DoT (LT-515)', () => {
     expect(h.board.get(timerKey('Odium', 'a ratman warrior'))!.endsAt).toBe(at('Sat Sep 12 23:11:10 2026') + 48_000)
   })
 })
+
+describe('mez and charm (LT-713, LT-714)', () => {
+  // Mesmerize: formula 7 capped at 4 ticks, 24 s at level 50. The landing and fade lines are the client's own.
+  const mez = `
+    [Tue Sep 01 12:20:00 2026] You begin casting Mesmerize.
+    [Tue Sep 01 12:20:01 2026] a gnoll pup has been mesmerized.`
+
+  it('warns before a mez ends, naming the target, with the mez and charm default', () => {
+    const h = harness()
+    h.feed(mez)
+    const t = h.board.get(timerKey('Mesmerize', 'a gnoll pup'))!
+    expect(t.category).toBe('mez')
+    expect(t.warnSec).toBe(12)
+    expect(t.endsAt - at('Tue Sep 01 12:20:01 2026')).toBe(24_000)
+    h.feed('[Tue Sep 01 12:20:13 2026] Kelwyn hits a gnoll pup for 10 points of damage.')
+    expect(h.spoken).toEqual(['Recast Mesmerize on a gnoll pup'])
+    expect(h.notified[0]).toMatchObject({ interrupt: false })
+    expect(h.notified[0].urgent).toBeFalsy()
+  })
+
+  it('says a mez that ends a tick or more early broke, at once and ahead of everything waiting', () => {
+    const h = harness()
+    h.feed(mez)
+    h.feed('[Tue Sep 01 12:20:06 2026] Your Mesmerize spell has worn off of a gnoll pup.')
+    expect(h.board.list()).toHaveLength(0)
+    expect(h.notified).toEqual([{ kind: 'speak', text: 'Mesmerize broke on a gnoll pup', interrupt: true, urgent: true }])
+    expect(h.feedItems.at(-1)).toEqual(['fade', 'Mesmerize broke on a gnoll pup'])
+  })
+
+  it('says a mez that ran its course wore off, as a DoT does', () => {
+    const h = harness()
+    h.feed(mez)
+    h.feed('[Tue Sep 01 12:20:14 2026] Kelwyn hits a gnoll pup for 10 points of damage.')
+    h.feed('[Tue Sep 01 12:20:25 2026] Your Mesmerize spell has worn off of a gnoll pup.')
+    expect(h.spoken).toEqual(['Recast Mesmerize on a gnoll pup', 'Mesmerize off'])
+    expect(h.notified[1].urgent).toBeFalsy()
+  })
+
+  it('does the same for a charm', () => {
+    const h = harness()
+    h.feed(`
+      [Tue Sep 01 12:30:00 2026] You begin casting Allure.
+      [Tue Sep 01 12:30:01 2026] a gnoll pup has been charmed.`)
+    const t = h.board.get(timerKey('Allure', 'a gnoll pup'))!
+    expect(t.category).toBe('charm')
+    expect(t.warnSec).toBe(12)
+    h.feed('[Tue Sep 01 12:30:20 2026] Your Allure spell has worn off of a gnoll pup.')
+    expect(h.notified).toEqual([{ kind: 'speak', text: 'Allure broke on a gnoll pup', interrupt: true, urgent: true }])
+  })
+
+  it('keeps a rule that turns the cues off, and one with its own words', () => {
+    const quiet = harness({ rules: { Mesmerize: { recastCue: false, fadeCue: false } } })
+    quiet.feed(mez)
+    quiet.feed('[Tue Sep 01 12:20:06 2026] Your Mesmerize spell has worn off of a gnoll pup.')
+    expect(quiet.spoken).toEqual([])
+    const own = harness({ rules: { Mesmerize: { warnSec: 5, warnSpeech: 'Remez {target}' } } })
+    own.feed(mez)
+    own.feed('[Tue Sep 01 12:20:20 2026] Kelwyn hits a gnoll pup for 10 points of damage.')
+    expect(own.spoken).toEqual(['Remez a gnoll pup'])
+  })
+})
+
+describe('invisibility (LT-717)', () => {
+  it('runs until you act, with no recast cue, and ends on the game’s warning that you are appearing', () => {
+    const h = harness()
+    h.feed(`
+      [Tue Sep 01 12:40:00 2026] You begin casting Gather Shadows.
+      [Tue Sep 01 12:40:02 2026] You gather shadows about you.`)
+    const t = h.board.get(timerKey('Gather Shadows', 'You'))!
+    expect(t.untilActed).toBe(true)
+    expect(t.warnSec).toBe(0)
+    expect(h.board.views()[0].untilActed).toBe(true)
+    expect(h.feedItems.at(-1)).toEqual(['timer', 'Gather Shadows on You: until you act'])
+    // Half an hour's formula; the first blow brings it down in half a minute.
+    h.feed('[Tue Sep 01 12:40:34 2026] You feel yourself starting to appear.')
+    expect(h.board.list()).toHaveLength(0)
+    expect(h.spoken).toEqual([])
+    expect(h.feedItems.at(-1)).toEqual(['fade', 'Gather Shadows is dropping'])
+    // Its own fade line then finds nothing to end, and says nothing.
+    h.feed('[Tue Sep 01 12:40:36 2026] Your shadows fade.')
+    expect(h.spoken).toEqual([])
+  })
+})

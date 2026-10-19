@@ -22,10 +22,15 @@ export interface TimerView {
   rank?: number
   /** What sets it: the spell's base name (its Spell Timers row), or the trigger's id (LT-691). */
   rule?: string
+  /** An invisibility: it ends when you act, so the bar shows no clock and cues no recast (LT-717). */
+  untilActed?: true
 }
 
 export type Notification =
-  { kind: 'speak'; text: string; interrupt: boolean } | { kind: 'sound'; file: string; volume: number } | { kind: 'text'; text: string; color: string; durationSec: number }
+  /** `urgent`: to the front of the speech queue, and never the phrase dropped when it is full (LT-719). */
+  | { kind: 'speak'; text: string; interrupt: boolean; urgent?: boolean }
+  | { kind: 'sound'; file: string; volume: number }
+  | { kind: 'text'; text: string; color: string; durationSec: number }
 
 export interface FeedItem {
   at: number

@@ -274,10 +274,13 @@ export function sanitizeSettings(v: unknown, fb: AppSettings): AppSettings | nul
     debuffs: bool(t.debuffs, fb.tracking.debuffs),
     buffWarnSec: num(t.buffWarnSec, fb.tracking.buffWarnSec, 0, 3600),
     dotWarnSec: num(t.dotWarnSec, fb.tracking.dotWarnSec, 0, 3600),
+    ccWarnSec: num(t.ccWarnSec, fb.tracking.ccWarnSec, 0, 3600),
     buffWarnSpeech: str(t.buffWarnSpeech, fb.tracking.buffWarnSpeech),
     buffFadeSpeech: str(t.buffFadeSpeech, fb.tracking.buffFadeSpeech),
     dotWarnSpeech: str(t.dotWarnSpeech, fb.tracking.dotWarnSpeech),
     dotFadeSpeech: str(t.dotFadeSpeech, fb.tracking.dotFadeSpeech),
+    ccWarnSpeech: str(t.ccWarnSpeech, fb.tracking.ccWarnSpeech),
+    ccBreakSpeech: str(t.ccBreakSpeech, fb.tracking.ccBreakSpeech),
     announceOtherBuffFades: bool(t.announceOtherBuffFades, fb.tracking.announceOtherBuffFades),
     tierDurationPct
   })

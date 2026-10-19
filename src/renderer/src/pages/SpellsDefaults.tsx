@@ -71,6 +71,21 @@ export function SpellDefaults() {
             <input value={t.dotFadeSpeech} onChange={(e) => setT({ dotFadeSpeech: e.target.value }, TYPING_MS)} />
           </Field>
         </div>
+        <div className="card stack gap-12">
+          <h2>Mez and charm announcements</h2>
+          <Field label="Warn before a mez or charm ends" hint="Seconds; 0 turns it off. A mez or charm shows no ticks, so this counts from the earliest it could end.">
+            <NumberInput value={t.ccWarnSec} min={0} onChange={(v) => setT({ ccWarnSec: v ?? 0 })} />
+          </Field>
+          <Field label="Warning" hint="{spell} and {target} are filled in.">
+            <input value={t.ccWarnSpeech} onChange={(e) => setT({ ccWarnSpeech: e.target.value }, TYPING_MS)} />
+          </Field>
+          <Field
+            label="When it breaks"
+            hint="Said at once, ahead of everything waiting, when a mez or charm ends before its time. One that runs its course gets the DoT’s wearing-off words. Blank for silence."
+          >
+            <input value={t.ccBreakSpeech} onChange={(e) => setT({ ccBreakSpeech: e.target.value }, TYPING_MS)} />
+          </Field>
+        </div>
       </div>
     </>
   )

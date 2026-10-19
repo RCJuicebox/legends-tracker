@@ -46,7 +46,7 @@ export class Notifier {
     for (const n of ns) {
       if (n.kind === 'text') this.out.alert({ text: n.text, color: n.color, durationSec: n.durationSec })
       else if (audio.muted) continue
-      else if (n.kind === 'speak') void this.speak(n.text, n.interrupt, expiresAt)
+      else if (n.kind === 'speak') void this.speak(n.text, n.interrupt, expiresAt, n.urgent)
       else if (n.kind === 'sound') void this.playSound(n.file, n.volume)
     }
   }
@@ -79,7 +79,7 @@ export class Notifier {
     this.speech.warm?.(this.settings().audio.voice)
   }
 
-  speak(text: string, interrupt = false, expiresAt?: number): Promise<void> {
+  speak(text: string, interrupt = false, expiresAt?: number, urgent = false): Promise<void> {
     if (!text.trim()) return Promise.resolve()
     const a = this.settings().audio
     const asked = performance.now()
@@ -93,7 +93,7 @@ export class Notifier {
       const r = await rendered
       perf.cue.add(performance.now() - asked)
       if ('wav' in r) {
-        this.out.audio({ kind: 'speech', wav: new Uint8Array(r.wav), interrupt, expiresAt })
+        this.out.audio({ kind: 'speech', wav: new Uint8Array(r.wav), interrupt, expiresAt, urgent })
         if (this.speechFailed) {
           this.speechFailed = false
           sources.ok('speech', 'Speaking again')
@@ -107,7 +107,7 @@ export class Notifier {
         sources.fail('speech', r.error, 'The audio window speaks with its own voice meanwhile')
       }
       this.speechFailed = true
-      this.out.audio({ kind: 'speech-fallback', text, interrupt, expiresAt })
+      this.out.audio({ kind: 'speech-fallback', text, interrupt, expiresAt, urgent })
     })
     this.order = sent
     return sent

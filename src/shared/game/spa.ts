@@ -6,6 +6,7 @@ export const SPA = {
   ATTACK: 2,
   MOVEMENT: 3,
   HASTE: 11,
+  INVISIBILITY: 12,
   CHARM: 22,
   BIND: 25,
   MEZ: 31,

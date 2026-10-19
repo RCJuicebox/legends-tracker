@@ -111,7 +111,8 @@ describe('GroupHealth', () => {
     } satisfies GroupHealthFromWorker)
     expect(row().detail).toContain('Watching 2 group members')
     w.emit('message', { kind: 'low', slot: 2, pct: 20 } satisfies GroupHealthFromWorker)
-    expect(notified[0]).toEqual({ kind: 'speak', text: 'Group member 2 is at 20', interrupt: false })
+    // Urgent either way: to the front of the speech queue, never dropped (LT-719); it cuts in only well under the line.
+    expect(notified[0]).toEqual({ kind: 'speak', text: 'Group member 2 is at 20', interrupt: false, urgent: true })
     w.emit('message', { kind: 'low', slot: 1, pct: 10 } satisfies GroupHealthFromWorker)
     expect(notified[2]).toMatchObject({ kind: 'speak', interrupt: true })
     w.emit('message', { kind: 'bars', bars: [] } satisfies GroupHealthFromWorker)

@@ -154,7 +154,9 @@ function TimerBar({ t, showTarget, onOpen }: { t: TimerView; showTarget: boolean
         {showTarget && t.target ? <span className="tgt">{t.target === 'You' ? '' : `· ${t.target}`}</span> : null}
       </div>
       <div className="time">
-        {overdue ? (
+        {t.untilActed ? (
+          <span title="Invisibility ends when you act, so there is no clock; the bar ends on the game’s own line">until you act</span>
+        ) : overdue ? (
           'fading…'
         ) : (
           <>
