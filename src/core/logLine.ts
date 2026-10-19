@@ -74,11 +74,21 @@ export class LogClock {
   private last = -Infinity
   private readonly stamps = new Stamps()
 
+  /**
+   * `now`, for a clock reading lines as they are written: its first line has no line before it, so
+   * one in the repeated hour more than 50 minutes behind now is the second time round (LT-523).
+   */
+  constructor(private readonly now?: () => number) {}
+
   parse(raw: string): LogLine | null {
     const line = this.stamps.parse(raw)
     if (!line) return null
+    if (this.last === -Infinity && this.now) {
+      const now = this.now()
+      if (now - line.time > 50 * 60_000 && line.time + HOUR <= now + 60_000 && repeatedHour(line.time)) line.time += HOUR
+    }
     // Lines are in order to within a few seconds, so a step back of close to an hour is the repeat.
-    if (line.time < this.last - 60_000 && line.time + HOUR >= this.last - 60_000 && repeatedHour(line.time)) line.time += HOUR
+    else if (line.time < this.last - 60_000 && line.time + HOUR >= this.last - 60_000 && repeatedHour(line.time)) line.time += HOUR
     this.last = line.time
     return line
   }

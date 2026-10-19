@@ -1,6 +1,7 @@
 import { zoneEntered, type LogLine } from '../../core/logLine'
 import { DIED, SLAIN_BY, SLAIN_BY_YOU } from '../../core/phrases'
 import { parseFactionLine } from './core'
+import { baseZone } from '../../core/zones'
 
 // What caused each faction change in the log: a kill or a hand-in. The game writes a kill's faction
 // lines in the second of the kill, just before the line that names it:
@@ -108,13 +109,6 @@ const BEFORE_KEPT = 12
 const AFTER_MAX = 8
 
 // "The Plane of Hate - Group 1 (Awakened)", "Kerra Isle 4 (Refined)", "Befallen 1 (Awakened)".
-const INSTANCE = /^(.+?)(?: - (?:Solo|Group))?(?: \d+)? \((?:Refined|Awakened|Adaptive|Fused)\)$/
-
-/** A zone's name without the instance it is one of. */
-export function baseZone(zone: string): string {
-  return INSTANCE.exec(zone)?.[1] ?? zone
-}
-
 const OFFERED = /^You offered (\d+) (.+) to (.+)\.$/
 /** Items put into one trade window come this close together. */
 const TRADE_MS = 60_000

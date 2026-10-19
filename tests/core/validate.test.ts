@@ -287,8 +287,12 @@ describe('mote history read back from disk', () => {
 
 describe('known casts read back from disk', () => {
   it('keeps good entries and drops the rest', () => {
-    expect(sanitizeCasts({ Puma: { rankedName: 'Puma X', lastCast: 10, count: 4 }, Bad: { count: 2 }, Worse: null })).toEqual({
-      Puma: { rankedName: 'Puma X', lastCast: 10, count: 4 }
+    expect(sanitizeCasts({ Kelwyn_neriak: { Puma: { rankedName: 'Puma X', lastCast: 10, count: 4 }, Bad: { count: 2 }, Worse: null } })).toEqual({
+      Kelwyn_neriak: { Puma: { rankedName: 'Puma X', lastCast: 10, count: 4 } }
+    })
+    // Kept by character key, '' for those kept before; a key that cannot be one is dropped, as is a character with none left.
+    expect(sanitizeCasts({ '': { Puma: { rankedName: 'Puma X', lastCast: 1, count: 1 } }, 'a/b': {}, Aldric_neriak: { Bad: null } })).toEqual({
+      '': { Puma: { rankedName: 'Puma X', lastCast: 1, count: 1 } }
     })
     for (const v of NOT_OBJECTS) expect(sanitizeCasts(v)).toEqual({})
   })

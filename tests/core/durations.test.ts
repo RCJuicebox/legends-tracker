@@ -99,6 +99,8 @@ describe('computeDuration against the log', () => {
     const r = book.resolve('Odium X')!
     const d = computeDuration({ spell: r.spell, rank: 10, level: 50, tierPct: DEFAULT_TIER_DURATION_PCT, focusPct: 0, overrideSec: 42 })
     expect(d.seconds).toBe(42)
+    // Seven whole ticks and the partial one, as the model counts: a DoT's first tick pins its end 42 s on (LT-515).
+    expect([d.wholeTicks, d.ticks]).toEqual([7, 8])
   })
 })
 

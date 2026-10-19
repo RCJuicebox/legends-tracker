@@ -169,10 +169,10 @@ export function skillRows(seg: Segment, row: Row): SkillRow[] {
   const ms = durationMs(seg)
   const e = seg.entities[row.key]
   const out: SkillRow[] = []
-  for (const s of Object.values(e?.skills ?? {})) {
+  for (const [k, s] of Object.entries(e?.skills ?? {})) {
     const proc = procTag(e, s.name)
     out.push({
-      key: `s:${s.name}`,
+      key: `s:${k}`,
       name: s.name,
       how: s.how,
       ...(proc ? { proc } : {}),
@@ -289,9 +289,9 @@ export function attackerSkillRows(seg: Segment, scope: MeterScope, attacker: str
   // per-target skill split, so the whole skill is shown when every target is in scope.
   const allInScope = Object.keys(a.targets).every((t) => wanted.has(nameKey(t)))
   const out: SkillRow[] = []
-  for (const s of Object.values(a.skills)) {
+  for (const [k, s] of Object.entries(a.skills)) {
     out.push({
-      key: `s:${s.name}`,
+      key: `s:${k}`,
       name: allInScope ? s.name : `${s.name} (all targets)`,
       how: s.how,
       total: s.total,

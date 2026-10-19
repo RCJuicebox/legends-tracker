@@ -107,6 +107,34 @@ describe('DoT tracking', () => {
     expect(h.board.list()).toHaveLength(0)
   })
 
+  it('drops a cast that did not take hold, as Legends prints it with what blocked it (LT-516)', () => {
+    const h = harness()
+    h.feed(`
+      [Sat Sep 12 23:11:04 2026] You begin casting Envenomed Bolt X.
+      [Sat Sep 12 23:11:05 2026] Your Envenomed Bolt X spell did not take hold on a ratman warrior. (Blocked by Envenomed Bolt X.)
+      [Sat Sep 12 23:11:05 2026] A ratman warrior has been poisoned.`)
+    expect(h.board.list()).toHaveLength(0)
+  })
+
+  it('leaves a cast in flight alone when a later attempt is refused (LT-517)', () => {
+    const h = harness()
+    h.feed(`
+      [Sat Sep 12 23:11:04 2026] You begin casting Envenomed Bolt X.
+      [Sat Sep 12 23:11:06 2026] Insufficient Mana to cast this spell!
+      [Sat Sep 12 23:11:06 2026] You can't cast spells while stunned!
+      [Sat Sep 12 23:11:07 2026] A ratman warrior has been poisoned.`)
+    expect(h.board.list().map((t) => t.label)).toEqual(['Envenomed Bolt'])
+  })
+
+  it('drops a cast refused in the second it began', () => {
+    const h = harness()
+    h.feed(`
+      [Sat Sep 12 23:11:04 2026] You begin casting Envenomed Bolt X.
+      [Sat Sep 12 23:11:04 2026] Insufficient Mana to cast this spell!
+      [Sat Sep 12 23:11:05 2026] A ratman warrior has been poisoned.`)
+    expect(h.board.list()).toHaveLength(0)
+  })
+
   it('drops a detrimental cast that did not take hold on its target, named', () => {
     const h = harness()
     h.feed(`
@@ -237,15 +265,24 @@ describe('more tracking rules', () => {
     ).toEqual(['Aldric', 'Brenna'])
   })
 
-  it("ends the newest matching buff on another when a pet's buff wears off", () => {
-    const h = harness()
+  it("ends the buff on your pet when the pet's buff wears off, not a groupmate's of the same spell (LT-514)", () => {
+    const h = harness({ yourPets: ['Gabobn'] })
     h.feed(`
       [Wed Sep 23 13:29:05 2026] You begin casting Slugs Healing V.
-      [Wed Sep 23 13:29:06 2026] Aldric is healed by the spirit of the slug.
+      [Wed Sep 23 13:29:06 2026] Gabobn is healed by the spirit of the slug.
       [Wed Sep 23 13:29:15 2026] You begin casting Slugs Healing V.
       [Wed Sep 23 13:29:16 2026] Brenna is healed by the spirit of the slug.
       [Wed Sep 23 13:29:30 2026] Your pet's Slugs Healing spell has worn off.`)
-    expect(h.board.list().map((t) => t.target)).toEqual(['Aldric'])
+    expect(h.board.list().map((t) => t.target)).toEqual(['Brenna'])
+  })
+
+  it("ends nothing on a pet's fade while the roster does not know the pet", () => {
+    const h = harness()
+    h.feed(`
+      [Wed Sep 23 13:29:15 2026] You begin casting Slugs Healing V.
+      [Wed Sep 23 13:29:16 2026] Brenna is healed by the spirit of the slug.
+      [Wed Sep 23 13:29:30 2026] Your pet's Slugs Healing spell has worn off.`)
+    expect(h.board.list().map((t) => t.target)).toEqual(['Brenna'])
   })
 
   it('ends your own buffs when you die, and leaves those on others', () => {
@@ -391,5 +428,36 @@ describe('Quick Buff (LT-503)', () => {
     const none = harness()
     none.feed(activation)
     expect(none.board.list()).toEqual([])
+  })
+})
+
+describe('bard songs', () => {
+  it("runs a song's timer on with each pulse, so it does not run out while the song plays (LT-521)", () => {
+    const h = harness()
+    h.feed(`
+      [Thu Sep 24 11:18:46 2026] You begin singing Selo's Accelerating Chorus.
+      [Thu Sep 24 11:18:48 2026] Your feet move faster.`)
+    const key = timerKey("Selo's Accelerating Chorus", 'You')
+    const first = h.board.get(key)!
+    const span = first.endsAt - first.startedAt
+    h.feed(`
+      [Thu Sep 24 11:18:55 2026] Your feet move faster.
+      [Thu Sep 24 11:19:01 2026] Your feet move faster.`)
+    const t = h.board.get(key)!
+    expect(t.startedAt).toBe(at('Thu Sep 24 11:19:01 2026'))
+    expect(t.endsAt).toBe(at('Thu Sep 24 11:19:01 2026') + span)
+    // One feed line for the song, not one a pulse.
+    expect(h.feedItems.filter(([k]) => k === 'timer')).toHaveLength(1)
+  })
+})
+
+describe('a fixed duration on a DoT (LT-515)', () => {
+  it('pins the end at the override after the first tick', () => {
+    const h = harness({ rules: { Odium: { durationOverrideSec: 48 } } })
+    h.feed(`
+      [Sat Sep 12 23:11:07 2026] You begin casting Odium X.
+      [Sat Sep 12 23:11:07 2026] A ratman warrior staggers under a dark curse.
+      [Sat Sep 12 23:11:10 2026] A ratman warrior has taken 300 damage from your Odium X.`)
+    expect(h.board.get(timerKey('Odium', 'a ratman warrior'))!.endsAt).toBe(at('Sat Sep 12 23:11:10 2026') + 48_000)
   })
 })

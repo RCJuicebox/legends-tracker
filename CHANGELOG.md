@@ -2,6 +2,15 @@
 
 What changed in each version. The release workflow publishes a version's section as its release notes, and installed copies show them when an update arrives.
 
+## Unreleased
+
+- **Spell timers: a bard song stays up while you sing it.** Each pulse of a song landing on you runs its timer on, so Selo's no longer runs out (and cues its recast) halfway through a song.
+- **Spell timers: your pet's buff fading ends the timer on your pet,** not a groupmate's timer for the same buff. A fixed duration set on a DoT now holds after its first tick (it ended a tick early), "did not take hold" is read as Legends prints it (with what blocked it), and running out of mana or being stunned no longer throws away a cast already on its way.
+- **Damage meter: a spell's hit and its ticks are two rows,** Crippling Blow and Slay Undead count as crits, and heals the log gives no spell for and "non-melee" damage on you are counted.
+- **A tracked Hunter achievement ticks only for a kill in its own zone:** a goblin alchemist in Permafrost is not the Misty Thicket's.
+- **Spell Timers lists the spells the character you are playing has cast,** not your alts' too. Casts kept before are given to the character the app follows when it starts.
+- **Fixes:** the pet planner's off-hand damage bonus is EQEmu's (it was overvalued); the Monk's haste AA is read from the AA list; a watch started in the hour the clocks go back no longer times every line an hour early.
+
 ## 2.14.3 (2026-10-15)
 
 - **Plan › Slayer: a step's Map shows its own mobs, and the plan no longer marks the game's map.** A step's map drew the Hunter named in its zone beside the step's mobs; now it shows the mobs that step kills, nothing else. A Slayer camp's mobs are all over their zone, so **Mark on the game's map** is gone from Plan › Slayer, and Slayer marks an earlier version put on the game's maps come off when the app starts. Plan › Hunter keeps its maps and its marks on the game's map for the named.

@@ -1,6 +1,5 @@
 import { respawnEstimate, type RespawnRecord } from '../../core/respawns'
-import { baseZone } from '../factions/attribution'
-import { zoneKey } from '../factions/names'
+import { baseZone, zoneKey } from '../../core/zones'
 import { LEGENDS_SPAWNS, type LegendsSpawn } from '../../shared/game/legendsSpawns'
 
 // What a zone's spawns allow: TAKP's classic spawn tables (scripts/takp-spawns.mjs) with each timer

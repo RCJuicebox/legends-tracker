@@ -5,6 +5,7 @@ import { checkAgainstLog } from '../../core/logCheck'
 import type { CharacterSettings, KnownSpell, LogCheckRow, SpellRule } from '../../shared/types'
 import type { EngineStore } from './contracts'
 import { jobs, type Job } from '../sources/jobs'
+import { characterKey } from '../../core/validate'
 
 /** Spell durations for the character being played, and the Spell Timers page's questions. */
 export class SpellQueries {
@@ -42,7 +43,8 @@ export class SpellQueries {
   knownSpells(): KnownSpell[] {
     const book = this.book()
     if (!book) return []
-    const casts = this.store.casts.get()
+    // The character being played's own casts: an alt's spells, worked out at this one's level and focus, are not its (LT-525).
+    const casts = this.store.casts.get()[characterKey(this.store.settings.get().logFile)] ?? {}
     const rules = this.store.rules.get()
     const byBase = new Map<string, { rankedName: string; lastCast: number }>()
     for (const c of Object.values(casts)) {

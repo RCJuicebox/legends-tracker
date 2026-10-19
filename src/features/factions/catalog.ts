@@ -22,7 +22,8 @@ import {
   type HandInHow,
   type Need
 } from '../../shared/game/factions'
-import { factionNamer, isCity, zoneKey } from './names'
+import { factionNamer, isCity } from './names'
+import { zoneKey } from '../../core/zones'
 import { bareNpc, isNamedNpc, TOO_TOUGH_HP, type NpcInfo } from './npcPages'
 import { BUY_ITEM_SEC, COMBINE_SEC } from './ways'
 

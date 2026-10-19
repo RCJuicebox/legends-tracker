@@ -107,10 +107,12 @@ export interface DurationInput {
 export function computeDuration(input: DurationInput): DurationBreakdown {
   const { spell, rank, level, tierPct, focusPct, focusSteps, overrideSec } = input
   if (overrideSec && overrideSec > 0) {
-    const ticks = Math.ceil(overrideSec / 6)
+    // Counted as the model counts: whole ticks plus the partial one it lands in, so a DoT's first tick
+    // pins its end at the override (Odium X set to 48 s fades 48 s after its first tick, LT-515).
+    const whole = Math.max(1, Math.round(overrideSec / 6))
     return {
-      ticks,
-      wholeTicks: Math.max(0, ticks - 1),
+      ticks: whole + 1,
+      wholeTicks: whole,
       permanent: false,
       seconds: overrideSec,
       earliestSec: overrideSec,

@@ -303,7 +303,7 @@ export class Engine {
   private quickBuffs(): RankedSpell[] {
     if (!this.book) return []
     const newest = new Map<string, { r: RankedSpell; at: number }>()
-    for (const c of Object.values(this.store.casts.get())) {
+    for (const c of Object.values(this.store.casts.get()[characterKey(this.settings.logFile)] ?? {})) {
       const r = this.book.resolve(c.rankedName)
       if (!r || !r.spell.beneficial || (!r.spell.landSelf && !r.spell.landOther)) continue
       const had = newest.get(r.spell.name)
@@ -338,12 +338,14 @@ export class Engine {
         },
         onCast: (r, at) => {
           // Changed in place: the file needs only a mark, not a copy of every known cast per cast (LT-384).
-          const casts = this.store.casts.get()
+          const all = this.store.casts.get()
+          const casts = (all[characterKey(this.settings.logFile)] ??= {})
           const prev = casts[r.rankedName]
           casts[r.rankedName] = { rankedName: r.rankedName, lastCast: at, count: (prev?.count ?? 0) + 1 }
-          this.store.casts.set(casts)
+          this.store.casts.set(all)
         },
         isPet: (name) => this.combat.meter.kindOf(name).kind === 'pet',
+        isYourPet: (name) => this.combat.meter.isYourPet(name),
         quickBuffs: () => this.quickBuffs()
       })
     } catch (e) {
@@ -419,7 +421,7 @@ export class Engine {
       logFile,
       start: -1,
       end: -1,
-      clock: new LogClock(),
+      clock: new LogClock(Date.now),
       tailer: new LogTailer(logFile, {
         startAtEnd: true,
         pollMs: this.archive.gameRunning ? LIVE_POLL_MS : IDLE_POLL_MS,

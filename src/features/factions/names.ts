@@ -1,6 +1,6 @@
 import { factionKey } from './core'
-import { baseZone } from './attribution'
-import { CITY_ZONES, FACTION_ALIASES, ZONE_ALIASES } from '../../shared/game/factions'
+import { zoneKey } from '../../core/zones'
+import { CITY_ZONES, FACTION_ALIASES } from '../../shared/game/factions'
 
 // Names written more than one way, put one way: a faction as the game writes it, whatever the wiki
 // calls it; a zone as one place, whatever the log or the wiki calls it; and a Loadouts swap that puts
@@ -34,15 +34,6 @@ export function unmatchedNames(pages: string[], gameNames: string[]): { pages: s
   }
   const abc = (a: string, b: string) => a.localeCompare(b)
   return { pages: left.sort(abc), factions: gameNames.filter((f) => !joined.has(f)).sort(abc) }
-}
-
-/** A zone reduced for "same place": the instance, "The", spacing and punctuation dropped. */
-export function zoneKey(zone: string): string {
-  const k = baseZone(zone)
-    .toLowerCase()
-    .replace(/^the\s+/, '')
-    .replace(/[^a-z0-9]/g, '')
-  return ZONE_ALIASES[k] ?? k
 }
 
 /** The cities, where killing the people brings the guards down on you. */

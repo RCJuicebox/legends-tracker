@@ -24,7 +24,7 @@ function queries(rules: Record<string, SpellRule>, casts: Record<string, { ranke
     settings: cell({ ...defaultSettings(), logFile: 'C:/nowhere/Logs/eqlog_Kelwyn_neriak.txt' }),
     triggers: cell([]),
     rules: cell(rules),
-    casts: cell(casts),
+    casts: cell({ Kelwyn_neriak: casts, Aldric_neriak: { 'Odium X': { rankedName: 'Odium X', lastCast: 9, count: 1 } } }),
     motes: cell<MoteState>({ active: null, sessions: [], daily: {} }),
     stock: cell<MoteStock>({ counts: {}, item: { name: '', lvl: 0, xp: 0, to: 1 }, autoAdd: true }),
     respawns: cell({}),

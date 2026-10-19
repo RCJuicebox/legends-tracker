@@ -19,7 +19,8 @@ export class Store {
   readonly settings: JsonFile<AppSettings>
   readonly triggers: JsonFile<Trigger[]>
   readonly rules: JsonFile<Record<string, SpellRule>>
-  readonly casts: JsonFile<Record<string, KnownCast>>
+  /** By character key: what each has cast. */
+  readonly casts: JsonFile<Record<string, Record<string, KnownCast>>>
   readonly motes: JsonFile<MoteState>
   readonly stock: JsonFile<MoteStock>
   readonly respawns: JsonFile<RespawnRecords>
@@ -102,7 +103,15 @@ export class Store {
     const often = { delayMs: 15_000, pretty: false }
     // Each file the log keeps changing is checked on the way in, like the settings: a hand edit or a
     // half-written file must not throw in the engine's tick on every start.
-    this.casts = new JsonFile<Record<string, KnownCast>>(p('casts.json'), sanitizeCasts(read('casts.json')), often)
+    const casts = sanitizeCasts(read('casts.json'))
+    const followed = this.settings.get().logFile ? characterKey(this.settings.get().logFile) : ''
+    const unowned = casts['']
+    if (unowned && followed) {
+      casts[followed] = { ...unowned, ...casts[followed] }
+      delete casts['']
+    }
+    this.casts = new JsonFile(p('casts.json'), casts, often)
+    if (unowned && followed) this.casts.markDirty()
     // Mote history is rebuilt from the logs when its file is missing, unreadable or the wrong shape.
     const motes = sanitizeMotes(read('motes.json'))
     this.motesFresh = !motes

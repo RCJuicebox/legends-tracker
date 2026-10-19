@@ -13,7 +13,7 @@ export const SCHEMAS: Readonly<Record<string, number>> = {
   'settings.json': 1,
   'triggers.json': 1,
   'spell-rules.json': 1,
-  'casts.json': 1,
+  'casts.json': 2,
   'motes.json': 1,
   'mote-stock.json': 1,
   'respawns.json': 2,
@@ -31,7 +31,10 @@ export interface Migration {
 const MIGRATIONS: readonly Migration[] = [
   // Spawn points (a record with `names`). Nothing to change: the bump keeps an older build, which would
   // drop the names, from writing the file.
-  { file: 'respawns.json', to: 2, run: (v) => v }
+  { file: 'respawns.json', to: 2, run: (v) => v },
+  // Casts by character (LT-525). Those kept before are put under '', and the store gives them to the
+  // character the log being followed is (the one they were mostly cast by).
+  { file: 'casts.json', to: 2, run: (v) => ({ '': v }) }
 ]
 
 export type SchemaState = { state: 'current' } | { state: 'migrated'; from: number; backup: string } | { state: 'newer'; version: number }

@@ -23,6 +23,21 @@ describe('combat lines', () => {
     expect(p('You punch Amygdalan warrior for 18 points of damage. (Riposte)')).toMatchObject({ target: 'Amygdalan warrior', mods: ['riposte'] })
     expect(p('You punch a fetid fiend for 221 points of damage. (Finishing Blow)')).toMatchObject({ mods: ['finishing blow'] })
     expect(parseMods('Riposte Critical')).toEqual(['riposte', 'critical'])
+    expect(p('Jobarab kicks Magi P`tasa for 681 points of damage. (Slay Undead)')).toMatchObject({ mods: ['slay undead'] })
+  })
+  it('reads a heal the log gives no spell for, and non-melee damage from nobody named (LT-519)', () => {
+    expect(p('Aldric healed himself for 60 hit points.')).toEqual({
+      kind: 'heal',
+      source: 'Aldric',
+      target: 'Aldric',
+      amount: 60,
+      raw: 60,
+      spell: 'Unnamed heal',
+      hot: false,
+      mods: []
+    })
+    expect(p('Aldric healed Brenna for 221 hit points.')).toMatchObject({ source: 'Aldric', target: 'Brenna', amount: 221, spell: 'Unnamed heal' })
+    expect(p('You were hit by non-melee for 10 damage.')).toEqual({ kind: 'damage', source: '', target: SELF, amount: 10, how: 'spell', skill: 'Non-melee', mods: [] })
   })
   it("reads others' melee: pets, players, mobs on you and on others", () => {
     expect(p('Jobarab slashes an ire ghast for 47 points of damage.')).toMatchObject({
@@ -219,6 +234,26 @@ describe('CombatMeter', () => {
     ])
   })
 
+  it("books a spell's direct hit and its ticks as two rows, and Crippling Blow and Slay Undead as crits (LT-518, LT-519)", () => {
+    const { m, feed } = meter()
+    feed(`
+      [Thu Sep 24 20:00:04 2026] You hit a fetid fiend for 400 points of poison damage by Envenomed Bolt X.
+      [Thu Sep 24 20:00:05 2026] A fetid fiend has taken 50 damage from your Envenomed Bolt X.
+      [Thu Sep 24 20:00:11 2026] A fetid fiend has taken 60 damage from your Envenomed Bolt X.
+      [Thu Sep 24 20:00:12 2026] You backstab a fetid fiend for 691 points of damage. (Crippling Blow)
+      [Thu Sep 24 20:00:13 2026] You kick a fetid fiend for 90 points of damage. (Slay Undead)`)
+    const f = m.liveSession!
+    const you = f.entities['you']
+    expect(you.skills['Envenomed Bolt X']).toMatchObject({ how: 'spell', total: 400, hits: 1 })
+    expect(you.skills['dot:Envenomed Bolt X']).toMatchObject({ how: 'dot', total: 110, hits: 2 })
+    expect(you.out.crits).toBe(2)
+    const rows = skillRows(
+      f,
+      damageRows(f, 'everyone', false).find((r) => r.name === 'You')!
+    )
+    expect(new Set(rows.map((r) => r.key)).size).toBe(rows.length)
+  })
+
   it('books one fight from first blow to the kill, per entity and skill', () => {
     const { m, feed } = meter()
     feed(FIGHT)
@@ -236,7 +271,7 @@ describe('CombatMeter', () => {
     expect(you.kind).toBe('you')
     expect(you.out).toEqual({ total: 603, hits: 4, crits: 1, critTotal: 200, max: 300, min: 3 })
     expect(you.skills['punch']).toMatchObject({ how: 'melee', total: 300, hits: 2, crits: 1, misses: 1, mods: { critical: 1 } })
-    expect(you.skills['Envenomed Bolt X']).toMatchObject({ how: 'dot', total: 300, hits: 1 })
+    expect(you.skills['dot:Envenomed Bolt X']).toMatchObject({ how: 'dot', total: 300, hits: 1 })
     expect(you.skills['Damage shield (thorns)']).toMatchObject({ how: 'ds', total: 3 })
     // The cast came before the first blow: the session saw it, the fight had not begun.
     expect(you.casts).toBe(0)
@@ -632,7 +667,7 @@ describe('CombatMeter', () => {
     expect(Object.keys(f.enemies)).toEqual(['a fetid fiend'])
     expect(f.entities['deadly poison']).toBeUndefined()
     expect(f.entities['jobarab'].in.total).toBe(80)
-    expect(f.entities['jobarab'].takenBy['Deadly Poison'].total).toBe(30)
+    expect(f.entities['jobarab'].takenBy['dot:Deadly Poison'].total).toBe(30)
     expect(f.entities['you'].in.total).toBe(20)
     expect(f.timeline!.inc[2]).toBe(20)
     // A lingering tick after the fight opens none of its own.

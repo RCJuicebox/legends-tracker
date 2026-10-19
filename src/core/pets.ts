@@ -211,7 +211,8 @@ export function weaponDamageBonus(level: number, delay: number, twoHanded: boole
   if (level < 28) return 0
   const t = (n: number) => Math.trunc(n)
   if (!twoHanded) {
-    if (offhand) return level < 40 ? 0 : Math.max(0, 1 + t(t((level - 40) / 3) * (delay / 30)))
+    // EQEmu's integer maths, each division truncated: level 50, delay 25 is 1 + 3 × 0 = 1 (LT-524).
+    if (offhand) return level < 40 ? 0 : Math.max(0, 1 + t((level - 40) / 3) * t(delay / 30))
     const lvl = t((level - 28) / 3)
     if (delay <= 39) return 1 + lvl
     const extra = t((delay - 40) / 3)

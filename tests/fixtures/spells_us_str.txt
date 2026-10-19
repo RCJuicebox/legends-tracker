@@ -12,3 +12,4 @@
 88^Your hands glow with malignant power.^'s hands glow with malignant power.^You writhe in the grip of agony.^ writhes in the grip of agony.^The agony ends.^
 13540^Your hands glow with malignant power.^'s hands glow with malignant power.^You writhe in the grip of agony.^ writhes in the grip of agony.^The agony ends.^
 17042^Your hands glow with malignant power.^'s hands glow with malignant power.^You writhe in the grip of agony.^ writhes in the grip of agony.^The agony ends.^
+2605^^^Your feet move faster.^^You slow down.^

@@ -26,7 +26,8 @@ const EFFECTS: [AaEffect, RegExp][] = [
   ['double_riposte_pct', /(\d+)% chance to perform a double riposte/i],
   ['strikethrough_pct', /strike through your opponent[^.]*?by (\d+)%/i],
   ['melee_dmg_pct', /improves the base damage of your melee attacks[^.]*?by (\d+)%/i],
-  ['haste_pct', /(\d+)% increase in your current and maximum haste/i],
+  // "grants a 10% increase in your current and maximum haste"; the Monk's: "increases the Monks current and maximum haste by 10%".
+  ['haste_pct', /(\d+)% increase in your current and maximum haste|current and maximum haste by (\d+)%/i],
   ['ac', /increases your armor class by (\d+)/i]
 ]
 
@@ -152,7 +153,7 @@ export function aaEffects(description: string): Partial<Record<AaEffect, number>
   const out: Partial<Record<AaEffect, number>> = {}
   for (const [key, re] of EFFECTS) {
     const m = re.exec(description || '')
-    if (m) out[key] = Number(m[1])
+    if (m) out[key] = Number(m[1] ?? m[2])
   }
   return out
 }

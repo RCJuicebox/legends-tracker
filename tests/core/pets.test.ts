@@ -168,6 +168,9 @@ describe('pet melee', () => {
     expect(weaponDamageBonus(20, 30, false)).toBe(0)
     expect(weaponDamageBonus(36, 30, false)).toBe(3)
     expect(weaponDamageBonus(36, 30, false, true)).toBe(0)
+    // Off-hand at 50: EQEmu divides in whole numbers, 1 + (10 / 3) × (25 / 30) = 1 + 3 × 0 (LT-524).
+    expect(weaponDamageBonus(50, 25, false, true)).toBe(1)
+    expect(weaponDamageBonus(50, 30, false, true)).toBe(4)
     expect(weaponDamageBonus(36, 43, true)).toBe(8)
     expect(weaponDamageBonus(50, 70, true)).toBe(26)
   })

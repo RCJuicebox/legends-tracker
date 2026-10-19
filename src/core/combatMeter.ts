@@ -63,6 +63,13 @@ const INVITE_MS = 60_000
 const tally = (): Tally => ({ total: 0, hits: 0, crits: 0, critTotal: 0, max: 0, min: 0 })
 const healTally = (): HealTally => ({ total: 0, raw: 0, count: 0, crits: 0, max: 0 })
 const skillStat = (name: string, how: DamageHow): SkillStat => ({ ...tally(), name, how, misses: 0, resists: 0, mods: {} })
+/**
+ * Where a skill is booked: by name, and a DoT's ticks apart from a direct hit of the same name
+ * (Envenomed Bolt X lands a hit and then ticks), so neither row mixes the two (LT-519).
+ */
+const skillKey = (name: string, how: DamageHow): string => (how === 'dot' ? `dot:${name}` : name)
+/** The criticals EQEmu's TryCriticalHit makes: a critical, a Crippling Blow, a Slay Undead (LT-518). */
+const isCrit = (mods: string[]): boolean => mods.includes('critical') || mods.includes('crippling blow') || mods.includes('slay undead')
 const defense = (): Defense => ({ swings: 0, hit: 0, miss: 0, dodge: 0, parry: 0, block: 0, riposte: 0, absorb: 0 })
 
 /** "Envenomed Bolt X" and "Envenomed Bolt" are one spell for matching a landing to its cast. */
@@ -235,6 +242,12 @@ export class CombatMeter {
   /** A name's kind as the meter has placed it: you, pet (and whose), group, player, mob. */
   kindOf(name: string): { kind: EntityKind; owner?: string } {
     return this.who.kindOf(name)
+  }
+
+  /** Whether a name is your own pet (one two may have charmed counts). */
+  isYourPet(name: string): boolean {
+    const { kind, owner } = this.who.kindOf(name)
+    return kind === 'pet' && !!owner && owner.split(' or ').includes(SELF)
   }
 
   /**
@@ -591,7 +604,7 @@ export class CombatMeter {
     if (ss === 'unknown' || ts === 'unknown' || ss === ts) return
     if (!this.admit(ev, at, ss === 'friend' ? source : target, ss === 'enemy' ? source : target)) return
     const closed = this.afterKill(at, ss === 'enemy' ? source : target)
-    const crit = ev.mods.includes('critical')
+    const crit = isCrit(ev.mods)
     const proc = ss === 'friend' && ev.how === 'spell' ? this.procOrigin(source, ev.skill, at) : null
     const procKey = `${nameKey(source)}|${spellBase(ev.skill)}`
     // A lifetap whose heal line came first already counted this firing.
@@ -609,13 +622,13 @@ export class CombatMeter {
       add(src.out, ev.amount, crit)
       if (proc) CombatMeter.proc(src, ev.skill, proc, ev.amount, 0, !paired)
       if (finishing) CombatMeter.proc(src, 'Finishing Blow', 'aa', ev.amount, 0, true)
-      const skill = (src.skills[ev.skill] ??= skillStat(ev.skill, ev.how))
+      const skill = (src.skills[skillKey(ev.skill, ev.how)] ??= skillStat(ev.skill, ev.how))
       add(skill, ev.amount, crit)
       for (const m of ev.mods) skill.mods[m] = (skill.mods[m] ?? 0) + 1
       add((src.targets[target] ??= tally()), ev.amount, crit)
       add(tgt.in, ev.amount, crit)
       add((tgt.attackers[source] ??= tally()), ev.amount, crit)
-      add((tgt.takenBy[ev.skill] ??= skillStat(ev.skill, ev.how)), ev.amount, crit)
+      add((tgt.takenBy[skillKey(ev.skill, ev.how)] ??= skillStat(ev.skill, ev.how)), ev.amount, crit)
       if (ev.how === 'melee') {
         tgt.defense.swings++
         tgt.defense.hit++
@@ -644,13 +657,13 @@ export class CombatMeter {
     const side = this.who.sideOf(target)
     if (side === 'unknown') return
     const k = nameKey(target)
-    const crit = ev.mods.includes('critical')
+    const crit = isCrit(ev.mods)
     let booked = false
     for (const seg of this.liveSegments(at, false)) {
       if (side === 'enemy' ? !(k in seg.enemies) : !this.who.ours(target) && !seg.entities[k]) continue
       const tgt = this.ent(seg, target, at)
       add(tgt.in, ev.amount, crit)
-      add((tgt.takenBy[ev.skill] ??= skillStat(ev.skill, ev.how)), ev.amount, crit)
+      add((tgt.takenBy[skillKey(ev.skill, ev.how)] ??= skillStat(ev.skill, ev.how)), ev.amount, crit)
       if (tgt.kind === 'you') book(seg, at, 'inc', ev.amount)
       booked = true
     }

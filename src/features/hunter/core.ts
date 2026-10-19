@@ -1,9 +1,9 @@
-import type { AchSection } from '../../core/achievements'
+import { placeZones, type AchSection } from '../../core/achievements'
 import type { SlayerKills } from '../../core/slayer'
 import type { HunterTrackView } from '../../shared/tracking'
 import { duration } from '../../core/format'
 import { respawnEstimate, type RespawnRecord } from '../../core/respawns'
-import { zoneKey } from '../factions/names'
+import { zoneKey } from '../../core/zones'
 import { bareName, campZone } from '../slayer/core'
 import { legendsSpawnsOf, type MobSpawn } from '../slayer/spawns'
 
@@ -156,8 +156,16 @@ export function hunterLive(
   isBroken: (achievement: string) => boolean
 ): HunterTrackView | null {
   if (!zone) return null
+  // Only kills here count: a same-named mob elsewhere is another zone's named (LT-520).
+  const here = placeZones(zone)
   const last = new Map<string, number>()
-  for (const k of kills?.values() ?? []) last.set(bareName(k.name), Math.max(last.get(bareName(k.name)) ?? 0, k.times.at(-1) ?? 0))
+  for (const k of kills?.values() ?? []) {
+    const b = bareName(k.name)
+    k.times.forEach((t, i) => {
+      const z = k.zones?.[i]
+      if ((!z || here.has(zoneKey(z))) && t > (last.get(b) ?? 0)) last.set(b, t)
+    })
+  }
   const rows = hunterHere(
     hunterZones(
       sections,

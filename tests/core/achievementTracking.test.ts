@@ -800,4 +800,15 @@ describe('tracked achievements', () => {
     )
     expect(got.map((t) => t.done)).toEqual([true, true])
   })
+
+  it('ticks a Hunter named only for a kill in that zone, or where the zone is not known (LT-520)', () => {
+    const tracked = [key(3, 0)]
+    const marks = { ticks: [], tracked }
+    const elsewhere = trackedAchievements(sections, marks, { kills: new Map([['skeletal warlord', { times: [5], zones: ['The Ruins of Old Guk'] }]]) })
+    expect(elsewhere[0].left).toContain('Skeletal Warlord')
+    const there = trackedAchievements(sections, marks, { kills: new Map([['skeletal warlord', { times: [5, 9], zones: ['Befallen', 'The Ruins of Old Guk'] }]]) })
+    expect(there[0].justDone).toEqual([{ name: 'Skeletal Warlord', at: 5 }])
+    const unknown = trackedAchievements(sections, marks, { kills: new Map([['skeletal warlord', { times: [7], zones: [''] }]]) })
+    expect(unknown[0].justDone).toEqual([{ name: 'Skeletal Warlord', at: 7 }])
+  })
 })

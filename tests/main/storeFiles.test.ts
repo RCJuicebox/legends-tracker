@@ -118,7 +118,7 @@ describe('saving and starting again', () => {
     first.settings.set(settings())
     first.triggers.set(triggers)
     first.rules.set({ 'Spirit of Wolf': { track: false, alias: 'SoW', warnSec: 20 } })
-    first.casts.set({ 'spirit of wolf': { rankedName: 'Spirit of Wolf', lastCast: 1_790_000_000_000, count: 7 } })
+    first.casts.set({ Tester_test: { 'spirit of wolf': { rankedName: 'Spirit of Wolf', lastCast: 1_790_000_000_000, count: 7 } } })
     first.motes.set(motes)
     first.stock.set({ counts: { major: 60 }, item: { name: 'Test cloak', lvl: 3, xp: 12, to: 6 }, autoAdd: false })
     first.respawns.set(respawns)
@@ -133,7 +133,7 @@ describe('saving and starting again', () => {
     expect(second.settings.get()).toEqual(settings())
     expect(second.triggers.get()).toEqual(triggers)
     expect(second.rules.get()).toEqual({ 'Spirit of Wolf': { track: false, alias: 'SoW', warnSec: 20 } })
-    expect(second.casts.get()).toEqual({ 'spirit of wolf': { rankedName: 'Spirit of Wolf', lastCast: 1_790_000_000_000, count: 7 } })
+    expect(second.casts.get()).toEqual({ Tester_test: { 'spirit of wolf': { rankedName: 'Spirit of Wolf', lastCast: 1_790_000_000_000, count: 7 } } })
     expect(second.motes.get()).toEqual(motes)
     expect(second.stock.get()).toEqual({ counts: { major: 60 }, item: { name: 'Test cloak', lvl: 3, xp: 12, to: 6 }, autoAdd: false })
     expect(second.respawns.get()).toEqual(respawns)
@@ -143,10 +143,10 @@ describe('saving and starting again', () => {
   it('writes settings for a person to read and the busy files compact', async () => {
     const store = new Store(defaultTriggers)
     store.settings.set(settings())
-    store.casts.set({ x: { rankedName: 'X', lastCast: 1, count: 1 } })
+    store.casts.set({ Tester_test: { x: { rankedName: 'X', lastCast: 1, count: 1 } } })
     await store.flushAll()
     expect(readFileSync(file('settings.json'), 'utf8')).toContain('\n  "installDir"')
-    expect(readFileSync(file('casts.json'), 'utf8')).toBe('{"x":{"rankedName":"X","lastCast":1,"count":1}}')
+    expect(readFileSync(file('casts.json'), 'utf8')).toBe('{"Tester_test":{"x":{"rankedName":"X","lastCast":1,"count":1}}}')
   })
 
   it('reads triggers and spell rules through their checks, so a bad entry cannot stop the start (LT-432)', () => {
@@ -192,7 +192,7 @@ describe('saving and starting again', () => {
   it('writes a changed setting on its own shortly after, and leaves the busy files for later', async () => {
     const store = new Store(defaultTriggers)
     store.settings.set(settings())
-    store.casts.set({ x: { rankedName: 'X', lastCast: 1, count: 1 } })
+    store.casts.set({ Tester_test: { x: { rankedName: 'X', lastCast: 1, count: 1 } } })
     await vi.waitFor(() => expect(existsSync(file('settings.json'))).toBe(true), { timeout: 3000 })
     expect(existsSync(file('casts.json'))).toBe(false)
     // Clears the casts timer so nothing is left running after the test.
@@ -356,6 +356,19 @@ describe('files read back through the sanitisers', () => {
   it('fill mote stock fields an older build did not save', () => {
     writeFileSync(file('mote-stock.json'), JSON.stringify({ counts: { minor: 2 } }))
     expect(new Store(defaultTriggers).stock.get()).toEqual({ counts: { minor: 2 }, item: { name: '', lvl: 0, xp: 0, to: 1 }, autoAdd: true })
+  })
+})
+
+describe('casts kept before they were per character', () => {
+  it('go to the character the log being followed is, and the file is written in the new shape', async () => {
+    writeFileSync(file('settings.json'), JSON.stringify({ ...defaultSettings(), logFile: 'C:/Games/EQL/Logs/eqlog_Kelwyn_neriak.txt' }))
+    writeFileSync(file('schema.json'), JSON.stringify({ ...SCHEMAS, 'casts.json': 1 }))
+    writeFileSync(file('casts.json'), JSON.stringify({ 'Odium X': { rankedName: 'Odium X', lastCast: 5, count: 2 } }))
+    const store = new Store(defaultTriggers)
+    expect(store.casts.get()).toEqual({ Kelwyn_neriak: { 'Odium X': { rankedName: 'Odium X', lastCast: 5, count: 2 } } })
+    await store.flushAll()
+    expect(readJson('casts.json')).toEqual({ Kelwyn_neriak: { 'Odium X': { rankedName: 'Odium X', lastCast: 5, count: 2 } } })
+    expect(readJson('schema.json')).toMatchObject({ 'casts.json': 2 })
   })
 })
 

@@ -28,6 +28,17 @@ describe('the hour the clocks go back', () => {
     expect(times[6] - times[3]).toBe(3_600_000)
   })
 
+  it('reads the first live line in the repeated hour as the second time round, from the clock on the wall (LT-523)', () => {
+    // A watch started at 01:20 the second time: lines read 01:20 now, which the plain parser puts an hour back.
+    const wall = Date.UTC(2026, 10, 1, 6, 20)
+    const clock = new LogClock(() => wall)
+    expect(clock.parse(at('01:20:00'))!.time).toBe(wall)
+    expect(clock.parse(at('01:20:05'))!.time).toBe(wall + 5000)
+    // Started the first time round, the lines stay where they are.
+    const early = new LogClock(() => Date.UTC(2026, 10, 1, 5, 20))
+    expect(early.parse(at('01:20:00'))!.time).toBe(Date.UTC(2026, 10, 1, 5, 20))
+  })
+
   it('leaves a step back outside that hour alone', () => {
     const clock = new LogClock()
     clock.parse(`[Tue Sep 01 12:30:00 2026] a`)

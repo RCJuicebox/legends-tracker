@@ -1,5 +1,5 @@
 import { STANDING_MAX, STANDING_MIN } from './core'
-import { zoneKey } from './names'
+import { zoneKey } from '../../core/zones'
 import type { FactionPlan, PlanTarget } from './planTypes'
 import type { FactionTrackGoal, FactionTrackView, TrackItem, TrackKind } from '../../shared/tracking'
 

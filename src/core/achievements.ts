@@ -8,6 +8,7 @@
 // one shows as Blocked instead of open. Those marks are kept by name, so they survive a new export.
 
 import type { AchMarks, AchObjective, AchSection, Achievement } from '../shared/character'
+import { zoneKey } from './zones'
 
 export type { AchMarks, AchObjective, AchSection, Achievement }
 
@@ -109,6 +110,16 @@ export function placeOf(a: Achievement): string | null {
  * be listed here.
  */
 const SHARED_KILLS: [string, string][] = [['The Lair of the Splitpaw', 'The Southern Plains of Karana']]
+
+/** The zones (zoneKey) a place's kills count in: its own ("X or Y" is both), and those it shares kills with. */
+export function placeZones(place: string): Set<string> {
+  const zones = place.split(' or ')
+  for (const [a, b] of SHARED_KILLS) {
+    if (zones.includes(a)) zones.push(b)
+    else if (zones.includes(b)) zones.push(a)
+  }
+  return new Set(zones.map(zoneKey))
+}
 
 /** [section, achievement] */
 export type AchRef = [number, number]

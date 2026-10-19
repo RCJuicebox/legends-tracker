@@ -25,7 +25,7 @@ import {
   type SlayerPlanChoices,
   type SlayerStep
 } from './core'
-import { zoneKey } from '../factions/names'
+import { zoneKey } from '../../core/zones'
 import { takeRequestedSlayerStep } from './jump'
 import { SpawnMap } from './SpawnMap'
 import type { MobSpawn } from './spawns'

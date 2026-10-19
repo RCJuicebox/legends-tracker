@@ -57,7 +57,7 @@ export function exampleShaman(book = fixtureBook()): CharacterSettings {
   }
 }
 
-export function harness(opts: { character?: CharacterSettings; rules?: Record<string, SpellRule>; pets?: string[]; quickBuffs?: string[] } = {}) {
+export function harness(opts: { character?: CharacterSettings; rules?: Record<string, SpellRule>; pets?: string[]; yourPets?: string[]; quickBuffs?: string[] } = {}) {
   const book = fixtureBook()
   /** The ranked names the tracker counted as casts (the engine's casts.json). */
   const casts: string[] = []
@@ -80,14 +80,16 @@ export function harness(opts: { character?: CharacterSettings; rules?: Record<st
           rank,
           level: 50,
           tierPct: DEFAULT_TIER_DURATION_PCT,
-          focusPct: focusFor(spell, character, casterLevel(spell, character)).pct
+          focusPct: focusFor(spell, character, casterLevel(spell, character)).pct,
+          overrideSec: opts.rules?.[spell.name]?.durationOverrideSec
         })
     },
     {
       notify: (ns) => ns.forEach((n) => n.kind === 'speak' && spoken.push(n.text)),
       feed: (kind, text) => void feedItems.push([kind, text]),
       onCast: (r) => void casts.push(r.rankedName),
-      isPet: (name) => !!opts.pets?.includes(name),
+      isPet: (name) => !!opts.pets?.includes(name) || !!opts.yourPets?.includes(name),
+      isYourPet: (name) => !!opts.yourPets?.includes(name),
       quickBuffs: () => (opts.quickBuffs ?? []).flatMap((n) => book.resolve(n) ?? [])
     }
   )

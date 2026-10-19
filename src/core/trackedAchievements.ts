@@ -1,4 +1,5 @@
-import { AchievementBook, achKey, type AchSection } from './achievements'
+import { AchievementBook, achKey, placeOf, placeZones, type AchSection } from './achievements'
+import { zoneKey } from './zones'
 import type { SkillRow, SlayerRow, TrackedAchievement } from '../shared/tracking'
 
 // The achievements the player tracks (the star on the Achievements page), each with its progress in
@@ -10,8 +11,8 @@ export interface TrackedSources {
   skills?: SkillRow[]
   /** Faction achievements' factions and standings, by achievement name lower-cased. */
   factions?: Record<string, { faction: string; standing: number | null }> | null
-  /** Kills since the export, by mob name lower-cased. */
-  kills?: Map<string, { times: number[] }>
+  /** Kills since the export, by mob name lower-cased, with the zone of each ('' where not known). */
+  kills?: Map<string, { times: number[]; zones?: string[] }>
   /** Achievements the game said were completed since the export, lower-cased. */
   completed?: Set<string>
 }
@@ -50,9 +51,18 @@ export function trackedAchievements(sections: AchSection[], marks: { ticks: stri
     else {
       const required = a.c.map((c, ci) => ({ c, ci })).filter(({ c }) => !c.o)
       const open = required.filter(({ ci }) => !book.objDone([si, ai, ci]))
+      // A Hunter named is that zone's: "a goblin alchemist" killed in Permafrost is not the Misty Thicket's (LT-520).
+      const place = placeOf(a)
+      const zones = place ? placeZones(place) : null
       const killedAt = (name: string) => {
-        const times = kills.get(bare(name))?.times
-        return times?.at(-1) ?? 0
+        const k = kills.get(bare(name))
+        if (!k) return 0
+        let last = 0
+        k.times.forEach((t, i) => {
+          const z = k.zones?.[i]
+          if (t > last && (!zones || !z || zones.has(zoneKey(z)))) last = t
+        })
+        return last
       }
       // A named killed since the export is ticked off here before the next export says so.
       const justDone = open.map(({ c }) => ({ name: c.t, at: killedAt(c.t) })).filter((x) => x.at > 0)

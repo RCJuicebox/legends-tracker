@@ -1,6 +1,7 @@
 import { usualAmount, type FactionSourceTallies, type SharedFrom, type SourceKind } from './attribution'
 import { NO_MOB, type FactionPageData, type FactionSources } from './core'
-import { factionNamer, zoneKey } from './names'
+import { factionNamer } from './names'
+import { zoneKey } from '../../core/zones'
 import type { Guesses } from './catalog'
 
 // Two questions the Standings tab answers from what the logs and eqlwiki say: what moved this

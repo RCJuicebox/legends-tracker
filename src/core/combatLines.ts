@@ -69,7 +69,13 @@ const RE_DOT_NO_CASTER = /^(.+?) has taken ([\d,]+) damage by (.+?)\.(?: \((.+)\
 const RE_DS_YOU = /^(.+?) is \w+ by YOUR (\w+) for ([\d,]+) points? of non-melee damage\.$/
 const RE_DS_ON_YOU = /^YOU are \w+ by (.+?)'s (\w+) for ([\d,]+) points? of non-melee damage!$/
 const RE_DS = /^(.+?) is \w+ by (.+?)'s (\w+) for ([\d,]+) points? of non-melee damage\.$/
-const RE_HEAL = /^(.+?) healed (.+?)( over time)? for ([\d,]+)(?: \(([\d,]+)\))? hit points by (.+?)\.(?: \((.+)\))?$/
+// The spell is left out of some heals: "Aldric healed himself for 60 hit points." (LT-519).
+const RE_HEAL = /^(.+?) healed (.+?)( over time)? for ([\d,]+)(?: \(([\d,]+)\))? hit points(?: by (.+?))?\.(?: \((.+)\))?$/
+/** What a heal the log does not name is booked under. */
+const UNNAMED_HEAL = 'Unnamed heal'
+/** "You were hit by non-melee for 10 damage.": a spell or effect the log does not name, from nobody it names. */
+const RE_NON_MELEE_ON_YOU = /^You were hit by non-melee for ([\d,]+) damage\.$/
+const NON_MELEE = 'Non-melee'
 const RE_RUNE = /^(.+?) gains? a rune for ([\d,]+) points? of absorption\.$/
 const RE_SLAIN_YOU = SLAIN_BY_YOU
 const RE_SLAIN_BY = SLAIN_BY
@@ -112,6 +118,7 @@ export function parseMods(tag: string | undefined): string[] {
   return tag
     .replace(/Finishing Blow/g, 'finishing-blow')
     .replace(/Crippling Blow/g, 'crippling-blow')
+    .replace(/Slay Undead/g, 'slay-undead')
     .replace(/Double Bow Shot/g, 'double-bow-shot')
     .split(/\s+/)
     .filter(Boolean)
@@ -149,6 +156,7 @@ export function parseCombatLine(text: string): CombatEvent | null {
     if ((m = RE_DOT_ON_YOU.exec(text))) return { kind: 'damage', source: m[3], target: SELF, amount: num(m[1]), how: 'dot', skill: spell(m[2]), mods: parseMods(m[4]) }
     if ((m = RE_DOT_ON_YOU_NO_CASTER.exec(text))) return { kind: 'damage', source: '', target: SELF, amount: num(m[1]), how: 'dot', skill: spell(m[2]), mods: parseMods(m[3]) }
     if ((m = RE_DS_ON_YOU.exec(text))) return { kind: 'damage', source: m[1], target: SELF, amount: num(m[3]), how: 'ds', skill: `Damage shield (${m[2]})`, mods: [] }
+    if ((m = RE_NON_MELEE_ON_YOU.exec(text))) return { kind: 'damage', source: '', target: SELF, amount: num(m[1]), how: 'spell', skill: NON_MELEE, mods: [] }
     if ((m = RE_SLAIN_YOU.exec(text))) return { kind: 'kill', target: m[1], killer: SELF }
     if (RE_YOU_DIED.test(text)) return { kind: 'kill', target: SELF, killer: null }
     if ((m = RE_YOU_SLAIN.exec(text))) return { kind: 'kill', target: SELF, killer: m[1] }
@@ -181,7 +189,7 @@ export function parseCombatLine(text: string): CombatEvent | null {
     const source = self(m[1])
     const target = reflexive(m[2]) ? source : self(m[2])
     const amount = num(m[4])
-    return { kind: 'heal', source, target, amount, raw: m[5] ? num(m[5]) : amount, spell: m[6], hot: !!m[3], mods: parseMods(m[7]) }
+    return { kind: 'heal', source, target, amount, raw: m[5] ? num(m[5]) : amount, spell: m[6] ?? UNNAMED_HEAL, hot: !!m[3], mods: parseMods(m[7]) }
   }
   if (text.includes(' rune ') && (m = RE_RUNE.exec(text))) return { kind: 'rune', target: self(m[1]), amount: num(m[2]) }
   if (text.endsWith('!') && text.includes(' has been slain by ') && (m = RE_SLAIN_BY.exec(text))) return { kind: 'kill', target: self(m[1]), killer: self(m[2]) }

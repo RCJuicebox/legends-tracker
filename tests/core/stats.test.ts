@@ -179,6 +179,8 @@ describe('AAs from the log, on single-digit days', () => {
 describe('AA effects', () => {
   it('reads haste and armor class as well as the calculator figures', () => {
     expect(aaEffects('This passive ability grants a 10% increase in your current and maximum haste.')).toEqual({ haste_pct: 10 })
+    // The Monk's wording (LT-522).
+    expect(aaEffects('This passive ability increases the Monks current and maximum haste by 10%.')).toEqual({ haste_pct: 10 })
     expect(aaEffects('This passive ability increases your armor class by 24 points.')).toEqual({ ac: 24 })
     expect(aaEffects('This ability reduces the damage your opponent deals by 5%.')).toEqual({})
   })

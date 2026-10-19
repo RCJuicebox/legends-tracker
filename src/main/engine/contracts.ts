@@ -66,7 +66,8 @@ export interface EngineStore {
   settings: Cell<AppSettings>
   triggers: { get(): Trigger[] }
   rules: { get(): Record<string, SpellRule> }
-  casts: Cell<Record<string, { rankedName: string; lastCast: number; count: number }>>
+  /** By character key. */
+  casts: Cell<Record<string, Record<string, { rankedName: string; lastCast: number; count: number }>>>
   motes: Cell<MoteState>
   stock: Cell<MoteStock>
   respawns: Cell<RespawnRecords>

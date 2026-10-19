@@ -21,6 +21,8 @@ export interface TrackerHooks {
   onCast?: (r: RankedSpell, at: number) => void
   /** Whether a name the log gives as a caster is a pet the damage meter knows: never another player. */
   isPet?: (name: string) => boolean
+  /** Whether a name is your own pet, as the roster knows it: whom "Your pet's X spell has worn off." is about. */
+  isYourPet?: (name: string) => boolean
   /** The buffs the character casts (the newest rank of each, from the casts kept): what Quick Buff can land. */
   quickBuffs?: () => RankedSpell[]
 }
@@ -69,8 +71,8 @@ const MAX_PENDING = 6
 const RE_CAST = CAST_BY_YOU
 const RE_FAIL_NAMED = /^Your (.+?) spell (?:is interrupted|fizzles)[.!]$/
 const RE_FAIL = /^Your spell (?:is interrupted|fizzles)[.!]$/
-/** "Your Infusion of Spirit spell did not take hold on Elund." */
-const RE_NO_HOLD_NAMED = /^Your (.+?) spell did not take hold on (.+)\.$/
+/** "Your Infusion of Spirit spell did not take hold on Elund. (Blocked by Harnessing of Spirit.)": Legends says what blocked it. */
+const RE_NO_HOLD_NAMED = /^Your (.+?) spell did not take hold(?: on (.+?))?\.(?: \(Blocked by .+\.\))?$/
 /** "Your Blade Dance spell on Innoruuk, the Prince of Hate has been overwritten." */
 const RE_OVERWRITTEN = /^Your (.+?) spell on (.+) has been overwritten\.$/
 // Older clients: "Your target resisted the X spell." Legends: "a ratman warrior resisted your Envenomed Bolt X!"
@@ -82,11 +84,14 @@ const FAIL_PREFIXES = [
   'You must first select a target',
   'Your target is out of range',
   'You cannot see your target',
-  'Insufficient Mana',
-  "You can't cast spells while stunned",
   'Your target is immune',
   'Your target cannot be'
 ]
+/** Attempts the game refuses before they begin: no cast line, so only a cast of yours begun that same second can be the one refused (LT-517). */
+const REFUSALS = ['Insufficient Mana', "You can't cast spells while stunned"]
+/** The casting skills of bard songs (brass, singing, stringed, wind, percussion): a song lands again on each pulse. */
+const SONG_SKILLS = new Set([12, 41, 49, 54, 70])
+const isSong = (s: Spell) => SONG_SKILLS.has(s.skill)
 // A tick that crits ends "(Critical)", as combatLines reads it.
 const RE_DOT_TICK = /^(.+?) has taken [\d,]+ damage from your (.+?)\.(?: \((.+)\))?$/
 /** "A forsaken revenant has taken 451 damage from Harm Touch X by Fenwick.": another player's DoT ticking. */
@@ -144,6 +149,8 @@ export class SpellTracker {
   private zone = ''
   /** Quick Buff was activated: until when its landings are yours, which buffs they may be, and which have been counted as a cast. */
   private quick: { until: number; spells: RankedSpell[]; counted: Set<string> } | null = null
+  /** Songs running on you, by their landing text: each pulse lands again and runs the timer on (LT-521). */
+  private songs = new Map<string, { key: string; seconds: number }>()
 
   constructor(
     private readonly book: SpellBook,
@@ -170,7 +177,7 @@ export class SpellTracker {
     if (text.includes(' begins ') && (m = CAST_BY_OTHER.exec(text))) return this.onOtherCast(m[1], m[2], now)
 
     if ((m = RE_FAIL_NAMED.exec(text))) return void this.dropPending(m[1])
-    if (RE_FAIL.test(text)) return void this.pending.pop()
+    if (RE_FAIL.test(text)) return void this.dropOwn()
     if (text.startsWith('Your ')) {
       if ((m = RE_NO_HOLD_NAMED.exec(text))) return this.onNoHold(m[1])
       if ((m = RE_OVERWRITTEN.exec(text))) return this.onOverwritten(m[1], m[2], now)
@@ -182,9 +189,11 @@ export class SpellTracker {
       if (this.dropPending(resisted) || cast) this.hooks.feed('warn', `${resisted} resisted`)
       return
     }
-    if (FAIL_PREFIXES.some((p) => text.startsWith(p))) return void this.pending.pop()
+    if (FAIL_PREFIXES.some((p) => text.startsWith(p))) return void this.dropOwn()
+    if (REFUSALS.some((p) => text.startsWith(p))) return void this.dropOwn(now)
 
     if (this.tryLand(text, now)) return
+    if (this.songs.size && this.onSongPulse(text, now)) return
     if (this.quick) {
       if (this.quick.until < now) this.quick = null
       else if (this.tryQuickLand(text, now)) return
@@ -286,6 +295,32 @@ export class SpellTracker {
     if (d.ticks === 0 || d.permanent) return
     this.pending.push({ r, at: now, expires: now + r.spell.castMs + CAST_SLACK_MS, targets: new Set(), caster })
     if (this.pending.length > MAX_PENDING) this.pending.shift()
+  }
+
+  /** Drops your newest pending cast, never another player's; with `at`, only one begun in that second. */
+  private dropOwn(at?: number): void {
+    for (let i = this.pending.length - 1; i >= 0; i--) {
+      const p = this.pending[i]
+      if (p.caster) continue
+      if (at === undefined || p.at === at) this.pending.splice(i, 1)
+      return
+    }
+  }
+
+  /** A song's pulse landing on you again: its timer runs on from now, without a feed line each pulse. */
+  private onSongPulse(text: string, now: number): boolean {
+    const song = this.songs.get(text)
+    if (!song) return false
+    const t = this.board.get(song.key)
+    if (!t) {
+      this.songs.delete(text)
+      return false
+    }
+    if (t.startedAt < now) {
+      t.startedAt = now
+      this.board.reschedule(song.key, now + song.seconds * 1000, false)
+    }
+    return true
   }
 
   /** Drops the latest pending cast of `name`; whether there was one. */
@@ -395,6 +430,7 @@ export class SpellTracker {
       meta: { kind, ticks: d.ticks, firstTick: joinedAtTick, joined: joinedAtTick, rankedName: r.rankedName, name, caster }
     }
     this.board.upsert(timer)
+    if (target === SELF && !caster && s.landSelf && isSong(s)) this.songs.set(s.landSelf, { key, seconds: d.seconds })
     const by = caster ? ` by ${caster}` : ''
     this.hooks.feed('timer', `${r.rankedName}${by} on ${target}: ${d.earliestSec}–${d.latestSec}s${joinedAtTick ? ' (joined at a tick)' : ''}`)
     if (caster) {
@@ -426,12 +462,17 @@ export class SpellTracker {
     if (t) this.announceFade(t)
   }
 
+  /**
+   * "Your pet's X spell has worn off.": the timer on your pet, as the roster names it; never a
+   * groupmate's buff of the same name, nor another player's cast (LT-514).
+   */
   private onPetWornOff(name: string): void {
     const r = this.book.resolve(name)
     const spell = r?.spell.name ?? name
+    const yours = this.hooks.isYourPet
     const candidates = this.board
       .list()
-      .filter((t) => t.source === 'spell' && t.spell === spell && t.target !== SELF)
+      .filter((t) => t.source === 'spell' && t.spell === spell && t.target !== SELF && !t.meta?.caster && (!yours || yours(t.target)))
       .sort((a, b) => b.startedAt - a.startedAt)
     if (candidates[0]) this.board.end(candidates[0].key, 'faded')
   }

@@ -691,13 +691,23 @@ export function sanitizeMotes(v: unknown): MoteState | null {
   return out
 }
 
-/** casts.json as read back: each spell's ranked name, last cast and count. Entries of another shape are dropped. */
-export function sanitizeCasts(v: unknown): Record<string, { rankedName: string; lastCast: number; count: number }> {
-  const out: Record<string, { rankedName: string; lastCast: number; count: number }> = {}
+type KnownCasts = Record<string, { rankedName: string; lastCast: number; count: number }>
+
+/**
+ * casts.json as read back: by character key (`''` for casts kept before they were per character),
+ * each spell's ranked name, last cast and count. Entries of another shape are dropped.
+ */
+export function sanitizeCasts(v: unknown): Record<string, KnownCasts> {
+  const out: Record<string, KnownCasts> = {}
   if (!isObj(v)) return out
-  for (const [name, c] of Object.entries(v)) {
-    if (!isObj(c) || typeof c.rankedName !== 'string') continue
-    out[name] = { rankedName: c.rankedName, lastCast: num(c.lastCast, 0, 0, 1e15), count: Math.round(num(c.count, 0, 0, 1e9)) }
+  for (const [key, casts] of Object.entries(v)) {
+    if (!isObj(casts) || (key !== '' && !isCharacterKey(key))) continue
+    const mine: KnownCasts = {}
+    for (const [name, c] of Object.entries(casts)) {
+      if (!isObj(c) || typeof c.rankedName !== 'string') continue
+      mine[name] = { rankedName: c.rankedName, lastCast: num(c.lastCast, 0, 0, 1e15), count: Math.round(num(c.count, 0, 0, 1e9)) }
+    }
+    if (Object.keys(mine).length) out[key] = mine
   }
   return out
 }
