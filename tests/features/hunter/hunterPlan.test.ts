@@ -191,4 +191,21 @@ describe('the achievements overlay’s Hunter rows (hunterLive)', () => {
     })
     expect(hunterLive(befallen, T0, 'Befallen', kills, seenOf, (a) => a === 'Hunter of Befallen')).toBeNull()
   })
+
+  it('say how far each named left is from the player’s /loc, and which way (FEAT-023)', () => {
+    const near = (name: string) => (name === 'Andrew Pine' ? '≈ 320 to the north (your /loc just now)' : undefined)
+    expect(
+      hunterLive(
+        befallen,
+        T0,
+        'Befallen',
+        kills,
+        () => undefined,
+        () => false,
+        near
+      )
+    ).toMatchObject({
+      rows: [{ left: ['Andrew Pine'], near: { 'Andrew Pine': '≈ 320 to the north (your /loc just now)' } }]
+    })
+  })
 })

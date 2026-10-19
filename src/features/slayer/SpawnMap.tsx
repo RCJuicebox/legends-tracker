@@ -1,8 +1,10 @@
 import { useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react'
-import { useInvoke } from '../../renderer/src/hooks'
+import { useInvoke, useVisibleInterval } from '../../renderer/src/hooks'
 import { Pending } from '../../renderer/src/components/ui'
 import { duration } from '../../core/format'
 import { waypoint, type SlayerMap } from './spawns'
+import { zoneKey } from '../../core/zones'
+import type { PlayerLocation } from '../../shared/tracking'
 
 // A step's zone as the game's own map files draw it, with a dot at every spot its mobs pop at (TAKP's
 // spawn tables, and Legends' own spawns the player found). The game's maps put x to the right and y
@@ -37,11 +39,17 @@ interface Stand {
   label: string
 }
 
+/** "You, at /loc 661, -301, 4 min ago". */
+const youText = (l: PlayerLocation, now: number) => {
+  const mins = Math.max(0, Math.round((now - l.at) / 60_000))
+  return `you at /loc ${Math.round(l.y)}, ${Math.round(l.x)}, ${mins ? `${mins} min ago` : 'just now'}`
+}
+
 /** What pops at a spot, its timer and its /waypoint, as one line. */
 const spotText = (s: SlayerMap['spots'][number]) =>
   `${s.mobs.map((m) => `${m.name}${m.chance < 100 ? ` ${m.chance}%` : ''}`).join(' or ')} · ${s.timer ? `${duration(s.timer)} classic` : (s.where ?? 'Legends')} · ${waypoint(s)}`
 
-function SpawnMapView({ map, stand }: { map: SlayerMap; stand?: Stand }) {
+function SpawnMapView({ map, stand, you }: { map: SlayerMap; stand?: Stand; you?: PlayerLocation | null }) {
   const whole = useMemo<View>(() => box(stand ? { ...map, spots: [...map.spots, { x: -stand.at[1], y: -stand.at[0], z: 0, mobs: [], timer: 0 }] } : map), [map, stand])
   const [view, setView] = useState<View>(whole)
   useEffect(() => setView(whole), [whole])
@@ -133,6 +141,17 @@ function SpawnMapView({ map, stand }: { map: SlayerMap; stand?: Stand }) {
             <title>{stand.label}</title>
           </circle>
         )}
+        {/* Where the player last typed /loc in this zone (FEAT-023). */}
+        {you && (
+          <g className="sl-map-you">
+            <circle cx={-you.x} cy={-you.y} r={r * 1.4}>
+              <title>{youText(you, Date.now())}</title>
+            </circle>
+            <text x={-you.x + r * 2} y={-you.y + r * 0.6} fontSize={font}>
+              you
+            </text>
+          </g>
+        )}
       </svg>
       <div className="row tight small sl-map-hot" aria-live="polite">
         <span className="mono">{hot !== null && map.spots[hot] ? spotText(map.spots[hot]) : 'Point at a spot for what pops there and its /waypoint'}</span>
@@ -150,17 +169,22 @@ function SpawnMapView({ map, stand }: { map: SlayerMap; stand?: Stand }) {
 /** A step's map, asked of main when shown. */
 export function SpawnMap({ zone, mobs, stand }: { zone: string; mobs: string[]; stand?: Stand }) {
   const q = useInvoke('slayer:map', [zone, mobs], [zone, mobs.join('|')])
+  // Where the player last typed /loc, asked again every half minute while the map shows (FEAT-023).
+  const where = useInvoke('game:location')
+  useVisibleInterval(where.reload, 30_000)
+  const you = where.data && zoneKey(where.data.zone) === zoneKey(zone) ? where.data : null
   if (!q.data) return <Pending error={q.error} retry={q.reload} what="the map" />
   const map = q.data
   if (!map.short) return <div className="faint small">TAKP’s spawn tables do not have {zone}.</div>
   return (
     <div className="sl-map-wrap">
-      <SpawnMapView map={map} stand={stand} />
+      <SpawnMapView map={map} stand={stand} you={you} />
       <div className="faint small">
         {map.spots.length
           ? `${map.spots.length} spot${map.spots.length === 1 ? '' : 's'} (${map.spots.some((s) => !s.timer) ? 'TAKP’s classic tables, and Legends’ own as found' : 'classic, from TAKP'})`
           : 'No spot of these mobs in TAKP’s tables'}
         {stand && ` · the ring: where to stand, /waypoint ${stand.at[0]}, ${stand.at[1]}`}
+        {you ? ` · ${youText(you, Date.now())}` : ' · type /loc in game to see where you are on it'}
         {!map.lines.length && ' · the game’s map for this zone was not found'}
       </div>
     </div>

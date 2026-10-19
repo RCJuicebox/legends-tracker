@@ -136,6 +136,8 @@ export interface HunterTrackView {
     since: string[]
     /** What the Respawns records say of each named left, by name ("died 6 min ago; back in ~2 min as you timed it"), where the log saw it die. */
     seen?: Record<string, string>
+    /** How far and which way the nearest spot of each named left is from the player's last /loc in this zone (FEAT-023). */
+    near?: Record<string, string>
   }[]
 }
 
@@ -184,4 +186,13 @@ export interface AchievementTrack {
   slayerPlan?: SlayerPlanTrackView | null
   /** The achievements the player tracks, in the order tracked. */
   tracked: TrackedAchievement[]
+}
+
+/** The player's last /loc, in the zone it was typed in (FEAT-023). */
+export interface PlayerLocation {
+  zone: string
+  y: number
+  x: number
+  z: number
+  at: number
 }

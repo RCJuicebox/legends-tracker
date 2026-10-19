@@ -381,3 +381,18 @@ describe('LiveAchievements reads', () => {
     expect(s.live.view?.character).toBe('Tester_neriak')
   })
 })
+
+describe('the player’s /loc (FEAT-023)', () => {
+  it('is kept with its zone, handed to the features’ tracks, and forgotten in another zone', async () => {
+    const s = setup()
+    s.status.zone = 'Befallen'
+    await s.tick(1000)
+    const seen: unknown[] = []
+    ;(s.live as unknown as { ctx: AppContext }).ctx.features = [{ id: 'probe', register: () => {}, track: (at: { loc?: unknown }) => (seen.push(at.loc), {}) }] as never
+    s.line('Your Location is 661.88, -301.44, -40.42')
+    expect(s.live.location).toMatchObject({ zone: 'Befallen', y: 661.88, x: -301.44 })
+    expect(seen.at(-1)).toMatchObject({ zone: 'Befallen', y: 661.88 })
+    s.status.zone = 'Unrest'
+    expect(s.live.location).toBeNull()
+  })
+})

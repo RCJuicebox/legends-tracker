@@ -4328,6 +4328,17 @@ input[aria-invalid='true'] {
   opacity: 0.8;
 }
 
+/* Where the player last typed /loc (FEAT-023). */
+.sl-map-you circle {
+  fill: var(--accent);
+  stroke: var(--bg);
+  stroke-width: 2;
+  vector-effect: non-scaling-stroke;
+}
+.sl-map-you text {
+  fill: var(--accent-2);
+  font-weight: 700;
+}
 .sl-map-stand {
   fill: none;
   stroke: var(--accent);

@@ -4,6 +4,7 @@ What changed in each version. The release workflow publishes a version's section
 
 ## Unreleased
 
+- **Type `/loc` and the app knows where you are.** The Slayer and Hunter maps put a "you" where you last typed it in their zone, and the achievements overlay's Hunter rows say how far each named left is and which way ("≈ 320 to the north-east"), from its nearest spot.
 - **Spell timers: a bard song stays up while you sing it.** Each pulse of a song landing on you runs its timer on, so Selo's no longer runs out (and cues its recast) halfway through a song.
 - **Spell timers: your pet's buff fading ends the timer on your pet,** not a groupmate's timer for the same buff. A fixed duration set on a DoT now holds after its first tick (it ended a tick early), "did not take hold" is read as Legends prints it (with what blocked it), and running out of mana or being stunned no longer throws away a cast already on its way.
 - **Damage meter: a spell's hit and its ticks are two rows,** Crippling Blow and Slay Undead count as crits, and heals the log gives no spell for and "non-melee" damage on you are counted.

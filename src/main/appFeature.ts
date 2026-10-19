@@ -1,7 +1,7 @@
 import type { LogHistory } from './sources/logHistory'
 import type { AppContext } from './context'
 import type { AchievementsExport } from './achievements'
-import type { AchievementTrack } from '../shared/tracking'
+import type { AchievementTrack, PlayerLocation } from '../shared/tracking'
 
 // A part of the app that keeps itself whole, beside the engine's parts (EngineFeature): its channels,
 // its Data Sources rows, its part in following the log and what it keeps on disk are its own, so the
@@ -16,6 +16,8 @@ export interface TrackContext {
   zone: string
   /** The character's achievements export as last read; null without one. */
   exported: AchievementsExport | null
+  /** The player's last /loc in this zone, if any (FEAT-023). */
+  loc?: PlayerLocation | null
 }
 
 export interface AppFeature {

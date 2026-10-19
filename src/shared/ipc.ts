@@ -17,7 +17,7 @@ import type { FollowedPlan } from '../features/factions/tracker'
 import type { SlayerPlanChoices, SlayerPlanData } from '../features/slayer/core'
 import type { SlayerMap, SlayerMark } from '../features/slayer/spawns'
 import type { HunterPlanData } from '../features/hunter/core'
-import type { AchievementTrack } from './tracking'
+import type { AchievementTrack, PlayerLocation } from './tracking'
 import type { FocusReport } from '../core/itemFocus'
 import type { LootSnapshot } from '../core/loot'
 import type { MeleeProfile } from '../core/meleeTally'
@@ -412,6 +412,8 @@ export interface Invokes {
   'hunter:broken': (achievement: string, broken: boolean) => string[]
   /** Where the character being played is in its faction plan, and its Slayer counts since its achievements export. */
   'achievements:track': (watching?: boolean) => AchievementTrack | null
+  /** The player's last /loc, while they are still in its zone; null without one (FEAT-023). */
+  'game:location': () => PlayerLocation | null
 
   'character:exports': () => { current: string; achievements: string[]; inventory: string[]; factions: string[] }
   'character:sheet': (character: string) => CharacterSheet
@@ -623,6 +625,7 @@ const INVOKE_CHANNELS: Record<InvokeChannel, true> = {
   'hunter:plan': true,
   'hunter:broken': true,
   'achievements:track': true,
+  'game:location': true,
   'character:exports': true,
   'character:sheet': true,
   'character:saveSheet': true,

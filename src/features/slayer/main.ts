@@ -34,6 +34,7 @@ import type { RespawnRecord } from '../../core/respawns'
 import TAKP from '../../shared/game/takpSpawns.json'
 import { hunterZones } from '../hunter/core'
 import { newerBuildWrote } from '../../main/schema'
+import type { MapPoint } from '../../core/where'
 
 // The Slayer page's side of the app: every kill over each character's log and archives, by zone
 // (a LogHistory consumer), and the plan's data built from them, the achievements export, the live
@@ -444,3 +445,15 @@ export async function markMaps(installDir: string, marks: SlayerMark[]): Promise
   }
   return { folder: set, zones: marked.size, spots }
 }
+
+/** The map points each of these named can pop at in a zone: TAKP's spots and Legends' own (FEAT-023). */
+export function namedSpots(zone: string, names: string[]): Map<string, MapPoint[]> {
+  const out = new Map<string, MapPoint[]>()
+  const short = zoneOf(zone)
+  const z = short ? TABLES[short] : undefined
+  if (!z) return out
+  for (const s of spotsIn(z, names)) for (const m of s.mobs) out.set(m.name.toLowerCase(), [...(out.get(m.name.toLowerCase()) ?? []), { x: s.x, y: s.y }])
+  return out
+}
+
+const zoneOf = zoneIndex(TABLES)

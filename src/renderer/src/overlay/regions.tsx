@@ -463,6 +463,7 @@ function AchievementsRegion({ config, track, arranging }: { config: OverlayConfi
                 <div key={n} className="ach-ov-line">
                   {n}
                   {r.seen?.[n] && <span className="ach-ov-faint"> · {r.seen[n]}</span>}
+                  {r.near?.[n] && <span className="ach-ov-faint"> · {r.near[n]}</span>}
                 </div>
               ))}
               {r.left.length > HUNTER_ROWS && <div className="ach-ov-faint">+{r.left.length - HUNTER_ROWS} more</div>}

@@ -5,7 +5,7 @@ import { skillGoals, skillId, skillValue } from '../core/skillAchievements'
 import { classIdOf, type ClassId } from '../shared/game/classes'
 import { parseFactionLine } from '../features/factions/core'
 import { FACTION_SECTION } from '../features/factions/followSource'
-import type { AchievementTrack, SkillRow, SkillTrackView, SlayerPlanTrackView, TrackedAchievement } from '../shared/tracking'
+import type { AchievementTrack, SkillRow, SkillTrackView, SlayerPlanTrackView, TrackedAchievement, PlayerLocation } from '../shared/tracking'
 import { planSlayer, slayerPlanView } from '../features/slayer/core'
 import type { AchievementsExport } from './achievements'
 import type { AppContext } from './context'
@@ -13,6 +13,7 @@ import type { AppFeature, TrackContext } from './appFeature'
 import type { EngineFeature } from './engine'
 import { handle } from './ipc/handle'
 import { log } from './log'
+import { parseLoc } from '../core/where'
 
 // What the achievements overlay follows as the game is played: the step of the faction plan the
 // player follows (the Factions feature holds it, followSource.ts), the Slayer counts since the last
@@ -78,6 +79,8 @@ export class LiveAchievements implements AppFeature {
 
   /** Its channel, and its part in following the log: registered after the engine's own, it sees each line last. */
   register(ctx: AppContext): void {
+    // Where the player last typed /loc, for the "you" on the Slayer and Hunter maps (FEAT-023).
+    handle('game:location', () => this.location)
     handle('achievements:track', (watching) => {
       if (typeof watching === 'boolean') ctx.liveAchievements.watch(watching)
       return ctx.liveAchievements.view
@@ -95,8 +98,23 @@ export class LiveAchievements implements AppFeature {
     return this.last
   }
 
+  /** The player's last /loc, and the zone it was typed in (FEAT-023). */
+  private loc: PlayerLocation | null = null
+
+  /** The player's last /loc, while they are still in its zone. */
+  get location(): PlayerLocation | null {
+    return this.loc && this.loc.zone === this.ctx.engine.status.zone ? this.loc : null
+  }
+
   private line(text: string): void {
     const now = Date.now()
+    const loc = parseLoc(text)
+    if (loc) {
+      this.loc = { ...loc, zone: this.ctx.engine.status.zone, at: now }
+      // The overlay's Hunter rows say how far each named's nearest spot is: told at once.
+      if (this.character) this.publish()
+      return
+    }
     if (text.startsWith('Your faction standing with ')) {
       const f = parseFactionLine(text)
       if (f && 'amount' in f) this.moved[f.faction] = (this.moved[f.faction] ?? 0) + f.amount
@@ -347,7 +365,7 @@ export class LiveAchievements implements AppFeature {
   /** The track as it stands: what this class read, and each feature's part (AppFeature.track). */
   private publish(): void {
     const exported = this.exported?.character === this.character ? this.exported : null
-    const at: TrackContext = { character: this.character, zone: this.zone, exported }
+    const at: TrackContext = { character: this.character, zone: this.zone, exported, loc: this.location }
     const track: AchievementTrack = {
       character: this.character,
       at: Date.now(),

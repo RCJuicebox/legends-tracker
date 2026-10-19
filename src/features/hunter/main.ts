@@ -8,8 +8,9 @@ import type { AchievementTrack } from '../../shared/tracking'
 import type { AppFeature, FeatureDeps, TrackContext } from '../../main/appFeature'
 import { joinKillTallies, type SlayerKillTallies } from '../slayer/core'
 import { seenFromRecords } from './core'
-import { KILLS_KEY, lastKills, namedSpawns, spawnTimings } from '../slayer/main'
+import { KILLS_KEY, lastKills, namedSpawns, namedSpots, spawnTimings } from '../slayer/main'
 import { hunterLive, hunterZones, type HunterPlanData } from './core'
+import { locPoint, nearest, nearText } from '../../core/where'
 
 // Plan › Hunter's side of the app: the character's achievements export, the kills its own log has
 // shown (the Slayer plan's history of kills, each mob's last), and the spawn tables in Legends' terms.
@@ -54,7 +55,14 @@ export class HunterPlanner implements AppFeature {
     const ctx = this.ctx
     if (!ctx || !at.exported) return { hunter: null }
     const seenOf = seenFromRecords(ctx.store.respawns?.get() ?? {}, Date.now())
-    return { hunter: hunterLive(at.exported.sections, at.exported.modified, at.zone, ctx.slayer?.live?.kills(at.character), seenOf, (a) => this.isBroken(a)) }
+    // From the player's last /loc here: how far each named's nearest spot is, and which way (FEAT-023).
+    const loc = at.loc
+    const near = (name: string) => {
+      const spots = loc ? namedSpots(at.zone, [name]).get(name.toLowerCase()) : undefined
+      const n = loc && spots ? nearest(locPoint(loc), spots) : null
+      return loc && n ? nearText(n, loc.at, Date.now()) : undefined
+    }
+    return { hunter: hunterLive(at.exported.sections, at.exported.modified, at.zone, ctx.slayer?.live?.kills(at.character), seenOf, (a) => this.isBroken(a), near) }
   }
 
   register(ctx: AppContext): void {

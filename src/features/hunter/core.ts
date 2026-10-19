@@ -153,7 +153,9 @@ export function hunterLive(
   zone: string,
   kills: SlayerKills | undefined,
   seenOf: (zone: string, name: string, timer: number | undefined) => string | undefined,
-  isBroken: (achievement: string) => boolean
+  isBroken: (achievement: string) => boolean,
+  /** How far and which way the nearest spot of a named is, from the player's last /loc here; undefined without one. */
+  near: (name: string) => string | undefined = () => undefined
 ): HunterTrackView | null {
   if (!zone) return null
   // Only kills here count: a same-named mob elsewhere is another zone's named (LT-520).
@@ -181,7 +183,20 @@ export function hunterLive(
         zone,
         rows: rows.map((r) => {
           const seen = Object.fromEntries(r.left.flatMap((n) => (n.seen ? [[n.name, n.seen]] : [])))
-          return { achievement: r.achievement, left: r.left.map((n) => n.name), total: r.total, since: r.since, ...(Object.keys(seen).length ? { seen } : {}) }
+          const far = Object.fromEntries(
+            r.left.flatMap((n) => {
+              const t = near(n.name)
+              return t ? [[n.name, t]] : []
+            })
+          )
+          return {
+            achievement: r.achievement,
+            left: r.left.map((n) => n.name),
+            total: r.total,
+            since: r.since,
+            ...(Object.keys(seen).length ? { seen } : {}),
+            ...(Object.keys(far).length ? { near: far } : {})
+          }
         })
       }
     : null
