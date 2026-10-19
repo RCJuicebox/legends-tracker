@@ -32,6 +32,7 @@ import { takeRequestedSlayerStep } from './jump'
 import { SpawnMap } from './SpawnMap'
 import type { MobSpawn } from './spawns'
 import type { HunterZone } from '../hunter/core'
+import { RaceSayer } from './RaceSayer'
 
 // Plan › Slayer: the Slayer achievements still open and where to kill for them quickest, step by
 // step (core.ts plans it). Counts are the achievements export plus the kills the log has shown since,
@@ -914,12 +915,7 @@ export function Slayer() {
               </div>
             )}
 
-            {data.unplaced.length > 0 && (
-              <div className="card mb-16 small">
-                <b>Kills no race was found for</b> <span className="faint">(eqlwiki has no race for them and the name gives none, so they count toward nothing here):</span>{' '}
-                {data.unplaced.map((u) => `${u.name} ×${num(u.n)}`).join(', ')}
-              </div>
-            )}
+            <RaceSayer unplaced={data.unplaced} onSaid={() => q.reload()} />
           </>
         )
       )}

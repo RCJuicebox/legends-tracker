@@ -4369,3 +4369,16 @@ input[aria-invalid='true'] {
   flex-wrap: wrap;
   margin: 4px 0 4px 6px;
 }
+
+/* Slayer: unplaced kills, each with a race to say it is (FEAT-021). */
+.sl-say {
+  margin: 6px 0 0;
+  padding-left: 18px;
+  columns: 2 280px;
+}
+.sl-say li {
+  margin-bottom: 4px;
+}
+.sl-say select {
+  font-size: 12px;
+}

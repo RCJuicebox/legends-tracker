@@ -29,7 +29,8 @@ export const SCHEMAS: Readonly<Record<string, number>> = {
   'pets.json': 1,
   'skin-commands.json': 1,
   'hunter-broken.json': 1,
-  'hunter-spots.json': 1
+  'hunter-spots.json': 1,
+  'slayer-races.json': 1
 }
 
 /** Brings one file from the schema before `to` up to `to`. */

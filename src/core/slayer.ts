@@ -103,7 +103,7 @@ export function achievementRaces(text: string, game: RaceTable): { keys: Set<str
 /** How a mob was given its race: what play settled (for the zone it was in, or anywhere), eqlwiki's page, or its name. */
 export interface Placed {
   key: string | null
-  by: 'zone' | 'play' | 'wiki' | 'name' | null
+  by: 'zone' | 'you' | 'play' | 'wiki' | 'name' | null
   /** Placed by play, or by a wiki race that is the client's name or a settled alias; a name is a guess. */
   sure: boolean
 }
@@ -122,6 +122,18 @@ function nameWords(mob: string): string {
 }
 
 /** The open Slayer achievements' races, and the placing of a mob in one race. */
+/** The races the player said mobs are (slayer-races.json, FEAT-021), by the mob's name words; main sets them as it reads and saves them. */
+let saidRaces: Record<string, string> = {}
+
+export function setSaidRaces(races: Record<string, string>): void {
+  saidRaces = races
+}
+
+/** A mob's name as said races are kept by: lower case, the article and a number dropped. */
+export function sayKey(mob: string): string {
+  return nameWords(mob)
+}
+
 export class SlayerRaces {
   /** Per counter, the race keys it counts. */
   readonly keys: Set<string>[]
@@ -191,6 +203,11 @@ export class SlayerRaces {
     return last
   }
 
+  /** Every race a mob can be said to be: the client's, the playable ones and the achievements' own, as keys. */
+  names(): string[] {
+    return [...this.vocab].sort()
+  }
+
   /** A race as the spawn tables or eqlwiki name it ("Human", "Half Elf"), placed on its own: no mob's name in it. */
   raceOf(race: string): string | null {
     const w = wikiRaceKey(race)
@@ -228,6 +245,9 @@ export class SlayerRaces {
   place(mob: string, wikiRace: string | null | undefined, zone = ''): Placed {
     const here = zone ? ZONE_MOB_RACES[zoneWords(zone)]?.[nameWords(mob)] : undefined
     if (here) return { key: here, by: 'zone', sure: true }
+    // What the player said it is, from the page (FEAT-021): over eqlwiki and the name.
+    const said = saidRaces[nameWords(mob)]
+    if (said) return { key: said, by: 'you', sure: true }
     const play = MOB_RACES[nameWords(mob)]
     // Several races under the name, as play settled: placed by its zone's race mix, not here.
     if (play === RACE_MIX) return { key: null, by: 'play', sure: false }

@@ -408,6 +408,10 @@ export interface Invokes {
   /** Marks these spawns on the game's map, in its own map set (maps\LegendsTracker, a copy of the game's); none clears them. Each page's (`set`) are kept apart and written together. */
   'slayer:mark': (marks: SlayerMark[], set?: 'hunter') => { folder: string; zones: number; spots: number }
   /** What Plan › Hunter shows: each Hunter achievement not done, the named it still wants, and what their spawns allow. */
+  /** The races the player said mobs are (by the mob's name words), and every race there is to say (FEAT-021). */
+  'slayer:said': () => { races: Record<string, string>; names: string[] }
+  /** Says a mob's race, or forgets it (null); the races said after. Everything counts again at once. */
+  'slayer:sayRace': (mob: string, race: string | null) => Record<string, string>
   'hunter:plan': (character: string) => HunterPlanData
   /** Says a Hunter achievement does not work in Legends (left out of the plans and the overlay), or works again; the list after. */
   'hunter:broken': (achievement: string, broken: boolean) => string[]
@@ -629,6 +633,8 @@ const INVOKE_CHANNELS: Record<InvokeChannel, true> = {
   'slayer:choices': true,
   'slayer:map': true,
   'slayer:mark': true,
+  'slayer:said': true,
+  'slayer:sayRace': true,
   'hunter:plan': true,
   'hunter:broken': true,
   'hunter:found': true,

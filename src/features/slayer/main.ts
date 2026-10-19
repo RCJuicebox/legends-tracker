@@ -1,8 +1,8 @@
 import { join } from 'node:path'
 import { copyFile, mkdir, readdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { RACE_TABLE } from '../../core/raceNames'
-import { mixCredits, SlayerRaces, slayerCounters } from '../../core/slayer'
-import { characterKey, isCharacterKey } from '../../core/validate'
+import { mixCredits, sayKey, setSaidRaces, SlayerRaces, slayerCounters } from '../../core/slayer'
+import { characterKey, isCharacterKey, isRecordKey } from '../../core/validate'
 import { handle } from '../../main/ipc/handle'
 import { log } from '../../main/log'
 import { JsonFile, readJsonFile } from '../../main/storeCore'
@@ -95,6 +95,8 @@ export class SlayerPlanner implements AppFeature {
   /** The maps being written again, one write after another. */
   private redraw: Promise<unknown> = Promise.resolve()
   private readonly shared = new Map<string, { at: number; data: Promise<SlayerPlanData> }>()
+  /** The races the player said unplaced mobs are, for every character (FEAT-021). */
+  private readonly said: JsonFile<{ version: 1; races: Record<string, string> }>
   /** The data the overlay's plan was last made from, by character: made again when it is old or another export came. */
   private readonly overlayData = new Map<string, { at: number; exportAt: number; data: Promise<SlayerPlanData>; done?: SlayerPlanData }>()
 
@@ -113,6 +115,12 @@ export class SlayerPlanner implements AppFeature {
     this.choices = new JsonFile(path, Object.fromEntries(Object.entries(value).map(([k, v]) => [k, sanitizeChoices(v)])), { delayMs: 1000, backup: true })
     if (read.state === 'unreadable') this.choices.freeze('could not be read at start')
     if (newerBuildWrote(path)) this.choices.freeze('written by a newer version')
+    const saidPath = join(dir, 'slayer-races.json')
+    const saidRead = readJsonFile(saidPath)
+    this.said = new JsonFile(saidPath, { version: 1, races: sanitizeSaid(saidRead.state === 'ok' ? saidRead.value : null) }, { delayMs: 1000, backup: true })
+    if (saidRead.state === 'unreadable') this.said.freeze('could not be read at start')
+    if (newerBuildWrote(saidPath)) this.said.freeze('written by a newer version')
+    setSaidRaces(this.said.get().races)
     const marksPath = join(dir, 'map-marks.json')
     const kept = readJsonFile(marksPath)
     const sets = (kept.state === 'ok' && kept.value && typeof kept.value === 'object' ? kept.value : {}) as Record<string, unknown>
@@ -123,7 +131,7 @@ export class SlayerPlanner implements AppFeature {
   }
 
   flush(): Promise<void> {
-    return Promise.all([this.choices.flush(), this.marks.flush(), this.live?.flush()]).then(() => undefined)
+    return Promise.all([this.choices.flush(), this.marks.flush(), this.said.flush(), this.live?.flush()]).then(() => undefined)
   }
 
   /** Its part of the achievements overlay's track: the Slayer counts since the export (LT-623). */
@@ -142,6 +150,25 @@ export class SlayerPlanner implements AppFeature {
         data.catch(() => this.shared.get(character)?.data === data && this.shared.delete(character))
       }
       return { data: await data, choices: this.choices.get()[character] ?? DEFAULT_CHOICES }
+    })
+    // The races the player said mobs are, and every race there is to say (FEAT-021).
+    handle('slayer:said', async () => ({ races: this.said.get().races, names: new SlayerRaces([], await ctx.gameTables.get(RACE_TABLE)).names() }))
+    handle('slayer:sayRace', async (mob, race) => {
+      if (typeof mob !== 'string' || !mob.trim() || mob.length > 120) throw new Error('No such mob.')
+      const k = sayKey(mob)
+      const races = { ...this.said.get().races }
+      if (race === null) delete races[k]
+      else {
+        const names = new SlayerRaces([], await ctx.gameTables.get(RACE_TABLE)).names()
+        if (typeof race !== 'string' || !names.includes(race)) throw new Error('Not a race the game has.')
+        races[k] = race
+      }
+      this.said.set({ version: 1, races })
+      setSaidRaces(races)
+      // Counted again at once: the page's plan, the counts since the export, the overlay.
+      this.shared.clear()
+      this.live?.recount()
+      return races
     })
     handle('slayer:choices', (character, choices) => {
       if (!isCharacterKey(character)) throw new Error('No such character.')
@@ -457,3 +484,14 @@ export function namedSpots(zone: string, names: string[]): Map<string, MapPoint[
 }
 
 const zoneOf = zoneIndex(TABLES)
+
+/** slayer-races.json as read back: a race key for each mob's name words, short strings both. */
+export function sanitizeSaid(v: unknown): Record<string, string> {
+  const races = v && typeof v === 'object' ? (v as { races?: unknown }).races : null
+  if (!races || typeof races !== 'object' || Array.isArray(races)) return {}
+  return Object.fromEntries(
+    Object.entries(races as Record<string, unknown>)
+      .filter(([k, r]) => isRecordKey(k) && typeof r === 'string' && r.length > 0 && r.length <= 60)
+      .slice(0, 2000) as [string, string][]
+  )
+}

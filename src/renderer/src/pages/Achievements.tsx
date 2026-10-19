@@ -6,6 +6,7 @@ import { GoContext } from '../nav'
 import { useCharacterChoice } from '../character'
 import { useAchievementTrack, useInvoke } from '../hooks'
 import { planSlayer, type CampSource } from '../../../features/slayer/core'
+import { RaceSayer } from '../../../features/slayer/RaceSayer'
 import type { SlayerStepHint } from './AchievementRows'
 import { showError, showToast } from '../toast'
 import { Ago, FilterBox, GameCommand, Pending } from '../components/ui'
@@ -353,6 +354,8 @@ export function Achievements() {
           </button>
         </div>
       )}
+
+      {curCat === 'Slayer' && track?.slayer && track.character.toLowerCase() === view.character.toLowerCase() && <RaceSayer unplaced={track.slayer.unplaced} />}
 
       <TrackedBar book={book} tracked={view.marks.tracked ?? []} onUntrack={(k) => setTracked(k, false)} goTo={goTo} />
 

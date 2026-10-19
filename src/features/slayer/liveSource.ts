@@ -437,6 +437,12 @@ export class SlayerLive {
     this.facts.set({ version: 1, mobs })
   }
 
+  /** The counts again at once: the player said a mob's race (FEAT-021). */
+  recount(): void {
+    this.count()
+    this.onChange()
+  }
+
   /** The counts from the kills so far; mobs not looked up on eqlwiki yet are asked about, and counted again when it answers. */
   private count(): void {
     const s = this.state

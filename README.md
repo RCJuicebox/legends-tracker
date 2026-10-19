@@ -1009,6 +1009,7 @@ The settings folder, `%APPDATA%\Legends Tracker` (or the `EQL_USER_DATA` folder)
 | `tradeskills.json` | Starred recipes, the combines planned of each, and prices typed in |
 | `slayer-plan.json` | Per character, what you chose on the Slayer page: achievements left out or taken in, camps and mobs ruled out, minutes between camps and the pace assumed where nothing gives one |
 | `hunter-broken.json` | The Hunter achievements you said do not work in Legends, left out of the plans and the overlay |
+| `slayer-races.json` | The races you said mobs are (Count as… on the Slayer page), for every character, over what eqlwiki says |
 | `hunter-spots.json` | The spots you found Hunter named at in play (Found it here on the Hunter page), drawn on its maps and marked on the game's map with the built-in ones |
 | `map-marks.json` | What the Slayer and Hunter pages last marked on the game's map (`maps\LegendsTracker`), each page's apart |
 | `faction-follow.json` | Per character, the faction plan the achievements overlay follows: its steps, the step you are on, and what is done |
