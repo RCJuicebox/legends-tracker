@@ -12,6 +12,7 @@ import { cacheDir } from '../../main/paths'
 import { readForward } from '../../main/sources/logHistory'
 import { sinceStart, type SincePosition } from '../../main/sources/sinceExport'
 import { JsonFile, readJsonFile } from '../../main/storeCore'
+import { newerBuildWrote } from '../../main/schema'
 
 // The Slayer counts since the character's achievements export, as the game is played: the kills the
 // log shows after the export (this PC's log and the character's log on other PCs), each placed by its
@@ -146,6 +147,7 @@ export class SlayerLive {
     const facts = readJsonFile(factsPath)
     this.facts = new JsonFile(factsPath, factsFile(facts.state === 'ok' ? facts.value : null), { delayMs: 3000, pretty: false, backup: true })
     if (facts.state === 'unreadable') this.facts.freeze('could not be read at start')
+    if (newerBuildWrote(factsPath)) this.facts.freeze('written by a newer version')
   }
 
   flush(): Promise<void> {

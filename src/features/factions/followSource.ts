@@ -4,6 +4,7 @@ import type { AppContext } from '../../main/context'
 import { log } from '../../main/log'
 import { JsonFile, readJsonFile } from '../../main/storeCore'
 import { carryFollow, freshFollow, pickStep, readFollow, sanitizeFollows, sayStep, type FollowEvent, type FollowedPlan, type FollowState } from './tracker'
+import { newerBuildWrote } from '../../main/schema'
 
 // The faction plan the player follows, as the game is played: the Plan tab hands the plan over
 // (factions:follow), the standings are read a moment after each faction line, and the step the plan is
@@ -43,6 +44,7 @@ export class FactionFollow {
     const value: Record<string, Followed> = read.state === 'ok' ? sanitizeFollows(read.value) : {}
     this.follows = new JsonFile(path, value, { delayMs: 3000, pretty: false, backup: true })
     if (read.state === 'unreadable') this.follows.freeze('could not be read at start')
+    if (newerBuildWrote(path)) this.follows.freeze('written by a newer version')
   }
 
   flush(): Promise<void> {

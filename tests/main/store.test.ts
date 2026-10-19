@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { DEFAULT_OVERLAYS, JsonFile, characterKey, characterName, defaultSettings, mergeDefaults, readJsonFile, retrySchedule, writeFileAtomic } from '../../src/main/storeCore'
-import { upgrade } from '../../src/main/schema'
+import { newerBuildWrote, upgrade } from '../../src/main/schema'
 import { tempDir } from '../tempDir'
 
 describe('merging saved settings over the defaults', () => {
@@ -237,6 +237,19 @@ describe('schema versions', () => {
     const r = upgrade(join(dir, 'settings.json'), { x: 1 }, 4, { 'settings.json': 1 }, [])
     expect(r).toEqual({ value: { x: 1 }, state: { state: 'newer', version: 4 } })
     expect(upgrade(join(dir, 'settings.json'), { x: 1 }, 1, { 'settings.json': 1 }, []).state).toEqual({ state: 'current' })
+  })
+
+  it("says when a newer build recorded a feature's file, whose JsonFile then stays unwritten (LT-639)", () => {
+    const path = join(dir, 'slayer-plan.json')
+    expect(newerBuildWrote(path)).toBeNull()
+    writeFileSync(join(dir, 'schema.json'), JSON.stringify({ 'slayer-plan.json': 1, 'pets.json': 3 }))
+    expect(newerBuildWrote(path)).toBeNull()
+    expect(newerBuildWrote(join(dir, 'pets.json'))).toBe(3)
+    // A file nobody registered, and a schema.json that will not read, say nothing.
+    expect(newerBuildWrote(join(dir, 'window.json'))).toBeNull()
+    writeFileSync(join(dir, 'schema.json'), '{ not json')
+    expect(newerBuildWrote(join(dir, 'pets.json'))).toBeNull()
+    expect(existsSync(join(dir, 'schema.json'))).toBe(true)
   })
 
   it('never writes a frozen file', async () => {

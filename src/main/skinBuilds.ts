@@ -17,12 +17,14 @@ import {
   type SkinBuildResult
 } from '../core/skinBuild'
 import { log } from './log'
+import { newerBuildWrote } from './schema'
 
 /** The rebuild commands the player has agreed to, kept with the settings in `path` (the newest fifty). */
 export function approvedCommands(path: string): { has: (command: string) => boolean; add: (command: string) => void } {
   const read = readJsonFile(path)
   const list = read.state === 'ok' && Array.isArray(read.value) ? read.value.filter((c): c is string => typeof c === 'string') : []
   const file = new JsonFile<string[]>(path, list)
+  if (newerBuildWrote(path)) file.freeze('written by a newer version')
   return { has: (c) => file.get().includes(c), add: (c) => file.set([...file.get(), c].slice(-50)) }
 }
 

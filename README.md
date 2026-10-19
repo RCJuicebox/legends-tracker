@@ -998,7 +998,7 @@ The settings folder, `%APPDATA%\Legends Tracker` (or the `EQL_USER_DATA` folder)
 | `mote-stock.json` | Motes on hand, the item in the Merge planner, and whether looted motes are added |
 | `respawns.json` | Each mob's kills and death-to-sighting gaps, by zone, and the spawn points you made with the mobs they pop |
 | `buffs.json` | Who is who from `/who`, the buffs each character wants, and the buffs on each character now |
-| `schema.json` | The schema version of each file above; a file from an older build is backed up as `<file>.pre-<N>.json` before it is brought forward |
+| `schema.json` | The schema version of each file here (the settings folder's), the features' own files too; a file from an older build is backed up as `<file>.pre-<N>.json` before it is brought forward, and one a newer build wrote is read but not written |
 | `window.json` | Where the main window was, whether it was maximised, and whether the tray notice was shown |
 | `pets.json` | Per character, the newest pet gear list (`/pet inventory check`) and summoning cast the log showed, and how far back it was read |
 | `tradeskills.json` | Starred recipes, the combines planned of each, and prices typed in |

@@ -46,6 +46,8 @@ export class Store {
     const schemaRead = readJsonFile(p('schema.json'))
     const recorded = schemaRead.state === 'ok' && schemaRead.value && typeof schemaRead.value === 'object' ? (schemaRead.value as Record<string, number>) : {}
     const versions: Record<string, number> = { ...SCHEMAS }
+    // A feature's file a newer build wrote keeps the newer number (the store writes schema.json for all).
+    for (const f of Object.keys(SCHEMAS)) if (typeof recorded[f] === 'number' && recorded[f] > SCHEMAS[f]) versions[f] = recorded[f]
     const migrated: string[] = []
     /** A file as read and brought up to this build's schema; undefined when missing or unreadable. */
     const readResult = (f: string): ReadResult => {

@@ -33,6 +33,7 @@ import { mapMarks, mobSpawns, parseMap, raceMixer, spotsIn, zoneIndex, zoneTimin
 import type { RespawnRecord } from '../../core/respawns'
 import TAKP from '../../shared/game/takpSpawns.json'
 import { hunterZones } from '../hunter/core'
+import { newerBuildWrote } from '../../main/schema'
 
 // The Slayer page's side of the app: every kill over each character's log and archives, by zone
 // (a LogHistory consumer), and the plan's data built from them, the achievements export, the live
@@ -105,12 +106,14 @@ export class SlayerPlanner implements AppFeature {
     const value = read.state === 'ok' && read.value && typeof read.value === 'object' ? (read.value as Record<string, unknown>) : {}
     this.choices = new JsonFile(path, Object.fromEntries(Object.entries(value).map(([k, v]) => [k, sanitizeChoices(v)])), { delayMs: 1000, backup: true })
     if (read.state === 'unreadable') this.choices.freeze('could not be read at start')
+    if (newerBuildWrote(path)) this.choices.freeze('written by a newer version')
     const marksPath = join(dir, 'map-marks.json')
     const kept = readJsonFile(marksPath)
     const sets = (kept.state === 'ok' && kept.value && typeof kept.value === 'object' ? kept.value : {}) as Record<string, unknown>
     const list = (v: unknown) => (Array.isArray(v) ? (v as unknown[]).filter(isMark).slice(0, 200) : [])
     this.staleSlayer = list(sets.slayer).length > 0
     this.marks = new JsonFile(marksPath, { hunter: list(sets.hunter) }, { delayMs: 1000 })
+    if (newerBuildWrote(marksPath)) this.marks.freeze('written by a newer version')
   }
 
   flush(): Promise<void> {

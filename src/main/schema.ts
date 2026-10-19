@@ -1,6 +1,7 @@
 import { copyFileSync } from 'node:fs'
 import { basename, dirname, join } from 'node:path'
 import { log } from './log'
+import { readJsonFile } from './storeCore'
 
 // Every file the settings store keeps has a schema version, recorded in schema.json beside them. A
 // build that changes a file's shape bumps its number here and adds a migration; a file at an older
@@ -17,7 +18,16 @@ export const SCHEMAS: Readonly<Record<string, number>> = {
   'motes.json': 1,
   'mote-stock.json': 1,
   'respawns.json': 2,
-  'buffs.json': 1
+  'buffs.json': 1,
+  // The features' own files beside them (LT-639): recorded too, so a build that changes one's shape
+  // bumps it here and an older build, finding the newer number, leaves the file alone.
+  'slayer-plan.json': 1,
+  'slayer-facts.json': 1,
+  'map-marks.json': 1,
+  'faction-follow.json': 1,
+  'tradeskills.json': 1,
+  'pets.json': 1,
+  'skin-commands.json': 1
 }
 
 /** Brings one file from the schema before `to` up to `to`. */
@@ -66,4 +76,16 @@ export function upgrade(
     log.info(`${file}: brought from schema ${m.to - 1} to ${m.to}`)
   }
   return { value: v, state: { state: 'migrated', from, backup } }
+}
+
+/**
+ * The schema a newer build recorded for this file in schema.json beside it, or null when this build's
+ * is as new: a feature's own file is then read but never written this run (LT-639).
+ */
+export function newerBuildWrote(path: string, schemas: Readonly<Record<string, number>> = SCHEMAS): number | null {
+  const ours = schemas[basename(path)]
+  if (ours === undefined) return null
+  const r = readJsonFile(join(dirname(path), 'schema.json'), { setAside: false })
+  const recorded = r.state === 'ok' && r.value && typeof r.value === 'object' ? (r.value as Record<string, unknown>)[basename(path)] : undefined
+  return typeof recorded === 'number' && recorded > ours ? recorded : null
 }

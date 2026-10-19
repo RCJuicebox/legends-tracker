@@ -108,3 +108,13 @@ describe('a profile saved at an older schema', () => {
     expect(existsSync(file('triggers.pre-1.json'))).toBe(false)
   })
 })
+
+describe("a feature's file a newer build wrote", () => {
+  it('keeps its newer number in schema.json, so this build never records it as its own (LT-639)', async () => {
+    writeFileSync(file('settings.json'), JSON.stringify({ zoom: 1.5 }))
+    writeFileSync(file('schema.json'), JSON.stringify({ 'settings.json': 1, 'slayer-plan.json': 7 }))
+    const store = open()
+    await store.flushAll()
+    expect(readJson('schema.json')).toEqual({ ...SCHEMAS, 'slayer-plan.json': 7 })
+  })
+})

@@ -4,6 +4,7 @@ import { log } from './log'
 import { parseJson } from '../core/json'
 import { sanitizeTradeSaved } from '../core/validate'
 import type { TradeSaved } from '../shared/ipc'
+import { newerBuildWrote } from './schema'
 
 // tradeskills.json: the recipes the player starred, how many combines they plan of each, and prices
 // they typed in for things the log has never seen them buy.
@@ -31,6 +32,8 @@ export class TradeFavorites {
   async set(input: unknown): Promise<TradeSaved> {
     const clean = sanitizeTradeSaved(input)
     if (!clean) throw new Error('The favourites were not saved: they were not in the expected form.')
+    // A newer version of the app wrote the file: it is read, never written over (LT-639).
+    if (newerBuildWrote(this.path)) throw new Error('The favourites were not saved: a newer version of Legends Tracker wrote tradeskills.json.')
     this.data = clean
     await writeFileAtomic(this.path, JSON.stringify(clean, null, 2))
     return clean

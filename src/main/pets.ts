@@ -13,6 +13,7 @@ import type { PetState } from '../shared/ipc'
 import { cacheDir } from './paths'
 import { sources } from './sources/registry'
 import { expired, WIKI_FRESH_MS } from './sources/freshness'
+import { newerBuildWrote } from './schema'
 
 // The pet: what it wears (the log's `/pet inventory check` lists) and which pet it is (the last
 // summoning spell cast), both kept per character so an archived log loses neither; and the pet's
@@ -102,6 +103,7 @@ export class PetStore {
       this.data = {}
     }
     this.file = new JsonFile(this.path, this.data, { delayMs: 3000, pretty: false })
+    if (newerBuildWrote(this.path)) this.file.freeze('written by a newer version')
     return this.data
   }
 
