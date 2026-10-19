@@ -4,14 +4,13 @@ import { AchievementBook, achKey, compareNames, norm, placeOf, secKey, type AchO
 import { HUNT } from '../../../shared/game/hunt'
 import { useContext } from 'react'
 import { GoContext } from '../nav'
-import { duration } from '../../../core/format'
+import { duration, when } from '../../../core/format'
 import { requestSlayerStep } from '../../../features/slayer/jump'
 import type { SkillRow } from '../../../shared/tracking'
+import { skillObjective } from '../../../core/skillAchievements'
+import { visitObjective } from '../../../core/zoneVisits'
 
 // The Achievements page's sections and rows: each achievement, its objectives and progress, the tracked bar and search results.
-
-/** "Reach the maximum skill in Divination at level 50.": the skill. */
-const SKILL_OBJECTIVE = /^Reach the maximum skill in (.+?) at level \d+\.?$/
 
 interface Ctx {
   remaining: boolean
@@ -27,6 +26,8 @@ interface Ctx {
   since: Map<string, { since: number; done: boolean }>
   /** The skill a skill objective wants, as the log last gave it and the cap to reach, by "achievement|skill" lower-cased (the character being played only). */
   skills: Map<string, SkillRow>
+  /** Places entered since the export, by zoneKey, with when last: an Exploration "Visit X" still open is ticked by it (the character being played only). */
+  visited: Record<string, number>
   /** Achievements kept on the achievements overlay, by achKey(). */
   tracked: Set<string>
   setTracked: (key: string, on: boolean) => void
@@ -401,9 +402,9 @@ function ObjectiveRow({ book, r, c, label, sub, ctx, single }: { book: Achieveme
     : more && c.p
       ? `${num(c.p[0])} at your achievements export, and ${num(more)} kills since that the log shows (yours, your pet's and your group's)`
       : undefined
-  // A skill objective ("Reach the maximum skill in Divination at level 50.") shows the skill as the log last gave it, against the cap to reach.
-  const skillGoal = SKILL_OBJECTIVE.exec(c.t)
-  const skill = skillGoal ? ctx.skills.get(`${book.ach([r[0], r[1]]).n}|${skillGoal[1]}`.toLowerCase()) : undefined
+  // A skill objective ("Reach the maximum skill in Divination at level 50.", "Reach 150 skill in Baking") shows the skill as the log last gave it, against the cap or number to reach.
+  const skillGoal = skillObjective(c.t)
+  const skill = skillGoal ? ctx.skills.get(`${book.ach([r[0], r[1]]).n}|${skillGoal}`.toLowerCase()) : undefined
   const skillProg =
     skill && skill.target > 0 ? (
       skill.value === null ? (
@@ -413,7 +414,7 @@ function ObjectiveRow({ book, r, c, label, sub, ctx, single }: { book: Achieveme
       ) : (
         <Tip
           className="ach-prog"
-          text={`${skill.skill} ${num(skill.value)} when the log last saw it go up; ${num(skill.target)} is the best cap of your classes at level ${skill.level}. One raised at a guildmaster prints no line, so it may be higher.`}
+          text={`${skill.skill} ${num(skill.value)} when the log last saw it go up; ${num(skill.target)} is ${skill.goal ? 'what the objective asks for' : `the best cap of your classes at level ${skill.level}`}. One raised at a guildmaster prints no line, so it may be higher.`}
         >
           <span>
             {num(skill.value)} / {num(skill.target)}
@@ -441,13 +442,24 @@ function ObjectiveRow({ book, r, c, label, sub, ctx, single }: { book: Achieveme
       <span className="ach-prog">{bar}</span>
     )
   ) : null
+  // An Exploration objective ("Visit Befallen") the log has seen entered since the export (LT-732).
+  const visit = !done ? visitObjective(c.t) : null
+  const visitedAt = visit !== null ? ctx.visited[visit] : undefined
+  const visitProg = visitedAt ? (
+    <Tip
+      className="chip ok"
+      text={`Your log shows you entering it ${when(visitedAt)}, after your achievements export was written. Type /outputfile achievements in game to record it.`}
+    >
+      ✓ visited since your export
+    </Tip>
+  ) : null
   return (
     <label className={`ach-obj${done ? ' done' : ''}${single ? ' single' : ''}${fromGame ? ' recorded' : ''}`} title={fromGame ? 'The game has recorded this one.' : undefined}>
       <input type="checkbox" checked={done} disabled={fromGame} onChange={(e) => ctx.tick(r, e.target.checked)} />
       <span className="ach-box" />
       {name}
       {optional}
-      {prog ?? skillProg}
+      {prog ?? skillProg ?? visitProg}
       {zone}
     </label>
   )

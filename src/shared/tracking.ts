@@ -94,10 +94,12 @@ export interface SkillRow {
   level: number
   /** The value the log last gave; null when it has none (a skill never raised since logging began, or only at a guildmaster). */
   value: number | null
-  /** The cap to reach: the best of the character's classes at that level, as the Skills window shows it. */
+  /** The cap to reach: the best of the character's classes at that level, as the Skills window shows it; or the number the objective names (`goal`). */
   target: number
   /** When the log last saw it go up; 0 for never. */
   last: number
+  /** The target is the number the objective itself asks for ("Reach 150 skill in Baking"), not a cap (LT-730). */
+  goal?: true
 }
 
 export interface SkillTrackView {
@@ -191,6 +193,8 @@ export interface AchievementTrack {
   slayerPlan?: SlayerPlanTrackView | null
   /** The achievements the player tracks, in the order tracked. */
   tracked: TrackedAchievement[]
+  /** Places entered since the achievements export, by zoneKey, with when last: the Exploration objectives the log ticks before the next export (LT-732). */
+  visited?: Record<string, number>
 }
 
 /** The player's last /loc, in the zone it was typed in (FEAT-023). */

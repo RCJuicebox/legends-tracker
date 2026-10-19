@@ -52,7 +52,8 @@ function context(): AppContext {
     gameTables: { get: async () => GAME },
     npcPages: { ready: async () => undefined, race: () => null, lookUp: async () => false },
     hunter: { isBroken: () => false },
-    skills: { view: async () => ({}) }
+    skills: { view: async () => ({}) },
+    zoneVisits: { view: async () => ({}) }
   } as unknown as AppContext
 }
 

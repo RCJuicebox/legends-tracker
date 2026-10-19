@@ -349,15 +349,18 @@ function AchievementsRegion({ config, track, arranging }: { config: OverlayConfi
   const trackedSkills = new Set(tracked.flatMap((t) => (t.done ? [] : (t.skills ?? []).map((k) => k.skill))))
   // What is tracked shows in its own place, not again among what moved lately.
   const slayer = (track?.slayer?.rows ?? []).filter((r) => r.since > 0 && now - r.last < SLAYER_RECENT_MS && !trackedNames.has(r.name)).sort((a, b) => b.last - a.last)
-  // Skills the open skill achievements want that went up lately, once each however many achievements want them.
+  // Skills the open skill achievements want that went up lately, once each however many achievements want
+  // them: against the nearest number still to reach (a Tradeskill's 150 before its 200, LT-730), else the furthest.
   const skills = [
     ...(track?.skills?.rows ?? [])
       .filter((r) => r.value !== null && r.target > 0 && now - r.last < SLAYER_RECENT_MS && !trackedNames.has(r.achievement) && !trackedSkills.has(r.skill))
       .reduce((m, r) => {
         const had = m.get(r.skill)
-        m.set(r.skill, { ...r, target: Math.max(r.target, had?.target ?? 0), wants: [...(had?.wants ?? []), r.achievement] })
+        const targets = [...(had?.targets ?? []), r.target]
+        const ahead = targets.filter((t) => t > (r.value ?? 0))
+        m.set(r.skill, { ...r, target: ahead.length ? Math.min(...ahead) : Math.max(...targets), targets, wants: [...(had?.wants ?? []), r.achievement] })
         return m
-      }, new Map<string, SkillGoalRow & { wants: string[] }>())
+      }, new Map<string, SkillGoalRow & { wants: string[]; targets: number[] }>())
       .values()
   ].sort((a, b) => b.last - a.last)
   const step = plan?.current ?? null
@@ -519,7 +522,7 @@ function AchievementsRegion({ config, track, arranging }: { config: OverlayConfi
         <section className="ach-ov-skills">
           <div className="ach-ov-head">
             <span>Skills</span>
-            <span className="ach-ov-faint">to the cap at {skills[0].level}</span>
+            <span className="ach-ov-faint">{skills.every((r) => r.goal) ? 'to the number each asks' : `to the cap at ${skills.find((r) => !r.goal)?.level}`}</span>
           </div>
           {skills.slice(0, SLAYER_ROWS).map((r) => {
             const v = Math.min(r.value ?? 0, r.target)

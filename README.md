@@ -580,8 +580,14 @@ A skill objective (General › Skills: "Reach the maximum skill in Divination at
 the skill as the log last gave it (`You have become better at Divination! (190)`) against the cap
 to reach, from the game's `skillcaps.txt`: the best of your classes at that level, as the Skills
 window shows it, or the achievement's own class's when your classes are not known (type `/who`).
+A Tradeskill objective ("Reach 150 skill in Baking") names its number, and shows the skill against
+it the same way; its Smithing and Jewelcrafting are the log's Blacksmithing and Jewelry Making.
 The log never prints a skill raised at a guildmaster, so one it has never seen go up says so, and a
 value can be higher than the log last said.
+
+An Exploration objective ("Visit Befallen") still open is ticked the moment the log shows you
+entering that zone after the export was written (an instance counts as its zone), on the page and
+on a tracked Traveler achievement on the overlay, until the next export records it.
 
 ## Factions
 
@@ -835,7 +841,8 @@ are listed at the foot. Your choices are kept per character.
 
 ## Hunter
 
-The **Hunter** page (under Plan in the sidebar) lists each Hunter achievement not done ("Hunter of Befallen") with the named it still
+The **Hunter** page (under Plan in the sidebar) lists each Hunter achievement not done ("Hunter of Befallen"), and each Conqueror
+achievement under Raids ("Conqueror of The Plane of Fear"), with the named it still
 wants: the achievements export, less the named your log has shown you killing since. Beside each
 named, what TAKP's spawn tables say of it: its spots, how often it is up against its placeholders,
 its timer (the zone's respawn as your log timed it, as on the Slayer page), and the wait, how long
@@ -1087,7 +1094,7 @@ roaming profile:
 | `faction-alla.json` | Allakhazam's faction pages (the cons quests want, kill amounts), read one every 20 seconds; kept a month |
 | `faction-npcs.json` | eqlwiki's page for each named mob the faction plan's kill camps would hold: whether Legends has it, its health, respawn and kill amounts; kept a month, a name with no page asked again after a week |
 | `faction-since.json`, `slayer-since.json` | What the live log, and the character's log on another PC, has shown since the factions and achievements exports (standings moved, achievements completed, Slayer kills), and how far each was read, so a start reads on from there rather than from the export's line |
-| `log-history.json` | Casts, melee, purchases and AAs bought counted over each character's log and archives, for Gear, Spell upgrades, Tradeskills and Stats › AAs; only what a log gains is read again |
+| `log-history.json` | Casts, melee, purchases, AAs bought and zones entered counted over each character's log and archives, for Gear, Spell upgrades, Tradeskills, Stats › AAs and the Exploration achievements; only what a log gains is read again |
 | `speech-cache\` | Azure phrases as WAV files, the newest 4,000 |
 
 It also holds `ocr.ps1`, the OCR script, written each run; the screen captures an OCR read takes are

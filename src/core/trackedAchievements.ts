@@ -1,5 +1,6 @@
 import { AchievementBook, achKey, placeOf, placeZones, type AchSection } from './achievements'
 import { zoneKey } from './zones'
+import { visitObjective } from './zoneVisits'
 import type { SkillRow, SlayerRow, TrackedAchievement } from '../shared/tracking'
 
 // The achievements the player tracks (the star on the Achievements page), each with its progress in
@@ -15,6 +16,8 @@ export interface TrackedSources {
   kills?: Map<string, { times: number[]; zones?: string[] }>
   /** Achievements the game said were completed since the export, lower-cased. */
   completed?: Set<string>
+  /** Places entered since the export (visitedSince), by zoneKey, with when last: an Exploration "Visit X" is ticked off by it (LT-732). */
+  visited?: Record<string, number>
 }
 
 /** A mob's name for matching: lower-cased, its article and the log's marks off. */
@@ -64,8 +67,12 @@ export function trackedAchievements(sections: AchSection[], marks: { ticks: stri
         })
         return last
       }
-      // A named killed since the export is ticked off here before the next export says so.
-      const justDone = open.map(({ c }) => ({ name: c.t, at: killedAt(c.t) })).filter((x) => x.at > 0)
+      // A named killed, or a place entered, since the export is ticked off here before the next export says so.
+      const doneAt = (text: string) => {
+        const visit = visitObjective(text)
+        return visit !== null ? (from.visited?.[visit] ?? 0) : killedAt(text)
+      }
+      const justDone = open.map(({ c }) => ({ name: c.t, at: doneAt(c.t) })).filter((x) => x.at > 0)
       t.left = open.map(({ c }) => c.t).filter((n) => !justDone.some((x) => x.name === n))
       t.total = required.length
       if (justDone.length) t.justDone = justDone.sort((x, y) => y.at - x.at)

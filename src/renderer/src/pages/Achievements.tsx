@@ -71,6 +71,8 @@ export function Achievements() {
     const rows = track && view && track.character.toLowerCase() === view.character.toLowerCase() ? (track.skills?.rows ?? []) : []
     return new Map(rows.map((r) => [`${r.achievement}|${r.skill}`.toLowerCase(), r]))
   }, [track, view])
+  // The places entered since the export, for the Exploration objectives the log ticks before the next export (LT-732).
+  const visited = useMemo(() => (track && view && track.character.toLowerCase() === view.character.toLowerCase() && track.visited ? track.visited : {}), [track, view])
   // Plan › Slayer's step for each open Slayer achievement, drawn under it in place of eqlwiki's census (LT-654).
   const planQ = useInvoke(character ? 'slayer:plan' : null, [character])
   const steps = useMemo(() => {
@@ -360,12 +362,16 @@ export function Achievements() {
       <TrackedBar book={book} tracked={view.marks.tracked ?? []} onUntrack={(k) => setTracked(k, false)} goTo={goTo} />
 
       {query.length >= 2 ? (
-        <SearchResults book={book} query={query} ctx={{ remaining, hideOpt, sort, open, setOpen, touched, flash, tick, goTo, since, skills, tracked, setTracked, steps }} />
+        <SearchResults
+          book={book}
+          query={query}
+          ctx={{ remaining, hideOpt, sort, open, setOpen, touched, flash, tick, goTo, since, skills, visited, tracked, setTracked, steps }}
+        />
       ) : cur ? (
         <SectionView
           si={cur.si}
           book={book}
-          ctx={{ remaining, hideOpt, sort, open, setOpen, touched, flash, tick, goTo, since, skills, tracked, setTracked, steps }}
+          ctx={{ remaining, hideOpt, sort, open, setOpen, touched, flash, tick, goTo, since, skills, visited, tracked, setTracked, steps }}
           setHideOpt={setHideOpt}
           setSort={setSort}
         />

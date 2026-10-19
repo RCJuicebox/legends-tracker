@@ -14,6 +14,7 @@ import type { EngineFeature } from './engine'
 import { handle } from './ipc/handle'
 import { log } from './log'
 import { parseLoc } from '../core/where'
+import { visitedSince, type ZoneVisits } from '../core/zoneVisits'
 
 // What the achievements overlay follows as the game is played: the step of the faction plan the
 // player follows (the Factions feature holds it, followSource.ts), the Slayer counts since the last
@@ -53,6 +54,10 @@ export class LiveAchievements implements AppFeature {
   private reading = false
   private skillsAt = 0
   private skills: SkillTrackView | null = null
+  /** When a zone was entered and the places visited not read since; 0 once read. */
+  private visitsAt = 0
+  /** The places the character's log has entered, for the Exploration objectives (LT-732). */
+  private visits: ZoneVisits | null = null
   /** When the Slayer plan was last asked to be made again (a zone entered, the choices changed), 0 when made since. */
   private planAt = 0
   private slayerPlan: SlayerPlanTrackView | null = null
@@ -138,6 +143,7 @@ export class LiveAchievements implements AppFeature {
       this.ctx.slayer?.live?.reset()
       this.ctx.factions?.follow?.reset()
       this.skills = null
+      this.visits = null
       this.slayerPlan = null
       this.marks = null
       this.moved = {}
@@ -149,6 +155,8 @@ export class LiveAchievements implements AppFeature {
       this.zone = zone
       this.factionAt ||= now - SETTLE_MS
       this.planAt ||= now - SETTLE_MS
+      // The zone just entered may be one an Exploration achievement wants: its line is in the log already.
+      if (zone) this.visitsAt ||= now - SETTLE_MS
     }
     if (this.reading || !character || !this.ctx.engine.status.watching) return
     const due = (at: number) => at > 0 && now - at >= SETTLE_MS
@@ -157,10 +165,11 @@ export class LiveAchievements implements AppFeature {
     const sweep = now - this.sweptAt >= SWEEP_MS && this.shown(character, now)
     // A completion line clears slayerSince's wait: it is read on the short settle.
     const killsDue = this.slayerAt > 0 && (this.slayerSince ? now - this.slayerAt >= KILLS_SETTLE_MS || now - this.slayerSince >= KILLS_AT_MOST_MS : due(this.slayerAt))
-    if (!sweep && !due(this.factionAt) && !killsDue && !due(this.skillsAt) && !due(this.planAt)) return
+    if (!sweep && !due(this.factionAt) && !killsDue && !due(this.skillsAt) && !due(this.planAt) && !due(this.visitsAt)) return
     const faction = sweep || due(this.factionAt)
     const slayer = sweep || killsDue
     const skills = sweep || due(this.skillsAt)
+    const visits = sweep || due(this.visitsAt)
     // The Slayer plan is made again from the counts each time they are read.
     const plan = slayer || due(this.planAt)
     if (plan) this.planAt = 0
@@ -170,6 +179,7 @@ export class LiveAchievements implements AppFeature {
       this.slayerSince = 0
     }
     if (skills) this.skillsAt = 0
+    if (visits) this.visitsAt = 0
     if (sweep) this.sweptAt = now
     this.reading = true
     void (async () => {
@@ -179,6 +189,7 @@ export class LiveAchievements implements AppFeature {
         if (slayer) await this.readSlayer(character)
         if (plan) await this.readSlayerPlan(character)
         if (skills) await this.readSkills(character)
+        if (visits) await this.readVisits(character)
         if (character === this.character) this.publish()
       } catch (e) {
         log.warn('The achievements overlay could not read:', e)
@@ -313,11 +324,34 @@ export class LiveAchievements implements AppFeature {
     for (const g of goals) {
       const id = skillId(g.skill)
       const own = classIdOf(g.className)
-      const target = id === null ? 0 : await capOf(classes.length ? classes : own ? [own] : [], g.level, id)
+      // A Tradeskill objective names its number; the rest want the cap (LT-730).
+      const target = g.goal ?? (id === null ? 0 : await capOf(classes.length ? classes : own ? [own] : [], g.level, id))
       const v = skillValue(values, g.skill)
-      rows.push({ achievement: g.achievement, className: g.className, skill: g.skill, level: g.level, value: v?.value ?? null, target, last: v?.at ?? 0 })
+      rows.push({
+        achievement: g.achievement,
+        className: g.className,
+        skill: g.skill,
+        level: g.level,
+        value: v?.value ?? null,
+        target,
+        last: v?.at ?? 0,
+        ...(g.goal ? { goal: true } : {})
+      })
     }
     this.skills = { rows, classes }
+  }
+
+  // ---- places visited ----
+
+  /** The places the character's log has entered, for the Exploration objectives still open (LT-732). */
+  private async readVisits(character: string): Promise<void> {
+    this.visits = await this.ctx.zoneVisits.view(this.ctx.historyOf(character))
+  }
+
+  /** The places entered since the export, for the character played; none for another. */
+  private visitedSinceExport(): Record<string, number> | undefined {
+    const exp = this.exported
+    return this.visits && exp && exp.character === this.character ? visitedSince(this.visits, exp.modified) : undefined
   }
 
   // ---- tracked ----
@@ -359,7 +393,8 @@ export class LiveAchievements implements AppFeature {
       skills: this.skills?.rows,
       factions: this.ctx.factions?.follow?.byAchievement ?? null,
       kills: mine ? live.kills(exp.character) : undefined,
-      completed: mine ? live.completed(exp.character) : undefined
+      completed: mine ? live.completed(exp.character) : undefined,
+      visited: this.visitedSinceExport()
     })
   }
 
@@ -377,10 +412,11 @@ export class LiveAchievements implements AppFeature {
       skills: this.skills,
       hunter: null,
       slayerPlan: this.slayerPlan,
-      tracked: this.trackedAchievements()
+      tracked: this.trackedAchievements(),
+      visited: this.visitedSinceExport()
     }
     for (const f of this.ctx.features ?? []) if (f !== this && f.track) Object.assign(track, f.track(at))
-    const key = JSON.stringify([track.character, track.faction, track.slayer, track.skills, track.hunter, track.slayerPlan, track.tracked])
+    const key = JSON.stringify([track.character, track.faction, track.slayer, track.skills, track.hunter, track.slayerPlan, track.tracked, track.visited])
     if (key === this.lastKey) return
     this.lastKey = key
     this.last = track

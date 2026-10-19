@@ -36,6 +36,7 @@ import { GroupHealth } from './groupHealth'
 import type { AppFeature } from './appFeature'
 import { SkillHistory, skillConsumer } from './skillHistory'
 import { AaHistory, aaConsumer } from './aaHistory'
+import { ZoneHistory, zoneConsumer } from './zoneHistory'
 import { PetStore, PetWiki } from './pets'
 import { isGameRunning, listLogs, logIsIn } from './game'
 import { LogFolders, otherArchiveDir } from './logFolders'
@@ -99,6 +100,8 @@ export interface AppContext {
   skills: SkillHistory
   /** The AAs bought and the ability points the log recorded, for Stats › AAs. */
   aaHistory: AaHistory
+  /** The zones each character's log has entered, for the Exploration achievements (LT-732). */
+  zoneVisits: ZoneHistory
   tradeFavorites: TradeFavorites
   petStore: PetStore
   petWiki: PetWiki
@@ -179,6 +182,7 @@ export function createContext(): AppContext {
       purchases: purchaseConsumer,
       skills: skillConsumer,
       aas: aaConsumer,
+      zones: zoneConsumer,
       ...FEATURE_CONSUMERS
     },
     (folder) => logFolders.reachable(folder)
@@ -217,6 +221,7 @@ export function createContext(): AppContext {
     factions: features.factions,
     skills: new SkillHistory(logHistory, 'skills'),
     aaHistory: new AaHistory(logHistory, 'aas'),
+    zoneVisits: new ZoneHistory(logHistory, 'zones'),
     tradeFavorites: new TradeFavorites(join(dataDir, 'tradeskills.json')),
     inventoryFiles: new InventoryFiles(
       dataDir,

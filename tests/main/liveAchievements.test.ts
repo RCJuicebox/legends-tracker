@@ -20,7 +20,7 @@ process.env['EQL_USER_DATA'] = h.dir
 const { LiveAchievements } = await import('../../src/main/liveAchievements')
 const { DEFAULT_CHOICES } = await import('../../src/features/slayer/core')
 
-type Read = 'readMarks' | 'readFaction' | 'readSlayer' | 'readSkills'
+type Read = 'readMarks' | 'readFaction' | 'readSlayer' | 'readSkills' | 'readVisits'
 type Reads = Record<Read, (character: string) => Promise<void>> & { marks: { character: string; ticks: string[]; tracked: string[] } | null }
 
 const T0 = new Date(2026, 8, 30, 12, 0, 0).getTime()
@@ -46,7 +46,7 @@ function setup() {
   /** A read waits for this while set. */
   const hold: { faction: Promise<void> | null } = { faction: null }
   const reads = live as unknown as Reads
-  for (const m of ['readMarks', 'readFaction', 'readSlayer', 'readSkills'] as const)
+  for (const m of ['readMarks', 'readFaction', 'readSlayer', 'readSkills', 'readVisits'] as const)
     vi.spyOn(reads, m).mockImplementation(async (character) => {
       calls.push(`${m}:${character}`)
       // As the real one does: the marks are what says whether they were read.
@@ -288,11 +288,11 @@ describe('LiveAchievements reads', () => {
     const s = setup()
     s.live.watch(true)
     await s.tick(0)
-    expect(s.taken()).toEqual(['Marks', 'Faction', 'Slayer', 'Skills'])
+    expect(s.taken()).toEqual(['Marks', 'Faction', 'Slayer', 'Skills', 'Visits'])
     await s.tick(10_000)
     expect(s.taken()).toEqual([])
     await s.tick(30_000)
-    expect(s.taken()).toEqual(['Marks', 'Faction', 'Slayer', 'Skills'])
+    expect(s.taken()).toEqual(['Marks', 'Faction', 'Slayer', 'Skills', 'Visits'])
     s.windows.mainShown = false
     await s.tick(60_000)
     expect(s.taken()).toEqual([])
@@ -311,7 +311,7 @@ describe('LiveAchievements reads', () => {
     vi.setSystemTime(T0 + 5000)
     s.live.watch(true)
     await s.tick(5000)
-    expect(s.taken()).toEqual(['Marks', 'Faction', 'Slayer', 'Skills'])
+    expect(s.taken()).toEqual(['Marks', 'Faction', 'Slayer', 'Skills', 'Visits'])
   })
 
   it('a page that stops saying it is open stops the sweep after a minute and a half', async () => {
@@ -319,21 +319,21 @@ describe('LiveAchievements reads', () => {
     s.live.watch(true)
     await s.tick(0)
     await s.tick(60_000)
-    expect(s.taken()).toEqual(['Marks', 'Faction', 'Slayer', 'Skills', 'Marks', 'Faction', 'Slayer', 'Skills'])
+    expect(s.taken()).toEqual(['Marks', 'Faction', 'Slayer', 'Skills', 'Visits', 'Marks', 'Faction', 'Slayer', 'Skills', 'Visits'])
     await s.tick(90_000)
     expect(s.taken()).toEqual([])
   })
 
-  it('the standings at once on entering a zone: the step worked on can be there', async () => {
+  it('the standings, and the places visited, at once on entering a zone: the step worked on can be there, and an Exploration objective (LT-732)', async () => {
     const s = setup()
     s.status.zone = 'Greater Faydark'
     await s.tick(0)
-    expect(s.taken()).toEqual(['Marks', 'Faction'])
+    expect(s.taken()).toEqual(['Marks', 'Faction', 'Visits'])
     await s.tick(1000)
     expect(s.taken()).toEqual([])
     s.status.zone = 'Kelethin'
     await s.tick(2000)
-    expect(s.taken()).toEqual(['Faction'])
+    expect(s.taken()).toEqual(['Faction', 'Visits'])
   })
 
   it('nothing while the log is not watched or no character is known, and what waited once it is', async () => {

@@ -8,6 +8,9 @@ import { SKILL_NAMES } from './combatModel'
 // character's classes at that level. Checked on one character (Shadow Knight, Monk, Shaman, all 50):
 // it and the class's own cap each account for every open objective but one, and the Skills window
 // shows the best cap. A skill raised at a guildmaster prints no line, so the log's value can be low.
+//
+// The Tradeskill sections ("Baking (150)") name the number themselves: "Reach 150 skill in Baking",
+// no level and no cap to look up (LT-730). The same skill-up lines move them.
 
 /** "You have become better at Divination! (190)". */
 const BETTER = /^You have become better at (.+)! \((\d+)\)$/
@@ -28,12 +31,18 @@ export function joinSkillValues(stretches: SkillValues[]): SkillValues {
   return out
 }
 
-/** Names the objectives and the log give otherwise than the game's tables: "Channelling", an Iksar's "Tail Rake". */
+/**
+ * Names the objectives and the log give otherwise than the game's tables: "Channelling", an Iksar's
+ * "Tail Rake", the Tradeskill objectives' "Smithing" and "Jewelcrafting" (the log and the tables say
+ * Blacksmithing and Jewelry Making).
+ */
 const SKILL_ALIASES: Record<string, number> = {
   channelling: 13,
   dragonpunch: 21,
   tailrake: 21,
-  handtohand: 28
+  handtohand: 28,
+  smithing: 63,
+  jewelcrafting: 68
 }
 
 const norm = (name: string) => name.toLowerCase().replace(/[^a-z0-9]/g, '')
@@ -48,15 +57,24 @@ export function skillId(name: string): number | null {
 /** A skill objective still open. */
 export interface SkillGoal {
   achievement: string
-  /** The class the achievement is for, as the game names it: "Shadow Knight". */
+  /** The class the achievement is for, as the game names it: "Shadow Knight"; '' for a Tradeskill objective, which is any class's. */
   className: string
   /** As the objective names it. */
   skill: string
+  /** The level whose cap is to be reached; 0 when the objective names the number itself. */
   level: number
+  /** The number the objective itself asks for ("Reach 150 skill in Baking"); none when it asks for the cap. */
+  goal?: number
 }
 
 const OBJECTIVE = /^Reach the maximum skill in (.+?) at level (\d+)\.?$/
+const GOAL = /^Reach (\d+) skill in (.+?)\.?$/
 const CLASS_OF = /^(.+?)'s .*Proficiency/
+
+/** The skill an objective wants, in either wording; null for an objective that is not one. */
+export function skillObjective(text: string): string | null {
+  return OBJECTIVE.exec(text)?.[1] ?? GOAL.exec(text)?.[2] ?? null
+}
 
 /** The skill objectives the achievements export lists as still open. */
 export function skillGoals(sections: AchSection[]): SkillGoal[] {
@@ -65,8 +83,13 @@ export function skillGoals(sections: AchSection[]): SkillGoal[] {
     for (const a of sec.ach) {
       if (a.d) continue
       for (const c of a.c) {
-        const m = c.d ? null : OBJECTIVE.exec(c.t)
+        if (c.d) continue
+        const m = OBJECTIVE.exec(c.t)
         if (m) out.push({ achievement: a.n, className: CLASS_OF.exec(a.n)?.[1] ?? '', skill: m[1], level: Number(m[2]) })
+        else {
+          const g = GOAL.exec(c.t)
+          if (g) out.push({ achievement: a.n, className: '', skill: g[2], level: 0, goal: Number(g[1]) })
+        }
       }
     }
   return out

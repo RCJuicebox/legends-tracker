@@ -54,7 +54,13 @@ describe('Plan › Hunter', () => {
       ['Kedge Keep', ['Seahorse Patriarch'], 1, [], null]
     ])
     expect(zones[1].left[0].spawn?.name).toBe('Andrew Pine')
-    expect(hunterZones(sections, () => 0, 0).map((z) => z.zone)).toEqual(['Kedge Keep', 'The Ocean of Tears', 'Befallen'])
+    // Raids' Conqueror achievements are places with named too (LT-731): Befallen's wants the orc, killed since.
+    expect(hunterZones(sections, () => 0, 0).map((z) => [z.zone, z.achievement])).toEqual([
+      ['Befallen', 'Conqueror of Befallen'],
+      ['Kedge Keep', 'Hunter of Kedge Keep'],
+      ['The Ocean of Tears', 'Hunter of The Ocean of Tears'],
+      ['Befallen', 'Hunter of Befallen']
+    ])
   })
 
   it('waits nothing for a named always up (the first kill is there; the next waits its timer), and its timer over its odds otherwise (LT-671)', () => {
@@ -66,7 +72,7 @@ describe('Plan › Hunter', () => {
 
   it('finds the Hunter achievements of the zone the player is in, however the log names it', () => {
     const zones = hunterZones(sections, () => 0, 0)
-    expect(hunterHere(zones, 'Befallen 2 (Adaptive)').map((z) => z.achievement)).toEqual(['Hunter of Befallen'])
+    expect(hunterHere(zones, 'Befallen 2 (Adaptive)').map((z) => z.achievement)).toEqual(['Conqueror of Befallen', 'Hunter of Befallen'])
     expect(hunterHere(zones, 'Ocean of Tears - Group').map((z) => z.achievement)).toEqual(['Hunter of The Ocean of Tears'])
     expect(hunterHere(zones, '')).toEqual([])
   })
@@ -129,7 +135,7 @@ describe('Plan › Hunter: what the Respawns records say of a named (LT-670)', (
       (zone) => TABLES[zone.toLowerCase()] ?? null,
       seenOf
     )
-    const befallen = zones.find((z) => z.zone === 'Befallen')!
+    const befallen = zones.find((z) => z.achievement === 'Hunter of Befallen')!
     expect(befallen.left.map((n) => [n.name, n.seen])).toEqual([
       ['Skeletal Orc', 'died 2 min ago, seen since'],
       ['Andrew Pine', 'died 6 min ago; back in ~2 min as you timed it']

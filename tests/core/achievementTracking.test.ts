@@ -16,7 +16,7 @@ import {
   type SlayerKills
 } from '../../src/core/slayer'
 import { parseRaceTable, PLAYABLE_MARK, raceKey, wikiRaceKey } from '../../src/core/raceNames'
-import { joinSkillValues, skillGoals, skillId, skillUp, skillValue } from '../../src/core/skillAchievements'
+import { joinSkillValues, skillGoals, skillId, skillObjective, skillUp, skillValue } from '../../src/core/skillAchievements'
 import type { PlanSettings } from '../../src/shared/settings'
 import type { PlanActivity } from '../../src/features/factions/catalog'
 import { DEFAULT_SETTINGS } from '../../src/features/factions/ways'
@@ -737,14 +737,30 @@ describe('skill achievements', () => {
     'C\t\tReach the maximum skill in Flying Kick at level 50.',
     'I\t\tReach the maximum skill in Dragon Punch at level 50.',
     "C\tMonk's Combat Proficiency, Level 50",
-    'C\t\tReach the maximum skill in Defense at level 50.'
+    'C\t\tReach the maximum skill in Defense at level 50.',
+    'Tradeskill: Baking',
+    'C\tBaking (100)',
+    'C\t\tReach 100 skill in Baking',
+    'I\tBaking (150)',
+    'I\t\tReach 150 skill in Baking',
+    'Tradeskill: Blacksmithing',
+    'I\tSmithing (50)',
+    'I\t\tReach 50 skill in Smithing'
   ].join('\n')
 
-  it('reads the open skill objectives, with the class each is for', () => {
+  it('reads the open skill objectives, with the class each is for, and the number a Tradeskill objective asks for (LT-730)', () => {
     expect(skillGoals(parseAchievements(SKILLS).sections)).toEqual([
       { achievement: "Shaman's Casting Proficiency, Level 50", className: 'Shaman', skill: 'Divination', level: 50 },
-      { achievement: "Monk's Specialized Proficiency, Level 50", className: 'Monk', skill: 'Dragon Punch', level: 50 }
+      { achievement: "Monk's Specialized Proficiency, Level 50", className: 'Monk', skill: 'Dragon Punch', level: 50 },
+      { achievement: 'Baking (150)', className: '', skill: 'Baking', level: 0, goal: 150 },
+      { achievement: 'Smithing (50)', className: '', skill: 'Smithing', level: 0, goal: 50 }
     ])
+    expect(skillObjective('Reach the maximum skill in Divination at level 50.')).toBe('Divination')
+    expect(skillObjective('Reach 150 skill in Baking')).toBe('Baking')
+    expect(skillObjective('Kill 50 orcs')).toBeNull()
+    // The log and the tables say Blacksmithing and Jewelry Making where the objectives say Smithing and Jewelcrafting.
+    expect(skillValue({ Blacksmithing: { value: 62, at: 3 } }, 'Smithing')).toEqual({ value: 62, at: 3 })
+    expect(skillId('Jewelcrafting')).toBe(skillId('Jewelry Making'))
   })
 
   it('reads a skill-up line, and knows a skill by any name the game gives it', () => {

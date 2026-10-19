@@ -151,7 +151,7 @@ export function Hunter() {
         <div>
           <h1>Hunter</h1>
           <div className="lead">
-            The named each Hunter achievement still wants, and where and how often they spawn
+            The named each Hunter achievement, and each Conqueror achievement under Raids, still wants, and where and how often they spawn
             {data?.export ? (
               <>
                 . Counts are {data.export.file} (written by the game {ago(data.export.modified, now)}) plus your kills since; type <GameCommand cmd="/outputfile achievements" /> in
@@ -189,7 +189,8 @@ export function Hunter() {
             <>
               <div className="card row mb-16">
                 <span>
-                  <b>{data.zones.length}</b> Hunter achievement{data.zones.length === 1 ? '' : 's'} to go, <b>{num(left)}</b> named
+                  <b>{data.zones.length}</b> Hunter{data.zones.some((z) => /^Conqueror/i.test(z.achievement)) ? ' and Conqueror' : ''} achievement
+                  {data.zones.length === 1 ? '' : 's'} to go, <b>{num(left)}</b> named
                 </span>
                 <FilterBox placeholder="Find a zone or named…" label="Find a zone, achievement or named" value={filter} onChange={setFilter} width={240} />
                 <span className="spacer" />

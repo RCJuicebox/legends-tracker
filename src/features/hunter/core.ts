@@ -70,7 +70,14 @@ export function seenText(r: Pick<RespawnRecord, 'lastDeath' | 'pendingSince' | '
 }
 
 /** An objective that is another achievement: "Complete the achievement …", or a region's "Hunter of Crushbone". */
-const LINK = /^(?:\(Optional\)\s*)?(?:Complete the achievement |Hunter of )/i
+const LINK = /^(?:\(Optional\)\s*)?(?:Complete the achievement |(?:Hunter|Conqueror) of )/i
+
+/**
+ * "Hunter of Befallen", and Raids' "Conqueror of The Plane of Fear": named mobs in a place, which the
+ * tables, the Respawns records and the maps treat alike (LT-731). "Hunter of The Ruins of Old Paineel
+ * or The Hole": the zone Legends has is the first.
+ */
+const PLACE = /^(?:Hunter|Conqueror) of (.+)$/i
 
 /**
  * Each Hunter achievement not done, with the named it still wants: the export's open objectives, less
@@ -88,8 +95,7 @@ export function hunterZones(
   const out: HunterZone[] = []
   for (const sec of sections)
     for (const a of sec.ach) {
-      // "Hunter of The Ruins of Old Paineel or The Hole": the zone Legends has is the first.
-      const zone = /^Hunter of (.+)$/i.exec(a.n)?.[1].split(/\s+or\s+/)[0]
+      const zone = PLACE.exec(a.n)?.[1].split(/\s+or\s+/)[0]
       if (!zone || a.d) continue
       const named = a.c.filter((c) => !c.o && !LINK.test(c.t))
       const open = named.filter((c) => !c.d)
