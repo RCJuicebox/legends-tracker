@@ -33,8 +33,8 @@ Release workflow does the rest.
 | `src/renderer` | `core`, `shared`, types from `main` | Node modules, Electron, `main`, `preload` |
 
 A feature module (`src/features/<name>/`) keeps one feature whole; its files follow their layer's
-rules by name: every `.tsx` and the page's Web Workers and their clients (`*Worker.ts`, `*Runner.ts`)
-the renderer's, `main.ts` and any `*Source.ts` main's, every other `.ts` core's. One feature imports
+rules by name: every `.tsx`, the page's hooks (`use*.ts`) and its Web Workers and their clients
+(`*Worker.ts`, `*Runner.ts`) the renderer's, `main.ts` and any `*Source.ts` main's, every other `.ts` core's. One feature imports
 no other: what two share goes in core (Hunter, built on Slayer's spawns and map, is the one
 exception). `tests/layers.test.ts` checks every import against this table, whatever folder it is in;
 the lint (`.oxlintrc.json`) catches the usual slips as you type. Core code runs in tests and workers, so it

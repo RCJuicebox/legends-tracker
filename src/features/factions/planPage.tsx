@@ -1,23 +1,21 @@
-import { Fragment, useCallback, useDeferredValue, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { Fragment, useCallback, useDeferredValue, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { ago, api } from '../../renderer/src/api'
 import { showError, showToast } from '../../renderer/src/toast'
-import { useAchievementTrack, useInvoke, useLatest, useSameContents, useVisibleInterval } from '../../renderer/src/hooks'
+import { useAchievementTrack, useInvoke, useSameContents, useVisibleInterval } from '../../renderer/src/hooks'
 import { useActions, useSettled } from '../../renderer/src/state'
 import { useCharacterRecord } from '../../renderer/src/character'
 import { useNow } from '../../renderer/src/components/TimerBars'
 import { ConfirmButton, Disclosure, GameCommand, Info, Pending, Segmented, SettingsLink, Switch, Tip } from '../../renderer/src/components/ui'
-import { duration, num, who, wikiUrl } from '../../core/format'
+import { duration, num, who } from '../../core/format'
 import { STANDING_MAX, standingBand, type FactionView } from './core'
-import { runPlan, Superseded } from './planRunner'
 import { deityName } from '../../shared/game/deities'
 import { playableRace } from '../../shared/game/races'
 import type { PlanChoices, PlanGoal, PlanSettings } from '../../shared/settings'
 import { classSwapOf, raceOfSwap } from './names'
 import { DEFAULT_SETTINGS, NO_CHOICES } from './ways'
-import type { FactionPlan, PlanInput, PlanShape, PlanStep, PlanTarget, Unplanned } from './planTypes'
+import type { FactionPlan, PlanInput, PlanStep, PlanTarget, Unplanned } from './planTypes'
 import { planFor, type FactionPlanData, type PlanFor } from './planner'
 import { unlockGoals, type RaceUnlock } from './unlocks'
-import { followedPlan } from './tracker'
 import { cityGuards, cityTargets } from './cities'
 import { Assumptions } from './plan/Assumptions'
 import { Cities } from './plan/Cities'
@@ -25,6 +23,8 @@ import { NowCard } from './plan/NowCard'
 import { Options } from './plan/Options'
 import { Doing, listed, plain, signedPlain, theirLogs, TYPING_SAVE_MS, withArticle } from './plan/parts'
 import { Steps } from './plan/Steps'
+import { Notices } from './plan/Notices'
+import { useFollowPlan, usePlanSearch, usePlanWithoutSwaps } from './plan/usePlanSearch'
 
 // The Factions page's Plan tab: the quickest known way to finish every faction achievement still to
 // do, step by step, and every way there is to raise each one, to lock one in (the plan is then built
@@ -121,9 +121,6 @@ export function useChoices(character: string): [PlanChoices, (c: PlanChoices, de
   return [choices, set]
 }
 
-/** Web notices put away this session, by what they said: the same failure stays away, a new one shows. */
-const dismissedNotices = new Set<string>()
-
 export function PlanTab({ character, view }: { character: string; view: FactionView | null }) {
   const { patchSettings } = useActions()
   const achievementCues = useSettled((s) => s.settings.achievementCues)
@@ -159,11 +156,6 @@ export function PlanTab({ character, view }: { character: string; view: FactionV
     }
   }
   const now = useNow(30_000)
-  const [, setDismissed] = useState(0)
-  const dismissNotice = (key: string) => {
-    dismissedNotices.add(key)
-    setDismissed((n) => n + 1)
-  }
   const [choices, setChoices] = useChoices(character)
   const [open, setOpen] = useState<string | null>(null)
   // The plan counts everyone as Agnostic; the character's own deity says whether it has a step to take first.
@@ -229,82 +221,22 @@ export function PlanTab({ character, view }: { character: string; view: FactionV
   const keySettings = stored.killsPerHour === undefined ? { ...deferredSettings, killsPerHour: 0 } : deferredSettings
   const held = data?.inventory?.modified ?? 0
   const structure = JSON.stringify([openSet, keySettings, deferredChoices, afresh, ways, cons, unlocksKey, held])
-  const keptShape = useRef<{ key: string; shape: PlanShape } | null>(null)
-  // Worked out in a worker (planRunner.ts), so a search does not freeze the page; the plan shown
-  // stays until the next one arrives, and a plan overtaken by newer inputs is dropped.
-  const [plan, setPlan] = useState<FactionPlan | null>(null)
-  useEffect(() => {
-    if (!data || !todo) return
-    let current = true
-    const keep = keptShape.current?.key === structure ? keptShape.current.shape : undefined
-    runPlan(
-      { targets: goalTargets, maxed: todo.maxed, standings: todo.standings, activities: data.catalog.activities, ...extras },
-      deferredSettings,
-      deferredChoices,
-      keep,
-      'plan'
-    ).then(
-      (p) => {
-        if (!current) return
-        keptShape.current = { key: structure, shape: p.shape }
-        // The order kept and the counts the same: the plan shown stays, and its hundred rows are not drawn again.
-        setPlan((old) => (old && JSON.stringify(old) === JSON.stringify(p) ? old : p))
-      },
-      (e: unknown) => current && !(e instanceof Superseded) && showError('Could not work out the faction plan', e)
-    )
-    return () => {
-      current = false
-    }
-  }, [data, todo, goalTargets, extras, deferredSettings, deferredChoices, structure])
+  // The plan, handed to the main process as its steps change (plan/usePlanSearch.ts).
+  const ask = useMemo(
+    () => ({ data, todo, targets: goalTargets, extras, settings: deferredSettings, choices: deferredChoices, structure }),
+    [data, todo, goalTargets, extras, deferredSettings, deferredChoices, structure]
+  )
+  const plan = usePlanSearch(ask)
 
-  // The plan shown is the one followed while this character is played: it goes to the main process
-  // whenever its steps change, for the achievements overlay and its cues. A city's guards are followed
-  // to their own standing; one a race unlock wants maxed as well, to 2000, as the plan has it.
-  const followKey = plan ? JSON.stringify(plan.steps.map((st) => [st.activity.id, st.finishes, st.lifts, st.reaches])) : ''
-  const following = useLatest({ plan, todo, cities })
-  useEffect(() => {
-    const { plan: p, todo: t, cities: c } = following.current
-    if (!followKey || !p || !t) return
-    const targets = c ? p.targets.filter((tg) => (tg.to ?? STANDING_MAX) < STANDING_MAX) : t.targets
-    const timer = setTimeout(
-      () => void api.invoke('factions:follow', character, followedPlan(p, targets)).catch((e: unknown) => showError('Could not hand the plan to the achievements overlay', e)),
-      400
-    )
-    return () => clearTimeout(timer)
-  }, [followKey, character, following])
+  useFollowPlan(character, plan, todo, cities)
   const track = useAchievementTrack()
   const tracked = track && track.character.toLowerCase() === character.toLowerCase() ? track.faction : null
 
-  // Race swaps: what they save against the same plan without them, worked out once asked for: a
-  // second run of the planner at every change of the plan is a third of a second each (LT-425).
+  // Race swaps: what they save against the same plan without them, once asked for.
   const swapSteps = plan ? plan.steps.filter((st) => st.race).length : 0
   const [askSaves, setAskSaves] = useState(false)
-  const swapKey = swapSteps && askSaves ? structure : ''
-  const [noSwap, setNoSwap] = useState<{ key: string; seconds: number; unplanned: number } | null>(null)
-  useEffect(() => {
-    if (!swapKey || !data || !todo || noSwap?.key === swapKey) return
-    let current = true
-    // Without swaps: every quest as the character's own race, when its standing gets there. A lock on one only another race opens now is dropped.
-    const needSwap = new Set(data.catalog.activities.flatMap((a) => (a.blocked && a.swap?.length ? [a.id] : [])))
-    runPlan(
-      { targets: goalTargets, maxed: todo.maxed, standings: todo.standings, activities: data.catalog.activities, ...extras },
-      { ...deferredSettings, raceSwaps: false },
-      {
-        ...deferredChoices,
-        locks: Object.fromEntries(Object.entries(deferredChoices.locks).filter(([, id]) => !needSwap.has(id))),
-        excluded: extras.races ? deferredChoices.excluded : [...deferredChoices.excluded, ...needSwap]
-      },
-      undefined,
-      'noSwap'
-    ).then(
-      (p) => current && setNoSwap({ key: swapKey, seconds: p.seconds, unplanned: p.unplanned.length }),
-      () => undefined
-    )
-    return () => {
-      current = false
-    }
-  }, [swapKey, data, todo, goalTargets, extras, deferredSettings, deferredChoices, noSwap?.key])
-  const swapSaves = plan && noSwap && noSwap.key === swapKey ? savedBySwaps(plan, noSwap) : null
+  const noSwap = usePlanWithoutSwaps(ask, plan, askSaves)
+  const swapSaves = plan && noSwap ? savedBySwaps(plan, noSwap) : null
   // The step each race is unlocked at, for a swap to a race the plan unlocks first.
   const unlockedAt = useMemo(() => {
     const at = new Map<string, number>()
@@ -382,78 +314,7 @@ export function PlanTab({ character, view }: { character: string; view: FactionV
 
   return (
     <>
-      {deity !== 'Agnostic' && (
-        <div className="notice mb-16">
-          This plan counts {who(character)} as Agnostic, the deity with no faction modifiers: renouncing your faith is the first step.{' '}
-          {deity ? `${who(character)} worships ${deity}. ` : 'No deity is set on the Stats page. '}
-          {data.agnostic ? (
-            'Agnostic is unlocked: pick it in Loadouts.'
-          ) : (
-            <>
-              {data.agnostic === false ? 'Unlock Agnostic' : 'If Agnostic is not unlocked yet, unlock it'} with{' '}
-              <a href={wikiUrl('Renouncing Your Faith')} target="_blank" rel="noreferrer">
-                Renouncing Your Faith
-              </a>{' '}
-              (level 46 and up: the Emissary of Zebuxoruk in the Oasis of Marr, then defeat Cazic Thule in the Plane of Fear and Innoruuk in the Plane of Hate), then pick it in
-              Loadouts.
-            </>
-          )}
-        </div>
-      )}
-      {cities && !data.raceMods && (
-        <div className="notice mb-16">
-          No race on record for {who(character)}, so the Cities plan cannot tell how each city&apos;s guards con you: it aims for each guards&apos; faction at 0 before any race or
-          class modifiers. Pick the race on the Stats page, or type <GameCommand cmd="/who" /> in game.
-        </div>
-      )}
-      {/* What is missing, in one notice rather than one each above the plan for weeks (LT-455). */}
-      {(!(view?.export ?? data.export) || !achievementsExport) && (
-        <div className="notice mb-16">
-          {!(view?.export ?? data.export) && !achievementsExport ? (
-            <>
-              No factions or achievements export for {who(character)} yet: every standing counts from 0, and an achievement counts as done only while its standing is at 2000. Type{' '}
-              <GameCommand cmd="/outputfile faction" /> and <GameCommand cmd="/outputfile achievements" /> in game for a plan from where you really stand.
-            </>
-          ) : !(view?.export ?? data.export) ? (
-            <>
-              No factions export for {who(character)} yet, so every standing counts from 0. Type <GameCommand cmd="/outputfile faction" /> in game for a plan from where you really
-              stand.
-            </>
-          ) : (
-            <>
-              No achievements export for {who(character)} yet, so an achievement counts as done only while its standing is at 2000. Type{' '}
-              <GameCommand cmd="/outputfile achievements" /> in game to plan only what is really left.
-            </>
-          )}
-        </div>
-      )}
-      {data.approximate && data.approximate.length > 0 && (
-        <div className="notice warn mb-16">
-          {data.approximate.length === 1 ? `${data.approximate[0]}’s standing is` : `${num(data.approximate.length)} standings are`} approximate (
-          {data.approximate.slice(0, 3).join(', ')}
-          {data.approximate.length > 3 ? ', …' : ''}): the log saw more changes since {who(character)}’s factions export than it keeps, so the plan may start from the wrong place.
-          Type <GameCommand cmd="/outputfile faction" /> in game to plan from where you really stand.
-        </div>
-      )}
-      {/* The web being out of reach is a passing state, not a fault: amber, and put away for the session (LT-455). */}
-      {data.wiki.error && !dismissedNotices.has(`wiki:${data.wiki.error}`) && (
-        <div className="notice warn row mb-16">
-          <span className="grow">
-            Could not read eqlwiki again ({data.wiki.error}); the pages read {ago(data.wiki.fetchedAt, now)} serve meanwhile.
-          </span>
-          <button className="btn small ghost" onClick={() => dismissNotice(`wiki:${data.wiki.error}`)}>
-            Hide
-          </button>
-        </div>
-      )}
-      {data.alla.error && !dismissedNotices.has(`alla:${data.alla.error}`) && (
-        <div className="notice warn row mb-16">
-          <span className="grow">Could not read Allakhazam ({data.alla.error}); it is tried again in ten minutes, and the plan goes on without the pages not yet read.</span>
-          <button className="btn small ghost" onClick={() => dismissNotice(`alla:${data.alla.error}`)}>
-            Hide
-          </button>
-        </div>
-      )}
+      <Notices character={character} data={data} deity={deity} cities={cities} hasExport={!!(view?.export ?? data.export)} achievementsExport={achievementsExport} now={now} />
 
       <NowCard
         character={character}

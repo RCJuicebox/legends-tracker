@@ -6,7 +6,7 @@ import { dirname, join, relative, resolve } from 'node:path'
 // The layers in CONTRIBUTING.md, checked on every import of every file under src (LT-640): the lint's
 // path patterns cover the folders they spell out, and a new folder needs no new globs here. Each file's
 // layer is from its folder, or in a feature module from its name: every .tsx and the page workers the
-// renderer's, main.ts and any *Source.ts main's, every other .ts core's.
+// renderer's (and its hooks, use*.ts), main.ts and any *Source.ts main's, every other .ts core's.
 
 type Layer = 'core' | 'shared' | 'main' | 'preload' | 'renderer'
 
@@ -26,8 +26,8 @@ export function layerOf(path: string): Layer {
   if (top === 'core' || top === 'shared' || top === 'main' || top === 'preload' || top === 'renderer') return top
   if (top !== 'features') throw new Error(`A file outside the layers: ${rel}`)
   const name = rest.at(-1) ?? rel.split('/')[1]
-  // The list of pages, every page, and the page's Web Workers and their clients are the renderer's.
-  if (rel === 'features/index.ts' || name.endsWith('.tsx') || /(?:Worker|Runner)\.ts$/.test(name)) return 'renderer'
+  // The list of pages, every page, its hooks, and the page's Web Workers and their clients are the renderer's.
+  if (rel === 'features/index.ts' || name.endsWith('.tsx') || /(?:Worker|Runner)\.ts$/.test(name) || /^use[A-Z]\w*\.ts$/.test(name)) return 'renderer'
   if (name === 'main.ts' || /Source\.ts$/.test(name)) return 'main'
   return 'core'
 }
@@ -134,6 +134,7 @@ describe('the layers', () => {
     expect(layerOf(join(SRC, 'features', 'slayer', 'liveSource.ts'))).toBe('main')
     expect(layerOf(join(SRC, 'features', 'factions', 'planWorker.ts'))).toBe('renderer')
     expect(layerOf(join(SRC, 'features', 'factions', 'plan', 'steps.ts'))).toBe('core')
+    expect(layerOf(join(SRC, 'features', 'factions', 'plan', 'usePlanSearch.ts'))).toBe('renderer')
     expect(layerOf(join(SRC, 'features', 'index.ts'))).toBe('renderer')
   })
 })

@@ -94,8 +94,8 @@
       }
     },
     {
-      // A feature's page workers and their clients run in the page: the renderer's rules (LT-637).
-      "files": ["src/features/*/*Worker.ts", "src/features/*/*Runner.ts"],
+      // A feature's page workers, their clients and its hooks run in the page: the renderer's rules (LT-637).
+      "files": ["src/features/*/*Worker.ts", "src/features/*/*Runner.ts", "src/features/*/use*.ts"],
       "rules": {
         "no-restricted-imports": [
           "error",
