@@ -53,7 +53,7 @@ function ReadFromScreen({ stock, onApplied }: { stock: MoteStock; onApplied: (s:
   }
   const found = read ? MOTE_RANKS.filter((r) => read.counts[r.key] !== undefined) : []
   return (
-    <div className="stack gap-10 mb-14">
+    <div className="stack gap-12 mb-16">
       <div className="row">
         <button className="btn primary" disabled={busy} onClick={() => void run()}>
           {busy ? 'Reading the screen…' : 'Read motes from screen'}
@@ -168,7 +168,7 @@ export function MotePlanner() {
 
   return (
     <div className="grid two" style={{ alignItems: 'start' }}>
-      <div className="card stack gap-14">
+      <div className="card stack gap-16">
         <h2>Item</h2>
         <p className="muted small" style={{ margin: 0 }}>
           Put in the item's level and the xp in its bar. It works out which motes you need, how many, and what to combine from your stock.
@@ -192,7 +192,7 @@ export function MotePlanner() {
           </label>
         </div>
 
-        <div className="stack gap-10">
+        <div className="stack gap-12">
           {result.steps.map((st) => {
             const state = st.noMote || st.short ? 'bad' : st.unsourced ? '' : 'ok'
             const pill = st.noMote ? 'No mote' : st.short ? `Short ${num(st.short)}` : st.unsourced ? 'Needs the step above' : 'Covered'
@@ -260,13 +260,14 @@ export function MotePlanner() {
       </div>
 
       <div className="card">
-        <h2>
-          Your motes <span className="spacer" />
-          <span className="row tight" style={{ textTransform: 'none', letterSpacing: 0, fontWeight: 500 }}>
+        <div className="card-head">
+          <h2>Your motes</h2>
+          <span className="spacer" />
+          <span className="row tight">
             <Switch on={stock.autoAdd} label="Add looted motes automatically" onChange={(v) => void writeStock(setStock, 'stock:autoAdd', v)} />
             Add looted motes automatically
           </span>
-        </h2>
+        </div>
         <ReadFromScreen stock={stock} onApplied={setStock} />
         <div className="table-scroll">
           <table className="table">

@@ -63,7 +63,7 @@ export function NowCard({
         </label>
       </div>
       {step && track ? (
-        <div className="stack gap-6 mt-10">
+        <div className="stack gap-8 mt-12">
           <div className="fp-head">
             <span className="fp-zone">{step.zone || 'Somewhere'}</span>
             <span className={`chip fp-kind ${step.kind}`}>{KIND_LABEL[step.kind]}</span>
@@ -127,7 +127,7 @@ export function NowCard({
           <span className="faint small">About {duration(track.secondsLeft)} of steps left, as planned.</span>
         </div>
       ) : !track ? (
-        <p className="faint small mb-0 mt-10">
+        <p className="faint small mb-0 mt-12">
           Play {who(character)} and this follows the plan as your factions move: the step you are on (the one your kills and hand-ins go the way of, or the first left in your
           zone), what it still wants, and the next. The achievements overlay shows the same over the game, with your Slayer counts.
         </p>

@@ -116,6 +116,12 @@
     color: var(--text);
     text-shadow: none;
   }
+  /* Live's timer bars follow the page in the light theme; the overlays keep their dark skin over the game (LT-688). */
+  :root:not(.overlay-html) {
+    --bar-bg: rgb(20 26 32 / 0.07);
+    --bar-text: var(--text);
+    --bar-shadow: none;
+  }
 }
 
 /* Overlay windows are transparent all the way down, or they would hide the game behind a dark box. */
@@ -399,6 +405,21 @@ textarea {
 .card h2 .spacer {
   flex: 1;
 }
+/* A card's heading with its controls beside it, not inside it: the heading reads as its title alone,
+   and the controls keep their own case and weight (LT-685). */
+.card-head {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0 0 12px;
+}
+.card-head > h2 {
+  margin: 0;
+}
+.card-head > .spacer {
+  flex: 1;
+}
 /* Times and figures keep their case in a heading ("≈ 4 h 40 min", not "≈ 4 H 40 MIN"), as do coin and file
    names on chips and buttons ("1s 9c", "alert.wav"): uppercase they read as other words (LT-581). */
 .card h2 .mono,
@@ -549,9 +570,11 @@ summary:focus-visible,
   min-height: 24px;
   justify-content: center;
 }
+/* Pressed: the sort chosen, a choice on (LT-697): tinted, not only its edge. */
 .btn.on {
   border-color: var(--accent);
   color: var(--accent-2);
+  background: color-mix(in srgb, var(--accent) 12%, var(--panel));
 }
 
 input[type='text'],
@@ -1073,7 +1096,7 @@ table.table {
   height: calc(var(--fs) * 1.95);
   padding-right: 8px;
   border-radius: 6px;
-  background: rgb(10 12 18 / calc(0.72 * var(--ov-panel, 1)));
+  background: var(--bar-bg, rgb(10 12 18 / calc(0.72 * var(--ov-panel, 1))));
   box-shadow: 0 0 0 1px rgb(var(--ink) / calc(0.06 * var(--ov-panel, 1))) inset;
 }
 /* The fill is scaled and its bright edge slid, never resized: a tick costs no layout. Both paint in
@@ -1140,8 +1163,17 @@ table.table {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  color: #fff;
-  text-shadow: var(--ov-shadow, 0 1px 2px rgba(0, 0, 0, 0.9));
+  color: var(--bar-text, #fff);
+  text-shadow: var(--bar-shadow, var(--ov-shadow, 0 1px 2px rgba(0, 0, 0, 0.9)));
+}
+/* On Live, a bar's name is a link to what sets it (LT-691). */
+.timer .timer-open {
+  all: unset;
+  cursor: pointer;
+}
+.timer .timer-open:hover,
+.timer .timer-open:focus-visible {
+  text-decoration: underline;
 }
 .timer .label .rank {
   font-weight: 500;
@@ -1158,8 +1190,8 @@ table.table {
 .timer .time {
   font-variant-numeric: tabular-nums;
   font-weight: 700;
-  color: #fff;
-  text-shadow: var(--ov-shadow, 0 1px 2px rgba(0, 0, 0, 0.9));
+  color: var(--bar-text, #fff);
+  text-shadow: var(--bar-shadow, var(--ov-shadow, 0 1px 2px rgba(0, 0, 0, 0.9)));
 }
 .timer .time .approx {
   opacity: 0.6;
@@ -1981,9 +2013,6 @@ details:not(.info) > summary::before {
   text-align: right;
   white-space: nowrap;
 }
-.char-green {
-  color: var(--green);
-}
 .char-heroic {
   color: var(--amber);
   font-weight: 500;
@@ -2416,12 +2445,6 @@ details:not(.info) > summary::before {
   font-size: 12px;
   font-variant-numeric: tabular-nums;
 }
-.lt-diffs .up {
-  color: var(--green);
-}
-.lt-diffs .down {
-  color: var(--red);
-}
 .lt-gain {
   font-size: 16px;
   font-weight: 700;
@@ -2458,7 +2481,7 @@ details:not(.info) > summary::before {
 .lt-chip.focus,
 .lt-chip.good {
   background: color-mix(in srgb, var(--green) 16%, transparent);
-  color: var(--green);
+  color: var(--green-text);
 }
 .lt-chip.warn {
   background: color-mix(in srgb, var(--accent) 16%, transparent);
@@ -2479,9 +2502,6 @@ details:not(.info) > summary::before {
 }
 .lt-chip.bad::before {
   content: '✕ ';
-}
-.lt-chip.good {
-  color: var(--green-text);
 }
 .lt-focus {
   display: grid;
@@ -2576,12 +2596,6 @@ details:not(.info) > summary::before {
 .lt-opt-line > span {
   padding: 6px 0;
   border-top: 1px solid rgb(var(--ink) / 0.04);
-}
-.lt-up {
-  color: var(--green);
-}
-.lt-down {
-  color: var(--red);
 }
 /* Worn effects and procs: the focus row's columns without its tick box. */
 .lt-focus-row.lt-effect-row {
@@ -3527,20 +3541,14 @@ button.tree-item {
 .wrap {
   flex-wrap: wrap;
 }
-.gap-6 {
-  gap: 6px;
-}
 .gap-8 {
   gap: 8px;
-}
-.gap-10 {
-  gap: 10px;
 }
 .gap-12 {
   gap: 12px;
 }
-.gap-14 {
-  gap: 14px;
+.gap-16 {
+  gap: 16px;
 }
 .m-0 {
   margin: 0;
@@ -3551,35 +3559,20 @@ button.tree-item {
 .mb-0 {
   margin-bottom: 0;
 }
-.mt-10 {
-  margin-top: 10px;
-}
-.mt-14 {
-  margin-top: 14px;
+.mt-12 {
+  margin-top: 12px;
 }
 .mt-16 {
   margin-top: 16px;
 }
-.mt-18 {
-  margin-top: 18px;
-}
 .mb-4 {
   margin-bottom: 4px;
-}
-.mb-6 {
-  margin-bottom: 6px;
 }
 .mb-8 {
   margin-bottom: 8px;
 }
-.mb-10 {
-  margin-bottom: 10px;
-}
 .mb-12 {
   margin-bottom: 12px;
-}
-.mb-14 {
-  margin-bottom: 14px;
 }
 .mb-16 {
   margin-bottom: 16px;

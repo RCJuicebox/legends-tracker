@@ -153,7 +153,7 @@ export function MoteSpells({ go }: { go?: Go }) {
         <span className="small muted grow">The casts of the character picked here, from its log and archives.</span>
         <CharacterPicker character={characterKey} available={available} onPick={setPicked} />
       </div>
-      <div className="card stack gap-10">
+      <div className="card stack gap-12">
         <div className="row">
           <b>Judged on what you cast</b>
           <Segmented label="Judged on what you cast" value={days} onChange={setDays} options={DAY_WINDOWS} />

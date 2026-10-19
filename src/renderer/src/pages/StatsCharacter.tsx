@@ -123,13 +123,13 @@ export function CharacterTab({
   const row = (label: string, value: React.ReactNode, note?: React.ReactNode, color?: boolean) => (
     <div className="char-row" key={label}>
       <span>{label}</span>
-      <b className={color ? 'char-green' : ''}>{value}</b>
+      <b className={color ? 'ok-text' : ''}>{value}</b>
       <span className="char-note">{note}</span>
     </div>
   )
 
   return (
-    <div className="stack gap-14">
+    <div className="stack gap-16">
       <div className="card row gap-12">
         <button className="btn primary" disabled={busy} onClick={() => void read()}>
           {busy ? 'Reading the screen…' : 'Read from screen'}
@@ -191,7 +191,7 @@ export function CharacterTab({
                 label,
                 w[label] ? (
                   <>
-                    <span className="char-green">{num(w[label][0])}</span> / {num(w[label][1] ?? 510)} <span className="char-heroic">+{w[label][2] ?? 0}</span>
+                    <span className="ok-text">{num(w[label][0])}</span> / {num(w[label][1] ?? 510)} <span className="char-heroic">+{w[label][2] ?? 0}</span>
                   </>
                 ) : (
                   '—'
@@ -209,7 +209,7 @@ export function CharacterTab({
                 label,
                 w[label] ? (
                   <>
-                    <span className="char-green">{num(w[label][0])}</span> / {num(w[label][1] ?? 1000)}
+                    <span className="ok-text">{num(w[label][0])}</span> / {num(w[label][1] ?? 1000)}
                   </>
                 ) : (
                   '—'

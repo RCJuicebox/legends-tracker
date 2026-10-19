@@ -14,12 +14,13 @@ import {
   FilterBox,
   Info,
   NumberInput,
+  PageLink,
   Pending,
+  type Sort,
   SortTh,
   Sparkline,
   Switch,
-  ToggleChip,
-  type Sort
+  ToggleChip
 } from '../components/ui'
 import { parseClock, SHARED_SEC, type RespawnRow, type RespawnTimerSpec, type RespawnView } from '../../../core/respawns'
 import { NotWatching } from '../components/NotWatching'
@@ -448,7 +449,8 @@ function TimerEditor({
           Cancel
         </button>
         <span className="faint small">
-          It starts at each kill of {names ? `any of ${names.join(', ')}` : name.trim() || 'the mob'}, anywhere, and can be edited further on the Triggers page (Respawns folder).
+          It starts at each kill of {names ? `any of ${names.join(', ')}` : name.trim() || 'the mob'}, anywhere, and can be edited further on the{' '}
+          <PageLink page="triggers">Triggers page</PageLink> (Respawns folder).
         </span>
       </div>
     </form>

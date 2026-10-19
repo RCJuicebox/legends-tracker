@@ -575,7 +575,7 @@ function HealedCard({ seg, scope }: { seg: Segment; scope: MeterScope }) {
       {rows.slice(0, 10).map((h, i) => (
         <HealBar key={h.key} h={h} rank={i + 1} />
       ))}
-      {runes > 0 && <div className="faint small mt-10">Runes absorbed {num(runes)} on top.</div>}
+      {runes > 0 && <div className="faint small mt-12">Runes absorbed {num(runes)} on top.</div>}
       {seg.enemyHeal > 0 && <div className="faint small">Enemies healed themselves for {num(seg.enemyHeal)}.</div>}
     </div>
   )

@@ -135,12 +135,14 @@ export function Overlays() {
       <div className="grid three">
         {overlays.map((o) => (
           <div className="card" key={o.id}>
-            <h2>
-              {o.name}{' '}
-              <span className="chip">{o.kind === 'timers' ? 'Timer bars' : o.kind === 'meter' ? 'Damage meter' : o.kind === 'achievements' ? 'Achievements' : 'Alert text'}</span>
+            <div className="card-head">
+              <h2>
+                {o.name}{' '}
+                <span className="chip">{o.kind === 'timers' ? 'Timer bars' : o.kind === 'meter' ? 'Damage meter' : o.kind === 'achievements' ? 'Achievements' : 'Alert text'}</span>
+              </h2>
               <span className="spacer" />
               <Switch on={o.visible} onChange={(v) => update(o.id, { visible: v })} title="Show this overlay" label={`Show ${o.name}`} />
-            </h2>
+            </div>
             <div className="stack gap-12">
               <Field label="Name">
                 <input value={o.name} onChange={(e) => update(o.id, { name: e.target.value }, TYPING_SAVE_MS)} />

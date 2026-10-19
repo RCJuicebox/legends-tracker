@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useActions, useSettled } from '../state'
-import { useSearch } from '../hooks'
+import { SEARCH_MIN, useSearch } from '../hooks'
 import { showUndo } from '../toast'
 import { NumberInput, Switch } from '../components/ui'
 import { type FocusSource } from '../../../shared/types'
@@ -14,7 +14,7 @@ export function FocusSources() {
   const { saveCharacter, latest } = useActions()
   const c = useSettled((s) => s.character)
   const [q, setQ] = useState('')
-  const results = useSearch('focus:search', q)
+  const { results, answered } = useSearch('focus:search', q)
   const [from, setFrom] = useState('')
   const save = (list: FocusSource[], debounceMs?: number) => saveCharacter({ ...c, focusSources: list }, { debounceMs })
   const update = (id: string, patch: Partial<FocusSource>, debounceMs?: number) =>
@@ -63,7 +63,7 @@ export function FocusSources() {
       </div>
       {c.focusSources.length > 0 && (
         <div className="table-scroll">
-          <table className="table mb-10">
+          <table className="table mb-12">
             <thead>
               <tr>
                 <th>On</th>
@@ -97,8 +97,9 @@ export function FocusSources() {
                       value={f.from}
                       placeholder="Which item?"
                       aria-label={`${f.name} comes from`}
+                      title={f.from || undefined}
                       onChange={(e) => update(f.id, { from: e.target.value }, TYPING_MS)}
-                      style={{ width: 150 }}
+                      style={{ width: '100%', minWidth: 220 }}
                     />
                   </td>
                   <td className="nowrap">
@@ -125,7 +126,7 @@ export function FocusSources() {
                     <NumberInput value={f.decayPct} width={56} min={0} label={`${f.name} decay per level %`} onChange={(v) => update(f.id, { decayPct: v ?? 0 })} /> %
                   </td>
                   <td>
-                    <button className="btn ghost small" onClick={() => remove(f)}>
+                    <button className="btn ghost small" aria-label={`Remove ${f.name}`} onClick={() => remove(f)}>
                       Remove
                     </button>
                   </td>
@@ -138,7 +139,7 @@ export function FocusSources() {
       <div className="row">
         <input
           className="grow"
-          placeholder="Find an item focus to add, e.g. Extended Enhancement II…"
+          placeholder="Find an item focus to add (three letters or more), e.g. Extended Enhancement II…"
           aria-label="Add an item focus by name"
           value={q}
           onChange={(e) => setQ(e.target.value)}
@@ -148,6 +149,7 @@ export function FocusSources() {
           Add an AA or other
         </button>
       </div>
+      {answered === q && q.trim().length >= SEARCH_MIN && !results.length && <div className="faint small mt-8">No item focus matches “{q.trim()}”.</div>}
       {results.length > 0 && (
         <div className="stack" style={{ gap: 2, marginTop: 8, maxHeight: 240, overflow: 'auto' }}>
           {results.map((r) => (

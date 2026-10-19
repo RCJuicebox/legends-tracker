@@ -43,7 +43,7 @@ export function AasTab({
   const now = useNow(60_000)
   const view = useMemo(() => (history ? withAaList(history, aa) : null), [history, aa])
   return (
-    <div className="stack gap-14">
+    <div className="stack gap-16">
       {view && view.capAt > 0 && (
         <div className="notice bad">
           Your pool of AA points is full: the game said so {ago(view.capAt, now)} and nothing has been bought since. It gives no more until you spend some.
@@ -231,7 +231,7 @@ function AbilityList({ aa, status, onRead }: { aa: AaSummary | null; status: str
   const applied = (Object.keys(AA_USES) as AaEffect[]).filter((k) => aa?.totals[k])
   return (
     <div className="card stack gap-8">
-      <div className="row small gap-10">
+      <div className="row small gap-12">
         <h2 style={{ margin: 0 }}>Your ability list</h2>
         <span className="muted">{aa ? `${aa.count} abilities, from your /alternateadv list of ${aa.when}.` : 'None read yet.'}</span>
         {status && <span className="faint">{status}</span>}

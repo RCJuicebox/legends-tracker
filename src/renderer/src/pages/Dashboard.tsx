@@ -1,5 +1,6 @@
+import type { FeedItem, TimerView } from '../../../shared/types'
 import type { SimulateResult } from '../../../shared/ipc'
-import { useMemo, useState } from 'react'
+import { useContext, useMemo, useState } from 'react'
 import { timeOfDay, who } from '../../../core/format'
 import { useRemembered } from '../remember'
 import { useActions, useLive, useSettled } from '../state'
@@ -7,13 +8,14 @@ import { ago, mb } from '../api'
 import { act, actDone } from '../toast'
 import { OVERLAY_BUFFS, TRY_LINES } from '../constants'
 import { TimerBars, useNow } from '../components/TimerBars'
-import { Icon } from '../components/ui'
+import { Icon, ToggleChip } from '../components/ui'
 import { GameFolderPrompt } from '../components/GameFolder'
 import { FactionNowCard, FightSummary, QuietLogNotice, SetupChecklist } from '../components/LiveSummary'
-import type { Go } from '../nav'
+import { GoContext, type Go } from '../nav'
 import { perHour, useMotes } from './MoteRuns'
 import { localDay, sessionHours, totalMotes } from '../../../core/motes'
 import { characterKey } from '../../../core/validate'
+import { handOff } from '../handoff'
 
 const SAMPLE = `[Tue Sep 01 12:15:08 2026] You begin casting Envenomed Bolt X.
 [Tue Sep 01 12:15:09 2026] A ratman warrior has been poisoned.
@@ -110,12 +112,13 @@ export function Dashboard({ go }: { go: Go }) {
       <div className="grid two">
         <Activity />
         <div className="card">
-          <h2>
-            Try log lines <span className="spacer" />
+          <div className="card-head">
+            <h2>Try log lines</h2>
+            <span className="spacer" />
             <button className="btn small" onClick={() => void actDone('Demo timers are up on the overlays', 'overlays:demo')}>
               <Icon name="sparkle" /> Show demo timers
             </button>
-          </h2>
+          </div>
           <p className="muted small mt-0">
             Paste log lines to run them through Spell Timers and the triggers, with their times moved to now. To see which trigger a line matches and what it would say, without
             running it, use{' '}
@@ -195,6 +198,13 @@ function StatCards({ go }: { go: Go }) {
 
 /** The buffs and the other timers, as the overlays show them. */
 function LiveTimers() {
+  const go = useContext(GoContext)
+  // A bar's name opens what sets it: its spell's row, or its trigger (LT-691).
+  const openRule = (t: TimerView) => {
+    if (!go || !t.rule) return
+    handOff(t.source === 'spell' ? 'spells' : 'triggers', t.rule)
+    go(t.source === 'spell' ? 'spells' : 'triggers')
+  }
   const timers = useLive((l) => l.timers)
   const buffs = useMemo(() => timers.filter((t) => t.overlay === OVERLAY_BUFFS), [timers])
   const others = useMemo(() => timers.filter((t) => t.overlay !== OVERLAY_BUFFS), [timers])
@@ -208,6 +218,7 @@ function LiveTimers() {
           timers={buffs}
           grouped
           fontSize={15}
+          onOpen={openRule}
           empty={<div className="empty">No buff timers running. Cast one and it appears here; the Buffs page lists every buff on you.</div>}
         />
       </div>
@@ -215,24 +226,52 @@ function LiveTimers() {
         <h2>
           DoTs &amp; timers <span className="chip">{others.length}</span>
         </h2>
-        <TimerBars timers={others} grouped fontSize={15} empty={<div className="empty">No DoTs or debuffs running.</div>} />
+        <TimerBars timers={others} grouped fontSize={15} onOpen={openRule} empty={<div className="empty">No DoTs or debuffs running.</div>} />
       </div>
     </div>
   )
 }
 
 /** What has happened lately: a feed line draws this card alone. */
+/** The kinds of line the activity feed has, in the order their chips show. */
+const FEED_KINDS: { kind: FeedItem['kind']; label: string }[] = [
+  { kind: 'timer', label: 'Timers' },
+  { kind: 'fade', label: 'Fades' },
+  { kind: 'trigger', label: 'Triggers' },
+  { kind: 'fight', label: 'Fights' },
+  { kind: 'loot', label: 'Loot' },
+  { kind: 'archive', label: 'Archive' },
+  { kind: 'info', label: 'Info' },
+  { kind: 'warn', label: 'Warnings' }
+]
+
 function Activity() {
   const feed = useLive((l) => l.feed)
+  // The kinds turned off, remembered, as Loot's outcomes are (LT-690).
+  const [hidden, setHidden] = useRemembered<FeedItem['kind'][]>('live.feed.hidden', [])
+  const toggle = (k: FeedItem['kind']) => setHidden(hidden.includes(k) ? hidden.filter((x) => x !== k) : [...hidden, k])
   // Newest first, and no more than a page shows: the feed keeps 300.
-  const recent = useMemo(() => feed.slice(-FEED_SHOWN).reverse(), [feed])
+  const recent = useMemo(
+    () =>
+      feed
+        .filter((f) => !hidden.includes(f.kind))
+        .slice(-FEED_SHOWN)
+        .reverse(),
+    [feed, hidden]
+  )
   return (
     <div className="card">
-      <h2>
-        Activity <span className="spacer" />
-      </h2>
+      <h2>Activity</h2>
+      <div className="row tight wrap mb-8" role="group" aria-label="Kinds of line shown">
+        {FEED_KINDS.map((k) => (
+          <ToggleChip key={k.kind} className={`k-${k.kind}`} on={!hidden.includes(k.kind)} onChange={() => toggle(k.kind)}>
+            {k.label}
+          </ToggleChip>
+        ))}
+      </div>
       <div className="feed">
         {feed.length === 0 && <div className="empty">Nothing yet.</div>}
+        {feed.length > 0 && !recent.length && <div className="empty">Every line shown is of a kind turned off above.</div>}
         {recent.map((f) => (
           <div className="feed-item" key={f.id}>
             <span className="t">{timeOfDay(f.at, true)}</span>

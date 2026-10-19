@@ -81,7 +81,7 @@ function Bar({
     <>
       <span className="dm-fill" />
       {rank !== undefined && <span className="dm-rank">{rank}</span>}
-      <span className="dm-name">
+      <span className="dm-name" title={typeof name === 'string' ? name : undefined}>
         {name}
         {tag ? <em className="dm-tag">{tag}</em> : null}
         {stat ? <span className="dm-stat">{stat}</span> : null}

@@ -1,8 +1,8 @@
 import { ranLines } from './Dashboard'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { api, errorMessage } from '../api'
 import { useSettled } from '../state'
-import { act, showError, actDone } from '../toast'
+import { act, showError, showToast, actDone } from '../toast'
 import { OVERLAY_TARGETS, TRY_LINES } from '../constants'
 import { TRIGGER_TEXT_COLOR, TRIGGER_TIMER_COLOR } from '../../../shared/overlays'
 import { recall, remember, useRemembered } from '../remember'
@@ -11,6 +11,7 @@ import { GroupHealthCard } from '../components/GroupHealthCard'
 import { ConfirmButton, Field, FilterBox, Icon, LoadError, NumberInput, Pending, Switch } from '../components/ui'
 import type { Phrase, Trigger, TriggerAction, TriggerTestResult } from '../../../shared/types'
 import type { TriggerError } from '../../../shared/ipc'
+import { takeHandOff } from '../handoff'
 
 const newId = () => (crypto.randomUUID ? crypto.randomUUID() : String(Math.random()).slice(2))
 
@@ -89,6 +90,8 @@ export function Triggers() {
     keep(draft)
   }, [draft])
 
+  // Sent here from a timer on Live: its trigger selected once the list is read (LT-691).
+  const wanted = useRef(takeHandOff('triggers'))
   useEffect(() => {
     let live = true
     setLoadError('')
@@ -97,7 +100,14 @@ export function Triggers() {
         live &&
         setDraft((d) =>
           // Edits left from an earlier visit win over a fresh read.
-          unsaved(d) ? rebase(d!, t) : { list: t, saved: t, selected: d?.selected && t.some((x) => x.id === d.selected) ? d.selected : (t[0]?.id ?? null) }
+          unsaved(d)
+            ? { ...rebase(d!, t), ...(wanted.current && t.some((x) => x.id === wanted.current) ? { selected: wanted.current } : {}) }
+            : {
+                list: t,
+                saved: t,
+                selected:
+                  wanted.current && t.some((x) => x.id === wanted.current) ? wanted.current : d?.selected && t.some((x) => x.id === d.selected) ? d.selected : (t[0]?.id ?? null)
+              }
         ),
       (e) => live && setLoadError(errorMessage(e))
     )
@@ -163,7 +173,10 @@ export function Triggers() {
             onClick={async () => {
               try {
                 const imported = await api.invoke('triggers:import')
-                if (imported) setList((l) => [...l, ...imported.map((t) => ({ ...blankTrigger(''), ...t, id: newId() }))])
+                if (imported) {
+                  setList((l) => [...l, ...imported.map((t) => ({ ...blankTrigger(''), ...t, id: newId() }))])
+                  showToast(`Imported ${imported.length} trigger${imported.length === 1 ? '' : 's'} into the list; Save changes keeps them.`)
+                }
               } catch (e) {
                 showError('Could not import that file', e)
               }
@@ -210,7 +223,7 @@ export function Triggers() {
 
       <div className="split">
         <div className="card" style={{ padding: 10 }}>
-          <FilterBox placeholder="Filter triggers…" label="Filter triggers" value={query} onChange={setQuery} width="100%" className="mb-6" />
+          <FilterBox placeholder="Filter triggers…" label="Filter triggers" value={query} onChange={setQuery} width="100%" className="mb-8" />
           <div className="tree">
             {folders.length === 0 && <div className="empty">No triggers.</div>}
             {folders.map(([folder, items]) => (
@@ -218,7 +231,7 @@ export function Triggers() {
                 <div className="tree-folder">{folder}</div>
                 {items.map((t) => (
                   <div key={t.id} className={`tree-item${t.id === selected ? ' active' : ''}${t.enabled ? '' : ' disabled'}`} onClick={() => setSelected(t.id)}>
-                    <button className="name" aria-current={t.id === selected ? 'true' : undefined} onClick={() => setSelected(t.id)}>
+                    <button className="name" title={t.name} aria-current={t.id === selected ? 'true' : undefined} onClick={() => setSelected(t.id)}>
                       {t.name}
                       {!t.enabled && <span className="faint"> (off)</span>}
                     </button>
@@ -288,8 +301,9 @@ function TriggerEditor({
   return (
     <div className="stack">
       <div className="card">
-        <h2>
-          Trigger <span className="spacer" />
+        <div className="card-head">
+          <h2>Trigger</h2>
+          <span className="spacer" />
           <button className="btn small" onClick={onDuplicate}>
             Duplicate
           </button>
@@ -297,7 +311,7 @@ function TriggerEditor({
           <ConfirmButton question={`Remove ${t.name || 'this trigger'}? It goes with Save changes.`} onConfirm={onDelete}>
             Remove
           </ConfirmButton>
-        </h2>
+        </div>
         <div className="grid three">
           <Field label="Name">
             <input value={t.name} onChange={(e) => set({ name: e.target.value })} />
@@ -320,12 +334,13 @@ function TriggerEditor({
       </div>
 
       <div className="card">
-        <h2>
-          When the log says <span className="spacer" />
+        <div className="card-head">
+          <h2>When the log says</h2>
+          <span className="spacer" />
           <button className="btn small" onClick={() => set({ phrases: [...t.phrases, { text: '', regex: false }] })}>
             <Icon name="plus" /> Phrase
           </button>
-        </h2>
+        </div>
         <div className="stack gap-8">
           {t.phrases.map((p, i) => (
             <div className="phrase-row" key={i}>
@@ -352,22 +367,18 @@ function TriggerEditor({
       </div>
 
       <div className="card">
-        <h2>
-          Then <span className="spacer" />
-          <select
-            value=""
-            aria-label="Add an action"
-            onChange={(e) => e.target.value && addAction(blankAction(e.target.value as TriggerAction['type']))}
-            style={{ textTransform: 'none', letterSpacing: 0 }}
-          >
+        <div className="card-head">
+          <h2>Then</h2>
+          <span className="spacer" />
+          <select value="" aria-label="Add an action" onChange={(e) => e.target.value && addAction(blankAction(e.target.value as TriggerAction['type']))}>
             <option value="">Add an action…</option>
             <option value="speak">Speak</option>
             <option value="sound">Play a sound</option>
             <option value="text">Show text</option>
             <option value="timer">Start a timer</option>
           </select>
-        </h2>
-        <div className="stack gap-10">
+        </div>
+        <div className="stack gap-12">
           {t.actions.length === 0 && <div className="empty">No actions: this trigger does nothing.</div>}
           {t.actions.map((a, i) => (
             <ActionEditor key={actionKeys[i] ?? `i${i}`} a={a} onChange={(x) => setAction(i, x)} onRemove={() => removeAction(i)} />
@@ -400,7 +411,7 @@ function ActionEditor({ a, onChange, onRemove }: { a: TriggerAction; onChange: (
       <div className="row">
         <b>{head}</b>
         <span className="grow" />
-        <button className="btn ghost small" onClick={onRemove}>
+        <button className="btn ghost small" aria-label={`Remove the ${head.toLowerCase()} action`} onClick={onRemove}>
           Remove
         </button>
       </div>
@@ -549,7 +560,7 @@ function TestPanel({ t }: { t: Trigger }) {
           {result.error ? (
             <div className="notice bad">{result.error}</div>
           ) : result.matched ? (
-            <div className="stack gap-6">
+            <div className="stack gap-8">
               <div className="row">
                 <span className="chip ok">Matches phrase {result.phraseIndex + 1}</span>
                 {Object.entries(result.captures).map(([k, v]) => (

@@ -72,17 +72,19 @@ export function SetupChecklist({ go }: { go: Go }) {
   if (hidden || !left.length) return null
   return (
     <div className="card mb-16">
-      <h2>
-        Getting set up{' '}
-        <span className="chip">
-          {steps.length - left.length} of {steps.length}
-        </span>
+      <div className="card-head">
+        <h2>
+          Getting set up{' '}
+          <span className="chip">
+            {steps.length - left.length} of {steps.length}
+          </span>
+        </h2>
         <span className="spacer" />
         <button className="btn small ghost" onClick={() => setSetup({ hidden: true })}>
           Hide
         </button>
-      </h2>
-      <div className="stack gap-6">
+      </div>
+      <div className="stack gap-8">
         {steps.map((x) => {
           const ok = x.done || accepted.includes(x.id)
           return (

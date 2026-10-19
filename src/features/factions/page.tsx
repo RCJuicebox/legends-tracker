@@ -6,7 +6,22 @@ import { useInvoke, useVisibleInterval } from '../../renderer/src/hooks'
 import { useRemembered } from '../../renderer/src/remember'
 import { usePickedCharacter } from '../../renderer/src/character'
 import { useNow } from '../../renderer/src/components/TimerBars'
-import { Disclosure, ErrorText, FilterBox, GameCommand, Info, Pending, Segmented, SettingsLink, SortTh, Tabs, Tip, ToggleChip, type Sort } from '../../renderer/src/components/ui'
+import {
+  Disclosure,
+  ErrorText,
+  FilterBox,
+  GameCommand,
+  Info,
+  LoadError,
+  Pending,
+  Segmented,
+  SettingsLink,
+  type Sort,
+  SortTh,
+  Tabs,
+  Tip,
+  ToggleChip
+} from '../../renderer/src/components/ui'
 import { duration, num, when, who, wikiUrl } from '../../core/format'
 import {
   STANDING_MAX,
@@ -256,9 +271,22 @@ export function Factions() {
                 Unnamed ({unnamed})
               </ToggleChip>
             )}
-            <FilterBox placeholder="Find a mob or NPC…" label="Find a mob or NPC" value={look} onChange={setLook} width={250} />
             <span className="spacer" />
             <span className="faint small">{view ? `${view.factions.length} faction${view.factions.length === 1 ? '' : 's'} on record` : ''}</span>
+          </div>
+
+          {/* Not a second filter beside the first: a question of its own (LT-708). */}
+          <div className="card row mb-16">
+            <b>What does a mob or NPC do to my factions?</b>
+            <input
+              type="search"
+              placeholder="A mob or NPC’s name, three letters or more…"
+              aria-label="Look up a mob or NPC"
+              value={look}
+              onChange={(e) => setLook(e.target.value)}
+              onKeyDown={(e) => e.key === 'Escape' && setLook('')}
+              style={{ width: 320 }}
+            />
           </div>
 
           {query.length >= 3 && !!character && <LookupResults query={query} results={lookupQ.data?.results ?? null} error={lookupQ.error} view={view ?? null} />}
@@ -466,7 +494,7 @@ function Sources({ name }: { name: string }) {
   )
   const none = !s.mobs.length && !s.quests.length && !s.zones.length
   return (
-    <div className="stack gap-6">
+    <div className="stack gap-8">
       <span className="faint">
         What raises it, from eqlwiki’s {link(s.page, s.page)} page (community-kept, so treat these as leads).{none ? ' The page lists nothing yet.' : ''}
       </span>
@@ -517,7 +545,7 @@ function Sources({ name }: { name: string }) {
 
 function History({ r, character, basis, ways }: { r: FactionRow; character: string; basis: ConBasis | null; ways: Catalog | null }) {
   return (
-    <div className="stack gap-6 small" style={{ padding: '6px 4px' }}>
+    <div className="stack gap-8 small" style={{ padding: '6px 4px' }}>
       {r.achievement && (
         <span>
           Achievement: <b>{r.achievement.name}</b>, done at the maximum standing ({STANDING_MAX}).
@@ -556,7 +584,7 @@ type Catalog = { activities: PlanActivity[]; logPace: number | null }
 /** What moved the faction in the logs: this character's, and the player's other characters'. */
 function Moved({ name, character }: { name: string; character: string }) {
   const q = useInvoke('factions:moved', [character, name])
-  if (!q.data) return q.error ? <span className="faint">Could not read what moved it: {q.error}</span> : null
+  if (!q.data) return q.error ? <LoadError what="what moved it" error={q.error} retry={q.reload} /> : null
   const movers = q.data.movers
   if (!movers.length) return null
   return (
@@ -627,7 +655,7 @@ function LookupResults({ query, results, error, view }: { query: string; results
     )
   else
     body = (
-      <div className="stack gap-10">
+      <div className="stack gap-12">
         {results.map((x) => (
           <div key={`${x.from}|${x.kind}|${x.zone}|${x.name}`} className="stack gap-4">
             <div className="row tight">

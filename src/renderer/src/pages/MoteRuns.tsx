@@ -4,7 +4,7 @@ import { api, clock } from '../api'
 import { useInvoke } from '../hooks'
 import { act } from '../toast'
 import { useNow } from '../components/TimerBars'
-import { ConfirmButton, Icon, Info, Pending, SortTh, sortRows, type Sort } from '../components/ui'
+import { ConfirmButton, FilterBox, Icon, Info, Pending, ShowingSome, type Sort, sortRows, SortTh } from '../components/ui'
 import { useRemembered } from '../remember'
 import { MOTE_RANKS, localDay, moteValue, moteWorth, pausedHours, sessionHours, timeOnDay, totalMotes, type MoteCounts, type MoteSession } from '../../../core/motes'
 import type { MoteScan, MoteView } from '../../../shared/ipc'
@@ -199,7 +199,7 @@ export function MoteRuns() {
               </span>
             </div>
           </div>
-          <div className="small muted mb-6">Today</div>
+          <div className="small muted mb-8">Today</div>
           <RankChips counts={today} />
           <div className="small muted" style={{ margin: '12px 0 6px' }}>
             Everything in your logs
@@ -262,10 +262,17 @@ function ActiveSession({ a }: { a: MoteSession | null | undefined }) {
 
 type SessionKey = 'when' | 'where' | 'type' | 'time' | 'motes' | 'perHour' | 'value'
 
+/** Sessions drawn before "Show all". */
+const SESSIONS_SHOWN = 100
+
 function SessionTable({ sessions, now }: { sessions: MoteSession[]; now: number }) {
   const [sort, setSort] = useRemembered<Sort<SessionKey>>('motes.sessions.sort', { key: 'when', dir: -1 })
+  const [filter, setFilter] = useState('')
+  const [all, setAll] = useState(false)
   const hours = (s: MoteSession) => sessionHours(s, now)
-  const rows = sortRows(sessions, sort, {
+  const words = filter.trim().toLowerCase()
+  const found = words ? sessions.filter((s) => s.name.toLowerCase().includes(words)) : sessions
+  const rows = sortRows(found, sort, {
     when: (s) => s.startedAt,
     where: (s) => s.name,
     type: (s) => s.kind,
@@ -279,8 +286,11 @@ function SessionTable({ sessions, now }: { sessions: MoteSession[]; now: number 
       <h2>
         Sessions <span className="chip">{sessions.length}</span>
       </h2>
+      {sessions.length > 0 && <FilterBox placeholder="Find a zone…" label="Find sessions by zone" value={filter} onChange={setFilter} width={220} className="mb-8" />}
       {sessions.length === 0 ? (
         <div className="empty">None yet.</div>
+      ) : !rows.length ? (
+        <div className="empty">No session in a zone matching “{filter.trim()}”.</div>
       ) : (
         <div className="table-scroll">
           <table className="table">
@@ -311,7 +321,7 @@ function SessionTable({ sessions, now }: { sessions: MoteSession[]; now: number 
               </tr>
             </thead>
             <tbody>
-              {rows.slice(0, 100).map((s) => {
+              {(all ? rows : rows.slice(0, SESSIONS_SHOWN)).map((s) => {
                 const h = sessionHours(s, now)
                 return (
                   <tr key={s.id}>
@@ -367,6 +377,7 @@ function SessionTable({ sessions, now }: { sessions: MoteSession[]; now: number 
               })}
             </tbody>
           </table>
+          <ShowingSome shown={all ? rows.length : Math.min(rows.length, SESSIONS_SHOWN)} total={rows.length} onAll={() => setAll(true)} />
         </div>
       )}
     </div>

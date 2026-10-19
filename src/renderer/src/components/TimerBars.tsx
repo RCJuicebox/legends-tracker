@@ -97,7 +97,7 @@ function phaseOf(t: TimerView, now: number, reduced: boolean): Phase {
  * fewer animations asked for, the bar steps four times a second to the very end. An overdue bar is
  * full, striped.
  */
-function TimerBar({ t, showTarget }: { t: TimerView; showTarget: boolean }) {
+function TimerBar({ t, showTarget, onOpen }: { t: TimerView; showTarget: boolean; onOpen?: (t: TimerView) => void }) {
   const reduced = useReducedMotion()
   const [phase, setPhase] = useState<Phase>(() => phaseOf(t, Date.now(), reduced))
   const track = useRef<HTMLDivElement>(null)
@@ -138,7 +138,18 @@ function TimerBar({ t, showTarget }: { t: TimerView; showTarget: boolean }) {
       </div>
       {t.icon !== undefined && iconOk ? <img src={iconUrl(t.icon)} alt="" onError={() => setIconOk(false)} /> : <div className="noicon" />}
       <div className="label">
-        {t.label}
+        {onOpen && t.rule ? (
+          <button
+            type="button"
+            className="timer-open"
+            onClick={() => onOpen(t)}
+            title={t.source === 'spell' ? 'Open its row on Spell Timers: why it runs this long' : 'Open its trigger on Triggers'}
+          >
+            {t.label}
+          </button>
+        ) : (
+          t.label
+        )}
         {t.rank ? <span className="rank">{roman(t.rank)}</span> : null}
         {showTarget && t.target ? <span className="tgt">{t.target === 'You' ? '' : `· ${t.target}`}</span> : null}
       </div>
@@ -162,7 +173,20 @@ function TimerBar({ t, showTarget }: { t: TimerView; showTarget: boolean }) {
  * keeps its own time; this renders only when the timers change. In an overlay too small for every
  * bar, the last line says how many are cut off (LT-352).
  */
-export function TimerBars({ timers, grouped, fontSize = 15, empty }: { timers: TimerView[]; grouped: boolean; fontSize?: number; empty?: ReactNode }) {
+export function TimerBars({
+  timers,
+  grouped,
+  fontSize = 15,
+  empty,
+  onOpen
+}: {
+  timers: TimerView[]
+  grouped: boolean
+  fontSize?: number
+  empty?: ReactNode
+  /** On the Live page: a bar's name opens what sets it. Overlays have none. */
+  onOpen?: (t: TimerView) => void
+}) {
   const box = useRef<HTMLDivElement>(null)
   const [hidden, setHidden] = useState(0)
   // The order and the groups change only when the timers do.
@@ -202,11 +226,11 @@ export function TimerBars({ timers, grouped, fontSize = 15, empty }: { timers: T
             <div className="timer-group" key={key}>
               {list[0].target && <div className="timer-group-head">{list[0].target === 'You' ? 'You' : list[0].target}</div>}
               {list.map((t) => (
-                <TimerBar key={t.id} t={t} showTarget={false} />
+                <TimerBar key={t.id} t={t} showTarget={false} onOpen={onOpen} />
               ))}
             </div>
           ))
-        : sorted.map((t) => <TimerBar key={t.id} t={t} showTarget />)}
+        : sorted.map((t) => <TimerBar key={t.id} t={t} showTarget onOpen={onOpen} />)}
       {hidden > 0 && <div className="timers-more">+{hidden} more</div>}
     </div>
   )

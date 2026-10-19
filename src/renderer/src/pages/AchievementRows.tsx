@@ -147,6 +147,7 @@ export function SectionView({
         <span className="faint small">Sort</span>
         {sortBtn('row', zoned ? 'Named' : 'Objective')}
         {sortBtn('blk', zoned ? 'Zone' : 'Achievement')}
+        {!sort.row && !sort.blk && <span className="faint small">the game’s order</span>}
         <button
           className={`btn small${ctx.hideOpt[k] ? ' on' : ' ghost'}`}
           aria-pressed={!!ctx.hideOpt[k]}
@@ -346,7 +347,7 @@ function ObjectiveRow({ book, r, c, label, sub, ctx, single }: { book: Achieveme
   const ignored = !done && book.objIgnored(r)
   const to = book.link(r)
   const name = (
-    <span className="ach-objname">
+    <span className="ach-objname" title={typeof label === 'string' ? label : undefined}>
       {label}
       {sub && <span className="ach-sub">{sub}</span>}
     </span>

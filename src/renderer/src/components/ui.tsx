@@ -1,5 +1,8 @@
 import { useContext, useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore, type CSSProperties, type HTMLAttributes, type ReactNode } from 'react'
 import { GoContext, type SettingsTab } from '../nav'
+import { useDebounced } from '../hooks'
+import { num } from '../../../core/format'
+import type { PageId } from '../main'
 import type { SpellCategory } from '../../../shared/types'
 import type { IconName } from '../../../shared/icons'
 import { CATEGORY_LABELS } from '../../../shared/types'
@@ -320,6 +323,93 @@ export function ErrorText({ children, block }: { children: ReactNode; block?: bo
   )
 }
 
+/**
+ * A number a costly model runs on, taken once typing stops (LT-406, LT-700): each value on the way to
+ * "1.5" ran the finder over eleven thousand items, and the round after it. Never below 0.
+ */
+export function TypedNumber({
+  value,
+  onCommit,
+  ...rest
+}: {
+  value: number
+  onCommit: (v: number) => void
+  step: number
+  title?: string
+  style?: CSSProperties
+  'aria-label'?: string
+}) {
+  const [draft, setDraft] = useState(String(value))
+  const [shown, setShown] = useState(value)
+  // Taken from outside (a preset picked): shown, unless it is what is typed already.
+  if (value !== shown) {
+    setShown(value)
+    if (Number(draft) !== value) setDraft(String(value))
+  }
+  const commit = useDebounced(onCommit, 250)
+  return (
+    <input
+      type="number"
+      min={0}
+      {...rest}
+      value={draft}
+      onChange={(e) => {
+        setDraft(e.target.value)
+        commit.call(Math.max(0, Number(e.target.value) || 0))
+      }}
+      onBlur={commit.flush}
+    />
+  )
+}
+
+/** A download's progress as a bar and its count: one look for the item catalog and the recipes (LT-701). */
+export function Progress({ done, total, label, unit = 'pages', small }: { done: number; total: number; label: string; unit?: string; small?: boolean }) {
+  const pctDone = total ? Math.min(100, Math.round((done / total) * 100)) : 0
+  return (
+    <div className={`row ${small ? 'small' : ''}`} style={{ minWidth: small ? 220 : 360 }}>
+      <span className="sr-only" role="status">
+        {label}
+      </span>
+      <span className="lt-mergebar grow" role="progressbar" aria-label={label} aria-valuemin={0} aria-valuemax={100} aria-valuenow={pctDone}>
+        <i style={{ width: `${pctDone}%` }} />
+      </span>
+      <span className="muted nowrap">
+        {num(done)} of {total ? num(total) : '…'} {unit}
+      </span>
+    </div>
+  )
+}
+
+/** Under a list cut short: "Showing 100 of 143 · Show all", rather than stopping in silence (LT-694). */
+export function ShowingSome({ shown, total, onAll }: { shown: number; total: number; onAll?: () => void }) {
+  if (shown >= total) return null
+  return (
+    <div className="faint small mt-8">
+      Showing {num(shown)} of {num(total)}
+      {onAll && (
+        <>
+          {' · '}
+          <button type="button" className="link-button inline" onClick={onAll}>
+            Show all
+          </button>
+        </>
+      )}
+    </div>
+  )
+}
+
+/** Another page named in a sentence, as a link to it where the page can go there (LT-692). */
+export function PageLink({ page, children }: { page: PageId; children: ReactNode }) {
+  const go = useContext(GoContext)
+  return go ? (
+    <button type="button" className="link-button inline" onClick={() => go(page)}>
+      {children}
+    </button>
+  ) : (
+    <>{children}</>
+  )
+}
+
 /** "Settings › General" and the like, as a link to that tab where the page can go there (LT-571). */
 export function SettingsLink({ tab, children }: { tab: SettingsTab; children: ReactNode }) {
   const go = useContext(GoContext)
@@ -620,7 +710,7 @@ export function Tabs<T extends string>({
     requestAnimationFrame(() => list?.querySelector<HTMLElement>(`[data-tab="${next}"]`)?.focus())
   }
   return (
-    <div role="tablist" aria-label={label} className={`row gap-6 ${className}`.trim()}>
+    <div role="tablist" aria-label={label} className={`row gap-8 ${className}`.trim()}>
       {tabs.map(([id, text], i) => (
         <button
           key={id}

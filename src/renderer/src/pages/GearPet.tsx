@@ -1,7 +1,7 @@
 import { useMemo } from 'react'
 import { useInvoke } from '../hooks'
 import { useRemembered } from '../remember'
-import { Ago, ErrorText, Info, Pending, Segmented, SettingsLink, Switch } from '../components/ui'
+import { Ago, Info, LoadError, Pending, Segmented, SettingsLink, Switch } from '../components/ui'
 import { num, signed, wikiUrl } from '../../../core/format'
 import { className } from '../../../shared/game/classes'
 import { itemKey, mergeLevel, parseStatsBlock, scaledStats, slotLabel, type InvItem } from '../../../core/inventory'
@@ -105,7 +105,7 @@ export function PetTab({ m }: { m: GearModel }) {
 
   return (
     <div className="stack gap-12">
-      <div className="card stack gap-10">
+      <div className="card stack gap-12">
         <div className="row" style={{ flexWrap: 'wrap', gap: 14 }}>
           <b>Pet</b>
           <select aria-label="Pet" value={spell} onChange={(e) => setPicked(e.target.value === state.summon?.spell ? '' : e.target.value)}>
@@ -148,9 +148,7 @@ export function PetTab({ m }: { m: GearModel }) {
             )}
           </p>
         ) : profileQ.error && loading ? (
-          <ErrorText block>
-            Could not read {spell} from eqlwiki: {profileQ.error}
-          </ErrorText>
+          <LoadError what={`${spell} from eqlwiki`} error={profileQ.error} retry={profileQ.reload} />
         ) : loading ? (
           <Pending inline doing={`Reading ${spell} from eqlwiki`} />
         ) : !profile ? (
@@ -208,7 +206,7 @@ export function PetTab({ m }: { m: GearModel }) {
         </label>
       </div>
 
-      <div className="card stack gap-6">
+      <div className="card stack gap-8">
         <h2 className="m-0">On your pet now</h2>
         {state.gear ? (
           <>
@@ -247,7 +245,7 @@ export function PetTab({ m }: { m: GearModel }) {
       </div>
 
       {plan && (
-        <div className="card stack gap-6">
+        <div className="card stack gap-8">
           <h2 className="m-0">Best use of what you own</h2>
           <p className="small muted m-0">
             {owned.length + onPet.length} pieces you {includeWorn ? 'wear, ' : ''}carry, bank or have on the pet, tried in every slot they fit, at most {capacity}. Give them in
@@ -257,10 +255,10 @@ export function PetTab({ m }: { m: GearModel }) {
             {gain > 0.5 ? (
               <>
                 <span className="lt-gain">+{num(gain)}</span>
-                <span className={plan.parts.stats - plan.currentParts.stats >= 0 ? 'lt-up' : 'lt-down'}>Stats {signed(plan.parts.stats - plan.currentParts.stats)}</span>
-                <span className={plan.parts.haste - plan.currentParts.haste >= 0 ? 'lt-up' : 'lt-down'}>Haste {signed(plan.parts.haste - plan.currentParts.haste)}</span>
+                <span className={plan.parts.stats - plan.currentParts.stats >= 0 ? 'ok-text' : 'bad-text'}>Stats {signed(plan.parts.stats - plan.currentParts.stats)}</span>
+                <span className={plan.parts.haste - plan.currentParts.haste >= 0 ? 'ok-text' : 'bad-text'}>Haste {signed(plan.parts.haste - plan.currentParts.haste)}</span>
                 {profile?.melee && (
-                  <span className={plan.parts.melee - plan.currentParts.melee >= 0 ? 'lt-up' : 'lt-down'}>Weapons {signed(plan.parts.melee - plan.currentParts.melee)}</span>
+                  <span className={plan.parts.melee - plan.currentParts.melee >= 0 ? 'ok-text' : 'bad-text'}>Weapons {signed(plan.parts.melee - plan.currentParts.melee)}</span>
                 )}
               </>
             ) : (

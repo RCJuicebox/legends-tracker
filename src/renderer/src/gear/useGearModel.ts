@@ -7,7 +7,7 @@ import type { Exaltation, Piece } from '../../../core/gearOptimizer'
 import { usePet } from './usePet'
 import type { CatalogItem } from '../../../core/wikiItem'
 import type { CharacterSheet, InventoryView } from '../../../shared/types'
-import type { CatalogState, FocusData } from '../../../shared/ipc'
+import type { FocusData } from '../../../shared/ipc'
 import { useCatalog } from './useCatalog'
 import { useCharacterWeights, type HandInfo } from './useCharacterWeights'
 import { useCatalogItems } from './useCatalogItems'
@@ -24,7 +24,7 @@ import { useFinderResults, type GearMode } from './useFinderResults'
 
 export { AC_OVER_CAP } from './useCharacterWeights'
 
-export type { CatalogState, FocusCandidate, GearMode, OwnedFocus }
+export type { FocusCandidate, GearMode, OwnedFocus }
 
 /** Everything the finder, the focus tab and the optimiser share. */
 export interface GearModel {

@@ -2,10 +2,10 @@ import { remember, useRemembered } from '../remember'
 import { useState } from 'react'
 import { useActions, useLive, useSettled } from '../state'
 import { api, clock } from '../api'
-import { useInvoke, useSearch } from '../hooks'
+import { SEARCH_MIN, useInvoke, useSearch } from '../hooks'
 import { showError, showUndo } from '../toast'
 import { duration, who } from '../../../core/format'
-import { Ago, CategoryChip, Disclosure, Field, FilterBox, Info, LoadError, NumberInput, Pending, SortTh, sortRows, SpellIcon, Switch, type Sort } from '../components/ui'
+import { Ago, CategoryChip, Disclosure, Field, FilterBox, Info, LoadError, NumberInput, PageLink, Pending, type Sort, sortRows, SortTh, SpellIcon, Switch } from '../components/ui'
 import { CATEGORY_LABELS, DEFAULT_TIER_DURATION_PCT, type ClassName, type KnownSpell, type SpellCategory, type SpellRule } from '../../../shared/types'
 import type { Go } from '../nav'
 import { FocusSources } from './SpellsFocus'
@@ -13,6 +13,7 @@ import { SpellDefaults } from './SpellsDefaults'
 import { RuleEditor, useSpellDrafts } from './SpellRule'
 import { LogCheck } from './SpellsLogCheck'
 import { NotWatching } from '../components/NotWatching'
+import { takeHandOff } from '../handoff'
 
 type SpellKey = 'name' | 'type' | 'window' | 'wears' | 'last'
 
@@ -28,7 +29,8 @@ export function Spells({ go }: { go?: Go }) {
   const q = useInvoke('spells:known', [], [deps, spellsLoaded])
   const known = q.data ?? []
   const setKnown = q.setData
-  const [open, setOpen] = useState<string | null>(null)
+  // Sent here from a timer on Live: its row open (LT-691).
+  const [open, setOpen] = useState<string | null>(() => takeHandOff('spells') ?? null)
   const [filter, setFilter] = useState('')
 
   const [sort, setSort] = useRemembered<Sort<SpellKey>>('spells.sort', { key: 'last', dir: -1 })
@@ -63,15 +65,19 @@ export function Spells({ go }: { go?: Go }) {
         <CharacterCard go={go} />
 
         <div className="card">
-          <h2>
-            Your spells <span className="chip">{known.length}</span>
+          <div className="card-head">
+            <h2>
+              Your spells <span className="chip">{filter.trim() ? `${shown.length} of ${known.length}` : known.length}</span>
+            </h2>
             <span className="spacer" />
             <FilterBox label="Filter spells" value={filter} onChange={setFilter} width={200} />
-          </h2>
+          </div>
           {!q.data && !q.error ? (
             <Pending what="your spells" />
           ) : known.length === 0 ? (
             <div className="empty">No spells yet. Cast something while watching, or add a spell below.</div>
+          ) : !shown.length ? (
+            <div className="empty">Nothing matches “{filter.trim()}”.</div>
           ) : (
             <div className="table-scroll">
               <table className="table">
@@ -139,8 +145,9 @@ function CharacterCard({ go }: { go?: Go }) {
   }
   return (
     <div className="card">
-      <h2>
-        {who(characterKey)} <span className="spacer" />
+      <div className="card-head">
+        <h2>{who(characterKey)}</h2>
+        <span className="spacer" />
         <button
           className="btn small"
           onClick={() => {
@@ -151,7 +158,7 @@ function CharacterCard({ go }: { go?: Go }) {
         >
           Edit classes and levels
         </button>
-      </h2>
+      </div>
       {classes.length ? (
         <div className="row tight mb-12">
           {classes.map(([name, lv]) => (
@@ -163,8 +170,8 @@ function CharacterCard({ go }: { go?: Go }) {
         </div>
       ) : (
         <div className="notice warn mb-12">
-          No classes set, so every spell is timed as if cast at level {c.level}. Set your classes and their levels on the Stats page: a spell uses the level of a class that can
-          cast it.
+          No classes set, so every spell is timed as if cast at level {c.level}. Set your classes and their levels on the <PageLink page="stats">Stats page</PageLink>: a spell uses
+          the level of a class that can cast it.
         </div>
       )}
       <FocusSources />
@@ -267,19 +274,20 @@ function SpellRow({ k, open, toggle, onSaved }: { k: KnownSpell; open: boolean; 
 
 function AddSpell({ onAdded }: { onAdded: (list: KnownSpell[]) => void }) {
   const [q, setQ] = useState('')
-  const results = useSearch('spells:search', q)
+  const { results, answered } = useSearch('spells:search', q)
   const withDuration = results.filter((r) => r.formula !== 0 || r.cap !== 0)
   return (
-    <div className="mt-14">
+    <div className="mt-16">
       <div className="row">
         <input
-          placeholder="Find a spell to add, one you have not cast yet…"
+          placeholder="Find a spell to add, one you have not cast yet (three letters or more)…"
           aria-label="Add a spell: search the spell book"
           value={q}
           onChange={(e) => setQ(e.target.value)}
           style={{ flex: 1 }}
         />
       </div>
+      {answered === q && q.trim().length >= SEARCH_MIN && !withDuration.length && <div className="faint small mt-8">No spell with a duration matches “{q.trim()}”.</div>}
       {withDuration.length > 0 && (
         <div className="stack" style={{ gap: 2, marginTop: 8, maxHeight: 260, overflow: 'auto' }}>
           {withDuration.map((r) => (
@@ -314,8 +322,9 @@ function TierTable({ go }: { go?: Go }) {
   const cats = ['dot', 'hot', 'buff', 'debuff', 'mez', 'charm'] as SpellCategory[]
   return (
     <div className="card">
-      <h2>
-        Rank bonuses <span className="spacer" />
+      <div className="card-head">
+        <h2>Rank bonuses</h2>
+        <span className="spacer" />
         <button
           className="btn small ghost"
           onClick={() => {
@@ -327,7 +336,7 @@ function TierTable({ go }: { go?: Go }) {
         >
           Reset to guide values
         </button>
-      </h2>
+      </div>
       <p className="muted small mt-0">
         Duration bonus per rank, from the EQL spell upgrade guide: rank X is ten tiers, an unranked spell none. Confirmed in game for DoTs (Envenomed Bolt X 0:36 → 0:54) and buffs
         (Spirit of the Puma X). Heal over time is fitted rather than from the guide: 7% matches Slugs Healing V's Spell window and log, where the guide's 5% does not.{' '}

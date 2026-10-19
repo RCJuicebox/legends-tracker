@@ -84,7 +84,7 @@ export function Assumptions({
         </label>
       </div>
       {changed && (
-        <button className="btn small ghost mt-10" onClick={() => onChange(kept(stored))}>
+        <button className="btn small ghost mt-12" onClick={() => onChange(kept(stored))}>
           Back to the defaults
         </button>
       )}

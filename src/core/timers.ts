@@ -32,6 +32,12 @@ export interface BoardEvents {
  * Every running timer, spell-tracked or trigger-made, in one place. `tick` is a pure function of the
  * clock it is given, so tests advance time instead of waiting for it.
  */
+/** What sets a timer, for a page to open: the spell's base name, or the trigger's id from its key ("trigger:<id>|…"). */
+function ruleOf(t: BoardTimer): { rule?: string } {
+  if (t.source === 'spell') return t.spell ? { rule: t.spell } : {}
+  return t.key.startsWith('trigger:') ? { rule: t.key.slice('trigger:'.length).split('|')[0] } : {}
+}
+
 export class TimerBoard {
   private readonly timers = new Map<string, BoardTimer>()
   private seq = 0
@@ -71,7 +77,8 @@ export class TimerBoard {
         endsAt: t.endsAt,
         exact: t.exact,
         warnSec: t.warnSec,
-        rank: t.rank
+        rank: t.rank,
+        ...ruleOf(t)
       }))
   }
 

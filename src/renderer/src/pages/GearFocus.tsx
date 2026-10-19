@@ -2,7 +2,7 @@ import { baseName } from '../../../core/inventory'
 import { restrictions } from '../../../core/gearFinder'
 import { focusValue, KIND_LABELS, KIND_ORDER, KIND_WORTH, type FocusInfo, type FocusLine } from '../../../core/itemFocus'
 import { type FocusCandidate, type GearModel, type OwnedFocus } from '../gear/useGearModel'
-import { DAY_WINDOWS, Info, Pending, Segmented } from '../components/ui'
+import { DAY_WINDOWS, Info, Pending, Segmented, TypedNumber } from '../components/ui'
 import { isoDays, num, pct as pctOf, wikiUrl } from '../../../core/format'
 
 /** A focus figure, given as a percentage already (10.5), to one place. */
@@ -108,16 +108,8 @@ export function FocusTab({ m }: { m: GearModel }) {
         <p className="small muted" style={{ margin: 0 }}>
           A focus is worth what it does to the spells you actually cast, spell by spell: its strength on each (less on a spell above its level cap), times how often you cast that
           spell. Only the best focus of a kind works on a spell, as in game. Making every spell you cast 10% better counts as{' '}
-          <input
-            type="number"
-            min={0}
-            step={25}
-            value={m.points}
-            style={{ width: 64 }}
-            aria-label="Points for making every spell 10% better"
-            onChange={(e) => m.setPoints(Math.max(0, Number(e.target.value) || 0))}
-          />{' '}
-          points in the upgrade finder and the optimiser; spell range and reagents count a quarter as much. Tick the ones you want: {wantedCount} of {m.lines.length} are.
+          <TypedNumber step={25} value={m.points} style={{ width: 64 }} aria-label="Points for making every spell 10% better" onCommit={m.setPoints} /> points in the upgrade finder
+          and the optimiser; spell range and reagents count a quarter as much. Tick the ones you want: {wantedCount} of {m.lines.length} are.
         </p>
       </div>
 

@@ -230,16 +230,22 @@ export function useItemInfo(names: string[]): { info: Record<string, ItemInfo>; 
   return { info, refresh }
 }
 
-/** A search as the player types: after a pause, and only the newest answer kept. */
-export function useSearch<K extends 'spells:search' | 'focus:search'>(channel: K, q: string): InvokeResult<K> {
-  const [results, setResults] = useState(() => [] as unknown as InvokeResult<K>)
+/** A search starts at this many letters. */
+export const SEARCH_MIN = 3
+
+/**
+ * A search as the player types: after a pause, and only the newest answer kept. `answered` is the
+ * words the results are for, so a page can say a search found nothing (LT-704).
+ */
+export function useSearch<K extends 'spells:search' | 'focus:search'>(channel: K, q: string): { results: InvokeResult<K>; answered: string } {
+  const [state, setState] = useState(() => ({ results: [] as unknown as InvokeResult<K>, answered: '' }))
   useEffect(() => {
-    if (q.trim().length < 3) return setResults([] as unknown as InvokeResult<K>)
+    if (q.trim().length < SEARCH_MIN) return setState({ results: [] as unknown as InvokeResult<K>, answered: '' })
     let live = true
     const id = setTimeout(
       () =>
         (api.invoke as (c: K, q: string) => Promise<InvokeResult<K>>)(channel, q).then(
-          (r) => live && setResults(r),
+          (r) => live && setState({ results: r, answered: q }),
           (e) => live && showError('Search failed', e)
         ),
       200
@@ -249,5 +255,5 @@ export function useSearch<K extends 'spells:search' | 'focus:search'>(channel: K
       clearTimeout(id)
     }
   }, [channel, q])
-  return results
+  return state
 }

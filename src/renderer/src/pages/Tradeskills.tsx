@@ -4,8 +4,8 @@ import { api, ago } from '../api'
 import { useInvoke, useItemInfo, useVisibleInterval } from '../hooks'
 import { useRemembered } from '../remember'
 import { act, showError } from '../toast'
-import { Ago, Disclosure, ErrorText, FilterBox, GameCommand, Info, Pending, Tabs } from '../components/ui'
-import { num, wikiUrl } from '../../../core/format'
+import { Ago, Disclosure, ErrorText, FilterBox, GameCommand, Info, Pending, Progress, ShowingSome, Tabs } from '../components/ui'
+import { wikiUrl } from '../../../core/format'
 import { fmtCoin } from '../../../core/loot'
 import { itemKey } from '../../../core/inventory'
 import { parseWikiCoin, recipeKey, shopping, unitPrice, type PriceSource, type Purchase } from '../../../core/tradeskills'
@@ -93,11 +93,13 @@ export function Tradeskills() {
     return m
   }, [book])
 
-  const results = useMemo(() => {
+  const [allResults, setAllResults] = useState(false)
+  const found = useMemo(() => {
     const q = query.trim().toLowerCase()
     if (q.length < 2) return []
-    return book.filter((r) => r.product.toLowerCase().includes(q)).slice(0, SEARCH_SHOWN)
+    return book.filter((r) => r.product.toLowerCase().includes(q))
   }, [book, query])
+  const results = allResults ? found : found.slice(0, SEARCH_SHOWN)
 
   // What the character holds: bags (and what the bags hold), bank, shared bank, tradeskill depot.
   const have = useMemo(() => {
@@ -177,7 +179,7 @@ export function Tradeskills() {
 
       {layoutBuild && (
         <Tabs
-          className="mb-14"
+          className="mb-16"
           label="Tradeskills view"
           value={showBags ? 'bags' : 'recipes'}
           onChange={setTab}
@@ -191,7 +193,7 @@ export function Tradeskills() {
         <BagLayout build={layoutBuild} character={character} />
       ) : (
         <>
-          <div className="card stack gap-10 mb-16">
+          <div className="card stack gap-12 mb-16">
             {!rs ? (
               <Pending what="the recipes" error={recipes.error} retry={recipes.reload} />
             ) : !rs.file ? (
@@ -200,9 +202,7 @@ export function Tradeskills() {
                   The recipes come from eqlwiki.com: some seven minutes to download (two thousand pages, as fast as the wiki likes), once a week, kept on this PC.
                 </span>
                 {p?.busy ? (
-                  <span className="small">
-                    Reading pages {p.pages} of {p.total || '…'}
-                  </span>
+                  <Progress done={p.pages} total={p.total} label="Recipe download" />
                 ) : (
                   <button className="btn primary" onClick={() => void recipes.refresh()}>
                     Download the recipes
@@ -219,9 +219,7 @@ export function Tradeskills() {
                     {book.length.toLocaleString()} recipes, <Ago t={rs.file.fetchedAt} />
                   </span>
                   {p?.busy ? (
-                    <span className="small">
-                      Reading {num(p.pages)} of {num(p.total)}
-                    </span>
+                    <Progress done={p.pages} total={p.total} label="Recipe download" small />
                   ) : (
                     <button className="btn ghost small" onClick={() => void recipes.refresh()}>
                       Refresh
@@ -257,6 +255,7 @@ export function Tradeskills() {
                         </div>
                       )
                     })}
+                    <ShowingSome shown={results.length} total={found.length} onAll={() => setAllResults(true)} />
                   </div>
                 )}
                 {query.trim().length >= 2 && !results.length && <span className="muted small">No recipe makes anything by that name.</span>}
@@ -285,6 +284,7 @@ export function Tradeskills() {
                   <span className="spacer" />
                   <button
                     className="btn small"
+                    aria-label={`Remove ${f.product} from favourites`}
                     onClick={() =>
                       void save({
                         ...saved,
@@ -362,7 +362,7 @@ function RecipeCard({
   const s = shopping(r, combines, have, price)
   const made = combines * Math.max(1, r.yields)
   return (
-    <div className="card stack gap-10 mb-16">
+    <div className="card stack gap-12 mb-16">
       <div className="row" style={{ flexWrap: 'wrap', gap: 14 }}>
         <Disclosure open={open} onToggle={toggleOpen} label={r.product} />
         <button className="btn small primary" aria-pressed aria-label={`Remove ${r.product} from favourites`} title="Remove from favourites" onClick={unfavorite}>
@@ -431,8 +431,13 @@ function RecipeDetail({
   madeBy: Map<string, string>
   setPrice: (name: string, copper: number) => void
 }) {
+  const lookingUp = s.lines.filter((l) => !info[itemKey(l.name)]).length
   return (
     <>
+      {/* One status for the table, not one a row (LT-684). */}
+      <span className="sr-only" role="status">
+        {lookingUp ? `Looking up ${lookingUp} ingredient${lookingUp === 1 ? '' : 's'} on eqlwiki` : ''}
+      </span>
       <div className="table-scroll">
         <table className="table">
           <thead>
@@ -487,7 +492,7 @@ function RecipeDetail({
                     ) : it ? (
                       <Sources info={it} craftedBy={madeBy.get(l.name.toLowerCase())} />
                     ) : (
-                      <Pending inline doing="Looking it up" />
+                      <span className="faint">Looking it up…</span>
                     )}
                   </td>
                 </tr>
@@ -559,7 +564,7 @@ function PriceCell({ unit, from, last, onSet }: { unit: number; from: PriceSourc
   const bad = !!text.trim() && !parsed
   if (editing || from === 'none') {
     return (
-      <span className="stack gap-6">
+      <span className="stack gap-8">
         <input
           placeholder="e.g. 2g 5s"
           aria-label="Price of one"
@@ -597,7 +602,7 @@ function SkinRebuilds({ character }: { character: string }) {
   const rebuild = useSkinBuild(character)
   if (!builds.data?.length) return null
   return (
-    <div className="row small mt-10">
+    <div className="row small mt-12">
       {builds.data.map((b) => (
         <button key={b.skin} className="btn" disabled={!!rebuild.busy} title={b.command.join(' ')} onClick={() => void rebuild.run(b.skin)}>
           {rebuild.busy === b.skin ? 'Rebuilding…' : b.label}

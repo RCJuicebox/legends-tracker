@@ -8,7 +8,7 @@ import { useGearPlan } from '../gear/useGearPlan'
 import type { CatalogItem } from '../../../core/wikiItem'
 import type { GearModel } from '../gear/useGearModel'
 import { CATALOG_PER_SLOT } from '../../../core/gearCatalog'
-import { Disclosure, Info, Segmented } from '../components/ui'
+import { Disclosure, Info, LoadError, Pending, Segmented } from '../components/ui'
 import { num, wikiUrl } from '../../../core/format'
 import { source, whereText } from './gearBits'
 import { pct } from './GearFocus'
@@ -80,7 +80,7 @@ export function OptimizeTab({ m }: { m: GearModel }) {
   if (!plan)
     return (
       <div className="card" aria-busy={!error}>
-        {error ? <p className="notice warn">The best set could not be worked out: {error}</p> : <p className="muted">Working out the best set…</p>}
+        {error ? <LoadError what="the best set" error={error} /> : <Pending doing="Working out the best set" />}
       </div>
     )
   const hostOf = (p: Piece) => p.host ?? p
@@ -123,7 +123,7 @@ export function OptimizeTab({ m }: { m: GearModel }) {
   return (
     <div className={`stack gap-12${stale ? ' lt-stale' : ''}`} aria-busy={stale}>
       {error && <p className="notice warn">The latest change could not be worked out, so this is the set from before it: {error}</p>}
-      <div className="card stack gap-6">
+      <div className="card stack gap-8">
         <div className="row">
           <h2 style={{ margin: 0 }}>{all ? 'Best set from all gear' : 'Best use of what you own'}</h2>
           <span className="grow" />
@@ -157,16 +157,16 @@ export function OptimizeTab({ m }: { m: GearModel }) {
               <b>{changes.length}</b> change{changes.length === 1 ? '' : 's'}
               {toGet > 0 && `, ${toGet} to get`}
             </span>
-            <span className={statGain >= 0 ? 'lt-up' : 'lt-down'}>
+            <span className={statGain >= 0 ? 'ok-text' : 'bad-text'}>
               Stats {statGain >= 0 ? '+' : ''}
               {num(statGain)}
             </span>
-            <span className={focusGain >= 0 ? 'lt-up' : 'lt-down'}>
+            <span className={focusGain >= 0 ? 'ok-text' : 'bad-text'}>
               Focus effects {focusGain >= 0 ? '+' : ''}
               {num(focusGain)}
             </span>
             {(m.effects.value || effectsGain !== 0) && (
-              <span className={effectsGain >= 0 ? 'lt-up' : 'lt-down'}>
+              <span className={effectsGain >= 0 ? 'ok-text' : 'bad-text'}>
                 Effects {effectsGain >= 0 ? '+' : ''}
                 {num(effectsGain)}
               </span>
@@ -256,7 +256,7 @@ export function OptimizeTab({ m }: { m: GearModel }) {
                         .map((o) => slotLabel(o.slot))
                         .join(' and ')}
                       : together{' '}
-                      <b className={moveGain(together) >= 0 ? 'lt-up' : 'lt-down'}>
+                      <b className={moveGain(together) >= 0 ? 'ok-text' : 'bad-text'}>
                         {moveGain(together) >= 0 ? '+' : ''}
                         {num(moveGain(together))}
                       </b>{' '}

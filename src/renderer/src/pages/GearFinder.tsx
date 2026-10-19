@@ -1,15 +1,14 @@
-import { useState, type CSSProperties } from 'react'
+import { useState } from 'react'
 import { useRemembered } from '../remember'
-import { useDebounced } from '../hooks'
 
 import { slotLabel } from '../../../core/inventory'
 import { DEFAULT_HIDDEN_ERAS, OTHER_ERA, OTHER_OUT_ERA } from '../../../core/gearFinder'
 import { ROLE_LABELS, ROLE_PRESETS, type RoleKey } from '../../../core/statValue'
 import type { CharacterSheet, InventoryView } from '../../../shared/types'
 import { className } from '../../../shared/game/classes'
-import { Ago, ErrorText, Info, Pending, Segmented, ToggleChip } from '../components/ui'
+import { Ago, ErrorText, Info, PageLink, Pending, Progress, Segmented, ToggleChip, TypedNumber } from '../components/ui'
 import { num, signed, wikiUrl } from '../../../core/format'
-import { AC_OVER_CAP, useGearModel, type CatalogState, type GearMode } from '../gear/useGearModel'
+import { AC_OVER_CAP, useGearModel, type GearMode } from '../gear/useGearModel'
 import { useCharacterWeights } from '../gear/useCharacterWeights'
 import { ItemIcon, source } from './gearBits'
 import { FocusTab } from './GearFocus'
@@ -83,7 +82,7 @@ function Finder({ view, sheet, mode }: { view: InventoryView; sheet: CharacterSh
           carries. That needs the wiki's item catalog first: a few minutes to download the first time, less once a week after, kept on this PC.
         </p>
         {p.busy ? (
-          <Progress p={p} />
+          <Progress done={p.pages} total={p.total || 11000} label="Item catalog download" />
         ) : (
           <div className="row">
             <button className="btn primary" onClick={() => void refresh()}>
@@ -100,7 +99,9 @@ function Finder({ view, sheet, mode }: { view: InventoryView; sheet: CharacterSh
     return classes.length ? (
       <PetTab m={model} />
     ) : (
-      <div className="card empty">Set your classes and level on the Stats page, and the pet tools will know what your pet can wear.</div>
+      <div className="card empty">
+        Set your classes and level on the <PageLink page="stats">Stats page</PageLink>, and the pet tools will know what your pet can wear.
+      </div>
     )
 
   const shown = (results ?? []).filter((r) => slot === 'all' || r.slot === slot)
@@ -311,7 +312,7 @@ function Finder({ view, sheet, mode }: { view: InventoryView; sheet: CharacterSh
             </button>
           </div>
         )}
-        <div className="row small muted gap-14">
+        <div className="row small muted gap-16">
           <span>
             For{' '}
             <b>
@@ -335,7 +336,7 @@ function Finder({ view, sheet, mode }: { view: InventoryView; sheet: CharacterSh
             {num(state.file.items.length)} pieces from eqlwiki, fetched <Ago t={state.file.fetchedAt} />
           </span>
           {p.busy ? (
-            <Progress p={p} small />
+            <Progress done={p.pages} total={p.total || 11000} label="Item catalog download" small />
           ) : (
             <button className="btn ghost small" onClick={() => void refresh()}>
               Refresh
@@ -345,7 +346,9 @@ function Finder({ view, sheet, mode }: { view: InventoryView; sheet: CharacterSh
       </div>
 
       {!classes.length ? (
-        <div className="card empty">Set your classes and level on the Stats page, and these tools will know what you can wear.</div>
+        <div className="card empty">
+          Set your classes and level on the <PageLink page="stats">Stats page</PageLink>, and these tools will know what you can wear.
+        </div>
       ) : mode === 'focus' ? (
         <FocusTab m={model} />
       ) : mode === 'effects' || mode === 'procs' ? (
@@ -436,7 +439,7 @@ function Finder({ view, sheet, mode }: { view: InventoryView; sheet: CharacterSh
                       </div>
                       <div className="lt-diffs">
                         {c.diffs.slice(0, 7).map((d) => (
-                          <span key={d.key} className={d.delta > 0 ? 'up' : 'down'}>
+                          <span key={d.key} className={d.delta > 0 ? 'ok-text' : 'bad-text'}>
                             {signed(d.delta, 2)} {d.label}
                           </span>
                         ))}
@@ -487,34 +490,6 @@ function Finder({ view, sheet, mode }: { view: InventoryView; sheet: CharacterSh
   )
 }
 
-/**
- * A number the finder runs on, taken once typing stops (LT-406): each value on the way to "1.5" ran
- * the finder over eleven thousand items, and the round after it. Never below 0.
- */
-function TypedNumber({ value, onCommit, ...rest }: { value: number; onCommit: (v: number) => void; step: number; title?: string; style?: CSSProperties; 'aria-label'?: string }) {
-  const [draft, setDraft] = useState(String(value))
-  const [shown, setShown] = useState(value)
-  // Taken from outside (a preset picked): shown, unless it is what is typed already.
-  if (value !== shown) {
-    setShown(value)
-    if (Number(draft) !== value) setDraft(String(value))
-  }
-  const commit = useDebounced(onCommit, 250)
-  return (
-    <input
-      type="number"
-      min={0}
-      {...rest}
-      value={draft}
-      onChange={(e) => {
-        setDraft(e.target.value)
-        commit.call(Math.max(0, Number(e.target.value) || 0))
-      }}
-      onBlur={commit.flush}
-    />
-  )
-}
-
 function FocusPoints({ points, setPoints, wanted, lines }: { points: number; setPoints: (n: number) => void; wanted: number; lines: number }) {
   return (
     <div className="row small">
@@ -523,23 +498,6 @@ function FocusPoints({ points, setPoints, wanted, lines }: { points: number; set
       <TypedNumber step={25} value={points} style={{ width: 72 }} aria-label="Points for making every spell 10% better" onCommit={setPoints} />
       <span className="muted">
         points; a focus counts for the spells it touches, by how often you cast them. {wanted} of the {lines} that touch your spells are wanted (Effects › Focus items).
-      </span>
-    </div>
-  )
-}
-
-function Progress({ p, small }: { p: CatalogState['progress']; small?: boolean }) {
-  const pctDone = p.total ? Math.min(100, Math.round((p.pages / p.total) * 100)) : 0
-  return (
-    <div className={`row ${small ? 'small' : ''}`} style={{ minWidth: small ? 220 : 360 }}>
-      <span className="sr-only" role="status">
-        Downloading the item catalog
-      </span>
-      <span className="lt-mergebar grow" role="progressbar" aria-label="Item catalog download" aria-valuemin={0} aria-valuemax={100} aria-valuenow={pctDone}>
-        <i style={{ width: `${pctDone}%` }} />
-      </span>
-      <span className="muted nowrap">
-        {num(p.pages)} of {num(p.total || 11000)} pages
       </span>
     </div>
   )

@@ -107,4 +107,11 @@ describe('TimerBoard', () => {
     for (const t of b.values()) b.end(t.key, 'cleared')
     expect(b.list()).toEqual([])
   })
+
+  it("says what sets each timer: a spell's base name, or a trigger's id (LT-691)", () => {
+    const { b } = board()
+    b.upsert(timer({ key: 'spell:Odium|a ratman', id: 's', source: 'spell', spell: 'Odium' }))
+    b.upsert(timer({ key: 'trigger:t-42|lord nagafen', id: 't', source: 'trigger', endsAt: 99_000 }))
+    expect(Object.fromEntries(b.views().map((v) => [v.id, v.rule]))).toEqual({ s: 'Odium', t: 't-42' })
+  })
 })

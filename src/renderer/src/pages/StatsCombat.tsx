@@ -14,9 +14,9 @@ export function CombatTab({ s, set, setOverride, auto, val, trio, primary, caps,
   const { weaponName, offense, acc, dp, crit, swings, notes, rows } = combatReport(s, val, trio, caps, skill)
 
   return (
-    <div className="stack gap-14">
+    <div className="stack gap-16">
       <div className="stats-grid">
-        <div className="stack gap-14">
+        <div className="stack gap-16">
           <div className="card">
             <div className="grid four">
               <div className="stat">
@@ -48,8 +48,8 @@ export function CombatTab({ s, set, setOverride, auto, val, trio, primary, caps,
           <StanceCard s={s} set={set} baseAcc={acc} weaponName={weaponName} />
         </div>
 
-        <div className="stack gap-14">
-          <div className="card stack gap-10">
+        <div className="stack gap-16">
+          <div className="card stack gap-12">
             <h2>Attack</h2>
             <div className="stats-fields two">
               <label className="field">
@@ -77,7 +77,7 @@ export function CombatTab({ s, set, setOverride, auto, val, trio, primary, caps,
               <NumField label="Double attack bonus" hint="%" value={s.doubleAttackBonus} onChange={(v) => set({ doubleAttackBonus: v ?? 0 })} />
             </div>
           </div>
-          <div className="card stack gap-10">
+          <div className="card stack gap-12">
             <h2>Crit</h2>
             <div className="stats-fields two">
               <NumField label="Measured crit rate" hint="%, from a parse" step={0.1} max={100} value={s.measuredCrit} onChange={(v) => set({ measuredCrit: v ?? 0 })} />
@@ -115,10 +115,11 @@ export function CombatTab({ s, set, setOverride, auto, val, trio, primary, caps,
 
 function SkillsCard({ s, set, caps, trio }: { s: StatsInputs; set: SetSheet; caps: Caps; trio: string[] }) {
   return (
-    <div className="card stack gap-10">
-      <h2>
-        Your skills <span className="spacer" />
-        <span className="row tight" style={{ textTransform: 'none', letterSpacing: 0, fontWeight: 500 }}>
+    <div className="card stack gap-12">
+      <div className="card-head">
+        <h2>Your skills</h2>
+        <span className="spacer" />
+        <span className="row tight">
           <button
             className="btn ghost small"
             onClick={() => {
@@ -140,7 +141,7 @@ function SkillsCard({ s, set, caps, trio }: { s: StatsInputs; set: SetSheet; cap
             Clear
           </button>
         </span>
-      </h2>
+      </div>
       <p className="faint small" style={{ margin: 0 }}>
         Type them from your in-game Skills window. Caps are the best of your classes at level {s.level}.
       </p>

@@ -31,7 +31,7 @@ function FightSettings({ go }: { go?: Go }) {
   const watching = useLive((l) => l.status.watching)
   const [open, setOpen] = useRemembered<boolean>('meter.settings', false)
   return (
-    <div className="card stack gap-14 mt-16">
+    <div className="card stack gap-16 mt-16">
       <h2 className="m-0">
         <Disclosure className="head" open={open} onToggle={() => setOpen(!open)}>
           Fights and sessions

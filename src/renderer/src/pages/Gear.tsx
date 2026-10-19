@@ -286,7 +286,7 @@ export function Gear({ go, only, onPlan }: { go?: Go; only?: GearMode; onPlan?: 
       )}
       <GearTotals view={view} sheet={sheet} updateSheet={updateSheet} summary={summary} scaled={scaled} setScaled={setScaled} />
       <Carried view={view} />
-      <p className="faint small mt-14">
+      <p className="faint small mt-16">
         Item stats and icon numbers come from{' '}
         <a href="https://eqlwiki.com" target="_blank" rel="noreferrer">
           eqlwiki.com
@@ -507,7 +507,7 @@ function GearTotals({
             </>
           )}
         </div>
-        <div className="faint small mt-10">
+        <div className="faint small mt-12">
           {found} of {worn.length} worn items on the wiki · ammo left out of AC
         </div>
         <div className="small muted" style={{ marginTop: 8 }}>
@@ -617,7 +617,7 @@ function ItemPanel({
           ) : (
             <p className="small muted">eqlwiki has no page for this item, so it adds nothing to the totals unless you type its AC below.</p>
           )}
-          <label className="row small gap-8 mt-10">
+          <label className="row small gap-8 mt-12">
             AC
             <input
               className="inv-ac"
@@ -639,7 +639,7 @@ function ItemPanel({
           </label>
         </div>
         {item.augs.length > 0 && (
-          <div className="stack gap-10">
+          <div className="stack gap-12">
             {item.augs.map((a) => {
               const ai = view.items[itemKey(a.name)]
               return (
@@ -719,7 +719,9 @@ function Carried({ view }: { view: InventoryView }) {
       <div className="lt-list">
         {shown.map((r) => (
           <div key={r.key} className="lt-row">
-            <span className="lt-row-name">{r.name}</span>
+            <span className="lt-row-name" title={r.name}>
+              {r.name}
+            </span>
             <span className="muted small">{r.where}</span>
             <span className="mono small">{r.count > 1 ? `×${num(r.count)}` : ''}</span>
           </div>

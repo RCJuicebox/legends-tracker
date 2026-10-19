@@ -73,7 +73,9 @@ export function Settings() {
       <div className="page-head">
         <h1>Settings</h1>
       </div>
-      <Tabs className="mb-14" label="Settings view" value={tab} onChange={setTab} tabs={TABS} />
+      <Tabs className="mb-16" label="Settings view" value={tab} onChange={setTab} tabs={TABS} />
+      {/* The panel's own heading, for heading navigation from "Settings" (LT-707). */}
+      <h2 className="sr-only">{TABS.find(([id]) => id === tab)?.[1]}</h2>
       {tab === 'overlays' ? (
         <Overlays />
       ) : tab === 'audio' ? (
@@ -153,7 +155,7 @@ function General({ openLogs }: { openLogs: () => void }) {
           </div>
         </div>
 
-        <div className="card stack gap-14">
+        <div className="card stack gap-16">
           <h2>Game</h2>
           <GameFolderCard />
           <OtherLogFolders />
@@ -172,7 +174,7 @@ function General({ openLogs }: { openLogs: () => void }) {
         </div>
 
         {/* This window's own look and keys, under a heading of their own (LT-457). */}
-        <div className="card stack gap-14">
+        <div className="card stack gap-16">
           <h2>This window</h2>
           <p className="hint">
             Closing this window keeps Legends Tracker running in the tray, so timers, overlays and speech carry on. To end it, use Quit on the tray icon&apos;s menu.
@@ -208,7 +210,7 @@ function General({ openLogs }: { openLogs: () => void }) {
             Hotkeys, even with the game in front
           </label>
           {s.hotkeys && (
-            <div className="small stack gap-6" style={{ marginLeft: 48 }}>
+            <div className="small stack gap-8" style={{ marginLeft: 48 }}>
               {(
                 [
                   [HOTKEYS.mute, 'Mute or unmute'],

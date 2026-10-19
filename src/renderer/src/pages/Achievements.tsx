@@ -259,17 +259,31 @@ export function Achievements() {
         </div>
       </div>
 
-      <div className="ach-tabs" role="group" aria-label="Category">
-        {cats.map((c) => {
+      {/* Tabs, as every other page's views are: one Tab stop, the arrows between them (LT-697). */}
+      <div className="ach-tabs" role="tablist" aria-label="Category">
+        {cats.map((c, i) => {
           const s = book.categoryStats(c)
+          const open = (to: string) => {
+            const first = book.sections.find((x) => x.cat === to)
+            chooseSection(first ? secKey(first) : '', to)
+          }
           return (
             <button
               key={c}
+              role="tab"
+              data-cat={c}
               className={`ach-tab${c === curCat && !query ? ' on' : ''}${s.trackable && s.done === s.trackable ? ' complete' : ''}`}
-              aria-pressed={c === curCat && !query}
-              onClick={() => {
-                const first = book.sections.find((x) => x.cat === c)
-                chooseSection(first ? secKey(first) : '', c)
+              aria-selected={c === curCat && !query}
+              tabIndex={c === curCat ? 0 : -1}
+              onClick={() => open(c)}
+              onKeyDown={(e) => {
+                const to = e.key === 'ArrowRight' ? i + 1 : e.key === 'ArrowLeft' ? i - 1 : e.key === 'Home' ? 0 : e.key === 'End' ? cats.length - 1 : null
+                if (to === null) return
+                e.preventDefault()
+                const next = cats[(to + cats.length) % cats.length]
+                open(next)
+                const strip = e.currentTarget.parentElement
+                requestAnimationFrame(() => strip?.querySelector<HTMLElement>(`[data-cat="${CSS.escape(next)}"]`)?.focus())
               }}
             >
               {c || 'Achievements'}
@@ -281,12 +295,26 @@ export function Achievements() {
         })}
       </div>
 
-      <div className="ach-chips" role="group" aria-label="Section">
-        {catSections.map(({ s, si }) => {
+      {/* One Tab stop for the sections too: the arrows move between them, Enter or Space opens one (LT-697). */}
+      <div className="ach-chips" role="toolbar" aria-label="Section">
+        {catSections.map(({ s, si }, i) => {
           const st = book.sectionStats(si)
+          const current = cur?.si === si || (!cur && i === 0)
           return (
             <button
               key={si}
+              tabIndex={current ? 0 : -1}
+              onKeyDown={(e) => {
+                const to = e.key === 'ArrowRight' ? i + 1 : e.key === 'ArrowLeft' ? i - 1 : e.key === 'Home' ? 0 : e.key === 'End' ? catSections.length - 1 : null
+                if (to === null) return
+                e.preventDefault()
+                const buttons = e.currentTarget.parentElement?.querySelectorAll<HTMLElement>('button')
+                const next = buttons?.[(to + catSections.length) % catSections.length]
+                if (!next) return
+                e.currentTarget.tabIndex = -1
+                next.tabIndex = 0
+                next.focus()
+              }}
               className={`ach-chip${cur?.si === si && !query ? ' on' : ''}${st.trackable && st.done === st.trackable ? ' complete' : ''}`}
               aria-pressed={cur?.si === si && !query}
               onClick={() => chooseSection(secKey(s))}
@@ -348,7 +376,7 @@ export function Achievements() {
         <div className="empty">No sections in this export.</div>
       )}
 
-      <p className="faint small mt-18">
+      <p className="faint small mt-16">
         Optional objectives never count toward completion, the same way the game scores them. An objective that names another achievement follows that achievement; click it to jump
         there. Your ticks are kept when the game writes a new export.
       </p>

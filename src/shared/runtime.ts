@@ -20,6 +20,8 @@ export interface TimerView {
   exact: boolean
   warnSec: number
   rank?: number
+  /** What sets it: the spell's base name (its Spell Timers row), or the trigger's id (LT-691). */
+  rule?: string
 }
 
 export type Notification =

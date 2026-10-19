@@ -39,7 +39,7 @@ export function Options({
     )
   const shown = all ? options : options.slice(0, SHOWN)
   return (
-    <div className="stack gap-6 fp-options">
+    <div className="stack gap-8 fp-options">
       {shown.map((o) => {
         const a = o.activity
         const locked = choices.locks[faction] === a.id

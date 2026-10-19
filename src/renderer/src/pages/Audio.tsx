@@ -67,7 +67,7 @@ export function Audio() {
       )}
 
       <div className="grid two" style={{ alignItems: 'start' }}>
-        <div className="card stack gap-14">
+        <div className="card stack gap-16">
           <h2>Output</h2>
           <Field
             label="Output device"
@@ -99,7 +99,7 @@ export function Audio() {
           </Field>
         </div>
 
-        <div className="card stack gap-14">
+        <div className="card stack gap-16">
           <h2>Voice</h2>
           <Field
             label="Voice"
@@ -194,7 +194,7 @@ function AzureCard({ status, error, onSaved }: { status: AzureStatus | null; err
     }
   }
   return (
-    <div className="card stack gap-10" style={{ gridColumn: '1 / -1' }}>
+    <div className="card stack gap-12" style={{ gridColumn: '1 / -1' }}>
       <h2 style={{ margin: 0 }}>
         Microsoft voices <Info label="How to get a key" text={AZURE_HELP} />
       </h2>

@@ -1,6 +1,6 @@
 import { Fragment, useCallback, useDeferredValue, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { ago, api } from '../../renderer/src/api'
-import { showError } from '../../renderer/src/toast'
+import { showError, showToast } from '../../renderer/src/toast'
 import { useAchievementTrack, useInvoke, useLatest, useSameContents, useVisibleInterval } from '../../renderer/src/hooks'
 import { useActions, useSettled } from '../../renderer/src/state'
 import { useCharacterRecord } from '../../renderer/src/character'
@@ -143,7 +143,14 @@ export function PlanTab({ character, view }: { character: string; view: FactionV
   const readAgain = async () => {
     setReading(true)
     try {
-      q.setData(await api.invoke('factions:plan', character, true, wide))
+      const fresh = await api.invoke('factions:plan', character, true, wide)
+      q.setData(fresh)
+      showToast(
+        fresh.wiki.error
+          ? `Could not read eqlwiki again (${fresh.wiki.error}); the pages kept serve meanwhile.`
+          : `Read ${num(fresh.wiki.pages)} faction pages and ${num(fresh.wiki.quests)} quests from eqlwiki.`,
+        { tone: fresh.wiki.error ? 'bad' : 'info' }
+      )
     } catch (e) {
       showError("Could not read eqlwiki's faction pages again", e)
     } finally {
@@ -582,7 +589,7 @@ export function PlanTab({ character, view }: { character: string; view: FactionV
             </div>
           )}
           <span className="spacer" />
-          <div className="stack gap-6" style={{ alignItems: 'flex-end' }}>
+          <div className="stack gap-8" style={{ alignItems: 'flex-end' }}>
             {plan?.kept && (
               <button
                 className="btn small ghost"
@@ -607,7 +614,7 @@ export function PlanTab({ character, view }: { character: string; view: FactionV
             </button>
           </div>
         </div>
-        <div className="faint small mt-10">
+        <div className="faint small mt-12">
           {cities ? `For the starting cities' guards, as they con ${who(character)}` : `For the achievements ${who(character)} has still to do`}, from that character&apos;s log (
           {data.log.handIns.toLocaleString()} hand-ins and {data.log.kills.toLocaleString()} kills that moved a faction)
           {data.shared.characters.length > 0 &&
@@ -641,6 +648,7 @@ export function PlanTab({ character, view }: { character: string; view: FactionV
           onLock={lock}
           onExclude={exclude}
           onWork={workOn}
+          notPlayed={track && track.character.toLowerCase() === character.toLowerCase() ? undefined : who(character)}
           now={tracked?.current ?? null}
           hint={swapHint}
           labels={cities ? cityLabels : undefined}
@@ -810,7 +818,7 @@ export function PlanTab({ character, view }: { character: string; view: FactionV
       {choices.excluded.length > 0 && (
         <div className="card mb-16">
           <h2>Ruled out</h2>
-          <div className="stack gap-6">
+          <div className="stack gap-8">
             {choices.excluded.map((id) => {
               const a = byId.get(id)
               return (

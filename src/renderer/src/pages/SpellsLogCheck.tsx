@@ -2,12 +2,16 @@ import { useState } from 'react'
 import { api, errorMessage } from '../api'
 import { duration } from '../../../core/format'
 import { showError } from '../toast'
-import { CategoryChip, NumberInput } from '../components/ui'
+import { CategoryChip, NumberInput, ShowingSome } from '../components/ui'
 import { type KnownSpell, type LogCheckRow } from '../../../shared/types'
 
 // Spell Timers' check against your log: each spell's real land-to-fade time beside the calculation.
 
+/** Spells drawn before "Show all". */
+const CHECK_SHOWN = 40
+
 export function LogCheck({ known, onSaved }: { known: KnownSpell[]; onSaved: (k: KnownSpell[]) => void }) {
+  const [allRows, setAllRows] = useState(false)
   const [rows, setRows] = useState<LogCheckRow[] | null>(null)
   const [added, setAdded] = useState<Record<string, number>>({})
 
@@ -42,9 +46,10 @@ export function LogCheck({ known, onSaved }: { known: KnownSpell[]; onSaved: (k:
 
   return (
     <div className="card">
-      <h2>
-        Check against your log <span className="spacer" />
-        <span className="row tight" style={{ textTransform: 'none', letterSpacing: 0, fontWeight: 500 }}>
+      <div className="card-head">
+        <h2>Check against your log</h2>
+        <span className="spacer" />
+        <span className="row tight">
           last
           <NumberInput value={mbs} min={10} max={2000} step={50} width={80} label="Megabytes of log to check" onChange={(v) => setMbs(v ?? 100)} />
           MB
@@ -52,7 +57,7 @@ export function LogCheck({ known, onSaved }: { known: KnownSpell[]; onSaved: (k:
         <button className="btn small" onClick={() => void run()} disabled={busy}>
           {busy ? 'Reading…' : 'Run check'}
         </button>
-      </h2>
+      </div>
       <p className="muted small mt-0">
         A diagnostic, not a data source: replays recent history and compares each spell's real landing-to-fade time with the calculation. A mismatch usually means a focus effect
         missing from, or wrongly set in, the list above; the row shows the total focus that spell would need.
@@ -77,7 +82,7 @@ export function LogCheck({ known, onSaved }: { known: KnownSpell[]; onSaved: (k:
               </tr>
             </thead>
             <tbody>
-              {rows.slice(0, 40).map((r) => (
+              {(allRows ? rows : rows.slice(0, CHECK_SHOWN)).map((r) => (
                 <tr key={r.rankedName}>
                   <td>{r.rankedName}</td>
                   <td>
@@ -118,6 +123,7 @@ export function LogCheck({ known, onSaved }: { known: KnownSpell[]; onSaved: (k:
               ))}
             </tbody>
           </table>
+          <ShowingSome shown={allRows ? rows.length : Math.min(rows.length, CHECK_SHOWN)} total={rows.length} onAll={() => setAllRows(true)} />
         </div>
       )}
     </div>

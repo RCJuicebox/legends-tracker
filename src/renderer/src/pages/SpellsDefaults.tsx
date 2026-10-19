@@ -12,7 +12,7 @@ export function SpellDefaults() {
   const setT = (patch: Partial<TrackingSettings>, debounceMs?: number) => patchSettings((x) => ({ ...x, tracking: { ...x.tracking, ...patch } }), { debounceMs })
   return (
     <>
-      <div className="card stack gap-14">
+      <div className="card stack gap-16">
         <h2>Tracked by default</h2>
         <div className="grid two">
           <label className="row">

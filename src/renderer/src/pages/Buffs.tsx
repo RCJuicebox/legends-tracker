@@ -5,7 +5,7 @@ import { useInvoke } from '../hooks'
 import { useRemembered } from '../remember'
 import { act } from '../toast'
 import { useNow } from '../components/TimerBars'
-import { ConfirmButton, Disclosure, FilterBox, Info, Pending, Segmented, SettingsLink, Switch, Tip } from '../components/ui'
+import { ConfirmButton, Disclosure, FilterBox, Info, PageLink, Pending, Segmented, SettingsLink, Switch, Tip } from '../components/ui'
 import { useActions, useSettled } from '../state'
 import { CLASSES, className } from '../../../shared/game/classes'
 import { NotWatching } from '../components/NotWatching'
@@ -141,6 +141,10 @@ export function Buffs() {
         <div className="card stack gap-8">
           <div className="row gap-8" style={{ justifyContent: 'space-between' }}>
             <h2 className="m-0">Your group</h2>
+            <span className="grow" />
+            <span className="faint small">
+              add people on the <PageLink page="meter">Damage Meter</PageLink>
+            </span>
             {v.group.length > 0 && (
               <ConfirmButton
                 className="btn ghost small"
@@ -256,7 +260,7 @@ export function Buffs() {
 
       <BestCombination view={v} unpick={toggle} />
 
-      <div className="card stack gap-10">
+      <div className="card stack gap-12">
         <div className="row">
           <h2 className="m-0">Buffs you want</h2>
           <span className="faint small">{v.wanted.length} picked</span>
@@ -341,7 +345,7 @@ function BestCombination({ view, unpick }: { view: BuffView; unpick: (spell: str
   const stacked = plan.leftOut.filter((l) => l.reason === 'stack')
   const order = castOrder(plan.chosen)
   return (
-    <div className="card stack gap-10 mb-16">
+    <div className="card stack gap-12 mb-16">
       <div className="row wrap">
         <h2 className="m-0">Best combination</h2>
         <Segmented

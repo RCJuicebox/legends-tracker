@@ -61,7 +61,7 @@ export function Logs() {
       </div>
 
       <div className="grid two mb-16" style={{ alignItems: 'start' }}>
-        <div className="card stack gap-14">
+        <div className="card stack gap-16">
           <h2>Automatic archiving</h2>
           {/* One sentence, read as one: the switch and the size belong to it. */}
           <div className="row" role="group" aria-labelledby="archive-when archive-unit">
@@ -85,7 +85,7 @@ export function Logs() {
             </div>
           </Field>
         </div>
-        <div className="card stack gap-10">
+        <div className="card stack gap-12">
           <h2>While the game is running</h2>
           <div className="row">
             <span className={`status-dot${status.gameRunning ? ' live' : ''}`} />
@@ -105,9 +105,9 @@ export function Logs() {
 
       <div className="card mb-16">
         <h2>Character logs</h2>
-        {view && view.logs.length > 0 && !followed && <div className="notice mb-10">No log is followed yet: pick the character you play with Follow.</div>}
+        {view && view.logs.length > 0 && !followed && <div className="notice mb-12">No log is followed yet: pick the character you play with Follow.</div>}
         {view && followed && !view.logs.some((l) => l.path === followed) && (
-          <div className="notice mb-10">The log being followed ({followed.split('\\').pop()}) is not in the game&apos;s Logs folder any more: pick another with Follow.</div>
+          <div className="notice mb-12">The log being followed ({followed.split('\\').pop()}) is not in the game&apos;s Logs folder any more: pick another with Follow.</div>
         )}
         {!view ? (
           <Pending what="the character logs" />
@@ -187,7 +187,7 @@ export function Logs() {
             </table>
           </div>
         )}
-        <label className="row mt-10">
+        <label className="row mt-12">
           <Switch on={settings.autoStart} onChange={(v) => patchSettings((x) => ({ ...x, autoStart: v }))} />
           Start watching the followed log as soon as the app opens
         </label>
@@ -202,7 +202,7 @@ export function Logs() {
           </span>
         </h2>
         {loose.length > 0 && (
-          <div className="notice row mb-10">
+          <div className="notice row mb-12">
             <span className="grow">
               {loose.length} uncompressed log{loose.length === 1 ? '' : 's'} in the archive folder ({mb(loose.reduce((n, x) => n + x.size, 0))}).
             </span>
@@ -230,7 +230,7 @@ export function Logs() {
           </div>
         )}
         {zipErrors.length > 0 && (
-          <div className="notice bad mb-10" role="alert">
+          <div className="notice bad mb-12" role="alert">
             Could not zip {zipErrors.length === 1 ? 'one log' : `${zipErrors.length} logs`}:
             {zipErrors.map((x) => (
               <div key={x} className="small">

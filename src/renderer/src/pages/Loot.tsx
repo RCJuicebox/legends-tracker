@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { timeOfDay, when } from '../../../core/format'
+import { num, timeOfDay, when } from '../../../core/format'
 import { useItemInfo, useLootView } from '../hooks'
 import { useRemembered } from '../remember'
 import { actDone } from '../toast'
@@ -66,6 +66,10 @@ export function Loot() {
   const sessions = useMemo(() => new Map((view?.sessions ?? []).map((s) => [s.id, s])), [view])
 
   const toggle = (k: LootOutcome) => setHidden(hidden.includes(k) ? hidden.filter((x) => x !== k) : [...hidden, k])
+  // One status for the list, not one a row still on its way from eqlwiki (LT-684).
+  const lookingUp = shownNames.filter((n) => !info[itemKey(n)]).length
+  // Everything hidden by the outcome chips, nothing typed: said so, with a way back (LT-693).
+  const allHidden = OUTCOMES.every((o) => hidden.includes(o.key))
 
   return (
     <>
@@ -92,6 +96,9 @@ export function Loot() {
         </span>
         <span className="spacer" />
         {view?.reading && <span className="chip warn">{view.reading}</span>}
+        <span className="faint small" role="status">
+          {lookingUp ? `Looking up ${num(lookingUp)} item${lookingUp === 1 ? '' : 's'} on eqlwiki…` : ''}
+        </span>
         <span className="faint small">{view ? `${view.entries.length} item${view.entries.length === 1 ? '' : 's'} on record` : ''}</span>
         <button
           className="btn small"
@@ -105,7 +112,21 @@ export function Loot() {
       {!view ? (
         <Pending error={q.error} retry={q.reload} what="the loot" />
       ) : !groups.length ? (
-        <div className="card empty">{view.entries.length ? 'Nothing matches the filter.' : 'Nothing looted yet.'}</div>
+        <div className="card empty">
+          {!view.entries.length ? (
+            'Nothing looted yet.'
+          ) : allHidden && !filtering ? (
+            <>
+              Every outcome is hidden: turn one on above, or{' '}
+              <button className="link-button inline" onClick={() => setHidden([])}>
+                show all
+              </button>
+              .
+            </>
+          ) : (
+            'Nothing matches the filter.'
+          )}
+        </div>
       ) : (
         groups.map((g) => {
           const s = sessions.get(g.id)
@@ -186,7 +207,7 @@ function Row({ e, info, refresh }: { e: LootEntry; info: ItemInfo | undefined; r
       </div>
       <div className="loot-what">
         {!info ? (
-          <Pending inline doing="Looking it up on eqlwiki" />
+          <span className="faint">Looking it up on eqlwiki…</span>
         ) : (
           <>
             {d.head && <b>{d.head}</b>}

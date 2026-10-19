@@ -31,7 +31,9 @@ export function Motes({ go }: { go?: Go }) {
       <div className="page-head">
         <h1>Motes</h1>
       </div>
-      <Tabs className="mb-14" label="Motes view" value={tab} onChange={setTab} tabs={TABS} />
+      <Tabs className="mb-16" label="Motes view" value={tab} onChange={setTab} tabs={TABS} />
+      {/* The panel's own heading, for heading navigation from "Motes" (LT-707). */}
+      <h2 className="sr-only">{TABS.find(([id]) => id === tab)?.[1]}</h2>
       {tab === 'runs' ? (
         <MoteRuns />
       ) : (

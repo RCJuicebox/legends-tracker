@@ -73,7 +73,7 @@ export function GameFolderCard() {
     : []
 
   return (
-    <div className="stack gap-10">
+    <div className="stack gap-12">
       {checkError && <div className="notice bad">Could not look in the folder: {checkError}</div>}
       <label className="field">
         <span>EverQuest Legends folder</span>
@@ -203,7 +203,7 @@ export function OtherLogFolders() {
   const remove = (dir: string) => patchSettings((x) => ({ ...x, logFolders: x.logFolders.filter((d) => d !== dir) }))
 
   return (
-    <div className="stack gap-10">
+    <div className="stack gap-12">
       <div className="field">
         <span>Other PCs&apos; logs</span>
         <p className="hint">
@@ -235,7 +235,7 @@ export function OtherLogFolders() {
                           : `Is that PC on, with the folder shared? What was read from it before still counts${held ? ` (${held})` : ''}.`}
                     </td>
                     <td style={{ width: 1 }}>
-                      <button className="btn small ghost" onClick={() => void remove(dir)}>
+                      <button className="btn small ghost" aria-label={`Remove ${dir}`} onClick={() => void remove(dir)}>
                         Remove
                       </button>
                     </td>

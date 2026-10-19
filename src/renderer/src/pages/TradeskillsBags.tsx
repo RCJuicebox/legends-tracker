@@ -38,7 +38,7 @@ export function SkinBuildOutcome({ build, character }: { build: ReturnType<typeo
     )
   if (r.confirm)
     return (
-      <div className="notice stack gap-6" role="alert">
+      <div className="notice stack gap-8" role="alert">
         <span>The {r.skin} skin asks to run this program, which this app has not run before. Run it only if you trust where the skin came from:</span>
         <code className="mono small">{r.confirm.join(' ')}</code>
         <span className="row tight">

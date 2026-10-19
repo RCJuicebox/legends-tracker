@@ -21,6 +21,7 @@ export function Steps({
   onLock,
   onExclude,
   onWork,
+  notPlayed,
   now,
   hint,
   labels,
@@ -32,6 +33,8 @@ export function Steps({
   onExclude: (id: string, out: boolean) => void
   /** Makes a step the one the Now card and the overlay follow. */
   onWork: (index: number) => void
+  /** The character, when it is not the one being played: a step is followed only while it is (LT-709). */
+  notPlayed?: string
   /** The step the character being played is on, as the achievements overlay follows it. */
   now: FactionTrackView['current']
   /** Anything to do first for a step, such as a race swap. */
@@ -102,7 +105,11 @@ export function Steps({
                     {st.copper > 0 && <span className="faint"> · about {fmtCoin(Math.round(st.copper))} to buy</span>}
                   </div>
                 )}
-                {a.kind === 'kill' && a.mobs && a.mobs.length > 2 && <div className="faint small fp-mobs">{a.mobs.join(', ')}</div>}
+                {a.kind === 'kill' && a.mobs && a.mobs.length > 2 && (
+                  <div className="faint small fp-mobs" title={a.mobs.join(', ')}>
+                    {a.mobs.join(', ')}
+                  </div>
+                )}
                 <div className="row tight fp-effects">
                   <Effects step={st} labels={labels} />
                   <span className="spacer" />
@@ -110,8 +117,13 @@ export function Steps({
                   {!isNow && (
                     <button
                       className="btn small ghost"
+                      disabled={!!notPlayed}
                       onClick={() => onWork(i)}
-                      title="Follow this step now, on the Now card and the overlay, until your kills or hand-ins go toward another"
+                      title={
+                        notPlayed
+                          ? `Play ${notPlayed} to follow a step: the Now card and the overlay follow the character being played`
+                          : 'Follow this step now, on the Now card and the overlay, until your kills or hand-ins go toward another'
+                      }
                     >
                       Work on this
                     </button>

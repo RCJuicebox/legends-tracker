@@ -22,7 +22,7 @@ export function AcTab({
 
   return (
     <div className="stats-grid">
-      <div className="stack gap-14">
+      <div className="stack gap-16">
         <div className="card">
           <div className="grid three">
             <div className="stat">
@@ -71,8 +71,8 @@ export function AcTab({
         </div>
       </div>
 
-      <div className="stack gap-14">
-        <div className="card stack gap-10">
+      <div className="stack gap-16">
+        <div className="card stack gap-12">
           <h2>
             Worn gear
             {/* The worn figures are only as new as the export they come from (LT-486). */}
@@ -109,7 +109,7 @@ export function AcTab({
             </p>
           )}
         </div>
-        <div className="card stack gap-10">
+        <div className="card stack gap-12">
           <h2>Character</h2>
           <div className="stats-fields two">
             <NumField label="Agility" hint="Inventory window" value={s.agility} onChange={(v) => set({ agility: v ?? 0 })} />
@@ -120,7 +120,7 @@ export function AcTab({
           </div>
           <p className="faint small">Defence skill ({num(skill(15))}) comes from your skills on the Combat tab.</p>
         </div>
-        <div className="card stack gap-10">
+        <div className="card stack gap-12">
           <h2>Buffs and AAs</h2>
           <div className="stats-fields two">
             <NumField label="AC from buffs" hint="spells and songs on you" title="Spell effects 1 and 416 (AC)" value={s.acBuffs} onChange={(v) => set({ acBuffs: v ?? 0 })} />
@@ -146,7 +146,7 @@ export function AcTab({
             />
           </div>
         </div>
-        <div className="card stack gap-10">
+        <div className="card stack gap-12">
           <h2>Soft cap</h2>
           <div className="stats-fields two">
             <NumField label="Soft cap" value={s.overrides.softCap} auto={auto.softCap} autoFrom="game table" onChange={(v) => setOverride('softCap', v)} />
