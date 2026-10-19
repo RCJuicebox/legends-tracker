@@ -76,6 +76,26 @@ describe('NpcPages', () => {
     expect(n.race('Gate Guard Bram')).toBe('Kaladim Citizen')
   })
 
+  it('asks again about a name with no page a week on, so a page added since is read (LT-538)', async () => {
+    const weekAgo = Date.now() - 8 * 24 * 3600_000
+    await fs.writeFile(
+      join(dir, 'npc-pages.json'),
+      JSON.stringify({
+        version: 1,
+        npcs: { 'a nobody': { at: weekAgo, found: false, race: null, info: {} }, 'a newer nobody': { at: Date.now(), found: false, race: null, info: {} } }
+      })
+    )
+    const w = fakeWiki({ 'A nobody': PAGE('Gnoll', '100') })
+    const n = new NpcPages({ dir, pages: w.fetch })
+    await n.ready()
+    // Stale: not known, so the counts ask again; a miss of today stays a miss.
+    expect(n.race('a nobody')).toBeUndefined()
+    expect(n.race('a newer nobody')).toBeNull()
+    expect(await n.lookUp(['a nobody', 'a newer nobody'])).toBe(true)
+    expect(w.asked).toEqual([['A nobody', 'A Nobody']])
+    expect(n.race('a nobody')).toBe('Gnoll')
+  })
+
   it('keeps what it has when the wiki cannot be reached, and does not ask again for a while', async () => {
     let calls = 0
     const n = new NpcPages({

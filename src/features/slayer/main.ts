@@ -317,6 +317,7 @@ export class SlayerPlanner implements AppFeature {
     return {
       character,
       export: { file: exp.file, modified: exp.modified },
+      sinceKills: live?.exportAt === exp.modified,
       goals,
       camps,
       unplaced: [...unplaced.values()].sort((a, b) => b.n - a.n).slice(0, 20),

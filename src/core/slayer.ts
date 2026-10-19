@@ -198,6 +198,18 @@ export class SlayerRaces {
     return this.vocab.has(w) ? w : (this.byName(race) ?? w)
   }
 
+  /**
+   * Whether a placement is open to what an export says for counter `i`: a guess, none, a race the
+   * achievement lists some of, or a compound race whose last word it lists ("Earth Elemental" under
+   * Elementals, "Dire Wolf" under Wolves: a client race of its own, never counted on the plural, so
+   * only an export can say, LT-531; suspected until one does).
+   */
+  open(i: number, p: Placed): boolean {
+    if (!p.sure || p.key === null || this.broader[i].has(p.key)) return true
+    const words = p.key.split(' ')
+    return words.length > 1 && !this.keys[i].has(p.key) && this.keys[i].has(words[words.length - 1])
+  }
+
   /** Whether play settled that a mob is several races under one name (a dervish cutthroat): its kills are placed by its zone's race mix. */
   mixed(mob: string): boolean {
     return MOB_RACES[nameWords(mob)] === RACE_MIX
@@ -468,7 +480,7 @@ export function learnFromExport(
     // achievement lists counted, one surely of a race it does not list did not, and only the others
     // (a name's guess, an alias not settled, a race the achievement lists some of) are learned of.
     const done = new Set(first.map((f) => f.mob))
-    const open = new Set(placed.filter((k) => !k.p.sure || k.p.key === null || races.broader[i].has(k.p.key)).map((k) => k.mob))
+    const open = new Set(placed.filter((k) => races.open(i, k.p)).map((k) => k.mob))
     const maybe = placed.filter((k) => facts(k.mob, name) ?? (open.has(k.mob) || races.keys[i].has(k.p.key ?? '')))
     for (const f of forced(
       maybe.map((k) => ({ mob: k.mob, n: k.n })),
@@ -477,6 +489,26 @@ export function learnFromExport(
       if (!done.has(f.mob) && open.has(f.mob)) add(f)
   })
   return out
+}
+
+/**
+ * Whether a learned fact tells the counts anything the race placement does not: the mob's placement
+ * is open (a guess, none, play's by zone, or a race the achievement lists only some of), or the fact
+ * goes against it, and every one that counts. One that restates a sure race ("an orc pawn does not count toward Swordfish
+ * Mermaid") changes no count, and is not kept (LT-532). An achievement not open for this character
+ * cannot be judged here, and its facts stay for the others.
+ */
+export function factTells(
+  races: SlayerRaces,
+  counters: Pick<SlayerCounter, 'name'>[],
+  raceOf: (mob: string) => string | null | undefined,
+  fact: { mob: string; achievement: string; counts: boolean }
+): boolean {
+  const i = counters.findIndex((c) => c.name.toLowerCase() === fact.achievement)
+  if (fact.counts || i < 0 || races.zoned(fact.mob) || races.mixed(fact.mob)) return true
+  const p = races.place(fact.mob, raceOf(fact.mob))
+  if (races.open(i, p)) return true
+  return fact.counts !== races.keys[i].has(p.key ?? '')
 }
 
 /**

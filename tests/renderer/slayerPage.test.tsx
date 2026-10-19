@@ -194,6 +194,8 @@ it('draws the plan, the lockouts beside it, and keeps a camp ruled out', async (
   await act(async () => travel.dispatchEvent(new FocusEvent('focusout', { bubbles: true })))
   expect(invoke).toHaveBeenLastCalledWith('slayer:choices', 'Kelwyn_neriak', expect.objectContaining({ travelMin: 25 }))
   await act(async () => button('Read again').click())
+  // Built afresh, not the shared build of the last 30 s (LT-537).
+  expect(invoke).toHaveBeenCalledWith('slayer:plan', 'Kelwyn_neriak', true)
   // What the spawns allow beside each mob, what holds the camp back, and the Hunter named on the way.
   expect(host.textContent).toContain('(12 spots · 6:24 · spawn-bound)')
   expect(host.textContent).toContain('Hunter of Clan Crushbone · Lord Darish, Ambassador DVinn')

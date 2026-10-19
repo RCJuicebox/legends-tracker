@@ -158,11 +158,14 @@ export function bandMax(word: string): number | undefined {
   return i > 0 ? BAND_MIN[ORDER[i - 1]] - 1 : undefined
 }
 
-/** A quest's name reduced for matching Allakhazam's to eqlwiki's: case, punctuation and a trailing "Quest" dropped. */
+/**
+ * A quest's name reduced for matching Allakhazam's to eqlwiki's: case, punctuation and a trailing
+ * "Quest" dropped. "(good)" and "(evil)" stay: they are two quests, each with its own needs (LT-545).
+ */
 export const questKey = (name: string) =>
   name
     .toLowerCase()
-    .replace(/\s*\((?:quest|evil|good)\)\s*$/, '')
+    .replace(/\s*\(quest\)\s*$/, '')
     .replace(/\bquest$/, '')
     .replace(/[^a-z0-9]/g, '')
 

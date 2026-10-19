@@ -114,10 +114,14 @@ export class NpcPages {
     return this.load()
   }
 
-  /** A mob's race as eqlwiki gives it: a race, null when the wiki has none, undefined when not asked yet. */
+  /**
+   * A mob's race as eqlwiki gives it: a race, null when the wiki has none, undefined when not asked yet,
+   * or when its page was missing a week ago: the counts then ask again, for a page added since (LT-538).
+   */
   race(mob: string): string | null | undefined {
     const e = this.file?.npcs[keyOf(mob)]
-    return e && e.race !== undefined ? e.race : undefined
+    if (!e || e.race === undefined || (!e.found && this.stale(e, Date.now()))) return undefined
+    return e.race
   }
 
   private stale(e: Entry, now: number): boolean {

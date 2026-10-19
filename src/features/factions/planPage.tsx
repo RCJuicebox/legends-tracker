@@ -6,9 +6,9 @@ import { useActions, useSettled } from '../../renderer/src/state'
 import { useCharacterRecord } from '../../renderer/src/character'
 import { useNow } from '../../renderer/src/components/TimerBars'
 import { ConfirmButton, Disclosure, GameCommand, Info, Pending, Segmented, Switch, Tip } from '../../renderer/src/components/ui'
-import { duration, who, wikiUrl } from '../../core/format'
+import { duration, num, who, wikiUrl } from '../../core/format'
 import { STANDING_MAX, standingBand, type FactionView } from './core'
-import { runPlan } from './planRunner'
+import { runPlan, Superseded } from './planRunner'
 import { deityName } from '../../shared/game/deities'
 import { playableRace } from '../../shared/game/races'
 import type { PlanChoices, PlanGoal, PlanSettings } from '../../shared/settings'
@@ -229,14 +229,20 @@ export function PlanTab({ character, view }: { character: string; view: FactionV
     if (!data || !todo) return
     let current = true
     const keep = keptShape.current?.key === structure ? keptShape.current.shape : undefined
-    runPlan({ targets: goalTargets, maxed: todo.maxed, standings: todo.standings, activities: data.catalog.activities, ...extras }, deferredSettings, deferredChoices, keep).then(
+    runPlan(
+      { targets: goalTargets, maxed: todo.maxed, standings: todo.standings, activities: data.catalog.activities, ...extras },
+      deferredSettings,
+      deferredChoices,
+      keep,
+      'plan'
+    ).then(
       (p) => {
         if (!current) return
         keptShape.current = { key: structure, shape: p.shape }
         // The order kept and the counts the same: the plan shown stays, and its hundred rows are not drawn again.
         setPlan((old) => (old && JSON.stringify(old) === JSON.stringify(p) ? old : p))
       },
-      (e: unknown) => current && showError('Could not work out the faction plan', e)
+      (e: unknown) => current && !(e instanceof Superseded) && showError('Could not work out the faction plan', e)
     )
     return () => {
       current = false
@@ -279,7 +285,9 @@ export function PlanTab({ character, view }: { character: string; view: FactionV
         ...deferredChoices,
         locks: Object.fromEntries(Object.entries(deferredChoices.locks).filter(([, id]) => !needSwap.has(id))),
         excluded: extras.races ? deferredChoices.excluded : [...deferredChoices.excluded, ...needSwap]
-      }
+      },
+      undefined,
+      'noSwap'
     ).then(
       (p) => current && setNoSwap({ key: swapKey, seconds: p.seconds, unplanned: p.unplanned.length }),
       () => undefined
@@ -409,6 +417,14 @@ export function PlanTab({ character, view }: { character: string; view: FactionV
               <GameCommand cmd="/outputfile achievements" /> in game to plan only what is really left.
             </>
           )}
+        </div>
+      )}
+      {data.approximate && data.approximate.length > 0 && (
+        <div className="notice warn mb-16">
+          {data.approximate.length === 1 ? `${data.approximate[0]}’s standing is` : `${num(data.approximate.length)} standings are`} approximate (
+          {data.approximate.slice(0, 3).join(', ')}
+          {data.approximate.length > 3 ? ', …' : ''}): the log saw more changes since {who(character)}’s factions export than it keeps, so the plan may start from the wrong place.
+          Type <GameCommand cmd="/outputfile faction" /> in game to plan from where you really stand.
         </div>
       )}
       {/* The web being out of reach is a passing state, not a fault: amber, and put away for the session (LT-455). */}

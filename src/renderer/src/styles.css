@@ -3741,6 +3741,20 @@ input[aria-invalid='true'] {
   background: color-mix(in srgb, var(--blue) 16%, transparent);
   color: var(--blue-text);
 }
+/* Slayer's camp sources, by how far each is trusted (LT-536): your log, players, the spawn tables, a wiki guess. */
+.chip.sl-src.log {
+  background: color-mix(in srgb, var(--green) 16%, transparent);
+  color: var(--green-text);
+}
+.chip.sl-src.play,
+.chip.sl-src.spawns {
+  background: color-mix(in srgb, var(--blue) 12%, transparent);
+  color: var(--text-2);
+}
+.chip.sl-src.wiki {
+  background: color-mix(in srgb, var(--amber) 16%, transparent);
+  color: var(--amber-text);
+}
 .fp-mobs {
   overflow: hidden;
   text-overflow: ellipsis;

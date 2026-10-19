@@ -3,7 +3,7 @@ import { SELF } from '../../core/combatLines'
 import { isFriend } from '../../core/combatMeter'
 import { zoneEntered } from '../../core/logLine'
 import { NO_RACE_TABLE, RACE_TABLE, type RaceTable } from '../../core/raceNames'
-import { learnFromExport, SlayerRaces, slayerCounters, slayerCounts, slayerLine, type RaceMix, type SlayerCounter, type SlayerKills } from '../../core/slayer'
+import { factTells, learnFromExport, SlayerRaces, slayerCounters, slayerCounts, slayerLine, type RaceMix, type SlayerCounter, type SlayerKills } from '../../core/slayer'
 import type { SlayerTrackView } from '../../shared/tracking'
 import type { AppContext } from '../../main/context'
 import { lastZoneLine } from '../../main/game'
@@ -129,6 +129,8 @@ export class SlayerLive {
   private readonly kept: JsonFile<KeptSlayer | null>
   /** What the exports settled (slayer.ts, learnFromExport). */
   private readonly facts: JsonFile<FactsFile>
+  /** Whether the facts were pruned this run (pruneFacts). */
+  private pruned = false
   /** Told when the counts changed on their own (eqlwiki answered a mob's race): the overlay publishes. */
   onChange: () => void = () => undefined
 
@@ -249,6 +251,8 @@ export class SlayerLive {
       }
       this.state = s
     }
+    // Races known from eqlwiki first, so a mob placed by its page is judged by it.
+    void this.ctx.npcPages.ready().then(() => this.pruneFacts(s.counters, s.races))
     await this.readLog(s)
     this.count()
   }
@@ -396,13 +400,38 @@ export class SlayerLive {
    */
   private learn(s: SlayerState, at: number, counters: SlayerCounter[], races: SlayerRaces): void {
     const kills = [...s.kills.values()].map((k) => ({ name: k.name, n: k.times.filter((t) => t <= at).length }))
-    const got = learnFromExport(s.counts, counters, races, kills, (m) => this.ctx.npcPages.race(m), this.fact, this.raceMix)
+    const raceOf = (m: string) => this.ctx.npcPages.race(m)
+    const got = learnFromExport(s.counts, counters, races, kills, raceOf, this.fact, this.raceMix)
     if (!got.length) return
+    // Only what changes a count is kept, and said: the rest restates a race already sure (LT-532).
+    const telling = got.filter((f) => factTells(races, counters, raceOf, f))
+    log.info(`Slayer: the new export settled ${got.length} mob and achievement pairs; ${telling.length} tell the counts something the races do not`)
+    if (!telling.length) return
     const mobs = { ...this.facts.get().mobs }
-    for (const f of got) {
+    for (const f of telling) {
       mobs[f.mob] = { ...mobs[f.mob], [f.achievement]: { counts: f.counts, at, kills: f.kills, rise: f.rise } }
       log.info(`Slayer: the export says ${f.mob} ${f.counts ? 'counts' : 'does not count'} toward ${f.achievement} (${f.kills} killed, the count rose ${f.rise})`)
     }
+    this.facts.set({ version: 1, mobs })
+  }
+
+  /**
+   * Once a run, with the races of an export to judge by: the facts kept before that tell the counts
+   * nothing are dropped (2,836 on 10-12, all "does not count" of a race already sure; LT-532, LT-669).
+   */
+  private pruneFacts(counters: SlayerCounter[], races: SlayerRaces): void {
+    if (this.pruned) return
+    this.pruned = true
+    const raceOf = (m: string) => this.ctx.npcPages.race(m)
+    const mobs: FactsFile['mobs'] = {}
+    let dropped = 0
+    for (const [mob, by] of Object.entries(this.facts.get().mobs))
+      for (const [achievement, x] of Object.entries(by)) {
+        if (factTells(races, counters, raceOf, { mob, achievement, counts: x.counts })) (mobs[mob] ??= {})[achievement] = x
+        else dropped++
+      }
+    if (!dropped) return
+    log.info(`Slayer: ${dropped} learned facts that restate a race already sure are dropped from slayer-facts.json`)
     this.facts.set({ version: 1, mobs })
   }
 

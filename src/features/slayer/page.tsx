@@ -89,6 +89,24 @@ export function usePlanCharacter() {
 
 const kills = (n: number) => num(Math.ceil(n))
 
+/**
+ * Each step's "+N" toward each achievement, so a goal's steps add up to what it needs: the running
+ * total rounded up, each step the difference (LT-535), not every step rounded up on its own.
+ */
+function stepPluses(steps: SlayerStep[]): Record<number, number>[] {
+  const ran: Record<number, number> = {}
+  return steps.map((st) => {
+    const out: Record<number, number> = {}
+    for (const [k, n] of Object.entries(st.kills)) {
+      const g = Number(k)
+      const before = ran[g] ?? 0
+      ran[g] = before + n
+      out[g] = Math.ceil(ran[g] - 1e-9) - Math.ceil(before - 1e-9)
+    }
+    return out
+  })
+}
+
 const TIMED: Record<MobSpawn['timerFrom'], string> = { timed: 'timed by your log', zone: 'the zone’s respawn as you timed it', classic: 'classic' }
 
 /** What a mob's spawns allow, short: "12 spots · 6:00", and the rest in the tooltip. */
@@ -146,7 +164,23 @@ function Names({ names, shown = 3, onOut }: { names: { name: string; n: number; 
  * What a step is there for: each achievement of its tier it moves, with how many and the mobs that
  * count toward it. What the same kills do for a later tier is in the tooltip, not the line.
  */
-function StepWork({ step, goals, choices, onOut }: { step: SlayerStep; goals: SlayerGoal[]; choices: SlayerPlanChoices; onOut: (mob: string) => void }) {
+function StepWork({
+  step,
+  plus,
+  since,
+  goals,
+  choices,
+  onOut
+}: {
+  step: SlayerStep
+  /** The step's "+N" toward each goal (stepPluses). */
+  plus: Record<number, number>
+  /** Whether the counts have the kills since the export. */
+  since: boolean
+  goals: SlayerGoal[]
+  choices: SlayerPlanChoices
+  onOut: (mob: string) => void
+}) {
   const done = new Set(step.finishes)
   const killed = stepKills(step, choices)
   const besides = Object.keys(step.kills)
@@ -160,14 +194,14 @@ function StepWork({ step, goals, choices, onOut }: { step: SlayerStep; goals: Sl
         return (
           <div key={g}>
             <b>{goals[g].name}</b>{' '}
-            <Tip className="mono" text={`${num(count)} of ${num(max)} so far: your achievements export plus the kills since`}>
+            <Tip className="mono" text={`${num(count)} of ${num(max)} so far: your achievements export${since ? ' plus the kills since' : ''}`}>
               {num(count)} / {num(max)}
             </Tip>
             <span className="sl-count-bar" aria-hidden="true">
               <i style={{ width: `${Math.round((Math.min(count, max) / Math.max(1, max)) * 100)}%` }} />
             </span>
             <Tip className="mono" text="What this step adds">
-              +{kills(step.kills[g] ?? 0)}
+              +{num(plus[g] ?? 0)}
             </Tip>
             {done.has(g) && <b> done</b>}
             <span className="faint">
@@ -186,7 +220,7 @@ function StepWork({ step, goals, choices, onOut }: { step: SlayerStep; goals: Sl
       {besides.length > 0 && (
         <Tip
           className="faint"
-          text={`The same kills count toward these too: ${besides.map((g) => `${goals[g].name} +${kills(step.kills[g])}${done.has(g) ? ' (done)' : ''}`).join(', ')}`}
+          text={`The same kills count toward these too: ${besides.map((g) => `${goals[g].name} +${num(plus[g] ?? 0)}${done.has(g) ? ' (done)' : ''}`).join(', ')}`}
         >
           also counts toward {besides.length} more
         </Tip>
@@ -274,6 +308,18 @@ export function Slayer() {
   const [openGoals, setOpenGoals] = useState(false)
   const [openOut, setOpenOut] = useState(false)
   const [openTimes, setOpenTimes] = useState(false)
+  const [reading, setReading] = useState(false)
+  // Built afresh, not the build the last 30 s share (LT-537): a kill just made or a new export shows.
+  const readAgain = () => {
+    setReading(true)
+    void api
+      .invoke('slayer:plan', character, true)
+      .then(
+        () => q.reload(),
+        () => q.reload()
+      )
+      .finally(() => setReading(false))
+  }
   /** The steps whose map is shown, by index. */
   const [maps, setMaps] = useState<Set<number>>(new Set())
   // The choices kept for the character, taken once its first answer comes: not on every reload, which would undo a change not yet saved.
@@ -302,6 +348,7 @@ export function Slayer() {
     })
     return out
   }, [plan])
+  const pluses = useMemo(() => stepPluses(plan?.steps ?? []), [plan])
   const inPlay = useMemo(() => new Set(data ? goalsInPlay(data.goals, choices) : []), [data, choices])
   const sections = useMemo(() => {
     const by = new Map<string, number[]>()
@@ -359,7 +406,9 @@ export function Slayer() {
             {data?.export ? (
               <>
                 The Slayer achievements {who(character) || 'your character'} still has to do, and where to kill for them quickest. Counts are {data.export.file} (written by the
-                game {ago(data.export.modified, now)}) plus your kills since; type <GameCommand cmd="/outputfile achievements" /> in game to refresh it.
+                game {ago(data.export.modified, now)})
+                {data.sinceKills ? ' plus your kills since' : `, without the kills since: those count while you play ${who(character) || 'the character'}`}; type{' '}
+                <GameCommand cmd="/outputfile achievements" /> in game to refresh it.
               </>
             ) : (
               <>
@@ -537,9 +586,16 @@ export function Slayer() {
                                     <div className="sl-sub-head">
                                       {run.length > 1 && <span className="mono faint">{i + 1}.</span>}
                                       <div className="sl-sub-work">
-                                        <StepWork step={st} goals={data.goals} choices={choices} onOut={(mob) => ruleOutMob(mob, true)} />
+                                        <StepWork
+                                          step={st}
+                                          plus={pluses[i]}
+                                          since={!!data.sinceKills}
+                                          goals={data.goals}
+                                          choices={choices}
+                                          onOut={(mob) => ruleOutMob(mob, true)}
+                                        />
                                       </div>
-                                      <Tip className={`chip fp-kind ${st.camp.source === 'log' ? 'kill' : 'quest'}`} text={SOURCE[st.camp.source].tip}>
+                                      <Tip className={`chip sl-src ${st.camp.source}`} text={SOURCE[st.camp.source].tip}>
                                         {SOURCE[st.camp.source].label}
                                       </Tip>
                                       <Tip className="mono" text={`What you kill there: ${killed.map((k) => `${k.name} ×${kills(k.n)}`).join(', ')}`}>
@@ -742,8 +798,8 @@ export function Slayer() {
                 </ToggleChip>
               )}
               <span className="spacer" />
-              <button className="btn small ghost" onClick={() => q.reload()}>
-                Read again
+              <button className="btn small ghost" disabled={reading} onClick={readAgain}>
+                {reading ? 'Reading…' : 'Read again'}
               </button>
             </div>
 

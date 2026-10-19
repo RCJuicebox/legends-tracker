@@ -670,8 +670,9 @@ export function buildCatalog(input: CatalogInput): FactionCatalog {
       ['lower', p.lower.mobs]
     ] as const) {
       for (const m of list) {
-        // Where a page has no mob to list, some write "none" or "unknown" (and a cached page may still have it).
-        if (NO_MOB.test(m.name)) continue
+        // Where a page has no mob to list, some write "none" or "unknown" (and a cached page may still have
+        // it); a mob with no zone, or "?" for one, is no camp to send anyone to (LT-544).
+        if (NO_MOB.test(m.name) || !m.zone.trim() || NO_MOB.test(m.zone.trim())) continue
         const k = mobKey(m.name, m.zone)
         const e = wikiMobs.get(k) ?? { mob: m, raise: new Set<string>(), lower: new Set<string>(), page: '' }
         if (side === 'raise') {

@@ -60,7 +60,7 @@ export interface KillRun {
 export const emptyKillTallies = (): SlayerKillTallies => ({ zone: '', lastAt: 0, lastZone: '', zones: {}, enteredAt: 0, killsHere: 0, died: false, moves: {} })
 
 /** The zone an instance is of: "The Permafrost Caverns - Solo" and "Befallen 1 (Awakened)" are their zones' camps. */
-export const campZone = (zone: string) => baseZone(zone).replace(/ - (?:Solo|Group)$/, '')
+export const campZone = (zone: string) => baseZone(zone)
 
 /** A kill's killer that is no mob: the player, or a player or pet named in one word ("Vonartik"). */
 const ourSide = (by: string) => by === 'You' || /^[A-Z][a-z']+$/.test(by)
@@ -381,6 +381,8 @@ export interface SlayerPlanData {
   character: string
   /** The achievements export it read, and when the game wrote it; null without one. */
   export: { file: string; modified: number } | null
+  /** Whether the counts have the kills since the export: only for the character being played (LT-539). */
+  sinceKills?: boolean
   goals: SlayerGoal[]
   camps: SlayerPlanCamp[]
   /** Kills in the logs that no race was found for, most first: what the plan cannot place. */
@@ -811,14 +813,19 @@ export interface SlayerPlan {
 
 /**
  * eqlwiki's census only where nothing measured or named feeds a goal at a fair pace: beside a crawl,
- * or in place of a mob or camp ruled out. Its guesses never outbid the log's pace or play's camps.
+ * or in place of a mob or camp ruled out. Its guesses never outbid the log's pace or play's camps,
+ * and never stand where the log has measured the goal's pace.
  */
 function fallbackOnly(camps: SlayerPlanCamp[]): SlayerPlanCamp[] {
   const firm = camps.filter((c) => c.source !== 'wiki' && !c.daily)
   const wanted = (g: number) => !firm.some((c) => (c.assumed && c.pace[g]) || (c.pace[g] ?? 0) >= SLOW)
+  // Nor in a zone your log has measured for the goal, however slow: 4/h a dracolich on a count beat
+  // the 1.6/h 137 hours in the Plane of Fear had measured (LT-533).
+  const measured = new Set(firm.flatMap((c) => (c.source === 'log' ? Object.keys(c.pace).flatMap((g) => ((c.pace[+g] ?? 0) > 0 ? [`${zoneKey(c.zone)}|${g}`] : [])) : [])))
   return camps.flatMap((c) => {
     if (c.source !== 'wiki') return [c]
-    const kinds = c.kinds.map((k) => ({ ...k, goals: k.goals.filter(wanted) })).filter((k) => k.goals.length)
+    const zone = zoneKey(c.zone)
+    const kinds = c.kinds.map((k) => ({ ...k, goals: k.goals.filter((g) => wanted(g) && !measured.has(`${zone}|${g}`)) })).filter((k) => k.goals.length)
     if (!kinds.length) return []
     return [{ ...c, kinds, pace: paceOfKinds(kinds) }]
   })

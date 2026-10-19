@@ -681,7 +681,8 @@ const named = (line: string) => {
 }
 
 /** What a page writes where it has no mob to list: "none", "unknown". */
-export const NO_MOB = /^(?:none|unknown|n\/?a|various|tbd|\?+|-+)$/i
+// "None known" and "None listed" too, and "All lizards in" (a page's words for the zone's whole race, not a mob, LT-544).
+export const NO_MOB = /^(?:none(?: known| listed)?|unknown|n\/?a|various|tbd|\?+|-+|all\b.*)$/i
 
 function mob(line: string): FactionMob | null {
   const name = named(line)

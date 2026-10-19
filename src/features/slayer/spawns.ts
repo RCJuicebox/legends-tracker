@@ -1,5 +1,5 @@
 import { respawnEstimate, type RespawnRecord } from '../../core/respawns'
-import { baseZone, zoneKey } from '../../core/zones'
+import { zoneKey } from '../../core/zones'
 import { LEGENDS_SPAWNS, type LegendsSpawn } from '../../shared/game/legendsSpawns'
 
 // What a zone's spawns allow: TAKP's classic spawn tables (scripts/takp-spawns.mjs) with each timer
@@ -33,7 +33,7 @@ const MIN_GAPS = 3
 /** The zone the game's log names, as the tables have it: "The Permafrost Caverns - Solo 2 (Adaptive)" → permafrost. */
 export function zoneIndex(tables: SpawnTables): (zone: string) => string | null {
   const byKey = new Map(Object.entries(tables).map(([short, z]) => [zoneKey(z.name), short]))
-  return (zone) => byKey.get(zoneKey(baseZone(zone).replace(/ - (?:Solo|Group)$/, ''))) ?? null
+  return (zone) => byKey.get(zoneKey(zone)) ?? null
 }
 
 /** A mob's name as the tables and the log both have it: no article, no marks, lower-cased ("an orc pawn" and TAKP's "orc pawn"). */
@@ -229,7 +229,7 @@ export function spotsOf(z: TakpZone, mobs: string[]): MapSpot[] {
 /** Legends' own spawns of these mobs in a zone (legendsSpawns.ts): what TAKP's tables lack. */
 export function legendsSpawnsOf(zone: string, mobs: string[]): LegendsSpawn[] {
   const want = new Set(mobs.map(lower))
-  const k = zoneKey(baseZone(zone).replace(/ - (?:Solo|Group)$/, ''))
+  const k = zoneKey(zone)
   return LEGENDS_SPAWNS.filter((s) => zoneKey(s.zone) === k && want.has(lower(s.name)))
 }
 

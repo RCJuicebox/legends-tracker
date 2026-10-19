@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { emptySources, joinSources, shareSources, sourceReader, usualAmount, type FactionSourceTallies } from '../../../src/features/factions/attribution'
-import { parseFactionPageFull, type FactionRow } from '../../../src/features/factions/core'
+import { NO_MOB, parseFactionPageFull, type FactionRow } from '../../../src/features/factions/core'
 import { parseQuestPage, readHandIn } from '../../../src/features/factions/questPages'
 import type { PlanSettings } from '../../../src/shared/settings'
 import { classSwapName, classSwapOf, factionNamer, raceOfSwap, unmatchedNames } from '../../../src/features/factions/names'
@@ -193,6 +193,10 @@ describe('what caused a faction change', () => {
     expect(baseZone('Kerra Isle 4 (Refined)')).toBe('Kerra Isle')
     expect(baseZone("Nagafen's Lair - Solo 4 (Fused)")).toBe("Nagafen's Lair")
     expect(baseZone('Guild Hall (Grand)')).toBe('Guild Hall (Grand)')
+    // An instance with no tier is its zone too (LT-543).
+    expect(baseZone('The Permafrost Caverns - Solo')).toBe('The Permafrost Caverns')
+    expect(baseZone("Nagafen's Lair - Group 2")).toBe("Nagafen's Lair")
+    expect(zoneKey('The Plane of Hate - Group')).toBe(zoneKey('Plane of Hate'))
   })
 })
 
@@ -575,6 +579,12 @@ describe("Allakhazam's faction pages", () => {
     expect([bandMax('Dubious'), bandMax('Ally'), bandMax('')]).toEqual([-101, undefined, undefined])
     expect(questKey('Rat Ear Pie Quest')).toBe(questKey('rat ear pie'))
     expect(questKey('Tunare Scouts Dagger')).toBe('tunarescoutsdagger')
+    // A quest's good and evil versions are two quests, each gated by its own needs (LT-545).
+    expect(questKey('The Clothspinner Sisters (evil)')).not.toBe(questKey('The Clothspinner Sisters (good)'))
+    expect(questKey('Rat Ear Pie (Quest)')).toBe(questKey('rat ear pie'))
+    // A wiki page's words for no mob, or a whole race, are no camp (LT-544).
+    expect(['None known', 'none listed', 'N/A', '?', 'All lizards in'].every((n) => NO_MOB.test(n))).toBe(true)
+    expect(NO_MOB.test('a lizard man')).toBe(false)
   })
 
   // Two factions' pages, made up in Allakhazam's shape.
@@ -2138,7 +2148,7 @@ describe('what the character holds', () => {
       { name: 'Snake Fang', count: 3, how: 'drop', sec: 50 }
     ])
     const lyda = c.activities.find((a) => a.title === 'Death of Lyda Nasin')!
-    expect(lyda.items).toEqual([{ name: 'Human Head', count: 1, how: 'drop', where: expect.stringContaining('Lyda Nasin'), named: 1, sec: 4320 }])
+    expect(lyda.items).toEqual([{ name: 'Human Head', count: 1, how: 'drop', where: expect.stringContaining('Lyda Nasin'), named: 1, sec: 8640 }])
     // A point from her head takes many times a point from a bag of snake parts.
     expect(unitTime(lyda, S).seconds / 20).toBeGreaterThan((10 * unitTime(snakes[0], S).seconds) / 10)
   })

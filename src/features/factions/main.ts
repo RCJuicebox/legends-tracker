@@ -236,9 +236,12 @@ async function firstStamp(logPath: string, size: number): Promise<number> {
   return first
 }
 
-/** What caused each faction change, kill or hand-in, as a LogHistory consumer. Version 2: a trade's items are counted together. */
+/**
+ * What caused each faction change, kill or hand-in, as a LogHistory consumer. Version 2: a trade's
+ * items are counted together. Version 3: an instance with no tier ("- Solo", "- Group 2") is its zone's camp.
+ */
 const factionSourceConsumer: HistoryConsumer<FactionSourceTallies> = {
-  version: 2,
+  version: 3,
   empty: emptySources,
   reader: sourceReader
 }
@@ -605,16 +608,29 @@ export class FactionBook {
   }
 }
 
-/** What the character holds, by itemKey: bags, bank, shared bank and depot, at the last inventory export. */
+/** Each inventory export read for the plan, by path, kept while the file is unchanged. */
+const holdingsRead = new Map<string, { modified: number; have: Record<string, number> }>()
+
+/**
+ * What the character holds, by itemKey: bags, bank, shared bank and depot, at the last inventory
+ * export. Read once a write, and not until it has settled, as the factions export is (LT-541): the
+ * game writes inventory, achievements and factions in the same second.
+ */
 async function holdings(dir: string, character: string): Promise<{ have: Record<string, number>; file: { file: string; modified: number } | null }> {
   const file = `${character}-Inventory.txt`
   try {
     const path = join(dir, file)
-    const [text, st] = await Promise.all([fs.readFile(path, 'utf8'), fs.stat(path)])
-    const inv = parseInventory(text)
+    const modified = (await fs.stat(path)).mtimeMs
+    const kept = holdingsRead.get(path)
+    if (kept?.modified === modified) return { have: kept.have, file: { file, modified } }
+    const young = SETTLE_MS - (Date.now() - modified)
+    if (young > 0) await new Promise((r) => setTimeout(r, young))
+    const inv = parseInventory(await fs.readFile(path, 'utf8'))
     const have: Record<string, number> = {}
     for (const it of [...inv.bags, ...inv.bank, ...inv.sharedBank, ...inv.depot]) have[itemKey(it.name)] = (have[itemKey(it.name)] ?? 0) + it.count
-    return { have, file: { file, modified: st.mtimeMs } }
+    if (holdingsRead.size > 20) holdingsRead.clear()
+    holdingsRead.set(path, { modified, have })
+    return { have, file: { file, modified } }
   } catch (e) {
     if ((e as NodeJS.ErrnoException).code !== 'ENOENT') log.warn(`Could not read ${file}:`, e)
     return { have: {}, file: null }
@@ -634,7 +650,7 @@ async function planData(ctx: AppContext, character: string, refresh: boolean, wi
   }
   const achievements = await factionAchievements(ctx, character)
   const view = await ctx.factions.history.view(where, exported, achievements)
-  const { targets, maxed, achievementsExport, standings } = planFor(view)
+  const { targets, maxed, achievementsExport, standings, approximate } = planFor(view)
   const [tallies, book, purchases, held, others] = await Promise.all([
     ctx.factions.causes.view(where),
     ctx.factions.book.get(refresh),
@@ -701,6 +717,7 @@ async function planData(ctx: AppContext, character: string, refresh: boolean, wi
     maxed,
     achievementsExport,
     standings,
+    ...(approximate ? { approximate } : {}),
     catalog,
     export: exported ? { file: exported.file, modified: exported.modified } : null,
     inventory: held.file,
@@ -900,7 +917,13 @@ export class Factions implements AppFeature {
       if (query.trim().length < 3) return { results: [] }
       const where = ctx.historyOf(character)
       const exported = await readFactionExport(ctx.installDir(), character).catch(() => null)
-      const [shared, book, view] = await Promise.all([sharedTallies(ctx, character), ctx.factions.book.get(false), ctx.factions.history.view(where, exported)])
+      // With the achievements export too, as the page asks: the since-export read is kept by both, and
+      // asked without one it was thrown away and read again from the export at every lookup (LT-540).
+      const [shared, book, view] = await Promise.all([
+        sharedTallies(ctx, character),
+        ctx.factions.book.get(false),
+        factionAchievements(ctx, character).then((achievements) => ctx.factions.history.view(where, exported, achievements))
+      ])
       const name = factionNamer(view.factions.map((r) => r.name))
       return { results: lookUp(query, shared.sources, shared.from, book.book.pages, name, guessesFrom(shared.sources)) }
     })

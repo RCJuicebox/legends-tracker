@@ -520,8 +520,11 @@ export const QUEST_ITEMS_IN_PLAY: Record<string, Record<string, ItemInPlay>> = {
   'ogre heads': { 'ogre head': { how: 'drop', where: 'Corflunk and Zarchoomi', named: 2, notHeld: true } },
   // Lyda Nasin's own head (the walkthrough), lore and no drop, so one at a time; she comes up once a game
   // day (72 minutes: /time moves an hour every 3 minutes in the log), in a spawn she shares with Lunce
-  // Nasin (eqlwiki) (2026-10-06). eqlwiki's item page adds other named mobs' heads.
-  'death of lyda nasin': { 'human head': { how: 'drop', where: 'Lyda Nasin (East Freeport), lore: one a game day, when she is up', named: 1, sec: 4320 } }
+  // Nasin (eqlwiki) (2026-10-06). eqlwiki's item page adds other named mobs' heads. The share is taken
+  // as even, so one head every two game days: a guess until play times her (LT-546).
+  'death of lyda nasin': {
+    'human head': { how: 'drop', where: 'Lyda Nasin (East Freeport), lore: she shares her spawn with Lunce Nasin, so about one every two game days', named: 1, sec: 8640 }
+  }
 }
 
 /** Who takes a quest's hand-in where the walkthrough's line names someone else, by quest page (lower-cased). */

@@ -4,6 +4,7 @@ import { trackedAchievements } from '../../src/core/trackedAchievements'
 import {
   achievementRaces,
   forced,
+  factTells,
   learnFromExport,
   SlayerRaces,
   slayerCounters,
@@ -371,6 +372,32 @@ describe('what an export settles', () => {
     // The numbers alone cannot tell him from the kobolds; the kobolds' race can.
     const got = learnFromExport(new Map([['dragonbane', 0]]), [{ ...dragons[0], count: 5 }], r, kills, raceOf, noFacts)
     expect(got).toEqual([{ mob: 'lord nagafen', achievement: 'dragonbane', counts: true, kills: 5, rise: 5 }])
+  })
+
+  it('leaves a compound race open to an export under the race its last word is (LT-531)', () => {
+    // The client's own rows: Elemental (75) and Earth Elemental (209), a race of its own.
+    const game = parseRaceTable(['75^11^Elemental^0^', '75^12^Elementals^0^', '209^11^Earth Elemental^0^', '54^11^Orc^0^'].join('\n'))
+    const r = new SlayerRaces([{ races: 'Elementals' }, { races: 'Orcs' }], game)
+    const p = r.place('an earth elemental', 'Earth Elemental')
+    expect(p).toMatchObject({ key: 'earth elemental', sure: true })
+    // Not counted under Elementals on its race, but an export may say it counts.
+    expect(r.keys[0].has('earth elemental')).toBe(false)
+    expect(r.open(0, p)).toBe(true)
+    // Under an achievement whose list has nothing of it, it stays settled.
+    expect(r.open(1, p)).toBe(false)
+  })
+
+  it('keeps a fact only when it tells the counts something the races do not (LT-532, LT-669)', () => {
+    const raceOf = (m: string) => ({ 'an orc pawn': 'Orc', 'a kobold runt': 'Kobold' })[m] ?? null
+    const tells = (mob: string, achievement: string, counts: boolean) => factTells(races, counters, raceOf, { mob, achievement, counts })
+    // An orc not counting toward the dogs: the race says as much.
+    expect(tells('an orc pawn', "puttin' on the dog", false)).toBe(false)
+    // An orc said not to count toward the orcs goes against its race; a count is always kept.
+    expect(tells('an orc pawn', 'orc stomp!', false)).toBe(true)
+    expect(tells('an orc pawn', 'orc stomp!', true)).toBe(true)
+    // A mob with no race known, and an achievement not open for this character, are kept.
+    expect(tells('a mystery', 'orc stomp!', false)).toBe(true)
+    expect(tells('an orc pawn', 'done long ago', false)).toBe(true)
   })
 })
 

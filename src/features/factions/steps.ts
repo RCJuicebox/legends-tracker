@@ -60,6 +60,10 @@ export function planSteps(m: Model, best: { blocks: Block[]; cost: number }, kep
       const maxedLowered: Record<string, number> = {}
       const lifts: string[] = []
       const sinks: string[] = []
+      // A block that goes on the step before (the same activity) carries on what it took off maxed
+      // factions: the step's "takes N off (maxed)" is from its first block's standing (LT-534).
+      const prev = steps.at(-1)
+      const wasMaxed = prev?.activity.id === x.a.id ? prev.maxedLowered : {}
       for (const { i, h } of x.touch) {
         const f = names[i]
         const v = st.s[i]
@@ -71,7 +75,7 @@ export function planSteps(m: Model, best: { blocks: Block[]; cost: number }, kep
         }
         // A city's guards taken below where they must end: a later step makes it up.
         if (i < T && h < 0 && after < floor[i]) lowers[f] = v - after
-        if (h < 0 && v >= STANDING_MAX) maxedLowered[f] = v - after
+        if (h < 0 && (v >= STANDING_MAX || wasMaxed[f] !== undefined)) maxedLowered[f] = v - after
         if (v < 0 && after >= 0) lifts.push(f)
         else if (v >= 0 && after < 0) sinks.push(f)
       }

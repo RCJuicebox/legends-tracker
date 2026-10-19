@@ -61,6 +61,11 @@ export interface PlanFor {
   achievementsExport: boolean
   /** Every faction's standing where it is known (the factions export plus the log since): where each ends is counted. */
   standings: Record<string, number>
+  /**
+   * Factions whose standing is approximate: the log saw more changes since the factions export than it
+   * keeps (an export older than the live log), so the plan may start from the wrong place (LT-542).
+   */
+  approximate?: string[]
 }
 
 /** The achievements a character has still to do, from its factions view: whichever character it is, whatever it has done. */
@@ -68,15 +73,17 @@ export function planFor(view: Pick<FactionView, 'factions'>): PlanFor {
   const targets: PlanTarget[] = []
   const maxed: string[] = []
   const standings: Record<string, number> = {}
+  const approximate: string[] = []
   let achievementsExport = false
   for (const r of view.factions) {
     const standing = r.standing?.value ?? 0
     if (r.standing) standings[r.name] = r.standing.value
+    if (r.standing && !r.standing.sinceAll) approximate.push(r.name)
     if (standing >= STANDING_MAX) maxed.push(r.name)
     if (r.achievement?.from === 'achievements') achievementsExport = true
     if (r.achievement && r.achievement.done !== true) targets.push({ faction: r.name, achievement: r.achievement.name, standing })
   }
-  return { targets, maxed, achievementsExport, standings }
+  return { targets, maxed, achievementsExport, standings, ...(approximate.length ? { approximate } : {}) }
 }
 
 /**

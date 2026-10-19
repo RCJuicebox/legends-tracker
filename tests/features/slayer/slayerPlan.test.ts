@@ -545,6 +545,22 @@ describe('Slayer plan: the plan', () => {
     expect(planSlayer({ goals: goal, camps: two }, { ...DEFAULT_CHOICES, outMobs: ['duggin scumber', 'a puma', 'a guard'] }).unplanned).toEqual([0])
   })
 
+  it('offers no eqlwiki guess in a zone the log has measured for the goal, however slow (LT-533)', () => {
+    const goal = [g('Dragonbane', 0, 50)]
+    const measured: SlayerPlanCamp = {
+      id: 'log:The Plane of Fear',
+      zone: 'The Plane of Fear',
+      kinds: [{ name: 'a dracolich', perHour: 1.6, goals: [0] }],
+      source: 'log',
+      pace: { 0: 1.6 }
+    }
+    const sameZone: SlayerPlanCamp = { id: 'wiki:planeoffear', zone: 'The Plane of Fear', kinds: [{ name: 'dragon', perHour: 4, goals: [0] }], source: 'wiki', pace: { 0: 4 } }
+    const elsewhere: SlayerPlanCamp = { id: 'wiki:skyfire', zone: 'The Skyfire Mountains', kinds: [{ name: 'dragon', perHour: 3, goals: [0] }], source: 'wiki', pace: { 0: 3 } }
+    expect(planSlayer({ goals: goal, camps: [measured, sameZone] }, DEFAULT_CHOICES).steps.map((s) => s.camp.id)).toEqual(['log:The Plane of Fear'])
+    // Another zone's guess may still stand beside a crawl.
+    expect(planSlayer({ goals: goal, camps: [measured, sameZone, elsewhere] }, DEFAULT_CHOICES).steps[0].camp.id).toBe('wiki:skyfire')
+  })
+
   it('takes the assumed pace where play gives none, shared among the camp’s races', () => {
     // Half the camp's kills are orcs: ten of the twenty an hour.
     const plan = planSlayer(
