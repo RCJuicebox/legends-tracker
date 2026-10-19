@@ -449,7 +449,16 @@ const shortList = (names: string[]) => (names.length <= 2 ? names.join(', ') : `
 const ONCE_POINTS = 50
 
 /** Every activity that raises one of the achievements still to do, from the log and the wiki. */
-export function buildCatalog(input: CatalogInput): FactionCatalog {
+/** A mob eqlwiki's faction pages name, with the factions it raises and lowers and the page that sends one there. */
+interface WikiMob {
+  mob: FactionMob
+  raise: Set<string>
+  lower: Set<string>
+  page: string
+}
+
+/** What every part of the catalog is built with: the input, its names and the helpers each part shares (LT-638). */
+function catalogContext(input: CatalogInput) {
   const name = factionNamer(input.factions)
   const open = wanted(input, name)
   const guesses = guessesFrom(input.sources)
@@ -568,8 +577,49 @@ export function buildCatalog(input: CatalogInput): FactionCatalog {
         p.name.toLowerCase() === t.name.replace(/^\*/, '').toLowerCase() &&
         (t.kind === 'kill' ? !p.item : !!p.item && Object.keys(t.items ?? {}).every((it) => itemName(it).toLowerCase() === p.item!.toLowerCase()))
     )
+  return {
+    input,
+    name,
+    open,
+    guesses,
+    isThing,
+    isZone,
+    alla,
+    allaNeed,
+    allaAmount,
+    npcOf,
+    leftOut,
+    goneZones,
+    inPlay,
+    zoneGone,
+    leaveZone,
+    leave,
+    respawnsOf,
+    allaKill,
+    mobKey,
+    allaMobs,
+    activities,
+    entries,
+    acts,
+    keyOf,
+    sharedBy,
+    withStock,
+    loggedCommon,
+    common,
+    had,
+    loopOf,
+    loops,
+    doubled,
+    parts,
+    isPart
+  }
+}
 
-  // ---- hand-ins from the log ----
+type CatalogContext = ReturnType<typeof catalogContext>
+
+/** The hand-ins the log saw, by NPC: each with every item offered for it. */
+function logHandIns(cx: CatalogContext) {
+  const { activities, acts, doubled, guesses, had, isPart, loops, name, open, sharedBy, withStock } = cx
   // By NPC: each hand-in activity, with every item offered for it.
   const loggedNpcs = new Map<string, { a: PlanActivity; offered: Set<string> }[]>()
   for (const t of acts) {
@@ -607,8 +657,12 @@ export function buildCatalog(input: CatalogInput): FactionCatalog {
     const k = t.name.toLowerCase()
     loggedNpcs.set(k, [...(loggedNpcs.get(k) ?? []), { a, offered: new Set(Object.keys(t.items ?? {}).map((it) => itemName(it).toLowerCase())) }])
   }
+  return loggedNpcs
+}
 
-  // ---- kill camps from the log: the mobs of a zone that move the same factions ----
+/** The kill camps the log saw: the mobs of a zone that move the same factions. The mobs it saw killed, by mobKey. */
+function logCamps(cx: CatalogContext) {
+  const { activities, acts, guesses, input, isPart, mobKey, name, open, sharedBy } = cx
   const camps = new Map<string, SourceTally[]>()
   for (const t of acts) {
     if (t.kind !== 'kill' || isPart(t)) continue
@@ -654,14 +708,12 @@ export function buildCatalog(input: CatalogInput): FactionCatalog {
       ...(isCity(zone) && members.some((m) => !isCommon(m.name) || CITY_PEOPLE.test(m.name)) ? { city: true } : {})
     })
   }
+  return logged
+}
 
-  // ---- kill camps from the wiki, for mobs the log has not seen killed there ----
-  interface WikiMob {
-    mob: FactionMob
-    raise: Set<string>
-    lower: Set<string>
-    page: string
-  }
+/** The kill camps eqlwiki's faction pages give, for mobs the log has not seen killed there; every mob the pages name, by mobKey. */
+function wikiCamps(cx: CatalogContext, logged: Set<string>) {
+  const { activities, allaMobs, common, guesses, input, leave, leaveZone, mobKey, name, open, respawnsOf, zoneGone } = cx
   const wikiMobs = new Map<string, WikiMob>()
   for (const p of input.pages) {
     const f = name(p.page)
@@ -721,8 +773,12 @@ export function buildCatalog(input: CatalogInput): FactionCatalog {
       ...(isCity(zone) && members.some((m) => !isCommon(m.mob.name, m.mob.note) || CITY_PEOPLE.test(m.mob.name)) ? { city: true } : {})
     })
   }
+  return wikiMobs
+}
 
-  // ---- kill camps from Allakhazam: the mobs its pages give amounts for, that the log has not seen killed ----
+/** The kill camps from Allakhazam: the mobs its pages give amounts for, that the log has not seen killed. */
+function allaCamps(cx: CatalogContext, logged: Set<string>) {
+  const { activities, allaKill, leave, leaveZone, mobKey, open, respawnsOf, zoneGone } = cx
   const allaCamps = new Map<string, AllaKill[]>()
   for (const m of allaKill) {
     if (logged.has(mobKey(m.name, m.zone)) || !raisesAny(m.hits, open)) continue
@@ -760,8 +816,11 @@ export function buildCatalog(input: CatalogInput): FactionCatalog {
       ...(isCity(zone) && members.some((m) => !isCommon(m.name) || CITY_PEOPLE.test(m.name)) ? { city: true } : {})
     })
   }
+}
 
-  // ---- kill camps known from play or read off Allakhazam by hand, for mobs nothing above has ----
+/** The kill camps known from play or read off Allakhazam by hand, for mobs nothing above has. */
+function playCamps(cx: CatalogContext, logged: Set<string>, wikiMobs: Map<string, WikiMob>) {
+  const { activities, allaMobs, mobKey, name, open } = cx
   for (const c of CAMPS) {
     const hits = Object.fromEntries(Object.entries(c.hits).map(([f, v]) => [name(f), legends(v)]))
     const known = c.mobs.some((m) => {
@@ -783,8 +842,11 @@ export function buildCatalog(input: CatalogInput): FactionCatalog {
       named: 0
     })
   }
+}
 
-  // ---- quests from the wiki, for the achievements still open ----
+/** The quests eqlwiki's pages give for the achievements still open. */
+function wikiQuests(cx: CatalogContext, loggedNpcs: Map<string, { a: PlanActivity; offered: Set<string> }[]>) {
+  const { activities, allaAmount, allaNeed, common, guesses, had, input, isThing, isZone, leaveZone, loopOf, name, open, withStock, zoneGone } = cx
   const replaced = new Set(CYCLES.filter((c) => c.replaces).map((c) => c.page.toLowerCase()))
   const seenSteps = new Set<string>()
   const sameSteps = new Set<string>()
@@ -921,8 +983,11 @@ export function buildCatalog(input: CatalogInput): FactionCatalog {
       })
     }
   }
+}
 
-  // ---- quest cycles known from play ----
+/** The quest cycles known from play. */
+function playCycles(cx: CatalogContext) {
+  const { activities, had, input, name, open, withStock } = cx
   for (const c of CYCLES) {
     const hits = Object.fromEntries(Object.entries(c.hits).map(([f, v]) => [name(f), v]))
     if (!raisesAny(hits, open)) continue
@@ -957,7 +1022,18 @@ export function buildCatalog(input: CatalogInput): FactionCatalog {
       page: c.page
     })
   }
+}
 
+export function buildCatalog(input: CatalogInput): FactionCatalog {
+  const cx = catalogContext(input)
+  const loggedNpcs = logHandIns(cx)
+  const logged = logCamps(cx)
+  const wikiMobs = wikiCamps(cx, logged)
+  allaCamps(cx, logged)
+  playCamps(cx, logged, wikiMobs)
+  wikiQuests(cx, loggedNpcs)
+  playCycles(cx)
+  const { activities, guesses, leftOut } = cx
   // The player's pace at killing things that move factions, over every zone with enough runs.
   const rates: number[] = []
   for (const z of Object.values(input.sources.zones)) if (z.runN >= 10 && z.runMs > 0) for (let i = 0; i < Math.min(z.runN, 200); i++) rates.push(z.runN / (z.runMs / 3_600_000))
