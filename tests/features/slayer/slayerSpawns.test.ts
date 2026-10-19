@@ -1,5 +1,18 @@
 import { describe, expect, it } from 'vitest'
-import { legendsSpawnsOf, mapMarks, mobSpawns, parseMap, spotsIn, spotsOf, waypoint, zoneIndex, zoneTimings, type SpawnTables } from '../../../src/features/slayer/spawns'
+import {
+  legendsSpawnsOf,
+  mapMarks,
+  mobSpawns,
+  parseMap,
+  petCamps,
+  spotsIn,
+  spotsOf,
+  waypoint,
+  zoneIndex,
+  zoneTimings,
+  type MapSpot,
+  type SpawnTables
+} from '../../../src/features/slayer/spawns'
 import type { RespawnRecord } from '../../../src/core/respawns'
 
 // TAKP's spawn tables in Legends' terms: made-up zones in the tables' shape.
@@ -175,5 +188,27 @@ describe('the game’s maps', () => {
     expect(waypoint(spots[1])).toBe('/waypoint -649, -13825')
     // The tables' spot comes back as the player found it there.
     expect(waypoint(spots[0])).toBe('/waypoint -619, -13792')
+  })
+})
+
+describe('where to stand with a pet', () => {
+  const at = (x: number, y: number, z = 0, chance = 100, timer = 600): MapSpot => ({ x, y, z, mobs: [{ name: 'an orc pawn', chance }], timer })
+
+  it('stands where the most spawns are within reach, and the next best out of reach of it', () => {
+    // A pack of four by the gate, two off in the woods, one far away.
+    const spots = [at(0, 0), at(40, 0), at(0, 40), at(60, 60), at(500, 0), at(540, 0), at(2000, 2000)]
+    const [best, next, ...rest] = petCamps(spots)
+    expect(best).toMatchObject({ spots: 4, radius: 150, perHour: 24 })
+    expect(Math.hypot(best.x, best.y)).toBeLessThan(100)
+    expect(next).toMatchObject({ spots: 2, perHour: 12 })
+    expect(next.x).toBeGreaterThanOrEqual(500)
+    expect(rest).toEqual([])
+  })
+
+  it('leaves out another floor, counts each spot’s odds and timer, and takes a Legends spot as a common mob', () => {
+    // Below the castle floor; a 25% roll; a slow one; a spot of Legends' own (no timer).
+    const spots = [at(0, 0), at(10, 0, 80), at(20, 0, 0, 25), at(30, 0, 0, 100, 3600), { ...at(40, 0), timer: 0 }]
+    expect(petCamps(spots, 150, 1)).toEqual([{ x: 0, y: 0, z: 0, radius: 150, spots: 4, perHour: 6 + 1.5 + 1 + 6 }])
+    expect(petCamps([])).toEqual([])
   })
 })

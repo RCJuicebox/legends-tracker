@@ -725,6 +725,7 @@ export function Slayer() {
                                       <SpawnMap
                                         zone={zone}
                                         mobs={killed.map((k) => k.name)}
+                                        pet
                                         stand={(() => {
                                           const s = spotFor(zone, data.goals[st.focus[0]]?.name ?? '')
                                           return s?.at ? { at: s.at, label: `${s.tip} (${s.said})` } : undefined

@@ -78,7 +78,7 @@ const invoke = vi.fn((channel: string, ...args: unknown[]) => {
     case 'hunter:broken':
       return args[1] ? Promise.resolve([]) : Promise.reject(new Error('read-only'))
     case 'slayer:map':
-      return Promise.resolve({ zone: 'Lake Nerius', short: '', lines: [], labels: [], spots: [] })
+      return Promise.resolve({ zone: 'Lake Nerius', short: '', lines: [], labels: [], spots: [], camps: [] })
     case 'slayer:mark':
       return (args[0] as unknown[]).length ? Promise.resolve({ folder: 'maps/LegendsTracker', zones: 2, spots: 3 }) : Promise.reject('locked')
     default:

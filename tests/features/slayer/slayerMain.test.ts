@@ -287,7 +287,7 @@ describe('the Slayer page', () => {
     expect(map).toMatchObject({ zone: 'Clan Crushbone', short: 'crushbone', lines: [0, 0, 100, 100], labels: [{ x: 10, y: 10, text: 'to Greater Faydark' }] })
     expect(map.spots.length).toBeGreaterThan(0)
     expect(map.spots[0].mobs[0].name).toBe('orc pawn')
-    expect(await call('slayer:map', 'Lake Nerius', ['a fish'])).toEqual({ zone: 'Lake Nerius', short: '', lines: [], labels: [], spots: [] })
+    expect(await call('slayer:map', 'Lake Nerius', ['a fish'])).toEqual({ zone: 'Lake Nerius', short: '', lines: [], labels: [], spots: [], camps: [] })
     await expect(call('slayer:map', 3, [])).rejects.toThrow()
   })
 

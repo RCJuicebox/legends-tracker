@@ -262,6 +262,56 @@ const legendsSpots = (zone: string, mobs: string[]): MapSpot[] =>
 /** A spot as the game's /waypoint takes it, in the /loc order: "/waypoint -649, -13825". */
 export const waypoint = (s: Pick<MapSpot, 'x' | 'y'>) => `/waypoint ${Math.round(-s.y)}, ${Math.round(-s.x)}`
 
+/**
+ * Where to stand still and let a pet kill what pops around you (most Slayer kills are farmed so, AFK):
+ * the spot with the most of the step's spawns within reach, at about its own height (a castle's
+ * floors, a cave's levels).
+ */
+export interface PetCamp {
+  x: number
+  y: number
+  z: number
+  /** How far it reaches, map units. */
+  radius: number
+  /** The spawn spots within reach. */
+  spots: number
+  /** What they give an hour on their classic timers, each spot's odds counted. */
+  perHour: number
+}
+
+/** A pet's reach from where you stand: a spawn farther off is a walk the pet does not make on its own. */
+export const PET_REACH = 150
+/** A spawn more above or below you than this is another floor. */
+const PET_HEIGHT = 25
+/** A spot of Legends' own has no known timer: taken as a common mob's. */
+const LEGENDS_TIMER = 600
+
+/**
+ * The best places to stand still with a pet, best first: each spawn spot tried as where you stand,
+ * scored by the kills an hour the spots within reach give. The next is never within reach of one before.
+ */
+export function petCamps(spots: MapSpot[], reach = PET_REACH, most = 2): PetCamp[] {
+  const worth = spots.map((s) => (s.mobs.reduce((n, m) => n + m.chance, 0) / 100) * (3600 / (s.timer || LEGENDS_TIMER)))
+  const tried = spots.map((c) => {
+    let n = 0
+    let perHour = 0
+    spots.forEach((s, i) => {
+      if (Math.hypot(s.x - c.x, s.y - c.y) > reach || Math.abs(s.z - c.z) > PET_HEIGHT) return
+      n++
+      perHour += worth[i]
+    })
+    return { x: c.x, y: c.y, z: c.z, radius: reach, spots: n, perHour }
+  })
+  tried.sort((a, b) => b.perHour - a.perHour || b.spots - a.spots)
+  const out: PetCamp[] = []
+  for (const t of tried) {
+    if (out.length >= most) break
+    if (out.some((o) => Math.hypot(o.x - t.x, o.y - t.y) < reach)) continue
+    out.push(t)
+  }
+  return out
+}
+
 /** A zone's map as the game draws it, with the spots a step's mobs pop at. */
 export interface SlayerMap {
   zone: string
@@ -271,6 +321,8 @@ export interface SlayerMap {
   lines: number[]
   labels: { x: number; y: number; text: string }[]
   spots: MapSpot[]
+  /** Where to stand with a pet, best first (petCamps). */
+  camps: PetCamp[]
 }
 
 /** The game's map files (lines "L x1, y1, z1, x2, y2, z2, r, g, b", labels "P x, y, z, r, g, b, size, text"), heights dropped. */

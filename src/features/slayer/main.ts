@@ -30,7 +30,7 @@ import {
   type SlayerPlanChoices,
   type SlayerPlanData
 } from './core'
-import { mapMarks, mobSpawns, parseMap, raceMixer, spotsIn, zoneIndex, zoneTimings, type MobSpawn, type SlayerMap, type SlayerMark, type SpawnTables } from './spawns'
+import { mapMarks, mobSpawns, parseMap, petCamps, raceMixer, spotsIn, zoneIndex, zoneTimings, type MobSpawn, type SlayerMap, type SlayerMark, type SpawnTables } from './spawns'
 import type { RespawnFallback, RespawnRecord, RespawnRecords } from '../../core/respawns'
 import TAKP from '../../shared/game/takpSpawns.json'
 import { hunterZones } from '../hunter/core'
@@ -470,11 +470,12 @@ const readText = (path: string) => readFile(path, 'latin1').catch(() => null)
 /** A zone's map as the game draws it (its own files, and its labels), with the spots these mobs pop at. A zone the tables lack has no short name. */
 async function spawnMap(installDir: string, zone: string, mobs: string[]): Promise<SlayerMap> {
   const short = tableOf(zone)
-  if (!short) return { zone, short: '', lines: [], labels: [], spots: [] }
+  if (!short) return { zone, short: '', lines: [], labels: [], spots: [], camps: [] }
   const maps = join(installDir, 'maps')
   const files = await Promise.all([`${short}.txt`, `${short}_1.txt`].map((f) => (installDir ? readText(join(maps, f)) : Promise.resolve(null))))
   const map = parseMap(files.filter((t): t is string => t !== null).join('\n'))
-  return { zone: TABLES[short].name, short, ...map, spots: spotsIn(TABLES[short], mobs) }
+  const spots = spotsIn(TABLES[short], mobs)
+  return { zone: TABLES[short].name, short, ...map, spots, camps: petCamps(spots) }
 }
 
 /**

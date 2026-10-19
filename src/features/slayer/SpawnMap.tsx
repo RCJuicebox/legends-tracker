@@ -2,14 +2,15 @@ import { useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointer
 import { useInvoke, useVisibleInterval } from '../../renderer/src/hooks'
 import { Pending } from '../../renderer/src/components/ui'
 import { duration } from '../../core/format'
-import { waypoint, type SlayerMap } from './spawns'
+import { waypoint, type PetCamp, type SlayerMap } from './spawns'
 import { zoneKey } from '../../core/zones'
 import type { PlayerLocation } from '../../shared/tracking'
 
 // A step's zone as the game's own map files draw it, with a dot at every spot its mobs pop at (TAKP's
 // spawn tables, and Legends' own spawns the player found). The game's maps put x to the right and y
 // down, as drawn here. The wheel zooms where the pointer is and a drag moves the map; a spot hovered or
-// focused says what pops there and its /waypoint under the map (LT-675).
+// focused says what pops there and its /waypoint under the map (LT-675). A Slayer step's map also rings
+// where to stand still with a pet (most Slayer kills are farmed so, AFK): the most spawns within reach.
 
 const PAD = 0.04
 /** The map's tallest, in CSS pixels: its width follows from the zone's shape. */
@@ -45,11 +46,15 @@ const youText = (l: PlayerLocation, now: number) => {
   return `you at /loc ${Math.round(l.y)}, ${Math.round(l.x)}, ${mins ? `${mins} min ago` : 'just now'}`
 }
 
+/** "AFK pet spot: /waypoint 147, 13 · 28 spawns within 150, about 170 an hour on classic timers". */
+const campText = (c: PetCamp, best: boolean) =>
+  `${best ? 'AFK pet spot' : 'Next best'}: ${waypoint(c)} · ${c.spots} spawn${c.spots === 1 ? '' : 's'} within ${c.radius}, about ${Math.round(c.perHour)} an hour on classic timers`
+
 /** What pops at a spot, its timer and its /waypoint, as one line. */
 const spotText = (s: SlayerMap['spots'][number]) =>
   `${s.mobs.map((m) => `${m.name}${m.chance < 100 ? ` ${m.chance}%` : ''}`).join(' or ')} · ${s.timer ? `${duration(s.timer)} classic` : (s.where ?? 'Legends')} · ${waypoint(s)}`
 
-function SpawnMapView({ map, stand, you }: { map: SlayerMap; stand?: Stand; you?: PlayerLocation | null }) {
+function SpawnMapView({ map, stand, you, camps = [] }: { map: SlayerMap; stand?: Stand; you?: PlayerLocation | null; camps?: PetCamp[] }) {
   const whole = useMemo<View>(() => box(stand ? { ...map, spots: [...map.spots, { x: -stand.at[1], y: -stand.at[0], z: 0, mobs: [], timer: 0 }] } : map), [map, stand])
   const [view, setView] = useState<View>(whole)
   useEffect(() => setView(whole), [whole])
@@ -121,6 +126,17 @@ function SpawnMapView({ map, stand, you }: { map: SlayerMap; stand?: Stand; you?
               {l.text}
             </text>
           ))}
+        {/* Under the spots, so each still says what pops there. */}
+        {camps.map((c, i) => (
+          <g key={`camp${i}`} className={`sl-map-camp${i ? ' next' : ''}`}>
+            <circle cx={c.x} cy={c.y} r={c.radius} className="sl-map-reach" vectorEffect="non-scaling-stroke">
+              <title>{campText(c, !i)}</title>
+            </circle>
+            <rect x={c.x - r * 1.6} y={c.y - r * 1.6} width={r * 3.2} height={r * 3.2} className="sl-map-camp-mark" vectorEffect="non-scaling-stroke">
+              <title>{campText(c, !i)}</title>
+            </rect>
+          </g>
+        ))}
         {map.spots.map((s, i) => (
           <circle
             key={i}
@@ -166,8 +182,8 @@ function SpawnMapView({ map, stand, you }: { map: SlayerMap; stand?: Stand; you?
   )
 }
 
-/** A step's map, asked of main when shown. */
-export function SpawnMap({ zone, mobs, stand }: { zone: string; mobs: string[]; stand?: Stand }) {
+/** A step's map, asked of main when shown; `pet` rings where to stand with a pet (a Slayer step's, not a Hunter named's). */
+export function SpawnMap({ zone, mobs, stand, pet = false }: { zone: string; mobs: string[]; stand?: Stand; pet?: boolean }) {
   const q = useInvoke('slayer:map', [zone, mobs], [zone, mobs.join('|')])
   // Where the player last typed /loc, asked again every half minute while the map shows (FEAT-023).
   const where = useInvoke('game:location')
@@ -176,9 +192,19 @@ export function SpawnMap({ zone, mobs, stand }: { zone: string; mobs: string[]; 
   if (!q.data) return <Pending error={q.error} retry={q.reload} what="the map" />
   const map = q.data
   if (!map.short) return <div className="faint small">TAKP’s spawn tables do not have {zone}.</div>
+  const camps = pet ? map.camps : []
   return (
     <div className="sl-map-wrap">
-      <SpawnMapView map={map} stand={stand} you={you} />
+      <SpawnMapView map={map} stand={stand} you={you} camps={camps} />
+      {camps.length > 0 && (
+        <div className="small sl-map-camps">
+          {camps.map((c, i) => (
+            <div key={i} className={i ? 'faint' : undefined}>
+              <span className="mono">{campText(c, !i)}</span>
+            </div>
+          ))}
+        </div>
+      )}
       <div className="faint small">
         {map.spots.length
           ? `${map.spots.length} spot${map.spots.length === 1 ? '' : 's'} (${map.spots.some((s) => !s.timer) ? 'TAKP’s classic tables, and Legends’ own as found' : 'classic, from TAKP'})`

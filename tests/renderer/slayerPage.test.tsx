@@ -126,7 +126,8 @@ const invoke = vi.fn((channel: string, ...args: unknown[]) => {
           { x: 10, y: 10, text: 'to Greater Faydark' },
           { x: 20, y: 20, text: 'Throne' }
         ],
-        spots: [{ x: 30, y: 40, z: 0, mobs: [{ name: 'an orc pawn', chance: 50 }], timer: 600 }]
+        spots: [{ x: 30, y: 40, z: 0, mobs: [{ name: 'an orc pawn', chance: 50 }], timer: 600 }],
+        camps: [{ x: 30, y: 40, z: 0, radius: 150, spots: 1, perHour: 3 }]
       })
     case 'slayer:mark':
       return (args[0] as unknown[]).length ? Promise.resolve({ folder: 'maps/LegendsTracker', zones: 1, spots: 12 }) : Promise.reject(new Error('locked'))
@@ -216,6 +217,9 @@ it('draws the plan, the lockouts beside it, and keeps a camp ruled out', async (
   expect(host.querySelectorAll('circle.sl-map-spot')).toHaveLength(1)
   expect(seen(host)).toContain('to Greater Faydark')
   expect(seen(host)).not.toContain('Throne')
+  // Where to stand with a pet, ringed, its /waypoint (the /loc order) under the map.
+  expect(host.querySelectorAll('.sl-map-camp circle.sl-map-reach')).toHaveLength(1)
+  expect(seen(host)).toContain('AFK pet spot: /waypoint -40, -30 · 1 spawn within 150, about 3 an hour on classic timers')
   await act(async () => button('Map').click())
   // Timed respawns against classic.
   await act(async () => button('Zone respawns').click())
