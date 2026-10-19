@@ -8,7 +8,7 @@ import { ReplayCheck, reportText, shapeOf } from './replay/replayCheck'
 // a fade with no timer, and the lines no part takes counted by shape.
 
 const run = (text: string) => {
-  const check = new ReplayCheck(fixtureBook(), { character: { ...DEFAULT_CHARACTER, classLevels: { shm: 50 } }, self: 'Kelwyn', rules: {}, tracking: TRACKING })
+  const check = new ReplayCheck(fixtureBook(), { character: { ...DEFAULT_CHARACTER, classLevels: { Shaman: 50 } }, self: 'Kelwyn', rules: {}, tracking: TRACKING })
   for (const raw of text.trim().split('\n')) {
     const l = parseLogLine(raw.trim())
     if (l) check.line(l)
