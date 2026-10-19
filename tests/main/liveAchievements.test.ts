@@ -97,6 +97,12 @@ describe('LiveAchievements tells the Hunter named', () => {
       zone: 'Befallen 2 (Adaptive)',
       rows: [{ achievement: 'Hunter of Befallen', left: ['Andrew Pine'], total: 3, since: ['Skeletal Orc'] }]
     })
+    // The Respawns records say when a named left died (LT-670).
+    vi.setSystemTime(T0 + 6 * 60_000)
+    Object.assign((live as unknown as { ctx: { store: object } }).ctx.store, {
+      respawns: { get: () => ({ 'befallen|andrew pine': { zone: 'Befallen', name: 'Andrew Pine', kills: 1, lastDeath: T0, pendingSince: T0, gaps: [480], shared: false } }) }
+    })
+    expect(inner.hunterHere()).toMatchObject({ rows: [{ left: ['Andrew Pine'], seen: { 'Andrew Pine': 'died 6 min ago; back in ~2 min as you timed it' } }] })
     inner.zone = 'Kedge Keep'
     expect(inner.hunterHere()).toBeNull()
     // Said not to work (Plan › Hunter): not shown.

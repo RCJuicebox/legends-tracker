@@ -354,9 +354,17 @@ export function ConfirmButton({
   disabled?: boolean
 }) {
   const [asking, setAsking] = useState(false)
+  const button = useRef<HTMLButtonElement>(null)
+  // Focus went to Yes while asking; the button it came from, drawn again, takes it back, so a keyboard
+  // user is not dropped onto the page (LT-678). Not on the first draw, which nobody asked for.
+  const asked = useRef(false)
+  useEffect(() => {
+    if (asking) asked.current = true
+    else if (asked.current) button.current?.focus()
+  }, [asking])
   if (!asking) {
     return (
-      <button type="button" className={className} title={title} aria-label={label} disabled={disabled} onClick={() => setAsking(true)}>
+      <button ref={button} type="button" className={className} title={title} aria-label={label} disabled={disabled} onClick={() => setAsking(true)}>
         {children}
       </button>
     )

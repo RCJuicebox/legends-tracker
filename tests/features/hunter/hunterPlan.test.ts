@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { parseAchievements } from '../../../src/core/achievements'
-import { hunterHere, hunterMatch, hunterZones, namedWait } from '../../../src/features/hunter/core'
+import { hunterHere, hunterMatch, hunterZones, namedWait, seenFromRecords, seenText } from '../../../src/features/hunter/core'
 import type { MobSpawn } from '../../../src/features/slayer/spawns'
 
 // Plan › Hunter: the named each Hunter achievement still wants, with what the spawn tables say of
@@ -57,8 +57,9 @@ describe('Plan › Hunter', () => {
     expect(hunterZones(sections, () => 0, 0).map((z) => z.zone)).toEqual(['Kedge Keep', 'The Ocean of Tears', 'Befallen'])
   })
 
-  it('waits a timer for a named always up, and its timer over its odds otherwise', () => {
-    expect(namedWait(spawn('x', 2, 300))).toBe(300)
+  it('waits nothing for a named always up (the first kill is there; the next waits its timer), and its timer over its odds otherwise (LT-671)', () => {
+    expect(namedWait(spawn('x', 2, 300))).toBe(0)
+    expect(namedWait(spawn('x', 1, 300))).toBe(0)
     expect(namedWait(spawn('x', 0.5, 300))).toBe(600)
     expect(namedWait(spawn('x', 0, 300))).toBeGreaterThan(1e6)
   })
@@ -85,5 +86,56 @@ describe('Plan › Hunter search', () => {
     expect(hunterMatch(z, '  West  karana ')).toBe(true)
     expect(hunterMatch(z, 'werewolf')).toBe(true)
     expect(hunterMatch(z, 'north karana')).toBe(false)
+  })
+})
+
+describe('Plan › Hunter: what the Respawns records say of a named (LT-670)', () => {
+  const now = 100 * MIN
+  it('says when it died and when it is back, timed by the log or by the tables, or that it is due', () => {
+    expect(seenText(undefined, 600, now)).toBeUndefined()
+    expect(seenText({ lastDeath: 0, pendingSince: 0, gaps: [] }, 600, now)).toBeUndefined()
+    // Still down six minutes, timed at eight: back in two, as the log timed it.
+    expect(seenText({ lastDeath: now - 6 * MIN, pendingSince: now - 6 * MIN, gaps: [480, 470] }, 600, now)).toBe('died 6 min ago; back in ~2 min as you timed it')
+    // Nothing timed: the tables' ten minutes.
+    expect(seenText({ lastDeath: now - 6 * MIN, pendingSince: now - 6 * MIN, gaps: [] }, 600, now)).toBe('died 6 min ago; back in ~4 min by the tables')
+    expect(seenText({ lastDeath: now - 11 * MIN, pendingSince: now - 11 * MIN, gaps: [] }, 600, now)).toBe('down 11 min, due')
+    expect(seenText({ lastDeath: now - 11 * MIN, pendingSince: now - 11 * MIN, gaps: [] }, undefined, now)).toBe('died 11 min ago, still down')
+    // Seen again since it died.
+    expect(seenText({ lastDeath: now - 40 * MIN, pendingSince: 0, gaps: [600] }, 600, now)).toBe('died 40 min ago, seen since')
+  })
+
+  it('finds a record by zone and name, a spawn point by any of the names it pops, and the page shows the words', () => {
+    const records = {
+      'befallen|andrew pine': { zone: 'Befallen', name: 'Andrew Pine', kills: 2, lastDeath: now - 6 * MIN, pendingSince: now - 6 * MIN, gaps: [480], shared: false },
+      'befallen|the orc spot': {
+        zone: 'Befallen',
+        name: 'the orc spot',
+        kills: 3,
+        lastDeath: now - 2 * MIN,
+        pendingSince: 0,
+        gaps: [],
+        shared: false,
+        names: ['a skeletal orc', 'Skeletal Orc']
+      }
+    }
+    const seenOf = seenFromRecords(records, now)
+    expect(seenOf('Befallen 2 (Adaptive)', 'Andrew Pine', 600)).toBe('died 6 min ago; back in ~2 min as you timed it')
+    expect(seenOf('Befallen', 'Skeletal Orc', 600)).toBe('died 2 min ago, seen since')
+    expect(seenOf('Befallen', 'Nobody', 600)).toBeUndefined()
+    const zones = hunterZones(
+      sections,
+      () => 0,
+      0,
+      (zone) => TABLES[zone.toLowerCase()] ?? null,
+      seenOf
+    )
+    const befallen = zones.find((z) => z.zone === 'Befallen')!
+    expect(befallen.left.map((n) => [n.name, n.seen])).toEqual([
+      ['Skeletal Orc', 'died 2 min ago, seen since'],
+      ['Andrew Pine', 'died 6 min ago; back in ~2 min as you timed it']
+    ])
+    // The orc is always up: it waits nothing, and the zone takes as long as Andrew Pine.
+    expect(befallen.left[0].wait).toBe(0)
+    expect(befallen.wait).toBe(2400)
   })
 })

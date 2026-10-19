@@ -47,15 +47,35 @@ function NamedSpawn({ n }: { n: HunterNamed }) {
   if (!n.spawn) return <span className="faint small"> (not in TAKP’s tables)</span>
   const s = n.spawn
   const odds = s.up >= 1 ? 'always up' : `${num(Math.round(s.up * 100))}%`
+  const timer = `${clock(s.timer)}${s.timerFrom === 'timed' ? ' (timed by your log)' : s.timerFrom === 'zone' ? ' (the zone’s respawn as you timed it)' : ' (classic)'}`
   return (
     <Tip
       className="mono sl-spawn"
-      text={`${s.name}, level ${s.lo === s.hi ? s.lo : `${s.lo}–${s.hi}`}: ${s.spots === 1 ? 'one spot' : `${num(s.spots)} spots`}, up ${odds} of the time, respawn ${clock(s.timer)}${
-        s.timerFrom === 'timed' ? ' (timed by your log)' : s.timerFrom === 'zone' ? ' (the zone’s respawn as you timed it)' : ' (classic)'
-      }. Clearing its spots, it pops in about ${duration(n.wait ?? s.timer)} on average.`}
+      text={`${s.name}, level ${s.lo === s.hi ? s.lo : `${s.lo}–${s.hi}`}: ${s.spots === 1 ? 'one spot' : `${num(s.spots)} spots`}, up ${odds} of the time, respawn ${timer}. ${
+        s.up >= 1
+          ? `Up now: the first kill waits nothing, the next its timer, ${clock(s.timer)}.`
+          : `Clearing its spots, it pops in about ${duration(n.wait ?? s.timer)} on average.`
+      }`}
     >
       {' '}
-      ({s.spots === 1 ? '1 spot' : `${num(s.spots)} spots`} · {odds} · {clock(s.timer)} · ≈ {duration(n.wait ?? s.timer)})
+      ({s.spots === 1 ? '1 spot' : `${num(s.spots)} spots`} · {odds} · {clock(s.timer)} · {s.up >= 1 ? `up now, then every ${clock(s.timer)}` : `≈ ${duration(n.wait ?? s.timer)}`})
+    </Tip>
+  )
+}
+
+/** What the Respawns records say of a named: when it died last, and whether it is back. */
+function Seen({ n }: { n: HunterNamed }) {
+  return (
+    <Tip
+      className="faint small"
+      text={
+        n.seen
+          ? 'From the Respawns records: every death the log saw in the zone, and the respawn it timed'
+          : 'The log has not seen it die; the Respawns page times a spawn from its deaths'
+      }
+    >
+      {' '}
+      · {n.seen ?? 'not seen die in your log'}
     </Tip>
   )
 }
@@ -183,6 +203,7 @@ export function Hunter() {
                             <div key={n.name}>
                               <b>{n.name}</b>
                               <NamedSpawn n={n} />
+                              <Seen n={n} />
                             </div>
                           ))}
                         </div>

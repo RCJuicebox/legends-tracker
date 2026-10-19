@@ -86,7 +86,7 @@ export function LogCheck({ known, onSaved }: { known: KnownSpell[]; onSaved: (k:
                   <td className="muted">{r.samples}</td>
                   <td className="mono">{duration(r.observedMedianSec)}</td>
                   <td className="mono">
-                    {r.calculatedEarliestSec}–{duration(r.calculatedLatestSec)}
+                    {duration(r.calculatedEarliestSec)}–{duration(r.calculatedLatestSec)}
                   </td>
                   <td>
                     {r.fits ? (

@@ -268,6 +268,13 @@ export type AudioCommand =
 // ---- The channels ----
 
 /** Request and answer: api.invoke(channel, ...args) → Promise<result>. */
+/** What running pasted log lines did: the lines read, and the timers and triggers that started. */
+export interface SimulateResult {
+  lines: number
+  timers: number
+  triggers: number
+}
+
 export interface Invokes {
   'app:state': () => AppState
   'app:openLogs': () => string
@@ -280,7 +287,7 @@ export interface Invokes {
   'character:put': (key: string, character: CharacterSettings) => CharacterSettings
   'watch:start': () => void
   'watch:stop': () => void
-  simulate: (text: string) => void
+  simulate: (text: string) => SimulateResult
 
   'triggers:get': () => Trigger[]
   'triggers:save': (triggers: Trigger[]) => TriggerError[]

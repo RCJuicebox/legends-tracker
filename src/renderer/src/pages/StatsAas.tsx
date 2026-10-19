@@ -50,7 +50,7 @@ export function AasTab({
         </div>
       )}
       {view ? <Summary view={view} now={now} /> : error ? <LoadError error={error} retry={retry} what="your AA history" /> : null}
-      <Bought view={view} list={aa} />
+      <Bought view={view} list={aa} error={error} />
       <AbilityList aa={aa} status={status} onRead={onRead} />
     </div>
   )
@@ -92,7 +92,7 @@ function Summary({ view, now }: { view: AaHistoryView; now: number }) {
   )
 }
 
-function Bought({ view, list }: { view: AaHistoryView | null; list: AaSummary | null }) {
+function Bought({ view, list, error }: { view: AaHistoryView | null; list: AaSummary | null; error: string }) {
   const [filter, setFilter] = useState('')
   const [granted, setGranted] = useRemembered('stats.aas.granted', false)
   const [sort, setSort] = useRemembered<Sort<Key>>('stats.aas.sort', { key: 'last', dir: -1 })
@@ -119,7 +119,10 @@ function Bought({ view, list }: { view: AaHistoryView | null; list: AaSummary | 
         <FilterBox placeholder="Filter by ability…" label="Filter abilities" value={filter} onChange={setFilter} width={200} />
       </div>
       {!view ? (
-        <Pending doing="Reading your log and its archives" />
+        // The history failed to load: its error is said above, not a wait that never ends beside it (LT-680).
+        error ? null : (
+          <Pending doing="Reading your log and its archives" />
+        )
       ) : !view.bought.length && !(granted && view.granted.length) ? (
         <div className="empty">No AA bought on record yet. Play with logging on (/log on) and every rank you buy shows up here.</div>
       ) : !rows.length ? (

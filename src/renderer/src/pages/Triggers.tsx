@@ -1,3 +1,4 @@
+import { ranLines } from './Dashboard'
 import { useEffect, useMemo, useState } from 'react'
 import { api, errorMessage } from '../api'
 import { useSettled } from '../state'
@@ -538,7 +539,7 @@ function TestPanel({ t }: { t: Trigger }) {
           className="btn"
           disabled={!line.trim()}
           title="Run the line through Spell Timers and every trigger, as if it had just been logged, as Try it on the Live page does: you hear and see what it does"
-          onClick={() => void act('simulate', line)}
+          onClick={() => void actDone(ranLines, 'simulate', line)}
         >
           Run it for real
         </button>

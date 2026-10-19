@@ -1,3 +1,4 @@
+import type { SimulateResult } from '../../shared/ipc'
 import { promises as fs } from 'node:fs'
 import { basename } from 'node:path'
 import { LogClock, parseLogLine, type LogLine } from '../../core/logLine'
@@ -599,14 +600,21 @@ export class Engine {
   }
 
   /** Feeds pasted log lines through the live pipeline, with their times shifted to now. */
-  simulate(text: string): void {
+  /**
+   * Runs pasted log lines through the spell timers and the triggers as if just logged, and says what
+   * came of it: the lines read, and the timers and triggers the feed saw start (LT-679).
+   */
+  simulate(text: string): SimulateResult {
     this.simulating = true
+    const before = this.feed.length
+    let lines = 0
     try {
       const parsed = text
         .split(/\r?\n/)
         .map((l) => parseLogLine(l.trim()))
         .filter((l) => l !== null)
-      if (!parsed.length) return
+      lines = parsed.length
+      if (!parsed.length) return { lines, timers: 0, triggers: 0 }
       const shift = Date.now() - parsed[parsed.length - 1].time
       for (const line of parsed) {
         const shifted = { ...line, time: line.time + shift }
@@ -617,6 +625,8 @@ export class Engine {
     } finally {
       this.simulating = false
     }
+    const added = this.feed.slice(before)
+    return { lines, timers: added.filter((f) => f.kind === 'timer').length, triggers: added.filter((f) => f.kind === 'trigger').length }
   }
 
   private lastTickAt = 0

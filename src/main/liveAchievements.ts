@@ -12,7 +12,7 @@ import { parseFactionLine } from '../features/factions/core'
 import { standingsNow } from '../features/factions/main'
 import { carryFollow, freshFollow, pickStep, readFollow, sanitizeFollows, sayStep, type FollowEvent, type FollowedPlan, type FollowState } from '../features/factions/tracker'
 import type { AchievementTrack, FactionTrackView, HunterTrackView, SkillRow, SkillTrackView, SlayerPlanTrackView, SlayerTrackView, TrackedAchievement } from '../shared/tracking'
-import { hunterHere, hunterZones } from '../features/hunter/core'
+import { hunterHere, hunterZones, seenFromRecords } from '../features/hunter/core'
 import { bareName, planSlayer, slayerPlanView } from '../features/slayer/core'
 import { takpRaceMix } from '../features/slayer/main'
 import type { AchievementsExport } from './achievements'
@@ -795,11 +795,26 @@ export class LiveAchievements implements AppFeature {
     const last = new Map<string, number>()
     for (const k of this.slayer?.kills.values() ?? []) last.set(bareName(k.name), Math.max(last.get(bareName(k.name)) ?? 0, k.times.at(-1) ?? 0))
     // Less those the player has said do not work (Plan › Hunter).
+    const seenOf = seenFromRecords(this.ctx.store.respawns?.get() ?? {}, Date.now())
     const rows = hunterHere(
-      hunterZones(exp.sections, (bare) => last.get(bare) ?? 0, exp.modified),
+      hunterZones(
+        exp.sections,
+        (bare) => last.get(bare) ?? 0,
+        exp.modified,
+        () => null,
+        seenOf
+      ),
       this.zone
     ).filter((r) => !this.ctx.hunter?.isBroken(r.achievement))
-    return rows.length ? { zone: this.zone, rows: rows.map((r) => ({ achievement: r.achievement, left: r.left.map((n) => n.name), total: r.total, since: r.since })) } : null
+    return rows.length
+      ? {
+          zone: this.zone,
+          rows: rows.map((r) => {
+            const seen = Object.fromEntries(r.left.flatMap((n) => (n.seen ? [[n.name, n.seen]] : [])))
+            return { achievement: r.achievement, left: r.left.map((n) => n.name), total: r.total, since: r.since, ...(Object.keys(seen).length ? { seen } : {}) }
+          })
+        }
+      : null
   }
 
   // ---- telling ----

@@ -1,3 +1,5 @@
+import { CharacterPicker } from '../components/CharacterPicker'
+import { usePickedCharacter } from '../character'
 import { useMemo } from 'react'
 import { useLive, useSettled } from '../state'
 import { roman } from '../api'
@@ -85,7 +87,13 @@ function PayWith({ o }: { o: SpellUpgradeOption }) {
 }
 
 export function MoteSpells({ go }: { go?: Go }) {
-  const characterKey = useSettled((s) => s.characterKey)
+  const played = useSettled((s) => s.characterKey)
+  // Whose casts: the character picked on the Gear and Best merge tabs, when it has a log; else the one being played (LT-683).
+  const [picked, setPicked] = usePickedCharacter()
+  const installDir = useSettled((s) => s.settings.installDir)
+  const logsQ = useInvoke('logs:list', [], [installDir])
+  const available = useMemo(() => [...new Set([...(logsQ.data ?? []).map((l) => l.character), ...(played ? [played] : [])])], [logsQ.data, played])
+  const characterKey = picked && available.some((a) => a.toLowerCase() === picked.toLowerCase()) ? picked : played
   const tracking = useSettled((s) => s.settings.tracking)
   const spellsLoaded = useLive((l) => l.status.spellsLoaded)
   const [days, setDays] = useRemembered<number>('spellmotes.days', 14)
@@ -136,6 +144,10 @@ export function MoteSpells({ go }: { go?: Go }) {
 
   return (
     <div className="stack gap-12">
+      <div className="row mb-4" style={{ flexWrap: 'wrap' }}>
+        <span className="small muted grow">The casts of the character picked here, from its log and archives.</span>
+        <CharacterPicker character={characterKey} available={available} onPick={setPicked} />
+      </div>
       <div className="card stack gap-10">
         <div className="row">
           <b>Judged on what you cast</b>

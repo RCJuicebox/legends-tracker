@@ -1,9 +1,10 @@
+import type { SimulateResult } from '../../../shared/ipc'
 import { useMemo, useState } from 'react'
 import { timeOfDay } from '../../../core/format'
 import { useRemembered } from '../remember'
 import { useActions, useLive, useSettled } from '../state'
 import { ago, mb } from '../api'
-import { act } from '../toast'
+import { act, actDone } from '../toast'
 import { OVERLAY_BUFFS, TRY_LINES } from '../constants'
 import { TimerBars, useNow } from '../components/TimerBars'
 import { Icon } from '../components/ui'
@@ -25,6 +26,14 @@ const FEED_SHOWN = 100
  * The page selects only what its head and notices read; the stat cards, the timers and the activity
  * each select their own, so a status tick or a feed line draws only the part it changes (LT-403).
  */
+/** What running pasted lines did, for the corner: a line that matched nothing is told from a run that did not happen (LT-679). */
+export const ranLines = (r: SimulateResult): string => {
+  if (!r.lines) return 'No log lines in the text: each needs its [time] in front'
+  const n = (k: number, what: string) => `${k} ${what}${k === 1 ? '' : 's'}`
+  const did = [r.timers ? n(r.timers, 'timer') : '', r.triggers ? n(r.triggers, 'trigger') : ''].filter(Boolean).join(', ')
+  return `Ran ${n(r.lines, 'line')}: ${did || 'no timer or trigger matched'}`
+}
+
 export function Dashboard({ go }: { go: Go }) {
   const { patchSettings } = useActions()
   const arranging = useSettled((s) => s.arranging)
@@ -102,7 +111,7 @@ export function Dashboard({ go }: { go: Go }) {
         <div className="card">
           <h2>
             Try log lines <span className="spacer" />
-            <button className="btn small" onClick={() => void act('overlays:demo')}>
+            <button className="btn small" onClick={() => void actDone('Demo timers are up on the overlays', 'overlays:demo')}>
               <Icon name="sparkle" /> Show demo timers
             </button>
           </h2>
@@ -118,7 +127,7 @@ export function Dashboard({ go }: { go: Go }) {
             <div className="stack gap-8">
               <textarea className="mono" rows={7} value={sim} aria-label="Log lines to run" onChange={(e) => setSim(e.target.value)} placeholder={SAMPLE} />
               <div className="row">
-                <button className="btn primary" onClick={() => void act('simulate', sim || SAMPLE)}>
+                <button className="btn primary" onClick={() => void actDone(ranLines, 'simulate', sim || SAMPLE)}>
                   Run lines
                 </button>
                 <button className="btn ghost" onClick={() => setSim(SAMPLE)}>

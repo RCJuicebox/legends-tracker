@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { CharacterPicker } from '../components/CharacterPicker'
 import { api } from '../api'
 import { useRemembered } from '../remember'
@@ -561,12 +561,26 @@ function ItemPanel({
   const s = statsFor(view.items, item.name)
   const own = sheet?.acOverrides[key]
   const lvl = mergeLevel(item.name)
+  // The panel sits below the sheet, often below the fold: it comes into view and takes focus when an
+  // item is picked, so the click is seen to do something; Escape closes it (LT-681).
+  const title = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    title.current?.scrollIntoView?.({ block: 'nearest', behavior: 'smooth' })
+    title.current?.focus({ preventScroll: true })
+  }, [item.name])
   return (
-    <div className="card lt-panel">
+    <div
+      className="card lt-panel"
+      onKeyDown={(e) => {
+        if (e.key !== 'Escape') return
+        e.stopPropagation()
+        onClose()
+      }}
+    >
       <div className="row gap-12" style={{ alignItems: 'flex-start' }}>
         <ItemIcon icon={info?.icon} size={44} />
         <div className="grow">
-          <div className="lt-panel-title">
+          <div className="lt-panel-title" ref={title} tabIndex={-1}>
             {plainName(item.name)} {lvl > 0 && <b className="lt-plus">+{lvl}</b>}
           </div>
           <div className="row small muted">

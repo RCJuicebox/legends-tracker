@@ -811,14 +811,18 @@ Plan › Hunter lists each Hunter achievement not done ("Hunter of Befallen") wi
 wants: the achievements export, less the named your log has shown you killing since. Beside each
 named, what TAKP's spawn tables say of it: its spots, how often it is up against its placeholders,
 its timer (the zone's respawn as your log timed it, as on the Slayer page), and the wait, how long
-its spots are cleared on average before it pops (its timer over how often it is up). A zone's named
-pop side by side, so a zone takes as long as its longest wait, and the quickest zones come first;
-those with a named the tables lack come after. **Map** shows where the named left spawn, and **Mark
+its spots are cleared on average before it pops (its timer over how often it is up; one always up
+waits nothing: "up now, then every 10:00", the next kill a timer away). Then what your Respawns
+records say of it: "died 6 min ago; back in ~2 min as you timed it" while it is down, "down 11 min,
+due" past its time, "died 40 min ago, seen since" once the log saw it again, or that the log has not
+seen it die. A zone's named pop side by side, so a zone takes as long as its longest wait, and the
+quickest zones come first; those with a named the tables lack come after. **Map** shows where the named left spawn, and **Mark
 on the game's map** puts them on the in-game map with the Slayer plan's marks (each page's are kept
 apart). Legends has changed some spawns, so the odds are a lead. Some Hunter achievements do not
 work in Legends (Hunter of Crushbone): **Doesn't work** leaves one out of the page, the Slayer plan's
 steps and the overlay, for every character, until **Works again** under Not working. The achievements
-overlay shows the Hunter named left in the zone you are in, under a switch of its own (Overlays).
+overlay shows the Hunter named left in the zone you are in, each with what the Respawns records say
+of it, under a switch of its own (Overlays).
 
 ## Stats
 

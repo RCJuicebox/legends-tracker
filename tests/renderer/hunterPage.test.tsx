@@ -35,8 +35,8 @@ const data: HunterPlanData = {
       zone: 'Clan Crushbone',
       achievement: 'Hunter of Clan Crushbone',
       left: [
-        { name: 'Lord Darish', spawn: spawn('Lord Darish', 0.25, 600), wait: 2400 },
-        { name: 'Emperor Crush', spawn: { ...spawn('Emperor Crush', 1, 384), spots: 2, timerFrom: 'timed' }, wait: 384 }
+        { name: 'Lord Darish', spawn: spawn('Lord Darish', 0.25, 600), wait: 2400, seen: 'died 6 min ago; back in ~2 min as you timed it' },
+        { name: 'Emperor Crush', spawn: { ...spawn('Emperor Crush', 1, 384), spots: 2, timerFrom: 'timed' }, wait: 0 }
       ],
       total: 4,
       since: ['Ambassador DVinn'],
@@ -104,7 +104,8 @@ it('lists the named left, zone by zone, with what their spawns allow', async () 
   const { host, done } = await draw()
   const text = host.textContent ?? ''
   expect(text).toContain('2 Hunter achievements to go, 4 named')
-  expect(text).toContain('Lord Darish (1 spot · 25% · 10:00 · ≈ 40 min)')
+  expect(text).toContain('Lord Darish (1 spot · 25% · 10:00 · ≈ 40 min) · died 6 min ago; back in ~2 min as you timed it')
+  expect(text).toContain('Emperor Crush (2 spots · always up · 6:24 · up now, then every 6:24) · not seen die in your log')
   expect(text).toContain('Emperor Crush (2 spots · always up · 6:24')
   expect(text).toContain('Seahorse Patriarch (not in TAKP’s tables)')
   expect(text).toContain('Killed since your export: Ambassador DVinn')

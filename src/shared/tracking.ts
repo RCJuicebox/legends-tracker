@@ -132,6 +132,8 @@ export interface HunterTrackView {
     total: number
     /** Killed since the export, the export not knowing yet. */
     since: string[]
+    /** What the Respawns records say of each named left, by name ("died 6 min ago; back in ~2 min as you timed it"), where the log saw it die. */
+    seen?: Record<string, string>
   }[]
 }
 

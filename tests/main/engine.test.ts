@@ -213,6 +213,20 @@ describe('Engine', () => {
     expect(engine.status.watching).toBe(false)
   })
 
+  it('says what pasted lines did: the lines read, and the timers and triggers that started (LT-679)', async () => {
+    // The spell file in the game folder, so the timers run.
+    for (const f of ['spells_us.txt', 'spells_us_str.txt']) await fs.copyFile(join(__dirname, '..', 'fixtures', f), join(game, f))
+    const { engine } = makeEngine({ logFile: join(logs, 'eqlog_Kelwyn_neriak.txt') })
+    await engine.loadSpells()
+    expect(engine.simulate('not a log line')).toEqual({ lines: 0, timers: 0, triggers: 0 })
+    expect(engine.simulate('[Thu Sep 24 16:00:00 2026] Kelwyn hits a gnoll for 20 points of damage.')).toEqual({ lines: 1, timers: 0, triggers: 0 })
+    expect(engine.simulate('[Tue Sep 01 12:15:08 2026] You begin casting Envenomed Bolt X.\n[Tue Sep 01 12:15:09 2026] Bazzt Zzzt has been poisoned.')).toEqual({
+      lines: 2,
+      timers: 1,
+      triggers: 0
+    })
+  })
+
   it('pasted test lines leave mote history and stock alone', () => {
     const { engine, store } = makeEngine({ logFile: join(logs, 'eqlog_Kelwyn_neriak.txt') })
     const before = JSON.stringify(engine.motes.state)
