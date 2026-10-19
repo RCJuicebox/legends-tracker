@@ -8,6 +8,7 @@ import { log } from './log'
 import { assertCharacterKey, isCharacterKey, sanitizeSheet } from '../core/validate'
 import { sources } from './sources/registry'
 import { ExportWatch } from './exportWatch'
+import { SettledReads } from './exportFiles'
 
 const EMPTY_SHEET: CharacterSheet = { acOverrides: {}, shield: null, stats: {} }
 
@@ -53,6 +54,9 @@ export class InventoryFiles {
     return p
   }
 
+  /** The exports read, once a write and once settled, as the achievements and factions exports are (LT-633). */
+  private readonly exports = new SettledReads(parseInventory)
+
   private async read(character: string, refresh: boolean): Promise<InventoryView> {
     if (!isCharacterKey(character)) {
       this.watch.follow('')
@@ -63,12 +67,11 @@ export class InventoryFiles {
     const base: InventoryView = { character, file: `${character}-Inventory.txt`, modified: 0, inventory: null, items: {}, error: '' }
     let inventory: Inventory
     try {
-      const path = this.exportPath(character)
-      const [text, st] = await Promise.all([fs.readFile(path, 'utf8'), fs.stat(path)])
-      this.watch.seen(st.mtimeMs)
-      inventory = parseInventory(text)
-      base.modified = st.mtimeMs
-      sources.ok('exports', `${base.file}, written ${new Date(st.mtimeMs).toLocaleString()}`)
+      const read = await this.exports.read(this.exportPath(character))
+      this.watch.seen(read.modified)
+      inventory = read.value
+      base.modified = read.modified
+      sources.ok('exports', `${base.file}, written ${new Date(read.modified).toLocaleString()}`)
     } catch (e) {
       const err = e as NodeJS.ErrnoException
       if (err.code !== 'ENOENT') sources.fail('exports', e, base.file)

@@ -7,9 +7,9 @@ import { log } from './log'
 import { assertCharacterKey, isCharacterKey } from '../core/validate'
 import { sources } from './sources/registry'
 import { ExportWatch } from './exportWatch'
+import { SettledReads } from './exportFiles'
 
 /** How long a just-written export is left before it is read. */
-const EXPORT_SETTLE_MS = 1500
 
 const EMPTY_MARKS: AchMarks = { ticks: [], broken: [] }
 
@@ -29,7 +29,8 @@ export interface AchievementsExport {
 export class AchievementFiles {
   private readonly watch: ExportWatch
   /** Each export read, by path, kept while the file is unchanged. */
-  private readonly read = new Map<string, { modified: number; sections: AchSection[] }>()
+  /** The exports read, by path, once a write (exportFiles.ts). */
+  private readonly read = new SettledReads((text) => parseAchievements(text).sections)
 
   constructor(
     /** The app's data folder (userData): the player's marks go in its achievements folder. */
@@ -87,28 +88,15 @@ export class AchievementFiles {
     if (!isCharacterKey(character) || !this.gameDir()) return null
     const file = `${character}-Achievements.txt`
     const path = this.exportPath(character)
-    let modified: number
+    // Left a moment after the game writes it, so a read never catches the game mid-write and counts a
+    // cut-off Progression section's tail as done (LT-417); read once a write (exportFiles.ts).
     try {
-      modified = (await fs.stat(path)).mtimeMs
+      const { modified, value } = await this.read.read(path)
+      return { file, modified, sections: value }
     } catch (e) {
       if ((e as NodeJS.ErrnoException).code === 'ENOENT') return null
       throw e
     }
-    let kept = this.read.get(path)
-    if (kept?.modified !== modified) {
-      // Just written: left a moment first, as the factions and inventory exports are, so a read never
-      // catches the game mid-write and counts a cut-off Progression section's tail as done (LT-417).
-      const young = Math.min(EXPORT_SETTLE_MS, EXPORT_SETTLE_MS - (Date.now() - modified))
-      if (young > 0) {
-        await new Promise((r) => setTimeout(r, young))
-        const again = (await fs.stat(path)).mtimeMs
-        if (again !== modified) return this.readExport(character)
-      }
-      kept = { modified, sections: parseAchievements(await fs.readFile(path, 'utf8')).sections }
-      if (this.read.size > 20) this.read.clear()
-      this.read.set(path, kept)
-    }
-    return { file, modified, sections: kept.sections }
   }
 
   /** The export, for what only uses it (the overlay, the Factions page): one that cannot be read is logged, and null. */

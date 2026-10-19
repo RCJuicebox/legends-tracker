@@ -56,6 +56,7 @@ import type { AppContext } from '../../main/context'
 import type { AppFeature, TrackContext } from '../../main/appFeature'
 import type { AchievementTrack } from '../../shared/tracking'
 import { FactionFollow } from './followSource'
+import { SettledReads } from '../../main/exportFiles'
 
 // A character's faction changes, from "Your faction standing with X has been adjusted by N." and
 // the cap lines, over the log and its archives, for the Factions page. The reading is LogHistory's.
@@ -260,9 +261,6 @@ export class FactionSourceHistory {
   }
 }
 
-/** How long a just-written export is left before it is read, so a read never catches the game mid-write. */
-const SETTLE_MS = 1500
-
 /**
  * The factions exports in the game folder by character (lower-cased), listed again only when the
  * folder's entries change: the folder holds some three thousand files, and the Factions page asks
@@ -270,8 +268,8 @@ const SETTLE_MS = 1500
  * says so below.
  */
 let exportNames: { dir: string; mtime: number; byWho: Map<string, string[]> } | null = null
-/** Each export read, by path, kept while the file is unchanged. */
-const exportsRead = new Map<string, { modified: number; standings: FactionExport['standings'] }>()
+/** Each factions export read, by path, once a write and once settled (exportFiles.ts). */
+const exportsRead = new SettledReads(parseFactionsExport)
 
 /**
  * A character's newest factions export in the game folder, read; null when there is none. The game
@@ -300,14 +298,8 @@ export async function readFactionExport(dir: string, character: string): Promise
   if (!dated.length) return null
   const newest = dated.sort((a, b) => b.modified - a.modified)[0]
   const path = join(dir, newest.file)
-  const kept = exportsRead.get(path)
-  if (kept?.modified === newest.modified) return { ...newest, standings: kept.standings }
-  const young = SETTLE_MS - (Date.now() - newest.modified)
-  if (young > 0) await new Promise((r) => setTimeout(r, young))
-  const standings = parseFactionsExport(await fs.readFile(path, 'utf8'))
-  if (exportsRead.size > 20) exportsRead.clear()
-  exportsRead.set(path, { modified: newest.modified, standings })
-  return { ...newest, standings }
+  const read = await exportsRead.read(path, newest.modified)
+  return { file: newest.file, modified: read.modified, standings: read.value }
 }
 
 /**
@@ -609,8 +601,13 @@ export class FactionBook {
   }
 }
 
-/** Each inventory export read for the plan, by path, kept while the file is unchanged. */
-const holdingsRead = new Map<string, { modified: number; have: Record<string, number> }>()
+/** Each inventory export read for the plan, by path, as what it holds by itemKey: bags, bank, shared bank and depot. */
+const holdingsRead = new SettledReads((text) => {
+  const inv = parseInventory(text)
+  const have: Record<string, number> = {}
+  for (const it of [...inv.bags, ...inv.bank, ...inv.sharedBank, ...inv.depot]) have[itemKey(it.name)] = (have[itemKey(it.name)] ?? 0) + it.count
+  return have
+})
 
 /**
  * What the character holds, by itemKey: bags, bank, shared bank and depot, at the last inventory
@@ -620,18 +617,8 @@ const holdingsRead = new Map<string, { modified: number; have: Record<string, nu
 async function holdings(dir: string, character: string): Promise<{ have: Record<string, number>; file: { file: string; modified: number } | null }> {
   const file = `${character}-Inventory.txt`
   try {
-    const path = join(dir, file)
-    const modified = (await fs.stat(path)).mtimeMs
-    const kept = holdingsRead.get(path)
-    if (kept?.modified === modified) return { have: kept.have, file: { file, modified } }
-    const young = SETTLE_MS - (Date.now() - modified)
-    if (young > 0) await new Promise((r) => setTimeout(r, young))
-    const inv = parseInventory(await fs.readFile(path, 'utf8'))
-    const have: Record<string, number> = {}
-    for (const it of [...inv.bags, ...inv.bank, ...inv.sharedBank, ...inv.depot]) have[itemKey(it.name)] = (have[itemKey(it.name)] ?? 0) + it.count
-    if (holdingsRead.size > 20) holdingsRead.clear()
-    holdingsRead.set(path, { modified, have })
-    return { have, file: { file, modified } }
+    const { modified, value } = await holdingsRead.read(join(dir, file))
+    return { have: value, file: { file, modified } }
   } catch (e) {
     if ((e as NodeJS.ErrnoException).code !== 'ENOENT') log.warn(`Could not read ${file}:`, e)
     return { have: {}, file: null }

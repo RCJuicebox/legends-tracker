@@ -1,5 +1,6 @@
 import { promises as fs } from 'node:fs'
 import { log } from './log'
+import { EXPORT_SETTLE_MS } from './exportFiles'
 
 /**
  * Watches the export a page shows (a character's achievements or inventory) for the game to write it
@@ -45,7 +46,7 @@ export class ExportWatch {
     try {
       const st = await fs.stat(this.path(character))
       // The game writes the file in one go, but give it a moment before reading a fresh one.
-      if (st.mtimeMs !== this.modified && Date.now() - st.mtimeMs > 1500) await this.changed(character)
+      if (st.mtimeMs !== this.modified && Date.now() - st.mtimeMs > EXPORT_SETTLE_MS) await this.changed(character)
     } catch (e) {
       // Not there (yet): nothing to send.
       if ((e as NodeJS.ErrnoException).code !== 'ENOENT') log.warn(`${this.what} poll failed`, e)
