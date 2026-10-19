@@ -11,6 +11,7 @@ import {
   BANESTRIKE,
   campZone,
   clock,
+  costsPlan,
   DEFAULT_CHOICES,
   goalsInPlay,
   guideTip,
@@ -25,6 +26,7 @@ import {
   type SlayerStep
 } from './core'
 import { zoneKey } from '../factions/names'
+import { takeRequestedSlayerStep } from './jump'
 import { SpawnMap } from './SpawnMap'
 import type { MobSpawn } from './spawns'
 import type { HunterZone } from '../hunter/core'
@@ -154,9 +156,19 @@ function StepWork({ step, goals, choices, onOut }: { step: SlayerStep; goals: Sl
     <div className="small">
       {step.focus.map((g) => {
         const tip = guideTip(goals[g].name)
+        const { count, max } = goals[g]
         return (
           <div key={g}>
-            <b>{goals[g].name}</b> <span className="mono">+{kills(step.kills[g] ?? 0)}</span>
+            <b>{goals[g].name}</b>{' '}
+            <Tip className="mono" text={`${num(count)} of ${num(max)} so far: your achievements export plus the kills since`}>
+              {num(count)} / {num(max)}
+            </Tip>
+            <span className="sl-count-bar" aria-hidden="true">
+              <i style={{ width: `${Math.round((Math.min(count, max) / Math.max(1, max)) * 100)}%` }} />
+            </span>
+            <Tip className="mono" text="What this step adds">
+              +{kills(step.kills[g] ?? 0)}
+            </Tip>
             {done.has(g) && <b> done</b>}
             <span className="faint">
               {' '}
@@ -229,15 +241,25 @@ function HunterHere({ hunter }: { hunter: HunterZone[] }) {
   )
 }
 
-function FactionCost({ camp }: { camp: SlayerPlanCamp }) {
+function FactionCost({ camp, raising }: { camp: SlayerPlanCamp; raising: readonly string[] }) {
   const worst = (camp.factions ?? []).filter((f) => f.perHour < 0).slice(0, 3)
   if (!worst.length) return null
+  const up = new Set(costsPlan(camp, raising))
   return (
     <Tip
       className="small faint"
-      text="What the faction lines after your kills there did, an hour at this pace. Feign death and let a pet land the kill, players say, and there is no hit."
+      text={`What the faction lines after your kills there did, an hour at this pace. Feign death and let a pet land the kill, players say, and there is no hit.${
+        up.size ? ` Your faction plan (Factions › Plan) is raising ${[...up].join(' and ')}: turn on "Avoid my faction plan’s factions" to leave such camps out.` : ''
+      }`}
     >
-      costs {worst.map((f) => `${f.faction} ${num(Math.round(f.perHour))}`).join(', ')} an hour
+      costs{' '}
+      {worst.map((f, i) => (
+        <span key={f.faction} className={up.has(f.faction) ? 'bad-text' : undefined}>
+          {i > 0 && ', '}
+          {f.faction} {num(Math.round(f.perHour))}
+        </span>
+      ))}{' '}
+      an hour
     </Tip>
   )
 }
@@ -308,7 +330,20 @@ export function Slayer() {
   const isHere = (zone: string) => !!hereKey && zoneKey(zone) === hereKey
   const hereStep = plan?.steps.findIndex((st) => isHere(st.camp.zone)) ?? -1
   const hereDaily = plan?.daily.some((d) => isHere(d.camp.zone)) ?? false
-  const jumpHere = () => document.getElementById(`sl-step-${hereStep + 1}`)?.scrollIntoView?.({ block: 'center', behavior: 'smooth' })
+  const jumpTo = (index: number) => document.getElementById(`sl-step-${index + 1}`)?.scrollIntoView?.({ block: 'center', behavior: 'smooth' })
+  const jumpHere = () => jumpTo(hereStep)
+  // Sent here from another page for a step (the Achievements page's "Step 4 · Lake Rathetear"): shown once the plan is drawn.
+  useEffect(() => {
+    if (!plan) return
+    const wanted = takeRequestedSlayerStep()
+    if (wanted !== null) jumpTo(wanted)
+  }, [plan])
+  const raising = useMemo(() => data?.raising ?? [], [data])
+  // Camps the choice rules out for costing a faction the faction plan raises, with the factions.
+  const autoOut = useMemo(
+    () => (choices.avoidPlanFactions && data ? data.camps.flatMap((c) => ((f) => (f.length ? [{ camp: c, factions: f }] : []))(costsPlan(c, raising))) : []),
+    [choices.avoidPlanFactions, data, raising]
+  )
   const toggleMap = (i: number) => setMaps((m) => (m.has(i) ? new Set([...m].filter((x) => x !== i)) : new Set([...m, i])))
   return (
     <>
@@ -406,6 +441,12 @@ export function Slayer() {
                           <span className="spacer" />
                           <span className="mono fp-time">
                             {Math.max(...d.goals.map((g) => d.camp.pace[g] ?? 0))} a day · {d.days} days
+                            {d.camp.today !== undefined && (
+                              <Tip text="Kills of its mobs your log has seen since midnight (the live counts, since your export)">
+                                {' '}
+                                · {d.camp.today} of {Math.max(...d.goals.map((g) => d.camp.pace[g] ?? 0))} today
+                              </Tip>
+                            )}
                           </span>
                         </div>
                         <div className="small">
@@ -452,7 +493,7 @@ export function Slayer() {
                         const zone = first.camp.zone
                         const total = run.reduce((t, i) => t + plan.steps[i].seconds + plan.steps[i].travel, 0)
                         return (
-                          <li key={first.camp.id + run[0]} id={`sl-step-${run[0] + 1}`} className={`fp-step${isHere(zone) ? ' now' : ''}`}>
+                          <li key={first.camp.id + run[0]} id={`sl-run-${run[0] + 1}`} className={`fp-step${isHere(zone) ? ' now' : ''}`}>
                             <span className="fp-num">{run[0] + 1}</span>
                             <div className="fp-body">
                               <div className="fp-head">
@@ -476,7 +517,7 @@ export function Slayer() {
                                 const st = plan.steps[i]
                                 const killed = stepKills(st, choices)
                                 return (
-                                  <div key={i} className="sl-substep">
+                                  <div key={i} id={`sl-step-${i + 1}`} className="sl-substep">
                                     <div className="sl-sub-head">
                                       {run.length > 1 && <span className="mono faint">{i + 1}.</span>}
                                       <div className="sl-sub-work">
@@ -494,7 +535,7 @@ export function Slayer() {
                                     </div>
                                     <div className="row tight fp-effects">
                                       <Limit camp={st.camp} />
-                                      <FactionCost camp={st.camp} />
+                                      <FactionCost camp={st.camp} raising={raising} />
                                       {(st.camp.note ?? spotTip(zone, data.goals[st.focus[0]]?.name ?? '')) && (
                                         <span className="faint small">{st.camp.note ?? spotTip(zone, data.goals[st.focus[0]]?.name ?? '')}</span>
                                       )}
@@ -599,11 +640,11 @@ export function Slayer() {
               )}
             </div>
 
-            {choices.outCamps.length + choices.outMobs.length > 0 && (
+            {choices.outCamps.length + choices.outMobs.length + autoOut.length > 0 && (
               <div className="card mb-16">
                 <Disclosure open={openOut} onToggle={() => setOpenOut(!openOut)} label="Ruled out">
                   <h2>
-                    Ruled out <span className="faint small">{choices.outCamps.length + choices.outMobs.length}</span>
+                    Ruled out <span className="faint small">{choices.outCamps.length + choices.outMobs.length + autoOut.length}</span>
                   </h2>
                 </Disclosure>
                 {openOut && (
@@ -614,6 +655,14 @@ export function Slayer() {
                         <button className="btn small ghost" onClick={() => ruleOut(id, false)}>
                           Bring back
                         </button>
+                      </div>
+                    ))}
+                    {autoOut.map(({ camp, factions }) => (
+                      <div key={camp.id} className="row tight small">
+                        <span>
+                          {camp.zone}: {camp.kinds.map((k) => k.name).join(', ')}
+                        </span>
+                        <span className="faint">costs {factions.join(' and ')}, which your faction plan raises</span>
                       </div>
                     ))}
                     {choices.outMobs.map((m) => (
@@ -666,6 +715,15 @@ export function Slayer() {
                 <Tip className="small faint" text="The middle of your kills an hour over the zones you have hunted an hour or more: a spawn-table camp gives no more than this">
                   your usual pace {num(Math.round(data.killSpeed))}/h
                 </Tip>
+              )}
+              {raising.length > 0 && (
+                <ToggleChip
+                  on={choices.avoidPlanFactions}
+                  onChange={(on) => setChoices({ ...choices, avoidPlanFactions: on })}
+                  title={`Rule out camps whose kills cost a faction your faction plan (Factions › Plan) is raising: ${raising.join(', ')}. They are listed under Ruled out.`}
+                >
+                  Avoid my faction plan’s factions
+                </ToggleChip>
               )}
               <span className="spacer" />
               <button className="btn small ghost" onClick={() => q.reload()}>

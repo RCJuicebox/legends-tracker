@@ -71,7 +71,8 @@ export function sanitizeChoices(v: unknown): SlayerPlanChoices {
     outMobs: names(c.outMobs).map((m) => m.toLowerCase()),
     travelMin: num(c.travelMin, 0, 120, DEFAULT_CHOICES.travelMin),
     pace: num(c.pace, 1, 2000, DEFAULT_CHOICES.pace),
-    overlay: c.overlay === true
+    overlay: c.overlay === true,
+    avoidPlanFactions: c.avoidPlanFactions === true
   }
 }
 
@@ -254,6 +255,14 @@ export class SlayerPlanner implements AppFeature {
       place: placeSpawn,
       killSpeed: killSpeed ?? DEFAULT_CHOICES.pace
     })
+    // A raid lockout's kills so far today, from the live counts: "2 of 5 today" (LT-657).
+    const midnight = new Date()
+    midnight.setHours(0, 0, 0, 0)
+    for (const c of camps) {
+      if (!c.daily) continue
+      const mobs = c.kinds.flatMap((k) => k.name.split(', '))
+      c.today = ctx.liveAchievements.killsSince(character, mobs, midnight.getTime())
+    }
     // Less the Hunter achievements the player has said do not work.
     const hunter = hunterZones(exp.sections, lastKills(zones), exp.modified, namedSpawns(timings)).filter((z) => !ctx.hunter?.isBroken(z.achievement))
     // Kills no race was found for: the wiki answered, and neither it, the name nor a zone's race mix places them.
@@ -282,7 +291,8 @@ export class SlayerPlanner implements AppFeature {
       timings: [...timings.values()]
         .filter((t) => t.timed.length)
         .map((t) => ({ zone: t.timed[0].zone, timer: t.timer, timed: t.timed.map(({ name, legends, classic }) => ({ name, legends, classic })) })),
-      hunter
+      hunter,
+      raising: ctx.liveAchievements.raisedByPlan(character)
     }
   }
 }

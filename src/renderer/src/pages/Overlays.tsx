@@ -188,7 +188,9 @@ export function Overlays() {
                   <label className="check">
                     <input type="checkbox" checked={achievementCues} onChange={(e) => patchSettings((s) => ({ ...s, achievementCues: e.target.checked }))} />
                     Say when a step is done
-                    <span className="faint small">the faction plan's, as on the Plan tab's Now card; each achievement it finishes flashes on the alerts overlay</span>
+                    <span className="faint small">
+                      the faction plan's (as on its Now card) and the Slayer plan's: each achievement finished flashes on the alerts overlay, and the step to go on to is said
+                    </span>
                   </label>
                   <p className="faint small m-0">
                     The step of the faction plan you follow (Factions › Plan), counting down as your factions move; the Slayer achievements your last half hour of kills counted

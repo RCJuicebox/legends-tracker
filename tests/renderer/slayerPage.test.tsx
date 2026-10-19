@@ -60,9 +60,11 @@ const data: SlayerPlanData = {
       pace: { 1: 5 },
       daily: true,
       note: 'One a difficulty a day.',
-      said: 'test'
+      said: 'test',
+      today: 2
     }
   ],
+  raising: ['Kaladim Residents'],
   unplaced: [{ name: 'a mystery', n: 3 }],
   pending: 0,
   moves: [],
@@ -148,12 +150,12 @@ it('draws the plan, the lockouts beside it, and keeps a camp ruled out', async (
   expect(text).toContain('The plan, step by step')
   expect(text).toContain('Clan Crushbone')
   // What the step is there for, and what to kill for it.
-  expect(text).toContain('Orc Stomp! +100 done · an orc pawn ×100')
+  expect(text).toContain('Orc Stomp! 4,900 / 5,000+100 done · an orc pawn ×100')
   expect(text).toContain('×100')
   expect(text).toContain('costs Kaladim Residents −40 an hour')
   // Ten kedge at five a day.
   expect(text).toContain('Every day')
-  expect(text).toContain('5 a day · 2 days')
+  expect(text).toContain('5 a day · 2 days · 2 of 5 today')
   // The steps under the Banestrike tier they work toward.
   expect(text).toContain('ProgressiveBanestrike rank 2')
   expect(text).toContain('a mystery ×3')
@@ -234,7 +236,16 @@ it('marks the steps in the zone the player is in, and jumps to the first', async
   const here = [...host.querySelectorAll('button')].find((b) => b.textContent === 'You are here: step 1')!
   await act(async () => here.click())
   expect(scrolled).toHaveBeenCalledTimes(1)
-  expect(scrolled.mock.instances[0]).toBe(now[0])
+  expect((scrolled.mock.instances[0] as HTMLElement).id).toBe('sl-step-1')
+  // The camp costs a faction the faction plan is raising: flagged, and ruled out by choice, listed with the reason (LT-656).
+  const cost = [...host.querySelectorAll('.bad-text')].find((e) => e.textContent?.includes('Kaladim Residents'))
+  expect(cost).toBeDefined()
+  const avoid = [...host.querySelectorAll('button')].find((b) => b.textContent?.includes('Avoid my faction plan'))!
+  await act(async () => avoid.click())
+  expect(invoke).toHaveBeenLastCalledWith('slayer:choices', 'Kelwyn_neriak', expect.objectContaining({ avoidPlanFactions: true }))
+  await act(async () => [...host.querySelectorAll('button')].find((b) => b.textContent?.startsWith('Ruled out'))!.click())
+  expect(host.textContent).toContain('Clan Crushbone: an orc pawn')
+  expect(host.textContent).toContain('costs Kaladim Residents, which your faction plan raises')
   act(() => root.unmount())
   host.remove()
   appState.status.zone = ''

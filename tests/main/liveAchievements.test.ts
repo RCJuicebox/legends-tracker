@@ -1,3 +1,4 @@
+import type { Notification } from '../../src/shared/runtime'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { mkdtempSync } from 'node:fs'
 import { tmpdir } from 'node:os'
@@ -160,6 +161,53 @@ describe('LiveAchievements makes the Slayer plan again', () => {
     inner.slayerView = { exportAt: T0, rows: [] }
     await inner.readSlayerPlan('Tester_neriak')
     expect(inner.slayerPlan).toBeNull()
+  })
+
+  it('says an achievement of the step is done, and the step to go on to, as the faction plan’s steps are said (LT-655)', async () => {
+    const { live } = setup()
+    const inner = live as unknown as {
+      character: string
+      zone: string
+      slayer: unknown
+      slayerView: unknown
+      ctx: Record<string, unknown>
+      readSlayerPlan: (c: string) => Promise<void>
+    }
+    const said: Notification[] = []
+    inner.ctx.store = { settings: { get: () => ({ achievementCues: true, overlays: [] }) } }
+    inner.ctx.engine = { status: { zone: '' }, notify: (ns: Notification[]) => said.push(...ns) }
+    inner.ctx.slayer = { forOverlay: async () => ({ data: data(T0), choices: { ...DEFAULT_CHOICES, overlay: true } }) }
+    inner.character = 'Tester_neriak'
+    inner.slayer = { character: 'Tester_neriak' }
+    inner.slayerView = { exportAt: T0, rows: [{ name: 'Orc Stomp!', count: 4900, since: 90, done: false }] }
+    await inner.readSlayerPlan('Tester_neriak')
+    // Kills along the way say nothing.
+    inner.slayerView = { exportAt: T0, rows: [{ name: 'Orc Stomp!', count: 4900, since: 95, done: false }] }
+    await inner.readSlayerPlan('Tester_neriak')
+    expect(said).toEqual([])
+    // The game said Orc Stomp! was done: a flash for it, and the giants' step is said.
+    inner.slayerView = { exportAt: T0, rows: [{ name: 'Orc Stomp!', count: 4900, since: 0, done: true }] }
+    await inner.readSlayerPlan('Tester_neriak')
+    expect(said).toEqual([
+      { kind: 'text', text: '✓ Orc Stomp!', color: '#8fe0a6', durationSec: 6 },
+      { kind: 'text', text: 'Slayer step done · next: The Permafrost Caverns, a frost giant', color: '#f7c965', durationSec: 8 },
+      { kind: 'speak', text: 'Orc Stomp! done. Next, The Permafrost Caverns: a frost giant.', interrupt: false }
+    ])
+    // Nothing more once everything is done.
+    said.length = 0
+    inner.slayerView = {
+      exportAt: T0,
+      rows: [
+        { name: 'Orc Stomp!', count: 4900, since: 0, done: true },
+        { name: 'A Giant Problem', count: 900, since: 0, done: true }
+      ]
+    }
+    await inner.readSlayerPlan('Tester_neriak')
+    expect(said).toEqual([
+      { kind: 'text', text: '✓ A Giant Problem', color: '#8fe0a6', durationSec: 6 },
+      { kind: 'text', text: 'Every Slayer step is done', color: '#f7c965', durationSec: 8 },
+      { kind: 'speak', text: 'Every step of the Slayer plan is done.', interrupt: false }
+    ])
   })
 
   it('on entering a zone, and at once when the choices change', async () => {

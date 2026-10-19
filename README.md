@@ -787,11 +787,20 @@ soonest, travel counted, then the next; every kill still counts toward whatever 
 a later tier's too. Staying on at one camp is one step. Raid lockouts
 (Phinigel Autropos, the only kedge; Lady Vox and Lord Nagafen for the true dragons) give a kill a
 difficulty a day, so they are listed beside the plan with the days they take, the lockouts that feed
-one achievement together. Each step says what it is there for: each achievement of its tier it
-moves, how many and the mobs to kill for it ("Cubic +7 done · gelatinous cube ×7"), and ×N, the
-kills you make there, each once however many achievements it counts toward (what the same kills do
-for a later tier is in a tooltip). It says where the pace came from, and what an hour there did to your factions (from the faction lines after kills there; players
-say a kill your pet lands while you feign death costs none). **Rule out** leaves a camp out.
+one achievement together, and how many of today's kills are done ("2 of 5 today", since midnight).
+Each step says what it is there for: each achievement of its tier it moves, its count so far with a
+thin bar, how many the step adds and the mobs to kill for it ("Cubic 93 / 100 +7 done · gelatinous
+cube ×7"), and ×N, the kills you make there, each once however many achievements it counts toward
+(what the same kills do for a later tier is in a tooltip). It says where the pace came from, and
+what an hour there did to your factions (from the faction lines after kills there; players say a
+kill your pet lands while you feign death costs none). A faction the faction plan you follow
+(Factions › Plan) is raising is marked red there, and **Avoid my faction plan's factions** rules such
+camps out, listed under Ruled out with the reason. **Rule out** leaves a camp out. The steps in the
+zone you are in are marked, with "You are here: step N" at the top to jump to them; the Achievements
+page shows each open Slayer achievement's step the same way, a click opening the plan at it, and
+eqlwiki's census of a race's zones only where the plan has no step. With "Say when a step is done"
+on (Settings › Overlays), an achievement finished flashes on the alerts overlay and the step to go on
+to is said, as the faction plan's steps are.
 **Achievements in the plan** turns achievements off, or the optional ones on: those the Slayer metas
 hold only as optional are out of era, and Banestrike does not need them. Kills no race was found for
 are listed at the foot. Your choices are kept per character.

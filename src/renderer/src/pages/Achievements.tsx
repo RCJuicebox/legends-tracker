@@ -4,6 +4,8 @@ import { api } from '../api'
 import { useRemembered } from '../remember'
 import { usePickedCharacter } from '../character'
 import { useAchievementTrack, useInvoke } from '../hooks'
+import { planSlayer, type CampSource } from '../../../features/slayer/core'
+import type { SlayerStepHint } from './AchievementRows'
 import { showError, showToast } from '../toast'
 import { Ago, FilterBox, GameCommand, Pending } from '../components/ui'
 import { numExact as num, who } from '../../../core/format'
@@ -37,6 +39,9 @@ function useAchievements() {
   return { chars, character, setCharacter: setPicked, view: viewQ.data, setView, error: charsQ.error || viewQ.error, retry }
 }
 
+/** Where a step's pace comes from, as Plan › Slayer labels it. */
+const SLAYER_SOURCE: Record<CampSource, string> = { log: 'your log', play: 'players', spawns: 'spawn table', wiki: 'eqlwiki guess' }
+
 export function Achievements() {
   const { chars, character, setCharacter, view, setView, error, retry } = useAchievements()
   const [cat, setCat] = useRemembered<string>('ach.cat', '')
@@ -69,6 +74,20 @@ export function Achievements() {
     const rows = track && view && track.character.toLowerCase() === view.character.toLowerCase() ? (track.skills?.rows ?? []) : []
     return new Map(rows.map((r) => [`${r.achievement}|${r.skill}`.toLowerCase(), r]))
   }, [track, view])
+  // Plan › Slayer's step for each open Slayer achievement, drawn under it in place of eqlwiki's census (LT-654).
+  const planQ = useInvoke(character ? 'slayer:plan' : null, [character])
+  const steps = useMemo(() => {
+    const out = new Map<string, SlayerStepHint>()
+    if (!planQ.data || planQ.data.data.character !== character) return out
+    const { data, choices } = planQ.data
+    planSlayer(data, choices).steps.forEach((st, i) => {
+      for (const g of st.focus) {
+        const name = data.goals[g].name.toLowerCase()
+        if (!out.has(name)) out.set(name, { index: i, zone: st.camp.zone, seconds: st.seconds, source: SLAYER_SOURCE[st.camp.source] })
+      }
+    })
+    return out
+  }, [planQ.data, character])
   const cats = useMemo(() => book?.categories() ?? [], [book])
   // Nothing picked yet: General, where the everyday ones are. The export lists Untapped Potential
   // first, whose deity unlocks are the game's "Future Placeholder" rows.
@@ -295,12 +314,12 @@ export function Achievements() {
       <TrackedBar book={book} tracked={view.marks.tracked ?? []} onUntrack={(k) => setTracked(k, false)} goTo={goTo} />
 
       {query.length >= 2 ? (
-        <SearchResults book={book} query={query} ctx={{ remaining, hideOpt, sort, open, setOpen, touched, flash, tick, goTo, since, skills, tracked, setTracked }} />
+        <SearchResults book={book} query={query} ctx={{ remaining, hideOpt, sort, open, setOpen, touched, flash, tick, goTo, since, skills, tracked, setTracked, steps }} />
       ) : cur ? (
         <SectionView
           si={cur.si}
           book={book}
-          ctx={{ remaining, hideOpt, sort, open, setOpen, touched, flash, tick, goTo, since, skills, tracked, setTracked }}
+          ctx={{ remaining, hideOpt, sort, open, setOpen, touched, flash, tick, goTo, since, skills, tracked, setTracked, steps }}
           setHideOpt={setHideOpt}
           setSort={setSort}
         />

@@ -2,6 +2,10 @@ import { Disclosure, Tip } from '../components/ui'
 import { numExact as num } from '../../../core/format'
 import { AchievementBook, achKey, compareNames, norm, placeOf, secKey, type AchObjective, type AchRef, type Achievement, type ObjRef } from '../../../core/achievements'
 import { HUNT } from '../../../shared/game/hunt'
+import { useContext } from 'react'
+import { GoContext } from '../nav'
+import { duration } from '../../../core/format'
+import { requestSlayerStep } from '../../../features/slayer/jump'
 import type { SkillRow } from '../../../shared/tracking'
 
 // The Achievements page's sections and rows: each achievement, its objectives and progress, the tracked bar and search results.
@@ -26,6 +30,8 @@ interface Ctx {
   /** Achievements kept on the achievements overlay, by achKey(). */
   tracked: Set<string>
   setTracked: (key: string, on: boolean) => void
+  /** Plan › Slayer's step for each open Slayer achievement, by lower-cased name (the first step that works toward it). */
+  steps: Map<string, SlayerStepHint>
 }
 
 interface Entry {
@@ -261,6 +267,42 @@ function Block({ book, r, rows, query, ctx }: { book: AchievementBook; r: AchRef
   )
 }
 
+/** Where Plan › Slayer sends the player for an achievement: its first step toward it. */
+export interface SlayerStepHint {
+  index: number
+  zone: string
+  /** Seconds killing there. */
+  seconds: number
+  /** Where the step's pace comes from, in the plan's words ("your log", "players"). */
+  source: string
+}
+
+/** The plan's step for an open Slayer achievement: a click opens Plan › Slayer at it (LT-654). */
+function PlanStep({ step }: { step: SlayerStepHint }) {
+  const go = useContext(GoContext)
+  const text = `Step ${step.index + 1} · ${step.zone}`
+  return (
+    <div className="ach-hunt">
+      <span>Plan</span>{' '}
+      {go ? (
+        <button
+          className="btn small ghost"
+          onClick={() => {
+            requestSlayerStep(step.index)
+            go('slayer')
+          }}
+          title="Open Plan › Slayer at this step"
+        >
+          {text}
+        </button>
+      ) : (
+        <b>{text}</b>
+      )}{' '}
+      · ≈ {duration(step.seconds)} · <em>{step.source}</em>
+    </div>
+  )
+}
+
 function SingleRow({ book, r, ctx }: { book: AchievementBook; r: AchRef; ctx: Ctx }) {
   const a = book.ach(r)
   const c = a.c[0]
@@ -268,11 +310,14 @@ function SingleRow({ book, r, ctx }: { book: AchievementBook; r: AchRef; ctx: Ct
   const sub = norm(c.t) === norm(a.n) ? undefined : c.t
   const done = book.objDone([...r, 0])
   const hunt = HUNT[norm(a.n)]
+  const step = done ? undefined : ctx.steps.get(a.n.toLowerCase())
   return (
     <div id={`ach-${r[0]}-${r[1]}`} className={`ach-single ${state}${ctx.flash === `ach-${r[0]}-${r[1]}` ? ' flash' : ''}`}>
       <ObjectiveRow book={book} r={[...r, 0]} c={c} label={a.n} sub={sub} ctx={ctx} single />
       <TrackStar k={achKey(book.sections[r[0]], a)} name={a.n} ctx={ctx} />
-      {!done && hunt && (
+      {step && <PlanStep step={step} />}
+      {/* eqlwiki's census of a race's NPCs by zone (2026-09-24): only where the plan has no step for the achievement. */}
+      {!done && !step && hunt && (
         <div className="ach-hunt">
           <span>Try</span>{' '}
           {hunt.length

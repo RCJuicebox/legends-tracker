@@ -370,6 +370,8 @@ export interface SlayerPlanCamp {
    */
   limit?: 'spawns' | 'you'
   ceiling?: number
+  /** For a raid lockout: kills of its mobs so far today (since local midnight), from the live counts. */
+  today?: number
 }
 
 /** What the plan is built from, all of it from main. */
@@ -391,6 +393,8 @@ export interface SlayerPlanData {
   timings: { zone: string; timer: number | null; timed: { name: string; legends: number; classic: number | null }[] }[]
   /** The Hunter named still to kill, by place (Plan › Hunter's). */
   hunter: HunterZone[]
+  /** The factions the faction plan the character follows (Factions › Plan) is raising: a camp that costs one is flagged, or ruled out by choice. */
+  raising?: string[]
 }
 
 /** TAKP's spawn tables for buildCamps, with how a zone's timers compare and how the tables' mobs count. */
@@ -744,9 +748,18 @@ export interface SlayerPlanChoices {
   pace: number
   /** The plan's step shown on the achievements overlay. */
   overlay: boolean
+  /** Camps whose kills cost a faction the followed faction plan (Factions › Plan) is raising are ruled out. */
+  avoidPlanFactions: boolean
 }
 
-export const DEFAULT_CHOICES: SlayerPlanChoices = { excluded: [], included: [], outCamps: [], outMobs: [], travelMin: 10, pace: 60, overlay: false }
+export const DEFAULT_CHOICES: SlayerPlanChoices = { excluded: [], included: [], outCamps: [], outMobs: [], travelMin: 10, pace: 60, overlay: false, avoidPlanFactions: false }
+
+/** The factions a camp costs (its kills' faction hits an hour, below zero) that the followed faction plan is raising. */
+export function costsPlan(camp: Pick<SlayerPlanCamp, 'factions'>, raising: readonly string[]): string[] {
+  if (!raising.length || !camp.factions) return []
+  const up = new Set(raising.map((f) => f.toLowerCase()))
+  return camp.factions.filter((f) => f.perHour < 0 && up.has(f.faction.toLowerCase())).map((f) => f.faction)
+}
 
 /** A step of the plan: a stretch at one camp. */
 export interface SlayerStep {
@@ -839,12 +852,14 @@ export function goalsInPlay(goals: SlayerGoal[], choices: SlayerPlanChoices): nu
  * day beside the plan. Travel is the way the log has seen taken between the two zones, or the
  * player's minutes between camps where it knows none.
  */
-export function planSlayer(data: Pick<SlayerPlanData, 'goals' | 'camps'> & { moves?: SlayerMove[] }, choices: SlayerPlanChoices): SlayerPlan {
+export function planSlayer(data: Pick<SlayerPlanData, 'goals' | 'camps'> & { moves?: SlayerMove[]; raising?: string[] }, choices: SlayerPlanChoices): SlayerPlan {
   const goals = goalsInPlay(data.goals, choices)
   const need = new Map(goals.map((g) => [g, data.goals[g].max - data.goals[g].count]))
   const ruled = new Set(choices.outCamps)
+  // By choice, a camp that costs a faction the followed faction plan is raising is out too (LT-656).
+  const raising = choices.avoidPlanFactions ? (data.raising ?? []) : []
   const paceOf = (c: SlayerPlanCamp, g: number) => (c.pace[g] ?? 0) * (c.assumed ? choices.pace : 1)
-  const camps = fallbackOnly(data.camps.filter((c) => !ruled.has(c.id)).flatMap((c) => withoutMobs(c, choices.outMobs)))
+  const camps = fallbackOnly(data.camps.filter((c) => !ruled.has(c.id) && !costsPlan(c, raising).length).flatMap((c) => withoutMobs(c, choices.outMobs)))
   // The lockouts: what they alone feed is out of the hourly plan, done in the days the lockouts'
   // kills a day take together (Lady Vox and Lord Nagafen, ten true dragons a day). What an hourly
   // camp also feeds, they only help along.

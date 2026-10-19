@@ -106,7 +106,10 @@ const ctx = {
     },
     fact: () => undefined,
     changed: [] as string[],
-    slayerChoicesChanged: (c: string) => ctx.liveAchievements.changed.push(c)
+    slayerChoicesChanged: (c: string) => ctx.liveAchievements.changed.push(c),
+    // No faction plan followed, and no lockout killed today.
+    raisedByPlan: () => [] as string[],
+    killsSince: () => 0
   },
   factions: {
     causes: {

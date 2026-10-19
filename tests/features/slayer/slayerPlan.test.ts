@@ -17,6 +17,7 @@ import {
   slayerGoals,
   slayerPlanView,
   slayerRaceLists,
+  costsPlan,
   stepKills,
   type KillRun,
   type SlayerGoal,
@@ -538,5 +539,35 @@ describe('Slayer plan: the plan', () => {
       ['Nagafen', 20]
     ])
     expect(plan.steps.map((s) => s.camp.id)).toEqual(['log:OoT'])
+  })
+})
+
+describe('Slayer plan: the faction plan’s factions (LT-656)', () => {
+  const g = (name: string): SlayerGoal => ({ name, section: 'Slayer: Conquest', races: '', count: 0, max: 100, optional: false, tier: 0 })
+  const crushbone: SlayerPlanCamp = {
+    id: 'log:Clan Crushbone',
+    zone: 'Clan Crushbone',
+    kinds: [{ name: 'an orc pawn', perHour: 100, goals: [0] }],
+    source: 'log',
+    pace: { 0: 100 },
+    factions: [
+      { faction: 'Clurg', perHour: -278 },
+      { faction: 'Kaladim Residents', perHour: -40 }
+    ]
+  }
+  const halas: SlayerPlanCamp = { id: 'play:Halas|a halas orc', zone: 'Halas', kinds: [{ name: 'a halas orc', perHour: 20, goals: [0] }], source: 'play', pace: { 0: 20 } }
+
+  it('names the factions a camp costs that the plan is raising', () => {
+    expect(costsPlan(crushbone, ['clurg', 'Steel Warriors'])).toEqual(['Clurg'])
+    expect(costsPlan(crushbone, [])).toEqual([])
+    expect(costsPlan(halas, ['Clurg'])).toEqual([])
+  })
+
+  it('rules such a camp out by choice, and not otherwise', () => {
+    const data = { goals: [g('Orc Stomp!')], camps: [crushbone, halas], raising: ['Clurg'] }
+    expect(planSlayer(data, DEFAULT_CHOICES).steps.map((s) => s.camp.id)).toEqual(['log:Clan Crushbone'])
+    expect(planSlayer(data, { ...DEFAULT_CHOICES, avoidPlanFactions: true }).steps.map((s) => s.camp.id)).toEqual(['play:Halas|a halas orc'])
+    // Nothing raised: the choice changes nothing.
+    expect(planSlayer({ ...data, raising: [] }, { ...DEFAULT_CHOICES, avoidPlanFactions: true }).steps.map((s) => s.camp.id)).toEqual(['log:Clan Crushbone'])
   })
 })

@@ -1,3 +1,4 @@
+import type { Notification } from '../shared/runtime'
 import { promises as fs } from 'node:fs'
 import { join } from 'node:path'
 import { trackedAchievements } from '../core/trackedAchievements'
@@ -330,6 +331,24 @@ export class LiveAchievements implements AppFeature {
     this.cue(r.events)
   }
 
+  /** The factions the faction plan the character follows is raising (its steps' hits), for Plan › Slayer's faction costs; none without a plan. */
+  raisedByPlan(character: string): string[] {
+    const f = this.follows.get()[character]
+    if (!f) return []
+    const out = new Set<string>()
+    for (const s of f.plan.steps) for (const [faction, v] of Object.entries(s.per)) if (v > 0) out.add(faction)
+    return [...out]
+  }
+
+  /** How many of these mobs the character's live counts have seen die since a time (a raid lockout's kills today). */
+  killsSince(character: string, mobs: readonly string[], since: number): number {
+    const s = this.slayer
+    if (!s || s.character !== character) return 0
+    let n = 0
+    for (const m of mobs) n += s.kills.get(m.toLowerCase())?.times.filter((t) => t >= since).length ?? 0
+    return n
+  }
+
   /** An achievement done flashes; a step done flashes and is said, with the step to go on to (once, for the last of several). */
   private cue(events: FollowEvent[]): void {
     if (!events.length || !this.ctx.store.settings.get().achievementCues) return
@@ -648,7 +667,44 @@ export class LiveAchievements implements AppFeature {
       const r = live.get(g.name.toLowerCase())
       return r ? { ...g, count: r.done ? g.max : Math.min(g.max, r.count + r.since) } : g
     })
+    const before = this.slayerPlan
     this.slayerPlan = slayerPlanView(planSlayer({ ...got.data, goals }, got.choices), goals, got.choices, this.zone)
+    this.cueSlayer(before, this.slayerPlan, goals)
+  }
+
+  /**
+   * A Slayer achievement of the step being worked on finished: it flashes, and when the plan has moved
+   * on, the step now is said with where and what to kill, as the faction plan's steps are (LT-655).
+   */
+  private cueSlayer(before: SlayerPlanTrackView | null, now: SlayerPlanTrackView, goals: { name: string; count: number; max: number }[]): void {
+    const was = before?.current
+    if (!was || !this.ctx.store.settings.get().achievementCues) return
+    const done = was.goals.filter((g) => g.count < g.max && (goals.find((x) => x.name === g.name)?.count ?? 0) >= g.max)
+    if (!done.length) return
+    const ns: Notification[] = done.map((g) => ({ kind: 'text', text: `✓ ${g.name}`, color: '#8fe0a6', durationSec: 6 }))
+    const next = now.current
+    const moved = !next || next.zone !== was.zone || next.goals.some((g) => !was.goals.some((w) => w.name === g.name))
+    if (moved) {
+      const what =
+        next?.mobs
+          .slice(0, 2)
+          .map((m) => m.name)
+          .join(', ') ?? ''
+      ns.push(
+        {
+          kind: 'text',
+          text: next ? `Slayer step done · next: ${next.zone}${what ? `, ${what}` : ''}` : 'Every Slayer step is done',
+          color: '#f7c965',
+          durationSec: 8
+        },
+        {
+          kind: 'speak',
+          text: next ? `${done.map((g) => g.name).join(' and ')} done. Next, ${next.zone}${what ? `: ${what}` : ''}.` : 'Every step of the Slayer plan is done.',
+          interrupt: false
+        }
+      )
+    }
+    this.ctx.engine.notify(ns)
   }
 
   /** The player changed Plan › Slayer's choices (or showed it here): the plan is made again at once. */
