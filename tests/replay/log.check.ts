@@ -46,5 +46,7 @@ it('replays the log', async () => {
   mkdirSync(dir, { recursive: true })
   const out = join(dir, `${basename(log, '.txt')}-${new Date().toISOString().slice(0, 10)}.md`)
   writeFileSync(out, reportText(report, basename(log)))
-  process.stdout.write(`Replay check: ${report.lines.toLocaleString()} lines; ${report.fades.length} spells timed, ${report.fadesNoTimer.length} with fades and no timer; report in ${out}\n`)
+  process.stdout.write(
+    `Replay check: ${report.lines.toLocaleString()} lines; ${report.fades.length} spells timed, ${report.fadesNoTimer.length} with fades and no timer; report in ${out}\n`
+  )
 }, 3_600_000)

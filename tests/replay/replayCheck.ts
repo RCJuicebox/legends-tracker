@@ -50,11 +50,13 @@ const SHAPES_KEPT = 60
 
 /** A line's shape: numbers, quoted words and a leading name stripped, so like lines count together. */
 export function shapeOf(text: string): string {
-  return text
-    // What someone says, to the end of the line ("I'll give you…" has a quote of its own).
-    .replace(/, '.*'\.?$/, ", '…'")
-    .replace(/\d[\d,.]*/g, 'N')
-    .replace(/^(?!You\b|Your\b)[A-Z][a-z`']+(?: [A-Z][a-z`']+)?\b/, 'X')
+  return (
+    text
+      // What someone says, to the end of the line ("I'll give you…" has a quote of its own).
+      .replace(/, '.*'\.?$/, ", '…'")
+      .replace(/\d[\d,.]*/g, 'N')
+      .replace(/^(?!You\b|Your\b)[A-Z][a-z`']+(?: [A-Z][a-z`']+)?\b/, 'X')
+  )
 }
 
 class Shapes {
@@ -105,7 +107,12 @@ export class ReplayCheck {
       }
     })
     const tracking = { ...o.tracking, enabled: true, selfBuffs: true, otherBuffs: true, groupBuffs: true, dots: true, debuffs: true }
-    this.tracker = new SpellTracker(book, this.board, { tracking, ruleFor: (n) => o.rules[n] ?? {}, durationFor: (spell, rank) => this.duration(spell, rank) }, { notify: () => {}, feed: () => {} })
+    this.tracker = new SpellTracker(
+      book,
+      this.board,
+      { tracking, ruleFor: (n) => o.rules[n] ?? {}, durationFor: (spell, rank) => this.duration(spell, rank) },
+      { notify: () => {}, feed: () => {} }
+    )
     this.meter.setSelf(o.self)
     this.buffs = new BuffWatch([], { seconds: (spell, rank) => this.duration(spell, rank).seconds, onChange: () => {}, onLand: () => void this.landed++ })
     this.buffs.setBook(book, buffOffers(book, o.tracking.tierDurationPct))
@@ -127,7 +134,8 @@ export class ReplayCheck {
     const fade = text.startsWith('Your ') ? FADE.exec(text) : null
     if (fade) {
       const r = this.book.resolve(fade[1])
-      if (r && !this.board.get(timerKey(r.spell.name, fade[2])) && !this.board.get(timerKey(r.spell.name, 'You'))) this.fadeNoTimer.set(r.spell.name, (this.fadeNoTimer.get(r.spell.name) ?? 0) + 1)
+      if (r && !this.board.get(timerKey(r.spell.name, fade[2])) && !this.board.get(timerKey(r.spell.name, 'You')))
+        this.fadeNoTimer.set(r.spell.name, (this.fadeNoTimer.get(r.spell.name) ?? 0) + 1)
     }
     const timersBefore = this.board.list().length
     this.tracker.handle(line)
@@ -143,7 +151,15 @@ export class ReplayCheck {
       this.meter.tick(time)
     }
     // What took the line: the tracker (a timer started, moved or ended), the meter, the loot, a cast or a zone.
-    const took = ev || zone || this.board.list().length !== timersBefore || fade || parseLootLine(text) || CAST_BY_YOU.test(text) || CAST_BY_OTHER.test(text) || COMPLETED_ACHIEVEMENT.test(text)
+    const took =
+      ev ||
+      zone ||
+      this.board.list().length !== timersBefore ||
+      fade ||
+      parseLootLine(text) ||
+      CAST_BY_YOU.test(text) ||
+      CAST_BY_OTHER.test(text) ||
+      COMPLETED_ACHIEVEMENT.test(text)
     if (took) return
     if (CHAT.test(text)) {
       this.chat++
@@ -184,7 +200,8 @@ export class ReplayCheck {
 export function reportText(r: ReplayReport, logName: string): string {
   const when = (t: number) => new Date(t).toLocaleString()
   const table = (rows: string[][]) => rows.map((x) => `| ${x.join(' | ')} |`).join('\n')
-  const shapes = (list: Shape[]) => (list.length ? table([['Lines', 'Shape', 'Example'], ['---', '---', '---'], ...list.map((s) => [String(s.n), `\`${s.shape}\``, s.example.replace(/\|/g, '/')])]) : 'None.')
+  const shapes = (list: Shape[]) =>
+    list.length ? table([['Lines', 'Shape', 'Example'], ['---', '---', '---'], ...list.map((s) => [String(s.n), `\`${s.shape}\``, s.example.replace(/\|/g, '/')])]) : 'None.'
   return [
     `# Replay check: ${logName}`,
     '',
@@ -192,7 +209,13 @@ export function reportText(r: ReplayReport, logName: string): string {
     '',
     '## Fades against the estimate (seconds, most off first)',
     '',
-    r.fades.length ? table([['Spell', 'Fades', 'Median', 'Estimate', 'Off'], ['---', '---', '---', '---', '---'], ...r.fades.map((f) => [f.spell, String(f.n), f.median.toFixed(0), f.estimate.toFixed(0), String(f.off)])]) : 'None.',
+    r.fades.length
+      ? table([
+          ['Spell', 'Fades', 'Median', 'Estimate', 'Off'],
+          ['---', '---', '---', '---', '---'],
+          ...r.fades.map((f) => [f.spell, String(f.n), f.median.toFixed(0), f.estimate.toFixed(0), String(f.off)])
+        ])
+      : 'None.',
     '',
     '## Timers that ran out with no fade line',
     '',
