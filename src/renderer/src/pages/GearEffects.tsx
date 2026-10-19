@@ -192,7 +192,7 @@ function EffectLine({ r, kind }: { r: EffectRow; kind: EffectKind }) {
   const mine = r.carriers.filter((c) => c.owned)
   const toGet = r.carriers.filter((c) => !c.owned)
   const active = mine.some((c) => c.active)
-  const chip = active ? { label: kind === 'worn' ? 'Wearing it' : 'In hand', tone: 'good' } : mine.length ? { label: 'Owned, not in use', tone: 'warn' } : null
+  const chip = active ? { label: kind === 'worn' ? 'Wearing it' : 'In hand', tone: 'ok' } : mine.length ? { label: 'Owned, not in use', tone: 'warn' } : null
   const dpm = w?.dpm ?? 0
   return (
     <div className="lt-focus-row lt-effect-row">
@@ -220,7 +220,7 @@ function EffectLine({ r, kind }: { r: EffectRow; kind: EffectKind }) {
         )}
       </div>
       <div className="lt-focus-col">
-        <div className="lt-focus-cap">You have {chip && <span className={`lt-chip ${chip.tone}`}>{chip.label}</span>}</div>
+        <div className="lt-focus-cap">You have {chip && <span className={`chip pill ${chip.tone}`}>{chip.label}</span>}</div>
         {mine.slice(0, 3).map((c) => (
           <div key={c.name + c.where} className="small">
             {c.name} <span className="faint">{c.where}</span>

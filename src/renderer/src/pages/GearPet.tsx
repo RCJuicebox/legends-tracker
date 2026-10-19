@@ -177,7 +177,7 @@ export function PetTab({ m }: { m: GearModel }) {
               )}
             </span>
             {profile.unsure.length > 0 && (
-              <span className="lt-chip warn" title="The wiki marks these with a question mark">
+              <span className="chip pill warn" title="The wiki marks these with a question mark">
                 unconfirmed: {profile.unsure.join(', ')}
               </span>
             )}
@@ -279,7 +279,7 @@ export function PetTab({ m }: { m: GearModel }) {
                     <ItemIcon icon={byKey.get(itemKey(c.piece.item.name))?.icon} size={24} />
                     <b>{c.piece.item.name}</b>
                     <span className="small muted">{where(c.piece)}</span>
-                    {c.piece.from === 'pet' && <span className="lt-chip good">keep</span>}
+                    {c.piece.from === 'pet' && <span className="chip pill ok">keep</span>}
                   </div>
                 </div>
                 <span className="lt-gain" title="This item's stats by the pet's weights (haste and weapon damage are counted over the whole set, above)">

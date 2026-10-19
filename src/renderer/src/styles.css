@@ -792,6 +792,22 @@ p.hint {
 .chip.bad::before {
   content: '✕ ';
 }
+/*
+ * One chip (LT-686): the square, upper-case one says what a thing is (a spell's category, a status); a
+ * pill is a tag or a count in running text, in its words' own case. Both take the tones above, with
+ * their marks; gold is a pill's for what is the player's own (yours, a level, +N).
+ */
+.chip.pill {
+  border-radius: 12px;
+  padding: 2px 9px;
+  font-family: inherit;
+  text-transform: none;
+  letter-spacing: 0;
+}
+.chip.gold {
+  background: color-mix(in srgb, var(--accent) 16%, transparent);
+  color: var(--accent-2);
+}
 
 .status-dot {
   width: 8px;
@@ -2201,19 +2217,6 @@ details:not(.info) > summary::before {
   letter-spacing: 0.01em;
   color: var(--accent-2);
 }
-.lt-chip {
-  display: inline-block;
-  padding: 2px 9px;
-  border-radius: 12px;
-  font-size: 12px;
-  font-weight: 600;
-  background: var(--line);
-  color: var(--text-2);
-}
-.lt-chip.gold {
-  background: color-mix(in srgb, var(--accent) 16%, transparent);
-  color: var(--accent-2);
-}
 .lt-big {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
@@ -2446,31 +2449,6 @@ details:not(.info) > summary::before {
 
 /* ---------- gear: focus effects and the optimizer ---------- */
 
-.lt-chip.focus,
-.lt-chip.good {
-  background: color-mix(in srgb, var(--green) 16%, transparent);
-  color: var(--green-text);
-}
-.lt-chip.warn {
-  background: color-mix(in srgb, var(--accent) 16%, transparent);
-  color: var(--accent-2);
-}
-.lt-chip.bad {
-  background: color-mix(in srgb, var(--red) 16%, transparent);
-  /* --red on this tint is 3.8:1; the lighter red of .chip.bad reads at AA. */
-  color: var(--red-text);
-}
-/* A pill that says how something stands carries the status chip's mark too, so the two kinds of
-   chip read alike: colour and a mark (LT-473). A plain pill (a count, a tag) has neither. */
-.lt-chip.good::before {
-  content: '✓ ';
-}
-.lt-chip.warn::before {
-  content: '! ';
-}
-.lt-chip.bad::before {
-  content: '✕ ';
-}
 .lt-focus {
   display: grid;
   gap: 2px;
@@ -2511,10 +2489,6 @@ details:not(.info) > summary::before {
   display: flex;
   gap: 8px;
   align-items: center;
-}
-.lt-focus-cap .lt-chip {
-  text-transform: none;
-  letter-spacing: 0;
 }
 .lt-focus-item {
   display: flex;

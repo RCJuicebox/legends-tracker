@@ -363,7 +363,10 @@ function Finder({ view, sheet, mode }: { view: InventoryView; sheet: CharacterSh
                 <div className="lt-finder-head">
                   <span className="lt-slot">{slotLabel(r.slot)}</span>
                   {ratioFirst && (r.slot === 'Primary' || r.slot === 'Secondary') && (
-                    <span className="lt-chip" title="Weapons go by ratio first: gains in the hands count weapon ratio 100 times over, so a better-ratio weapon always comes first">
+                    <span
+                      className="chip pill"
+                      title="Weapons go by ratio first: gains in the hands count weapon ratio 100 times over, so a better-ratio weapon always comes first"
+                    >
                       ratio first
                     </span>
                   )}
@@ -399,9 +402,9 @@ function Finder({ view, sheet, mode }: { view: InventoryView; sheet: CharacterSh
                         <a className="lt-cand-name" href={wikiUrl(c.item.title)} target="_blank" rel="noreferrer">
                           {c.item.title}
                         </a>
-                        {c.owned && <span className="lt-chip gold">you have one</span>}
+                        {c.owned && <span className="chip pill gold">you have one</span>}
                         <span
-                          className="lt-chip"
+                          className="chip pill"
                           title={
                             c.eraInferred
                               ? c.eraBy === 'recipe'
@@ -415,7 +418,7 @@ function Finder({ view, sheet, mode }: { view: InventoryView; sheet: CharacterSh
                         </span>
                         {c.focus && (
                           <span
-                            className={`lt-chip ${c.focus.gain > 0 ? 'focus' : ''}`}
+                            className={`chip pill ${c.focus.gain > 0 ? 'will' : ''}`}
                             title={c.focus.gain > 0 ? `Adds ${num(c.focus.gain)} to your focus effects` : 'A focus you already have as good, or one you do not want'}
                           >
                             {c.focus.name}
@@ -430,7 +433,7 @@ function Finder({ view, sheet, mode }: { view: InventoryView; sheet: CharacterSh
                             .map(([kind, name]) => (
                               <span
                                 key={kind}
-                                className={`lt-chip ${c.effects!.gain > 0 ? 'focus' : ''}`}
+                                className={`chip pill ${c.effects!.gain > 0 ? 'will' : ''}`}
                                 title={`${kind === 'worn' ? 'Worn effect' : 'Proc (from a weapon in your hands)'}${c.effects!.gain ? `; with it the set's worn effects and procs change by ${num(c.effects!.gain)}` : ''}`}
                               >
                                 {name}

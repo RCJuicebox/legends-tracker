@@ -29,14 +29,14 @@ function strengthNote(info: FocusInfo): string {
   return [cap, on.length ? 'On the spells you cast:' : 'No use on the spells you cast.', ...on].join('\n')
 }
 
-type Status = { label: string; tone: 'good' | 'warn' | 'bad' | '' }
+type Status = { label: string; tone: 'ok' | 'warn' | 'bad' | '' }
 
 function status(have: OwnedFocus[], best: FocusCandidate | undefined, cap = Infinity): Status {
   // Anything past the rank called enough counts as that rank: wearing it is "enough", not "a lower rank".
   const worn = Math.min(cap, have.find((h) => h.from === 'worn')?.eff ?? 0)
   const owned = Math.min(cap, have[0]?.eff ?? 0)
   const top = Math.max(best?.eff ?? 0, owned)
-  if (worn && worn >= top) return { label: cap < Infinity ? 'Wearing enough' : 'Wearing the best', tone: 'good' }
+  if (worn && worn >= top) return { label: cap < Infinity ? 'Wearing enough' : 'Wearing the best', tone: 'ok' }
   if (worn && owned > worn) return { label: 'You own a better one', tone: 'warn' }
   if (worn) return { label: 'Wearing a lower rank', tone: 'warn' }
   if (owned) return { label: 'Owned, not worn', tone: 'warn' }
@@ -205,7 +205,7 @@ function FocusRow({ m, l }: { m: GearModel; l: FocusLine }) {
                 <span className="faint">
                   {slotWords(c.item.statsblock)} · {c.era}
                 </span>
-                {c.owned && <span className="lt-chip gold">yours</span>}
+                {c.owned && <span className="chip pill gold">yours</span>}
               </div>
             ))}
             {topItems.length > 3 && <div className="faint small">and {topItems.length - 3} more</div>}
@@ -222,7 +222,7 @@ function FocusRow({ m, l }: { m: GearModel; l: FocusLine }) {
       </div>
       <div className="lt-focus-col">
         <div className="lt-focus-cap">
-          You have <span className={`lt-chip ${st.tone}`}>{st.label}</span>
+          You have <span className={`chip pill ${st.tone}`}>{st.label}</span>
         </div>
         {have.length ? (
           <>

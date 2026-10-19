@@ -375,9 +375,9 @@ function CharacterCard({
         {server && <span className="muted">{server}</span>}
       </div>
       <div className="row tight" style={{ gap: 6, justifyContent: 'center', flexWrap: 'wrap' }}>
-        {level ? <span className="lt-chip gold">Level {level}</span> : null}
+        {level ? <span className="chip pill gold">Level {level}</span> : null}
         {classes.map((c) => (
-          <span key={c} className="lt-chip">
+          <span key={c} className="chip pill">
             {className(c)}
           </span>
         ))}
@@ -648,7 +648,7 @@ function ItemPanel({
                   <div className="row small gap-8">
                     <ItemIcon icon={ai?.icon} size={22} />
                     <b>{augName(a.name)}</b>
-                    <span className="lt-chip">exaltation</span>
+                    <span className="chip pill">exaltation</span>
                   </div>
                   {ai?.found && (
                     <pre className="inv-block" style={{ marginTop: 4 }}>

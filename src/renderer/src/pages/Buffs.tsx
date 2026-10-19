@@ -165,7 +165,7 @@ export function Buffs() {
                   {classesSaid(v.me.classes)} {v.me.level}
                 </span>
               ) : (
-                <span className="small lt-chip warn">
+                <span className="small chip pill warn">
                   type <span className="mono">/who</span> in game so the tracker knows your classes
                 </span>
               )}
@@ -196,7 +196,7 @@ export function Buffs() {
                         {classesSaid(g.person.classes)} {g.person.level}
                       </span>
                     ) : (
-                      <span className="small lt-chip warn">
+                      <span className="small chip pill warn">
                         type <span className="mono">/who {g.name}</span> in game
                       </span>
                     )}
@@ -286,7 +286,7 @@ export function Buffs() {
                 <span className="small muted">
                   {list.length} buffs{picked ? `, ${picked} picked` : ''}
                 </span>
-                {groupClasses.includes(c) && <span className="lt-chip good">in your group</span>}
+                {groupClasses.includes(c) && <span className="chip pill ok">in your group</span>}
               </div>
               {open && (
                 <div className="table-scroll">
@@ -311,9 +311,9 @@ export function Buffs() {
                             <a href={wikiUrl(o.spell)} target="_blank" rel="noreferrer">
                               {o.spell}
                             </a>
-                            {o.group && <span className="lt-chip ml-6">group</span>}
+                            {o.group && <span className="chip pill ml-6">group</span>}
                             {o.self && (
-                              <Tip className="lt-chip ml-6" text="Only the caster can have it: yours to cast when your classes can">
+                              <Tip className="chip pill ml-6" text="Only the caster can have it: yours to cast when your classes can">
                                 self
                               </Tip>
                             )}
@@ -394,11 +394,11 @@ function BestCombination({ view, unpick }: { view: BuffView; unpick: (spell: str
                       {o ? effectText(o) : ''}
                     </span>
                     {c.on ? (
-                      <span className="lt-chip good">on you</span>
+                      <span className="chip pill ok">on you</span>
                     ) : c.from === YOU ? (
-                      <span className="lt-chip">cast it yourself</span>
+                      <span className="chip pill">cast it yourself</span>
                     ) : (
-                      <span className="lt-chip warn">ask {c.from}</span>
+                      <span className="chip pill warn">ask {c.from}</span>
                     )}
                     <span className="spacer" />
                     <span className="faint mono">{num(c.value)}</span>

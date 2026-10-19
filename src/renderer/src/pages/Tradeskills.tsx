@@ -401,7 +401,7 @@ function RecipeCard({
         <span className="small">
           makes <b>{made.toLocaleString()}</b>
         </span>
-        <span className={`lt-chip ${s.canMake >= combines ? 'good' : s.canMake > 0 ? 'warn' : ''}`} title="Combines the ingredients you have would make">
+        <span className={`chip pill ${s.canMake >= combines ? 'ok' : s.canMake > 0 ? 'warn' : ''}`} title="Combines the ingredients you have would make">
           {s.canMake.toLocaleString()} from what you have
         </span>
         {!open && (
@@ -510,7 +510,7 @@ function RecipeDetail({
         <span className="muted">
           Whole batch {coin(s.batch)} · {coin(s.each)} each
         </span>
-        {s.unpriced && <span className="lt-chip warn">Some prices unknown: totals leave them out</span>}
+        {s.unpriced && <span className="chip pill warn">Some prices unknown: totals leave them out</span>}
       </div>
     </>
   )

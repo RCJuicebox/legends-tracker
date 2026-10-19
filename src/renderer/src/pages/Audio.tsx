@@ -208,7 +208,7 @@ function AzureCard({ status, error, onSaved }: { status: AzureStatus | null; err
       {error && <LoadError what="the Azure settings" error={error} />}
       {status?.configured ? (
         <div className="row" style={{ flexWrap: 'wrap' }}>
-          <span className="lt-chip good">Connected</span>
+          <span className="chip pill ok">Connected</span>
           <span className="small">
             Region <b>{status.region}</b>, {status.voices.length} voices. Pick one in the Voice list above.
           </span>

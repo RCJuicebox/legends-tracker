@@ -208,7 +208,7 @@ export function OptimizeTab({ m }: { m: GearModel }) {
                 <div className="lt-cand-body">
                   <div className="row gap-8">
                     {lockedSlots.has(c.i) && (
-                      <span className="lt-chip gold" title="Locked in: the rest of the set is worn around it">
+                      <span className="chip pill gold" title="Locked in: the rest of the set is worn around it">
                         locked
                       </span>
                     )}
@@ -219,7 +219,7 @@ export function OptimizeTab({ m }: { m: GearModel }) {
                             <a href={wikiUrl(baseName(c.after.item.name))} target="_blank" rel="noreferrer">
                               <b>{c.after.item.name}</b>
                             </a>
-                            <span className="lt-chip warn">to get</span>
+                            <span className="chip pill warn">to get</span>
                             <span className="small muted">{catalogWhere(byTitle.get(baseName(c.after.item.name)))}</span>
                           </>
                         ) : (
@@ -302,7 +302,7 @@ export function OptimizeTab({ m }: { m: GearModel }) {
               const owned = m.ownedFoci.get(l.key)?.[0]
               const cap = m.capOf(l.key)
               const best = (m.available.get(l.key) ?? []).find((c) => c.eff <= cap + 1e-9)
-              const tone = after && after >= (best?.eff ?? 0) ? 'good' : after ? 'warn' : 'bad'
+              const tone = after && after >= (best?.eff ?? 0) ? 'ok' : after ? 'warn' : 'bad'
               return (
                 <div key={l.key} className="lt-opt-line">
                   <span>
@@ -311,7 +311,7 @@ export function OptimizeTab({ m }: { m: GearModel }) {
                   </span>
                   <span>{now ? pct(now) : <span className="faint">none</span>}</span>
                   <span>
-                    <span className={`lt-chip ${tone}`}>{after ? pct(after) : 'none'}</span>
+                    <span className={`chip pill ${tone}`}>{after ? pct(after) : 'none'}</span>
                     {owned && owned.eff > after && (
                       <div className="faint small" title="You own it, but by these weights the slot is worth more with something else in it">
                         left off: {owned.focus} ({pct(owned.eff)})
@@ -444,7 +444,7 @@ function LockCard({
               <span className="lt-slot">{slotLabel(SLOT_LAYOUT[r.slot] ?? '')}</span>
               <b>{r.name}</b>
               {found[k] && <span className="muted">{whereText(found[k]!.from, found[k]!.item)}</span>}
-              {note && <span className="lt-chip warn">{note}</span>}
+              {note && <span className="chip pill warn">{note}</span>}
               <span className="grow" />
               <button className="btn ghost small" aria-label={`Unlock ${r.name}`} onClick={() => unlock(r.slot)}>
                 Unlock

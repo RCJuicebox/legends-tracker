@@ -184,7 +184,7 @@ function Row({ e, info, refresh }: { e: LootEntry; info: ItemInfo | undefined; r
           {e.count > 1 ? `${e.count} × ` : ''}
           {e.base}
         </a>
-        {e.plus > 0 && <span className="lt-chip gold">+{e.plus}</span>}
+        {e.plus > 0 && <span className="chip pill gold">+{e.plus}</span>}
         <span className={`chip ${e.outcome}`} title={o.hint}>
           {o.label}
           {e.outcome === 'sold' && e.copper > 0 ? ` · ${fmtCoin(e.copper)}` : ''}
