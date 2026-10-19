@@ -323,7 +323,7 @@ function turnInText(v: QuestView): string {
 
 function TestRow({ v, act, open, onOpen }: { v: QuestView; act: Act; open: boolean; onOpen: () => void }) {
   const q = v.quest
-  const mobs = [...new Set(q.items.filter((i) => i.from).map((i) => `${i.from} · Island ${i.island}`))]
+  const mobs = [...new Set(q.items.flatMap((i) => i.drops.filter((d) => d.mob).map((d) => `${d.mob} (island ${d.island})`)))]
   const total = v.needs.length
   const got = total - v.missing
   return (

@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react'
 import { Info, NumberInput, Segmented, Tip } from '../../renderer/src/components/ui'
 import { num } from '../../core/format'
 import { itemKey } from '../../core/inventory'
-import { heldOf, questNeeds, SKY_QUESTS, wishDone, wishLeft, type SkyItem, type SkyState } from './core'
+import { firstIsland, heldOf, questNeeds, SKY_QUESTS, wishDone, wishLeft, type SkyItem, type SkyState } from './core'
 import { ANY_MOB, classRows, cleanupRows, shoppingList, targets, type CountFrom, type QuestView } from './views'
 import { Bar, whereOf } from './parts'
 
@@ -126,7 +126,7 @@ export function Items({ s, filter, onHave }: { s: SkyState; filter: string; onHa
     const words = filter.toLowerCase().split(/\s+/).filter(Boolean)
     return [...by.values()]
       .filter((r) => words.every((w) => [r.item.name, whereOf(r.item), ...r.tests].join(' ').toLowerCase().includes(w)))
-      .sort((a, b) => (a.item.island ?? 0) - (b.item.island ?? 0) || a.item.name.localeCompare(b.item.name))
+      .sort((a, b) => firstIsland(a.item) - firstIsland(b.item) || a.item.name.localeCompare(b.item.name))
   }, [filter])
   return (
     <div className="card mb-16">
@@ -228,6 +228,7 @@ export function Targets({ views, shown }: { views: readonly QuestView[]; shown: 
                       <td>
                         <b>{r.item.name}</b>
                         {r.item.noDrop && <span className="faint small"> · No Drop</span>}
+                        {r.also.length > 0 && <span className="faint small"> · also {r.also.join(', ')}</span>}
                       </td>
                       <td className="mono">
                         {num(r.have)}/{num(r.need)}

@@ -59,13 +59,14 @@ describe('the Tests tab', () => {
     expect(names({ cls: 'Monk', favoritesOnly: true })).toEqual([FISTS])
     expect(names({ cls: 'Monk', onlyTurnedIn: true })).toEqual(['Monk Test of Speed'])
     expect(names({ cls: 'Monk', hideTurnedIn: true })).not.toContain('Monk Test of Speed')
-    expect(names({ text: 'island 8 monk' })).toEqual(['Monk Test of Tranquility'])
+    // Brass Knuckles drops on island 8 too.
+    expect(names({ text: 'island 8 monk' })).toEqual([FISTS, 'Monk Test of Tranquility'])
   })
 
   it('orders by what was looted last, by island, or as the wiki lists them', () => {
     const monk = views.filter((v) => v.quest.cls === 'Monk')
     expect([...monk].sort(sortViews('recent')).map((v) => v.quest.name)[0]).toBe('Monk Test of Strength')
-    expect([...monk].sort(sortViews('island')).map((v) => v.quest.items[0].island)).toEqual([3, 4, 5, 6, 7, 8])
+    expect([...monk].sort(sortViews('island')).map((v) => v.quest.items[0].drops[0].island)).toEqual([3, 4, 5, 6, 7, 8])
     expect([...monk].sort(sortViews('class'))).toEqual(monk)
   })
 
@@ -73,8 +74,9 @@ describe('the Tests tab', () => {
     const claw = views.find((v) => v.quest.name === CLAW)!
     expect(claw.shared.map((x) => x.item)).toEqual(['Sphinx Claw', 'Mithril Bands', 'Brass Knuckles'])
     const facets = skyFacets()
-    expect(facets.islands).toEqual([2, 3, 4, 5, 6, 7, 8])
-    expect(facets.mobs[0]).toEqual({ mob: 'Protector of Sky', island: 2 })
+    expect(facets.islands).toEqual([1.5, 2, 3, 4, 5, 6, 7, 8])
+    expect(facets.mobs.map((m) => m.mob)).toContain('The Hand of Veeshan')
+    expect(facets.mobs[0]).toEqual({ mob: 'Noble Dojorn', island: 1.5 })
   })
 })
 
@@ -83,9 +85,16 @@ describe('the other tabs', () => {
     const s = state({ logged: { 'wind rune neza': 1 } })
     const t = targets([FISTS, CLAW].map((n) => questView(quest(n), s, 'log')))
     expect(t[0].mob).toBe(ANY_MOB)
-    expect(t[t.length - 1].mob).toBe(ELSEWHERE)
-    const knuckles = t[t.length - 1].items.find((i) => i.item.name === 'Brass Knuckles')!
-    expect(knuckles).toMatchObject({ have: 0, need: 2, tests: [FISTS, CLAW] })
+    expect(t.some((x) => x.mob === ELSEWHERE)).toBe(false)
+    // Brass Knuckles drops from three mobs: under each, with the others named.
+    const under = t.filter((x) => x.items.some((i) => i.item.name === 'Brass Knuckles')).map((x) => [x.mob, x.island])
+    expect(under).toEqual([
+      ['Noble Dojorn', 1.5],
+      ['Overseer of Air', 4],
+      ['The Hand of Veeshan', 8]
+    ])
+    const knuckles = t.find((x) => x.mob === 'Overseer of Air')!.items.find((i) => i.item.name === 'Brass Knuckles')!
+    expect(knuckles).toMatchObject({ have: 0, need: 2, tests: [FISTS, CLAW], also: ['Noble Dojorn', 'The Hand of Veeshan'] })
     // The rune for Fists is held: only Claw's is missing.
     expect(t[0].items.map((i) => i.item.name)).toEqual(['Wind Rune Izah'])
   })

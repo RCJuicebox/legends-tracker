@@ -27,15 +27,23 @@ import type { Inventory } from '../../shared/character'
 //   You offered 1 Wind Rune Geza to Holwin.
 //   You complete the trade with Holwin.                                                 Monk Test of Sight
 
+/** Where an item drops: an island (1.5 is Noble Island), and the mob when one is named. */
+export interface SkyDrop {
+  island: number
+  /** The mob, or "any mob on the island"; absent where the wiki names none. */
+  mob?: string
+}
+
 export interface SkyItem {
   name: string
-  /** The island it drops on; absent for what is not from the Plane of Sky (Brass Knuckles). */
-  island?: number
-  /** The mob it drops from, or "any mob on the island". */
-  from?: string
+  /** Where it drops, each place it can; none for the Wind Runes, which any Plane of Sky mob drops. */
+  drops: SkyDrop[]
   /** No Drop: whoever does the quest loots it. */
   noDrop?: true
 }
+
+/** The first island an item drops on; 0 for a Wind Rune or one with no place. */
+export const firstIsland = (i: SkyItem): number => (i.drops.length ? Math.min(...i.drops.map((d) => d.island)) : 0)
 
 export interface SkyQuest {
   cls: string
@@ -55,7 +63,7 @@ export const SKY_SOURCE: string = SKY.source
 export const SKY_QUESTS: readonly SkyQuest[] = SKY.quests as SkyQuest[]
 
 /** Everything one Test takes, the runes first, once each. */
-export const questNeeds = (q: SkyQuest): SkyItem[] => [...q.runes.map((name): SkyItem => ({ name })), ...q.items]
+export const questNeeds = (q: SkyQuest): SkyItem[] => [...q.runes.map((name): SkyItem => ({ name, drops: [] })), ...q.items]
 
 /** The keys of every item a Test takes or gives: the only ones the log is counted for. */
 const SKY_KEYS: ReadonlySet<string> = new Set(SKY_QUESTS.flatMap((q) => [...questNeeds(q).map((i) => itemKey(i.name)), ...q.rewards.map(itemKey)]))

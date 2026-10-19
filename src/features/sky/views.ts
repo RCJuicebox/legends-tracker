@@ -1,5 +1,5 @@
 import { itemKey } from '../../core/inventory'
-import { heldOf, questNeeds, SKY_QUESTS, wishLeft, type SkyItem, type SkyQuest, type SkyState } from './core'
+import { firstIsland, heldOf, questNeeds, SKY_QUESTS, wishLeft, type SkyItem, type SkyQuest, type SkyState } from './core'
 
 // What Plan › Plane of Sky draws from a character's state (core.ts): each Test as a row (what it takes,
 // held of needed, whether and how it was handed in), the filters and orders over them, and the other
@@ -120,8 +120,8 @@ export function questView(q: SkyQuest, s: SkyState, from: CountFrom): QuestView 
 /** The orders the Tests can be listed in. */
 export type SkySort = 'near' | 'recent' | 'class' | 'island'
 
-/** The furthest island a Test's items drop on: where it is finished. */
-const lastIsland = (v: QuestView) => Math.max(0, ...v.quest.items.map((i) => i.island ?? 0))
+/** The furthest island a Test needs to reach, each item got where it first drops: where it is finished. */
+const lastIsland = (v: QuestView) => Math.max(0, ...v.quest.items.map(firstIsland))
 
 const wikiOrder = (a: QuestView, b: QuestView) => SKY_QUESTS.indexOf(a.quest) - SKY_QUESTS.indexOf(b.quest)
 
@@ -157,7 +157,9 @@ export const NO_FILTER: SkyFilter = { cls: 'all', island: 0, mob: '', text: '', 
 export function questMatch(q: SkyQuest, filter: string): boolean {
   const words = filter.toLowerCase().split(/\s+/).filter(Boolean)
   if (!words.length) return true
-  const hay = [q.name, q.cls, q.giver, ...q.rewards, ...questNeeds(q).flatMap((i) => [i.name, i.from ?? '', i.island ? `island ${i.island}` : ''])].join(' ').toLowerCase()
+  const hay = [q.name, q.cls, q.giver, ...q.rewards, ...questNeeds(q).flatMap((i) => [i.name, ...i.drops.flatMap((d) => [d.mob ?? '', `island ${d.island}`])])]
+    .join(' ')
+    .toLowerCase()
   return words.every((w) => hay.includes(w))
 }
 
@@ -166,8 +168,8 @@ export function passes(v: QuestView, f: SkyFilter, mine: readonly string[]): boo
   const q = v.quest
   if (v.ignored) return false
   if (f.cls === 'mine' ? mine.length > 0 && !mine.includes(q.cls) : f.cls !== 'all' && q.cls !== f.cls) return false
-  if (f.island && !q.items.some((i) => i.island === f.island)) return false
-  if (f.mob && !q.items.some((i) => i.from === f.mob)) return false
+  if (f.island && !q.items.some((i) => i.drops.some((d) => d.island === f.island))) return false
+  if (f.mob && !q.items.some((i) => i.drops.some((d) => d.mob === f.mob))) return false
   if (f.hideReady && v.ready) return false
   if (f.hideTurnedIn && v.turnIn.any) return false
   if (f.onlyTurnedIn && !v.turnIn.any) return false
@@ -180,9 +182,9 @@ export function skyFacets(): { islands: number[]; mobs: { mob: string; island: n
   const islands = new Set<number>()
   const mobs = new Map<string, number>()
   for (const q of SKY_QUESTS)
-    for (const i of q.items) {
-      if (i.island) islands.add(i.island)
-      if (i.from && i.island) mobs.set(i.from, i.island)
+    for (const d of q.items.flatMap((i) => i.drops)) {
+      islands.add(d.island)
+      if (d.mob && !/^any mob/i.test(d.mob)) mobs.set(d.mob, d.island)
     }
   return {
     islands: [...islands].sort((a, b) => a - b),
@@ -194,16 +196,17 @@ export function skyFacets(): { islands: number[]; mobs: { mob: string; island: n
 
 /** A mob to hunt, and what it drops that the Tests shown still need. */
 export interface Target {
-  /** The mob; "Any Plane of Sky mob" for the runes, "Not from the Plane of Sky" for what is not. */
+  /** The mob; "Any Plane of Sky mob" for the runes, "Not from the Plane of Sky" for what has no place. */
   mob: string
   island?: number
-  items: { item: SkyItem; have: number; need: number; tests: string[] }[]
+  /** Each item, with the other mobs that drop it too. */
+  items: { item: SkyItem; have: number; need: number; tests: string[]; also: string[] }[]
 }
 
 export const ANY_MOB = 'Any Plane of Sky mob'
 export const ELSEWHERE = 'Not from the Plane of Sky'
 
-/** Where to hunt for what the given Tests are missing: each item once, needed by every Test that wants it. Runes first, then by island, then what is from elsewhere. */
+/** Where to hunt for what the given Tests are missing: each item under every mob that drops it, needed by every Test that wants it. Runes first, then by island, then what has no place. */
 export function targets(views: readonly QuestView[]): Target[] {
   const items = new Map<string, { item: SkyItem; have: number; need: number; tests: string[] }>()
   for (const v of views)
@@ -215,13 +218,20 @@ export function targets(views: readonly QuestView[]): Target[] {
       items.set(k, r)
     }
   const by = new Map<string, Target>()
+  const put = (mob: string, island: number | undefined, row: Target['items'][number]) => {
+    const key = `${mob}|${island ?? ''}`
+    const t = by.get(key) ?? { mob, ...(island ? { island } : {}), items: [] }
+    t.items.push(row)
+    by.set(key, t)
+  }
   for (const r of items.values()) {
     if (r.have >= r.need) continue
-    const mob = isRune(r.item) ? ANY_MOB : (r.item.from ?? ELSEWHERE)
-    const key = `${mob}|${r.item.island ?? ''}`
-    const t = by.get(key) ?? { mob, ...(r.item.island ? { island: r.item.island } : {}), items: [] }
-    t.items.push(r)
-    by.set(key, t)
+    if (isRune(r.item) || !r.item.drops.length) {
+      put(isRune(r.item) ? ANY_MOB : ELSEWHERE, undefined, { ...r, also: [] })
+      continue
+    }
+    const named = r.item.drops.map((d) => d.mob ?? 'Any mob on the island')
+    r.item.drops.forEach((d, i) => put(named[i], d.island, { ...r, also: named.filter((_, j) => j !== i) }))
   }
   const rank = (t: Target) => (t.mob === ANY_MOB ? 0 : t.mob === ELSEWHERE ? 99 : (t.island ?? 98))
   for (const t of by.values()) t.items.sort((a, b) => a.item.name.localeCompare(b.item.name))
@@ -322,6 +332,6 @@ export function shoppingList(s: SkyState, from: CountFrom): ShoppingRow[] {
       rows.set(k, r)
     }
   }
-  const rank = (i: SkyItem) => i.island ?? (isRune(i) ? 0 : 99)
+  const rank = (i: SkyItem) => (isRune(i) ? 0 : firstIsland(i) || 99)
   return [...rows.values()].sort((a, b) => rank(a.item) - rank(b.item) || a.item.name.localeCompare(b.item.name))
 }

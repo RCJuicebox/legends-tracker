@@ -6,10 +6,11 @@ import type { QuestView } from './views'
 // The pieces Plan › Plane of Sky's tabs share: where an item drops, an item's chip, the wish control,
 // a progress bar.
 
-/** Where an item comes from, short: "Island 7 · Sister of the Spire · No Drop". */
+/** Where an item comes from, short: "Island 7, Sister of the Spire · No Drop"; several places joined by "or". */
 export function whereOf(i: SkyItem): string {
   if (/^Wind Rune /.test(i.name)) return 'Any Plane of Sky mob'
-  return [i.island ? `Island ${i.island}` : 'Not from the Plane of Sky', i.from, i.noDrop ? 'No Drop' : ''].filter(Boolean).join(' · ')
+  const at = i.drops.map((d) => (d.mob ? `Island ${d.island}, ${d.mob}` : `Island ${d.island}`)).join(' or ')
+  return [at || 'Not from the Plane of Sky', i.noDrop ? 'No Drop' : ''].filter(Boolean).join(' · ')
 }
 
 /** An item a Test takes, as a chip: held of needed, ticked when there are enough. */

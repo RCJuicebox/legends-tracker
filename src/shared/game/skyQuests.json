@@ -15,8 +15,12 @@
    "items": [
     {
      "name": "Light Woolen Mask",
-     "island": 3,
-     "from": "Gorgalosk",
+     "drops": [
+      {
+       "island": 3,
+       "mob": "Gorgalosk"
+      }
+     ],
      "noDrop": true
     }
    ]
@@ -35,8 +39,12 @@
    "items": [
     {
      "name": "Light Woolen Mantle",
-     "island": 4,
-     "from": "Keeper of Souls",
+     "drops": [
+      {
+       "island": 4,
+       "mob": "Keeper of Souls"
+      }
+     ],
      "noDrop": true
     }
    ]
@@ -55,8 +63,12 @@
    "items": [
     {
      "name": "Crude Wooden Flute",
-     "island": 5,
-     "from": "The Spiroc Lord",
+     "drops": [
+      {
+       "island": 5,
+       "mob": "The Spiroc Lord"
+      }
+     ],
      "noDrop": true
     }
    ]
@@ -75,8 +87,12 @@
    "items": [
     {
      "name": "Amulet of Woven Hair",
-     "island": 6,
-     "from": "Bazzt Zzzt",
+     "drops": [
+      {
+       "island": 6,
+       "mob": "Bazzt Zzzt"
+      }
+     ],
      "noDrop": true
     }
    ]
@@ -95,12 +111,30 @@
    "items": [
     {
      "name": "Glowing Diamond",
-     "island": 7,
-     "from": "Sister of the Spire",
+     "drops": [
+      {
+       "island": 7,
+       "mob": "Sister of the Spire"
+      }
+     ],
      "noDrop": true
     },
     {
-     "name": "Efreeti War Horn"
+     "name": "Efreeti War Horn",
+     "drops": [
+      {
+       "island": 1.5,
+       "mob": "Noble Dojorn"
+      },
+      {
+       "island": 4,
+       "mob": "Overseer of Air"
+      },
+      {
+       "island": 8,
+       "mob": "The Hand of Veeshan"
+      }
+     ]
     }
    ]
   },
@@ -118,12 +152,26 @@
    "items": [
     {
      "name": "Nebulous Diamond",
-     "island": 8,
-     "from": "Eye of Veeshan",
+     "drops": [
+      {
+       "island": 8,
+       "mob": "Eye of Veeshan"
+      }
+     ],
      "noDrop": true
     },
     {
-     "name": "Efreeti War Spear"
+     "name": "Efreeti War Spear",
+     "drops": [
+      {
+       "island": 1.5,
+       "mob": "Noble Dojorn"
+      },
+      {
+       "island": 4,
+       "mob": "Overseer of Air"
+      }
+     ]
     }
    ]
   },
@@ -141,8 +189,12 @@
    "items": [
     {
      "name": "Spiroc Elder's Totem",
-     "island": 5,
-     "from": "The Spiroc Lord",
+     "drops": [
+      {
+       "island": 5,
+       "mob": "The Spiroc Lord"
+      }
+     ],
      "noDrop": true
     }
    ]
@@ -161,8 +213,12 @@
    "items": [
     {
      "name": "Azarack Skin",
-     "island": 2,
-     "from": "Protector of Sky",
+     "drops": [
+      {
+       "island": 2,
+       "mob": "Protector of Sky"
+      }
+     ],
      "noDrop": true
     }
    ]
@@ -182,18 +238,40 @@
    "items": [
     {
      "name": "Sphinx Claw",
-     "island": 7,
-     "from": "Sister of the Spire",
+     "drops": [
+      {
+       "island": 7,
+       "mob": "Sister of the Spire"
+      }
+     ],
      "noDrop": true
     },
     {
      "name": "Mithril Bands",
-     "island": 8,
-     "from": "Eye of Veeshan",
+     "drops": [
+      {
+       "island": 8,
+       "mob": "Eye of Veeshan"
+      }
+     ],
      "noDrop": true
     },
     {
-     "name": "Brass Knuckles"
+     "name": "Brass Knuckles",
+     "drops": [
+      {
+       "island": 1.5,
+       "mob": "Noble Dojorn"
+      },
+      {
+       "island": 4,
+       "mob": "Overseer of Air"
+      },
+      {
+       "island": 8,
+       "mob": "The Hand of Veeshan"
+      }
+     ]
     }
    ]
   },
@@ -211,8 +289,12 @@
    "items": [
     {
      "name": "Leather Cord",
-     "island": 3,
-     "from": "Gorgalosk",
+     "drops": [
+      {
+       "island": 3,
+       "mob": "Gorgalosk"
+      }
+     ],
      "noDrop": true
     }
    ]
@@ -231,8 +313,12 @@
    "items": [
     {
      "name": "Silken Wrap",
-     "island": 6,
-     "from": "Bazzt Zzzt",
+     "drops": [
+      {
+       "island": 6,
+       "mob": "Bazzt Zzzt"
+      }
+     ],
      "noDrop": true
     }
    ]
@@ -251,12 +337,30 @@
    "items": [
     {
      "name": "Djinni War Blade",
-     "island": 7,
-     "from": "Sister of the Spire",
+     "drops": [
+      {
+       "island": 7,
+       "mob": "Sister of the Spire"
+      }
+     ],
      "noDrop": true
     },
     {
-     "name": "Efreeti Standard"
+     "name": "Efreeti Standard",
+     "drops": [
+      {
+       "island": 1.5,
+       "mob": "Noble Dojorn"
+      },
+      {
+       "island": 4,
+       "mob": "Overseer of Air"
+      },
+      {
+       "island": 8,
+       "mob": "The Hand of Veeshan"
+      }
+     ]
     }
    ]
   },
@@ -274,8 +378,12 @@
    "items": [
     {
      "name": "Pulsating Ruby",
-     "island": 6,
-     "from": "Bazzt Zzzt",
+     "drops": [
+      {
+       "island": 6,
+       "mob": "Bazzt Zzzt"
+      }
+     ],
      "noDrop": true
     }
    ]
@@ -294,8 +402,12 @@
    "items": [
     {
      "name": "High Quality Raiment",
-     "island": 5,
-     "from": "The Spiroc Lord",
+     "drops": [
+      {
+       "island": 5,
+       "mob": "The Spiroc Lord"
+      }
+     ],
      "noDrop": true
     }
    ]
@@ -314,8 +426,12 @@
    "items": [
     {
      "name": "Feathered Cape",
-     "island": 3,
-     "from": "Gorgalosk",
+     "drops": [
+      {
+       "island": 3,
+       "mob": "Gorgalosk"
+      }
+     ],
      "noDrop": true
     }
    ]
@@ -334,8 +450,12 @@
    "items": [
     {
      "name": "Azarack Blood",
-     "island": 2,
-     "from": "Protector of Sky",
+     "drops": [
+      {
+       "island": 2,
+       "mob": "Protector of Sky"
+      }
+     ],
      "noDrop": true
     }
    ]
@@ -354,14 +474,22 @@
    "items": [
     {
      "name": "Jester's Mask",
-     "island": 4,
-     "from": "Keeper of Souls",
+     "drops": [
+      {
+       "island": 4,
+       "mob": "Keeper of Souls"
+      }
+     ],
      "noDrop": true
     },
     {
      "name": "Efreeti Great Staff",
-     "island": 8,
-     "from": "Eye of Veeshan"
+     "drops": [
+      {
+       "island": 8,
+       "mob": "Eye of Veeshan"
+      }
+     ]
     }
    ]
   },
@@ -379,8 +507,12 @@
    "items": [
     {
      "name": "Silver Hoop",
-     "island": 3,
-     "from": "Gorgalosk",
+     "drops": [
+      {
+       "island": 3,
+       "mob": "Gorgalosk"
+      }
+     ],
      "noDrop": true
     }
    ]
@@ -399,8 +531,12 @@
    "items": [
     {
      "name": "Small Shield",
-     "island": 4,
-     "from": "Keeper of Souls",
+     "drops": [
+      {
+       "island": 4,
+       "mob": "Keeper of Souls"
+      }
+     ],
      "noDrop": true
     }
    ]
@@ -419,8 +555,12 @@
    "items": [
     {
      "name": "Shiny Pauldrons",
-     "island": 5,
-     "from": "The Spiroc Lord",
+     "drops": [
+      {
+       "island": 5,
+       "mob": "The Spiroc Lord"
+      }
+     ],
      "noDrop": true
     }
    ]
@@ -439,8 +579,12 @@
    "items": [
     {
      "name": "Silvered Spiroc Necklace",
-     "island": 6,
-     "from": "Bazzt Zzzt",
+     "drops": [
+      {
+       "island": 6,
+       "mob": "Bazzt Zzzt"
+      }
+     ],
      "noDrop": true
     }
    ]
@@ -459,12 +603,30 @@
    "items": [
     {
      "name": "Djinni Aura",
-     "island": 7,
-     "from": "Sister of the Spire",
+     "drops": [
+      {
+       "island": 7,
+       "mob": "Sister of the Spire"
+      }
+     ],
      "noDrop": true
     },
     {
-     "name": "Efreeti Mace"
+     "name": "Efreeti Mace",
+     "drops": [
+      {
+       "island": 1.5,
+       "mob": "Noble Dojorn"
+      },
+      {
+       "island": 4,
+       "mob": "Overseer of Air"
+      },
+      {
+       "island": 8,
+       "mob": "The Hand of Veeshan"
+      }
+     ]
     }
    ]
   },
@@ -482,12 +644,30 @@
    "items": [
     {
      "name": "Mithril Bands",
-     "island": 8,
-     "from": "Eye of Veeshan",
+     "drops": [
+      {
+       "island": 8,
+       "mob": "Eye of Veeshan"
+      }
+     ],
      "noDrop": true
     },
     {
-     "name": "Efreeti Standard"
+     "name": "Efreeti Standard",
+     "drops": [
+      {
+       "island": 1.5,
+       "mob": "Noble Dojorn"
+      },
+      {
+       "island": 4,
+       "mob": "Overseer of Air"
+      },
+      {
+       "island": 8,
+       "mob": "The Hand of Veeshan"
+      }
+     ]
     }
    ]
   },
@@ -505,8 +685,12 @@
    "items": [
     {
      "name": "Worn Leather Mask",
-     "island": 3,
-     "from": "Gorgalosk",
+     "drops": [
+      {
+       "island": 3,
+       "mob": "Gorgalosk"
+      }
+     ],
      "noDrop": true
     }
    ]
@@ -525,8 +709,12 @@
    "items": [
     {
      "name": "Mantle of Woven Grass",
-     "island": 4,
-     "from": "Keeper of Souls",
+     "drops": [
+      {
+       "island": 4,
+       "mob": "Keeper of Souls"
+      }
+     ],
      "noDrop": true
     }
    ]
@@ -545,12 +733,30 @@
    "items": [
     {
      "name": "Spiroc Battle Staff",
-     "island": 5,
-     "from": "The Spiroc Lord",
+     "drops": [
+      {
+       "island": 5,
+       "mob": "The Spiroc Lord"
+      }
+     ],
      "noDrop": true
     },
     {
-     "name": "Efreeti Statuette"
+     "name": "Efreeti Statuette",
+     "drops": [
+      {
+       "island": 1.5,
+       "mob": "Noble Dojorn"
+      },
+      {
+       "island": 4,
+       "mob": "Overseer of Air"
+      },
+      {
+       "island": 8,
+       "mob": "The Hand of Veeshan"
+      }
+     ]
     }
    ]
   },
@@ -568,8 +774,12 @@
    "items": [
     {
      "name": "Divine Honeycomb",
-     "island": 6,
-     "from": "Bazzt Zzzt",
+     "drops": [
+      {
+       "island": 6,
+       "mob": "Bazzt Zzzt"
+      }
+     ],
      "noDrop": true
     }
    ]
@@ -588,14 +798,22 @@
    "items": [
     {
      "name": "Ethereal Ruby",
-     "island": 7,
-     "from": "Sister of the Spire",
+     "drops": [
+      {
+       "island": 7,
+       "mob": "Sister of the Spire"
+      }
+     ],
      "noDrop": true
     },
     {
      "name": "Spiroc Elder's Totem",
-     "island": 5,
-     "from": "The Spiroc Lord",
+     "drops": [
+      {
+       "island": 5,
+       "mob": "The Spiroc Lord"
+      }
+     ],
      "noDrop": true
     }
    ]
@@ -614,12 +832,26 @@
    "items": [
     {
      "name": "Storm Sky Opal",
-     "island": 8,
-     "from": "Eye of Veeshan",
+     "drops": [
+      {
+       "island": 8,
+       "mob": "Eye of Veeshan"
+      }
+     ],
      "noDrop": true
     },
     {
-     "name": "Efreeti Scimitar"
+     "name": "Efreeti Scimitar",
+     "drops": [
+      {
+       "island": 1.5,
+       "mob": "Noble Dojorn"
+      },
+      {
+       "island": 4,
+       "mob": "Overseer of Air"
+      }
+     ]
     }
    ]
   },
@@ -637,8 +869,12 @@
    "items": [
     {
      "name": "Finely Woven Cloth Cord",
-     "island": 3,
-     "from": "Gorgalosk",
+     "drops": [
+      {
+       "island": 3,
+       "mob": "Gorgalosk"
+      }
+     ],
      "noDrop": true
     }
    ]
@@ -657,8 +893,12 @@
    "items": [
     {
      "name": "Light Cloth Mantle",
-     "island": 4,
-     "from": "Keeper of Souls",
+     "drops": [
+      {
+       "island": 4,
+       "mob": "Keeper of Souls"
+      }
+     ],
      "noDrop": true
     }
    ]
@@ -677,8 +917,12 @@
    "items": [
     {
      "name": "Silken Mask",
-     "island": 5,
-     "from": "The Spiroc Lord",
+     "drops": [
+      {
+       "island": 5,
+       "mob": "The Spiroc Lord"
+      }
+     ],
      "noDrop": true
     }
    ]
@@ -697,8 +941,12 @@
    "items": [
     {
      "name": "Adamantium Earring",
-     "island": 6,
-     "from": "Bazzt Zzzt",
+     "drops": [
+      {
+       "island": 6,
+       "mob": "Bazzt Zzzt"
+      }
+     ],
      "noDrop": true
     }
    ]
@@ -717,8 +965,12 @@
    "items": [
     {
      "name": "Glowing Necklace",
-     "island": 7,
-     "from": "Sister of the Spire",
+     "drops": [
+      {
+       "island": 7,
+       "mob": "Sister of the Spire"
+      }
+     ],
      "noDrop": true
     }
    ]
@@ -737,12 +989,30 @@
    "items": [
     {
      "name": "Large Sky Sapphire",
-     "island": 8,
-     "from": "Eye of Veeshan",
+     "drops": [
+      {
+       "island": 8,
+       "mob": "Eye of Veeshan"
+      }
+     ],
      "noDrop": true
     },
     {
-     "name": "Efreeti Wind Staff"
+     "name": "Efreeti Wind Staff",
+     "drops": [
+      {
+       "island": 1.5,
+       "mob": "Noble Dojorn"
+      },
+      {
+       "island": 4,
+       "mob": "Overseer of Air"
+      },
+      {
+       "island": 8,
+       "mob": "The Hand of Veeshan"
+      }
+     ]
     }
    ]
   },
@@ -760,8 +1030,12 @@
    "items": [
     {
      "name": "Feathered Cape",
-     "island": 3,
-     "from": "Gorgalosk",
+     "drops": [
+      {
+       "island": 3,
+       "mob": "Gorgalosk"
+      }
+     ],
      "noDrop": true
     }
    ]
@@ -780,8 +1054,12 @@
    "items": [
     {
      "name": "Ceramic Mask",
-     "island": 4,
-     "from": "Keeper of Souls",
+     "drops": [
+      {
+       "island": 4,
+       "mob": "Keeper of Souls"
+      }
+     ],
      "noDrop": true
     }
    ]
@@ -800,8 +1078,12 @@
    "items": [
     {
      "name": "Golden Coffer",
-     "island": 5,
-     "from": "The Spiroc Lord",
+     "drops": [
+      {
+       "island": 5,
+       "mob": "The Spiroc Lord"
+      }
+     ],
      "noDrop": true
     }
    ]
@@ -820,8 +1102,12 @@
    "items": [
     {
      "name": "Large Diamond",
-     "island": 6,
-     "from": "Bazzt Zzzt",
+     "drops": [
+      {
+       "island": 6,
+       "mob": "Bazzt Zzzt"
+      }
+     ],
      "noDrop": true
     }
    ]
@@ -840,8 +1126,12 @@
    "items": [
     {
      "name": "Golden Efreeti Ring",
-     "island": 7,
-     "from": "Sister of the Spire",
+     "drops": [
+      {
+       "island": 7,
+       "mob": "Sister of the Spire"
+      }
+     ],
      "noDrop": true
     }
    ]
@@ -860,12 +1150,26 @@
    "items": [
     {
      "name": "Hazy Opal",
-     "island": 8,
-     "from": "Eye of Veeshan",
+     "drops": [
+      {
+       "island": 8,
+       "mob": "Eye of Veeshan"
+      }
+     ],
      "noDrop": true
     },
     {
-     "name": "Efreeti Magi Staff"
+     "name": "Efreeti Magi Staff",
+     "drops": [
+      {
+       "island": 1.5,
+       "mob": "Noble Dojorn"
+      },
+      {
+       "island": 4,
+       "mob": "Overseer of Air"
+      }
+     ]
     }
    ]
   },
@@ -883,20 +1187,32 @@
    "items": [
     {
      "name": "Crown of Elemental Mastery",
-     "island": 7,
-     "from": "any mob on the island",
+     "drops": [
+      {
+       "island": 7,
+       "mob": "any mob on the island"
+      }
+     ],
      "noDrop": true
     },
     {
      "name": "Large Opal",
-     "island": 8,
-     "from": "Eye of Veeshan",
+     "drops": [
+      {
+       "island": 8,
+       "mob": "Eye of Veeshan"
+      }
+     ],
      "noDrop": true
     },
     {
      "name": "Djinni Stave",
-     "island": 7,
-     "from": "Sister of the Spire",
+     "drops": [
+      {
+       "island": 7,
+       "mob": "Sister of the Spire"
+      }
+     ],
      "noDrop": true
     }
    ]
@@ -915,8 +1231,12 @@
    "items": [
     {
      "name": "Silken Strands",
-     "island": 3,
-     "from": "Gorgalosk",
+     "drops": [
+      {
+       "island": 3,
+       "mob": "Gorgalosk"
+      }
+     ],
      "noDrop": true
     }
    ]
@@ -935,8 +1255,12 @@
    "items": [
     {
      "name": "Cracked Leather Eyepatch",
-     "island": 4,
-     "from": "Keeper of Souls",
+     "drops": [
+      {
+       "island": 4,
+       "mob": "Keeper of Souls"
+      }
+     ],
      "noDrop": true
     }
    ]
@@ -955,8 +1279,12 @@
    "items": [
     {
      "name": "Dove Slippers",
-     "island": 5,
-     "from": "The Spiroc Lord",
+     "drops": [
+      {
+       "island": 5,
+       "mob": "The Spiroc Lord"
+      }
+     ],
      "noDrop": true
     }
    ]
@@ -975,8 +1303,12 @@
    "items": [
     {
      "name": "Silken Wrap",
-     "island": 6,
-     "from": "Bazzt Zzzt",
+     "drops": [
+      {
+       "island": 6,
+       "mob": "Bazzt Zzzt"
+      }
+     ],
      "noDrop": true
     }
    ]
@@ -995,12 +1327,30 @@
    "items": [
     {
      "name": "Nebulous Sapphire",
-     "island": 7,
-     "from": "Sister of the Spire",
+     "drops": [
+      {
+       "island": 7,
+       "mob": "Sister of the Spire"
+      }
+     ],
      "noDrop": true
     },
     {
-     "name": "Brass Knuckles"
+     "name": "Brass Knuckles",
+     "drops": [
+      {
+       "island": 1.5,
+       "mob": "Noble Dojorn"
+      },
+      {
+       "island": 4,
+       "mob": "Overseer of Air"
+      },
+      {
+       "island": 8,
+       "mob": "The Hand of Veeshan"
+      }
+     ]
     }
    ]
   },
@@ -1018,8 +1368,12 @@
    "items": [
     {
      "name": "Tear of Quellious",
-     "island": 8,
-     "from": "Eye of Veeshan",
+     "drops": [
+      {
+       "island": 8,
+       "mob": "Eye of Veeshan"
+      }
+     ],
      "noDrop": true
     }
    ]
@@ -1038,8 +1392,12 @@
    "items": [
     {
      "name": "Griffon's Beak",
-     "island": 3,
-     "from": "Gorgalosk",
+     "drops": [
+      {
+       "island": 3,
+       "mob": "Gorgalosk"
+      }
+     ],
      "noDrop": true
     }
    ]
@@ -1058,8 +1416,12 @@
    "items": [
     {
      "name": "Black Silk Cape",
-     "island": 4,
-     "from": "Keeper of Souls",
+     "drops": [
+      {
+       "island": 4,
+       "mob": "Keeper of Souls"
+      }
+     ],
      "noDrop": true
     }
    ]
@@ -1078,8 +1440,12 @@
    "items": [
     {
      "name": "Fine Cloth Raiment",
-     "island": 5,
-     "from": "The Spiroc Lord",
+     "drops": [
+      {
+       "island": 5,
+       "mob": "The Spiroc Lord"
+      }
+     ],
      "noDrop": true
     }
    ]
@@ -1098,8 +1464,12 @@
    "items": [
     {
      "name": "Pulsating Ruby",
-     "island": 6,
-     "from": "Bazzt Zzzt",
+     "drops": [
+      {
+       "island": 6,
+       "mob": "Bazzt Zzzt"
+      }
+     ],
      "noDrop": true
     }
    ]
@@ -1118,8 +1488,12 @@
    "items": [
     {
      "name": "Ring of Veeshan",
-     "island": 7,
-     "from": "Sister of the Spire",
+     "drops": [
+      {
+       "island": 7,
+       "mob": "Sister of the Spire"
+      }
+     ],
      "noDrop": true
     }
    ]
@@ -1138,14 +1512,22 @@
    "items": [
     {
      "name": "Gorgon Head",
-     "island": 3,
-     "from": "Gorgalosk",
+     "drops": [
+      {
+       "island": 3,
+       "mob": "Gorgalosk"
+      }
+     ],
      "noDrop": true
     },
     {
      "name": "Efreeti Great Staff",
-     "island": 8,
-     "from": "Eye of Veeshan"
+     "drops": [
+      {
+       "island": 8,
+       "mob": "Eye of Veeshan"
+      }
+     ]
     }
    ]
   },
@@ -1163,8 +1545,12 @@
    "items": [
     {
      "name": "Ivory Sky Diamond",
-     "island": 5,
-     "from": "The Spiroc Lord",
+     "drops": [
+      {
+       "island": 5,
+       "mob": "The Spiroc Lord"
+      }
+     ],
      "noDrop": true
     }
    ]
@@ -1183,8 +1569,12 @@
    "items": [
     {
      "name": "Bixie Sword Blade",
-     "island": 6,
-     "from": "Bazzt Zzzt",
+     "drops": [
+      {
+       "island": 6,
+       "mob": "Bazzt Zzzt"
+      }
+     ],
      "noDrop": true
     }
    ]
@@ -1203,14 +1593,22 @@
    "items": [
     {
      "name": "Golden Hilt",
-     "island": 7,
-     "from": "any mob on the island",
+     "drops": [
+      {
+       "island": 7,
+       "mob": "any mob on the island"
+      }
+     ],
      "noDrop": true
     },
     {
      "name": "Sphinx Claw",
-     "island": 7,
-     "from": "Sister of the Spire",
+     "drops": [
+      {
+       "island": 7,
+       "mob": "Sister of the Spire"
+      }
+     ],
      "noDrop": true
     }
    ]
@@ -1229,12 +1627,30 @@
    "items": [
     {
      "name": "Large Sky Diamond",
-     "island": 8,
-     "from": "Eye of Veeshan",
+     "drops": [
+      {
+       "island": 8,
+       "mob": "Eye of Veeshan"
+      }
+     ],
      "noDrop": true
     },
     {
-     "name": "Efreeti Zweihander"
+     "name": "Efreeti Zweihander",
+     "drops": [
+      {
+       "island": 1.5,
+       "mob": "Noble Dojorn"
+      },
+      {
+       "island": 4,
+       "mob": "Overseer of Air"
+      },
+      {
+       "island": 8,
+       "mob": "The Hand of Veeshan"
+      }
+     ]
     }
    ]
   },
@@ -1252,8 +1668,12 @@
    "items": [
     {
      "name": "Griffon Talon",
-     "island": 3,
-     "from": "Gorgalosk",
+     "drops": [
+      {
+       "island": 3,
+       "mob": "Gorgalosk"
+      }
+     ],
      "noDrop": true
     }
    ]
@@ -1272,8 +1692,12 @@
    "items": [
     {
      "name": "Fine Velvet Cloak",
-     "island": 4,
-     "from": "Keeper of Souls",
+     "drops": [
+      {
+       "island": 4,
+       "mob": "Keeper of Souls"
+      }
+     ],
      "noDrop": true
     }
    ]
@@ -1292,8 +1716,12 @@
    "items": [
     {
      "name": "Spiroc Earth Totem",
-     "island": 5,
-     "from": "The Spiroc Lord",
+     "drops": [
+      {
+       "island": 5,
+       "mob": "The Spiroc Lord"
+      }
+     ],
      "noDrop": true
     }
    ]
@@ -1312,8 +1740,12 @@
    "items": [
     {
      "name": "White Gold Earring",
-     "island": 6,
-     "from": "Bazzt Zzzt",
+     "drops": [
+      {
+       "island": 6,
+       "mob": "Bazzt Zzzt"
+      }
+     ],
      "noDrop": true
     }
    ]
@@ -1332,12 +1764,30 @@
    "items": [
     {
      "name": "Circlet of Brambles",
-     "island": 7,
-     "from": "Sister of the Spire",
+     "drops": [
+      {
+       "island": 7,
+       "mob": "Sister of the Spire"
+      }
+     ],
      "noDrop": true
     },
     {
-     "name": "Efreeti Long Sword"
+     "name": "Efreeti Long Sword",
+     "drops": [
+      {
+       "island": 1.5,
+       "mob": "Noble Dojorn"
+      },
+      {
+       "island": 4,
+       "mob": "Overseer of Air"
+      },
+      {
+       "island": 8,
+       "mob": "The Hand of Veeshan"
+      }
+     ]
     }
    ]
   },
@@ -1355,12 +1805,30 @@
    "items": [
     {
      "name": "Shimmering Pearl",
-     "island": 8,
-     "from": "Eye of Veeshan",
+     "drops": [
+      {
+       "island": 8,
+       "mob": "Eye of Veeshan"
+      }
+     ],
      "noDrop": true
     },
     {
-     "name": "Efreeti War Bow"
+     "name": "Efreeti War Bow",
+     "drops": [
+      {
+       "island": 1.5,
+       "mob": "Noble Dojorn"
+      },
+      {
+       "island": 4,
+       "mob": "Overseer of Air"
+      },
+      {
+       "island": 8,
+       "mob": "The Hand of Veeshan"
+      }
+     ]
     }
    ]
   },
@@ -1378,8 +1846,12 @@
    "items": [
     {
      "name": "Inlaid Choker",
-     "island": 3,
-     "from": "Gorgalosk",
+     "drops": [
+      {
+       "island": 3,
+       "mob": "Gorgalosk"
+      }
+     ],
      "noDrop": true
     }
    ]
@@ -1398,8 +1870,12 @@
    "items": [
     {
      "name": "Sphinxian Circlet",
-     "island": 7,
-     "from": "Sister of the Spire",
+     "drops": [
+      {
+       "island": 7,
+       "mob": "Sister of the Spire"
+      }
+     ],
      "noDrop": true
     }
    ]
@@ -1418,8 +1894,12 @@
    "items": [
     {
      "name": "Spiroc Sky Totem",
-     "island": 5,
-     "from": "The Spiroc Lord",
+     "drops": [
+      {
+       "island": 5,
+       "mob": "The Spiroc Lord"
+      }
+     ],
      "noDrop": true
     }
    ]
@@ -1438,8 +1918,12 @@
    "items": [
     {
      "name": "Jester's Mask",
-     "island": 4,
-     "from": "Keeper of Souls",
+     "drops": [
+      {
+       "island": 4,
+       "mob": "Keeper of Souls"
+      }
+     ],
      "noDrop": true
     }
    ]
@@ -1458,8 +1942,12 @@
    "items": [
     {
      "name": "Fine Wool Cloak",
-     "island": 6,
-     "from": "Bazzt Zzzt",
+     "drops": [
+      {
+       "island": 6,
+       "mob": "Bazzt Zzzt"
+      }
+     ],
      "noDrop": true
     }
    ]
@@ -1478,14 +1966,22 @@
    "items": [
     {
      "name": "Bixie Stinger (Bixie God's Stinger)",
-     "island": 6,
-     "from": "Bazzt Zzzt",
+     "drops": [
+      {
+       "island": 6,
+       "mob": "Bazzt Zzzt"
+      }
+     ],
      "noDrop": true
     },
     {
      "name": "Bloodsky Sapphire",
-     "island": 8,
-     "from": "Eye of Veeshan",
+     "drops": [
+      {
+       "island": 8,
+       "mob": "Eye of Veeshan"
+      }
+     ],
      "noDrop": true
     }
    ]
@@ -1504,8 +2000,12 @@
    "items": [
     {
      "name": "Finely Crafted Amulet",
-     "island": 3,
-     "from": "Gorgalosk",
+     "drops": [
+      {
+       "island": 3,
+       "mob": "Gorgalosk"
+      }
+     ],
      "noDrop": true
     }
    ]
@@ -1524,8 +2024,12 @@
    "items": [
     {
      "name": "Silvery Ring",
-     "island": 4,
-     "from": "Keeper of Souls",
+     "drops": [
+      {
+       "island": 4,
+       "mob": "Keeper of Souls"
+      }
+     ],
      "noDrop": true
     }
    ]
@@ -1544,8 +2048,12 @@
    "items": [
     {
      "name": "Finely Woven Cloth Belt",
-     "island": 5,
-     "from": "The Spiroc Lord",
+     "drops": [
+      {
+       "island": 5,
+       "mob": "The Spiroc Lord"
+      }
+     ],
      "noDrop": true
     }
    ]
@@ -1564,8 +2072,12 @@
    "items": [
     {
      "name": "Rusted Pauldrons",
-     "island": 6,
-     "from": "Bazzt Zzzt",
+     "drops": [
+      {
+       "island": 6,
+       "mob": "Bazzt Zzzt"
+      }
+     ],
      "noDrop": true
     }
    ]
@@ -1583,7 +2095,21 @@
    ],
    "items": [
     {
-     "name": "Efreeti War Shield"
+     "name": "Efreeti War Shield",
+     "drops": [
+      {
+       "island": 1.5,
+       "mob": "Noble Dojorn"
+      },
+      {
+       "island": 4,
+       "mob": "Overseer of Air"
+      },
+      {
+       "island": 8,
+       "mob": "The Hand of Veeshan"
+      }
+     ]
     }
    ]
   },
@@ -1601,14 +2127,22 @@
    "items": [
     {
      "name": "Sphinxian Ring",
-     "island": 7,
-     "from": "Sister of the Spire",
+     "drops": [
+      {
+       "island": 7,
+       "mob": "Sister of the Spire"
+      }
+     ],
      "noDrop": true
     },
     {
      "name": "Fae Pauldrons",
-     "island": 8,
-     "from": "Eye of Veeshan",
+     "drops": [
+      {
+       "island": 8,
+       "mob": "Eye of Veeshan"
+      }
+     ],
      "noDrop": true
     }
    ]
@@ -1627,12 +2161,30 @@
    "items": [
     {
      "name": "Blood Sky Ruby",
-     "island": 8,
-     "from": "Eye of Veeshan",
+     "drops": [
+      {
+       "island": 8,
+       "mob": "Eye of Veeshan"
+      }
+     ],
      "noDrop": true
     },
     {
-     "name": "Efreeti War Axe"
+     "name": "Efreeti War Axe",
+     "drops": [
+      {
+       "island": 1.5,
+       "mob": "Noble Dojorn"
+      },
+      {
+       "island": 4,
+       "mob": "Overseer of Air"
+      },
+      {
+       "island": 8,
+       "mob": "The Hand of Veeshan"
+      }
+     ]
     }
    ]
   },
@@ -1650,8 +2202,12 @@
    "items": [
     {
      "name": "Leather Cord",
-     "island": 3,
-     "from": "Gorgalosk",
+     "drops": [
+      {
+       "island": 3,
+       "mob": "Gorgalosk"
+      }
+     ],
      "noDrop": true
     }
    ]
@@ -1670,8 +2226,12 @@
    "items": [
     {
      "name": "Ceremonial Belt",
-     "island": 5,
-     "from": "The Spiroc Lord",
+     "drops": [
+      {
+       "island": 5,
+       "mob": "The Spiroc Lord"
+      }
+     ],
      "noDrop": true
     }
    ]
@@ -1690,8 +2250,12 @@
    "items": [
     {
      "name": "Light Damask Mantle",
-     "island": 5,
-     "from": "The Spiroc Lord",
+     "drops": [
+      {
+       "island": 5,
+       "mob": "The Spiroc Lord"
+      }
+     ],
      "noDrop": true
     }
    ]
@@ -1710,12 +2274,30 @@
    "items": [
     {
      "name": "Corrosive Venom",
-     "island": 6,
-     "from": "Bazzt Zzzt",
+     "drops": [
+      {
+       "island": 6,
+       "mob": "Bazzt Zzzt"
+      }
+     ],
      "noDrop": true
     },
     {
-     "name": "Efreeti War Club"
+     "name": "Efreeti War Club",
+     "drops": [
+      {
+       "island": 1.5,
+       "mob": "Noble Dojorn"
+      },
+      {
+       "island": 4,
+       "mob": "Overseer of Air"
+      },
+      {
+       "island": 8,
+       "mob": "The Hand of Veeshan"
+      }
+     ]
     }
    ]
   },
@@ -1733,13 +2315,21 @@
    "items": [
     {
      "name": "Bixie Essence",
-     "island": 6,
+     "drops": [
+      {
+       "island": 6
+      }
+     ],
      "noDrop": true
     },
     {
      "name": "Spiritualist`s Ring",
-     "island": 7,
-     "from": "Sister of the Spire",
+     "drops": [
+      {
+       "island": 7,
+       "mob": "Sister of the Spire"
+      }
+     ],
      "noDrop": true
     }
    ]
@@ -1758,12 +2348,30 @@
    "items": [
     {
      "name": "Symbol of Veeshan",
-     "island": 8,
-     "from": "Eye of Veeshan",
+     "drops": [
+      {
+       "island": 8,
+       "mob": "Eye of Veeshan"
+      }
+     ],
      "noDrop": true
     },
     {
-     "name": "Efreeti War Maul"
+     "name": "Efreeti War Maul",
+     "drops": [
+      {
+       "island": 1.5,
+       "mob": "Noble Dojorn"
+      },
+      {
+       "island": 4,
+       "mob": "Overseer of Air"
+      },
+      {
+       "island": 8,
+       "mob": "The Hand of Veeshan"
+      }
+     ]
     }
    ]
   },
@@ -1781,8 +2389,12 @@
    "items": [
     {
      "name": "Azure Ring",
-     "island": 3,
-     "from": "Gorgalosk",
+     "drops": [
+      {
+       "island": 3,
+       "mob": "Gorgalosk"
+      }
+     ],
      "noDrop": true
     }
    ]
@@ -1801,8 +2413,12 @@
    "items": [
     {
      "name": "Stone Amulet",
-     "island": 4,
-     "from": "Keeper of Souls",
+     "drops": [
+      {
+       "island": 4,
+       "mob": "Keeper of Souls"
+      }
+     ],
      "noDrop": true
     }
    ]
@@ -1821,8 +2437,12 @@
    "items": [
     {
      "name": "Spiroc Air Totem",
-     "island": 5,
-     "from": "The Spiroc Lord",
+     "drops": [
+      {
+       "island": 5,
+       "mob": "The Spiroc Lord"
+      }
+     ],
      "noDrop": true
     }
    ]
@@ -1841,12 +2461,26 @@
    "items": [
     {
      "name": "Wind Tablet",
-     "island": 6,
-     "from": "Bazzt Zzzt",
+     "drops": [
+      {
+       "island": 6,
+       "mob": "Bazzt Zzzt"
+      }
+     ],
      "noDrop": true
     },
     {
-     "name": "Efreeti Belt"
+     "name": "Efreeti Belt",
+     "drops": [
+      {
+       "island": 1.5,
+       "mob": "Noble Dojorn"
+      },
+      {
+       "island": 8,
+       "mob": "The Hand of Veeshan"
+      }
+     ]
     }
    ]
   },
@@ -1864,14 +2498,22 @@
    "items": [
     {
      "name": "Djinni War Blade",
-     "island": 7,
-     "from": "Sister of the Spire",
+     "drops": [
+      {
+       "island": 7,
+       "mob": "Sister of the Spire"
+      }
+     ],
      "noDrop": true
     },
     {
      "name": "Gem of Invigoration",
-     "island": 7,
-     "from": "any mob on the island",
+     "drops": [
+      {
+       "island": 7,
+       "mob": "any mob on the island"
+      }
+     ],
      "noDrop": true
     }
    ]
@@ -1890,12 +2532,30 @@
    "items": [
     {
      "name": "Ethereal Emerald",
-     "island": 8,
-     "from": "Eye of Veeshan",
+     "drops": [
+      {
+       "island": 8,
+       "mob": "Eye of Veeshan"
+      }
+     ],
      "noDrop": true
     },
     {
-     "name": "Efreeti Battle Axe"
+     "name": "Efreeti Battle Axe",
+     "drops": [
+      {
+       "island": 1.5,
+       "mob": "Noble Dojorn"
+      },
+      {
+       "island": 4,
+       "mob": "Overseer of Air"
+      },
+      {
+       "island": 8,
+       "mob": "The Hand of Veeshan"
+      }
+     ]
     }
    ]
   },
@@ -1913,8 +2573,12 @@
    "items": [
     {
      "name": "Grey Damask Cloak",
-     "island": 3,
-     "from": "Gorgalosk",
+     "drops": [
+      {
+       "island": 3,
+       "mob": "Gorgalosk"
+      }
+     ],
      "noDrop": true
     }
    ]
@@ -1933,8 +2597,12 @@
    "items": [
     {
      "name": "Woven Skull Cap",
-     "island": 4,
-     "from": "Keeper of Souls",
+     "drops": [
+      {
+       "island": 4,
+       "mob": "Keeper of Souls"
+      }
+     ],
      "noDrop": true
     }
    ]
@@ -1953,8 +2621,12 @@
    "items": [
     {
      "name": "High Quality Raiment",
-     "island": 5,
-     "from": "The Spiroc Lord",
+     "drops": [
+      {
+       "island": 5,
+       "mob": "The Spiroc Lord"
+      }
+     ],
      "noDrop": true
     }
    ]
@@ -1973,12 +2645,30 @@
    "items": [
     {
      "name": "Box of Winds",
-     "island": 6,
-     "from": "Bazzt Zzzt",
+     "drops": [
+      {
+       "island": 6,
+       "mob": "Bazzt Zzzt"
+      }
+     ],
      "noDrop": true
     },
     {
-     "name": "Efreeti Statuette"
+     "name": "Efreeti Statuette",
+     "drops": [
+      {
+       "island": 1.5,
+       "mob": "Noble Dojorn"
+      },
+      {
+       "island": 4,
+       "mob": "Overseer of Air"
+      },
+      {
+       "island": 8,
+       "mob": "The Hand of Veeshan"
+      }
+     ]
     }
    ]
   },
@@ -1996,8 +2686,12 @@
    "items": [
     {
      "name": "Amethyst Amulet",
-     "island": 7,
-     "from": "Sister of the Spire",
+     "drops": [
+      {
+       "island": 7,
+       "mob": "Sister of the Spire"
+      }
+     ],
      "noDrop": true
     }
    ]
@@ -2016,12 +2710,30 @@
    "items": [
     {
      "name": "Large Sky Lapis",
-     "island": 8,
-     "from": "Eye of Veeshan",
+     "drops": [
+      {
+       "island": 8,
+       "mob": "Eye of Veeshan"
+      }
+     ],
      "noDrop": true
     },
     {
-     "name": "Efreeti War Staff"
+     "name": "Efreeti War Staff",
+     "drops": [
+      {
+       "island": 1.5,
+       "mob": "Noble Dojorn"
+      },
+      {
+       "island": 4,
+       "mob": "Overseer of Air"
+      },
+      {
+       "island": 8,
+       "mob": "The Hand of Veeshan"
+      }
+     ]
     }
    ]
   }

@@ -43,7 +43,19 @@ describe('the Tests', () => {
     expect(fists.name).toBe(FISTS)
     expect(fists.giver).toBe('Holwin')
     expect(fists.runes).toEqual(['Wind Rune Neza'])
-    expect(fists.items).toEqual([{ name: 'Nebulous Sapphire', island: 7, from: 'Sister of the Spire', noDrop: true }, { name: 'Brass Knuckles' }])
+    expect(fists.items).toEqual([
+      { name: 'Nebulous Sapphire', drops: [{ island: 7, mob: 'Sister of the Spire' }], noDrop: true },
+      {
+        name: 'Brass Knuckles',
+        drops: [
+          { island: 1.5, mob: 'Noble Dojorn' },
+          { island: 4, mob: 'Overseer of Air' },
+          { island: 8, mob: 'The Hand of Veeshan' }
+        ]
+      }
+    ])
+    // Every item a Test takes has a place it drops.
+    expect(SKY_QUESTS.flatMap((q) => q.items).filter((i) => !i.drops.length)).toEqual([])
   })
 
   it('are found by every word typed, in the name, class, giver, reward or what they take', () => {
@@ -150,10 +162,11 @@ describe('the wish list', () => {
     expect(v.ready).toBe(true)
     expect(v.missing).toBe(0)
     expect(v.near).toBeCloseTo(4 / 6)
+    // By the first island each drops on: Brass Knuckles from Noble Island (1.5).
     expect(shoppingList(state, 'log').map((r) => [r.item.name, r.have, r.need, r.for])).toEqual([
       ['Wind Rune Neza', 3, 2, [FISTS]],
-      ['Nebulous Sapphire', 1, 2, [FISTS]],
-      ['Brass Knuckles', 1, 2, [FISTS]]
+      ['Brass Knuckles', 1, 2, [FISTS]],
+      ['Nebulous Sapphire', 1, 2, [FISTS]]
     ])
   })
 
