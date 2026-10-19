@@ -2,7 +2,7 @@
 
 What changed in each version. The release workflow publishes a version's section as its release notes, and installed copies show them when an update arrives.
 
-## Unreleased
+## 2.15.0 (2026-10-19)
 
 - **Slayer: the step you are at, at your pace now.** While you kill there, the overlay's step and the Slayer page's say how long it takes at the pace of your last twenty minutes ("At your pace now (120/h) ≈ 1 h 40 min; the plan assumed 84/h").
 - **Slayer: say what a mob is.** Kills no race was found for each have a **Count as…** list on the Slayer page and the Achievements page's Slayer category: what you pick is kept for every character, outranks eqlwiki, counts at once (the overlay's guesses too), and is listed with an Undo.
