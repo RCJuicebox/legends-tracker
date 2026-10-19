@@ -1,5 +1,6 @@
 import type { GameTable } from '../../core/gameTables'
 import type { LogLine } from '../../core/logLine'
+import { COMPLETED_ACHIEVEMENT, EXPORT_SLACK_MS } from '../../core/phrases'
 import type { AchSection } from '../../shared/character'
 import { deityKey, deityName } from '../../shared/game/deities'
 import { CLASS_TABLE } from '../../shared/game/classes'
@@ -461,8 +462,8 @@ export interface FactionAchievements {
 // time. An achievement the game says
 // was completed after the achievements export is done, though that export still lists it open.
 
-/** How far apart an export's file time and its "Outputfile Complete" line may be. */
-export const EXPORT_LINE_MS = 3000
+/** How far apart an export's file time and its "Outputfile Complete" line may be: the one slack every since-export read uses. */
+export const EXPORT_LINE_MS = EXPORT_SLACK_MS
 
 /** An export: its file name, and when the game wrote it. */
 export interface ExportMark {
@@ -471,7 +472,7 @@ export interface ExportMark {
 }
 
 const OUTPUT_DONE = 'Outputfile Complete: '
-const COMPLETED = /^You have completed achievement: (.+?)\.?$/
+const COMPLETED = COMPLETED_ACHIEVEMENT
 
 const isExportLine = (mark: ExportMark | null, file: string, at: number) => !!mark && mark.file.toLowerCase() === file && Math.abs(at - mark.modified) <= EXPORT_LINE_MS
 

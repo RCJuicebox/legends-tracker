@@ -97,13 +97,13 @@ const ctx = {
   ),
   historyOf: (c: string) => ({ logPath: join(game, 'Logs', `eqlog_${c}.txt`), archiveDir: join(game, 'Logs', 'Archive'), stem: `eqlog_${c}` }),
   logCharacters: async () => (await listLogs(game)).map((l) => l.character),
+  npcPages: {
+    ready: async () => undefined,
+    race: (m: string) => (m.toLowerCase() in races ? races[m.toLowerCase()] : undefined),
+    lookUp: async (mobs: string[]) => (asked.push(mobs), learned)
+  },
   liveAchievements: {
     view: null as unknown,
-    races: {
-      ready: async () => undefined,
-      race: (m: string) => (m.toLowerCase() in races ? races[m.toLowerCase()] : undefined),
-      lookUp: async (mobs: string[]) => (asked.push(mobs), learned)
-    },
     fact: () => undefined,
     changed: [] as string[],
     slayerChoicesChanged: (c: string) => ctx.liveAchievements.changed.push(c),

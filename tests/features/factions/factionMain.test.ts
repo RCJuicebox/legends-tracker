@@ -282,6 +282,8 @@ beforeAll(() => {
     factions: Object.assign(new m.Factions(history), { alla: { factions: async () => [], status: () => ({ read: 0, wanted: 0, error: '' }) } }),
     purchases: { latest: async () => ({}) },
     inventoryFiles: { lookup: async () => ({}) },
+    // eqlwiki's NPC pages are not read here: the source has its own tests.
+    npcPages: { lookup: async () => ({}) },
     store: { characterByKey: () => record },
     engine: { use: () => {} },
     windows: { toMain: () => {} }

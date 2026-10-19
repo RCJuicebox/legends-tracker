@@ -280,6 +280,8 @@ export interface Invokes {
   'app:openLogs': () => string
   /** Version, machine, settings summary and the end of the log, for a bug report. */
   'app:diagnostics': () => string
+  /** Whether the group-health worker starts and loads the Windows calls: the packaged smoke test asks (LT-630). */
+  'groupHealth:selfTest': () => { pong: boolean; koffi: boolean; error?: string }
   'settings:save': (settings: AppSettings) => AppSettings
   'character:save': (character: CharacterSettings) => void
   /** Any character's record (classes, levels, race, focus), by key; the character being played is the one app:state carries. */
@@ -520,6 +522,7 @@ const INVOKE_CHANNELS: Record<InvokeChannel, true> = {
   'app:state': true,
   'app:openLogs': true,
   'app:diagnostics': true,
+  'groupHealth:selfTest': true,
   'settings:save': true,
   'character:save': true,
   'character:get': true,

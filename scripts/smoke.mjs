@@ -4,7 +4,8 @@
 //   node scripts/smoke.mjs                      the built source (out/) under node_modules' Electron
 //   node scripts/smoke.mjs dist/win-unpacked/Legends Tracker.exe   a packaged copy
 //
-// Exits 0 when the app started, answered app:state and quit by itself; 1 otherwise.
+// Exits 0 when the app started, answered app:state, had its audio window and its workers up, and quit
+// by itself; 1 otherwise.
 
 import { spawn } from 'node:child_process'
 import { copyFileSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
@@ -93,6 +94,22 @@ try {
   if (!/Windows calls \(koffi\): available/.test(diag)) fail(`the Windows calls did not load: ${/Windows calls \(koffi\): [^\n]*/.exec(diag)?.[0] ?? 'no line'}`)
   else if (/Windows API unavailable/.test(diag)) fail('main.log says the Windows API is unavailable')
   else console.log('smoke: the Windows calls (koffi) loaded')
+
+  // The audio window (the hidden mixer, whose CSP the build tightens) is up beside the main one (LT-630).
+  const targets = await (await fetch(`http://127.0.0.1:${port}/json`)).json()
+  if (!targets.some((t) => /audio\.html/.test(t.url))) fail(`the audio window is not up (targets: ${targets.map((t) => t.url).join(', ')})`)
+  else console.log('smoke: the audio window is up')
+
+  // The page's two Web Workers answer: the gear optimiser and the faction planner.
+  const workers = await until('the page workers', 20_000, () => evaluate(page.webSocketDebuggerUrl, 'window.ltSmoke.pingWorkers()'))
+  if (!workers.gear || !workers.plan) fail(`a page worker did not answer: ${JSON.stringify(workers)}`)
+  else console.log('smoke: the gear and plan workers answer')
+
+  // The group-health worker starts, and loads koffi inside the worker (from app.asar.unpacked in a packaged build).
+  const health = await until('the group health worker', 20_000, () => evaluate(page.webSocketDebuggerUrl, "window.eql.invoke('groupHealth:selfTest')"))
+  if (!health.pong) fail(`the group health worker did not answer: ${health.error ?? ''}`)
+  else if (!health.koffi) fail(`the group health worker could not load the Windows calls: ${health.error ?? ''}`)
+  else console.log('smoke: the group health worker answers, with the Windows calls loaded')
 
   // A second copy with --quit asks the first to save and close, and exits itself.
   const quitter = spawn(exe, [...appArgs, '--quit'], { env, stdio: 'ignore' })

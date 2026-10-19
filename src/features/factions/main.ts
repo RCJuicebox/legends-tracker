@@ -1,6 +1,7 @@
 import { LEGENDS_ZONES } from '../../shared/game/factions'
 import { promises as fs, readFileSync } from 'node:fs'
 import { join } from 'node:path'
+import { sinceStart } from '../../main/sources/sinceExport'
 import {
   addFactionLine,
   conBasis,
@@ -35,7 +36,6 @@ import { RACE_UNLOCK_DEFS, raceUnlocks, unlockedRaces, type RaceUnlockDef } from
 import { lookUp, moversOf, sourcesOf } from './lookup'
 import { sanitizeFollowedPlan } from './tracker'
 import { FactionAlla } from './allaSource'
-import { FactionNpcs } from './npcSource'
 import type { Purchases } from '../../shared/ipc'
 import { explorationZones, type AchSection } from '../../core/achievements'
 import { PLAYABLE_RACES, playableRace } from '../../shared/game/races'
@@ -50,8 +50,7 @@ import { expired } from '../../main/sources/freshness'
 import { wiki } from '../../main/sources/wiki'
 import { cacheDir } from '../../main/paths'
 import { log } from '../../main/log'
-import { everyStretch, identityOf, offsetBefore, readForward, type HistoryConsumer, type HistoryWhere, type LogHistory } from '../../main/sources/logHistory'
-import { sameFile } from '../../core/fileIdentity'
+import { everyStretch, readForward, type HistoryConsumer, type HistoryWhere, type LogHistory } from '../../main/sources/logHistory'
 import type { AppContext } from '../../main/context'
 import type { AppFeature } from '../../main/appFeature'
 
@@ -195,16 +194,19 @@ export class FactionHistory {
   }
 
   private async readSince(logPath: string, factions: ExportMark | null, achievements: ExportMark | null): Promise<SinceRead | null> {
-    const st = await fs.stat(logPath, { bigint: true }).catch(() => null)
-    const size = Number(st?.size ?? 0)
-    if (!st || !size) return null
-    const id = identityOf(st)
     const key = sinceKey(factions, achievements)
     let s = this.since.get(logPath) ?? this.recall(logPath, key, factions, achievements) ?? undefined
     // New exports, or a log started afresh (another file at the path, or this one cut short even if it
-    // has since grown past where the last read ended): read again from the line before the earlier export.
-    if (!s || s.key !== key || !sameFile({ id: s.id, size: s.readTo }, { id, size })) {
-      const readTo = await offsetBefore(logPath, Math.min(factions?.modified ?? Infinity, achievements?.modified ?? Infinity), { slackMs: EXPORT_LINE_MS })
+    // has since grown past where the last read ended): read again from the line before the earlier export (sinceStart).
+    const start = await sinceStart(
+      logPath,
+      s && s.key === key ? { id: s.id, readTo: s.readTo } : null,
+      Math.min(factions?.modified ?? Infinity, achievements?.modified ?? Infinity)
+    )
+    if (!start) return null
+    const { id, size } = start
+    if (!s || s.key !== key || start.fresh) {
+      const readTo = start.from
       const whole = !factions || readTo > 0 || (await firstStamp(logPath, size)) < factions.modified - EXPORT_LINE_MS
       s = { key, id, readTo, whole, tally: new SinceExports(factions, achievements) }
       this.since.set(logPath, s)
@@ -667,7 +669,7 @@ async function planData(ctx: AppContext, character: string, refresh: boolean, wi
   const mats = craftMaterials(items).filter((m) => !items[itemKey(m)])
   if (mats.length) Object.assign(items, await ctx.inventoryFiles.lookup(mats))
   // Which of the camps' named mobs Legends has, and how tough they are and how soon back (Allakhazam lists live EverQuest's).
-  const npcs = await ctx.factions.npcs.lookup(npcsToLookUp(input), NPC_WAIT_MS)
+  const npcs = await ctx.npcPages.lookup(npcsToLookUp(input), NPC_WAIT_MS)
   // The race unlocks, done or not, part by part; the races done are the ones to swap to.
   const [sections, defs] = await Promise.all([achievementSections(ctx, character), ctx.gameTables.get(RACE_UNLOCK_DEFS)])
   const ids = factionIds(view)
@@ -793,8 +795,6 @@ export class Factions implements AppFeature {
   readonly book = new FactionBook()
   /** Allakhazam's faction pages, for the con a quest wants and the kills eqlwiki lacks. */
   readonly alla = new FactionAlla()
-  /** eqlwiki's pages for the named mobs of the plan's kill camps: whether Legends has them, how tough, how soon back. */
-  readonly npcs = new FactionNpcs()
 
   constructor(logHistory: LogHistory) {
     this.history = new FactionHistory(logHistory, HISTORY_KEY, join(cacheDir(), 'faction-since.json'))
@@ -827,11 +827,6 @@ export class Factions implements AppFeature {
       kind: 'wiki',
       what: "eqlwiki's faction pages and the quest pages they name, for what raises a faction and the Factions page's plan. Kept a week.",
       refresh: () => ctx.factions.book.get(true)
-    })
-    sources.add('factionNpcs', {
-      label: 'NPC pages',
-      kind: 'wiki',
-      what: "eqlwiki's pages for the named mobs the plan's kill camps would hold: whether Legends has them at all, their health and respawn, and kill amounts. Kept a month."
     })
     sources.add('allakhazam', {
       label: 'Allakhazam',

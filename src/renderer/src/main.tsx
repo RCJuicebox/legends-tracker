@@ -6,6 +6,9 @@ import { Ago, Disclosure, Icon, type IconName } from './components/ui'
 import { GoContext, TAB_KEY, type Go } from './nav'
 import { ErrorBoundary } from './components/ErrorBoundary'
 import { Jobs } from './components/Jobs'
+import { pingGearWorker } from './gear/gearRunner'
+// Named apart, so the page list's own test does not take this import for a page.
+import { pingPlanWorker as pingPlan } from '../../features/factions/planRunner'
 import { act, Toasts } from './toast'
 import { useUpdate } from './update'
 import { recall, remember, useRemembered } from './remember'
@@ -221,6 +224,17 @@ function Shell() {
 }
 
 carryPage()
+// The smoke test (scripts/smoke.mjs) asks the page's two workers whether they are up (LT-630): a
+// packaged build lays them out as an installed copy does, which the source run never shows.
+declare global {
+  interface Window {
+    ltSmoke?: { pingWorkers(): Promise<{ gear: boolean; plan: boolean }> }
+  }
+}
+window.ltSmoke = {
+  pingWorkers: async () => ({ gear: await pingGearWorker().catch(() => false), plan: await pingPlan().catch(() => false) })
+}
+
 createRoot(document.getElementById('root')!).render(
   <ErrorBoundary what="Legends Tracker">
     <StateProvider>

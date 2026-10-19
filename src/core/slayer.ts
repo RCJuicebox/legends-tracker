@@ -1,5 +1,5 @@
 import type { AchSection } from '../shared/character'
-import { DIED, SLAIN_BY, SLAIN_BY_YOU } from './phrases'
+import { COMPLETED_ACHIEVEMENT, DIED, SLAIN_BY, SLAIN_BY_YOU } from './phrases'
 import {
   ACHIEVEMENT_RACES,
   MOB_RACES,
@@ -236,8 +236,6 @@ export type SlayerFacts = (mob: string, achievement: string) => boolean | undefi
 
 /** "Vonartik told you, 'Attacking a minotaur slaver Master.'": the pet's name, and what it goes for. */
 const PET_TELL = /^(\S+) told you, 'Attacking (.+) Master\.'$/
-/** "You have completed achievement: Bear With Me". */
-const COMPLETED = /^You have completed achievement: (.+?)\.?$/
 /** "You punch a lion for 75 points of damage.", "You hit a bixie for 45 points of poison damage by Envenomed Bolt.". */
 const YOU_HIT = /^You \w+ (.+?) for \d+ points? of /
 /** "A samhain has taken 100 damage by Rotting Flesh.": the player's damage over time. */
@@ -263,7 +261,7 @@ export function slayerLine(text: string): SlayerLine {
   if (m) return { pet: m[1], engaged: m[2] }
   m = YOU_HIT.exec(text) ?? TAKEN_BY.exec(text)
   if (m) return { engaged: m[1] }
-  m = COMPLETED.exec(text)
+  m = COMPLETED_ACHIEVEMENT.exec(text)
   if (m) return { completed: m[1] }
   return null
 }
@@ -490,7 +488,9 @@ export function wikiTitles(mob: string): string[] {
   const t = mob.replace(/^\*+/, '').trim()
   const first = t.charAt(0).toUpperCase() + t.slice(1)
   const words = t.replace(/(^|[\s`'-])([a-z])/g, (_, a: string, b: string) => a + b.toUpperCase())
-  return words === first ? [first] : [first, words]
+  // Each way of writing it, then each with its backtick dropped or made an apostrophe (Ambassador DVinn, Tani N`Mar): the faction pages' rule and the Slayer's, as one (LT-624).
+  const cases = words === first ? [first] : [first, words]
+  return [...new Set([...cases, ...cases.map((c) => c.replace(/`/g, '')), ...cases.map((c) => c.replace(/`/g, "'"))])]
 }
 
 /** The race a {{Namedmobpage}} gives, links and markup taken off; null when it gives none. */

@@ -29,6 +29,7 @@ import { HunterPlanner } from '../features/hunter/main'
 import { LogHistory, type HistoryWhere } from './sources/logHistory'
 import { TradeFavorites } from './tradeFavorites'
 import { LiveAchievements } from './liveAchievements'
+import { NpcPages } from './sources/npcPages'
 import { GroupHealth } from './groupHealth'
 import type { AppFeature } from './appFeature'
 import { SkillHistory, skillConsumer } from './skillHistory'
@@ -82,6 +83,8 @@ export interface AppContext {
   factions: Factions
   /** The faction plan followed and the Slayer counts, for the achievements overlay. */
   liveAchievements: LiveAchievements
+  /** eqlwiki's pages for named mobs, for the Slayer counts and the faction plan (one cache for both). */
+  npcPages: NpcPages
   /** Plan › Hunter's side: which Hunter achievements the player has said do not work. */
   hunter: HunterPlanner
   /** Plan › Slayer's side: the plan's data, and the player's choices (the overlay makes the plan from them). */
@@ -207,6 +210,7 @@ export function createContext(): AppContext {
     meleeHistory: new CastHistory(logHistory, 'melee'),
     recipeBook: new RecipeBook((p) => toMain('state:recipes', p)),
     purchases: new PurchaseHistory(logHistory, 'purchases'),
+    npcPages: new NpcPages(),
     factions: new Factions(logHistory),
     skills: new SkillHistory(logHistory, 'skills'),
     aaHistory: new AaHistory(logHistory, 'aas'),

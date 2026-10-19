@@ -5,7 +5,7 @@ import { optimizeGear } from '../../../core/gearOptimizer'
 // takes a few hundred milliseconds, and judging the finder's candidates in the round runs one per
 // candidate. gearRunner.ts on the page sends the work and gets the answers back.
 
-export type GearRequest = { id: number; kind: 'plan'; input: GearInput } | { id: number; kind: 'round'; input: GearInput; asks: RoundAsk[] }
+export type GearRequest = { id: number; kind: 'plan'; input: GearInput } | { id: number; kind: 'round'; input: GearInput; asks: RoundAsk[] } | { id: number; kind: 'ping' }
 
 export type GearReply =
   | { id: number; plan: PlanWire; ms: number }
@@ -13,6 +13,8 @@ export type GearReply =
   /** A newer round was asked for before this one finished. */
   | { id: number; dropped: true }
   | { id: number; error: string }
+  /** The worker is up (the smoke test asks). */
+  | { id: number; pong: true }
 
 /** The worker's own global: a page's type lists would take `self` for a window. */
 const scope = self as unknown as { onmessage: ((e: MessageEvent<GearRequest>) => void) | null; postMessage(reply: GearReply): void }
@@ -26,6 +28,7 @@ scope.onmessage = (e) => {
   const r = e.data
   const started = performance.now()
   const fail = (err: unknown) => scope.postMessage({ id: r.id, error: err instanceof Error ? (err.stack ?? err.message) : String(err) })
+  if (r.kind === 'ping') return scope.postMessage({ id: r.id, pong: true })
   if (r.kind === 'plan') {
     try {
       const plan = optimizeGear(optionsOf(r.input))

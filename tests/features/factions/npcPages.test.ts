@@ -85,6 +85,8 @@ describe("eqlwiki's NPC pages", () => {
     expect(['Gate Guard Bram', 'Lord Brute - Test Keep', 'a pass bandit', 'pass rat', 'A Pass Bandit', 'An Ogre'].map(isNamedNpc)).toEqual([true, true, false, false, false, false])
     expect(bareNpc('Lord Brute - Test Keep')).toBe('Lord Brute')
     expect(npcTitles('Ambassador D`Vinn')).toEqual(['Ambassador D`Vinn', 'Ambassador DVinn', "Ambassador D'Vinn"])
+    // The Slayer's rule too: each word capitalised (LT-624).
+    expect(npcTitles('lesser blade fiend - The Estate of Unrest')).toEqual(['Lesser blade fiend', 'Lesser Blade Fiend'])
     expect(npcTitles('Gate Guard Bram')).toEqual(['Gate Guard Bram'])
   })
 })

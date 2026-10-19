@@ -226,7 +226,7 @@ export class SlayerPlanner implements AppFeature {
     const game = await ctx.gameTables.get(RACE_TABLE)
     const races = new SlayerRaces(counters, game)
     const { zones, moves } = await this.kills(ctx, character)
-    const npc = ctx.liveAchievements.races
+    const npc = ctx.npcPages
     await npc.ready()
     const unknown = new Set<string>()
     const unplaced = new Map<string, { name: string; n: number }>()

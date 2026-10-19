@@ -8,11 +8,17 @@ import type { PlanReply, PlanRequest } from './planWorker'
 let worker: Worker | null = null
 let next = 0
 const waiting = new Map<number, { resolve: (p: FactionPlan) => void; reject: (e: Error) => void }>()
+const pings = new Map<number, (up: boolean) => void>()
 
 function start(): Worker {
   const w = new Worker(new URL('./planWorker.ts', import.meta.url), { type: 'module' })
   w.onmessage = (e: MessageEvent<PlanReply>) => {
     const r = e.data
+    if ('pong' in r) {
+      pings.get(r.id)?.(true)
+      pings.delete(r.id)
+      return
+    }
     const call = waiting.get(r.id)
     if (!call) return
     waiting.delete(r.id)
@@ -43,5 +49,15 @@ export function runPlan(input: PlanInput, settings: PlanSettings, choices: PlanC
   return new Promise((resolve, reject) => {
     waiting.set(id, { resolve, reject })
     worker!.postMessage(request)
+  })
+}
+
+/** Whether the worker is up and answering: the smoke test asks (LT-630). */
+export function pingPlanWorker(): Promise<boolean> {
+  worker ??= start()
+  const id = ++next
+  return new Promise((resolve) => {
+    pings.set(id, resolve)
+    worker!.postMessage({ id, ping: true } satisfies PlanRequest)
   })
 }

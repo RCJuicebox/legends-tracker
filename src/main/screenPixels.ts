@@ -61,6 +61,11 @@ function bitmapInfo(width: number, height: number): Buffer {
 }
 
 /** The screen's pixels in this rectangle: blue, green, red and an unused byte each. Throws when Windows will not copy them. */
+/** Whether the Windows calls (koffi, gdi32) load here: inside the worker, from app.asar.unpacked in a packaged build. */
+export function gdiAvailable(): boolean {
+  return load() !== null
+}
+
 export function captureRect(x: number, y: number, width: number, height: number): Frame {
   const w = load()
   const screen = w.GetDC(null)

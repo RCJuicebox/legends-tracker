@@ -1,3 +1,4 @@
+import { EventEmitter } from 'node:events'
 import { beforeAll, describe, expect, it, vi } from 'vitest'
 import { mkdtempSync } from 'node:fs'
 import { tmpdir } from 'node:os'
@@ -21,10 +22,21 @@ function stub(): unknown {
   })
 }
 
+vi.mock('../../src/main/groupHealthWorker?modulePath', () => ({ default: 'worker.js' }))
 vi.mock('electron', () => {
   const any = stub()
   return {
-    app: { getPath: () => h.dir, getVersion: () => 'test', isPackaged: false, quit: () => {}, relaunch: () => {}, exit: () => {}, on: () => {} },
+    app: {
+      getPath: () => h.dir,
+      getVersion: () => 'test',
+      isPackaged: false,
+      quit: () => {},
+      relaunch: () => {},
+      exit: () => {},
+      on: () => {},
+      whenReady: () => Promise.resolve(),
+      isReady: () => false
+    },
     ipcMain: { handle: (channel: string, fn: Handler) => void h.handlers.set(channel, fn), on: () => {} },
     BrowserWindow: any,
     Menu: any,
@@ -100,11 +112,19 @@ beforeAll(async () => {
   const { LiveAchievements } = await import('../../src/main/liveAchievements')
   const { SlayerPlanner } = await import('../../src/features/slayer/main')
   const { HunterPlanner } = await import('../../src/features/hunter/main')
+  const { GroupHealth } = await import('../../src/main/groupHealth')
   for (const f of [
     new Factions(stub() as never),
     new LiveAchievements({ store: { dir: h.dir } } as never),
     new SlayerPlanner(stub() as never, h.dir),
-    new HunterPlanner(stub() as never, h.dir)
+    new HunterPlanner(stub() as never, h.dir),
+    // Its worker is stood in by one that answers the ping: the self-test channel is what is registered.
+    new GroupHealth(() => {
+      const w = new EventEmitter() as EventEmitter & { postMessage(m: unknown): void; terminate(): void }
+      w.postMessage = () => void setTimeout(() => w.emit('message', { kind: 'pong', koffi: true }), 0)
+      w.terminate = () => {}
+      return w as never
+    })
   ])
     f.register(ctx as never)
 }, 30_000)

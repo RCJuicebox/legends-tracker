@@ -250,7 +250,8 @@ describe('Slayer counts', () => {
     expect(wikiRace('{{Namedmobpage\n| race =\n| zone = x\n}}')).toBeNull()
     // eqlwiki's titles are exact past the first letter: the log's own, and each word capitalised.
     expect(wikiTitles('lesser blade fiend')).toEqual(['Lesser blade fiend', 'Lesser Blade Fiend'])
-    expect(wikiTitles('*Magi P`tasa')).toEqual(['Magi P`tasa', 'Magi P`Tasa'])
+    // Both ways of writing it, then the backtick dropped and made an apostrophe (LT-624).
+    expect(wikiTitles('*Magi P`tasa')).toEqual(['Magi P`tasa', 'Magi P`Tasa', 'Magi Ptasa', 'Magi PTasa', "Magi P'tasa", "Magi P'Tasa"])
     expect(wikiTitles('Cleric of Innoruuk')).toEqual(['Cleric of Innoruuk', 'Cleric Of Innoruuk'])
     expect(wikiTitles('Terror')).toEqual(['Terror'])
   })

@@ -12,6 +12,7 @@ import { discardScreens, ocrImage, writeBmp } from './ocr'
 import { cacheDir } from './paths'
 import { sources } from './sources/registry'
 import { log } from './log'
+import { handle } from './ipc/handle'
 // oxlint-disable-next-line import/default -- electron-vite's ?modulePath import: the build supplies the default export
 import groupHealthWorkerPath from './groupHealthWorker?modulePath'
 
@@ -28,16 +29,34 @@ export interface ScreenArea {
   height: number
 }
 
-export type GroupHealthToWorker = { kind: 'config'; on: boolean; areas: ScreenArea[]; belowPct: number; rearmPct: number; front: boolean } | { kind: 'search' }
+export type GroupHealthToWorker = { kind: 'config'; on: boolean; areas: ScreenArea[]; belowPct: number; rearmPct: number; front: boolean } | { kind: 'search' } | { kind: 'ping' }
 
-export type GroupHealthFromWorker = { kind: 'bars'; bars: GroupBar[] } | ({ kind: 'low' } & LowHealth) | { kind: 'error'; message: string }
+export type GroupHealthFromWorker =
+  { kind: 'bars'; bars: GroupBar[] } | ({ kind: 'low' } & LowHealth) | { kind: 'error'; message: string } | { kind: 'pong'; koffi: boolean; error?: string }
+
+/** What the watch needs of its worker thread: node's Worker, or a stand-in in tests (LT-627). */
+export interface WorkerLike {
+  postMessage(m: GroupHealthToWorker): void
+  on(event: 'message', fn: (m: GroupHealthFromWorker) => void): unknown
+  on(event: 'error', fn: (e: Error) => void): unknown
+  on(event: 'exit', fn: (code: number) => void): unknown
+  terminate(): unknown
+}
+
+/** What the self-test says: whether the worker answered, and whether the Windows calls (koffi) loaded inside it. */
+export interface GroupHealthSelfTest {
+  pong: boolean
+  koffi: boolean
+  error?: string
+}
 
 /** Back over the line by this much before a member is said again. */
 const REARM_ABOVE = 10
 
 export class GroupHealth implements AppFeature {
   readonly id = 'groupHealth'
-  private worker: Worker | null = null
+  private worker: WorkerLike | null = null
+  constructor(private readonly makeWorker: () => WorkerLike = () => new Worker(groupHealthWorkerPath)) {}
   private ctx!: AppContext
   private bars: GroupBar[] = []
   private names: string[] = []
@@ -56,6 +75,7 @@ export class GroupHealth implements AppFeature {
       kind: 'screen',
       what: "Your group's health bars in JuiceboxUI's Group window, watched on the screen while the game runs, for the Triggers page's group health alert."
     })
+    handle('groupHealth:selfTest', () => this.selfTest())
     const feature: EngineFeature = {
       id: 'groupHealth',
       line: (l) => {
@@ -104,8 +124,29 @@ export class GroupHealth implements AppFeature {
     this.worker!.postMessage({ kind: 'config', on: true, areas, belowPct: s.belowPct, rearmPct: s.belowPct + REARM_ABOVE, front } satisfies GroupHealthToWorker)
   }
 
+  /** Starts a worker of its own, asks it a ping and ends it: whether it loads at all, koffi included (the smoke test asks, LT-630). */
+  selfTest(): Promise<GroupHealthSelfTest> {
+    return new Promise((resolve) => {
+      const w = this.makeWorker()
+      let over = false
+      const done = (r: GroupHealthSelfTest) => {
+        if (over) return
+        over = true
+        clearTimeout(timer)
+        w.terminate()
+        resolve(r)
+      }
+      const timer = setTimeout(() => done({ pong: false, koffi: false, error: 'The worker did not answer in ten seconds.' }), 10_000)
+      w.on('message', (m) => {
+        if (m.kind === 'pong') done({ pong: true, koffi: m.koffi, ...(m.error ? { error: m.error } : {}) })
+      })
+      w.on('error', (e) => done({ pong: false, koffi: false, error: e.message }))
+      w.postMessage({ kind: 'ping' })
+    })
+  }
+
   private start(): void {
-    const w = new Worker(groupHealthWorkerPath)
+    const w = this.makeWorker()
     this.worker = w
     this.bars = []
     sources.reading('groupHealth', 'Looking for the Group window…')

@@ -85,3 +85,9 @@ export async function runRound(input: GearInput, asks: RoundAsk[]): Promise<Roun
   const round = await judgeRound(input, asks, () => true)
   return round ?? []
 }
+
+/** Whether the worker is up and answering: the smoke test asks (LT-630). */
+export async function pingGearWorker(): Promise<boolean> {
+  const r = await ask({ kind: 'ping' })
+  return 'pong' in r
+}

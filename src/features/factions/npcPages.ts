@@ -1,3 +1,4 @@
+import { wikiTitles } from '../../core/slayer'
 // What eqlwiki's page for a named NPC tells the faction planner. Allakhazam's faction pages list live
 // EverQuest's NPCs, and Legends never had many of them (Goriba Thurgorson in North Kaladim, Kugaran in
 // Grobb): eqlwiki, Legends' own wiki, has a page for every named NPC of its zones, so one of
@@ -35,11 +36,9 @@ export const isNamedNpc = (name: string) => {
   return /^[A-Z]/.test(n) && !/^(?:A|An|The)\s/.test(n)
 }
 
-/** The titles eqlwiki may keep a name's page under: as written, and with its backtick dropped or made an apostrophe (Ambassador DVinn, Tani N`Mar). */
+/** The titles eqlwiki may keep a name's page under (wikiTitles, the one rule for every reader): as written, each word capitalised, and the backtick dropped or made an apostrophe. */
 export function npcTitles(name: string): string[] {
-  const n = bareNpc(name)
-  const t = n.charAt(0).toUpperCase() + n.slice(1)
-  return [...new Set([t, t.replace(/`/g, ''), t.replace(/`/g, "'")])]
+  return wikiTitles(bareNpc(name))
 }
 
 /** A field's text without links, tags or bold: "[[Kaladim|North Kaladim]]" → "North Kaladim". */

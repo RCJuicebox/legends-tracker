@@ -17,3 +17,8 @@ export const DIED = /^(.+) died\.$/
 export const YOU_DIED = /^You died\.$/
 /** "You have been slain by a fetid fiend!": the killer. */
 export const YOU_WERE_SLAIN = /^You have been slain by (.+)!$/
+
+/** "You have completed achievement: Bear With Me": the achievement. */
+export const COMPLETED_ACHIEVEMENT = /^You have completed achievement: (.+?)\.?$/
+/** How far apart an export's file time and its "Outputfile Complete" line may be, and how far before an export a read of what came after it starts. */
+export const EXPORT_SLACK_MS = 3000

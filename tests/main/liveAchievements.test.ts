@@ -421,6 +421,49 @@ describe('LiveAchievements reads', () => {
 })
 
 describe('LiveAchievements counts Slayer kills since the export', () => {
+  it('reads a log replaced at its path from the export again, not from the old offset into the new file (LT-625)', async () => {
+    const { live } = setup()
+    const { promises: fs } = await import('node:fs')
+    const root = mkdtempSync(join(tmpdir(), 'eql-slayer-'))
+    const here = join(root, 'eqlog_Tester_neriak.txt')
+    const kill = (stamp: string, mob = 'a gnoll') => `[${stamp}] You have slain ${mob}!\r\n`
+    await fs.writeFile(here, kill('Wed Sep 30 11:59:00 2026') + kill('Wed Sep 30 12:00:10 2026'))
+    Object.assign((live as unknown as { ctx: object }).ctx, {
+      historyOf: () => ({ logPath: here, archiveDir: join(root, 'archive'), stem: 'eqlog_Tester_neriak', elsewhere: [] }),
+      logHistory: { reachable: async () => true },
+      slayer: { namedKilled: () => undefined }
+    })
+    Object.assign((live as unknown as { ctx: { engine: object } }).ctx.engine, { meter: { kindOf: () => ({ kind: 'mob' }) } })
+    const s = {
+      character: 'Tester_neriak',
+      exportAt: T0,
+      logPath: here,
+      readTo: -1,
+      logId: '',
+      others: new Map<string, number>(),
+      zoneIn: new Map<string, string>(),
+      kills: new Map<string, { name: string; times: number[]; zones?: string[] }>(),
+      pets: new Set<string>(),
+      engaged: new Map<string, number>(),
+      completed: new Map<string, number>(),
+      counts: new Map<string, number>()
+    }
+    const readLog = (live as unknown as { readLog: (state: typeof s) => Promise<void> }).readLog.bind(live)
+    await readLog(s)
+    expect(s.kills.get('a gnoll')?.times).toHaveLength(1)
+    expect(s.logId).not.toBe('')
+    const readTo = s.readTo
+    // Another log at the same path, longer than the old read: its kills after the export count, from the export on.
+    await fs.rm(here)
+    await fs.writeFile(
+      here,
+      kill('Wed Sep 30 11:58:00 2026', 'a bat') + kill('Wed Sep 30 12:00:30 2026', 'a bat') + kill('Wed Sep 30 12:01:00 2026', 'a bat') + kill('Wed Sep 30 12:02:00 2026', 'a bat')
+    )
+    expect((await fs.stat(here)).size).toBeGreaterThan(readTo)
+    await readLog(s)
+    expect(s.kills.get('a bat')?.times).toHaveLength(3)
+  })
+
   it("in the character's log on another PC too: in time order, each log read on from where it got to, one out of reach left alone", async () => {
     const { live } = setup()
     const { promises: fs } = await import('node:fs')
