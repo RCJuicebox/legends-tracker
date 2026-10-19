@@ -58,3 +58,12 @@ describe('a download, on the Data Sources page and in the jobs strip', () => {
     expect(steps).toHaveLength(2)
   })
 })
+
+describe('a source that is there and simply not read now', () => {
+  it('is idle, with its words and no error: the log while it is not watched (LT-570)', () => {
+    sources.add('idle-test', { label: 'Idle test', what: 'a test row', kind: 'log' })
+    sources.fail('idle-test', new Error('it broke'))
+    sources.idle('idle-test', 'eqlog_Kelwyn_neriak.txt is not being watched.')
+    expect(sources.list().find((r) => r.id === 'idle-test')).toMatchObject({ status: 'idle', detail: 'eqlog_Kelwyn_neriak.txt is not being watched.', error: '' })
+  })
+})
