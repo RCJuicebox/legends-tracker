@@ -6,8 +6,9 @@ import type { AppContext } from '../../../src/main/context'
 import { listLogs } from '../../../src/main/game'
 
 // The Slayer page's main side against a game folder on disk: the achievements export, the client's
-// race table and two characters' logs, read as the app reads them. The live Slayer tracker (eqlwiki's
-// races, what the exports settled) and the faction lines after kills are stood in for.
+// race table and two characters' logs, read as the app reads them. eqlwiki's races, the faction
+// lines after kills and the faction plan followed are stood in for; the live counts are the planner's
+// own (liveSource.ts), stood in for where a test needs kills since the export.
 
 type Handler = (e: unknown, ...args: unknown[]) => unknown
 const h = vi.hoisted(() => ({ dir: '', handlers: new Map<string, Handler>() }))
@@ -75,6 +76,7 @@ const ctx = {
   installDir: () => game,
   // The Respawns page's records: Khrix Fritchoff timed at 7:21 in Unrest, against classic's sixteen minutes.
   store: {
+    dir: h.dir,
     respawns: {
       get: () => ({
         'the estate of unrest|khrix fritchoff': {
@@ -103,15 +105,12 @@ const ctx = {
     lookUp: async (mobs: string[]) => (asked.push(mobs), learned)
   },
   liveAchievements: {
-    view: null as unknown,
-    fact: () => undefined,
     changed: [] as string[],
-    slayerChoicesChanged: (c: string) => ctx.liveAchievements.changed.push(c),
-    // No faction plan followed, and no lockout killed today.
-    raisedByPlan: () => [] as string[],
-    killsSince: () => 0
+    slayerChoicesChanged: (c: string) => ctx.liveAchievements.changed.push(c)
   },
   factions: {
+    // No faction plan followed.
+    follow: { raisedByPlan: () => [] as string[] },
     causes: {
       fail: false,
       view: async () =>
@@ -161,13 +160,14 @@ describe('the Slayer page', () => {
 
   it('counts the kills since the export where the live counts are for the same export', async () => {
     const exp = await ctx.achievementFiles.exported('Kelwyn_neriak')
-    ctx.liveAchievements.view = {
-      character: 'Kelwyn_neriak',
-      slayer: { exportAt: exp!.modified, rows: [{ name: 'Orc Stomp!', since: 60 }] }
+    const real = planner.live
+    planner.live = { character: 'Kelwyn_neriak', view: { exportAt: exp!.modified, rows: [{ name: 'Orc Stomp!', since: 60 }] }, fact: () => undefined, killsSince: () => 0 } as never
+    try {
+      const { data } = await call('slayer:plan', 'Kelwyn_neriak', true)
+      expect(data.goals[0].count).toBe(4960)
+    } finally {
+      planner.live = real
     }
-    const { data } = await call('slayer:plan', 'Kelwyn_neriak', true)
-    expect(data.goals[0].count).toBe(4960)
-    ctx.liveAchievements.view = null
   })
 
   it('asks eqlwiki for the mobs not looked up yet', async () => {
@@ -363,5 +363,18 @@ describe('the Slayer page', () => {
     for (let i = 0; i < 50 && 'slayer' in (await kept()); i++) await new Promise((r) => setTimeout(r, 20))
     expect(await kept()).toEqual({ hunter: [{ zone: 'The Estate of Unrest', mobs: [], named: ['Khrix Fritchoff'] }] })
     planner.register(ctx as unknown as AppContext)
+  })
+
+  it('gives the achievements overlay its part of the track: the Slayer counts, and the Hunter named left in the zone (LT-623)', async () => {
+    await call('hunter:broken', 'hunter of clan crushbone', false)
+    const exp = await ctx.achievementFiles.exported('Kelwyn_neriak')
+    const at = { character: 'Kelwyn_neriak', zone: 'Clan Crushbone', exported: exp }
+    // Nothing counted live yet.
+    expect(planner.track(at)).toEqual({ slayer: null })
+    expect(hunter.track(at)).toEqual({ hunter: { zone: 'Clan Crushbone', rows: [{ achievement: 'Hunter of Clan Crushbone', left: ['Ambassador DVinn'], total: 2, since: [] }] } })
+    expect(hunter.track({ ...at, zone: 'The Estate of Unrest' })).toEqual({ hunter: null })
+    expect(hunter.track({ ...at, exported: null })).toEqual({ hunter: null })
+    await call('hunter:broken', 'Hunter of Clan Crushbone', true)
+    expect(hunter.track(at)).toEqual({ hunter: null })
   })
 })

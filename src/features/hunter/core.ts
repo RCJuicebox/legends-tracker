@@ -1,4 +1,6 @@
 import type { AchSection } from '../../core/achievements'
+import type { SlayerKills } from '../../core/slayer'
+import type { HunterTrackView } from '../../shared/tracking'
 import { duration } from '../../core/format'
 import { respawnEstimate, type RespawnRecord } from '../../core/respawns'
 import { zoneKey } from '../factions/names'
@@ -137,4 +139,42 @@ export function seenFromRecords(records: Readonly<Record<string, RespawnRecord>>
     for (const n of r.names ?? []) byKey.set(`${zoneKey(r.zone)}|${bareName(n)}`, r)
   }
   return (zone, name, timer) => seenText(byKey.get(`${zoneKey(zone)}|${bareName(name)}`), timer, now)
+}
+
+/**
+ * The Hunter named left in the zone the player is in, for the achievements overlay: the export's, less
+ * those the live counts have seen killed since (`kills`, by lower-cased mob), each with what the
+ * Respawns records say of it (`seenOf`); less the achievements the player has said do not work. Null
+ * outside a Hunter zone, or with nothing left there.
+ */
+export function hunterLive(
+  sections: AchSection[],
+  exportAt: number,
+  zone: string,
+  kills: SlayerKills | undefined,
+  seenOf: (zone: string, name: string, timer: number | undefined) => string | undefined,
+  isBroken: (achievement: string) => boolean
+): HunterTrackView | null {
+  if (!zone) return null
+  const last = new Map<string, number>()
+  for (const k of kills?.values() ?? []) last.set(bareName(k.name), Math.max(last.get(bareName(k.name)) ?? 0, k.times.at(-1) ?? 0))
+  const rows = hunterHere(
+    hunterZones(
+      sections,
+      (bare) => last.get(bare) ?? 0,
+      exportAt,
+      () => null,
+      seenOf
+    ),
+    zone
+  ).filter((r) => !isBroken(r.achievement))
+  return rows.length
+    ? {
+        zone,
+        rows: rows.map((r) => {
+          const seen = Object.fromEntries(r.left.flatMap((n) => (n.seen ? [[n.name, n.seen]] : [])))
+          return { achievement: r.achievement, left: r.left.map((n) => n.name), total: r.total, since: r.since, ...(Object.keys(seen).length ? { seen } : {}) }
+        })
+      }
+    : null
 }

@@ -1,9 +1,21 @@
 import type { AppContext } from './context'
+import type { AchievementsExport } from './achievements'
+import type { AchievementTrack } from '../shared/tracking'
 
 // A part of the app that keeps itself whole, beside the engine's parts (EngineFeature): its channels,
 // its Data Sources rows, its part in following the log and what it keeps on disk are its own, so the
 // context builds it, registers it and flushes it without knowing what it does. What it counts over the
 // logs is fixed before LogHistory is built, so a feature class lists that as a static `consumers`.
+
+/** What LiveAchievements has read when it asks each feature for its part of the track. */
+export interface TrackContext {
+  /** The character being played (its key). */
+  character: string
+  /** The zone the player is in. */
+  zone: string
+  /** The character's achievements export as last read; null without one. */
+  exported: AchievementsExport | null
+}
 
 export interface AppFeature {
   readonly id: string
@@ -11,4 +23,9 @@ export interface AppFeature {
   register(ctx: AppContext): void
   /** Writes what it keeps; quitting waits for it. */
   flush?(): Promise<void>
+  /**
+   * Its part of the achievements overlay's track, from what it holds (LiveAchievements asks when it
+   * publishes, LT-623): the faction plan's step, the Slayer counts, the Hunter named in the zone.
+   */
+  track?(at: TrackContext): Partial<Pick<AchievementTrack, 'faction' | 'slayer' | 'hunter'>>
 }

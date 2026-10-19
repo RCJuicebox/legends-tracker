@@ -284,7 +284,7 @@ beforeAll(() => {
     inventoryFiles: { lookup: async () => ({}) },
     // eqlwiki's NPC pages are not read here: the source has its own tests.
     npcPages: { lookup: async () => ({}) },
-    store: { characterByKey: () => record },
+    store: { dir: h.dir, characterByKey: () => record },
     engine: { use: () => {} },
     windows: { toMain: () => {} }
   }

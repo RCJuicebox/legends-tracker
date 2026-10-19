@@ -1059,7 +1059,7 @@ of JuiceboxUI's Group window, while the game runs.
 | Path | What |
 |---|---|
 | `src/core` | Log parsing and tailing, spell book, duration model, spell tracker, triggers, archiver, log check, the damage meter (`combatLines` reads the lines, `combatRoster` knows who is on which side, `combatMeter` keeps the fights, `combatTimeline` their seconds for the chart, `combatView` sums them for display), the loot ledger (`loot`), motes (`motes` counts them, `moteCalc` plans item upgrades, `mergeValue` picks the best merge, `spellMotes` the best spell to upgrade). Plain TypeScript with no Electron dependency, so it is unit-tested directly |
-| `src/features` | Feature modules, one folder each (factions, slayer, hunter): the feature's logic (`core.ts`; for factions also `attribution.ts`, what caused each change, `questPages.ts`, eqlwiki's quest pages, and the achievement plan: `catalog.ts`, what can raise each faction, `names.ts`, `ways.ts`, one faction's ways to 2000, and `planner.ts` with its `model.ts`, `search.ts` and `steps.ts`; `cities.ts`, the Cities plan's guards), its main-process side (`main.ts`: the log-history consumers and what the page asks for) and its pages (`page.tsx`, `planPage.tsx`, with the Plan tab's parts in `plan/`). `index.ts` lists their pages for the sidebar |
+| `src/features` | Feature modules, one folder each (factions, slayer, hunter): the feature's logic (`core.ts`; for factions also `attribution.ts`, what caused each change, `questPages.ts`, eqlwiki's quest pages, and the achievement plan: `catalog.ts`, what can raise each faction, `names.ts`, `ways.ts`, one faction's ways to 2000, and `planner.ts` with its `model.ts`, `search.ts` and `steps.ts`; `cities.ts`, the Cities plan's guards), its main-process side (`main.ts`: the log-history consumers and what the page asks for; for slayer also `liveSource.ts`, the kills counted since the achievements export as the game is played, and for factions `followSource.ts`, the plan followed on the achievements overlay) and its pages (`page.tsx`, `planPage.tsx`, with the Plan tab's parts in `plan/`). `index.ts` lists their pages for the sidebar |
 | `src/shared` | What both processes use: the IPC contract (`ipc.ts`), settings and view types, the game's tables and what is known of the game beyond them (`game/`: classes, spell effect numbers, guide bonuses; `factions.ts`, the faction planner's lore from play and Allakhazam; `hunt.ts`, where to hunt each Slayer race), the default overlays and hotkeys |
 | `src/main` | Electron main process: windows, tray, overlays, speech, icons, persistence, the engine that joins it all (`engine/`, with the contract its parts keep in `feature.ts`), the data sources and long jobs (`sources/`), IPC handlers by family (`ipc/`) |
 | `src/preload` | The IPC bridge, which lets a page use only the channels in the contract |
@@ -1086,8 +1086,9 @@ channels, its Data Sources rows and its engine feature, `flush()` writes what it
 `consumers` names what it counts over the logs. The context builds it and lists it in `ctx.features`,
 registers each once as the app starts and flushes each at quit, so neither `src/main/index.ts` nor
 the lifecycle knows what it does. The live achievements (`src/main/liveAchievements.ts`) are one
-too. Its page's entry in `src/features/index.ts` (id, group, label, icon and the
-page it follows) is where the sidebar puts it. Inside the engine the same idea runs the live log:
+too: they say when to read, and put the overlay's track together from each feature's `track()`. A
+feature's page's entry in `src/features/index.ts` (id, group, label, icon and the page it follows) is
+where the sidebar puts it. Inside the engine the same idea runs the live log:
 each part (the spell tracker, triggers, pet, motes, the combat feed, buffs, the status line and the
 views that go out) is an `EngineFeature` with optional `line`, `tick`, `reset`, `linesRead`,
 `watching`, `spellsLoaded` and `reconfigure` hooks, and the engine hands every line, tick and change

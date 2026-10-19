@@ -9,7 +9,9 @@ import type { LogLine } from '../../src/core/logLine'
 
 // When the achievements overlay reads: a moment after the lines that move something, each half for
 // its own lines, never two reads at once, and everything every half minute only while something
-// shows it. The reads themselves are stood in for; what they read is tested with each part.
+// shows it. The reads themselves are stood in for; what they read is tested with each part (the
+// Slayer counts in features/slayer/liveSource.test.ts and main/liveSlayer.test.ts, the faction plan
+// in features/factions/, the Hunter rows in features/hunter/hunterPlan.test.ts).
 
 const h = vi.hoisted(() => ({ dir: '' }))
 vi.mock('electron', () => ({ app: { getPath: () => h.dir }, ipcMain: { handle: () => {}, on: () => {} } }))
@@ -73,45 +75,6 @@ afterEach(() => {
   vi.useRealTimers()
 })
 
-describe('LiveAchievements tells the Hunter named', () => {
-  it('left in the zone the player is in: the export’s, less those killed since', () => {
-    const { live } = setup()
-    const inner = live as unknown as {
-      character: string
-      zone: string
-      exported: unknown
-      slayer: unknown
-      hunterHere: () => unknown
-    }
-    inner.character = 'Tester_neriak'
-    inner.exported = {
-      character: 'Tester_neriak',
-      file: 'x',
-      modified: T0,
-      sections: [{ cat: 'EverQuest', name: 'Hunter', ach: [{ n: 'Hunter of Befallen', c: [{ t: 'Skeletal Orc' }, { t: 'Andrew Pine' }, { t: 'Skeleton Grimfiend', d: true }] }] }]
-    }
-    inner.slayer = { kills: new Map([['a skeletal orc', { name: 'a skeletal orc', times: [T0 + 1000] }]]) }
-    expect(inner.hunterHere()).toBeNull()
-    inner.zone = 'Befallen 2 (Adaptive)'
-    expect(inner.hunterHere()).toEqual({
-      zone: 'Befallen 2 (Adaptive)',
-      rows: [{ achievement: 'Hunter of Befallen', left: ['Andrew Pine'], total: 3, since: ['Skeletal Orc'] }]
-    })
-    // The Respawns records say when a named left died (LT-670).
-    vi.setSystemTime(T0 + 6 * 60_000)
-    Object.assign((live as unknown as { ctx: { store: object } }).ctx.store, {
-      respawns: { get: () => ({ 'befallen|andrew pine': { zone: 'Befallen', name: 'Andrew Pine', kills: 1, lastDeath: T0, pendingSince: T0, gaps: [480], shared: false } }) }
-    })
-    expect(inner.hunterHere()).toMatchObject({ rows: [{ left: ['Andrew Pine'], seen: { 'Andrew Pine': 'died 6 min ago; back in ~2 min as you timed it' } }] })
-    inner.zone = 'Kedge Keep'
-    expect(inner.hunterHere()).toBeNull()
-    // Said not to work (Plan › Hunter): not shown.
-    Object.assign((live as unknown as { ctx: object }).ctx, { hunter: { isBroken: (a: string) => a === 'Hunter of Befallen' } })
-    inner.zone = 'Befallen'
-    expect(inner.hunterHere()).toBeNull()
-  })
-})
-
 describe('LiveAchievements makes the Slayer plan again', () => {
   const goal = (name: string, count: number, max: number) => ({ name, section: 'Slayer: Conquest', races: '', count, max, optional: false, tier: 0 })
   const data = (exportAt: number) => ({
@@ -132,21 +95,23 @@ describe('LiveAchievements makes the Slayer plan again', () => {
 
   it('from the counts as they are now, the step in the player’s zone first', async () => {
     const { live } = setup()
+    // The Slayer feature's live counts, as the overlay reads them (LT-623).
+    const slayer = { character: 'Tester_neriak', view: null as unknown }
     const inner = live as unknown as {
       character: string
       zone: string
-      slayer: unknown
-      slayerView: unknown
       ctx: Record<string, unknown>
       slayerPlan: AchievementTrack['slayerPlan']
       readSlayerPlan: (c: string) => Promise<void>
     }
     const asked: number[] = []
-    inner.ctx.slayer = { forOverlay: async (_c: unknown, _who: string, at: number) => (asked.push(at), { data: data(T0), choices: { ...DEFAULT_CHOICES, overlay: true } }) }
+    inner.ctx.slayer = {
+      live: slayer,
+      forOverlay: async (_c: unknown, _who: string, at: number) => (asked.push(at), { data: data(T0), choices: { ...DEFAULT_CHOICES, overlay: true } })
+    }
     inner.character = 'Tester_neriak'
-    inner.slayer = { character: 'Tester_neriak' }
     // Ninety orcs since the export: ten to go, a quarter hour's kills, against the giants' hour.
-    inner.slayerView = { exportAt: T0, rows: [{ name: 'Orc Stomp!', count: 4900, since: 90, done: false }] }
+    slayer.view = { exportAt: T0, rows: [{ name: 'Orc Stomp!', count: 4900, since: 90, done: false }] }
     await inner.readSlayerPlan('Tester_neriak')
     expect(asked).toEqual([T0])
     expect(inner.slayerPlan?.current).toMatchObject({ index: 0, zone: 'Clan Crushbone', here: false, goals: [{ name: 'Orc Stomp!', count: 4990, max: 5000 }] })
@@ -156,43 +121,42 @@ describe('LiveAchievements makes the Slayer plan again', () => {
     await inner.readSlayerPlan('Tester_neriak')
     expect(inner.slayerPlan?.current).toMatchObject({ zone: 'The Permafrost Caverns', here: true })
     // The game said Orc Stomp! was done: only the giants are left.
-    inner.slayerView = { exportAt: T0, rows: [{ name: 'Orc Stomp!', count: 4900, since: 0, done: true }] }
+    slayer.view = { exportAt: T0, rows: [{ name: 'Orc Stomp!', count: 4900, since: 0, done: true }] }
     await inner.readSlayerPlan('Tester_neriak')
     expect([inner.slayerPlan?.steps, inner.slayerPlan?.next]).toEqual([1, null])
     // Data for another export than the counts', or a character that does not show it: nothing.
-    inner.slayerView = { exportAt: T0 + 1, rows: [] }
+    slayer.view = { exportAt: T0 + 1, rows: [] }
     await inner.readSlayerPlan('Tester_neriak')
     expect(inner.slayerPlan).toBeNull()
-    inner.ctx.slayer = { forOverlay: async () => null }
-    inner.slayerView = { exportAt: T0, rows: [] }
+    inner.ctx.slayer = { live: slayer, forOverlay: async () => null }
+    slayer.view = { exportAt: T0, rows: [] }
     await inner.readSlayerPlan('Tester_neriak')
     expect(inner.slayerPlan).toBeNull()
   })
 
   it('says an achievement of the step is done, and the step to go on to, as the faction plan’s steps are said (LT-655)', async () => {
     const { live } = setup()
+    // The Slayer feature's live counts, as the overlay reads them (LT-623).
+    const slayer = { character: 'Tester_neriak', view: null as unknown }
     const inner = live as unknown as {
       character: string
       zone: string
-      slayer: unknown
-      slayerView: unknown
       ctx: Record<string, unknown>
       readSlayerPlan: (c: string) => Promise<void>
     }
     const said: Notification[] = []
     inner.ctx.store = { settings: { get: () => ({ achievementCues: true, overlays: [] }) } }
     inner.ctx.engine = { status: { zone: '' }, notify: (ns: Notification[]) => said.push(...ns) }
-    inner.ctx.slayer = { forOverlay: async () => ({ data: data(T0), choices: { ...DEFAULT_CHOICES, overlay: true } }) }
+    inner.ctx.slayer = { live: slayer, forOverlay: async () => ({ data: data(T0), choices: { ...DEFAULT_CHOICES, overlay: true } }) }
     inner.character = 'Tester_neriak'
-    inner.slayer = { character: 'Tester_neriak' }
-    inner.slayerView = { exportAt: T0, rows: [{ name: 'Orc Stomp!', count: 4900, since: 90, done: false }] }
+    slayer.view = { exportAt: T0, rows: [{ name: 'Orc Stomp!', count: 4900, since: 90, done: false }] }
     await inner.readSlayerPlan('Tester_neriak')
     // Kills along the way say nothing.
-    inner.slayerView = { exportAt: T0, rows: [{ name: 'Orc Stomp!', count: 4900, since: 95, done: false }] }
+    slayer.view = { exportAt: T0, rows: [{ name: 'Orc Stomp!', count: 4900, since: 95, done: false }] }
     await inner.readSlayerPlan('Tester_neriak')
     expect(said).toEqual([])
     // The game said Orc Stomp! was done: a flash for it, and the giants' step is said.
-    inner.slayerView = { exportAt: T0, rows: [{ name: 'Orc Stomp!', count: 4900, since: 0, done: true }] }
+    slayer.view = { exportAt: T0, rows: [{ name: 'Orc Stomp!', count: 4900, since: 0, done: true }] }
     await inner.readSlayerPlan('Tester_neriak')
     expect(said).toEqual([
       { kind: 'text', text: '✓ Orc Stomp!', color: '#8fe0a6', durationSec: 6 },
@@ -201,7 +165,7 @@ describe('LiveAchievements makes the Slayer plan again', () => {
     ])
     // Nothing more once everything is done.
     said.length = 0
-    inner.slayerView = {
+    slayer.view = {
       exportAt: T0,
       rows: [
         { name: 'Orc Stomp!', count: 4900, since: 0, done: true },
@@ -417,120 +381,5 @@ describe('LiveAchievements reads', () => {
     expect(s.taken()).toEqual(['Marks', 'Faction', 'Faction'])
     expect(s.published).toHaveLength(1)
     expect(s.live.view?.character).toBe('Tester_neriak')
-  })
-})
-
-describe('LiveAchievements counts Slayer kills since the export', () => {
-  it('reads a log replaced at its path from the export again, not from the old offset into the new file (LT-625)', async () => {
-    const { live } = setup()
-    const { promises: fs } = await import('node:fs')
-    const root = mkdtempSync(join(tmpdir(), 'eql-slayer-'))
-    const here = join(root, 'eqlog_Tester_neriak.txt')
-    const kill = (stamp: string, mob = 'a gnoll') => `[${stamp}] You have slain ${mob}!\r\n`
-    await fs.writeFile(here, kill('Wed Sep 30 11:59:00 2026') + kill('Wed Sep 30 12:00:10 2026'))
-    Object.assign((live as unknown as { ctx: object }).ctx, {
-      historyOf: () => ({ logPath: here, archiveDir: join(root, 'archive'), stem: 'eqlog_Tester_neriak', elsewhere: [] }),
-      logHistory: { reachable: async () => true },
-      slayer: { namedKilled: () => undefined }
-    })
-    Object.assign((live as unknown as { ctx: { engine: object } }).ctx.engine, { meter: { kindOf: () => ({ kind: 'mob' }) } })
-    const s = {
-      character: 'Tester_neriak',
-      exportAt: T0,
-      logPath: here,
-      readTo: -1,
-      logId: '',
-      others: new Map<string, number>(),
-      zoneIn: new Map<string, string>(),
-      kills: new Map<string, { name: string; times: number[]; zones?: string[] }>(),
-      pets: new Set<string>(),
-      engaged: new Map<string, number>(),
-      completed: new Map<string, number>(),
-      counts: new Map<string, number>()
-    }
-    const readLog = (live as unknown as { readLog: (state: typeof s) => Promise<void> }).readLog.bind(live)
-    await readLog(s)
-    expect(s.kills.get('a gnoll')?.times).toHaveLength(1)
-    expect(s.logId).not.toBe('')
-    const readTo = s.readTo
-    // Another log at the same path, longer than the old read: its kills after the export count, from the export on.
-    await fs.rm(here)
-    await fs.writeFile(
-      here,
-      kill('Wed Sep 30 11:58:00 2026', 'a bat') + kill('Wed Sep 30 12:00:30 2026', 'a bat') + kill('Wed Sep 30 12:01:00 2026', 'a bat') + kill('Wed Sep 30 12:02:00 2026', 'a bat')
-    )
-    expect((await fs.stat(here)).size).toBeGreaterThan(readTo)
-    await readLog(s)
-    expect(s.kills.get('a bat')?.times).toHaveLength(3)
-  })
-
-  it("in the character's log on another PC too: in time order, each log read on from where it got to, one out of reach left alone", async () => {
-    const { live } = setup()
-    const { promises: fs } = await import('node:fs')
-    const root = mkdtempSync(join(tmpdir(), 'eql-slayer-'))
-    const here = join(root, 'eqlog_Tester_neriak.txt')
-    const there = join(root, 'there', 'Logs')
-    const otherLog = join(there, 'eqlog_Tester_neriak.txt')
-    await fs.mkdir(there, { recursive: true })
-    const kill = (stamp: string) => `[${stamp}] You have slain a gnoll!\r\n`
-    const entered = (stamp: string, zone: string) => `[${stamp}] You have entered ${zone}.\r\n`
-    // Before the export, then after it on this PC and on the other in turn.
-    await fs.writeFile(
-      here,
-      entered('Wed Sep 30 11:50:00 2026', 'The Western Plains of Karana') + kill('Wed Sep 30 11:59:00 2026') + kill('Wed Sep 30 12:00:10 2026') + kill('Wed Sep 30 12:05:00 2026')
-    )
-    await fs.writeFile(otherLog, entered('Wed Sep 30 11:57:00 2026', 'Lake Rathetear') + kill('Wed Sep 30 11:58:00 2026') + kill('Wed Sep 30 12:01:40 2026'))
-    let answers = true
-    const killedNamed: string[] = []
-    Object.assign((live as unknown as { ctx: object }).ctx, {
-      historyOf: () => ({
-        logPath: here,
-        archiveDir: join(root, 'archive'),
-        stem: 'eqlog_Tester_neriak',
-        elsewhere: [{ folder: there, logPath: otherLog, archiveDir: join(there, 'archive') }]
-      }),
-      logHistory: { reachable: async () => answers },
-      slayer: { namedKilled: (mobs: string[]) => killedNamed.push(...mobs) }
-    })
-    Object.assign((live as unknown as { ctx: { engine: object } }).ctx.engine, { meter: { kindOf: () => ({ kind: 'mob' }) } })
-    const s = {
-      character: 'Tester_neriak',
-      exportAt: T0,
-      logPath: here,
-      readTo: -1,
-      others: new Map<string, number>(),
-      zoneIn: new Map<string, string>(),
-      kills: new Map<string, { name: string; times: number[]; zones?: string[] }>(),
-      pets: new Set<string>(),
-      engaged: new Map<string, number>(),
-      completed: new Map<string, number>(),
-      counts: new Map<string, number>()
-    }
-    const readLog = (live as unknown as { readLog: (state: typeof s) => Promise<void> }).readLog.bind(live)
-    const at = (hms: string) => new Date(`2026-09-30T${hms}`).getTime()
-    await readLog(s)
-    expect(s.kills.get('a gnoll')?.times).toEqual([at('12:00:10'), at('12:01:40'), at('12:05:00')])
-    // Each kill is handed on, so a Hunter named killed comes off the game's map.
-    expect(killedNamed).toContain('a gnoll')
-    // Each kill in the zone its log was in, found back before the export where the read began, and kept beside its time.
-    expect(s.kills.get('a gnoll')?.zones).toEqual(['The Western Plains of Karana', 'Lake Rathetear', 'The Western Plains of Karana'])
-    expect(s.zoneIn.get(here.toLowerCase())).toBe('The Western Plains of Karana')
-    expect(s.readTo).toBe((await fs.stat(here)).size)
-    expect(s.others.get(otherLog.toLowerCase())).toBe((await fs.stat(otherLog)).size)
-
-    await fs.appendFile(otherLog, entered('Wed Sep 30 12:06:00 2026', 'The Rathe Mountains') + kill('Wed Sep 30 12:06:40 2026'))
-    await readLog(s)
-    expect(s.kills.get('a gnoll')?.times).toHaveLength(4)
-    expect(s.kills.get('a gnoll')?.zones?.at(-1)).toBe('The Rathe Mountains')
-
-    // That PC off: its log is not touched, and what it counted stands.
-    answers = false
-    await fs.appendFile(otherLog, kill('Wed Sep 30 12:08:00 2026'))
-    await readLog(s)
-    expect(s.kills.get('a gnoll')?.times).toHaveLength(4)
-    answers = true
-    await readLog(s)
-    expect(s.kills.get('a gnoll')?.times).toHaveLength(5)
-    await fs.rm(root, { recursive: true, force: true })
   })
 })

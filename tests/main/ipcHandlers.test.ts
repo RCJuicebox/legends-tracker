@@ -96,7 +96,9 @@ beforeAll(async () => {
   process.env['EQL_USER_DATA'] = h.dir
   const { rendererUrl } = await import('../../src/main/push')
   OWN = { senderFrame: { url: rendererUrl() + 'index.html' } }
-  const ctx = stub()
+  // The features keep what they hold under the store's folder, so that one path is real.
+  const store = new Proxy(stub() as object, { get: (t, p, r) => (p === 'dir' ? h.dir : Reflect.get(t, p, r)) })
+  const ctx = new Proxy(stub() as object, { get: (t, p, r) => (p === 'store' ? store : Reflect.get(t, p, r)) })
   const modules = await Promise.all([
     import('../../src/main/ipc/app'),
     import('../../src/main/ipc/triggers'),

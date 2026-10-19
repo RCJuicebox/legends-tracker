@@ -52,7 +52,9 @@ import { cacheDir } from '../../main/paths'
 import { log } from '../../main/log'
 import { everyStretch, readForward, type HistoryConsumer, type HistoryWhere, type LogHistory } from '../../main/sources/logHistory'
 import type { AppContext } from '../../main/context'
-import type { AppFeature } from '../../main/appFeature'
+import type { AppFeature, TrackContext } from '../../main/appFeature'
+import type { AchievementTrack } from '../../shared/tracking'
+import { FactionFollow } from './followSource'
 
 // A character's faction changes, from "Your faction standing with X has been adjusted by N." and
 // the cap lines, over the log and its archives, for the Factions page. The reading is LogHistory's.
@@ -795,19 +797,27 @@ export class Factions implements AppFeature {
   readonly book = new FactionBook()
   /** Allakhazam's faction pages, for the con a quest wants and the kills eqlwiki lacks. */
   readonly alla = new FactionAlla()
+  /** The plan the player follows on the achievements overlay (followSource.ts): made when the feature is registered. */
+  follow!: FactionFollow
 
   constructor(logHistory: LogHistory) {
     this.history = new FactionHistory(logHistory, HISTORY_KEY, join(cacheDir(), 'faction-since.json'))
     this.causes = new FactionSourceHistory(logHistory, CAUSES_KEY)
   }
 
-  /** Writes the Allakhazam pages read since the last write. */
+  /** Writes the Allakhazam pages read since the last write, and where the followed plans stand. */
   flush(): Promise<void> {
-    return Promise.all([this.alla.flush(), this.history.flush()]).then(() => undefined)
+    return Promise.all([this.alla.flush(), this.history.flush(), this.follow?.flush()]).then(() => undefined)
+  }
+
+  /** Its part of the achievements overlay's track: the step of the plan the character follows (LT-623). */
+  track(at: TrackContext): Partial<Pick<AchievementTrack, 'faction'>> {
+    return { faction: this.follow?.viewFor_(at.character) ?? null }
   }
 
   // The handlers reach the feature through the context, as every other channel does.
   register(ctx: AppContext): void {
+    this.follow = new FactionFollow(ctx, (character) => standingsNow(ctx, character))
     // The page is told when a standing moves or an export is written (a moment after, as the game
     // finishes the file), rather than asking every ten seconds (LT-399).
     let told: NodeJS.Timeout | null = null
@@ -899,12 +909,12 @@ export class Factions implements AppFeature {
       assertCharacterKey(character)
       const clean = plan === null ? null : sanitizeFollowedPlan(plan)
       if (plan !== null && !clean) throw new Error('Not a plan.')
-      await ctx.liveAchievements.follow(character, clean)
+      await this.follow.follow(character, clean)
     })
     handle('factions:follow-step', async (character, index) => {
       assertCharacterKey(character)
       if (typeof index !== 'number' || !Number.isInteger(index) || index < 0) throw new Error('Not a step.')
-      await ctx.liveAchievements.followStep(character, index)
+      await this.follow.followStep(character, index)
     })
   }
 }

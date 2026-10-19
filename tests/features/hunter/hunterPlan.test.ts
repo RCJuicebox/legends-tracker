@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { parseAchievements } from '../../../src/core/achievements'
-import { hunterHere, hunterMatch, hunterZones, namedWait, seenFromRecords, seenText } from '../../../src/features/hunter/core'
+import { hunterHere, hunterLive, hunterMatch, hunterZones, namedWait, seenFromRecords, seenText } from '../../../src/features/hunter/core'
 import type { MobSpawn } from '../../../src/features/slayer/spawns'
 
 // Plan › Hunter: the named each Hunter achievement still wants, with what the spawn tables say of
@@ -137,5 +137,58 @@ describe('Plan › Hunter: what the Respawns records say of a named (LT-670)', (
     // The orc is always up: it waits nothing, and the zone takes as long as Andrew Pine.
     expect(befallen.left[0].wait).toBe(0)
     expect(befallen.wait).toBe(2400)
+  })
+})
+
+describe('the achievements overlay’s Hunter rows (hunterLive)', () => {
+  const T0 = new Date(2026, 8, 30, 12, 0, 0).getTime()
+  const befallen = parseAchievements(['EverQuest: Hunter', 'I\tHunter of Befallen', 'I\t\tSkeletal Orc', 'I\t\tAndrew Pine', 'C\t\tSkeleton Grimfiend'].join('\n')).sections
+  const kills = new Map([['a skeletal orc', { name: 'a skeletal orc', times: [T0 + 1000] }]])
+
+  it('are the named left in the zone the player is in: the export’s, less those killed since', () => {
+    expect(
+      hunterLive(
+        befallen,
+        T0,
+        '',
+        kills,
+        () => undefined,
+        () => false
+      )
+    ).toBeNull()
+    expect(
+      hunterLive(
+        befallen,
+        T0,
+        'Befallen 2 (Adaptive)',
+        kills,
+        () => undefined,
+        () => false
+      )
+    ).toEqual({
+      zone: 'Befallen 2 (Adaptive)',
+      rows: [{ achievement: 'Hunter of Befallen', left: ['Andrew Pine'], total: 3, since: ['Skeletal Orc'] }]
+    })
+    expect(
+      hunterLive(
+        befallen,
+        T0,
+        'Kedge Keep',
+        kills,
+        () => undefined,
+        () => false
+      )
+    ).toBeNull()
+  })
+
+  it('say when a named left died, from the Respawns records (LT-670), and leave out the achievements said not to work', () => {
+    const seenOf = seenFromRecords(
+      { 'befallen|andrew pine': { zone: 'Befallen', name: 'Andrew Pine', kills: 1, lastDeath: T0, pendingSince: T0, gaps: [480], shared: false } },
+      T0 + 6 * MIN
+    )
+    expect(hunterLive(befallen, T0, 'Befallen', kills, seenOf, () => false)).toMatchObject({
+      rows: [{ left: ['Andrew Pine'], seen: { 'Andrew Pine': 'died 6 min ago; back in ~2 min as you timed it' } }]
+    })
+    expect(hunterLive(befallen, T0, 'Befallen', kills, seenOf, (a) => a === 'Hunter of Befallen')).toBeNull()
   })
 })

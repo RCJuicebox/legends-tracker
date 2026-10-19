@@ -1,146 +1,28 @@
-import { sinceStart, type SincePosition } from './sources/sinceExport'
 import { COMPLETED_ACHIEVEMENT } from '../core/phrases'
 import type { Notification } from '../shared/runtime'
-import { join } from 'node:path'
 import { trackedAchievements } from '../core/trackedAchievements'
-import { SELF } from '../core/combatLines'
-import { isFriend } from '../core/combatMeter'
-import { learnFromExport, SlayerRaces, slayerCounters, slayerCounts, slayerLine, type SlayerCounter, type SlayerKills } from '../core/slayer'
-import { NO_RACE_TABLE, RACE_TABLE, type RaceTable } from '../core/raceNames'
 import { skillGoals, skillId, skillValue } from '../core/skillAchievements'
 import { classIdOf, type ClassId } from '../shared/game/classes'
 import { parseFactionLine } from '../features/factions/core'
-import { standingsNow } from '../features/factions/main'
-import { carryFollow, freshFollow, pickStep, readFollow, sanitizeFollows, sayStep, type FollowEvent, type FollowedPlan, type FollowState } from '../features/factions/tracker'
-import type { AchievementTrack, FactionTrackView, HunterTrackView, SkillRow, SkillTrackView, SlayerPlanTrackView, SlayerTrackView, TrackedAchievement } from '../shared/tracking'
-import { hunterHere, hunterZones, seenFromRecords } from '../features/hunter/core'
-import { bareName, planSlayer, slayerPlanView } from '../features/slayer/core'
-import { takpRaceMix } from '../features/slayer/main'
+import { FACTION_SECTION } from '../features/factions/followSource'
+import type { AchievementTrack, SkillRow, SkillTrackView, SlayerPlanTrackView, TrackedAchievement } from '../shared/tracking'
+import { planSlayer, slayerPlanView } from '../features/slayer/core'
 import type { AchievementsExport } from './achievements'
 import type { AppContext } from './context'
-import type { AppFeature } from './appFeature'
+import type { AppFeature, TrackContext } from './appFeature'
 import type { EngineFeature } from './engine'
 import { handle } from './ipc/handle'
 import { log } from './log'
-import { readForward } from './sources/logHistory'
-import { lastZoneLine } from './game'
-import { zoneEntered } from '../core/logLine'
-import { JsonFile, readJsonFile } from './storeCore'
-import { cacheDir } from './paths'
 
 // What the achievements overlay follows as the game is played: the step of the faction plan the
-// player follows (the Plan tab hands it over), the Slayer counts since the last achievements
-// export, the skills the open skill achievements want, and the achievements the player tracks (the
-// star on the Achievements page). The log is watched for the lines that move any of them (faction
-// lines, kills, skill-ups, the game saying an achievement is done); a moment after a burst of them the
-// standings, or the new stretch of log, are read and the overlay and the pages told. A step done is
-// said aloud.
+// player follows (the Factions feature holds it, followSource.ts), the Slayer counts since the last
+// achievements export (the Slayer feature's, liveSource.ts), the skills the open skill achievements
+// want, and the achievements the player tracks (the star on the Achievements page). This class says
+// when to read: the log is watched for the lines that move any of them (faction lines, kills,
+// skill-ups, the game saying an achievement is done); a moment after a burst of them the standings, or
+// the new stretch of log, are read, and the track is put together from what each feature holds
+// (AppFeature.track) and the overlay and the pages told.
 
-interface Followed {
-  plan: FollowedPlan
-  state: FollowState
-}
-
-/** Slayer counting for the character being played, since its achievements export. */
-interface SlayerState {
-  character: string
-  exportFile: string
-  exportAt: number
-  counters: SlayerCounter[]
-  /** Each open achievement's count at the export, by lower-cased name: what the next export's are set against. */
-  counts: Map<string, number>
-  /** The client's race table the races were built with: a new one (a patch) builds them again. */
-  game: RaceTable
-  races: SlayerRaces
-  logPath: string
-  /** How far into the log the kills have been counted; -1 before the first read. */
-  readTo: number
-  /** The log file's identity where the counts got to, so a log replaced at the path is read afresh (LT-625); '' while unknown. */
-  logId?: string
-  /** The same for the character's log on each other PC, by lower-cased path. */
-  others: Map<string, number>
-  otherIds?: Map<string, string>
-  /** The zone each log was in where its counts got to, by lower-cased path: each kill is put to its zone. */
-  zoneIn: Map<string, string>
-  kills: SlayerKills
-  /** The player's pets, as they said so ("Attacking a gnoll, Master."). */
-  pets: Set<string>
-  /** Mobs the player or its pet went for lately (lower-cased), and when: one of those dying with no killer named is the player's kill. */
-  engaged: Map<string, number>
-  /** Achievements the game said were completed since the export (lower-cased), and when. */
-  completed: Map<string, number>
-}
-
-/** A SlayerState's counts as kept on disk, so a start reads on from where the last run got to (LT-371). */
-interface KeptSlayer {
-  character: string
-  logPath: string
-  exportAt: number
-  readTo: number
-  /** Each kill's zone beside its time; an older file kept the times alone. */
-  kills: [string, { name: string; times: number[]; zones?: string[] }][]
-  pets: string[]
-  /** With when each was; an older file kept the names alone. */
-  completed: ([string, number] | string)[]
-  /** The export's counts, by lower-cased name; missing from an older file. */
-  counts?: [string, number][]
-  /** How far into the character's log on each other PC, by lower-cased path; missing from an older file. */
-  others?: [string, number][]
-  /** The identity of the log at each path where the counts got to (this PC's under its own path); missing from an older file. */
-  logIds?: [string, string][]
-  /** The zone each log was in where the counts got to, by lower-cased path; missing from an older file. */
-  zoneIn?: [string, string][]
-}
-
-function keptSlayer(v: unknown): KeptSlayer | null {
-  const k = v as Partial<KeptSlayer> | null
-  if (!k || typeof k.character !== 'string' || typeof k.logPath !== 'string' || typeof k.exportAt !== 'number' || typeof k.readTo !== 'number') return null
-  if (!Array.isArray(k.kills) || !Array.isArray(k.pets) || !Array.isArray(k.completed)) return null
-  const kills = k.kills
-    .filter(
-      (e): e is KeptSlayer['kills'][number] =>
-        Array.isArray(e) && typeof e[0] === 'string' && typeof e[1]?.name === 'string' && Array.isArray(e[1].times) && e[1].times.every((t) => typeof t === 'number')
-    )
-    .map(([key, v]): KeptSlayer['kills'][number] => {
-      // Zones that do not line up with the times are not known.
-      const zones = Array.isArray(v.zones) && v.zones.length === v.times.length && v.zones.every((z) => typeof z === 'string') ? v.zones : v.times.map(() => '')
-      return [key, { name: v.name, times: v.times, zones }]
-    })
-  const completed = k.completed.filter((c) => typeof c === 'string' || (Array.isArray(c) && typeof c[0] === 'string' && typeof c[1] === 'number'))
-  const pairs = (v: unknown) => (Array.isArray(v) ? v.filter((c): c is [string, number] => Array.isArray(c) && typeof c[0] === 'string' && typeof c[1] === 'number') : undefined)
-  const strPairs = (v: unknown) => (Array.isArray(v) ? v.filter((c): c is [string, string] => Array.isArray(c) && typeof c[0] === 'string' && typeof c[1] === 'string') : undefined)
-  return {
-    ...(k as KeptSlayer),
-    kills,
-    pets: k.pets.filter((p) => typeof p === 'string'),
-    completed,
-    counts: pairs(k.counts),
-    others: pairs(k.others),
-    zoneIn: strPairs(k.zoneIn),
-    logIds: strPairs(k.logIds)
-  }
-}
-
-/** What the exports settled about which mobs count toward which Slayer achievements, for every character: a race is the game's, not the player's. */
-interface FactsFile {
-  version: 1
-  /** By lower-cased mob, then lower-cased achievement: whether its kills count, when that was settled, and on what. */
-  mobs: Record<string, Record<string, { counts: boolean; at: number; kills: number; rise: number }>>
-}
-
-function factsFile(v: unknown): FactsFile {
-  const f = v as Partial<FactsFile> | null
-  if (!f || f.version !== 1 || !f.mobs || typeof f.mobs !== 'object') return { version: 1, mobs: {} }
-  const mobs: FactsFile['mobs'] = {}
-  for (const [mob, by] of Object.entries(f.mobs)) {
-    if (!by || typeof by !== 'object') continue
-    for (const [ach, x] of Object.entries(by)) if (x && typeof x.counts === 'boolean') (mobs[mob] ??= {})[ach] = x
-  }
-  return { version: 1, mobs }
-}
-
-/** The faction achievements' section: tracking one of them reads the standings. */
-const FACTION_SECTION = 'EverQuest: Progression'
 /** A read waits this long after the last line that moves something: a stack hand-in or an area kill comes in a burst. */
 const SETTLE_MS = 800
 /**
@@ -154,12 +36,9 @@ const KILLS_AT_MOST_MS = 15_000
 const SWEEP_MS = 30_000
 /** A page that shows the track says so at least this often while it is open (useAchievementTrack). */
 const PAGE_MS = 90_000
-/** A mob the player went for this recently that dies with no killer named ("A bixie died.") died of the player's damage over time. */
-const ENGAGED_MS = 60_000
 
 export class LiveAchievements implements AppFeature {
   readonly id = 'achievements'
-  private readonly follows: JsonFile<Record<string, Followed>>
   private character = ''
   private zone = ''
   /** When a line last moved each half, 0 when read since. */
@@ -171,9 +50,6 @@ export class LiveAchievements implements AppFeature {
   /** What the faction lines since the last read did. */
   private moved: Record<string, number> = {}
   private reading = false
-  private faction: FactionTrackView | null = null
-  private slayer: SlayerState | null = null
-  private slayerView: SlayerTrackView | null = null
   private skillsAt = 0
   private skills: SkillTrackView | null = null
   /** When the Slayer plan was last asked to be made again (a zone entered, the choices changed), 0 when made since. */
@@ -183,29 +59,12 @@ export class LiveAchievements implements AppFeature {
   private exported: (AchievementsExport & { character: string }) | null = null
   /** The player's marks on the Achievements page: hand ticks, and the achievements tracked. */
   private marks: { character: string; ticks: string[]; tracked: string[] } | null = null
-  /** Faction achievements' factions and standings, by achievement name (lower-cased), for tracked ones. */
-  private byAchievement: Record<string, { faction: string; standing: number | null }> | null = null
   private last: AchievementTrack | null = null
   private lastKey = ''
   /** When a page showing the track last said it was open; 0 once it closed. */
   private pageAt = 0
 
-  constructor(private readonly ctx: AppContext) {
-    const path = join(ctx.store.dir, 'faction-follow.json')
-    const read = readJsonFile(path)
-    // Checked as it is read: a plan kept in an older shape would otherwise throw on every faction line.
-    const value: Record<string, Followed> = read.state === 'ok' ? sanitizeFollows(read.value) : {}
-    this.follows = new JsonFile(path, value, { delayMs: 3000, pretty: false, backup: true })
-    if (read.state === 'unreadable') this.follows.freeze('could not be read at start')
-    const keptPath = join(cacheDir(), 'slayer-since.json')
-    const kept = readJsonFile(keptPath)
-    this.keptSlayer = new JsonFile<KeptSlayer | null>(keptPath, kept.state === 'ok' ? keptSlayer(kept.value) : null, { delayMs: 10_000, pretty: false })
-    const factsPath = join(ctx.store.dir, 'slayer-facts.json')
-    const facts = readJsonFile(factsPath)
-    this.facts = new JsonFile(factsPath, factsFile(facts.state === 'ok' ? facts.value : null), { delayMs: 3000, pretty: false, backup: true })
-    if (facts.state === 'unreadable') this.facts.freeze('could not be read at start')
-    void ctx.npcPages?.ready()
-  }
+  constructor(private readonly ctx: AppContext) {}
 
   /** Its part in following the log: it sees each line after everything else has. */
   readonly feature: EngineFeature = {
@@ -217,16 +76,6 @@ export class LiveAchievements implements AppFeature {
     }
   }
 
-  /** Writes where the player is in each followed plan, and the Slayer counts since the export. */
-  flush(): Promise<void> {
-    return Promise.all([this.follows.flush(), this.keptSlayer.flush(), this.facts.flush()]).then(() => undefined)
-  }
-
-  /** The Slayer counts since the export, kept so the next start need not read the log from the export again. */
-  private readonly keptSlayer: JsonFile<KeptSlayer | null>
-  /** What the exports settled (slayer.ts, learnFromExport). */
-  private readonly facts: JsonFile<FactsFile>
-
   /** Its channel, and its part in following the log: registered after the engine's own, it sees each line last. */
   register(ctx: AppContext): void {
     handle('achievements:track', (watching) => {
@@ -234,6 +83,11 @@ export class LiveAchievements implements AppFeature {
       return ctx.liveAchievements.view
     })
     ctx.engine.use(this.feature)
+    // What the features hold changes on its own too: eqlwiki answers a mob's race, a page follows a plan.
+    const live = ctx.slayer?.live
+    if (live) live.onChange = () => this.publish()
+    const follow = ctx.factions?.follow
+    if (follow) follow.onChange = (character) => this.refreshFaction(character)
   }
 
   /** What the overlay and the pages were last told. */
@@ -263,13 +117,11 @@ export class LiveAchievements implements AppFeature {
     if (character !== this.character) {
       // Another character: read both halves for it at once.
       this.character = character
-      this.slayer = null
-      this.slayerView = null
-      this.faction = null
+      this.ctx.slayer?.live?.reset()
+      this.ctx.factions?.follow?.reset()
       this.skills = null
       this.slayerPlan = null
       this.marks = null
-      this.byAchievement = null
       this.moved = {}
       this.sweptAt = 0
     }
@@ -318,115 +170,26 @@ export class LiveAchievements implements AppFeature {
     })()
   }
 
-  // ---- the faction plan ----
+  // ---- the faction plan (the Factions feature's, followSource.ts) ----
 
   private async readFaction(character: string): Promise<void> {
-    const f = this.follows.get()[character]
+    const follow = this.ctx.factions?.follow
+    if (!follow) return
     // A faction achievement tracked wants its standing, plan or no plan.
     const tracksFaction = (this.marks?.tracked ?? []).some((k) => k.startsWith(`${FACTION_SECTION} > `))
-    if (!f && !tracksFaction) {
-      this.faction = null
-      this.byAchievement = null
-      return
-    }
-    const { standings, done, byAchievement } = await standingsNow(this.ctx, character)
-    this.byAchievement = byAchievement
-    if (!f) {
-      this.faction = null
-      return
-    }
     const moved = this.moved
     this.moved = {}
-    const r = readFollow(f.plan, f.state, standings, done, { zone: this.zone, moved })
-    if (JSON.stringify(r.state) !== JSON.stringify(f.state)) this.follows.set({ ...this.follows.get(), [character]: { plan: f.plan, state: r.state } })
-    this.faction = r.view
-    this.cue(r.events)
+    await follow.read(character, { zone: this.zone, moved, tracksFaction })
   }
 
-  /** The factions the faction plan the character follows is raising (its steps' hits), for Plan › Slayer's faction costs; none without a plan. */
-  raisedByPlan(character: string): string[] {
-    const f = this.follows.get()[character]
-    if (!f) return []
-    const out = new Set<string>()
-    for (const s of f.plan.steps) for (const [faction, v] of Object.entries(s.per)) if (v > 0) out.add(faction)
-    return [...out]
+  /** A page followed a plan or picked a step: read where it stands now, and tell the overlay. */
+  async refreshFaction(character: string): Promise<void> {
+    if (character !== this.character || !this.ctx.engine.status.watching) return
+    await this.readFaction(character)
+    this.publish()
   }
 
-  /** How many of these mobs the character's live counts have seen die since a time (a raid lockout's kills today). */
-  killsSince(character: string, mobs: readonly string[], since: number): number {
-    const s = this.slayer
-    if (!s || s.character !== character) return 0
-    let n = 0
-    for (const m of mobs) n += s.kills.get(m.toLowerCase())?.times.filter((t) => t >= since).length ?? 0
-    return n
-  }
-
-  /** An achievement done flashes; a step done flashes and is said, with the step to go on to (once, for the last of several). */
-  private cue(events: FollowEvent[]): void {
-    if (!events.length || !this.ctx.store.settings.get().achievementCues) return
-    for (const e of events) if (e.kind === 'achievement') this.ctx.engine.notify([{ kind: 'text', text: `✓ ${e.name}`, color: '#8fe0a6', durationSec: 6 }])
-    const step = events.filter((e) => e.kind === 'step').pop()
-    if (!step || step.kind !== 'step') return
-    const next = step.next
-    this.ctx.engine.notify([
-      {
-        kind: 'text',
-        text: next ? `Faction step done · next: ${next.title}${next.zone ? ` (${next.zone})` : ''}` : 'Every faction step is done',
-        color: '#f7c965',
-        durationSec: 8
-      },
-      { kind: 'speak', text: next ? `Faction step done. Next, ${sayStep(next)}.` : 'Every step of the faction plan is done.', interrupt: false }
-    ])
-  }
-
-  /** The Plan tab's plan for a character, to follow; null stops following. The old plan is read one last time first, so a step done is still said. */
-  async follow(character: string, plan: FollowedPlan | null): Promise<void> {
-    const had = this.follows.get()[character]
-    if (had && character === this.character && this.ctx.engine.status.watching) await this.readFaction(character).catch(() => undefined)
-    const next = { ...this.follows.get() }
-    if (!plan) delete next[character]
-    else {
-      // The same steps keep their progress; another plan keeps the step worked on where it is still in it.
-      const key = (p: FollowedPlan) => JSON.stringify(p.steps.map((s) => [s.id, s.finish, s.lift, s.reach ?? []]))
-      const same = had && key(had.plan) === key(plan)
-      next[character] = { plan, state: !had ? freshFollow() : same ? had.state : carryFollow(had.plan, had.state, plan) }
-    }
-    this.follows.set(next)
-    if (character === this.character) {
-      await this.readFaction(character).catch((e: unknown) => log.warn('Could not read the faction plan just followed:', e))
-      this.publish()
-    }
-  }
-
-  /**
-   * The step to work on now, as the player picked it on the Plan tab: it is the one followed, its
-   * progress counted from here, until kills or hand-ins go toward another step (or it is done).
-   */
-  async followStep(character: string, index: number): Promise<void> {
-    const f = this.follows.get()[character]
-    if (!f || index >= f.plan.steps.length) return
-    this.follows.set({ ...this.follows.get(), [character]: { plan: f.plan, state: pickStep(f.state, index) } })
-    if (character === this.character) {
-      await this.readFaction(character).catch((e: unknown) => log.warn('Could not read the faction plan after a step was picked:', e))
-      this.publish()
-    }
-  }
-
-  // ---- Slayer ----
-
-  /** Whether a kill counts for the character: its own, its pet's, or its group's. */
-  private credited(by: string, pets: Set<string>): boolean {
-    if (by === 'You' || pets.has(by)) return true
-    const meter = this.ctx.engine.meter
-    const k = meter.kindOf(by)
-    if (k.kind === 'group') return true
-    return k.kind === 'pet' && !!k.owner && k.owner.split(' or ').some((o) => o === SELF || meter.kindOf(o).kind === 'group')
-  }
-
-  /** A name the damage meter knows for a player, or a player's pet: never a Slayer kill. */
-  private friendly(name: string): boolean {
-    return isFriend(this.ctx.engine.meter.kindOf(name).kind)
-  }
+  // ---- Slayer (the Slayer feature's, liveSource.ts) ----
 
   /** The character's achievements export, read again only when the game has written it again; null without one. */
   private async achievementsExport(character: string): Promise<LiveAchievements['exported']> {
@@ -435,239 +198,8 @@ export class LiveAchievements implements AppFeature {
   }
 
   private async readSlayer(character: string): Promise<void> {
-    const exp = await this.achievementsExport(character)
-    if (!exp) {
-      this.slayer = null
-      this.slayerView = null
-      return
-    }
-    const logPath = this.ctx.historyOf(character).logPath
-    const game = await this.ctx.gameTables.get(RACE_TABLE)
-    const mem = this.slayer
-    // Nothing in memory for this character and log yet (a start): what the last run counted.
-    let s = mem && mem.character === character && mem.logPath === logPath ? mem : this.fromDisk(character, logPath, game)
-    if (!s || s.exportAt !== exp.modified || s.game !== game) {
-      const counters = slayerCounters(exp.sections)
-      const races = new SlayerRaces(counters, game)
-      if (s && s.exportAt < exp.modified) {
-        // A new export: the kills up to it, read to the end first, are set against how far its counts rose.
-        await this.readLog(s)
-        this.learn(s, exp.modified, counters, races)
-      }
-      // The new export counts everything up to it: only what came after it is kept.
-      const kept = s && s.exportAt <= exp.modified ? s : null
-      const kills: SlayerKills = new Map()
-      for (const [k, v] of kept?.kills ?? []) {
-        const after = v.times.flatMap((t, i) => (t > exp.modified ? [i] : []))
-        if (after.length) kills.set(k, { name: v.name, times: after.map((i) => v.times[i]), zones: after.map((i) => v.zones?.[i] ?? '') })
-      }
-      s = {
-        character,
-        exportFile: exp.file,
-        exportAt: exp.modified,
-        counters,
-        counts: new Map(counters.map((c) => [c.name.toLowerCase(), c.count])),
-        game,
-        races,
-        logPath,
-        readTo: kept ? kept.readTo : -1,
-        others: new Map(kept?.others ?? []),
-        zoneIn: new Map(kept?.zoneIn ?? []),
-        kills,
-        pets: kept?.pets ?? new Set(),
-        engaged: kept?.engaged ?? new Map(),
-        completed: new Map([...(kept?.completed ?? [])].filter(([, t]) => t > exp.modified))
-      }
-    }
-    this.slayer = s
-    await this.readLog(s)
-    this.countSlayer()
-  }
-
-  /** What the last run kept for this character and log, at whichever export it was counting from; null for none. */
-  private fromDisk(character: string, logPath: string, game: RaceTable): SlayerState | null {
-    const d = this.keptSlayer.get()
-    if (!d || d.character !== character || d.logPath !== logPath) return null
-    return {
-      character,
-      exportFile: '',
-      exportAt: d.exportAt,
-      // Only its counts are wanted from an export since written over; the same export is read again.
-      counters: [],
-      counts: new Map(d.counts ?? []),
-      // Not the table read now: the state is built again from the export either way.
-      game: NO_RACE_TABLE,
-      races: new SlayerRaces([], game),
-      logPath,
-      readTo: d.readTo,
-      others: new Map(d.others ?? []),
-      logId: new Map(d.logIds ?? []).get(logPath.toLowerCase()) ?? '',
-      otherIds: new Map((d.logIds ?? []).filter(([p]) => p !== logPath.toLowerCase())),
-      zoneIn: new Map(d.zoneIn ?? []),
-      kills: new Map(d.kills),
-      pets: new Set(d.pets),
-      engaged: new Map(),
-      completed: new Map(d.completed.map((c): [string, number] => (typeof c === 'string' ? [c, Infinity] : c)))
-    }
-  }
-
-  /**
-   * Reads the character's logs on from where the counts got to, and keeps how far: this PC's, then
-   * its log on each other PC that answers (a kill there counts the same).
-   */
-  private async readLog(s: SlayerState): Promise<void> {
-    const own = await this.readOne(s, s.logPath, { id: s.logId ?? '', readTo: s.readTo })
-    s.readTo = own.readTo
-    s.logId = own.id
-    let read = own.read
-    s.otherIds ??= new Map()
-    for (const o of this.ctx.historyOf(s.character).elsewhere ?? []) {
-      if (!(await this.ctx.logHistory.reachable(o.folder))) continue
-      const k = o.logPath.toLowerCase()
-      try {
-        const there = await this.readOne(s, o.logPath, { id: s.otherIds.get(k) ?? '', readTo: s.others.get(k) ?? -1 })
-        s.others.set(k, there.readTo)
-        s.otherIds.set(k, there.id)
-        read += there.read
-      } catch (e) {
-        // Its PC went away part way: nothing from this read was counted, and the next one starts where this did.
-        log.warn(`Slayer: could not read ${o.logPath}:`, e)
-      }
-    }
-    if (read > 0)
-      this.keptSlayer.set({
-        character: s.character,
-        logPath: s.logPath,
-        exportAt: s.exportAt,
-        readTo: s.readTo,
-        kills: [...s.kills],
-        pets: [...s.pets],
-        completed: [...s.completed],
-        counts: [...s.counts],
-        others: [...s.others],
-        zoneIn: [...s.zoneIn],
-        logIds: [[s.logPath.toLowerCase(), s.logId ?? ''], ...(s.otherIds ?? new Map())]
-      })
-  }
-
-  /**
-   * Reads one log on from where the kept read got to (readTo -1 before its first read), counting what it
-   * finds only once the read is done: how much was read, how far into the log the counts now go, and
-   * which file that is. A log replaced at the path, or cut short, starts again from the line before the
-   * export (sinceStart, as the factions' reader does: LT-625).
-   */
-  private async readOne(s: SlayerState, logPath: string, kept: SincePosition): Promise<{ read: number; readTo: number; id: string }> {
-    const path = logPath.toLowerCase()
-    const start = await sinceStart(logPath, kept, s.exportAt)
-    if (!start) return { read: 0, readTo: Math.max(0, kept.readTo), id: kept.id }
-    let readTo = start.from
-    const { size, id } = start
-    // The zone the read is in where it left off; a read started afresh works it out again.
-    let zone = start.fresh ? undefined : s.zoneIn.get(path)
-    if (size <= readTo) return { read: 0, readTo, id }
-    // The zone the read starts in, the first time: the last one entered before it.
-    if (zone === undefined) zone = readTo > 0 ? ((await lastZoneLine(logPath, { end: readTo }).then((l) => l && zoneEntered(l.text))) ?? '') : ''
-    const kills: { mob: string; at: number; zone: string }[] = []
-    const completed: [string, number][] = []
-    const read = await readForward(
-      logPath,
-      readTo,
-      size,
-      (line) => {
-        const entered = zoneEntered(line.text)
-        if (entered) {
-          zone = entered
-          return
-        }
-        const x = slayerLine(line.text)
-        if (!x) return
-        if ('pet' in x) s.pets.add(x.pet)
-        if ('engaged' in x) {
-          s.engaged.set(x.engaged.toLowerCase(), line.time)
-          // Only the last few minutes' are asked about: the rest go, a few hundred at a time (LT-380).
-          if (s.engaged.size > 500) for (const [k, t] of s.engaged) if (line.time - t > ENGAGED_MS) s.engaged.delete(k)
-          return
-        }
-        if (line.time <= s.exportAt || 'pet' in x) return
-        if ('completed' in x) completed.push([x.completed.toLowerCase(), line.time])
-        else {
-          let mob: string | null = null
-          // A player your side killed (a duel, a charmed pet turned) is nobody's Slayer kill.
-          if ('kill' in x) mob = this.credited(x.kill.by, s.pets) && !this.friendly(x.kill.mob) ? x.kill.mob : null
-          else if (line.time - (s.engaged.get(x.died.toLowerCase()) ?? -Infinity) <= ENGAGED_MS) mob = x.died
-          if (mob) kills.push({ mob, at: line.time, zone: zone ?? '' })
-        }
-      },
-      { flushLast: false }
-    )
-    for (const [k, t] of completed) s.completed.set(k, t)
-    // A Hunter named killed comes off the game's map (Plan › Hunter's marks).
-    if (kills.length) this.ctx.slayer?.namedKilled(kills.map((k) => k.mob))
-    for (const { mob, at, zone: where } of kills) {
-      const k = mob.toLowerCase()
-      const had = s.kills.get(k) ?? { name: mob, times: [], zones: [] }
-      const zones = (had.zones ??= had.times.map(() => ''))
-      had.times.push(at)
-      zones.push(where)
-      // Another PC's kills can come before this PC's: times stay in order, the newest last, each zone with its time.
-      if (had.times.length > 1 && had.times[had.times.length - 2] > at) {
-        const order = had.times.map((t, i) => [t, zones[i]] as const).sort((a, b) => a[0] - b[0])
-        had.times = order.map((o) => o[0])
-        had.zones = order.map((o) => o[1])
-      }
-      s.kills.set(k, had)
-    }
-    s.zoneIn.set(path, zone ?? '')
-    return { read, readTo: readTo + read, id }
-  }
-
-  /** Whether the exports settled that a mob's kills count toward an achievement (both lower-cased): the Slayer plan asks it too. */
-  readonly fact = (mob: string, achievement: string): boolean | undefined => this.facts.get().mobs[mob]?.[achievement]?.counts
-
-  /**
-   * Sets the kills between the export counted from and a new one against how far the new one's
-   * counts rose, and keeps what that settles.
-   */
-  private learn(s: SlayerState, at: number, counters: SlayerCounter[], races: SlayerRaces): void {
-    const kills = [...s.kills.values()].map((k) => ({ name: k.name, n: k.times.filter((t) => t <= at).length }))
-    const got = learnFromExport(s.counts, counters, races, kills, (m) => this.ctx.npcPages.race(m), this.fact, takpRaceMix)
-    if (!got.length) return
-    const mobs = { ...this.facts.get().mobs }
-    for (const f of got) {
-      mobs[f.mob] = { ...mobs[f.mob], [f.achievement]: { counts: f.counts, at, kills: f.kills, rise: f.rise } }
-      log.info(`Slayer: the export says ${f.mob} ${f.counts ? 'counts' : 'does not count'} toward ${f.achievement} (${f.kills} killed, the count rose ${f.rise})`)
-    }
-    this.facts.set({ version: 1, mobs })
-  }
-
-  /** The counts from the kills so far; mobs not looked up on eqlwiki yet are asked about, and counted again when it answers. */
-  private countSlayer(): void {
-    const s = this.slayer
-    if (!s) return
-    const got = slayerCounts(s.counters, s.races, s.kills, (m) => this.ctx.npcPages.race(m), this.fact, new Set(s.completed.keys()), takpRaceMix)
-    if (got.unknown.length)
-      void this.ctx.npcPages.lookUp(got.unknown).then((learned) => {
-        if (!learned || this.slayer !== s) return
-        this.countSlayer()
-        this.publish()
-      })
-    this.slayerView = {
-      exportFile: s.exportFile,
-      exportAt: s.exportAt,
-      rows: got.rows.map((r) => ({
-        name: r.counter.name,
-        section: r.counter.section,
-        races: r.counter.races,
-        count: r.counter.count,
-        since: r.since,
-        guessed: r.guessed,
-        max: r.counter.max,
-        last: r.last,
-        done: r.done
-      })),
-      unplaced: got.unplaced.slice(0, 20),
-      pending: got.unknown.length
-    }
+    await this.achievementsExport(character)
+    await this.ctx.slayer?.live?.read(character)
   }
 
   /**
@@ -675,15 +207,16 @@ export class LiveAchievements implements AppFeature {
    * counts as they are now (the export's and the kills since), the camps as the page reads them.
    */
   private async readSlayerPlan(character: string): Promise<void> {
-    const view = this.slayerView
-    const got = view && this.slayer?.character === character ? await this.ctx.slayer?.forOverlay(this.ctx, character, view.exportAt) : null
+    const live = this.ctx.slayer?.live
+    const view = live?.character === character ? live.view : null
+    const got = view ? await this.ctx.slayer?.forOverlay(this.ctx, character, view.exportAt) : null
     if (!view || !got || got.data.export?.modified !== view.exportAt) {
       this.slayerPlan = null
       return
     }
-    const live = new Map(view.rows.map((r) => [r.name.toLowerCase(), r]))
+    const rows = new Map(view.rows.map((r) => [r.name.toLowerCase(), r]))
     const goals = got.data.goals.map((g) => {
-      const r = live.get(g.name.toLowerCase())
+      const r = rows.get(g.name.toLowerCase())
       return r ? { ...g, count: r.done ? g.max : Math.min(g.max, r.count + r.since) } : g
     })
     const before = this.slayerPlan
@@ -782,7 +315,7 @@ export class LiveAchievements implements AppFeature {
 
   /** Whether anything shows the track now: the achievements overlay up, a plan followed (its cues are spoken), or a page open on it. */
   private shown(character: string, now: number): boolean {
-    if (this.follows.get()[character]) return true
+    if (this.ctx.factions?.follow?.has(character)) return true
     if (this.ctx.overlays.isShown && this.ctx.store.settings.get().overlays.some((o) => o.kind === 'achievements' && o.visible)) return true
     return now - this.pageAt < PAGE_MS && this.ctx.windows.mainShown
   }
@@ -793,62 +326,39 @@ export class LiveAchievements implements AppFeature {
     this.pageAt = open ? Date.now() : 0
   }
 
-  /** Each tracked achievement with its progress (trackedAchievements), from what the other parts read. */
+  /** Each tracked achievement with its progress (trackedAchievements), from what the features hold. */
   private trackedAchievements(): TrackedAchievement[] {
     const exp = this.exported
     const marks = this.marks
     if (!exp || !marks || exp.character !== marks.character) return []
+    const live = this.ctx.slayer?.live
+    const mine = live?.character === exp.character
     return trackedAchievements(exp.sections, marks, {
-      slayer: this.slayerView?.rows,
+      slayer: mine ? live.view?.rows : undefined,
       skills: this.skills?.rows,
-      factions: this.byAchievement,
-      kills: this.slayer?.kills,
-      completed: this.slayer ? new Set(this.slayer.completed.keys()) : undefined
+      factions: this.ctx.factions?.follow?.byAchievement ?? null,
+      kills: mine ? live.kills(exp.character) : undefined,
+      completed: mine ? live.completed(exp.character) : undefined
     })
-  }
-
-  /** The Hunter named left in the zone the player is in: the export's, less those killed since. */
-  private hunterHere(): HunterTrackView | null {
-    const exp = this.exported
-    if (!exp || exp.character !== this.character || !this.zone) return null
-    const last = new Map<string, number>()
-    for (const k of this.slayer?.kills.values() ?? []) last.set(bareName(k.name), Math.max(last.get(bareName(k.name)) ?? 0, k.times.at(-1) ?? 0))
-    // Less those the player has said do not work (Plan › Hunter).
-    const seenOf = seenFromRecords(this.ctx.store.respawns?.get() ?? {}, Date.now())
-    const rows = hunterHere(
-      hunterZones(
-        exp.sections,
-        (bare) => last.get(bare) ?? 0,
-        exp.modified,
-        () => null,
-        seenOf
-      ),
-      this.zone
-    ).filter((r) => !this.ctx.hunter?.isBroken(r.achievement))
-    return rows.length
-      ? {
-          zone: this.zone,
-          rows: rows.map((r) => {
-            const seen = Object.fromEntries(r.left.flatMap((n) => (n.seen ? [[n.name, n.seen]] : [])))
-            return { achievement: r.achievement, left: r.left.map((n) => n.name), total: r.total, since: r.since, ...(Object.keys(seen).length ? { seen } : {}) }
-          })
-        }
-      : null
   }
 
   // ---- telling ----
 
+  /** The track as it stands: what this class read, and each feature's part (AppFeature.track). */
   private publish(): void {
+    const exported = this.exported?.character === this.character ? this.exported : null
+    const at: TrackContext = { character: this.character, zone: this.zone, exported }
     const track: AchievementTrack = {
       character: this.character,
       at: Date.now(),
-      faction: this.faction,
-      slayer: this.slayerView,
+      faction: null,
+      slayer: null,
       skills: this.skills,
-      hunter: this.hunterHere(),
+      hunter: null,
       slayerPlan: this.slayerPlan,
       tracked: this.trackedAchievements()
     }
+    for (const f of this.ctx.features ?? []) if (f !== this && f.track) Object.assign(track, f.track(at))
     const key = JSON.stringify([track.character, track.faction, track.slayer, track.skills, track.hunter, track.slayerPlan, track.tracked])
     if (key === this.lastKey) return
     this.lastKey = key

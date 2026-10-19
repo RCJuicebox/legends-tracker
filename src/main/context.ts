@@ -397,11 +397,12 @@ export function createContext(): AppContext {
     return [...new Set([...here, ...there].map((l) => l.character))]
   }
   // It reads the standings and the log as they settle, so its engine feature goes after everything the
-  // engine has of its own (registered with the features, below).
+  // engine has of its own (registered with the features, below), and after the features whose parts
+  // of the track it reads and publishes (LT-623).
   ctx.liveAchievements = new LiveAchievements(ctx)
   ctx.hunter = new HunterPlanner(logHistory, store.dir)
   ctx.slayer = new SlayerPlanner(logHistory, store.dir)
-  ctx.features = [ctx.factions, ctx.liveAchievements, ctx.slayer, ctx.hunter, new GroupHealth()]
+  ctx.features = [ctx.factions, ctx.slayer, ctx.hunter, ctx.liveAchievements, new GroupHealth()]
 
   ctx.refreshOverlayVisibility = () =>
     ctx.overlays.setShown(

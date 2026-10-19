@@ -4,11 +4,12 @@ import { handle } from '../../main/ipc/handle'
 import { JsonFile, readJsonFile } from '../../main/storeCore'
 import { everyStretch, type LogHistory } from '../../main/sources/logHistory'
 import type { AppContext } from '../../main/context'
-import type { AppFeature } from '../../main/appFeature'
+import type { AchievementTrack } from '../../shared/tracking'
+import type { AppFeature, TrackContext } from '../../main/appFeature'
 import { joinKillTallies, type SlayerKillTallies } from '../slayer/core'
 import { seenFromRecords } from './core'
 import { KILLS_KEY, lastKills, namedSpawns, spawnTimings } from '../slayer/main'
-import { hunterZones, type HunterPlanData } from './core'
+import { hunterLive, hunterZones, type HunterPlanData } from './core'
 
 // Plan › Hunter's side of the app: the character's achievements export, the kills its own log has
 // shown (the Slayer plan's history of kills, each mob's last), and the spawn tables in Legends' terms.
@@ -19,6 +20,7 @@ import { hunterZones, type HunterPlanData } from './core'
 export class HunterPlanner implements AppFeature {
   readonly id = 'hunter'
   private readonly brokenFile: JsonFile<{ broken: string[] }>
+  private ctx: AppContext | null = null
 
   constructor(
     private readonly history: LogHistory,
@@ -42,7 +44,16 @@ export class HunterPlanner implements AppFeature {
     return this.brokenFile.flush()
   }
 
+  /** Its part of the achievements overlay's track: the named left in the zone the player is in (LT-623). */
+  track(at: TrackContext): Partial<Pick<AchievementTrack, 'hunter'>> {
+    const ctx = this.ctx
+    if (!ctx || !at.exported) return { hunter: null }
+    const seenOf = seenFromRecords(ctx.store.respawns?.get() ?? {}, Date.now())
+    return { hunter: hunterLive(at.exported.sections, at.exported.modified, at.zone, ctx.slayer?.live?.kills(at.character), seenOf, (a) => this.isBroken(a)) }
+  }
+
   register(ctx: AppContext): void {
+    this.ctx = ctx
     handle('hunter:plan', async (character) => {
       if (!isCharacterKey(character)) throw new Error('No such character.')
       return this.data(ctx, character)

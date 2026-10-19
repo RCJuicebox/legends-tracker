@@ -8,7 +8,9 @@ import { log } from '../../main/log'
 import { JsonFile, readJsonFile } from '../../main/storeCore'
 import { everyStretch, type HistoryConsumer, type LogHistory } from '../../main/sources/logHistory'
 import type { AppContext } from '../../main/context'
-import type { AppFeature } from '../../main/appFeature'
+import type { AppFeature, TrackContext } from '../../main/appFeature'
+import type { AchievementTrack } from '../../shared/tracking'
+import { SlayerLive } from './liveSource'
 import {
   banestrikeTiers,
   bareName,
@@ -86,6 +88,8 @@ export class SlayerPlanner implements AppFeature {
   private readonly staleSlayer: boolean
   /** The game folder, once registered: a named killed takes its marks off the map then and there. */
   private installDir: () => string = () => ''
+  /** The Slayer counts since the export, as the game is played (liveSource.ts): made when the feature is registered. */
+  live!: SlayerLive
   /** The maps being written again, one write after another. */
   private redraw: Promise<unknown> = Promise.resolve()
   private readonly shared = new Map<string, { at: number; data: Promise<SlayerPlanData> }>()
@@ -110,10 +114,16 @@ export class SlayerPlanner implements AppFeature {
   }
 
   flush(): Promise<void> {
-    return Promise.all([this.choices.flush(), this.marks.flush()]).then(() => undefined)
+    return Promise.all([this.choices.flush(), this.marks.flush(), this.live?.flush()]).then(() => undefined)
+  }
+
+  /** Its part of the achievements overlay's track: the Slayer counts since the export (LT-623). */
+  track(at: TrackContext): Partial<Pick<AchievementTrack, 'slayer'>> {
+    return { slayer: this.live?.character === at.character ? this.live.view : null }
   }
 
   register(ctx: AppContext): void {
+    this.live = new SlayerLive(ctx, takpRaceMix)
     handle('slayer:plan', async (character, refresh) => {
       if (!isCharacterKey(character)) throw new Error('No such character.')
       const had = this.shared.get(character)
@@ -214,11 +224,11 @@ export class SlayerPlanner implements AppFeature {
     if (!exp) return { character, export: null, goals: [], camps: [], unplaced: [], pending: 0, moves: [], killSpeed: null, timings: [], hunter: [] }
     const counters = slayerCounters(exp.sections)
     // The live counts, while the export they count on is the one read here.
-    const track = ctx.liveAchievements.view
+    const live = this.live.character === character ? this.live.view : null
     const since = new Map<string, number>()
     const done = new Set<string>()
-    if (track?.character === character && track.slayer?.exportAt === exp.modified)
-      for (const r of track.slayer.rows) {
+    if (live?.exportAt === exp.modified)
+      for (const r of live.rows) {
         since.set(r.name.toLowerCase(), r.since)
         if (r.done) done.add(r.name.toLowerCase())
       }
@@ -241,7 +251,7 @@ export class SlayerPlanner implements AppFeature {
       const wiki = npc.race(mob)
       if (wiki === undefined) unknown.add(mob)
       const p = races.place(mob, wiki, zone)
-      const fact = (g: string) => (p.by === 'zone' ? undefined : ctx.liveAchievements.fact(k, g))
+      const fact = (g: string) => (p.by === 'zone' ? undefined : this.live.fact(k, g))
       // Several races under one name: each goal gets the part of a kill the spawn tables' mix for the
       // zone gives it (as the live counts count them), unless an export has settled the mob whole.
       const mix = p.key === null && races.mixed(mob) ? mixCredits(mob, [zone], races, takpRaceMix) : null
@@ -270,7 +280,7 @@ export class SlayerPlanner implements AppFeature {
     const placeSpawn = (mob: string, race: string) => {
       const k = mob.toLowerCase()
       const p = races.place(mob, npc.race(mob) || race)
-      return goals.flatMap((g, i) => ((ctx.liveAchievements.fact(k, g.name.toLowerCase()) ?? (p.key !== null && races.keys[i].has(p.key))) ? [i] : []))
+      return goals.flatMap((g, i) => ((this.live.fact(k, g.name.toLowerCase()) ?? (p.key !== null && races.keys[i].has(p.key))) ? [i] : []))
     }
     const timings = spawnTimings(Object.values(ctx.store.respawns.get()))
     const killSpeed = usualPace(zones)
@@ -286,7 +296,7 @@ export class SlayerPlanner implements AppFeature {
     for (const c of camps) {
       if (!c.daily) continue
       const mobs = c.kinds.flatMap((k) => k.name.split(', '))
-      c.today = ctx.liveAchievements.killsSince(character, mobs, midnight.getTime())
+      c.today = this.live.killsSince(character, mobs, midnight.getTime())
     }
     // Less the Hunter achievements the player has said do not work.
     const hunter = hunterZones(exp.sections, lastKills(zones), exp.modified, namedSpawns(timings)).filter((z) => !ctx.hunter?.isBroken(z.achievement))
@@ -317,7 +327,7 @@ export class SlayerPlanner implements AppFeature {
         .filter((t) => t.timed.length)
         .map((t) => ({ zone: t.timed[0].zone, timer: t.timer, timed: t.timed.map(({ name, legends, classic }) => ({ name, legends, classic })) })),
       hunter,
-      raising: ctx.liveAchievements.raisedByPlan(character)
+      raising: ctx.factions.follow.raisedByPlan(character)
     }
   }
 }
@@ -338,7 +348,7 @@ export function namedSpawns(timings: ReturnType<typeof zoneTimings>): (zone: str
 }
 
 /** The races a mob's name is in TAKP's tables, by share, in a zone (else everywhere it is): for a kill nothing else places. */
-export const takpRaceMix = raceMixer(TABLES)
+const takpRaceMix = raceMixer(TABLES)
 
 /** The spawn tables' timings: each zone's timers against classic, from the Respawns page's records. */
 export const spawnTimings = (records: RespawnRecord[]) => zoneTimings(TABLES, records)
