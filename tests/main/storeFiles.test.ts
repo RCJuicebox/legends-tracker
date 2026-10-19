@@ -50,8 +50,9 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.restoreAllMocks()
-  rmSync(profile.dir, { recursive: true, force: true })
-  rmSync(defaultsDir, { recursive: true, force: true })
+  // A store's timed write can still land as the folder goes (ENOTEMPTY under a full run): tried again.
+  rmSync(profile.dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 50 })
+  rmSync(defaultsDir, { recursive: true, force: true, maxRetries: 5, retryDelay: 50 })
 })
 
 describe('a first run on an empty profile', () => {
