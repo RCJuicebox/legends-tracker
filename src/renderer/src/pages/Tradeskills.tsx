@@ -14,7 +14,7 @@ import { useInventory } from '../gear/model'
 import { useCharacterChoice } from '../character'
 import { ItemIcon } from './gearBits'
 import type { BookRecipe, TradeSaved } from '../../../shared/ipc'
-import { BagLayout, SkinBuildOutcome, useSkinBuild } from './TradeskillsBags'
+import { BagLayout } from './TradeskillsBags'
 
 // Recipes the player keeps making: what goes in, what they have (bags, bank, tradeskill depot), where
 // to buy the rest and what a batch costs.
@@ -186,8 +186,6 @@ export function Tradeskills() {
               }
             />
           </div>
-          {/* On Bag layout its own Save and rebuild does it, with the edits waiting (LT-587). */}
-          {!showBags && <SkinRebuilds character={character} />}
         </div>
         <div className="actions">
           <CharacterPicker character={character} available={exp.available} onPick={exp.setCharacter} />
@@ -620,25 +618,5 @@ function PriceCell({ unit, from, last, onSet }: { unit: number; from: PriceSourc
       {from === 'wiki' ? '≈ ' : ''}
       {coin(unit)}
     </button>
-  )
-}
-
-/**
- * A button for each UI skin that asks to be rebuilt from the inventory export (src/core/skinBuild.ts),
- * here because this is where the export gets refreshed. Nothing shows when no skin asks.
- */
-function SkinRebuilds({ character }: { character: string }) {
-  const builds = useInvoke('skins:builds')
-  const rebuild = useSkinBuild(character)
-  if (!builds.data?.length) return null
-  return (
-    <div className="row small mt-12">
-      {builds.data.map((b) => (
-        <button key={b.skin} className="btn" disabled={!!rebuild.busy} title={b.command.join(' ')} onClick={() => void rebuild.run(b.skin)}>
-          {rebuild.busy === b.skin ? 'Rebuilding…' : b.label}
-        </button>
-      ))}
-      <SkinBuildOutcome build={rebuild} character={character} />
-    </div>
   )
 }

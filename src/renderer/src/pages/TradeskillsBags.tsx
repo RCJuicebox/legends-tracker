@@ -3,60 +3,15 @@ import { markUnsaved } from '../unsaved'
 import { useInvoke } from '../hooks'
 import { act } from '../toast'
 import { Ago, ErrorText, GameCommand, Pending } from '../components/ui'
-import { BAG_KINDS, bagCells, bagGrid, type BagKind, type BagLayoutView, type BagSlot, type SkinBuild, type SkinBuildResult } from '../../../core/skinBuild'
+import { SkinBuildOutcome, useSkinBuild } from '../components/SkinBuild'
+import { BAG_KINDS, bagCells, bagGrid, type BagKind, type BagLayoutView, type BagSlot, type SkinBuild } from '../../../core/skinBuild'
 
 // Tradeskills › Bag layout: for a UI skin that draws each bag as a block of cells (src/core/skinBuild.ts),
-// how many cells go on a line, bag by bag, saved in the skin's folder and put in game by its rebuild.
+// how many cells go on a line, bag by bag, saved in the skin's folder and put in game by its rebuild
+// (the rebuild buttons themselves are on Settings › General, components/SkinBuild.tsx).
 
 const KIND_TITLES: Record<BagKind, string> = { General: 'Bags', Bank: 'Bank', SharedBank: 'Shared bank' }
 const KIND_SHORT: Record<BagKind, string> = { General: 'Bag', Bank: 'Bank', SharedBank: 'Shared' }
-
-/** Running a skin's rebuild, with the first-run agreement its command needs (LT-442). */
-export function useSkinBuild(character: string) {
-  const [busy, setBusy] = useState('')
-  const [result, setResult] = useState<SkinBuildResult | null>(null)
-  const run = async (skin: string, approve = false) => {
-    setBusy(skin)
-    setResult(null)
-    const r = await act('skins:build', skin, character, approve)
-    setBusy('')
-    if (r) setResult(r)
-    return r
-  }
-  return { busy, result, run, clear: () => setResult(null) }
-}
-
-/** What a rebuild came to: the /loadskin line, the command to agree to, or what went wrong. */
-export function SkinBuildOutcome({ build, character }: { build: ReturnType<typeof useSkinBuild>; character: string }) {
-  const r = build.result
-  if (!r) return null
-  if (r.ok)
-    return (
-      <span>
-        Rebuilt from {character ? `${character}'s` : 'the'} export. In game: <GameCommand cmd={`/loadskin ${r.skin} 1`} />
-      </span>
-    )
-  if (r.confirm)
-    return (
-      <div className="notice stack gap-8" role="alert">
-        <span>The {r.skin} skin asks to run this program, which this app has not run before. Run it only if you trust where the skin came from:</span>
-        <code className="mono small">{r.confirm.join(' ')}</code>
-        <span className="row tight">
-          <button className="btn small primary" onClick={() => void build.run(r.skin, true)}>
-            Run it
-          </button>
-          <button className="btn small ghost" onClick={build.clear}>
-            Cancel
-          </button>
-        </span>
-      </div>
-    )
-  return (
-    <ErrorText>
-      Could not rebuild {r.skin}: {r.output || 'no output'}
-    </ErrorText>
-  )
-}
 
 /** A bag's cells in their lines: the bag's own slot first, then its contents. */
 function BagPreview({ cells, columns }: { cells: number; columns: number }) {
