@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { readdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { existsSync, readFileSync, writeFileSync } from 'node:fs'
+import { createHash } from 'node:crypto'
 import { join } from 'node:path'
 import { tempDir } from '../tempDir'
 
@@ -73,11 +74,11 @@ describe('the phrases kept on disk', () => {
     const az = new AzureSpeech()
     await az.configure('eastus', 'good-key')
     await az.synthesize('Odium off', 'en-US-JennyNeural', 1)
-    const cache = join(dir, 'local', 'speech-cache')
-    await new Promise((r) => setTimeout(r, 50))
-    const files = readdirSync(cache).filter((n) => n.endsWith('.wav'))
-    expect(files.length).toBeGreaterThan(0)
-    for (const f of files) writeFileSync(join(cache, f), Buffer.alloc(0))
+    // This phrase's own file, once its write (flushed, then renamed in) is done: a slow disk takes more
+    // than a moment, and a file cut short before it lands would be put whole again.
+    const file = join(dir, 'local', 'speech-cache', `${createHash('sha1').update('en-US-JennyNeural|0|Odium off').digest('hex')}.wav`)
+    await vi.waitFor(() => expect(existsSync(file)).toBe(true), { timeout: 5000, interval: 20 })
+    writeFileSync(file, Buffer.alloc(0))
     calls = []
     // A new reader (as after a start): nothing in memory, a 0-byte file on disk.
     const fresh = new AzureSpeech()
