@@ -41,6 +41,7 @@ const ctx = {
   store: { dir: h.dir, settings: { get: () => ({ characters: { Kelwyn_neriak: { level: 50, classLevels: { 'Shadow Knight': 50 }, focusSources: [] } } }) } },
   send: vi.fn(),
   on: vi.fn(() => () => {}),
+  engine: { use: vi.fn() },
   historyOf: (c: string) => ({ logPath: join(logs, `eqlog_${c}.txt`), archiveDir: join(logs, 'Archive'), stem: `eqlog_${c}` }),
   inventoryFiles: { exported: async () => exports.inventory }
 } as unknown as AppContext

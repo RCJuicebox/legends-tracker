@@ -2,10 +2,14 @@ import { join } from 'node:path'
 import { isCharacterKey } from '../../core/validate'
 import { itemKey } from '../../core/inventory'
 import { lastLooted, loggedCounts } from '../../core/itemTally'
+import { parseLootLine } from '../../core/loot'
+import { SELF } from '../../core/combatLines'
+import type { LogLine } from '../../core/logLine'
 import { handle } from '../../main/ipc/handle'
 import { JsonFile, readJsonFile } from '../../main/storeCore'
 import { everyStretch, type HistoryConsumer, type LogHistory } from '../../main/sources/logHistory'
 import { newerBuildWrote } from '../../main/schema'
+import { log } from '../../main/log'
 import type { AppContext } from '../../main/context'
 import type { AppFeature, FeatureDeps } from '../../main/appFeature'
 import {
@@ -21,11 +25,14 @@ import {
   type EpicState,
   type EpicTally
 } from './core'
+import { beforeCopy, dropsOf, killCue, lootCue, slainMob, wantedBy } from './cue'
 
 // Goals › Epics' side of the app (an optional module): the epic pieces counted over each character's
 // logs (a LogHistory consumer), the inventory export as the game last wrote it, and what the player
 // keeps per character in epics.json: the steps ticked off and their corrections to the counts. The
-// consumer counts whether the module is on or not, so turning it on finds the counts ready.
+// consumer counts whether the module is on or not, so turning it on finds the counts ready. While the
+// module is on, a piece the character loots, or a named that drops one dying, is said on the Live
+// page's feed and the alert overlay when a class on its record still wants it (cue.ts).
 
 /** Each stretch of log's epic pieces, as a LogHistory consumer. */
 const epicConsumer: HistoryConsumer<EpicTally> = {
@@ -36,11 +43,17 @@ const epicConsumer: HistoryConsumer<EpicTally> = {
 
 const EPIC_KEY = 'epicItems'
 
+/** The cue's colour on the alert overlay, and how long it shows. */
+const CUE_COLOR = '#f7c965'
+const CUE_SEC = 8
+
 export class EpicTracker implements AppFeature {
   readonly id = 'epics'
   static readonly consumers: Readonly<Record<string, HistoryConsumer<unknown>>> = { [EPIC_KEY]: epicConsumer }
   /** By character key. */
   private readonly file: JsonFile<{ characters: Record<string, EpicCharacter> }>
+  /** The drop cues in hand, one after another as their lines came. */
+  private cued: Promise<void> = Promise.resolve()
 
   /** Built as every feature module is (src/features/main.ts). */
   static create(d: FeatureDeps): EpicTracker {
@@ -99,6 +112,56 @@ export class EpicTracker implements AppFeature {
       this.keep(c, { ...kept, adjust: have === logged ? adjust : { ...adjust, [k]: have - logged } })
       return this.state(ctx, c)
     })
+    ctx.engine.use({ id: 'epics', line: (line) => this.line(ctx, line) })
+  }
+
+  /** A line of the followed log: a piece looted, or a named that drops pieces slain, is looked into while the module is on. */
+  private line(ctx: AppContext, line: LogLine): boolean {
+    if (ctx.store.settings.get().modules.epics !== true) return false
+    const text = line.text
+    if (text.startsWith('--You have looted ') || text.startsWith('You looted ')) {
+      const e = parseLootLine(text)
+      // Sold as it dropped, or looted into a merge: never held as itself.
+      if (e?.kind !== 'loot' || e.looter !== SELF || e.outcome === 'sold' || e.outcome === 'merged' || !isEpicItem(e.item)) return false
+      this.cue(ctx, async (character) => {
+        const s = beforeCopy(await this.state(ctx, character), e.item, e.count, line.time)
+        return lootCue(e.item, wantedBy(s, e.item))
+      })
+      return true
+    }
+    const mob = slainMob(text)
+    const items = mob ? dropsOf(mob) : []
+    if (!mob || !items.length) return false
+    this.cue(ctx, async (character) => {
+      const s = await this.state(ctx, character)
+      return killCue(
+        mob,
+        items.map((item) => ({ item, wanted: wantedBy(s, item) }))
+      )
+    })
+    return true
+  }
+
+  /** Says a cue for the character being played, if there is one, on the Live page's feed and the alert overlay. */
+  private cue(ctx: AppContext, make: (character: string) => Promise<string | null>): void {
+    const character = ctx.characterKey()
+    if (!isCharacterKey(character)) return
+    this.cued = this.cued
+      .then(() => make(character))
+      .then((text) => {
+        if (!text) return
+        ctx.engine.pushFeed('loot', text)
+        ctx.engine.notify([{ kind: 'text', text, color: CUE_COLOR, durationSec: CUE_SEC }])
+      })
+      .catch((e: unknown) => log.warn('Epics: the drop cue failed:', e))
+  }
+
+  /**
+   * Waits for the drop cues in hand (the tests).
+   * @public
+   */
+  cuesSaid(): Promise<void> {
+    return this.cued
   }
 
   private async tally(ctx: AppContext, character: string): Promise<EpicTally> {

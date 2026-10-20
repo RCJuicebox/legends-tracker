@@ -958,6 +958,11 @@ looted, kept or stored, less what a completed trade took and what you merged awa
 export (`/outputfile inventory`: bags, bank, depot, worn and Storage), or the higher of the two for
 each item (the default).
 
+While the module is on, a piece you loot that a class on your record still wants, or a named that
+drops one dying, is said on the Live page's feed and the alert overlay, with the class and what the
+piece is for ("Ghoulbane dropped: Shadow Knight epic, for the Corrupted Ghoulbane"); a piece you
+already hold enough of, or whose reward or finished epic you hold, says nothing.
+
 ## Stats
 
 Your character's record: up to three classes, the level of each, race (one of the sixteen playable
