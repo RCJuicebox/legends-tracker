@@ -13,6 +13,7 @@ import { SpellDefaults } from './SpellsDefaults'
 import { RuleEditor, useSpellDrafts } from './SpellRule'
 import { LogCheck } from './SpellsLogCheck'
 import { NotWatching } from '../components/NotWatching'
+import { TryLogLineLink } from '../components/TryLogLine'
 import { takeHandOff } from '../handoff'
 
 type SpellKey = 'name' | 'type' | 'resisted' | 'window' | 'wears' | 'last'
@@ -62,7 +63,7 @@ export function Spells({ go }: { go?: Go }) {
           <h1>Spell Timers</h1>
           <p>
             Durations are calculated from the game's spell data, your level, the spell's rank and your focus effects — the same sum the in-game Spell window shows in brackets.
-            Every spell you cast appears here automatically.
+            Every spell you cast appears here automatically. <TryLogLineLink /> to see a cast timed without casting it.
           </p>
         </div>
       </div>

@@ -1,20 +1,38 @@
-import { ranLines } from './Dashboard'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { api, errorMessage } from '../api'
 import { useSettled } from '../state'
 import { useInvoke } from '../hooks'
 import { act, showError, showToast, actDone } from '../toast'
-import { OVERLAY_TARGETS, TRY_LINES } from '../constants'
+import { OVERLAY_TARGETS } from '../constants'
 import { TRIGGER_TEXT_COLOR, TRIGGER_TIMER_COLOR } from '../../../shared/overlays'
 import { recall, remember, useRemembered } from '../remember'
 import { markUnsaved } from '../unsaved'
 import { GroupHealthCard } from '../components/GroupHealthCard'
 import { ConfirmButton, Field, FilterBox, Icon, LoadError, NumberInput, Pending, Switch } from '../components/ui'
 import type { Phrase, Trigger, TriggerAction, TriggerCompare, TriggerTestResult, TriggerWhen } from '../../../shared/types'
-import type { TriggerError } from '../../../shared/ipc'
-import { takeHandOff } from '../handoff'
+import type { SimulateResult, TriggerError } from '../../../shared/ipc'
+import { takeHandOff, TEST_CARD } from '../handoff'
 
 const newId = () => (crypto.randomUUID ? crypto.randomUUID() : String(Math.random()).slice(2))
+
+/** The lines waiting in the Test card, kept across visits and restarts (remember.ts). */
+const TRY_LINES = 'try.lines'
+
+const SAMPLE = `[Tue Sep 01 12:15:08 2026] You begin casting Envenomed Bolt X.
+[Tue Sep 01 12:15:09 2026] A ratman warrior has been poisoned.
+[Tue Sep 01 12:15:10 2026] You begin casting Spirit of the Puma X.
+[Tue Sep 01 12:15:11 2026] You begin to snarl as your features become feline.`
+
+/**
+ * What running pasted lines did, for the corner: a line that matched nothing is told from a run that did not happen (LT-679).
+ * @public
+ */
+export const ranLines = (r: SimulateResult): string => {
+  if (!r.lines) return 'No log lines in the text: each needs its [time] in front'
+  const n = (k: number, what: string) => `${k} ${what}${k === 1 ? '' : 's'}`
+  const did = [r.timers ? n(r.timers, 'timer') : '', r.triggers ? n(r.triggers, 'trigger') : ''].filter(Boolean).join(', ')
+  return `Ran ${n(r.lines, 'line')}: ${did || 'no timer or trigger matched'}`
+}
 
 function blankTrigger(folder: string): Trigger {
   return {
@@ -92,7 +110,8 @@ export function Triggers() {
     keep(draft)
   }, [draft])
 
-  // Sent here from a timer on Live: its trigger selected once the list is read (LT-691).
+  // Sent here from a timer on Live: its trigger selected once the list is read (LT-691). Or by
+  // "Try a log line" on Live or Spell Timers: the Test card in view.
   const wanted = useRef(takeHandOff('triggers'))
   useEffect(() => {
     let live = true
@@ -289,6 +308,9 @@ export function Triggers() {
           <div className="card empty">Select a trigger, or make a new one.</div>
         )}
       </div>
+
+      {/* The one test panel (Live and Spell Timers link here): the lines are matched against the selected trigger, and run for real through everything. */}
+      <TestPanel t={current} focus={wanted.current === TEST_CARD} />
     </>
   )
 }
@@ -413,8 +435,6 @@ function TriggerEditor({
           ))}
         </div>
       </div>
-
-      <TestPanel t={t} />
     </div>
   )
 }
@@ -650,23 +670,36 @@ function ActionEditor({ a, onChange, onRemove }: { a: TriggerAction; onChange: (
   )
 }
 
-function TestPanel({ t }: { t: Trigger }) {
-  const [shared, setShared] = useRemembered<string>(TRY_LINES, '')
-  // The last line pasted on Live, if any, is the one to test.
-  const [line, setLine] = useState(
+/**
+ * The Test card, the one place to try log lines (Live's and Spell Timers' "Try a log line" open it):
+ * the last line is matched against the selected trigger, without running it; Run for real runs every
+ * line through Spell Timers and every trigger as if just logged, their times moved to now.
+ */
+function TestPanel({ t, focus }: { t: Trigger | null; focus: boolean }) {
+  const [lines, setLines] = useRemembered<string>(TRY_LINES, '')
+  const last = useMemo(
     () =>
-      shared
+      lines
         .split(/\r?\n/)
         .filter((l) => l.trim())
-        .pop() ?? ''
+        .pop() ?? '',
+    [lines]
   )
   const [result, setResult] = useState<TriggerTestResult | null>(null)
+  const card = useRef<HTMLDivElement>(null)
+  const box = useRef<HTMLTextAreaElement>(null)
+  // Sent here to try a line: the card in view, the lines ready to type into.
   useEffect(() => {
-    if (!line.trim()) return setResult(null)
+    if (!focus) return
+    card.current?.scrollIntoView?.({ block: 'start' })
+    box.current?.focus()
+  }, [focus])
+  useEffect(() => {
+    if (!t || !last) return setResult(null)
     let live = true
     const id = setTimeout(
       () =>
-        api.invoke('triggers:test', t, line).then(
+        api.invoke('triggers:test', t, last).then(
           (r) => live && setResult(r),
           (e) => live && setResult({ matched: false, phraseIndex: -1, captures: {}, outputs: [], error: errorMessage(e) })
         ),
@@ -676,30 +709,36 @@ function TestPanel({ t }: { t: Trigger }) {
       live = false
       clearTimeout(id)
     }
-  }, [line, t])
+  }, [last, t])
   return (
-    <div className="card">
+    <div className="card mt-16" ref={card}>
       <h2>Test</h2>
-      <div className="row">
-        <input
-          className="mono"
-          style={{ flex: 1 }}
-          value={line}
-          aria-label="A log line to test"
-          onChange={(e) => {
-            setLine(e.target.value)
-            setShared(e.target.value)
-          }}
-          placeholder="Paste a log line, e.g. [Wed Sep 23 13:29:05 2026] Aldric tells you, 'inc'"
-        />
-        <button
-          className="btn"
-          disabled={!line.trim()}
-          title="Run the line through Spell Timers and every trigger, as if it had just been logged, as Try it on the Live page does: you hear and see what it does"
-          onClick={() => void actDone(ranLines, 'simulate', line)}
-        >
-          Run it for real
-        </button>
+      <p className="muted small mt-0">
+        Paste log lines.{' '}
+        {t ? (
+          <>
+            The last is matched against <b>{t.name}</b>: which phrase, the captures and what it would do, without running it.
+          </>
+        ) : (
+          'Select a trigger to see which of its phrases the last line matches.'
+        )}{' '}
+        <b>Run for real</b> runs them all through Spell Timers and every trigger, as if they had just been logged, with their times moved to now: you hear and see what they do.
+      </p>
+      <div className="stack gap-8">
+        <textarea ref={box} className="mono" rows={4} value={lines} aria-label="Log lines to test" onChange={(e) => setLines(e.target.value)} placeholder={SAMPLE} />
+        <div className="row">
+          <button
+            className="btn primary"
+            disabled={!last}
+            title="Run the lines through Spell Timers and every trigger, as if they had just been logged: you hear and see what they do"
+            onClick={() => void actDone(ranLines, 'simulate', lines)}
+          >
+            Run for real
+          </button>
+          <button className="btn ghost" onClick={() => setLines(SAMPLE)}>
+            Use example
+          </button>
+        </div>
       </div>
       {result && (
         <div style={{ marginTop: 10 }}>

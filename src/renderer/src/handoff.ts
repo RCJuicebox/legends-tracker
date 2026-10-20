@@ -3,6 +3,9 @@
 
 const wanted = new Map<string, string>()
 
+/** What Triggers is asked to open by Live's and Spell Timers' "Try a log line": its Test card, not a trigger. */
+export const TEST_CARD = 'test'
+
 /** Asks `page` to open `what` when it is next drawn. */
 export function handOff(page: string, what: string): void {
   wanted.set(page, what)

@@ -1,26 +1,21 @@
 import type { FeedItem, TimerView } from '../../../shared/types'
-import type { SimulateResult } from '../../../shared/ipc'
-import { useContext, useMemo, useState } from 'react'
+import { useContext, useMemo } from 'react'
 import { timeOfDay, who } from '../../../core/format'
 import { useRemembered } from '../remember'
 import { useActions, useLive, useSettled } from '../state'
 import { ago, mb } from '../api'
 import { act, actDone } from '../toast'
-import { OVERLAY_BUFFS, TRY_LINES } from '../constants'
+import { OVERLAY_BUFFS } from '../constants'
 import { TimerBars, useNow } from '../components/TimerBars'
 import { Icon, ToggleChip } from '../components/ui'
 import { GameFolderPrompt } from '../components/GameFolder'
 import { FactionNowCard, FightSummary, QuietLogNotice, SetupChecklist } from '../components/LiveSummary'
+import { TryLogLineLink } from '../components/TryLogLine'
 import { GoContext, type Go } from '../nav'
 import { perHour, useMotes } from './MoteRuns'
 import { localDay, sessionHours, totalMotes } from '../../../core/motes'
 import { characterKey } from '../../../core/validate'
 import { handOff } from '../handoff'
-
-const SAMPLE = `[Tue Sep 01 12:15:08 2026] You begin casting Envenomed Bolt X.
-[Tue Sep 01 12:15:09 2026] A ratman warrior has been poisoned.
-[Tue Sep 01 12:15:10 2026] You begin casting Spirit of the Puma X.
-[Tue Sep 01 12:15:11 2026] You begin to snarl as your features become feline.`
 
 /** Feed items drawn on Live, newest first. */
 const FEED_SHOWN = 100
@@ -29,14 +24,6 @@ const FEED_SHOWN = 100
  * The page selects only what its head and notices read; the stat cards, the timers and the activity
  * each select their own, so a status tick or a feed line draws only the part it changes (LT-403).
  */
-/** What running pasted lines did, for the corner: a line that matched nothing is told from a run that did not happen (LT-679). */
-export const ranLines = (r: SimulateResult): string => {
-  if (!r.lines) return 'No log lines in the text: each needs its [time] in front'
-  const n = (k: number, what: string) => `${k} ${what}${k === 1 ? '' : 's'}`
-  const did = [r.timers ? n(r.timers, 'timer') : '', r.triggers ? n(r.triggers, 'trigger') : ''].filter(Boolean).join(', ')
-  return `Ran ${n(r.lines, 'line')}: ${did || 'no timer or trigger matched'}`
-}
-
 export function Dashboard({ go }: { go: Go }) {
   const { patchSettings } = useActions()
   const arranging = useSettled((s) => s.arranging)
@@ -47,9 +34,6 @@ export function Dashboard({ go }: { go: Go }) {
   const elsewherePath = useLive((l) => l.status.elsewhere?.path ?? '')
   const elsewhereCharacter = useLive((l) => l.status.elsewhere?.character ?? '')
   const remote = useLive((l) => l.status.remote ?? null)
-  // Shared with the Triggers page's Test panel: lines pasted in either are waiting in the other.
-  const [sim, setSim] = useRemembered<string>(TRY_LINES, '')
-  const [simOpen, setSimOpen] = useState(() => !!sim)
 
   return (
     <>
@@ -126,43 +110,7 @@ export function Dashboard({ go }: { go: Go }) {
 
       <LiveTimers />
 
-      <div className="grid two">
-        <Activity />
-        <div className="card">
-          <div className="card-head">
-            <h2>Try log lines</h2>
-            <span className="spacer" />
-            <button className="btn small" onClick={() => void actDone('Demo timers are up on the overlays', 'overlays:demo')}>
-              <Icon name="sparkle" /> Show demo timers
-            </button>
-          </div>
-          <p className="muted small mt-0">
-            Paste log lines to run them through Spell Timers and the triggers, with their times moved to now. To see which trigger a line matches and what it would say, without
-            running it, use{' '}
-            <button className="link-button inline" onClick={() => go('triggers')}>
-              Test on the Triggers page
-            </button>
-            .
-          </p>
-          {simOpen ? (
-            <div className="stack gap-8">
-              <textarea className="mono" rows={7} value={sim} aria-label="Log lines to run" onChange={(e) => setSim(e.target.value)} placeholder={SAMPLE} />
-              <div className="row">
-                <button className="btn primary" onClick={() => void actDone(ranLines, 'simulate', sim || SAMPLE)}>
-                  Run lines
-                </button>
-                <button className="btn ghost" onClick={() => setSim(SAMPLE)}>
-                  Use example
-                </button>
-              </div>
-            </div>
-          ) : (
-            <button className="btn" onClick={() => setSimOpen(true)}>
-              Paste log lines…
-            </button>
-          )}
-        </div>
-      </div>
+      <Activity />
     </>
   )
 }
@@ -240,9 +188,17 @@ function LiveTimers() {
         />
       </div>
       <div className="card">
-        <h2>
-          DoTs &amp; timers <span className="chip">{others.length}</span>
-        </h2>
+        {/* Seeing timers without casting: the Triggers page's Test card runs pasted lines, and the demo puts made-up ones on the overlays. */}
+        <div className="card-head">
+          <h2>
+            DoTs &amp; timers <span className="chip">{others.length}</span>
+          </h2>
+          <span className="spacer" />
+          <TryLogLineLink className="link-button inline small" />
+          <button className="btn small" onClick={() => void actDone('Demo timers are up on the overlays', 'overlays:demo')}>
+            <Icon name="sparkle" /> Show demo timers
+          </button>
+        </div>
         <TimerBars timers={others} grouped fontSize={15} onOpen={openRule} empty={<div className="empty">No DoTs or debuffs running.</div>} />
       </div>
     </div>
