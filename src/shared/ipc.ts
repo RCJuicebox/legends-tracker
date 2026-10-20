@@ -36,7 +36,20 @@ import type { CombatSnapshot, Segment, SegmentSummary, StitchedTimeline } from '
 import type { AppSettings, AudioSettings, CharacterSettings, FocusSource, MeterOverlayOptions, OverlayConfig, SpellRule } from './settings'
 import type { Trigger, TriggerTestResult } from './triggers'
 import type { FoundSpot } from './game/legendsSpawns'
-import type { ArchiveInfo, ArchiveOutcome, ArchiveStatus, FeedItem, KnownSpell, LogCheckRow, LogFileInfo, SpellSummary, TimerView, UpdateState, WatchStatus } from './runtime'
+import type {
+  ArchiveInfo,
+  ArchiveOutcome,
+  ArchiveStatus,
+  FeedItem,
+  KnownSpell,
+  KokoroStatus,
+  LogCheckRow,
+  LogFileInfo,
+  SpellSummary,
+  TimerView,
+  UpdateState,
+  WatchStatus
+} from './runtime'
 
 // ---- Views main hands the pages ----
 
@@ -61,6 +74,7 @@ export interface AppState {
   characterKey: string
   voices: string[]
   speechError: string
+  kokoro: KokoroStatus
   arranging: boolean
   devices: AudioDevice[]
   triggerErrors: TriggerError[]
@@ -438,6 +452,8 @@ export interface Invokes {
   /** The Audio page is open (true) or closed (false): the output devices are listed only meanwhile. */
   'audio:watchDevices': (on: boolean) => void
   'audio:voices': () => { voices: string[]; error: string }
+  /** Starts the Kokoro voices' download if the model is not here (a Kokoro voice was chosen, or Try again). */
+  'audio:kokoro': () => KokoroStatus
 
   'achievements:load': (character: string) => AchievementsView
   'achievements:marks': (character: string, marks: AchMarks) => void
@@ -573,6 +589,7 @@ export interface Pushes {
   'state:arranging': (on: boolean) => void
   'state:devices': (devices: AudioDevice[]) => void
   'state:voices': (voices: { voices: string[]; error: string }) => void
+  'state:kokoro': (status: KokoroStatus) => void
   'state:update': (status: UpdateState) => void
   'state:combat': (snapshot: CombatSnapshot) => void
   'state:loot': (view: LootView) => void
@@ -711,6 +728,7 @@ const INVOKE_CHANNELS: Record<InvokeChannel, true> = {
   'audio:sound': true,
   'audio:sounds': true,
   'audio:voices': true,
+  'audio:kokoro': true,
   'achievements:load': true,
   'achievements:marks': true,
   'achievements:progress': true,
@@ -797,6 +815,7 @@ const PUSH_CHANNELS: Record<PushChannel, true> = {
   'state:arranging': true,
   'state:devices': true,
   'state:voices': true,
+  'state:kokoro': true,
   'state:update': true,
   'state:combat': true,
   'state:loot': true,

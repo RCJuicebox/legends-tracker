@@ -3,8 +3,31 @@ import { useActions, useSettled } from '../state'
 import { useInvoke } from '../hooks'
 import { act } from '../toast'
 import { api } from '../api'
-import { Field, LoadError, Switch } from '../components/ui'
+import { ErrorText, Field, LoadError, Progress, Switch } from '../components/ui'
+import { KOKORO_MODEL, KOKORO_PREFIX, KOKORO_VOICES, kokoroLabel } from '../../../core/kokoro'
 import type { AudioSettings } from '../../../shared/types'
+import type { KokoroStatus } from '../../../shared/runtime'
+
+const KOKORO_MB = Math.round(KOKORO_MODEL.size / 1e6)
+
+/** Where the Kokoro voices' download stands, under the voice picker while a Kokoro voice is chosen. */
+function KokoroState({ status }: { status: KokoroStatus }) {
+  if (status.state === 'downloading')
+    return <Progress small done={Math.round((status.fraction ?? 0) * KOKORO_MB)} total={KOKORO_MB} unit="MB" label="Downloading the Kokoro voices" />
+  if (status.state === 'ready') return status.error ? <ErrorText block>The Kokoro voices failed ({status.error}); the Windows voice speaks meanwhile.</ErrorText> : null
+  return (
+    <div className="row">
+      {status.state === 'failed' ? (
+        <ErrorText>The download failed ({status.error}); the Windows voice speaks meanwhile.</ErrorText>
+      ) : (
+        <span className="small muted">The Kokoro voices are not downloaded yet; the Windows voice speaks meanwhile.</span>
+      )}
+      <button className="btn small" onClick={() => void act('audio:kokoro')}>
+        {status.state === 'failed' ? 'Try again' : `Download (${KOKORO_MB} MB)`}
+      </button>
+    </div>
+  )
+}
 
 /** The name the audio window gives a device Windows reports without one. */
 const UNNAMED = 'Output device'
@@ -24,7 +47,14 @@ export function Audio() {
   // Starts the Windows speech engine if it is not running; the list arrives as state:voices.
   useInvoke('audio:voices')
   const sounds = soundsQ.data ?? []
+  const kokoro = useSettled((s) => s.kokoro)
+  const isKokoro = a.voice.startsWith(KOKORO_PREFIX)
   const set = (patch: Partial<AudioSettings>) => patchSettings((s) => ({ ...s, audio: { ...s.audio, ...patch } }))
+  // A Kokoro voice chosen for the first time starts the model's download.
+  const pickVoice = (voice: string) => {
+    void set({ voice })
+    if (voice.startsWith(KOKORO_PREFIX) && kokoro.state !== 'ready') void act('audio:kokoro')
+  }
   const slide = (patch: Partial<AudioSettings>) => patchSettings((s) => ({ ...s, audio: { ...s.audio, ...patch } }), { debounceMs: SLIDER_SAVE_MS })
   const pct = (v: number) => `${Math.round(v * 100)}%`
   // The output devices are listed only while this page is open (LT-447).
@@ -88,16 +118,31 @@ export function Audio() {
 
         <div className="card stack gap-16">
           <h2>Voice</h2>
-          <Field label="Voice" hint="More Windows voices: Settings → Time & language → Speech → Manage voices, then restart.">
-            <select value={a.voice} onChange={(e) => set({ voice: e.target.value })}>
+          <Field
+            label="Voice"
+            hint={
+              isKokoro
+                ? 'Kokoro voices sound natural and are made on this PC: a new phrase takes about a second, then it is kept. Until the voices are downloaded, and if they ever fail, the Windows default speaks.'
+                : 'More Windows voices: Settings → Time & language → Speech → Manage voices, then restart. The Kokoro voices sound more natural.'
+            }
+          >
+            <select value={a.voice} onChange={(e) => pickVoice(e.target.value)}>
               <option value="">Windows default</option>
               <optgroup label="Windows">
                 {voices.map((v) => (
                   <option key={v}>{v}</option>
                 ))}
               </optgroup>
+              <optgroup label={`Kokoro (natural; ${KOKORO_MB} MB download, once)`}>
+                {KOKORO_VOICES.map((v) => (
+                  <option key={v.id} value={KOKORO_PREFIX + v.id}>
+                    {kokoroLabel(v)}
+                  </option>
+                ))}
+              </optgroup>
             </select>
           </Field>
+          {isKokoro && <KokoroState status={kokoro} />}
           <Field label={`Speed ${a.rate.toFixed(1)}×`}>
             <input type="range" min={0.5} max={2} step={0.1} value={a.rate} onChange={(e) => slide({ rate: Number(e.target.value) })} />
           </Field>

@@ -2,6 +2,10 @@
 
 What changed in each version. The release workflow publishes a version's section as its release notes, and installed copies show them when an update arrives.
 
+## Unreleased
+
+- **Natural-sounding voices, made on your PC.** Settings › Audio's Voice list now has sixteen Kokoro voices below the Windows ones, American and British, women and men (Heart, Emma, George, Michael…). Pick one and its model downloads once (92 MB); after that it works offline, a new phrase takes about a second and is kept, and a timer's cues are ready before they are due. Until the download is done, or if Kokoro ever fails, the Windows voice speaks instead, so no cue is lost.
+
 ## 2.18.0 (2026-10-19)
 
 - **Azure voices are gone.** Speech is the Windows voices alone: the Microsoft voices card on Settings › Audio, its key and the phrases it kept are removed. A voice that was an Azure one is now the Windows default; pick another under Voice.

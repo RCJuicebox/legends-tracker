@@ -445,6 +445,16 @@ with alert sounds in one audio context on the device you
 choose. Speech follows that device instead of the system default. Phrases are cached. Speech plays
 one phrase at a time, and the backlog is capped so warnings about a finished fight get dropped.
 
+**Kokoro voices.** Below the Windows voices the Voice list has sixteen English voices from
+[Kokoro](https://huggingface.co/hexgrad/Kokoro-82M), an open voice model that sounds close to
+Microsoft's natural voices and runs on your own PC, offline. The first time you pick one, its model
+downloads once (92 MB, from Hugging Face, checked against its SHA-256; the job strip shows it, with
+Cancel), and each voice's own file (half a megabyte) the first time it speaks. Phrases are made in a
+process of their own, started when needed and stopped after five quiet minutes: about a second a new
+phrase, after which it is kept on disk, and a timer's cue phrases are made as the timer starts, so a
+cue never waits. Until the model is here, if a phrase takes over two and a half seconds, or if Kokoro
+fails (it is then left alone for a minute), the Windows default voice says it instead.
+
 ## Overlays
 
 A tab of Settings. Transparent windows that let clicks through, never take focus (EverQuest drops keyboard input the
@@ -1051,7 +1061,7 @@ No path loses a line. An archive interrupted by the app closing is finished on t
 A tab of Settings. Every place the app's information comes from reports how its last read went, so
 nothing fails quietly. The tab groups them: your logs (the chat log, log history, mote history), the game's files
 (spell data, game tables, icons, the character exports), eqlwiki.com (item lookups, the item
-catalog, recipes, pet pages), the screen (OCR reads) and the app itself (Windows voices, updates).
+catalog, recipes, pet pages), the screen (OCR reads) and the app itself (Windows voices, the Kokoro voices' download, updates).
 Each row says what the source is for, its state (OK, due a refresh, failed, not there, reading, not
 read yet), what was read, the last error and when it last read well, with **Refresh** where reading
 it again makes sense. If a page is empty or out of date, the answer is usually here. **Open log
@@ -1157,6 +1167,7 @@ roaming profile:
 | `faction-alla.json` | Allakhazam's faction pages (the cons quests want, kill amounts), read one every 20 seconds; kept a month |
 | `faction-npcs.json` | eqlwiki's page for each named mob the faction plan's kill camps would hold: whether Legends has it, its health, respawn and kill amounts; kept a month, a name with no page asked again after a week |
 | `faction-since.json`, `slayer-since.json` | What the live log, and the character's log on another PC, has shown since the factions and achievements exports (standings moved, achievements completed, Slayer kills), and how far each was read, so a start reads on from there rather than from the export's line |
+| `kokoro\` | The Kokoro voices: the model (`model-<hash>.onnx`, 92 MB), each voice used (`voices\`) and the phrases they made (`phrases\`, the 4,000 heard most recently) |
 | `log-history.json` | Casts, melee, purchases, AAs bought and zones entered counted over each character's log and archives, for Gear, Spell upgrades, Tradeskills, Stats › AAs and the Exploration achievements; only what a log gains is read again |
 
 It also holds `ocr.ps1`, the OCR script, written each run; the screen captures an OCR read takes are
@@ -1230,3 +1241,11 @@ Game Company. EverQuest and EverQuest Legends are trademarks of Daybreak Game Co
 reads spell data and icons from your own game installation at runtime and ships none of the game's
 files, apart from a few spell-file rows used as test fixtures. Per-rank duration bonuses are from the
 community's EQL spell upgrade (mote) guide.
+
+The Kokoro voices use the Kokoro-82M model and its voices (Apache-2.0, by hexgrad; the ONNX copy
+from onnx-community), downloaded when first chosen, not shipped. Their text-to-phoneme steps are ported
+from [kokoro-js](https://github.com/hexgrad/kokoro) (Apache-2.0). The app ships
+[ONNX Runtime](https://github.com/microsoft/onnxruntime) (MIT) to run the model and the
+[phonemizer](https://www.npmjs.com/package/phonemizer) package (Apache-2.0), which includes
+[eSpeak NG](https://github.com/espeak-ng/espeak-ng) compiled to WebAssembly; eSpeak NG is GPL-3.0, and
+its source is at that link.

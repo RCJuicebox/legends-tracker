@@ -30,6 +30,7 @@ export function registerAppIpc(ctx: AppContext): void {
     characterKey: engine.characterKey(),
     voices: ctx.speech.voices,
     speechError: ctx.speech.failed,
+    kokoro: ctx.kokoro.status(),
     arranging: ctx.overlays.isArranging,
     devices: ctx.audioDevices,
     triggerErrors: engine.triggers.errors,

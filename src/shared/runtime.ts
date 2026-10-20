@@ -156,6 +156,16 @@ export interface LogCheckRow {
   impliedFocusRange: [number, number] | null
 }
 
+/** The Kokoro voices' model, as the Audio page is told it. */
+export interface KokoroStatus {
+  /** absent: not downloaded; failed: the last download failed (error says why). */
+  state: 'absent' | 'downloading' | 'ready' | 'failed'
+  /** How far the download has got, 0 to 1, while downloading. */
+  fraction: number | null
+  /** Why the download or the model failed; '' when all is well. */
+  error: string
+}
+
 /** Where the self-updater has got to. */
 export type UpdateState =
   | { state: 'dev' }

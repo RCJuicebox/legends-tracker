@@ -113,6 +113,10 @@ export function diagnostics(ctx: AppContext): string {
   lines.push(
     `Speech: ${speech.running || speech.voices.length ? `${speech.voices.length} Windows voice${speech.voices.length === 1 ? '' : 's'}` : 'Windows speech not started (it starts when first needed)'}${speech.failed ? ` (${speech.failed})` : ''}`
   )
+  const kokoro = ctx.kokoro.status()
+  lines.push(
+    `Kokoro voices: ${kokoro.state === 'ready' ? 'downloaded' : kokoro.state === 'downloading' ? 'downloading' : kokoro.state === 'failed' ? 'download failed' : 'not downloaded'}${kokoro.error ? ` (${kokoro.error})` : ''}`
+  )
   lines.push(`Windows calls (koffi): ${win32Available() ? 'available' : 'not available; the game is found by process list instead'}`)
   lines.push(`Hotkeys: ${s.hotkeys ? (ctx.hotkeysTaken.length ? `on; held by another program: ${ctx.hotkeysTaken.join(', ')}` : 'on') : 'off'}`)
   const triggerErrors = ctx.engine.triggers.errors

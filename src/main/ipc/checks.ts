@@ -140,6 +140,7 @@ export const CHECKS: { [K in InvokeChannel]: Check<Parameters<Invokes[K]>> } = {
   'audio:sounds': none,
   'audio:watchDevices': args(bool),
   'audio:voices': none,
+  'audio:kokoro': none,
   'achievements:load': args(str),
   'achievements:marks': args(str, obj),
   'achievements:progress': args(str),

@@ -23,6 +23,7 @@ const appState: AppState = {
   characterKey: '',
   voices: [],
   speechError: '',
+  kokoro: { state: 'absent', fraction: null, error: '' },
   arranging: false,
   devices: [],
   triggerErrors: [],

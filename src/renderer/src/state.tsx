@@ -136,6 +136,7 @@ export function StateProvider({ children }: { children: ReactNode }) {
       api.on('state:arranging', set('arranging') as (v: boolean) => void),
       api.on('state:devices', set('devices') as (v: AppState['devices']) => void),
       api.on('state:voices', (v: { voices: string[]; error: string }) => setState((s) => (s ? { ...s, voices: v.voices, speechError: v.error } : s))),
+      api.on('state:kokoro', set('kokoro') as (v: AppState['kokoro']) => void),
       api.on('state:feed', (item: FeedItem) => setLive((s) => (s ? { ...s, feed: [...s.feed.slice(-(FEED_MAX - 1)), numbered(item)] } : s)))
     ]
     return () => {

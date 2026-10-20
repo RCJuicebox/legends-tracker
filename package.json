@@ -33,6 +33,8 @@
   "dependencies": {
     "electron-updater": "^6.8.9",
     "koffi": "^3.3.3",
+    "onnxruntime-node": "1.30.0",
+    "phonemizer": "1.2.1",
     "yauzl": "^3.4.0",
     "yazl": "^3.3.1"
   },
@@ -60,7 +62,8 @@
   "allowScripts": {
     "esbuild": true,
     "electron-winstaller": false,
-    "koffi": false
+    "koffi": false,
+    "onnxruntime-node": false
   },
   "author": "RCJuicebox",
   "homepage": "https://github.com/RCJuicebox/legends-tracker",
@@ -87,7 +90,14 @@
       "!node_modules/koffi/cnoke.cjs",
       "!node_modules/koffi/src/koffi/CMakeLists.txt",
       "!node_modules/koffi/src/koffi/src/abi/**",
-      "!node_modules/koffi/src/**/*.{cc,hh,inc,S,asm}"
+      "!node_modules/koffi/src/**/*.{cc,hh,inc,S,asm}",
+      "!node_modules/onnxruntime-node/bin/napi-v6/{darwin,linux}/**",
+      "!node_modules/onnxruntime-node/bin/napi-v6/win32/arm64/**",
+      "!node_modules/onnxruntime-node/bin/napi-v6/win32/x64/{DirectML,dxcompiler,dxil}.dll",
+      "!node_modules/onnxruntime-node/{lib,script}/**"
+    ],
+    "asarUnpack": [
+      "node_modules/onnxruntime-node/bin/**"
     ],
     "extraResources": [
       {

@@ -3,6 +3,7 @@
   "entry": [
     "src/main/moteWorker.ts!",
     "src/main/groupHealthWorker.ts!",
+    "src/main/kokoroWorker.ts!",
     "src/renderer/src/main.tsx!",
     "src/renderer/src/overlay/main.tsx!",
     "src/renderer/src/overlay/host.tsx!",

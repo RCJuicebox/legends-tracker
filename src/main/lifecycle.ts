@@ -165,6 +165,7 @@ async function stopAndSave(ctx: AppContext, limitMs = 3000): Promise<void> {
     ['achievement export poller', () => ctx.achievementFiles.stop()],
     ['inventory export poller', () => ctx.inventoryFiles.stop()],
     ['speech', () => ctx.speech.stop()],
+    ['Kokoro voices', () => ctx.kokoro.stop()],
     ['screen reads', () => stopOcr()],
     ['overlays', () => ctx.overlays.destroy()],
     ['hotkeys', () => globalShortcut.unregisterAll()]

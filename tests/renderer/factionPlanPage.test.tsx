@@ -40,6 +40,7 @@ const appState = (): AppState => ({
   characterKey: 'Kelwyn_neriak',
   voices: [],
   speechError: '',
+  kokoro: { state: 'absent', fraction: null, error: '' },
   arranging: false,
   devices: [],
   triggerErrors: [],

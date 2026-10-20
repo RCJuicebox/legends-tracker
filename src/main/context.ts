@@ -2,7 +2,7 @@ import { timeOfDay } from '../core/format'
 import { unreadText } from '../core/unreadLines'
 import { diffSpellBooks, spellDiffEmpty, spellDiffSummary, spellDiffText } from '../core/spellDiff'
 import type { SpellBook } from '../core/spells'
-import { app, globalShortcut, nativeTheme, Notification, session } from 'electron'
+import { app, globalShortcut, nativeTheme, Notification, session, utilityProcess } from 'electron'
 import { HOTKEYS } from '../shared/hotkeys'
 import { promises as fs, rmSync } from 'node:fs'
 import { basename, join } from 'node:path'
@@ -10,6 +10,10 @@ import { Store } from './store'
 import { Engine } from './engine'
 import { appEngineEnv } from './engineEnv'
 import { SpeechWorker } from './speech'
+import { KokoroSpeech } from './kokoroSpeech'
+// oxlint-disable-next-line import/default -- electron-vite's ?modulePath import: the build supplies the default export
+import kokoroWorkerPath from './kokoroWorker?modulePath'
+import { VoiceRouter } from './voiceRouter'
 import { IconSource } from './icons'
 import { OverlayManager } from './overlays'
 import { GameWatcher } from './gameWatcher'
@@ -71,6 +75,7 @@ export interface AppContext {
   watcher: GameWatcher
   updater: Updater
   speech: SpeechWorker
+  kokoro: KokoroSpeech
   icons: IconSource
   achievementFiles: AchievementFiles
   inventoryFiles: InventoryFiles
@@ -156,6 +161,8 @@ export function createContext(): AppContext {
   const dataDir = app.getPath('userData')
   const installDir = () => store.settings.get().installDir
   const speech = new SpeechWorker()
+  // The Kokoro voices: natural-sounding, rendered on this PC once their model is downloaded.
+  const kokoro = new KokoroSpeech({ fork: () => utilityProcess.fork(kokoroWorkerPath, [], { serviceName: 'Legends Tracker voices' }) })
   // The theme is Windows' own setting for this app's windows, so every page's prefers-color-scheme
   // follows it: System, or Light or Dark whatever Windows says.
   nativeTheme.themeSource = store.settings.get().theme
@@ -169,6 +176,11 @@ export function createContext(): AppContext {
     }
   })
   const toMain = windows.toMain.bind(windows)
+  kokoro.onStatus((s) => {
+    toMain('state:kokoro', s)
+    if (s.state === 'ready' && !s.error) sources.ok('kokoro', 'Downloaded')
+    else if (s.error) sources.fail('kokoro', s.error, 'The Windows voice speaks meanwhile')
+  })
   // Item pages the Gear page looked up, kept a week; a catalog download refreshes them in passing.
   const itemCatalog = new ItemCatalog(cacheDir())
   // Casts, the melee tally, purchases and faction changes over each character's log and archives,
@@ -209,6 +221,7 @@ export function createContext(): AppContext {
     store,
     windows,
     speech,
+    kokoro,
     installDir,
     icons: new IconSource(installDir),
     achievementFiles: new AchievementFiles(
@@ -306,7 +319,7 @@ export function createContext(): AppContext {
 
   ctx.engine = new Engine(
     store,
-    speech,
+    new VoiceRouter(speech, kokoro),
     engineOutputs({
       toMain,
       mainWatches: (c) => windows.mainWatches(c),
@@ -391,6 +404,7 @@ export function createContext(): AppContext {
     const on = store.settings.get().yieldToGame
     // The speech engine is no Electron process: told on its own (LT-614).
     speech.setYield(on)
+    kokoro.setYield(on)
     const keep = new Set([windows.audioPid()])
     for (const m of app.getAppMetrics()) {
       if (keep.has(m.pid) || /audio/i.test(m.serviceName ?? '')) continue
@@ -560,6 +574,13 @@ function registerSources(ctx: AppContext): void {
       sources.ok('speech', `${ctx.speech.voices.length} voices`)
     }
   })
+  sources.add('kokoro', {
+    label: 'Kokoro voices',
+    kind: 'app',
+    what: 'The natural-sounding voices: a 92 MB model from Hugging Face, downloaded the first time one is chosen, then rendered on this PC.',
+    refresh: () => ctx.kokoro.download()
+  })
+  if (ctx.kokoro.status().state === 'ready') sources.ok('kokoro', 'Downloaded')
   sources.add('updates', { label: 'Updates', kind: 'app', what: "This app's releases on GitHub, checked hourly.", refresh: () => ctx.updater.check() })
   sources.add('screen', {
     label: 'Screen reads',

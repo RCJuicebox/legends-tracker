@@ -27,6 +27,11 @@ export function registerAudioIpc(ctx: AppContext): void {
     ctx.windows.toMain('state:voices', v)
     return v
   })
+  // A Kokoro voice was chosen, or Try again: the model comes down if it is not here (its progress as state:kokoro).
+  handle('audio:kokoro', () => {
+    void ctx.kokoro.download()
+    return ctx.kokoro.status()
+  })
 
   // What the audio window could not do, logged once each and counted for Copy diagnostics (LT-618):
   // "I hear nothing" reports carried nothing before.
