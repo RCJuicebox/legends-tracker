@@ -5,7 +5,8 @@ import { useInvoke } from '../hooks'
 import { useRemembered } from '../remember'
 import { act } from '../toast'
 import { useNow } from '../components/TimerBars'
-import { ConfirmButton, Disclosure, FilterBox, Info, PageLink, Pending, Segmented, SettingsLink, Switch, Tip } from '../components/ui'
+import { Disclosure, FilterBox, Info, Pending, Segmented, SettingsLink, Switch, Tip } from '../components/ui'
+import { GroupRoster } from '../components/GroupRoster'
 import { useActions, useSettled } from '../state'
 import { CLASSES, className } from '../../../shared/game/classes'
 import { NotWatching } from '../components/NotWatching'
@@ -140,23 +141,7 @@ export function Buffs() {
 
       <div className="grid two mb-16" style={{ alignItems: 'start' }}>
         <div className="card stack gap-8">
-          <div className="row gap-8" style={{ justifyContent: 'space-between' }}>
-            <h2 className="m-0">Your group</h2>
-            <span className="grow" />
-            <span className="faint small">
-              add people on the <PageLink page="meter">Damage Meter</PageLink>
-            </span>
-            {v.group.length > 0 && (
-              <ConfirmButton
-                className="btn ghost small"
-                question="Forget everyone in the group?"
-                title="Forget everyone; the log fills the group again as people join, or add them on the Damage Meter page"
-                onConfirm={() => void act('combat:clearGroup').then(() => q.reload())}
-              >
-                Reset group
-              </ConfirmButton>
-            )}
-          </div>
+          <h2 className="m-0">Your group</h2>
           <div className="stack gap-2">
             <div className="row gap-8">
               <b>You</b>
@@ -180,32 +165,32 @@ export function Buffs() {
               </div>
             )}
           </div>
-          {!v.group.length ? (
-            <p className="muted m-0">
-              Not in a group: the combination below is what you can cast yourself. Join one and each member shows here with what they could buff you with.
-            </p>
-          ) : (
-            v.group.map((g) => {
-              const can = g.person ? offersFor(v.offers, g.person.classes, g.person.level).filter((o) => wanted.has(o.spell)) : []
-              return (
-                <div key={g.name} className="stack gap-2">
-                  <div className="row gap-8">
-                    <b>{g.name}</b>
-                    {g.person ? (
-                      <span className="small muted">
-                        {classesSaid(g.person.classes)} {g.person.level}
-                      </span>
-                    ) : (
-                      <span className="small chip pill warn">
-                        type <span className="mono">/who {g.name}</span> in game
-                      </span>
-                    )}
-                  </div>
-                  {g.person && <div className="small">{can.length ? can.map((o) => o.spell).join(', ') : <span className="faint">none of the buffs you want</span>}</div>}
-                </div>
-              )
-            })
-          )}
+          {/* The group is the damage meter's roster, edited here the same way; the plan hears of an edit at once (groupChanged). */}
+          <GroupRoster
+            members={v.group}
+            empty="Not in a group: the combination below is what you can cast yourself. Join one and each member shows here with what they could buff you with, or add them by name."
+            onChanged={() => q.reload()}
+            detail={(name) => {
+              const g = v.group.find((x) => x.name === name)
+              if (!g?.person)
+                return {
+                  head: (
+                    <span className="small chip pill warn">
+                      type <span className="mono">/who {name}</span> in game
+                    </span>
+                  )
+                }
+              const can = offersFor(v.offers, g.person.classes, g.person.level).filter((o) => wanted.has(o.spell))
+              return {
+                head: (
+                  <span className="small muted">
+                    {classesSaid(g.person.classes)} {g.person.level}
+                  </span>
+                ),
+                body: can.length ? can.map((o) => o.spell).join(', ') : <span className="faint">none of the buffs you want</span>
+              }
+            }}
+          />
           <div className="small mt-4">
             {v.needs.length ? (
               <>

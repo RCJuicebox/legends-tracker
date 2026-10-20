@@ -1,8 +1,8 @@
 import { clock, num, num1, pct, round } from '../../../core/format'
-import { useMemo, useState } from 'react'
-import { act, showToast, showUndo } from '../toast'
-import { ConfirmButton, Icon, Info } from './ui'
-import { EntityBar, HealBar, HEAL_TEXT, KIND_TEXT, PROC_COLOR, PROC_HINT, PROC_TEXT, PROC_WORD, SkillBar, kindTag } from './MeterBars'
+import { useMemo } from 'react'
+import { showToast } from '../toast'
+import { Icon, Info } from './ui'
+import { EntityBar, HealBar, HEAL_TEXT, PROC_COLOR, PROC_HINT, PROC_TEXT, PROC_WORD, SkillBar } from './MeterBars'
 import {
   attackerSkillRows,
   damageRows,
@@ -24,7 +24,7 @@ import {
   type HealRow,
   type Row
 } from '../../../core/combatView'
-import type { CombatSnapshot, Defense, MeterMode, MeterScope, Segment } from '../../../shared/types'
+import type { Defense, MeterMode, MeterScope, Segment } from '../../../shared/types'
 
 // The damage meter's panes (LT-638): the headline, an entity's numbers, damage, incoming and healing, and the cards beside them.
 
@@ -422,63 +422,6 @@ export function HealedCard({ seg, scope }: { seg: Segment; scope: MeterScope }) 
       ))}
       {runes > 0 && <div className="faint small mt-12">Runes absorbed {num(runes)} on top.</div>}
       {seg.enemyHeal > 0 && <div className="faint small">Enemies healed themselves for {num(seg.enemyHeal)}.</div>}
-    </div>
-  )
-}
-
-export function Roster({ snap }: { snap: CombatSnapshot }) {
-  const [name, setName] = useState('')
-  const add = () => {
-    if (!name.trim()) return
-    void act('combat:addMember', name.trim())
-    setName('')
-  }
-  const pets = Object.entries(snap.otherPets)
-  return (
-    <div className="dm-roster">
-      <span className="faint small">Group:</span>
-      {!snap.roster.length && <span className="faint small">nobody seen joining yet. The log names who joins after you; add anyone already there.</span>}
-      {snap.roster.map((m) => (
-        <span key={m.name} className="chip" style={{ color: KIND_TEXT.group }} title={m.from === 'log' ? 'Seen joining in the log' : 'Added by you'}>
-          {m.name}
-          <button
-            className="btn ghost small x-btn"
-            aria-label={`Remove ${m.name}`}
-            onClick={() => {
-              void act('combat:removeMember', m.name)
-              showUndo(`${m.name} taken off the group.`, () => void act('combat:addMember', m.name))
-            }}
-          >
-            ×
-          </button>
-        </span>
-      ))}
-      {pets.map(([pet, owner]) => (
-        <span key={pet} className="chip" style={{ color: KIND_TEXT.pet }}>
-          {pet} <small className="faint">{kindTag('pet', owner)}</small>
-        </span>
-      ))}
-      <input
-        value={name}
-        placeholder="Add a name"
-        aria-label="Add a group member by name"
-        onChange={(e) => setName(e.target.value)}
-        onKeyDown={(e) => e.key === 'Enter' && add()}
-        style={{ width: 130 }}
-      />
-      <button className="btn small" onClick={add} disabled={!name.trim()}>
-        Add
-      </button>
-      {snap.roster.length > 0 && (
-        <ConfirmButton
-          className="btn ghost small"
-          question="Forget everyone in the group?"
-          title="Forget everyone in the group; the log fills it again as people join, or add them by name"
-          onConfirm={() => void act('combat:clearGroup')}
-        >
-          Reset group
-        </ConfirmButton>
-      )}
     </div>
   )
 }

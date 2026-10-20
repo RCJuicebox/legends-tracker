@@ -9,7 +9,9 @@ import { attackerRows, copyText, damageRows, defenseOf, fmtRate, healTotals, hea
 import type { MeterMode, MeterScope, MeterSpan, Segment, SegmentSummary } from '../../../shared/types'
 import { DpsChart } from './MeterChart'
 import { ComparePane } from './MeterCompare'
-import { DamagePane, DefenseCard, Headline, HealedCard, HealingPane, IncomingPane, ProcsCard, Roster, TakenCard, TargetsCard, type Drill } from './MeterPanes'
+import { DamagePane, DefenseCard, Headline, HealedCard, HealingPane, IncomingPane, ProcsCard, TakenCard, TargetsCard, type Drill } from './MeterPanes'
+import { KIND_TEXT, kindTag } from './MeterBars'
+import { GroupRoster } from './GroupRoster'
 
 // The damage meter on the Damage Meter page: one segment (the fight or the session) read three ways
 // (damage out, damage in, healing), the rows clickable down into skills, targets and attackers.
@@ -164,7 +166,16 @@ export function Meter({ standalone = false }: { standalone?: boolean }) {
           Active DPS
         </label>
       </div>
-      {scope === 'group' && snap && <Roster snap={snap} />}
+      {/* The group, as Buffs' Your group shows it too, with the group-mates' pets the log has owned. */}
+      {scope === 'group' && snap && (
+        <GroupRoster members={snap.roster} compact>
+          {Object.entries(snap.otherPets).map(([pet, owner]) => (
+            <span key={pet} className="chip" style={{ color: KIND_TEXT.pet }}>
+              {pet} <small className="faint">{kindTag('pet', owner)}</small>
+            </span>
+          ))}
+        </GroupRoster>
+      )}
 
       {!seg ? (
         <div className="empty">
