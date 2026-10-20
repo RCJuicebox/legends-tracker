@@ -52,8 +52,8 @@ const MAP_SET = 'LegendsTracker'
 
 /** Each stretch of log's kills by zone, as a LogHistory consumer. Version 2: trips between zones, each mob's last kill; 3: each stretch of killing. */
 const killConsumer: HistoryConsumer<SlayerKillTallies> = {
-  // 4: mobs' pets left out (isNpcPet).
-  version: 4,
+  // 4: mobs' pets left out (isNpcPet). 5: raid lockout bosses' kill times.
+  version: 5,
   empty: emptyKillTallies,
   reader: () => readKillLine
 }
@@ -344,13 +344,10 @@ export class SlayerPlanner implements AppFeature {
       place: placeSpawn,
       killSpeed: killSpeed ?? DEFAULT_CHOICES.pace
     })
-    // A raid lockout's kills so far today, since the game's noon reset, from the live counts: "2 of 5 today" (LT-657).
+    // A raid lockout's kills so far today, since the game's noon reset: "2 of 5 today" (LT-657). From this
+    // character's logs, not the live counts: those keep only what came after the export.
     const reset = lockoutDayStart()
-    for (const c of camps) {
-      if (!c.daily) continue
-      const mobs = c.kinds.flatMap((k) => k.name.split(', '))
-      c.today = this.live.killsSince(character, mobs, reset)
-    }
+    for (const c of camps) if (c.daily) c.today = lockoutKillsSince(own, c.mobs ?? [], reset)
     // A named counts for the character that killed it: its own log alone, as on Plan › Hunter (LT-715).
     // Less the Hunter achievements the player has said do not work.
     const hunter = hunterZones(exp.sections, lastKills(own), exp.modified, namedSpawns(timings)).filter((z) => !ctx.hunter?.isBroken(z.achievement))
@@ -386,6 +383,14 @@ export class SlayerPlanner implements AppFeature {
       raising: ctx.factions.follow.raisedByPlan(character)
     }
   }
+}
+
+/** How many times the logs saw these raid lockout bosses die since a time, in any zone. */
+export function lockoutKillsSince(zones: SlayerKillTallies['zones'], mobs: readonly string[], since: number): number {
+  const keys = new Set(mobs.map((m) => m.toLowerCase()))
+  let n = 0
+  for (const z of Object.values(zones)) for (const [k, m] of Object.entries(z.mobs)) if (keys.has(k)) n += m.times?.filter((t) => t >= since).length ?? 0
+  return n
 }
 
 /** When the logs last saw each mob killed, by bareName: 0 for never. */

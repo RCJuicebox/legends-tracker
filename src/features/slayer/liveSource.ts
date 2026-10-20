@@ -175,15 +175,6 @@ export class SlayerLive {
     return this.state?.character === character ? new Set(this.state.completed.keys()) : undefined
   }
 
-  /** How many of these mobs the character's live counts have seen die since a time (a raid lockout's kills today). */
-  killsSince(character: string, mobs: readonly string[], since: number): number {
-    const s = this.state
-    if (!s || s.character !== character) return 0
-    let n = 0
-    for (const m of mobs) n += s.kills.get(m.toLowerCase())?.times.filter((t) => t >= since).length ?? 0
-    return n
-  }
-
   /** Whether the exports settled that a mob's kills count toward an achievement (both lower-cased): the Slayer plan asks it too. */
   readonly fact = (mob: string, achievement: string): boolean | undefined => this.facts.get().mobs[mob]?.[achievement]?.counts
 

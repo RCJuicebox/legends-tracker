@@ -27,6 +27,10 @@ import type { SlayerPlanStepView, SlayerPlanTrackView } from '../../shared/track
 const MOVE_SEC = 30 * 60
 /** Trips kept for each way between two zones. */
 const KEEP_MOVES = 15
+/** The raid lockouts' bosses, lower-cased: each kill's time is kept, for the kills since the daily reset. */
+const LOCKOUT_MOBS = new Set(SLAYER_CAMPS.filter((k) => k.perDay !== undefined).flatMap((k) => k.mobs.map((m) => m.toLowerCase())))
+/** A lockout boss's latest kill times kept: a few days' worth. */
+const KEEP_LOCKOUT_KILLS = 25
 
 /** Each zone's kills and the time spent killing there, over one stretch of log. */
 export interface SlayerKillTallies {
@@ -37,10 +41,11 @@ export interface SlayerKillTallies {
   lastZone: string
   /**
    * By zone (instances folded in), then by mob lower-cased: the name as the log gave it, kills, and the
-   * last one's time. And each stretch of killing there (kills KILL_RUN_MS apart at most): its time and
-   * what died, by mob lower-cased, so a race's pace is its own stretches' (runPace), not the zone's.
+   * last one's time (and, for a raid lockout's boss, its latest kills' times). And each stretch of
+   * killing there (kills KILL_RUN_MS apart at most): its time and what died, by mob lower-cased, so a
+   * race's pace is its own stretches' (runPace), not the zone's.
    */
-  zones: Record<string, { sec: number; kills: number; last: number; mobs: Record<string, { name: string; n: number; at?: number }>; runs?: KillRun[] }>
+  zones: Record<string, { sec: number; kills: number; last: number; mobs: Record<string, { name: string; n: number; at?: number; times?: number[] }>; runs?: KillRun[] }>
   /** When the zone the stretch is in was entered, the kills there since, and whether the player has died since. */
   enteredAt: number
   killsHere: number
@@ -122,6 +127,11 @@ export function readKillLine(line: LogLine, into: SlayerKillTallies): void {
   const run = runs[runs.length - 1].mobs
   run[k] = (run[k] ?? 0) + 1
   m.at = Math.max(m.at ?? 0, line.time)
+  if (LOCKOUT_MOBS.has(k)) {
+    const times = (m.times ??= [])
+    times.push(line.time)
+    if (times.length > KEEP_LOCKOUT_KILLS) times.splice(0, times.length - KEEP_LOCKOUT_KILLS)
+  }
 }
 
 /** Stretches of log (archives and the live log, and other characters') as one. */
@@ -138,6 +148,7 @@ export function joinKillTallies(stretches: SlayerKillTallies[]): SlayerKillTalli
         const hm = (had.mobs[k] ??= { name: m.name, n: 0 })
         hm.n += m.n
         if (m.at) hm.at = Math.max(hm.at ?? 0, m.at)
+        if (m.times) hm.times = [...(hm.times ?? []), ...m.times]
       }
     }
   return out
@@ -373,7 +384,8 @@ export interface SlayerPlanCamp {
    */
   limit?: 'spawns' | 'you'
   ceiling?: number
-  /** For a raid lockout: kills of its mobs so far today (since local midnight), from the live counts. */
+  /** For a raid lockout: its bosses as the log names them, and their kills since the daily reset, from this character's logs. */
+  mobs?: string[]
   today?: number
 }
 
@@ -648,7 +660,7 @@ export function buildCamps(
       source: 'play',
       pace: Object.fromEntries(left.map((g) => [g, (per ?? 1) * part(g)])),
       ...(per === undefined ? { assumed: true } : {}),
-      ...(daily ? { daily: true } : {}),
+      ...(daily ? { daily: true, mobs: k.mobs } : {}),
       note: k.note,
       said: k.said
     })

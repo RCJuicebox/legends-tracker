@@ -163,7 +163,7 @@ describe('the Slayer page', () => {
   it('counts the kills since the export where the live counts are for the same export', async () => {
     const exp = await ctx.achievementFiles.exported('Kelwyn_neriak')
     const real = planner.live
-    planner.live = { character: 'Kelwyn_neriak', view: { exportAt: exp!.modified, rows: [{ name: 'Orc Stomp!', since: 60 }] }, fact: () => undefined, killsSince: () => 0 } as never
+    planner.live = { character: 'Kelwyn_neriak', view: { exportAt: exp!.modified, rows: [{ name: 'Orc Stomp!', since: 60 }] }, fact: () => undefined } as never
     try {
       const { data } = await call('slayer:plan', 'Kelwyn_neriak', true)
       expect(data.goals[0].count).toBe(4960)

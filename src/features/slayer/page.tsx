@@ -239,10 +239,7 @@ function Limit({ camp }: { camp: SlayerPlanCamp }) {
 function LockoutPips({ done, of }: { done: number; of: number }) {
   const boxes = Math.max(of, done)
   return (
-    <Tip
-      className={`sl-pips${of > 0 && done >= of ? ' full' : ''}`}
-      text={`${done} of ${of} killed today: kills of its mobs your log has seen since the daily reset at noon Eastern (the live counts, since your export)`}
-    >
+    <Tip className={`sl-pips${of > 0 && done >= of ? ' full' : ''}`} text={`${done} of ${of} killed today: its kills your logs have seen since the daily reset at noon Eastern`}>
       {Array.from({ length: boxes }, (_, i) => (
         <span key={i} className={`sl-pip${i < done ? ' on' : ''}`}>
           {i < done ? '✓' : ''}
