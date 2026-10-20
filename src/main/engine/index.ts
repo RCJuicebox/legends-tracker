@@ -7,6 +7,7 @@ import { TimerBoard } from '../../core/timers'
 import { SpellTracker } from '../../core/spellTracker'
 import type { QuickBuffLanding } from '../castHistory'
 import { TriggerEngine } from '../../core/triggers'
+import { respawnTriggerId } from '../../core/respawns'
 import { MoteTracker, moteName } from '../../core/motes'
 import { PetGearReader, petSummonName } from '../../core/pets'
 import type { BuffView } from '../../core/buffs'
@@ -175,7 +176,8 @@ export class Engine {
       // The merge planner follows what the log says was merged, not only its own Done (LT-740).
       merged: (name, at) => {
         if (!this.simulating) this.stock.observed([name], at, 'merge')
-      }
+      },
+      spotKill: (spawn, death) => this.triggers.fireById(respawnTriggerId(spawn), death)
     })
     this.petReader = new PetGearReader((gear) => out.pet({ gear }))
     this.motes = new MoteTracker(store.motes.get(), {

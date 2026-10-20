@@ -141,9 +141,9 @@ export function registerTriggerIpc(ctx: AppContext): void {
   handle('respawns:setTimer', (input) => {
     const spec = sanitizeRespawnTimer(input)
     if (!spec) throw new Error('The timer was not saved: it needs a name and a length.')
-    // A spawn point's timer starts at a death of any of its mobs.
-    const names = engine.respawns.namesOf(spec.name)
-    saveTimer(names ? { ...spec, names } : spec)
+    // A spawn point's timer starts at a death of any of its mobs; a pinned one's, at a kill a /loc puts there.
+    const spawn = engine.respawns.spawnOf(spec.name)
+    saveTimer(spawn ? { ...spec, ...spawn } : spec)
     return engine.combat.respawnView()
   })
 
@@ -159,11 +159,11 @@ export function registerTriggerIpc(ctx: AppContext): void {
   // made to match here: a link's names go into its timer, and an unlink takes the timer with it.
   handle('respawns:link', (input) => {
     const link = sanitizeSpawnLink(input)
-    if (!link) throw new Error('A spawn point needs a zone, a name and at least two mobs.')
+    if (!link) throw new Error('A spawn point needs a zone, a name and at least two mobs, or one pinned to a spot.')
     engine.respawns.link(link)
     const timer = store.triggers.get().find((t) => t.id === respawnTriggerId(link.name))
     const spec = timer && respawnTimerSpec(timer)
-    if (spec) saveTimer({ ...spec, name: link.name, names: engine.respawns.namesOf(link.name) ?? link.names })
+    if (spec) saveTimer({ ...spec, name: link.name, ...(engine.respawns.spawnOf(link.name) ?? { names: link.names }) })
     return engine.combat.respawnView()
   })
   handle('respawns:unlink', (key) => {

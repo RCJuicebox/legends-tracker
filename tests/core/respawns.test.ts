@@ -16,6 +16,7 @@ import {
   respawnView,
   type RespawnRecords
 } from '../../src/core/respawns'
+import { sanitizeRespawns, sanitizeSpawnLink } from '../../src/core/validate'
 import type { Trigger } from '../../src/shared/types'
 
 // Line shapes copied from the log (September 2026); times moved to make the gaps.
@@ -27,7 +28,12 @@ function feed(records: RespawnRecords = {}) {
   const meter = new CombatMeter({ fightGapSec: 10, newSessionOnZone: true })
   meter.setSelf('Kelwyn')
   let changes = 0
-  const log = new RespawnLog(records, { onChange: () => changes++, kindOf: (n) => meter.kindOf(n).kind })
+  const spotKills: { spawn: string; at: number }[] = []
+  const log = new RespawnLog(records, {
+    onChange: () => changes++,
+    kindOf: (n) => meter.kindOf(n).kind,
+    onSpot: (r, death) => spotKills.push({ spawn: r.name, at: death.time })
+  })
   const run = (lines: string) => {
     for (const raw of lines.split('\n').filter((l) => l.trim())) {
       const line = parseLogLine(raw.trim())
@@ -36,7 +42,7 @@ function feed(records: RespawnRecords = {}) {
       log.handle(line, meter.currentZone || ZONE, ev)
     }
   }
-  return { log, run, records, changes: () => changes }
+  return { log, run, records, spotKills, changes: () => changes }
 }
 
 const KEY = respawnKey(ZONE, 'Coercer T`vala')
@@ -268,8 +274,114 @@ describe('spawn points', () => {
   it('names its mobs for its timer', () => {
     const f = feed()
     f.log.link(SPOT)
-    expect(f.log.namesOf("boog mudtoe's SPAWN")).toEqual(['A seafury cyclops', 'An aqua goblin', 'Boog Mudtoe'])
-    expect(f.log.namesOf('Boog Mudtoe')).toBeNull()
+    expect(f.log.spawnOf("boog mudtoe's SPAWN")).toEqual({ names: ['A seafury cyclops', 'An aqua goblin', 'Boog Mudtoe'] })
+    expect(f.log.spawnOf('Boog Mudtoe')).toBeNull()
+  })
+})
+
+const PF = 'Permafrost Keep 4 (Refined)'
+const PRIEST = respawnKey(PF, 'a goblin priest')
+const PIN = { zone: PF, name: 'A goblin priest at 289, -375', names: ['a goblin priest'], spot: { at: [288.63, -374.69, 4.69] as [number, number, number], within: 50 } }
+const PINNED = respawnKey(PF, PIN.name)
+const at = (h: number, m: number, s: number) => new Date(2026, 9, 19, h, m, s).getTime()
+
+describe('spawn points pinned to a spot', () => {
+  it('counts a kill there only when the next /loc, soon after, is near the spot', () => {
+    const f = feed()
+    f.log.link(PIN)
+    f.run(`
+      [Mon Oct 19 20:00:00 2026] You have entered ${PF}.
+      [Mon Oct 19 20:01:20 2026] You have slain a goblin priest!
+      [Mon Oct 19 20:01:30 2026] Your Location is 290.12, -370.55, 4.69
+      [Mon Oct 19 20:02:00 2026] You have slain a goblin priest!
+      [Mon Oct 19 20:02:05 2026] Your Location is 600.00, -100.00, 4.00
+      [Mon Oct 19 20:02:40 2026] You have slain a goblin priest!
+      [Mon Oct 19 20:03:30 2026] Your Location is 288.00, -374.00, 4.69
+    `)
+    expect(f.records[PINNED]).toMatchObject({ kills: 1, lastDeath: at(20, 1, 20), pendingSince: at(20, 1, 20) })
+    expect(f.spotKills).toEqual([{ spawn: PIN.name, at: at(20, 1, 20) }])
+    // The name keeps its own record of every kill in the zone.
+    expect(f.records[PRIEST].kills).toBe(3)
+  })
+
+  it('times a gap from a death there to the start of the fight that ends in the next kill there', () => {
+    const f = feed()
+    f.log.link(PIN)
+    f.run(`
+      [Mon Oct 19 20:00:00 2026] You have entered ${PF}.
+      [Mon Oct 19 20:01:20 2026] You have slain a goblin priest!
+      [Mon Oct 19 20:01:25 2026] Your Location is 290.12, -370.55, 4.69
+      [Mon Oct 19 20:02:00 2026] A goblin priest hits YOU for 12 points of damage.
+      [Mon Oct 19 20:02:10 2026] You have slain a goblin priest!
+      [Mon Oct 19 20:02:12 2026] Your Location is 600.00, -100.00, 4.00
+      [Mon Oct 19 20:02:40 2026] A goblin priest hits YOU for 12 points of damage.
+      [Mon Oct 19 20:02:46 2026] A goblin priest hits YOU for 14 points of damage.
+      [Mon Oct 19 20:03:00 2026] You have slain a goblin priest!
+      [Mon Oct 19 20:03:05 2026] Your Location is 287.40, -376.02, 4.69
+    `)
+    expect(f.records[PINNED]).toMatchObject({ kills: 2, gaps: [80], shared: false })
+    expect(respawnEstimate(f.records[PINNED])).toBe(80)
+  })
+
+  it('gives a kill to the nearest of two spots, and drops one held over a zone line', () => {
+    const f = feed()
+    f.log.link(PIN)
+    const far = f.log.link({ ...PIN, name: 'A goblin priest at 320, -375', spot: { at: [320, -375], within: 50 } })
+    f.run(`
+      [Mon Oct 19 20:00:00 2026] You have entered ${PF}.
+      [Mon Oct 19 20:01:20 2026] You have slain a goblin priest!
+      [Mon Oct 19 20:01:30 2026] Your Location is 315.00, -375.00, 4.69
+      [Mon Oct 19 20:02:20 2026] You have slain a goblin priest!
+      [Mon Oct 19 20:02:21 2026] You have entered ${PF}.
+      [Mon Oct 19 20:02:30 2026] Your Location is 288.63, -374.69, 4.69
+    `)
+    expect(f.records[far].kills).toBe(1)
+    expect(f.records[PINNED].kills).toBe(0)
+  })
+
+  it('counts nothing twice when the same log is read again after a restart', () => {
+    const lines = `
+      [Mon Oct 19 20:00:00 2026] You have entered ${PF}.
+      [Mon Oct 19 20:01:20 2026] You have slain a goblin priest!
+      [Mon Oct 19 20:01:30 2026] Your Location is 290.12, -370.55, 4.69
+    `
+    const first = feed()
+    first.log.link(PIN)
+    first.run(lines)
+    const again = feed(sanitizeRespawns(JSON.parse(JSON.stringify(first.records))))
+    again.run(lines)
+    expect(again.records).toEqual(first.records)
+    expect(again.spotKills).toEqual([])
+  })
+
+  it('will not take the name of a mob of its own, and comes undone by being linked without a spot', () => {
+    const f = feed()
+    f.run(`
+      [Mon Oct 19 20:00:00 2026] You have entered ${PF}.
+      [Mon Oct 19 20:01:20 2026] You have slain a goblin priest!
+    `)
+    expect(() => f.log.link({ ...PIN, name: 'a goblin priest' })).toThrow(/mob of its own/)
+    f.log.link(PIN)
+    expect(f.log.spawnOf(PIN.name)).toEqual({ names: ['A goblin priest'], spot: PIN.spot })
+    f.log.link({ zone: PF, name: PIN.name, names: ['a goblin priest', 'a goblin prelate'] })
+    expect(f.records[PINNED].spot).toBeUndefined()
+    // Unpinned, it takes the names' own records in.
+    expect(f.records[PRIEST]).toBeUndefined()
+  })
+
+  it('has a timer with no phrase of its own, which the respawn log starts', () => {
+    const t = respawnTrigger({ name: PIN.name, names: ['A goblin priest'], spot: PIN.spot, seconds: 66, overlay: 'respawns', warnSec: 30, announce: true })
+    expect(t.phrases).toEqual([])
+    expect(t.comment).toMatch(/your \/loc within 30 s of it is within 50 of 289, -375/)
+  })
+
+  it('is read back and linked only with a spot that is numbers', () => {
+    expect(sanitizeSpawnLink(PIN)).toEqual({ ...PIN, names: ['a goblin priest'] })
+    expect(sanitizeSpawnLink({ ...PIN, spot: undefined })).toBeNull()
+    expect(sanitizeSpawnLink({ ...PIN, spot: { at: ['288', -374] } })).toBeNull()
+    expect(sanitizeSpawnLink({ ...PIN, spot: { at: [288, -374] } })?.spot).toEqual({ at: [288, -374], within: 50 })
+    const read = sanitizeRespawns({ [PINNED]: { zone: PF, name: PIN.name, names: ['A goblin priest'], spot: PIN.spot } })
+    expect(read[PINNED].spot).toEqual(PIN.spot)
   })
 })
 

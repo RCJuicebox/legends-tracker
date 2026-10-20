@@ -17,7 +17,7 @@ export const SCHEMAS: Readonly<Record<string, number>> = {
   'casts.json': 2,
   'motes.json': 1,
   'mote-stock.json': 1,
-  'respawns.json': 2,
+  'respawns.json': 3,
   'buffs.json': 1,
   // The features' own files beside them (LT-639): recorded too, so a build that changes one's shape
   // bumps it here and an older build, finding the newer number, leaves the file alone.
@@ -48,6 +48,8 @@ const MIGRATIONS: readonly Migration[] = [
   // Spawn points (a record with `names`). Nothing to change: the bump keeps an older build, which would
   // drop the names, from writing the file.
   { file: 'respawns.json', to: 2, run: (v) => v },
+  // Spawn points pinned to a spot (`spot`): the same again, for an older build would drop the spot.
+  { file: 'respawns.json', to: 3, run: (v) => v },
   // Casts by character (LT-525). Those kept before are put under '', and the store gives them to the
   // character the log being followed is (the one they were mostly cast by).
   { file: 'casts.json', to: 2, run: (v) => ({ '': v }) }

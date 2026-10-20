@@ -22,7 +22,20 @@ import {
   Switch,
   ToggleChip
 } from '../components/ui'
-import { mergeRespawns, parseClock, respawnLength, SHARED_SEC, type RespawnRow, type RespawnTimerSpec, type RespawnView } from '../../../core/respawns'
+import {
+  mergeRespawns,
+  parseClock,
+  respawnLength,
+  SHARED_SEC,
+  SPOT_CONFIRM_MS,
+  SPOT_WITHIN,
+  spotText,
+  type RespawnRow,
+  type RespawnTimerSpec,
+  type RespawnView,
+  type SpawnSpot
+} from '../../../core/respawns'
+import { parseSpot } from '../../../core/where'
 import { NotWatching } from '../components/NotWatching'
 
 // How long mobs take to come back, measured from the log, and a timer on an overlay for any of them.
@@ -41,7 +54,9 @@ const HOW =
   'speaks, is considered, or is killed again. A mob is only seen once it is back, so each gap is at least its ' +
   'respawn time and the shortest gap is the closest. Leaving the zone ends every watch. A gap under ' +
   `${SHARED_SEC} seconds means two mobs share the name; those names are hidden unless you show them. ` +
-  'A spawn point that pops one of several mobs, such as a placeholder and its named, can be made one row: a death of any of them starts its watch and its timer, and any of them seen ends the watch.'
+  'A spawn point that pops one of several mobs, such as a placeholder and its named, can be made one row: a death of any of them starts its watch and its timer, and any of them seen ends the watch. ' +
+  `One spot of a name many mobs share can be pinned to your /loc there: a kill counts for it only when your next /loc, within ${SPOT_CONFIRM_MS / 1000} seconds, is near the spot. ` +
+  'Its gaps run from a death there to the start of the fight that ends in the next kill there.'
 
 type SortKey = 'name' | 'kills' | 'respawn' | 'gap' | 'last'
 
@@ -221,6 +236,7 @@ export function Respawns() {
                             measured={r.estimate ?? r.gaps[r.gaps.length - 1] ?? null}
                             timer={r.timer}
                             names={r.names}
+                            spot={r.spot}
                             overlays={overlays}
                             onDone={(v) => {
                               saved(v)
@@ -283,8 +299,13 @@ function Row({
           {r.name}
         </Disclosure>
         {r.names && (
-          <span className="chip" title="One spawn point that pops any of these mobs">
-            spawn
+          <span
+            className="chip"
+            title={
+              r.spot ? `Kills of these mobs count here when your /loc after one is within ${r.spot.within} of ${spotText(r.spot)}` : 'One spawn point that pops any of these mobs'
+            }
+          >
+            {r.spot ? `spot ${spotText(r.spot)}` : 'spawn'}
           </span>
         )}
         {r.names && <div className="faint small">{r.names.join(' · ')}</div>}
@@ -360,6 +381,7 @@ function TimerEditor({
   measured,
   timer,
   names,
+  spot,
   overlays,
   onDone,
   onCancel
@@ -371,6 +393,8 @@ function TimerEditor({
   timer: RespawnRow['timer']
   /** A spawn point's mobs. */
   names?: string[]
+  /** A pinned spawn's spot. */
+  spot?: SpawnSpot
   overlays: { id: string; name: string; kind: string }[]
   onDone: (v: RespawnView | undefined) => void
   onCancel: () => void
@@ -470,8 +494,10 @@ function TimerEditor({
           Cancel
         </button>
         <span className="faint small">
-          It starts at each kill of {names ? `any of ${names.join(', ')}` : name.trim() || 'the mob'}, anywhere, and can be edited further on the{' '}
-          <PageLink page="triggers">Triggers page</PageLink> (Respawns folder).
+          {spot
+            ? `It starts at a kill of ${names?.join(' or ') ?? 'its mob'} when your /loc within ${SPOT_CONFIRM_MS / 1000} s after is within ${spot.within} of ${spotText(spot)}, timed from the death,`
+            : `It starts at each kill of ${names ? `any of ${names.join(', ')}` : name.trim() || 'the mob'}, anywhere,`}{' '}
+          and can be edited further on the <PageLink page="triggers">Triggers page</PageLink> (Respawns folder).
         </span>
       </div>
     </form>
@@ -491,18 +517,23 @@ function SpawnEditor({ r, zoneMobs, onDone }: { r: RespawnRow; zoneMobs: string[
   const [names, setNames] = useState<string[]>(r.names ?? [r.name])
   const [label, setLabel] = useState<string | null>(null)
   const [typed, setTyped] = useState('')
+  const [spotTyped, setSpotTyped] = useState(r.spot ? r.spot.at.join(', ') : '')
+  const [within, setWithin] = useState(r.spot?.within ?? SPOT_WITHIN)
   const [error, setError] = useState('')
   const has = (n: string) => names.some((x) => x.toLowerCase() === n.toLowerCase())
   const choices = [...new Map([...names, ...zoneMobs].map((n) => [n.toLowerCase(), n])).values()]
-  const shownLabel = isSpawn ? r.name : (label ?? spawnName(names))
+  const at = spotTyped.trim() ? parseSpot(spotTyped) : null
+  const shownLabel = isSpawn ? r.name : (label ?? (at && names[0] ? `${names[0]} at ${at[0]}, ${at[1]}` : spawnName(names)))
 
   if (!editing) {
     return (
       <div className="row" style={{ padding: '0 4px 8px' }}>
         <button className="btn small" onClick={() => setEditing(true)}>
-          Same spawn as other mobs…
+          Make a spawn point…
         </button>
-        <span className="faint small">For a placeholder and the named it pops: one row and one timer for the spot.</span>
+        <span className="faint small">
+          One spot of a name many mobs share, pinned to your /loc there; or a placeholder and the named it pops. Either way, one row and one timer for the spot.
+        </span>
       </div>
     )
   }
@@ -515,10 +546,13 @@ function SpawnEditor({ r, zoneMobs, onDone }: { r: RespawnRow; zoneMobs: string[
   }
   const save = async () => {
     setError('')
-    if (names.length < 2) return setError('Pick at least two mobs that pop there.')
+    if (spotTyped.trim() && !at) return setError('Give the spot as /loc prints it, e.g. 288.63, -374.69, 4.69.')
+    if (!at && names.length < 2) return setError('Pick at least two mobs that pop there, or give the spot’s /loc.')
+    if (!names.length) return setError('Pick the mob that pops there.')
     if (!shownLabel.trim()) return setError('Give the spawn point a name.')
+    const spot: SpawnSpot | undefined = at ? { at, within } : undefined
     try {
-      onDone(await api.invoke('respawns:link', { zone: r.zone, name: shownLabel.trim(), names }))
+      onDone(await api.invoke('respawns:link', { zone: r.zone, name: shownLabel.trim(), names, ...(spot ? { spot } : {}) }))
     } catch (e) {
       setError(errorMessage(e))
     }
@@ -560,10 +594,27 @@ function SpawnEditor({ r, zoneMobs, onDone }: { r: RespawnRow; zoneMobs: string[
           </div>
         </Field>
       </div>
+      <div className="row" style={{ alignItems: 'flex-start', flexWrap: 'wrap' }}>
+        <Field label="Spot (/loc)" hint="For a name other mobs in the zone share: stand at the spawn and /loc. Empty for anywhere.">
+          <input
+            className="mono"
+            value={spotTyped}
+            onChange={(e) => setSpotTyped(e.target.value)}
+            placeholder="288.63, -374.69, 4.69"
+            aria-invalid={!!spotTyped.trim() && !at}
+            style={{ width: 240 }}
+          />
+        </Field>
+        {at && (
+          <Field label="Within" hint="How near your /loc must be">
+            <NumberInput value={within} min={1} max={5000} onChange={(v) => setWithin(v ?? SPOT_WITHIN)} width={80} />
+          </Field>
+        )}
+      </div>
       {error && <div className="notice bad">{error}</div>}
       <div className="row">
         <button className="btn primary" onClick={() => void save()}>
-          {isSpawn ? 'Save mobs' : 'Make one spawn'}
+          {isSpawn ? 'Save' : at ? 'Pin to the spot' : 'Make one spawn'}
         </button>
         {isSpawn ? (
           <ConfirmButton className="btn" question="Split it up? Each mob starts afresh, and the spawn's timer goes too." onConfirm={() => void unlink()}>
@@ -575,9 +626,11 @@ function SpawnEditor({ r, zoneMobs, onDone }: { r: RespawnRow; zoneMobs: string[
           </button>
         )}
         <span className="faint small">
-          {isSpawn
-            ? 'A death of any of them starts the watch and the timer.'
-            : 'Their kills go into the spawn. Their gaps do not: each measured one name, not the spot, so the spawn measures afresh.'}
+          {at
+            ? `A kill counts here when you /loc within ${SPOT_CONFIRM_MS / 1000} seconds of it, within ${within} of the spot: put /loc on a hotkey. The names keep their own rows for every other kill.`
+            : isSpawn
+              ? 'A death of any of them starts the watch and the timer.'
+              : 'Their kills go into the spawn. Their gaps do not: each measured one name, not the spot, so the spawn measures afresh.'}
         </span>
       </div>
     </div>

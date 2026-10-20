@@ -131,9 +131,13 @@ export class TriggerEngine {
     private readonly hooks: TriggerHooks
   ) {}
 
+  /** The enabled triggers by id, phrase or none: one with no phrase is fired by its id alone. */
+  private enabled = new Map<string, Trigger>()
+
   load(triggers: Trigger[], character: string): void {
     this.character = character
     this.errors = []
+    this.enabled = new Map(triggers.filter((t) => t.enabled).map((t) => [t.id, t]))
     const previous = new Map(this.compiled.map((c) => [c.trigger.id, c.lastFired]))
     this.compiled = []
     for (const trigger of triggers) {
@@ -170,6 +174,17 @@ export class TriggerEngine {
       }
     }
     return matched
+  }
+
+  /**
+   * Fires the enabled trigger `id` as if `line` had matched it: a pinned spawn's respawn timer, which
+   * the respawn log starts once a /loc puts the kill at its spot. False when there is no such trigger.
+   */
+  fireById(id: string, line: LogLine): boolean {
+    const trigger = this.enabled.get(id)
+    if (!trigger) return false
+    this.fire(trigger, {}, line)
+    return true
   }
 
   /** A trigger with `when.count` fires on its n-th match within the window, then counts again from none (FEAT-030). */

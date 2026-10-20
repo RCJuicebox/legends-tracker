@@ -42,7 +42,8 @@ export function seenFromRecords(records: Readonly<Record<string, RespawnRecord>>
   const byKey = new Map<string, RespawnRecord>()
   for (const r of Object.values(records)) {
     byKey.set(`${zoneKey(r.zone)}|${mobKey(r.name)}`, r)
-    for (const n of r.names ?? []) byKey.set(`${zoneKey(r.zone)}|${mobKey(n)}`, r)
+    // A pinned spawn is one spot of a name others share: what it says is not the name's.
+    if (!r.spot) for (const n of r.names ?? []) byKey.set(`${zoneKey(r.zone)}|${mobKey(n)}`, r)
   }
   return (zone, name, timer) => seenOf(byKey.get(`${zoneKey(zone)}|${mobKey(name)}`), timer, now)
 }

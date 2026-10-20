@@ -1,5 +1,5 @@
 import { type MoteStock, type SpellRule } from '../../shared/types'
-import type { RespawnRecords, RespawnTimerSpec, SpawnLink } from '../respawns'
+import { SPOT_WITHIN, type RespawnRecords, type RespawnTimerSpec, type SpawnLink, type SpawnSpot } from '../respawns'
 import { MOTE_RANKS, type MoteSession, type MoteState } from '../motes'
 import type { ActiveBuff, BuffsFile, Person } from '../buffs'
 import { DAY } from './triggers'
@@ -25,6 +25,8 @@ export function sanitizeRespawns(v: unknown): RespawnRecords {
     }
     const names = stringsArg(r.names, MAX_SPAWN_NAMES)
     if (names.length) out[key].names = names
+    const spot = names.length ? spawnSpot(r.spot) : null
+    if (spot) out[key].spot = spot
   }
   return out
 }
@@ -32,7 +34,14 @@ export function sanitizeRespawns(v: unknown): RespawnRecords {
 /** The most mobs one spawn point can pop, as far as a link goes. */
 export const MAX_SPAWN_NAMES = 12
 
-/** A spawn point as the Respawns page links it: a zone, its own name and at least two mobs; null otherwise. */
+/** A spawn point's spot: two or three numbers in the /loc order, and how near; null otherwise. */
+function spawnSpot(v: unknown): SpawnSpot | null {
+  if (!isObj(v) || !Array.isArray(v.at) || v.at.length < 2 || v.at.length > 3) return null
+  if (!v.at.every((n) => typeof n === 'number' && Number.isFinite(n) && Math.abs(n) < 1e6)) return null
+  return { at: [...v.at] as SpawnSpot['at'], within: Math.round(num(v.within, SPOT_WITHIN, 1, 5000)) }
+}
+
+/** A spawn point as the Respawns page links it: a zone, its own name and at least two mobs, or one pinned to a spot; null otherwise. */
 export function sanitizeSpawnLink(v: unknown): SpawnLink | null {
   if (!isObj(v) || typeof v.zone !== 'string' || !v.zone.trim() || typeof v.name !== 'string' || !v.name.trim()) return null
   const names = [
@@ -43,8 +52,10 @@ export function sanitizeSpawnLink(v: unknown): SpawnLink | null {
         .map((n) => [n.toLowerCase(), n])
     ).values()
   ]
-  if (names.length < 2) return null
-  return { zone: v.zone.trim(), name: v.name.trim().slice(0, 100), names }
+  const spot = v.spot === undefined ? null : spawnSpot(v.spot)
+  if (v.spot !== undefined && !spot) return null
+  if (names.length < (spot ? 1 : 2)) return null
+  return { zone: v.zone.trim(), name: v.name.trim().slice(0, 100), names, ...(spot ? { spot } : {}) }
 }
 
 /** A respawn timer as the Respawns page asks for it; null without a name or a length. */

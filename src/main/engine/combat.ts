@@ -31,6 +31,8 @@ export interface CombatHooks {
   merged?: (name: string, at: number) => void
   /** The zone the status line shows, for a line the meter has not placed. */
   zone: () => string
+  /** A /loc put a kill at a pinned spawn: its timer starts from the death line. */
+  spotKill?: (spawn: string, death: LogLine) => void
 }
 
 /**
@@ -99,7 +101,11 @@ export class CombatFeed implements EngineFeature {
         this.store.respawns.set(this.respawns.records)
         this.respawnsOut.mark()
       },
-      kindOf: (name) => this.meter.kindOf(name).kind
+      kindOf: (name) => this.meter.kindOf(name).kind,
+      // A kill read back from history is not news, as a trigger's phrase would not fire on it.
+      onSpot: (r, death) => {
+        if (!this.backlog.active) this.hooks.spotKill?.(r.name, death)
+      }
     })
   }
 
