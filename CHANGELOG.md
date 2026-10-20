@@ -2,7 +2,7 @@
 
 What changed in each version. The release workflow publishes a version's section as its release notes, and installed copies show them when an update arrives.
 
-## 2.17.0 (2026-10-19)
+## 2.17.1 (2026-10-19)
 
 - **Epics, an optional module.** Settings › Modules turns it on, and **Epics** joins Goals: what to keep for each class's epic quest, pre-Kunark, as the eqlwiki's "Epic Items To Keep" checklist by Manlaan lists it (the page SEQO reads too), with how many of each you hold from your log and inventory export. A quest's reward in hand covers what makes it (the Darkforge Breastplate its Decayed pieces and bars), the finished epic covers the whole class, an item two of your classes take is wanted by both, and a box on every step ticks off what no file can see. **Targets** says where to hunt for the rest, zone by zone; **Items** is where a count is put right.
 - **Epics: a cue when a piece drops.** While the module is on, looting a piece a class on your record still wants, or killing a named that drops one, is said on the Live page's feed and the alert overlay with the class and what it is for ("Ghoulbane dropped: Shadow Knight epic, for the Corrupted Ghoulbane"), as SEQO's toast does; nothing is said of a piece you already hold enough of.
