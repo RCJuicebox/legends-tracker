@@ -31,6 +31,7 @@ import type { Factions } from '../features/factions/main'
 import type { SlayerPlanner } from '../features/slayer/main'
 import type { HunterPlanner } from '../features/hunter/main'
 import type { SkyTracker } from '../features/sky/main'
+import type { EpicTracker } from '../features/epics/main'
 import { createFeatures, FEATURE_CONSUMERS } from '../features/main'
 import { LogHistory, type HistoryWhere } from './sources/logHistory'
 import { TradeFavorites } from './tradeFavorites'
@@ -102,6 +103,8 @@ export interface AppContext {
   hunter: HunterPlanner
   /** Plan › Plane of Sky's side (an optional module): the Sky's items counted over the logs, and each character's wish list. */
   sky: SkyTracker
+  /** Goals › Epics' side (an optional module): the epic pieces counted over the logs, and each character's ticks and corrections. */
+  epics: EpicTracker
   /** Plan › Slayer's side: the plan's data, and the player's choices (the overlay makes the plan from them). */
   slayer: SlayerPlanner
   /** The parts that register, and flush, themselves (AppFeature): the two above. */
@@ -360,7 +363,8 @@ export function createContext(): AppContext {
   ctx.hunter = features.hunter
   ctx.slayer = features.slayer
   ctx.sky = features.sky
-  ctx.features = [ctx.factions, ctx.slayer, ctx.hunter, ctx.sky, ctx.liveAchievements, new GroupHealth()]
+  ctx.epics = features.epics
+  ctx.features = [ctx.factions, ctx.slayer, ctx.hunter, ctx.sky, ctx.epics, ctx.liveAchievements, new GroupHealth()]
 
   ctx.refreshOverlayVisibility = () =>
     ctx.overlays.setShown(

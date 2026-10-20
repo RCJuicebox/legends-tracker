@@ -1,0 +1,1251 @@
+{
+ "source": "eqlwiki.com, Epic Items To Keep (Manlaan), revision 198085, read 2026-10-19",
+ "url": "https://eqlwiki.com/User:Manlaan/Epic_Items_To_Keep",
+ "classes": [
+  {
+   "cls": "Bard",
+   "epic": [
+    "Singing Short Sword"
+   ],
+   "steps": [
+    {
+     "qty": 1,
+     "how": "Kill Lady Vox (raid)",
+     "item": "White Dragon Scales",
+     "zone": "Permafrost",
+     "parts": []
+    },
+    {
+     "qty": 1,
+     "how": "Kill Amygdalan warrior",
+     "item": "Amygdalan Tendril",
+     "zone": "Plane of Fear",
+     "parts": []
+    },
+    {
+     "qty": 1,
+     "how": "Kill Lord Nagafen (raid)",
+     "item": "Red Dragon Scales",
+     "zone": "Nagafen's Lair",
+     "parts": []
+    },
+    {
+     "qty": 1,
+     "how": "Kill Blackwing",
+     "item": "Onyx Drake Gut",
+     "zone": "Rathe Mountains",
+     "unverified": true,
+     "parts": []
+    },
+    {
+     "qty": 1,
+     "how": "Kill Quag Maelstrom",
+     "item": "Alluring Horn",
+     "zone": "Ocean of Tears",
+     "parts": []
+    }
+   ]
+  },
+  {
+   "cls": "Beastlord",
+   "epic": [],
+   "steps": []
+  },
+  {
+   "cls": "Berserker",
+   "epic": [],
+   "steps": [
+    {
+     "qty": 1,
+     "how": "Kill Gnashing Kobold",
+     "item": "Gnashing Kobold Paw",
+     "zone": "Stonebrunt Mountains",
+     "note": "+1900 +2350",
+     "unverified": true,
+     "parts": []
+    },
+    {
+     "qty": 1,
+     "how": "Kill a skunk+",
+     "item": "Skunk Scent Gland",
+     "zone": "Toxxulia Forest",
+     "parts": []
+    }
+   ]
+  },
+  {
+   "cls": "Cleric",
+   "epic": [
+    "Water Sprinkler of Nem Ankh"
+   ],
+   "steps": [
+    {
+     "qty": 1,
+     "how": "Kill Lord Bergurgle",
+     "item": "Lord Bergurgle's Crown",
+     "zone": "Lake Rathetear",
+     "parts": []
+    },
+    {
+     "qty": 1,
+     "how": "Kill Lord Gimblox",
+     "item": "Lord Gimblox's Signet Ring",
+     "zone": "Solusek's Eye",
+     "parts": []
+    }
+   ]
+  },
+  {
+   "cls": "Druid",
+   "epic": [
+    "Nature Walker's Scimitar"
+   ],
+   "steps": [
+    {
+     "qty": 1,
+     "how": "Complete Cleansed Spirit of Antonica",
+     "quest": "Cleansed Spirit of Antonica",
+     "parts": [
+      {
+       "qty": 1,
+       "how": "Kill Tainted Aquagoblin/Corrupted Shaman",
+       "item": "Clean Lakewater",
+       "zone": "Lake Rathe",
+       "parts": []
+      },
+      {
+       "qty": 1,
+       "how": "Kill tainted wooly mammoth/corrupted wooly mammoth",
+       "item": "Chunk of Tundra",
+       "zone": "Everfrost",
+       "parts": []
+      },
+      {
+       "qty": 1,
+       "how": "Kill tainted hill giant/corrupted hill giant",
+       "item": "Ancient Rock",
+       "zone": "Rathe Mountains",
+       "parts": []
+      }
+     ]
+    },
+    {
+     "qty": 1,
+     "how": "Complete Cleansed Spirit of Faydwer",
+     "quest": "Cleansed Spirit of Faydwer",
+     "parts": [
+      {
+       "qty": 1,
+       "how": "Kill tainted seahorse/Corrupted Seahorse",
+       "item": "Kedge Cave Crystals",
+       "zone": "Kedge Keep",
+       "parts": []
+      },
+      {
+       "qty": 1,
+       "how": "Kill Tainted seafury cyclops/Corrupted seafury cyclops",
+       "item": "Ocean of Tears Seavines",
+       "zone": "Ocean of Tears",
+       "parts": []
+      },
+      {
+       "qty": 1,
+       "how": "Kill 3x [Brownie Scouts]/Corrupted brownie",
+       "item": "Green Heartwood Branch",
+       "zone": "Lesser Faydark",
+       "parts": []
+      }
+     ]
+    },
+    {
+     "qty": 1,
+     "how": "Forage",
+     "item": "Chilled Tundra Root",
+     "zone": "Everfrost",
+     "parts": []
+    },
+    {
+     "qty": 1,
+     "how": "Forage",
+     "item": "Ripened Heartfruit",
+     "zone": "Greater Faydark",
+     "parts": []
+    },
+    {
+     "qty": 1,
+     "how": "Forage",
+     "item": "Speckled Molded Mushroom",
+     "zone": "Innothule Swamp",
+     "parts": []
+    },
+    {
+     "qty": 1,
+     "how": "Forage",
+     "item": "Sweetened Mudroot",
+     "zone": "Misty Thicket",
+     "parts": []
+    }
+   ]
+  },
+  {
+   "cls": "Enchanter",
+   "epic": [
+    "Staff of the Serpent"
+   ],
+   "steps": [
+    {
+     "qty": 1,
+     "how": "Kill The ghoul arch magi",
+     "item": "Shining Metallic Robes",
+     "zone": "Lower Guk",
+     "parts": []
+    },
+    {
+     "qty": 1,
+     "how": "Kill Cazel",
+     "item": "Spoon",
+     "zone": "Oasis",
+     "unverified": true,
+     "parts": []
+    },
+    {
+     "qty": 1,
+     "how": "Pick up at the quest room at +1300, +560",
+     "item": "Charm and Sacrifice",
+     "zone": "Plane of Sky",
+     "parts": []
+    },
+    {
+     "qty": 1,
+     "how": "Kill a forsaken revenant",
+     "item": "Essence of a Vampire",
+     "zone": "Plane of Hate",
+     "parts": []
+    }
+   ]
+  },
+  {
+   "cls": "Magician",
+   "epic": [
+    "Orb of Mastery"
+   ],
+   "steps": [
+    {
+     "qty": 1,
+     "how": "Complete Words of Magi`kot",
+     "quest": "Words of Magi`kot",
+     "parts": [
+      {
+       "qty": 1,
+       "how": "Kill enraged dread wolf+",
+       "item": "Torn Page of Magi`kot pg. 1",
+       "zone": "Kithicor Forest",
+       "parts": []
+      },
+      {
+       "qty": 1,
+       "how": "Kill a tentacle terror+",
+       "item": "Torn Page of Magi`kot pg. 2",
+       "zone": "Estate of Unrest",
+       "parts": []
+      },
+      {
+       "qty": 1,
+       "how": "Kill a bloodthirsty ghoul",
+       "item": "Torn Page of Magi`kot pg. 3",
+       "zone": "Lower Guk",
+       "parts": []
+      }
+     ]
+    },
+    {
+     "qty": 1,
+     "how": "Complete Words of Mastery",
+     "quest": "Words of Mastery",
+     "parts": [
+      {
+       "qty": 1,
+       "how": "Kill A Magician or an alligator",
+       "item": "Torn Page of Mastery Earth",
+       "zone": "Najena or Temple of Cazic-Thule",
+       "parts": []
+      },
+      {
+       "qty": 1,
+       "how": "Kill A Magician or an alligator",
+       "item": "Torn Page of Mastery Fire",
+       "zone": "Najena or Temple of Cazic-Thule",
+       "parts": []
+      },
+      {
+       "qty": 1,
+       "how": "Kill A Magician or an alligator",
+       "item": "Torn Page of Mastery Water",
+       "zone": "Najena or Temple of Cazic-Thule",
+       "parts": []
+      },
+      {
+       "qty": 1,
+       "how": "Kill A Magician or an alligator",
+       "item": "Torn Page of Mastery Wind",
+       "zone": "Najena or Temple of Cazic-Thule",
+       "parts": []
+      }
+     ]
+    },
+    {
+     "qty": 1,
+     "how": "Complete Shovel Of Ponz Quest",
+     "quest": "Shovel Of Ponz Quest",
+     "parts": [
+      {
+       "qty": 1,
+       "how": "Kill A Magician or an alligator",
+       "item": "A Shovel",
+       "zone": "Najena or Temple of Cazic-Thule",
+       "parts": []
+      },
+      {
+       "qty": 1,
+       "how": "Buy",
+       "item": "Ruby",
+       "parts": []
+      },
+      {
+       "qty": 1,
+       "how": "Kill A Gargoyle",
+       "item": "Gargoyle Eye",
+       "parts": []
+      },
+      {
+       "qty": 1,
+       "how": "Kill A Hill Giant",
+       "item": "Hill Giant Toes",
+       "parts": []
+      }
+     ]
+    },
+    {
+     "qty": 1,
+     "how": "Complete Broom Of Trilon Quest",
+     "quest": "Broom Of Trilon Quest",
+     "parts": [
+      {
+       "qty": 1,
+       "how": "Kill A Magician or an alligator",
+       "item": "A Broom",
+       "zone": "Najena or Temple of Cazic-Thule",
+       "parts": []
+      },
+      {
+       "qty": 1,
+       "how": "Buy",
+       "item": "Star Ruby",
+       "parts": []
+      },
+      {
+       "qty": 1,
+       "how": "Kill A Griffin",
+       "item": "Griffon Feathers",
+       "parts": []
+      },
+      {
+       "qty": 1,
+       "how": "Kill A Cyclops",
+       "item": "Cyclops Toes",
+       "parts": []
+      }
+     ]
+    },
+    {
+     "qty": 1,
+     "how": "Kill a gypsy dancer",
+     "item": "Power of Wind",
+     "zone": "Mistmoore",
+     "parts": []
+    },
+    {
+     "qty": 1,
+     "how": "Kill A Fairy Guard",
+     "item": "Power of Earth",
+     "zone": "Lesser Faydark",
+     "parts": []
+    },
+    {
+     "qty": 1,
+     "how": "Kill Undertow",
+     "item": "Blazing Wand",
+     "zone": "Kedge Keep",
+     "parts": []
+    },
+    {
+     "qty": 1,
+     "how": "Kill Magi P`Tasa (instance/raid)",
+     "item": "Staff of Elemental Mastery: Earth",
+     "zone": "Plane of Hate",
+     "parts": []
+    },
+    {
+     "qty": 1,
+     "how": "Kill Phinigel Autropos (raid)",
+     "item": "Staff of Elemental Mastery: Water",
+     "zone": "Kedge Keep",
+     "parts": []
+    },
+    {
+     "qty": 1,
+     "how": "Kill Island 7",
+     "item": "Crown of Elemental Mastery",
+     "zone": "Plane of Sky",
+     "parts": []
+    },
+    {
+     "qty": 1,
+     "how": "Kill elementals",
+     "item": "Elemental Binder",
+     "zone": "The Hole",
+     "parts": []
+    },
+    {
+     "qty": 1,
+     "how": "Kill Quillmane",
+     "item": "Pegasus Feather Cloak",
+     "zone": "South Karana",
+     "parts": []
+    },
+    {
+     "qty": 1,
+     "how": "Kill Lava elemental or Blazing Elemental",
+     "item": "Power of Fire",
+     "zone": "Solusek's Eye",
+     "note": "3 spawns - no power of fire",
+     "unverified": true,
+     "parts": []
+    }
+   ]
+  },
+  {
+   "cls": "Monk",
+   "epic": [
+    "Celestial Fists"
+   ],
+   "steps": [
+    {
+     "qty": 1,
+     "how": "Craft (Tailoring no fail)",
+     "item": "Robe of the Lost Circle",
+     "parts": [
+      {
+       "qty": 1,
+       "how": "Craft (Tailoring 36)",
+       "item": "Shadow Silk",
+       "parts": [
+        {
+         "qty": 1,
+         "how": "",
+         "item": "Shadow Wolf Pelt",
+         "parts": []
+        },
+        {
+         "qty": 1,
+         "how": "",
+         "item": "Silk Swatch",
+         "parts": []
+        },
+        {
+         "qty": 1,
+         "how": "",
+         "item": "Gather Shadows",
+         "parts": []
+        }
+       ]
+      },
+      {
+       "qty": 1,
+       "how": "",
+       "item": "Jonthan's Whistling Warsong",
+       "parts": []
+      },
+      {
+       "qty": 1,
+       "how": "Complete Monks of The Whistling Fist",
+       "item": "Rare Robe Pattern",
+       "quest": "Monks of The Whistling Fist",
+       "parts": [
+        {
+         "qty": 1,
+         "how": "Kill Raster of Guk",
+         "item": "The Idol",
+         "zone": "Lower Guk",
+         "parts": []
+        },
+        {
+         "qty": 1,
+         "how": "Complete Monk Sash Quests (Velan Torresk/Reyia Beslin)",
+         "item": "Red Sash of Order",
+         "quest": "Monk Sash Quests",
+         "zone": "West Freeport",
+         "parts": [
+          {
+           "qty": 2,
+           "how": "Kill a deathfist pawn",
+           "item": "Deathfist Pawn Scalp",
+           "zone": "West Freeport",
+           "parts": []
+          },
+          {
+           "qty": 1,
+           "how": "Kill any snake",
+           "item": "Snake Fang",
+           "parts": []
+          },
+          {
+           "qty": 1,
+           "how": "Kill any skeleton",
+           "item": "Bone Chips",
+           "parts": []
+          },
+          {
+           "qty": 1,
+           "how": "Kill Orc Centurion+",
+           "item": "Deathfist Slashed Belt",
+           "zone": "East Commons",
+           "parts": []
+          },
+          {
+           "qty": 1,
+           "how": "Kill a darkweed snake+",
+           "item": "Giant Snake Rattle",
+           "zone": "East Commons",
+           "parts": []
+          },
+          {
+           "qty": 1,
+           "how": "Kill a desert tarantula+",
+           "item": "Desert Tarantula Chitin",
+           "zone": "North Ro",
+           "parts": []
+          },
+          {
+           "qty": 1,
+           "how": "Kill orc legionnaire",
+           "item": "Legionnaire's Bracer",
+           "zone": "Crushbone",
+           "parts": []
+          },
+          {
+           "qty": 1,
+           "how": "Kill a willowisp",
+           "item": "Greater Lightstone",
+           "parts": []
+          },
+          {
+           "qty": 1,
+           "how": "Kill a Dervish Cutthroat",
+           "item": "Cutthroat Insignia Ring",
+           "zone": "North Ro",
+           "parts": []
+          },
+          {
+           "qty": 1,
+           "how": "Kill Ekeros",
+           "item": "Blackened Sapphire",
+           "zone": "Najena",
+           "parts": []
+          },
+          {
+           "qty": 1,
+           "how": "Kill Priest Amiaz",
+           "item": "Blackened Wand",
+           "zone": "Befallen",
+           "parts": []
+          }
+         ]
+        }
+       ]
+      },
+      {
+       "qty": 1,
+       "how": "Complete Monks of The Whistling Fist",
+       "item": "Needle of the Void",
+       "quest": "Monks of The Whistling Fist",
+       "parts": [
+        {
+         "qty": 1,
+         "how": "Kill Targin the Rock",
+         "item": "Code of Zan Fi",
+         "zone": "Nagafen's Lair",
+         "parts": []
+        },
+        {
+         "qty": 1,
+         "how": "Complete Monk Headband Quests",
+         "item": "Purple Headband",
+         "quest": "Monk Headband Quests",
+         "parts": [
+          {
+           "qty": 4,
+           "how": "Kill a gnoll pup",
+           "item": "Gnoll Pup Scalp",
+           "parts": []
+          },
+          {
+           "qty": 3,
+           "how": "Kill a putrid skeleton",
+           "item": "Putrid Rib Bone",
+           "zone": "Qeynos Hills",
+           "note": "4664, -968",
+           "parts": []
+          },
+          {
+           "qty": 2,
+           "how": "Kill various gnolls",
+           "item": "Blackburrow Gnoll Pelt",
+           "zone": "Blackburrow",
+           "parts": []
+          },
+          {
+           "qty": 1,
+           "how": "Kill various gnolls",
+           "item": "Blackburrow Gnoll Skin",
+           "zone": "Blackburrow",
+           "parts": []
+          },
+          {
+           "qty": 1,
+           "how": "Kill High Shaman Phido",
+           "item": "Dareb's Skull",
+           "zone": "Southern Karana",
+           "parts": []
+          },
+          {
+           "qty": 1,
+           "how": "Kill High Shaman Grisok",
+           "item": "Head of Shen",
+           "zone": "Southern Karana",
+           "parts": []
+          },
+          {
+           "qty": 1,
+           "how": "Kill Ghanex Drah",
+           "item": "Head of Ghanex Drah",
+           "zone": "Southern Karana",
+           "parts": []
+          },
+          {
+           "qty": 1,
+           "how": "Kill a gnoll embalmer",
+           "item": "Skull of Jhen`Tra",
+           "zone": "Lake Rathetear",
+           "parts": []
+          },
+          {
+           "qty": 1,
+           "how": "Kill the thaumaturgist",
+           "item": "Dagger of Marnek",
+           "zone": "Befallen",
+           "parts": []
+          },
+          {
+           "qty": 1,
+           "how": "Kill High Priest Zaharn",
+           "item": "Zaharn's Coronet",
+           "zone": "Permafrost",
+           "parts": []
+          }
+         ]
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "cls": "Necromancer",
+   "epic": [
+    "Scythe of the Shadowed Soul"
+   ],
+   "steps": [
+    {
+     "qty": 1,
+     "how": "Kill Najena",
+     "item": "Flowing Black Robe",
+     "zone": "Najena",
+     "parts": []
+    },
+    {
+     "qty": 1,
+     "how": "Kill Sir Edwin Motte",
+     "item": "Head of Sir Edwin Motte",
+     "zone": "Qeynos Hills",
+     "parts": []
+    },
+    {
+     "qty": 1,
+     "how": "Kill Dread, Fright, or Terror (raid)",
+     "item": "Eye of Innoruuk",
+     "zone": "Plane of Fear",
+     "parts": []
+    },
+    {
+     "qty": 1,
+     "how": "Kill Dread, Fright, or Terror (raid)",
+     "item": "Slime Blood of Cazic Thule",
+     "zone": "Plane of Fear",
+     "parts": []
+    },
+    {
+     "qty": 1,
+     "how": "Kill Island 2",
+     "item": "Silver Disc",
+     "zone": "Plane of Sky",
+     "parts": []
+    },
+    {
+     "qty": 1,
+     "how": "Kill Island 3",
+     "item": "Spiroc Feathers",
+     "zone": "Plane of Sky",
+     "parts": []
+    },
+    {
+     "qty": 1,
+     "how": "Kill Keeper of Souls",
+     "item": "Black Silk Cape",
+     "zone": "Plane of Sky",
+     "parts": []
+    }
+   ]
+  },
+  {
+   "cls": "Paladin",
+   "epic": [
+    "Fiery Defender"
+   ],
+   "steps": [
+    {
+     "qty": 1,
+     "how": "Complete The Fiery Avenger",
+     "item": "Fiery Avenger",
+     "quest": "The Fiery Avenger",
+     "parts": [
+      {
+       "qty": 1,
+       "how": "Kill The froglok shin lord",
+       "item": "Ghoulbane",
+       "zone": "Upper Guk",
+       "parts": []
+      },
+      {
+       "qty": 1,
+       "how": "Complete Zimel's Blades (SoulFire)",
+       "item": "SoulFire",
+       "quest": "Zimel's Blades (SoulFire)",
+       "parts": [
+        {
+         "qty": 1,
+         "how": "Craft (Brewing 21)",
+         "item": "Bog Juice",
+         "parts": [
+          {
+           "qty": 1,
+           "how": "",
+           "item": "Bottle",
+           "parts": []
+          },
+          {
+           "qty": 1,
+           "how": "",
+           "item": "Snake Scales",
+           "parts": []
+          },
+          {
+           "qty": 1,
+           "how": "",
+           "item": "Water Flask",
+           "parts": []
+          }
+         ]
+        },
+        {
+         "qty": 1,
+         "how": "Craft (Baking 21)",
+         "item": "Edible Goo",
+         "parts": [
+          {
+           "qty": 1,
+           "how": "",
+           "item": "Fire Beetle Eye",
+           "parts": []
+          },
+          {
+           "qty": 1,
+           "how": "",
+           "item": "Rat Ears",
+           "parts": []
+          }
+         ]
+        },
+        {
+         "qty": 4,
+         "how": "Buy",
+         "item": "Drom's Champagne",
+         "parts": []
+        },
+        {
+         "qty": 1,
+         "how": "Kill spiders",
+         "item": "A Spider Venom Sac",
+         "parts": []
+        },
+        {
+         "qty": 1,
+         "how": "Buy",
+         "item": "Cloth Shirt",
+         "parts": []
+        },
+        {
+         "qty": 1,
+         "how": "Kill Xicotl",
+         "item": "Glowing Sword Hilt",
+         "zone": "Mistmoore",
+         "parts": []
+        },
+        {
+         "qty": 1,
+         "how": "Kill Sir Lucan D'Lere (both GM and undead spawn)",
+         "item": "Testimony of Truth",
+         "zone": "East Freeport",
+         "parts": []
+        }
+       ]
+      },
+      {
+       "qty": 1,
+       "how": "Kill Lord Nagafen (raid)",
+       "item": "Torn, burnt book",
+       "zone": "Nagafen's Lair",
+       "parts": []
+      },
+      {
+       "qty": 1,
+       "how": "Kill Lady Vox (raid)",
+       "item": "Torn, Frost covered book",
+       "zone": "Permafrost",
+       "parts": []
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "cls": "Ranger",
+   "epic": [
+    "Earthcaller",
+    "Swiftwind"
+   ],
+   "steps": [
+    {
+     "qty": 1,
+     "how": "Kill An Essence Tamer",
+     "item": "Swirling Sphere of Color",
+     "zone": "Plane of Sky",
+     "parts": []
+    },
+    {
+     "qty": 1,
+     "how": "Kill Mini Bosses (instance/raid)",
+     "item": "Shattered Emerald of Corruption",
+     "zone": "Plane of Hate",
+     "parts": []
+    },
+    {
+     "qty": 1,
+     "how": "Forage",
+     "item": "Sweetened Mudroot",
+     "zone": "Misty Thicket",
+     "parts": []
+    },
+    {
+     "qty": 1,
+     "how": "Forage",
+     "item": "Ripened Heartfruit",
+     "zone": "Greater Faydark",
+     "parts": []
+    },
+    {
+     "qty": 1,
+     "how": "Forage",
+     "item": "Speckled Molded Mushroom",
+     "zone": "Innothule Swamp",
+     "parts": []
+    },
+    {
+     "qty": 1,
+     "how": "Forage",
+     "item": "Chilled Tundra Root",
+     "zone": "Everfrost",
+     "parts": []
+    }
+   ]
+  },
+  {
+   "cls": "Rogue",
+   "epic": [
+    "Ragebringer"
+   ],
+   "steps": [
+    {
+     "qty": 1,
+     "how": "Kill Phinigel Autropos (raid)",
+     "item": "Robe of the Kedge",
+     "zone": "Kedge Keep",
+     "parts": []
+    },
+    {
+     "qty": 1,
+     "how": "Kill The ghoul arch magi",
+     "item": "Shining Metallic Robes",
+     "zone": "Lower Guk",
+     "parts": []
+    },
+    {
+     "qty": 1,
+     "how": "Kill The froglok king",
+     "item": "Mithril Two-Handed Sword",
+     "zone": "Lower Guk",
+     "parts": []
+    },
+    {
+     "qty": 1,
+     "how": "Kill Solusek kobold king",
+     "item": "Fleshripper",
+     "zone": "Nagafen's Lair",
+     "parts": []
+    },
+    {
+     "qty": 1,
+     "how": "Kill Kobold champion",
+     "item": "Painbringer",
+     "zone": "Nagafen's Lair",
+     "parts": []
+    },
+    {
+     "qty": 1,
+     "how": "Kill The Ishva Mal",
+     "item": "Robe of the Ishva",
+     "zone": "Splitpaw",
+     "parts": []
+    },
+    {
+     "qty": 1,
+     "how": "Kill Oracle of K`Arnon",
+     "item": "Robe of the Oracle",
+     "zone": "Ocean of Tears",
+     "parts": []
+    },
+    {
+     "qty": 1,
+     "how": "Kill Karg Icebear",
+     "item": "Gigantic Zweihander",
+     "zone": "Everfrost Peaks",
+     "parts": []
+    },
+    {
+     "qty": 1,
+     "how": "Pickpocket Founy Jestands",
+     "item": "Stained Parchment Top",
+     "zone": "North Kaladim",
+     "parts": []
+    },
+    {
+     "qty": 1,
+     "how": "Pickpocket Tani N`Mar",
+     "item": "Stained Parchment Bottom",
+     "zone": "Neriak Third Gate",
+     "parts": []
+    },
+    {
+     "qty": 1,
+     "how": "Pick up at -60, +325, 56",
+     "item": "Book of Souls",
+     "zone": "Plane of Hate",
+     "parts": []
+    }
+   ]
+  },
+  {
+   "cls": "Shadow Knight",
+   "epic": [
+    "Innoruuk's Curse"
+   ],
+   "steps": [
+    {
+     "qty": 1,
+     "how": "Complete Darkforge Armor Quests",
+     "item": "Darkforge Breastplate",
+     "quest": "Darkforge Armor Quests",
+     "parts": [
+      {
+       "qty": 1,
+       "how": "Kill A Lizard Crusader or A lizard ritualist",
+       "item": "Decayed Chainmail",
+       "zone": "Temple of Cazic-Thule",
+       "parts": []
+      },
+      {
+       "qty": 1,
+       "how": "Kill A Lizard Crusader or A lizard ritualist",
+       "item": "Decayed Breastplate",
+       "zone": "Temple of Cazic-Thule",
+       "parts": []
+      },
+      {
+       "qty": 2,
+       "how": "Buy and enchant",
+       "item": "Enchanted Platinum Bar",
+       "parts": []
+      }
+     ]
+    },
+    {
+     "qty": 1,
+     "how": "Complete Darkforge Armor Quests",
+     "item": "Darkforge Greaves",
+     "quest": "Darkforge Armor Quests",
+     "parts": [
+      {
+       "qty": 1,
+       "how": "Kill A Lizard Crusader or A lizard ritualist",
+       "item": "Decayed Left Legplate",
+       "zone": "Temple of Cazic-Thule",
+       "parts": []
+      },
+      {
+       "qty": 1,
+       "how": "Kill A Lizard Crusader or A lizard ritualist",
+       "item": "Decayed Right Legplate",
+       "zone": "Temple of Cazic-Thule",
+       "parts": []
+      },
+      {
+       "qty": 2,
+       "how": "Kill clockwork",
+       "item": "Melatite",
+       "zone": "Sol A",
+       "parts": []
+      }
+     ]
+    },
+    {
+     "qty": 1,
+     "how": "Complete Darkforge Armor Quests",
+     "item": "Darkforge Helm",
+     "quest": "Darkforge Armor Quests",
+     "parts": [
+      {
+       "qty": 1,
+       "how": "Kill A Lizard Crusader or A lizard ritualist",
+       "item": "Decayed Helm",
+       "zone": "Temple of Cazic-Thule",
+       "parts": []
+      },
+      {
+       "qty": 1,
+       "how": "Kill A Lizard Crusader or A lizard ritualist",
+       "item": "Decayed Visor",
+       "zone": "Temple of Cazic-Thule",
+       "parts": []
+      },
+      {
+       "qty": 2,
+       "how": "Kill Freeport Guards",
+       "item": "Damaged Militia Helm",
+       "zone": "Freeport",
+       "parts": []
+      }
+     ]
+    },
+    {
+     "qty": 1,
+     "how": "Kill A mimic",
+     "item": "Cell Key",
+     "zone": "The Hole",
+     "parts": []
+    },
+    {
+     "item": "Corrupted Ghoulbane",
+     "qty": 1,
+     "how": "Hand in to Zarvarg Nullheart (Shadow Knight Epic Quest)",
+     "parts": [
+      {
+       "qty": 1,
+       "how": "Kill The froglok shin lord",
+       "item": "Ghoulbane",
+       "zone": "Upper Guk",
+       "parts": []
+      },
+      {
+       "qty": 1,
+       "how": "Kill Cazic Thule (raid)",
+       "item": "Soul Leech, Dark Sword of Blood",
+       "zone": "Plane of Fear",
+       "parts": []
+      },
+      {
+       "qty": 1,
+       "how": "Kill various",
+       "item": "Blade of Abrogation",
+       "zone": "Plane of Sky",
+       "parts": []
+      },
+      {
+       "item": "Decrepit Sheath",
+       "qty": 1,
+       "how": "Hand in to Zarvarg Nullheart (Shadow Knight Epic Quest)",
+       "parts": [
+        {
+         "qty": 1,
+         "how": "Kill Rharzar",
+         "item": "Drake Spine",
+         "zone": "Rathe Mountains",
+         "unverified": true,
+         "parts": []
+        },
+        {
+         "qty": 1,
+         "how": "Kill an ashenbone drake",
+         "item": "Decrepit Hide",
+         "zone": "Plane of Hate",
+         "parts": []
+        },
+        {
+         "item": "Enchanted Platinum Bar",
+         "qty": 1,
+         "how": "Buy and enchant",
+         "parts": []
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "cls": "Shaman",
+   "epic": [
+    "Spear of Fate"
+   ],
+   "steps": [
+    {
+     "qty": 1,
+     "how": "Kill Glaron the Wicked",
+     "item": "Envy",
+     "zone": "Rathe Mountains",
+     "unverified": true,
+     "parts": []
+    },
+    {
+     "qty": 1,
+     "how": "Kill Glaron the Wicked",
+     "item": "Woe",
+     "zone": "Rathe Mountains",
+     "unverified": true,
+     "parts": []
+    },
+    {
+     "qty": 1,
+     "how": "Kill Tabien the Goodly",
+     "item": "Marr's Promise",
+     "zone": "Rathe Mountains",
+     "unverified": true,
+     "parts": []
+    },
+    {
+     "qty": 1,
+     "how": "Kill Black Dire",
+     "item": "Black Dire Pelt",
+     "zone": "Mistmoore",
+     "note": "trigger mob not up",
+     "unverified": true,
+     "parts": []
+    }
+   ]
+  },
+  {
+   "cls": "Warrior",
+   "epic": [
+    "Jagged Blade of War"
+   ],
+   "steps": [
+    {
+     "qty": 1,
+     "how": "Pick up +2513, +920",
+     "item": "Unjeweled Dragon Head Hilt",
+     "zone": "Lake Rathetear",
+     "parts": []
+    },
+    {
+     "qty": 1,
+     "how": "Kill Fright, Dread, or Terror (raid)",
+     "item": "Ball of Everliving Golem",
+     "zone": "Plane of Fear",
+     "parts": []
+    },
+    {
+     "qty": 1,
+     "how": "Kill An Ice Giant (raid)",
+     "item": "Block of Permafrost",
+     "zone": "Permafrost",
+     "parts": []
+    },
+    {
+     "qty": 1,
+     "how": "Kill Lord Nagafen (raid)",
+     "item": "Red Dragon Scales",
+     "zone": "Nagafen's Lair",
+     "parts": []
+    },
+    {
+     "qty": 1,
+     "how": "Kill Spiroc Lord",
+     "item": "Spiroc Wingblade",
+     "zone": "Plane of Air",
+     "parts": []
+    },
+    {
+     "qty": 1,
+     "how": "Kill A goblin wizard",
+     "item": "Heart of Frost",
+     "zone": "Permafrost",
+     "parts": []
+    },
+    {
+     "qty": 1,
+     "how": "Kill Hand of the Maestro",
+     "item": "Hand of the Maestro",
+     "zone": "Plane of Hate",
+     "parts": []
+    }
+   ]
+  },
+  {
+   "cls": "Wizard",
+   "epic": [
+    "Staff of the Four"
+   ],
+   "steps": [
+    {
+     "qty": 1,
+     "how": "Kill Phinigel Autropos (raid)",
+     "item": "Blue Crystal Staff",
+     "zone": "Kedge Keep",
+     "note": "The wiki says it does not drop now",
+     "unverified": true,
+     "parts": []
+    }
+   ]
+  }
+ ]
+}

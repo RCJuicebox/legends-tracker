@@ -151,8 +151,9 @@ chosen on Settings › Log files; **Arrange overlays** and **Mute** sit beside t
   damage meter.
 - Every buff, DoT and timer running, as the overlays show them, and **Activity**: timers started
   and faded, triggers fired, fights, loot, archives, notes and warnings, newest first.
-- **Try log lines**: paste log lines to run them through the live tracker and triggers, with their times
-  moved to now, or **Show demo timers** on the overlays.
+- **Try a log line** (in the DoTs & timers card) opens the Triggers page's Test card, the one place to
+  run pasted lines through the live tracker and triggers; **Show demo timers** beside it puts made-up
+  timers on the overlays.
 
 ## Damage meter
 
@@ -187,7 +188,8 @@ fighting near you, and everything hitting your side.
   are marked as such; swings the game annotates `(Finishing Blow)` count as the AA, with the damage
   of the swings that procced. The same note sits on the skill rows in a drilldown.
 - **Everyone, Group, You.** Whose rows are listed. Group members are learned from the log's
-  join and leave lines and can be added by hand; a group-mate's pet joins them once it says
+  join and leave lines; under Group the roster shows them, to add anyone by name, take one off or
+  **Reset group** (the same roster Buffs' Your group edits); a group-mate's pet joins them once it says
   `/pet who leader`. A single capitalised name is a stranger or a named mob until it hits or heals
   someone whose side is known, and is then remembered.
 - **Pets.** Your own pet is yours from the first `<pet> told you, 'Attacking … Master.'`, and what
@@ -212,6 +214,10 @@ lines: Legends characters play three classes and change them, so each name keeps
 `/who <name>` for a group-mate the tracker does not know yet (the feed says so, once each) and
 `/who <your name>` for yourself; failing that, your own classes come from the Stats page. What each
 class can cast, and at what level, comes from `spells_us.txt`, up to the level cap of 50.
+
+**Your group** lists the members as the damage meter knows them (the log's join and leave lines),
+each with their classes and the buffs you want that they could cast; add anyone by name, take one
+off, or **Reset group**: it is the meter's roster, edited in either place.
 
 A buff counts as on you from its "you feel…" line, matched to the cast just before it, until its
 fade line or your death. Someone else's buff is timed at their `/who` level without their focus, so
@@ -291,11 +297,8 @@ layout tab sets how many cells go on a line, bag by bag, for your bags, bank and
 your inventory export's bag sizes. **Save and rebuild** writes the layout to `uifiles\<skin>\bag-layout.json`
 and runs the skin's rebuild, so the game draws the bags that way at its next `/loadskin`.
 
-**Rebuild.** A skin that is built by a script can ask for a button: a `legends-tracker.json` in its
-folder names the command (a program by its full path, and its arguments). Tradeskills shows a
-**Rebuild** button for each such skin and runs the command for the character shown. The first time
-a skin's button would run a program, the page shows the whole command and asks: a skin from anywhere
-could name any program, and nothing runs until you agree.
+A skin that is built by a script can ask for a **Rebuild** button; it sits beside the game folder on
+Settings › General (see [Settings](#settings)).
 
 ## Spell timers
 
@@ -405,8 +408,11 @@ place to confirm a log line's exact wording.
 Custom alerts for any log line: plain text (anywhere in the line, ignoring case) or a regular
 expression, with snippets `{C}` (your character), `{S1}` (any text), `{N1}` (a number) and
 `${Name}` (a named capture). Actions: speak, play a sound, show text, start a timer (with a warning,
-ended speech and end-early phrases). Each trigger has a live test box: paste a log line to see the
-match, the captures and exactly what it would do.
+ended speech and end-early phrases). The **Test** card at the foot of the page is the one place to try
+log lines: the last line is matched against the selected trigger (the phrase, the captures and exactly
+what it would do, without running it), and **Run for real** runs every line through Spell Timers and
+every trigger as if just logged, their times moved to now. **Try a log line** on Live and Spell Timers
+opens it.
 
 The sound library is the game's own `AudioTriggers\default` and `shared` folders plus the app's
 `sounds` folder.
@@ -820,7 +826,10 @@ timer (the lesser blade fiend is a 3% roll in TAKP, a spawn of its own in Legend
 out named NPCs (one of each, and their timers Legends' own), raid zones' timers of over an hour, and
 cities. Zones TAKP lacks fall back on eqlwiki's count of the race's NPCs in a zone, marked a guess.
 Beside each mob a step says what its spawns allow ("12 spots · 6:24"), and "spawn-bound" where your
-own pace there is up against it.
+own pace there is up against it. **Assumptions** folds the plan's inputs, their values in its summary
+line: the minutes between camps where your log knows no way, the kills an hour where nothing gives a
+number, your usual pace, **Avoid my faction plan's factions**, and the zone respawns your Respawns page
+has timed, each beside classic's.
 
 **Travel** between steps is the way your log has seen you go: from a camp's last kill to the next
 zone, then across each zone between as long as crossing it took you (gates and ports are trips like
@@ -881,7 +890,7 @@ of it, under a switch of its own (Overlays).
 
 An optional module: off until you turn it on under Settings › Modules, when **Plane of Sky** joins
 Goals in the sidebar. It reads every class's Test quests from the eqlwiki's Plane of Sky page
-(`scripts/sky-quests.mjs` builds `src/shared/game/skyQuests.json` from it), and has eight tabs:
+(`scripts/sky-quests.mjs` builds `src/shared/game/skyQuests.json` from it), and has seven tabs:
 
 - **Tests**: each Test with its class, reward, giver and what to say, the mobs to kill, and a chip
   for each thing it takes (its Wind Rune, from any Plane of Sky mob, and the island items) with how
@@ -889,9 +898,11 @@ Goals in the sidebar. It reads every class's Test quests from the eqlwiki's Plan
   of its items are missing, and which of them other Tests take too (🔗); ☆ stars it. Opened, it shows
   each item's count from your log and from the inventory export, what eqlwiki says each item and the
   reward is, the hand-ins (with **+1 hand-in** and **−1** to put the count right) and **Ignore this
-  Test**. Filters: class (your classes first), island, mob, words, and boxes to hide the Tests you
-  hold everything for, hide or show only those handed in, and show only the starred. Sorted nearest
-  to done (the Tests you can hand in now first), most recently looted, by class or by island.
+  Test**, which takes it out of every list. Filters: class (your classes first), island, mob, words,
+  and boxes to hide the Tests you hold everything for, hide or show only those handed in, show only
+  the starred, and **Show ignored**, which draws the ignored Tests faint among the rest, each with
+  **Show it again**. Sorted nearest to done (the Tests you can hand in now first), most recently
+  looted, by class or by island.
 - **Ready**: the Tests you hold everything for, with a box for those never handed in.
 - **Wish list**: **☆ Want it** on a Test puts its reward here, and + wants it more than once (two
   Wu's Fists of Mastery to merge is the Monk Test of Fists twice). It counts the hand-ins your log
@@ -904,7 +915,6 @@ Goals in the sidebar. It reads every class's Test quests from the eqlwiki's Plan
 - **Cleanup**: what you hold that every Test taking it has been handed in for and no wish wants. A
   Test can be done again and two rewards merge into a +1, so a row you hold a whole set for says Keep.
 - **Classes**: each class's Tests handed in, and whether it is unlocked as a Primary Class.
-- **Ignored**: the Tests you ignored, out of every other tab, with **Show it again**.
 
 What you hold is counted from your log, from your inventory export (`/outputfile inventory`: bags,
 bank, depot, worn and Storage, but not the currency tab or the Dragon Hoard, where the Wind Runes
@@ -917,6 +927,36 @@ achievements`) says you obtained its reward. That export's Primary Class Unlocks
 are unlocked; an export made with completed achievements hidden leaves out the classes that are,
 and a class unlocked by confirming it or by a token marks every reward obtained, so its rewards say
 nothing of its Tests.
+
+## Epics
+
+An optional module: off until you turn it on under Settings › Modules, when **Epics** joins Goals in
+the sidebar. It reads what to keep for each class's epic quest, pre-Kunark, from the eqlwiki's
+["Epic Items To Keep" checklist by Manlaan](https://eqlwiki.com/User:Manlaan/Epic_Items_To_Keep)
+(`scripts/epic-items.mjs` builds `src/shared/game/epicItems.json` from it; [SEQO](https://github.com/RealMaeel/seqo)
+reads the same page, and gave the finished epics' names and the Shadow Knight's two hand-in recipes
+the page leaves out), and has three tabs:
+
+- **Checklist**: each class picked (yours first, or every class, or one), its epic, how many of its
+  pieces are done, and its steps as a tree. A piece says how and where it comes ("Kill Lady Vox
+  (raid) · Permafrost"), how many you hold of how many are wanted, and ⚠ where the wiki has not
+  verified it. A step with steps under it is a quest or a craft: its reward in hand covers what makes
+  it (the Darkforge Breastplate covers its Decayed pieces and bars), a chain works (the Corrupted
+  Ghoulbane covers the Decrepit Sheath and what makes that), and the finished epic in hand covers the
+  whole class. An item two classes shown take, or two steps take, is wanted by both: one Shining
+  Metallic Robes reads 1/2 shared for an Enchanter and a Rogue. The box on every row **ticks a step
+  off** yourself, for what no file can see: a piece handed in, a reward quested on another PC. Words
+  find a step by its item, mob, zone or quest, and **Hide what is done** leaves what is left to gather.
+- **Targets**: where to hunt, zone by zone, for the pieces the classes shown are still missing, with
+  every class that wants each; what the wiki gives no zone for (bought, crafted, from mobs of many
+  zones) is under Anywhere.
+- **Items**: every item the steps take, with your log's count and the export's: type what you hold
+  where the log's is wrong, and the log goes on counting from your number.
+
+What you hold is counted as [Plane of Sky](#plane-of-sky) counts it: from your log (every copy you
+looted, kept or stored, less what a completed trade took and what you merged away), from your inventory
+export (`/outputfile inventory`: bags, bank, depot, worn and Storage), or the higher of the two for
+each item (the default).
 
 ## Stats
 
@@ -1026,7 +1066,7 @@ folder** opens the app's own `logs` folder.
 
 Six tabs: **General** (below), **Modules**, then [Overlays](#overlays), [Audio](#audio), [Log files](#log-files)
 and [Data sources](#data-sources), each of them set once and seldom opened again. **Modules** turns
-on the optional modules, pages for a part of the game not everyone plays ([Plane of Sky](#plane-of-sky)):
+on the optional modules, pages for a part of the game not everyone plays ([Plane of Sky](#plane-of-sky), [Epics](#epics)):
 off, a module's page leaves the sidebar, and what it keeps waits for when it is on again. What one page
 alone uses is set on that page: the damage meter's fights and sessions under the meter, and what
 Spell Timers tracks and says by default on Spell Timers.
@@ -1040,7 +1080,11 @@ dark one.
   diagnostics**: the version, your PC, the settings that matter, each process's memory and CPU (see
   [Measuring](#measuring)) and the end of the app's log, ready to paste into a bug report, with no
   keys and no Windows user name.
-- **Game**: the game folder (the character log is chosen on the Log files tab) and **Yield CPU to
+- **Game**: the game folder (the character log is chosen on the Log files tab), a **Rebuild** button
+  for each UI skin in it that asks for one (a `legends-tracker.json` in the skin's folder names the
+  command: a program by its full path, and its arguments; it runs for the character the character pages
+  show, and the first time a skin's button would run a program the whole command is shown and nothing
+  runs until you agree: a skin from anywhere could name any program) and **Yield CPU to
   EverQuest** (the app runs below normal priority, so the game wins every tie; sound stays normal).
   **UI size** scales this window from 90% to 200% (`Ctrl` `+`, `Ctrl` `-` and `Ctrl` `0` as in a
   browser); overlays have their own text sizes, on the Overlays tab.
@@ -1068,7 +1112,7 @@ The settings folder, `%APPDATA%\Legends Tracker` (or the `EQL_USER_DATA` folder)
 |---|---|
 | `settings.json` | Everything set on the pages: game folder, character log, other PCs' Logs folders, tracking, audio, overlays, damage meter and archive settings, the faction plan's Assumptions, the Live page's setup checklist, and per character the classes, levels, race and duration focus sources and the faction plan's locks, rule-outs and paces |
 | `settings.bak.json`, `triggers.bak.json` | The two files you make by hand, as each run found them, copied before the run first saves over them |
-| `skin-commands.json` | The UI skin rebuild commands you have agreed to run (Tradeskills) |
+| `skin-commands.json` | The UI skin rebuild commands you have agreed to run (Settings › General) |
 | `triggers.json` | Your triggers, respawn timers included; the first run copies them from `defaults/triggers.json` |
 | `spell-rules.json` | Per-spell settings from the Spell Timers page: tracking, cues, speech, colour, overlay, a fixed duration |
 | `casts.json` | Each ranked spell you have cast, when last and how often, for the Spell Timers page's list |
@@ -1084,6 +1128,7 @@ The settings folder, `%APPDATA%\Legends Tracker` (or the `EQL_USER_DATA` folder)
 | `hunter-broken.json` | The Hunter achievements you said do not work in Legends, left out of the plans and the overlay, and whether a wanted named that dies starts its respawn timer by itself (Time each kill) |
 | `slayer-races.json` | The races you said mobs are (Count as… on the Slayer page), for every character, over what eqlwiki says |
 | `sky.json` | Per character, the Plane of Sky wish list (each reward wanted, how many times, since when, and hand-ins you added), the Tests starred and ignored, hand-ins you added or took away, and what you said you hold where the log's count was wrong |
+| `epics.json` | Per character, the epic steps you ticked off by hand, and what you said you hold of an epic piece where the log's count was wrong |
 | `achievements-history.json` | Each achievements export kept small, for Achievements › Progress over time: how many achievements were done, by section, and each Slayer achievement's count, one entry an export |
 | `hunter-spots.json` | The spots you found Hunter named at in play (Found it here on the Hunter page), drawn on its maps and marked on the game's map with the built-in ones |
 | `map-marks.json` | What the Slayer and Hunter pages last marked on the game's map (`maps\LegendsTracker`), each page's apart |
@@ -1144,8 +1189,8 @@ of the skin's Group window (and the Player window's mana bar for your own mana c
 | Path | What |
 |---|---|
 | `src/core` | Log parsing and tailing, spell book, duration model, spell tracker, triggers, archiver, log check, the damage meter (`combatLines` reads the lines, `combatRoster` knows who is on which side, `combatMeter` keeps the fights, `combatTimeline` their seconds for the chart, `combatView` sums them for display), the loot ledger (`loot`), motes (`motes` counts them, `moteCalc` plans item upgrades, `mergeValue` picks the best merge, `spellMotes` the best spell to upgrade). Plain TypeScript with no Electron dependency, so it is unit-tested directly |
-| `src/features` | Feature modules, one folder each (factions, slayer, hunter, sky): the feature's logic (`core.ts`; for factions also `attribution.ts`, what caused each change, `questPages.ts`, eqlwiki's quest pages, and the achievement plan: `catalog.ts`, what can raise each faction, `names.ts`, `ways.ts`, one faction's ways to 2000, and `planner.ts` with its `model.ts`, `search.ts` and `steps.ts`; `cities.ts`, the Cities plan's guards), its main-process side (`main.ts`: the log-history consumers and what the page asks for; for slayer also `liveSource.ts`, the kills counted since the achievements export as the game is played, and for factions `followSource.ts`, the plan followed on the achievements overlay) and its pages (`page.tsx`, `planPage.tsx`, with the Plan tab's parts in `plan/`). `index.ts` lists their pages for the sidebar, an optional module's (sky) with what Settings › Modules says of it |
-| `src/shared` | What both processes use: the IPC contract (`ipc.ts`), settings and view types, the game's tables and what is known of the game beyond them (`game/`: classes, spell effect numbers, guide bonuses; `factions.ts`, the faction planner's lore from play and Allakhazam; `hunt.ts`, where to hunt each Slayer race; `skyQuests.json`, the Plane of Sky Tests, built by `scripts/sky-quests.mjs`), the default overlays and hotkeys |
+| `src/features` | Feature modules, one folder each (factions, slayer, hunter, sky, epics): the feature's logic (`core.ts`; for factions also `attribution.ts`, what caused each change, `questPages.ts`, eqlwiki's quest pages, and the achievement plan: `catalog.ts`, what can raise each faction, `names.ts`, `ways.ts`, one faction's ways to 2000, and `planner.ts` with its `model.ts`, `search.ts` and `steps.ts`; `cities.ts`, the Cities plan's guards), its main-process side (`main.ts`: the log-history consumers and what the page asks for; for slayer also `liveSource.ts`, the kills counted since the achievements export as the game is played, and for factions `followSource.ts`, the plan followed on the achievements overlay) and its pages (`page.tsx`, `planPage.tsx`, with the Plan tab's parts in `plan/`). `index.ts` lists their pages for the sidebar, an optional module's (sky, epics) with what Settings › Modules says of it |
+| `src/shared` | What both processes use: the IPC contract (`ipc.ts`), settings and view types, the game's tables and what is known of the game beyond them (`game/`: classes, spell effect numbers, guide bonuses; `factions.ts`, the faction planner's lore from play and Allakhazam; `hunt.ts`, where to hunt each Slayer race; `skyQuests.json`, the Plane of Sky Tests, built by `scripts/sky-quests.mjs`; `epicItems.json`, the epic checklist, built by `scripts/epic-items.mjs`), the default overlays and hotkeys |
 | `src/main` | Electron main process: windows, tray, overlays, speech, icons, persistence, the engine that joins it all (`engine/`, with the contract its parts keep in `feature.ts`), the data sources and long jobs (`sources/`), IPC handlers by family (`ipc/`) |
 | `src/preload` | The IPC bridge, which lets a page use only the channels in the contract |
 | `src/renderer` | The React UI (`index.html`), the overlays of one monitor (`overlays.html`), one overlay alone while it is arranged (`overlay.html`), the hidden audio mixer (`audio.html`) |

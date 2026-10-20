@@ -1,8 +1,6 @@
-import { MERGED_ITEM } from '../../core/phrases'
 import SKY from '../../shared/game/skyQuests.json'
 import { itemKey } from '../../core/inventory'
-import { parseLootLine } from '../../core/loot'
-import { SELF } from '../../core/combatLines'
+import { addItemTally, heldOf as heldOfCounts, readItemLine, type ItemTally } from '../../core/itemTally'
 import type { LogLine } from '../../core/logLine'
 import { leftOutIsDone, type AchSection } from '../../core/achievements'
 import type { Inventory } from '../../shared/character'
@@ -12,15 +10,8 @@ import type { Inventory } from '../../shared/character'
 // the player keeps (the wish list, favourites, Tests ignored, corrections). What the page draws from
 // them (each Test's view, the targets, the cleanup, the classes) is views.ts.
 //
-// What is held comes from the log alone, as a LogHistory consumer counts it:
-//   --You have looted a Nebulous Sapphire from Sister of the Spire's corpse.--          +1
-//   You looted a Wind Rune Neza from a blade storm's corpse and stored it in your currency   +1 (and the depot, the Dragon Hoard)
-//   You looted a Nebulous Sapphire from Sister of the Spire's corpse and sold it for free.  never held
-//   You offered 1 Nebulous Sapphire to Holwin.   then   You complete the trade with Holwin.  −1
-//   You have cancelled the trade.                                                       what was offered comes back
-//   You have successfully merged two items together to create a new item: Wu's Fist of Mastery +7    −1 (two become one)
-// Copies held before the log began are not in it: the player puts the count right by hand, and that
-// correction is kept as a difference, so the log goes on counting from it.
+// What is held comes from the log alone, as a LogHistory consumer counts it (src/core/itemTally.ts:
+// looted in, handed over or merged away out, with the player's correction for what the log never saw).
 //
 // A Test is done when a trade with its class's giver completes with its items in it. Which Test: the
 // one of that giver's whose items the trade held most of. The player's hand-ins of 2026-08-10 read so:
@@ -73,30 +64,16 @@ const GIVERS: ReadonlySet<string> = new Set(SKY_QUESTS.map((q) => q.giver))
 // ---- The log ----
 
 /** One stretch of log's count of the Sky's items, and the Tests it saw handed in. */
-export interface SkyTally {
-  /** By item key: copies that came in, and copies that went (handed over, merged away); when the last came in. */
-  items: Record<string, { got: number; gave: number; last?: number }>
+export interface SkyTally extends ItemTally {
   /** By Test name: when each hand-in was. */
   runs: Record<string, number[]>
-  /** The trade open at the end of what was read: its NPC and what was offered, by item as printed. */
-  trade?: { npc: string; items: Record<string, number> }
 }
 
 export const emptySkyTally = (): SkyTally => ({ items: {}, runs: {} })
 
-const OFFERED = /^You offered (\d+) (.+) to (.+)\.$/
-const TRADED = /^You complete the trade with (.+)\.$/
-const CANCELLED = 'You have cancelled the trade.'
-const MERGED = MERGED_ITEM
+export { lastLooted, loggedCounts } from '../../core/itemTally'
 
-function count(into: SkyTally, item: string, got: number, gave: number, at: number): void {
-  const k = itemKey(item)
-  if (!SKY_KEYS.has(k)) return
-  const c = (into.items[k] ??= { got: 0, gave: 0 })
-  c.got += got
-  c.gave += gave
-  if (got) c.last = at
-}
+const isSkyKey = (k: string) => SKY_KEYS.has(k)
 
 /** The Test a completed trade with one of the Sky's givers was: the giver's with most of its items in it. */
 export function questOfTrade(npc: string, offered: readonly string[]): SkyQuest | null {
@@ -111,62 +88,20 @@ export function questOfTrade(npc: string, offered: readonly string[]): SkyQuest 
   return best
 }
 
-/** Reads one line into a stretch's tally (the LogHistory consumer's reader). */
+/** Reads one line into a stretch's tally (the LogHistory consumer's reader): the items, and a trade with a giver as the Test it was. */
 export function readSkyLine(line: LogLine, into: SkyTally): void {
-  const text = line.text
-  if (text.startsWith('You offered ')) {
-    const m = OFFERED.exec(text)
-    if (!m) return
-    // Another NPC: the trade before is over, whatever became of it.
-    if (into.trade?.npc !== m[3]) into.trade = { npc: m[3], items: {} }
-    into.trade.items[m[2]] = (into.trade.items[m[2]] ?? 0) + Number(m[1])
-  } else if (text.startsWith('You complete the trade with ')) {
-    const m = TRADED.exec(text)
-    const t = into.trade
-    if (!m || !t || t.npc !== m[1]) return
-    delete into.trade
-    for (const [item, n] of Object.entries(t.items)) count(into, item, 0, n, line.time)
-    const q = GIVERS.has(t.npc) ? questOfTrade(t.npc, Object.keys(t.items)) : null
-    if (q) (into.runs[q.name] ??= []).push(line.time)
-  } else if (text === CANCELLED) {
-    delete into.trade
-  } else if (text.startsWith('You have successfully merged ')) {
-    const m = MERGED.exec(text)
-    if (m) count(into, m[1], 0, 1, line.time)
-  } else {
-    const e = parseLootLine(text)
-    // Kept, or put in the depot, the currency tab or the Dragon Hoard: held. Sold as it dropped: never
-    // held. Looted into a merge: one in, one out.
-    if (e?.kind === 'loot' && e.looter === SELF && e.outcome !== 'sold' && e.outcome !== 'merged') count(into, e.item, e.count, 0, line.time)
-  }
+  const t = readItemLine(line, into, isSkyKey)
+  const q = t && GIVERS.has(t.npc) ? questOfTrade(t.npc, Object.keys(t.items)) : null
+  if (q) (into.runs[q.name] ??= []).push(line.time)
 }
 
 /** The stretches of a character's history, oldest first, as one tally (the open trade is the last one's). */
 export function joinSkyTallies(stretches: readonly SkyTally[]): SkyTally {
   const out = emptySkyTally()
   for (const s of stretches) {
-    for (const [k, c] of Object.entries(s.items)) {
-      const o = (out.items[k] ??= { got: 0, gave: 0 })
-      o.got += c.got
-      o.gave += c.gave
-      if (c.last) o.last = Math.max(o.last ?? 0, c.last)
-    }
+    addItemTally(out, s)
     for (const [q, ts] of Object.entries(s.runs)) (out.runs[q] ??= []).push(...ts)
   }
-  return out
-}
-
-/** What the log says is held, by item key: what came in less what went, never under none. */
-export function loggedCounts(t: SkyTally): Record<string, number> {
-  const out: Record<string, number> = {}
-  for (const [k, c] of Object.entries(t.items)) out[k] = Math.max(0, c.got - c.gave)
-  return out
-}
-
-/** When the log last saw each item come in, by item key. */
-export function lastLooted(t: SkyTally): Record<string, number> {
-  const out: Record<string, number> = {}
-  for (const [k, c] of Object.entries(t.items)) if (c.last) out[k] = c.last
   return out
 }
 
@@ -241,10 +176,7 @@ export function skyMobs(): string[] {
 }
 
 /** Held, by item key: the log's count with the player's correction, never under none. */
-export function heldOf(s: Pick<SkyState, 'logged' | 'adjust'>, name: string): number {
-  const k = itemKey(name)
-  return Math.max(0, (s.logged[k] ?? 0) + (s.adjust[k] ?? 0))
-}
+export const heldOf = (s: Pick<SkyState, 'logged' | 'adjust'>, name: string): number => heldOfCounts(s, name)
 
 /** The hand-ins that count toward a wish: those the log saw since it was made, and those the player added. */
 export function wishDone(w: SkyWish, runs: Readonly<Record<string, readonly number[]>>): number {

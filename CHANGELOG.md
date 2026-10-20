@@ -4,7 +4,14 @@ What changed in each version. The release workflow publishes a version's section
 
 ## Unreleased
 
+- **Epics, an optional module.** Settings › Modules turns it on, and **Epics** joins Goals: what to keep for each class's epic quest, pre-Kunark, as the eqlwiki's "Epic Items To Keep" checklist by Manlaan lists it (the page SEQO reads too), with how many of each you hold from your log and inventory export. A quest's reward in hand covers what makes it (the Darkforge Breastplate its Decayed pieces and bars), the finished epic covers the whole class, an item two of your classes take is wanted by both, and a box on every step ticks off what no file can see. **Targets** says where to hunt for the rest, zone by zone; **Items** is where a count is put right.
+
 - **The sidebar's groups follow what the pages do.** Four groups where there were three: **Play** (Live, Damage Meter, Loot, Respawns), **Character** (Stats, Gear, Motes, Tradeskills), **Goals** (Achievements, Factions, Slayer, Hunter, and Plane of Sky when it is on) and **Cues** (Spell Timers, Buffs, Triggers: what the app watches for and says). Settings sits at the foot of the sidebar, over who is being watched. Motes moved beside Gear, whose Best merge it shows, and Buffs beside Spell Timers; no page changed inside, and the app opens where you left it.
+- **One place to try log lines.** The Triggers page's Test card takes pasted lines: the last is matched against the selected trigger, and **Run for real** runs them all through Spell Timers and every trigger as if just logged; **Try a log line** on Live (in the DoTs & timers card, beside **Show demo timers**) and on Spell Timers opens it. Live's own Try log lines card is gone.
+- **One group roster.** The Damage Meter's Group scope and Buffs' Your group show the same roster, and both edit it: add anyone by name, take one off, **Reset group**.
+- **Rebuild buttons moved to Settings › General,** beside the game folder, from the head of the Tradeskills page; Bag layout stays on Tradeskills.
+- **Slayer's zone respawns are under Assumptions,** with the plan's other inputs and counted in the fold's summary line, where before they had a fold of their own.
+- **Plane of Sky: Show ignored instead of an Ignored tab.** A box among the Tests tab's filters draws the ignored Tests faint among the rest, each with **Show it again**; the eighth tab is gone.
 
 ## 2.16.1 (2026-10-19)
 

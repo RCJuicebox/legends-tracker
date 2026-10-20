@@ -41,6 +41,15 @@ export const FEATURE_PAGES = [
     after: 'hunter',
     optional:
       'Every class’s Test quests, with what each takes and how many of each you have, counted from your log. A wish list keeps the rewards you want, and how many of each (two Wu’s Fists to merge), and adds up what they still take.'
+  },
+  {
+    id: 'epics',
+    group: 'Goals',
+    label: 'Epics',
+    icon: 'scroll',
+    after: 'sky',
+    optional:
+      'What to keep for each class’s epic quest, as the eqlwiki’s Epic Items To Keep checklist lists it, with how many of each you hold from your log and inventory export; a quest reward in hand covers what makes it. Targets says where to hunt for the rest.'
   }
 ] as const satisfies readonly FeaturePage[]
 

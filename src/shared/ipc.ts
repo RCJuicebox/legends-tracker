@@ -18,6 +18,7 @@ import type { SlayerPlanChoices, SlayerPlanData } from '../features/slayer/core'
 import type { SlayerMap, SlayerMark } from '../features/slayer/spawns'
 import type { HunterPlanData } from '../features/hunter/core'
 import type { SkyState } from '../features/sky/core'
+import type { EpicState } from '../features/epics/core'
 import type { AchievementTrack, PlayerLocation } from './tracking'
 import type { FocusReport } from '../core/itemFocus'
 import type { LootSnapshot, MobDrops } from '../core/loot'
@@ -504,6 +505,12 @@ export interface Invokes {
   'sky:mark': (character: string, quest: string, mark: 'favorite' | 'ignored', on: boolean) => SkyState
   /** Hand-ins of a Test the player adds over what the log saw (or takes away, below 0); the state after. */
   'sky:turnIns': (character: string, quest: string, hand: number) => SkyState
+  /** What Goals › Epics shows for a character: the epic pieces its logs and inventory export count, the steps ticked off and its corrections. */
+  'epics:state': (character: string) => EpicState
+  /** Ticks a step off by hand (by its tick key, "class|step"), or unticks it; the state after. */
+  'epics:tick': (character: string, key: string, on: boolean) => EpicState
+  /** Says how many of an item the character holds: kept as a correction to the log's count; the state after. */
+  'epics:have': (character: string, item: string, have: number) => EpicState
   /** Where the character being played is in its faction plan, and its Slayer counts since its achievements export. */
   'achievements:track': (watching?: boolean) => AchievementTrack | null
   /** The player's last /loc, while they are still in its zone; null without one (FEAT-023). */
@@ -747,6 +754,9 @@ const INVOKE_CHANNELS: Record<InvokeChannel, true> = {
   'sky:have': true,
   'sky:mark': true,
   'sky:turnIns': true,
+  'epics:state': true,
+  'epics:tick': true,
+  'epics:have': true,
   'achievements:track': true,
   'game:location': true,
   'character:exports': true,

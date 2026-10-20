@@ -10,3 +10,4 @@ package-lock.json
 *.md
 src/shared/game/takpSpawns.json
 src/shared/game/skyQuests.json
+src/shared/game/epicItems.json

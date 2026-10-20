@@ -4580,3 +4580,71 @@ input[aria-invalid='true'] {
 .sky-target-table td:nth-child(2) {
   width: 90px;
 }
+
+/* ---------- Goals › Epics (an optional module) ---------- */
+
+.epic-class h2 {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.epic-bar-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.epic-bar {
+  display: inline-block;
+  width: 120px;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--line);
+  overflow: hidden;
+}
+.epic-bar > span {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+}
+/* The steps as a tree: each row indented by its depth, its parts listed under it. */
+.epic-steps {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.epic-step > .epic-step-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 5px 4px;
+  border-top: 1px solid var(--line);
+}
+.epic-step.done > .epic-step-row {
+  opacity: 0.6;
+}
+.epic-step-name a {
+  font-weight: 650;
+  color: inherit;
+  text-decoration: none;
+}
+.epic-step-name a:hover {
+  text-decoration: underline;
+}
+.epic-step-how {
+  min-width: 0;
+}
+/* Targets: every zone's table has the same columns, so they line up down the page. */
+.epic-target-table {
+  table-layout: fixed;
+}
+.epic-target-table td:first-child {
+  width: 36%;
+}
+.epic-target-table td:nth-child(2) {
+  width: 70px;
+}
+.epic-target-table td:last-child {
+  width: 22%;
+}
