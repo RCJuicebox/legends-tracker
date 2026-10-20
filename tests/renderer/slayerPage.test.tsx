@@ -169,7 +169,10 @@ it('draws the plan, the lockouts beside it, and keeps a camp ruled out', async (
   expect(text).toContain('costs Kaladim Residents −40 an hour')
   // Ten kedge at five a day.
   expect(text).toContain('Every day')
-  expect(text).toContain('5 a day · 2 days · 2 of 5 today')
+  expect(text).toContain('5 a day · 2 days')
+  // Today's kills as a box a difficulty, two of five ticked.
+  expect(host.querySelectorAll('.sl-pip')).toHaveLength(5)
+  expect(host.querySelectorAll('.sl-pip.on')).toHaveLength(2)
   // The steps under the Banestrike tier they work toward.
   expect(text).toContain('ProgressiveBanestrike rank 2')
   expect(text).toContain('a mystery ×3')

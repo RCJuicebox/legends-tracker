@@ -4111,6 +4111,33 @@ input[aria-invalid='true'] {
   color: var(--on-accent);
 }
 
+/* Plan › Slayer, Every day: a raid lockout's kills today, a box a difficulty, ticked as they die. */
+.sl-pips {
+  display: inline-flex;
+  gap: 3px;
+  vertical-align: middle;
+}
+.sl-pip {
+  display: inline-grid;
+  place-items: center;
+  width: 14px;
+  height: 14px;
+  border: 1px solid var(--line-3);
+  border-radius: 2px;
+  font-size: 10px;
+  line-height: 1;
+}
+.sl-pip.on {
+  border-color: var(--accent-2);
+  background: color-mix(in srgb, var(--accent-2) 22%, transparent);
+  color: var(--accent-2);
+}
+.sl-pips.full .sl-pip.on {
+  border-color: var(--green);
+  background: color-mix(in srgb, var(--green) 22%, transparent);
+  color: var(--green-text);
+}
+
 /* Plan › Slayer: an achievement's count on its step, as a thin bar beside the numbers (LT-653). */
 .sl-count-bar {
   display: inline-block;

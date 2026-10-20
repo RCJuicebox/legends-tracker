@@ -235,6 +235,23 @@ function Limit({ camp }: { camp: SlayerPlanCamp }) {
   )
 }
 
+/** A raid lockout's kills today as boxes, one a difficulty: ticked as the log sees them die, cleared at the noon reset. */
+function LockoutPips({ done, of }: { done: number; of: number }) {
+  const boxes = Math.max(of, done)
+  return (
+    <Tip
+      className={`sl-pips${of > 0 && done >= of ? ' full' : ''}`}
+      text={`${done} of ${of} killed today: kills of its mobs your log has seen since the daily reset at noon Eastern (the live counts, since your export)`}
+    >
+      {Array.from({ length: boxes }, (_, i) => (
+        <span key={i} className={`sl-pip${i < done ? ' on' : ''}`}>
+          {i < done ? '✓' : ''}
+        </span>
+      ))}
+    </Tip>
+  )
+}
+
 /** A Hunter named's spawn, as Plan › Hunter puts it: "1 spot · 25% · 4:30". */
 const namedSpawn = (n: HunterZone['left'][number]) =>
   n.spawn
@@ -574,15 +591,10 @@ export function Slayer() {
                           <span className="fp-zone">{d.camp.zone}</span>
                           {isHere(d.camp.zone) && <span className="chip fp-now-chip">You are here</span>}
                           <span className="small">{d.camp.kinds.map((k) => k.name).join(', ')}</span>
+                          {d.camp.today !== undefined && <LockoutPips done={d.camp.today} of={Math.max(...d.goals.map((g) => d.camp.pace[g] ?? 0))} />}
                           <span className="spacer" />
                           <span className="mono fp-time">
                             {Math.max(...d.goals.map((g) => d.camp.pace[g] ?? 0))} a day · {d.days} days
-                            {d.camp.today !== undefined && (
-                              <Tip text="Kills of its mobs your log has seen since midnight (the live counts, since your export)">
-                                {' '}
-                                · {d.camp.today} of {Math.max(...d.goals.map((g) => d.camp.pace[g] ?? 0))} today
-                              </Tip>
-                            )}
                           </span>
                         </div>
                         <div className="small">

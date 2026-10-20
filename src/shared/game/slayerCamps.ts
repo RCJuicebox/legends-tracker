@@ -23,6 +23,37 @@ export interface SlayerCamp {
   said: string
 }
 
+/** The game's daily reset, when raid lockouts open again: noon US Eastern (the player, 2026-10-20; the replay timer ends then). */
+const RESET_ZONE = 'America/New_York'
+const RESET_HOUR = 12
+
+/** When the lockout day a time falls in began: the last daily reset at or before it. */
+export function lockoutDayStart(now: number = Date.now()): number {
+  const fmt = new Intl.DateTimeFormat('en-US', {
+    timeZone: RESET_ZONE,
+    hourCycle: 'h23',
+    year: 'numeric',
+    month: 'numeric',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: 'numeric',
+    second: 'numeric'
+  })
+  const wall = (t: number) => {
+    const p = Object.fromEntries(fmt.formatToParts(t).map((x) => [x.type, Number(x.value)]))
+    return { y: p.year, m: p.month - 1, d: p.day, ms: Date.UTC(p.year, p.month - 1, p.day, p.hour, p.minute, p.second) }
+  }
+  // The zone's offset at a time, asked again at the answer so a clock change that day lands right.
+  const offset = (t: number) => wall(t).ms - Math.floor(t / 1000) * 1000
+  const reset = (y: number, m: number, d: number) => {
+    const w = Date.UTC(y, m, d, RESET_HOUR)
+    return w - offset(w - offset(w))
+  }
+  const { y, m, d } = wall(now)
+  const today = reset(y, m, d)
+  return today <= now ? today : reset(y, m, d - 1)
+}
+
 /**
  * Where in a zone, as players say, for the achievements named: shown with a step there for one of
  * them, whatever paces it; `at`, where to stand, as /waypoint takes it (y, x), marked on its map.

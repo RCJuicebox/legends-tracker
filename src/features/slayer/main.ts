@@ -33,6 +33,7 @@ import {
 import { mapMarks, mobSpawns, parseMap, petCamps, raceMixer, spotsIn, zoneIndex, zoneTimings, type MobSpawn, type SlayerMap, type SlayerMark, type SpawnTables } from './spawns'
 import type { RespawnFallback, RespawnRecord, RespawnRecords } from '../../core/respawns'
 import TAKP from '../../shared/game/takpSpawns.json'
+import { lockoutDayStart } from '../../shared/game/slayerCamps'
 import { hunterZones } from '../hunter/core'
 import { newerBuildWrote } from '../../main/schema'
 import type { MapPoint } from '../../core/where'
@@ -343,13 +344,12 @@ export class SlayerPlanner implements AppFeature {
       place: placeSpawn,
       killSpeed: killSpeed ?? DEFAULT_CHOICES.pace
     })
-    // A raid lockout's kills so far today, from the live counts: "2 of 5 today" (LT-657).
-    const midnight = new Date()
-    midnight.setHours(0, 0, 0, 0)
+    // A raid lockout's kills so far today, since the game's noon reset, from the live counts: "2 of 5 today" (LT-657).
+    const reset = lockoutDayStart()
     for (const c of camps) {
       if (!c.daily) continue
       const mobs = c.kinds.flatMap((k) => k.name.split(', '))
-      c.today = this.live.killsSince(character, mobs, midnight.getTime())
+      c.today = this.live.killsSince(character, mobs, reset)
     }
     // A named counts for the character that killed it: its own log alone, as on Plan › Hunter (LT-715).
     // Less the Hunter achievements the player has said do not work.
