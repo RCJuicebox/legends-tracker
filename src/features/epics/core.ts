@@ -15,7 +15,7 @@ import { SPELL_QUEST_DATA } from './spellQuests'
 // the steps ticked off by hand (a turn-in no file can see) and the corrections to the counts. What the
 // page draws from them (each class's steps, what is still needed of each item, where to hunt) is views.ts.
 // The five class spell quests (spellQuests.ts) are lists of the same kind, one a spell, counted and
-// ticked the same way: an item one wants and an epic too is wanted by both.
+// ticked the same way and kept in the same file; Goals › Spell Quests is their page and module.
 
 /** One step of a class's list: a piece to hold, or a quest or craft whose parts are the steps under it. */
 export interface EpicStep {

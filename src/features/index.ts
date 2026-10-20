@@ -49,7 +49,16 @@ export const FEATURE_PAGES = [
     icon: 'scroll',
     after: 'sky',
     optional:
-      'What to keep for each class’s epic quest, as the eqlwiki’s Epic Items To Keep checklist lists it, and for the five class spell quests (Tashania, Ice Comet, Divine Might, Life Leech, Call of Flame), with how many of each you hold from your log and inventory export; a quest reward in hand covers what makes it. Targets says where to hunt for the rest.'
+      'What to keep for each class’s epic quest, as the eqlwiki’s Epic Items To Keep checklist lists it, with how many of each you hold from your log and inventory export; a quest reward in hand covers what makes it. Targets says where to hunt for the rest.'
+  },
+  {
+    id: 'spellquests',
+    group: 'Goals',
+    label: 'Spell Quests',
+    icon: 'book',
+    after: 'epics',
+    optional:
+      'The five class spells a quest gives (Tashania, Ice Comet, Divine Might, Life Leech, Call of Flame), every step of each with how many of each piece you hold from your log and inventory export. Every class’s by default; pick yours to narrow it. Targets says where to hunt for the rest.'
   }
 ] as const satisfies readonly FeaturePage[]
 

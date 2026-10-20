@@ -94,7 +94,7 @@ describe('a spell quest’s steps', () => {
     expect(leech.near).toBe(1)
   })
 
-  it('share an item with an epic: the Shadow Knight’s three bars and the Paladin’s two', () => {
+  it('count an item with an epic’s when listed together: the Shadow Knight’s three bars and the Paladin’s two', () => {
     const lists = [...pickClasses({ cls: 'mine' }, ['Paladin', 'Shadow Knight'], 'epic'), ...pickClasses({ cls: 'mine' }, ['Paladin', 'Shadow Knight'], 'spell')]
     const views = classViews(lists, state({ logged: { 'enchanted platinum bar': 4 } }), 'log')
     const dm = find(views.find((c) => c.key === 'Divine Might')!.steps, 'Enchanted Platinum Bar')
@@ -128,12 +128,13 @@ describe('the spell quests on the page', () => {
   })
 
   it('list their items once, the scrolls after the pieces', () => {
-    const rows = itemRows()
+    const rows = itemRows('spell')
     expect(rows.filter((r) => r.name === 'Old Silver Coin')).toEqual([
       { name: 'Old Silver Coin', how: 'Ground spawn', zone: "Ak'Anon", classes: ['Tashania (Enchanter)'], kind: 'piece' }
     ])
     expect(rows.find((r) => r.name === 'Spell: Tashania')).toMatchObject({ kind: 'spell', classes: ['Tashania (Enchanter)'] })
-    expect(rows.find((r) => r.name === 'Enchanted Platinum Bar')!.classes).toEqual(expect.arrayContaining(['Shadow Knight', 'Divine Might (Paladin)']))
+    expect(rows.find((r) => r.name === 'Enchanted Platinum Bar')!.classes).toEqual(['Divine Might (Paladin)'])
+    expect(rows.find((r) => r.name === 'Ghoulbane')).toBeUndefined()
   })
 })
 
@@ -143,6 +144,9 @@ describe('the spell quests’ cue', () => {
     expect(w).toEqual([{ cls: 'Shadow Knight', spell: 'Life Leech', forWhat: 'Faceted Hyacinth Telesm', epic: false }])
     expect(lootCue('Crystalline Orb', w)).toBe('Crystalline Orb dropped: Shadow Knight’s Life Leech quest, for the Faceted Hyacinth Telesm')
     expect(wantedBy(state({ ticks: ['Life Leech|Spell: Life Leech'] }), 'Crystalline Orb')).toEqual([])
+    // Each kind is its own module: the epics alone want no Crystalline Orb.
+    expect(wantedBy(state(), 'Crystalline Orb', ['epic'])).toEqual([])
+    expect(wantedBy(state(), 'Crystalline Orb', ['spell'])).toHaveLength(1)
   })
 
   it('knows the named that drop a piece, and leaves the common mobs to their loot', () => {

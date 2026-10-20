@@ -9,7 +9,7 @@ import { tempDir } from '../../tempDir'
 
 // Goals › Epics' live cue against a log on disk: a line the tailer hands the engine, written to the
 // log as the game writes it, cues on the Live page's feed and the alert overlay while the module is on
-// and the piece is still wanted, and not once enough is held.
+// and the piece is still wanted, and not once enough is held; a spell quest's piece while Spell Quests is.
 
 const h = vi.hoisted(() => ({ dir: '' }))
 vi.mock('electron', () => ({ app: { getPath: () => h.dir }, ipcMain: { handle: () => {}, on: () => {} } }))
@@ -83,5 +83,15 @@ describe('the Epics drop cue', () => {
     expect(await replay('21:30:10', "--You have looted a Rusty Dagger from a gnoll's corpse.--")).toBe(false)
     expect(await replay('21:30:20', "--Brenna has looted a Ghoulbane from the froglok shin lord's corpse.--")).toBe(false)
     expect(feed).toEqual([])
+  })
+
+  it('says a spell quest’s piece only while Spell Quests, its own module, is on', async () => {
+    feed.length = 0
+    expect(await replay('21:40:00', "--You have looted a Prickly Pear from an icy terror's corpse.--")).toBe(true)
+    expect(feed).toEqual([])
+    settings.modules.spellquests = true
+    settings.modules.epics = false
+    expect(await replay('21:40:10', "--You have looted a Crystalline Orb from a stone spider's corpse.--")).toBe(true)
+    expect(feed).toEqual([{ kind: 'loot', text: 'Crystalline Orb dropped: Shadow Knight’s Life Leech quest, for the Faceted Hyacinth Telesm' }])
   })
 })

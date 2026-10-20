@@ -63,7 +63,8 @@ const PAGE_NAMES = [
   'Slayer',
   'Hunter',
   'Sky',
-  'Epics'
+  'Epics',
+  'SpellQuests'
 ]
 let pages: Record<string, Page>
 let StateProvider: ComponentType<{ children: React.ReactNode }>
@@ -146,7 +147,7 @@ describe('every page draws', () => {
     // The shell's own pages as main.tsx imports them, and the feature modules' as features/pages.tsx does.
     const read = (f: string) => readFileSync(join(__dirname, '../../src', f), 'utf8')
     const shellPages = [...read('renderer/src/main.tsx').matchAll(/^import \{ (\w+) \} from '\.\/pages\/\w+'$/gm)].map((m) => m[1])
-    const featurePages = [...read('features/pages.tsx').matchAll(/^import \{ (\w+) \} from '\.\/\w+\/page'$/gm)].map((m) => m[1])
+    const featurePages = [...read('features/pages.tsx').matchAll(/^import \{ (\w+) \} from '\.\/\w+\/\w*[pP]age'$/gm)].map((m) => m[1])
     const drawn = [...shellPages, ...featurePages]
     expect(drawn.sort()).toEqual([...PAGE_NAMES].sort())
     expect(Object.keys(pages).sort()).toEqual([...PAGE_NAMES].sort())

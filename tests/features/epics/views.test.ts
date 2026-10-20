@@ -138,7 +138,7 @@ describe('the Targets', () => {
 
 describe('the Items', () => {
   it('list every item once with who takes it, the finished epics last', () => {
-    const rows = itemRows()
+    const rows = itemRows('epic')
     const robes = rows.find((r) => r.name === 'Shining Metallic Robes')!
     expect(robes).toEqual({ name: 'Shining Metallic Robes', how: 'Kill The ghoul arch magi', zone: 'Lower Guk', classes: ['Enchanter', 'Rogue'], kind: 'piece' })
     const bars = rows.filter((r) => r.name === 'Enchanted Platinum Bar')

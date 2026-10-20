@@ -221,15 +221,15 @@ export interface ItemRow {
   kind: 'piece' | 'epic' | 'spell'
 }
 
-/** Every item the steps take, and every finished epic and spell, each once, by name: the pieces first. */
-export function itemRows(): ItemRow[] {
+/** Every item a kind of list's steps take, and what finishes each, each once, by name: the pieces first. */
+export function itemRows(kind: EpicList['kind']): ItemRow[] {
   const by = new Map<string, ItemRow>()
   const add = (name: string, row: () => ItemRow, list: string) => {
     const r = by.get(itemKey(name)) ?? row()
     if (!r.classes.includes(list)) r.classes.push(list)
     by.set(itemKey(name), r)
   }
-  for (const c of EPIC_LISTS) {
+  for (const c of EPIC_LISTS.filter((l) => l.kind === kind)) {
     // The spell's scroll is the top step of its list, and what finishes it.
     for (const e of c.epic) add(e, () => ({ name: e, how: c.kind === 'spell' ? 'The spell’s scroll' : 'The finished epic', classes: [], kind: c.kind }), listName(c))
     for (const s of everyStep(c.steps)) {

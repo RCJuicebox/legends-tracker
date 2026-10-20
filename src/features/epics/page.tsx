@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useState, type ReactNode } from 'react'
 import { CharacterPicker } from '../../renderer/src/components/CharacterPicker'
 import { api } from '../../renderer/src/api'
 import { useInvoke, useVisibleInterval } from '../../renderer/src/hooks'
@@ -9,58 +9,99 @@ import { num, who, wikiUrl } from '../../core/format'
 import { itemKey } from '../../core/inventory'
 import { heldOf } from '../../core/itemTally'
 import { useCharacterChoice } from '../../renderer/src/character'
-import { EPIC_CLASSES, EPIC_SOURCE, EPIC_URL, SPELL_QUESTS, tickKey, type EpicState } from './core'
+import { EPIC_CLASSES, EPIC_SOURCE, EPIC_URL, tickKey, type EpicList, type EpicState } from './core'
 import { ANYWHERE, classViews, filterViews, itemRows, NO_FILTER, pickClasses, targets, type ClassView, type CountFrom, type EpicFilter, type StepView } from './views'
 
 // Goals › Epics (an optional module, Settings › Modules): what to keep for each class's epic quest, as
-// the eqlwiki's checklist lists it, with what the character holds of each; the five class spell
-// quests, the same way; Targets, where to hunt for what either is missing; and Items, where a count is
-// put right.
+// the eqlwiki's checklist lists it, with what the character holds of each; Targets, where to hunt for
+// what is missing; and Items, where a count is put right. Goals › Spell Quests (spellPage.tsx, its own
+// module) is the same page over the class spell quests, from the same counts and ticks.
 
-type View = 'checklist' | 'spells' | 'targets' | 'items'
+type View = 'checklist' | 'targets' | 'items'
 
-/** The classes a spell quest is for, as a sentence ends: "an Enchanter, a Wizard, … and a Ranger". */
-const SPELL_CLASSES = SPELL_QUESTS.map((q) => `${/^[AEIOU]/.test(q.cls) ? 'an' : 'a'} ${q.cls}`)
-  .join(', ')
-  .replace(/, ([^,]*)$/, ' and $1')
+const VIEWS: readonly View[] = ['checklist', 'targets', 'items']
 
-const HOW = (
-  <>
-    <div>
-      <b>The checklist</b> is the eqlwiki’s “Epic Items To Keep” by Manlaan ({EPIC_SOURCE}): what each class’s epic quest takes that can be gathered now, pre-Kunark. A step with
-      steps under it is a quest or a craft: its reward in hand covers what makes it, as does the finished epic. ⚠ marks what the wiki has not verified. SEQO reads the same page.
-    </div>
-    <div>
-      <b>What you hold</b> is counted from your log (every copy you looted, kept or stored, less what you handed over or merged away), from your inventory export (
-      <code>/outputfile inventory</code>: bags, bank, depot, worn and Storage), or the higher of the two for each item. Copies you had before your log began are put right on the
-      Items tab. An item two of your classes take is wanted by both, so one of it reads 1/2.
-    </div>
-    <div>
-      <b>Spell quests</b> are the five class spells a quest gives (Tashania, Ice Comet, Divine Might, Life Leech and Call of Flame), each from its eqlwiki quest page; SEQO chose
-      the five. The scroll in hand covers the quest. Most pieces are ground spawns, which may leave no line in your log: the inventory export counts them, or tick them off. The ten
-      Old Silver Coins share one name, and the ten Rods too, so they are counted together: tick each spot off as you pick it up. A piece an epic and a spell quest both take is
-      wanted by both, on Targets too; tick the spell off to leave a quest out.
-    </div>
-    <div>
-      <b>Tick a step off</b> yourself for what no file can see: a piece handed in, a reward quested on another PC, a step you will not do.
-    </div>
-  </>
+/** What sets one checklist page apart from the other: its lists, its words, and how it opens. */
+export interface ChecklistPageConfig {
+  /** The kind of list it shows. */
+  kind: EpicList['kind']
+  /** What its remembered choices are kept under ("epics" keeps the names it always had). */
+  id: string
+  title: string
+  lead: string
+  how: ReactNode
+  credit: ReactNode
+  /** The class pick it opens on: 'mine' (the character's classes) or 'all'. */
+  cls: 'mine' | 'all'
+  /** The classes its class pick offers. */
+  classes: readonly string[]
+  /** What it says when the classes picked have no list. */
+  empty: (picked: string) => string
+}
+
+const WHAT_YOU_HOLD = (
+  <div>
+    <b>What you hold</b> is counted from your log (every copy you looted, kept or stored, less what you handed over or merged away), from your inventory export (
+    <code>/outputfile inventory</code>: bags, bank, depot, worn and Storage), or the higher of the two for each item. Copies you had before your log began are put right on the
+    Items tab. An item two of the lists shown take is wanted by both, so one of it reads 1/2.
+  </div>
 )
+
+const TICK_OFF = (
+  <div>
+    <b>Tick a step off</b> yourself for what no file can see: a piece handed in, a reward quested on another PC, a step you will not do.
+  </div>
+)
+
+const EPICS: ChecklistPageConfig = {
+  kind: 'epic',
+  id: 'epics',
+  title: 'Epics',
+  lead: 'What to keep for each class’s epic quest, and how much of it you hold; where to hunt for the rest.',
+  how: (
+    <>
+      <div>
+        <b>The checklist</b> is the eqlwiki’s “Epic Items To Keep” by Manlaan ({EPIC_SOURCE}): what each class’s epic quest takes that can be gathered now, pre-Kunark. A step with
+        steps under it is a quest or a craft: its reward in hand covers what makes it, as does the finished epic. ⚠ marks what the wiki has not verified. SEQO reads the same page.
+      </div>
+      {WHAT_YOU_HOLD}
+      {TICK_OFF}
+    </>
+  ),
+  credit: (
+    <>
+      Checklist from <a href={EPIC_URL}>Epic Items To Keep</a> by Manlaan on eqlwiki.com, which also has each class’s Epic Quest walkthrough; SEQO (RealMaeel) reads the same page.
+    </>
+  ),
+  cls: 'mine',
+  classes: EPIC_CLASSES.map((c) => c.cls),
+  empty: () => 'No class picked.'
+}
+
+/** The words both checklist pages' How text says alike. */
+export const checklistParts = { WHAT_YOU_HOLD, TICK_OFF }
+
+export function Epics() {
+  return <ChecklistPage config={EPICS} />
+}
 
 type Act = {
   tick: (key: string, on: boolean) => void
   have: (item: string, n: number) => void
 }
 
-export function Epics() {
+/** A checklist page: a kind of list (epics, or spell quests), with the counts, ticks and corrections the Epics module keeps. */
+export function ChecklistPage({ config: c }: { config: ChecklistPageConfig }) {
   const chars = useCharacterChoice('inventory', { withLogs: true })
   const character = chars.character
   const q = useInvoke(character ? 'epics:state' : null, [character])
   useVisibleInterval(q.reload, 60_000)
-  const [view, setView] = useRemembered<View>('epics.view', 'checklist')
-  const [kept, setFilter] = useRemembered<Omit<EpicFilter, 'text'>>('epics.filter', { cls: 'mine', hideDone: false })
+  const [remembered, setView] = useRemembered<View>(`${c.id}.view`, 'checklist')
+  // A tab this page no longer has (the Epics page's old Spell quests tab) opens the checklist.
+  const view = VIEWS.includes(remembered) ? remembered : 'checklist'
+  const [kept, setFilter] = useRemembered<Omit<EpicFilter, 'text'>>(`${c.id}.filter`, { cls: c.cls, hideDone: false })
   const [text, setText] = useState('')
-  const [from, setFrom] = useRemembered<CountFrom>('epics.from', 'both')
+  const [from, setFrom] = useRemembered<CountFrom>(`${c.id}.from`, 'both')
   const s = q.data
   const f = useMemo<EpicFilter>(() => ({ ...NO_FILTER, ...kept, text }), [kept, text])
 
@@ -80,18 +121,16 @@ export function Epics() {
   const mine = useMemo(() => s?.classes ?? [], [s])
   // Without an inventory export there is the log alone.
   const counted: CountFrom = s?.exported ? from : 'log'
-  // The epics and the spell quests are counted together, so what both take is wanted by both.
-  const picked = useMemo(() => [...pickClasses(f, mine, 'epic'), ...pickClasses(f, mine, 'spell')], [f, mine])
+  const picked = useMemo(() => pickClasses(f, mine, c.kind), [f, mine, c.kind])
   const views = useMemo(() => (s ? classViews(picked, s, counted) : []), [s, picked, counted])
-  const shown = useMemo(() => views.filter((c) => c.kind === (view === 'spells' ? 'spell' : 'epic')), [views, view])
 
   return (
     <>
       <div className="page-head">
         <div>
-          <h1>Epics</h1>
+          <h1>{c.title}</h1>
           <div className="lead">
-            What to keep for each class’s epic quest and spell quest, and how much of it you hold; where to hunt for the rest. <Info label="How it is worked out" text={HOW} />
+            {c.lead} <Info label="How it is worked out" text={c.how} />
           </div>
         </div>
         <div className="actions">
@@ -111,12 +150,11 @@ export function Epics() {
         <>
           <Tabs
             className="mb-16"
-            label="Epics view"
+            label={`${c.title} view`}
             value={view}
             onChange={setView}
             tabs={[
               ['checklist', 'Checklist'],
-              ['spells', 'Spell quests'],
               ['targets', 'Targets'],
               ['items', 'Items']
             ]}
@@ -127,13 +165,13 @@ export function Epics() {
               <select value={f.cls === 'mine' && !mine.length ? 'all' : f.cls} onChange={(e) => setFilter({ ...kept, cls: e.target.value })} aria-label="Class">
                 {mine.length > 0 && <option value="mine">Your classes ({mine.join(', ')})</option>}
                 <option value="all">Every class</option>
-                {EPIC_CLASSES.map((c) => (
-                  <option key={c.cls} value={c.cls}>
-                    {c.cls}
+                {c.classes.map((cls) => (
+                  <option key={cls} value={cls}>
+                    {cls}
                   </option>
                 ))}
               </select>
-              {(view === 'checklist' || view === 'spells') && (
+              {view === 'checklist' && (
                 <>
                   <FilterBox placeholder="Find an item, mob, zone or quest…" label="Find an item, mob, zone or quest" value={text} onChange={setText} width={260} />
                   <label className="row tight small" title="What is left to gather: a step in hand, ticked off or covered is hidden">
@@ -144,24 +182,14 @@ export function Epics() {
               )}
             </div>
           )}
-          {view === 'checklist' || view === 'spells' ? (
-            <Checklist
-              views={shown}
-              f={f}
-              act={act}
-              empty={
-                view === 'spells' ? `No spell quest for ${f.cls === 'mine' && mine.length ? mine.join(' or ') : f.cls}: the five are for ${SPELL_CLASSES}.` : 'No class picked.'
-              }
-            />
+          {view === 'checklist' ? (
+            <Checklist views={views} f={f} act={act} empty={c.empty(f.cls === 'mine' && mine.length ? mine.join(' or ') : f.cls)} />
           ) : view === 'targets' ? (
             <Targets views={views} />
           ) : (
-            <Items s={s} filter={text} onText={setText} onHave={act.have} />
+            <Items s={s} kind={c.kind} filter={text} onText={setText} onHave={act.have} />
           )}
-          <div className="faint small mb-16">
-            Checklist from <a href={EPIC_URL}>Epic Items To Keep</a> by Manlaan on eqlwiki.com, which also has each class’s Epic Quest walkthrough; SEQO (RealMaeel) reads the same
-            page. Spell quests from their eqlwiki quest pages, with SEQO’s notes from the EQ Legends Tools quest guides.
-          </div>
+          <div className="faint small mb-16">{c.credit}</div>
         </>
       )}
     </>
@@ -368,11 +396,23 @@ function Targets({ views }: { views: readonly ClassView[] }) {
 }
 
 /** Every item the steps take, who takes it and how many are held: the place to put a count right. */
-function Items({ s, filter, onText, onHave }: { s: EpicState; filter: string; onText: (v: string) => void; onHave: (item: string, have: number) => void }) {
+function Items({
+  s,
+  kind,
+  filter,
+  onText,
+  onHave
+}: {
+  s: EpicState
+  kind: EpicList['kind']
+  filter: string
+  onText: (v: string) => void
+  onHave: (item: string, have: number) => void
+}) {
   const rows = useMemo(() => {
     const words = filter.toLowerCase().split(/\s+/).filter(Boolean)
-    return itemRows().filter((r) => words.every((w) => [r.name, r.how, r.zone ?? '', ...r.classes].join(' ').toLowerCase().includes(w)))
-  }, [filter])
+    return itemRows(kind).filter((r) => words.every((w) => [r.name, r.how, r.zone ?? '', ...r.classes].join(' ').toLowerCase().includes(w)))
+  }, [filter, kind])
   return (
     <>
       <div className="card row mb-16">

@@ -22,6 +22,7 @@ import {
   readEpicLine,
   sanitizeEpicCharacter,
   type EpicCharacter,
+  type EpicList,
   type EpicState,
   type EpicTally
 } from './core'
@@ -30,9 +31,10 @@ import { beforeCopy, dropsOf, killCue, lootCue, slainMob, wantedBy } from './cue
 // Goals › Epics' side of the app (an optional module): the epic pieces counted over each character's
 // logs (a LogHistory consumer), the inventory export as the game last wrote it, and what the player
 // keeps per character in epics.json: the steps ticked off and their corrections to the counts. The
-// consumer counts whether the module is on or not, so turning it on finds the counts ready. While the
-// module is on, a piece the character loots, or a named that drops one dying, is said on the Live
-// page's feed and the alert overlay when a class on its record still wants it (cue.ts).
+// consumer counts whether the module is on or not, so turning it on finds the counts ready. Goals ›
+// Spell Quests, a module of its own, reads and ticks through the same channels. While a module is on,
+// a piece the character loots, or a named that drops one dying, is said on the Live page's feed and the
+// alert overlay when a list of its kind on the character's classes still wants it (cue.ts).
 
 /** Each stretch of log's epic and spell-quest pieces, as a LogHistory consumer (2: the spell quests' pieces counted too). */
 const epicConsumer: HistoryConsumer<EpicTally> = {
@@ -42,6 +44,12 @@ const epicConsumer: HistoryConsumer<EpicTally> = {
 }
 
 const EPIC_KEY = 'epicItems'
+
+/** The module each kind of list is, by its page id: Goals › Epics and Goals › Spell Quests. */
+const MODULE_KINDS: readonly (readonly [string, EpicList['kind']])[] = [
+  ['epics', 'epic'],
+  ['spellquests', 'spell']
+]
 
 /** The cue's colour on the alert overlay, and how long it shows. */
 const CUE_COLOR = '#f7c965'
@@ -117,7 +125,10 @@ export class EpicTracker implements AppFeature {
 
   /** A line of the followed log: a piece looted, or a named that drops pieces slain, is looked into while the module is on. */
   private line(ctx: AppContext, line: LogLine): boolean {
-    if (ctx.store.settings.get().modules.epics !== true) return false
+    const modules = ctx.store.settings.get().modules
+    // Epics and Spell Quests are a module each: a kind cues while its own is on.
+    const kinds = MODULE_KINDS.filter(([id]) => modules[id] === true).map(([, kind]) => kind)
+    if (!kinds.length) return false
     const text = line.text
     if (text.startsWith('--You have looted ') || text.startsWith('You looted ')) {
       const e = parseLootLine(text)
@@ -125,7 +136,7 @@ export class EpicTracker implements AppFeature {
       if (e?.kind !== 'loot' || e.looter !== SELF || e.outcome === 'sold' || e.outcome === 'merged' || !isEpicItem(e.item)) return false
       this.cue(ctx, async (character) => {
         const s = beforeCopy(await this.state(ctx, character), e.item, e.count, line.time)
-        return lootCue(e.item, wantedBy(s, e.item))
+        return lootCue(e.item, wantedBy(s, e.item, kinds))
       })
       return true
     }
@@ -136,7 +147,7 @@ export class EpicTracker implements AppFeature {
       const s = await this.state(ctx, character)
       return killCue(
         mob,
-        items.map((item) => ({ item, wanted: wantedBy(s, item) }))
+        items.map((item) => ({ item, wanted: wantedBy(s, item, kinds) }))
       )
     })
     return true

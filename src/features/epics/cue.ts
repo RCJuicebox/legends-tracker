@@ -1,6 +1,6 @@
 import { itemKey } from '../../core/inventory'
 import { DIED, SLAIN_BY, SLAIN_BY_YOU } from '../../core/phrases'
-import { EPIC_LISTS, everyStep, type EpicState } from './core'
+import { EPIC_LISTS, everyStep, type EpicList, type EpicState } from './core'
 import { classViews, type StepView } from './views'
 
 // Goals › Epics' live cue (an optional module): the moment the character loots a piece, or a named that
@@ -32,12 +32,17 @@ export function beforeCopy<T extends Pick<EpicState, 'logged' | 'last'>>(s: T, i
   return { ...s, logged: { ...s.logged, [k]: Math.max(0, (s.logged[k] ?? 0) - count) } }
 }
 
-/** Every list (a class's epic, or a spell quest) of the character's classes that still wants an item, each once, its main class first. */
-export function wantedBy(s: Counts, item: string): WantedBy[] {
+/**
+ * Every list of the kinds given (the epics, the spell quests: each its own module) of the character's
+ * classes that still wants an item, each once, its main class first. Each kind is counted on its own,
+ * as its page counts it.
+ */
+export function wantedBy(s: Counts, item: string, kinds: readonly EpicList['kind'][] = ['epic', 'spell']): WantedBy[] {
   const k = itemKey(item)
-  const classes = EPIC_LISTS.filter((c) => s.classes.includes(c.cls)).sort((a, b) => s.classes.indexOf(a.cls) - s.classes.indexOf(b.cls))
+  const mine = (kind: EpicList['kind']) =>
+    EPIC_LISTS.filter((c) => c.kind === kind && s.classes.includes(c.cls)).sort((a, b) => s.classes.indexOf(a.cls) - s.classes.indexOf(b.cls))
   const out: WantedBy[] = []
-  for (const c of classViews(classes, s, 'both')) {
+  for (const c of kinds.flatMap((kind) => classViews(mine(kind), s, 'both'))) {
     const spell = c.spell ? { spell: c.spell.name } : {}
     const find = (views: readonly StepView[], above: StepView | null): WantedBy | null => {
       for (const v of views) {
