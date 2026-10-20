@@ -322,7 +322,6 @@ export function Slayer() {
   const [choices, setChoicesState] = useState<SlayerPlanChoices>(DEFAULT_CHOICES)
   const [openGoals, setOpenGoals] = useState(false)
   const [openOut, setOpenOut] = useState(false)
-  const [openTimes, setOpenTimes] = useState(false)
   const [reading, setReading] = useState(false)
   const [search, setSearch] = useState('')
   const words = useMemo(() => search.toLowerCase().split(/\s+/).filter(Boolean), [search])
@@ -776,6 +775,7 @@ export function Slayer() {
                   <span className="faint small sl-assume-now">
                     {choices.travelMin} min between camps · {num(choices.pace)}/h where nothing gives a number
                     {data.killSpeed !== null && ` · your usual pace ${num(Math.round(data.killSpeed))}/h`}
+                    {data.timings.length > 0 && ` · ${num(data.timings.length)} zone respawn${data.timings.length === 1 ? '' : 's'} timed`}
                   </span>
                 </summary>
                 <div className="fp-assume-grid">
@@ -809,6 +809,24 @@ export function Slayer() {
                     </label>
                   )}
                 </div>
+                {/* An input too: one Legends timer per zone, from the Respawns page, that a zone's spawn-table pace runs on. */}
+                {data.timings.length > 0 && (
+                  <div className="mt-12 small">
+                    <div>
+                      <b>Zone respawns</b> <span className="faint">{data.timings.length}</span>
+                    </div>
+                    <div className="faint mb-8">
+                      The spawns your Respawns page has timed (one spawn, a few gaps seen), beside TAKP’s classic timer: a zone’s spawn-table pace runs on the timer of those the
+                      tables give one spot.
+                    </div>
+                    {data.timings.map((t) => (
+                      <div key={t.zone}>
+                        <b>{t.zone}</b> <span className="mono">{t.timer === null ? 'no timer' : clock(t.timer)}</span>{' '}
+                        <span className="faint">· {t.timed.map((x) => `${x.name} ${clock(x.legends)}${x.classic ? ` (classic ${clock(x.classic)})` : ''}`).join(', ')}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </details>
             </div>
 
@@ -894,30 +912,6 @@ export function Slayer() {
                         <button className="btn small ghost" onClick={() => ruleOutMob(m, false)}>
                           Bring back
                         </button>
-                      </div>
-                    ))}
-                  </>
-                )}
-              </div>
-            )}
-
-            {data.timings.length > 0 && (
-              <div className="card mb-16">
-                <Disclosure open={openTimes} onToggle={() => setOpenTimes(!openTimes)} label="Zone respawns">
-                  <h2>
-                    Zone respawns <span className="faint small">{data.timings.length}</span>
-                  </h2>
-                </Disclosure>
-                {openTimes && (
-                  <>
-                    <div className="faint small mb-8">
-                      The spawns your Respawns page has timed (one spawn, a few gaps seen), beside TAKP’s classic timer: a zone’s spawn-table pace runs on the timer of those the
-                      tables give one spot.
-                    </div>
-                    {data.timings.map((t) => (
-                      <div key={t.zone} className="small">
-                        <b>{t.zone}</b> <span className="mono">{t.timer === null ? 'no timer' : clock(t.timer)}</span>{' '}
-                        <span className="faint">· {t.timed.map((x) => `${x.name} ${clock(x.legends)}${x.classic ? ` (classic ${clock(x.classic)})` : ''}`).join(', ')}</span>
                       </div>
                     ))}
                   </>

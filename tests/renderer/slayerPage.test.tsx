@@ -221,8 +221,8 @@ it('draws the plan, the lockouts beside it, and keeps a camp ruled out', async (
   expect(host.querySelectorAll('.sl-map-camp circle.sl-map-reach')).toHaveLength(1)
   expect(seen(host)).toContain('AFK pet spot: /waypoint -40, -30 · 1 spawn within 150, about 3 an hour on classic timers')
   await act(async () => button('Map').click())
-  // Timed respawns against classic.
-  await act(async () => button('Zone respawns').click())
+  // Timed respawns against classic, an input among the Assumptions, counted in the fold's summary.
+  expect(seen(host)).toContain('2 zone respawns timed')
   expect(seen(host)).toContain('Clan Crushbone 6:24 · Orc scoutsman 6:24 (classic 10:00), A wanderer 5:00')
   expect(seen(host)).toContain('Kedge Keep no timer · A sailfin 5:00')
   // A step's map shows its own mobs, not the Hunter named there; nothing of the plan goes on the game's map.
