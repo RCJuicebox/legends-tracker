@@ -136,8 +136,6 @@ export const CHECKS: { [K in InvokeChannel]: Check<Parameters<Invokes[K]>> } = {
   'update:check': none,
   'update:install': none,
   'audio:test': args(str),
-  'audio:azure': none,
-  'audio:setAzure': args(str, str),
   'audio:sound': args(str),
   'audio:sounds': none,
   'audio:watchDevices': args(bool),

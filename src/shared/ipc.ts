@@ -36,20 +36,7 @@ import type { CombatSnapshot, Segment, SegmentSummary, StitchedTimeline } from '
 import type { AppSettings, AudioSettings, CharacterSettings, FocusSource, MeterOverlayOptions, OverlayConfig, SpellRule } from './settings'
 import type { Trigger, TriggerTestResult } from './triggers'
 import type { FoundSpot } from './game/legendsSpawns'
-import type {
-  ArchiveInfo,
-  ArchiveOutcome,
-  ArchiveStatus,
-  AzureStatus,
-  FeedItem,
-  KnownSpell,
-  LogCheckRow,
-  LogFileInfo,
-  SpellSummary,
-  TimerView,
-  UpdateState,
-  WatchStatus
-} from './runtime'
+import type { ArchiveInfo, ArchiveOutcome, ArchiveStatus, FeedItem, KnownSpell, LogCheckRow, LogFileInfo, SpellSummary, TimerView, UpdateState, WatchStatus } from './runtime'
 
 // ---- Views main hands the pages ----
 
@@ -446,8 +433,6 @@ export interface Invokes {
   'update:install': () => void
 
   'audio:test': (text: string) => void
-  'audio:azure': () => AzureStatus
-  'audio:setAzure': (region: string, key: string) => AzureStatus
   'audio:sound': (file: string) => void
   'audio:sounds': () => string[]
   /** The Audio page is open (true) or closed (false): the output devices are listed only meanwhile. */
@@ -723,8 +708,6 @@ const INVOKE_CHANNELS: Record<InvokeChannel, true> = {
   'update:install': true,
   'audio:test': true,
   'audio:watchDevices': true,
-  'audio:azure': true,
-  'audio:setAzure': true,
   'audio:sound': true,
   'audio:sounds': true,
   'audio:voices': true,

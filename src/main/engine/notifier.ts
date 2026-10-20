@@ -53,7 +53,7 @@ export class Notifier {
 
   /**
    * Renders a new timer's cue phrases now, so the cue, when it is due, does not wait on the speech
-   * engine or Azure (LT-346). Both keep what they render, by text.
+   * engine (LT-346), which keeps what it renders, by text.
    */
   prepare(ns: Notification[]): void {
     const a = this.settings().audio

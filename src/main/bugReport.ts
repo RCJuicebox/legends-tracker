@@ -83,7 +83,7 @@ export async function saveBugReport(ctx: AppContext, file: string): Promise<{ na
     [
       `Legends Tracker ${app.getVersion()} bug report, ${new Date().toISOString()}.`,
       'Player and guild names are swapped for made-up ones (Kelwyn, Aldric, Brenna…) and what anyone said is cut;',
-      'the Windows user folder reads %USERPROFILE%. No keys are in it: the Azure key is kept apart from the settings.'
+      'the Windows user folder reads %USERPROFILE%.'
     ].join('\n')
   )
   zip.end()

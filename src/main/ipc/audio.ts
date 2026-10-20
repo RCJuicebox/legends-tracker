@@ -8,17 +8,9 @@ import type { AppContext } from '../context'
 // Speech, sounds and the output device.
 
 export function registerAudioIpc(ctx: AppContext): void {
-  const { store, engine, speech, azure } = ctx
+  const { store, engine, speech } = ctx
 
   handle('audio:test', (text) => engine.speak(textArg(text, 300), true))
-  handle('audio:azure', async () => {
-    await azure.load()
-    return azure.status()
-  })
-  handle('audio:setAzure', (region, key) => {
-    if (typeof region !== 'string' || typeof key !== 'string' || key.length > 200 || region.length > 40) throw new Error('Not a region and key.')
-    return azure.configure(region, key)
-  })
   // A page may play a sound from the sound folders, or a file one of the saved triggers already names.
   handle('audio:sound', (file) => {
     if (typeof file !== 'string') return

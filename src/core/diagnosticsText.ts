@@ -11,7 +11,7 @@ export function redact(text: string, home: string): string {
 
 /** The settings a support question turns on, on one line. */
 export function settingsSummary(s: AppSettings, triggers: number, home: string): string {
-  const voice = !s.audio.voice ? 'Windows default' : s.audio.voice.startsWith('azure:') ? `Azure ${s.audio.voice.slice(6)}` : s.audio.voice
+  const voice = s.audio.voice || 'Windows default'
   const overlays = s.overlays.map((o) => `${o.id}${o.visible ? '' : ' (hidden)'}`).join(', ')
   return redact(
     [

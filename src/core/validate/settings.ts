@@ -297,7 +297,8 @@ export function sanitizeSettings(v: unknown, fb: AppSettings): AppSettings | nul
     masterVolume: num(a.masterVolume, fb.audio.masterVolume, 0, 1),
     speechVolume: num(a.speechVolume, fb.audio.speechVolume, 0, 1),
     soundVolume: num(a.soundVolume, fb.audio.soundVolume, 0, 1),
-    voice: str(a.voice, fb.audio.voice),
+    // Azure's voices were taken out (2026-10-19): a voice saved as one ("azure:en-US-JennyNeural") is the Windows default.
+    voice: str(a.voice, fb.audio.voice).replace(/^azure:.*$/, ''),
     rate: num(a.rate, fb.audio.rate, 0.5, 2),
     muted: bool(a.muted, fb.audio.muted)
   })

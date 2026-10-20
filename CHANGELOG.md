@@ -2,6 +2,10 @@
 
 What changed in each version. The release workflow publishes a version's section as its release notes, and installed copies show them when an update arrives.
 
+## Unreleased
+
+- **Azure voices are gone.** Speech is the Windows voices alone: the Microsoft voices card on Settings › Audio, its key and the phrases it kept are removed. A voice that was an Azure one is now the Windows default; pick another under Voice.
+
 ## 2.17.1 (2026-10-19)
 
 - **Epics, an optional module.** Settings › Modules turns it on, and **Epics** joins Goals: what to keep for each class's epic quest, pre-Kunark, as the eqlwiki's "Epic Items To Keep" checklist by Manlaan lists it (the page SEQO reads too), with how many of each you hold from your log and inventory export. A quest's reward in hand covers what makes it (the Darkforge Breastplate its Decayed pieces and bars), the finished epic covers the whole class, an item two of your classes take is wanted by both, and a box on every step ticks off what no file can see. **Targets** says where to hunt for the rest, zone by zone; **Items** is where a count is put right.

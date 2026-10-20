@@ -440,3 +440,14 @@ describe('group health settings (FEAT-040, FEAT-043)', () => {
     expect(gh({ skin: '../up', calibrated: [], myManaPct: 'x' })).toMatchObject({ skin: 'JuiceboxUI', calibrated: {}, myManaPct: 0 })
   })
 })
+
+describe('the voice setting', () => {
+  const fb = defaultSettings()
+  const voice = (v: unknown) => sanitizeSettings({ ...fb, audio: { ...fb.audio, voice: v } }, fb)?.audio.voice
+
+  it('keeps a Windows voice, and makes an Azure one (taken out 2026-10-19) the Windows default', () => {
+    expect(voice('Microsoft Zira Desktop')).toBe('Microsoft Zira Desktop')
+    expect(voice('')).toBe('')
+    expect(voice('azure:en-US-JennyNeural')).toBe('')
+  })
+})

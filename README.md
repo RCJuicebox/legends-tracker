@@ -440,20 +440,10 @@ the mana bar hides it until the cast ends.
 ## Audio
 
 A tab of Settings. Speech is rendered by Windows' own speech engine (a PowerShell process driving WinRT and
-`System.Speech`, started when first needed and stopped after five quiet minutes) to WAV, or by Azure's
-neural voices with your own key, then mixed with alert sounds in one audio context on the device you
+`System.Speech`, started when first needed and stopped after five quiet minutes) to WAV, then mixed
+with alert sounds in one audio context on the device you
 choose. Speech follows that device instead of the system default. Phrases are cached. Speech plays
 one phrase at a time, and the backlog is capped so warnings about a finished fight get dropped.
-
-**Microsoft voices.** Azure AI Speech gives Microsoft's neural voices (Jenny, Aria, Guy and hundreds
-more) with your own key. Create a Speech resource in the Azure portal (the free tier allows half a
-million characters a month), then paste its key and region into the **Microsoft voices** card on
-Settings › Audio and press **Save and check**; the voices then join the Voice list. The key is kept
-encrypted with Windows' own data protection in `azure-speech.json`, is only ever sent to Azure, and
-is never shown again. Each phrase is fetched from Azure once and kept as a WAV in `speech-cache` in
-the cache folder (the newest 4,000), so a night's cues cost a few hundred characters. When Azure
-cannot answer (offline, a key turned down, over its limit), the Windows default voice speaks
-instead, so no cue is lost.
 
 ## Overlays
 
@@ -1139,7 +1129,6 @@ The settings folder, `%APPDATA%\Legends Tracker` (or the `EQL_USER_DATA` folder)
 | `map-marks.json` | What the Slayer and Hunter pages last marked on the game's map (`maps\LegendsTracker`), each page's apart |
 | `faction-follow.json` | Per character, the faction plan the achievements overlay follows: its steps, the step you are on, and what is done |
 | `slayer-facts.json` | Which mobs your achievements exports showed do, or do not, count toward which Slayer achievements, with the kills and the rise that settled it |
-| `azure-speech.json` | The Azure region, the key encrypted with Windows' data protection, and the voice list |
 | `app-icon.ico` | Running from source only: the icon for the "Legends Tracker (source)" Start menu shortcut |
 | `catchup.json` | How far into which log mote tracking had read when the app closed, so the next start carries on from there |
 | `mote-others.json` | For each character log on another PC (Settings › Log files): how far mote tracking has read it, the run it is in, and the motes it held per day |
@@ -1169,13 +1158,11 @@ roaming profile:
 | `faction-npcs.json` | eqlwiki's page for each named mob the faction plan's kill camps would hold: whether Legends has it, its health, respawn and kill amounts; kept a month, a name with no page asked again after a week |
 | `faction-since.json`, `slayer-since.json` | What the live log, and the character's log on another PC, has shown since the factions and achievements exports (standings moved, achievements completed, Slayer kills), and how far each was read, so a start reads on from there rather than from the export's line |
 | `log-history.json` | Casts, melee, purchases, AAs bought and zones entered counted over each character's log and archives, for Gear, Spell upgrades, Tradeskills, Stats › AAs and the Exploration achievements; only what a log gains is read again |
-| `speech-cache\` | Azure phrases as WAV files, the newest 4,000 |
 
 It also holds `ocr.ps1`, the OCR script, written each run; the screen captures an OCR read takes are
 deleted as soon as it is done. Everything here can be fetched or counted again, so the folder can be
 deleted safely: the wiki downloads come back from their pages (or **Refresh** on Settings › Data sources), log
-history is counted again from your logs and archives, and Azure phrases are fetched again as they
-are spoken.
+history is counted again from your logs and archives.
 
 The app reads what the game writes and changes none of it, with three exceptions you ask for: the
 archiver on Settings › Log files moves logs into `Logs\archive` or a folder you choose; Tradeskills ›

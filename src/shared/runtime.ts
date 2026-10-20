@@ -156,24 +156,6 @@ export interface LogCheckRow {
   impliedFocusRange: [number, number] | null
 }
 
-/** One of Microsoft's neural voices, as Azure lists it. */
-export interface AzureVoice {
-  /** The voice's short name, as SSML takes it: "en-US-JennyNeural". */
-  name: string
-  label: string
-  locale: string
-  gender: string
-}
-
-/** The Azure voices' state, as the Audio page is told it: never the key. */
-export interface AzureStatus {
-  configured: boolean
-  region: string
-  voices: AzureVoice[]
-  /** Why the key or the last phrase failed; '' when all is well. */
-  error: string
-}
-
 /** Where the self-updater has got to. */
 export type UpdateState =
   | { state: 'dev' }

@@ -110,9 +110,8 @@ export function diagnostics(ctx: AppContext): string {
     )
   lines.push(`Spell file: spells_us.txt written ${s.installDir ? modified(join(s.installDir, 'spells_us.txt')) : 'no game folder'}`)
   const speech = ctx.speech
-  const azure = ctx.azure.status()
   lines.push(
-    `Speech: ${speech.running || speech.voices.length ? `${speech.voices.length} Windows voice${speech.voices.length === 1 ? '' : 's'}` : 'Windows speech not started (it starts when first needed)'}${speech.failed ? ` (${speech.failed})` : ''}; Azure ${azure.configured ? `set up (${azure.region})` : 'not set up'}${azure.error ? ` (${azure.error})` : ''}`
+    `Speech: ${speech.running || speech.voices.length ? `${speech.voices.length} Windows voice${speech.voices.length === 1 ? '' : 's'}` : 'Windows speech not started (it starts when first needed)'}${speech.failed ? ` (${speech.failed})` : ''}`
   )
   lines.push(`Windows calls (koffi): ${win32Available() ? 'available' : 'not available; the game is found by process list instead'}`)
   lines.push(`Hotkeys: ${s.hotkeys ? (ctx.hotkeysTaken.length ? `on; held by another program: ${ctx.hotkeysTaken.join(', ')}` : 'on') : 'off'}`)

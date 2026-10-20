@@ -86,6 +86,7 @@ const CHROMIUM_CACHES = [
 ]
 
 if (primaryInstance) moveCaches(app.getPath('userData'), cacheDir())
+if (primaryInstance) dropAzure(app.getPath('userData'), cacheDir())
 // Chromium's own caches (GPU, shaders, the HTTP cache) are derived data too: out of the roaming
 // profile with the rest, the remembered page state (Local Storage) brought across once (LT-620).
 if (primaryInstance) app.setPath('sessionData', chromiumData(app.getPath('userData'), cacheDir()))
@@ -109,6 +110,19 @@ function chromiumData(profile: string, cache: string): string {
   }
 }
 
+/** Azure's voices were taken out (2026-10-19): the key kept for them (encrypted) and the phrases they spoke go too. */
+function dropAzure(profile: string, cache: string): void {
+  for (const path of [join(profile, 'azure-speech.json'), join(profile, 'speech-cache'), join(cache, 'speech-cache')]) {
+    if (!existsSync(path)) continue
+    try {
+      rmSync(path, { recursive: true, force: true })
+      log.info(`Removed ${path}: Azure voices are no longer offered`)
+    } catch (e) {
+      log.warn(`Could not remove ${path}`, e)
+    }
+  }
+}
+
 /** Caches used to live beside the settings; they move once, and a copy that cannot move is left to be fetched again. */
 function moveCaches(from: string, to: string): void {
   try {
@@ -117,7 +131,7 @@ function moveCaches(from: string, to: string): void {
     log.warn(`Could not make the cache folder ${to}`, e)
     return
   }
-  for (const name of ['item-cache.json', 'item-catalog.json', 'tradeskill-recipes.json', 'pet-wiki.json', 'log-history.json', 'speech-cache']) {
+  for (const name of ['item-cache.json', 'item-catalog.json', 'tradeskill-recipes.json', 'pet-wiki.json', 'log-history.json']) {
     const src = join(from, name)
     if (!existsSync(src) || existsSync(join(to, name))) continue
     try {

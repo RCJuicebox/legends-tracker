@@ -131,7 +131,7 @@ export class SpeechWorker {
 
   /**
    * Starts the process if it is not running, so the next phrase comes quickly, and keeps it for
-   * another idle spell. Nothing starts it at launch: with an Azure voice it may never be needed.
+   * another idle spell. Nothing starts it at launch: muted, it may never be needed.
    */
   warm(): Promise<void> {
     const ready = this.start()

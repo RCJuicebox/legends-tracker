@@ -10,7 +10,6 @@ import { Store } from './store'
 import { Engine } from './engine'
 import { appEngineEnv } from './engineEnv'
 import { SpeechWorker } from './speech'
-import { AzureSpeech, VoiceRouter } from './azureSpeech'
 import { IconSource } from './icons'
 import { OverlayManager } from './overlays'
 import { GameWatcher } from './gameWatcher'
@@ -72,7 +71,6 @@ export interface AppContext {
   watcher: GameWatcher
   updater: Updater
   speech: SpeechWorker
-  azure: AzureSpeech
   icons: IconSource
   achievementFiles: AchievementFiles
   inventoryFiles: InventoryFiles
@@ -158,8 +156,6 @@ export function createContext(): AppContext {
   const dataDir = app.getPath('userData')
   const installDir = () => store.settings.get().installDir
   const speech = new SpeechWorker()
-  // Microsoft's neural voices, with the player's own Azure key; the Windows voices otherwise.
-  const azure = new AzureSpeech()
   // The theme is Windows' own setting for this app's windows, so every page's prefers-color-scheme
   // follows it: System, or Light or Dark whatever Windows says.
   nativeTheme.themeSource = store.settings.get().theme
@@ -213,7 +209,6 @@ export function createContext(): AppContext {
     store,
     windows,
     speech,
-    azure,
     installDir,
     icons: new IconSource(installDir),
     achievementFiles: new AchievementFiles(
@@ -311,7 +306,7 @@ export function createContext(): AppContext {
 
   ctx.engine = new Engine(
     store,
-    new VoiceRouter(speech, azure),
+    speech,
     engineOutputs({
       toMain,
       mainWatches: (c) => windows.mainWatches(c),
