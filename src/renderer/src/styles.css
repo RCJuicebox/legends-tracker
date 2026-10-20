@@ -280,10 +280,29 @@ textarea {
   margin-left: auto;
 }
 
-.sidebar-foot {
+/* The sidebar's end: Settings, then who is watched. Sticky, so the list scrolls under it at a large
+   UI size on a short screen. */
+.sidebar-end {
   margin-top: auto;
   position: sticky;
   bottom: 0;
+  display: grid;
+  gap: 6px;
+  padding-top: 6px;
+  border-top: 1px solid var(--line);
+  background: var(--bg-2);
+}
+/* Scrolled, the list would show through the sidebar's bottom padding below it: cover it. */
+.sidebar-end::after {
+  content: '';
+  position: absolute;
+  left: -11px;
+  right: -11px;
+  top: 100%;
+  height: 13px;
+  background: var(--bg-2);
+}
+.sidebar-foot {
   padding: 12px;
   border-radius: var(--radius);
   background: var(--panel);
@@ -292,16 +311,6 @@ textarea {
   color: var(--text-2);
   display: grid;
   gap: 6px;
-}
-/* Scrolled, the list would show through the sidebar's bottom padding below the footer: cover it. */
-.sidebar-foot::after {
-  content: '';
-  position: absolute;
-  left: -11px;
-  right: -11px;
-  top: 100%;
-  height: 13px;
-  background: var(--bg-2);
 }
 .sidebar-foot .who {
   color: var(--text);
@@ -1803,7 +1812,7 @@ details:not(.info) > summary::before {
 .nav-group:first-child {
   margin-top: 2px;
 }
-/* A group's name folds its pages away (Setup starts folded): the name is the button. */
+/* A group's name folds its pages away (none starts folded): the name is the button. */
 .nav-group:hover {
   color: var(--text-2);
 }

@@ -134,8 +134,8 @@ tells you little.
 
 ## Live
 
-The first page. The sidebar's groups (Play, Plan, Setup) fold at a click on their names, and Setup
-starts folded: it is set once. **Start watching** and **Stop watching** follow the character log
+The first page. The sidebar's groups (Play, Character, Goals, Cues) fold at a click on their
+names, and Settings sits at the sidebar's foot, over who is being watched. **Start watching** and **Stop watching** follow the character log
 chosen on Settings › Log files; **Arrange overlays** and **Mute** sit beside them. Below:
 
 - **Getting set up**, a checklist shown until every step is done or it is hidden: the game folder
@@ -796,7 +796,7 @@ moves on by itself as achievements are done, and follows the order the tab showe
 
 ## Slayer
 
-The **Slayer** page (under Plan in the sidebar) plans the Slayer achievements still open: where to kill for them quickest, step by
+The **Slayer** page (under Goals in the sidebar) plans the Slayer achievements still open: where to kill for them quickest, step by
 step. Counts are the achievements export (`/outputfile achievements`) plus the kills the log has shown
 since, as on the Achievements page.
 
@@ -859,7 +859,7 @@ are listed at the foot. Your choices are kept per character.
 
 ## Hunter
 
-The **Hunter** page (under Plan in the sidebar) lists each Hunter achievement not done ("Hunter of Befallen"), and each Conqueror
+The **Hunter** page (under Goals in the sidebar) lists each Hunter achievement not done ("Hunter of Befallen"), and each Conqueror
 achievement under Raids ("Conqueror of The Plane of Fear"), with the named it still
 wants: the achievements export, less the named your log has shown you killing since. Beside each
 named, what TAKP's spawn tables say of it: its spots, how often it is up against its placeholders,
@@ -880,7 +880,7 @@ of it, under a switch of its own (Overlays).
 ## Plane of Sky
 
 An optional module: off until you turn it on under Settings › Modules, when **Plane of Sky** joins
-Plan in the sidebar. It reads every class's Test quests from the eqlwiki's Plane of Sky page
+Goals in the sidebar. It reads every class's Test quests from the eqlwiki's Plane of Sky page
 (`scripts/sky-quests.mjs` builds `src/shared/game/skyQuests.json` from it), and has eight tabs:
 
 - **Tests**: each Test with its class, reward, giver and what to say, the mobs to kill, and a chip

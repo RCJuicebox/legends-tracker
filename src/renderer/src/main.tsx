@@ -27,33 +27,36 @@ import { Respawns } from './pages/Respawns'
 import { Tradeskills } from './pages/Tradeskills'
 import { Buffs } from './pages/Buffs'
 import { DamageMeter } from './pages/DamageMeter'
-import { FEATURE_PAGES, pageShown, type FeaturePageId } from '../../features'
+import { FEATURE_PAGES, NAV_GROUPS, pageShown, type FeaturePageId, type NavGroup } from '../../features'
 import { FEATURE_ELEMENTS } from '../../features/pages'
 import { who } from '../../core/format'
 import { characterKey } from '../../core/validate'
 
 /**
- * The pages that are not feature modules, in sidebar order, grouped by the player's day: Play for
- * what runs beside the game, Plan for what is worked out between sessions (and looked back on), Setup
- * for what is set once. What is set once and seldom opened again (the overlays, audio, the log files,
- * the data sources) is a tab of Settings, not a page.
+ * The pages that are not feature modules, in sidebar order, grouped by the question each answers
+ * (NAV_GROUPS): Play, what runs beside the game; Character, what the character is made of and where
+ * the motes go; Goals, what is being worked towards; Cues, what the app watches for and says. Settings
+ * has no group: it sits at the sidebar's foot. What is set once and seldom opened again (the overlays,
+ * audio, the log files, the data sources) is a tab of Settings, not a page.
  */
 const SHELL_PAGES = [
   { id: 'dashboard', group: 'Play', label: 'Live', icon: 'dashboard', el: Dashboard },
   { id: 'meter', group: 'Play', label: 'Damage Meter', icon: 'meter', el: DamageMeter },
-  { id: 'buffs', group: 'Play', label: 'Buffs', icon: 'sparkle', el: Buffs },
-  { id: 'respawns', group: 'Play', label: 'Respawns', icon: 'respawn', el: Respawns },
   // Read mid-session ("what just dropped?"), beside the meter it shares New session with (LT-494).
   { id: 'loot', group: 'Play', label: 'Loot', icon: 'loot', el: Loot },
-  // Counted as you play, spent between sessions: one page, since it is one stock.
-  { id: 'motes', group: 'Play', label: 'Motes', icon: 'motes', el: Motes },
-  { id: 'achievements', group: 'Plan', label: 'Achievements', icon: 'trophy', el: Achievements },
-  { id: 'stats', group: 'Plan', label: 'Stats', icon: 'stats', el: Stats },
-  { id: 'gear', group: 'Plan', label: 'Gear', icon: 'bag', el: Gear },
-  { id: 'tradeskills', group: 'Plan', label: 'Tradeskills', icon: 'flask', el: Tradeskills },
-  { id: 'spells', group: 'Setup', label: 'Spell Timers', icon: 'spells', el: Spells },
-  { id: 'triggers', group: 'Setup', label: 'Triggers', icon: 'triggers', el: Triggers },
-  { id: 'settings', group: 'Setup', label: 'Settings', icon: 'settings', el: Settings }
+  { id: 'respawns', group: 'Play', label: 'Respawns', icon: 'respawn', el: Respawns },
+  // First of its group: its Character card (classes, race, deity) feeds every other page.
+  { id: 'stats', group: 'Character', label: 'Stats', icon: 'stats', el: Stats },
+  { id: 'gear', group: 'Character', label: 'Gear', icon: 'bag', el: Gear },
+  // Counted as you play, spent on the gear beside it: one page, since it is one stock.
+  { id: 'motes', group: 'Character', label: 'Motes', icon: 'motes', el: Motes },
+  { id: 'tradeskills', group: 'Character', label: 'Tradeskills', icon: 'flask', el: Tradeskills },
+  // The planners (features/index.ts) go in after this.
+  { id: 'achievements', group: 'Goals', label: 'Achievements', icon: 'trophy', el: Achievements },
+  { id: 'spells', group: 'Cues', label: 'Spell Timers', icon: 'spells', el: Spells },
+  { id: 'buffs', group: 'Cues', label: 'Buffs', icon: 'sparkle', el: Buffs },
+  { id: 'triggers', group: 'Cues', label: 'Triggers', icon: 'triggers', el: Triggers },
+  { id: 'settings', group: null, label: 'Settings', icon: 'settings', el: Settings }
 ] as const
 
 export type PageId = (typeof SHELL_PAGES)[number]['id'] | FeaturePageId
@@ -62,7 +65,8 @@ type PageComponent = ComponentType<{ go: Go }>
 
 interface PageEntry {
   id: PageId
-  group: string
+  /** Null: at the sidebar's foot, in no group. */
+  group: NavGroup | null
   label: string
   icon: IconName
   el: PageComponent
@@ -77,9 +81,6 @@ const PAGES: readonly PageEntry[] = (() => {
   }
   return pages
 })()
-
-/** The sidebar's groups, in order. */
-const GROUPS = [...new Set(PAGES.map((p) => p.group))]
 
 /** Where a page that others open on a given tab keeps its tab, if it is one. */
 const tabKey = (page: PageId): string | undefined => (TAB_KEY as Partial<Record<PageId, string>>)[page]
@@ -172,10 +173,26 @@ function Shell() {
     },
     [setPage]
   )
-  // Setup starts folded: it is set once. A folded group still shows the page that is open, if it is one of its own.
-  const [folded, setFolded] = useRemembered<string[]>('nav.folded', ['Setup'])
+  // A group folds on its name; none starts folded. A folded group still shows the page that is open, if it is one of its own.
+  const [folded, setFolded] = useRemembered<string[]>('nav.folded', [])
   const update = useUpdate()
   const unsaved = useUnsaved()
+  // One sidebar entry. A folded group's are kept in the page, hidden, but the open one (LT-689).
+  const item = (p: PageEntry, hidden = false) => (
+    <button
+      key={p.id}
+      hidden={hidden}
+      className={`nav-item${page === p.id ? ' active' : ''}`}
+      aria-current={page === p.id ? 'page' : undefined}
+      title={p.label}
+      onClick={() => setPage(p.id)}
+    >
+      <Icon name={p.icon} />
+      <span className="nav-label">{p.label}</span>
+      {p.id === 'dashboard' && <TimerCount />}
+      {unsaved.has(p.id) && <UnsavedMark />}
+    </button>
+  )
   return (
     <div className="shell">
       <div className="titlebar">
@@ -192,36 +209,25 @@ function Shell() {
         )}
       </div>
       <nav className="sidebar" aria-label="Pages">
-        {GROUPS.map((group) => {
+        {NAV_GROUPS.map((group) => {
           const own = pages.filter((p) => p.group === group)
           const shut = folded.includes(group)
           return [
             <Disclosure key={`g-${group}`} className="nav-group" open={!shut} onToggle={() => setFolded(shut ? folded.filter((g) => g !== group) : [...folded, group])}>
               <span className="nav-label">{group}</span>
-              {/* What a fold holds, for a screen reader: "Setup, 3 pages" (LT-689). */}
+              {/* What a fold holds, for a screen reader: "Cues, 3 pages" (LT-689). */}
               <span className="sr-only">, {own.length} pages</span>
               {/* Edits waiting on a page that is folded away still show. */}
               {shut && own.some((p) => p.id !== page && unsaved.has(p.id)) && <UnsavedMark />}
             </Disclosure>,
-            // A folded group's pages stay in the page, hidden, but the open one (LT-689).
-            ...own.map((p) => (
-              <button
-                key={p.id}
-                hidden={shut && p.id !== page}
-                className={`nav-item${page === p.id ? ' active' : ''}`}
-                aria-current={page === p.id ? 'page' : undefined}
-                title={p.label}
-                onClick={() => setPage(p.id)}
-              >
-                <Icon name={p.icon} />
-                <span className="nav-label">{p.label}</span>
-                {p.id === 'dashboard' && <TimerCount />}
-                {unsaved.has(p.id) && <UnsavedMark />}
-              </button>
-            ))
+            ...own.map((p) => item(p, shut && p.id !== page))
           ]
         })}
-        <WatchFoot />
+        {/* Settings, then who is watched, end the sidebar and stay in view while the list scrolls. */}
+        <div className="sidebar-end">
+          {pages.filter((p) => !p.group).map((p) => item(p))}
+          <WatchFoot />
+        </div>
       </nav>
       <main className="main">
         <Jobs />

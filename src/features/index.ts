@@ -5,10 +5,19 @@ import type { IconName } from '../shared/icons'
 // (page.tsx). This list is what the shell needs to put each page in the sidebar. It is data only, so
 // the renderer reads it without pulling in either process's code.
 
+/**
+ * The sidebar's groups, in order, by the question each answers: Play, what runs beside the game;
+ * Character, what the character is made of and where the motes go; Goals, what is being worked
+ * towards (the achievements and their planners); Cues, what the app watches for and says. Settings is
+ * in none: it sits at the sidebar's foot.
+ */
+export const NAV_GROUPS = ['Play', 'Character', 'Goals', 'Cues'] as const
+export type NavGroup = (typeof NAV_GROUPS)[number]
+
 export interface FeaturePage {
   /** The page's id, as the sidebar and `go` name it. */
   readonly id: string
-  readonly group: 'Play' | 'Plan' | 'Setup'
+  readonly group: NavGroup
   readonly label: string
   readonly icon: IconName
   /** The page it comes after in the sidebar. */
@@ -21,12 +30,12 @@ export interface FeaturePage {
 }
 
 export const FEATURE_PAGES = [
-  { id: 'factions', group: 'Plan', label: 'Factions', icon: 'flag', after: 'achievements' },
-  { id: 'slayer', group: 'Plan', label: 'Slayer', icon: 'sword', after: 'factions' },
-  { id: 'hunter', group: 'Plan', label: 'Hunter', icon: 'crosshair', after: 'slayer' },
+  { id: 'factions', group: 'Goals', label: 'Factions', icon: 'flag', after: 'achievements' },
+  { id: 'slayer', group: 'Goals', label: 'Slayer', icon: 'sword', after: 'factions' },
+  { id: 'hunter', group: 'Goals', label: 'Hunter', icon: 'crosshair', after: 'slayer' },
   {
     id: 'sky',
-    group: 'Plan',
+    group: 'Goals',
     label: 'Plane of Sky',
     icon: 'cloud',
     after: 'hunter',

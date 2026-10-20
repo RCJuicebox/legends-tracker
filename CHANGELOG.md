@@ -2,6 +2,10 @@
 
 What changed in each version. The release workflow publishes a version's section as its release notes, and installed copies show them when an update arrives.
 
+## Unreleased
+
+- **The sidebar's groups follow what the pages do.** Four groups where there were three: **Play** (Live, Damage Meter, Loot, Respawns), **Character** (Stats, Gear, Motes, Tradeskills), **Goals** (Achievements, Factions, Slayer, Hunter, and Plane of Sky when it is on) and **Cues** (Spell Timers, Buffs, Triggers: what the app watches for and says). Settings sits at the foot of the sidebar, over who is being watched. Motes moved beside Gear, whose Best merge it shows, and Buffs beside Spell Timers; no page changed inside, and the app opens where you left it.
+
 ## 2.16.1 (2026-10-19)
 
 - **Slayer: where to stand with a pet.** A step's **Map** rings the spot with the most of its mobs' spawns within a pet's reach (150 units, on the same floor), for farming AFK, and the next best beside it, each with its /waypoint and about how many kills an hour its spawns give on classic timers ("AFK pet spot: /waypoint 147, 13 · 28 spawns within 150, about 167 an hour on classic timers").
