@@ -100,6 +100,8 @@ export class LiveAchievements implements AppFeature {
     if (live) live.onChange = () => this.publish()
     const follow = ctx.factions?.follow
     if (follow) follow.onChange = (character) => this.refreshFaction(character)
+    const epics = ctx.epics
+    if (epics) epics.onChange = () => this.publish()
   }
 
   /** What the overlay and the pages were last told. */
@@ -432,6 +434,7 @@ export class LiveAchievements implements AppFeature {
       slayer: null,
       skills: this.skills,
       hunter: null,
+      epics: null,
       slayerPlan: this.slayerPlan,
       tracked: this.trackedAchievements(),
       visited: this.visitedSinceExport()
@@ -441,7 +444,19 @@ export class LiveAchievements implements AppFeature {
     if (route.length) track.route = route
     const here = routeHere(route, this.zone)
     if (here && here.planners > 1) track.here = here
-    const key = JSON.stringify([track.character, track.faction, track.slayer, track.skills, track.hunter, track.slayerPlan, track.tracked, track.visited, track.route, track.here])
+    const key = JSON.stringify([
+      track.character,
+      track.faction,
+      track.slayer,
+      track.skills,
+      track.hunter,
+      track.epics,
+      track.slayerPlan,
+      track.tracked,
+      track.visited,
+      track.route,
+      track.here
+    ])
     if (key === this.lastKey) return
     this.lastKey = key
     this.last = track

@@ -512,6 +512,8 @@ export interface Invokes {
   'epics:tick': (character: string, key: string, on: boolean) => EpicState
   /** Says how many of an item the character holds: kept as a correction to the log's count; the state after. */
   'epics:have': (character: string, item: string, have: number) => EpicState
+  /** Whether the epic pieces wanted in a zone are said on zoning in; turns it on or off when given. */
+  'epics:zoneAlert': (on?: boolean) => boolean
   /** Where the character being played is in its faction plan, and its Slayer counts since its achievements export. */
   'achievements:track': (watching?: boolean) => AchievementTrack | null
   /** The player's last /loc, while they are still in its zone; null without one (FEAT-023). */
@@ -758,6 +760,7 @@ const INVOKE_CHANNELS: Record<InvokeChannel, true> = {
   'epics:state': true,
   'epics:tick': true,
   'epics:have': true,
+  'epics:zoneAlert': true,
   'achievements:track': true,
   'game:location': true,
   'character:exports': true,

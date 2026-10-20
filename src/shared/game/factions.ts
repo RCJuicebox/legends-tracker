@@ -87,6 +87,15 @@ export const ZONE_ALIASES: Record<string, string> = {
   cazicthulezone: 'templeofcazicthule',
   steamfont: 'steamfontmountains',
   oldcommonlands: 'westcommonlands',
+  // The epic checklist's short names (Goals › Epics' "Wanted here").
+  permafrost: 'permafrostcaverns',
+  everfrost: 'everfrostpeaks',
+  lakerathe: 'lakerathetear',
+  oasis: 'oasisofmarr',
+  mistmoore: 'castleofmistmoore',
+  southernkarana: 'southkarana',
+  sola: 'solusekseye',
+  planeofair: 'planeofsky',
   // A page naming the city without its half: the half the game's zone list has first.
   felwithe: 'northernfelwithe',
   freeport: 'westfreeport',

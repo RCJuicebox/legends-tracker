@@ -158,6 +158,8 @@ export interface AchievementOverlayOptions {
   hunter: boolean
   /** Show what two or more planners want in the zone you are in, in one block (FEAT-031). */
   alsoHere?: boolean
+  /** Show the epic and spell-quest pieces still wanted from the zone you are in (Goals › Epics). */
+  epics?: boolean
 }
 
 export interface OverlayConfig {

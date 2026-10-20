@@ -201,6 +201,18 @@ export function Overlays() {
                       where the faction plan, the Slayer plan and the Hunter achievements meet in the zone you are in, one block saying what each wants there
                     </span>
                   </label>
+                  <label className="row">
+                    <Switch
+                      on={(o.achievements ?? DEFAULT_ACHIEVEMENT_OPTIONS).epics ?? true}
+                      onChange={(v) => update(o.id, { achievements: { ...DEFAULT_ACHIEVEMENT_OPTIONS, ...o.achievements, epics: v } })}
+                      label="Show the epic pieces wanted in your zone"
+                    />
+                    Show the epic pieces wanted in your zone
+                    <span className="faint small">
+                      &ldquo;Wanted here&rdquo;: what your classes’ epics and spell quests still need from the zone you are in, while Goals › Epics or Spell Quests is on; the same
+                      switch is on those pages
+                    </span>
+                  </label>
                   <div className="row small">
                     <span>The Slayer plan’s step</span>
                     <span className="faint small">is turned on for each character on its own, with On the overlay at the top of</span>

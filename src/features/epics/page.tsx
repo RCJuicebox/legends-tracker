@@ -2,7 +2,9 @@ import { useMemo, useState, type ReactNode } from 'react'
 import { CharacterPicker } from '../../renderer/src/components/CharacterPicker'
 import { api } from '../../renderer/src/api'
 import { useInvoke, useVisibleInterval } from '../../renderer/src/hooks'
-import { Ago, FilterBox, GameCommand, Info, NumberInput, Pending, SettingsLink, Tabs, Tip } from '../../renderer/src/components/ui'
+import { Ago, FilterBox, GameCommand, Info, NumberInput, Pending, SettingsLink, Switch, Tabs, Tip, ToggleChip } from '../../renderer/src/components/ui'
+import { useActions, useSettled } from '../../renderer/src/state'
+import { DEFAULT_ACHIEVEMENT_OPTIONS } from '../../shared/overlays'
 import { useRemembered } from '../../renderer/src/remember'
 import { showToast } from '../../renderer/src/toast'
 import { num, who, wikiUrl } from '../../core/format'
@@ -160,6 +162,7 @@ export function ChecklistPage({ config: c }: { config: ChecklistPageConfig }) {
             ]}
           />
           <Sources s={s} from={from} onFrom={setFrom} />
+          <InGame />
           {view !== 'items' && (
             <div className="card row mb-16">
               <select value={f.cls === 'mine' && !mine.length ? 'all' : f.cls} onChange={(e) => setFilter({ ...kept, cls: e.target.value })} aria-label="Class">
@@ -219,6 +222,52 @@ function Sources({ s, from, onFrom }: { s: EpicState; from: CountFrom; onFrom: (
           </>
         )}
       </span>
+    </div>
+  )
+}
+
+/**
+ * What is said in game of the zone the player is in: the pieces still wanted there, on zoning in (the
+ * alert overlay) and on the achievements overlay's "Wanted here" (the switch under Settings › Overlays,
+ * here too). Both pages share them, as they share the drop cue.
+ */
+function InGame() {
+  const q = useInvoke('epics:zoneAlert')
+  const { patchSettings } = useActions()
+  const achOverlay = useSettled((s) => s.settings.overlays.find((o) => o.kind === 'achievements'))
+  const onOverlay = (achOverlay?.achievements ?? DEFAULT_ACHIEVEMENT_OPTIONS).epics ?? true
+  const setOnOverlay = (on: boolean) =>
+    void patchSettings((s) => ({
+      ...s,
+      overlays: s.overlays.map((o) => (o.kind === 'achievements' ? { ...o, achievements: { ...DEFAULT_ACHIEVEMENT_OPTIONS, ...o.achievements, epics: on } } : o))
+    }))
+  const setZoneAlert = async (on: boolean) => {
+    try {
+      q.setData(await api.invoke('epics:zoneAlert', on))
+    } catch (e) {
+      showToast(`Could not save that: ${e instanceof Error ? e.message : String(e)}`, { tone: 'bad' })
+    }
+  }
+  return (
+    <div className="row small mb-16">
+      <span>In game:</span>
+      <label
+        className="row tight"
+        title="When you zone into a zone where a piece your classes still need comes from, the alert overlay says which: “Epic pieces here: Ghoulbane (Shadow Knight)”. Zoning back in within 10 minutes says nothing again."
+      >
+        <Switch on={q.data ?? true} disabled={q.data === null} label="Say the pieces wanted when you zone in" onChange={(v) => void setZoneAlert(v)} />
+        Say what is wanted when you zone in
+      </label>
+      {achOverlay && (
+        <ToggleChip
+          on={onOverlay}
+          onChange={setOnOverlay}
+          title="“Wanted here” on the achievements overlay: the pieces still needed from the zone you are in, for every character (the switch under Settings › Overlays)"
+        >
+          Wanted here on the overlay
+        </ToggleChip>
+      )}
+      {achOverlay && onOverlay && !achOverlay.visible && <span className="faint">the achievements overlay is hidden: show it on Settings › Overlays</span>}
     </div>
   )
 }

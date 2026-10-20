@@ -240,6 +240,8 @@ const SLAYER_RECENT_MS = 30 * 60_000
 const SLAYER_ROWS = 3
 /** Hunter named shown at most, for each achievement of the zone. */
 const HUNTER_ROWS = 6
+/** Epic pieces wanted here shown at most. */
+const EPIC_ROWS = 5
 /** Tracked achievements shown at most, and the objectives or skills of each. */
 const TRACKED_ROWS = 5
 const TRACKED_LINES = 3
@@ -366,13 +368,15 @@ function AchievementsRegion({ config, track, arranging }: { config: OverlayConfi
   const step = plan?.current ?? null
   // The Hunter named left in this zone, at the player's choice; what is tracked shows in its own place.
   const hunter = config.achievements?.hunter === false ? [] : (track?.hunter?.rows ?? []).filter((r) => !trackedNames.has(r.achievement))
+  // The epic pieces still wanted from this zone (Goals › Epics), at the player's choice.
+  const epics = config.achievements?.epics === false ? null : (track?.epics ?? null)
   // Shown on purpose and empty would look broken; one faint line says what it waits for.
-  if (!tracked.length && !plan && !slayerPlan && !slayer.length && !skills.length && !hunter.length)
+  if (!tracked.length && !plan && !slayerPlan && !slayer.length && !skills.length && !hunter.length && !epics)
     return (
       <div className="ach-ov" style={style}>
         <div className="ach-ov-empty">
           {arranging
-            ? 'Tracked achievements, the faction and Slayer plans’ steps, the Slayer counts and skills your kills move, and the Hunter named left in your zone show here.'
+            ? 'Tracked achievements, the faction and Slayer plans’ steps, the Slayer counts and skills your kills move, and the Hunter named and epic pieces left in your zone show here.'
             : track?.faction
               ? 'Nothing tracked. The faction plan is hidden from this overlay (Settings › Overlays).'
               : 'Nothing tracked. Track an achievement, or show your faction plan here from Factions › Plan, or your Slayer plan from the Slayer page.'}
@@ -496,6 +500,25 @@ function AchievementsRegion({ config, track, arranging }: { config: OverlayConfi
               )}
             </div>
           ))}
+        </section>
+      )}
+      {epics && (
+        <section className="ach-ov-epics">
+          <div className="ach-ov-head">
+            <span>Wanted here</span>
+            <span className="ach-ov-faint">epic pieces</span>
+          </div>
+          {epics.rows.slice(0, EPIC_ROWS).map((r) => (
+            <div key={r.name} className="ach-ov-line" title={`${r.how || 'No way given'}${r.unverified ? ' (unverified on the wiki)' : ''} · for ${r.lists.join(', ')}`}>
+              {r.unverified ? '⚠ ' : ''}
+              {r.name}
+              <span className="ach-ov-faint">
+                {' '}
+                · {r.have}/{r.need} · {r.lists.join(', ')}
+              </span>
+            </div>
+          ))}
+          {epics.rows.length > EPIC_ROWS && <div className="ach-ov-faint">+{epics.rows.length - EPIC_ROWS} more</div>}
         </section>
       )}
       {slayer.length > 0 && (

@@ -170,6 +170,7 @@ export const CHECKS: { [K in InvokeChannel]: Check<Parameters<Invokes[K]>> } = {
   'epics:state': args(str),
   'epics:tick': args(str, str, bool),
   'epics:have': args(str, str, num),
+  'epics:zoneAlert': args(opt(bool)),
   'achievements:track': args(opt(bool)),
   'game:location': none,
   'character:exports': none,

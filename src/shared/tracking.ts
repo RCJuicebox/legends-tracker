@@ -145,6 +145,22 @@ export interface HunterTrackView {
   }[]
 }
 
+/** The epic and spell-quest pieces the character's classes still want from the zone the player is in (Goals › Epics). */
+export interface EpicsTrackView {
+  zone: string
+  rows: {
+    name: string
+    /** How it comes: "Kill Lady Vox (raid)", "Forage". */
+    how: string
+    have: number
+    /** What every list still wants of it between them. */
+    need: number
+    /** The lists that want it: a class, or a spell quest ("Life Leech (Shadow Knight)"). */
+    lists: string[]
+    unverified: boolean
+  }[]
+}
+
 /** A step of the Slayer plan, as the overlay shows it (slayerPlanView). */
 export interface SlayerPlanStepView {
   /** Its place in the plan, from 0. */
@@ -191,6 +207,8 @@ export interface AchievementTrack {
   skills: SkillTrackView | null
   /** The Hunter named left in the zone the player is in; null outside a Hunter zone. */
   hunter?: HunterTrackView | null
+  /** The epic pieces still wanted from the zone the player is in, while Goals › Epics or Spell Quests is on; null when none. */
+  epics?: EpicsTrackView | null
   /** Plan › Slayer's step, when the player shows it here. */
   slayerPlan?: SlayerPlanTrackView | null
   /** The achievements the player tracks, in the order tracked. */

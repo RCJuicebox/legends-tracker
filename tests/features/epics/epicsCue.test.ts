@@ -10,6 +10,7 @@ import { tempDir } from '../../tempDir'
 // Goals › Epics' live cue against a log on disk: a line the tailer hands the engine, written to the
 // log as the game writes it, cues on the Live page's feed and the alert overlay while the module is on
 // and the piece is still wanted, and not once enough is held; a spell quest's piece while Spell Quests is.
+// Zoning in says the pieces still wanted there, and the achievements overlay's "Wanted here" shows them.
 
 const h = vi.hoisted(() => ({ dir: '' }))
 vi.mock('electron', () => ({ app: { getPath: () => h.dir }, ipcMain: { handle: () => {}, on: () => {} } }))
@@ -93,5 +94,54 @@ describe('the Epics drop cue', () => {
     settings.modules.epics = false
     expect(await replay('21:40:10', "--You have looted a Crystalline Orb from a stone spider's corpse.--")).toBe(true)
     expect(feed).toEqual([{ kind: 'loot', text: 'Crystalline Orb dropped: Shadow Knight’s Life Leech quest, for the Faceted Hyacinth Telesm' }])
+  })
+})
+
+describe('what is wanted in a zone', () => {
+  it('says the pieces still wanted on zoning in, and shows them on the achievements overlay', async () => {
+    settings.modules.epics = true
+    settings.modules.spellquests = false
+    feed.length = 0
+    alerts.length = 0
+    const changed = vi.fn()
+    epics.onChange = changed
+    expect(await replay('22:00:00', 'You have entered The Temple of Cazic-Thule.')).toBe(true)
+    const text =
+      'Epic pieces here: Decayed Breastplate (Shadow Knight), Decayed Chainmail (Shadow Knight), Decayed Helm (Shadow Knight), Decayed Left Legplate (Shadow Knight), +2 more'
+    expect(feed).toEqual([{ kind: 'loot', text }])
+    expect(alerts).toEqual([expect.objectContaining({ kind: 'text', text })])
+    expect(changed).toHaveBeenCalled()
+    const view = epics.track({ character: 'Kelwyn_neriak', zone: 'The Temple of Cazic-Thule', exported: null }).epics
+    expect(view?.rows.map((r) => r.name)).toContain('Decayed Visor')
+  })
+
+  it('says a zone again only after a while, and nothing where nothing is wanted', async () => {
+    feed.length = 0
+    expect(await replay('22:05:00', 'You have entered The Temple of Cazic-Thule.')).toBe(true)
+    expect(await replay('22:06:00', 'You have entered The City of Guk.')).toBe(true)
+    expect(feed).toEqual([])
+    expect(epics.track({ character: 'Kelwyn_neriak', zone: 'The City of Guk', exported: null }).epics).toBeNull()
+  })
+
+  it('shows nothing while the modules are off', () => {
+    settings.modules.epics = false
+    expect(epics.track({ character: 'Kelwyn_neriak', zone: 'The Temple of Cazic-Thule', exported: null }).epics).toBeNull()
+  })
+
+  it('says nothing on zoning in once the player turned it off', async () => {
+    const dir = tempDir('lt-epics-quiet-')
+    writeFileSync(join(dir, 'epics.json'), JSON.stringify({ characters: {}, zoneAlert: false }))
+    const quiet = EpicTracker.create({ logHistory: new LogHistory(join(dir, 'log-history.json'), EpicTracker.consumers), dir })
+    expect(quiet.zoneAlert).toBe(false)
+    const at = features.length
+    quiet.register(ctx)
+    settings.modules.epics = true
+    feed.length = 0
+    const raw = '[Tue Sep 29 22:10:00 2026] You have entered The Temple of Cazic-Thule.'
+    appendFileSync(logPath, `${raw}\r\n`)
+    features[at].line!(parseLogLine(raw)!)
+    await quiet.cuesSaid()
+    expect(feed).toEqual([])
+    expect(quiet.track({ character: 'Kelwyn_neriak', zone: 'The Temple of Cazic-Thule', exported: null }).epics?.rows.length).toBe(6)
   })
 })
