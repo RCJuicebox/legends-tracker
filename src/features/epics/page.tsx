@@ -9,14 +9,20 @@ import { num, who, wikiUrl } from '../../core/format'
 import { itemKey } from '../../core/inventory'
 import { heldOf } from '../../core/itemTally'
 import { useCharacterChoice } from '../../renderer/src/character'
-import { EPIC_CLASSES, EPIC_SOURCE, EPIC_URL, tickKey, type EpicState } from './core'
+import { EPIC_CLASSES, EPIC_SOURCE, EPIC_URL, SPELL_QUESTS, tickKey, type EpicState } from './core'
 import { ANYWHERE, classViews, filterViews, itemRows, NO_FILTER, pickClasses, targets, type ClassView, type CountFrom, type EpicFilter, type StepView } from './views'
 
 // Goals › Epics (an optional module, Settings › Modules): what to keep for each class's epic quest, as
-// the eqlwiki's checklist lists it, with what the character holds of each; Targets, where to hunt for
-// what is missing; and Items, where a count is put right.
+// the eqlwiki's checklist lists it, with what the character holds of each; the five class spell
+// quests, the same way; Targets, where to hunt for what either is missing; and Items, where a count is
+// put right.
 
-type View = 'checklist' | 'targets' | 'items'
+type View = 'checklist' | 'spells' | 'targets' | 'items'
+
+/** The classes a spell quest is for, as a sentence ends: "an Enchanter, a Wizard, … and a Ranger". */
+const SPELL_CLASSES = SPELL_QUESTS.map((q) => `${/^[AEIOU]/.test(q.cls) ? 'an' : 'a'} ${q.cls}`)
+  .join(', ')
+  .replace(/, ([^,]*)$/, ' and $1')
 
 const HOW = (
   <>
@@ -28,6 +34,12 @@ const HOW = (
       <b>What you hold</b> is counted from your log (every copy you looted, kept or stored, less what you handed over or merged away), from your inventory export (
       <code>/outputfile inventory</code>: bags, bank, depot, worn and Storage), or the higher of the two for each item. Copies you had before your log began are put right on the
       Items tab. An item two of your classes take is wanted by both, so one of it reads 1/2.
+    </div>
+    <div>
+      <b>Spell quests</b> are the five class spells a quest gives (Tashania, Ice Comet, Divine Might, Life Leech and Call of Flame), each from its eqlwiki quest page; SEQO chose
+      the five. The scroll in hand covers the quest. Most pieces are ground spawns, which may leave no line in your log: the inventory export counts them, or tick them off. The ten
+      Old Silver Coins share one name, and the ten Rods too, so they are counted together: tick each spot off as you pick it up. A piece an epic and a spell quest both take is
+      wanted by both, on Targets too; tick the spell off to leave a quest out.
     </div>
     <div>
       <b>Tick a step off</b> yourself for what no file can see: a piece handed in, a reward quested on another PC, a step you will not do.
@@ -68,8 +80,10 @@ export function Epics() {
   const mine = useMemo(() => s?.classes ?? [], [s])
   // Without an inventory export there is the log alone.
   const counted: CountFrom = s?.exported ? from : 'log'
-  const picked = useMemo(() => pickClasses(f, mine), [f, mine])
+  // The epics and the spell quests are counted together, so what both take is wanted by both.
+  const picked = useMemo(() => [...pickClasses(f, mine, 'epic'), ...pickClasses(f, mine, 'spell')], [f, mine])
   const views = useMemo(() => (s ? classViews(picked, s, counted) : []), [s, picked, counted])
+  const shown = useMemo(() => views.filter((c) => c.kind === (view === 'spells' ? 'spell' : 'epic')), [views, view])
 
   return (
     <>
@@ -77,7 +91,7 @@ export function Epics() {
         <div>
           <h1>Epics</h1>
           <div className="lead">
-            What to keep for each class’s epic quest, and how much of it you hold; where to hunt for the rest. <Info label="How it is worked out" text={HOW} />
+            What to keep for each class’s epic quest and spell quest, and how much of it you hold; where to hunt for the rest. <Info label="How it is worked out" text={HOW} />
           </div>
         </div>
         <div className="actions">
@@ -102,6 +116,7 @@ export function Epics() {
             onChange={setView}
             tabs={[
               ['checklist', 'Checklist'],
+              ['spells', 'Spell quests'],
               ['targets', 'Targets'],
               ['items', 'Items']
             ]}
@@ -118,7 +133,7 @@ export function Epics() {
                   </option>
                 ))}
               </select>
-              {view === 'checklist' && (
+              {(view === 'checklist' || view === 'spells') && (
                 <>
                   <FilterBox placeholder="Find an item, mob, zone or quest…" label="Find an item, mob, zone or quest" value={text} onChange={setText} width={260} />
                   <label className="row tight small" title="What is left to gather: a step in hand, ticked off or covered is hidden">
@@ -129,8 +144,15 @@ export function Epics() {
               )}
             </div>
           )}
-          {view === 'checklist' ? (
-            <Checklist views={views} f={f} act={act} />
+          {view === 'checklist' || view === 'spells' ? (
+            <Checklist
+              views={shown}
+              f={f}
+              act={act}
+              empty={
+                view === 'spells' ? `No spell quest for ${f.cls === 'mine' && mine.length ? mine.join(' or ') : f.cls}: the five are for ${SPELL_CLASSES}.` : 'No class picked.'
+              }
+            />
           ) : view === 'targets' ? (
             <Targets views={views} />
           ) : (
@@ -138,7 +160,7 @@ export function Epics() {
           )}
           <div className="faint small mb-16">
             Checklist from <a href={EPIC_URL}>Epic Items To Keep</a> by Manlaan on eqlwiki.com, which also has each class’s Epic Quest walkthrough; SEQO (RealMaeel) reads the same
-            page.
+            page. Spell quests from their eqlwiki quest pages, with SEQO’s notes from the EQ Legends Tools quest guides.
           </div>
         </>
       )}
@@ -173,19 +195,30 @@ function Sources({ s, from, onFrom }: { s: EpicState; from: CountFrom; onFrom: (
   )
 }
 
-/** Each class picked: its epic, how far along its pieces are, and its steps as a tree. */
-function Checklist({ views, f, act }: { views: readonly ClassView[]; f: EpicFilter; act: Act }) {
-  if (!views.length) return <div className="card empty">No class picked.</div>
+/** Each list picked (a class's epic, or a spell quest): what finishes it, how far along its pieces are, and its steps as a tree. */
+function Checklist({ views, f, act, empty }: { views: readonly ClassView[]; f: EpicFilter; act: Act; empty: string }) {
+  if (!views.length) return <div className="card empty">{empty}</div>
   return (
     <div className="stack mb-16">
       {views.map((c) => {
         const shown = filterViews(c.steps, f)
         const pct = Math.round(c.near * 100)
         return (
-          <div key={c.cls} className="card epic-class">
+          <div key={c.key} className="card epic-class">
             <h2>
-              <span>{c.cls}</span>
-              <span className="muted small">{c.epic.length ? c.epic.join(' and ') : 'epic not on the wiki yet'}</span>
+              {c.spell ? (
+                <>
+                  <span>{c.spell.name}</span>
+                  <span className="muted small">
+                    {c.cls} level {c.spell.level} · <a href={wikiUrl(c.spell.page)}>{c.spell.page}</a>
+                  </span>
+                </>
+              ) : (
+                <>
+                  <span>{c.cls}</span>
+                  <span className="muted small">{c.epic.length ? c.epic.join(' and ') : 'epic not on the wiki yet'}</span>
+                </>
+              )}
               {c.finished && (
                 <Tip className="chip ok" text={`${c.finished} is in your bags or bank: nothing more is needed`}>
                   Finished
@@ -197,7 +230,14 @@ function Checklist({ views, f, act }: { views: readonly ClassView[]; f: EpicFilt
                   <span className="small mono">
                     {num(c.done)}/{num(c.pieces)}
                   </span>
-                  <span className="epic-bar" role="progressbar" aria-label={`${c.cls}: ${c.done} of ${c.pieces} pieces`} aria-valuenow={pct} aria-valuemin={0} aria-valuemax={100}>
+                  <span
+                    className="epic-bar"
+                    role="progressbar"
+                    aria-label={`${c.spell?.name ?? c.cls}: ${c.done} of ${c.pieces} pieces`}
+                    aria-valuenow={pct}
+                    aria-valuemin={0}
+                    aria-valuemax={100}
+                  >
                     <span style={{ width: `${pct}%` }} />
                   </span>
                 </span>
@@ -224,7 +264,7 @@ function Checklist({ views, f, act }: { views: readonly ClassView[]; f: EpicFilt
 /** A step: its tick, its name and count, how it comes, and its parts under it. */
 function StepRow({ v, act }: { v: StepView; act: Act }) {
   const st = v.step
-  const key = tickKey(v.cls, st)
+  const key = tickKey(v.list, st)
   const where = [st.how, st.zone].filter(Boolean).join(' · ')
   const count = st.item ? (v.need > 0 ? `${num(Math.min(v.have, v.need))}/${num(v.need)}` : v.done && !v.ticked ? `${num(v.have)}/${num(st.qty)}` : '') : ''
   return (
@@ -239,9 +279,12 @@ function StepRow({ v, act }: { v: StepView; act: Act }) {
         />
         <span className="epic-step-name">
           {st.item ? (
-            <a href={wikiUrl(st.item)} title="Its eqlwiki page">
-              {st.item}
-            </a>
+            <>
+              <a href={wikiUrl(st.item)} title="Its eqlwiki page">
+                {st.item}
+              </a>
+              {st.label && <span className="muted"> ({st.label})</span>}
+            </>
           ) : (
             <b>{st.quest}</b>
           )}
@@ -358,7 +401,7 @@ function Items({ s, filter, onText, onHave }: { s: EpicState; filter: string; on
                 <tr key={k}>
                   <td>
                     <b>{r.name}</b>
-                    {r.epic && <span className="faint small"> · the epic</span>}
+                    {r.kind !== 'piece' && <span className="faint small"> · the {r.kind}</span>}
                   </td>
                   <td className="small">{[r.how, r.zone].filter(Boolean).join(' · ')}</td>
                   <td>

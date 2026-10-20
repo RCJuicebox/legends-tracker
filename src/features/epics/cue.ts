@@ -1,6 +1,6 @@
 import { itemKey } from '../../core/inventory'
 import { DIED, SLAIN_BY, SLAIN_BY_YOU } from '../../core/phrases'
-import { EPIC_CLASSES, everyStep, type EpicState } from './core'
+import { EPIC_LISTS, everyStep, type EpicState } from './core'
 import { classViews, type StepView } from './views'
 
 // Goals › Epics' live cue (an optional module): the moment the character loots a piece, or a named that
@@ -8,11 +8,15 @@ import { classViews, type StepView } from './views'
 // feed and the alert overlay say so: "Ghoulbane dropped: Shadow Knight epic, for the Corrupted
 // Ghoulbane". Still wanted is what the Checklist says: a step not done (not ticked, not covered by a
 // reward or the finished epic in hand, and not held as many as every class shown wants between them),
-// the counts taken as the page takes them by default, the higher of the log's and the export's.
+// the counts taken as the page takes them by default, the higher of the log's and the export's. A
+// spell quest's pieces are cued the same: "Crystalline Orb dropped: Shadow Knight's Life Leech quest,
+// for the Faceted Hyacinth Telesm".
 
 /** A class that still wants a piece, and what for. */
 export interface WantedBy {
   cls: string
+  /** The spell, when it is a spell quest that wants it, not the class's epic. */
+  spell?: string
   /** The reward the piece makes, or the quest it is for; at the top of a class's list, the finished epic. Null when none is named. */
   forWhat: string | null
   /** Whether `forWhat` is the finished epic (named as is), not a reward or quest (named "the …"). */
@@ -28,16 +32,17 @@ export function beforeCopy<T extends Pick<EpicState, 'logged' | 'last'>>(s: T, i
   return { ...s, logged: { ...s.logged, [k]: Math.max(0, (s.logged[k] ?? 0) - count) } }
 }
 
-/** Every class on the character's record that still wants an item, each once, its main class first. */
+/** Every list (a class's epic, or a spell quest) of the character's classes that still wants an item, each once, its main class first. */
 export function wantedBy(s: Counts, item: string): WantedBy[] {
   const k = itemKey(item)
-  const classes = EPIC_CLASSES.filter((c) => s.classes.includes(c.cls)).sort((a, b) => s.classes.indexOf(a.cls) - s.classes.indexOf(b.cls))
+  const classes = EPIC_LISTS.filter((c) => s.classes.includes(c.cls)).sort((a, b) => s.classes.indexOf(a.cls) - s.classes.indexOf(b.cls))
   const out: WantedBy[] = []
   for (const c of classViews(classes, s, 'both')) {
+    const spell = c.spell ? { spell: c.spell.name } : {}
     const find = (views: readonly StepView[], above: StepView | null): WantedBy | null => {
       for (const v of views) {
         if (v.step.item && itemKey(v.step.item) === k && !v.done)
-          return above ? { cls: c.cls, forWhat: above.name, epic: false } : { cls: c.cls, forWhat: c.epic[0] ?? null, epic: true }
+          return above ? { cls: c.cls, ...spell, forWhat: above.name, epic: false } : { cls: c.cls, ...spell, forWhat: c.epic[0] ?? null, epic: true }
         const below = find(v.parts, v)
         if (below) return below
       }
@@ -49,8 +54,19 @@ export function wantedBy(s: Counts, item: string): WantedBy[] {
   return out
 }
 
-/** Who wants it, as the cue says: "Shadow Knight epic, for the Corrupted Ghoulbane; Paladin epic, for the Fiery Avenger". */
-const forText = (wanted: readonly WantedBy[]): string => wanted.map((w) => `${w.cls} epic${w.forWhat ? `, for ${w.epic ? '' : 'the '}${w.forWhat}` : ''}`).join('; ')
+/**
+ * Who wants it, as the cue says: "Shadow Knight epic, for the Corrupted Ghoulbane; Paladin epic, for
+ * the Fiery Avenger"; a spell quest by its spell, "Ranger's Call of Flame quest, for the Poacher's Head"
+ * (its scroll, at the top, goes unsaid).
+ */
+const forText = (wanted: readonly WantedBy[]): string =>
+  wanted
+    .map((w) =>
+      w.spell
+        ? `${w.cls}’s ${w.spell} quest${w.forWhat && !w.epic ? `, for the ${w.forWhat}` : ''}`
+        : `${w.cls} epic${w.forWhat ? `, for ${w.epic ? '' : 'the '}${w.forWhat}` : ''}`
+    )
+    .join('; ')
 
 /** The cue for a piece looted that is still wanted; null when nothing wants it. */
 export function lootCue(item: string, wanted: readonly WantedBy[]): string | null {
@@ -91,7 +107,7 @@ export function namedKills(how: string): string[] {
 /** The pieces each named drops, by mob key: an item once a mob. */
 const DROPS: ReadonlyMap<string, readonly string[]> = (() => {
   const by = new Map<string, string[]>()
-  for (const c of EPIC_CLASSES)
+  for (const c of EPIC_LISTS)
     for (const s of everyStep(c.steps)) {
       const item = s.item
       if (!item) continue

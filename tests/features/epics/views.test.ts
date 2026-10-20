@@ -140,12 +140,12 @@ describe('the Items', () => {
   it('list every item once with who takes it, the finished epics last', () => {
     const rows = itemRows()
     const robes = rows.find((r) => r.name === 'Shining Metallic Robes')!
-    expect(robes).toEqual({ name: 'Shining Metallic Robes', how: 'Kill The ghoul arch magi', zone: 'Lower Guk', classes: ['Enchanter', 'Rogue'], epic: false })
+    expect(robes).toEqual({ name: 'Shining Metallic Robes', how: 'Kill The ghoul arch magi', zone: 'Lower Guk', classes: ['Enchanter', 'Rogue'], kind: 'piece' })
     const bars = rows.filter((r) => r.name === 'Enchanted Platinum Bar')
     expect(bars).toHaveLength(1)
-    expect(rows[rows.length - 1].epic).toBe(true)
-    expect(rows.find((r) => r.name === 'Swiftwind')).toMatchObject({ epic: true, classes: ['Ranger'] })
-    expect(rows.filter((r) => r.epic).map((r) => r.name)).toContain("Innoruuk's Curse")
+    expect(rows[rows.length - 1].kind).toBe('epic')
+    expect(rows.find((r) => r.name === 'Swiftwind')).toMatchObject({ kind: 'epic', classes: ['Ranger'] })
+    expect(rows.filter((r) => r.kind === 'epic').map((r) => r.name)).toContain("Innoruuk's Curse")
     expect(stepName(classes('Druid')[0].steps[0])).toBe('Cleansed Spirit of Antonica')
   })
 })

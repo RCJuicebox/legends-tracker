@@ -3,6 +3,7 @@ import { itemKey } from '../../core/inventory'
 import { addItemTally, emptyItemTally, readItemLine, type ItemTally } from '../../core/itemTally'
 import type { LogLine } from '../../core/logLine'
 import type { Inventory } from '../../shared/character'
+import { SPELL_QUEST_DATA } from './spellQuests'
 
 // Goals › Epics (an optional module): what to keep for every class's epic quest, pre-Kunark, as the
 // eqlwiki's "Epic Items To Keep" checklist by Manlaan lists it (scripts/epic-items.mjs builds
@@ -13,6 +14,8 @@ import type { Inventory } from '../../shared/character'
 // holds comes from the log (src/core/itemTally.ts) and the inventory export; what the player keeps is
 // the steps ticked off by hand (a turn-in no file can see) and the corrections to the counts. What the
 // page draws from them (each class's steps, what is still needed of each item, where to hunt) is views.ts.
+// The five class spell quests (spellQuests.ts) are lists of the same kind, one a spell, counted and
+// ticked the same way: an item one wants and an epic too is wanted by both.
 
 /** One step of a class's list: a piece to hold, or a quest or craft whose parts are the steps under it. */
 export interface EpicStep {
@@ -30,6 +33,8 @@ export interface EpicStep {
   unverified?: true
   /** What else the page says of it: a /loc, a warning. */
   note?: string
+  /** Which of several same-named pieces it is ("Azia", of the ten Old Silver Coins): its name is "Old Silver Coin (Azia)", its count the item's. */
+  label?: string
   parts: EpicStep[]
 }
 
@@ -40,29 +45,52 @@ export interface EpicClass {
   steps: EpicStep[]
 }
 
+/**
+ * A list the page counts: a class's epic, or a spell quest. Its `epic` is what finishes it (the epic,
+ * or the spell's scroll): in hand, nothing under it is needed.
+ */
+export interface EpicList extends EpicClass {
+  /** What its ticks are kept under: the class for an epic (as they always were), the spell for a spell quest. */
+  key: string
+  kind: 'epic' | 'spell'
+  /** A spell quest's spell, its level and its eqlwiki page. */
+  spell?: { name: string; level: number; page: string }
+}
+
 export const EPIC_SOURCE: string = EPIC_DATA.source
 export const EPIC_URL: string = EPIC_DATA.url
-export const EPIC_CLASSES: readonly EpicClass[] = EPIC_DATA.classes as EpicClass[]
+export const EPIC_CLASSES: readonly EpicList[] = (EPIC_DATA.classes as EpicClass[]).map((c) => ({ ...c, key: c.cls, kind: 'epic' }))
 
-/** What a step is called: its item, or its quest. */
-export const stepName = (s: EpicStep): string => s.item ?? s.quest ?? ''
+/** The class spell quests, a list each. */
+export const SPELL_QUESTS: readonly EpicList[] = SPELL_QUEST_DATA.map((q) => ({
+  cls: q.cls,
+  key: q.spell,
+  kind: 'spell',
+  epic: [`Spell: ${q.spell}`],
+  spell: { name: q.spell, level: q.level, page: q.page },
+  steps: q.steps
+}))
+
+/** Every list: the epics, then the spell quests. */
+export const EPIC_LISTS: readonly EpicList[] = [...EPIC_CLASSES, ...SPELL_QUESTS]
+
+/** What a step is called: its item (with which one it is, of several the same), or its quest. */
+export const stepName = (s: EpicStep): string => (s.item ? (s.label ? `${s.item} (${s.label})` : s.item) : (s.quest ?? ''))
 
 /** Every step under the given, depth first, each before its parts. */
 export const everyStep = (steps: readonly EpicStep[]): EpicStep[] => steps.flatMap((s) => [s, ...everyStep(s.parts)])
 
-/** The keys of every item a step takes or gives, and every finished epic: the only ones the log is counted for. */
-export const EPIC_KEYS: ReadonlySet<string> = new Set(
-  EPIC_CLASSES.flatMap((c) => [...everyStep(c.steps).flatMap((s) => (s.item ? [itemKey(s.item)] : [])), ...c.epic.map(itemKey)])
-)
+/** The keys of every item a step takes or gives, and every finished epic and spell: the only ones the log is counted for. */
+export const EPIC_KEYS: ReadonlySet<string> = new Set(EPIC_LISTS.flatMap((c) => [...everyStep(c.steps).flatMap((s) => (s.item ? [itemKey(s.item)] : [])), ...c.epic.map(itemKey)]))
 
 /** Whether an item is one a step takes or gives: the only ones a correction is kept for. */
 export const isEpicItem = (name: string): boolean => EPIC_KEYS.has(itemKey(name))
 
-/** A step's tick, as it is kept: the class and the step's name. */
-export const tickKey = (cls: string, step: EpicStep): string => `${cls}|${stepName(step)}`
+/** A step's tick, as it is kept: its list's key (an epic's class, a spell quest's spell) and the step's name. */
+export const tickKey = (list: string, step: EpicStep): string => `${list}|${stepName(step)}`
 
 /** Every tick there can be. */
-const TICK_KEYS: ReadonlySet<string> = new Set(EPIC_CLASSES.flatMap((c) => everyStep(c.steps).map((s) => tickKey(c.cls, s))))
+const TICK_KEYS: ReadonlySet<string> = new Set(EPIC_LISTS.flatMap((c) => everyStep(c.steps).map((s) => tickKey(c.key, s))))
 
 /** Whether a tick is one a step has. */
 export const isTick = (key: string): boolean => TICK_KEYS.has(key)

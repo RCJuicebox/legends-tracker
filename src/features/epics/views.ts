@@ -1,11 +1,12 @@
 import { itemKey } from '../../core/inventory'
 import { heldFrom, heldOf, type CountFrom } from '../../core/itemTally'
-import { EPIC_CLASSES, everyStep, stepName, tickKey, type EpicClass, type EpicState, type EpicStep } from './core'
+import { EPIC_LISTS, everyStep, stepName, tickKey, type EpicList, type EpicState, type EpicStep } from './core'
 
 // What Goals › Epics draws from a character's state (core.ts): each class's steps with what is held of
 // each, which are done and why (in hand, ticked off, or covered by the reward above them or the
 // finished epic), how much of each item the classes shown still want between them, and the other
-// tabs' lists: where to hunt for what is missing (Targets) and every item (Items).
+// tabs' lists: where to hunt for what is missing (Targets) and every item (Items). A spell quest is a
+// list like a class's epic, its scroll what finishes it.
 
 export type { CountFrom }
 
@@ -17,6 +18,8 @@ export function held(s: Pick<EpicState, 'logged' | 'adjust' | 'exported'>, name:
 /** A step as the page shows it. */
 export interface StepView {
   step: EpicStep
+  /** Its list's key: what its tick is kept under. */
+  list: string
   cls: string
   name: string
   depth: number
@@ -36,11 +39,15 @@ export interface StepView {
   parts: StepView[]
 }
 
-/** A class as the page shows it. */
+/** A list (a class's epic, or a spell quest) as the page shows it. */
 export interface ClassView {
+  key: string
+  kind: EpicList['kind']
   cls: string
+  /** A spell quest's spell. */
+  spell?: EpicList['spell']
   epic: string[]
-  /** The finished epic in hand, by name; null when not (or none is known). */
+  /** The finished epic (or the spell's scroll) in hand, by name; null when not (or none is known). */
   finished: string | null
   steps: StepView[]
   /** The pieces to gather (the steps with nothing under them), and how many are done. */
@@ -52,14 +59,17 @@ export interface ClassView {
 
 type Counts = Pick<EpicState, 'logged' | 'adjust' | 'exported' | 'ticks'>
 
+/** What a list is called where several are listed: an epic by its class, a spell quest by its spell ("Tashania (Enchanter)"). */
+export const listName = (c: Pick<EpicList, 'cls' | 'spell'>): string => (c.spell ? `${c.spell.name} (${c.cls})` : c.cls)
+
 /**
- * The classes given, each step with what is held and what the classes still want. A step is its own
+ * The lists given (classes' epics, spell quests), each step with what is held and what the classes still want. A step is its own
  * once ticked or its item held as many as it takes; a step under one that is covers nothing more,
  * nor does any step of a class whose finished epic is in hand. What is wanted of an item is every
  * step not covered or ticked, across the classes given, so one Shining Metallic Robes is half of what
  * an Enchanter and a Rogue want.
  */
-export function classViews(classes: readonly EpicClass[], s: Counts, from: CountFrom): ClassView[] {
+export function classViews(classes: readonly EpicList[], s: Counts, from: CountFrom): ClassView[] {
   const have = (name: string) => held(s, name, from)
   // What every class wants of each item, by item key: the steps that nothing covers.
   const wanted = new Map<string, number>()
@@ -67,7 +77,7 @@ export function classViews(classes: readonly EpicClass[], s: Counts, from: Count
   const first = classes.map((c) => {
     const finished = c.epic.find((e) => have(e) > 0) ?? null
     const view = (step: EpicStep, depth: number, covered: string | null): StepView => {
-      const ticked = s.ticks.includes(tickKey(c.cls, step))
+      const ticked = s.ticks.includes(tickKey(c.key, step))
       const h = step.item ? have(step.item) : 0
       const own = ticked || (!!step.item && h >= step.qty)
       if (step.item && !ticked && !covered) {
@@ -78,6 +88,7 @@ export function classViews(classes: readonly EpicClass[], s: Counts, from: Count
       const below = covered ?? (own ? `${stepName(step)} ${ticked ? 'ticked off' : 'in hand'}` : null)
       return {
         step,
+        list: c.key,
         cls: c.cls,
         name: stepName(step),
         depth,
@@ -92,7 +103,7 @@ export function classViews(classes: readonly EpicClass[], s: Counts, from: Count
       }
     }
     const steps = c.steps.map((st) => view(st, 0, finished ? `${finished} in hand` : null))
-    return { cls: c.cls, epic: c.epic, finished, steps }
+    return { key: c.key, kind: c.kind, cls: c.cls, ...(c.spell ? { spell: c.spell } : {}), epic: c.epic, finished, steps }
   })
   // Then each step against what everything wants of its item.
   return first.map((c) => {
@@ -129,11 +140,12 @@ export interface EpicFilter {
 
 export const NO_FILTER: EpicFilter = { cls: 'mine', text: '', hideDone: false }
 
-/** The classes the filter picks; the character's, or every class when it has none. */
-export function pickClasses(f: Pick<EpicFilter, 'cls'>, mine: readonly string[]): EpicClass[] {
-  if (f.cls === 'all' || (f.cls === 'mine' && !mine.length)) return [...EPIC_CLASSES]
-  if (f.cls === 'mine') return EPIC_CLASSES.filter((c) => mine.includes(c.cls))
-  return EPIC_CLASSES.filter((c) => c.cls === f.cls)
+/** The lists of a kind (epics, or spell quests) of the classes the filter picks: the character's, or every class when it has none. */
+export function pickClasses(f: Pick<EpicFilter, 'cls'>, mine: readonly string[], kind: EpicList['kind'] = 'epic'): EpicList[] {
+  const lists = EPIC_LISTS.filter((c) => c.kind === kind)
+  if (f.cls === 'all' || (f.cls === 'mine' && !mine.length)) return lists
+  if (f.cls === 'mine') return lists.filter((c) => mine.includes(c.cls))
+  return lists.filter((c) => c.cls === f.cls)
 }
 
 /** Whether a step's name, how, zone or note holds every word typed. */
@@ -165,7 +177,7 @@ export interface Target {
 
 export const ANYWHERE = 'Anywhere'
 
-/** Where to hunt for what the classes shown are missing: each piece not done, under its zone, with every class that wants it. Zones with most to do first. */
+/** Where to hunt for what the lists shown are missing: each piece not done, under its zone, with every list that wants it. Zones with most to do first. */
 export function targets(views: readonly ClassView[]): Target[] {
   const rows = new Map<string, Target['rows'][number] & { zone: string }>()
   for (const c of views)
@@ -182,7 +194,7 @@ export function targets(views: readonly ClassView[]): Target[] {
         unverified: !!v.step.unverified,
         ...(v.step.note ? { note: v.step.note } : {})
       }
-      if (!r.classes.includes(c.cls)) r.classes.push(c.cls)
+      if (!r.classes.includes(listName(c))) r.classes.push(listName(c))
       rows.set(key, r)
     }
   const by = new Map<string, Target>()
@@ -197,32 +209,34 @@ export function targets(views: readonly ClassView[]): Target[] {
 
 // ---- Items ----
 
-/** An item any class's steps take, where it comes from and who takes it. */
+/** An item any list's steps take, where it comes from and who takes it. */
 export interface ItemRow {
   name: string
   /** Where it comes from, as the first step that takes it says. */
   how: string
   zone?: string
+  /** The lists that take it, as listName names them. */
   classes: string[]
-  /** The finished epic of a class, not a piece. */
-  epic: boolean
+  /** A piece, or what finishes a list: a class's epic or a spell quest's scroll. */
+  kind: 'piece' | 'epic' | 'spell'
 }
 
-/** Every item the steps take, and every finished epic, each once, by name. */
+/** Every item the steps take, and every finished epic and spell, each once, by name: the pieces first. */
 export function itemRows(): ItemRow[] {
   const by = new Map<string, ItemRow>()
-  for (const c of EPIC_CLASSES) {
+  const add = (name: string, row: () => ItemRow, list: string) => {
+    const r = by.get(itemKey(name)) ?? row()
+    if (!r.classes.includes(list)) r.classes.push(list)
+    by.set(itemKey(name), r)
+  }
+  for (const c of EPIC_LISTS) {
+    // The spell's scroll is the top step of its list, and what finishes it.
+    for (const e of c.epic) add(e, () => ({ name: e, how: c.kind === 'spell' ? 'The spell’s scroll' : 'The finished epic', classes: [], kind: c.kind }), listName(c))
     for (const s of everyStep(c.steps)) {
-      if (!s.item) continue
-      const r = by.get(itemKey(s.item)) ?? { name: s.item, how: s.how, ...(s.zone ? { zone: s.zone } : {}), classes: [], epic: false }
-      if (!r.classes.includes(c.cls)) r.classes.push(c.cls)
-      by.set(itemKey(s.item), r)
-    }
-    for (const e of c.epic) {
-      const r = by.get(itemKey(e)) ?? { name: e, how: 'The finished epic', classes: [], epic: true }
-      if (!r.classes.includes(c.cls)) r.classes.push(c.cls)
-      by.set(itemKey(e), r)
+      const item = s.item
+      if (item) add(item, () => ({ name: item, how: s.how, ...(s.zone ? { zone: s.zone } : {}), classes: [], kind: 'piece' }), listName(c))
     }
   }
-  return [...by.values()].sort((a, b) => Number(a.epic) - Number(b.epic) || a.name.localeCompare(b.name))
+  const order = { piece: 0, spell: 1, epic: 2 }
+  return [...by.values()].sort((a, b) => order[a.kind] - order[b.kind] || a.name.localeCompare(b.name))
 }

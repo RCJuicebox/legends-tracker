@@ -34,9 +34,9 @@ import { beforeCopy, dropsOf, killCue, lootCue, slainMob, wantedBy } from './cue
 // module is on, a piece the character loots, or a named that drops one dying, is said on the Live
 // page's feed and the alert overlay when a class on its record still wants it (cue.ts).
 
-/** Each stretch of log's epic pieces, as a LogHistory consumer. */
+/** Each stretch of log's epic and spell-quest pieces, as a LogHistory consumer (2: the spell quests' pieces counted too). */
 const epicConsumer: HistoryConsumer<EpicTally> = {
-  version: 1,
+  version: 2,
   empty: emptyEpicTally,
   reader: () => readEpicLine
 }
