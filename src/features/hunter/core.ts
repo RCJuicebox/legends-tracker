@@ -92,7 +92,9 @@ export function hunterZones(
   exportAt: number,
   spawnsOf: (zone: string) => ReadonlyMap<string, MobSpawn> | null = () => null,
   /** What the Respawns records say of a named in a zone (seenOf); none without records. */
-  seenOf: (zone: string, name: string, timer: number | undefined) => Seen | undefined = () => undefined
+  seenOf: (zone: string, name: string, timer: number | undefined) => Seen | undefined = () => undefined,
+  /** Keeps an achievement whose named were all killed since the export, with none left: the Live page says they died. */
+  keepKilled = false
 ): HunterZone[] {
   const out: HunterZone[] = []
   for (const sec of sections)
@@ -113,11 +115,11 @@ export function hunterZones(
           const own = legendsSpawnsOf(zone, [c.t])[0]
           return own ? { name: c.t, legends: { spots: own.spots.length, ...(own.ph ? { ph: own.ph } : {}), said: own.said }, ...with_ } : { name: c.t, ...with_ }
         })
-      if (!left.length) continue
+      if (!left.length && !(keepKilled && since.length)) continue
       // The zone takes as long as its longest wait: the named not up pop side by side, those up wait nothing.
       const waits = left.map((n) => n.wait)
       // Up now unless the records say it died and is not back: the zone is due when its first named is.
-      const dueIn = Math.min(...left.map((n) => n.dueIn ?? 0))
+      const dueIn = left.length ? Math.min(...left.map((n) => n.dueIn ?? 0)) : 0
       out.push({ zone, achievement: a.n, left, total: named.length, since, wait: waits.every((w) => w !== undefined) ? Math.max(0, ...(waits as number[])) : null, dueIn })
     }
   // What is up now first (a zone whose named died two minutes ago sinks until it is due, LT-733); then
@@ -145,8 +147,9 @@ export function hunterMatch(z: Pick<HunterZone, 'zone' | 'achievement' | 'left'>
 /**
  * The Hunter named left in the zone the player is in, for the achievements overlay: the export's, less
  * those the live counts have seen killed since (`kills`, by lower-cased mob), each with what the
- * Respawns records say of it (`seenOf`); less the achievements the player has said do not work. Null
- * outside a Hunter zone, or with nothing left there.
+ * Respawns records say of it (`seenOf`); less the achievements the player has said do not work. One
+ * whose last named died since the export stays, with none left, so the Live page can say so. Null
+ * outside a Hunter zone, or with nothing open there.
  */
 export function hunterLive(
   sections: AchSection[],
@@ -175,7 +178,8 @@ export function hunterLive(
       (bare) => last.get(bare) ?? 0,
       exportAt,
       () => null,
-      seenOf
+      seenOf,
+      true
     ),
     zone
   ).filter((r) => !isBroken(r.achievement))
@@ -195,6 +199,7 @@ export function hunterLive(
             left: r.left.map((n) => n.name),
             total: r.total,
             since: r.since,
+            ...(r.since.length ? { killed: Object.fromEntries(r.since.map((n) => [n, last.get(bareName(n)) ?? 0])) } : {}),
             ...(Object.keys(seen).length ? { seen } : {}),
             ...(Object.keys(far).length ? { near: far } : {})
           }

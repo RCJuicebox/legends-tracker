@@ -195,7 +195,7 @@ describe('the achievements overlay’s Hunter rows (hunterLive)', () => {
       )
     ).toEqual({
       zone: 'Befallen 2 (Adaptive)',
-      rows: [{ achievement: 'Hunter of Befallen', left: ['Andrew Pine'], total: 3, since: ['Skeletal Orc'] }]
+      rows: [{ achievement: 'Hunter of Befallen', left: ['Andrew Pine'], total: 3, since: ['Skeletal Orc'], killed: { 'Skeletal Orc': T0 + 1000 } }]
     })
     expect(
       hunterLive(
@@ -207,6 +207,33 @@ describe('the achievements overlay’s Hunter rows (hunterLive)', () => {
         () => false
       )
     ).toBeNull()
+  })
+
+  it('keep an achievement whose last named died since the export, with none left, for the Live page to say so', () => {
+    const both = new Map([...kills, ['andrew pine', { name: 'Andrew Pine', times: [T0 + 5000] }]])
+    expect(
+      hunterLive(
+        befallen,
+        T0,
+        'Befallen',
+        both,
+        () => undefined,
+        () => false
+      )
+    ).toEqual({
+      zone: 'Befallen',
+      rows: [
+        {
+          achievement: 'Hunter of Befallen',
+          left: [],
+          total: 3,
+          since: ['Skeletal Orc', 'Andrew Pine'],
+          killed: { 'Skeletal Orc': T0 + 1000, 'Andrew Pine': T0 + 5000 }
+        }
+      ]
+    })
+    // Plan › Hunter still drops it: nothing is left to plan.
+    expect(hunterZones(befallen, (b) => (b === 'skeletal orc' || b === 'andrew pine' ? T0 + 1 : 0), T0)).toEqual([])
   })
 
   it('say when a named left died, from the Respawns records (LT-670), and leave out the achievements said not to work', () => {

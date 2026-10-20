@@ -138,6 +138,8 @@ export interface HunterTrackView {
     total: number
     /** Killed since the export, the export not knowing yet. */
     since: string[]
+    /** When each of `since` was last killed in this zone, by name. */
+    killed?: Record<string, number>
     /** What the Respawns records say of each named left, by name ("died 6 min ago; back in ~2 min as you timed it"), where the log saw it die. */
     seen?: Record<string, string>
     /** How far and which way the nearest spot of each named left is from the player's last /loc in this zone (FEAT-023). */

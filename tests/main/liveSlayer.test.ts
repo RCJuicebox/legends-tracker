@@ -51,7 +51,7 @@ function context(): AppContext {
     logHistory: { reachable: async () => true },
     gameTables: { get: async () => GAME },
     npcPages: { ready: async () => undefined, race: () => null, lookUp: async () => false },
-    hunter: { isBroken: () => false, routeParts: async () => [] },
+    hunter: { isBroken: () => false, routeParts: async () => [], namedDown: async () => {} },
     skills: { view: async () => ({}) },
     zoneVisits: { view: async () => ({}) }
   } as unknown as AppContext

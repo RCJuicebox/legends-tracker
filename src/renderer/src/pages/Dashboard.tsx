@@ -11,6 +11,7 @@ import { Icon, ToggleChip } from '../components/ui'
 import { GameFolderPrompt } from '../components/GameFolder'
 import { FactionNowCard, FightSummary, QuietLogNotice, SetupChecklist } from '../components/LiveSummary'
 import { TryLogLineLink } from '../components/TryLogLine'
+import { HuntCards } from '../components/LiveHunt'
 import { GoContext, type Go } from '../nav'
 import { perHour, useMotes } from './MoteRuns'
 import { localDay, sessionHours, totalMotes } from '../../../core/motes'
@@ -40,7 +41,7 @@ export function Dashboard({ go }: { go: Go }) {
       <div className="page-head">
         <div>
           <h1>Live</h1>
-          <p>Every timer the tracker is running, as the overlays show them, plus what has happened recently.</p>
+          <p>Every timer the tracker is running, as the overlays show them, what your hunt is doing, and what has happened recently.</p>
         </div>
         <div className="actions">
           {watching ? (
@@ -104,6 +105,9 @@ export function Dashboard({ go }: { go: Go }) {
       )}
 
       <StatCards go={go} />
+
+      {/* What a hunt is doing, here or on another PC's log: the named left and down, the Slayer counts moving. */}
+      <HuntCards go={go} />
 
       <FightSummary go={go} />
       <FactionNowCard go={go} />

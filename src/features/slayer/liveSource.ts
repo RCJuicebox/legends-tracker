@@ -384,6 +384,8 @@ export class SlayerLive {
       s.kills.set(k, had)
     }
     s.zoneIn.set(path, zone ?? '')
+    // A Hunter named killed is said at once, from whichever PC's log (the Live page's Hunter card).
+    if (kills.length) void this.ctx.hunter?.namedDown(s.character, s.kills, kills).catch((e: unknown) => log.warn('Hunter: could not check the kills for named:', e))
     return { read, readTo: readTo + read, id }
   }
 

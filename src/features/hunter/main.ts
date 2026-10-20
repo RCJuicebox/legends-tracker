@@ -13,7 +13,9 @@ import { hunterLive, hunterZones, wantedTimers, type HunterPlanData } from './co
 import { bareName } from '../slayer/core'
 import { respawnEstimate, respawnKey, respawnTriggerId } from '../../core/respawns'
 import { DIED, SLAIN_BY, SLAIN_BY_YOU } from '../../core/phrases'
-import { clock } from '../../core/format'
+import { clock, timeOfDay } from '../../core/format'
+import { zoneKey } from '../../core/zones'
+import type { SlayerKills } from '../../core/slayer'
 import type { RoutePart } from '../../core/route'
 
 /** A named's respawn bar, as the Respawns page's timers are coloured. */
@@ -95,6 +97,47 @@ export class HunterPlanner implements AppFeature {
     const hunter = hunterLive(at.exported.sections, at.exported.modified, at.zone, ctx.slayer?.live?.kills(at.character), seenOf, (a) => this.isBroken(a), near)
     this.wanted = hunter ? { character: at.character, zone: at.zone, names: wantedTimers(hunter.rows, this.lengthIn(ctx, at.zone)) } : null
     return { hunter }
+  }
+
+  /** Named kills already said, by zone, name and time: a log read again says nothing twice. */
+  private readonly said = new Set<string>()
+
+  /**
+   * Kills the Slayer counts just read, from any of the character's logs (this PC's, or another PC's
+   * it is hunting on unwatched): a named a Hunter achievement still wants, killed a moment ago, is said
+   * in the activity feed, and on the overlay and aloud as the achievement cues are.
+   */
+  async namedDown(character: string, kills: SlayerKills, fresh: readonly { at: number; zone: string }[]): Promise<void> {
+    const ctx = this.ctx
+    const now = Date.now()
+    const zones = [...new Set(fresh.filter((k) => k.zone && now - k.at < NAMED_FRESH_MS).map((k) => k.zone))]
+    if (!ctx || !zones.length) return
+    const exp = await ctx.achievementFiles.exported(character)
+    if (!exp) return
+    for (const zone of zones) {
+      const live = hunterLive(
+        exp.sections,
+        exp.modified,
+        zone,
+        kills,
+        () => undefined,
+        (a) => this.isBroken(a)
+      )
+      for (const r of live?.rows ?? [])
+        for (const name of r.since) {
+          const at = r.killed?.[name] ?? 0
+          const key = `${zoneKey(zone)}|${bareName(name)}|${at}`
+          if (now - at >= NAMED_FRESH_MS || this.said.has(key)) continue
+          this.said.add(key)
+          const left = r.left.length ? `${r.left.length} of ${r.total} left` : 'none left: your next export completes it'
+          ctx.engine.pushFeed('info', `Hunter: ${name} killed in ${zone} at ${timeOfDay(at)} · ${r.achievement}, ${left}`)
+          if (!ctx.store.settings.get().achievementCues) continue
+          ctx.engine.notify([
+            { kind: 'text', text: `✓ Hunter: ${name}`, color: '#8fe0a6', durationSec: 10 },
+            { kind: 'speak', text: `Hunter named down: ${name.replace(/`/g, '')}.`, interrupt: false }
+          ])
+        }
+    }
   }
 
   /** How long a named in a zone takes to come back: what your Respawns record timed, else the tables'. */
@@ -197,6 +240,8 @@ export class HunterPlanner implements AppFeature {
 }
 
 const FOUND_MAX = 500
+/** A named kill older than this when it is read (the log read on after a start) is not said. */
+const NAMED_FRESH_MS = 10 * 60_000
 
 /** hunter-spots.json as read back: spots with a zone, a name and two or three numbers. */
 export function sanitizeFound(v: unknown): FoundSpot[] {
