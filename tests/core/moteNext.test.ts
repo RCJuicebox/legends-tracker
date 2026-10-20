@@ -31,6 +31,14 @@ describe('Motes › Next: merges and spell ranks in one list (FEAT-033)', () => 
       ['Odium', 'VIII → IX', null, 0.6],
       ['Slugs Healing', 'VIII → IX', 256, null]
     ])
+    // What the columns sort by: the level it starts from, and the gain for each 1,000 motes.
+    expect(rows.map((r) => [r.level, r.perK === null ? null : Math.round(r.perK * 100) / 100])).toEqual([
+      [5, 31.25],
+      [9, 19.53],
+      [8, 7.03],
+      [8, null],
+      [8, null]
+    ])
   })
 
   it('gives each spell its share of your damage in a meter segment, its ticks with its hits', () => {

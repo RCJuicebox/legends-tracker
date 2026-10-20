@@ -10,12 +10,15 @@ import type { SpellUpgradeOption } from './spellMotes'
 export interface NextRow {
   kind: 'item' | 'spell'
   name: string
-  /** "+5 → +6", "VIII → IX". */
+  /** "+5 → +6", "VIII → IX"; and the level or rank it starts from, to sort by. */
   step: string
+  level: number
   /** What the step costs, in Infinitesimal motes' worth; null when the stock cannot pay it yet. */
   cost: number | null
   /** About how much more of your damage it gives, in percent; null where it cannot be said. */
   gainPct: number | null
+  /** That gain for each 1,000 motes it costs: the list's order. Null without a gain or a cost. */
+  perK: number | null
   /** Its gain in its own terms, for when no share can be put on it. */
   note: string
   affordable: boolean
@@ -35,31 +38,40 @@ export function nextRanking(
   }
 ): NextRow[] {
   const rows: NextRow[] = []
-  for (const m of items)
+  const perK = (gainPct: number | null, cost: number | null) => (gainPct !== null && cost ? (gainPct / cost) * 1000 : null)
+  for (const m of items) {
+    const gainPct = o.ratioWeight > 0 ? m.gain / o.ratioWeight : null
     rows.push({
       kind: 'item',
       name: m.item.name.replace(/\s*\+\d+$/, ''),
       step: `+${m.level} → +${m.next}`,
+      level: m.level,
       cost: m.cost,
-      gainPct: o.ratioWeight > 0 ? m.gain / o.ratioWeight : null,
+      gainPct,
+      perK: perK(gainPct, m.cost),
       note: `${m.gain.toFixed(1)} points by your weights`,
       affordable: m.affordable
     })
+  }
   for (const s of spells) {
     if (s.maxed) continue
     const power = s.parts.find((p) => p.key === 'power')
     const share = DAMAGE.has(s.row.category) && power ? o.damageShare(s.row.name) : null
+    const cost = s.spend.short ? null : s.spend.worth
+    const gainPct = share !== null && power ? power.pct * share : null
     rows.push({
       kind: 'spell',
       name: s.row.name,
       step: `${ROMAN[s.rank] ?? s.rank} → ${ROMAN[s.next] ?? s.next}`,
-      cost: s.spend.short ? null : s.spend.worth,
-      gainPct: share !== null && power ? power.pct * share : null,
+      level: s.rank,
+      cost,
+      gainPct,
+      perK: perK(gainPct, cost),
       note: `${s.worth.toFixed(0)} points over your casts`,
       affordable: s.affordable
     })
   }
-  const per = (r: NextRow) => (r.gainPct !== null && r.cost ? r.gainPct / r.cost : -1)
+  const per = (r: NextRow) => r.perK ?? -1
   return rows.sort(
     (a, b) => Number(b.gainPct !== null) - Number(a.gainPct !== null) || per(b) - per(a) || Number(b.affordable) - Number(a.affordable) || a.name.localeCompare(b.name)
   )
