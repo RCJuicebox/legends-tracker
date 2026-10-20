@@ -411,6 +411,7 @@ export function sanitizeSettings(v: unknown, fb: AppSettings): AppSettings | nul
     theme: oneOf(v.theme, ['system', 'light', 'dark'] as const, fb.theme),
     hotkeys: bool(v.hotkeys, fb.hotkeys),
     achievementCues: bool(v.achievementCues, fb.achievementCues),
+    hunterToasts: bool(v.hunterToasts, fb.hunterToasts ?? true),
     modules: modules(v.modules, fb.modules),
     combat,
     groupHealth,

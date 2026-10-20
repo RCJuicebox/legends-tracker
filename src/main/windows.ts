@@ -323,6 +323,28 @@ export class Windows {
     this.main?.focus()
   }
 
+  /** Notifications up and not yet clicked or closed: one left to the garbage collector loses its click (LT-616). */
+  private readonly toasts = new Set<Notification>()
+
+  /** A Windows notification; clicking it brings the main window up. */
+  toast(title: string, body: string): void {
+    if (!Notification.isSupported()) return
+    try {
+      const n = new Notification({ title, body, icon: this.opts.icon })
+      this.toasts.add(n)
+      const done = () => void this.toasts.delete(n)
+      n.on('click', () => {
+        done()
+        this.showMain()
+      })
+      n.on('close', done)
+      n.on('failed', done)
+      n.show()
+    } catch (e) {
+      log.warn('Could not show a notification:', e)
+    }
+  }
+
   /** Sends the main window a push; held while it is hidden (see mainHidden). */
   toMain<K extends PushChannel>(channel: K, ...args: Parameters<Pushes[K]>): void {
     const w = this.main

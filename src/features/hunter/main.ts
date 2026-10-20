@@ -105,7 +105,8 @@ export class HunterPlanner implements AppFeature {
   /**
    * Kills the Slayer counts just read, from any of the character's logs (this PC's, or another PC's
    * it is hunting on unwatched): a named a Hunter achievement still wants, killed a moment ago, is said
-   * in the activity feed, and on the overlay and aloud as the achievement cues are.
+   * in the activity feed, in a Windows notification while that is on (hunterToasts), and on the
+   * overlay and aloud as the achievement cues are.
    */
   async namedDown(character: string, kills: SlayerKills, fresh: readonly { at: number; zone: string }[]): Promise<void> {
     const ctx = this.ctx
@@ -131,7 +132,10 @@ export class HunterPlanner implements AppFeature {
           this.said.add(key)
           const left = r.left.length ? `${r.left.length} of ${r.total} left` : 'none left: your next export completes it'
           ctx.engine.pushFeed('info', `Hunter: ${name} killed in ${zone} at ${timeOfDay(at)} · ${r.achievement}, ${left}`)
-          if (!ctx.store.settings.get().achievementCues) continue
+          const settings = ctx.store.settings.get()
+          // A Windows notification, at the player's choice whatever the cues: they may be nowhere near the game or the overlay.
+          if (settings.hunterToasts) ctx.windows.toast(`Hunter: ${name} killed`, `${zone} at ${timeOfDay(at)} · ${r.achievement}, ${left}`)
+          if (!settings.achievementCues) continue
           ctx.engine.notify([
             { kind: 'text', text: `✓ Hunter: ${name}`, color: '#8fe0a6', durationSec: 10 },
             { kind: 'speak', text: `Hunter named down: ${name.replace(/`/g, '')}.`, interrupt: false }

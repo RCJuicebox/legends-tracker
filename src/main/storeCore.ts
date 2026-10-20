@@ -51,6 +51,7 @@ export function defaultSettings(): AppSettings {
     theme: 'system',
     hotkeys: true,
     achievementCues: true,
+    hunterToasts: true,
     modules: {},
     combat: { fightGapSec: 10, historyMinutes: 60, newSessionOnZone: true, combinePet: true, charmPets: true },
     groupHealth: {

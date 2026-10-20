@@ -1,7 +1,8 @@
 import type { HunterTrackView, SlayerRow } from '../../../shared/tracking'
 import { num, timeOfDay } from '../../../core/format'
 import { useAchievementTrack } from '../hooks'
-import { useLive } from '../state'
+import { useActions, useLive, useSettled } from '../state'
+import { ToggleChip } from './ui'
 import { ago } from '../api'
 import { useNow } from './TimerBars'
 import type { Go } from '../nav'
@@ -33,6 +34,8 @@ export function HuntCards({ go }: { go: Go }) {
 }
 
 function HunterCard({ hunter, zone, now, go }: { hunter: HunterTrackView | null; zone: string; now: number; go: Go }) {
+  const { patchSettings } = useActions()
+  const toasts = useSettled((s) => s.settings.hunterToasts)
   const rows = hunter?.rows ?? []
   // The named killed lately, newest first: what a hunt left running wants to hear.
   const down = rows
@@ -44,6 +47,13 @@ function HunterCard({ hunter, zone, now, go }: { hunter: HunterTrackView | null;
       <div className="card-head">
         <h2>Hunter {zone && <span className="chip">{zone}</span>}</h2>
         <span className="spacer" />
+        <ToggleChip
+          on={toasts}
+          onChange={(on) => void patchSettings((s) => ({ ...s, hunterToasts: on }))}
+          title="A Windows notification when a named a Hunter achievement still wants dies, on this PC's log or another's"
+        >
+          Notify me
+        </ToggleChip>
         <button className="link-button inline small" onClick={() => go('hunter')}>
           Plan › Hunter
         </button>

@@ -258,6 +258,8 @@ export interface AppSettings {
   hotkeys: boolean
   /** Say when a step of the faction plan being followed is done, and flash each achievement it finishes. */
   achievementCues: boolean
+  /** A Windows notification when a named a Hunter achievement still wants dies (Live's Hunter card). */
+  hunterToasts: boolean
   /** The optional modules the player turned on (Settings › Modules), by page id; one not named is off. */
   modules: Record<string, boolean>
   combat: CombatSettings
