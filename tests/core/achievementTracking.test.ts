@@ -244,6 +244,11 @@ describe('Slayer counts', () => {
     expect(slayerLine('You hit a bixie drone for 45 points of poison damage by Envenomed Bolt.')).toEqual({ engaged: 'a bixie drone' })
     expect(slayerLine('A samhain has taken 100 damage by Rotting Flesh.')).toEqual({ engaged: 'A samhain' })
     expect(slayerLine('A bixie died.')).toEqual({ died: 'A bixie' })
+    // A mob's pet counts toward nothing: its kill is no Slayer kill.
+    expect(slayerLine('You have slain Khrix Fritchoff pet!')).toBeNull()
+    expect(slayerLine('A dracoliche pet has been slain by Vonartik!')).toBeNull()
+    expect(slayerLine('Terror pet died.')).toBeNull()
+    expect(slayerLine('You have slain a carpet merchant!')).toEqual({ kill: { mob: 'a carpet merchant', by: 'You' } })
     expect(slayerLine('You have completed achievement: Bear With Me')).toEqual({ completed: 'Bear With Me' })
     expect(slayerLine('You gain party experience!')).toBeNull()
     expect(wikiRace('{{Namedmobpage\n| race = [[Dark Elf]]\n| zone = [[Neriak]]\n}}')).toBe('Dark Elf')

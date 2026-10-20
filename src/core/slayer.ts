@@ -271,6 +271,12 @@ const YOU_HIT = /^You \w+ (.+?) for \d+ points? of /
 /** "A samhain has taken 100 damage by Rotting Flesh.": the player's damage over time. */
 const TAKEN_BY = /^(.+?) has taken \d+ damage by /
 
+/**
+ * A mob's pet ("Khrix Fritchoff pet", "a dracoliche pet", "Terror pet"): its race is never the mob's,
+ * so its kills count toward no Slayer achievement and are not asked about (the player, 2026-10-19).
+ */
+export const isNpcPet = (mob: string): boolean => /\spet$/i.test(mob.trim())
+
 /** What one log line means to the Slayer counts. */
 export type SlayerLine = { kill: { mob: string; by: string } } | { pet: string; engaged: string } | { engaged: string } | { died: string } | { completed: string } | null
 
@@ -281,12 +287,12 @@ export type SlayerLine = { kill: { mob: string; by: string } } | { pet: string; 
  */
 export function slayerLine(text: string): SlayerLine {
   let m = SLAIN_BY_YOU.exec(text)
-  if (m) return { kill: { mob: m[1], by: 'You' } }
+  if (m) return isNpcPet(m[1]) ? null : { kill: { mob: m[1], by: 'You' } }
   m = SLAIN_BY.exec(text)
   // "Kelwyn has been slain by a gnoll!": a mob killed one of the player's side.
-  if (m) return /^(?:an?|the)\s/i.test(m[2]) ? null : { kill: { mob: m[1], by: m[2] } }
+  if (m) return /^(?:an?|the)\s/i.test(m[2]) || isNpcPet(m[1]) ? null : { kill: { mob: m[1], by: m[2] } }
   m = DIED.exec(text)
-  if (m) return { died: m[1] }
+  if (m) return isNpcPet(m[1]) ? null : { died: m[1] }
   // A pet of one word: a charmed mob's name ("a gnoll") is every other gnoll's too.
   m = PET_ATTACKING.exec(text)
   if (m && !m[1].includes(' ')) return { pet: m[1], engaged: m[2] }
@@ -362,6 +368,8 @@ export function slayerCounts(
   const unplaced: { name: string; n: number }[] = []
   const unknown: string[] = []
   for (const k of kills.values()) {
+    // Kills kept by a build before mobs' pets were left out.
+    if (isNpcPet(k.name)) continue
     const wiki = raceOf(k.name)
     if (wiki === undefined) unknown.push(k.name)
     const mob = k.name.toLowerCase()

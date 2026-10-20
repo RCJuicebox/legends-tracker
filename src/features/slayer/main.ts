@@ -51,7 +51,8 @@ const MAP_SET = 'LegendsTracker'
 
 /** Each stretch of log's kills by zone, as a LogHistory consumer. Version 2: trips between zones, each mob's last kill; 3: each stretch of killing. */
 const killConsumer: HistoryConsumer<SlayerKillTallies> = {
-  version: 3,
+  // 4: mobs' pets left out (isNpcPet).
+  version: 4,
   empty: emptyKillTallies,
   reader: () => readKillLine
 }
