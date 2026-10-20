@@ -2,7 +2,7 @@
 
 What changed in each version. The release workflow publishes a version's section as its release notes, and installed copies show them when an update arrives.
 
-## Unreleased
+## 2.18.0 (2026-10-19)
 
 - **Azure voices are gone.** Speech is the Windows voices alone: the Microsoft voices card on Settings › Audio, its key and the phrases it kept are removed. A voice that was an Azure one is now the Windows default; pick another under Voice.
 
