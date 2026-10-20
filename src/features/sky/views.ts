@@ -163,10 +163,10 @@ export function questMatch(q: SkyQuest, filter: string): boolean {
   return words.every((w) => hay.includes(w))
 }
 
-/** Whether a Test passes the filter; the ignored never do. */
-export function passes(v: QuestView, f: SkyFilter, mine: readonly string[]): boolean {
+/** Whether a Test passes the filter; the ignored never do, unless `withIgnored` (the Tests tab's Show ignored). */
+export function passes(v: QuestView, f: SkyFilter, mine: readonly string[], withIgnored = false): boolean {
   const q = v.quest
-  if (v.ignored) return false
+  if (v.ignored && !withIgnored) return false
   if (f.cls === 'mine' ? mine.length > 0 && !mine.includes(q.cls) : f.cls !== 'all' && q.cls !== f.cls) return false
   if (f.island && !q.items.some((i) => i.drops.some((d) => d.island === f.island))) return false
   if (f.mob && !q.items.some((i) => i.drops.some((d) => d.mob === f.mob))) return false

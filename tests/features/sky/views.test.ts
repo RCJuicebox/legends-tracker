@@ -62,6 +62,9 @@ describe('the Tests tab', () => {
     expect(names({ cls: 'Monk', hideTurnedIn: true })).not.toContain('Monk Test of Speed')
     // Brass Knuckles drops on island 8 too.
     expect(names({ text: 'island 8 monk' })).toEqual([FISTS, 'Monk Test of Tranquility'])
+    // Show ignored lets the ignored through the filter, among the rest.
+    expect(names({ cls: 'Monk' })).not.toContain('Monk Test of Sight')
+    expect(views.filter((v) => passes(v, { ...NO_FILTER, cls: 'Monk' }, s.classes, true)).map((v) => v.quest.name)).toContain('Monk Test of Sight')
   })
 
   it('orders by what was looted last, by island, or as the wiki lists them', () => {

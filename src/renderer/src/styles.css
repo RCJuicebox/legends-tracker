@@ -4509,6 +4509,10 @@ input[aria-invalid='true'] {
   background: color-mix(in srgb, var(--accent) 6%, transparent);
   box-shadow: inset 3px 0 0 var(--accent);
 }
+/* An ignored Test, shown among the rest under Show ignored: there, but faint. */
+.sky-test.ignored {
+  opacity: 0.55;
+}
 .sky-test-head {
   display: flex;
   align-items: center;

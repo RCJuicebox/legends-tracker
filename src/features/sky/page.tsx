@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { CharacterPicker } from '../../renderer/src/components/CharacterPicker'
 import { api } from '../../renderer/src/api'
 import { useInvoke, useVisibleInterval } from '../../renderer/src/hooks'
@@ -12,14 +12,15 @@ import { useCharacterChoice } from '../../renderer/src/character'
 import { SKY_QUESTS, SKY_SOURCE, wishLeft, type SkyState } from './core'
 import { NO_FILTER, passes, questView, skyFacets, sortViews, type CountFrom, type QuestView, type SkyFilter, type SkySort } from './views'
 import { Bar, NeedChip, WantControl, whereOf } from './parts'
-import { Classes, Cleanup, Ignored, Items, Targets, Wishes } from './tabs'
+import { Classes, Cleanup, Items, Targets, Wishes } from './tabs'
 
 // Plan › Plane of Sky (an optional module, Settings › Modules): every class's Test quests with what each
 // takes and how many of each the character holds; Ready, the Tests that can be handed in now; the wish
 // list; Targets, where to hunt for what is missing; Items, where a count is put right; Cleanup, what
-// could go; Classes, each class's Tests and its unlock; and the Tests ignored.
+// could go; Classes, each class's Tests and its unlock. The Tests ignored stay on Tests, faint, under
+// Show ignored.
 
-type View = 'tests' | 'ready' | 'wishes' | 'targets' | 'items' | 'cleanup' | 'classes' | 'ignored'
+type View = 'tests' | 'ready' | 'wishes' | 'targets' | 'items' | 'cleanup' | 'classes'
 
 const HOW = (
   <>
@@ -57,7 +58,15 @@ export function Sky() {
   const character = chars.character
   const q = useInvoke(character ? 'sky:state' : null, [character])
   useVisibleInterval(q.reload, 60_000)
-  const [view, setView] = useRemembered<View>('sky.view', 'tests')
+  // The Ignored tab became Show ignored on Tests: a remembered 'ignored' opens Tests with it on.
+  const [savedView, setView] = useRemembered<View | 'ignored'>('sky.view', 'tests')
+  const view: View = savedView === 'ignored' ? 'tests' : savedView
+  const [showIgnored, setShowIgnored] = useRemembered<boolean>('sky.showIgnored', false)
+  useEffect(() => {
+    if (savedView !== 'ignored') return
+    setShowIgnored(true)
+    setView('tests')
+  }, [savedView, setShowIgnored, setView])
   const [kept, setFilter] = useRemembered<Omit<SkyFilter, 'text'>>('sky.filter', { ...NO_FILTER, cls: 'mine' })
   const [text, setText] = useState('')
   const [sort, setSort] = useRemembered<SkySort>('sky.sort', 'near')
@@ -86,7 +95,7 @@ export function Sky() {
   // Without an inventory export there is the log alone.
   const counted: CountFrom = s?.exported ? from : 'log'
   const views = useMemo(() => (s ? SKY_QUESTS.map((x) => questView(x, s, counted)) : []), [s, counted])
-  const shown = useMemo(() => views.filter((v) => passes(v, f, mine)).sort(sortViews(sort)), [views, f, mine, sort])
+  const shown = useMemo(() => views.filter((v) => passes(v, f, mine, showIgnored)).sort(sortViews(sort)), [views, f, mine, sort, showIgnored])
   const ready = useMemo(() => views.filter((v) => v.ready && !v.ignored && (!firstTime || !v.turnIn.any)).sort(sortViews('near')), [views, firstTime])
   const ignored = useMemo(() => views.filter((v) => v.ignored), [views])
   const open = s ? s.wishes.filter((w) => wishLeft(w, s.runs) > 0).length : 0
@@ -127,16 +136,25 @@ export function Sky() {
               ['targets', 'Targets'],
               ['items', 'Items'],
               ['cleanup', 'Cleanup'],
-              ['classes', 'Classes'],
-              ['ignored', ignored.length ? `Ignored (${ignored.length})` : 'Ignored']
+              ['classes', 'Classes']
             ]}
           />
           <Sources s={s} from={from} onFrom={setFrom} />
           {view === 'tests' ? (
             <>
-              <FilterBar f={f} mine={mine} sort={sort} onSort={setSort} onFilter={patch} onText={setText} />
+              <FilterBar
+                f={f}
+                mine={mine}
+                sort={sort}
+                onSort={setSort}
+                onFilter={patch}
+                onText={setText}
+                showIgnored={showIgnored}
+                onShowIgnored={setShowIgnored}
+                ignoredCount={ignored.length}
+              />
               <div className="faint small mb-8">
-                {num(shown.length)} of {num(views.length - ignored.length)} Tests
+                {num(shown.length)} of {num(showIgnored ? views.length : views.length - ignored.length)} Tests
               </div>
               <TestList views={shown} act={act} />
             </>
@@ -164,7 +182,7 @@ export function Sky() {
             </>
           ) : view === 'cleanup' ? (
             <Cleanup s={s} from={counted} />
-          ) : view === 'classes' ? (
+          ) : (
             <Classes
               s={s}
               onClass={(cls) => {
@@ -172,8 +190,6 @@ export function Sky() {
                 setView('tests')
               }}
             />
-          ) : (
-            <Ignored views={ignored} onShow={(quest) => act.mark(quest, 'ignored', false)} />
           )}
         </>
       )}
@@ -219,14 +235,17 @@ function Sources({ s, from, onFrom }: { s: SkyState; from: CountFrom; onFrom: (v
   )
 }
 
-/** The Tests tab's filters and order. */
+/** The Tests tab's filters and order, and Show ignored (as Motes › Spell upgrades has it), there once a Test is ignored. */
 function FilterBar({
   f,
   mine,
   sort,
   onSort,
   onFilter,
-  onText
+  onText,
+  showIgnored,
+  onShowIgnored,
+  ignoredCount
 }: {
   f: SkyFilter
   mine: readonly string[]
@@ -234,6 +253,9 @@ function FilterBar({
   onSort: (v: SkySort) => void
   onFilter: (p: Partial<SkyFilter>) => void
   onText: (v: string) => void
+  showIgnored: boolean
+  onShowIgnored: (v: boolean) => void
+  ignoredCount: number
 }) {
   const facets = useMemo(skyFacets, [])
   const classes = useMemo(() => [...new Set(SKY_QUESTS.map((x) => x.cls))], [])
@@ -288,6 +310,12 @@ function FilterBar({
         {box('hideTurnedIn', 'Hide Tests I have handed in', 'What you have not run yet')}
         {box('onlyTurnedIn', 'Only Tests I have handed in', 'The Tests you have run at least once')}
         {box('favoritesOnly', '★ Starred only', 'The Tests you starred')}
+        {ignoredCount > 0 && (
+          <label className="row tight small" title="The Tests you ignored, faint among the rest, each with Show it again">
+            <input type="checkbox" checked={showIgnored} onChange={(e) => onShowIgnored(e.target.checked)} />
+            Show ignored ({ignoredCount})
+          </label>
+        )}
       </div>
     </div>
   )
@@ -327,7 +355,7 @@ function TestRow({ v, act, open, onOpen }: { v: QuestView; act: Act; open: boole
   const total = v.needs.length
   const got = total - v.missing
   return (
-    <li className={`sky-test${v.ready ? ' ready' : ''}`}>
+    <li className={`sky-test${v.ready ? ' ready' : ''}${v.ignored ? ' ignored' : ''}`}>
       <div className="sky-test-head">
         <span className="sky-test-title">
           <button
@@ -347,8 +375,14 @@ function TestRow({ v, act, open, onOpen }: { v: QuestView; act: Act; open: boole
               Ready
             </Tip>
           )}
+          {v.ignored && <span className="chip pill">ignored</span>}
         </span>
         <span className="sky-test-side">
+          {v.ignored && (
+            <button className="btn small ghost" onClick={() => act.mark(q.name, 'ignored', false)} title="Back into every list">
+              Show it again
+            </button>
+          )}
           {v.shared.length > 0 && (
             <Tip className="chip pill" text={v.shared.map((x) => `${x.item} is taken by ${x.tests.join(', ')} too`).join('. ')}>
               🔗 {v.shared.reduce((n, x) => n + x.tests.length, 0)}
@@ -445,9 +479,19 @@ function TestDetails({ v, act }: { v: QuestView; act: Act }) {
           </button>
         )}
         <span className="spacer" />
-        <button className="btn small ghost" onClick={() => act.mark(q.name, 'ignored', true)} title="Never show it: it waits on the Ignored tab, out of every other list">
-          Ignore this Test
-        </button>
+        {v.ignored ? (
+          <button className="btn small ghost" onClick={() => act.mark(q.name, 'ignored', false)} title="Back into every list">
+            Show it again
+          </button>
+        ) : (
+          <button
+            className="btn small ghost"
+            onClick={() => act.mark(q.name, 'ignored', true)}
+            title="Out of every list until Show ignored, among the Tests tab's filters, draws it faint among the rest"
+          >
+            Ignore this Test
+          </button>
+        )}
       </div>
       {v.shared.length > 0 && (
         <div className="small faint">

@@ -7,7 +7,7 @@ import { ANY_MOB, classRows, cleanupRows, shoppingList, targets, type CountFrom,
 import { Bar, whereOf } from './parts'
 
 // Plan › Plane of Sky's tabs beside the Tests: the wish list, where to hunt, every item (where a count
-// is put right), what could go, each class's Tests, and the Tests ignored.
+// is put right), what could go, and each class's Tests.
 
 /** The wish list: each reward wanted and how far along it is, then what they all still take. */
 export function Wishes({
@@ -357,32 +357,6 @@ export function Classes({ s, onClass }: { s: SkyState; onClass: (cls: string) =>
                     —
                   </Tip>
                 )}
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  )
-}
-
-/** The Tests ignored: there to be shown again. */
-export function Ignored({ views, onShow }: { views: readonly QuestView[]; onShow: (quest: string) => void }) {
-  if (!views.length) return <div className="card empty">No Test is ignored. Ignore one on the Tests tab and it waits here, out of every other list.</div>
-  return (
-    <div className="card mb-16">
-      <table className="table">
-        <tbody>
-          {views.map((v) => (
-            <tr key={v.quest.name}>
-              <td>
-                <b>{v.quest.name}</b> <span className="small muted">→ {v.quest.rewards.join(' and ')}</span>
-              </td>
-              <td className="small">{v.quest.cls}</td>
-              <td>
-                <button className="btn small ghost" onClick={() => onShow(v.quest.name)}>
-                  Show it again
-                </button>
               </td>
             </tr>
           ))}
