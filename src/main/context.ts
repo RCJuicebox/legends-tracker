@@ -14,7 +14,7 @@ import { KokoroSpeech } from './kokoroSpeech'
 // oxlint-disable-next-line import/default -- electron-vite's ?modulePath import: the build supplies the default export
 import kokoroWorkerPath from './kokoroWorker?modulePath'
 import { VoiceRouter } from './voiceRouter'
-import { IconSource } from './icons'
+import { IconSource, characterSkin } from './icons'
 import { OverlayManager } from './overlays'
 import { GameWatcher } from './gameWatcher'
 import { overlaysVisible } from '../core/overlayVisibility'
@@ -435,6 +435,7 @@ export function createContext(): AppContext {
     if (next.logFile !== prev.logFile && (ctx.engine.status.watching || next.autoStart)) void ctx.engine.startWatching()
     // Another character's log: its record, for the pages that show the character being played.
     if (next.logFile !== prev.logFile) toMain('state:character', store.characterOf(next.logFile))
+    if (next.logFile !== prev.logFile || next.installDir !== prev.installDir) void followSkin(ctx)
     toMain('state:settings', next)
     ctx.logSettings()
     return next
@@ -527,7 +528,12 @@ function registerSources(ctx: AppContext): void {
     what: "The Resources folder's skill caps, AC soft caps and stat values, for the Stats and Gear pages, and its faction modifiers and achievement lists, for the Factions page.",
     refresh: () => ctx.gameTables.refresh()
   })
-  sources.add('icons', { label: 'Icons', kind: 'game file', what: "The game's spell and item icon sheets.", refresh: async () => ctx.icons.clear() })
+  sources.add('icons', {
+    label: 'Icons',
+    kind: 'game file',
+    what: "The game's spell and item icon sheets: from the played character's UI skin folder when it has its own, else the game's.",
+    refresh: async () => ctx.icons.clear()
+  })
   sources.add('exports', {
     label: 'Character exports',
     kind: 'game file',
@@ -598,8 +604,11 @@ function registerSources(ctx: AppContext): void {
 
   // The game's data files are read once; a game patch changes them while the app sits in the tray.
   // Looked at every minute: a change reads them again.
+  // The character's skin, for the icons, is looked up with them: /loadskin changes it mid-session.
   let seen = 0
+  void followSkin(ctx)
   setInterval(() => {
+    void followSkin(ctx)
     void fs
       .stat(join(ctx.installDir(), 'spells_us.txt'))
       .then((st) => {
@@ -619,6 +628,15 @@ function registerSources(ctx: AppContext): void {
 
   // The lines no part read, on the chat log's row (FEAT-025): looked at each minute, sent only when changed.
   setInterval(() => sources.report('log', 'Lines nothing read', unreadText(ctx.engine.unread, UNREAD_SHOWN)), 60_000).unref()
+}
+
+/** Icons from the played character's skin folder first (src/core/uiSkin.ts); a new skin forgets the old one's. */
+async function followSkin(ctx: AppContext): Promise<void> {
+  const skin = await characterSkin(ctx.installDir(), ctx.characterKey())
+  if (!ctx.icons.setSkin(skin)) return
+  log.info(`Icons: ${skin ? `the ${skin} skin's sheets first` : "the game's own sheets"}`)
+  // Pages keep icons a day (eqicon:// answers max-age=86400): the old skin's would stay.
+  await session.defaultSession.clearCache().catch((e: unknown) => log.warn('Could not clear the icon cache:', e))
 }
 
 /** Reads the spell data, game tables and icons again. */

@@ -1,11 +1,14 @@
 import { promises as fs } from 'node:fs'
 import { join } from 'node:path'
 import { decodeDds, decodeTga, encodePng, type Sheet } from '../core/imageCodecs'
+import { parseUiSkin, uiFilesOf } from '../core/uiSkin'
 import { sources } from './sources/registry'
 
 // Spell icons come straight from the client: uifiles\default\SpellsNN.tga, 256×256 sheets of
 // 40×40 icons, six by six, numbered by the spell file's icon field. Item icons sit the same way in
 // dragitemNN.dds (DXT5), numbered from 500: the icon number an item's wiki page gives as lucy_img_ID.
+// A skin can carry its own sheets (Live EverQuest's painted spell icons, say), so the character's
+// skin folder is looked in first, as the game does (src/core/uiSkin.ts).
 const ICON = 40
 const PER_ROW = 6
 const PER_SHEET = 36
@@ -17,6 +20,10 @@ export class IconSource {
   private readonly itemPngs = new Map<number, Buffer>()
   /** Sheets read since the last clear, for the Data Sources row. */
   private read = 0
+  /** Counts clears, so an icon cut from a sheet read before one is not kept. */
+  private generation = 0
+  /** The skin folder looked in before uifiles\default, or null for the stock skin. */
+  private skin: string | null = null
 
   constructor(private readonly installDir: () => string) {}
 
@@ -27,6 +34,15 @@ export class IconSource {
     this.itemSheets.clear()
     this.itemPngs.clear()
     this.read = 0
+    this.generation++
+  }
+
+  /** The skin whose sheets come first; another one forgets every sheet read. Whether it changed. */
+  setSkin(skin: string | null): boolean {
+    if (skin === this.skin) return false
+    this.skin = skin
+    this.clear()
+    return true
   }
 
   /** A sheet as decoded: counted and reported when it reads, reported when it is not a sheet at all. */
@@ -36,13 +52,15 @@ export class IconSource {
       return null
     }
     this.read++
-    sources.ok('icons', `${this.read} icon sheet${this.read === 1 ? '' : 's'} read from the game folder`)
+    const where = this.skin ? `the ${this.skin} skin's folder, then the game's` : 'the game folder'
+    sources.ok('icons', `${this.read} icon sheet${this.read === 1 ? '' : 's'} read from ${where}`)
     return sheet
   }
 
   async png(index: number): Promise<Buffer | null> {
     const hit = this.pngs.get(index)
     if (hit) return hit
+    const generation = this.generation
     const sheetNo = Math.floor(index / PER_SHEET) + 1
     const sheet = await this.sheet(sheetNo)
     if (!sheet) return null
@@ -62,7 +80,7 @@ export class IconSource {
       }
     }
     const png = encodePng(ICON, ICON, rgba)
-    this.pngs.set(index, png)
+    if (generation === this.generation) this.pngs.set(index, png)
     return png
   }
 
@@ -72,12 +90,12 @@ export class IconSource {
     if (hit) return hit
     const index = icon - 500
     if (index < 0) return null
+    const generation = this.generation
     const sheetNo = Math.floor(index / PER_SHEET) + 1
     let p = this.itemSheets.get(sheetNo)
     if (!p) {
       const file = `dragitem${sheetNo}.dds`
-      p = fs
-        .readFile(join(this.installDir(), 'uifiles', 'default', file))
+      p = this.readSheet(file)
         .then((d) => this.loaded(decodeDds(d), file))
         .catch(sheetFailed)
       this.itemSheets.set(sheetNo, p)
@@ -91,7 +109,7 @@ export class IconSource {
     const rgba = Buffer.alloc(ICON * ICON * 4)
     for (let y = 0; y < ICON; y++) sheet.pixels.copy(rgba, y * ICON * 4, ((y0 + y) * sheet.width + x0) * 4, ((y0 + y) * sheet.width + x0 + ICON) * 4)
     const png = encodePng(ICON, ICON, rgba)
-    this.itemPngs.set(icon, png)
+    if (generation === this.generation) this.itemPngs.set(icon, png)
     return png
   }
 
@@ -106,7 +124,33 @@ export class IconSource {
 
   private async loadSheet(n: number): Promise<Sheet | null> {
     const file = `Spells${String(n).padStart(2, '0')}.tga`
-    return this.loaded(decodeTga(await fs.readFile(join(this.installDir(), 'uifiles', 'default', file))), file)
+    return this.loaded(decodeTga(await this.readSheet(file)), file)
+  }
+
+  /** A sheet from the skin's folder when it has one, else from uifiles\default. */
+  private async readSheet(file: string): Promise<Buffer> {
+    const ui = join(this.installDir(), 'uifiles')
+    if (this.skin) {
+      try {
+        return await fs.readFile(join(ui, this.skin, file))
+      } catch (e) {
+        if ((e as NodeJS.ErrnoException).code !== 'ENOENT') throw e
+      }
+    }
+    return fs.readFile(join(ui, 'default', file))
+  }
+}
+
+/** The skin a character plays with: the one their newest UI file names, or null for the stock skin or none found. */
+export async function characterSkin(installDir: string, character: string): Promise<string | null> {
+  if (!installDir || !character) return null
+  try {
+    const files = uiFilesOf(character, await fs.readdir(installDir))
+    const dated = await Promise.all(files.map(async (f) => ({ f, at: (await fs.stat(join(installDir, f))).mtimeMs })))
+    const newest = dated.sort((a, b) => b.at - a.at)[0]
+    return newest ? parseUiSkin(await fs.readFile(join(installDir, newest.f), 'utf8')) : null
+  } catch {
+    return null
   }
 }
 
