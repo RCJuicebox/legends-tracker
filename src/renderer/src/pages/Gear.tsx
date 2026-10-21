@@ -22,7 +22,7 @@ import { useCharacterRecord, withRecord } from '../character'
 import { readStatsInputs } from '../../../core/statsInputs'
 import type { Go } from '../nav'
 import { GearTotals, ItemPanel } from './GearPanels'
-import { CHARMS, HANDS, LEFT, MAX_MERGE, MergePips, RIGHT, SLOT_NAMES, augName, bySlot, plainName } from './GearParts'
+import { CHARMS, HANDS, LEFT, MAX_MERGE, MergePips, MergePlus, RIGHT, SLOT_NAMES, augName, bySlot, plainName } from './GearParts'
 
 type Filter = 'all' | 'worn' | 'bags' | 'bank' | 'keyring'
 
@@ -288,7 +288,7 @@ function SlotTile({ slot, item, view, wide, selected, onSelect }: { slot: string
       <div className="lt-tile-body">
         <span className="lt-slot">
           {slot}
-          {lvl > 0 && <b className="lt-plus">+{lvl}</b>}
+          {lvl > 0 && <MergePlus level={lvl} />}
           {item.augs.length > 0 && (
             <span className="lt-augs" title={item.augs.map((a) => augName(a.name)).join('\n')}>
               {item.augs.map((a) => (
@@ -334,6 +334,7 @@ function CharacterCard({
   const merged = levels.filter((l) => l > 0)
   const avg = merged.length ? merged.reduce((a, b) => a + b, 0) / merged.length : 0
   const maxed = levels.filter((l) => l >= MAX_MERGE).length
+  const progress = (levels.reduce((a, b) => a + b, 0) / Math.max(1, worn.length * MAX_MERGE)) * 100
   return (
     <div className="lt-card">
       <div className="lt-who">
@@ -366,16 +367,30 @@ function CharacterCard({
           <span>Haste</span>
         </div>
       </div>
+      <div className="lt-big three">
+        <div>
+          <b>
+            {merged.length}
+            <small> / {worn.length}</small>
+          </b>
+          <span>Merged</span>
+        </div>
+        <div>
+          <b>+{avg.toFixed(1)}</b>
+          <span>Average</span>
+        </div>
+        <div>
+          <b className={maxed ? 'lt-maxed' : ''}>{maxed}</b>
+          <span>At +{MAX_MERGE}</span>
+        </div>
+      </div>
       <div className="lt-merge">
         <div className="row" style={{ justifyContent: 'space-between' }}>
-          <span className="small muted">Merged</span>
-          <span className="small">
-            <b>{merged.length}</b> of {worn.length} items · average <b>+{avg.toFixed(1)}</b>
-            {maxed ? ` · ${maxed} at +${MAX_MERGE}` : ''}
-          </span>
+          <span className="small muted">Total merge progress</span>
+          <b className="small">{Math.floor(progress)}%</b>
         </div>
-        <div className="bar thick merge">
-          <i style={{ width: `${(levels.reduce((a, b) => a + b, 0) / Math.max(1, worn.length * MAX_MERGE)) * 100}%` }} />
+        <div className="bar thick merge" role="img" aria-label={`Total merge progress ${Math.floor(progress)}%`}>
+          <i style={{ width: `${progress}%` }} />
         </div>
       </div>
     </div>

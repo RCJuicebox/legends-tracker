@@ -131,8 +131,8 @@ export const everyView = (views: readonly StepView[]): StepView[] => views.flatM
 
 /** What narrows the Checklist. */
 export interface EpicFilter {
-  /** 'all', 'mine' (the character's classes) or a class. */
-  cls: string
+  /** 'all', 'mine' (the character's classes), a class, or the classes ticked. */
+  cls: string | readonly string[]
   text: string
   /** Hide the steps that are done. */
   hideDone: boolean
@@ -140,9 +140,11 @@ export interface EpicFilter {
 
 export const NO_FILTER: EpicFilter = { cls: 'mine', text: '', hideDone: false }
 
-/** The lists of a kind (epics, or spell quests) of the classes the filter picks: the character's, or every class when it has none. */
+/** The lists of a kind (epics, or spell quests) of the classes the filter picks: those ticked, the character's, or every class when it has none. */
 export function pickClasses(f: Pick<EpicFilter, 'cls'>, mine: readonly string[], kind: EpicList['kind'] = 'epic'): EpicList[] {
   const lists = EPIC_LISTS.filter((c) => c.kind === kind)
+  const ticked = f.cls
+  if (typeof ticked !== 'string') return lists.filter((c) => ticked.includes(c.cls))
   if (f.cls === 'all' || (f.cls === 'mine' && !mine.length)) return lists
   if (f.cls === 'mine') return lists.filter((c) => mine.includes(c.cls))
   return lists.filter((c) => c.cls === f.cls)

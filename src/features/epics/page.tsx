@@ -77,7 +77,7 @@ const EPICS: ChecklistPageConfig = {
   ),
   cls: 'mine',
   classes: EPIC_CLASSES.map((c) => c.cls),
-  empty: () => 'No class picked.'
+  empty: () => 'No class ticked.'
 }
 
 /** The words both checklist pages' How text says alike. */
@@ -101,7 +101,8 @@ export function ChecklistPage({ config: c }: { config: ChecklistPageConfig }) {
   const [remembered, setView] = useRemembered<View>(`${c.id}.view`, 'checklist')
   // A tab this page no longer has (the Epics page's old Spell quests tab) opens the checklist.
   const view = VIEWS.includes(remembered) ? remembered : 'checklist'
-  const [kept, setFilter] = useRemembered<Omit<EpicFilter, 'text'>>(`${c.id}.filter`, { cls: c.cls, hideDone: false })
+  // The classes ticked are kept for each character; one never ticked opens on the page's own pick (`cls`).
+  const [kept, setFilter] = useRemembered<Omit<EpicFilter, 'text'> & { ticked?: Record<string, string[]> }>(`${c.id}.filter`, { cls: c.cls, hideDone: false })
   const [text, setText] = useState('')
   const [from, setFrom] = useRemembered<CountFrom>(`${c.id}.from`, 'both')
   const s = q.data
@@ -123,7 +124,9 @@ export function ChecklistPage({ config: c }: { config: ChecklistPageConfig }) {
   const mine = useMemo(() => s?.classes ?? [], [s])
   // Without an inventory export there is the log alone.
   const counted: CountFrom = s?.exported ? from : 'log'
-  const picked = useMemo(() => pickClasses(f, mine, c.kind), [f, mine, c.kind])
+  const ticked = useMemo(() => (character && kept.ticked?.[character]) || pickClasses(f, mine, c.kind).map((l) => l.cls), [character, kept.ticked, f, mine, c.kind])
+  const tick = (classes: readonly string[]) => character && setFilter({ ...kept, ticked: { ...kept.ticked, [character]: c.classes.filter((x) => classes.includes(x)) } })
+  const picked = useMemo(() => pickClasses({ cls: ticked }, mine, c.kind), [ticked, mine, c.kind])
   const views = useMemo(() => (s ? classViews(picked, s, counted) : []), [s, picked, counted])
 
   return (
@@ -164,29 +167,44 @@ export function ChecklistPage({ config: c }: { config: ChecklistPageConfig }) {
           <Sources s={s} from={from} onFrom={setFrom} />
           <InGame />
           {view !== 'items' && (
-            <div className="card row mb-16">
-              <select value={f.cls === 'mine' && !mine.length ? 'all' : f.cls} onChange={(e) => setFilter({ ...kept, cls: e.target.value })} aria-label="Class">
-                {mine.length > 0 && <option value="mine">Your classes ({mine.join(', ')})</option>}
-                <option value="all">Every class</option>
-                {c.classes.map((cls) => (
-                  <option key={cls} value={cls}>
-                    {cls}
-                  </option>
-                ))}
-              </select>
+            <div className="card stack gap-12 mb-16">
+              <div className="row" style={{ alignItems: 'flex-start' }}>
+                <fieldset className="epic-classes grow">
+                  <legend className="sr-only">Classes</legend>
+                  {c.classes.map((cls) => (
+                    <label key={cls} className={`row tight small${mine.includes(cls) ? ' yours' : ''}`} title={mine.includes(cls) ? `${cls}: one of your classes` : undefined}>
+                      <input type="checkbox" checked={ticked.includes(cls)} onChange={(e) => tick(e.target.checked ? [...ticked, cls] : ticked.filter((x) => x !== cls))} />
+                      {cls}
+                    </label>
+                  ))}
+                </fieldset>
+                <div className="row tight">
+                  {mine.length > 0 && (
+                    <button className="btn ghost small" onClick={() => tick(mine)} title={`Tick ${mine.join(', ')} alone`}>
+                      Yours
+                    </button>
+                  )}
+                  <button className="btn ghost small" onClick={() => tick(c.classes)}>
+                    All
+                  </button>
+                  <button className="btn ghost small" onClick={() => tick([])}>
+                    None
+                  </button>
+                </div>
+              </div>
               {view === 'checklist' && (
-                <>
+                <div className="row">
                   <FilterBox placeholder="Find an item, mob, zone or quest…" label="Find an item, mob, zone or quest" value={text} onChange={setText} width={260} />
                   <label className="row tight small" title="What is left to gather: a step in hand, ticked off or covered is hidden">
                     <Switch on={f.hideDone} onChange={(v) => setFilter({ ...kept, hideDone: v })} />
                     Hide what is done
                   </label>
-                </>
+                </div>
               )}
             </div>
           )}
           {view === 'checklist' ? (
-            <Checklist views={views} f={f} act={act} empty={c.empty(f.cls === 'mine' && mine.length ? mine.join(' or ') : f.cls)} />
+            <Checklist views={views} f={f} act={act} empty={ticked.length ? c.empty(ticked.join(' or ')) : 'No class ticked.'} />
           ) : view === 'targets' ? (
             <Targets views={views} />
           ) : (

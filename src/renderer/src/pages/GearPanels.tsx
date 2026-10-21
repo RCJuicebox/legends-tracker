@@ -5,7 +5,7 @@ import { itemKey, mergeLevel, parseStatsBlock, slotLabel, wornTotals, SAVE_KEYS,
 import type { CharacterSheet, InventoryView, ItemInfo } from '../../../shared/types'
 import { statsFor, type WornSummary } from '../../../core/wornGear'
 import { ItemIcon } from './gearBits'
-import { MAX_MERGE, MergePips, UpdateSheet, augName, plainName } from './GearParts'
+import { MAX_MERGE, MergePips, MergePlus, UpdateSheet, augName, plainName } from './GearParts'
 
 // The Gear page's panels (LT-638): the totals of what is worn, and an item's own panel.
 
@@ -168,7 +168,7 @@ export function ItemPanel({
         <ItemIcon icon={info?.icon} size={44} />
         <div className="grow">
           <div className="lt-panel-title" ref={title} tabIndex={-1}>
-            {plainName(item.name)} {lvl > 0 && <b className="lt-plus">+{lvl}</b>}
+            {plainName(item.name)} {lvl > 0 && <MergePlus level={lvl} />}
           </div>
           <div className="row small muted">
             <span>{slotLabel(item.location)}</span>

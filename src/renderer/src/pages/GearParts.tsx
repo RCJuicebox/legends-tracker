@@ -28,11 +28,16 @@ export function bySlot(worn: InvItem[]): Map<string, InvItem[]> {
 export const augName = (name: string) => name.replace(/\s*\(Exaltation\)$/i, '')
 export const plainName = (name: string) => name.replace(/\s*\+\d+$/, '')
 
-/** Ten pips for the ten merge levels, filled up to this item's. */
+/** An item's +N; at the top merge level it takes the maxed colour. */
+export function MergePlus({ level }: { level: number }) {
+  return <b className={`lt-plus${level >= MAX_MERGE ? ' max' : ''}`}>+{level}</b>
+}
+
+/** Ten pips for the ten merge levels, filled up to this item's; all ten take the maxed colour. */
 export function MergePips({ level }: { level: number }) {
   return (
     <span
-      className="lt-pips"
+      className={`lt-pips${level >= MAX_MERGE ? ' max' : ''}`}
       title={level ? `Merged to +${level} of ${MAX_MERGE}` : 'Not merged yet'}
       role="img"
       aria-label={level ? `Merged to +${level} of ${MAX_MERGE}` : 'Not merged yet'}

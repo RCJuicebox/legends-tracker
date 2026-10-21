@@ -2294,6 +2294,14 @@ details:not(.info) > summary::before {
   background: linear-gradient(90deg, var(--accent), var(--accent-2));
   box-shadow: 0 0 4px color-mix(in srgb, var(--accent) 45%, transparent);
 }
+/* Merged as far as it goes: violet instead of gold. */
+.lt-plus.max {
+  color: var(--violet-text);
+}
+.lt-pips.max i.on {
+  background: linear-gradient(90deg, var(--violet), var(--violet-text));
+  box-shadow: 0 0 5px color-mix(in srgb, var(--violet) 60%, transparent);
+}
 .lt-augs {
   display: inline-flex;
   gap: 3px;
@@ -2347,9 +2355,20 @@ details:not(.info) > summary::before {
   border-radius: var(--radius-sm);
   background: rgba(0, 0, 0, 0.22);
 }
+.lt-big.three {
+  grid-template-columns: repeat(3, 1fr);
+}
 .lt-big b {
   font-size: 19px;
   font-variant-numeric: tabular-nums;
+}
+.lt-big b small {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-3);
+}
+.lt-big b.lt-maxed {
+  color: var(--violet-text);
 }
 .lt-big span {
   font-size: 12px;
@@ -3326,6 +3345,24 @@ button.tree-item {
 .chip.currency {
   background: color-mix(in srgb, var(--violet) 16%, transparent);
   color: var(--violet-text);
+}
+/* Goals › Epics and Spell Quests: the classes to show, ticked; the character's own stand out. */
+.epic-classes {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(132px, 1fr));
+  gap: 4px 12px;
+  margin: 0;
+  padding: 0;
+  border: none;
+  min-width: 0;
+}
+.epic-classes label {
+  cursor: pointer;
+  color: var(--text-2);
+}
+.epic-classes label.yours {
+  color: var(--accent-2);
+  font-weight: 600;
 }
 /*
  * One look for every on/off: a switch, its knob to the right and filled when on. A setting is a Switch

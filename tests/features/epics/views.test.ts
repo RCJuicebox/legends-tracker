@@ -98,6 +98,11 @@ describe('the filter', () => {
     expect(pickClasses({ cls: 'Rogue' }, ['Monk']).map((c) => c.cls)).toEqual(['Rogue'])
   })
 
+  it('picks the classes ticked, the character’s or not, and none when none are', () => {
+    expect(pickClasses({ cls: ['Monk', 'Rogue'] }, ['Monk', 'Bard']).map((c) => c.cls)).toEqual(['Monk', 'Rogue'])
+    expect(pickClasses({ cls: [] }, ['Monk'])).toEqual([])
+  })
+
   it('finds a step by every word typed, in its name, how, zone or note', () => {
     const vox = everyStep(classes('Bard')[0].steps).find((s) => s.item === 'White Dragon Scales')!
     expect(['', 'white scales', 'lady vox', 'permafrost', 'raid'].map((t) => stepMatch(vox, t))).toEqual([true, true, true, true, true])
