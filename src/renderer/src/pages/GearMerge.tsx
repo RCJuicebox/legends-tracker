@@ -5,7 +5,7 @@ import { useItemInfo, useLootView } from '../hooks'
 import { OPTIMIZED_KEY, type OptimizedPick } from '../gear/optimized'
 import { remember, useRemembered } from '../remember'
 import { showError, showToast } from '../toast'
-import { Ago, GameCommand, Info, Segmented, Tip } from '../components/ui'
+import { Ago, GameCommand, Info, Segmented, Tip, Switch } from '../components/ui'
 import { num } from '../../../core/format'
 import { useStock } from './MotePlanner'
 import { itemKey, parseStatsBlock, slotLabel, type InvItem } from '../../../core/inventory'
@@ -142,7 +142,7 @@ export function MergeTab({
             ]}
           />
           <label className="row tight">
-            <input type="checkbox" checked={onlyAffordable} onChange={(e) => setOnlyAffordable(e.target.checked)} />
+            <Switch on={onlyAffordable} onChange={(v) => setOnlyAffordable(v)} />
             Only what your motes cover
           </label>
         </div>

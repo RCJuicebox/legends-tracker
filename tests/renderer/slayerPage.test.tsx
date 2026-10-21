@@ -262,7 +262,7 @@ it('marks the steps in the zone the player is in, and jumps to the first', async
   // The camp costs a faction the faction plan is raising: flagged, and ruled out by choice, listed with the reason (LT-656).
   const cost = [...host.querySelectorAll('.bad-text')].find((e) => e.textContent?.includes('Kaladim Residents'))
   expect(cost).toBeDefined()
-  const avoid = [...host.querySelectorAll('button')].find((b) => b.textContent?.includes('Avoid my faction plan'))!
+  const avoid = [...host.querySelectorAll('[role=switch]')].find((b) => b.parentElement?.textContent?.includes('Avoid my faction plan')) as HTMLElement
   await act(async () => avoid.click())
   expect(invoke).toHaveBeenLastCalledWith('slayer:choices', 'Kelwyn_neriak', expect.objectContaining({ avoidPlanFactions: true }))
   await act(async () => [...host.querySelectorAll('button')].find((b) => b.textContent?.startsWith('Ruled out'))!.click())
@@ -319,9 +319,10 @@ it('draws what the plan leaves out, finds a step, and turns the overlay on once 
   await type('orc pawn')
   expect(seen(host)).toContain('1 of 1 steps match')
   expect(host.querySelector('#sl-step-1')?.classList.contains('sl-dim')).toBe(false)
-  // The overlay chip, once the saved choices are in.
-  const chip = [...host.querySelectorAll('button')].find((b) => b.textContent === 'On the overlay')!
-  expect(chip.classList.contains('waiting')).toBe(false)
+  // The overlay switch, once the saved choices are in.
+  const chip = [...host.querySelectorAll('[role=switch]')].find((b) => b.parentElement?.textContent === 'On the overlay') as HTMLElement
+  expect(chip.parentElement!.classList.contains('waiting')).toBe(false)
+  expect(chip.getAttribute('aria-checked')).toBe('false')
   await act(async () => chip.click())
   expect(invoke).toHaveBeenLastCalledWith('slayer:choices', 'Kelwyn_neriak', expect.objectContaining({ overlay: true }))
   answer = data

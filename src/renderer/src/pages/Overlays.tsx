@@ -59,12 +59,12 @@ function MeterOptions({ o, onChange }: { o: OverlayConfig; onChange: (m: Partial
         </Field>
       </div>
       <label className="check">
-        <input type="checkbox" checked={m.combinePet} onChange={(e) => onChange({ combinePet: e.target.checked })} />
+        <Switch on={m.combinePet} onChange={(v) => onChange({ combinePet: v })} />
         Pets with their owners
         <span className="faint small">this overlay's own; the Damage Meter page has its own</span>
       </label>
       <label className="check">
-        <input type="checkbox" checked={m.header} onChange={(e) => onChange({ header: e.target.checked })} />
+        <Switch on={m.header} onChange={(v) => onChange({ header: v })} />
         Header with the fight name and controls
       </label>
       <p className="faint small m-0">
@@ -165,7 +165,7 @@ export function Overlays() {
               </div>
               {o.kind === 'timers' && (
                 <label className="check">
-                  <input type="checkbox" checked={o.groupByTarget} onChange={(e) => update(o.id, { groupByTarget: e.target.checked })} />
+                  <Switch on={o.groupByTarget} onChange={(v) => update(o.id, { groupByTarget: v })} />
                   Group bars under each target's name
                 </label>
               )}
@@ -225,7 +225,7 @@ export function Overlays() {
                     )}
                   </div>
                   <label className="check">
-                    <input type="checkbox" checked={achievementCues} onChange={(e) => patchSettings((s) => ({ ...s, achievementCues: e.target.checked }))} />
+                    <Switch on={achievementCues} onChange={(v) => patchSettings((s) => ({ ...s, achievementCues: v }))} />
                     Say when a step is done
                     <span className="faint small">
                       the faction plan's (as on its Now card) and the Slayer plan's: each achievement finished flashes on the alerts overlay, and the step to go on to is said

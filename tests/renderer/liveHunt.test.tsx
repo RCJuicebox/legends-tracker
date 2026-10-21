@@ -109,5 +109,8 @@ it('calls out the named killed, lists those left, and the Slayer counts moving, 
   expect(counts[0]).toContain('Goblin Gobblin’')
   expect(counts[0]).toContain('425 / 500 +25')
   expect(counts[1]).toContain('Older')
+  // The Windows notification's switch: a switch beside its words, on by default.
+  const notify = [...host.querySelectorAll('[role=switch]')].find((b) => b.parentElement?.textContent?.includes('Notify me'))
+  expect(notify?.getAttribute('aria-checked')).toBe('true')
   await act(async () => root.unmount())
 })

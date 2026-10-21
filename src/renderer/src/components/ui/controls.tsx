@@ -96,7 +96,10 @@ export function Segmented<T extends string | number>({
   )
 }
 
-/** A chip that shows or hides one kind of thing; off is dashed and struck through. */
+/**
+ * A chip that shows or hides one kind of thing, among others in a row (a filter): a small switch in
+ * it says on or off at a glance, as Switch does for a setting; on is tinted in its kind's colour.
+ */
 export function ToggleChip({
   on,
   onChange,
@@ -112,6 +115,7 @@ export function ToggleChip({
 }) {
   return (
     <button className={`chip toggle-chip ${className}${on ? '' : ' off'}`.trim()} aria-pressed={on} title={title} onClick={() => onChange(!on)}>
+      <span className="chip-switch" aria-hidden="true" />
       {children}
     </button>
   )

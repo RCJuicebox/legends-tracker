@@ -7,7 +7,7 @@ import { useLive } from '../../renderer/src/state'
 import { useAchievementTrack, useInvoke, useVisibleInterval } from '../../renderer/src/hooks'
 import { useCharacterChoice } from '../../renderer/src/character'
 import { useNow } from '../../renderer/src/components/TimerBars'
-import { Disclosure, FilterBox, GameCommand, Info, NumberInput, Pending, SettingsLink, Tip, ToggleChip } from '../../renderer/src/components/ui'
+import { Disclosure, FilterBox, GameCommand, Info, NumberInput, Pending, SettingsLink, Switch, Tip, ToggleChip } from '../../renderer/src/components/ui'
 import { duration, isoDays, num, who } from '../../core/format'
 import {
   BANESTRIKE,
@@ -559,14 +559,13 @@ export function Slayer() {
               )}
               <span className="spacer" />
               {data.pending > 0 && <span className="faint small">Looking up {num(data.pending)} mobs’ races on eqlwiki…</span>}
-              <ToggleChip
-                on={choices.overlay}
-                className={keptFor === character ? '' : 'waiting'}
-                onChange={(on) => keptFor === character && setChoices({ ...choices, overlay: on })}
+              <label
+                className={`row tight small${keptFor === character ? '' : ' waiting'}`}
                 title="Show the step you are on (the one in your zone, else the one to head to) and the next on the achievements overlay, counting down as you kill"
               >
+                <Switch on={choices.overlay} onChange={(on) => keptFor === character && setChoices({ ...choices, overlay: on })} />
                 On the overlay
-              </ToggleChip>
+              </label>
               <button className="btn small ghost" disabled={reading} onClick={readAgain} title="Read the logs and the export again now">
                 {reading ? 'Reading…' : 'Read again'}
               </button>
@@ -808,13 +807,13 @@ export function Slayer() {
                   {raising.length > 0 && (
                     <label>
                       <span>Camps that cost your faction plan</span>
-                      <ToggleChip
-                        on={choices.avoidPlanFactions}
-                        onChange={(on) => setChoices({ ...choices, avoidPlanFactions: on })}
+                      <span
+                        className="row tight"
                         title={`Rule out camps whose kills cost a faction your faction plan (Factions › Plan) is raising: ${raising.join(', ')}. They are listed under Ruled out.`}
                       >
+                        <Switch on={choices.avoidPlanFactions} onChange={(on) => setChoices({ ...choices, avoidPlanFactions: on })} />
                         Avoid my faction plan’s factions
-                      </ToggleChip>
+                      </span>
                     </label>
                   )}
                 </div>

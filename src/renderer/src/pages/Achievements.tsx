@@ -9,7 +9,7 @@ import { planSlayer, type CampSource } from '../../../features/slayer/core'
 import { RaceSayer } from '../../../features/slayer/RaceSayer'
 import type { SlayerStepHint } from './AchievementRows'
 import { showError, showToast } from '../toast'
-import { Ago, FilterBox, GameCommand, Pending } from '../components/ui'
+import { Ago, FilterBox, GameCommand, Pending, Switch } from '../components/ui'
 import { duration, numExact as num, who } from '../../../core/format'
 import type { RoutePlanner, RouteZone } from '../../../core/route'
 import { AchievementBook, norm, secKey, type AchMarks, type AchRef, type ObjRef } from '../../../core/achievements'
@@ -332,9 +332,10 @@ export function Achievements() {
 
       <div className="row ach-controls">
         <FilterBox className="grow" placeholder="Filter achievements and objectives in every section…" label="Find an achievement or objective" value={q} onChange={setQ} />
-        <button className={`btn${remaining ? ' on' : ' ghost'}`} aria-pressed={remaining} onClick={() => setRemaining(!remaining)}>
+        <label className="check">
+          <Switch on={remaining} onChange={setRemaining} />
           Remaining only
-        </button>
+        </label>
         <button
           className="btn ghost"
           disabled={query.length >= 2}

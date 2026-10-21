@@ -2,7 +2,7 @@ import { useMemo, useState, type ReactNode } from 'react'
 import { CharacterPicker } from '../../renderer/src/components/CharacterPicker'
 import { api } from '../../renderer/src/api'
 import { useInvoke, useVisibleInterval } from '../../renderer/src/hooks'
-import { Ago, FilterBox, GameCommand, Info, NumberInput, Pending, SettingsLink, Switch, Tabs, Tip, ToggleChip } from '../../renderer/src/components/ui'
+import { Ago, FilterBox, GameCommand, Info, NumberInput, Pending, SettingsLink, Switch, Tabs, Tip } from '../../renderer/src/components/ui'
 import { useActions, useSettled } from '../../renderer/src/state'
 import { DEFAULT_ACHIEVEMENT_OPTIONS } from '../../shared/overlays'
 import { useRemembered } from '../../renderer/src/remember'
@@ -178,7 +178,7 @@ export function ChecklistPage({ config: c }: { config: ChecklistPageConfig }) {
                 <>
                   <FilterBox placeholder="Find an item, mob, zone or quest…" label="Find an item, mob, zone or quest" value={text} onChange={setText} width={260} />
                   <label className="row tight small" title="What is left to gather: a step in hand, ticked off or covered is hidden">
-                    <input type="checkbox" checked={f.hideDone} onChange={(e) => setFilter({ ...kept, hideDone: e.target.checked })} />
+                    <Switch on={f.hideDone} onChange={(v) => setFilter({ ...kept, hideDone: v })} />
                     Hide what is done
                   </label>
                 </>
@@ -259,13 +259,13 @@ function InGame() {
         Say what is wanted when you zone in
       </label>
       {achOverlay && (
-        <ToggleChip
-          on={onOverlay}
-          onChange={setOnOverlay}
+        <label
+          className="row tight"
           title="“Wanted here” on the achievements overlay: the pieces still needed from the zone you are in, for every character (the switch under Settings › Overlays)"
         >
+          <Switch on={onOverlay} onChange={setOnOverlay} />
           Wanted here on the overlay
-        </ToggleChip>
+        </label>
       )}
       {achOverlay && onOverlay && !achOverlay.visible && <span className="faint">the achievements overlay is hidden: show it on Settings › Overlays</span>}
     </div>

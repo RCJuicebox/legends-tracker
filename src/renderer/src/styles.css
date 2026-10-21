@@ -3327,35 +3327,90 @@ button.tree-item {
   background: color-mix(in srgb, var(--violet) 16%, transparent);
   color: var(--violet-text);
 }
-/* One look for every chip that shows or hides something: off is dashed, faint and struck through. */
+/*
+ * One look for every on/off: a switch, its knob to the right and filled when on. A setting is a Switch
+ * beside its words; a filter among others in a row is a chip with a small switch in it, tinted in its
+ * kind's colour while on (the accent when it has none), plain and faint while off. Checkboxes are
+ * left for ticking things in a list.
+ */
 .toggle-chip {
   cursor: pointer;
-  border: 1px solid transparent;
   font: inherit;
   font-size: 12px;
+  padding-left: 5px;
+  color: var(--accent-2);
+  background: color-mix(in srgb, currentColor 12%, transparent);
+  border: 1px solid color-mix(in srgb, currentColor 50%, transparent);
+}
+.toggle-chip.k-timer {
+  color: var(--teal);
+}
+.toggle-chip.k-fade {
+  color: var(--violet);
+}
+.toggle-chip.k-archive {
+  color: var(--blue-text);
+}
+.toggle-chip.k-loot {
+  color: var(--amber-text);
+}
+.toggle-chip.k-fight {
+  color: var(--orange-text);
+}
+.toggle-chip.k-warn {
+  color: var(--red);
 }
 .toggle-chip small {
   color: var(--text-3);
   margin-left: 3px;
 }
-.toggle-chip.accent {
-  border-color: color-mix(in srgb, var(--accent) 55%, transparent);
-  background: color-mix(in srgb, var(--accent) 10%, transparent);
-  color: var(--accent-2);
+/* An achievement done: ticked green, still there to turn off (LT-664). */
+.toggle-chip.done {
+  color: var(--green-text);
 }
-/* A chip's off state: muted and outlined, not struck through (struck reads as "disabled", LT-665, LT-579). */
+/* A kind whose own colour is grey (Loot's Sold): its switch takes the accent, so on never looks off. */
+.toggle-chip.sold {
+  border-color: color-mix(in srgb, var(--accent) 50%, transparent);
+}
+.toggle-chip.sold .chip-switch {
+  background: var(--accent);
+}
+/* Off: plain and faint, not struck through (struck reads as "disabled", LT-665, LT-579). */
 .toggle-chip.off {
   background: none;
-  border: 1px dashed var(--line-3);
+  border: 1px solid var(--line-2);
   color: var(--text-3);
+}
+.chip-switch {
+  position: relative;
+  flex: none;
+  width: 20px;
+  height: 11px;
+  border-radius: 11px;
+  background: currentColor;
+  transition: background 0.15s;
+}
+.chip-switch::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 11px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--panel);
+  transition: left 0.15s;
+}
+.toggle-chip.off .chip-switch {
+  background: var(--line-2);
+}
+.toggle-chip.off .chip-switch::after {
+  left: 2px;
+  background: var(--knob);
 }
 /* Waiting for what was kept: drawn neither on nor off (LT-665). */
-.toggle-chip.waiting {
+.waiting {
   visibility: hidden;
-}
-/* An achievement done: ticked and quiet, still there to turn off (LT-664). */
-.toggle-chip.done {
-  color: var(--text-3);
 }
 /* Plan › Slayer: steps the search does not find, dimmed rather than gone (LT-662). */
 .sl-dim {
@@ -4334,9 +4389,14 @@ input[aria-invalid='true'] {
   .ach-ov-bar i,
   .stats-bar > *,
   .lt-pips i.on,
-  .sl-count-bar i {
+  .sl-count-bar i,
+  .chip-switch {
     forced-color-adjust: none;
     background: Highlight;
+  }
+  .toggle-chip.off .chip-switch {
+    forced-color-adjust: none;
+    background: GrayText;
   }
   .fp-now-bar,
   .bar,

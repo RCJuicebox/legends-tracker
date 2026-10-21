@@ -5,7 +5,7 @@ import { useInvoke, useVisibleInterval } from '../../renderer/src/hooks'
 import { useActions, useLive, useSettled } from '../../renderer/src/state'
 import { DEFAULT_ACHIEVEMENT_OPTIONS } from '../../shared/overlays'
 import { useNow } from '../../renderer/src/components/TimerBars'
-import { FilterBox, GameCommand, Info, Pending, SettingsLink, Switch, Tip, ToggleChip } from '../../renderer/src/components/ui'
+import { FilterBox, GameCommand, Info, Pending, SettingsLink, Switch, Tip } from '../../renderer/src/components/ui'
 import { showToast } from '../../renderer/src/toast'
 import { duration, num, who } from '../../core/format'
 import { useCharacterChoice } from '../../renderer/src/character'
@@ -211,13 +211,13 @@ export function Hunter() {
                   Time each kill
                 </label>
                 {achOverlay && (
-                  <ToggleChip
-                    on={onOverlay}
-                    onChange={setOnOverlay}
+                  <label
+                    className="row tight small"
                     title="Show the named left in the zone you are in on the achievements overlay, for every character (the switch under Settings › Overlays)"
                   >
+                    <Switch on={onOverlay} onChange={setOnOverlay} />
                     On the overlay
-                  </ToggleChip>
+                  </label>
                 )}
                 <Tip text="Puts a blue dot at every spot the named left pop at, every zone’s, on the game’s own map: in a map set of its own, LegendsTracker (a copy of the game’s maps, so its own stay as they are). Pick it in the map window. A zone’s Mark marks that zone alone.">
                   <button className="btn small" onClick={() => void mark(data.zones)}>

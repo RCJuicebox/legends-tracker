@@ -9,7 +9,7 @@ import { DEFAULT_HIDDEN_ERAS, OTHER_ERA, OTHER_OUT_ERA } from '../../../core/gea
 import { ROLE_LABELS, ROLE_PRESETS, type RoleKey } from '../../../core/statValue'
 import type { CharacterSheet, InventoryView } from '../../../shared/types'
 import { className } from '../../../shared/game/classes'
-import { Ago, ErrorText, Info, PageLink, Pending, Progress, Segmented, ToggleChip, TypedNumber } from '../components/ui'
+import { Ago, ErrorText, Info, PageLink, Pending, Progress, Segmented, ToggleChip, TypedNumber, Switch } from '../components/ui'
 import { num, pct, signed, wikiUrl } from '../../../core/format'
 import { useGearModel, type GearMode } from '../gear/useGearModel'
 import { useCharacterWeights } from '../gear/useCharacterWeights'
@@ -143,7 +143,7 @@ function Finder({ view, sheet, mode }: { view: InventoryView; sheet: CharacterSh
               className="row tight small"
               title="In Primary and Secondary, a better weapon ratio wins over any stats, focus or effects: the weights only choose between weapons of about the same ratio. Change the other weights freely; the hands keep the best-ratio weapons. Worn effects, procs and merges are weighed as before."
             >
-              <input type="checkbox" checked={ratioFirst} onChange={(e) => setRatioFirst(e.target.checked)} />
+              <Switch on={ratioFirst} onChange={(v) => setRatioFirst(v)} />
               Weapons: best ratio first
             </label>
             <button

@@ -400,7 +400,7 @@ function TriggerEditor({
                 placeholder={p.regex ? "^(?<S1>\\w+) tells you, '(?<S2>.+)'$" : 'You feel yourself starting to appear.'}
               />
               <label className="check small">
-                <input type="checkbox" checked={p.regex} onChange={(e) => setPhrase(i, { ...p, regex: e.target.checked })} /> Regex
+                <Switch on={p.regex} onChange={(v) => setPhrase(i, { ...p, regex: v })} /> Regex
               </label>
               <button className="btn ghost small x-btn" aria-label={`Remove phrase ${i + 1}`} onClick={() => set({ phrases: t.phrases.filter((_, j) => j !== i) })}>
                 ×
@@ -578,7 +578,7 @@ function ActionEditor({ a, onChange, onRemove }: { a: TriggerAction; onChange: (
         <div className="row">
           <input className="grow" value={a.text} aria-label="Words to speak" onChange={(e) => onChange({ ...a, text: e.target.value })} placeholder="Tell from {S1}: {S2}" />
           <label className="check small">
-            <input type="checkbox" checked={a.interrupt} onChange={(e) => onChange({ ...a, interrupt: e.target.checked })} /> Interrupt other speech
+            <Switch on={a.interrupt} onChange={(v) => onChange({ ...a, interrupt: v })} /> Interrupt other speech
           </label>
           <HearButton text={a.text} />
         </div>

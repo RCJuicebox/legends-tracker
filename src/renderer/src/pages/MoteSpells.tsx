@@ -6,7 +6,7 @@ import { roman } from '../api'
 import { useInvoke } from '../hooks'
 import type { Go } from '../nav'
 import { useRemembered } from '../remember'
-import { CategoryChip, DAY_WINDOWS, Info, NumberInput, Pending, Segmented, SettingsLink, SpellIcon } from '../components/ui'
+import { CategoryChip, DAY_WINDOWS, Info, NumberInput, Pending, Segmented, SettingsLink, SpellIcon, Switch } from '../components/ui'
 import { num, num1, pct } from '../../../core/format'
 import { useStock } from './MotePlanner'
 import { classCode, classIdOf } from '../../../shared/game/classes'
@@ -281,16 +281,16 @@ export function MoteSpells({ go }: { go?: Go }) {
           />
           <span className="grow" />
           <label className="row tight">
-            <input type="checkbox" checked={onlyAffordable} onChange={(e) => setOnlyAffordable(e.target.checked)} />
+            <Switch on={onlyAffordable} onChange={(v) => setOnlyAffordable(v)} />
             Only what your motes cover
           </label>
           <label className="row tight">
-            <input type="checkbox" checked={showMaxed} onChange={(e) => setShowMaxed(e.target.checked)} />
+            <Switch on={showMaxed} onChange={(v) => setShowMaxed(v)} />
             Show rank X spells
           </label>
           {ignoredCount > 0 && (
             <label className="row tight">
-              <input type="checkbox" checked={showIgnored} onChange={(e) => setShowIgnored(e.target.checked)} />
+              <Switch on={showIgnored} onChange={(v) => setShowIgnored(v)} />
               Show ignored ({ignoredCount})
             </label>
           )}

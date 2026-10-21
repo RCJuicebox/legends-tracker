@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { CharacterPicker } from '../../renderer/src/components/CharacterPicker'
 import { api } from '../../renderer/src/api'
 import { useInvoke, useVisibleInterval } from '../../renderer/src/hooks'
-import { Ago, FilterBox, GameCommand, Info, Pending, SettingsLink, Tabs, Tip } from '../../renderer/src/components/ui'
+import { Ago, FilterBox, GameCommand, Info, Pending, SettingsLink, Tabs, Tip, Switch } from '../../renderer/src/components/ui'
 import { useRemembered } from '../../renderer/src/remember'
 import { showToast } from '../../renderer/src/toast'
 import { num, who } from '../../core/format'
@@ -162,7 +162,7 @@ export function Sky() {
             <>
               <div className="card row mb-16">
                 <label className="row tight small">
-                  <input type="checkbox" checked={firstTime} onChange={(e) => setFirstTime(e.target.checked)} />
+                  <Switch on={firstTime} onChange={(v) => setFirstTime(v)} />
                   Only Tests I have never handed in
                 </label>
                 <span className="faint small">The Tests you hold everything for: a walk to the giver away.</span>
@@ -261,7 +261,7 @@ function FilterBar({
   const classes = useMemo(() => [...new Set(SKY_QUESTS.map((x) => x.cls))], [])
   const box = (key: 'hideReady' | 'hideTurnedIn' | 'onlyTurnedIn' | 'favoritesOnly', label: string, title: string) => (
     <label className="row tight small" title={title}>
-      <input type="checkbox" checked={f[key]} onChange={(e) => onFilter({ [key]: e.target.checked })} />
+      <Switch on={f[key]} onChange={(v) => onFilter({ [key]: v })} />
       {label}
     </label>
   )
@@ -312,7 +312,7 @@ function FilterBar({
         {box('favoritesOnly', '★ Starred only', 'The Tests you starred')}
         {ignoredCount > 0 && (
           <label className="row tight small" title="The Tests you ignored, faint among the rest, each with Show it again">
-            <input type="checkbox" checked={showIgnored} onChange={(e) => onShowIgnored(e.target.checked)} />
+            <Switch on={showIgnored} onChange={(v) => onShowIgnored(v)} />
             Show ignored ({ignoredCount})
           </label>
         )}

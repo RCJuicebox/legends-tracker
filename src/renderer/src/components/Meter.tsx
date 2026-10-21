@@ -4,7 +4,7 @@ import { useActions, useLive, useSettled } from '../state'
 import { showToast, actDone } from '../toast'
 import { useRemembered } from '../remember'
 import { LIVE, useCombat, useSegment } from '../combat'
-import { Icon, Info, Segmented } from './ui'
+import { Icon, Info, Segmented, Switch } from './ui'
 import { attackerRows, copyText, damageRows, defenseOf, fmtRate, healTotals, healerRows, sourcesFor, totalsOf, type HealRow, type Row } from '../../../core/combatView'
 import type { MeterMode, MeterScope, MeterSpan, Segment, SegmentSummary } from '../../../shared/types'
 import { DpsChart } from './MeterChart'
@@ -150,11 +150,11 @@ export function Meter({ standalone = false }: { standalone?: boolean }) {
         <Segmented value={mode} options={MODES} onChange={setMode} label="What to list" />
         <span className="spacer" />
         <label className="check small" title="Fold each pet's damage into its owner's row">
-          <input type="checkbox" checked={combinePet} onChange={(e) => patchSettings((s) => ({ ...s, combat: { ...s.combat, combinePet: e.target.checked } }))} />
+          <Switch on={combinePet} onChange={(v) => patchSettings((s) => ({ ...s, combat: { ...s.combat, combinePet: v } }))} />
           Pets with owners
         </label>
         <label className="check small">
-          <input type="checkbox" checked={combat.charmPets} onChange={(e) => patchSettings((s) => ({ ...s, combat: { ...s.combat, charmPets: e.target.checked } }))} />
+          <Switch on={combat.charmPets} onChange={(v) => patchSettings((s) => ({ ...s, combat: { ...s.combat, charmPets: v } }))} />
           Charm pets
           <Info
             label="About charm pets"
@@ -162,7 +162,7 @@ export function Meter({ standalone = false }: { standalone?: boolean }) {
           />
         </label>
         <label className="check small" title="Rate over the time actually spent hitting (gaps between hits capped at 3 s) instead of the whole fight">
-          <input type="checkbox" checked={active} onChange={(e) => setActive(e.target.checked)} />
+          <Switch on={active} onChange={(v) => setActive(v)} />
           Active DPS
         </label>
       </div>

@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react'
-import { Ago, Segmented } from '../components/ui'
+import { Ago, Segmented, Switch } from '../components/ui'
 import { numExact as num, wikiUrl } from '../../../core/format'
 import { itemKey, mergeLevel, parseStatsBlock, slotLabel, wornTotals, SAVE_KEYS, STAT_KEYS, type InvItem } from '../../../core/inventory'
 import type { CharacterSheet, InventoryView, ItemInfo } from '../../../shared/types'
@@ -107,14 +107,7 @@ export function GearTotals({
         <div className="small muted" style={{ marginTop: 8 }}>
           {secondary ? (
             <label className="row tight" style={{ cursor: 'pointer' }}>
-              <input
-                type="checkbox"
-                checked={shield}
-                onChange={(e) => {
-                  const on = e.target.checked
-                  updateSheet((sh) => ({ ...sh, shield: on === shieldByName ? null : on }))
-                }}
-              />
+              <Switch on={shield} onChange={(on) => updateSheet((sh) => ({ ...sh, shield: on === shieldByName ? null : on }))} />
               Secondary is a shield{shield ? `: its ${shieldAC} AC lifts your soft cap` : ''}
             </label>
           ) : (

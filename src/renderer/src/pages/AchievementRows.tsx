@@ -1,4 +1,4 @@
-import { Disclosure, Tip } from '../components/ui'
+import { Disclosure, Switch, Tip } from '../components/ui'
 import { numExact as num } from '../../../core/format'
 import { AchievementBook, achKey, compareNames, norm, placeOf, secKey, type AchObjective, type AchRef, type Achievement, type ObjRef } from '../../../core/achievements'
 import { HUNT } from '../../../shared/game/hunt'
@@ -149,15 +149,10 @@ export function SectionView({
         {sortBtn('row', zoned ? 'Named' : 'Objective')}
         {sortBtn('blk', zoned ? 'Zone' : 'Achievement')}
         {!sort.row && !sort.blk && <span className="faint small">the game’s order</span>}
-        <button
-          className={`btn small${ctx.hideOpt[k] ? ' on' : ' ghost'}`}
-          aria-pressed={!!ctx.hideOpt[k]}
-          disabled={!st.opt}
-          title={st.opt ? undefined : 'No optional objectives in this section'}
-          onClick={() => setHideOpt({ ...ctx.hideOpt, [k]: !ctx.hideOpt[k] })}
-        >
+        <label className="check small" title={st.opt ? undefined : 'No optional objectives in this section'}>
+          <Switch on={!!ctx.hideOpt[k]} disabled={!st.opt} onChange={(on) => setHideOpt({ ...ctx.hideOpt, [k]: on })} />
           Hide optional
-        </button>
+        </label>
         {!st.opt && <span className="faint small">none here</span>}
       </div>
       {body.entries.length ? (
