@@ -34,7 +34,7 @@ export function GroupHealthCard() {
   const skins = useInvoke(watching ? 'skins:list' : null)
   const [sampling, setSampling] = useState(false)
   const sampled = g.calibrated[g.skin]
-  const skinNames = [...new Set([g.skin, 'JuiceboxUI', ...(skins.data ?? []).map((s) => s.skin)])].sort((a, b) => a.localeCompare(b))
+  const skinNames = [...new Set([g.skin, 'JBUI', ...(skins.data ?? []).map((s) => s.skin)])].sort((a, b) => a.localeCompare(b))
   const hasProfile = (skin: string) => skins.data?.some((s) => s.skin === skin && s.profile)
 
   const calibrate = async () => {

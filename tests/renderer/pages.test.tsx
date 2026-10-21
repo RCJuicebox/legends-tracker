@@ -162,6 +162,7 @@ describe('every page draws', () => {
       'Settings view/Modules',
       'Settings view/Overlays',
       'Settings view/Audio',
+      'Settings view/UI',
       'Settings view/Log files',
       'Settings view/Data sources'
     ])

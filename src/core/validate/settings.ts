@@ -337,7 +337,7 @@ export function sanitizeSettings(v: unknown, fb: AppSettings): AppSettings | nul
           .slice(0, 6)
       : (fb.groupHealth.watchNames ?? []),
     watchPct: Math.round(num(gh.watchPct, fb.groupHealth.watchPct ?? 40, 5, 90)),
-    skin: isSkinName(gh.skin) ? gh.skin : (fb.groupHealth.skin ?? 'JuiceboxUI'),
+    skin: isSkinName(gh.skin) ? gh.skin : (fb.groupHealth.skin ?? 'JBUI'),
     calibrated: isObj(gh.calibrated)
       ? Object.fromEntries(
           Object.entries(gh.calibrated)
@@ -412,6 +412,7 @@ export function sanitizeSettings(v: unknown, fb: AppSettings): AppSettings | nul
     hotkeys: bool(v.hotkeys, fb.hotkeys),
     achievementCues: bool(v.achievementCues, fb.achievementCues),
     hunterToasts: bool(v.hunterToasts, fb.hunterToasts ?? true),
+    skinStartCommands: Array.isArray(v.skinStartCommands) ? stringsArg(v.skinStartCommands, 20, 24000) : (fb.skinStartCommands ?? []),
     modules: modules(v.modules, fb.modules),
     combat,
     groupHealth,

@@ -52,6 +52,7 @@ export function defaultSettings(): AppSettings {
     hotkeys: true,
     achievementCues: true,
     hunterToasts: true,
+    skinStartCommands: [],
     modules: {},
     combat: { fightGapSec: 10, historyMinutes: 60, newSessionOnZone: true, combinePet: true, charmPets: true },
     groupHealth: {
@@ -62,7 +63,7 @@ export function defaultSettings(): AppSettings {
       manaSpeech: '{name} is low on mana',
       watchNames: [],
       watchPct: 40,
-      skin: 'JuiceboxUI',
+      skin: 'JBUI',
       calibrated: {},
       myManaPct: 0,
       myManaSpeech: 'Mana at {pct} percent'

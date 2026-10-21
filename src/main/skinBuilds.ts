@@ -12,10 +12,12 @@ import {
   parseSkinGroupHealth,
   readBagSlots,
   sanitizeColumns,
+  startKey,
   tailOutput,
   type BagLayoutView,
   type SkinBuild,
-  type SkinBuildResult
+  type SkinBuildResult,
+  type SkinStartRun
 } from '../core/skinBuild'
 import type { GroupHealthProfile } from '../core/groupHealth'
 import { log } from './log'
@@ -44,7 +46,44 @@ export async function listSkinBuilds(gameDir: string): Promise<SkinBuild[]> {
     return []
   }
   const found = await Promise.all(names.filter(isSkinName).map((skin) => readSkinBuild(root, skin)))
-  return found.filter((b): b is SkinBuild => b !== null).sort((a, b) => a.skin.localeCompare(b.skin))
+  return found
+    .filter((b): b is SkinBuild => b !== null)
+    .map((b) => (lastStarts.has(b.skin) ? { ...b, lastStart: lastStarts.get(b.skin) } : b))
+    .sort((a, b) => a.skin.localeCompare(b.skin))
+}
+
+/** How each skin's game-start command went this session, for Settings › UI. */
+const lastStarts = new Map<string, SkinStartRun>()
+
+/** A game-start command gets less time than a rebuild: it races the game's own loading. */
+const START_TIMEOUT_MS = 60_000
+
+/**
+ * Runs the game-start command of each skin whose file names one the player has switched on (`enabled`,
+ * startKey of the command exactly as shown), with no shell, in the skin's own folder, the character
+ * being played as EQL_CHARACTER. A skin whose file now names another command runs nothing.
+ */
+export async function runGameStart(gameDir: string, character: string, enabled: readonly string[]): Promise<SkinStartRun[]> {
+  if (!enabled.length) return []
+  const builds = (await listSkinBuilds(gameDir)).filter((b) => b.onGameStart && enabled.includes(startKey(b.onGameStart.command)))
+  const env = { ...process.env, ...(isCharacterKey(character) ? { EQL_CHARACTER: character } : {}) }
+  return Promise.all(
+    builds.map(
+      (b) =>
+        new Promise<SkinStartRun>((resolve) => {
+          const [program, ...rest] = b.onGameStart!.command
+          const cwd = join(gameDir, 'uifiles', b.skin)
+          execFile(program, rest, { cwd, env, windowsHide: true, timeout: START_TIMEOUT_MS, maxBuffer: 1024 * 1024 }, (err, stdout, stderr) => {
+            const output = tailOutput(`${stdout}\n${stderr}`)
+            const run = { at: Date.now(), ok: !err, output: err && !output ? err.message : output }
+            lastStarts.set(b.skin, run)
+            if (err) log.warn(`The ${b.skin} skin's game-start command failed`, err)
+            else log.info(`The ${b.skin} skin's game-start command ran: ${output.split('\n').pop() ?? ''}`)
+            resolve(run)
+          })
+        })
+    )
+  )
 }
 
 /** Every skin folder in the game's uifiles, and whether its file says how it draws the group health bars (FEAT-040). */

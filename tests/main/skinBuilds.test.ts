@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { listSkinBuilds, listSkins, readBagLayout, readSkinGroupHealth, runSkinBuild, saveBagLayout } from '../../src/main/skinBuilds'
-import { BAG_LAYOUT_FILE, SKIN_BUILD_FILE } from '../../src/core/skinBuild'
+import { listSkinBuilds, listSkins, readBagLayout, readSkinGroupHealth, runGameStart, runSkinBuild, saveBagLayout } from '../../src/main/skinBuilds'
+import { BAG_LAYOUT_FILE, SKIN_BUILD_FILE, startKey } from '../../src/core/skinBuild'
 import { tempDir } from '../tempDir'
 
 // Skins in the game's uifiles folder that ask for a rebuild button, and running one: the command
@@ -118,5 +118,31 @@ describe('group health profiles (FEAT-040)', () => {
     expect(await readSkinGroupHealth('', 'Arcane')).toBeNull()
     expect(await listSkins('')).toEqual([])
     expect(await listSkins(tempDir('lt-skins-'))).toEqual([])
+  })
+})
+
+describe('runGameStart', () => {
+  const writes = (what: string) => [node, '-e', `require("fs").writeFileSync("started.txt", "${what} " + process.env.EQL_CHARACTER); console.log("done")`]
+
+  it("runs a skin's game-start command only once switched on, in its folder, for the character played", async () => {
+    const start = writes('models')
+    const dir = gameFolder({ Mine: { command: [node, '-e', '1'], onGameStart: { label: 'Models', command: start } }, Other: { command: [node, '-e', '1'] } })
+    expect(await runGameStart(dir, 'Kelwyn_test', [])).toEqual([])
+    const [run] = await runGameStart(dir, 'Kelwyn_test', [startKey(start)])
+    expect(run).toMatchObject({ ok: true, output: 'done' })
+    expect(readFileSync(join(dir, 'uifiles', 'Mine', 'started.txt'), 'utf8')).toBe('models Kelwyn_test')
+    // How it went shows with the skin, for Settings › UI.
+    expect((await listSkinBuilds(dir)).find((b) => b.skin === 'Mine')?.lastStart).toMatchObject({ ok: true, output: 'done' })
+  })
+
+  it('runs nothing when the file now names another command than the one switched on', async () => {
+    const dir = gameFolder({ Mine: { command: [node, '-e', '1'], onGameStart: { command: writes('changed') } } })
+    expect(await runGameStart(dir, '', [startKey(writes('agreed'))])).toEqual([])
+  })
+
+  it('says when the command fails', async () => {
+    const start = [node, '-e', 'console.error("no luck"); process.exit(3)']
+    const dir = gameFolder({ Mine: { command: [node, '-e', '1'], onGameStart: { command: start } } })
+    expect((await runGameStart(dir, '', [startKey(start)]))[0]).toMatchObject({ ok: false, output: 'no luck' })
   })
 })

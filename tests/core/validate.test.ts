@@ -240,6 +240,13 @@ describe('paths in the settings', () => {
     expect(folders([])).toEqual([])
   })
 
+  it("keep the skins' game-start commands switched on as strings, none for settings from before them", () => {
+    const starts = (skinStartCommands: unknown) => sanitizeSettings({ ...fb, skinStartCommands }, fb)?.skinStartCommands
+    expect(starts(['["C:/py.exe","a.py"]', 7, ''])).toEqual(['["C:/py.exe","a.py"]'])
+    const { skinStartCommands: _, ...older } = fb
+    expect(sanitizeSettings(older, { ...fb, skinStartCommands: undefined } as never)?.skinStartCommands).toEqual([])
+  })
+
   it('know a full path from one that depends on the current folder', () => {
     expect(['C:\\x', 'c:/x', '\\\\server\\share'].map(isFullPath)).toEqual([true, true, true])
     expect(['', 'C:', 'C:x', 'x\\y', '\\\\', 7].map(isFullPath)).toEqual([false, false, false, false, false, false])
@@ -430,7 +437,7 @@ describe('group health settings (FEAT-040, FEAT-043)', () => {
   const gh = (groupHealth: Record<string, unknown>) => sanitizeSettings({ ...fb, groupHealth: { ...fb.groupHealth, ...groupHealth } }, fb)!.groupHealth
 
   it('keeps a skin name, sampled colours by skin and your mana line, and drops what is not one', () => {
-    expect(fb.groupHealth).toMatchObject({ skin: 'JuiceboxUI', calibrated: {}, myManaPct: 0 })
+    expect(fb.groupHealth).toMatchObject({ skin: 'JBUI', calibrated: {}, myManaPct: 0 })
     const g = gh({ skin: 'JuiceboxUI2', calibrated: { JuiceboxUI2: { hp: '#dc3c6e' }, '../x': {}, Other: 'red' }, myManaPct: 95.4, myManaSpeech: 'Low {pct}' })
     expect(g.skin).toBe('JuiceboxUI2')
     expect(Object.keys(g.calibrated)).toEqual(['JuiceboxUI2'])
@@ -438,7 +445,7 @@ describe('group health settings (FEAT-040, FEAT-043)', () => {
     expect(g.calibrated.JuiceboxUI2.mana).toEqual([91, 117, 174])
     expect(g.myManaPct).toBe(80)
     expect(g.myManaSpeech).toBe('Low {pct}')
-    expect(gh({ skin: '../up', calibrated: [], myManaPct: 'x' })).toMatchObject({ skin: 'JuiceboxUI', calibrated: {}, myManaPct: 0 })
+    expect(gh({ skin: '../up', calibrated: [], myManaPct: 'x' })).toMatchObject({ skin: 'JBUI', calibrated: {}, myManaPct: 0 })
   })
 })
 

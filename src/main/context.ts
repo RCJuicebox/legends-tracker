@@ -15,6 +15,7 @@ import { KokoroSpeech } from './kokoroSpeech'
 import kokoroWorkerPath from './kokoroWorker?modulePath'
 import { VoiceRouter } from './voiceRouter'
 import { IconSource, characterSkin } from './icons'
+import { runGameStart } from './skinBuilds'
 import { OverlayManager } from './overlays'
 import { GameWatcher } from './gameWatcher'
 import { overlaysVisible } from '../core/overlayVisibility'
@@ -292,7 +293,12 @@ export function createContext(): AppContext {
 
   ctx.watcher = new GameWatcher((state, previous) => {
     if (previous.gameRunning && !state.gameRunning) ctx.engine.gameClosed()
-    if (!previous.gameRunning && state.gameRunning) ctx.engine.gameStarted()
+    if (!previous.gameRunning && state.gameRunning) {
+      ctx.engine.gameStarted()
+      // Skins' game-start commands the player switched on (Settings › UI): as early as the game is seen,
+      // ahead of what it loads once a server is picked.
+      void runGameStart(ctx.installDir(), ctx.characterKey(), store.settings.get().skinStartCommands)
+    }
     ctx.refreshOverlayVisibility()
     ctx.overlays.setGameInFront(state.foregroundName === 'eqgame')
     // Another window to the front: the game may have put itself above the overlays as it came back.

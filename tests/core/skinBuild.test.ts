@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { bagCells, bagGrid, bagKindOf, isSkinName, parseSkinBuild, readBagSlots, sanitizeColumns, tailOutput } from '../../src/core/skinBuild'
+import { bagCells, bagGrid, bagKindOf, isSkinName, parseSkinBuild, readBagSlots, sanitizeColumns, startKey, tailOutput } from '../../src/core/skinBuild'
 
 // A UI skin asks for a rebuild button with a file in its folder; only a well-formed one, naming a
 // program by its full path, gets a button.
@@ -48,6 +48,25 @@ describe('parseSkinBuild', () => {
 
   it('turns away a folder name /loadskin could not take', () => {
     expect(parseSkinBuild('../up', file({ command: [PY] }))).toBeNull()
+  })
+
+  it('reads a command to run when the game starts, by the same rules as the rebuild', () => {
+    const start = { label: 'Live player models', command: [PY, 'D:/models/apply.py'] }
+    expect(parseSkinBuild('S', file({ command: [PY], onGameStart: start }))?.onGameStart).toEqual(start)
+    expect(parseSkinBuild('S', file({ command: [PY], onGameStart: { command: [PY] } }))?.onGameStart?.label).toBe('S at game start')
+    // A bad one is left out; the rebuild still stands.
+    for (const bad of [{ command: ['python.exe'] }, { command: [] }, [PY], 'x']) {
+      const b = parseSkinBuild('S', file({ command: [PY], onGameStart: bad }))
+      expect(b?.command).toEqual([PY])
+      expect(b?.onGameStart).toBeUndefined()
+    }
+  })
+})
+
+describe('startKey', () => {
+  it('keeps a command exactly: another argument is another command', () => {
+    expect(startKey([PY, 'a'])).not.toBe(startKey([PY, 'a', 'b']))
+    expect(startKey([PY, 'a b'])).not.toBe(startKey([PY, 'a', 'b']))
   })
 })
 

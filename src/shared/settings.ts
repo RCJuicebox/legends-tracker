@@ -260,6 +260,11 @@ export interface AppSettings {
   achievementCues: boolean
   /** A Windows notification when a named a Hunter achievement still wants dies (Live's Hunter card). */
   hunterToasts: boolean
+  /**
+   * The game-start commands UI skins offer (src/core/skinBuild.ts) that the player has switched on, each
+   * kept exactly as it was shown (startKey): a skin whose file names another command runs nothing.
+   */
+  skinStartCommands: string[]
   /** The optional modules the player turned on (Settings › Modules), by page id; one not named is off. */
   modules: Record<string, boolean>
   combat: CombatSettings

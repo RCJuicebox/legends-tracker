@@ -6,7 +6,6 @@ import { useUpdate, type UpdateState } from '../update'
 import { Ago, Field, Segmented, Switch, Tabs } from '../components/ui'
 import { useContext, type ReactNode } from 'react'
 import { GameFolderCard } from '../components/GameFolder'
-import { SkinRebuilds } from '../components/SkinBuild'
 import { GoContext, TAB_KEY, type SettingsTab } from '../nav'
 import { OPTIONAL_MODULES, type FeaturePageId } from '../../../features'
 import { useRemembered } from '../remember'
@@ -15,6 +14,7 @@ import { Overlays } from './Overlays'
 import { Audio } from './Audio'
 import { Logs } from './Logs'
 import { DataSources } from './DataSources'
+import { UiSkins } from './UiSkins'
 
 /** One line on where updates stand. */
 function updateText(u: UpdateState | null): ReactNode {
@@ -60,13 +60,14 @@ const TABS: [SettingsTab, string][] = [
   ['modules', 'Modules'],
   ['overlays', 'Overlays'],
   ['audio', 'Audio'],
+  ['ui', 'UI'],
   ['logs', 'Log files'],
   ['sources', 'Data sources']
 ]
 
 /**
- * What is set once: the app's own settings, and the overlays, audio, log files and data sources,
- * each a tab. What a page alone uses is set on that page (the damage meter's fights, Spell Timers'
+ * What is set once: the app's own settings, and the overlays, audio, UI skins, log files and data
+ * sources, each a tab. What a page alone uses is set on that page (the damage meter's fights, Spell Timers'
  * defaults).
  */
 export function Settings() {
@@ -86,18 +87,20 @@ export function Settings() {
         <Overlays />
       ) : tab === 'audio' ? (
         <Audio />
+      ) : tab === 'ui' ? (
+        <UiSkins />
       ) : tab === 'logs' ? (
         <Logs />
       ) : tab === 'sources' ? (
         <DataSources />
       ) : (
-        <General openLogs={() => setTab('logs')} />
+        <General openLogs={() => setTab('logs')} openUi={() => setTab('ui')} />
       )}
     </>
   )
 }
 
-function General({ openLogs }: { openLogs: () => void }) {
+function General({ openLogs, openUi }: { openLogs: () => void; openUi: () => void }) {
   const { patchSettings } = useActions()
   const settings = useSettled((s) => s.settings)
   const hotkeysTaken = useSettled((s) => s.hotkeysTaken)
@@ -173,12 +176,14 @@ function General({ openLogs }: { openLogs: () => void }) {
         <div className="card stack gap-16">
           <h2>Game</h2>
           <GameFolderCard />
-          {/* A UI skin in that folder with a legends-tracker.json asks for its rebuild button here; Bag layout stays on Tradeskills. */}
-          <SkinRebuilds />
           <p className="hint">
             Which character&apos;s log is followed, and other PCs&apos; logs, are on{' '}
             <button className="link-button inline" onClick={openLogs}>
               Log files
+            </button>
+            ; rebuilding your UI skins, and what runs when the game starts, on{' '}
+            <button className="link-button inline" onClick={openUi}>
+              UI
             </button>
             .
           </p>

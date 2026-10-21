@@ -9,6 +9,12 @@ import { parseGroupHealthProfile, type GroupHealthProfile } from './groupHealth'
 // The app shows a button for each skin that has one and runs the command, with no shell, in the
 // skin's own folder (so "build.py" is the skin's), when it is pressed. A skin without the file shows nothing.
 //
+// It can also name a command to run each time the game starts (a script that puts back game files the
+// launcher's check replaces, say), the same way; the app runs it only once the player has switched it
+// on, on Settings › UI, with the whole command in view:
+//
+//   "onGameStart": { "label": "Live player models", "command": ["C:/…/python.exe", "C:/…/models.py"] }
+//
 // The same file can say how the skin draws its Group and Player windows' bars, for the group health
 // alert (src/core/groupHealth.ts, FEAT-040), with or without a command: every part is optional, and
 // what it leaves out is JuiceboxUI's.
@@ -27,6 +33,28 @@ export interface SkinBuild {
   command: string[]
   /** The skin draws bags in rows it lets the player shape (Tradeskills › Bag layout). */
   bagLayout?: BagLayoutSpec
+  /** A command to run each time the game starts, once the player switches it on. */
+  onGameStart?: SkinCommand
+  /** How that command last went, this session (added by the app, not read from the file). */
+  lastStart?: SkinStartRun
+}
+
+/** A command a skin's file names, and what it says on its button or switch. */
+export interface SkinCommand {
+  label: string
+  command: string[]
+}
+
+/** How a skin's game-start command went. */
+export interface SkinStartRun {
+  at: number
+  ok: boolean
+  output: string
+}
+
+/** How a game-start command is kept in the settings once switched on: the command exactly as shown. */
+export function startKey(command: readonly string[]): string {
+  return JSON.stringify(command)
 }
 
 // A skin that draws each bag as a block of cells (the bag's own slot, then its contents) wrapping
@@ -167,13 +195,28 @@ export function parseSkinBuild(skin: string, text: string): SkinBuild | null {
     return null
   }
   if (!data || typeof data !== 'object' || Array.isArray(data)) return null
-  const { label, command, bagLayout } = data as { label?: unknown; command?: unknown; bagLayout?: unknown }
-  if (!Array.isArray(command) || !command.length || command.length > MAX_ARGS) return null
-  if (!command.every((a): a is string => typeof a === 'string' && a.length > 0 && a.length <= MAX_ARG && ![...a].some((c) => c.charCodeAt(0) < 32))) return null
-  if (!/^[a-z]:[\\/].+\.exe$/i.test(command[0])) return null
+  const { label, command, bagLayout, onGameStart } = data as { label?: unknown; command?: unknown; bagLayout?: unknown; onGameStart?: unknown }
+  if (!isCommand(command)) return null
   const named = typeof label === 'string' ? label.trim().slice(0, 60) : ''
   const layout = parseBagLayoutSpec(bagLayout)
-  return { skin, label: named || `Rebuild ${skin}`, command, ...(layout ? { bagLayout: layout } : {}) }
+  const start = parseStartCommand(skin, onGameStart)
+  return { skin, label: named || `Rebuild ${skin}`, command, ...(layout ? { bagLayout: layout } : {}), ...(start ? { onGameStart: start } : {}) }
+}
+
+/** A program named by its full path (an .exe) and its arguments, each a short string with no control characters. */
+function isCommand(v: unknown): v is string[] {
+  if (!Array.isArray(v) || !v.length || v.length > MAX_ARGS) return false
+  if (!v.every((a): a is string => typeof a === 'string' && a.length > 0 && a.length <= MAX_ARG && ![...a].some((c) => c.charCodeAt(0) < 32))) return false
+  return /^[a-z]:[\\/].+\.exe$/i.test(v[0])
+}
+
+/** A file's `onGameStart`, or null when it has none or it is not a command. */
+function parseStartCommand(skin: string, v: unknown): SkinCommand | null {
+  if (!v || typeof v !== 'object' || Array.isArray(v)) return null
+  const { label, command } = v as { label?: unknown; command?: unknown }
+  if (!isCommand(command)) return null
+  const named = typeof label === 'string' ? label.trim().slice(0, 60) : ''
+  return { label: named || `${skin} at game start`, command }
 }
 
 /** A skin file's `groupHealth` section (FEAT-040), or undefined when it has none or will not parse. */
