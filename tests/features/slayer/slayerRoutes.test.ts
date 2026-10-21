@@ -23,6 +23,7 @@ import {
 } from '../../../src/features/slayer/core'
 import { zoneIndex, zoneTimings, type SpawnTables } from '../../../src/features/slayer/spawns'
 import { SLAYER_GUIDE } from '../../../src/shared/game/slayerGuide'
+import { greenConMax } from '../../../src/shared/game/levels'
 import TAKP from '../../../src/shared/game/takpSpawns.json'
 
 // The Slayer plan's travel (the log's own trips between zones), the Hunter named left on the way, and
@@ -292,6 +293,66 @@ describe('Slayer plan: the spawn tables’ camps', () => {
       []
     )
     expect(any[0].kinds.map((k) => k.name)).toEqual(['an orc sailor', 'an orc warlord'])
+  })
+
+  it('plans pet kills alone: what cons green or lower in every camp, no raid lockouts', () => {
+    const oot: SpawnTables = {
+      oot: {
+        id: 69,
+        name: 'The Ocean of Tears',
+        npcs: [
+          ['an orc sailor', 'Orc', 10, 12],
+          ['a sea giant', 'Giant', 30, 32]
+        ],
+        groups: [
+          [600, [[0, 100]], [0, 0, 0, 40, 0, 0, 0, 40, 0]],
+          [600, [[1, 100]], [3000, 3000, 0, 3040, 3000, 0]]
+        ]
+      }
+    }
+    // An hour at the dock: sailors, giants, and an orc the tables do not know.
+    const log = {
+      'The Ocean of Tears': {
+        sec: 3600,
+        kills: 40,
+        last: 0,
+        mobs: { 'an orc sailor': { name: 'an orc sailor', n: 20 }, 'a sea giant': { name: 'a sea giant', n: 15 }, 'a mystery orc': { name: 'a mystery orc', n: 5 } }
+      }
+    }
+    const lockout = [{ zone: 'Nagafen’s Lair', mobs: ['a giant king'], races: ['giant'], perDay: 5, note: 'A lockout.', said: 'test' }]
+    const build = (petOnly: boolean) =>
+      buildCamps(
+        goals,
+        races,
+        log,
+        (mob) => place(mob, mob.includes('orc') ? 'Orc' : mob.includes('giant') ? 'Giant' : ''),
+        () => null,
+        slayerRaceLists(sections, GAME),
+        lockout,
+        { tables: oot, timings: new Map(), place, killSpeed: 100, maxLevel: petOnly ? greenConMax(28) : 45, petOnly },
+        []
+      )
+    const pet = build(true)
+    // Green to a level 28 is 18 and under: the giants (30 to 32) are out, the unknown orc stays.
+    expect(greenConMax(28)).toBe(18)
+    const dock = pet.find((c) => c.id === 'log:The Ocean of Tears')!
+    expect(dock.kinds.map((k) => k.name)).toEqual(['an orc sailor', 'a mystery orc'])
+    expect(dock.pace).toEqual({ [gi('Orc Stomp!')]: 25 })
+    expect(pet.some((c) => c.daily)).toBe(false)
+    const all = build(false)
+    expect(all.find((c) => c.id === 'log:The Ocean of Tears')!.pace[gi('Might They Be Giants?')]).toBe(15)
+    expect(all.some((c) => c.daily)).toBe(true)
+    // The choice takes the pet camps when the data has them: no giants at the dock then.
+    const petPlan = planSlayer({ goals, camps: all, petCamps: pet }, { ...DEFAULT_CHOICES, petOnly: true })
+    expect(petPlan.steps.length).toBeGreaterThan(0)
+    expect(petPlan.steps.every((s) => pet.includes(s.camp))).toBe(true)
+    expect(planSlayer({ goals, camps: all, petCamps: pet }, DEFAULT_CHOICES).steps.every((s) => all.includes(s.camp))).toBe(true)
+    // Without pet camps (no level known), the plan stands on the camps.
+    expect(planSlayer({ goals, camps: all }, { ...DEFAULT_CHOICES, petOnly: true }).steps.every((s) => all.includes(s.camp))).toBe(true)
+  })
+
+  it('knows what cons green to each level, as the classic server and Legends con', () => {
+    expect([1, 8, 10, 20, 30, 40, 50, 60, 65].map(greenConMax)).toEqual([-3, 3, 4, 12, 19, 26, 32, 39, 49])
   })
 
   it('says what the log’s mobs’ spawns allow, and when the log’s pace is up against it', () => {

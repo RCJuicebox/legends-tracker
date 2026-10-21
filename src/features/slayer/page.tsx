@@ -559,6 +559,15 @@ export function Slayer() {
               )}
               <span className="spacer" />
               {data.pending > 0 && <span className="faint small">Looking up {num(data.pending)} mobs’ races on eqlwiki…</span>}
+              {data.petLevel !== undefined && (
+                <label
+                  className={`row tight small${keptFor === character ? '' : ' waiting'}`}
+                  title={`A plan for your pet to farm alone: only mobs that con green or lower to you (level ${data.petLevel} and under), and no raid lockouts. A mob the spawn tables give no level stays in.`}
+                >
+                  <Switch on={choices.petOnly} onChange={(on) => keptFor === character && setChoices({ ...choices, petOnly: on })} />
+                  Pet kills only{choices.petOnly && <span className="faint">(level {data.petLevel} and under)</span>}
+                </label>
+              )}
               <label
                 className={`row tight small${keptFor === character ? '' : ' waiting'}`}
                 title="Show the step you are on (the one in your zone, else the one to head to) and the next on the achievements overlay, counting down as you kill"

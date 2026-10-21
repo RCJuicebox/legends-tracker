@@ -199,9 +199,11 @@ describe('the Slayer page', () => {
   })
 
   it('keeps the choices per character, as far as they are the right shape', async () => {
-    await call('slayer:choices', 'Kelwyn_neriak', { ...DEFAULT_CHOICES, outCamps: ['log:Clan Crushbone'], travelMin: 999 })
+    await call('slayer:choices', 'Kelwyn_neriak', { ...DEFAULT_CHOICES, outCamps: ['log:Clan Crushbone'], travelMin: 999, petOnly: 'yes' })
     const { choices } = await call('slayer:plan', 'Kelwyn_neriak')
     expect(choices).toEqual({ ...DEFAULT_CHOICES, outCamps: ['log:Clan Crushbone'], travelMin: 120 })
+    await call('slayer:choices', 'Kelwyn_neriak', { ...DEFAULT_CHOICES, outCamps: ['log:Clan Crushbone'], petOnly: true })
+    expect((await call('slayer:plan', 'Kelwyn_neriak')).choices.petOnly).toBe(true)
     await planner.flush()
     expect(JSON.parse(readFileSync(join(h.dir, 'slayer-plan.json'), 'utf8')).Kelwyn_neriak.outCamps).toEqual(['log:Clan Crushbone'])
     await expect(call('slayer:choices', '../x', DEFAULT_CHOICES)).rejects.toThrow()
@@ -243,6 +245,11 @@ describe('the Slayer page', () => {
     // Under an hour hunted anywhere: no usual pace of the player's own.
     expect(data.killSpeed).toBeNull()
     expect(data.camps.some((c: { source: string }) => c.source === 'spawns')).toBe(true)
+    // A level 50's pet plan: what cons green, level 32 and under; no raid lockouts.
+    expect(data.petLevel).toBe(32)
+    expect(data.petCamps.length).toBeGreaterThan(0)
+    expect(data.petCamps.some((c: { daily?: boolean }) => c.daily)).toBe(false)
+    expect(data.petCamps.flatMap((c: { kinds: { spawn?: { hi: number } }[] }) => c.kinds).every((k: { spawn?: { hi: number } }) => (k.spawn?.hi ?? 0) <= 32)).toBe(true)
     // The log's orc pawns, and what their spawns allow.
     expect(data.camps.find((c: { id: string }) => c.id === 'log:Clan Crushbone').kinds[0].spawn).toMatchObject({ name: 'orc pawn', race: 'Orc' })
     // Twenty minutes of Crushbone, then out: no trip yet.

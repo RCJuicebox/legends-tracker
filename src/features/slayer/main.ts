@@ -18,6 +18,7 @@ import {
   buildCamps,
   DEFAULT_CHOICES,
   emptyKillTallies,
+  joinConLevels,
   joinKillTallies,
   joinMoves,
   optionalSlayer,
@@ -34,6 +35,7 @@ import { mapMarks, mobSpawns, parseMap, petCamps, raceMixer, spotsIn, zoneIndex,
 import type { RespawnFallback, RespawnRecord, RespawnRecords } from '../../core/respawns'
 import TAKP from '../../shared/game/takpSpawns.json'
 import { lockoutDayStart } from '../../shared/game/slayerCamps'
+import { greenConMax } from '../../shared/game/levels'
 import { hunterZones } from '../hunter/core'
 import { newerBuildWrote } from '../../main/schema'
 import type { MapPoint } from '../../core/where'
@@ -52,8 +54,8 @@ const MAP_SET = 'LegendsTracker'
 
 /** Each stretch of log's kills by zone, as a LogHistory consumer. Version 2: trips between zones, each mob's last kill; 3: each stretch of killing. */
 const killConsumer: HistoryConsumer<SlayerKillTallies> = {
-  // 4: mobs' pets left out (isNpcPet). 5: raid lockout bosses' kill times.
-  version: 5,
+  // 4: mobs' pets left out (isNpcPet). 5: raid lockout bosses' kill times. 6: mobs' levels from /con.
+  version: 6,
   empty: emptyKillTallies,
   reader: () => readKillLine
 }
@@ -84,7 +86,8 @@ export function sanitizeChoices(v: unknown): SlayerPlanChoices {
     travelMin: num(c.travelMin, 0, 120, DEFAULT_CHOICES.travelMin),
     pace: num(c.pace, 1, 2000, DEFAULT_CHOICES.pace),
     overlay: c.overlay === true,
-    avoidPlanFactions: c.avoidPlanFactions === true
+    avoidPlanFactions: c.avoidPlanFactions === true,
+    petOnly: c.petOnly === true
   }
 }
 
@@ -260,7 +263,10 @@ export class SlayerPlanner implements AppFeature {
    * Every kill in this character's logs and the player's other characters', by zone, and their trips
    * between zones; and this character's own kills apart (`own`), for what counts for it alone (LT-715).
    */
-  private async kills(ctx: AppContext, character: string): Promise<{ zones: SlayerKillTallies['zones']; own: SlayerKillTallies['zones']; moves: SlayerMove[] }> {
+  private async kills(
+    ctx: AppContext,
+    character: string
+  ): Promise<{ zones: SlayerKillTallies['zones']; own: SlayerKillTallies['zones']; moves: SlayerMove[]; levels: Record<string, number> }> {
     const who = [character, ...(await ctx.logCharacters()).filter((c) => c.toLowerCase() !== character.toLowerCase())]
     const stretches: SlayerKillTallies[] = []
     let own: SlayerKillTallies[] = []
@@ -275,7 +281,7 @@ export class SlayerPlanner implements AppFeature {
         log.warn(`${c}'s log could not be read for the Slayer plan:`, e)
       }
     }
-    return { zones: joinKillTallies(stretches), own: joinKillTallies(own), moves: joinMoves(stretches) }
+    return { zones: joinKillTallies(stretches), own: joinKillTallies(own), moves: joinMoves(stretches), levels: joinConLevels(stretches) }
   }
 
   private async data(ctx: AppContext, character: string): Promise<SlayerPlanData> {
@@ -294,7 +300,7 @@ export class SlayerPlanner implements AppFeature {
     const goals = slayerGoals(counters, since, optionalSlayer(exp.sections), banestrikeTiers(exp.sections), done)
     const game = await ctx.gameTables.get(RACE_TABLE)
     const races = new SlayerRaces(counters, game)
-    const { zones, own, moves } = await this.kills(ctx, character)
+    const { zones, own, moves, levels } = await this.kills(ctx, character)
     const npc = ctx.npcPages
     await npc.ready()
     const unknown = new Set<string>()
@@ -344,13 +350,13 @@ export class SlayerPlanner implements AppFeature {
     const timings = spawnTimings(Object.values(ctx.store.respawns.get()))
     const killSpeed = usualPace(zones)
     const level = ctx.store.characterByKey(character).level
-    const camps = buildCamps(goals, races, zones, place, factionPerKill, slayerRaceLists(exp.sections, game), undefined, {
-      tables: TABLES,
-      timings,
-      place: placeSpawn,
-      killSpeed: killSpeed ?? DEFAULT_CHOICES.pace,
-      ...(level > 0 ? { maxLevel: level - PET_LEVELS_UNDER } : {})
-    })
+    const lists = slayerRaceLists(exp.sections, game)
+    const source = { tables: TABLES, timings, place: placeSpawn, killSpeed: killSpeed ?? DEFAULT_CHOICES.pace }
+    const camps = buildCamps(goals, races, zones, place, factionPerKill, lists, undefined, { ...source, ...(level > 0 ? { maxLevel: level - PET_LEVELS_UNDER } : {}) })
+    // The plan of pet kills alone (the choice petOnly): every camp held to what cons green or lower.
+    const petLevel = level > 0 ? greenConMax(level) : undefined
+    const petCamps =
+      petLevel === undefined ? undefined : buildCamps(goals, races, zones, place, factionPerKill, lists, undefined, { ...source, maxLevel: petLevel, petOnly: true, levels })
     // A raid lockout's kills so far today, since the game's noon reset: "2 of 5 today" (LT-657). From this
     // character's logs, not the live counts: those keep only what came after the export.
     const reset = lockoutDayStart()
@@ -387,7 +393,8 @@ export class SlayerPlanner implements AppFeature {
         .filter((t) => t.timed.length)
         .map((t) => ({ zone: t.timed[0].zone, timer: t.timer, timed: t.timed.map(({ name, legends, classic }) => ({ name, legends, classic })) })),
       hunter,
-      raising: ctx.factions.follow.raisedByPlan(character)
+      raising: ctx.factions.follow.raisedByPlan(character),
+      ...(petCamps ? { petCamps, petLevel } : {})
     }
   }
 }

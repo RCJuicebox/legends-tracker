@@ -52,6 +52,8 @@ export interface SlayerKillTallies {
   died: boolean
   /** Trips from zone to zone ("from|to"), seconds: across a zone killing nothing there, and from a camp's last kill to the next zone. */
   moves: Record<string, { pass: number[]; leave: number[] }>
+  /** Each mob's level as /con said it (lower-cased → the highest seen): Legends' own, for mobs the spawn tables lack. */
+  levels?: Record<string, number>
 }
 
 /** A stretch of killing in a zone: kills no more than KILL_RUN_MS apart, its seconds and what died (mob lower-cased → kills). */
@@ -64,6 +66,16 @@ export const emptyKillTallies = (): SlayerKillTallies => ({ zone: '', lastAt: 0,
 
 /** The zone an instance is of: "The Permafrost Caverns - Solo" and "Befallen 1 (Awakened)" are their zones' camps. */
 export const campZone = (zone: string) => baseZone(zone)
+
+/** A /con's answer: "a soul tamer regards you indifferently -- what would you like your tombstone to say? (Lvl: 56)". */
+const CON_LINE =
+  /^\*?(.+?)(?: - a rare creature -)? (?:regards you|looks upon you|kindly considers you|judges you|looks your way|glowers at you|glares at you|scowls at you)\b.* -- .*\(Lvl: (\d+)\)$/
+
+/** The mob a /con named and its level; null for any other line. */
+export function conLevel(text: string): { mob: string; level: number } | null {
+  const m = CON_LINE.exec(text)
+  return m ? { mob: m[1].toLowerCase(), level: Number(m[2]) } : null
+}
 
 /** A kill's killer that is no mob: the player, or a player or pet named in one word ("Vonartik"). */
 const ourSide = (by: string) => by === 'You' || /^[A-Z][a-z']+$/.test(by)
@@ -102,6 +114,11 @@ export function readKillLine(line: LogLine, into: SlayerKillTallies): void {
   }
   if (line.text === 'You died.' || line.text.startsWith('You have been slain by ')) {
     into.died = true
+    return
+  }
+  if (line.text.endsWith(')') && line.text.includes('(Lvl: ')) {
+    const c = conLevel(line.text)
+    if (c) (into.levels ??= {})[c.mob] = Math.max(into.levels[c.mob] ?? 0, c.level)
     return
   }
   if (!into.zone || !(line.text.startsWith('You have slain ') || line.text.includes(' has been slain by '))) return
@@ -151,6 +168,13 @@ export function joinKillTallies(stretches: SlayerKillTallies[]): SlayerKillTalli
         if (m.times) hm.times = [...(hm.times ?? []), ...m.times]
       }
     }
+  return out
+}
+
+/** The stretches' /con levels as one: each mob's highest. */
+export function joinConLevels(stretches: SlayerKillTallies[]): Record<string, number> {
+  const out: Record<string, number> = {}
+  for (const s of stretches) for (const [k, v] of Object.entries(s.levels ?? {})) out[k] = Math.max(out[k] ?? 0, v)
   return out
 }
 
@@ -412,6 +436,12 @@ export interface SlayerPlanData {
   hunter: HunterZone[]
   /** The factions the faction plan the character follows (Factions › Plan) is raising: a camp that costs one is flagged, or ruled out by choice. */
   raising?: string[]
+  /**
+   * The camps for a plan of pet kills alone (the choice petOnly): mobs that con green or lower, up to
+   * `petLevel`, and no raid lockouts. Absent before the character's level is known.
+   */
+  petCamps?: SlayerPlanCamp[]
+  petLevel?: number
 }
 
 /** TAKP's spawn tables for buildCamps, with how a zone's timers compare and how the tables' mobs count. */
@@ -427,6 +457,14 @@ export interface SpawnSource {
    * Hole's rock golems, 48 to 54, for a level 50, 2026-10-20). Unset, any.
    */
   maxLevel?: number
+  /**
+   * Camps of pet kills alone: `maxLevel` holds for every camp's mobs, the log's and play's too, where
+   * the tables know a mob's level (one they do not, New Sebilis Expedition's golems, stays), and the
+   * raid lockouts are left out.
+   */
+  petOnly?: boolean
+  /** Mobs' levels as the player's /con said them (lower-cased): for a mob the tables do not know. */
+  levels?: Readonly<Record<string, number>>
 }
 
 /** A mob counts as up against its spawns when the log's pace reaches this much of what they allow. */
@@ -819,7 +857,20 @@ export function buildCamps(
     for (const k of c.kinds) for (const g of k.goals) c.pace[g] = (c.pace[g] ?? 0) + k.perHour
     c.note = c.kinds.map((k) => `${k.name}: ${num(k.perHour / WIKI_PER_NPC)} on eqlwiki`).join(', ')
   }
-  return camps
+  if (!spawns?.petOnly || spawns.maxLevel === undefined) return camps
+  // Pet kills alone: a kind of a level the tables (or the player's /con) know over the ceiling is out, its camp paced by the rest.
+  const max = spawns.maxLevel
+  const levelOf = (zone: string, k: CampKind) => {
+    if (k.spawn) return k.spawn.hi
+    const his = k.name.split(', ').map((n) => spawnsIn(zone)?.get(spawnKey(n))?.hi ?? spawns.levels?.[n.replace(/^\*+/, '').toLowerCase()])
+    return his.every((h) => h !== undefined) ? Math.max(...(his as number[])) : null
+  }
+  return camps.flatMap((c) => {
+    if (c.daily) return []
+    const kinds = c.kinds.filter((k) => (levelOf(c.zone, k) ?? 0) <= max)
+    if (!kinds.length) return []
+    return kinds.length === c.kinds.length ? [c] : [{ ...c, kinds, pace: paceOfKinds(kinds) }]
+  })
 }
 
 /** What the player has chosen on the page. */
@@ -838,9 +889,21 @@ export interface SlayerPlanChoices {
   overlay: boolean
   /** Camps whose kills cost a faction the followed faction plan (Factions › Plan) is raising are ruled out. */
   avoidPlanFactions: boolean
+  /** A plan of pet kills alone: the data's petCamps, mobs that con green or lower (the player, 2026-10-21). */
+  petOnly: boolean
 }
 
-export const DEFAULT_CHOICES: SlayerPlanChoices = { excluded: [], included: [], outCamps: [], outMobs: [], travelMin: 10, pace: 60, overlay: false, avoidPlanFactions: false }
+export const DEFAULT_CHOICES: SlayerPlanChoices = {
+  excluded: [],
+  included: [],
+  outCamps: [],
+  outMobs: [],
+  travelMin: 10,
+  pace: 60,
+  overlay: false,
+  avoidPlanFactions: false,
+  petOnly: false
+}
 
 /** The factions a camp costs (its kills' faction hits an hour, below zero) that the followed faction plan is raising. */
 export function costsPlan(camp: Pick<SlayerPlanCamp, 'factions'>, raising: readonly string[]): string[] {
@@ -945,14 +1008,19 @@ export function goalsInPlay(goals: SlayerGoal[], choices: SlayerPlanChoices): nu
  * day beside the plan. Travel is the way the log has seen taken between the two zones, or the
  * player's minutes between camps where it knows none.
  */
-export function planSlayer(data: Pick<SlayerPlanData, 'goals' | 'camps'> & { moves?: SlayerMove[]; raising?: string[] }, choices: SlayerPlanChoices): SlayerPlan {
+export function planSlayer(
+  data: Pick<SlayerPlanData, 'goals' | 'camps'> & { moves?: SlayerMove[]; raising?: string[]; petCamps?: SlayerPlanCamp[] },
+  choices: SlayerPlanChoices
+): SlayerPlan {
   const goals = goalsInPlay(data.goals, choices)
   const need = new Map(goals.map((g) => [g, data.goals[g].max - data.goals[g].count]))
   const ruled = new Set(choices.outCamps)
   // By choice, a camp that costs a faction the followed faction plan is raising is out too (LT-656).
   const raising = choices.avoidPlanFactions ? (data.raising ?? []) : []
   const paceOf = (c: SlayerPlanCamp, g: number) => (c.pace[g] ?? 0) * (c.assumed ? choices.pace : 1)
-  const camps = fallbackOnly(data.camps.filter((c) => !ruled.has(c.id) && !costsPlan(c, raising).length).flatMap((c) => withoutMobs(c, choices.outMobs)))
+  const camps = fallbackOnly(
+    (choices.petOnly && data.petCamps ? data.petCamps : data.camps).filter((c) => !ruled.has(c.id) && !costsPlan(c, raising).length).flatMap((c) => withoutMobs(c, choices.outMobs))
+  )
   // The lockouts: what they alone feed is out of the hourly plan, done in the days the lockouts'
   // kills a day take together (Lady Vox and Lord Nagafen, ten true dragons a day). What an hourly
   // camp also feeds, they only help along.

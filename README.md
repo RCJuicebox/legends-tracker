@@ -822,7 +822,11 @@ says which holds it back. A zone with good places for different achievements is 
 second on named by its /waypoint. These camps leave out mobs more than five levels over your
 character, which a pet left alone loses to. Where your log measured a zone for an achievement, the
 log's pace stands, unless a place to stand there gives clearly more (your log's pace under 70% of
-it): then both are offered. Legends' respawns are not classic's: a zone's spawns come back on one timer of its own,
+it): then both are offered. **Pet kills only** plans for a pet farming alone: each camp keeps only the
+mobs that con green or lower to you (the classic server's con table, `greenConMax` in
+`src/shared/game/levels.ts`: level 32 and under at 50, which your own /con lines bear out), raid
+lockouts drop out, and a camp is paced by what is left. A mob's level is the spawn tables', else the
+highest your /con lines have shown (the log is read for them, "(Lvl: 56)"); one neither knows stays in. Legends' respawns are not classic's: a zone's spawns come back on one timer of its own,
 quicker than classic in every zone timed so far (Blackburrow's gnoll brewer, eighteen minutes classic,
 and its Splitpaw sharpshooter both 3:40; Ak'Anon's clockworks 4:50 against twenty minutes). So a zone
 runs on the respawn your Respawns page has timed there, from a spawn the tables give one spot, and a
