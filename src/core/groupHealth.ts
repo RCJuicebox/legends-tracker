@@ -134,10 +134,37 @@ function is(f: Frame, x: number, y: number, c: Rgb): boolean {
   return Math.abs(d[i + 2] - c[0]) <= TOLERANCE && Math.abs(d[i + 1] - c[1]) <= TOLERANCE && Math.abs(d[i] - c[2]) <= TOLERANCE
 }
 
+/**
+ * How dark a fill may be shaded and still be its colour: JBUI and JuiceboxUI2 draw each fill from 55%
+ * of its colour at the left to the whole of it at the right (Interface/fieldkit.py white_fill, the
+ * theme's gradient), so a flat colour match found only the bars' last few pixels and no bar at all.
+ */
+const SHADE_FROM = 0.45
+const SHADE_TO = 1.08
+
+/** Whether a pixel is a bar's fill: `ink` at some brightness from SHADE_FROM to full, so a flat fill and a shaded one both read. */
+function isInk(f: Frame, x: number, y: number, ink: Rgb): boolean {
+  if (x < 0 || y < 0 || x >= f.width || y >= f.height) return false
+  const i = at(f, x, y)
+  const d = f.data
+  const [r, g, b] = [d[i + 2], d[i + 1], d[i]]
+  const k = (r * ink[0] + g * ink[1] + b * ink[2]) / (ink[0] * ink[0] + ink[1] * ink[1] + ink[2] * ink[2] || 1)
+  if (k < SHADE_FROM || k > SHADE_TO) return false
+  return Math.abs(r - k * ink[0]) <= TOLERANCE && Math.abs(g - k * ink[1]) <= TOLERANCE && Math.abs(b - k * ink[2]) <= TOLERANCE
+}
+
+/** Whether a pixel is an empty bar's inside: the empty colour or darker, as JBUI shades it down to black mid-bar. */
+function isEmpty(f: Frame, x: number, y: number, c: Rgb): boolean {
+  if (x < 0 || y < 0 || x >= f.width || y >= f.height) return false
+  const i = at(f, x, y)
+  const d = f.data
+  return d[i + 2] <= c[0] + TOLERANCE && d[i + 1] <= c[1] + TOLERANCE && d[i] <= c[2] + TOLERANCE
+}
+
 /** A bar `height` tall inside its outline, filled with `ink` or empty, its inside's top-left at (x, y): frame coordinates. */
 function barAt(f: Frame, x: number, y: number, height: number, ink: Rgb, c: GroupColours): boolean {
   if (!is(f, x, y - 1, c.outline) || !is(f, x, y + height, c.outline) || !is(f, x - 1, y, c.outline)) return false
-  for (let r = 0; r < height; r++) if (!is(f, x, y + r, ink) && !is(f, x, y + r, c.empty)) return false
+  for (let r = 0; r < height; r++) if (!isInk(f, x, y + r, ink) && !isEmpty(f, x, y + r, c.empty)) return false
   return true
 }
 
@@ -148,14 +175,14 @@ function barAt(f: Frame, x: number, y: number, height: number, ink: Rgb, c: Grou
  */
 function scan(f: Frame, p: GroupHealthProfile, ink: Rgb, inner: number, fits: (left: number, top: number) => boolean): GroupBar[] {
   const c = p.colours
-  const inkOrEmpty = (x: number, y: number) => is(f, x, y, ink) || is(f, x, y, c.empty)
+  const inkOrEmpty = (x: number, y: number) => isInk(f, x, y, ink) || isEmpty(f, x, y, c.empty)
   const found = new Map<string, GroupBar>()
   for (let y = 1; y < f.height - 1; y++) {
     for (let x = 0; x < f.width - p.minWidth; x++) {
       if (!is(f, x, y, c.outline) || !inkOrEmpty(x + 1, y)) continue
       let e = x + 1
-      while (e < f.width && is(f, e, y, ink)) e++
-      while (e < f.width && is(f, e, y, c.empty)) e++
+      while (e < f.width && isInk(f, e, y, ink)) e++
+      while (e < f.width && isEmpty(f, e, y, c.empty)) e++
       if (!is(f, e, y, c.outline) || e - x - 1 < p.minWidth) continue
       const left = x + 1
       const right = e - 1
@@ -236,11 +263,11 @@ function inkFill(f: Frame, bar: GroupBar, offset: number, height: number, ink: R
   const right = bar.right - f.x
   const top = bar.top - f.y + offset
   if (!is(f, left - 1, top, c.outline) || !is(f, right + 1, top, c.outline) || !is(f, left, top - 1, c.outline)) return null
-  if (!is(f, left, top, ink) && !is(f, left, top, c.empty)) return null
+  if (!isInk(f, left, top, ink) && !isEmpty(f, left, top, c.empty)) return null
   let end = left - 1
   for (const y of [top, top + height - 1]) {
     for (let x = right; x > end; x--) {
-      if (is(f, x, y, ink)) {
+      if (isInk(f, x, y, ink)) {
         end = x
         break
       }

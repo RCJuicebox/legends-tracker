@@ -47,18 +47,28 @@ function fill(f: Frame, x: number, y: number, w: number, h: number, c: Rgb): voi
     }
 }
 
-/** A bar `w` × `h` with its outline, its top-left corner (the outline's) at (x, y), filled `pct` of the way with `ink`. */
-function bar(f: Frame, x: number, y: number, w: number, h: number, ink: Rgb, pct: number): void {
+/**
+ * A bar `w` × `h` with its outline, its top-left corner (the outline's) at (x, y), filled `pct` of the way with `ink`.
+ * Shaded, as JBUI draws it (Interface/fieldkit.py, gradient 0.55): the fill from 55% of its colour at the left to the
+ * whole of it at the right, and the empty inside darkening to black in its middle rows.
+ */
+function bar(f: Frame, x: number, y: number, w: number, h: number, ink: Rgb, pct: number, shaded = false): void {
   fill(f, x, y, w, h, GROUP_COLOURS.outline)
-  fill(f, x + 1, y + 1, w - 2, h - 2, GROUP_COLOURS.empty)
-  fill(f, x + 1, y + 1, Math.floor((w - 2) * pct), h - 2, ink)
+  const inside = w - 2
+  for (let r = 0; r < h - 2; r++) {
+    const dark = shaded ? 1 - Math.min(r, h - 3 - r) / ((h - 2) / 2) : 1
+    fill(f, x + 1, y + 1 + r, inside, 1, GROUP_COLOURS.empty.map((v) => Math.round(v * dark)) as unknown as Rgb)
+  }
+  const filled = Math.floor(inside * pct)
+  if (!shaded) return fill(f, x + 1, y + 1, filled, h - 2, ink)
+  for (let i = 0; i < filled; i++) fill(f, x + 1 + i, y + 1, 1, h - 2, ink.map((v) => Math.round(v * (0.55 + (0.45 * i) / (inside - 1)))) as unknown as Rgb)
 }
 
 /** A Group window's member row: the health bar's outline at (x, t), 202 wide inside. */
-function member(f: Frame, x: number, t: number, hp: number, opts: { name?: boolean; mana?: boolean } = {}): void {
-  bar(f, x, t, 204, 18, GROUP_COLOURS.hp, hp)
-  if (opts.mana !== false) bar(f, x, t + 20, 204, 12, GROUP_COLOURS.mana, 0.6)
-  bar(f, x, t + 34, 204, 12, GROUP_COLOURS.end, 0.9)
+function member(f: Frame, x: number, t: number, hp: number, opts: { name?: boolean; mana?: boolean; shaded?: boolean } = {}): void {
+  bar(f, x, t, 204, 18, GROUP_COLOURS.hp, hp, opts.shaded)
+  if (opts.mana !== false) bar(f, x, t + 20, 204, 12, GROUP_COLOURS.mana, 0.6, opts.shaded)
+  bar(f, x, t + 34, 204, 12, GROUP_COLOURS.end, 0.9, opts.shaded)
   // The name in white over the bar's middle rows, 4 in from its left.
   if (opts.name !== false) fill(f, x + 6, t + 4, 40, 10, WHITE)
 }
@@ -107,6 +117,17 @@ describe('barFill', () => {
     expect(fills[1]).toBeCloseTo(0.5, 2)
     expect(fills[2]).toBe(0)
     expect(fills[3]).toBeCloseTo(0.24, 2)
+  })
+
+  it("finds and reads JBUI's shaded bars, health and mana", () => {
+    const f = frame(400, 200)
+    member(f, 50, 20, 0.73, { shaded: true })
+    member(f, 50, 80, 0.18, { shaded: true })
+    const bars = findGroupBars(f)
+    expect(bars).toHaveLength(2)
+    expect(barFill(f, bars[0])).toBeCloseTo(0.73, 2)
+    expect(barFill(f, bars[1])).toBeCloseTo(0.18, 2)
+    expect(manaFill(f, bars[1])).toBeCloseTo(0.6, 2)
   })
 
   it('reads a sample captured around the bars alone, and says when a bar is gone', () => {
@@ -259,10 +280,10 @@ function memberIn(f: Frame, c: GroupColours, x: number, t: number, hp: number, m
 }
 
 /** JuiceboxUI's Player window: health, mana and endurance 16 tall (14 inside), 20 apart, the top one's outline at (x, t). */
-function playerWindow(f: Frame, x: number, t: number, mana: number, o: { end?: boolean } = {}): void {
-  bar(f, x, t, 266, 16, GROUP_COLOURS.hp, 0.8)
-  bar(f, x, t + 20, 266, 16, GROUP_COLOURS.mana, mana)
-  if (o.end !== false) bar(f, x, t + 40, 266, 16, GROUP_COLOURS.end, 1)
+function playerWindow(f: Frame, x: number, t: number, mana: number, o: { end?: boolean; shaded?: boolean } = {}): void {
+  bar(f, x, t, 266, 16, GROUP_COLOURS.hp, 0.8, o.shaded)
+  bar(f, x, t + 20, 266, 16, GROUP_COLOURS.mana, mana, o.shaded)
+  if (o.end !== false) bar(f, x, t + 40, 266, 16, GROUP_COLOURS.end, 1, o.shaded)
   // "Mana" on the bar's left, its numbers on its right.
   fill(f, x + 6, t + 24, 30, 8, WHITE)
   fill(f, x + 200, t + 24, 50, 8, WHITE)
@@ -359,6 +380,16 @@ describe('findPlayerMana (FEAT-043)', () => {
     const piece = frame(a.width, a.height, a.x, a.y)
     playerWindow(piece, 2030 - a.x, 140 - a.y, 0.35)
     expect(playerManaFill(piece, bar!)).toBeCloseTo(0.35, 2)
+  })
+
+  it("reads JBUI's shaded bars: the fill darker to its left, the empty inside darker mid-bar", () => {
+    const f = frame(400, 200, 2000, 100)
+    playerWindow(f, 30, 40, 0.87, { shaded: true })
+    const bar = findPlayerMana(f)
+    expect(bar).toEqual({ left: 2031, right: 2294, top: 161 })
+    expect(playerManaFill(f, bar!)).toBeCloseTo(0.87, 2)
+    playerWindow(f, 30, 40, 0.12, { shaded: true })
+    expect(playerManaFill(f, bar!)).toBeCloseTo(0.12, 2)
   })
 
   it('reads an empty bar (a class without mana) as 0, and a cast bar over it as nothing', () => {
