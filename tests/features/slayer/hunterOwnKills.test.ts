@@ -59,7 +59,12 @@ put(join(game, 'Logs', 'eqlog_Aldric_neriak.txt'), [line('12:00:00', 'You have e
 const races: Record<string, string | null> = { 'an orc pawn': 'Orc', 'orc centurion': 'Orc', 'ambassador dvinn': 'Orc' }
 const ctx = {
   installDir: () => game,
-  store: { dir: h.dir, settings: { get: () => ({ logFile: join(game, 'Logs', 'eqlog_Kelwyn_neriak.txt') }) }, respawns: { get: () => ({}) } },
+  store: {
+    dir: h.dir,
+    characterByKey: () => ({ level: 50, classLevels: {}, focusSources: [] }),
+    settings: { get: () => ({ logFile: join(game, 'Logs', 'eqlog_Kelwyn_neriak.txt') }) },
+    respawns: { get: () => ({}) }
+  },
   gameTables: new GameTables(() => game),
   achievementFiles: new AchievementFiles(
     h.dir,

@@ -240,8 +240,58 @@ describe('Slayer plan: the spawn tables’ camps', () => {
     ])
     expect(rathe).toMatchObject({ limit: 'spawns', note: 'classic timers: Legends has been as quick or quicker' })
     expect(camps.some((c) => c.id === 'spawns:halas')).toBe(false)
-    // Crushbone and Unrest are the log's.
-    expect(camps.some((c) => c.id === 'spawns:crushbone' || c.id === 'spawns:unrest')).toBe(false)
+    // Unrest is the log's: seven fiends an hour, near all its one spot allows.
+    expect(camps.some((c) => c.id === 'spawns:unrest')).toBe(false)
+    // Crushbone's log kept ten an hour where its four spots allow 24: the tables' camp stands beside it.
+    expect(camp('spawns:crushbone').kinds.map((k) => [k.name, Math.round(k.perHour), k.goals])).toEqual([['an orc pawn', 24, [gi('Orc Stomp!')]]])
+  })
+
+  it('paces a zone by where a pet stands, a camp for each place, and leaves out mobs over the level a pet farms', () => {
+    const oot: SpawnTables = {
+      oot: {
+        id: 69,
+        name: 'The Ocean of Tears',
+        npcs: [
+          ['an orc sailor', 'Orc', 10, 12],
+          ['a sea giant', 'Giant', 30, 32],
+          ['an orc warlord', 'Orc', 55, 60]
+        ],
+        // Three orc spots by the dock, two giants on the far isle, the warlord beside the orcs.
+        groups: [
+          [600, [[0, 100]], [0, 0, 0, 40, 0, 0, 0, 40, 0]],
+          [600, [[1, 100]], [3000, 3000, 0, 3040, 3000, 0]],
+          [600, [[2, 100]], [20, 20, 0]]
+        ]
+      }
+    }
+    const at = buildCamps(
+      goals,
+      races,
+      {},
+      () => [],
+      () => null,
+      slayerRaceLists(sections, GAME),
+      [],
+      { tables: oot, timings: new Map(), place, killSpeed: 100, maxLevel: 45 },
+      []
+    )
+    expect(at.map((c) => [c.id, c.kinds.map((k) => [k.name, Math.round(k.perHour)])])).toEqual([
+      ['spawns:oot', [['an orc sailor', 18]]],
+      ['spawns:oot@-3000,-3000', [['a sea giant', 12]]]
+    ])
+    // With no ceiling, the warlord is one of the dock's.
+    const any = buildCamps(
+      goals,
+      races,
+      {},
+      () => [],
+      () => null,
+      slayerRaceLists(sections, GAME),
+      [],
+      { tables: oot, timings: new Map(), place, killSpeed: 100 },
+      []
+    )
+    expect(any[0].kinds.map((k) => k.name)).toEqual(['an orc sailor', 'an orc warlord'])
   })
 
   it('says what the log’s mobs’ spawns allow, and when the log’s pace is up against it', () => {

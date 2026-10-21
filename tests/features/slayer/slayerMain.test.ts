@@ -77,6 +77,8 @@ const ctx = {
   // The Respawns page's records: Khrix Fritchoff timed at 7:21 in Unrest, against classic's sixteen minutes.
   store: {
     dir: h.dir,
+    // A level 50: the tables' camps are of mobs up to 45.
+    characterByKey: () => ({ level: 50, classLevels: {}, focusSources: [] }),
     // The log followed: the counts have the kills since for this character (LT-539).
     settings: { get: () => ({ logFile: join(game, 'Logs', 'eqlog_Kelwyn_neriak.txt') }) },
     respawns: {

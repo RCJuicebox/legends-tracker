@@ -2,6 +2,10 @@
 
 What changed in each version. The release workflow publishes a version's section as its release notes, and installed copies show them when an update arrives.
 
+## Unreleased
+
+- **Slayer: a camp is where a pet farms, not a whole zone.** Where the plan paces a zone by its spawn tables, it now counts only what pops within a pet's reach of the best place to stand, on one floor, instead of every spot in the zone. A zone with two good places for different achievements is two camps, the second named by its /waypoint. Mobs more than five levels over your character are left out of these camps, since a pet left alone loses to them. A zone you have hunted no longer hides a better place in it: where a pet's spot there clearly beats your log's pace for an achievement, both are offered (Lesser Faydark's faeries beside its brownies). Your Conquest plan now sends you to the Qeynos Aqueducts for Swordfishmermaid and the Lesser Faydark faeries for Legendary Creatures, and no longer to Cazic-Thule's oozes for A Sight for Sore Eyes.
+
 ## 2.19.0 (2026-10-20)
 
 - **Two PCs at once: pick which one Live follows.** While this PC's game is closed and two or more other PCs' logs are being written, the Live page's "Following … on another PC" notice has a **Follow** list: **Automatic** (the newest, this PC's character first, as before) or any log written in the last quarter hour. A log picked is followed at once and kept until it goes quiet a quarter hour or Automatic is picked again; this PC's log still comes first whenever its game is played.

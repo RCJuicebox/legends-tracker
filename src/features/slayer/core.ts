@@ -1,5 +1,5 @@
 import type { AchSection } from '../../core/achievements'
-import { mobSpawns, spawnKey, zoneIndex, type MobSpawn, type SpawnTables, type ZoneTiming } from './spawns'
+import { mobSpawns, petReach, spawnKey, zoneIndex, type MobSpawn, type PetReach, type SpawnTables, type ZoneTiming } from './spawns'
 import type { HunterZone } from '../hunter/core'
 import type { LogLine } from '../../core/logLine'
 import { zoneEntered } from '../../core/logLine'
@@ -422,6 +422,11 @@ export interface SpawnSource {
   place: (mob: string, race: string) => number[]
   /** Kills an hour the player keeps where the spawns allow more: what a camp of plenty gives at most. */
   killSpeed: number
+  /**
+   * The highest level a mob of the tables' camps may be: a pet left to farm alone loses to more (the
+   * Hole's rock golems, 48 to 54, for a level 50, 2026-10-20). Unset, any.
+   */
+  maxLevel?: number
 }
 
 /** A mob counts as up against its spawns when the log's pace reaches this much of what they allow. */
@@ -551,6 +556,8 @@ export function buildCamps(
 ): SlayerPlanCamp[] {
   const camps: SlayerPlanCamp[] = []
   const fed = new Set<string>()
+  // The log's best pace for a goal in a zone: what the tables' camp there must beat to stand beside it.
+  const logPace = new Map<string, number>()
   // What the spawn tables say of a zone's mobs, worked out once a zone.
   const tableOf = spawns ? zoneIndex(spawns.tables) : () => null
   const spawnCache = new Map<string, Map<string, MobSpawn>>()
@@ -564,10 +571,37 @@ export function buildCamps(
   // A zone's mobs that feed these goals, as kinds: what their spawns allow an hour.
   const spawnKinds = (zone: string, open: (g: number) => boolean): CampKind[] =>
     [...(spawnsIn(zone)?.values() ?? [])]
-      .filter((m) => usable(m) && (!named(m.name) || m.timerFrom === 'timed') && !lockoutMobs.has(spawnKey(m.name)) && m.ceiling >= MIN_KIND)
+      .filter(
+        (m) => usable(m) && (!named(m.name) || m.timerFrom === 'timed') && !lockoutMobs.has(spawnKey(m.name)) && m.ceiling >= MIN_KIND && m.hi <= (spawns!.maxLevel ?? Infinity)
+      )
       .map((m) => ({ name: m.name, perHour: m.ceiling, goals: spawns!.place(m.name, m.race).filter(open), spawn: m }))
       .filter((k) => k.goals.length)
       .sort((a, b) => b.perHour - a.perHour)
+  // The tables' kinds of a zone as a pet farms them (petReach): for each goal they feed, the best place
+  // to stand for its kinds, and what every kind gives from there; goals best farmed from the same place
+  // are one camp. Most kills an hour first.
+  const reached = (zone: string, kinds: CampKind[]): { kinds: CampKind[]; at: PetReach }[] => {
+    const short = tableOf(zone)
+    if (!short || !spawns || !kinds.length) return []
+    const timer = spawns.timings.get(short)?.timer ?? null
+    const byGoal = (g: number) => new Map(kinds.filter((k) => k.goals.includes(g)).map((k) => [spawnKey(k.name), k.spawn!]))
+    const all = new Map(kinds.map((k) => [spawnKey(k.name), k.spawn!]))
+    const out = new Map<string, { kinds: CampKind[]; at: PetReach }>()
+    for (const g of [...new Set(kinds.flatMap((k) => k.goals))]) {
+      const best = petReach(spawns.tables[short], byGoal(g), timer)
+      if (!best || out.has(`${best.x},${best.y},${best.z}`)) continue
+      const at = petReach(spawns.tables[short], all, timer, best)!
+      const here = kinds
+        .map((k) => ({ ...k, perHour: at.perHour.get(spawnKey(k.name)) ?? 0 }))
+        .filter((k) => k.perHour >= MIN_KIND)
+        .sort((a, b) => b.perHour - a.perHour)
+      if (here.length) out.set(`${best.x},${best.y},${best.z}`, { kinds: here, at })
+    }
+    const total = (p: { kinds: CampKind[] }) => p.kinds.reduce((s, k) => s + k.perHour, 0)
+    return [...out.values()].sort((a, b) => total(b) - total(a))
+  }
+  // A zone's second place to stand, and any after it, is a camp of its own, named for where it is (/waypoint's order).
+  const placeId = (id: string, i: number, at: PetReach) => (i ? `${id}@${Math.round(-at.y)},${Math.round(-at.x)}` : id)
   // A raid boss's kills are a lockout's, a few a day, however quick the log made them look.
   const lockoutMobs = new Set(known.filter((k) => k.perDay !== undefined).flatMap((k) => k.mobs.map(spawnKey)))
   const feeds = (zone: string, g: number) => `${zoneKey(zone)}|${g}`
@@ -606,7 +640,10 @@ export function buildCamps(
         for (const [g, w] of here) pace[g] = (pace[g] ?? 0) + perHour * w
       }
       if (!kinds.length) return
-      for (const g of Object.keys(pace)) fed.add(feeds(zone, +g))
+      for (const [g, v] of Object.entries(pace)) {
+        fed.add(feeds(zone, +g))
+        logPace.set(feeds(zone, +g), Math.max(logPace.get(feeds(zone, +g)) ?? 0, v))
+      }
       camps.push({
         id: i === 0 ? `log:${zone}` : `log:${zone}#${i + 1}`,
         zone,
@@ -636,14 +673,32 @@ export function buildCamps(
     const part = (g: number) => (daily ? 1 : k.races.filter((r) => races.keys[g].has(r)).length / k.races.length)
     if (!daily) for (const g of open) fed.add(feeds(k.zone, g))
     // A camp named without a number: the zone's spawns of what it feeds, where the tables know them.
-    const table = per === undefined && spawns ? spawnKinds(k.zone, (g) => open.includes(g)) : []
+    const table =
+      per === undefined && spawns
+        ? reached(
+            k.zone,
+            spawnKinds(k.zone, (g) => open.includes(g))
+          )
+        : []
     let id = `play:${k.zone}|${k.mobs.join('|')}`
     let left = open
     if (table.length) {
-      const c = capped(table, spawns!.killSpeed)
-      camps.push({ id, zone: k.zone, kinds: c.kinds, source: 'play', pace: paceOfKinds(c.kinds), limit: c.limit, ceiling: c.ceiling, note: k.note, said: k.said })
+      table.forEach((p, i) => {
+        const c = capped(p.kinds, spawns!.killSpeed)
+        camps.push({
+          id: placeId(id, i, p.at),
+          zone: k.zone,
+          kinds: c.kinds,
+          source: 'play',
+          pace: paceOfKinds(c.kinds),
+          limit: c.limit,
+          ceiling: c.ceiling,
+          note: k.note,
+          said: k.said
+        })
+      })
       // What play names there and the tables lack (South Karana's treants): at the assumed pace, beside.
-      const covered = new Set(table.flatMap((t) => t.goals))
+      const covered = new Set(table.flatMap((p) => p.kinds.flatMap((t) => t.goals)))
       left = open.filter((g) => !covered.has(g))
       if (!left.length) continue
       id += '|rest'
@@ -684,21 +739,27 @@ export function buildCamps(
       // A city's people bring its guards down (the guide says faction hit): no camp, the words stand.
       if (isCity(e.zone)) continue
       const open = [...e.goals].filter((g) => !fed.has(feeds(e.zone, g)))
-      const kinds = open.length ? spawnKinds(e.zone, (g) => open.includes(g)) : []
-      if (!kinds.length) continue
-      const c = capped(kinds, spawns.killSpeed)
-      for (const x of c.kinds) for (const g of x.goals) fed.add(feeds(e.zone, g))
+      const pieces = open.length
+        ? reached(
+            e.zone,
+            spawnKinds(e.zone, (g) => open.includes(g))
+          )
+        : []
       const spot = SLAYER_GUIDE_SPOTS.find((s) => zoneKey(s.zone) === k)
-      camps.push({
-        id: `guide:${k}`,
-        zone: e.zone,
-        kinds: c.kinds,
-        source: 'play',
-        pace: paceOfKinds(c.kinds),
-        limit: c.limit,
-        ceiling: c.ceiling,
-        ...(spot ? { note: spot.tip } : {}),
-        said: SLAYER_GUIDE_SAID
+      pieces.forEach((p, i) => {
+        const c = capped(p.kinds, spawns.killSpeed)
+        for (const x of c.kinds) for (const g of x.goals) fed.add(feeds(e.zone, g))
+        camps.push({
+          id: placeId(`guide:${k}`, i, p.at),
+          zone: e.zone,
+          kinds: c.kinds,
+          source: 'play',
+          pace: paceOfKinds(c.kinds),
+          limit: c.limit,
+          ceiling: c.ceiling,
+          ...(spot ? { note: spot.tip } : {}),
+          said: SLAYER_GUIDE_SAID
+        })
       })
     }
   }
@@ -707,25 +768,33 @@ export function buildCamps(
   // taken off. A race only raid bosses are (the kedge, Phinigel): no census guess stands in for the lockout.
   const lockoutRaces = new Set(known.filter((k) => k.perDay !== undefined).flatMap((k) => k.races))
   const wanting = goals.flatMap((_, i) => ([...races.keys[i]].every((k) => lockoutRaces.has(k)) ? [] : [i]))
-  // TAKP's tables: each zone of them, for what nothing measured or named feeds there, paced by its spawns
-  // at no more than the player's usual pace. A city's people are its citizens and guards: no camp.
+  // TAKP's tables: each zone of them, for what nothing named feeds there, paced by its spawns at no more
+  // than the player's usual pace. What the log measured there stands unless a pet's place to stand gives
+  // the goal clearly more (the log's pace short of BOUND of it): the log's killing may have been
+  // elsewhere in the zone (Lesser Faydark's brownies, 67 an hour, beside its faeries). A log near what
+  // the spawns allow was killing all there was. A city's people are its citizens and guards: no camp.
   if (spawns)
     for (const [short, z] of Object.entries(spawns.tables)) {
       if (isCity(z.name)) continue
-      const kinds = spawnKinds(z.name, (g) => wanting.includes(g) && !fed.has(feeds(z.name, g)))
-      if (!kinds.length) continue
-      const c = capped(kinds, spawns.killSpeed)
       const timed = spawns.timings.get(short)
-      camps.push({
-        id: `spawns:${short}`,
-        zone: z.name,
-        kinds: c.kinds,
-        source: 'spawns',
-        pace: paceOfKinds(c.kinds),
-        limit: c.limit,
-        ceiling: c.ceiling,
-        note: timed?.timer ? `respawns as you timed them here (${clock(timed.timer)})` : 'classic timers: Legends has been as quick or quicker',
-        said: 'TAKP’s spawn table'
+      const open = (g: number) => wanting.includes(g) && (!fed.has(feeds(z.name, g)) || logPace.has(feeds(z.name, g)))
+      reached(z.name, spawnKinds(z.name, open)).forEach((p, i) => {
+        const pace = paceOfKinds(capped(p.kinds, spawns.killSpeed).kinds)
+        const beats = (g: number) => (logPace.get(feeds(z.name, g)) ?? 0) < (pace[g] ?? 0) * BOUND
+        const kinds = p.kinds.map((k) => ({ ...k, goals: k.goals.filter(beats) })).filter((k) => k.goals.length)
+        if (!kinds.length) return
+        const c = capped(kinds, spawns.killSpeed)
+        camps.push({
+          id: placeId(`spawns:${short}`, i, p.at),
+          zone: z.name,
+          kinds: c.kinds,
+          source: 'spawns',
+          pace: paceOfKinds(c.kinds),
+          limit: c.limit,
+          ceiling: c.ceiling,
+          note: timed?.timer ? `respawns as you timed them here (${clock(timed.timer)})` : 'classic timers: Legends has been as quick or quicker',
+          said: 'TAKP’s spawn table'
+        })
       })
     }
   for (const [name, rows] of Object.entries(HUNT)) {

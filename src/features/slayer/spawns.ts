@@ -312,6 +312,61 @@ export function petCamps(spots: MapSpot[], reach = PET_REACH, most = 2): PetCamp
   return out
 }
 
+/** Where to stand with a pet for some of a zone's mobs, and each one's kills an hour from there (by spawnKey). */
+export interface PetReach {
+  x: number
+  y: number
+  z: number
+  perHour: Map<string, number>
+}
+
+/**
+ * The best place to stand with a pet for these mobs of a zone, as the spawn tables put them: the spot
+ * whose reach (PET_REACH, at about its height) takes in the most of their kills an hour, on the timers
+ * `mobs` give them. A zone's spawns spread over the map are not a camp: what pops out of reach is not
+ * killed while you stand (a whole zone's treants once paced Plants Concrete and Stone at 55 an hour,
+ * where a pet reaches 19). A mob never gives more than its spawns allow in the whole zone. With `at`,
+ * what they give from there. Null when none of them has a spot.
+ */
+export function petReach(z: TakpZone, mobs: ReadonlyMap<string, MobSpawn>, zoneTimer: number | null = null, at?: Pick<PetReach, 'x' | 'y' | 'z'>): PetReach | null {
+  const spots: { x: number; y: number; z: number; rates: [string, number][] }[] = []
+  for (const [sec, rolls, flat] of z.groups) {
+    if (sec <= 0) continue
+    const total = Math.max(
+      100,
+      rolls.reduce((s, [, c]) => s + c, 0)
+    )
+    const n = flat.length / 3
+    // A roamer's group counts no more spots than mobSpawns gives it, spread over where it starts.
+    const part = sec < ROAMER_SEC ? Math.min(n, ROAMER_SPOTS) / n : 1
+    const rates: [string, number][] = []
+    for (const [i, chance] of rolls) {
+      const k = lower(z.npcs[i][0])
+      const m = mobs.get(k)
+      if (!m) continue
+      const timer = m.timerFrom === 'timed' ? m.timer : zoneTimer === null ? sec : Math.min(sec, zoneTimer)
+      rates.push([k, (part * chance * 3600) / total / timer])
+    }
+    if (rates.length) for (let p = 0; p + 2 < flat.length; p += 3) spots.push({ x: flat[p], y: flat[p + 1], z: flat[p + 2], rates })
+  }
+  let best: PetReach | null = null
+  let most = -1
+  for (const c of at ? [at] : spots) {
+    const perHour = new Map<string, number>()
+    for (const s of spots) {
+      if (Math.hypot(s.x - c.x, s.y - c.y) > PET_REACH || Math.abs(s.z - c.z) > PET_HEIGHT) continue
+      for (const [k, r] of s.rates) perHour.set(k, (perHour.get(k) ?? 0) + r)
+    }
+    for (const [k, r] of perHour) perHour.set(k, Math.min(r, mobs.get(k)!.ceiling))
+    const sum = [...perHour.values()].reduce((a, b) => a + b, 0)
+    if (sum > most) {
+      most = sum
+      best = { x: c.x, y: c.y, z: c.z, perHour }
+    }
+  }
+  return best
+}
+
 /** A zone's map as the game draws it, with the spots a step's mobs pop at. */
 export interface SlayerMap {
   zone: string

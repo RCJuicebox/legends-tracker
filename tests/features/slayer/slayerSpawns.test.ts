@@ -5,6 +5,7 @@ import {
   mobSpawns,
   parseMap,
   petCamps,
+  petReach,
   spotsIn,
   spotsOf,
   waypoint,
@@ -210,5 +211,38 @@ describe('where to stand with a pet', () => {
     const spots = [at(0, 0), at(10, 0, 80), at(20, 0, 0, 25), at(30, 0, 0, 100, 3600), { ...at(40, 0), timer: 0 }]
     expect(petCamps(spots, 150, 1)).toEqual([{ x: 0, y: 0, z: 0, radius: 150, spots: 4, perHour: 6 + 1.5 + 1 + 6 }])
     expect(petCamps([])).toEqual([])
+  })
+
+  // A courtyard of three gargoyle spots, one more far off, a gargoyle on another floor; a roamer's forty starts.
+  const castle: SpawnTables['x'] = {
+    id: 59,
+    name: 'The Castle of Mistmoore',
+    npcs: [
+      ['a gargoyle', 'Gargoyle', 28, 30],
+      ['a wanderer', 'Human', 10, 12]
+    ],
+    groups: [
+      [600, [[0, 100]], [0, 0, 0, 50, 0, 0, 0, 50, 0, 900, 900, 0, 20, 0, 80]],
+      [60, [[1, 100]], Array.from({ length: 120 }, (_, i) => (i % 3 === 2 ? 0 : (i % 3) * 3 + i))]
+    ]
+  }
+
+  it('paces a zone’s mobs by what pops within a pet’s reach of the best place to stand, never more than the zone allows', () => {
+    const mobs = mobSpawns(castle)
+    const gargoyles = new Map([['gargoyle', mobs.get('gargoyle')!]])
+    // Three spots on ten minutes within reach: 18 an hour, where the zone's five give 30.
+    const best = petReach(castle, gargoyles)!
+    expect(best.perHour.get('gargoyle')).toBeCloseTo(18, 5)
+    expect(Math.hypot(best.x, best.y)).toBeLessThan(60)
+    expect(mobs.get('gargoyle')!.ceiling).toBeCloseTo(30, 5)
+    // A zone timed quicker: its timer at every spot.
+    const quick = new Map([['gargoyle', mobSpawns(castle, { timer: 300, timed: [] }).get('gargoyle')!]])
+    expect(petReach(castle, quick, 300)!.perHour.get('gargoyle')).toBeCloseTo(36, 5)
+    // What they give from a given place: none from the far spot's corner but it.
+    expect(petReach(castle, gargoyles, null, { x: 900, y: 900, z: 0 })!.perHour.get('gargoyle')).toBeCloseTo(6, 5)
+    // A roamer's four counted spots spread over its starts: never more than the zone gives it.
+    const wanderer = petReach(castle, new Map([['wanderer', mobs.get('wanderer')!]]))!
+    expect(wanderer.perHour.get('wanderer')!).toBeLessThanOrEqual(mobs.get('wanderer')!.ceiling)
+    expect(petReach(castle, new Map())).toBeNull()
   })
 })

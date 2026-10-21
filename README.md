@@ -814,10 +814,15 @@ Giants? and A Giant Problem at once. Where you have not hunted a race, what play
 in (`src/shared/game/slayerCamps.ts`, dated: the EQL Discord's Slayer talk, and what you have told
 the app), then TAKP's classic spawn tables (`src/shared/game/takpSpawns.json`, read from
 [TAKP's AllaClone](https://www.takproject.net/allaclone/) by `scripts/takp-spawns.mjs`): every zone
-Legends has, its spawn spots, the mobs each rolls and how often, and their timers. A zone's pace
-from the tables is what its spots allow, killing each mob as it pops, at no more than your usual
-kills an hour (the middle of the zones you have hunted an hour or more); each step says which holds
-it back. Legends' respawns are not classic's: a zone's spawns come back on one timer of its own,
+Legends has, its spawn spots, the mobs each rolls and how often, and their timers. A camp from the
+tables is a place to stand with a pet: the spot whose reach (150 units, on one floor) takes in the
+most of what an achievement wants, its pace what pops there, killing each mob as it pops, at no more
+than your usual kills an hour (the middle of the zones you have hunted an hour or more); each step
+says which holds it back. A zone with good places for different achievements is a camp for each, the
+second on named by its /waypoint. These camps leave out mobs more than five levels over your
+character, which a pet left alone loses to. Where your log measured a zone for an achievement, the
+log's pace stands, unless a place to stand there gives clearly more (your log's pace under 70% of
+it): then both are offered. Legends' respawns are not classic's: a zone's spawns come back on one timer of its own,
 quicker than classic in every zone timed so far (Blackburrow's gnoll brewer, eighteen minutes classic,
 and its Splitpaw sharpshooter both 3:40; Ak'Anon's clockworks 4:50 against twenty minutes). So a zone
 runs on the respawn your Respawns page has timed there, from a spawn the tables give one spot, and a

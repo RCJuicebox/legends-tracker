@@ -63,6 +63,11 @@ export const KILLS_KEY = 'slayerKills'
 const SHARED_MS = 30_000
 /** The overlay's plan stands on data this old at most: what the camps' paces come from moves slowly. */
 const OVERLAY_MS = 10 * 60_000
+/**
+ * The spawn tables' camps are of mobs at least this many levels under the character: what a pet farms
+ * alone (the player: the Hole's rock golems, 48 to 54, are too high for a level 50, 2026-10-20).
+ */
+const PET_LEVELS_UNDER = 5
 /** Mobs asked of eqlwiki for one plan at most: fifty a request, in the background. */
 const LOOKUPS = 400
 
@@ -338,11 +343,13 @@ export class SlayerPlanner implements AppFeature {
     }
     const timings = spawnTimings(Object.values(ctx.store.respawns.get()))
     const killSpeed = usualPace(zones)
+    const level = ctx.store.characterByKey(character).level
     const camps = buildCamps(goals, races, zones, place, factionPerKill, slayerRaceLists(exp.sections, game), undefined, {
       tables: TABLES,
       timings,
       place: placeSpawn,
-      killSpeed: killSpeed ?? DEFAULT_CHOICES.pace
+      killSpeed: killSpeed ?? DEFAULT_CHOICES.pace,
+      ...(level > 0 ? { maxLevel: level - PET_LEVELS_UNDER } : {})
     })
     // A raid lockout's kills so far today, since the game's noon reset: "2 of 5 today" (LT-657). From this
     // character's logs, not the live counts: those keep only what came after the export.
