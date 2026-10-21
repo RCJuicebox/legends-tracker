@@ -93,6 +93,7 @@ export function Dashboard({ go }: { go: Go }) {
           >
             Stop following other PCs
           </button>
+          <OtherLogPicker />
         </div>
       )}
       {elsewherePath && (
@@ -116,6 +117,30 @@ export function Dashboard({ go }: { go: Go }) {
 
       <Activity />
     </>
+  )
+}
+
+/**
+ * Which other PC's log to follow, when more than one is being written (two PCs playing at once): the
+ * automatic pick, or one chosen here until it goes quiet. This PC's log still comes first while its
+ * game is played.
+ */
+function OtherLogPicker() {
+  const others = useLive((l) => l.status.others ?? [])
+  const chosen = useLive((l) => l.status.chosenOther ?? null)
+  if (others.length < 2 && !chosen) return null
+  return (
+    <label className="row mt-12">
+      Follow
+      <select aria-label="Other PC's log to follow" value={chosen ?? ''} onChange={(e) => void act('logs:followOther', e.target.value || null)}>
+        <option value="">Automatic: the newest, this PC&apos;s character first</option>
+        {others.map((o) => (
+          <option key={o.path} value={o.path}>
+            {o.character} on {o.folder}, written {ago(o.modified)}
+          </option>
+        ))}
+      </select>
+    </label>
   )
 }
 

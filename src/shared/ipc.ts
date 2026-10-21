@@ -379,6 +379,8 @@ export interface Invokes {
   'logs:folders': (again?: boolean) => LogFolderView[]
   /** Picks another PC's Logs folder and adds it. */
   'logs:addFolder': () => { canceled: boolean; dir: string; problem: string }
+  /** Follows that other PC's log (one Live lists) over the automatic pick; null goes back to the automatic pick. */
+  'logs:followOther': (path: string | null) => void
 
   'overlays:arrange': (on: boolean) => void
   'overlays:demo': () => void
@@ -675,6 +677,7 @@ const INVOKE_CHANNELS: Record<InvokeChannel, true> = {
   'logs:reveal': true,
   'logs:folders': true,
   'logs:addFolder': true,
+  'logs:followOther': true,
   'overlays:arrange': true,
   'overlays:demo': true,
   'combat:get': true,

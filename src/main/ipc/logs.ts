@@ -27,6 +27,7 @@ export function registerLogIpc(ctx: AppContext): void {
 
   handle('logs:list', () => listLogs(ctx.installDir()))
   handle('logs:folders', async (again) => (await ctx.logFolders.lookAll(again === true)).map(folderView))
+  handle('logs:followOther', (path) => ctx.engine.chooseOther(path))
   // Another PC's Logs folder, picked (its game folder or Logs, often over the network) and checked; a page cannot add one any other way.
   handle('logs:addFolder', async () => {
     const r = await ctx.windows.openDialog({ title: "Choose the other PC's EverQuest Legends Logs folder", properties: ['openDirectory'] })

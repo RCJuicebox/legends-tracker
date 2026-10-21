@@ -121,3 +121,113 @@ describe("following another PC's log", () => {
     expect(engine.status.logFile).toBe(mainLog)
   })
 })
+
+describe("picking which other PC's log to follow", () => {
+  /** An engine following this PC's quiet log, with two other PCs' Logs folders each being written. */
+  async function twoPcs() {
+    const game = join(dir, 'game')
+    const logs = join(game, 'Logs')
+    const pc2 = join(dir, 'pc2')
+    const pc3 = join(dir, 'pc3')
+    for (const d of [logs, pc2, pc3]) await fs.mkdir(d, { recursive: true })
+    const mainLog = join(logs, 'eqlog_Kelwyn_neriak.txt')
+    await fs.writeFile(mainLog, `${stamp(new Date(Date.now() - 120_000))} You have entered Neriak - Commons.\r\n`)
+    const old = new Date(Date.now() - 120_000)
+    await fs.utimes(mainLog, old, old)
+    const kelwyn = join(pc3, 'eqlog_Kelwyn_neriak.txt')
+    const aldric = join(pc2, 'eqlog_Aldric_neriak.txt')
+    for (const f of [kelwyn, aldric]) await fs.writeFile(f, `${stamp(new Date())} You have entered Befallen.\r\n`)
+    const written = { [kelwyn]: Date.now(), [aldric]: Date.now() - 5_000 }
+    const store = {
+      settings: cell({ ...defaultSettings(), installDir: game, logFile: mainLog, logFolders: [pc2, pc3] }),
+      triggers: cell([]),
+      rules: cell({}),
+      casts: cell({}),
+      motes: cell<MoteState>({ active: null, sessions: [], daily: {} }),
+      stock: cell<MoteStock>({ counts: {}, item: { name: '', lvl: 0, xp: 0, to: 1 }, autoAdd: true }),
+      respawns: cell({}),
+      buffs: cell({ people: {}, wanted: {}, active: {} }),
+      motesFresh: false,
+      characterOf: () => ({ level: 50, classLevels: {}, focusSources: [] })
+    } satisfies EngineStore
+    const env: EngineEnv = {
+      moteWorkerPath: '',
+      isGameRunning: async () => false,
+      findInstall: async () => '',
+      soundDirs: () => [],
+      dataDir: dir,
+      scanMotes: (job, progress) => ({ done: scanMoteHistory(job, progress), stop: () => {} }),
+      pollMs: 10,
+      logFolders: {
+        lookAll: async () => [
+          { dir: pc2, reachable: true, logs: [{ path: aldric, modified: written[aldric], character: 'Aldric_neriak' }] },
+          { dir: pc3, reachable: true, logs: [{ path: kelwyn, modified: written[kelwyn], character: 'Kelwyn_neriak' }] }
+        ]
+      }
+    }
+    const noop = () => {}
+    const outputs = {
+      timers: noop,
+      alert: noop,
+      audio: noop,
+      status: noop,
+      feed: noop,
+      archive: noop,
+      motes: noop,
+      moteScan: noop,
+      stock: noop,
+      combat: noop,
+      loot: noop,
+      respawns: noop,
+      pet: noop,
+      push: noop
+    }
+    const engine = new Engine(store, { synthesize: async () => Buffer.alloc(0) }, outputs, env)
+    engines.push(engine)
+    await engine.startWatching()
+    const follow = () => (engine as unknown as { followOtherPc(now?: number): Promise<void> }).followOtherPc()
+    return { engine, follow, kelwyn, aldric, written }
+  }
+
+  it('lists both, follows this character first on its own, and swaps to the one picked and back', async () => {
+    const { engine, follow, kelwyn, aldric } = await twoPcs()
+    await follow()
+    expect(engine.status.others?.map((o) => o.character)).toEqual(['Kelwyn', 'Aldric'])
+    expect(engine.status.remote?.path).toBe(kelwyn)
+    await engine.chooseOther(aldric)
+    expect(engine.status.chosenOther).toBe(aldric)
+    expect(engine.status.remote?.path).toBe(aldric)
+    // The pick holds at the next look.
+    await follow()
+    expect(engine.status.remote?.path).toBe(aldric)
+    // Automatic again: back to this character's log.
+    await engine.chooseOther(null)
+    expect(engine.status.chosenOther).toBeNull()
+    expect(engine.status.remote?.path).toBe(kelwyn)
+  })
+
+  it('takes only a log it lists', async () => {
+    const { engine, follow, kelwyn } = await twoPcs()
+    await follow()
+    await engine.chooseOther(join(dir, 'elsewhere', 'eqlog_Mallory_neriak.txt'))
+    expect(engine.status.chosenOther ?? null).toBeNull()
+    expect(engine.status.remote?.path).toBe(kelwyn)
+  })
+
+  it('forgets a pick once that log has gone quiet a quarter hour', async () => {
+    const { engine, follow, kelwyn, aldric, written } = await twoPcs()
+    await follow()
+    await engine.chooseOther(aldric)
+    written[aldric] = Date.now() - 16 * 60_000
+    await follow()
+    expect(engine.status.chosenOther).toBeNull()
+    expect(engine.status.others?.map((o) => o.path)).toEqual([kelwyn])
+  })
+
+  it('takes no pick before the other logs have been looked at', async () => {
+    const { engine, aldric } = await twoPcs()
+    // No look yet, so nothing is listed to pick from.
+    await engine.chooseOther(aldric)
+    expect(engine.status.remote ?? null).toBeNull()
+  })
+})

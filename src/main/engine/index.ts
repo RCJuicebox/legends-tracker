@@ -29,7 +29,7 @@ import { IDLE_POLL_MS, LIVE_POLL_MS, LogFollower } from './logFollower'
 import { Throttled } from '../../core/throttle'
 import { UnreadLines } from '../../core/unreadLines'
 import type { EngineFeature } from './feature'
-import type { AppSettings, ArchiveStatus, CharacterSettings, FeedItem, Notification, SpellRule, WatchStatus } from '../../shared/types'
+import type { AppSettings, ArchiveStatus, CharacterSettings, FeedItem, Notification, OtherLog, SpellRule, WatchStatus } from '../../shared/types'
 import type { EngineEnv, EngineOutputs, EngineStore, MoteView, Speaker } from './contracts'
 import { jobs } from '../sources/jobs'
 import { perf } from '../perf'
@@ -101,6 +101,8 @@ export class Engine {
   private starting = false
   /** Another PC's log being followed while this PC's game is closed; null while this PC's is. */
   private remote: RemoteFollow | null = null
+  /** The other PC's log the player picked on Live (chooseOther), followed over the automatic pick; null for automatic. */
+  private chosen: string | null = null
   /** The log last watched, to tell a switch of character from a restart of the same log. */
   private watchedLog = ''
   private tickTimer: NodeJS.Timeout | null = null
@@ -777,14 +779,40 @@ export class Engine {
   }
 
   /**
-   * Another PC's log, followed live while this PC's game is closed and its log quiet (the second PC a
-   * player leaves killing): the newest log in the other PCs' folders written in the last minute, the
-   * same character's first. Back to this PC's log as soon as its game starts or its log is written, or
-   * once the other one has been quiet a quarter hour.
+   * Follow the other PC's log `path` over the automatic pick (Live's picker), or null to go back to
+   * the automatic pick. Only a log Live lists (status.others); this PC's log still comes first whenever
+   * its game is played.
    */
-  private async followOtherPc(now = Date.now()): Promise<void> {
+  async chooseOther(path: string | null): Promise<void> {
+    const known = path === null || (this.status.others ?? []).some((o) => samePath(o.path, path))
+    if (!known) return
+    this.chosen = path
+    this.status.chosenOther = path
+    this.emitStatus()
+    await this.followOtherPc(Date.now(), true)
+  }
+
+  /**
+   * Another PC's log, followed live while this PC's game is closed and its log quiet (the second PC a
+   * player leaves killing): the one the player picked on Live, while it is still being written; else
+   * the newest log in the other PCs' folders written in the last minute, the same character's first.
+   * Back to this PC's log as soon as its game starts or its log is written, or once the other one has
+   * been quiet a quarter hour (a pick of that log is then forgotten). `picked`: the player just picked,
+   * so no wait for this PC's log to have been quiet a minute.
+   */
+  private async followOtherPc(now = Date.now(), picked = false): Promise<void> {
     if (this.starting) return
     const s = this.settings
+    const active = s.logFolders.length ? await this.otherLogs(now) : []
+    if (this.chosen && !active.some((o) => samePath(o.path, this.chosen!))) {
+      // The picked log has gone quiet: back to the automatic pick.
+      this.chosen = null
+      this.status.chosenOther = null
+    }
+    if (JSON.stringify(active) !== JSON.stringify(this.status.others ?? [])) {
+      this.status.others = active
+      this.emitStatus()
+    }
     if (this.remote) {
       const main = s.logFile ? await fs.stat(s.logFile).catch(() => null) : null
       const mainWritten = !!main && main.mtimeMs > this.remote.since
@@ -797,21 +825,41 @@ export class Engine {
             : `${this.remote.character}'s log on the other PC has gone quiet; back to this PC's log.`
         )
         await this.startWatching()
+        return
       }
+      // Another log picked (or the pick taken back): over to it now.
+      const want = this.pick(active, now)
+      if (want && !samePath(want.path, this.remote.path) && (this.chosen || picked)) await this.startWatching(this.follow(want, now))
       return
     }
-    if (!s.followOtherPcs || !s.logFolders.length || !this.status.watching || this.archive.gameRunning) return
-    if (now - this.status.lastLineAt < MAIN_QUIET_MS) return
-    const looks = (await this.env.logFolders?.lookAll().catch(() => [])) ?? []
-    const fresh = looks
-      .filter((l) => l.reachable)
-      .flatMap((l) => l.logs.map((x) => ({ ...x, folder: l.dir })))
-      .filter((x) => now - x.modified < REMOTE_FRESH_MS)
-      .sort((a, b) => b.modified - a.modified)
-    const mine = characterKey(s.logFile).toLowerCase()
-    const pick = fresh.find((x) => characterKey(x.path).toLowerCase() === mine) ?? fresh[0]
+    if (!s.followOtherPcs || !active.length || !this.status.watching || this.archive.gameRunning) return
+    if (!picked && now - this.status.lastLineAt < MAIN_QUIET_MS) return
+    const pick = this.pick(active, now)
     // A start or a stop may have come while the folders were looked at.
     if (!pick || this.remote || !this.status.watching || this.archive.gameRunning) return
-    await this.startWatching({ path: pick.path, character: characterName(pick.path), folder: pick.folder, since: now })
+    await this.startWatching(this.follow(pick, now))
+  }
+
+  /** Other PCs' logs written in the last quarter hour, newest first. */
+  private async otherLogs(now: number): Promise<OtherLog[]> {
+    const looks = (await this.env.logFolders?.lookAll().catch(() => [])) ?? []
+    return looks
+      .filter((l) => l.reachable)
+      .flatMap((l) => l.logs.map((x) => ({ path: x.path, character: characterName(x.path), folder: l.dir, modified: x.modified })))
+      .filter((x) => now - x.modified < REMOTE_IDLE_MS)
+      .sort((a, b) => b.modified - a.modified)
+  }
+
+  /** Which other PC's log to follow: the player's pick, else the newest written in the last minute, the same character's first. */
+  private pick(active: OtherLog[], now: number): OtherLog | undefined {
+    const chosen = this.chosen ? active.find((o) => samePath(o.path, this.chosen!)) : undefined
+    if (chosen) return chosen
+    const fresh = active.filter((x) => now - x.modified < REMOTE_FRESH_MS)
+    const mine = characterKey(this.settings.logFile).toLowerCase()
+    return fresh.find((x) => characterKey(x.path).toLowerCase() === mine) ?? fresh[0]
+  }
+
+  private follow(o: OtherLog, now: number): RemoteFollow {
+    return { path: o.path, character: o.character, folder: o.folder, since: now }
   }
 }

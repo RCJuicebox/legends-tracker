@@ -59,6 +59,19 @@ export interface WatchStatus {
   elsewhere?: { path: string; character: string } | null
   /** Another PC's log, followed while this PC's game is closed (Settings › Log files); null while this PC's is. */
   remote?: { path: string; character: string; folder: string } | null
+  /** Other PCs' logs written in the last quarter hour, newest first: the ones Live lets the player pick between. */
+  others?: OtherLog[]
+  /** The other PC's log the player picked to follow, over the automatic pick; null for automatic. */
+  chosenOther?: string | null
+}
+
+/** Another PC's log being written. */
+export interface OtherLog {
+  path: string
+  character: string
+  folder: string
+  /** When it was last written (ms). */
+  modified: number
 }
 
 export interface LogFileInfo {

@@ -84,6 +84,7 @@ export const CHECKS: { [K in InvokeChannel]: Check<Parameters<Invokes[K]>> } = {
   'logs:compress': args(str),
   'logs:reveal': args(str),
   'logs:folders': args(opt(bool)),
+  'logs:followOther': args(nullable(str)),
   'logs:addFolder': none,
   'overlays:arrange': args(bool),
   'overlays:demo': none,
