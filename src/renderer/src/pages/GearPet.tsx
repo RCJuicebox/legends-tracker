@@ -5,9 +5,8 @@ import { Ago, Info, LoadError, Pending, Segmented, SettingsLink, Switch } from '
 import { num, signed, wikiUrl } from '../../../core/format'
 import { className } from '../../../shared/game/classes'
 import { itemKey, mergeLevel, parseStatsBlock, scaledStats, slotLabel, type InvItem } from '../../../core/inventory'
-import { restrictions, isLore, score } from '../../../core/gearFinder'
-import { rawWeights } from '../../../core/statValue'
-import { optimizePetGear, PET_ROLE_PRESETS, petConversions, petMelee, petSlots, type PetChoice, type PetPiece } from '../../../core/pets'
+import { restrictions, isLore, score, type Weights } from '../../../core/gearFinder'
+import { optimizePetGear, PET_ROLE_PRESETS, petMelee, petSlots, petWeights, type PetChoice, type PetPiece } from '../../../core/pets'
 import type { GearModel } from '../gear/useGearModel'
 import { ItemIcon } from './gearBits'
 
@@ -48,7 +47,7 @@ export function PetTab({ m }: { m: GearModel }) {
   const capacity = petSlots(m.classes)
   const byKey = useMemo(() => new Map(m.catalog.map((it) => [itemKey(it.title), it])), [m.catalog])
   const weights = useMemo(
-    () => (profile ? rawWeights(PET_ROLE_PRESETS[preset] ?? PET_ROLE_PRESETS.Damage, petConversions(profile, capsQ.data?.factors ?? {})) : null),
+    () => (profile ? petWeights(PET_ROLE_PRESETS[preset] ?? PET_ROLE_PRESETS.Damage, profile, capsQ.data?.factors ?? {}) : null),
     [profile, preset, capsQ.data]
   )
   const wearer = useMemo(
@@ -191,8 +190,9 @@ export function PetTab({ m }: { m: GearModel }) {
                   </div>
                   <div>
                     Stats are weighed the way the upgrade finder weighs yours, with the pet's classes and stats: {profile.stats.STR} STR, {profile.stats.STA} STA,{' '}
-                    {profile.stats.AGI} AGI. Haste counts once, the best worn. Weapons count by the melee damage they give the pet under the Pet Guide's rules (a better ratio is
-                    used outright; more damage at a worse ratio keeps the pet's delay), with a hit averaging bonus + 1.5 × damage. A two-hander gives up the off hand.
+                    {profile.stats.AGI} AGI. STA counts as HP and, for a pet that casts, WIS and INT as mana, at a player's rates: since the 10-22 patch a pet gets both, by how
+                    much is unpublished. Haste counts once, the best worn. Weapons count by the melee damage they give the pet: since the 10-13 patch a pet uses a weapon whose
+                    ratio beats its own and gets nothing from a worse one, with a hit averaging bonus + 1.5 × damage. A two-hander gives up the off hand.
                   </div>
                   <div>Focus effects and procs are not counted: nothing yet says whether a pet's gear focuses anything.</div>
                 </>
@@ -301,4 +301,4 @@ export function PetTab({ m }: { m: GearModel }) {
 }
 
 /** One item's stats by the pet's weights, haste and weapon aside. */
-const scoreOf = (c: PetChoice, weights: ReturnType<typeof rawWeights> | null) => (weights ? score(c.piece.stats, { ...weights, haste: 0, ratio: 0, rangedRatio: 0 }) : 0)
+const scoreOf = (c: PetChoice, weights: Weights | null) => (weights ? score(c.piece.stats, { ...weights, haste: 0, ratio: 0, rangedRatio: 0 }) : 0)

@@ -160,7 +160,7 @@ interface WikiCache {
  * pet-wiki.json's shape (LT-415): bumped when what a page or the guide keeps changes, so an older file
  * is read again from the wiki rather than taken as it is. A file from before has none, and counts as 1.
  */
-const CACHE_VERSION = 1
+const CACHE_VERSION = 2 // 2: a page keeps whether the pet casts
 
 /** Pet pages from eqlwiki: "<spell> Summon" for the pet, and the Pet Guide for its base melee. */
 export class PetWiki {

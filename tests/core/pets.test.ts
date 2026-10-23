@@ -5,14 +5,18 @@ import {
   optimizePetGear,
   parsePetGuide,
   parseSummonPage,
+  petConversions,
   petMelee,
   petSlots,
   petSwing,
+  petWeights,
+  PET_ROLE_PRESETS,
   PetGearReader,
   weaponDamageBonus,
   type PetGearReading,
   type PetMelee,
-  type PetPiece
+  type PetPiece,
+  type PetProfile
 } from '../../src/core/pets'
 import { parseLogLine } from '../../src/core/logLine'
 import { parseWikiTables } from '../../src/core/wikiTable'
@@ -102,7 +106,19 @@ describe('the pet from the wiki', () => {
     expect(p).toMatchObject({ classes: ['bst', 'war'], level: 30, hp: 2000, dualWield: 0.4 })
     expect(p.stats).toMatchObject({ STR: 110, STA: 100, AGI: 90 })
     expect(p.unsure).toEqual(['Agility'])
+    expect(p.casts).toBe(false)
     expect(parseSummonPage('X', '<li>Pet Classes: [[Shadow Knight]] / [[Warrior]]</li>').classes).toEqual(['shd', 'war'])
+  })
+
+  it('reads whether the pet casts from its spell list', () => {
+    const casting = `== Spell List ==
+* [[Lifedraw|<span class='itemeff'>Lifedraw</span>]]
+
+== Focus Items ==
+* None`
+    expect(parseSummonPage('X', casting).casts).toBe(true)
+    expect(parseSummonPage('X', "== Spell List ==\n'''Needs Updated'''\n* [[Frost Dagger]]").casts).toBe(true)
+    expect(parseSummonPage('X', '== Spell List ==\n* None\n== Notes ==\n* [[Somewhere]]').casts).toBe(false)
   })
 
   it('reads base melee from both table layouts, rowspans included', () => {
@@ -176,12 +192,11 @@ describe('pet melee', () => {
   })
 
   const wolf: PetMelee = { damage: 20, delay: 28, bonus: 11, dualWield: 0.55 }
-  it('follows the Pet Guide’s three weapon rules', () => {
+  it('uses a weapon by its ratio alone (10-13 and 10-22 patches)', () => {
     // A better ratio: the weapon's damage, delay and bonus.
     expect(petSwing(wolf, 36, { damage: 57, delay: 43, twoHanded: true })).toEqual({ damage: 57, delay: 43, bonus: 8 })
-    // A worse ratio but more damage: its damage, the pet's own delay and bonus.
-    expect(petSwing(wolf, 36, { damage: 30, delay: 60, twoHanded: false })).toEqual({ damage: 30, delay: 28, bonus: 11 })
-    // Worse at both: nothing changes.
+    // A worse ratio changes nothing, however much more damage it has.
+    expect(petSwing(wolf, 36, { damage: 30, delay: 60, twoHanded: false })).toEqual({ damage: 20, delay: 28, bonus: 11 })
     expect(petSwing(wolf, 36, { damage: 10, delay: 30, twoHanded: false })).toEqual({ damage: 20, delay: 28, bonus: 11 })
   })
 
@@ -189,6 +204,38 @@ describe('pet melee', () => {
     const bare = petMelee(wolf, 36, null, null)
     expect(bare).toBeCloseTo((11 + 30) / 28 + (0.55 * 30) / 28, 6)
     expect(petMelee(wolf, 36, { damage: 57, delay: 43, twoHanded: true }, null)).toBeCloseTo((8 + 85.5) / 43, 6)
+  })
+})
+
+describe('what a pet’s stats buy it', () => {
+  const pet = (casts: boolean): PetProfile => ({
+    spell: 'Test Fire',
+    classes: ['wiz', 'war'],
+    level: 41,
+    hp: 3000,
+    stats: { STR: 130, STA: 127, AGI: 90, DEX: 90, WIS: 50, INT: 150 },
+    casts,
+    melee: null,
+    unsure: []
+  })
+  const factors = { wiz: { hp: 9, mana: 4, end: 0 }, war: { hp: 20, mana: 0, end: 15 } }
+
+  it('counts STA as HP, and WIS and INT both as mana for a pet that casts (10-22 patch)', () => {
+    const c = petConversions(pet(true), factors)
+    expect(c.hpPerSta).toBe(29)
+    // A wizard's mana factor from each stat, on each stat's own slope: WIS 50 (1), INT 150 (2.5).
+    expect(c.manaPerWis).toBe(4)
+    expect(c.manaPerInt).toBe(10)
+    expect(c.avoidancePerAgi).toBe(0.5)
+  })
+
+  it('gives mana nothing for a pet that casts nothing', () => {
+    expect(petConversions(pet(false), factors)).toMatchObject({ manaPerWis: 0, manaPerInt: 0 })
+    const w = petWeights(PET_ROLE_PRESETS.Balanced, pet(false), factors)
+    expect([w.mana, w.wis, w.int, w.manaRegen]).toEqual([0, 0, 0, 0])
+    const cast = petWeights(PET_ROLE_PRESETS.Balanced, pet(true), factors)
+    expect(cast.mana).toBe(PET_ROLE_PRESETS.Balanced.mana)
+    expect(cast.int).toBeCloseTo(PET_ROLE_PRESETS.Balanced.mana * 10, 9)
   })
 })
 

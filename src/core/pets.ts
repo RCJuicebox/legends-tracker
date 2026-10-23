@@ -7,9 +7,12 @@
 //     for an Enchanter, Druid or Shaman (a Shadow Knight adds none): 12 at most.
 //   - It wears them as a player would, one chest, two earrings and so on; given two for one slot it
 //     wears the one with more AC. So the best gift is at most one item per slot.
-//   - Weapons: a weapon with a better damage/delay ratio than the pet's own is used outright
-//     (damage, delay and bonus damage). One with a worse ratio but more damage lends only its damage;
-//     the pet keeps its own delay and bonus. Anything else changes nothing.
+//   - Weapons: since the 10-13 patch a pet weapon is judged on its damage/delay ratio, not its base
+//     damage, and the 10-22 patch made pets choose by it too. One with a better ratio than the pet's
+//     own is used outright (damage, delay and bonus damage); one with a worse ratio changes nothing.
+//     The game's new damage maths is unpublished: the swing and bonus here are still EQEmu's.
+//   - Since the 10-22 patch a summoned pet's HP depends on its STA, and its mana on WIS and INT both.
+//     How much is unpublished: a point is taken to buy what it would for a player of the pet's classes.
 // The game shows what a pet wears with `/pet inventory check`; the inventory export does not list it.
 // Nothing about any pet is kept here: the pet's classes, level, stats and base melee come from the
 // wiki at run time.
@@ -18,7 +21,7 @@ import { summonsPet } from './spellKinds'
 import type { InvItem, ItemStats } from './inventory'
 import { canWear, isTwoHanded, score, type Restrictions, type Wearer, type Weights } from './gearFinder'
 import type { ClassFactors, Conversions, RoleWeights } from './statValue'
-import { conversions } from './statValue'
+import { conversions, rawWeights, statSlope } from './statValue'
 import type { PieceSource } from './gearOptimizer'
 import { parseWikiTables } from './wikiTable'
 import type { SpellBook } from './spells'
@@ -131,6 +134,8 @@ export interface PetProfile {
   level: number
   hp: number
   stats: { STR: number; STA: number; AGI: number; DEX: number; WIS: number; INT: number }
+  /** Whether its summon page lists spells it casts: only then is mana worth anything to it. */
+  casts: boolean
   /** Base melee, from the Pet Guide's tables; null where the guide has no figures yet. */
   melee: PetMelee | null
   /** Figures the wiki marks as unconfirmed ("?"), by name. */
@@ -142,7 +147,7 @@ const num = (s: string | undefined): number | null => {
   return m ? Number(m[0]) : null
 }
 
-/** A "<spell> Summon" page: its classes, level, hit points and base stats. */
+/** A "<spell> Summon" page: its classes, level, hit points, base stats and whether it casts. */
 export function parseSummonPage(spell: string, wikitext: string): Omit<PetProfile, 'melee'> & { dualWield: number | null } {
   const field = (label: string) => new RegExp(`<li>\\s*${label}:\\s*([^<\\n]*)`, 'i').exec(wikitext)?.[1].trim() ?? ''
   const unsure: string[] = []
@@ -153,6 +158,7 @@ export function parseSummonPage(spell: string, wikitext: string): Omit<PetProfil
   }
   const classes = [...field('Pet Classes').matchAll(/\[\[([^\]|]+)(?:\|[^\]]*)?\]\]/g)].map((m) => classIdOf(m[1])).filter((c) => c !== null)
   const dw = val('Dual Wield', 'dual wield')
+  const spellList = /==\s*Spell List\s*==([\s\S]*?)(?:\n==|$)/i.exec(wikitext)?.[1] ?? ''
   return {
     spell,
     classes: classes.length ? classes : ['war'],
@@ -166,6 +172,7 @@ export function parseSummonPage(spell: string, wikitext: string): Omit<PetProfil
       WIS: val('Wisdom') ?? 75,
       INT: val('Intelligence') ?? 75
     },
+    casts: /^\s*\*\s*\[\[/m.test(spellList),
     dualWield: dw === null ? null : dw / 100,
     unsure
   }
@@ -251,12 +258,11 @@ export interface PetWeapon {
   twoHanded: boolean
 }
 
-/** What one hand swings with a weapon in it (or none), by the Pet Guide's rules. */
+/** What one hand swings with a weapon in it (or none): the weapon if its ratio beats the pet's own. */
 export function petSwing(base: PetMelee, level: number, w: PetWeapon | null, offhand = false): { damage: number; delay: number; bonus: number } {
   const own = { damage: base.damage, delay: base.delay, bonus: offhand ? 0 : base.bonus }
   if (!w || w.damage <= 0 || w.delay <= 0) return own
   if (w.damage / w.delay > base.damage / base.delay) return { damage: w.damage, delay: w.delay, bonus: weaponDamageBonus(level, w.delay, w.twoHanded, offhand) }
-  if (w.damage > base.damage) return { ...own, damage: w.damage }
   return own
 }
 
@@ -276,12 +282,12 @@ export function petMelee(base: PetMelee, level: number, primary: PetWeapon | nul
 
 /**
  * What a pet values, per unit of outcome, as the player roles do; `ratio` here is per 1% more melee
- * damage. A pet has no use for endurance, and mana only for its few spells.
+ * damage. A pet has no use for endurance, and mana only when it casts (petWeights drops it otherwise).
  */
 export const PET_ROLE_PRESETS: Record<string, RoleWeights> = {
   Damage: {
     hp: 0.3,
-    mana: 0,
+    mana: 0.15,
     end: 0,
     ac: 2,
     avoidance: 0.3,
@@ -298,7 +304,7 @@ export const PET_ROLE_PRESETS: Record<string, RoleWeights> = {
   },
   Balanced: {
     hp: 0.6,
-    mana: 0,
+    mana: 0.25,
     end: 0,
     ac: 5,
     avoidance: 0.8,
@@ -315,7 +321,7 @@ export const PET_ROLE_PRESETS: Record<string, RoleWeights> = {
   },
   Tank: {
     hp: 1,
-    mana: 0,
+    mana: 0.1,
     end: 0,
     ac: 8,
     avoidance: 1.5,
@@ -334,11 +340,26 @@ export const PET_ROLE_PRESETS: Record<string, RoleWeights> = {
 
 /**
  * What a point of each stat buys the pet: the player formulas with the pet's own classes and
- * stats, except agility, which the Pet Guide puts at +5 evasion for +10 AGI.
+ * stats, except agility, which the Pet Guide puts at +5 evasion for +10 AGI, and mana, which since
+ * the 10-22 patch comes from WIS and INT alike: each at the rate the pet's casting class gets from
+ * its own stat. A pet that casts nothing has no use for mana.
  */
 export function petConversions(pet: PetProfile, factors: Record<string, ClassFactors>): Conversions {
   const c = conversions({ classes: pet.classes, factors, stats: pet.stats, hpBonusPct: 0, evasionPct: 0 })
-  return { ...c, avoidancePerAgi: 0.5, notes: [...c.notes, 'AGI: +5 evasion per 10, from the Pet Guide'] }
+  const perPoint = pet.casts ? pet.classes.reduce((a, k) => a + (factors[k]?.mana ?? 0), 0) : 0
+  const manaPerWis = perPoint * statSlope(pet.stats.WIS)
+  const manaPerInt = perPoint * statSlope(pet.stats.INT)
+  const notes = [
+    ...c.notes.filter((n) => !/^\S+ mana per (WIS|INT)/.test(n)),
+    pet.casts ? `${manaPerWis.toFixed(1)} mana per WIS, ${manaPerInt.toFixed(1)} per INT` : 'WIS and INT: no use, the pet casts nothing',
+    'AGI: +5 evasion per 10, from the Pet Guide'
+  ]
+  return { ...c, manaPerWis, manaPerInt, avoidancePerAgi: 0.5, notes }
+}
+
+/** A preset's weights for this pet's stats: mana counts only for a pet that casts. */
+export function petWeights(role: RoleWeights, pet: PetProfile, factors: Record<string, ClassFactors>): Weights {
+  return rawWeights(pet.casts ? role : { ...role, mana: 0, manaRegen: 0 }, petConversions(pet, factors))
 }
 
 // ---- the optimiser ----
