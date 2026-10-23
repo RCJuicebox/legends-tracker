@@ -1,5 +1,20 @@
 import { describe, expect, it } from 'vitest'
-import { dropRates, fmtCoin, itemWorth, lastSales, LootLedger, mergeLoot, parseCoin, parseLootLine, sessionWorth, type LootEntry, type LootSnapshot } from '../../src/core/loot'
+import {
+  dropRates,
+  fmtCoin,
+  itemWorth,
+  lastSales,
+  LootLedger,
+  LootSinceTally,
+  mergeLoot,
+  parseCoin,
+  parseLootLine,
+  sessionWorth,
+  withLootSince,
+  type LootEntry,
+  type LootSnapshot
+} from '../../src/core/loot'
+import type { Inventory } from '../../src/shared/types'
 import { parseOffer } from '../../src/core/tradeskills'
 import { parseItemUse, plainText } from '../../src/core/wikiItem'
 import { parseLogLine } from '../../src/core/logLine'
@@ -108,6 +123,76 @@ describe('LootLedger', () => {
     expect(snap.coin).toEqual({ s1: { corpse: 4298, sales: 679 }, s2: { corpse: 0, sales: 600 } })
     l.reset()
     expect(l.snapshot().entries).toEqual([])
+  })
+})
+
+describe('gear looted since the inventory export', () => {
+  const tally = (after: number, text: string) => {
+    const t = new LootSinceTally(after)
+    const changed = text
+      .trim()
+      .split('\n')
+      .map((raw) => t.add(parseLogLine(raw.trim())!))
+    return { view: t.view(), changed }
+  }
+  const exportAt = new Date(2026, 9, 22, 20, 0, 0, 500).getTime()
+
+  it('counts what you kept or merged after the export, not what auto-loot sold or stored, nor what a groupmate looted', () => {
+    const { view, changed } = tally(
+      exportAt,
+      `
+      [Thu Oct 22 20:00:00 2026] --You have looted a Star Ruby from a fetid fiend's corpse.--
+      [Thu Oct 22 20:01:00 2026] --You have looted a Shadow Rage Helm +4 from Cleric of Innoruuk's corpse.--
+      [Thu Oct 22 20:02:00 2026] You looted a Shadow Rage Helm +4 from Cleric of Innoruuk's corpse and sold it for free.
+      [Thu Oct 22 20:03:00 2026] You looted an Apothic Crown +4 from a spite golem's corpse and stored it in your Dragon Hoard
+      [Thu Oct 22 20:04:00 2026] --Kelwyn has looted a Bone Mask from a putrid skeleton's corpse.--
+      [Thu Oct 22 20:05:00 2026] --You have looted a Shadow Rage Helm +4 from Cleric of Innoruuk's corpse.--
+      [Thu Oct 22 20:06:00 2026] You looted an Indicolite Bracer +4 from Reward Chest to create an Indicolite Bracer +6`
+    )
+    // The line stamped in the export's own second is in the export.
+    expect(changed).toEqual([false, true, false, false, false, true, true])
+    expect(view.kept).toEqual([{ name: 'Shadow Rage Helm +4', count: 2, at: new Date(2026, 9, 22, 20, 5).getTime() }])
+    expect(view.merged).toEqual([{ name: 'Indicolite Bracer +6', at: new Date(2026, 9, 22, 20, 6).getTime() }])
+  })
+
+  const item = (location: string, name: string) => ({ location, name, id: 1, count: 1, augs: [] })
+  const inv: Inventory = {
+    worn: [item('Wrist', 'Indicolite Bracer +3'), item('Wrist', 'Indicolite Bracer +5')],
+    bags: [item('General 1-Slot1', 'Star Ruby')],
+    bank: [],
+    sharedBank: [],
+    depot: [],
+    keyRing: [{ kind: 'Equipment', name: 'Apothic Crown +2', id: 2 }]
+  }
+
+  it('adds the gear kept, a copy each, and raises the copy a merge most likely went into', () => {
+    const isGear = (name: string) => !/Star Ruby/.test(name)
+    const r = withLootSince(
+      inv,
+      {
+        kept: [
+          { name: 'Shadow Rage Helm +4', count: 2, at: 1 },
+          { name: 'Star Ruby', count: 3, at: 1 }
+        ],
+        merged: [
+          { name: 'Indicolite Bracer +6', at: 2 },
+          { name: 'Shadow Rage Helm +5', at: 3 },
+          { name: 'Apothic Crown +3', at: 4 },
+          { name: 'Fungus Covered Scale Tunic +2', at: 5 }
+        ]
+      },
+      isGear
+    )
+    expect(r.added.map((it) => [it.location, it.name])).toEqual([
+      ['Looted', 'Shadow Rage Helm +5'],
+      ['Looted', 'Shadow Rage Helm +4']
+    ])
+    expect(r.inventory.worn.map((it) => it.name)).toEqual(['Indicolite Bracer +3', 'Indicolite Bracer +6'])
+    expect(r.inventory.keyRing[0].name).toBe('Apothic Crown +3')
+    expect(r.raised).toBe(3)
+    // The export itself is left as it was.
+    expect(inv.worn[1].name).toBe('Indicolite Bracer +5')
+    expect(inv.keyRing[0].name).toBe('Apothic Crown +2')
   })
 })
 

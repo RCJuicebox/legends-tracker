@@ -1,5 +1,7 @@
 // A character as the game's export files and the wiki describe them, and what the player adds.
 
+import type { LootedSince } from '../core/loot'
+
 export interface AchObjective {
   t: string
   /** Complete. */
@@ -127,6 +129,8 @@ export interface InventoryView {
   items: Record<string, ItemInfo>
   /** 'missing' when there is no export yet; otherwise a read error, or ''. */
   error: string
+  /** What this PC's log saw you loot after the export was written; absent when the log was not read. */
+  looted?: LootedSince
 }
 
 /** What the player has told the tracker about a character that no file records. */

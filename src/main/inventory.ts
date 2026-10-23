@@ -2,6 +2,7 @@ import { promises as fs } from 'node:fs'
 import { writeFileAtomic } from './storeCore'
 import { join } from 'node:path'
 import { parseInventory, type Inventory } from '../core/inventory'
+import { LootSinceTally, type LootedSince } from '../core/loot'
 import type { ItemCatalog } from './items'
 import type { CharacterSheet, InventoryView } from '../shared/types'
 import { log } from './log'
@@ -9,6 +10,9 @@ import { assertCharacterKey, isCharacterKey, sanitizeSheet } from '../core/valid
 import { sources } from './sources/registry'
 import { ExportWatch } from './exportWatch'
 import { SettledReads } from './exportFiles'
+import { sinceStart } from './sources/sinceExport'
+import { readForward } from './sources/logHistory'
+import { logStem } from './storeCore'
 
 const EMPTY_SHEET: CharacterSheet = { acOverrides: {}, shield: null, stats: {} }
 
@@ -21,6 +25,12 @@ export class InventoryFiles {
   /** Told each export read with a new time, for the merge planner to follow its levels (LT-740); the context sets it. */
   onExport: (character: string, inventory: Inventory, modified: number) => void = () => {}
   private readonly exportSeen = new Map<string, number>()
+  /** A character's live log; the context sets it to the one being watched for the character played. */
+  logFile: (character: string) => string = (c) => join(this.gameDir(), 'Logs', `${logStem(c)}.txt`)
+  /** Each character's log as read on from its export: where the read got to, and what it saw looted. */
+  private readonly since = new Map<string, { after: number; id: string; readTo: number; tally: LootSinceTally }>()
+  /** The read of each character's log under way: one at a time, or two would count the same lines. */
+  private readonly sinceReads = new Map<string, Promise<boolean>>()
 
   private exportRead(character: string, inventory: Inventory, modified: number): void {
     if (this.exportSeen.get(character) === modified) return
@@ -46,7 +56,9 @@ export class InventoryFiles {
       (c) => this.exportPath(c),
       gameDir,
       shown,
-      async (c) => send(await this.load(c))
+      async (c) => send(await this.load(c)),
+      // Loot lands in the log, not the export: a look at the log's new lines too.
+      (c) => this.readSince(c)
     )
   }
 
@@ -90,7 +102,53 @@ export class InventoryFiles {
       return { ...base, error: err.code === 'ENOENT' ? 'missing' : err.message }
     }
     const names = inventory.worn.flatMap((it) => [it.name, ...it.augs.map((a) => a.name)])
-    return { ...base, inventory, items: await this.catalog.lookup(names, refresh) }
+    const looted = await this.lootedSince(character, base.modified)
+    return { ...base, inventory, items: await this.catalog.lookup(names, refresh), ...(looted ? { looted } : {}) }
+  }
+
+  /** What the character's log saw looted after the export written at `after`; undefined without a log. */
+  private async lootedSince(character: string, after: number): Promise<LootedSince | undefined> {
+    await this.readSince(character, after).catch((e) => log.warn(`Could not read ${character}'s log for loot since the inventory export`, e))
+    const kept = this.since.get(character)
+    return kept?.after === after ? kept.tally.view() : undefined
+  }
+
+  /**
+   * Reads the character's log on from where the last read got to (from the line before the export at
+   * first, or when the log was replaced): whether it saw anything looted. `after` is the export's time;
+   * without one, the export last read for the character.
+   */
+  private readSince(character: string, after = this.since.get(character)?.after): Promise<boolean> {
+    if (after === undefined) return Promise.resolve(false)
+    const run = (this.sinceReads.get(character) ?? Promise.resolve(false)).catch(() => false).then(() => this.readOn(character, after))
+    this.sinceReads.set(character, run)
+    return run
+  }
+
+  private async readOn(character: string, after: number): Promise<boolean> {
+    const path = this.logFile(character)
+    let s = this.since.get(character)
+    const start = await sinceStart(path, s && s.after === after ? { id: s.id, readTo: s.readTo } : null, after)
+    if (!start) return false
+    let changed = false
+    if (!s || s.after !== after || start.fresh) {
+      s = { after, id: start.id, readTo: start.from, tally: new LootSinceTally(after) }
+      this.since.set(character, s)
+      changed = true
+    }
+    if (start.size > s.readTo) {
+      const tally = s.tally
+      s.readTo += await readForward(
+        path,
+        s.readTo,
+        start.size,
+        (line) => {
+          if (tally.add(line)) changed = true
+        },
+        { flushLast: false }
+      )
+    }
+    return changed
   }
 
   /**

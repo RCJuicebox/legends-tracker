@@ -48,8 +48,11 @@ export const SLOT_LAYOUT = [
   'Any Slot'
 ]
 
-/** Where a piece is now; 'catalog' is one the character does not own, from the wiki (the optimizer's all-gear mode). */
-export type PieceSource = 'worn' | 'bags' | 'bank' | 'sharedBank' | 'storage' | 'pet' | 'catalog'
+/**
+ * Where a piece is now; 'looted' is one the log saw kept on looting since the inventory export, and
+ * 'catalog' one the character does not own, from the wiki (the optimizer's all-gear mode).
+ */
+export type PieceSource = 'worn' | 'bags' | 'bank' | 'sharedBank' | 'storage' | 'pet' | 'looted' | 'catalog'
 
 export interface Piece {
   item: InvItem
@@ -494,7 +497,9 @@ export function ownedPieces(
   inv: { worn: InvItem[]; bags: InvItem[]; bank: InvItem[]; sharedBank: InvItem[]; keyRing?: Inventory['keyRing'] },
   describe: (item: InvItem) => { r: Restrictions | null; stats: ItemStats | null; foci: string[]; worn?: string[]; procs?: string[]; lore: boolean } | null,
   /** What the pet wears, from the log's list of its gear. */
-  pet: InvItem[] = []
+  pet: InvItem[] = [],
+  /** Gear kept on looting since the export, from the log. */
+  looted: InvItem[] = []
 ): Piece[] {
   const out: Piece[] = []
   const add = (items: InvItem[], from: PieceSource) => {
@@ -511,5 +516,6 @@ export function ownedPieces(
   add(inv.sharedBank, 'sharedBank')
   if (inv.keyRing) add(storedEquipment({ keyRing: inv.keyRing }), 'storage')
   add(pet, 'pet')
+  add(looted, 'looted')
   return out
 }

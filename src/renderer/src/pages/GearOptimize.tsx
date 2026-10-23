@@ -35,6 +35,7 @@ const PICK_GROUPS: [PieceSource, string][] = [
   ['sharedBank', 'Shared bank'],
   ['storage', 'Storage › Equipment'],
   ['pet', 'On your pet'],
+  ['looted', 'Looted since the export'],
   ['catalog', 'To get']
 ]
 

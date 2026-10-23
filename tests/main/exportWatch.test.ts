@@ -100,6 +100,28 @@ describe('ExportWatch, noticing an export written again', () => {
     watch.stop()
   })
 
+  it('calls back for the export unchanged when something else the page shows has changed', async () => {
+    const modified = write('Tester_halas', 5000)
+    let more = false
+    const calls: string[] = []
+    const watch = new ExportWatch(
+      'Inventory',
+      path,
+      () => game,
+      () => true,
+      async (c) => void calls.push(c),
+      async () => more
+    )
+    watch.follow('Tester_halas')
+    watch.seen(modified)
+    await watch.poll()
+    expect(calls).toEqual([])
+    more = true
+    await watch.poll()
+    expect(calls).toEqual(['Tester_halas'])
+    watch.stop()
+  })
+
   it('keeps one timer however often it is followed, until stopped', () => {
     vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] })
     const { watch } = setup()

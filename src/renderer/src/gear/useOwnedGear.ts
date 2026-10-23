@@ -5,14 +5,16 @@ import { ANY_SLOT, canWear, isLore, restrictions, type Wearer } from '../../../c
 import { ownedPieces, type Exaltation } from '../../../core/gearOptimizer'
 import { itemEffects } from '../../../core/itemEffects'
 import type { CatalogItem } from '../../../core/wikiItem'
-import type { InventoryView } from '../../../shared/types'
+import type { Inventory, InventoryView } from '../../../shared/types'
 import type { usePet } from './usePet'
 
-// What the character owns, the pet's gear included: item names for the finder's "owned" marks, the
-// pieces the optimiser arranges, and the exaltations kept in Storage.
+// What the character owns, the pet's gear and the gear looted since the export included: item names
+// for the finder's "owned" marks, the pieces the optimiser arranges, and the exaltations kept in Storage.
 
 export function useOwnedGear({
   view,
+  inv,
+  looted,
   pet,
   byKey,
   fociOf,
@@ -20,22 +22,28 @@ export function useOwnedGear({
   wearer
 }: {
   view: InventoryView
+  /** The export with what was looted since (withLootSince). */
+  inv: Inventory
+  /** Gear kept on looting since the export. */
+  looted: InvItem[]
   pet: ReturnType<typeof usePet>
   byKey: Map<string, CatalogItem>
   fociOf: (item: InvItem) => { name: string; via: string }[]
   effectsOfItem: (name: string) => { worn: string; proc: string } | undefined
   wearer: Wearer
 }) {
-  const inv = view.inventory!
   // What the pet wears is the character's too: the log's list names each piece (not its exaltations).
   const petGear = pet.data?.gear
   const petItems = useMemo<InvItem[]>(() => (petGear?.items ?? []).map((g) => ({ location: 'Pet', name: g.name, id: 0, count: 1, augs: [] })), [petGear])
   const owned = useMemo(
     () =>
       new Set(
-        [...inv.worn, ...inv.bags, ...inv.bank, ...inv.sharedBank, ...storedEquipment(inv), ...petItems].flatMap((i) => [itemKey(i.name), ...i.augs.map((a) => itemKey(a.name))])
+        [...inv.worn, ...inv.bags, ...inv.bank, ...inv.sharedBank, ...storedEquipment(inv), ...petItems, ...looted].flatMap((i) => [
+          itemKey(i.name),
+          ...i.augs.map((a) => itemKey(a.name))
+        ])
       ),
-    [inv, petItems]
+    [inv, petItems, looted]
   )
 
   const pieces = useMemo(
@@ -56,9 +64,10 @@ export function useOwnedGear({
             lore: c ? isLore(c.statsblock) : true
           }
         },
-        petItems
+        petItems,
+        looted
       ),
-    [inv, byKey, view.items, fociOf, petItems, effectsOfItem]
+    [inv, byKey, view.items, fociOf, petItems, looted, effectsOfItem]
   )
   // Exaltations kept in Storage › Exaltations that bring a focus and the character may use, with what
   // the item each was made from allows: the slot kind it goes in, and its classes, race and level.

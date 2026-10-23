@@ -1,8 +1,8 @@
-import { baseName } from './inventory'
+import { baseName, itemKey, mergeLevel } from './inventory'
 import { SELF } from './combatLines'
 import { displayName, nameKey } from './combatMeter'
 import type { LogLine } from './logLine'
-import type { ItemInfo, Segment } from '../shared/types'
+import type { InvItem, Inventory, ItemInfo, Segment } from '../shared/types'
 
 // Loot, as EverQuest Legends prints it. Auto-loot tells you what became of each item:
 //
@@ -245,6 +245,78 @@ export class LootLedger {
     }
     return { entries: [...this.entries].reverse(), coin, reading: this.reading }
   }
+}
+
+// ---- gear looted since the inventory export ----
+
+/** What your log saw you keep or merge on looting after the inventory export was written: the export knows none of it yet. */
+export interface LootedSince {
+  /** Kept as it dropped, by name as printed ("Shadow Rage Helm +4"): how many, and when the last one was. */
+  kept: { name: string; count: number; at: number }[]
+  /** What looting merged into ("Indicolite Bracer +6"), oldest first. */
+  merged: { name: string; at: number }[]
+}
+
+/**
+ * Counts your loot after an export, a log line at a time. Only what you kept or merged: what
+ * auto-loot sold or stored in the depot, the currency tab or the Dragon Hoard is not in your bags.
+ */
+export class LootSinceTally {
+  private readonly kept = new Map<string, { name: string; count: number; at: number }>()
+  private readonly merged: { name: string; at: number }[] = []
+
+  /** `after`: when the export was written; a line stamped then or before is in it. */
+  constructor(readonly after: number) {}
+
+  /** Whether the line changed what was looted. */
+  add(line: LogLine): boolean {
+    if (line.time <= this.after) return false
+    const c = line.text.charCodeAt(0)
+    if (c !== 89 && c !== 45) return false
+    const ev = parseLootLine(line.text)
+    if (!ev || ev.kind !== 'loot' || ev.looter !== SELF) return false
+    if (ev.outcome === 'merged' && ev.into) {
+      this.merged.push({ name: ev.into, at: line.time })
+      return true
+    }
+    if (ev.outcome !== 'kept') return false
+    const had = this.kept.get(ev.item)
+    this.kept.set(ev.item, { name: ev.item, count: (had?.count ?? 0) + ev.count, at: line.time })
+    return true
+  }
+
+  view(): LootedSince {
+    return { kept: [...this.kept.values()], merged: [...this.merged] }
+  }
+}
+
+/**
+ * The inventory with what was looted since its export: each piece of gear kept (`isGear`) in `added`,
+ * one item a copy, and each merge on looting raising a copy of its item, the highest one under the
+ * new level (the one it most likely went into, a looted copy included). `raised` counts the merges
+ * that found a copy to raise.
+ */
+export function withLootSince(inv: Inventory, looted: LootedSince, isGear: (name: string) => boolean): { inventory: Inventory; added: InvItem[]; raised: number } {
+  const added: InvItem[] = looted.kept
+    .filter((k) => isGear(k.name))
+    .flatMap((k) => Array.from({ length: Math.min(k.count, 20) }, () => ({ location: 'Looted', name: k.name, id: 0, count: 1, augs: [] })))
+  const next = { ...inv, worn: [...inv.worn], bags: [...inv.bags], bank: [...inv.bank], sharedBank: [...inv.sharedBank], keyRing: [...inv.keyRing] }
+  const lists: { name: string }[][] = [next.worn, next.bags, next.bank, next.sharedBank, next.keyRing, added]
+  let raised = 0
+  for (const m of looted.merged) {
+    const key = itemKey(m.name)
+    const to = mergeLevel(m.name)
+    let best: { list: { name: string }[]; i: number; level: number } | null = null
+    for (const list of lists)
+      for (let i = 0; i < list.length; i++) {
+        const level = mergeLevel(list[i].name)
+        if (itemKey(list[i].name) === key && level < to && (!best || level > best.level)) best = { list, i, level }
+      }
+    if (!best) continue
+    best.list[best.i] = { ...best.list[best.i], name: m.name }
+    raised++
+  }
+  return { inventory: next, added, raised }
 }
 
 // ---- drop rates (FEAT-037) ----

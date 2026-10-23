@@ -9,7 +9,7 @@ import { DEFAULT_HIDDEN_ERAS, OTHER_ERA, OTHER_OUT_ERA } from '../../../core/gea
 import { ROLE_LABELS, ROLE_PRESETS, type RoleKey } from '../../../core/statValue'
 import type { CharacterSheet, InventoryView } from '../../../shared/types'
 import { className } from '../../../shared/game/classes'
-import { Ago, ErrorText, Info, PageLink, Pending, Progress, Segmented, ToggleChip, TypedNumber, Switch } from '../components/ui'
+import { Ago, ErrorText, GameCommand, Info, PageLink, Pending, Progress, Segmented, ToggleChip, TypedNumber, Switch } from '../components/ui'
 import { num, pct, signed, wikiUrl } from '../../../core/format'
 import { useGearModel, type GearMode } from '../gear/useGearModel'
 import { useCharacterWeights } from '../gear/useCharacterWeights'
@@ -131,9 +131,20 @@ function Finder({ view, sheet, mode }: { view: InventoryView; sheet: CharacterSh
   const withUpgrades = shown.filter((r) => r.candidates.length)
   const none = shown.filter((r) => !r.candidates.length && r.current)
   const scoring = mode !== 'focus'
+  const lootedCount = model.looted.length
 
   return (
     <div className="stack gap-12">
+      {(lootedCount > 0 || model.raisedByLoot > 0) && (
+        <div className="notice info">
+          {lootedCount > 0 &&
+            `${lootedCount} piece${lootedCount === 1 ? '' : 's'} of gear you looted since the inventory export ${lootedCount === 1 ? 'counts' : 'count'} as yours`}
+          {lootedCount > 0 && model.raisedByLoot > 0 && ', and '}
+          {model.raisedByLoot > 0 &&
+            `${model.raisedByLoot} item${model.raisedByLoot === 1 ? '' : 's'} ${model.raisedByLoot === 1 ? 'is' : 'are'} at the +N your log saw ${model.raisedByLoot === 1 ? 'it' : 'them'} merged to on looting`}
+          . The log does not say what you sold or destroyed since: type <GameCommand cmd="/outputfile inventory" /> in game to set it straight.
+        </div>
+      )}
       <div className="card stack gap-12">
         {scoring && (
           <div className="row">

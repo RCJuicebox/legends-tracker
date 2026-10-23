@@ -276,6 +276,8 @@ export function createContext(): AppContext {
     const names = [...inv.worn, ...inv.bags, ...inv.bank, ...inv.sharedBank].map((it) => it.name)
     ctx.engine.stock.observed(names, modified, 'export')
   }
+  // Gear looted since the export, from the log being watched for the character played.
+  ctx.inventoryFiles.logFile = (character) => characterLogFile(character, ctx.characterKey(), store.settings.get().logFile, installDir())
   // Each new achievements export is kept small, for Achievements › Progress (FEAT-032).
   ctx.achievementFiles.onRead = (character, sections, modified) => ctx.achievementHistory.add(character, sections, modified)
 

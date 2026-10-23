@@ -1,7 +1,9 @@
-import { useDeferredValue } from 'react'
+import { useDeferredValue, useMemo } from 'react'
 import { useRemembered } from '../remember'
 import type { InvItem } from '../../../core/inventory'
-import { DEFAULT_HIDDEN_ERAS, type HandWeights, type Wearer, type Weights } from '../../../core/gearFinder'
+import { DEFAULT_HIDDEN_ERAS, restrictions, type HandWeights, type Wearer, type Weights } from '../../../core/gearFinder'
+import { itemKey } from '../../../core/inventory'
+import { withLootSince } from '../../../core/loot'
 import type { FocusLine, FocusWorth } from '../../../core/itemFocus'
 import type { Exaltation, Piece } from '../../../core/gearOptimizer'
 import { usePet } from './usePet'
@@ -80,6 +82,10 @@ export interface GearModel {
   pet: ReturnType<typeof usePet>
   worth: FocusWorth | null
   focusValue: (names: string[]) => number
+  /** Gear kept on looting since the inventory export, one item a copy, counted as owned. */
+  looted: InvItem[]
+  /** Merges on looting since the export that raised an item owned. */
+  raisedByLoot: number
 }
 
 export function useGearModel(view: InventoryView, sheet: CharacterSheet | null, mode: GearMode) {
@@ -93,12 +99,23 @@ export function useGearModel(view: InventoryView, sheet: CharacterSheet | null, 
   // 'round': every candidate judged with everything owned rearranged around it; 'slot': one slot, one item out.
   const [judge, setJudge] = useRemembered<'slot' | 'round'>('finder.judge', 'round')
   const pet = usePet(view.character, classes, level)
-  const inv = view.inventory!
 
   // Hiding an era re-sorts the whole catalog; the buttons answer first, the lists follow.
   const shownEras = useDeferredValue(hiddenEras)
   const { items, eraStatus, zones, eraCounts, byKey, effectsOfItem, fociOf, eraHidden } = useCatalogItems(state, shownEras)
-  const { owned, pieces, storedExaltations, exaltations } = useOwnedGear({ view, pet, byKey, fociOf, effectsOfItem, wearer })
+  // The export with what the log saw looted since: gear kept goes in as yours, and a merge on looting
+  // raises the copy it went into. The log does not say what was sold or destroyed after; the next export does.
+  const lootSince = useMemo(() => {
+    const exported = view.inventory!
+    if (!view.looted) return { inventory: exported, added: [], raised: 0 }
+    const isGear = (name: string) => {
+      const c = byKey.get(itemKey(name))
+      return !!c && restrictions(c.statsblock).slots.length > 0
+    }
+    return withLootSince(exported, view.looted, isGear)
+  }, [view.inventory, view.looted, byKey])
+  const inv = lootSince.inventory
+  const { owned, pieces, storedExaltations, exaltations } = useOwnedGear({ view, inv, looted: lootSince.added, pet, byKey, fociOf, effectsOfItem, wearer })
   const { report, days, setDays, lines, idleLines, wanted, setWanted, resetWanted, enough, setEnough, capOf, points, setPoints, available, ownedFoci, worth, valueOf } =
     useFocusModel({ view, items, classes, level, zones, eraStatus, wearer, owned, pieces, fociOf, shownEras })
   const effects = useEffectsModel({ view, items, effectsOfItem, days, sheetStats: stats, pieces, level, weights })
@@ -180,7 +197,9 @@ export function useGearModel(view: InventoryView, sheet: CharacterSheet | null, 
         exaltations,
         pet,
         worth,
-        focusValue: valueOf
+        focusValue: valueOf,
+        looted: lootSince.added,
+        raisedByLoot: lootSince.raised
       }
     : null
 

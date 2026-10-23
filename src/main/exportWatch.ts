@@ -23,7 +23,9 @@ export class ExportWatch {
     /** Whether a page could be showing the export: the main window is open. Hidden, the file is not looked at. */
     private readonly shown: () => boolean,
     /** Reads the export again and sends it to the page. */
-    private readonly changed: (character: string) => Promise<void>
+    private readonly changed: (character: string) => Promise<void>,
+    /** Whether something else the page shows has changed since (the inventory's loot in the log): a call back too. */
+    private readonly also?: (character: string) => Promise<boolean>
   ) {}
 
   /** Watches this character's export from now on ('' for none), and starts looking if not already. */
@@ -47,6 +49,7 @@ export class ExportWatch {
       const st = await fs.stat(this.path(character))
       // The game writes the file in one go, but give it a moment before reading a fresh one.
       if (st.mtimeMs !== this.modified && Date.now() - st.mtimeMs > EXPORT_SETTLE_MS) await this.changed(character)
+      else if (st.mtimeMs === this.modified && this.also && (await this.also(character))) await this.changed(character)
     } catch (e) {
       // Not there (yet): nothing to send.
       if ((e as NodeJS.ErrnoException).code !== 'ENOENT') log.warn(`${this.what} poll failed`, e)
