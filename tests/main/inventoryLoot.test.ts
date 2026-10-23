@@ -56,6 +56,33 @@ describe('gear looted since the inventory export', () => {
     files.stop()
   })
 
+  it('looks up an item the wiki has no page for in the gear from eqlegendstools.com', async () => {
+    const files = new InventoryFiles(
+      game,
+      () => game,
+      catalog,
+      () => {},
+      () => false
+    )
+    const robe = {
+      title: 'Pyrosilk Robe',
+      statsblock: 'Slot: CHEST<br>',
+      icon: 0,
+      focus: '',
+      era: 'Nektropos',
+      zones: [],
+      mobs: [],
+      quest: false,
+      crafted: false,
+      url: 'https://eqlegendstools.com/items/pyrosilk-robe/'
+    }
+    files.extraItems = async () => [robe]
+    const items = await files.lookup(['Pyrosilk Robe +4', 'Star Ruby'])
+    expect(items['pyrosilk robe']).toEqual({ title: 'Pyrosilk Robe', found: true, statsblock: 'Slot: CHEST<br>', icon: 0, url: robe.url })
+    expect(items['star ruby']).toBeUndefined()
+    files.stop()
+  })
+
   it('leaves it out without a log', async () => {
     const empty = tempDir('lt-inventory-nolog-')
     writeFileSync(join(empty, `${character}-Inventory.txt`), 'Location\tName\tID\tCount\tSlots\r\n')

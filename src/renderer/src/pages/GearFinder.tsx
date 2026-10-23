@@ -10,7 +10,8 @@ import { ROLE_LABELS, ROLE_PRESETS, type RoleKey } from '../../../core/statValue
 import type { CharacterSheet, InventoryView } from '../../../shared/types'
 import { className } from '../../../shared/game/classes'
 import { Ago, ErrorText, GameCommand, Info, PageLink, Pending, Progress, Segmented, ToggleChip, TypedNumber, Switch } from '../components/ui'
-import { num, pct, signed, wikiUrl } from '../../../core/format'
+import { num, pct, signed } from '../../../core/format'
+import { itemPageUrl } from '../../../core/wikiItem'
 import { useGearModel, type GearMode } from '../gear/useGearModel'
 import { useCharacterWeights } from '../gear/useCharacterWeights'
 import { ItemIcon, source } from './gearBits'
@@ -29,7 +30,7 @@ function eraTip(era: string): string {
     : era === OTHER_OUT_ERA
       ? 'Out of era on the wiki, in no expansion named here: FearHateRevamp, HoleVP, WarrensFearHateRevamp and Unknown Era pages'
       : era === 'Classic'
-        ? "Everything the wiki counts as in era for EverQuest Legends: Classic, and Legends' live zones (Fear, Hate, Hole, Sky, Temple, Warrens, Paineel, Stonebrunt)"
+        ? "Everything the wiki counts as in era for EverQuest Legends: Classic, and Legends' live zones (Fear, Hate, Hole, Sky, Temple, Warrens, Paineel, Stonebrunt, Nektropos Castle)"
         : `${era}: out of era on EverQuest Legends`
 }
 
@@ -439,7 +440,7 @@ function Finder({ view, sheet, mode }: { view: InventoryView; sheet: CharacterSh
                     <ItemIcon icon={c.item.icon} />
                     <div className="lt-cand-body">
                       <div className="row gap-8">
-                        <a className="lt-cand-name" href={wikiUrl(c.item.title)} target="_blank" rel="noreferrer">
+                        <a className="lt-cand-name" href={itemPageUrl(c.item)} target="_blank" rel="noreferrer">
                           {c.item.title}
                         </a>
                         {c.owned && <span className="chip pill gold">you have one</span>}

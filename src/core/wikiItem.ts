@@ -2,6 +2,7 @@
 // its focus effect, which era the item belongs to, and where it comes from.
 
 import type { ItemSources, ItemUse } from '../shared/types'
+import { wikiUrl } from './format'
 
 /** Bumped when a catalog entry gains something, so a stored catalog from an older build is fetched again. */
 export const CATALOG_FORMAT = 3
@@ -24,6 +25,13 @@ export interface CatalogItem {
   mobs: string[]
   quest: boolean
   crafted: boolean
+  /** Its page, when that is not on eqlwiki: an item the wiki has no page for yet, from eqlegendstools.com (toolsItem.ts). */
+  url?: string
+}
+
+/** Where an item's page is: eqlwiki's, or the other site's it came from. */
+export function itemPageUrl(item: Pick<CatalogItem, 'title' | 'url'>): string {
+  return item.url ?? wikiUrl(item.title)
 }
 
 const FIELD_RE = new Map<string, RegExp>()

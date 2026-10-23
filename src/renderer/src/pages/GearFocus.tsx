@@ -3,7 +3,8 @@ import { restrictions } from '../../../core/gearFinder'
 import { focusValue, KIND_LABELS, KIND_ORDER, KIND_WORTH, type FocusInfo, type FocusLine } from '../../../core/itemFocus'
 import { type FocusCandidate, type GearModel, type OwnedFocus } from '../gear/useGearModel'
 import { DAY_WINDOWS, Info, Pending, Segmented, TypedNumber } from '../components/ui'
-import { isoDays, num, pct as pctOf, wikiUrl } from '../../../core/format'
+import { isoDays, num, pct as pctOf } from '../../../core/format'
+import { itemPageUrl } from '../../../core/wikiItem'
 
 /** A focus figure, given as a percentage already (10.5), to one place. */
 export const pct = (n: number) => pctOf(n / 100, 1)
@@ -199,7 +200,7 @@ function FocusRow({ m, l }: { m: GearModel; l: FocusLine }) {
             {topItems.slice(0, 3).map((c) => (
               <div key={c.item.title} className="lt-focus-item" title={source(c.item)}>
                 <ItemIcon icon={c.item.icon} size={20} />
-                <a href={wikiUrl(c.item.title)} target="_blank" rel="noreferrer">
+                <a href={itemPageUrl(c.item)} target="_blank" rel="noreferrer">
                   {c.item.title}
                 </a>
                 <span className="faint">

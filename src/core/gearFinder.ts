@@ -59,6 +59,8 @@ const DEFAULT_ERA_STATUS: Record<string, 'in' | 'out'> = {
   temple: 'in',
   warrens: 'in',
   paineel: 'in',
+  // Not on the wiki's list yet: the tag eqlegendstools.com's Nektropos Castle items take (toolsItem.ts).
+  nektropos: 'in',
   kunark: 'out',
   velious: 'out',
   luclin: 'out',

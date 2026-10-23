@@ -1,10 +1,11 @@
 import { promises as fs } from 'node:fs'
 import { writeFileAtomic } from './storeCore'
 import { join } from 'node:path'
-import { parseInventory, type Inventory } from '../core/inventory'
+import { itemKey, parseInventory, type Inventory } from '../core/inventory'
 import { LootSinceTally, type LootedSince } from '../core/loot'
 import type { ItemCatalog } from './items'
-import type { CharacterSheet, InventoryView } from '../shared/types'
+import type { CatalogItem } from '../core/wikiItem'
+import type { CharacterSheet, InventoryView, ItemInfo } from '../shared/types'
 import { log } from './log'
 import { assertCharacterKey, isCharacterKey, sanitizeSheet } from '../core/validate'
 import { sources } from './sources/registry'
@@ -25,6 +26,8 @@ export class InventoryFiles {
   /** Told each export read with a new time, for the merge planner to follow its levels (LT-740); the context sets it. */
   onExport: (character: string, inventory: Inventory, modified: number) => void = () => {}
   private readonly exportSeen = new Map<string, number>()
+  /** Gear eqlwiki has no page for, from the other site (ToolsCatalog): what a name the wiki lacks is looked up in. */
+  extraItems: () => Promise<CatalogItem[]> = async () => []
   /** A character's live log; the context sets it to the one being watched for the character played. */
   logFile: (character: string) => string = (c) => join(this.gameDir(), 'Logs', `${logStem(c)}.txt`)
   /** Each character's log as read on from its export: where the read got to, and what it saw looted. */
@@ -103,7 +106,21 @@ export class InventoryFiles {
     }
     const names = inventory.worn.flatMap((it) => [it.name, ...it.augs.map((a) => a.name)])
     const looted = await this.lootedSince(character, base.modified)
-    return { ...base, inventory, items: await this.catalog.lookup(names, refresh), ...(looted ? { looted } : {}) }
+    return { ...base, inventory, items: await this.lookup(names, refresh), ...(looted ? { looted } : {}) }
+  }
+
+  /** The wiki's pages for these names; a name it has none for, from the other site's when that has it. */
+  async lookup(names: string[], force = false): Promise<Record<string, ItemInfo>> {
+    const found = await this.catalog.lookup(names, force)
+    const missing = names.filter((n) => !found[itemKey(n)]?.found)
+    if (!missing.length) return found
+    const extra = new Map((await this.extraItems().catch(() => [])).map((it) => [itemKey(it.title), it]))
+    const out = { ...found }
+    for (const name of missing) {
+      const it = extra.get(itemKey(name))
+      if (it) out[itemKey(name)] = { title: it.title, found: true, statsblock: it.statsblock, icon: it.icon, ...(it.url ? { url: it.url } : {}) }
+    }
+    return out
   }
 
   /** What the character's log saw looted after the export written at `after`; undefined without a log. */
@@ -164,11 +181,6 @@ export class InventoryFiles {
     } catch {
       return null
     }
-  }
-
-  /** Looks up more items on demand (an item in a bag, opened to see what it is). */
-  lookup(names: string[], force = false) {
-    return this.catalog.lookup(names, force)
   }
 
   private sheetPath(character: string): string {

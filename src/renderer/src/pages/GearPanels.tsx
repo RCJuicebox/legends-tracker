@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react'
 import { Ago, Segmented, Switch } from '../components/ui'
-import { numExact as num, wikiUrl } from '../../../core/format'
+import { numExact as num } from '../../../core/format'
+import { itemPageUrl } from '../../../core/wikiItem'
 import { itemKey, mergeLevel, parseStatsBlock, slotLabel, wornTotals, SAVE_KEYS, STAT_KEYS, type InvItem } from '../../../core/inventory'
 import type { CharacterSheet, InventoryView, ItemInfo } from '../../../shared/types'
 import { statsFor, type WornSummary } from '../../../core/wornGear'
@@ -174,8 +175,8 @@ export function ItemPanel({
             <span>{slotLabel(item.location)}</span>
             <MergePips level={lvl} />
             {info?.found && (
-              <a href={wikiUrl(info.title)} target="_blank" rel="noreferrer">
-                eqlwiki
+              <a href={itemPageUrl(info)} target="_blank" rel="noreferrer">
+                {info.url ? 'eqlegendstools' : 'eqlwiki'}
               </a>
             )}
           </div>

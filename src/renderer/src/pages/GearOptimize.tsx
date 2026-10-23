@@ -6,7 +6,7 @@ import { canWear, score, weightsForSlot } from '../../../core/gearFinder'
 import { pieceName, SLOT_LAYOUT, type GearLock, type Piece, type PieceSource, type Plan } from '../../../core/gearOptimizer'
 import type { GearInput } from '../../../core/gearWork'
 import { useGearPlan } from '../gear/useGearPlan'
-import type { CatalogItem } from '../../../core/wikiItem'
+import { itemPageUrl, type CatalogItem } from '../../../core/wikiItem'
 import type { GearModel } from '../gear/useGearModel'
 import { CATALOG_PER_SLOT } from '../../../core/gearCatalog'
 import { Disclosure, Info, LoadError, Pending, Segmented } from '../components/ui'
@@ -336,7 +336,7 @@ export function OptimizeTab({ m }: { m: GearModel }) {
                     {best ? (
                       <>
                         {pct(best.eff)}{' '}
-                        <a className="small" href={wikiUrl(best.item.title)} target="_blank" rel="noreferrer">
+                        <a className="small" href={itemPageUrl(best.item)} target="_blank" rel="noreferrer">
                           {best.item.title}
                         </a>
                         <div className="faint small">{source(best.item)}</div>

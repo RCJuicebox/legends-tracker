@@ -26,6 +26,7 @@ import { InventoryFiles } from './inventory'
 import { ItemCatalog } from './items'
 import { GameTables } from './stats'
 import { WikiCatalog } from './wikiCatalog'
+import { ToolsCatalog } from './toolsCatalog'
 import { CastHistory, castCounter, dayConsumer, resistCounter, spellMergeCounter } from './castHistory'
 import { meleeCounter } from '../core/meleeTally'
 import { RecipeBook } from './recipes'
@@ -82,6 +83,8 @@ export interface AppContext {
   inventoryFiles: InventoryFiles
   gameTables: GameTables
   wikiCatalog: WikiCatalog
+  /** Gear eqlwiki has no page for yet, from eqlegendstools.com. */
+  toolsCatalog: ToolsCatalog
   /** Every consumer's counts over each character's log history, in one cache file (log-history.json). */
   logHistory: LogHistory
   /** Other PCs' Logs folders (Settings › Log files), and whether each answers. */
@@ -240,6 +243,8 @@ export function createContext(): AppContext {
       },
       (pages) => void itemCatalog.refreshFrom(pages)
     ),
+    // New pieces read: the Gear tools ask for the catalog again, as after a download.
+    toolsCatalog: new ToolsCatalog(() => toMain('state:catalog', { ...ctx.wikiCatalog.progress, busy: false })),
     logHistory,
     logFolders,
     castHistory: new CastHistory(logHistory, 'casts'),
@@ -276,6 +281,8 @@ export function createContext(): AppContext {
     const names = [...inv.worn, ...inv.bags, ...inv.bank, ...inv.sharedBank].map((it) => it.name)
     ctx.engine.stock.observed(names, modified, 'export')
   }
+  // A worn item the wiki has no page for yet is looked up in what the other site gave.
+  ctx.inventoryFiles.extraItems = () => ctx.toolsCatalog.items()
   // Gear looted since the export, from the log being watched for the character played.
   ctx.inventoryFiles.logFile = (character) => characterLogFile(character, ctx.characterKey(), store.settings.get().logFile, installDir())
   // Each new achievements export is kept small, for Achievements › Progress (FEAT-032).
@@ -570,6 +577,12 @@ function registerSources(ctx: AppContext): void {
     kind: 'wiki',
     what: 'Every piece of equipment on eqlwiki, for the upgrade finder and optimizer. Due again weekly, and refreshed when you ask, reading only pages edited since.',
     refresh: () => ctx.wikiCatalog.refresh()
+  })
+  sources.add('toolsCatalog', {
+    label: 'New gear (eqlegendstools.com)',
+    kind: 'wiki',
+    what: "Item pages from eqlegendstools.com for gear eqlwiki has no page for yet (a new zone's drops), added to the item catalog. Read again weekly when a Gear tool opens, and when you ask.",
+    refresh: async () => ctx.toolsCatalog.refresh((await ctx.wikiCatalog.stored())?.items ?? [])
   })
   sources.add('recipes', {
     label: 'Recipes',

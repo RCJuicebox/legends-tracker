@@ -117,6 +117,8 @@ export interface ItemInfo {
   use?: ItemUse
   /** When the page was read from eqlwiki. */
   fetchedAt?: number
+  /** Its page, when the wiki has none and it came from eqlegendstools.com. */
+  url?: string
 }
 
 /** A character's inventory export, with what the wiki says about the items worn. */

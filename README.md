@@ -1070,7 +1070,7 @@ No path loses a line. An archive interrupted by the app closing is finished on t
 A tab of Settings. Every place the app's information comes from reports how its last read went, so
 nothing fails quietly. The tab groups them: your logs (the chat log, log history, mote history), the game's files
 (spell data, game tables, icons, the character exports), eqlwiki.com (item lookups, the item
-catalog, recipes, pet pages), the screen (OCR reads) and the app itself (Windows voices, the Kokoro voices' download, updates).
+catalog, recipes, pet pages) and eqlegendstools.com (gear eqlwiki has no page for yet), the screen (OCR reads) and the app itself (Windows voices, the Kokoro voices' download, updates).
 Each row says what the source is for, its state (OK, due a refresh, failed, not there, reading, not
 read yet), what was read, the last error and when it last read well, with **Refresh** where reading
 it again makes sense. If a page is empty or out of date, the answer is usually here. **Open log
@@ -1168,6 +1168,7 @@ roaming profile:
 | File | What it holds |
 |---|---|
 | `item-catalog.json` | Every piece of equipment on eqlwiki, for the upgrade finder, focus items and optimiser; refreshed at most weekly |
+| `tools-items.json` | eqlegendstools.com's pages for gear eqlwiki has no page for yet (a new zone's drops, such as Nektropos Castle's), added to the item catalog; read one every second and a half, again weekly when a Gear tool opens |
 | `item-cache.json` | eqlwiki pages for the items you wear and look at (Gear, Loot, Tradeskills), kept a week |
 | `tradeskill-recipes.json` | Every player-crafted recipe on eqlwiki, with the era of each product and ingredient; refreshed at most weekly |
 | `pet-wiki.json` | eqlwiki's pet summon pages and Pet Guide, for the Pet tab |
