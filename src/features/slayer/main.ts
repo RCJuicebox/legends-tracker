@@ -21,6 +21,7 @@ import {
   joinConLevels,
   joinKillTallies,
   joinMoves,
+  mobKills,
   optionalSlayer,
   readKillLine,
   slayerGoals,
@@ -170,6 +171,12 @@ export class SlayerPlanner implements AppFeature {
         data.catch(() => this.shared.get(character)?.data === data && this.shared.delete(character))
       }
       return { data: await data, choices: this.choices.get()[character] ?? DEFAULT_CHOICES }
+    })
+    // Respawns › Kill counts: every mob the character's logs saw die, zone by zone.
+    handle('slayer:kills', async (character) => {
+      if (!isCharacterKey(character)) throw new Error('No such character.')
+      const slice = await this.history.get<SlayerKillTallies>(KILLS_KEY, ctx.historyOf(character))
+      return { character, rows: mobKills(joinKillTallies(everyStretch(slice))) }
     })
     // The races the player said mobs are, and every race there is to say (FEAT-021).
     handle('slayer:said', async () => ({ races: this.said.get().races, names: new SlayerRaces([], await ctx.gameTables.get(RACE_TABLE)).names() }))

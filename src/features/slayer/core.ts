@@ -171,6 +171,24 @@ export function joinKillTallies(stretches: SlayerKillTallies[]): SlayerKillTalli
   return out
 }
 
+/** One mob's kills in one zone, every instance of the zone together. */
+export interface MobKills {
+  /** As the log gave it, first letter capitalised: "The Game Master", "A shiverback". */
+  mob: string
+  zone: string
+  kills: number
+  /** When the last one died; 0 when the log history is from before that was kept. */
+  last: number
+}
+
+/** Every mob killed and how often, zone by zone: the most killed first, then by name. */
+export function mobKills(zones: SlayerKillTallies['zones']): MobKills[] {
+  const out: MobKills[] = []
+  for (const [zone, z] of Object.entries(zones))
+    for (const m of Object.values(z.mobs)) if (m.n > 0) out.push({ mob: m.name.charAt(0).toUpperCase() + m.name.slice(1), zone, kills: m.n, last: m.at ?? 0 })
+  return out.sort((a, b) => b.kills - a.kills || a.mob.localeCompare(b.mob) || a.zone.localeCompare(b.zone))
+}
+
 /** The stretches' /con levels as one: each mob's highest. */
 export function joinConLevels(stretches: SlayerKillTallies[]): Record<string, number> {
   const out: Record<string, number> = {}

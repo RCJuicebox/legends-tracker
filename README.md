@@ -277,6 +277,13 @@ placeholder's name that other mobs in the zone share (a seafury cyclops) counts 
 gaps are only as good as how well you keep to the one spot. **Split up** undoes it, and takes its
 timer with it.
 
+**Kill counts.** The page's second tab says how many times the character has killed each mob, zone by
+zone, with every instance of a zone counted as the zone (Nektropos Castle 4 (Refined) as Nektropos
+Castle). The counts come from the same log history as the Slayer plan: the live log, its archives,
+and the character's log on your other PCs. A kill is one by you or by any killer with a one-word
+name (your pet, your group, another player nearby), as the Slayer plan counts them. Filter by mob or
+zone, sort by any column, and pick another character at the right.
+
 ## Tradeskills
 
 For the consumables you keep making. **Download the recipes** reads every page in eqlwiki's Player

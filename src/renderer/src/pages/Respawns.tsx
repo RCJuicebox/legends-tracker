@@ -20,6 +20,7 @@ import {
   SortTh,
   Sparkline,
   Switch,
+  Tabs,
   ToggleChip
 } from '../components/ui'
 import {
@@ -37,6 +38,7 @@ import {
 } from '../../../core/respawns'
 import { parseSpot } from '../../../core/where'
 import { NotWatching } from '../components/NotWatching'
+import { KillCounts } from './KillCounts'
 
 // How long mobs take to come back, measured from the log, and a timer on an overlay for any of them.
 // A timer is an ordinary trigger in the Respawns folder, so the Triggers page can change it too.
@@ -79,7 +81,40 @@ function bySort(sort: Sort<SortKey>) {
   }
 }
 
+type RespawnsTab = 'times' | 'kills'
+const TABS: readonly (readonly [RespawnsTab, string])[] = [
+  ['times', 'Respawn times'],
+  ['kills', 'Kill counts']
+]
+
 export function Respawns() {
+  const [tab, setTab] = useRemembered<RespawnsTab>('respawns.tab', 'times')
+  return (
+    <>
+      <div className="page-head">
+        <div>
+          <h1>Respawns</h1>
+          <div className="lead">
+            {tab === 'kills' ? (
+              'How many times you have killed each mob, zone by zone, counted over your logs and their archives.'
+            ) : (
+              <>
+                How long each mob you kill takes to come back, measured from the log. Once you know, add a timer: it starts at every kill of that mob and counts down on an overlay.{' '}
+                <Info label="How it is measured" text={HOW} />
+              </>
+            )}
+          </div>
+        </div>
+      </div>
+      <Tabs className="mb-16" label="Respawns view" value={tab} onChange={setTab} tabs={TABS} />
+      {/* The panel's own heading, for heading navigation from "Respawns" (LT-707). */}
+      <h2 className="sr-only">{TABS.find(([id]) => id === tab)?.[1]}</h2>
+      {tab === 'kills' ? <KillCounts /> : <RespawnTimes />}
+    </>
+  )
+}
+
+function RespawnTimes() {
   const overlays = useSettled((s) => s.settings.overlays)
   const q = useRespawns()
   const view = q.data
@@ -113,16 +148,6 @@ export function Respawns() {
 
   return (
     <>
-      <div className="page-head">
-        <div>
-          <h1>Respawns</h1>
-          <div className="lead">
-            How long each mob you kill takes to come back, measured from the log. Once you know, add a timer: it starts at every kill of that mob and counts down on an overlay.{' '}
-            <Info label="How it is measured" text={HOW} />
-          </div>
-        </div>
-      </div>
-
       <NotWatching what="kills and respawn gaps" />
 
       <div className="card row mb-16">

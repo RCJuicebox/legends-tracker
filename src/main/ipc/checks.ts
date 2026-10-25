@@ -153,6 +153,7 @@ export const CHECKS: { [K in InvokeChannel]: Check<Parameters<Invokes[K]>> } = {
   'factions:follow': args(str, nullable(obj)),
   'factions:follow-step': args(str, num),
   'slayer:plan': args(str, opt(bool)),
+  'slayer:kills': args(str),
   'slayer:choices': args(str, obj),
   'slayer:map': args(str, strs),
   'slayer:mark': args(list, opt(oneOf('hunter'))),

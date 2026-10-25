@@ -14,7 +14,7 @@ import type { FactionSources, FactionView } from '../features/factions/core'
 import type { FactionPlanData } from '../features/factions/planner'
 import type { FactionLookup, FactionMover } from '../features/factions/lookup'
 import type { FollowedPlan } from '../features/factions/tracker'
-import type { SlayerPlanChoices, SlayerPlanData } from '../features/slayer/core'
+import type { MobKills, SlayerPlanChoices, SlayerPlanData } from '../features/slayer/core'
 import type { SlayerMap, SlayerMark } from '../features/slayer/spawns'
 import type { HunterPlanData } from '../features/hunter/core'
 import type { SkyState } from '../features/sky/core'
@@ -478,6 +478,8 @@ export interface Invokes {
   'factions:follow-step': (character: string, index: number) => void
   /** What the Slayer page plans from: the open Slayer achievements and where kills of their races come from; `refresh` reads the logs again. */
   'slayer:plan': (character: string, refresh?: boolean) => { data: SlayerPlanData; choices: SlayerPlanChoices }
+  /** Respawns › Kill counts: every mob the character's logs and archives saw die, by zone, instances together. */
+  'slayer:kills': (character: string) => { character: string; rows: MobKills[] }
   /** What the player chose on the Slayer page for a character. */
   'slayer:choices': (character: string, choices: SlayerPlanChoices) => void
   /** A zone's map as the game draws it, with the spots these mobs pop at (TAKP's spawn tables); no short name for a zone they lack. */
@@ -745,6 +747,7 @@ const INVOKE_CHANNELS: Record<InvokeChannel, true> = {
   'factions:follow': true,
   'factions:follow-step': true,
   'slayer:plan': true,
+  'slayer:kills': true,
   'slayer:choices': true,
   'slayer:map': true,
   'slayer:mark': true,
