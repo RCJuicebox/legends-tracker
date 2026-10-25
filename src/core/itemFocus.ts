@@ -5,8 +5,10 @@
 // duration…) and limits that say which spells it touches: 134 a level cap with a decay past it, 137
 // effects a spell must or must not carry, 138 beneficial or detrimental, 140 a minimum duration, 141
 // instant only, 143 a minimum cast time, 136 target types, 139 spell ids, 411/414 bards' class and
-// instrument. Foci that differ only in strength, level cap and minimum cast time are ranks of one
-// line: Extended Enhancement III and Tavee's Greater Diuturnity are the same focus, both capped at 60.
+// instrument. Foci that differ only in strength, level cap, minimum cast time and the effects a spell
+// must not carry are ranks of one line: Extended Enhancement III and Tavee's Greater Diuturnity are
+// the same focus, both capped at 60, and Mana Preservation III is II's next rank though it also skips
+// spells with a percent heal (137:-147). What each rank touches is still judged by its own limits.
 // Only the best focus of a kind applies to a spell, so what counts is the best rank worn in each line.
 
 import type { Spell } from './spells'
@@ -47,6 +49,8 @@ export const KIND_ORDER: FocusKind[] = ['damage', 'healing', 'haste', 'mana', 'd
 const LIMIT_SPAS = new Set([135, 136, 137, 138, 139, 140, 141, 142, 143, 411, 414])
 /** Limits that make one rank of a line differ from another, not a different line. */
 const RANK_LIMITS = new Set([142, 143])
+/** A rank may leave out spells with some effect (137 with a negative effect number) and stay in its line. */
+const rankLimit = ([spa, base]: [number, number]) => RANK_LIMITS.has(spa) || (spa === 137 && base < 0)
 const INSTRUMENTS: Record<number, string> = { 12: 'brass', 49: 'stringed', 54: 'wind', 70: 'percussion' }
 
 export interface FocusSpec {
@@ -73,7 +77,7 @@ export function focusSpec(spell: Spell): FocusSpec | null {
   const cap = spell.effects.find((e) => e.spa === 134)
   const limits = spell.effects.filter((e) => LIMIT_SPAS.has(e.spa)).map((e) => [e.spa, e.base] as [number, number])
   const lineLimits = limits
-    .filter(([spa]) => !RANK_LIMITS.has(spa))
+    .filter((l) => !rankLimit(l))
     .map(([spa, base]) => `${spa}:${base}`)
     .sort()
   return { name: spell.name, spellId: spell.id, kind, pct, maxLevel: cap?.base ?? 0, decayPct: cap?.base2 ?? 0, limits, line: [main.spa, ...lineLimits].join(' ') }

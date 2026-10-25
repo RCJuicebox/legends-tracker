@@ -58,6 +58,18 @@ describe('reading focus spells', () => {
     expect(tavee.line).toBe(ee3.line)
     expect(dmg2.line).not.toBe(ee3.line)
     expect(familyName("Tavee's Charm of Diuturnity")).toBe("Tavee's Diuturnity")
+  })
+
+  it('keeps a rank that also leaves out spells with an effect in its line, judged on its own limits', () => {
+    // Real rows (2026-10): from III on, Mana Preservation skips spells with a percent heal (137:-147).
+    const mp2 = focusSpec(spell(2343, 'Mana Preservation II', { effects: [fx(132, 10), fx(134, 44, 5), fx(139, -13)] }))!
+    const mp3 = focusSpec(spell(2344, 'Mana Preservation III', { effects: [fx(132, 10), fx(134, 60, 5), fx(139, -13), fx(137, -147)] }))!
+    expect(mp3.line).toBe(mp2.line)
+    const percentHeal = spell(5, 'Percent Heal', { beneficial: true, classLevels: at({ 9: 40 }), effects: [fx(147, 50)] })
+    expect(focusApplies(mp2, { spell: percentHeal, level: 40 }, 50, 1 << 9)).toBe(true)
+    expect(focusApplies(mp3, { spell: percentHeal, level: 40 }, 50, 1 << 9)).toBe(false)
+    // An exclusion is not a whole other focus: a nuke and a duration focus stay apart.
+    expect(mp3.line).not.toBe(dmg2.line)
     expect(familyName('Improved Damage III')).toBe('Improved Damage')
     expect(familyName('Improved Healing XII')).toBe('Improved Healing')
   })
