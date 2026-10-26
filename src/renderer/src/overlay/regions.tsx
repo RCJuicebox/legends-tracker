@@ -306,9 +306,11 @@ function SlayerPlanSection({ plan }: { plan: SlayerPlanTrackView }) {
               </div>
             )}
             <div className="ach-ov-faint">
-              {step.now
-                ? `At your pace now (${num(step.now.perHour)}/h) ≈ ${duration(step.now.seconds)}; the plan assumed ${num(step.now.planPerHour)}/h`
-                : `≈ ${duration(step.seconds)} there${!step.here && step.travel > 0 ? `, ${duration(step.travel)} to get there` : ''}`}
+              {step.lockout
+                ? `A raid lockout: ${num(step.lockout.perDay)} a day, ${num(step.lockout.days)} days`
+                : step.now
+                  ? `At your pace now (${num(step.now.perHour)}/h) ≈ ${duration(step.now.seconds)}; the plan assumed ${num(step.now.planPerHour)}/h`
+                  : `≈ ${duration(step.seconds)} there${!step.here && step.travel > 0 ? `, ${duration(step.travel)} to get there` : ''}`}
             </div>
           </div>
           {plan.next ? (

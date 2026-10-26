@@ -386,10 +386,13 @@ describe('Slayer plan: the plan', () => {
     expect(plan.steps.map((s) => [s.camp.id, Math.round(s.seconds), s.travel, s.finishes, s.focus])).toEqual([
       ['log:The Permafrost Caverns', 1200, 0, [2], [2]],
       ['log:The Permafrost Caverns', 1800, 0, [1], [1]],
-      ['log:Clan Crushbone', 3600, 600, [0], [0]]
+      ['log:Clan Crushbone', 3600, 600, [0], [0]],
+      // What only the lockout feeds closes the tier as a step: no hours, no travel.
+      ['play:Kedge Keep', 0, 0, [3], [3]]
     ])
+    expect(plan.steps[3]).toMatchObject({ days: 2, kills: { 3: 10 } })
     expect(Math.round(plan.seconds)).toBe(7200)
-    // Ten kedge at five a day, beside the plan.
+    // Ten kedge at five a day, beside the plan from day one too.
     expect(plan.daily.map((d) => [d.camp.id, d.days, d.goals])).toEqual([['play:Kedge Keep', 2, [3]]])
     expect(plan.unplanned).toEqual([])
   })
@@ -397,7 +400,7 @@ describe('Slayer plan: the plan', () => {
   it('shows the overlay the step in the zone the player is in, else the first to head to, and the one after', () => {
     const plan = planSlayer({ goals, camps }, DEFAULT_CHOICES)
     const away = slayerPlanView(plan, goals, DEFAULT_CHOICES, 'The Northern Plains of Karana')
-    expect(away.steps).toBe(3)
+    expect(away.steps).toBe(4)
     expect(away.goals).toBe(4)
     expect(Math.round(away.secondsLeft)).toBe(7200)
     expect(away.current).toMatchObject({ index: 0, zone: 'The Permafrost Caverns', here: false, tier: 'Not for Banestrike' })
@@ -406,6 +409,8 @@ describe('Slayer plan: the plan', () => {
     // At Crushbone (an instance of it counts): that step now, the Permafrost after it.
     const there = slayerPlanView(plan, goals, DEFAULT_CHOICES, 'Clan Crushbone - Solo')
     expect([there.current?.index, there.current?.here, there.next?.index]).toEqual([2, true, 0])
+    // In Kedge Keep: the lockout's step, in days.
+    expect(slayerPlanView(plan, goals, DEFAULT_CHOICES, 'Kedge Keep').current).toMatchObject({ index: 3, here: true, seconds: 0, lockout: { days: 2, perDay: 5 } })
     // Nothing left to plan: no step.
     expect(slayerPlanView(planSlayer({ goals: [], camps }, DEFAULT_CHOICES), [], DEFAULT_CHOICES, '')).toMatchObject({ steps: 0, current: null, next: null })
   })
@@ -515,7 +520,7 @@ describe('Slayer plan: the plan', () => {
   it('says what nothing feeds, and leaves out the camps ruled out', () => {
     const plan = planSlayer({ goals, camps }, { ...DEFAULT_CHOICES, outCamps: ['log:Clan Crushbone'] })
     expect(plan.unplanned).toEqual([0])
-    expect(plan.steps.map((s) => s.camp.id)).toEqual(['log:The Permafrost Caverns', 'log:The Permafrost Caverns'])
+    expect(plan.steps.map((s) => s.camp.id)).toEqual(['log:The Permafrost Caverns', 'log:The Permafrost Caverns', 'play:Kedge Keep'])
   })
 
   it('leaves a mob ruled out out of every camp, and finds its kills elsewhere', () => {
@@ -584,7 +589,13 @@ describe('Slayer plan: the plan', () => {
       ['Vox', 20],
       ['Nagafen', 20]
     ])
-    expect(plan.steps.map((s) => s.camp.id)).toEqual(['log:OoT'])
+    // Dragonbane closes the tier: a step a dragon, each its half of the kills, the second finishing it.
+    expect(plan.steps.map((s) => [s.camp.id, s.days, s.kills, s.finishes])).toEqual([
+      ['log:OoT', undefined, { 1: 4480 }, [1]],
+      ['Vox', 20, { 0: 100 }, []],
+      ['Nagafen', 20, { 0: 100 }, [0]]
+    ])
+    expect(plan.steps[2].travel).toBe(0)
   })
 })
 

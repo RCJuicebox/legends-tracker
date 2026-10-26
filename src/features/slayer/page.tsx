@@ -71,8 +71,9 @@ const HOW = (
       <b>The plan</b> works through Banestrike’s tiers in turn (Progressive, Highly Decorated, A Force of Nature, then what Megadeath names besides), each done before the next is
       begun; within a tier, the achievement that can be finished soonest, travel counted, first, then the others whose best zone is the same while you are there. Each step is one
       achievement and kills only its own mobs (a zone’s races are seldom near each other); steps in the same zone sit under one heading. A kill still counts toward every open
-      achievement its race feeds, a later tier’s too. Raid lockouts (Phinigel, Lady Vox, Lord Nagafen, Innoruuk, Cazic-Thule) are a few kills a day, so they run beside it. Rule out
-      a camp, or a mob with the ✕ beside its name (one that takes a faction to spawn, say), and the plan finds the kills elsewhere.
+      achievement its race feeds, a later tier’s too. Raid lockouts (Phinigel, Lady Vox, Lord Nagafen, Innoruuk, Cazic-Thule) are a few kills a day, so they run beside it, every
+      day (the Every day card); an achievement only they feed (Dragonbane) closes its tier as a step of its own, in days. Rule out a camp, or a mob with the ✕ beside its name (one
+      that takes a faction to spawn, say), and the plan finds the kills elsewhere.
     </div>
   </>
 )
@@ -114,16 +115,24 @@ function SpawnHint({ spawn, bound }: { spawn: MobSpawn; bound?: boolean }) {
   )
 }
 
-/** The plan's steps from..to, in runs of the same zone, by index: one zone heading for the steps done there together. */
+/**
+ * The plan's steps from..to, in runs of the same zone, by index: one zone heading for the steps done there
+ * together. A raid lockout's steps for the same achievements are one run, whatever their zones (the true dragons).
+ */
 function zoneRuns(steps: SlayerStep[], from: number, to: number): number[][] {
   const out: number[][] = []
+  const together = (a: SlayerStep, b: SlayerStep) =>
+    a.days !== undefined || b.days !== undefined ? a.days !== undefined && b.days !== undefined && a.focus.join() === b.focus.join() : zoneKey(a.camp.zone) === zoneKey(b.camp.zone)
   for (let i = from; i < to; i++) {
     const last = out.at(-1)
-    if (last && zoneKey(steps[last[0]].camp.zone) === zoneKey(steps[i].camp.zone)) last.push(i)
+    if (last && together(steps[last[0]], steps[i])) last.push(i)
     else out.push([i])
   }
   return out
 }
+
+/** A raid lockout step's kills a day: its boss's, toward what it is there for. */
+const perDayOf = (st: SlayerStep) => Math.max(0, ...st.focus.map((g) => st.camp.pace[g] ?? 0))
 
 /** A Banestrike tier's name: the meta whose achievements it is. */
 const tierName = (tier: number) => BANESTRIKE[tier] ?? 'Not for Banestrike'
@@ -401,7 +410,7 @@ export function Slayer() {
   }
   // The headline's kills are the steps' own (a kill feeding two achievements once), the lockouts' beside them;
   // what the plan leaves out is said apart (LT-563).
-  const stepTotal = plan ? plan.steps.reduce((s, st) => s + stepKills(st, choices).reduce((t, k) => t + k.n, 0), 0) : 0
+  const stepTotal = plan ? plan.steps.reduce((s, st) => s + (st.days !== undefined ? 0 : stepKills(st, choices).reduce((t, k) => t + k.n, 0)), 0) : 0
   const lockoutKills = plan ? [...new Set(plan.daily.flatMap((d) => d.goals))].reduce((s, g) => s + (data!.goals[g].max - data!.goals[g].count), 0) : 0
   const unplannedKills = plan ? plan.unplanned.reduce((s, g) => s + (data!.goals[g].max - data!.goals[g].count), 0) : 0
   const optionalOut = data ? data.goals.filter((g) => g.optional && g.count < g.max && !choices.included.includes(g.name.toLowerCase())).length : 0
@@ -653,19 +662,26 @@ export function Slayer() {
                         const first = plan.steps[run[0]]
                         const zone = first.camp.zone
                         const total = run.reduce((t, i) => t + plan.steps[i].seconds + plan.steps[i].travel, 0)
+                        // A raid lockout's run: its bosses' zones, their kills a day together, and the days.
+                        const lockout = first.days !== undefined
+                        const here = run.some((i) => isHere(plan.steps[i].camp.zone))
                         return (
-                          <li
-                            key={first.camp.id + run[0]}
-                            id={`sl-run-${run[0] + 1}`}
-                            className={`fp-step${isHere(zone) ? ' now' : ''}${run.some((i) => matching[i]) ? '' : ' sl-dim'}`}
-                          >
+                          <li key={first.camp.id + run[0]} id={`sl-run-${run[0] + 1}`} className={`fp-step${here ? ' now' : ''}${run.some((i) => matching[i]) ? '' : ' sl-dim'}`}>
                             <span className="fp-num">{run[0] + 1}</span>
                             <div className="fp-body">
                               <div className="fp-head">
-                                <span className="fp-zone">{zone}</span>
-                                {isHere(zone) && (
+                                <span className="fp-zone">{lockout ? [...new Set(run.map((i) => plan.steps[i].camp.zone))].join(' and ') : zone}</span>
+                                {here && (
                                   <Tip className="chip fp-now-chip" text="The zone you are in">
                                     You are here
+                                  </Tip>
+                                )}
+                                {lockout && (
+                                  <Tip
+                                    className="chip"
+                                    text="Raid lockouts: one kill a difficulty (0 to 4) a day each. Kill them every day from day one, beside the other steps, as the Every day card has them."
+                                  >
+                                    ↻ every day
                                   </Tip>
                                 )}
                                 {first.travel > 0 && (
@@ -674,9 +690,15 @@ export function Slayer() {
                                   </Tip>
                                 )}
                                 <span className="spacer" />
-                                <Tip className="mono fp-time" text={run.length > 1 ? 'The steps here together, getting there included' : 'Getting there and killing there'}>
-                                  {duration(total)}
-                                </Tip>
+                                {lockout ? (
+                                  <Tip className="mono fp-time" text="Their kills a day together, and the days until what they are there for is done">
+                                    {num(run.reduce((t, i) => t + perDayOf(plan.steps[i]), 0))} a day · {num(Math.max(...run.map((i) => plan.steps[i].days ?? 0)))} days
+                                  </Tip>
+                                ) : (
+                                  <Tip className="mono fp-time" text={run.length > 1 ? 'The steps here together, getting there included' : 'Getting there and killing there'}>
+                                    {duration(total)}
+                                  </Tip>
+                                )}
                               </div>
                               {paceHere?.now && isHere(zone) && zoneKey(paceHere.zone) === zoneKey(zone) && (
                                 <div className="small sl-pace-now">
@@ -707,11 +729,13 @@ export function Slayer() {
                                       <Tip className="mono" text={`What you kill there: ${killed.map((k) => `${k.name} ×${kills(k.n)}`).join(', ')}`}>
                                         ×{kills(killed.reduce((t, k) => t + k.n, 0))}
                                       </Tip>
-                                      {run.length > 1 && (
-                                        <Tip className="mono small" text="Time killing for it">
-                                          {duration(st.seconds)}
-                                        </Tip>
-                                      )}
+                                      {st.days !== undefined
+                                        ? st.camp.today !== undefined && <LockoutPips done={st.camp.today} of={perDayOf(st)} />
+                                        : run.length > 1 && (
+                                            <Tip className="mono small" text="Time killing for it">
+                                              {duration(st.seconds)}
+                                            </Tip>
+                                          )}
                                     </div>
                                     <div className="row tight fp-effects">
                                       <Limit camp={st.camp} />

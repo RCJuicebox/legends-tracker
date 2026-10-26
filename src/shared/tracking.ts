@@ -181,6 +181,8 @@ export interface SlayerPlanStepView {
   goals: { name: string; count: number; max: number }[]
   /** What to kill there and about how many, most first. */
   mobs: { name: string; n: number }[]
+  /** For a raid lockout's step: its kills a day, and the days until it is done. */
+  lockout?: { days: number; perDay: number }
   /**
    * While the player kills there: their pace over the last twenty minutes of its mobs, and the step's
    * time at that pace, beside the pace the plan assumed (FEAT-022).

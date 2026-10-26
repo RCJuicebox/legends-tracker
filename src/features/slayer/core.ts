@@ -930,12 +930,14 @@ export function costsPlan(camp: Pick<SlayerPlanCamp, 'factions'>, raising: reado
   return camp.factions.filter((f) => f.perHour < 0 && up.has(f.faction.toLowerCase())).map((f) => f.faction)
 }
 
-/** A step of the plan: a stretch at one camp. */
+/** A step of the plan: a stretch at one camp, or a raid lockout's kills a day. */
 export interface SlayerStep {
   camp: SlayerPlanCamp
-  /** Hours there, and the travel to it. */
+  /** Hours there, and the travel to it: none for a raid lockout, whose kills come beside the others. */
   seconds: number
   travel: number
+  /** For a raid lockout's step: the days until what it is there for is done, at the lockouts' kills a day. */
+  days?: number
   /** The zones crossed on the way there, when the log knows the way. */
   via?: string[]
   /** Kills toward each goal it moves (index → kills). */
@@ -949,6 +951,11 @@ export interface SlayerStep {
 
 /** What a step kills: each kind there that feeds the goals it is there for, and how many in its time. */
 export function stepKills(st: SlayerStep, choices: Pick<SlayerPlanChoices, 'pace'>): { name: string; n: number; goals: number[]; spawn?: MobSpawn; bound?: boolean }[] {
+  // A raid lockout's boss: its share of what the step is there for, whatever the hours.
+  if (st.days !== undefined) {
+    const n = Math.max(0, ...st.focus.map((g) => st.kills[g] ?? 0))
+    return st.camp.kinds.map((k) => ({ name: k.name, n, goals: k.goals }))
+  }
   const focus = new Set(st.focus)
   const scale = st.camp.assumed ? choices.pace : 1
   return st.camp.kinds
@@ -1022,8 +1029,8 @@ export function goalsInPlay(goals: SlayerGoal[], choices: SlayerPlanChoices): nu
  * The plan: a step an achievement, at the camp and on the way that finish it soonest, travel counted;
  * then the tier's others whose best zone is the same, one after another while there. A step kills
  * only the mobs that achievement wants (a zone's races are seldom near each other), each kill still
- * counting toward whatever else its race feeds. Raid lockouts are not steps: each gives its kills a
- * day beside the plan. Travel is the way the log has seen taken between the two zones, or the
+ * counting toward whatever else its race feeds. Raid lockouts give their kills a day beside the plan;
+ * what they alone feed closes its tier as steps of their own (a boss each), in days, not hours. Travel is the way the log has seen taken between the two zones, or the
  * player's minutes between camps where it knows none.
  */
 export function planSlayer(
@@ -1124,14 +1131,27 @@ export function planSlayer(
       steps.push({ camp: best.c, seconds: best.secs, travel: 0, kills, finishes: [], tier, focus: [best.g] })
       at = best.c
     }
+    // The tier's achievements only raid lockouts feed (Dragonbane), last: a step a boss, its share of
+    // the kills, run every day beside the rest. No hours, and the way on is from the hourly step before.
+    for (const d of daily) {
+      const focus = d.goals.filter((g) => tierOf(g) === tier)
+      if (!focus.length) continue
+      const kills = Object.fromEntries(focus.map((g) => [g, ((need.get(g) ?? 0) * paceOf(d.camp, g)) / perDay(g)]))
+      const days = Math.ceil(Math.max(...focus.map((g) => (need.get(g) ?? 0) / perDay(g))))
+      steps.push({ camp: d.camp, seconds: 0, travel: 0, kills, finishes: [], tier, focus, days })
+    }
   }
   const unplanned = goals.filter((g) => (need.get(g) ?? 0) > LEFT && !onlyDaily.has(g))
   // What each step finishes, and the travel to it, in the order they are done.
   const left = new Map(goals.map((g) => [g, data.goals[g].max - data.goals[g].count]))
-  steps.forEach((st, i) => {
-    const way = trip(i ? steps[i - 1].camp : null, st.camp)
-    st.travel = way.seconds
-    if (way.via.length) st.via = way.via
+  let from: SlayerPlanCamp | null = null
+  steps.forEach((st) => {
+    if (st.days === undefined) {
+      const way = trip(from, st.camp)
+      st.travel = way.seconds
+      if (way.via.length) st.via = way.via
+      from = st.camp
+    }
     for (const [g, k] of Object.entries(st.kills)) {
       const l = (left.get(+g) ?? 0) - k
       left.set(+g, l)
@@ -1162,7 +1182,8 @@ export function slayerPlanView(plan: SlayerPlan, goals: SlayerGoal[], choices: P
       goals: st.focus.map((g) => ({ name: goals[g].name, count: goals[g].count, max: goals[g].max })),
       mobs: stepKills(st, choices)
         .map((k) => ({ name: k.name, n: Math.ceil(k.n) }))
-        .sort((a, b) => b.n - a.n)
+        .sort((a, b) => b.n - a.n),
+      ...(st.days !== undefined ? { lockout: { days: st.days, perDay: Math.max(0, ...st.focus.map((g) => st.camp.pace[g] ?? 0)) } } : {})
     }
   }
   const current = plan.steps.length ? Math.max(0, at) : -1

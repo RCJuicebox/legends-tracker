@@ -170,9 +170,14 @@ it('draws the plan, the lockouts beside it, and keeps a camp ruled out', async (
   // Ten kedge at five a day.
   expect(text).toContain('Every day')
   expect(text).toContain('5 a day · 2 days')
-  // Today's kills as a box a difficulty, two of five ticked.
-  expect(host.querySelectorAll('.sl-pip')).toHaveLength(5)
-  expect(host.querySelectorAll('.sl-pip.on')).toHaveLength(2)
+  // And as the step closing its tier, in days, with the same boxes.
+  const lockStep = host.querySelector('#sl-run-2')!
+  expect(seen(lockStep)).toContain('Kedge Keep↻ every day5 a day · 2 days')
+  expect(seen(lockStep)).toContain('Re-Extinction 40 / 50+10 done · Phinigel Autropos ×10')
+  // Today's kills as a box a difficulty, two of five ticked, on the card and the step.
+  expect(host.querySelectorAll('.sl-pip')).toHaveLength(10)
+  expect(host.querySelectorAll('.sl-pip.on')).toHaveLength(4)
+  expect(lockStep.querySelectorAll('.sl-pip.on')).toHaveLength(2)
   // The steps under the Banestrike tier they work toward.
   expect(text).toContain('ProgressiveBanestrike rank 2')
   expect(text).toContain('a mystery ×3')
@@ -313,11 +318,13 @@ it('draws what the plan leaves out, finds a step, and turns the overlay on once 
       Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(input, v)
       input.dispatchEvent(new Event('input', { bubbles: true }))
     })
+  // The kedge are the lockout's step now, which closes the tier.
   await type('kedge')
-  expect(seen(host)).toContain('0 of 1 steps match')
+  expect(seen(host)).toContain('1 of 2 steps match')
   expect(host.querySelector('#sl-step-1')?.classList.contains('sl-dim')).toBe(true)
+  expect(host.querySelector('#sl-step-2')?.classList.contains('sl-dim')).toBe(false)
   await type('orc pawn')
-  expect(seen(host)).toContain('1 of 1 steps match')
+  expect(seen(host)).toContain('1 of 2 steps match')
   expect(host.querySelector('#sl-step-1')?.classList.contains('sl-dim')).toBe(false)
   // The overlay switch, once the saved choices are in.
   const chip = [...host.querySelectorAll('[role=switch]')].find((b) => b.parentElement?.textContent === 'On the overlay') as HTMLElement

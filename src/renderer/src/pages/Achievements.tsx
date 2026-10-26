@@ -84,7 +84,8 @@ export function Achievements() {
     planSlayer(data, choices).steps.forEach((st, i) => {
       for (const g of st.focus) {
         const name = data.goals[g].name.toLowerCase()
-        if (!out.has(name)) out.set(name, { index: i, zone: st.camp.zone, seconds: st.seconds, source: SLAYER_SOURCE[st.camp.source] })
+        if (!out.has(name))
+          out.set(name, { index: i, zone: st.camp.zone, seconds: st.seconds, ...(st.days !== undefined ? { days: st.days } : {}), source: SLAYER_SOURCE[st.camp.source] })
       }
     })
     return out

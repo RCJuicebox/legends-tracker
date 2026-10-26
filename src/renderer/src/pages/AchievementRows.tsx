@@ -270,6 +270,8 @@ export interface SlayerStepHint {
   zone: string
   /** Seconds killing there. */
   seconds: number
+  /** For a raid lockout's step: the days it takes, a few kills a day. */
+  days?: number
   /** Where the step's pace comes from, in the plan's words ("your log", "players"). */
   source: string
 }
@@ -295,7 +297,7 @@ function PlanStep({ step }: { step: SlayerStepHint }) {
       ) : (
         <b>{text}</b>
       )}{' '}
-      · ≈ {duration(step.seconds)} · <em>{step.source}</em>
+      · {step.days !== undefined ? `every day, ${step.days} days` : `≈ ${duration(step.seconds)}`} · <em>{step.source}</em>
     </div>
   )
 }
