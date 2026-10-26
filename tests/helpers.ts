@@ -4,7 +4,7 @@ import { SpellBook } from '../src/core/spells'
 import { casterLevel, computeDuration } from '../src/core/durations'
 import { focusFor, focusFromSpell } from '../src/core/focus'
 import { TimerBoard } from '../src/core/timers'
-import { SpellTracker } from '../src/core/spellTracker'
+import { SpellTracker, type TrackerConfig } from '../src/core/spellTracker'
 import { parseLogLine } from '../src/core/logLine'
 import { DEFAULT_TIER_DURATION_PCT, type CharacterSettings, type FocusSource, type Notification, type SpellRule, type TrackingSettings } from '../src/shared/types'
 import type { Weights } from '../src/core/gearFinder'
@@ -76,31 +76,27 @@ export function harness(opts: { character?: CharacterSettings; rules?: Record<st
     onChange: () => {},
     onNotify: (ns: Notification[]) => ns.forEach((n) => n.kind === 'speak' && (spoken.push(n.text), notified.push(n)))
   })
-  const tracker = new SpellTracker(
-    book,
-    board,
-    {
-      tracking: TRACKING,
-      ruleFor: (name) => opts.rules?.[name] ?? {},
-      durationFor: (spell, rank) =>
-        computeDuration({
-          spell,
-          rank,
-          level: 50,
-          tierPct: DEFAULT_TIER_DURATION_PCT,
-          focusPct: focusFor(spell, character, casterLevel(spell, character)).pct,
-          overrideSec: opts.rules?.[spell.name]?.durationOverrideSec
-        })
-    },
-    {
-      notify: (ns) => ns.forEach((n) => n.kind === 'speak' && (spoken.push(n.text), notified.push(n))),
-      feed: (kind, text) => void feedItems.push([kind, text]),
-      onCast: (r) => void casts.push(r.rankedName),
-      isPet: (name) => !!opts.pets?.includes(name) || !!opts.yourPets?.includes(name),
-      isYourPet: (name) => !!opts.yourPets?.includes(name),
-      quickBuffs: () => (opts.quickBuffs ?? []).flatMap((n) => book.resolve(n) ?? [])
-    }
-  )
+  const config: TrackerConfig = {
+    tracking: TRACKING,
+    ruleFor: (name) => opts.rules?.[name] ?? {},
+    durationFor: (spell, rank) =>
+      computeDuration({
+        spell,
+        rank,
+        level: 50,
+        tierPct: DEFAULT_TIER_DURATION_PCT,
+        focusPct: focusFor(spell, character, casterLevel(spell, character)).pct,
+        overrideSec: opts.rules?.[spell.name]?.durationOverrideSec
+      })
+  }
+  const tracker = new SpellTracker(book, board, config, {
+    notify: (ns) => ns.forEach((n) => n.kind === 'speak' && (spoken.push(n.text), notified.push(n))),
+    feed: (kind, text) => void feedItems.push([kind, text]),
+    onCast: (r) => void casts.push(r.rankedName),
+    isPet: (name) => !!opts.pets?.includes(name) || !!opts.yourPets?.includes(name),
+    isYourPet: (name) => !!opts.yourPets?.includes(name),
+    quickBuffs: () => (opts.quickBuffs ?? []).flatMap((n) => book.resolve(n) ?? [])
+  })
   const feed = (text: string) => {
     for (const raw of text.trim().split('\n')) {
       const line = parseLogLine(raw.trim())
@@ -109,7 +105,7 @@ export function harness(opts: { character?: CharacterSettings; rules?: Record<st
       board.tick(line.time)
     }
   }
-  return { book, board, tracker, spoken, notified, feed, feedItems, casts }
+  return { book, board, tracker, config, spoken, notified, feed, feedItems, casts }
 }
 
 export function at(stamp: string): number {

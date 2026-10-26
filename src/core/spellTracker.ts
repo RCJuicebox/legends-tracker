@@ -181,6 +181,14 @@ export class SpellTracker {
 
   configure(config: TrackerConfig): void {
     this.config = config
+    // A ready-again bar switched off goes now, not when it runs out.
+    this.board.endWhere((t) => isCooldown(t) && !this.wantsReadyBar(t.spell ?? ''), 'cleared')
+  }
+
+  /** Whether a spell's long recast gets its bar: cooldowns on, and not switched off for the spell. */
+  private wantsReadyBar(name: string): boolean {
+    const t = this.config.tracking
+    return t.enabled && t.cooldowns && this.config.ruleFor(name).readyBar !== false
   }
 
   get currentZone(): string {
@@ -357,7 +365,7 @@ export class SpellTracker {
   private startCooldown(r: RankedSpell, now: number): void {
     const t = this.config.tracking
     const s = r.spell
-    if (!t.enabled || !t.cooldowns || s.recastMs < COOLDOWN_MIN_MS) return
+    if (s.recastMs < COOLDOWN_MIN_MS || !this.wantsReadyBar(s.name)) return
     const key = `cooldown:${s.name}`
     const words = t.cooldownReadySpeech
     this.board.upsert({

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { at, harness, exampleShaman } from '../helpers'
 import { timerKey } from '../../src/core/spellTracker'
 import { parseLogLine } from '../../src/core/logLine'
+import type { SpellRule } from '../../src/shared/types'
 
 // Every sequence below is copied from Kelwyn's real log.
 
@@ -617,5 +618,20 @@ describe('ready again (FEAT-024)', () => {
     expect(h.board.get('cooldown:Harm Touch')).toBeUndefined()
     h.feed('[Tue Sep 01 12:41:00 2026] You begin casting Harm Touch X.')
     expect(h.board.list().filter((t) => t.key.startsWith('cooldown:'))).toEqual([])
+  })
+
+  it('has none for a spell whose bar is switched off, and ends a running one when it is', () => {
+    const off = harness({ rules: { 'Harm Touch': { readyBar: false } } })
+    off.feed('[Tue Sep 01 12:40:00 2026] You begin casting Harm Touch.')
+    expect(off.board.get('cooldown:Harm Touch')).toBeUndefined()
+
+    const rules: Record<string, SpellRule> = {}
+    const h = harness({ rules })
+    h.feed('[Tue Sep 01 12:40:00 2026] You begin casting Harm Touch.')
+    expect(h.board.get('cooldown:Harm Touch')).toBeDefined()
+    rules['Harm Touch'] = { readyBar: false }
+    h.tracker.configure(h.config)
+    expect(h.board.get('cooldown:Harm Touch')).toBeUndefined()
+    expect(h.spoken).toEqual([])
   })
 })

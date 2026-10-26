@@ -370,6 +370,7 @@ export function summarize(s: Spell): SpellSummary {
     beneficial: s.beneficial,
     icon: s.icon,
     castMs: s.castMs,
+    recastMs: s.recastMs,
     resist: s.resist,
     formula: s.formula,
     cap: s.cap,

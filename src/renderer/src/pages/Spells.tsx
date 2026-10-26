@@ -15,6 +15,7 @@ import { LogCheck } from './SpellsLogCheck'
 import { NotWatching } from '../components/NotWatching'
 import { TryLogLineLink } from '../components/TryLogLine'
 import { takeHandOff } from '../handoff'
+import { COOLDOWN_MIN_MS } from '../../../core/spellTracker'
 
 type SpellKey = 'name' | 'type' | 'resisted' | 'window' | 'wears' | 'last'
 
@@ -23,6 +24,12 @@ type ResistCount = { casts: number; resisted: number }
 
 /** The share of casts resisted, once there are casts to go by; null for none. */
 const resistRate = (r: ResistCount | undefined): number | null => (r && r.casts > 0 ? Math.min(1, r.resisted / r.casts) : null)
+
+/** A spell with nothing to time on its target (Frenzied Spirit): listed only for its ready-again bar. */
+const instant = (k: KnownSpell): boolean => k.duration.ticks === 0
+
+/** Whether its recast is long enough for a ready-again bar (FEAT-024). */
+const longRecast = (k: KnownSpell): boolean => k.recastMs >= COOLDOWN_MIN_MS
 
 export function Spells({ go }: { go?: Go }) {
   const character = useSettled((s) => s.character)
@@ -50,8 +57,8 @@ export function Spells({ go }: { go?: Go }) {
       name: (k) => k.rankedName,
       type: (k) => k.category,
       resisted: (k) => (k.beneficial ? null : resistRate(resists[k.name])),
-      window: (k) => (k.duration.permanent ? Infinity : k.duration.spellWindowSec),
-      wears: (k) => (k.duration.permanent ? Infinity : k.duration.seconds),
+      window: (k) => (instant(k) ? null : k.duration.permanent ? Infinity : k.duration.spellWindowSec),
+      wears: (k) => (instant(k) ? null : k.duration.permanent ? Infinity : k.duration.seconds),
       last: (k) => k.lastCast || null
     }
   )
@@ -125,6 +132,9 @@ export function Spells({ go }: { go?: Go }) {
                     </th>
                     <th>
                       Fade cue <Info label="About Fade cue" text="The spoken announcement when it wears off" />
+                    </th>
+                    <th>
+                      Ready bar <Info label="About Ready bar" text="A bar until it can be cast again, for a spell with a recast of 30 seconds or more" />
                     </th>
                     <SortTh k="last" sort={sort} onSort={setSort}>
                       Last cast
@@ -226,6 +236,8 @@ function SpellRow({
   const rate = k.beneficial ? null : resistRate(resist)
   const d = k.duration
   const unsaved = useSpellDrafts().has(k.name)
+  const cooldowns = useSettled((s) => s.settings.tracking.cooldowns)
+  const none = <span className="faint">—</span>
   return (
     <>
       <tr className={`clickable${open ? ' selected' : ''}`} onClick={toggle}>
@@ -258,38 +270,64 @@ function SpellRow({
         <td className="nowrap" title={resist && rate !== null ? `${resist.resisted} of ${resist.casts} casts in the last two weeks` : undefined}>
           {rate === null ? <span className="faint">—</span> : pct(rate)}
         </td>
-        <td className="mono nowrap">{d.permanent ? 'Permanent' : `${clock(d.baseSec)} (${clock(d.spellWindowSec)})`}</td>
-        <td className="nowrap muted">{d.permanent ? '—' : `${clock(d.earliestSec)}–${clock(d.latestSec)}`}</td>
-        <td>
-          <span className="row tight">
-            <span className={`chip${k.rule.track === false ? ' bad' : k.rule.track ? ' ok' : ''}`}>{trackLabel(k.rule)}</span>
-            {k.rule.others && (
-              <span className="chip ok" title="Other players' casts of this spell are timed too">
-                anyone's
+        <td className="mono nowrap">{instant(k) ? 'Instant' : d.permanent ? 'Permanent' : `${clock(d.baseSec)} (${clock(d.spellWindowSec)})`}</td>
+        <td className="nowrap muted">{instant(k) || d.permanent ? '—' : `${clock(d.earliestSec)}–${clock(d.latestSec)}`}</td>
+        {instant(k) ? (
+          <>
+            <td>{none}</td>
+            <td>{none}</td>
+            <td>{none}</td>
+          </>
+        ) : (
+          <>
+            <td>
+              <span className="row tight">
+                <span className={`chip${k.rule.track === false ? ' bad' : k.rule.track ? ' ok' : ''}`}>{trackLabel(k.rule)}</span>
+                {k.rule.others && (
+                  <span className="chip ok" title="Other players' casts of this spell are timed too">
+                    anyone's
+                  </span>
+                )}
               </span>
-            )}
-          </span>
-        </td>
+            </td>
+            <td onClick={(e) => e.stopPropagation()}>
+              <span className="row tight nowrap">
+                <Switch
+                  on={k.rule.recastCue !== false && k.rule.track !== false}
+                  disabled={k.rule.track === false}
+                  title={k.rule.track === false ? 'Not timed: no cues' : 'Recast warning'}
+                  label={`Recast warning for ${k.rankedName}`}
+                  onChange={(v) => void setCue(k, { recastCue: v ? undefined : false }, onSaved)}
+                />
+                {k.rule.recastCue !== false && k.rule.track !== false && <span className="faint small">{k.rule.warnSec !== undefined ? duration(k.rule.warnSec) : 'default'}</span>}
+              </span>
+            </td>
+            <td onClick={(e) => e.stopPropagation()}>
+              <Switch
+                on={k.rule.fadeCue !== false && k.rule.track !== false}
+                disabled={k.rule.track === false}
+                title={k.rule.track === false ? 'Not timed: no cues' : 'Fade announcement'}
+                label={`Fade announcement for ${k.rankedName}`}
+                onChange={(v) => void setCue(k, { fadeCue: v ? undefined : false }, onSaved)}
+              />
+            </td>
+          </>
+        )}
         <td onClick={(e) => e.stopPropagation()}>
-          <span className="row tight nowrap">
-            <Switch
-              on={k.rule.recastCue !== false && k.rule.track !== false}
-              disabled={k.rule.track === false}
-              title={k.rule.track === false ? 'Not timed: no cues' : 'Recast warning'}
-              label={`Recast warning for ${k.rankedName}`}
-              onChange={(v) => void setCue(k, { recastCue: v ? undefined : false }, onSaved)}
-            />
-            {k.rule.recastCue !== false && k.rule.track !== false && <span className="faint small">{k.rule.warnSec !== undefined ? duration(k.rule.warnSec) : 'default'}</span>}
-          </span>
-        </td>
-        <td onClick={(e) => e.stopPropagation()}>
-          <Switch
-            on={k.rule.fadeCue !== false && k.rule.track !== false}
-            disabled={k.rule.track === false}
-            title={k.rule.track === false ? 'Not timed: no cues' : 'Fade announcement'}
-            label={`Fade announcement for ${k.rankedName}`}
-            onChange={(v) => void setCue(k, { fadeCue: v ? undefined : false }, onSaved)}
-          />
+          {longRecast(k) ? (
+            <span className="row tight nowrap">
+              <Switch
+                on={cooldowns && k.rule.readyBar !== false}
+                disabled={!cooldowns}
+                title={cooldowns ? 'Ready-again bar' : 'Ready-again bars are off in the defaults below'}
+                label={`Ready-again bar for ${k.rankedName}`}
+                onChange={(v) => void setCue(k, { readyBar: v ? undefined : false }, onSaved)}
+              />
+              <span className="faint small">{duration(Math.round(k.recastMs / 1000))}</span>
+            </span>
+          ) : (
+            none
+          )}
         </td>
         <td className="faint small nowrap">
           <Ago t={k.lastCast ?? 0} never="rule only" />
@@ -297,7 +335,7 @@ function SpellRow({
       </tr>
       {open && (
         <tr>
-          <td colSpan={10} style={{ background: 'var(--bg-2)' }}>
+          <td colSpan={11} style={{ background: 'var(--bg-2)' }}>
             <RuleEditor k={k} onSaved={onSaved} />
           </td>
         </tr>

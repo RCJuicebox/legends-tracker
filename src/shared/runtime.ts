@@ -114,6 +114,8 @@ export interface SpellSummary {
   beneficial: boolean
   icon: number
   castMs: number
+  /** Before it can be cast again, from the spell file. */
+  recastMs: number
   resist: ResistType
   formula: number
   cap: number

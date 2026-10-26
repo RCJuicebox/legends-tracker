@@ -4,12 +4,13 @@ import { markUnsaved } from '../unsaved'
 import { api, errorMessage } from '../api'
 import { duration } from '../../../core/format'
 // The colour a bar has unless one is set: its kind's, not a fixed teal (LT-495).
-import { CATEGORY_COLORS, DEFAULT_OTHERS_SPEECH } from '../../../core/spellTracker'
+import { CATEGORY_COLORS, COOLDOWN_MIN_MS, DEFAULT_OTHERS_SPEECH } from '../../../core/spellTracker'
 import { act, showToast } from '../toast'
 import { ConfirmButton, Field, NumberInput, SpellIcon, Switch } from '../components/ui'
 import { type KnownSpell, type SpellRule } from '../../../shared/types'
 
-// One spell's rule on Spell Timers: tracking, cues, speech, colour, overlay and a fixed duration.
+// One spell's rule on Spell Timers: tracking, cues, speech, colour, overlay and a fixed duration;
+// for an instant spell, only its ready-again bar.
 
 const same = (a: SpellRule, b: SpellRule) => JSON.stringify(a) === JSON.stringify(b)
 
@@ -71,6 +72,8 @@ export function RuleEditor({ k, onSaved }: { k: KnownSpell; onSaved: (list: Know
   }
   const beneficial = k.beneficial
   const t = tracking
+  const timed = k.duration.ticks !== 0
+  const recastSec = Math.round(k.recastMs / 1000)
   const overlays = allOverlays.filter((o) => o.kind === 'timers')
   return (
     <div
@@ -96,11 +99,15 @@ export function RuleEditor({ k, onSaved }: { k: KnownSpell; onSaved: (list: Know
             <div className="faint small">{k.classes || 'No class can scribe this'}</div>
           </div>
         </div>
-        <ol className="steps">
-          {k.duration.steps.map((s, i) => (
-            <li key={i}>{s}</li>
-          ))}
-        </ol>
+        {timed ? (
+          <ol className="steps">
+            {k.duration.steps.map((s, i) => (
+              <li key={i}>{s}</li>
+            ))}
+          </ol>
+        ) : (
+          <div className="small faint">Instant: nothing on its target to time. It is listed for its {duration(recastSec)} recast.</div>
+        )}
         <div className="small faint" style={{ lineHeight: 1.6 }}>
           {k.landSelf && <div>Lands on you: “{k.landSelf}”</div>}
           {k.landOther && (
@@ -114,93 +121,113 @@ export function RuleEditor({ k, onSaved }: { k: KnownSpell; onSaved: (list: Know
       </div>
       <div className="stack gap-12">
         <div className="row" style={{ gap: 24 }}>
-          <label className="row tight">
-            <Switch on={rule.recastCue !== false} onChange={(v) => set({ recastCue: v ? undefined : false })} />
-            Recast warning
-          </label>
-          <label className="row tight">
-            <Switch on={rule.fadeCue !== false} onChange={(v) => set({ fadeCue: v ? undefined : false })} />
-            Fade announcement
-          </label>
-          {!beneficial && (
+          {timed && (
+            <label className="row tight">
+              <Switch on={rule.recastCue !== false} onChange={(v) => set({ recastCue: v ? undefined : false })} />
+              Recast warning
+            </label>
+          )}
+          {timed && (
+            <label className="row tight">
+              <Switch on={rule.fadeCue !== false} onChange={(v) => set({ fadeCue: v ? undefined : false })} />
+              Fade announcement
+            </label>
+          )}
+          {k.recastMs >= COOLDOWN_MIN_MS && (
+            <label
+              className="row tight"
+              title={t.cooldowns ? `A bar for its ${duration(recastSec)} recast, until it can be cast again` : 'Ready-again bars are off in the defaults below'}
+            >
+              <Switch on={t.cooldowns && rule.readyBar !== false} disabled={!t.cooldowns} onChange={(v) => set({ readyBar: v ? undefined : false })} />
+              Ready-again bar
+            </label>
+          )}
+          {timed && !beneficial && (
             <label className="row tight" title="For a spell a mob carries only one of, such as Harm Touch: anyone's cast of it gets the bar, so nobody casts over another's">
               <Switch on={rule.others === true} onChange={(v) => set({ others: v ? true : undefined })} />
               Anyone's casts
             </label>
           )}
         </div>
-        {rule.others && (
-          <Field
-            label="Said when someone else's lands"
-            hint="{caster}, {spell}, {target} and {seconds} are filled in. Their bar carries their name; its end is exact once it ticks."
-          >
-            <input
-              value={rule.othersSpeech ?? ''}
-              placeholder={DEFAULT_OTHERS_SPEECH}
-              onChange={(e) => set({ othersSpeech: e.target.value === '' ? undefined : e.target.value })}
-            />
-          </Field>
-        )}
-        <div className="grid two">
-          <Field label="Tracking">
-            <select value={rule.track === undefined ? '' : rule.track ? 'on' : 'off'} onChange={(e) => set({ track: e.target.value === '' ? undefined : e.target.value === 'on' })}>
-              <option value="">Default ({beneficial ? 'buff' : 'DoT/debuff'} setting)</option>
-              <option value="on">Always track</option>
-              <option value="off">Never track</option>
-            </select>
-          </Field>
-          <Field label="Short name" hint="Shown on the bar and spoken.">
-            <input value={rule.alias ?? ''} placeholder={k.name} onChange={(e) => set({ alias: e.target.value || undefined })} />
-          </Field>
-          <Field label="Warn before it ends" hint={`Seconds. Default: ${duration(beneficial ? t.buffWarnSec : t.dotWarnSec)} (0 = off).`}>
-            <NumberInput value={rule.warnSec} placeholder="default" min={0} onChange={(v) => set({ warnSec: v })} />
-          </Field>
-          <Field label="Overlay">
-            <select value={rule.overlay ?? ''} onChange={(e) => set({ overlay: e.target.value || undefined })}>
-              <option value="">Default ({beneficial ? 'Buffs' : 'DoTs & Timers'})</option>
-              {overlays.map((o) => (
-                <option key={o.id} value={o.id}>
-                  {o.name}
-                </option>
-              ))}
-            </select>
-          </Field>
-          <Field label="Warning speech" hint="{spell} and {target} are filled in.">
-            <input
-              value={rule.warnSpeech ?? ''}
-              placeholder={beneficial ? t.buffWarnSpeech : t.dotWarnSpeech}
-              onChange={(e) => set({ warnSpeech: e.target.value === '' ? undefined : e.target.value })}
-            />
-          </Field>
-          <Field label="Fade speech" hint="Leave blank for the default.">
-            <input
-              value={rule.fadeSpeech ?? ''}
-              placeholder={beneficial ? t.buffFadeSpeech : t.dotFadeSpeech}
-              onChange={(e) => set({ fadeSpeech: e.target.value === '' ? undefined : e.target.value })}
-            />
-          </Field>
-          <Field label="Extra focus for this spell" hint="Percent, added to your character focus (e.g. an item that only extends this line).">
-            <NumberInput value={rule.extraFocusPct} placeholder="0" onChange={(v) => set({ extraFocusPct: v })} />
-          </Field>
-          <Field label="Bar colour">
-            <div className="row tight">
-              <input
-                type="color"
-                value={rule.color ?? CATEGORY_COLORS[k.category]}
-                onChange={(e) => set({ color: e.target.value })}
-                style={{ width: 44, height: 32, padding: 2 }}
-              />
-              {rule.color && (
-                <button className="btn ghost small" onClick={() => set({ color: undefined })}>
-                  Reset
-                </button>
-              )}
+        {timed && (
+          <>
+            {rule.others && (
+              <Field
+                label="Said when someone else's lands"
+                hint="{caster}, {spell}, {target} and {seconds} are filled in. Their bar carries their name; its end is exact once it ticks."
+              >
+                <input
+                  value={rule.othersSpeech ?? ''}
+                  placeholder={DEFAULT_OTHERS_SPEECH}
+                  onChange={(e) => set({ othersSpeech: e.target.value === '' ? undefined : e.target.value })}
+                />
+              </Field>
+            )}
+            <div className="grid two">
+              <Field label="Tracking">
+                <select
+                  value={rule.track === undefined ? '' : rule.track ? 'on' : 'off'}
+                  onChange={(e) => set({ track: e.target.value === '' ? undefined : e.target.value === 'on' })}
+                >
+                  <option value="">Default ({beneficial ? 'buff' : 'DoT/debuff'} setting)</option>
+                  <option value="on">Always track</option>
+                  <option value="off">Never track</option>
+                </select>
+              </Field>
+              <Field label="Short name" hint="Shown on the bar and spoken.">
+                <input value={rule.alias ?? ''} placeholder={k.name} onChange={(e) => set({ alias: e.target.value || undefined })} />
+              </Field>
+              <Field label="Warn before it ends" hint={`Seconds. Default: ${duration(beneficial ? t.buffWarnSec : t.dotWarnSec)} (0 = off).`}>
+                <NumberInput value={rule.warnSec} placeholder="default" min={0} onChange={(v) => set({ warnSec: v })} />
+              </Field>
+              <Field label="Overlay">
+                <select value={rule.overlay ?? ''} onChange={(e) => set({ overlay: e.target.value || undefined })}>
+                  <option value="">Default ({beneficial ? 'Buffs' : 'DoTs & Timers'})</option>
+                  {overlays.map((o) => (
+                    <option key={o.id} value={o.id}>
+                      {o.name}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+              <Field label="Warning speech" hint="{spell} and {target} are filled in.">
+                <input
+                  value={rule.warnSpeech ?? ''}
+                  placeholder={beneficial ? t.buffWarnSpeech : t.dotWarnSpeech}
+                  onChange={(e) => set({ warnSpeech: e.target.value === '' ? undefined : e.target.value })}
+                />
+              </Field>
+              <Field label="Fade speech" hint="Leave blank for the default.">
+                <input
+                  value={rule.fadeSpeech ?? ''}
+                  placeholder={beneficial ? t.buffFadeSpeech : t.dotFadeSpeech}
+                  onChange={(e) => set({ fadeSpeech: e.target.value === '' ? undefined : e.target.value })}
+                />
+              </Field>
+              <Field label="Extra focus for this spell" hint="Percent, added to your character focus (e.g. an item that only extends this line).">
+                <NumberInput value={rule.extraFocusPct} placeholder="0" onChange={(v) => set({ extraFocusPct: v })} />
+              </Field>
+              <Field label="Bar colour">
+                <div className="row tight">
+                  <input
+                    type="color"
+                    value={rule.color ?? CATEGORY_COLORS[k.category]}
+                    onChange={(e) => set({ color: e.target.value })}
+                    style={{ width: 44, height: 32, padding: 2 }}
+                  />
+                  {rule.color && (
+                    <button className="btn ghost small" onClick={() => set({ color: undefined })}>
+                      Reset
+                    </button>
+                  )}
+                </div>
+              </Field>
             </div>
-          </Field>
-        </div>
-        <Field label="Fixed duration override" hint="Only for a spell the calculation cannot model. Seconds; blank to calculate.">
-          <NumberInput value={rule.durationOverrideSec} placeholder="calculated" min={0} onChange={(v) => set({ durationOverrideSec: v })} />
-        </Field>
+            <Field label="Fixed duration override" hint="Only for a spell the calculation cannot model. Seconds; blank to calculate.">
+              <NumberInput value={rule.durationOverrideSec} placeholder="calculated" min={0} onChange={(v) => set({ durationOverrideSec: v })} />
+            </Field>
+          </>
+        )}
         <div className="row">
           <button className="btn primary" onClick={() => void save(rule)}>
             Save
@@ -210,28 +237,32 @@ export function RuleEditor({ k, onSaved }: { k: KnownSpell; onSaved: (list: Know
               Discard changes
             </button>
           )}
-          <button
-            className="btn"
-            onClick={() =>
-              void act(
-                'audio:test',
-                (rule.warnSpeech ?? (beneficial ? t.buffWarnSpeech : t.dotWarnSpeech)).replace(/\{spell\}/gi, rule.alias || k.name).replace(/\{target\}/gi, 'a gnoll')
-              )
-            }
-          >
-            Hear warning
-          </button>
-          <button
-            className="btn"
-            onClick={() =>
-              void act(
-                'audio:test',
-                (rule.fadeSpeech ?? (beneficial ? t.buffFadeSpeech : t.dotFadeSpeech)).replace(/\{spell\}/gi, rule.alias || k.name).replace(/\{target\}/gi, 'a gnoll')
-              )
-            }
-          >
-            Hear fade
-          </button>
+          {timed && (
+            <>
+              <button
+                className="btn"
+                onClick={() =>
+                  void act(
+                    'audio:test',
+                    (rule.warnSpeech ?? (beneficial ? t.buffWarnSpeech : t.dotWarnSpeech)).replace(/\{spell\}/gi, rule.alias || k.name).replace(/\{target\}/gi, 'a gnoll')
+                  )
+                }
+              >
+                Hear warning
+              </button>
+              <button
+                className="btn"
+                onClick={() =>
+                  void act(
+                    'audio:test',
+                    (rule.fadeSpeech ?? (beneficial ? t.buffFadeSpeech : t.dotFadeSpeech)).replace(/\{spell\}/gi, rule.alias || k.name).replace(/\{target\}/gi, 'a gnoll')
+                  )
+                }
+              >
+                Hear fade
+              </button>
+            </>
+          )}
           <span className="grow" />
           <ConfirmButton className="btn ghost" question="Clear every setting for this spell?" onConfirm={() => void save(null)}>
             Reset to defaults

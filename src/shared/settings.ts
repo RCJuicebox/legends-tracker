@@ -63,6 +63,8 @@ export interface SpellRule {
   recastCue?: boolean
   /** The spoken announcement when it wears off. */
   fadeCue?: boolean
+  /** False for no "ready again" bar for this spell's long recast (FEAT-024), when cooldowns are on. */
+  readyBar?: boolean
   alias?: string
   warnSec?: number
   warnSpeech?: string

@@ -1,6 +1,7 @@
 import { summarize, type Spell, type SpellBook } from '../../core/spells'
 import { casterLevel, computeDuration } from '../../core/durations'
 import { focusFor } from '../../core/focus'
+import { COOLDOWN_MIN_MS } from '../../core/spellTracker'
 import { checkAgainstLog } from '../../core/logCheck'
 import type { CharacterSettings, KnownSpell, LogCheckRow, SpellRule } from '../../shared/types'
 import type { EngineStore } from './contracts'
@@ -41,7 +42,10 @@ export class SpellQueries {
     })
   }
 
-  /** Spells the character has cast, or has settings for, newest first, each with its duration worked out. */
+  /**
+   * Spells the character has cast, or has settings for, newest first, each with its duration worked out.
+   * An instant spell is here only for its ready-again bar (Frenzied Spirit's recast), to switch it off.
+   */
   knownSpells(): KnownSpell[] {
     const book = this.book()
     if (!book) return []
@@ -67,7 +71,7 @@ export class SpellQueries {
       const r = book.resolve(rankedName)
       if (!r) continue
       const d = this.durationFor(r.spell, r.rank)
-      if (d.ticks === 0) continue
+      if (d.ticks === 0 && r.spell.recastMs < COOLDOWN_MIN_MS) continue
       out.push({ ...summarize(r.spell), rank: r.rank, rankedName, lastCast, duration: d, rule: rules[r.spell.name] ?? {} })
     }
     return out.sort((a, b) => b.lastCast - a.lastCast)
