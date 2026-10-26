@@ -39,6 +39,8 @@ const ONLY_ON: Record<number, string> = { 10: 'undead', 11: 'summoned creatures'
 const RE_WORN =
   /Worn Effect:\s*(?:\[\[)?([^\]|<\n(]+?)(?:\|[^\]]*)?(?:\]\])?\s*(?:<br>|\n|$|\()|(?<!Focus |Worn )Effect:\s*(?:\[\[)?([^\]|<\n(]+?)(?:\|[^\]]*)?(?:\]\])?\s*\(Worn\b/i
 const RE_PROC = /(?<!Worn )Effect:\s*(?:\[\[)?([^\]|<\n(]+?)(?:\|[^\]]*)?(?:\]\])?\s*\(Combat/i
+// "(Combat, Rate +64%)", "(Combat, Casting Time: Instant, Rate: +289%)".
+const RE_PROC_RATE = /(?<!Worn )Effect:[^\n]*?\(Combat[^)\n]*?Rate:?\s*([+-]?\d+)%/i
 
 /** The worn effect an item's stats block names; '' for none. */
 export function wornEffectOf(statsblock: string): string {
@@ -51,10 +53,27 @@ export function procOf(statsblock: string): string {
   return RE_PROC.exec(statsblock)?.[1].trim() ?? ''
 }
 
+/**
+ * How much more often than a plain proc an item's proc fires, in percent: the tooltip's "Rate +64%".
+ * 0 for none. A dummy test (2026-10-26) put Winter's Roar at "Rate +64%" 1.43 times a plain proc's
+ * rate, within chance of 1.64, so it is taken as written.
+ */
+export function procRateOf(statsblock: string): number {
+  return Number(RE_PROC_RATE.exec(statsblock)?.[1] ?? 0)
+}
+
+/** An item's own worn effect and proc ('' for none), and its proc's rate bonus in percent. */
+export interface OwnEffects {
+  worn: string
+  proc: string
+  procRate?: number
+}
+
 export interface ItemEffects {
   /** Each with the exaltation it comes from ('' for the item's own). */
   worn: { name: string; via: string }[]
-  procs: { name: string; via: string }[]
+  /** `rate`: its rate bonus in percent, the item's it comes from. */
+  procs: { name: string; via: string; rate: number }[]
 }
 
 /**
@@ -62,16 +81,16 @@ export interface ItemEffects {
  * (proc) exaltations bring their item's worn effect and proc in place of the host's.
  * `effectsOf` is an item's own, by name.
  */
-export function itemEffects(item: InvItem, effectsOf: (name: string) => { worn: string; proc: string } | undefined): ItemEffects {
+export function itemEffects(item: InvItem, effectsOf: (name: string) => OwnEffects | undefined): ItemEffects {
   const exalted = (slot: number) => item.augs.find((a) => /\(Exaltation\)$/i.test(a.name) && a.location.endsWith(`-Slot${slot}`))
   const own = effectsOf(item.name)
   const pick = (slot: number, kind: 'worn' | 'proc') => {
     const e = exalted(slot)
-    const theirs = e ? effectsOf(e.name)?.[kind] : ''
-    if (theirs) return [{ name: theirs, via: e!.name }]
-    return own?.[kind] ? [{ name: own[kind], via: '' }] : []
+    const theirs = e ? effectsOf(e.name) : undefined
+    if (theirs?.[kind]) return [{ name: theirs[kind], via: e!.name, rate: theirs.procRate ?? 0 }]
+    return own?.[kind] ? [{ name: own[kind], via: '', rate: own.procRate ?? 0 }] : []
   }
-  return { worn: pick(9, 'worn'), procs: pick(10, 'proc') }
+  return { worn: pick(9, 'worn').map(({ name, via }) => ({ name, via })), procs: pick(10, 'proc') }
 }
 
 const signed = (v: number) => `${v < 0 ? '−' : '+'}${Math.abs(v)}`
@@ -251,20 +270,29 @@ function procCeiling(spell: EffectSpell, level: number): number {
 }
 
 /**
- * How often a proc in the off hand fires against the same proc in the main hand. Measured on a dummy
- * (2026-10-26, 71 minutes swinging, a different proc in each fist): 2.13 a minute in the main hand,
- * 0.77 in the off hand, and the two add up rather than share. It takes in both the off hand's fewer
- * swings and a lower chance a swing.
+ * How often a proc in the off hand fires against a plain proc in the main hand, by the main-hand
+ * weapon's delay. Measured on a dummy (2026-10-26) with Wu's Fist (delay 22) in the off hand: a plain
+ * main-hand proc fired 2.20 a minute over 144 minutes; the off hand's 0.77 a minute behind another
+ * Wu's Fist (22) and 1.15 behind Garduk (40), adding to the main hand's rather than sharing them.
+ * Between those delays it is read off the line through the two, and held to them outside it.
  */
-export const OFF_HAND_PROC = 0.36
+export function offHandProcShare(mainDelay?: number): number {
+  const at22 = 0.77 / 2.2
+  const at40 = 1.15 / 2.2
+  const d = Math.min(40, Math.max(22, mainDelay || 22))
+  return at22 + ((d - 22) / 18) * (at40 - at22)
+}
+
+/** A proc's rate bonus as a multiplier: "Rate +64%" fires 1.64 times as often. */
+export const procRateFactor = (rate?: number) => 1 + (rate ?? 0) / 100
 
 /** EQEmu's proc rate for a weapon with no rate of its own: 2 a minute, raised 0.075% for each point of DEX. */
 export const procsPerMinute = (dex: number) => 2 * (1 + (dex * 0.075) / 100)
 
 /**
- * A proc on a weapon in the main hand. `carriers` is the hands worn now that carry it, the main hand
- * counting 1 and the off hand OFF_HAND_PROC: the log's firings are theirs together, so a proc in
- * both fists is the main hand's for 1 / 1.36 of them.
+ * A proc on a weapon in the main hand, with no rate bonus of its own. `carriers` is the weapons worn
+ * now that carry it, each counting its hand's share (1 for the main hand, offHandProcShare for the
+ * off hand) times its rate bonus: the log's firings are theirs together.
  */
 export function procWorth(spell: EffectSpell, profile: MeleeProfile, o: { level: number; dex: number; carriers: number }): EffectWorth {
   const does: string[] = []

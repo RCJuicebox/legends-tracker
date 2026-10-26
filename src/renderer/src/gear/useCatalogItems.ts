@@ -3,7 +3,7 @@ import { api } from '../api'
 import { useInvoke } from '../hooks'
 import { itemFoci, itemKey, type InvItem } from '../../../core/inventory'
 import { ERA_ORDER, eraOf, zoneEras } from '../../../core/gearFinder'
-import { procOf, wornEffectOf } from '../../../core/itemEffects'
+import { procOf, procRateOf, wornEffectOf } from '../../../core/itemEffects'
 import { withRaceFix, type CatalogItem } from '../../../core/wikiItem'
 import type { CatalogState } from '../../../shared/ipc'
 
@@ -27,7 +27,7 @@ function derive(items: CatalogItem[], eraStatus: Record<string, 'in' | 'out'> | 
   }
   const byKey = new Map(items.map((it) => [itemKey(it.title), it]))
   // Every catalog item's own worn effect and proc, read from its stats block once.
-  const byItem = new Map([...byKey].map(([key, c]) => [key, { worn: wornEffectOf(c.statsblock), proc: procOf(c.statsblock) }]))
+  const byItem = new Map([...byKey].map(([key, c]) => [key, { worn: wornEffectOf(c.statsblock), proc: procOf(c.statsblock), procRate: procRateOf(c.statsblock) }]))
   const effectsOfItem = (name: string) => byItem.get(itemKey(name))
   const fociOf = (item: InvItem) => itemFoci(item, (name) => byKey.get(itemKey(name))?.focus)
   return { zones, eraCounts: [...counts], byKey, effectsOfItem, fociOf }

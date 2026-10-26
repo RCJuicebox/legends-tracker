@@ -63,11 +63,19 @@ export function EffectsTab({ m, kind }: { m: GearModel; kind: EffectKind }) {
       if (!names.length) continue
       const where = p.from === 'worn' ? `worn in ${slotLabel(p.item.location)}` : whereText(p.from, p.item)
       const active = p.from === 'worn' && (kind === 'worn' || p.item.location === 'Primary' || p.item.location === 'Secondary')
-      for (const n of names) row(n).carriers.push({ name: p.item.name, where, classes: classesOf(p.r), owned: true, active })
+      const rate = kind === 'proc' && p.procRate ? ` · proc rate +${p.procRate}%` : ''
+      for (const n of names) row(n).carriers.push({ name: p.item.name, where: where + rate, classes: classesOf(p.r), owned: true, active })
     }
     for (const e of who === 'yours' ? exaltations : storedExaltations) {
       const n = kind === 'worn' ? e.worn : e.proc
-      if (n) row(n).carriers.push({ name: e.item.name, where: `in Storage › Exaltations, for a ${kind} slot`, classes: classesOf(e.r), owned: true, active: false })
+      if (n)
+        row(n).carriers.push({
+          name: e.item.name,
+          where: `in Storage › Exaltations, for a ${kind} slot${kind === 'proc' && e.procRate ? ` · proc rate +${e.procRate}%` : ''}`,
+          classes: classesOf(e.r),
+          owned: true,
+          active: false
+        })
     }
     // What there is to get.
     for (const c of catalog) {
@@ -80,7 +88,7 @@ export function EffectsTab({ m, kind }: { m: GearModel; kind: EffectKind }) {
       if (rw.carriers.some((x) => x.owned && x.name.startsWith(c.title))) continue
       rw.carriers.push({
         name: c.title,
-        where: `${r.slots.map((s) => s.toLowerCase()).join(' ')}${c.era ? ` · ${c.era}` : ''}`,
+        where: `${r.slots.map((s) => s.toLowerCase()).join(' ')}${c.era ? ` · ${c.era}` : ''}${kind === 'proc' && own?.procRate ? ` · proc rate +${own.procRate}%` : ''}`,
         classes: classesOf(r),
         owned: false,
         active: false,

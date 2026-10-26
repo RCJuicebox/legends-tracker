@@ -3,7 +3,7 @@ import { statsFor } from '../../../core/wornGear'
 import { itemKey, mergeLevel, parseStatsBlock, scaledStats, storedEquipment, type InvItem } from '../../../core/inventory'
 import { ANY_SLOT, canWear, isLore, restrictions, type Wearer } from '../../../core/gearFinder'
 import { ownedPieces, type Exaltation } from '../../../core/gearOptimizer'
-import { itemEffects } from '../../../core/itemEffects'
+import { itemEffects, type OwnEffects } from '../../../core/itemEffects'
 import type { CatalogItem } from '../../../core/wikiItem'
 import type { Inventory, InventoryView } from '../../../shared/types'
 import type { usePet } from './usePet'
@@ -29,7 +29,7 @@ export function useOwnedGear({
   pet: ReturnType<typeof usePet>
   byKey: Map<string, CatalogItem>
   fociOf: (item: InvItem) => { name: string; via: string }[]
-  effectsOfItem: (name: string) => { worn: string; proc: string } | undefined
+  effectsOfItem: (name: string) => OwnEffects | undefined
   wearer: Wearer
 }) {
   // What the pet wears is the character's too: the log's list names each piece (not its exaltations).
@@ -61,6 +61,7 @@ export function useOwnedGear({
             foci: fociOf(item).map((f) => f.name),
             worn: fx.worn.map((f) => f.name),
             procs: fx.procs.map((f) => f.name),
+            procRate: fx.procs[0]?.rate || undefined,
             lore: c ? isLore(c.statsblock) : true
           }
         },
@@ -79,7 +80,7 @@ export function useOwnedGear({
         const fx = effectsOfItem(k.name)
         if (!c || !(c.focus || fx?.worn || fx?.proc)) return []
         const item = { location: 'Storage', name: k.name, id: k.id, count: 1, augs: [] }
-        return [{ item, from: 'storage', focus: c.focus, worn: fx?.worn ?? '', proc: fx?.proc ?? '', r: restrictions(c.statsblock) }]
+        return [{ item, from: 'storage', focus: c.focus, worn: fx?.worn ?? '', proc: fx?.proc ?? '', procRate: fx?.procRate || undefined, r: restrictions(c.statsblock) }]
       }),
     [inv, byKey, effectsOfItem]
   )

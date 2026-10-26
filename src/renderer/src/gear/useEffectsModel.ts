@@ -3,7 +3,7 @@ import { useInvoke } from '../hooks'
 import type { StatsInputs } from '../../../core/statsInputs'
 import type { Weights } from '../../../core/gearFinder'
 import type { EffectValue, Piece } from '../../../core/gearOptimizer'
-import { OFF_HAND_PROC, type EffectSpell, type EffectWorth } from '../../../core/itemEffects'
+import { offHandProcShare, procRateFactor, type EffectSpell, type EffectWorth, type OwnEffects } from '../../../core/itemEffects'
 import type { MeleeProfile } from '../../../core/meleeTally'
 import { effectScorers, type EffectInputs } from '../../../core/effectScorers'
 import { HANDS } from '../../../core/gearCatalog'
@@ -43,7 +43,7 @@ export function useEffectsModel({
 }: {
   view: InventoryView
   items: CatalogItem[] | undefined
-  effectsOfItem: (name: string) => { worn: string; proc: string } | undefined
+  effectsOfItem: (name: string) => OwnEffects | undefined
   days: number
   sheetStats: StatsInputs
   pieces: Piece[]
@@ -68,9 +68,11 @@ export function useEffectsModel({
     const profile = data?.profile ?? null
     const spells = data?.spells ?? {}
     const carriers = new Map<string, number>()
+    // Each weapon in hand carrying a proc counts its hand's share of a main hand's firings, times its rate bonus.
+    const mainDelay = pieces.find((p) => p.from === 'worn' && p.item.location === 'Primary')?.stats?.delay
     for (const p of pieces)
       if (p.from === 'worn' && HANDS.includes(p.item.location))
-        for (const n of p.procs ?? []) carriers.set(n, (carriers.get(n) ?? 0) + (p.item.location === 'Secondary' ? OFF_HAND_PROC : 1))
+        for (const n of p.procs ?? []) carriers.set(n, (carriers.get(n) ?? 0) + (p.item.location === 'Secondary' ? offHandProcShare(mainDelay) : 1) * procRateFactor(p.procRate))
     const inputs: EffectInputs = { spells, profile, level, dex, carriers: [...carriers] }
     const s = effectScorers(inputs, weights)
     return {

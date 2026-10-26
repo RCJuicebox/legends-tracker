@@ -2,12 +2,15 @@ import { describe, expect, it } from 'vitest'
 import {
   effectScore,
   itemEffects,
-  OFF_HAND_PROC,
+  offHandProcShare,
+  procRateFactor,
+  procRateOf,
   procDamage,
   procOf,
   procsPerMinute,
   procWorth,
   wornEffectOf,
+  type OwnEffects,
   wornStats,
   wornWorth,
   type EffectSpell
@@ -139,6 +142,13 @@ describe('effects on gear', () => {
     expect(procOf('Slot: CHEST<br>\nAC: 5<br>')).toBe('')
   })
 
+  it("reads a proc's rate bonus, as eqlwiki writes it both ways", () => {
+    expect(procRateOf("Effect:  [[Winter's Roar|<span class='itemeff'>Winter's Roar</span>]] (Combat, Rate +64%) at Level 30<br>")).toBe(64)
+    expect(procRateOf('Effect:  [[Ward Summoned]] (Combat, Casting Time: Instant, Rate: +289%) at Level 20<br>')).toBe(289)
+    expect(procRateOf(TORRID)).toBe(0)
+    expect(procRateFactor(64)).toBeCloseTo(1.64, 9)
+  })
+
   it('takes a worn exaltation’s worn effect and a proc exaltation’s proc in place of the item’s', () => {
     const inv = parseInventory(
       [
@@ -148,10 +158,10 @@ describe('effects on gear', () => {
         "Primary-Slot10\tCherista's Fangs (Exaltation)\t3\t1\t10"
       ].join('\n')
     )
-    const own: Record<string, { worn: string; proc: string }> = {
+    const own: Record<string, OwnEffects> = {
       "wu's fist of mastery": { worn: '', proc: '' },
       'torrid corruptor': { worn: 'Unrighteous Bash', proc: "Oathbreaker's Curse" },
-      "cherista's fangs": { worn: '', proc: 'Lifebite' }
+      "cherista's fangs": { worn: '', proc: 'Lifebite', procRate: 20 }
     }
     const fx = itemEffects(
       inv.worn[0],
@@ -164,7 +174,8 @@ describe('effects on gear', () => {
         ]
     )
     expect(fx.worn).toEqual([{ name: 'Unrighteous Bash', via: 'Torrid Corruptor (Exaltation)' }])
-    expect(fx.procs).toEqual([{ name: 'Lifebite', via: "Cherista's Fangs (Exaltation)" }])
+    // The rate bonus is the exaltation's: the item it was made from.
+    expect(fx.procs).toEqual([{ name: 'Lifebite', via: "Cherista's Fangs (Exaltation)", rate: 20 }])
   })
 })
 
@@ -189,13 +200,27 @@ describe('what an effect is worth', () => {
     const seen = meleeProfile({ active: 600_000, 'm|punch|h': 600, 'm|punch|d': 48_000, 'p|Lifebite|n': 30, 'p|Lifebite|d': 1260 }, { from: 'a', to: 'b' })
     // One fist carries it: 3 a minute, 42 a firing.
     expect(procWorth(LIFEBITE, seen, { level: 50, dex: 200, carriers: 1 }).dpm).toBeCloseTo(3 * 42, 6)
-    // Both fists carry it: the 3 a minute are the main hand's and the off hand's, 1 to 0.36.
-    expect(procWorth(LIFEBITE, seen, { level: 50, dex: 200, carriers: 1 + OFF_HAND_PROC }).dpm).toBeCloseTo((3 / 1.36) * 42, 6)
-    // Only the off hand carries it: the main hand would fire it 3 / 0.36 a minute.
-    expect(procWorth(LIFEBITE, seen, { level: 50, dex: 200, carriers: OFF_HAND_PROC }).dpm).toBeCloseTo((3 / 0.36) * 42, 6)
+    // Both fists carry it: the 3 a minute are the main hand's and the off hand's, 1 to 0.35.
+    const off = offHandProcShare(22)
+    expect(procWorth(LIFEBITE, seen, { level: 50, dex: 200, carriers: 1 + off }).dpm).toBeCloseTo((3 / (1 + off)) * 42, 6)
+    // Only the off hand carries it: the main hand would fire it 3 / 0.35 a minute.
+    expect(procWorth(LIFEBITE, seen, { level: 50, dex: 200, carriers: off }).dpm).toBeCloseTo((3 / off) * 42, 6)
+    // A main-hand weapon with "Rate +64%" carries it: a plain proc fires 3 / 1.64 a minute.
+    expect(procWorth(LIFEBITE, seen, { level: 50, dex: 200, carriers: 1.64 }).dpm).toBeCloseTo((3 / 1.64) * 42, 6)
     // Never fired: 2 a minute raised 15% by 200 DEX, and the spell's 42 at level 50 (36 + 50, capped at 42).
     expect(procsPerMinute(200)).toBeCloseTo(2.3, 6)
     expect(procWorth(LIFEBITE, profile, { level: 50, dex: 200, carriers: 1 }).dpm).toBeCloseTo(2.3 * 42, 6)
+  })
+
+  it('has the off hand proc as measured: more behind a slow main-hand weapon', () => {
+    // A plain main-hand proc 2.20 a minute; the off hand 0.77 behind delay 22, 1.15 behind delay 40.
+    expect(offHandProcShare(22)).toBeCloseTo(0.77 / 2.2, 9)
+    expect(offHandProcShare(40)).toBeCloseTo(1.15 / 2.2, 9)
+    expect(offHandProcShare(31)).toBeCloseTo((0.77 + 1.15) / 2 / 2.2, 9)
+    // Held to the measured range, and the faster weapon's when the main hand's delay is unknown.
+    expect(offHandProcShare(60)).toBeCloseTo(1.15 / 2.2, 9)
+    expect(offHandProcShare(15)).toBeCloseTo(0.77 / 2.2, 9)
+    expect(offHandProcShare(undefined)).toBeCloseTo(0.77 / 2.2, 9)
   })
 
   it('rates a proc over the time it was worn, not the whole window', () => {
@@ -299,8 +324,17 @@ describe('the optimiser and effects', () => {
     const plan = optimizeGear({ pieces: [fang('Fang A', 'Primary'), fang('Fang B', 'Any Slot')], wearer, weights, twoHanders: false, focusValue: () => 0, effects })
     expect(plan.effectsBefore).toBe(20)
     // The second fang goes to the off hand, where its proc counts too, as often as an off hand procs.
-    expect(plan.effectsAfter).toBeCloseTo(20 + 20 * OFF_HAND_PROC, 9)
+    expect(plan.effectsAfter).toBeCloseTo(20 + 20 * offHandProcShare(20), 9)
     expect(plan.after[plan.slots.indexOf('Secondary')]?.item.name).toBe('Fang B')
+  })
+
+  it("counts a proc's rate bonus on the weapon that carries it", () => {
+    const fang = (n: string, where: string, procRate?: number) =>
+      piece(n, where, 'Slot: PRIMARY<br>\nSkill: 1H Piercing Atk Delay: 20<br>\nDMG: 10<br>\nClass: ALL<br>\nRace: ALL<br>', { procs: ['Lifebite'], procRate })
+    const plan = optimizeGear({ pieces: [fang('Plain Fang', 'Primary'), fang('Quick Fang', 'Any Slot', 64)], wearer, weights, twoHanders: false, focusValue: () => 0, effects })
+    // "Rate +64%": the same proc, 1.64 times as often, takes the main hand.
+    expect(plan.effectsAfter).toBeCloseTo(20 * 1.64, 9)
+    expect(plan.after[plan.slots.indexOf('Primary')]?.item.name).toBe('Quick Fang')
   })
 
   it('puts an exaltation only in a piece that shares a class of the character with it', () => {

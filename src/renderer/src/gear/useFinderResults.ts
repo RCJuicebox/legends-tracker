@@ -4,7 +4,7 @@ import type { InvItem } from '../../../core/inventory'
 import { findUpgrades, type HandWeights, type Wearer, type Weights } from '../../../core/gearFinder'
 import type { FocusWorth } from '../../../core/itemFocus'
 import type { Exaltation, Piece } from '../../../core/gearOptimizer'
-import { itemEffects } from '../../../core/itemEffects'
+import { itemEffects, type OwnEffects } from '../../../core/itemEffects'
 import { bestOwned, type RoundSlot } from '../../../core/finderRound'
 import type { GearInput } from '../../../core/gearWork'
 import { Dropped, runRound } from './gearRunner'
@@ -56,7 +56,7 @@ export function useFinderResults({
   exaltations: Exaltation[]
   judge: 'slot' | 'round'
   effects: GearEffects
-  effectsOfItem: (name: string) => { worn: string; proc: string } | undefined
+  effectsOfItem: (name: string) => OwnEffects | undefined
   weaponHands: HandWeights | null
 }) {
   // The finder scores the whole catalog (about 11,000 pieces) against every slot. Its inputs go
@@ -129,7 +129,7 @@ export function useFinderResults({
         ? {
             of: (it) => {
               const fx = itemEffects(it, d.effectsOfItem)
-              return { worn: fx.worn.map((f) => f.name), procs: fx.procs.map((f) => f.name) }
+              return { worn: fx.worn.map((f) => f.name), procs: fx.procs.map((f) => f.name), procRate: fx.procs[0]?.rate || undefined }
             },
             value: d.effects.value
           }

@@ -4,7 +4,7 @@
 import { itemKey, mergeLevel, parseStatsBlock, scaledStats, type InvItem, type ItemStats } from './inventory'
 import type { CatalogItem } from './wikiItem'
 import type { EffectValue } from './gearOptimizer'
-import { OFF_HAND_PROC, procOf, wornEffectOf } from './itemEffects'
+import { offHandProcShare, procOf, procRateFactor, procRateOf, wornEffectOf } from './itemEffects'
 import { classCode } from '../shared/game/classes'
 
 /** Worn locations as the inventory export names them → the words a stats block's "Slot:" line uses. */
@@ -342,9 +342,16 @@ export interface SlotResult {
   candidates: Candidate[]
 }
 
+/** What an item carries: its worn effects, its procs, and its proc's rate bonus in percent. */
+interface FinderItemEffects {
+  worn: string[]
+  procs: string[]
+  procRate?: number
+}
+
 /** Worn effects and procs in the finder: what a worn item carries (with its exaltations) and what they are worth. */
 interface FinderEffects {
-  of: (item: InvItem) => { worn: string[]; procs: string[] }
+  of: (item: InvItem) => FinderItemEffects
   value: EffectValue
 }
 
@@ -396,6 +403,7 @@ interface ParsedItem {
   /** Its worn effect and combat proc; '' for none. */
   worn: string
   proc: string
+  procRate: number
   era: string
   inferred: boolean
   by?: 'zone' | 'recipe'
@@ -420,6 +428,7 @@ function parseCatalog(catalog: CatalogItem[], eraStatus: FinderOptions['eraStatu
         base: parseStatsBlock(item.statsblock),
         worn: wornEffectOf(item.statsblock),
         proc: procOf(item.statsblock),
+        procRate: procRateOf(item.statsblock),
         ...eraOf(item, zones, eraStatus)
       }))
   parsedCatalogs.set(catalog, { status: eraStatus, items })
@@ -445,10 +454,12 @@ export function findUpgrades(o: FinderOptions): SlotResult[] {
   const hasteWithout = (item?: InvItem) => Math.max(0, ...wornHaste.filter((_, i) => o.worn[i] !== item))
   // Worn effects count once wherever worn; procs count on weapons in the hands.
   const HANDS = ['Primary', 'Secondary']
-  // An offhand proc fires as often as measured against the main hand's.
-  const procShare = (slot: string) => (slot === 'Secondary' ? OFF_HAND_PROC : 1)
+  // An offhand proc fires as often as measured against the main hand's, by the main hand's delay.
+  const primary = o.worn.find((w) => w.location === 'Primary')
+  const offShare = offHandProcShare(primary ? o.statsOf(primary)?.delay : undefined)
+  const procShare = (slot: string) => (slot === 'Secondary' ? offShare : 1)
   const wornFx = o.worn.map((w) => o.effects?.of(w) ?? { worn: [], procs: [] })
-  const effectsWith = (item: InvItem | undefined, add: { worn: string[]; procs: string[] } | null, slot: string): number => {
+  const effectsWith = (item: InvItem | undefined, add: FinderItemEffects | null, slot: string): number => {
     const fx = o.effects
     if (!fx) return 0
     const names = new Set<string>()
@@ -456,11 +467,11 @@ export function findUpgrades(o: FinderOptions): SlotResult[] {
     o.worn.forEach((w, i) => {
       if (w === item) return
       for (const n of wornFx[i].worn) names.add(n)
-      if (HANDS.includes(w.location)) for (const n of wornFx[i].procs) t += fx.value.proc(n) * procShare(w.location)
+      if (HANDS.includes(w.location)) for (const n of wornFx[i].procs) t += fx.value.proc(n) * procShare(w.location) * procRateFactor(wornFx[i].procRate)
     })
     if (add) {
       for (const n of add.worn) names.add(n)
-      if (HANDS.includes(slot)) for (const n of add.procs) t += fx.value.proc(n) * procShare(slot)
+      if (HANDS.includes(slot)) for (const n of add.procs) t += fx.value.proc(n) * procShare(slot) * procRateFactor(add.procRate)
     }
     return t + (names.size ? fx.value.worn([...names].sort()) : 0)
   }
@@ -498,7 +509,7 @@ export function findUpgrades(o: FinderOptions): SlotResult[] {
       const focusGain = !o.focus ? 0 : (p.item.focus ? focusWithout(current?.item, [p.item.focus]) : withoutCurrent) - focusNow
       const worn = o.effects ? p.worn : ''
       const proc = o.effects ? p.proc : ''
-      const effectGain = o.effects ? effectsWith(current?.item, { worn: worn ? [worn] : [], procs: proc ? [proc] : [] }, slot) - effectsNow : 0
+      const effectGain = o.effects ? effectsWith(current?.item, { worn: worn ? [worn] : [], procs: proc ? [proc] : [], procRate: p.procRate }, slot) - effectsNow : 0
       const statDelta = sc - (current?.score ?? 0)
       const delta = statDelta + focusGain + effectGain
       if (delta <= 0 && !(o.keepStatWinners && statDelta > 0)) continue

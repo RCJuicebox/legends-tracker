@@ -6,6 +6,7 @@ import type { InventoryView } from '../../../shared/types'
 import type { CatalogItem } from '../../../core/wikiItem'
 import type { GearEffects } from './useEffectsModel'
 import type { GearMode } from './useFinderResults'
+import type { OwnEffects } from '../../../core/itemEffects'
 
 export function useCatalogPieces({
   mode,
@@ -32,7 +33,7 @@ export function useCatalogPieces({
   eraStatus: Record<string, 'in' | 'out'> | undefined
   wearer: Wearer
   twoHanders: boolean
-  effectsOfItem: (name: string) => { worn: string; proc: string } | undefined
+  effectsOfItem: (name: string) => OwnEffects | undefined
   valueOf: (names: string[]) => number
   effects: GearEffects
   weights: Weights

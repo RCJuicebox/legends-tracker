@@ -21,7 +21,7 @@
 
 import { itemKey, storedEquipment, type Inventory, type InvItem, type ItemStats } from './inventory'
 import { ANY_SLOT, canWear, isTwoHanded, score, weightsForSlot, type HandWeights, type Restrictions, type Wearer, type Weights } from './gearFinder'
-import { OFF_HAND_PROC } from './itemEffects'
+import { offHandProcShare, procRateFactor } from './itemEffects'
 
 /** Every slot gear is worn in, one entry per slot: two ears, two wrists, two rings, two Any slots. */
 export const SLOT_LAYOUT = [
@@ -67,6 +67,8 @@ export interface Piece {
   /** Its worn effect and combat proc (its exaltations' in their place); absent for none. */
   worn?: string[]
   procs?: string[]
+  /** Its proc's rate bonus in percent ("Rate +64%"); absent for none. */
+  procRate?: number
   lore: boolean
   /** For an exalted copy: the exaltation put in it, the slot it goes in, and the piece it is a copy of. */
   exalt?: Exaltation
@@ -85,6 +87,7 @@ export interface Exaltation {
   focus: string
   worn?: string
   proc?: string
+  procRate?: number
   /**
    * What the item it was made from may be worn by: its slot words ("FINGER", "CHEST") say which
    * pieces it goes in (one of the same kind), its classes, race and level who may use it.
@@ -149,7 +152,7 @@ export function exaltedCopy(h: Piece, e: Exaltation, slot: ExaltSlot): Piece {
   if (!byExalt) exaltedCopies.set(h, (byExalt = new WeakMap()))
   let bySlot = byExalt.get(e)
   if (!bySlot) byExalt.set(e, (bySlot = {}))
-  const put: Partial<Piece> = slot === 'focus' ? { foci: [e.focus] } : slot === 'worn' ? { worn: [e.worn!] } : { procs: [e.proc!] }
+  const put: Partial<Piece> = slot === 'focus' ? { foci: [e.focus] } : slot === 'worn' ? { worn: [e.worn!] } : { procs: [e.proc!], procRate: e.procRate }
   return (bySlot[slot] ??= { ...h, ...put, exalt: e, exaltSlot: slot, host: h })
 }
 
@@ -326,8 +329,8 @@ export function optimizeGear(o: OptimizeOptions): Plan {
         for (const n of p.procs) {
           let v = procCache.get(n)
           if (v === undefined) procCache.set(n, (v = fx.proc(n)))
-          // An offhand proc fires as often as measured against the main hand's.
-          t += i === secondary ? v * OFF_HAND_PROC : v
+          // An offhand proc fires as often as measured against the main hand's, by the main hand's delay.
+          t += v * procRateFactor(p.procRate) * (i === secondary ? offHandProcShare(a[primary]?.stats?.delay) : 1)
         }
     }
     if (names) {
@@ -495,7 +498,7 @@ export function optimizeGear(o: OptimizeOptions): Plan {
 /** A piece for every item the character has: worn, in bags, in the bank, the shared bank, Storage › Equipment and on the pet. */
 export function ownedPieces(
   inv: { worn: InvItem[]; bags: InvItem[]; bank: InvItem[]; sharedBank: InvItem[]; keyRing?: Inventory['keyRing'] },
-  describe: (item: InvItem) => { r: Restrictions | null; stats: ItemStats | null; foci: string[]; worn?: string[]; procs?: string[]; lore: boolean } | null,
+  describe: (item: InvItem) => { r: Restrictions | null; stats: ItemStats | null; foci: string[]; worn?: string[]; procs?: string[]; procRate?: number; lore: boolean } | null,
   /** What the pet wears, from the log's list of its gear. */
   pet: InvItem[] = [],
   /** Gear kept on looting since the export, from the log. */

@@ -18,6 +18,7 @@ import { useFocusModel, type FocusCandidate, type OwnedFocus } from './useFocusM
 import { useEffectsModel, type GearEffects } from './useEffectsModel'
 import { useCatalogPieces } from './useCatalogPieces'
 import { useFinderResults, type GearMode } from './useFinderResults'
+import type { OwnEffects } from '../../../core/itemEffects'
 
 // Everything the upgrade finder, the focus effects tab and the optimiser work out, apart from how
 // they show it. Each concern is its own hook (the catalog, the character's weights, the catalog's
@@ -71,7 +72,7 @@ export interface GearModel {
   /** Worn effects and procs: the character's melee they are weighed against, their spells, their worth. */
   effects: GearEffects
   /** An item's own worn effect and proc, by name; undefined when the wiki does not know it. */
-  effectsOfItem: (name: string) => { worn: string; proc: string } | undefined
+  effectsOfItem: (name: string) => OwnEffects | undefined
   /** Every exaltation kept in Storage with a focus, worn effect or proc, whoever may use it. */
   storedExaltations: Exaltation[]
   /** Whether the era buttons hide a catalog item. */

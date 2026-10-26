@@ -7,7 +7,7 @@ import { itemKey, mergeLevel, type InvItem, type ItemStats } from './inventory'
 import { optimizeGear, pieceName, type OptimizeOptions, type Piece, type Plan } from './gearOptimizer'
 import { isLore, restrictions, type SlotResult } from './gearFinder'
 import type { CatalogItem } from './wikiItem'
-import { procOf, wornEffectOf } from './itemEffects'
+import { procOf, procRateOf, wornEffectOf } from './itemEffects'
 
 /** Where a piece of gear ends up, when a candidate moves things around. */
 interface RoundMove {
@@ -41,6 +41,7 @@ export function candidatePiece(item: CatalogItem, stats: ItemStats): Piece {
     foci: item.focus ? [item.focus] : [],
     worn: worn ? [worn] : [],
     procs: proc ? [proc] : [],
+    procRate: proc ? procRateOf(item.statsblock) : undefined,
     lore: isLore(item.statsblock)
   }
 }
