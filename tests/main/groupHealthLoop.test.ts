@@ -183,6 +183,31 @@ describe('your own mana (FEAT-043)', () => {
     expect(posted.filter((m) => m.kind === 'low')).toHaveLength(1)
   })
 
+  it('reads no mana while paused for Cannibalization, and says it again once back if still low', () => {
+    let mana = 0.5
+    const { l, posted, tick } = loop({ player: () => MANA, myMana: () => mana })
+    const config = (myManaPaused: boolean) =>
+      l.message({ kind: 'config', on: true, areas: [AREA], belowPct: 25, rearmPct: 35, front: true, myManaPct: 70, group: false, myManaPaused })
+    config(false)
+    const lows = () => posted.filter((m) => m.kind === 'low')
+    config(true)
+    tick(200)
+    tick(200)
+    expect(lows()).toEqual([])
+    config(false)
+    tick(200)
+    tick(200)
+    expect(lows()).toEqual([{ kind: 'low', slot: 1, pct: 50, what: 'myMana' }])
+    // Used again while still low: said again when ready, though never back over the line.
+    config(true)
+    mana = 0.6
+    tick(200)
+    config(false)
+    tick(200)
+    tick(200)
+    expect(lows()).toHaveLength(2)
+  })
+
   it('looks for the Player window only while the cue is on, and forgets it when switched off', () => {
     const { l, posted, tick, playerSearches } = loop({ bars: () => ROWS, player: () => MANA, myMana: () => 0.9 })
     l.message({ kind: 'config', on: true, areas: [AREA], belowPct: 25, rearmPct: 35, front: true })

@@ -347,7 +347,8 @@ export function sanitizeSettings(v: unknown, fb: AppSettings): AppSettings | nul
         )
       : (fb.groupHealth.calibrated ?? {}),
     myManaPct: Math.round(num(gh.myManaPct, fb.groupHealth.myManaPct ?? 0, 0, 80)),
-    myManaSpeech: str(gh.myManaSpeech, fb.groupHealth.myManaSpeech ?? 'Mana at {pct} percent').slice(0, 200)
+    myManaSpeech: str(gh.myManaSpeech, fb.groupHealth.myManaSpeech ?? 'Mana at {pct} percent').slice(0, 200),
+    myManaCanniSec: Math.round(num(gh.myManaCanniSec, fb.groupHealth.myManaCanniSec ?? 180, 0, 1200))
   })
 
   let overlays = fb.overlays

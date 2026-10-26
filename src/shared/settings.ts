@@ -219,6 +219,8 @@ export interface GroupHealthSettings {
   myManaPct: number
   /** What is said for your mana: {pct}. */
   myManaSpeech: string
+  /** Your mana is not read for this long after you use Cannibalization, its recast; 0 read always. */
+  myManaCanniSec: number
 }
 
 /** Other PCs' Logs folders the settings hold at most. */

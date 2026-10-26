@@ -152,6 +152,24 @@ export function GroupHealthCard() {
               </button>
             </div>
           </Field>
+          <Field label="Only while Cannibalization is ready" hint="Not read for its recast after you use it, then said again if still low.">
+            <div className="row tight">
+              <Switch on={g.myManaCanniSec > 0} onChange={(v) => void set({ myManaCanniSec: v ? 180 : 0 })} label="Only while Cannibalization is ready" />
+              {g.myManaCanniSec > 0 && (
+                <>
+                  <NumberInput
+                    value={g.myManaCanniSec}
+                    min={1}
+                    max={1200}
+                    width={80}
+                    onChange={(v) => void set({ myManaCanniSec: v ?? 180 })}
+                    label="Cannibalization recast, seconds"
+                  />
+                  <span className="faint small">seconds</span>
+                </>
+              )}
+            </div>
+          </Field>
         </div>
       )}
       {watching && (

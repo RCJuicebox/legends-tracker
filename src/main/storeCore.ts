@@ -66,7 +66,8 @@ export function defaultSettings(): AppSettings {
       skin: 'JBUI',
       calibrated: {},
       myManaPct: 0,
-      myManaSpeech: 'Mana at {pct} percent'
+      myManaSpeech: 'Mana at {pct} percent',
+      myManaCanniSec: 180
     },
     factionPlan: { assumptions: {}, choices: {} },
     setup: { hidden: false, accepted: [], arranged: false }

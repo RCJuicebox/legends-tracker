@@ -62,6 +62,8 @@ export type GroupHealthToWorker =
       myManaPct?: number
       /** Whether the Group window is watched at all: false while only your own mana cue is on. */
       group?: boolean
+      /** Your own mana is not read for now: Cannibalization is recasting. */
+      myManaPaused?: boolean
     }
   | { kind: 'search' }
   | { kind: 'ping' }
@@ -90,6 +92,10 @@ export interface GroupHealthSelfTest {
   error?: string
 }
 
+/** You use Cannibalization (any rank; not the Cannibalize spells, which have no recast), or are told when it is ready. */
+const RE_CANNI_USED = /^You (?:begin casting|hit yourself for \d+ points of unresistable damage by) Cannibalization\b/
+const RE_CANNI_AGAIN = /^You can use the ability Cannibalization again in (\d+) minute\(s\) (\d+) seconds/
+
 /** Back over the line by this much before a member is said again. */
 const REARM_ABOVE = 10
 
@@ -116,6 +122,8 @@ export class GroupHealth implements AppFeature {
   private reading = ''
   /** Your mana bar is in view (FEAT-043), for what the sources page says. */
   private playerSeen = false
+  /** When your Cannibalization is ready again, by the log's clock: your mana is read only from then. */
+  private canniReadyAt = 0
 
   register(ctx: AppContext): void {
     this.ctx = ctx
@@ -129,10 +137,12 @@ export class GroupHealth implements AppFeature {
     const feature: EngineFeature = {
       id: 'groupHealth',
       line: (l) => {
+        if (l.text.includes('Cannibalization')) return this.canni(l.time, l.text)
         if (!l.text.includes(' group') || !RE_GROUP_CHANGE.test(l.text)) return false
         this.worker?.postMessage({ kind: 'search' } satisfies GroupHealthToWorker)
         return true
       },
+      reset: () => (this.canniReadyAt = 0),
       // Five times a second: cheap, and it starts or stops the watch as the game opens and closes.
       tick: () => this.apply(),
       // Settings saved: the skin's file is read again too, in case it was rebuilt.
@@ -174,7 +184,8 @@ export class GroupHealth implements AppFeature {
     const areas = rect && all.some(overlaps) ? all.filter(overlaps) : all
     const rowLines = this.rowLines(s.watchNames, s.watchPct)
     const profile = this.profile()
-    const key = `${s.enabled}|${s.belowPct}|${s.manaPct}|${s.myManaPct}|${JSON.stringify(rowLines)}|${front}|${areas.map((a) => `${a.x},${a.y}`).join(';')}|${JSON.stringify(profile)}`
+    const myManaPaused = s.myManaCanniSec > 0 && Date.now() < this.canniReadyAt
+    const key = `${myManaPaused}|${s.enabled}|${s.belowPct}|${s.manaPct}|${s.myManaPct}|${JSON.stringify(rowLines)}|${front}|${areas.map((a) => `${a.x},${a.y}`).join(';')}|${JSON.stringify(profile)}`
     if (this.worker && !force && key === this.lastConfig) return
     // A watch that ended badly is started again, but not more than twice a minute.
     if (!this.worker && Date.now() < this.retryAt) return
@@ -191,8 +202,22 @@ export class GroupHealth implements AppFeature {
       rowLines,
       profile,
       myManaPct: s.myManaPct,
-      group: s.enabled
+      group: s.enabled,
+      myManaPaused
     } satisfies GroupHealthToWorker)
+  }
+
+  /**
+   * Cannibalization used, at `time`: your mana is not read until it is ready again, its recast later
+   * (the Triggers page's, three minutes unless changed). The game saying how long is left
+   * puts it right. The tick sends the pause to the worker, and its end.
+   */
+  private canni(time: number, text: string): boolean {
+    const again = RE_CANNI_AGAIN.exec(text)
+    if (again) this.canniReadyAt = time + (Number(again[1]) * 60 + Number(again[2])) * 1000
+    else if (RE_CANNI_USED.test(text)) this.canniReadyAt = time + this.ctx.store.settings.get().groupHealth.myManaCanniSec * 1000
+    else return false
+    return true
   }
 
   /** The game folder and skin the profile is read for. */

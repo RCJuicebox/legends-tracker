@@ -62,7 +62,8 @@ function setup(o: { enabled?: boolean; myManaPct?: number; skin?: string } = {})
       skin: o.skin ?? 'JuiceboxUI',
       calibrated: {} as Record<string, unknown>,
       myManaPct: o.myManaPct ?? 0,
-      myManaSpeech: 'Mana at {pct} percent'
+      myManaSpeech: 'Mana at {pct} percent',
+      myManaCanniSec: 180
     },
     overlays: []
   }
@@ -111,7 +112,8 @@ describe('GroupHealth', () => {
         rowLines: {},
         profile: JUICEBOX_PROFILE,
         myManaPct: 0,
-        group: true
+        group: true,
+        myManaPaused: false
       }
     ])
     // The same settings again: nothing more is sent.
@@ -205,6 +207,37 @@ describe('GroupHealth', () => {
     ])
     workers[0].emit('message', { kind: 'player', bar: null } satisfies GroupHealthFromWorker)
     expect(row().detail).toContain('No group members')
+  })
+
+  it("pauses your mana for Cannibalization's recast, or as long as the game says is left", () => {
+    const { workers, settings, tick, feature } = setup({ enabled: false, myManaPct: 70 })
+    tick()
+    expect(workers[0].posted.at(-1)).toMatchObject({ myManaPaused: false })
+    const at = (text: string) => feature().line!({ time: Date.now(), text })
+    // The Cannibalize spells have no recast: not taken.
+    expect(at('You begin casting Cannibalize IV.')).toBe(false)
+    expect(at('You begin casting Cannibalization I.')).toBe(true)
+    tick()
+    expect(workers[0].posted.at(-1)).toMatchObject({ myManaPaused: true })
+    vi.setSystemTime(Date.now() + 179_000)
+    tick()
+    expect(workers[0].posted.at(-1)).toMatchObject({ myManaPaused: true })
+    vi.setSystemTime(Date.now() + 1000)
+    tick()
+    expect(workers[0].posted.at(-1)).toMatchObject({ myManaPaused: false })
+    // The game's own count puts it right.
+    at('You hit yourself for 1540 points of unresistable damage by Cannibalization I.')
+    at('You can use the ability Cannibalization again in 0 minute(s) 35 seconds.')
+    tick()
+    expect(workers[0].posted.at(-1)).toMatchObject({ myManaPaused: true })
+    vi.setSystemTime(Date.now() + 35_000)
+    tick()
+    expect(workers[0].posted.at(-1)).toMatchObject({ myManaPaused: false })
+    // Switched off: read always.
+    settings.groupHealth.myManaCanniSec = 0
+    at('You begin casting Cannibalization I.')
+    tick()
+    expect(workers[0].posted.at(-1)).toMatchObject({ myManaPaused: false })
   })
 
   it("reads the skin's profile from its file, and puts the colours sampled for it in its place (FEAT-040)", async () => {

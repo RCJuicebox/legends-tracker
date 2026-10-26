@@ -19,7 +19,8 @@ import type { GroupHealthFromWorker, GroupHealthToWorker, ScreenArea } from './g
 // own (LT-627). Until the Group window is found, one monitor is searched every few seconds, backing
 // off to a minute, and only while the game is in front; found, its bars are copied five times a
 // second and each member going low is posted to say. With your own mana cue on (FEAT-043), each search
-// also looks for the Player window's mana bar, which is sampled with the rows, or alone when solo.
+// also looks for the Player window's mana bar, which is sampled with the rows, or alone when solo; it is
+// not read while the main process says your Cannibalization is recasting.
 
 /** Between samples of the bars once found. */
 const SAMPLE_MS = 200
@@ -75,6 +76,8 @@ export class GroupHealthLoop {
   player: GroupBar | null = null
   readonly myManaAlarm = new GroupHealthAlarm(0, 10)
   private myManaOn = false
+  /** Your mana is not read for now: Cannibalization is recasting. */
+  private myManaPaused = false
   /** The Group window is watched: off while only your own mana cue is on. */
   private groupOn = true
   private readonly find: NonNullable<LoopDeps['find']>
@@ -140,7 +143,7 @@ export class GroupHealthLoop {
 
   private sample(): void {
     if (this.bars.length) this.sampleRows()
-    if (!this.player) return
+    if (!this.player || this.myManaPaused) return
     // Read alone, a small piece of its own: the Player window is seldom near the Group window.
     const a = playerArea(this.player, this.profile)
     const fill = this.playerFill(this.deps.capture(a.x, a.y, a.width, a.height), this.player, this.profile)
@@ -211,6 +214,10 @@ export class GroupHealthLoop {
       const profile = m.profile ?? JUICEBOX_PROFILE
       const wasMyMana = this.myManaOn
       this.myManaOn = myMana > 0
+      // Paused or back: said afresh from here, so mana still low when Cannibalization is ready again is said.
+      const paused = m.myManaPaused ?? false
+      if (paused !== this.myManaPaused) this.myManaAlarm.reset()
+      this.myManaPaused = paused
       if (!this.myManaOn) this.setPlayer(null)
       // Another skin's bars, or your mana cue just on: looked for afresh.
       const newProfile = JSON.stringify(profile) !== JSON.stringify(this.profile)
