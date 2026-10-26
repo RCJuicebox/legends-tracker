@@ -1,5 +1,17 @@
 import { describe, expect, it } from 'vitest'
-import { effectScore, itemEffects, procDamage, procOf, procsPerMinute, procWorth, wornEffectOf, wornStats, wornWorth, type EffectSpell } from '../../src/core/itemEffects'
+import {
+  effectScore,
+  itemEffects,
+  OFF_HAND_PROC,
+  procDamage,
+  procOf,
+  procsPerMinute,
+  procWorth,
+  wornEffectOf,
+  wornStats,
+  wornWorth,
+  type EffectSpell
+} from '../../src/core/itemEffects'
 import { meleeCounter, meleeProfile } from '../../src/core/meleeTally'
 import { optimizeGear, type Piece } from '../../src/core/gearOptimizer'
 import { parseInventory, parseStatsBlock } from '../../src/core/inventory'
@@ -175,8 +187,12 @@ describe('what an effect is worth', () => {
 
   it("prices a proc from the log when it has fired, else from EQEmu's rate and the spell file", () => {
     const seen = meleeProfile({ active: 600_000, 'm|punch|h': 600, 'm|punch|d': 48_000, 'p|Lifebite|n': 30, 'p|Lifebite|d': 1260 }, { from: 'a', to: 'b' })
-    // Two fists carry it: 3 a minute between them, 1.5 each, 42 a firing.
-    expect(procWorth(LIFEBITE, seen, { level: 50, dex: 200, carriers: 2 }).dpm).toBeCloseTo(1.5 * 42, 6)
+    // One fist carries it: 3 a minute, 42 a firing.
+    expect(procWorth(LIFEBITE, seen, { level: 50, dex: 200, carriers: 1 }).dpm).toBeCloseTo(3 * 42, 6)
+    // Both fists carry it: the 3 a minute are the main hand's and the off hand's, 1 to 0.36.
+    expect(procWorth(LIFEBITE, seen, { level: 50, dex: 200, carriers: 1 + OFF_HAND_PROC }).dpm).toBeCloseTo((3 / 1.36) * 42, 6)
+    // Only the off hand carries it: the main hand would fire it 3 / 0.36 a minute.
+    expect(procWorth(LIFEBITE, seen, { level: 50, dex: 200, carriers: OFF_HAND_PROC }).dpm).toBeCloseTo((3 / 0.36) * 42, 6)
     // Never fired: 2 a minute raised 15% by 200 DEX, and the spell's 42 at level 50 (36 + 50, capped at 42).
     expect(procsPerMinute(200)).toBeCloseTo(2.3, 6)
     expect(procWorth(LIFEBITE, profile, { level: 50, dex: 200, carriers: 1 }).dpm).toBeCloseTo(2.3 * 42, 6)
@@ -282,8 +298,8 @@ describe('the optimiser and effects', () => {
       piece(n, where, 'Slot: PRIMARY SECONDARY<br>\nSkill: 1H Piercing Atk Delay: 20<br>\nDMG: 10<br>\nClass: ALL<br>\nRace: ALL<br>', { procs: ['Lifebite'] })
     const plan = optimizeGear({ pieces: [fang('Fang A', 'Primary'), fang('Fang B', 'Any Slot')], wearer, weights, twoHanders: false, focusValue: () => 0, effects })
     expect(plan.effectsBefore).toBe(20)
-    // The second fang goes to the off hand, where its proc counts too.
-    expect(plan.effectsAfter).toBe(40)
+    // The second fang goes to the off hand, where its proc counts too, as often as an off hand procs.
+    expect(plan.effectsAfter).toBeCloseTo(20 + 20 * OFF_HAND_PROC, 9)
     expect(plan.after[plan.slots.indexOf('Secondary')]?.item.name).toBe('Fang B')
   })
 

@@ -4,7 +4,7 @@
 import { itemKey, mergeLevel, parseStatsBlock, scaledStats, type InvItem, type ItemStats } from './inventory'
 import type { CatalogItem } from './wikiItem'
 import type { EffectValue } from './gearOptimizer'
-import { procOf, wornEffectOf } from './itemEffects'
+import { OFF_HAND_PROC, procOf, wornEffectOf } from './itemEffects'
 import { classCode } from '../shared/game/classes'
 
 /** Worn locations as the inventory export names them → the words a stats block's "Slot:" line uses. */
@@ -445,8 +445,8 @@ export function findUpgrades(o: FinderOptions): SlotResult[] {
   const hasteWithout = (item?: InvItem) => Math.max(0, ...wornHaste.filter((_, i) => o.worn[i] !== item))
   // Worn effects count once wherever worn; procs count on weapons in the hands.
   const HANDS = ['Primary', 'Secondary']
-  // An offhand proc fires on offhand swings: as often as the offhand swings against the main hand.
-  const procShare = (slot: string) => (slot === 'Secondary' && o.hands ? o.hands.off / o.hands.main : 1)
+  // An offhand proc fires as often as measured against the main hand's.
+  const procShare = (slot: string) => (slot === 'Secondary' ? OFF_HAND_PROC : 1)
   const wornFx = o.worn.map((w) => o.effects?.of(w) ?? { worn: [], procs: [] })
   const effectsWith = (item: InvItem | undefined, add: { worn: string[]; procs: string[] } | null, slot: string): number => {
     const fx = o.effects

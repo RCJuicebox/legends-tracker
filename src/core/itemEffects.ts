@@ -250,12 +250,21 @@ function procCeiling(spell: EffectSpell, level: number): number {
   return spell.effects.filter((e) => e.spa === 0 && e.base < 0).reduce((s, e) => s + Math.abs(effectValue(e, level)), 0) * 10
 }
 
+/**
+ * How often a proc in the off hand fires against the same proc in the main hand. Measured on a dummy
+ * (2026-10-26, 71 minutes swinging, a different proc in each fist): 2.13 a minute in the main hand,
+ * 0.77 in the off hand, and the two add up rather than share. It takes in both the off hand's fewer
+ * swings and a lower chance a swing.
+ */
+export const OFF_HAND_PROC = 0.36
+
 /** EQEmu's proc rate for a weapon with no rate of its own: 2 a minute, raised 0.075% for each point of DEX. */
 export const procsPerMinute = (dex: number) => 2 * (1 + (dex * 0.075) / 100)
 
 /**
- * A proc on one weapon in hand. `carriers` is how many weapons worn now carry it: the log's firings
- * are theirs together.
+ * A proc on a weapon in the main hand. `carriers` is the hands worn now that carry it, the main hand
+ * counting 1 and the off hand OFF_HAND_PROC: the log's firings are theirs together, so a proc in
+ * both fists is the main hand's for 1 / 1.36 of them.
  */
 export function procWorth(spell: EffectSpell, profile: MeleeProfile, o: { level: number; dex: number; carriers: number }): EffectWorth {
   const does: string[] = []
@@ -277,7 +286,7 @@ export function procWorth(spell: EffectSpell, profile: MeleeProfile, o: { level:
     // The melee time between its firings is the time it was worn; all of the window's melee would
     // count days it was not (a new weapon's proc read at a fraction of its rate).
     const worn = seen.gaps >= 3 && seen.wornMin > 0
-    const ppm = (worn ? seen.gaps / seen.wornMin : seen.count / profile.activeMin) / Math.max(1, o.carriers)
+    const ppm = (worn ? seen.gaps / seen.wornMin : seen.count / profile.activeMin) / (o.carriers > 0 ? o.carriers : 1)
     const each = seen.damage / seen.count
     // A proc that lasts is ticks the log books elsewhere: its first hit alone is short of it.
     const per = Math.max(each, damage)

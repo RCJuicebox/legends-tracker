@@ -3,7 +3,7 @@ import { useInvoke } from '../hooks'
 import type { StatsInputs } from '../../../core/statsInputs'
 import type { Weights } from '../../../core/gearFinder'
 import type { EffectValue, Piece } from '../../../core/gearOptimizer'
-import type { EffectSpell, EffectWorth } from '../../../core/itemEffects'
+import { OFF_HAND_PROC, type EffectSpell, type EffectWorth } from '../../../core/itemEffects'
 import type { MeleeProfile } from '../../../core/meleeTally'
 import { effectScorers, type EffectInputs } from '../../../core/effectScorers'
 import { HANDS } from '../../../core/gearCatalog'
@@ -68,7 +68,9 @@ export function useEffectsModel({
     const profile = data?.profile ?? null
     const spells = data?.spells ?? {}
     const carriers = new Map<string, number>()
-    for (const p of pieces) if (p.from === 'worn' && HANDS.includes(p.item.location)) for (const n of p.procs ?? []) carriers.set(n, (carriers.get(n) ?? 0) + 1)
+    for (const p of pieces)
+      if (p.from === 'worn' && HANDS.includes(p.item.location))
+        for (const n of p.procs ?? []) carriers.set(n, (carriers.get(n) ?? 0) + (p.item.location === 'Secondary' ? OFF_HAND_PROC : 1))
     const inputs: EffectInputs = { spells, profile, level, dex, carriers: [...carriers] }
     const s = effectScorers(inputs, weights)
     return {

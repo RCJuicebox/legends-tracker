@@ -14,7 +14,7 @@ export interface EffectInputs {
   profile: MeleeProfile | null
   level: number
   dex: number
-  /** Weapons in hand now that carry each proc, by name. */
+  /** The hands now carrying each proc, by name: the main hand 1, the off hand OFF_HAND_PROC. */
   carriers: [string, number][]
 }
 

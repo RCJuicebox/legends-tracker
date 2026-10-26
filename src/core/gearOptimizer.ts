@@ -21,6 +21,7 @@
 
 import { itemKey, storedEquipment, type Inventory, type InvItem, type ItemStats } from './inventory'
 import { ANY_SLOT, canWear, isTwoHanded, score, weightsForSlot, type HandWeights, type Restrictions, type Wearer, type Weights } from './gearFinder'
+import { OFF_HAND_PROC } from './itemEffects'
 
 /** Every slot gear is worn in, one entry per slot: two ears, two wrists, two rings, two Any slots. */
 export const SLOT_LAYOUT = [
@@ -268,8 +269,6 @@ export function optimizeGear(o: OptimizeOptions): Plan {
   // Weapon ratio counts in the hands, ranged ratio in the Range slot. Haste is counted once for the
   // whole set: only the best worn works.
   const slotWeights = slots.map((s) => ({ ...weightsForSlot(o.weights, s, o.hands), haste: 0 }))
-  // An offhand proc fires on offhand swings, so it counts as often as the offhand swings against the main hand.
-  const offProc = o.hands && o.hands.main > 0 ? o.hands.off / o.hands.main : 1
   const hasteOf = (a: (Piece | null)[]) => Math.max(0, ...a.map((p) => p?.stats?.haste ?? 0)) * o.weights.haste
   const kept = o.cache ?? optimizerCache()
   const scoreCache = kept.score
@@ -327,7 +326,8 @@ export function optimizeGear(o: OptimizeOptions): Plan {
         for (const n of p.procs) {
           let v = procCache.get(n)
           if (v === undefined) procCache.set(n, (v = fx.proc(n)))
-          t += i === secondary ? v * offProc : v
+          // An offhand proc fires as often as measured against the main hand's.
+          t += i === secondary ? v * OFF_HAND_PROC : v
         }
     }
     if (names) {
