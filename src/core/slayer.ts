@@ -1,6 +1,7 @@
 import type { AchSection } from '../shared/character'
 import { COMPLETED_ACHIEVEMENT, DIED, PET_ATTACKING, SLAIN_BY, SLAIN_BY_YOU } from './phrases'
 import {
+  ACHIEVEMENT_GROUPS,
   ACHIEVEMENT_RACES,
   MOB_RACES,
   NAME_CALLINGS,
@@ -76,6 +77,14 @@ export function achievementRaces(text: string, game: RaceTable): { keys: Set<str
     const named = ACHIEVEMENT_RACES[item]
     if (named) {
       for (const r of named) keys.add(r)
+      continue
+    }
+    const group = prefix ? undefined : ACHIEVEMENT_GROUPS[item]
+    if (group) {
+      const g = achievementRaces(group, game)
+      for (const k of g.keys) keys.add(k)
+      unnamed.push(...g.unnamed)
+      for (const b of g.broader) broader.add(b)
       continue
     }
     const words = item.split(' ')

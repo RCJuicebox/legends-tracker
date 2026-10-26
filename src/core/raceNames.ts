@@ -258,6 +258,20 @@ export const ACHIEVEMENT_RACES: Record<string, string[]> = {
   'the avatar': ['innoruuk', 'cazic thule']
 }
 
+/**
+ * Words a roll-up writes for another achievement's race list: The Zookeeper's "Birds" are what
+ * Featherbrained Plan lists, its "Apes" Better Get a Barrel's, its "Mystical Horses" Slayer of
+ * Mystical Horses'. Each to that list as the client writes it. Play says so: The Zookeeper rose 49
+ * while about 54 pegasi died in the Plane of Sky (exports of 2026-10-25), and the aviaks that
+ * finished Bird Flew (2026-10-12) are Birds. "Bears" and "Mammoths" are the client's races, so they
+ * stay as written; "Sea Mammals" has no list in the client.
+ */
+export const ACHIEVEMENT_GROUPS: Record<string, string> = {
+  apes: 'Gorillas, Holgresh, and Yetis.',
+  birds: 'Aviaks, Blood Ravens, Cockatrices, Hawks, and Parrots.',
+  'mystical horses': 'Kirins, Nightmares, Pegasus, and Unicorns.'
+}
+
 /** The races "The playable races." stands for. */
 export const PLAYABLE = [
   'barbarian',

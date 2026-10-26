@@ -74,6 +74,8 @@ const DBSTR = [
   '6^11^Dark Elf^0^',
   '8^11^Dwarf^0^',
   '10^11^Ogre^0^',
+  '13^11^Aviak^0^',
+  '13^12^Aviaks^0^',
   '14^11^Werewolf^0^',
   '15^11^Brownie^0^',
   '15^12^Brownies^0^',
@@ -89,6 +91,8 @@ const DBSTR = [
   '37^11^Snake^0^',
   '38^11^Spider^0^',
   '39^11^Gnoll^0^',
+  '41^11^Gorilla^0^',
+  '41^12^Gorillas^0^',
   '42^11^Wolf^0^',
   '43^11^Bear^0^',
   '44^11^Guard^0^',
@@ -103,6 +107,9 @@ const DBSTR = [
   '69^11^Will-O-Wisp^0^',
   '79^11^Bixie^0^',
   '100^11^Dervish^0^',
+  '124^11^Unicorn^0^',
+  '124^12^Unicorns^0^',
+  '125^11^Pegasus^0^',
   '100^12^Dervishes^0^',
   '133^11^Drolvarg^0^',
   '140^11^Giant^0^',
@@ -188,6 +195,25 @@ describe('Slayer counts', () => {
     const gods = new SlayerRaces([{ races: 'The avatar of a deity.' }], GAME)
     expect(gods.place('Innoruuk, the Prince of Hate', null).key).toBe('innoruuk')
     expect(gods.place('Cazic-Thule', null).key).toBe('cazic thule')
+  })
+
+  it("reads a roll-up's group words as the race lists they stand for", () => {
+    const zoo = 'Apes, Bears, Birds, Boars, Mammoths, Mystical Horses, Othmirs, Rhinos, Sea Mammals, and Swinetors.'
+    const keys = keysOf(zoo)
+    // Birds are Featherbrained Plan's list, Apes Better Get a Barrel's, Mystical Horses Slayer of Mystical Horses'.
+    expect(keys).toEqual(expect.arrayContaining(['aviak', 'blood raven', 'cockatrice', 'parrot', 'gorilla', 'holgresh', 'yeti', 'kirin', 'pegasus', 'unicorn', 'bear']))
+    expect(keys).not.toContain('bird')
+    expect(keys).not.toContain('ape')
+    expect(keys).not.toContain('mystical horse')
+    // A list with no list of its own stays as written.
+    expect(achievementRaces(zoo, GAME).unnamed).toContain('sea mammal')
+    // As the log names them: aviaks, the Plane of Sky's pegasi and gorillas all count.
+    const zooRaces = new SlayerRaces([{ races: zoo }], GAME)
+    expect(zooRaces.keys[0].has(zooRaces.place('an aviak starling', null).key ?? '')).toBe(true)
+    expect(zooRaces.keys[0].has(zooRaces.place('a soul tamer', 'Pegasus').key ?? '')).toBe(true)
+    expect(zooRaces.keys[0].has(zooRaces.place('a graniteback', 'Gorilla').key ?? '')).toBe(true)
+    // Its own words only: Birds in a list does not make a bird of every name.
+    expect(keysOf('Aviaks')).toEqual(['aviak'])
   })
 
   it('takes the race a name ends on, never a word inside another', () => {
