@@ -206,7 +206,7 @@ export function createContext(): AppContext {
     {
       casts: dayConsumer(() => castCounter(() => ctx.engine.quickBuffLandings()), 2),
       // 2: crits counted per skill (LT-739).
-      melee: dayConsumer(meleeCounter, 2),
+      melee: dayConsumer(meleeCounter, 3),
       resists: dayConsumer(resistCounter),
       spellMerges: dayConsumer(spellMergeCounter),
       purchases: purchaseConsumer,

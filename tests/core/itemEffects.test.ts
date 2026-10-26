@@ -72,7 +72,23 @@ describe('your melee from the log', () => {
   })
 
   it('takes spell damage with no cast of it just before as a proc', () => {
-    expect(profile.procs).toEqual({ Lifebite: { count: 1, damage: 42 } })
+    expect(profile.procs).toEqual({ Lifebite: { count: 1, damage: 42, wornMin: 0, gaps: 0 } })
+  })
+
+  it("times a proc by the melee between its firings: swinging long without it is time it wasn't worn", () => {
+    const lines = ['[Fri Sep 25 12:00:00 2026] You punch a skeleton for 60 points of damage.']
+    // Two minutes of swinging every 5 s with Lifedraw at 12:00:30, 12:01:00 and 12:02:00.
+    for (let s = 5; s <= 120; s += 5) {
+      const at = `12:0${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`
+      lines.push(`[Fri Sep 25 ${at} 2026] You punch a skeleton for 60 points of damage.`)
+      if (s === 30 || s === 60 || s === 120) lines.push(`[Fri Sep 25 ${at} 2026] You hit a skeleton for 130 points of magic damage by Lifedraw.`)
+    }
+    // Then 21 minutes of swinging with no Lifedraw (it came off), and one more firing: that gap is no worn time.
+    for (let m = 3; m <= 24; m++)
+      for (let s = 0; s < 60; s += 5) lines.push(`[Fri Sep 25 12:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')} 2026] You punch a skeleton for 60 points of damage.`)
+    lines.push('[Fri Sep 25 12:24:55 2026] You hit a skeleton for 130 points of magic damage by Lifedraw.')
+    const p = fromLog(lines.join('\n'))
+    expect(p.procs.Lifedraw).toEqual({ count: 4, damage: 520, wornMin: 1.5, gaps: 2 })
   })
 })
 
@@ -164,6 +180,18 @@ describe('what an effect is worth', () => {
     // Never fired: 2 a minute raised 15% by 200 DEX, and the spell's 42 at level 50 (36 + 50, capped at 42).
     expect(procsPerMinute(200)).toBeCloseTo(2.3, 6)
     expect(procWorth(LIFEBITE, profile, { level: 50, dex: 200, carriers: 1 }).dpm).toBeCloseTo(2.3 * 42, 6)
+  })
+
+  it('rates a proc over the time it was worn, not the whole window', () => {
+    // 100 minutes of melee, but the proc fired 30 times in the last 10: 29 gaps over 10 worn minutes.
+    const late = meleeProfile(
+      { active: 6_000_000, 'm|punch|h': 6000, 'm|punch|d': 480_000, 'p|Lifedraw|n': 30, 'p|Lifedraw|d': 3900, 'p|Lifedraw|a': 600_000, 'p|Lifedraw|i': 29 },
+      { from: 'a', to: 'b' }
+    )
+    const lifedraw = { ...LIFEBITE, name: 'Lifedraw' }
+    const w = procWorth(lifedraw, late, { level: 50, dex: 200, carriers: 1 })
+    expect(w.dpm).toBeCloseTo(2.9 * 130, 6)
+    expect(w.basis).toBe('2.90 a minute while worn (10 min in your log) × 130')
   })
 
   it('gives a proc that lands only on undead or summoned creatures no value', () => {

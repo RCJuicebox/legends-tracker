@@ -274,11 +274,15 @@ export function procWorth(spell: EffectSpell, profile: MeleeProfile, o: { level:
   if (only) return { dpm: 0, does: [...does, `works only on ${only}`], basis: 'Not valued: most of what you fight is neither.' }
   const seen = profile.procs[spell.name]
   if (seen && seen.count >= 3 && profile.activeMin > 0) {
-    const ppm = seen.count / profile.activeMin / Math.max(1, o.carriers)
+    // The melee time between its firings is the time it was worn; all of the window's melee would
+    // count days it was not (a new weapon's proc read at a fraction of its rate).
+    const worn = seen.gaps >= 3 && seen.wornMin > 0
+    const ppm = (worn ? seen.gaps / seen.wornMin : seen.count / profile.activeMin) / Math.max(1, o.carriers)
     const each = seen.damage / seen.count
     // A proc that lasts is ticks the log books elsewhere: its first hit alone is short of it.
     const per = Math.max(each, damage)
-    return capped(ppm * per, `${ppm.toFixed(2)} a minute as your log has it × ${Math.round(per)}`)
+    const when = worn ? `while worn (${Math.round(seen.wornMin)} min in your log)` : 'as your log has it'
+    return capped(ppm * per, `${ppm.toFixed(2)} a minute ${when} × ${Math.round(per)}`)
   }
   if (damage <= 0) return { dpm: 0, does, basis: '' }
   const ppm = procsPerMinute(o.dex)

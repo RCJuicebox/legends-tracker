@@ -4,6 +4,9 @@
 //   m|bash|h / |d / |x / |c    a melee skill's hits, damage, misses and crits ("bash", "kick", "punch" …)
 //   p|Lifebite|n / |d     a proc's firings and damage: spell damage from you with no cast of that
 //                         spell just before it (the meter's rule)
+//   p|Lifebite|a / |i     melee time between one firing and the next, and how many such gaps: the
+//                         time it was worn, so the days before it was (or after it came off) leave its
+//                         rate alone
 
 import { parseCombatLine, SELF } from './combatLines'
 import { CAST_WINDOW_MS, spellBase } from './combatMeter'
@@ -15,9 +18,18 @@ type Days = Record<string, Record<string, number>>
 /** Swings further apart than this are two stretches of fighting: the time between is not counted. */
 const MELEE_GAP_MS = 6000
 
+/**
+ * More swinging than this between two firings of a proc is taken as time it was not worn: it counts
+ * toward neither. Two a minute almost never goes 20 minutes without one.
+ */
+export const PROC_WORN_GAP_MS = 20 * 60_000
+
 /** A fresh counter: it remembers the last swing and the last casts across the lines it reads. */
 export function meleeCounter(): (line: LogLine, into: Days) => void {
   let lastSwing = 0
+  // Melee time so far, and where it stood at each proc's last firing.
+  let swung = 0
+  const fired = new Map<string, number>()
   const casts = new Map<string, number>()
   return (line, into) => {
     // Everything counted here is the player's own, and the log starts each such line "You ": the
@@ -35,7 +47,10 @@ export function meleeCounter(): (line: LogLine, into: Days) => void {
       day[key] = (day[key] ?? 0) + v
     }
     const swing = () => {
-      if (lastSwing && t >= lastSwing && t - lastSwing <= MELEE_GAP_MS) add('active', t - lastSwing)
+      if (lastSwing && t >= lastSwing && t - lastSwing <= MELEE_GAP_MS) {
+        add('active', t - lastSwing)
+        swung += t - lastSwing
+      }
       lastSwing = t
     }
     if (ev.kind === 'damage' && ev.source === SELF) {
@@ -50,6 +65,12 @@ export function meleeCounter(): (line: LogLine, into: Days) => void {
         if (cast === undefined || t - cast > CAST_WINDOW_MS || t < cast) {
           add(`p|${ev.skill}|n`, 1)
           add(`p|${ev.skill}|d`, ev.amount)
+          const last = fired.get(ev.skill)
+          if (last !== undefined && swung - last <= PROC_WORN_GAP_MS) {
+            add(`p|${ev.skill}|a`, swung - last)
+            add(`p|${ev.skill}|i`, 1)
+          }
+          fired.set(ev.skill, swung)
         }
       }
     } else if (ev.kind === 'miss' && ev.source === SELF) {
@@ -75,8 +96,11 @@ export interface MeleeProfile {
   dpm: number
   /** Per melee skill as the log names it ("bash", "kick", "punch"). */
   skills: Record<string, SkillUse>
-  /** Per proc as the log names it ("Lifebite"). */
-  procs: Record<string, { count: number; damage: number }>
+  /**
+   * Per proc as the log names it ("Lifebite"): its firings and damage, and the melee minutes between
+   * firings (`wornMin`, over `gaps` of them), which is its rate while worn.
+   */
+  procs: Record<string, { count: number; damage: number; wornMin: number; gaps: number }>
   /** The first and last day counted, "2026-09-10"; '' when nothing was. */
   from: string
   to: string
@@ -98,7 +122,7 @@ export function meleeRates(p: MeleeProfile): { hits: number; crits: number; miss
 /** Counters summed over a window (as the day tally hands them back) read as a profile. */
 export function meleeProfile(counts: Record<string, number>, window: { from: string; to: string }): MeleeProfile {
   const skills: Record<string, SkillUse> = {}
-  const procs: Record<string, { count: number; damage: number }> = {}
+  const procs: MeleeProfile['procs'] = {}
   let damage = 0
   for (const [key, v] of Object.entries(counts)) {
     const [kind, name, what] = key.split('|')
@@ -111,9 +135,11 @@ export function meleeProfile(counts: Record<string, number>, window: { from: str
       } else if (what === 'x') s.misses += v
       else if (what === 'c') s.crits += v
     } else if (kind === 'p') {
-      const p = (procs[name] ??= { count: 0, damage: 0 })
+      const p = (procs[name] ??= { count: 0, damage: 0, wornMin: 0, gaps: 0 })
       if (what === 'n') p.count += v
       else if (what === 'd') p.damage += v
+      else if (what === 'a') p.wornMin += v / 60_000
+      else if (what === 'i') p.gaps += v
     }
   }
   const activeMin = (counts.active ?? 0) / 60_000
