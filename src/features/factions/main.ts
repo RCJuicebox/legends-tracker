@@ -388,7 +388,7 @@ function factionIds(view: FactionView): Map<number, string> {
   const ids = new Map<number, string>()
   for (const r of view.factions) {
     if (r.achievement) ids.set(r.achievement.id - FACTION_ACH_BASE, r.name)
-    if (r.standing) ids.set(r.standing.id, r.name)
+    if (r.standing && !r.standing.assumed) ids.set(r.standing.id, r.name)
   }
   return ids
 }

@@ -17,6 +17,7 @@ import {
   RECENT_KEPT,
   SinceExports,
   standingBand,
+  withCons,
   type FactionTallies
 } from '../../../src/features/factions/core'
 import { CLASS_NUMBER } from '../../../src/shared/game/classes'
@@ -281,7 +282,7 @@ describe('factionView with an export', () => {
     expect(v.export).toEqual({ file: 'Tester_neriak-MNK-Factions.txt', modified: at })
     const brownies = v.factions.find((f) => f.name === 'Brownies of Faydwer')
     expect(brownies).toMatchObject({ net: -2, changes: 2, standing: { id: 65, value: -3, atExport: -6, since: 3, sinceAll: true } })
-    expect(v.factions.find((f) => f.name === 'Gem Choppers')?.standing).toBeNull()
+    expect(v.factions.find((f) => f.name === 'Gem Choppers')?.standing).toEqual({ id: 0, value: 1, atExport: 0, since: 1, sinceAll: true, assumed: true })
     expect(v.factions.find((f) => f.name === 'Faction723')).toMatchObject({ net: 0, changes: 0, last: 0, standing: { value: 0 } })
     // The log's first, then the export's own by name.
     expect(v.factions.map((f) => f.name)).toEqual(['Gem Choppers', 'Brownies of Faydwer', 'Antonius Bayle', 'Crushbone Orcs', 'Faction723'])
@@ -292,6 +293,26 @@ describe('factionView with an export', () => {
     expect(v.factions.find((f) => f.name === 'Antonius Bayle')).toMatchObject({ cap: 'top', standing: { value: 2000, since: 5 } })
     expect(v.factions.find((f) => f.name === 'Crushbone Orcs')?.cap).toBe('bottom')
     expect(v.factions.find((f) => f.name === 'Brownies of Faydwer')?.cap).toBeNull()
+  })
+
+  it('takes a faction the export leaves out to start at 0, held at the end the game says it is stuck at', () => {
+    const v = factionView(tally([...Array(5).fill(adjusted('Host of Nektropos', -2)), adjusted('Dread Slayers', 5), better('Dread Slayers'), worse('Beta Dubious')]), exported)
+    const of = (name: string) => v.factions.find((f) => f.name === name)?.standing
+    expect(of('Host of Nektropos')).toMatchObject({ value: -10, assumed: true })
+    expect(of('Dread Slayers')).toMatchObject({ value: 2000, assumed: true })
+    expect(of('Beta Dubious')).toMatchObject({ value: -2000, assumed: true })
+    expect(of('Brownies of Faydwer')?.assumed).toBeUndefined()
+    // Without an export there is nothing to say it was left out of.
+    expect(factionView(tally([adjusted('Host of Nektropos', -2)])).factions[0].standing).toBeNull()
+  })
+
+  it('adds no modifiers to an assumed standing, whose faction id is not known', () => {
+    const v = withCons(factionView(tally([adjusted('Host of Nektropos', -2)]), exported), new Map([[0, new Map([[51, -500]])]]), {
+      basis: { race: 'Human', classes: ['Monk'], deity: '' },
+      keys: { race: 51, classes: [7], deity: null }
+    })
+    expect(v.factions.find((f) => f.name === 'Host of Nektropos')?.standing?.con).toBeUndefined()
+    expect(v.factions.find((f) => f.name === 'Brownies of Faydwer')?.standing?.con).toBeDefined()
   })
 
   it('says when the log saw more changes since the export than it keeps', () => {

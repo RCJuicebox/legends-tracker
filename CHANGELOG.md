@@ -4,6 +4,8 @@ What changed in each version. The release workflow publishes a version's section
 
 ## Unreleased
 
+- **Factions: the newer zones' own factions get a standing.** The game leaves factions such as Host of Nektropos, Nerius Trade Association and Dread Slayers out of its faction window and the `/outputfile faction` export, so Standings showed only their net change. A faction your logs name that the export leaves out now starts at 0 (Indifferent) and adds every change the log saw, or sits at 2000 or −2000 where the game said it could get no better or worse. Its con word is that standing alone, since the game's modifier table doesn't list these factions.
+
 ## 2.20.0 (2026-10-26)
 
 - **Your mana cue waits for Cannibalization.** With **Only while Cannibalization is ready** on (Triggers, under "Say when your own mana is low"), your mana is not read for Cannibalization's recast after you use it, three minutes unless you change it. When it is ready again, mana still under your line is said again, even if it never came back over. The game's own "You can use the ability Cannibalization again in…" sets the time left. Turn it off and your mana is read all the time, as before.

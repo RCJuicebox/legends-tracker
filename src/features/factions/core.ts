@@ -317,7 +317,7 @@ export function withCons(view: FactionView, mods: Map<number, Map<number, number
   return {
     ...view,
     conBasis: c.basis,
-    factions: view.factions.map((r) => (r.standing ? { ...r, standing: { ...r.standing, con: conOf(mods, r.standing.id, r.standing.value, c.keys) } } : r))
+    factions: view.factions.map((r) => (r.standing && !r.standing.assumed ? { ...r, standing: { ...r.standing, con: conOf(mods, r.standing.id, r.standing.value, c.keys) } } : r))
   }
 }
 
@@ -337,6 +337,12 @@ export interface FactionStandingNow {
   sinceAll: boolean
   /** What NPCs con: the value with the character's race, class and deity modifiers; absent without a race on its record. */
   con?: FactionCon
+  /**
+   * The export does not list it (newer zones' factions, Nektropos's and Lake Nerius's, are left out of
+   * it and of the game's faction window): taken to start at 0, Indifferent, and `value` is what the log
+   * saw since. Its id is not known (0), so no modifiers are added for its con.
+   */
+  assumed?: true
 }
 
 /** One faction as the Factions page shows it. */
@@ -350,7 +356,7 @@ export interface FactionRow {
   cap: FactionCap | null
   /** The last adjustments, newest first. */
   recent: FactionChange[]
-  /** From the factions export; null when there is none or it does not list this faction. */
+  /** From the factions export (assumed from 0 for a faction the log names and it leaves out); null without an export. */
   standing: FactionStandingNow | null
   /** Its EverQuest › Progression achievement, when it has one. */
   achievement: FactionRowAchievement | null
@@ -556,6 +562,15 @@ function standingNow(s: FactionStanding, t: FactionTally | undefined, since: num
   return { id: s.id, value, atExport: s.value, since: sum, sinceAll }
 }
 
+/**
+ * A faction the export leaves out, from 0: every change the log saw, or the cap the game last said it
+ * is stuck at. Only as right as the log and archives reach back, which they do for a newer zone's.
+ */
+function assumedStanding(t: FactionTally): FactionStandingNow {
+  const value = t.cap === 'top' ? STANDING_MAX : t.cap === 'bottom' ? STANDING_MIN : Math.max(STANDING_MIN, Math.min(STANDING_MAX, t.net))
+  return { id: 0, value, atExport: 0, since: value, sinceAll: true, assumed: true }
+}
+
 export function factionView(
   tallies: FactionTallies,
   exported: FactionExport | null = null,
@@ -585,9 +600,10 @@ export function factionView(
       if (!(t && t.capAt > exported.modified)) r.cap = standing.value >= STANDING_MAX ? 'top' : standing.value <= STANDING_MIN ? 'bottom' : null
       rows.set(key, r)
     }
+    for (const [key, r] of rows) if (!r.standing) r.standing = assumedStanding(tallies[key])
   }
   if (achievements) {
-    const byId = new Map([...rows.values()].flatMap((r) => (r.standing ? [[r.standing.id, r] as const] : [])))
+    const byId = new Map([...rows.values()].flatMap((r) => (r.standing && !r.standing.assumed ? [[r.standing.id, r] as const] : [])))
     for (const a of achievements.list) {
       const key = a.faction.toLowerCase()
       let r = byId.get(a.factionId) ?? rows.get(key)

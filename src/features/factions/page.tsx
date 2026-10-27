@@ -54,7 +54,7 @@ const HOW = (
   <>
     <div>
       <b>Standing</b> is the factions export (<code>/outputfile faction</code>) plus every change the log recorded since, so it keeps up as you play. It is what the achievements
-      count.
+      count. A faction the export leaves out (the newer zones’ own, such as Nektropos’s and Lake Nerius’s) is taken to start at 0, Indifferent, plus every change the log recorded.
     </div>
     <div>
       <b>Con</b> is what NPCs see: the standing plus your race’s, your deity’s and the best of your three classes’ modifiers, from the game’s own table. Race and classes are the
@@ -126,6 +126,9 @@ function standingNote(s: FactionStandingNow, basis: ConBasis | null): string {
   const c = s.con
   const band = standingBand(c?.value ?? s.value)
   const next = band.next ? ` ${band.next.points} more to ${band.next.word}.` : ''
+  if (s.assumed) {
+    return `Not in the factions export (nor the game’s faction window), so taken to start at 0, Indifferent: ${plain(s.value)} from every change the log saw, or the end the game said it could go no further past. Its race, class and deity modifiers are not in the game’s table, so the con word is the standing alone.${next}`
+  }
   const from = !s.since && s.sinceAll ? `${plain(s.value)} in the factions export.` : `${plain(s.atExport)} in the factions export, ${signed(s.since)} from the log since.`
   const part = s.sinceAll ? '' : ' The log saw more changes since than it keeps, so it may be further off: type /outputfile faction to refresh it.'
   const con =
