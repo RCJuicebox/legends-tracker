@@ -169,6 +169,7 @@ describe('Slayer counts', () => {
     expect(raceKey('Vah Shir')).toBe('kerran')
     expect(wikiRaceKey('Half-Elf')).toBe('half elf')
     expect(wikiRaceKey('Lycanthrope')).toBe('drolvarg')
+    expect(wikiRaceKey('Fungusman')).toBe('sporali')
     // Not one race: the name places the mob instead.
     expect(wikiRaceKey('Animal')).toBeNull()
     expect(wikiRaceKey('Human, Barbarian, Half-Elf')).toBeNull()

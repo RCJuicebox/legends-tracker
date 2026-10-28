@@ -122,6 +122,8 @@ const ALIASES: Record<string, string> = {
   'erudite ghost': 'ghost',
   'ghost dwarf': 'ghost',
   'elf vampire': 'vampire',
+  // 28 Fungusman, 456 Sporali: eqlwiki calls Runnyeye's sporali Fungusman; the achievements say Sporalis.
+  fungusman: 'sporali',
   // One race each, by another name.
   'lava dragon': 'dragon',
   'ice dragon': 'dragon',
@@ -201,7 +203,8 @@ const UNSURE: ReadonlySet<string> = new Set([
   'bee',
   'giant bee',
   'polar bear',
-  'kerra'
+  'kerra',
+  'fungusman'
 ])
 
 /** Wiki races that say nothing of which race: the mob is placed by its name. */
