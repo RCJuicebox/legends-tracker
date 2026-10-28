@@ -20,7 +20,7 @@ import type { CharacterSheet, InventoryView } from '../../../shared/types'
 // Infinitesimal motes' worth and, where it can be said, how much more of your damage it gives.
 
 const HOW =
-  "An item's next merge counts its gain in your stat weights, over what 1% more weapon damage counts for in them. A damage spell's next rank counts its damage bonus times that spell's share of your damage in this meter session. Heals, buffs and crowd control have no share of damage to put on them: they follow, by their own worth. Cost is the motes' combine value in Infinitesimal motes. Per 1,000 is the gain for each 1,000 motes of cost: the list's own order. Click a column to sort by it."
+  "An item's next merge counts its gain in your stat weights, over what 1% more weapon damage counts for in them. A damage spell's next rank counts its damage bonus times that spell's share of your damage in this meter session. A buff's next rank counts what it adds to your stats (2% stats, resists and AC, 3% attack and HP regen, 2.5% haste, 10% max HP), priced by the same weights as a merge, as though you keep it up; a proc buff's adds 3% of its proc's share of your damage. Heals, debuffs and crowd control have no gain to put on them: they follow, by their own worth. Cost is the motes' combine value in Infinitesimal motes. Per 1,000 is the gain for each 1,000 motes of cost: the list's own order. Click a column to sort by it."
 
 type SortKey = 'name' | 'step' | 'cost' | 'gain' | 'perK'
 const SORT_VALUE: Record<SortKey, (r: NextRow) => string | number | null> = {
@@ -61,7 +61,7 @@ function Ranking({ view, sheet }: { view: InventoryView; sheet: CharacterSheet |
     const spells = spellUpgradeOptions({ rows: spellRows, tierPct: tracking.tierDurationPct, weights: spellWeights, stock: stock?.counts })
     const you = segQ.data?.entities['you']
     const shares = you ? spellShares(you.skills, (n) => spellBase(n)) : new Map<string, number>()
-    return nextRanking(items, spells, { ratioWeight: c.weights.ratio, damageShare: (name) => shares.get(name.toLowerCase()) ?? null })
+    return nextRanking(items, spells, { ratioWeight: c.weights.ratio, damageShare: (name) => shares.get(name.toLowerCase()) ?? null, weights: c.weights })
   }, [view, c.weights, c.hands, stock, spellsQ.data, tracking.tierDurationPct, spellWeights, segQ.data])
   // The list's own order is the most per mote first; a column sorts it otherwise, a gain not known last.
   const [sort, setSort] = useRemembered<Sort<SortKey>>('motenext.sort', { key: 'perK', dir: -1 })

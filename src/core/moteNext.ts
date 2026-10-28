@@ -1,11 +1,15 @@
 import type { MergeOption } from './mergeValue'
 import type { SpellUpgradeOption } from './spellMotes'
+import { score, type Weights } from './gearFinder'
+import { EFFECT_RANK_PCT } from '../shared/game/guide'
 
 // Motes › Next (FEAT-033): Best merge and Spell upgrades in one list. Both already price motes in
 // Infinitesimal-equivalents; the gain is made the same where it can be: an item's gain in your
 // weights' points over what 1% more weapon damage counts for (`ratioWeight`), and a damage spell's
-// rank as its damage bonus times that spell's share of your damage. Heals, buffs and crowd control keep
-// the guide's points, ranked after the ones a share of damage could be put on.
+// rank as its damage bonus times that spell's share of your damage. A buff's rank is what it adds to
+// your stats, priced by the same weights as a merge (kept up, it is worn); a proc buff's adds its proc's
+// share of your damage times the proc's rate. Heals, debuffs and crowd control keep the guide's points,
+// ranked after the ones a gain could be put on.
 
 export interface NextRow {
   kind: 'item' | 'spell'
@@ -35,6 +39,8 @@ export function nextRanking(
     ratioWeight: number
     /** A spell's share of your damage (0 to 1) by its name, or null when the meter has none of it. */
     damageShare: (spell: string) => number | null
+    /** Your stat weights, to price what a buff's rank adds; without them buffs keep their points. */
+    weights?: Weights
   }
 ): NextRow[] {
   const rows: NextRow[] = []
@@ -58,7 +64,8 @@ export function nextRanking(
     const power = s.parts.find((p) => p.key === 'power')
     const share = DAMAGE.has(s.row.category) && power ? o.damageShare(s.row.name) : null
     const cost = s.spend.short ? null : s.spend.worth
-    const gainPct = share !== null && power ? power.pct * share : null
+    const buff = buffGain(s, o)
+    const gainPct = share !== null && power ? power.pct * share : (buff?.pct ?? null)
     rows.push({
       kind: 'spell',
       name: s.row.name,
@@ -67,7 +74,7 @@ export function nextRanking(
       cost,
       gainPct,
       perK: perK(gainPct, cost),
-      note: `${s.worth.toFixed(0)} points over your casts`,
+      note: buff?.note ?? `${s.worth.toFixed(0)} points over your casts`,
       affordable: s.affordable
     })
   }
@@ -75,6 +82,29 @@ export function nextRanking(
   return rows.sort(
     (a, b) => Number(b.gainPct !== null) - Number(a.gainPct !== null) || per(b) - per(a) || Number(b.affordable) - Number(a.affordable) || a.name.localeCompare(b.name)
   )
+}
+
+/**
+ * What a buff's next rank gives in the list's terms: its stats priced by your weights over what 1% more
+ * weapon damage counts for, plus its proc's share of your damage times the proc's rate. Null when
+ * neither can be said.
+ */
+function buffGain(s: SpellUpgradeOption, o: { ratioWeight: number; damageShare: (spell: string) => number | null; weights?: Weights }): { pct: number; note: string } | null {
+  const parts: string[] = []
+  let pct = 0
+  if (s.row.rankStats && o.weights && o.ratioWeight > 0) {
+    // Not a hand: a shield's AC rule has no place here.
+    const { shieldAc: _shield, ...w } = o.weights
+    const points = score(s.row.rankStats, w)
+    pct += points / o.ratioWeight
+    parts.push(`${points.toFixed(1)} points by your weights`)
+  }
+  const share = s.row.procSpell ? o.damageShare(s.row.procSpell) : null
+  if (share !== null) {
+    pct += EFFECT_RANK_PCT.procDamage * share
+    parts.push(`${s.row.procSpell} ${(share * 100).toFixed(1)}% of your damage`)
+  }
+  return parts.length ? { pct, note: parts.join('; ') } : null
 }
 
 /** Each spell's share of your damage in a meter segment, by its unranked name, from your skills' totals (DoT ticks with their hits). */

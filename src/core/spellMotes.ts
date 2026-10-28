@@ -24,7 +24,10 @@ import { casterLevel, formulaTicks } from './durations'
 import { isItemEffect } from './focus'
 import { isSong, summonsPet } from './spellKinds'
 import { RESIST_SPA, SPA, STAT_SPA } from '../shared/game/spa'
-import type { SpellBook } from './spells'
+import type { Spell, SpellBook } from './spells'
+import { wornStats } from './itemEffects'
+import { effectValue } from './effectValue'
+import { parseStatsBlock, type ItemStats } from './inventory'
 import { CLASS_NAMES, type CharacterSettings, type SpellCategory } from '../shared/types'
 import { EFFECT_RANK_PCT, RANK_BONUS, UNIVERSAL, UTILITY_BONUS, type RankBonus } from '../shared/game/guide'
 
@@ -151,6 +154,38 @@ export function valueGainOf(category: SpellCategory, effects: { spa: number; bas
   return { pct: pcts[0] ?? 0, note: pcts.map((p) => `+${p}% ${listOf(byPct.get(p)!)}`).join(', ') }
 }
 
+/**
+ * What one more rank of a buff adds to you, as item stats, so your gear weights price it as they price a
+ * merge: each effect's value at your level times its kind's rate (EFFECT_RANK_PCT). Haste is the part
+ * over 100 the spell file writes it as (140 is 40%). Null for anything but a buff, or a buff with
+ * nothing the weights read (a proc, movement).
+ */
+export function rankStatsOf(spell: Spell, level: number): ItemStats | null {
+  if (spell.category !== 'buff') return null
+  const base = wornStats(spell, level)
+  const r = (k: EffectKind) => EFFECT_RANK_PCT[k] / 100
+  const s = parseStatsBlock('')
+  for (const [k, v] of Object.entries(base.stats)) if (v) s.stats[k as keyof ItemStats['stats']] = v * r('stats')
+  for (const [k, v] of Object.entries(base.saves)) if (v) s.saves[k as keyof ItemStats['saves']] = v * r('resists')
+  s.ac = base.ac * r('AC')
+  s.attack = base.attack * r('attack')
+  if (base.pools.HP) s.pools.HP = base.pools.HP * r('maxHp')
+  s.hpRegen = base.hpRegen * r('healing')
+  for (const e of spell.effects) {
+    const v = e.spa === SPA.HASTE ? effectValue(e, level) : 0
+    if (v > 100) s.haste += (v - 100) * r('haste')
+  }
+  const any = [...Object.values(s.stats), ...Object.values(s.saves), s.ac, s.attack, s.pools.HP ?? 0, s.hpRegen, s.haste].some((v) => v)
+  return any ? s : null
+}
+
+/** The spell a buff's proc fires, by name, as the damage meter counts it. */
+function procSpellOf(book: SpellBook, spell: Spell): string | null {
+  if (spell.category !== 'buff') return null
+  const e = spell.effects.find((x) => x.spa === SPA.PROC)
+  return (e && book.get(e.base)?.name) || null
+}
+
 /** The per-rank table for a spell: its category's row, unless its section has none in the guide. */
 function bonusFor(category: SpellCategory, section: SectionKey): RankBonus {
   return section === 'transport' || section === 'utility' ? UTILITY_BONUS : RANK_BONUS[category]
@@ -181,6 +216,10 @@ export interface SpellCastRow {
   /** What a rank adds to a buff's or debuff's values (valueGainOf), in percent, and what it is. */
   valueGain: number
   valueNote: string
+  /** What one more rank of a buff adds to you, as item stats (rankStatsOf); null for the rest. */
+  rankStats: ItemStats | null
+  /** The spell a buff's proc fires, for its share of your damage; null without one. */
+  procSpell: string | null
   /** Whether a resist modifier applies: a detrimental spell. */
   resistable: boolean
   /** Casts in the window a target resisted outright, every rank counted (LT-722). */
@@ -245,6 +284,7 @@ export function castRows(
     }
     const pet = summonsPet(s)
     const value = valueGainOf(s.category, s.effects)
+    const level = casterLevel(s, character)
     rows.set(s.name, {
       name: s.name,
       rank: r.rank,
@@ -255,7 +295,9 @@ export function castRows(
       castMs: s.castMs,
       recastMs: s.recastMs,
       mana: s.mana,
-      ticks: formulaTicks(casterLevel(s, character), s.formula, s.cap),
+      ticks: formulaTicks(level, s.formula, s.cap),
+      rankStats: rankStatsOf(s, level),
+      procSpell: procSpellOf(book, s),
       song: isSong(s),
       pet,
       valueGain: value.pct,

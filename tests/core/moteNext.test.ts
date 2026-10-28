@@ -1,5 +1,12 @@
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { nextRanking, spellShares } from '../../src/core/moteNext'
+import { WEIGHT_LABELS, type WeightKey, type Weights } from '../../src/core/gearFinder'
+import { parseStatsBlock } from '../../src/core/inventory'
+import { castRows } from '../../src/core/spellMotes'
+import { SpellBook } from '../../src/core/spells'
+import { fixtureBook } from '../helpers'
 import type { MergeOption } from '../../src/core/mergeValue'
 import type { SpellUpgradeOption } from '../../src/core/spellMotes'
 
@@ -39,6 +46,50 @@ describe('Motes › Next: merges and spell ranks in one list (FEAT-033)', () => 
       [8, null],
       [8, null]
     ])
+  })
+
+  it("prices a buff's next rank by your weights, and a proc buff's by its proc's share of your damage", () => {
+    const weights = { ...(Object.fromEntries(Object.keys(WEIGHT_LABELS).map((k) => [k, 0])) as Record<WeightKey, number>), str: 1, hp: 0.5, ratio: 10, shieldAc: 99 } as Weights
+    // Strength II → III: 2% of 67 STR is 1.34 STR; Harnessing: 10% of 251 HP and 2% of its STR and DEX.
+    const strength = parseStatsBlock('')
+    strength.stats.STR = 1.34
+    const harnessing = parseStatsBlock('')
+    harnessing.stats.STR = 1.34
+    harnessing.pools.HP = 25.1
+    const buff = (name: string, rankStats: unknown, procSpell: string | null = null) =>
+      ({ ...spell(name, 'buff', 2, 50), row: { name, category: 'buff', rankStats, procSpell } }) as unknown as SpellUpgradeOption
+    const rows = nextRanking(
+      [],
+      [buff('Strength', strength), buff('Harnessing of Spirit', harnessing), buff('Vampiric Embrace', null, 'Vampiric Embrace'), buff('Spirit of Wolf', null)],
+      {
+        ratioWeight: 10,
+        damageShare: (n) => (n === 'Vampiric Embrace' ? 0.05 : null),
+        weights
+      }
+    )
+    expect(rows.map((r) => [r.name, r.gainPct === null ? null : Math.round(r.gainPct * 1000) / 1000, r.note])).toEqual([
+      ['Harnessing of Spirit', 1.389, '13.9 points by your weights'],
+      ['Vampiric Embrace', 0.15, 'Vampiric Embrace 5.0% of your damage'],
+      ['Strength', 0.134, '1.3 points by your weights'],
+      // Movement does not grow: nothing to price, so it keeps its points.
+      ['Spirit of Wolf', null, '50 points over your casts']
+    ])
+  })
+
+  it("reads a buff row's rank stats and proc from the spell file", () => {
+    const character = { level: 50, classLevels: {}, focusSources: [] }
+    const stacking = SpellBook.parse(
+      readFileSync(join(__dirname, '..', 'fixtures', 'stacking_spells_us.txt'), 'latin1'),
+      readFileSync(join(__dirname, '..', 'fixtures', 'stacking_spells_us_str.txt'), 'latin1')
+    )
+    // Harnessing at level 50: 251 max HP, 67 STR, 50 DEX; its one-time heal is not a stat.
+    const [harnessing] = castRows(stacking, { 'Harnessing of Spirit I': 1 }, character).rows
+    expect(harnessing.procSpell).toBeNull()
+    expect(harnessing.rankStats?.pools.HP).toBeCloseTo(25.1)
+    expect(harnessing.rankStats?.stats).toEqual({ STR: expect.closeTo(1.34), DEX: expect.closeTo(1) })
+    // Spirit of the Puma is all proc: no stats. Its proc spell is not in this fixture, so it names none.
+    const [puma] = castRows(fixtureBook(), { 'Spirit of the Puma IX': 1 }, character).rows
+    expect(puma).toMatchObject({ rankStats: null, procSpell: null })
   })
 
   it('gives each spell its share of your damage in a meter segment, its ticks with its hits', () => {
