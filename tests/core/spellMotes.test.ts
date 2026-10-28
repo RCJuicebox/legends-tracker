@@ -1,5 +1,8 @@
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { castableByMine, castRows, DEFAULT_SPELL_WEIGHTS, isAbility, rankGain, sectionOf, spellUpgradeOptions, spendOnSpell, stockXp } from '../../src/core/spellMotes'
+import { castableByMine, castRows, DEFAULT_SPELL_WEIGHTS, isAbility, rankGain, sectionOf, spellUpgradeOptions, spendOnSpell, stockXp, valueGainOf } from '../../src/core/spellMotes'
+import { SpellBook } from '../../src/core/spells'
 import { DEFAULT_TIER_DURATION_PCT } from '../../src/shared/types'
 import { fixtureBook } from '../helpers'
 
@@ -59,6 +62,34 @@ describe('what a rank gives', () => {
       ['cast', 4],
       ['reuse', 4]
     ])
+  })
+
+  it("grows a buff's stats 2% a rank and its max HP 10%, as the spell windows show", () => {
+    const stacking = SpellBook.parse(
+      readFileSync(join(__dirname, '..', 'fixtures', 'stacking_spells_us.txt'), 'latin1'),
+      readFileSync(join(__dirname, '..', 'fixtures', 'stacking_spells_us_str.txt'), 'latin1')
+    )
+    const { rows } = castRows(stacking, { 'Strength II': 1, 'Harnessing of Spirit I': 1, 'Infusion of Spirit IV': 1, Guardian: 1 }, character)
+    const power = (name: string) =>
+      rankGain(
+        rows.find((r) => r.name === name)!,
+        DEFAULT_TIER_DURATION_PCT,
+        DEFAULT_SPELL_WEIGHTS
+      ).find((p) => p.key === 'power')
+    expect(power('Strength')).toMatchObject({ pct: 2, label: '+2% stats and resists' })
+    // Infusion pads its first slots with blank CHA 0 effects: still a stat buff, nothing more.
+    expect(power('Infusion of Spirit')).toMatchObject({ pct: 2 })
+    expect(power('Harnessing of Spirit')).toMatchObject({ pct: 10, label: '+10% max HP (stats +2%)' })
+    // AC alone is not measured, so it counts nothing.
+    expect(power('Guardian')).toBeUndefined()
+  })
+
+  it('grows a debuff that takes stats or resists, and nothing else', () => {
+    // Malosi: −10 to −60 on each resist; a slow (SPA 11) is not measured.
+    const malosi = [47, 50, 48, 46].map((spa) => ({ spa, base: -10 }))
+    expect(valueGainOf('debuff', malosi)).toEqual({ pct: 2, note: 'stats and resists taken' })
+    expect(valueGainOf('debuff', [{ spa: 11, base: 70 }])).toEqual({ pct: 0, note: '' })
+    expect(valueGainOf('nuke', malosi).pct).toBe(0)
   })
 
   it('sums every rank of a spell into one row at its highest rank, and keeps clickies and unknown names apart', () => {

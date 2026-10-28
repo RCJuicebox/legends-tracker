@@ -39,11 +39,26 @@ export const RANK_BONUS: Record<SpellCategory, RankBonus> = {
   dot: { cast: 4, mana: 2, power: 3, powerNote: 'per tick', caveat: 'the per-tick gain is unconfirmed; the direct hit of a hybrid gets +6%' },
   heal: { cast: 4, mana: 2, power: 3, powerNote: 'healing', caveat: 'from a single report (65 → 79 at rank VII)' },
   hot: { cast: 4, mana: 2, power: 3, powerNote: 'per tick', caveat: 'per-tick gain from the community table only' },
-  debuff: { cast: 4, mana: 4, power: 0, powerNote: '', caveat: 'the effect itself does not scale' },
+  debuff: { cast: 4, mana: 4, power: 0, powerNote: '', caveat: 'stats and resists +2%, from spell windows; slows and other effects not measured' },
   charm: { cast: 4, mana: 4, power: 0, powerNote: '', level: true },
   mez: { cast: 4, mana: 4, power: 0, powerNote: '', level: true },
-  buff: { cast: 4, mana: 4, power: 0, powerNote: '', caveat: "the buff's stats do not grow (damage shields confirmed not to)" }
+  buff: {
+    cast: 4,
+    mana: 4,
+    power: 0,
+    powerNote: '',
+    caveat: 'stats and resists +2%, max HP +10%, from spell windows; haste, procs and damage shields not measured'
+  }
 }
+
+/**
+ * What a rank adds to a buff's or debuff's values, in percent of the base: not the guide's (it said they
+ * do not grow), but measured from spell windows on 2026-10-28. Stats and resists 2%, rounded (Strength
+ * II 67 → 70, Infusion of Spirit IV 50/55/45 → 54/59/49, Malosi VIII 60 → 70); max HP 10% (Harnessing
+ * of Spirit 251 → 276 → 301). Other effects of these spells are not measured, so they count nothing.
+ */
+export const STAT_RANK_PCT = 2
+export const MAX_HP_RANK_PCT = 10
 
 /**
  * Duration bonus per tier, in percent. A setting (Spell Timers › per-tier bonus) starts from these.

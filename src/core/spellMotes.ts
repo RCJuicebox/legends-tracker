@@ -10,6 +10,7 @@
 //     their full xp here. Spending the lowest ranks first costs the least combine value.
 //   - What a rank gives depends on the spell's category (the guide's table, RANK_BONUS below), plus
 //     the same for every spell: recovery and reuse −2%, resist modifier −15 on resistable spells.
+//     Buffs and debuffs also grow their stats, resists and max HP (valueGainOf), measured in game.
 //     Duration bonuses are the ones the spell timers use (the tracking settings' per-rank table).
 //   - Instant and permanent spells get no duration bonus; a zero-mana spell nothing on the mana line.
 //
@@ -22,10 +23,10 @@ import { countsToArray } from './moteCalc'
 import { casterLevel, formulaTicks } from './durations'
 import { isItemEffect } from './focus'
 import { isSong, summonsPet } from './spellKinds'
-import { SPA } from '../shared/game/spa'
+import { RESIST_SPA, SPA, STAT_SPA } from '../shared/game/spa'
 import type { SpellBook } from './spells'
 import { CLASS_NAMES, type CharacterSettings, type SpellCategory } from '../shared/types'
-import { RANK_BONUS, UNIVERSAL, UTILITY_BONUS, type RankBonus } from '../shared/game/guide'
+import { MAX_HP_RANK_PCT, RANK_BONUS, STAT_RANK_PCT, UNIVERSAL, UTILITY_BONUS, type RankBonus } from '../shared/game/guide'
 
 const MAX_RANK = 10
 
@@ -53,7 +54,7 @@ export interface SpellWeights {
 export const DEFAULT_SPELL_WEIGHTS: SpellWeights = { power: 1, duration: 1, mana: 0.5, cast: 0.5, reuse: 0.25, level: 5 }
 
 export const WEIGHT_LABELS: Record<keyof SpellWeights, string> = {
-  power: 'Damage & healing',
+  power: 'Damage, healing & stats',
   duration: 'Duration',
   mana: 'Mana',
   cast: 'Cast time',
@@ -91,6 +92,21 @@ export function sectionOf(category: SpellCategory, pet: boolean, effects: { spa:
   return SECTIONS.find((s) => (s.cats as readonly string[]).includes(category))?.key ?? 'buff'
 }
 
+/** Max HP, an effect of buffs like Harnessing of Spirit. */
+const MAX_HP_SPA = 69
+
+/**
+ * What a rank adds to a buff's or debuff's values, by the effects measured (STAT_RANK_PCT): max HP 10%,
+ * stats and resists 2%, anything else nothing. A spell with max HP and stats counts the max HP rate.
+ * The blank CHA 0 effects spells pad their slots with are not a stat.
+ */
+export function valueGainOf(category: SpellCategory, effects: { spa: number; base: number }[]): { pct: number; note: string } {
+  if (category !== 'buff' && category !== 'debuff') return { pct: 0, note: '' }
+  const stats = effects.some((e) => e.base !== 0 && (e.spa in STAT_SPA || e.spa in RESIST_SPA))
+  if (effects.some((e) => e.spa === MAX_HP_SPA && e.base > 0)) return { pct: MAX_HP_RANK_PCT, note: stats ? `max HP (stats +${STAT_RANK_PCT}%)` : 'max HP' }
+  return stats ? { pct: STAT_RANK_PCT, note: category === 'debuff' ? 'stats and resists taken' : 'stats and resists' } : { pct: 0, note: '' }
+}
+
 /** The per-rank table for a spell: its category's row, unless its section has none in the guide. */
 function bonusFor(category: SpellCategory, section: SectionKey): RankBonus {
   return section === 'transport' || section === 'utility' ? UTILITY_BONUS : RANK_BONUS[category]
@@ -118,6 +134,9 @@ export interface SpellCastRow {
   song: boolean
   /** Summons a pet: each rank adds a pet level. */
   pet: boolean
+  /** What a rank adds to a buff's or debuff's values (valueGainOf), in percent, and what it is. */
+  valueGain: number
+  valueNote: string
   /** Whether a resist modifier applies: a detrimental spell. */
   resistable: boolean
   /** Casts in the window a target resisted outright, every rank counted (LT-722). */
@@ -181,6 +200,7 @@ export function castRows(
       continue
     }
     const pet = summonsPet(s)
+    const value = valueGainOf(s.category, s.effects)
     rows.set(s.name, {
       name: s.name,
       rank: r.rank,
@@ -194,6 +214,8 @@ export function castRows(
       ticks: formulaTicks(casterLevel(s, character), s.formula, s.cap),
       song: isSong(s),
       pet,
+      valueGain: value.pct,
+      valueNote: value.note,
       resistable: !s.beneficial,
       resisted: 0,
       classes: s.classLevels
@@ -308,6 +330,7 @@ export function rankGain(row: SpellCastRow, tierPct: Record<SpellCategory, numbe
     if (pct > 0) parts.push({ key, pct, points: round(pct * w[key], 3), label })
   }
   if (b.power) add('power', b.power, `+${b.power}% ${b.powerNote}`)
+  else if (row.valueGain) add('power', row.valueGain, `+${row.valueGain}% ${row.valueNote}`)
   const dur = row.ticks > 0 ? (tierPct[row.category] ?? 0) : 0
   if (dur) add('duration', dur, `+${dur}% duration`)
   if (row.mana > 0) add('mana', b.mana, `−${b.mana}% mana`)
