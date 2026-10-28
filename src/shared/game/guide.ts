@@ -36,10 +36,10 @@ export interface RankBonus {
 
 export const RANK_BONUS: Record<SpellCategory, RankBonus> = {
   nuke: { cast: 2, mana: 2, power: 6, powerNote: 'damage' },
-  dot: { cast: 4, mana: 2, power: 3, powerNote: 'per tick', caveat: 'the per-tick gain is unconfirmed; the direct hit of a hybrid gets +6%' },
-  heal: { cast: 4, mana: 2, power: 3, powerNote: 'healing', caveat: 'from a single report (65 → 79 at rank VII)' },
-  hot: { cast: 4, mana: 2, power: 3, powerNote: 'per tick', caveat: 'per-tick gain from the community table only' },
-  debuff: { cast: 4, mana: 4, power: 0, powerNote: '', caveat: 'stats and resists +2%, from spell windows; slows and other effects not measured' },
+  dot: { cast: 4, mana: 2, power: 3, powerNote: 'per tick', caveat: 'the direct hit of a hybrid gets +6%' },
+  heal: { cast: 4, mana: 2, power: 3, powerNote: 'healing' },
+  hot: { cast: 4, mana: 2, power: 3, powerNote: 'per tick' },
+  debuff: { cast: 4, mana: 4, power: 0, powerNote: '', caveat: 'stats, resists and AC taken +2%; slows do not grow' },
   charm: { cast: 4, mana: 4, power: 0, powerNote: '', level: true },
   mez: { cast: 4, mana: 4, power: 0, powerNote: '', level: true },
   buff: {
@@ -47,18 +47,37 @@ export const RANK_BONUS: Record<SpellCategory, RankBonus> = {
     mana: 4,
     power: 0,
     powerNote: '',
-    caveat: 'stats and resists +2%, max HP +10%, from spell windows; haste, procs and damage shields not measured'
+    caveat: 'by effect: max HP +10%, attack and healing +3%, haste +2.5%, stats, resists and AC +2%, a proc a rank of its own every two; movement and endurance regen do not grow'
   }
 }
 
 /**
- * What a rank adds to a buff's or debuff's values, in percent of the base: not the guide's (it said they
- * do not grow), but measured from spell windows on 2026-10-28. Stats and resists 2%, rounded (Strength
- * II 67 → 70, Infusion of Spirit IV 50/55/45 → 54/59/49, Malosi VIII 60 → 70); max HP 10% (Harnessing
- * of Spirit 251 → 276 → 301). Other effects of these spells are not measured, so they count nothing.
+ * What a rank adds to a buff's or debuff's effects, in percent of the base, linear in rank. Not the
+ * guide's (it said they do not grow): read off spell windows on 2026-10-28. Stats, resists and attack
+ * round to the nearest point; healing and damage drop the fraction. Slows (Togor's Insects X still 60%),
+ * movement (Spirit of Wolf IV 55), endurance regen (Chloroplast VI 10) and counters do not grow.
+ * The guide's own rows check out the same way: Superior Healing V 600 → 689, Slugs Healing V 200 → 229
+ * a tick, Envenomed Bolt X 345 → 448 a tick and 41 → 65 on the hit.
  */
-export const STAT_RANK_PCT = 2
-export const MAX_HP_RANK_PCT = 10
+export const EFFECT_RANK_PCT = {
+  /** Max HP: Harnessing of Spirit 251 → 276 → 301. */
+  maxHp: 10,
+  /** HP regen and heals on a buff: Chloroplast VI 16 → 18, Harnessing II's heal 251 → 266. */
+  healing: 3,
+  /** Attack ("Offense"): Dark Temptation V and VI 25 → 29, Spirit of Bih`Li IV 15 → 17, Grim Aura IV 10 → 11. */
+  attack: 3,
+  /**
+   * A proc's damage: its own spell goes up a rank every two (Vampiric Embrace V–X fire Vampiric Embrace
+   * II–V), and that spell's lifetap 6% a rank (62 → 69, 73, 76, 80), so 3% a rank on average.
+   */
+  procDamage: 3,
+  /** Haste: Alacrity VI 40% → 46%, a single window. */
+  haste: 2.5,
+  /** STR to CHA, resists and AC, given or taken: Rage VI 52 → 58, Malosi VIII 60 → 70, Incapacitate III AC 20 → 21. */
+  stats: 2,
+  resists: 2,
+  AC: 2
+} as const
 
 /**
  * Duration bonus per tier, in percent. A setting (Spell Timers › per-tier bonus) starts from these.

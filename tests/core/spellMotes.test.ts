@@ -53,10 +53,11 @@ describe('what a rank gives', () => {
     const heal = rows.find((r) => r.name === 'Superior Healing')!
     expect(heal.ticks).toBe(0)
     expect(rankGain(heal, DEFAULT_TIER_DURATION_PCT, DEFAULT_SPELL_WEIGHTS).map((p) => p.key)).toEqual(['power', 'mana', 'cast', 'reuse'])
-    // A buff gains duration at the timers' own rate, and nothing on damage.
+    // A buff gains duration at the timers' own rate, and its proc 3% a rank (a rank of the proc every two).
     const puma = rows.find((r) => r.name === 'Spirit of the Puma')!
     expect(puma).toMatchObject({ rank: 9, category: 'buff' })
     expect(rankGain(puma, DEFAULT_TIER_DURATION_PCT, DEFAULT_SPELL_WEIGHTS).map((p) => [p.key, p.pct])).toEqual([
+      ['power', 3],
       ['duration', 10],
       ['mana', 4],
       ['cast', 4],
@@ -64,7 +65,7 @@ describe('what a rank gives', () => {
     ])
   })
 
-  it("grows a buff's stats 2% a rank and its max HP 10%, as the spell windows show", () => {
+  it('grows each kind of buff effect at its own rate, as the spell windows show', () => {
     const stacking = SpellBook.parse(
       readFileSync(join(__dirname, '..', 'fixtures', 'stacking_spells_us.txt'), 'latin1'),
       readFileSync(join(__dirname, '..', 'fixtures', 'stacking_spells_us_str.txt'), 'latin1')
@@ -76,19 +77,59 @@ describe('what a rank gives', () => {
         DEFAULT_TIER_DURATION_PCT,
         DEFAULT_SPELL_WEIGHTS
       ).find((p) => p.key === 'power')
-    expect(power('Strength')).toMatchObject({ pct: 2, label: '+2% stats and resists' })
+    expect(power('Strength')).toMatchObject({ pct: 2, label: '+2% stats' })
     // Infusion pads its first slots with blank CHA 0 effects: still a stat buff, nothing more.
-    expect(power('Infusion of Spirit')).toMatchObject({ pct: 2 })
-    expect(power('Harnessing of Spirit')).toMatchObject({ pct: 10, label: '+10% max HP (stats +2%)' })
-    // AC alone is not measured, so it counts nothing.
-    expect(power('Guardian')).toBeUndefined()
+    expect(power('Infusion of Spirit')).toMatchObject({ pct: 2, label: '+2% stats' })
+    // The best rate counts; the label names every kind.
+    expect(power('Harnessing of Spirit')).toMatchObject({ pct: 10, label: '+10% max HP, +3% healing, +2% stats' })
+    expect(power('Guardian')).toMatchObject({ pct: 2, label: '+2% AC' })
   })
 
-  it('grows a debuff that takes stats or resists, and nothing else', () => {
-    // Malosi: −10 to −60 on each resist; a slow (SPA 11) is not measured.
+  it('reads haste, attack, procs and stats with AC, and leaves movement and endurance regen alone', () => {
+    // Alacrity, Spirit of Bih`Li (movement and attack), Rage (AC and three stats), Spirit of the Puma (a proc).
+    expect(valueGainOf('buff', [{ spa: 11, base: 122 }])).toEqual({ pct: 2.5, note: '+2.5% haste' })
+    expect(
+      valueGainOf('buff', [
+        { spa: 3, base: 55 },
+        { spa: 2, base: 15 }
+      ])
+    ).toEqual({ pct: 3, note: '+3% attack' })
+    expect(
+      valueGainOf('buff', [
+        { spa: 1, base: 35 },
+        { spa: 6, base: 2 },
+        { spa: 4, base: 2 },
+        { spa: 5, base: 2 }
+      ])
+    ).toEqual({ pct: 2, note: '+2% stats and AC' })
+    expect(valueGainOf('buff', [{ spa: 85, base: 6908 }])).toEqual({ pct: 3, note: '+3% proc damage' })
+    // Chloroplast: HP regen grows, endurance regen (189) does not. Spirit of Wolf: nothing.
+    expect(
+      valueGainOf('buff', [
+        { spa: 0, base: 6 },
+        { spa: 189, base: 3 }
+      ])
+    ).toEqual({ pct: 3, note: '+3% healing' })
+    expect(valueGainOf('buff', [{ spa: 3, base: 55 }])).toEqual({ pct: 0, note: '' })
+  })
+
+  it('grows what a debuff takes away, and not its slow', () => {
+    // Malosi: −10 to −60 on each resist. Togor's Insects X still slows 60%.
     const malosi = [47, 50, 48, 46].map((spa) => ({ spa, base: -10 }))
-    expect(valueGainOf('debuff', malosi)).toEqual({ pct: 2, note: 'stats and resists taken' })
-    expect(valueGainOf('debuff', [{ spa: 11, base: 70 }])).toEqual({ pct: 0, note: '' })
+    expect(valueGainOf('debuff', malosi)).toEqual({ pct: 2, note: '+2% resists' })
+    expect(
+      valueGainOf('debuff', [
+        { spa: 6, base: -5 },
+        { spa: 4, base: -5 },
+        { spa: 1, base: -30 }
+      ])
+    ).toEqual({ pct: 2, note: '+2% stats and AC' })
+    expect(
+      valueGainOf('debuff', [
+        { spa: 11, base: 90 },
+        { spa: 35, base: 12 }
+      ])
+    ).toEqual({ pct: 0, note: '' })
     expect(valueGainOf('nuke', malosi).pct).toBe(0)
   })
 
@@ -162,8 +203,8 @@ describe('the best spell to upgrade next', () => {
     const { rows } = castRows(book, { 'Envenomed Bolt X': 100, 'Superior Healing III': 40, 'Spirit of the Puma': 5 }, character)
     const opts = spellUpgradeOptions({ rows, tierPct: DEFAULT_TIER_DURATION_PCT, stock: { infinitesimal: 2, lesser: 3 } })
     expect(opts.map((o) => o.row.name)).toEqual(['Spirit of the Puma', 'Superior Healing', 'Envenomed Bolt'])
-    // Puma at rank 0: 1 xp; 5 casts × (10 + 2 + 2 + 1) points.
-    expect(opts[0]).toMatchObject({ rank: 0, next: 1, need: 1, benefit: 15, worth: 75, rate: 75, affordable: true, maxed: false, section: 'buff' })
+    // Puma at rank 0: 1 xp; 5 casts × (3 + 10 + 2 + 2 + 1) points.
+    expect(opts[0]).toMatchObject({ rank: 0, next: 1, need: 1, benefit: 18, worth: 90, rate: 90, affordable: true, maxed: false, section: 'buff' })
     expect(opts[0].spend.motes).toEqual([{ m: 0, n: 1 }])
     // Superior Healing at III: 8 xp; 40 casts × (3 + 1 + 2 + 1). The stock's 2 + 6 xp just covers it.
     expect(opts[1]).toMatchObject({ rank: 3, next: 4, need: 8, benefit: 7, worth: 280, rate: 35, affordable: true, section: 'heal' })

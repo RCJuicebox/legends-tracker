@@ -10,7 +10,7 @@
 //     their full xp here. Spending the lowest ranks first costs the least combine value.
 //   - What a rank gives depends on the spell's category (the guide's table, RANK_BONUS below), plus
 //     the same for every spell: recovery and reuse −2%, resist modifier −15 on resistable spells.
-//     Buffs and debuffs also grow their stats, resists and max HP (valueGainOf), measured in game.
+//     Buffs and debuffs grow by what their effects are (valueGainOf), measured from spell windows.
 //     Duration bonuses are the ones the spell timers use (the tracking settings' per-rank table).
 //   - Instant and permanent spells get no duration bonus; a zero-mana spell nothing on the mana line.
 //
@@ -26,7 +26,7 @@ import { isSong, summonsPet } from './spellKinds'
 import { RESIST_SPA, SPA, STAT_SPA } from '../shared/game/spa'
 import type { SpellBook } from './spells'
 import { CLASS_NAMES, type CharacterSettings, type SpellCategory } from '../shared/types'
-import { MAX_HP_RANK_PCT, RANK_BONUS, STAT_RANK_PCT, UNIVERSAL, UTILITY_BONUS, type RankBonus } from '../shared/game/guide'
+import { EFFECT_RANK_PCT, RANK_BONUS, UNIVERSAL, UTILITY_BONUS, type RankBonus } from '../shared/game/guide'
 
 const MAX_RANK = 10
 
@@ -95,16 +95,60 @@ export function sectionOf(category: SpellCategory, pet: boolean, effects: { spa:
 /** Max HP, an effect of buffs like Harnessing of Spirit. */
 const MAX_HP_SPA = 69
 
+type EffectKind = keyof typeof EFFECT_RANK_PCT
+
+/** Each kind's name in a gain's label, in the order the label lists them. */
+const KIND_LABELS: Record<EffectKind, string> = {
+  maxHp: 'max HP',
+  healing: 'healing',
+  attack: 'attack',
+  procDamage: 'proc damage',
+  haste: 'haste',
+  stats: 'stats',
+  resists: 'resists',
+  AC: 'AC'
+}
+
 /**
- * What a rank adds to a buff's or debuff's values, by the effects measured (STAT_RANK_PCT): max HP 10%,
- * stats and resists 2%, anything else nothing. A spell with max HP and stats counts the max HP rate.
- * The blank CHA 0 effects spells pad their slots with are not a stat.
+ * Which of the measured kinds an effect of a buff or debuff is, if any. The blank CHA 0 effects spells pad
+ * their slots with are none. A debuff grows only what it takes away (stats, resists, AC, attack): its
+ * slow, snare and counters stay as they are.
+ */
+function effectKind(category: SpellCategory, e: { spa: number; base: number }): EffectKind | undefined {
+  if (e.base === 0) return undefined
+  if (e.spa in STAT_SPA) return 'stats'
+  if (e.spa in RESIST_SPA) return 'resists'
+  if (e.spa === SPA.AC) return 'AC'
+  if (e.spa === SPA.ATTACK) return 'attack'
+  if (category !== 'buff') return undefined
+  if (e.spa === SPA.HASTE) return 'haste'
+  if (e.spa === MAX_HP_SPA && e.base > 0) return 'maxHp'
+  if (HEAL_SPAS.includes(e.spa) && e.base > 0) return 'healing'
+  if (e.spa === SPA.PROC) return 'procDamage'
+  return undefined
+}
+
+/** "a", "a and b", "a, b and c". */
+function listOf(names: string[]): string {
+  return names.length < 2 ? (names[0] ?? '') : `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`
+}
+
+/**
+ * What a rank adds to a buff's or debuff's effects, by kind (EFFECT_RANK_PCT, read off spell windows):
+ * the best rate among its effects counts, and the label names every kind at its own rate, "+10% max HP,
+ * +3% healing, +2% stats". Effects that do not grow, or are not measured, count nothing.
  */
 export function valueGainOf(category: SpellCategory, effects: { spa: number; base: number }[]): { pct: number; note: string } {
   if (category !== 'buff' && category !== 'debuff') return { pct: 0, note: '' }
-  const stats = effects.some((e) => e.base !== 0 && (e.spa in STAT_SPA || e.spa in RESIST_SPA))
-  if (effects.some((e) => e.spa === MAX_HP_SPA && e.base > 0)) return { pct: MAX_HP_RANK_PCT, note: stats ? `max HP (stats +${STAT_RANK_PCT}%)` : 'max HP' }
-  return stats ? { pct: STAT_RANK_PCT, note: category === 'debuff' ? 'stats and resists taken' : 'stats and resists' } : { pct: 0, note: '' }
+  const kinds = new Set(effects.map((e) => effectKind(category, e)).filter((k): k is EffectKind => k !== undefined))
+  const byPct = new Map<number, string[]>()
+  for (const k of Object.keys(KIND_LABELS) as EffectKind[]) {
+    if (!kinds.has(k)) continue
+    const pct = EFFECT_RANK_PCT[k]
+    byPct.set(pct, [...(byPct.get(pct) ?? []), KIND_LABELS[k]])
+  }
+  const pcts = [...byPct.keys()].sort((a, b) => b - a)
+  return { pct: pcts[0] ?? 0, note: pcts.map((p) => `+${p}% ${listOf(byPct.get(p)!)}`).join(', ') }
 }
 
 /** The per-rank table for a spell: its category's row, unless its section has none in the guide. */
@@ -330,7 +374,7 @@ export function rankGain(row: SpellCastRow, tierPct: Record<SpellCategory, numbe
     if (pct > 0) parts.push({ key, pct, points: round(pct * w[key], 3), label })
   }
   if (b.power) add('power', b.power, `+${b.power}% ${b.powerNote}`)
-  else if (row.valueGain) add('power', row.valueGain, `+${row.valueGain}% ${row.valueNote}`)
+  else if (row.valueGain) add('power', row.valueGain, row.valueNote)
   const dur = row.ticks > 0 ? (tierPct[row.category] ?? 0) : 0
   if (dur) add('duration', dur, `+${dur}% duration`)
   if (row.mana > 0) add('mana', b.mana, `−${b.mana}% mana`)
