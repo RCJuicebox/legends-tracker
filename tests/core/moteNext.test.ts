@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest'
 import { nextRanking, spellShares } from '../../src/core/moteNext'
 import { WEIGHT_LABELS, type WeightKey, type Weights } from '../../src/core/gearFinder'
 import { parseStatsBlock } from '../../src/core/inventory'
-import { castRows } from '../../src/core/spellMotes'
+import { castRows, rankStatsOf } from '../../src/core/spellMotes'
 import { SpellBook } from '../../src/core/spells'
 import { fixtureBook } from '../helpers'
 import type { MergeOption } from '../../src/core/mergeValue'
@@ -90,6 +90,10 @@ describe('Motes › Best upgrade: merges and spell ranks in one list (FEAT-033)'
     // Spirit of the Puma is all proc: no stats. Its proc spell is not in this fixture, so it names none.
     const [puma] = castRows(fixtureBook(), { 'Spirit of the Puma IX': 1 }, character).rows
     expect(puma).toMatchObject({ rankStats: null, procSpell: null })
+    // The same buff cast on a pet (target type 14, as Spirit Quickening is) makes the pet stronger, not you.
+    const spirit = stacking.named('Harnessing of Spirit')!
+    expect(rankStatsOf(spirit, 50)).not.toBeNull()
+    expect(rankStatsOf({ ...spirit, targetType: 14 }, 50)).toBeNull()
   })
 
   it('gives each spell its share of your damage in a meter segment, its ticks with its hits', () => {

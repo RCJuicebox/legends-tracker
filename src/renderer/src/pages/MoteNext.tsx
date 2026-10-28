@@ -7,7 +7,7 @@ import { useInventory } from '../gear/model'
 import { useCharacterWeights } from '../gear/useCharacterWeights'
 import { useCombat } from '../combat'
 import { useStock } from './MotePlanner'
-import { Info, Pending, SortTh, sortRows, type Sort } from '../components/ui'
+import { Info, Pending, SortTh, Switch, sortRows, type Sort } from '../components/ui'
 import { num, num1 } from '../../../core/format'
 import { itemKey, parseStatsBlock, type InvItem } from '../../../core/inventory'
 import { mergeOptions } from '../../../core/mergeValue'
@@ -20,7 +20,7 @@ import type { CharacterSheet, InventoryView } from '../../../shared/types'
 // Infinitesimal motes' worth and, where it can be said, how much more of your damage it gives.
 
 const HOW =
-  "An item's next merge counts its gain in your stat weights, over what 1% more weapon damage counts for in them. A damage spell's next rank counts its damage bonus times that spell's share of your damage in this meter session. A buff's next rank counts what it adds to your stats (2% stats, resists and AC, 3% attack and HP regen, 2.5% haste, 10% max HP), priced by the same weights as a merge, as though you keep it up; a proc buff's adds 3% of its proc's share of your damage. Heals, debuffs and crowd control have no gain to put on them: they follow, by their own worth. Cost is the motes' combine value in Infinitesimal motes. Per 1,000 is the gain for each 1,000 motes of cost: the list's own order. Click a column to sort by it."
+  "An item's next merge counts its gain in your stat weights, over what 1% more weapon damage counts for in them. A damage spell's next rank counts its damage bonus times that spell's share of your damage in this meter session. A buff's next rank counts what it adds to your stats (2% stats, resists and AC, 3% attack and HP regen, 2.5% haste, 10% max HP), priced by the same weights as a merge, as though you keep it up; a proc buff's adds 3% of its proc's share of your damage. A pet's buff is not priced: it makes the pet stronger, not you. Heals, debuffs and crowd control have no gain to put on them: they follow, by their own worth. Ignore leaves a spell out, here and on Spell upgrades. Cost is the motes' combine value in Infinitesimal motes. Per 1,000 is the gain for each 1,000 motes of cost: the list's own order. Click a column to sort by it."
 
 type SortKey = 'name' | 'step' | 'cost' | 'gain' | 'perK'
 const SORT_VALUE: Record<SortKey, (r: NextRow) => string | number | null> = {
@@ -66,6 +66,13 @@ function Ranking({ view, sheet }: { view: InventoryView; sheet: CharacterSheet |
   // The list's own order is the most per mote first; a column sorts it otherwise, a gain not known last.
   const [sort, setSort] = useRemembered<Sort<SortKey>>('motenext.sort', { key: 'perK', dir: -1 })
   const sorted = useMemo(() => sortRows(rows, sort, SORT_VALUE), [rows, sort])
+  // The same ignored spells as Spell upgrades, kept per character.
+  const [ignored, setIgnored] = useRemembered<string[]>(`spellmotes.ignored.${view.character || 'none'}`, [])
+  const ignore = (name: string, on: boolean) => setIgnored(on ? [...new Set([...ignored, name])] : ignored.filter((n) => n !== name))
+  const [showIgnored, setShowIgnored] = useRemembered<boolean>('motenext.showIgnored', false)
+  const isIgnored = (r: NextRow) => r.kind === 'spell' && ignored.includes(r.name)
+  const ignoredCount = rows.filter(isIgnored).length
+  const shown = showIgnored ? sorted : sorted.filter((r) => !isIgnored(r))
 
   return (
     <div className="card">
@@ -73,6 +80,12 @@ function Ranking({ view, sheet }: { view: InventoryView; sheet: CharacterSheet |
         <span className="muted small">
           Your next merges and spell ranks in one list, the most of your damage per mote first. <Info label="How it is worked out" text={HOW} />
         </span>
+        {ignoredCount > 0 && (
+          <label className="row tight">
+            <Switch on={showIgnored} onChange={(v) => setShowIgnored(v)} />
+            Show ignored ({ignoredCount})
+          </label>
+        )}
       </div>
       {!rows.length ? (
         <div className="empty">Nothing to rank: no worn item the wiki knows under +10, and no spell cast lately to put motes into.</div>
@@ -96,11 +109,12 @@ function Ranking({ view, sheet }: { view: InventoryView; sheet: CharacterSheet |
                 <SortTh k="perK" sort={sort} onSort={setSort} num title="The gain for each 1,000 motes it costs: the list's own order, highest first">
                   Per 1,000
                 </SortTh>
+                <th />
               </tr>
             </thead>
             <tbody>
-              {sorted.slice(0, 40).map((r) => (
-                <tr key={`${r.kind}|${r.name}`} className={r.affordable ? '' : 'faint'}>
+              {shown.slice(0, 40).map((r) => (
+                <tr key={`${r.kind}|${r.name}`} className={r.affordable && !isIgnored(r) ? '' : 'faint'}>
                   <td>
                     <b>{r.name}</b> <span className="chip small">{r.kind === 'item' ? 'merge' : 'spell'}</span>
                   </td>
@@ -108,6 +122,17 @@ function Ranking({ view, sheet }: { view: InventoryView; sheet: CharacterSheet |
                   <td className="mono nowrap num">{r.cost === null ? <span className="faint">short</span> : num(r.cost)}</td>
                   <td className="small">{r.gainPct !== null ? <b>≈ {num1(Math.round(r.gainPct * 100) / 100)}% of your damage</b> : <span className="faint">{r.note}</span>}</td>
                   <td className="mono nowrap num">{r.perK === null ? '' : `${num1(Math.round(r.perK * 10) / 10)}%`}</td>
+                  <td>
+                    {r.kind !== 'spell' ? null : isIgnored(r) ? (
+                      <button className="btn ghost small" onClick={() => ignore(r.name, false)} title="Put it back in the list">
+                        Restore
+                      </button>
+                    ) : (
+                      <button className="btn ghost small" onClick={() => ignore(r.name, true)} title="Leave this spell out: you will not put motes into it">
+                        Ignore
+                      </button>
+                    )}
+                  </td>
                 </tr>
               ))}
             </tbody>

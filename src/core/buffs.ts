@@ -218,7 +218,7 @@ function valueOf(effects: { spa: number; base: number; max: number }[], permanen
 }
 
 /** Target types of a buff on a pet: never on a player. */
-const PET_TARGETS = [14, 38]
+export const PET_TARGETS = [14, 38]
 /** A buff the caster can only put on themself: listed so the player is reminded to cast their own. */
 const SELF_TARGET = 6
 /** Buffs shorter than this are left out: the tracker is for the long ones worth asking for. */

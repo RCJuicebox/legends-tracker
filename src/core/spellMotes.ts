@@ -28,6 +28,7 @@ import type { Spell, SpellBook } from './spells'
 import { wornStats } from './itemEffects'
 import { effectValue } from './effectValue'
 import { parseStatsBlock, type ItemStats } from './inventory'
+import { PET_TARGETS } from './buffs'
 import { CLASS_NAMES, type CharacterSettings, type SpellCategory } from '../shared/types'
 import { EFFECT_RANK_PCT, RANK_BONUS, UNIVERSAL, UTILITY_BONUS, type RankBonus } from '../shared/game/guide'
 
@@ -157,11 +158,12 @@ export function valueGainOf(category: SpellCategory, effects: { spa: number; bas
 /**
  * What one more rank of a buff adds to you, as item stats, so your gear weights price it as they price a
  * merge: each effect's value at your level times its kind's rate (EFFECT_RANK_PCT). Haste is the part
- * over 100 the spell file writes it as (140 is 40%). Null for anything but a buff, or a buff with
+ * over 100 the spell file writes it as (140 is 40%). Null for anything but a buff on you, or a buff with
  * nothing the weights read (a proc, movement).
  */
 export function rankStatsOf(spell: Spell, level: number): ItemStats | null {
-  if (spell.category !== 'buff') return null
+  // A pet's buff makes the pet stronger, not you: nothing here to price by your weights.
+  if (spell.category !== 'buff' || PET_TARGETS.includes(spell.targetType)) return null
   const base = wornStats(spell, level)
   const r = (k: EffectKind) => EFFECT_RANK_PCT[k] / 100
   const s = parseStatsBlock('')
@@ -181,7 +183,7 @@ export function rankStatsOf(spell: Spell, level: number): ItemStats | null {
 
 /** The spell a buff's proc fires, by name, as the damage meter counts it. */
 function procSpellOf(book: SpellBook, spell: Spell): string | null {
-  if (spell.category !== 'buff') return null
+  if (spell.category !== 'buff' || PET_TARGETS.includes(spell.targetType)) return null
   const e = spell.effects.find((x) => x.spa === SPA.PROC)
   return (e && book.get(e.base)?.name) || null
 }
