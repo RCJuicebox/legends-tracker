@@ -278,6 +278,12 @@ export function Hunter() {
                               <b>{n.name}</b>
                               <NamedSpawn n={n} />
                               <Seen n={n} />
+                              {n.waypoint && (
+                                <>
+                                  {' '}
+                                  · <GameCommand cmd={n.waypoint} />
+                                </>
+                              )}
                               <FoundHere
                                 zone={z.zone}
                                 name={n.name}

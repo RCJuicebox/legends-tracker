@@ -9,7 +9,7 @@ import type { AppFeature, FeatureDeps, TrackContext } from '../../main/appFeatur
 import { joinKillTallies, type SlayerKillTallies } from '../slayer/core'
 import { seenFromRecords } from '../../core/respawnSeen'
 import { KILLS_KEY, lastKills, namedSpawns, namedSpots, spawnTimings } from '../slayer/main'
-import { hunterLive, hunterZones, wantedTimers, type HunterPlanData } from './core'
+import { hunterLive, hunterZones, wantedTimers, type HunterPlanData, type HunterZone } from './core'
 import { bareName } from '../slayer/core'
 import { respawnEstimate, respawnKey, respawnTriggerId } from '../../core/respawns'
 import { DIED, SLAIN_BY, SLAIN_BY_YOU } from '../../core/phrases'
@@ -22,7 +22,7 @@ import type { RoutePart } from '../../core/route'
 const HUNTER_COLOR = '#6cc3ff'
 import { locPoint, nearest, nearText } from '../../core/where'
 import { parseSpot } from '../../core/where'
-import { setFoundSpawns } from '../slayer/spawns'
+import { setFoundSpawns, waypoint } from '../slayer/spawns'
 import { newerBuildWrote } from '../../main/schema'
 import type { FoundSpot, LegendsSpawn } from '../../shared/game/legendsSpawns'
 
@@ -239,7 +239,9 @@ export class HunterPlanner implements AppFeature {
     const records = ctx.store.respawns.get()
     const spawns = namedSpawns(spawnTimings(Object.values(records)))
     const all = hunterZones(exp.sections, lastKills(zones), exp.modified, spawns, seenFromRecords(records, Date.now()))
-    return { character, export: { file: exp.file, modified: exp.modified }, zones: all.filter((z) => !this.isBroken(z.achievement)), broken, autoTimers }
+      .filter((z) => !this.isBroken(z.achievement))
+      .map((z) => withWaypoints(z))
+    return { character, export: { file: exp.file, modified: exp.modified }, zones: all, broken, autoTimers }
   }
 }
 
@@ -274,6 +276,21 @@ export function sanitizeFound(v: unknown): FoundSpot[] {
       }
     ]
   })
+}
+
+/** A named with one spot alone in its zone gets that spot's /waypoint: nothing to search, just go there. */
+export function withWaypoints(z: HunterZone): HunterZone {
+  const spots = namedSpots(
+    z.zone,
+    z.left.map((n) => n.name)
+  )
+  return {
+    ...z,
+    left: z.left.map((n) => {
+      const at = spots.get(n.name.toLowerCase())
+      return at?.length === 1 ? { ...n, waypoint: waypoint(at[0]) } : n
+    })
+  }
 }
 
 /** The found spots as Legends' own spawns, one entry a spot: legendsSpawnsOf puts a named's together. */

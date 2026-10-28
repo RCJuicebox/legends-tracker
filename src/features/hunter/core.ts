@@ -23,6 +23,8 @@ export interface HunterNamed {
   seen?: string
   /** Seconds until it is due back by those records: 0 when it is (LT-733); undefined where they say nothing. */
   dueIn?: number
+  /** Its spot as /waypoint takes it, where it has one spot alone (TAKP's or Legends' own). */
+  waypoint?: string
 }
 
 /** A Hunter achievement not done: its place, the named left, how many it wants in all. */
