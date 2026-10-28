@@ -3,7 +3,7 @@ import type { SpellUpgradeOption } from './spellMotes'
 import { score, type Weights } from './gearFinder'
 import { EFFECT_RANK_PCT } from '../shared/game/guide'
 
-// Motes › Next (FEAT-033): Best merge and Spell upgrades in one list. Both already price motes in
+// Motes › Best upgrade (FEAT-033, was Next): Best merge and Spell upgrades in one list. Both already price motes in
 // Infinitesimal-equivalents; the gain is made the same where it can be: an item's gain in your
 // weights' points over what 1% more weapon damage counts for (`ratioWeight`), and a damage spell's
 // rank as its damage bonus times that spell's share of your damage. A buff's rank is what it adds to

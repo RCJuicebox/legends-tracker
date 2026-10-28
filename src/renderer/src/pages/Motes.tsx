@@ -16,14 +16,14 @@ const TABS: [MotesTab, string][] = [
   ['merge', 'Best merge'],
   ['planner', 'Merge planner'],
   ['spells', 'Spell upgrades'],
-  ['next', 'Next']
+  ['next', 'Best upgrade']
 ]
 
 const INTRO: Record<Exclude<MotesTab, 'runs'>, string> = {
   merge: 'Which of the gear you wear gains most for the motes its next merge takes, by your stat weights.',
   planner: 'Which motes an item needs to reach the level you want, and how to get them from your stock.',
   spells: "Which of the spells and songs you cast to put motes into next: the most gained per xp, by the guide's categories.",
-  next: 'Best merge and Spell upgrades in one list: the most of your damage per mote first, where that can be said.'
+  next: 'Best merge and Spell upgrades in one list, buffs included: the most gained per mote first, where that can be said.'
 }
 
 export function Motes({ go }: { go?: Go }) {

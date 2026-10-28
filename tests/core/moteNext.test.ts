@@ -10,7 +10,7 @@ import { fixtureBook } from '../helpers'
 import type { MergeOption } from '../../src/core/mergeValue'
 import type { SpellUpgradeOption } from '../../src/core/spellMotes'
 
-describe('Motes › Next: merges and spell ranks in one list (FEAT-033)', () => {
+describe('Motes › Best upgrade: merges and spell ranks in one list (FEAT-033)', () => {
   const item = (name: string, level: number, gain: number, cost: number) =>
     ({ item: { location: 'Back', name: `${name} +${level}`, id: 1, count: 1, augs: [] }, level, next: level + 1, gain, cost, affordable: true }) as unknown as MergeOption
   const spell = (name: string, category: string, power: number, worth: number, short = 0) =>

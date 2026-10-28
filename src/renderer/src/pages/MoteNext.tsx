@@ -16,7 +16,7 @@ import { spellBase } from '../../../core/combatMeter'
 import { nextRanking, spellShares, type NextRow } from '../../../core/moteNext'
 import type { CharacterSheet, InventoryView } from '../../../shared/types'
 
-// Motes › Next (FEAT-033): Best merge and Spell upgrades in one list, with what each step costs in
+// Motes › Best upgrade (FEAT-033, was Next): Best merge and Spell upgrades in one list, with what each step costs in
 // Infinitesimal motes' worth and, where it can be said, how much more of your damage it gives.
 
 const HOW =

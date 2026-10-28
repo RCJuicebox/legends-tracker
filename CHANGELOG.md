@@ -4,6 +4,7 @@ What changed in each version. The release workflow publishes a version's section
 
 ## Unreleased
 
+- **Motes: buff and debuff ranks grow, and Next is now Best upgrade.** A rank now adds to a buff's or debuff's effects, as spell windows show since the change: max HP 10%, attack and healing 3%, haste 2.5%, stats, resists and AC 2% (given or taken), and a proc a rank of its own every two. Slows, movement and endurance regen don't grow. Spell upgrades counts this, and **Best upgrade** (the Next tab, renamed) ranks a buff's next rank beside your gear merges: its stats by your Gear weights, as though you keep the buff up, and a proc buff by the proc's share of your damage.
 - **Factions: the newer zones' own factions get a standing.** The game leaves factions such as Host of Nektropos, Nerius Trade Association and Dread Slayers out of its faction window and the `/outputfile faction` export, so Standings showed only their net change. A faction your logs name that the export leaves out now starts at 0 (Indifferent) and adds every change the log saw, or sits at 2000 or −2000 where the game said it could get no better or worse. Its con word is that standing alone, since the game's modifier table doesn't list these factions.
 
 ## 2.20.0 (2026-10-26)
