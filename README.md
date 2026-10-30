@@ -444,6 +444,10 @@ then show the game with a member or two in the group) and keeps them for that sk
 unless you change it), read off the Player window's mana bar, solo or grouped. A cast bar drawn over
 the mana bar hides it until the cast ends.
 
+**Your own endurance** (the same card, off until you turn it on) works the same way off the Player
+window's endurance bar: said when it falls to a line (25% unless you change it), and again once it has
+been 10% back over.
+
 ## Audio
 
 A tab of Settings. Speech is rendered by Windows' own speech engine (a PowerShell process driving WinRT and
@@ -1202,7 +1206,7 @@ It reads the chat logs in `Logs` (`eqlog_<name>_<server>.txt`), the `/outputfile
 `skillcaps.txt`, `ACMitigation.txt`, `Faction\FactionAssociations.txt`, `Achievements\*.txt`), the
 icon sheets in `uifiles\default`, each skin's `legends-tracker.json`, and the sounds in
 `AudioTriggers`. The group health alert, when you turn it on, also reads the screen: the health bars
-of the skin's Group window (and the Player window's mana bar for your own mana cue), while the game runs.
+of the skin's Group window (and the Player window's mana and endurance bars for your own mana and endurance cues), while the game runs.
 
 ## Layout
 

@@ -4,6 +4,8 @@ What changed in each version. The release workflow publishes a version's section
 
 ## Unreleased
 
+- **Your own endurance, said when it runs low.** The Triggers page's group health card has **Say when your own endurance is low** beside the mana cue (off until switched on; 25% unless changed, said again once you are 10% back over). It reads the Player window's endurance bar on the screen, solo or grouped, and works with the group alert and the mana cue off. Cannibalization's pause holds back only your mana, never your endurance.
+
 ## 2.21.0 (2026-10-28)
 
 - **Slayer: sporali count toward Plants Concrete and Stone.** eqlwiki calls Runnyeye's sporali, Guk's fungusmen and Innothule's fungus spores "Fungusman", while the achievement lists Sporalis, so their kills counted toward nothing between exports and the plan never sent you to them. They now count as Sporali, and Plan › Slayer offers their camps: Runnyeye's sporali, Guk's fungusmen, and Innothule's fungus spores, which the spawn tables make the quickest. That fungusmen count the same as sporali is a guess from eqlwiki's guide; your next achievements export will show whether they do.

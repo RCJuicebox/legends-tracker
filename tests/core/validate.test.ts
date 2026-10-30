@@ -445,6 +445,8 @@ describe('group health settings (FEAT-040, FEAT-043)', () => {
     expect(g.calibrated.JuiceboxUI2.mana).toEqual([91, 117, 174])
     expect(g.myManaPct).toBe(80)
     expect(g.myManaSpeech).toBe('Low {pct}')
+    expect(gh({ myEndPct: 25.4, myEndSpeech: 'Tired {pct}' })).toMatchObject({ myEndPct: 25, myEndSpeech: 'Tired {pct}' })
+    expect(gh({ myEndPct: -3 })).toMatchObject({ myEndPct: 0, myEndSpeech: 'Endurance at {pct} percent' })
     expect(gh({ skin: '../up', calibrated: [], myManaPct: 'x' })).toMatchObject({ skin: 'JBUI', calibrated: {}, myManaPct: 0 })
   })
 })

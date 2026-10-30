@@ -223,6 +223,10 @@ export interface GroupHealthSettings {
   myManaSpeech: string
   /** Your mana is not read for this long after you use Cannibalization, its recast; 0 read always. */
   myManaCanniSec: number
+  /** Your own endurance, off the Player window's endurance bar: said at this or under; 0 off. */
+  myEndPct: number
+  /** What is said for your endurance: {pct}. */
+  myEndSpeech: string
 }
 
 /** Other PCs' Logs folders the settings hold at most. */

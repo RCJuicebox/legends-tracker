@@ -14,6 +14,7 @@ import {
   parseColours,
   parseGroupHealthProfile,
   playerArea,
+  playerEndFill,
   playerManaFill,
   rgbOf,
   type Frame,
@@ -280,10 +281,10 @@ function memberIn(f: Frame, c: GroupColours, x: number, t: number, hp: number, m
 }
 
 /** JuiceboxUI's Player window: health, mana and endurance 16 tall (14 inside), 20 apart, the top one's outline at (x, t). */
-function playerWindow(f: Frame, x: number, t: number, mana: number, o: { end?: boolean; shaded?: boolean } = {}): void {
+function playerWindow(f: Frame, x: number, t: number, mana: number, o: { end?: boolean; endFill?: number; shaded?: boolean } = {}): void {
   bar(f, x, t, 266, 16, GROUP_COLOURS.hp, 0.8, o.shaded)
   bar(f, x, t + 20, 266, 16, GROUP_COLOURS.mana, mana, o.shaded)
-  if (o.end !== false) bar(f, x, t + 40, 266, 16, GROUP_COLOURS.end, 1, o.shaded)
+  if (o.end !== false) bar(f, x, t + 40, 266, 16, GROUP_COLOURS.end, o.endFill ?? 1, o.shaded)
   // "Mana" on the bar's left, its numbers on its right.
   fill(f, x + 6, t + 24, 30, 8, WHITE)
   fill(f, x + 200, t + 24, 50, 8, WHITE)
@@ -376,10 +377,23 @@ describe('findPlayerMana (FEAT-043)', () => {
     expect(playerManaFill(f, bar!)).toBeCloseTo(0.35, 2)
     // A sample of just the bar reads the same.
     const a = playerArea(bar!)
-    expect(a).toEqual({ x: 2029, y: 159, width: 268, height: 18 })
+    expect(a).toEqual({ x: 2029, y: 159, width: 268, height: 38 })
     const piece = frame(a.width, a.height, a.x, a.y)
     playerWindow(piece, 2030 - a.x, 140 - a.y, 0.35)
     expect(playerManaFill(piece, bar!)).toBeCloseTo(0.35, 2)
+  })
+
+  it('reads your endurance off the bar under the mana bar, from the whole screen or just the piece around them', () => {
+    const f = frame(400, 200, 2000, 100)
+    playerWindow(f, 30, 40, 0.9, { endFill: 0.22 })
+    const bar = findPlayerMana(f)!
+    expect(playerEndFill(f, bar)).toBeCloseTo(0.22, 2)
+    const a = playerArea(bar)
+    const piece = frame(a.width, a.height, a.x, a.y)
+    playerWindow(piece, 2030 - a.x, 140 - a.y, 0.9, { endFill: 0.22, shaded: true })
+    expect(playerEndFill(piece, bar)).toBeCloseTo(0.22, 2)
+    playerWindow(f, 30, 40, 0.9, { endFill: 0 })
+    expect(playerEndFill(f, bar)).toBe(0)
   })
 
   it("reads JBUI's shaded bars: the fill darker to its left, the empty inside darker mid-bar", () => {

@@ -60,7 +60,9 @@ export type GroupHealthToWorker =
       profile?: GroupHealthProfile
       /** Your own mana's line, off the Player window; 0 off (FEAT-043). */
       myManaPct?: number
-      /** Whether the Group window is watched at all: false while only your own mana cue is on. */
+      /** Your own endurance's line, off the Player window; 0 off. */
+      myEndPct?: number
+      /** Whether the Group window is watched at all: false while only your own mana or endurance cue is on. */
       group?: boolean
       /** Your own mana is not read for now: Cannibalization is recasting. */
       myManaPaused?: boolean
@@ -166,7 +168,7 @@ export class GroupHealth implements AppFeature {
   private apply(force = false): void {
     if (!app.isReady()) return
     const s = this.ctx.store.settings.get().groupHealth
-    const wanted = s.enabled || s.myManaPct > 0
+    const wanted = s.enabled || s.myManaPct > 0 || s.myEndPct > 0
     const on = wanted && this.ctx.watcher.gameRunning === true
     if (!on) {
       if (this.worker) this.stop()
@@ -185,7 +187,7 @@ export class GroupHealth implements AppFeature {
     const rowLines = this.rowLines(s.watchNames, s.watchPct)
     const profile = this.profile()
     const myManaPaused = s.myManaCanniSec > 0 && Date.now() < this.canniReadyAt
-    const key = `${myManaPaused}|${s.enabled}|${s.belowPct}|${s.manaPct}|${s.myManaPct}|${JSON.stringify(rowLines)}|${front}|${areas.map((a) => `${a.x},${a.y}`).join(';')}|${JSON.stringify(profile)}`
+    const key = `${myManaPaused}|${s.enabled}|${s.belowPct}|${s.manaPct}|${s.myManaPct}|${s.myEndPct}|${JSON.stringify(rowLines)}|${front}|${areas.map((a) => `${a.x},${a.y}`).join(';')}|${JSON.stringify(profile)}`
     if (this.worker && !force && key === this.lastConfig) return
     // A watch that ended badly is started again, but not more than twice a minute.
     if (!this.worker && Date.now() < this.retryAt) return
@@ -202,6 +204,7 @@ export class GroupHealth implements AppFeature {
       rowLines,
       profile,
       myManaPct: s.myManaPct,
+      myEndPct: s.myEndPct,
       group: s.enabled,
       myManaPaused
     } satisfies GroupHealthToWorker)
@@ -376,7 +379,10 @@ export class GroupHealth implements AppFeature {
 
   /** What the sources page says with no rows to watch. */
   private nobody(): string {
-    return this.playerSeen ? 'Watching your mana; no group members in the Group window.' : 'No group members in the Group window, or it is not on the screen.'
+    if (!this.playerSeen) return 'No group members in the Group window, or it is not on the screen.'
+    const s = this.ctx.store.settings.get().groupHealth
+    const own = [s.myManaPct > 0 && 'mana', s.myEndPct > 0 && 'endurance'].filter(Boolean).join(' and ')
+    return `Watching your ${own || 'Player window'}; no group members in the Group window.`
   }
 
   private say(low: LowHealth): void {
@@ -388,6 +394,14 @@ export class GroupHealth implements AppFeature {
         { kind: 'text', text: `Mana ${low.pct}%`, color: '#5b75ae', durationSec: 4 }
       ])
       this.ctx.engine.pushFeed('trigger', `Your mana at ${low.pct}%`)
+      return
+    }
+    if (low.what === 'myEnd') {
+      this.ctx.engine.notify([
+        { kind: 'speak', text: groupHealthPhrase(s.myEndSpeech, 'You', low.pct), interrupt: false },
+        { kind: 'text', text: `Endurance ${low.pct}%`, color: '#b58332', durationSec: 4 }
+      ])
+      this.ctx.engine.pushFeed('trigger', `Your endurance at ${low.pct}%`)
       return
     }
     if (low.what === 'mana') {

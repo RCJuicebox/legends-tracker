@@ -47,7 +47,7 @@ class FakeWorker extends EventEmitter {
   }
 }
 
-function setup(o: { enabled?: boolean; myManaPct?: number; skin?: string } = {}) {
+function setup(o: { enabled?: boolean; myManaPct?: number; myEndPct?: number; skin?: string } = {}) {
   const workers: FakeWorker[] = []
   const notified: unknown[] = []
   const settings = {
@@ -63,7 +63,9 @@ function setup(o: { enabled?: boolean; myManaPct?: number; skin?: string } = {})
       calibrated: {} as Record<string, unknown>,
       myManaPct: o.myManaPct ?? 0,
       myManaSpeech: 'Mana at {pct} percent',
-      myManaCanniSec: 180
+      myManaCanniSec: 180,
+      myEndPct: o.myEndPct ?? 0,
+      myEndSpeech: 'Endurance at {pct} percent'
     },
     overlays: []
   }
@@ -112,6 +114,7 @@ describe('GroupHealth', () => {
         rowLines: {},
         profile: JUICEBOX_PROFILE,
         myManaPct: 0,
+        myEndPct: 0,
         group: true,
         myManaPaused: false
       }
@@ -207,6 +210,20 @@ describe('GroupHealth', () => {
     ])
     workers[0].emit('message', { kind: 'player', bar: null } satisfies GroupHealthFromWorker)
     expect(row().detail).toContain('No group members')
+  })
+
+  it('watches your own endurance with the group alert off, and says it in its own words', () => {
+    const { workers, notified, tick, row } = setup({ enabled: false, myEndPct: 25 })
+    tick()
+    expect(workers).toHaveLength(1)
+    expect(workers[0].posted[0]).toMatchObject({ kind: 'config', myManaPct: 0, myEndPct: 25, group: false })
+    workers[0].emit('message', { kind: 'player', bar: { left: 31, right: 294, top: 61 } } satisfies GroupHealthFromWorker)
+    expect(row().detail).toContain('Watching your endurance;')
+    workers[0].emit('message', { kind: 'low', slot: 1, pct: 22, what: 'myEnd' } satisfies GroupHealthFromWorker)
+    expect(notified.slice(-2)).toEqual([
+      { kind: 'speak', text: 'Endurance at 22 percent', interrupt: false },
+      { kind: 'text', text: 'Endurance 22%', color: '#b58332', durationSec: 4 }
+    ])
   })
 
   it("pauses your mana for Cannibalization's recast, or as long as the game says is left", () => {

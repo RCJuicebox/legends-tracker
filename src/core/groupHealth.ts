@@ -257,6 +257,11 @@ export function playerManaFill(f: Frame, bar: GroupBar, p: GroupHealthProfile = 
   return inkFill(f, bar, 0, p.playerInner, p.colours.mana, p.colours)
 }
 
+/** Your endurance, 0 to 1, from the Player window's endurance bar, its step under the mana bar findPlayerMana found; null while it cannot be read. */
+export function playerEndFill(f: Frame, bar: GroupBar, p: GroupHealthProfile = JUICEBOX_PROFILE): number | null {
+  return inkFill(f, bar, p.playerStep, p.playerInner, p.colours.end, p.colours)
+}
+
 /** How full one of a row's bars is: the one `offset` under the health bar's inside top, `height` tall inside, filled with `ink`. */
 function inkFill(f: Frame, bar: GroupBar, offset: number, height: number, ink: Rgb, c: GroupColours): number | null {
   const left = bar.left - f.x
@@ -294,9 +299,9 @@ export function barsArea(bars: GroupBar[], p: GroupHealthProfile = JUICEBOX_PROF
   return { x, y, width: Math.max(...bars.map((b) => b.right)) + 3 - x, height: Math.max(...bars.map((b) => b.top)) + under + 2 - y }
 }
 
-/** The screen area your mana bar covers, its outline and a pixel more: what a sample of it captures. */
+/** The screen area your mana and endurance bars cover, their outlines and a pixel more: what a sample of them captures. */
 export function playerArea(bar: GroupBar, p: GroupHealthProfile = JUICEBOX_PROFILE): Area {
-  return { x: bar.left - 2, y: bar.top - 2, width: bar.right - bar.left + 5, height: p.playerInner + 4 }
+  return { x: bar.left - 2, y: bar.top - 2, width: bar.right - bar.left + 5, height: p.playerStep + p.playerInner + 4 }
 }
 
 /** What sampling the colours off the screen found (FEAT-040): the colours, which of them were seen there (the rest kept), and the rows read. */
@@ -417,8 +422,8 @@ export function calibrateColours(f: Frame, p: GroupHealthProfile = JUICEBOX_PROF
 export interface LowHealth {
   slot: number
   pct: number
-  /** The bar that went low: health, a member's mana (LT-751), or your own mana (FEAT-043). */
-  what?: 'mana' | 'myMana'
+  /** The bar that went low: health, a member's mana (LT-751), your own mana (FEAT-043) or your own endurance. */
+  what?: 'mana' | 'myMana' | 'myEnd'
 }
 
 interface SlotState {

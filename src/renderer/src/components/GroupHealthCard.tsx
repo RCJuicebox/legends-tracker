@@ -30,7 +30,7 @@ export function GroupHealthCard() {
   const g = useSettled((s) => s.settings.groupHealth)
   const { patchSettings } = useActions()
   const set = (patch: Partial<GroupHealthSettings>, debounceMs?: number) => patchSettings((s) => ({ ...s, groupHealth: { ...s.groupHealth, ...patch } }), { debounceMs })
-  const watching = g.enabled || g.myManaPct > 0
+  const watching = g.enabled || g.myManaPct > 0 || g.myEndPct > 0
   const skins = useInvoke(watching ? 'skins:list' : null)
   const [sampling, setSampling] = useState(false)
   const sampled = g.calibrated[g.skin]
@@ -168,6 +168,30 @@ export function GroupHealthCard() {
                   <span className="faint small">seconds</span>
                 </>
               )}
+            </div>
+          </Field>
+        </div>
+      )}
+      <label className="row">
+        <Switch on={g.myEndPct > 0} onChange={(v) => void set({ myEndPct: v ? 25 : 0 })} label="Say when your own endurance is low" />
+        <b>Say when your own endurance is low</b>
+        <span className="faint small">read off the Player window&apos;s endurance bar, solo or grouped</span>
+      </label>
+      {g.myEndPct > 0 && (
+        <div className="row gap-12" style={{ alignItems: 'flex-start', flexWrap: 'wrap' }}>
+          <Field label="At or under" hint="Percent of your endurance; said again once it is 10% back over.">
+            <NumberInput value={g.myEndPct} min={1} max={80} width={80} onChange={(v) => void set({ myEndPct: v ?? 25 })} label="Your endurance line, percent" />
+          </Field>
+          <Field label="Say" hint="{pct} is filled in." style={{ flex: 1, minWidth: 260 }}>
+            <div className="row tight">
+              <input className="grow" value={g.myEndSpeech} onChange={(e) => void set({ myEndSpeech: e.target.value }, TYPING_MS)} />
+              <button
+                type="button"
+                className="btn small"
+                onClick={() => void act('audio:test', g.myEndSpeech.replace(/\{name\}/gi, 'You').replace(/\{pct\}/gi, String(g.myEndPct)))}
+              >
+                Hear
+              </button>
             </div>
           </Field>
         </div>

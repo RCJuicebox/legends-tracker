@@ -67,7 +67,9 @@ export function defaultSettings(): AppSettings {
       calibrated: {},
       myManaPct: 0,
       myManaSpeech: 'Mana at {pct} percent',
-      myManaCanniSec: 180
+      myManaCanniSec: 180,
+      myEndPct: 0,
+      myEndSpeech: 'Endurance at {pct} percent'
     },
     factionPlan: { assumptions: {}, choices: {} },
     setup: { hidden: false, accepted: [], arranged: false }

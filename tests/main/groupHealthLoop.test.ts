@@ -20,6 +20,7 @@ function loop(
     manas?: () => (number | null)[]
     player?: () => GroupBar | null
     myMana?: () => number | null
+    myEnd?: () => number | null
   } = {}
 ) {
   const posted: GroupHealthFromWorker[] = []
@@ -46,6 +47,7 @@ function loop(
       return o.player?.() ?? null
     },
     playerFill: () => o.myMana?.() ?? null,
+    playerEnd: () => o.myEnd?.() ?? null,
     fill: (_, b) => (o.fills?.() ?? [0.9, 0.9])[ROWS.findIndex((r) => r.top === b.top)],
     mana: (_, b) => (o.manas?.() ?? [0.9, 0.9])[ROWS.findIndex((r) => r.top === b.top)]
   })
@@ -170,7 +172,7 @@ describe('your own mana (FEAT-043)', () => {
     expect(posted).toEqual([{ kind: 'player', bar: MANA }])
     tick(200)
     // Sampled by itself, a small piece around the bar.
-    expect(captured.at(-1)).toEqual({ x: 29, y: 59, width: 268, height: 18 })
+    expect(captured.at(-1)).toEqual({ x: 29, y: 59, width: 268, height: 38 })
     mana = 0.18
     tick(200)
     // A cast bar over it: skipped, not taken for a fall or a rise.
@@ -239,6 +241,60 @@ describe('your own mana (FEAT-043)', () => {
     expect(captured).toHaveLength(n)
     tick(SEARCH_MS)
     expect(captured).toHaveLength(n + 1)
+  })
+})
+
+describe('your own endurance', () => {
+  const MANA: GroupBar = { left: 31, right: 294, top: 61 }
+
+  it('finds the Player window with only the endurance cue on, and says your endurance once it falls to the line', () => {
+    let end: number | null = 0.6
+    let manaReads = 0
+    const { l, posted, tick } = loop({
+      player: () => MANA,
+      myMana: () => {
+        manaReads++
+        return 0.1
+      },
+      myEnd: () => end
+    })
+    l.message({ kind: 'config', on: true, areas: [AREA], belowPct: 25, rearmPct: 35, front: true, myEndPct: 25, group: false })
+    expect(posted).toEqual([{ kind: 'player', bar: MANA }])
+    const lows = () => posted.filter((m) => m.kind === 'low')
+    tick(200)
+    end = 0.24
+    tick(200)
+    tick(200)
+    expect(lows()).toEqual([{ kind: 'low', slot: 1, pct: 24, what: 'myEnd' }])
+    // Your mana cue off: your mana is never read.
+    expect(manaReads).toBe(0)
+    // Said again only once back 10 over the line, then down to it.
+    end = 0.3
+    tick(200)
+    tick(200)
+    end = 0.36
+    tick(200)
+    tick(200)
+    end = 0.2
+    tick(200)
+    tick(200)
+    expect(lows()).toEqual([
+      { kind: 'low', slot: 1, pct: 24, what: 'myEnd' },
+      { kind: 'low', slot: 1, pct: 20, what: 'myEnd' }
+    ])
+  })
+
+  it('keeps reading endurance while your mana is paused for Cannibalization', () => {
+    const { l, posted, tick } = loop({ player: () => MANA, myMana: () => 0.1, myEnd: () => 0.1 })
+    l.message({ kind: 'config', on: true, areas: [AREA], belowPct: 25, rearmPct: 35, front: true, myManaPct: 70, myEndPct: 25, group: false, myManaPaused: true })
+    tick(200)
+    tick(200)
+    expect(posted.filter((m) => m.kind === 'low')).toEqual([{ kind: 'low', slot: 1, pct: 10, what: 'myEnd' }])
+    // The mana cue off: the Player window is kept while the endurance cue is on.
+    l.message({ kind: 'config', on: true, areas: [AREA], belowPct: 25, rearmPct: 35, front: true, myManaPct: 0, myEndPct: 25, group: false })
+    expect(posted.filter((m) => m.kind === 'player')).toEqual([{ kind: 'player', bar: MANA }])
+    l.message({ kind: 'config', on: true, areas: [AREA], belowPct: 25, rearmPct: 35, front: true, myManaPct: 0, myEndPct: 0, group: false })
+    expect(posted.at(-1)).toEqual({ kind: 'player', bar: null })
   })
 })
 

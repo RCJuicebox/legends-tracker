@@ -7,6 +7,7 @@ import {
   JUICEBOX_PROFILE,
   manaFill,
   playerArea,
+  playerEndFill,
   playerManaFill,
   type Frame,
   type GroupBar,
@@ -20,7 +21,8 @@ import type { GroupHealthFromWorker, GroupHealthToWorker, ScreenArea } from './g
 // off to a minute, and only while the game is in front; found, its bars are copied five times a
 // second and each member going low is posted to say. With your own mana cue on (FEAT-043), each search
 // also looks for the Player window's mana bar, which is sampled with the rows, or alone when solo; it is
-// not read while the main process says your Cannibalization is recasting.
+// not read while the main process says your Cannibalization is recasting. Your own endurance cue reads
+// the endurance bar under it, found the same way, and is never paused.
 
 /** Between samples of the bars once found. */
 const SAMPLE_MS = 200
@@ -47,6 +49,7 @@ export interface LoopDeps {
   mana?: (f: Frame, b: GroupBar, p: GroupHealthProfile) => number | null
   findPlayer?: (f: Frame, p: GroupHealthProfile) => GroupBar | null
   playerFill?: (f: Frame, b: GroupBar, p: GroupHealthProfile) => number | null
+  playerEnd?: (f: Frame, b: GroupBar, p: GroupHealthProfile) => number | null
 }
 
 const same = (a: GroupBar[], b: GroupBar[]) => a.length === b.length && a.every((x, i) => x.left === b[i].left && x.right === b[i].right && x.top === b[i].top)
@@ -72,12 +75,14 @@ export class GroupHealthLoop {
   private rowLines: Record<number, number> = {}
   /** How the skin draws its bars (FEAT-040). */
   private profile: GroupHealthProfile = JUICEBOX_PROFILE
-  /** Your own mana bar in the Player window, while your mana cue is on and it is found (FEAT-043). */
+  /** Your own mana bar in the Player window, while your mana or endurance cue is on and it is found (FEAT-043). */
   player: GroupBar | null = null
   readonly myManaAlarm = new GroupHealthAlarm(0, 10)
   private myManaOn = false
   /** Your mana is not read for now: Cannibalization is recasting. */
   private myManaPaused = false
+  readonly myEndAlarm = new GroupHealthAlarm(0, 10)
+  private myEndOn = false
   /** The Group window is watched: off while only your own mana cue is on. */
   private groupOn = true
   private readonly find: NonNullable<LoopDeps['find']>
@@ -85,6 +90,7 @@ export class GroupHealthLoop {
   private readonly mana: NonNullable<LoopDeps['mana']>
   private readonly findPlayer: NonNullable<LoopDeps['findPlayer']>
   private readonly playerFill: NonNullable<LoopDeps['playerFill']>
+  private readonly playerEnd: NonNullable<LoopDeps['playerEnd']>
 
   constructor(private readonly deps: LoopDeps) {
     this.find = deps.find ?? findGroupBars
@@ -92,6 +98,12 @@ export class GroupHealthLoop {
     this.mana = deps.mana ?? manaFill
     this.findPlayer = deps.findPlayer ?? findPlayerMana
     this.playerFill = deps.playerFill ?? playerManaFill
+    this.playerEnd = deps.playerEnd ?? playerEndFill
+  }
+
+  /** Either of your own bars' cues on: the Player window is looked for. */
+  private get playerOn(): boolean {
+    return this.myManaOn || this.myEndOn
   }
 
   /** Something to sample: the Group window's rows or your mana bar. */
@@ -105,6 +117,7 @@ export class GroupHealthLoop {
     if (was === bar || (was && bar && same([was], [bar]))) return
     this.player = bar
     this.myManaAlarm.reset()
+    this.myEndAlarm.reset()
     this.deps.post({ kind: 'player', bar })
   }
 
@@ -116,7 +129,7 @@ export class GroupHealthLoop {
     const a = this.areas[i]
     const frame = this.deps.capture(a.x, a.y, a.width, a.height)
     const found = this.groupOn ? this.find(frame, this.profile) : []
-    this.setPlayer(this.myManaOn ? this.findPlayer(frame, this.profile) : null)
+    this.setPlayer(this.playerOn ? this.findPlayer(frame, this.profile) : null)
     if (this.player) {
       this.nextArea = i
       this.searchWait = SEARCH_MS
@@ -143,11 +156,19 @@ export class GroupHealthLoop {
 
   private sample(): void {
     if (this.bars.length) this.sampleRows()
-    if (!this.player || this.myManaPaused) return
+    const readMana = this.myManaOn && !this.myManaPaused
+    if (!this.player || (!readMana && !this.myEndOn)) return
     // Read alone, a small piece of its own: the Player window is seldom near the Group window.
     const a = playerArea(this.player, this.profile)
-    const fill = this.playerFill(this.deps.capture(a.x, a.y, a.width, a.height), this.player, this.profile)
-    for (const low of this.myManaAlarm.update([fill], [this.player.top])) this.deps.post({ kind: 'low', ...low, what: 'myMana' })
+    const frame = this.deps.capture(a.x, a.y, a.width, a.height)
+    if (readMana) {
+      const fill = this.playerFill(frame, this.player, this.profile)
+      for (const low of this.myManaAlarm.update([fill], [this.player.top])) this.deps.post({ kind: 'low', ...low, what: 'myMana' })
+    }
+    if (this.myEndOn) {
+      const fill = this.playerEnd(frame, this.player, this.profile)
+      for (const low of this.myEndAlarm.update([fill], [this.player.top])) this.deps.post({ kind: 'low', ...low, what: 'myEnd' })
+    }
   }
 
   private sampleRows(): void {
@@ -212,16 +233,19 @@ export class GroupHealthLoop {
       const myMana = m.myManaPct ?? 0
       this.myManaAlarm.setLine(myMana, myMana + 10)
       const profile = m.profile ?? JUICEBOX_PROFILE
-      const wasMyMana = this.myManaOn
+      const myEnd = m.myEndPct ?? 0
+      this.myEndAlarm.setLine(myEnd, myEnd + 10)
+      const wasPlayerOn = this.playerOn
       this.myManaOn = myMana > 0
+      this.myEndOn = myEnd > 0
       // Paused or back: said afresh from here, so mana still low when Cannibalization is ready again is said.
       const paused = m.myManaPaused ?? false
       if (paused !== this.myManaPaused) this.myManaAlarm.reset()
       this.myManaPaused = paused
-      if (!this.myManaOn) this.setPlayer(null)
-      // Another skin's bars, or your mana cue just on: looked for afresh.
+      if (!this.playerOn) this.setPlayer(null)
+      // Another skin's bars, or one of your own bars' cues just on: looked for afresh.
       const newProfile = JSON.stringify(profile) !== JSON.stringify(this.profile)
-      const fresh = newProfile || (this.myManaOn && !wasMyMana)
+      const fresh = newProfile || (this.playerOn && !wasPlayerOn)
       if (newProfile) {
         this.profile = profile
         this.alarm.reset()
