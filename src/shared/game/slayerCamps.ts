@@ -71,6 +71,13 @@ export const SLAYER_SPOTS: { zone: string; for: string[]; tip: string; said: str
     for: ['Shorter People', 'Legendary Creatures'],
     tip: 'The faeries, all to the west of the map: the best camp for Shorter People (about 460 an hour), and Legendary Creatures too',
     said: 'the player, 2026-10-15'
+  },
+  {
+    zone: 'The Eastern Plains of Karana',
+    for: ['Strange Weather'],
+    tip: 'Stand at /waypoint 515, -797 and let the pet pull: gorge hounds, lion patriarchs, lioness matriarchs and lionesses, about 51 an hour over 7 h',
+    said: 'the player, 2026-10-30',
+    at: [515, -797]
   }
 ]
 
