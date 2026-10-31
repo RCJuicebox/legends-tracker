@@ -48,7 +48,11 @@ const track: AchievementTrack = {
   slayer: {
     exportFile: 'x',
     exportAt: NOW - 3_600_000,
-    rows: [row('Goblin Gobblin’', 400, 25, 500, NOW - 60_000), row('Not Moving', 3, 0, 50, 0), row('Older', 10, 2, 50, NOW - 1_800_000)],
+    rows: [
+      { ...row('Goblin Gobblin’', 400, 25, 500, NOW - 60_000), pace: { perHour: 150, kills: 25, from: NOW - 600_000, to: NOW - 60_000 } },
+      row('Not Moving', 3, 0, 50, 0),
+      row('Older', 10, 2, 50, NOW - 1_800_000)
+    ],
     unplaced: [],
     pending: 0
   },
@@ -108,7 +112,10 @@ it('calls out the named killed, lists those left, and the Slayer counts moving, 
   expect(counts).toHaveLength(2)
   expect(counts[0]).toContain('Goblin Gobblin’')
   expect(counts[0]).toContain('425 / 500 +25')
+  // Its last stretch's pace, and 75 left at it.
+  expect(counts[0]).toContain('150 an hour over the last stretch · about 30 min to finish')
   expect(counts[1]).toContain('Older')
+  expect(counts[1]).not.toContain('an hour')
   // The Windows notification's switch: a switch beside its words, on by default.
   const notify = [...host.querySelectorAll('[role=switch]')].find((b) => b.parentElement?.textContent?.includes('Notify me'))
   expect(notify?.getAttribute('aria-checked')).toBe('true')

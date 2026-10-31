@@ -5,6 +5,7 @@ What changed in each version. The release workflow publishes a version's section
 ## Unreleased
 
 - **Your own endurance, said when it runs low.** The Triggers page's group health card has **Say when your own endurance is low** beside the mana cue (off until switched on; 25% unless changed, said again once you are 10% back over). It reads the Player window's endurance bar on the screen, solo or grouped, and works with the group alert and the mana cue off. Cannibalization's pause holds back only your mana, never your endurance.
+- **Slayer: your pace and the time to finish, on Live.** Each count on Live's Slayer card now says its kills an hour over your last stretch of killing and about how long the rest takes at that pace ("228 an hour over the last stretch · about 9 h 25 min to finish"). A stretch is the kills that count toward it no more than 10 minutes apart, so short breaks for your pet's health are in the pace and a longer one starts a new stretch. A stretch of under 10 kills or 5 minutes says nothing.
 
 ## 2.21.0 (2026-10-28)
 

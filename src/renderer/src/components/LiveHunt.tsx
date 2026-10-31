@@ -1,5 +1,5 @@
 import type { HunterTrackView, SlayerRow } from '../../../shared/tracking'
-import { num, timeOfDay } from '../../../core/format'
+import { duration, num, timeOfDay } from '../../../core/format'
 import { useAchievementTrack } from '../hooks'
 import { useActions, useLive, useSettled } from '../state'
 import { Switch } from './ui'
@@ -139,11 +139,24 @@ function SlayerCard({ rows, now, go }: { rows: SlayerRow[]; now: number; go: Go 
             <span className="bar thin" aria-hidden="true">
               <i style={{ width: `${Math.round((n / Math.max(1, r.max)) * 100)}%` }} />
             </span>
+            {r.pace && !r.done && n < r.max && <Pace pace={r.pace} left={r.max - n} />}
           </div>
         )
       })}
       {rows.length > SLAYER_ROWS && <div className="faint small">+{rows.length - SLAYER_ROWS} more moved since your export</div>}
       {!rows.length && <div className="empty">No Slayer count has moved since your achievements export.</div>}
     </div>
+  )
+}
+
+/** A count's last stretch of killing: its kills an hour, and the time to finish at that pace. */
+function Pace({ pace, left }: { pace: NonNullable<SlayerRow['pace']>; left: number }) {
+  return (
+    <span
+      className="faint small"
+      title={`${num(pace.kills)} counted from ${timeOfDay(pace.from)} to ${timeOfDay(pace.to)}, kills no more than 10 minutes apart: short breaks count, a longer one starts a new stretch`}
+    >
+      {num(Math.round(pace.perHour))} an hour over the last stretch · about {duration((left / pace.perHour) * 3600)} to finish
+    </span>
   )
 }

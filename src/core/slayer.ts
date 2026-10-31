@@ -1,5 +1,6 @@
 import type { AchSection } from '../shared/character'
-import { COMPLETED_ACHIEVEMENT, DIED, PET_ATTACKING, SLAIN_BY, SLAIN_BY_YOU } from './phrases'
+import type { SlayerPace } from '../shared/tracking'
+import { COMPLETED_ACHIEVEMENT, DIED, KILL_RUN_MS, PET_ATTACKING, SLAIN_BY, SLAIN_BY_YOU } from './phrases'
 import {
   ACHIEVEMENT_GROUPS,
   ACHIEVEMENT_RACES,
@@ -356,6 +357,28 @@ export function mixCredits(name: string, zones: readonly string[], races: Slayer
   return known ? out : null
 }
 
+/** The fewest kills, and the shortest stretch, that set a pace: a pull of three in a minute says too little. */
+const PACE_MIN_KILLS = 10
+const PACE_MIN_MS = 5 * 60_000
+
+/**
+ * A count's pace over its last stretch of killing: back from its newest kill while the kills are no
+ * more than KILL_RUN_MS apart, so the short breaks a pet's health asks for are in it and a long one
+ * ends it. `credits` are each kill's time and the part of it the count gets (a race mix's share).
+ * The kills after the stretch's first over its length, as the time between kills.
+ */
+export function lastStretchPace(credits: readonly (readonly [number, number])[]): SlayerPace | null {
+  const sorted = [...credits].filter(([, w]) => w > 0).sort((a, b) => a[0] - b[0])
+  const to = sorted.at(-1)?.[0]
+  if (to === undefined) return null
+  let i = sorted.length - 1
+  while (i > 0 && sorted[i][0] - sorted[i - 1][0] <= KILL_RUN_MS) i--
+  const from = sorted[i][0]
+  const kills = sorted.slice(i).reduce((n, [, w]) => n + w, 0)
+  if (kills < PACE_MIN_KILLS || to - from < PACE_MIN_MS) return null
+  return { perHour: ((kills - sorted[i][1]) / (to - from)) * 3_600_000, kills: Math.round(kills), from, to }
+}
+
 /**
  * The counts: each open achievement's export count and the kills since that count toward it. A mob
  * is placed by `raceOf` (eqlwiki's race, null for none known, undefined while not yet looked up: its
@@ -370,10 +393,15 @@ export function slayerCounts(
   facts: SlayerFacts,
   completed: Set<string>,
   mixOf?: RaceMix
-): { rows: { counter: SlayerCounter; since: number; guessed: number; last: number; done: boolean }[]; unplaced: { name: string; n: number }[]; unknown: string[] } {
+): {
+  rows: { counter: SlayerCounter; since: number; guessed: number; last: number; done: boolean; pace: SlayerPace | null }[]
+  unplaced: { name: string; n: number }[]
+  unknown: string[]
+} {
   const since = counters.map(() => 0)
   const guessed = counters.map(() => 0)
   const last = counters.map(() => 0)
+  const credits = counters.map((): [number, number][] => [])
   const unplaced: { name: string; n: number }[] = []
   const unknown: string[] = []
   for (const k of kills.values()) {
@@ -403,13 +431,22 @@ export function slayerCounts(
         since[i] += n
         if (fact === undefined && !p.sure) guessed[i] += n
         last[i] = Math.max(last[i], newest)
+        const each = n / part.times.length
+        for (const t of part.times) credits[i].push([t, each])
       })
     }
     if (!any && !placedAny && wiki !== undefined) unplaced.push({ name: k.name, n: k.times.length })
   }
   return {
     // A share of a kill is a guess: the counts stay whole kills.
-    rows: counters.map((counter, i) => ({ counter, since: Math.round(since[i]), guessed: Math.round(guessed[i]), last: last[i], done: completed.has(counter.name.toLowerCase()) })),
+    rows: counters.map((counter, i) => ({
+      counter,
+      since: Math.round(since[i]),
+      guessed: Math.round(guessed[i]),
+      last: last[i],
+      done: completed.has(counter.name.toLowerCase()),
+      pace: lastStretchPace(credits[i])
+    })),
     unplaced: unplaced.sort((a, b) => b.n - a.n),
     unknown
   }

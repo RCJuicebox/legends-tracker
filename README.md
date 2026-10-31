@@ -603,7 +603,10 @@ the client's Bat; `Qeynos Citizen` is Human), or, where the wiki has none, the r
 (`a fire giant warrior` is a Giant, `a giant bat` a Bat, `a dark elf guard` a Dark Elf). It counts
 toward an achievement whose list names that race, and no other: a race is never a word found inside
 another name. A count with kills placed only by a name shows `+~N`, and its tooltip says how many. A
-mob that dies of your damage over time with no killer named (`A bixie died.`) counts too.
+mob that dies of your damage over time with no killer named (`A bixie died.`) counts too. Live's
+Slayer card gives each count's pace over your last stretch of killing, its kills no more than 10
+minutes apart (short breaks for a pet's health are in it), and about how long the rest takes at it;
+a stretch of under 10 kills or 5 minutes gives none.
 
 Each new export then checks the kills: between two exports, every achievement's count rose by the
 kills that counted toward it. Ten giant bats killed and Giants not moved: bats are not Giants. What

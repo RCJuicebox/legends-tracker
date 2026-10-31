@@ -459,7 +459,8 @@ export class SlayerLive {
         guessed: r.guessed,
         max: r.counter.max,
         last: r.last,
-        done: r.done
+        done: r.done,
+        pace: r.pace
       })),
       unplaced: got.unplaced.slice(0, 20),
       pending: got.unknown.length

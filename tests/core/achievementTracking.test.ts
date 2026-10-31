@@ -5,6 +5,7 @@ import {
   achievementRaces,
   forced,
   factTells,
+  lastStretchPace,
   learnFromExport,
   SlayerRaces,
   slayerCounters,
@@ -317,6 +318,41 @@ describe('Slayer counts', () => {
       mob === 'a giant bat' && ach === 'might they be giants?' ? true : mob === 'a hill giant' && ach === 'might they be giants?' ? false : undefined
     const got = slayerCounts(counters, races, kills, (m) => wiki[m], facts, new Set())
     expect(got.rows.find((r) => r.counter.name === 'Might They Be Giants?')).toMatchObject({ since: 3, guessed: 0, last: 82 })
+  })
+})
+
+describe("a Slayer count's last stretch of killing", () => {
+  const MIN = 60_000
+  const every = (start: number, n: number, gap: number) => Array.from({ length: n }, (_, i): [number, number] => [start + i * gap, 1])
+
+  it('runs back from the newest kill while the kills are no more than ten minutes apart', () => {
+    // An hour's stretch, a 53-minute break, then 21 kills two minutes apart: the 20 after the first in 40 minutes.
+    const pace = lastStretchPace([...every(0, 60, MIN), ...every(112 * MIN, 21, 2 * MIN)])
+    expect(pace).toEqual({ perHour: 30, kills: 21, from: 112 * MIN, to: 152 * MIN })
+    // A 2-minute break in a stretch is part of it.
+    expect(lastStretchPace([...every(0, 10, MIN), ...every(19 * MIN, 10, MIN)])).toMatchObject({ kills: 20, from: 0 })
+  })
+
+  it('says nothing from a stretch too short or too few, and counts a share of a kill as that share', () => {
+    expect(lastStretchPace([])).toBeNull()
+    expect(lastStretchPace(every(0, 9, MIN))).toBeNull()
+    expect(lastStretchPace(every(0, 30, 5_000))).toBeNull()
+    // Half of each kill: 20 kills ten minutes, ten counted.
+    expect(lastStretchPace(every(0, 21, 30_000).map(([t]) => [t, 0.5]))).toMatchObject({ perHour: 60, kills: 11 })
+  })
+
+  it("is each row's, from the kills that count toward it", () => {
+    const runts: SlayerKills = new Map([['a kobold runt', { name: 'a kobold runt', times: every(0, 13, MIN).map(([t]) => t) }]])
+    const got = slayerCounts(
+      counters,
+      races,
+      runts,
+      () => 'Kobold',
+      () => undefined,
+      new Set()
+    )
+    expect(got.rows.find((r) => r.counter.name === "Puttin' On The Dog")?.pace).toEqual({ perHour: 60, kills: 13, from: 0, to: 12 * MIN })
+    expect(got.rows.find((r) => r.counter.name === 'Orc Stomp!')?.pace).toBeNull()
   })
 })
 

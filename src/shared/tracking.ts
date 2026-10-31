@@ -75,6 +75,16 @@ export interface SlayerRow {
   last: number
   /** The game said it was completed since the export. */
   done: boolean
+  /** Its pace over the last stretch of killing it counted; none when that stretch says too little. */
+  pace?: SlayerPace | null
+}
+
+/** A count's kills an hour over its last stretch of killing (kills no more than KILL_RUN_MS apart), and that stretch. */
+export interface SlayerPace {
+  perHour: number
+  kills: number
+  from: number
+  to: number
 }
 
 export interface SlayerTrackView {
