@@ -131,6 +131,9 @@ function nameWords(mob: string): string {
     .replace(/\s+pet$/, '')
 }
 
+/** A name that says the mob is a clockwork ("Clockwork XVIB", "a rogue clockwork"). */
+const isClockwork = (mob: string) => nameWords(mob).split(' ').includes('clockwork')
+
 /** The open Slayer achievements' races, and the placing of a mob in one race. */
 /** The races the player said mobs are (slayer-races.json, FEAT-021), by the mob's name words; main sets them as it reads and saves them. */
 let saidRaces: Record<string, string> = {}
@@ -263,6 +266,11 @@ export class SlayerRaces {
     if (play === RACE_MIX) return { key: null, by: 'play', sure: false }
     if (play) return { key: play, by: 'play', sure: true }
     const wiki = wikiRace ? wikiRaceKey(wikiRace) : null
+    // A clockwork is a clockwork, whatever eqlwiki says it is made to look like: Ak'Anon's "Giant
+    // Spider" clockworks rose Domo Arigato (both of two, 10-25; ~500 by 10-31's export), and its
+    // ~820 clockwork gnomes (Clockwork MM most) with them: 1,728 for ~1,685 clockwork kills, ~840
+    // without them. So does every clockwork gnome, Solusek's Eye's CWG Models too (the player, 10-31).
+    if (wiki === 'clockwork gnome' || (wiki && isClockwork(mob) && !wiki.startsWith('clockwork'))) return { key: 'clockwork', by: 'wiki', sure: true }
     if (wikiRace && wiki) {
       if (this.vocab.has(wiki)) return { key: wiki, by: 'wiki', sure: !unsureRace(wikiRace) }
       // A race no list names ("Dark Elf Guard", "Undead Gnoll"): read as a name is, and a guess.

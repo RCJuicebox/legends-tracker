@@ -264,6 +264,15 @@ describe('Slayer counts', () => {
     expect(races.place('Cleaner VII', 'Clockwork Rat')).toEqual({ key: 'clockwork rat', by: 'wiki', sure: true })
   })
 
+  it('takes a clockwork for a clockwork, whatever eqlwiki says it looks like, and every clockwork gnome too', () => {
+    expect(races.place('Clockwork XVIB', 'Giant Spider')).toEqual({ key: 'clockwork', by: 'wiki', sure: true })
+    expect(races.place('rogue clockwork', 'Giant Spider')).toEqual({ key: 'clockwork', by: 'wiki', sure: true })
+    expect(races.place('Clockwork scrubber', 'Clockwork Rat')).toEqual({ key: 'clockwork rat', by: 'wiki', sure: true })
+    expect(races.place('Clockwork MM', 'Clockwork Gnome', "Ak'Anon")).toEqual({ key: 'clockwork', by: 'wiki', sure: true })
+    expect(races.place('Gearheart', 'Clockwork Gnome')).toEqual({ key: 'clockwork', by: 'wiki', sure: true })
+    expect(races.place('CWG Model CA', 'Clockwork Gnome', "Solusek's Eye")).toEqual({ key: 'clockwork', by: 'wiki', sure: true })
+  })
+
   it('reads kills, pets and completions off the log', () => {
     expect(slayerLine('You have slain a kobold runt!')).toEqual({ kill: { mob: 'a kobold runt', by: 'You' } })
     expect(slayerLine('A gnoll has been slain by Vonartik!')).toEqual({ kill: { mob: 'A gnoll', by: 'Vonartik' } })

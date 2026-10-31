@@ -171,7 +171,7 @@ export const SLAYER_CAMPS: SlayerCamp[] = [
     zone: 'Steamfont Mountains',
     mobs: ['a clockwork'],
     races: ['clockwork'],
-    note: 'The northern valleys, for most kinds of clockwork. The clockwork gnomes of Solusek A do not count.',
+    note: 'The northern valleys, for most kinds of clockwork.',
     said: 'EQL Discord, 2026-07-29 and 10-07'
   },
   {
