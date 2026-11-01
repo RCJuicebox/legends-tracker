@@ -123,6 +123,8 @@ const ALIASES: Record<string, string> = {
   'ghost dwarf': 'ghost',
   'elf vampire': 'vampire',
   // 28 Fungusman, 456 Sporali: eqlwiki calls Runnyeye's sporali Fungusman; the achievements say Sporalis.
+  // Settled by the exports of 2026-10-31: Plants Concrete and Stone rose 23 (839 to 862, 21:17 to 22:00)
+  // while exactly 23 Runnyeye sporali died and nothing else of its races.
   fungusman: 'sporali',
   // One race each, by another name.
   'lava dragon': 'dragon',
@@ -203,8 +205,7 @@ const UNSURE: ReadonlySet<string> = new Set([
   'bee',
   'giant bee',
   'polar bear',
-  'kerra',
-  'fungusman'
+  'kerra'
 ])
 
 /** Wiki races that say nothing of which race: the mob is placed by its name. */
