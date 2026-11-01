@@ -31,7 +31,7 @@
     "release": "node scripts/release.mjs"
   },
   "dependencies": {
-    "electron-updater": "^6.8.9",
+    "electron-updater": "^6.8.11",
     "koffi": "^3.3.3",
     "onnxruntime-node": "1.30.0",
     "phonemizer": "1.2.1",
