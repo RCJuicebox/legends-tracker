@@ -2,11 +2,14 @@
 
 What changed in each version. The release workflow publishes a version's section as its release notes, and installed copies show them when an update arrives.
 
-## Unreleased
+## 2.22.0 (2026-11-06)
 
 - **Your own endurance, said when it runs low.** The Triggers page's group health card has **Say when your own endurance is low** beside the mana cue (off until switched on; 25% unless changed, said again once you are 10% back over). It reads the Player window's endurance bar on the screen, solo or grouped, and works with the group alert and the mana cue off. Cannibalization's pause holds back only your mana, never your endurance.
 - **Slayer: your pace and the time to finish, on Live.** Each count on Live's Slayer card now says its kills an hour over your last stretch of killing and about how long the rest takes at that pace ("228 an hour over the last stretch · about 9 h 25 min to finish"). A stretch is the kills that count toward it no more than 10 minutes apart, so short breaks for your pet's health are in the pace and a longer one starts a new stretch. A stretch of under 10 kills or 5 minutes says nothing.
 - **Slayer: every kind of clockwork counts toward Domo Arigato.** eqlwiki gives many clockworks the race they are made to look like (Clockwork XVIB, rogue clockworks: Giant Spider), and Ak'Anon's Clockwork MM and its kin are Clockwork Gnomes, so only the clockwork rats counted between exports. A mob named as a clockwork now counts as one whatever eqlwiki says, and so does a clockwork gnome: an export rose Domo Arigato 1,728 over about 1,685 clockwork kills in Ak'Anon, all three kinds. Every clockwork gnome counts, Solusek's Eye's CWG Models too.
+- **Slayer: evil eyes count toward A Sight for Sore Eyes.** Its list says Eyes, which counted only the game's Eye race, so glare lords, evil eye prisoners and the Gorge of King Xorbb's eyes counted toward nothing between exports and the plan never sent you to them. Eyes now covers the Evil Eye too, as exports show: a rise of 9 was 5 icy terrors, 2 phoboplasm and 2 glare lords, and one of 10 was 8 evil eyes and 2 evil eye prisoners. Eye See What You Did There!'s Evil Eyes is still the Evil Eye alone.
+- **Slayer: sporali for Plants Concrete and Stone are settled.** 2.21.0 counted Runnyeye's sporali and their kin as a guess. An export has since risen by exactly the sporali killed, so they count for certain and a later export no longer reconsiders them.
+- **Plan › Slayer: an East Karana spot for Strange Weather.** /waypoint 515, -797, among the gorge hounds and lions, ran about 51 an hour over a 7-hour pet run. The step shows it and its map marks it.
 
 ## 2.21.0 (2026-10-28)
 
