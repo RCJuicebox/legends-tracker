@@ -193,6 +193,12 @@ describe('Slayer counts', () => {
     expect(achievementRaces('Dracoliches, Water Dragons, and Witherans.', GAME).unnamed).toEqual(['dracolich', 'water dragon', 'witheran'])
     // Words that name no race: the avatars are Innoruuk and Cazic-Thule.
     expect([...achievementRaces('The avatar of a deity.', GAME).keys]).toEqual(['innoruuk', 'cazic thule'])
+    // "Eyes" is the client's Eye and Evil Eye; "Evil Eyes" only the Evil Eye.
+    expect(keysOf('Cubes, Eyes, and Goos.')).toEqual(['evil eye', 'eye', 'gelatinous cube', 'goo'])
+    expect(keysOf('Evil Eyes')).toEqual(['evil eye'])
+    const eyes = new SlayerRaces([{ races: 'Cubes, Eyes, and Goos.' }], GAME)
+    expect(eyes.keys[0].has(eyes.place('a glare lord', 'Evil Eye').key ?? '')).toBe(true)
+    expect(eyes.keys[0].has(eyes.place('a thought bleeder', 'Eye of Zomm').key ?? '')).toBe(true)
     // As the log names them.
     const gods = new SlayerRaces([{ races: 'The avatar of a deity.' }], GAME)
     expect(gods.place('Innoruuk, the Prince of Hate', null).key).toBe('innoruuk')

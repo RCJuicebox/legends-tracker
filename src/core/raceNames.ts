@@ -259,7 +259,11 @@ export function wikiRaceKey(race: string): string | null {
  * achievement's item is read, its " of …" off.
  */
 export const ACHIEVEMENT_RACES: Record<string, string[]> = {
-  'the avatar': ['innoruuk', 'cazic thule']
+  'the avatar': ['innoruuk', 'cazic thule'],
+  // A Sight for Sore Eyes' "Eyes" is the client's Eye and its Evil Eye. Settled by the exports: a rise
+  // of 9 (2026-10-19 to 10-20) was 5 icy terrors, 2 phoboplasm and 2 glare lords; one of 10 (10-31) was
+  // 8 evil eyes and 2 evil eye prisoners. "Evil Eyes" (Eye See What You Did There!) stays Evil Eye alone.
+  eyes: ['eye', 'evil eye']
 }
 
 /**
