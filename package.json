@@ -32,7 +32,7 @@
   },
   "dependencies": {
     "electron-updater": "^6.8.9",
-    "koffi": "^3.3.3",
+    "koffi": "^3.3.5",
     "onnxruntime-node": "1.30.0",
     "phonemizer": "1.2.1",
     "yauzl": "^3.4.0",
