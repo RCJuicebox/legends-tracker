@@ -2,6 +2,12 @@
 
 What changed in each version. The release workflow publishes a version's section as its release notes, and installed copies show them when an update arrives.
 
+## 2.23.1 (2026-11-09)
+
+- **Plan › Slayer: every unfinished achievement gets a step.** A new log could still find achievements on Not planned when the only camps for them are above your level, or the spawn tables have none. The plan still prefers camps at your level. Where there is none, it now offers a higher camp, marked "over your level: a group’s camp more than a pet’s". Where the spawn tables have nothing, it offers the zones eqlwiki’s guide names, at your usual pace. Only an achievement nothing the plan knows can feed is left on Not planned.
+- **Plan › Slayer: Pet kills only drops nothing either.** Pet camps still come first. An achievement no pet camp can feed now keeps the ordinary plan's camp for it instead of dropping out. That covers the raid lockouts, the Iksar troopers and higher-level mobs.
+- **Plan › Slayer: Denizens of Fear at the Plane of Fear's amygdalans.** The spawn tables give Fear a twelve-hour repop, about one amygdalan an hour, so the plan sent you to Cazic-Thule's level-56 amygdalans instead. A measured Fear run of 26 an hour now paces them there.
+
 ## 2.23.0 (2026-11-09)
 
 - **Updates install by themselves.** **Restart into updates by itself** (Settings › General) is now on for everyone, since an update that waited for the app to close never came for a tracker left running for days. Once an update has downloaded, the app restarts into it at the next lull in play: out of combat with the log quiet a minute, or the game not in front, and at most two hours after it arrived. The overlays blink and come back; settings and overlays stay as they were, though spell timers running then are lost. Turn it off on Settings › General to update only when you close the app or choose Restart and update; once off, it stays off.
