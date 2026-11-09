@@ -181,7 +181,8 @@ describe('Engine', () => {
     await waitFor(() => engine.unread.total >= 2, 10_000)
     // The mote loot is read; the talk is chat.
     expect(engine.unread.top(5)).toEqual([{ shape: 'Your target is too far away, get closer!', n: 2, example: 'Your target is too far away, get closer!' }])
-  })
+    // Its wait is up to ten seconds; the test's own limit must be longer, or a busy full run times it out.
+  }, 15_000)
 
   it('says skill-ups, AA points and your death in the feed, follows a merge in the planner, and starts a timer a feature asks for (LT-726, LT-727, LT-740)', async () => {
     const logFile = join(logs, 'eqlog_Kelwyn_neriak.txt')

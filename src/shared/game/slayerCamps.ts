@@ -209,6 +209,16 @@ export const SLAYER_CAMPS: SlayerCamp[] = [
     said: 'EQL Discord, 2026-09-20'
   },
   {
+    // The tables give Fear the classic twelve-hour repop, about one amygdalan an hour: they would send a
+    // player to Cazic-Thule's instead. A run of two characters, 2026-11-05: 23 in 53 minutes, export-settled.
+    zone: 'The Plane of Fear',
+    mobs: ['Amygdalan knight', 'Amygdalan warrior'],
+    races: ['amygdalan'],
+    perHour: 26,
+    note: 'The amygdalans, levels 48 to 52: a group’s camp more than a pet’s.',
+    said: 'the player, 2026-11-05'
+  },
+  {
     // The zone has no spawn table: without this, Mostly Kunzar and I'm a People Person! had no camp for
     // a player whose log has not been there. A pet run 2026-10-14: 722 undead in 2.96 h.
     zone: 'New Sebilis Expedition',

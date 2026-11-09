@@ -627,11 +627,9 @@ export function buildCamps(
     return m
   }
   // A zone's mobs that feed these goals, as kinds: what their spawns allow an hour.
-  const spawnKinds = (zone: string, open: (g: number) => boolean): CampKind[] =>
+  const spawnKinds = (zone: string, open: (g: number) => boolean, maxLevel = spawns?.maxLevel ?? Infinity): CampKind[] =>
     [...(spawnsIn(zone)?.values() ?? [])]
-      .filter(
-        (m) => usable(m) && (!named(m.name) || m.timerFrom === 'timed') && !lockoutMobs.has(spawnKey(m.name)) && m.ceiling >= MIN_KIND && m.hi <= (spawns!.maxLevel ?? Infinity)
-      )
+      .filter((m) => usable(m) && (!named(m.name) || m.timerFrom === 'timed') && !lockoutMobs.has(spawnKey(m.name)) && m.ceiling >= MIN_KIND && m.hi <= maxLevel)
       .map((m) => ({ name: m.name, perHour: m.ceiling, goals: spawns!.place(m.name, m.race).filter(open), spawn: m }))
       .filter((k) => k.goals.length)
       .sort((a, b) => b.perHour - a.perHour)
@@ -879,6 +877,48 @@ export function buildCamps(
     for (const k of c.kinds) for (const g of k.goals) c.pace[g] = (c.pace[g] ?? 0) + k.perHour
     c.note = c.kinds.map((k) => `${k.name}: ${num(k.perHour / WIKI_PER_NPC)} on eqlwiki`).join(', ')
   }
+  // Last, what nothing above feeds, so every open achievement has a way in the plan (the player,
+  // 2026-11-09): the tables' mobs over the level ceiling, a group's camp more than a pet's; and where the
+  // tables have none either, each zone eqlwiki's guide names, at the player's usual pace.
+  if (spawns && !spawns.petOnly) {
+    const fedNow = () => new Set(camps.flatMap((c) => Object.keys(c.pace).flatMap((g) => ((c.pace[+g] ?? 0) > 0 ? [+g] : []))))
+    let bare = wanting.filter((g) => !fedNow().has(g))
+    if (bare.length)
+      for (const [short, z] of Object.entries(spawns.tables)) {
+        if (isCity(z.name)) continue
+        reached(
+          z.name,
+          spawnKinds(z.name, (g) => bare.includes(g), Infinity)
+        ).forEach((p, i) => {
+          const c = capped(p.kinds, spawns.killSpeed)
+          const lo = Math.min(...c.kinds.map((k) => k.spawn?.lo ?? Infinity))
+          const hi = Math.max(...c.kinds.map((k) => k.spawn?.hi ?? 0))
+          camps.push({
+            id: placeId(`over:${short}`, i, p.at),
+            zone: z.name,
+            kinds: c.kinds,
+            source: 'spawns',
+            pace: paceOfKinds(c.kinds),
+            limit: c.limit,
+            ceiling: c.ceiling,
+            note: `levels ${lo === hi ? lo : `${lo} to ${hi}`}, over your level: a group’s camp more than a pet’s`,
+            said: 'TAKP’s spawn table'
+          })
+        })
+      }
+    const fed2 = fedNow()
+    bare = bare.filter((g) => !fed2.has(g))
+    for (const g of bare) {
+      const tip = guide.find((t) => metaName(t.achievement) === metaName(goals[g].name))
+      for (const zone of tip?.zones ?? []) {
+        const id = `guide:${zoneKey(zone)}|assumed`
+        let c = camps.find((x) => x.id === id)
+        if (!c) camps.push((c = { id, zone, kinds: [], source: 'play', pace: {}, assumed: true, note: `eqlwiki’s guide: ${tip!.tip}`, said: SLAYER_GUIDE_SAID }))
+        c.kinds.push({ name: goals[g].races.replace(/\.$/, ''), perHour: 1, goals: [g] })
+        c.pace[g] = 1
+      }
+    }
+  }
   if (!spawns?.petOnly || spawns.maxLevel === undefined) return camps
   // Pet kills alone: a kind of a level the tables (or the player's /con) know over the ceiling is out, its camp paced by the rest.
   const max = spawns.maxLevel
@@ -1005,6 +1045,29 @@ function fallbackOnly(camps: SlayerPlanCamp[]): SlayerPlanCamp[] {
   })
 }
 
+/**
+ * The plan of pet kills alone, with nothing dropped from it: the pet's camps, and for an achievement no
+ * pet camp feeds, the ordinary plan's camps for it alone (a raid lockout, the troopers, mobs over the
+ * pet's ceiling), the player's way for it (2026-11-09).
+ */
+export function petFirst(pet: SlayerPlanCamp[], all: SlayerPlanCamp[]): SlayerPlanCamp[] {
+  const fed = new Set(pet.flatMap((c) => Object.keys(c.pace).flatMap((g) => ((c.pace[+g] ?? 0) > 0 ? [+g] : []))))
+  const ids = new Set(pet.map((c) => c.id))
+  return [
+    ...pet,
+    ...all.flatMap((c) => {
+      const keep = Object.keys(c.pace)
+        .map(Number)
+        .filter((g) => (c.pace[g] ?? 0) > 0 && !fed.has(g))
+      if (!keep.length) return []
+      const kinds = c.kinds.map((k) => ({ ...k, goals: k.goals.filter((g) => keep.includes(g)) })).filter((k) => k.goals.length)
+      // The pet's camp of the same place keeps its id: this one is the rest of it, not for a pet.
+      const id = ids.has(c.id) ? `${c.id}|not-pet` : c.id
+      return [{ ...c, id, kinds, pace: Object.fromEntries(keep.map((g) => [g, c.pace[g]])) }]
+    })
+  ]
+}
+
 /** A camp without the mobs ruled out, its pace their kinds' together again; none when nothing is left. */
 function withoutMobs(c: SlayerPlanCamp, out: string[]): SlayerPlanCamp[] {
   if (!out.length) return [c]
@@ -1048,7 +1111,9 @@ export function planSlayer(
   const raising = choices.avoidPlanFactions ? (data.raising ?? []) : []
   const paceOf = (c: SlayerPlanCamp, g: number) => (c.pace[g] ?? 0) * (c.assumed ? choices.pace : 1)
   const camps = fallbackOnly(
-    (choices.petOnly && data.petCamps ? data.petCamps : data.camps).filter((c) => !ruled.has(c.id) && !costsPlan(c, raising).length).flatMap((c) => withoutMobs(c, choices.outMobs))
+    (choices.petOnly && data.petCamps ? petFirst(data.petCamps, data.camps) : data.camps)
+      .filter((c) => !ruled.has(c.id) && !costsPlan(c, raising).length)
+      .flatMap((c) => withoutMobs(c, choices.outMobs))
   )
   // The lockouts: what they alone feed is out of the hourly plan, done in the days the lockouts'
   // kills a day take together (Lady Vox and Lord Nagafen, ten true dragons a day). What an hourly

@@ -12,6 +12,7 @@ import {
   joinKillTallies,
   joinMoves,
   optionalSlayer,
+  petFirst,
   planSlayer,
   readKillLine,
   routeFinder,
@@ -295,7 +296,7 @@ describe('Slayer plan: the spawn tables’ camps', () => {
     expect(any[0].kinds.map((k) => k.name)).toEqual(['an orc sailor', 'an orc warlord'])
   })
 
-  it('plans pet kills alone: what cons green or lower in every camp, no raid lockouts', () => {
+  it('plans pet kills alone: what cons green or lower in every camp, the rest only for what no pet camp feeds', () => {
     const oot: SpawnTables = {
       oot: {
         id: 69,
@@ -342,10 +343,15 @@ describe('Slayer plan: the spawn tables’ camps', () => {
     const all = build(false)
     expect(all.find((c) => c.id === 'log:The Ocean of Tears')!.pace[gi('Might They Be Giants?')]).toBe(15)
     expect(all.some((c) => c.daily)).toBe(true)
-    // The choice takes the pet camps when the data has them: no giants at the dock then.
+    // The choice takes the pet camps when the data has them: no giants at the dock then. The giants no
+    // pet camp feeds keep the ordinary plan's camps, the lockout too, so nothing drops from the plan.
     const petPlan = planSlayer({ goals, camps: all, petCamps: pet }, { ...DEFAULT_CHOICES, petOnly: true })
-    expect(petPlan.steps.length).toBeGreaterThan(0)
-    expect(petPlan.steps.every((s) => pet.includes(s.camp))).toBe(true)
+    const orcs = petPlan.steps.filter((s) => s.focus.includes(gi('Orc Stomp!')))
+    expect(orcs.length).toBeGreaterThan(0)
+    expect(orcs.every((s) => pet.includes(s.camp))).toBe(true)
+    expect(petPlan.steps.filter((s) => s.focus.includes(gi('Might They Be Giants?'))).map((s) => s.camp.id)).toEqual(['log:The Ocean of Tears|not-pet'])
+    // Only what nothing feeds at all: no dervish anywhere here.
+    expect(petPlan.unplanned).toEqual([gi('Spin Me Round')])
     expect(planSlayer({ goals, camps: all, petCamps: pet }, DEFAULT_CHOICES).steps.every((s) => all.includes(s.camp))).toBe(true)
     // Without pet camps (no level known), the plan stands on the camps.
     expect(planSlayer({ goals, camps: all }, { ...DEFAULT_CHOICES, petOnly: true }).steps.every((s) => all.includes(s.camp))).toBe(true)
@@ -394,5 +400,70 @@ describe('Slayer plan: the spawn tables’ camps', () => {
     expect(stepKills(plan.steps[0], DEFAULT_CHOICES)[0].spawn).toEqual({ name: 'an orc pawn' })
     // Without the trips, the player's ten minutes.
     expect(planSlayer({ goals: [g('A', 0, 60), g('B', 0, 60)], camps: plan.steps.map((s) => s.camp).slice(0, 2) }, DEFAULT_CHOICES).steps[1].travel).toBe(600)
+  })
+})
+
+describe('Slayer plan: nothing dropped for want of a camp at your level (2026-11-09)', () => {
+  // Giants only over the ceiling, orcs low in Crushbone and high in Fear, dervishes in no table at all.
+  const tables: SpawnTables = {
+    fearplane: {
+      id: 72,
+      name: 'The Plane of Fear',
+      npcs: [
+        ['a fear giant', 'Giant', 50, 52],
+        ['an orc elite', 'Orc', 50, 52]
+      ],
+      groups: [
+        [
+          600,
+          [
+            [0, 50],
+            [1, 50]
+          ],
+          Array.from({ length: 10 }, () => 0)
+        ]
+      ]
+    },
+    crushbone: TABLES.crushbone
+  }
+  const tips = [
+    { achievement: 'Spin me round.', tip: 'Najena, the dervish room', zones: ['Najena'] },
+    { achievement: 'Might They Be Giants?', tip: 'Fear', zones: ['The Plane of Fear'] }
+  ]
+  const build = (petOnly = false) =>
+    buildCamps(
+      goals,
+      races,
+      {},
+      () => [],
+      () => null,
+      slayerRaceLists(sections, GAME),
+      [],
+      { tables, timings: zoneTimings(tables, []), place, killSpeed: 100, maxLevel: petOnly ? 32 : 45, ...(petOnly ? { petOnly } : {}) },
+      tips
+    )
+  const camps = build()
+
+  it('takes the tables over your level only for what nothing at your level feeds, and the guide’s zones where the tables have nothing', () => {
+    const over = camps.filter((c) => c.id.startsWith('over:'))
+    expect(over.map((c) => [c.zone, c.kinds.map((k) => k.name)])).toEqual([['The Plane of Fear', ['a fear giant']]])
+    expect(over[0].note).toBe('levels 50 to 52, over your level: a group’s camp more than a pet’s')
+    expect(camps.find((c) => c.id === 'guide:najena|assumed')).toMatchObject({
+      assumed: true,
+      kinds: [{ name: 'Dervishes', perHour: 1, goals: [gi('Spin Me Round')] }],
+      note: 'eqlwiki’s guide: Najena, the dervish room'
+    })
+    expect(planSlayer({ goals, camps }, DEFAULT_CHOICES).unplanned).toEqual([])
+  })
+
+  it('keeps, with Pet kills only, the ordinary plan’s camps for what no pet camp feeds', () => {
+    const pet = build(true)
+    const fed = (cs: SlayerPlanCamp[], g: number) => cs.filter((c) => (c.pace[g] ?? 0) > 0).map((c) => c.id)
+    expect(fed(pet, gi('Might They Be Giants?'))).toEqual([])
+    const both = petFirst(pet, camps)
+    expect(fed(both, gi('Might They Be Giants?'))).toEqual(fed(camps, gi('Might They Be Giants?')))
+    // Orcs a pet takes in Crushbone: the ordinary plan's camps add nothing for them.
+    expect(fed(both, gi('Orc Stomp!'))).toEqual(fed(pet, gi('Orc Stomp!')))
+    expect(planSlayer({ goals, camps, petCamps: pet }, { ...DEFAULT_CHOICES, petOnly: true }).unplanned).toEqual([])
   })
 })

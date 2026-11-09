@@ -794,8 +794,8 @@ export function Slayer() {
               <div className="card mb-16">
                 <h2>Not planned</h2>
                 <div className="faint small mb-8">
-                  Nothing the plan can pace feeds these: your logs have no camp for them, players have settled none, and the spawn tables have none of these races in eqlwiki’s
-                  zones at your level. Kill some anywhere and the plan learns the pace.
+                  Nothing the plan knows feeds these: not your logs, a camp players have settled, the spawn tables at any level, or a zone eqlwiki’s guide names. Kill some anywhere
+                  and the plan learns the pace.
                 </div>
                 {plan.unplanned.map((g) => (
                   <div key={g} className="small">
