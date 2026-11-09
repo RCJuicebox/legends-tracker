@@ -628,3 +628,63 @@ describe('Slayer plan: the faction plan’s factions (LT-656)', () => {
     expect(planSlayer({ ...data, raising: [] }, { ...DEFAULT_CHOICES, avoidPlanFactions: true }).steps.map((s) => s.camp.id)).toEqual(['log:Clan Crushbone'])
   })
 })
+
+describe('the camps players settled, for a log that has been nowhere', () => {
+  const game = parseRaceTable(['128^11^Iksar^0^', '128^12^Iksars^0^', '156^11^Ratman^0^', '104^11^Leech^0^', '104^12^Leeches^0^'].join('\n'))
+  const exp = parseAchievements(
+    [
+      'Slayer: Special',
+      'I\tMostly Kunzar',
+      'I\t\tIksars and Kylong Iksars of Veksar.\t59/1000',
+      "I\tI'm a People Person!",
+      'I\t\tIksars\t0/10',
+      'Slayer: Skill',
+      'I\tYou Dirty Ratman!',
+      'I\t\tRatmen\t16/100',
+      'I\tLeechy Keen',
+      'I\t\tLeeches, Ticks, and Vacuum Worms.\t5/100'
+    ].join('\n')
+  ).sections
+  const counters = slayerCounters(exp)
+  const goals = slayerGoals(counters, new Map(), new Set())
+  const camps = buildCamps(
+    goals,
+    new SlayerRaces(counters, game),
+    {},
+    () => [],
+    () => null,
+    slayerRaceLists(exp, game)
+  )
+
+  it('plans New Sebilis, the Hole’s ratmen and Rathe’s larval bleeders, where no spawn table can (2026-11-09)', () => {
+    const plan = planSlayer({ goals, camps }, DEFAULT_CHOICES)
+    expect(plan.unplanned).toEqual([])
+    const seb = (mob: string) => camps.find((c) => c.zone === 'New Sebilis Expedition' && c.kinds[0].name.includes(mob))!
+    // The undead are Kylong Iksars, for Mostly Kunzar alone; I'm a People Person! wants the troopers.
+    expect(seb('skeleton').pace).toEqual({ 0: 244 })
+    expect(seb('Trooper Loxra')).toMatchObject({ noPet: true, pace: { 1: 22.5 } })
+    // North Ro's three by the zone line, back about every eight minutes.
+    expect(camps.find((c) => c.zone === 'The Northern Desert of Ro')).toMatchObject({ noPet: true, pace: { 0: 22.5, 1: 22.5 } })
+    expect(camps.find((c) => c.zone === 'The Ruins of Old Paineel')).toMatchObject({ assumed: true, pace: { 2: 1 } })
+    expect(camps.find((c) => c.zone === 'The Rathe Mountains' && c.kinds[0].name === 'a larval bleeder')!.pace).toEqual({ 3: 68 })
+    // A pet cannot take the troopers: no camp for them in the plan of pet kills alone.
+    const pet = buildCamps(
+      goals,
+      new SlayerRaces(counters, game),
+      {},
+      () => [],
+      () => null,
+      slayerRaceLists(exp, game),
+      undefined,
+      {
+        tables: {},
+        timings: new Map(),
+        place: () => [],
+        killSpeed: 60,
+        maxLevel: 40,
+        petOnly: true
+      }
+    )
+    expect(pet.some((c) => c.kinds[0]?.name.includes('Trooper'))).toBe(false)
+  })
+})

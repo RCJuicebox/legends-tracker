@@ -4,6 +4,8 @@
 // camp feeds every open achievement that lists one of them. Each says who said so and when: the EQL
 // Discord's Slayer talk read 2026-10-11, or the player.
 
+import { SLAYER_GUIDE_SAID } from './slayerGuide'
+
 export interface SlayerCamp {
   zone: string
   /** The mobs to kill, as the log names them. */
@@ -14,6 +16,10 @@ export interface SlayerCamp {
   perDay?: number
   /** Kills an hour while at it, where play has put a number on it. */
   perHour?: number
+  /** Achievements its races list that its mobs do not count toward, as play settled. */
+  not?: string[]
+  /** Mobs a pet cannot take: no camp when the plan is of pet kills alone. */
+  noPet?: boolean
   /** One spawn's respawn, in minutes, and how many spawns: an hour's kills at most. */
   respawnMin?: number
   spawns?: number
@@ -78,6 +84,20 @@ export const SLAYER_SPOTS: { zone: string; for: string[]; tip: string; said: str
     tip: 'Stand at /waypoint 515, -797 and let the pet pull: gorge hounds, lion patriarchs, lioness matriarchs and lionesses, about 51 an hour over 7 h',
     said: 'the player, 2026-10-30',
     at: [515, -797]
+  },
+  {
+    zone: 'New Sebilis Expedition',
+    for: ['Mostly Kunzar'],
+    tip: 'Stand at /waypoint -697, -195 and let the pet pull the undead: about 244 an hour over 3 h',
+    said: 'the player, 2026-11-09',
+    at: [-697, -195]
+  },
+  {
+    zone: 'The Rathe Mountains',
+    for: ['Leechy Keen'],
+    tip: 'Stand at /waypoint -1272, 1472 for the larval bleeders: about 68 an hour with a pet',
+    said: 'the player, 2026-11-09',
+    at: [-1272, 1472]
   }
 ]
 
@@ -187,5 +207,58 @@ export const SLAYER_CAMPS: SlayerCamp[] = [
     races: ['nightmare'],
     note: 'The ponies at the top right.',
     said: 'EQL Discord, 2026-09-20'
+  },
+  {
+    // The zone has no spawn table: without this, Mostly Kunzar and I'm a People Person! had no camp for
+    // a player whose log has not been there. A pet run 2026-10-14: 722 undead in 2.96 h.
+    zone: 'New Sebilis Expedition',
+    mobs: ['a decaying skeleton', 'a skeleton', 'a withering skeleton', 'an iksar ghost', 'a sarnak ghost'],
+    races: ['iksar'],
+    // Kylong Iksars, not the true Iksars I'm a People Person! wants (ZONE_MOB_NOT_FOR).
+    not: ["I'm a People Person!"],
+    perHour: 244,
+    note: 'The undead, Kylong Iksars that count as Iksars for Mostly Kunzar; spiderlings and golems among them.',
+    said: 'the player, 2026-11-09'
+  },
+  {
+    // The troopers, here and in North Ro by the zone line: the only true Iksars for I'm a People Person!'s ten.
+    zone: 'New Sebilis Expedition',
+    mobs: ['Trooper Loxra', 'Trooper Axyl', 'Crusader Graez'],
+    races: ['iksar'],
+    noPet: true,
+    // Not timed here: taken as North Ro's troopers', not the usual pace three named mobs cannot keep.
+    respawnMin: 8,
+    spawns: 3,
+    note: 'The troopers, the only true Iksars there: a pet cannot take them.',
+    said: 'the player, 2026-11-09'
+  },
+  {
+    zone: 'The Northern Desert of Ro',
+    mobs: ['Trooper Tygin', 'Trooper Axlia', 'Crusader Iktra'],
+    races: ['iksar'],
+    noPet: true,
+    // Two came back 8 and 9 minutes after they died (the log, 2026-10-13).
+    respawnMin: 8,
+    spawns: 3,
+    note: 'The troopers by the New Sebilis zone line: a pet cannot take them.',
+    said: 'the player, 2026-11-09'
+  },
+  {
+    zone: 'The Rathe Mountains',
+    mobs: ['a larval bleeder'],
+    races: ['leech'],
+    // Measured beside the plant camp at -1273, 1586, a pet's 15.8 h on 2026-11-02 and 03.
+    perHour: 68,
+    note: 'The larval bleeders, the very small leeches by the froglok city.',
+    said: 'the player, 2026-11-09'
+  },
+  {
+    // The tables' ratmen (45 to 55) are over the plan's level ceiling, and eqlwiki's count leaves a zone
+    // the tables have to them: nothing else feeds You Dirty Ratman!.
+    zone: 'The Ruins of Old Paineel',
+    mobs: ['a ratman warrior', 'a ratman guard'],
+    races: ['ratman'],
+    note: 'Camp Slizik the Mighty: ratmen of 45 to 55, a group’s camp more than a pet’s.',
+    said: SLAYER_GUIDE_SAID
   }
 ]

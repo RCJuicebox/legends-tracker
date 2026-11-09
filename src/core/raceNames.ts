@@ -317,7 +317,12 @@ export const MOB_RACES: Record<string, string> = {
   'dervish thug': 'ogre',
   // New Sebilis Expedition's golems: their kills between two exports were the golem achievements' rise to the one (2026-10-14).
   'failed experiment': 'golem',
-  'abomination of ro': 'golem'
+  'abomination of ro': 'golem',
+  // Rathe's very small leeches: no eqlwiki page, and not TAKP's (the player, 2026-11-09).
+  'larval bleeder': 'leech',
+  // North Ro's troopers by the New Sebilis zone line, true Iksars like their fellows eqlwiki has (the player, 2026-11-09).
+  'trooper tygin': 'iksar',
+  'trooper axlia': 'iksar'
 }
 
 /**
@@ -334,6 +339,15 @@ export const ZONE_MOB_RACES: Record<string, Record<string, string>> = {
     'iksar ghost': 'iksar',
     'sarnak ghost': 'iksar'
   }
+}
+
+/**
+ * Achievements a zone's settled mobs do not count toward, though their race is one listed: New Seb's
+ * undead are Kylong Iksars, not the true Iksars I'm a People Person! wants, which only its guards are
+ * (the player, 2026-11-09). By the zone as ZONE_MOB_RACES keys it, the names lower-cased.
+ */
+export const ZONE_MOB_NOT_FOR: Record<string, string[]> = {
+  'new sebilis expedition': ["i'm a people person!"]
 }
 
 /** A zone as ZONE_MOB_RACES keys it. */

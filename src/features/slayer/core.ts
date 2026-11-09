@@ -413,6 +413,8 @@ export interface SlayerPlanCamp {
   assumed?: boolean
   /** Kills a day at most, for a raid lockout: run beside the plan, not in it. */
   daily?: boolean
+  /** Mobs a pet cannot take (New Seb's guards): no camp in the plan of pet kills alone. */
+  noPet?: boolean
   /** The log's hours spent killing there, and kills: what the pace stands on. */
   hours?: number
   kills?: number
@@ -717,7 +719,8 @@ export function buildCamps(
   }
   const goalsOf = (keys: string[]) => goals.flatMap((_, i) => (keys.some((k) => races.keys[i].has(k)) ? [i] : []))
   for (const k of known) {
-    const at = goalsOf(k.races)
+    // Less what play settled its mobs do not count toward, their race though it lists.
+    const at = goalsOf(k.races).filter((g) => !k.not?.some((n) => metaName(n) === metaName(goals[g].name)))
     const daily = k.perDay !== undefined
     // The log's pace for the same zone and goals stands; a raid lockout is a lockout whatever the log says.
     const open = daily ? at : at.filter((g) => !fed.has(feeds(k.zone, g)))
@@ -772,6 +775,7 @@ export function buildCamps(
       pace: Object.fromEntries(left.map((g) => [g, (per ?? 1) * part(g)])),
       ...(per === undefined ? { assumed: true } : {}),
       ...(daily ? { daily: true, mobs: k.mobs } : {}),
+      ...(k.noPet ? { noPet: true } : {}),
       note: k.note,
       said: k.said
     })
@@ -884,7 +888,7 @@ export function buildCamps(
     return his.every((h) => h !== undefined) ? Math.max(...(his as number[])) : null
   }
   return camps.flatMap((c) => {
-    if (c.daily) return []
+    if (c.daily || c.noPet) return []
     const kinds = c.kinds.filter((k) => (levelOf(c.zone, k) ?? 0) <= max)
     if (!kinds.length) return []
     return kinds.length === c.kinds.length ? [c] : [{ ...c, kinds, pace: paceOfKinds(kinds) }]

@@ -16,6 +16,8 @@ const counters = slayerCounters(
       'Slayer: Special',
       'I\tMostly Kunzar',
       'I\t\tIksars and Kylong Iksars of Veksar.\t100/1000',
+      "I\tI'm a People Person!",
+      'I\t\tIksars\t0/10',
       'I\tGooooooooooooooolem!',
       'I\t\tGingerbread Men, Golems, Muddites, and Statues.\t229/1000',
       'Slayer: Conquest',
@@ -39,6 +41,8 @@ describe('a race play settled for one zone', () => {
     expect(races.place('an iksar ghost', 'Ghost', SEB).key).toBe('iksar')
     expect(races.place('a failed experiment', null)).toMatchObject({ key: 'golem', by: 'play' })
     expect(races.place('Abomination of Ro', null).key).toBe('golem')
+    // North Ro's troopers by the zone line, which eqlwiki has no page for, are Iksars (the player, 2026-11-09).
+    expect(races.place('Trooper Tygin', undefined)).toMatchObject({ key: 'iksar', by: 'play' })
     expect(races.zoned('A Withering Skeleton')).toBe(true)
     expect(races.zoned('a failed experiment')).toBe(false)
   })
@@ -52,6 +56,8 @@ describe('a race play settled for one zone', () => {
     const facts: SlayerFacts = (mob, ach) => (mob === 'a skeleton' && ach === "doesn't play well with others" ? true : undefined)
     const got = slayerCounts(counters, races, kills, () => null, facts, new Set())
     expect(row(got, 'Mostly Kunzar')).toMatchObject({ since: 3, guessed: 0 })
+    // Kylong Iksars, not the true Iksars I'm a People Person! wants (the player, 2026-11-09).
+    expect(row(got, "I'm a People Person!").since).toBe(0)
     // New Seb's three as Iksars, playable; the other two by what the export settled of the name, and skeletons still.
     expect(row(got, "Doesn't Play Well With Others").since).toBe(5)
     expect(row(got, 'We Are the Dead!').since).toBe(2)

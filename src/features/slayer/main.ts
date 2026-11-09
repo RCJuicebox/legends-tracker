@@ -2,7 +2,7 @@ import { join } from 'node:path'
 import { copyFile, mkdir, readdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { RACE_TABLE } from '../../core/raceNames'
 import { zoneKey } from '../../core/zones'
-import { mixCredits, sayKey, setSaidRaces, SlayerRaces, slayerCounters } from '../../core/slayer'
+import { mixCredits, sayKey, setSaidRaces, SlayerRaces, slayerCounters, zoneLeavesOut } from '../../core/slayer'
 import { characterKey, isCharacterKey, isRecordKey } from '../../core/validate'
 import { handle } from '../../main/ipc/handle'
 import { log } from '../../main/log'
@@ -364,7 +364,7 @@ export class SlayerPlanner implements AppFeature {
           if (w > 0) shares.set(i, w)
         })
         at = shares
-      } else at = goals.flatMap((g, i) => ((fact(g.name.toLowerCase()) ?? (p.key !== null && races.keys[i].has(p.key))) ? [i] : []))
+      } else at = goals.flatMap((g, i) => ((fact(g.name.toLowerCase()) ?? (p.key !== null && races.keys[i].has(p.key) && !zoneLeavesOut(p, zone, g.name))) ? [i] : []))
       placed.set(key, at)
       return at
     }

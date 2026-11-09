@@ -15,6 +15,7 @@ import {
   singulars,
   unsureRace,
   wikiRaceKey,
+  ZONE_MOB_NOT_FOR,
   ZONE_MOB_RACES,
   zoneWords,
   type RaceTable
@@ -109,6 +110,10 @@ export function achievementRaces(text: string, game: RaceTable): { keys: Set<str
   }
   return { keys, unnamed, broader }
 }
+
+/** Whether a kill placed by its zone is one an achievement does not take, its race though it is (ZONE_MOB_NOT_FOR). */
+export const zoneLeavesOut = (p: Placed, zone: string, achievement: string): boolean =>
+  p.by === 'zone' && (ZONE_MOB_NOT_FOR[zoneWords(zone)] ?? []).includes(achievement.toLowerCase())
 
 /** How a mob was given its race: what play settled (for the zone it was in, or anywhere), eqlwiki's page, or its name. */
 export interface Placed {
@@ -433,7 +438,16 @@ export function slayerCounts(
       counters.forEach((c, i) => {
         // What play settled for the zone stands over what the exports settled of the name, which may be another zone's.
         const fact = p.by === 'zone' ? undefined : facts(mob, c.name.toLowerCase())
-        const n = fact !== undefined ? (fact ? part.times.length : 0) : p.key !== null ? (races.keys[i].has(p.key) ? part.times.length : 0) : (mix?.[i] ?? 0)
+        const n =
+          fact !== undefined
+            ? fact
+              ? part.times.length
+              : 0
+            : p.key !== null
+              ? races.keys[i].has(p.key) && !zoneLeavesOut(p, part.zone, c.name)
+                ? part.times.length
+                : 0
+              : (mix?.[i] ?? 0)
         if (n <= 0) return
         any = true
         since[i] += n
