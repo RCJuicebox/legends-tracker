@@ -37,7 +37,7 @@ import type { RespawnFallback, RespawnRecord, RespawnRecords } from '../../core/
 import TAKP from '../../shared/game/takpSpawns.json'
 import { lockoutDayStart } from '../../shared/game/slayerCamps'
 import { greenConMax } from '../../shared/game/levels'
-import { hunterZones } from '../hunter/core'
+import { hunterZones, type HunterZone } from '../hunter/core'
 import { newerBuildWrote } from '../../main/schema'
 import type { MapPoint } from '../../core/where'
 
@@ -96,8 +96,11 @@ export class SlayerPlanner implements AppFeature {
   readonly id = 'slayer'
   static readonly consumers: Readonly<Record<string, HistoryConsumer<unknown>>> = { [KILLS_KEY]: killConsumer }
   private readonly choices: JsonFile<Record<string, SlayerPlanChoices>>
-  /** What Plan › Hunter last marked on the game's map: the named left. The Slayer plan's mobs are never marked there. */
-  private readonly marks: JsonFile<{ hunter: SlayerMark[] }>
+  /**
+   * What Plan › Hunter last marked on the game's map: the named left, and the character whose plan
+   * they are (none for marks a version before 2.22.1 made). The Slayer plan's mobs are never marked there.
+   */
+  private readonly marks: JsonFile<{ hunter: SlayerMark[]; character?: string }>
   /** Slayer marks a version before 2.14.3 put on the game's maps: taken off once, at start. */
   private readonly staleSlayer: boolean
   /** The game folder, once registered: a named killed takes its marks off the map then and there. */
@@ -138,7 +141,8 @@ export class SlayerPlanner implements AppFeature {
     const sets = (kept.state === 'ok' && kept.value && typeof kept.value === 'object' ? kept.value : {}) as Record<string, unknown>
     const list = (v: unknown) => (Array.isArray(v) ? (v as unknown[]).filter(isMark).slice(0, 200) : [])
     this.staleSlayer = list(sets.slayer).length > 0
-    this.marks = new JsonFile(marksPath, { hunter: list(sets.hunter) }, { delayMs: 1000 })
+    const marked = typeof sets.character === 'string' && isCharacterKey(sets.character) ? { character: sets.character } : {}
+    this.marks = new JsonFile(marksPath, { hunter: list(sets.hunter), ...marked }, { delayMs: 1000 })
     if (newerBuildWrote(marksPath)) this.marks.freeze('written by a newer version')
   }
 
@@ -208,21 +212,21 @@ export class SlayerPlanner implements AppFeature {
       return spawnMap(ctx.installDir(), zone, mobs.filter((m): m is string => typeof m === 'string').slice(0, 50))
     })
     this.installDir = () => ctx.installDir()
-    handle('slayer:mark', async (marks, set = 'hunter') => {
+    handle('slayer:mark', async (marks, set = 'hunter', character) => {
       if (!Array.isArray(marks) || set !== 'hunter') throw new Error('Nothing to mark.')
       // The Hunter named alone: a Slayer camp's mobs are everywhere in its zone, no help on the game's map.
       const hunter = (marks as unknown[])
         .filter(isMark)
         .slice(0, 200)
         .map((m) => ({ zone: m.zone, mobs: [], named: m.named ?? [] }))
-      this.marks.set({ hunter })
+      this.marks.set({ hunter, ...(typeof character === 'string' && isCharacterKey(character) ? { character } : {}) })
       return markMaps(ctx.installDir(), hunter)
     })
     // The maps written again at start, as this version labels them: the Slayer marks an older version
     // put there come off, and the Hunter named read as their names alone ("Hunter_" was dropped 2026-10-18).
     if ((this.staleSlayer || this.marks.get().hunter.length) && ctx.installDir())
       this.redraw = markMaps(ctx.installDir(), this.marks.get().hunter)
-        .then(() => this.marks.set({ hunter: this.marks.get().hunter }))
+        .then(() => this.marks.set({ ...this.marks.get() }))
         .catch((e: unknown) => log.warn('Could not write the marks on the game’s maps again:', e))
   }
 
@@ -232,12 +236,37 @@ export class SlayerPlanner implements AppFeature {
    */
   namedKilled(mobs: string[]): void {
     const gone = new Set(mobs.map(bareName))
+    this.keepMarked((_zone, name) => !gone.has(name), 'Could not take a killed named off the game’s map:')
+  }
+
+  /**
+   * The character's Hunter plan as it stands (Plan › Hunter, the overlay's route): the marks keep only
+   * the named it still wants, so a named the log never saw die (another PC's kill, one before the
+   * marks) comes off once an export says it is done (2026-11-09, a shady mercenary in the Aqueducts).
+   * Another character's plan leaves the marks alone; marks of no character's are the first plan's.
+   */
+  hunterLeft(character: string, zones: readonly HunterZone[]): void {
+    const marks = this.marks.get()
+    if (marks.character && marks.character !== character) return
+    const left = new Map<string, Set<string>>()
+    for (const z of zones) {
+      const k = zoneKey(z.zone)
+      const names = left.get(k) ?? new Set<string>()
+      for (const n of z.left) names.add(bareName(n.name))
+      left.set(k, names)
+    }
+    if (!marks.character && marks.hunter.length) this.marks.set({ ...marks, character })
+    this.keepMarked((zone, name) => !!left.get(zoneKey(zone))?.has(name), 'Could not take a done named off the game’s map:')
+  }
+
+  /** The marks with only the named `keep` says (by zone and bare name); written to the game's maps when any came off. */
+  private keepMarked(keep: (zone: string, bare: string) => boolean, failed: string): void {
     const was = this.marks.get().hunter
-    const hunter = was.map((m) => ({ ...m, named: (m.named ?? []).filter((n) => !gone.has(bareName(n))) })).filter((m) => m.named.length)
+    const hunter = was.map((m) => ({ ...m, named: (m.named ?? []).filter((n) => keep(m.zone, bareName(n))) })).filter((m) => m.named.length)
     if (hunter.length === was.length && hunter.every((m, i) => m.named.length === (was[i].named ?? []).length)) return
-    this.marks.set({ hunter })
+    this.marks.set({ ...this.marks.get(), hunter })
     const dir = this.installDir()
-    if (dir) this.redraw = this.redraw.then(() => markMaps(dir, this.marks.get().hunter)).catch((e: unknown) => log.warn('Could not take a killed named off the game’s map:', e))
+    if (dir) this.redraw = this.redraw.then(() => markMaps(dir, this.marks.get().hunter)).catch((e: unknown) => log.warn(failed, e))
   }
 
   /**

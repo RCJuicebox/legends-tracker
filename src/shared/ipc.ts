@@ -485,7 +485,7 @@ export interface Invokes {
   /** A zone's map as the game draws it, with the spots these mobs pop at (TAKP's spawn tables); no short name for a zone they lack. */
   'slayer:map': (zone: string, mobs: string[]) => SlayerMap
   /** Marks these spawns on the game's map, in its own map set (maps\LegendsTracker, a copy of the game's); none clears them. Each page's (`set`) are kept apart and written together. */
-  'slayer:mark': (marks: SlayerMark[], set?: 'hunter') => { folder: string; zones: number; spots: number }
+  'slayer:mark': (marks: SlayerMark[], set?: 'hunter', character?: string) => { folder: string; zones: number; spots: number }
   /** What Plan › Hunter shows: each Hunter achievement not done, the named it still wants, and what their spawns allow. */
   /** The races the player said mobs are (by the mob's name words), and every race there is to say (FEAT-021). */
   'slayer:said': () => { races: Record<string, string>; names: string[] }

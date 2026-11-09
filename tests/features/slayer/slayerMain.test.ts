@@ -356,6 +356,39 @@ describe('the Slayer page', () => {
     await call('slayer:mark', [], 'hunter')
   })
 
+  it('takes a named off the game’s map once the plan no longer wants it, the log never having seen it die', async () => {
+    const set = join(game, 'maps', 'LegendsTracker')
+    const marks = [
+      { zone: 'Clan Crushbone', mobs: [], named: ['Ambassador DVinn', 'Emperor Crush'] },
+      { zone: 'The Estate of Unrest', mobs: [], named: ['Khrix Fritchoff'] }
+    ]
+    Object.assign(ctx, { slayer: planner })
+    try {
+      // Another character's plan leaves them be.
+      await call('slayer:mark', marks, 'hunter', 'Aldric_neriak')
+      await call('hunter:plan', 'Kelwyn_neriak')
+      await planner.flush()
+      expect(JSON.parse(readFileSync(join(h.dir, 'map-marks.json'), 'utf8'))).toEqual({ hunter: marks, character: 'Aldric_neriak' })
+      // Kelwyn's export: Emperor Crush done, and no Hunter of Unrest open.
+      await call('slayer:mark', marks, 'hunter', 'Kelwyn_neriak')
+      await call('hunter:plan', 'Kelwyn_neriak')
+      for (let i = 0; i < 50 && existsSync(join(set, 'unrest_1.txt')); i++) await new Promise((r) => setTimeout(r, 20))
+      expect(existsSync(join(set, 'unrest_1.txt'))).toBe(false)
+      const left = { hunter: [{ zone: 'Clan Crushbone', mobs: [], named: ['Ambassador DVinn'] }], character: 'Kelwyn_neriak' }
+      await planner.flush()
+      expect(JSON.parse(readFileSync(join(h.dir, 'map-marks.json'), 'utf8'))).toEqual(left)
+      expect(readFileSync(join(set, 'crushbone_1.txt'), 'latin1')).not.toContain('Emperor_Crush')
+      // Marks of no character's (a version before) are the first plan's.
+      await call('slayer:mark', marks, 'hunter')
+      await call('hunter:plan', 'Kelwyn_neriak')
+      await planner.flush()
+      expect(JSON.parse(readFileSync(join(h.dir, 'map-marks.json'), 'utf8'))).toEqual(left)
+      await call('slayer:mark', [], 'hunter')
+    } finally {
+      delete (ctx as { slayer?: unknown }).slayer
+    }
+  })
+
   it('takes the Slayer marks an older version put on the game’s maps off at start', async () => {
     const set = join(game, 'maps', 'LegendsTracker')
     const dir = join(h.dir, 'old-marks')

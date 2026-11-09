@@ -241,6 +241,8 @@ export class HunterPlanner implements AppFeature {
     const all = hunterZones(exp.sections, lastKills(zones), exp.modified, spawns, seenFromRecords(records, Date.now()))
       .filter((z) => !this.isBroken(z.achievement))
       .map((z) => withWaypoints(z))
+    // The game's map marks follow the plan: a named done since they were made comes off.
+    ctx.slayer?.hunterLeft(character, all)
     return { character, export: { file: exp.file, modified: exp.modified }, zones: all, broken, autoTimers }
   }
 }

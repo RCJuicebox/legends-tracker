@@ -137,13 +137,14 @@ it('lists the named left, zone by zone, with what their spawns allow', async () 
       { zone: 'Clan Crushbone', mobs: [], named: ['Lord Darish', 'Emperor Crush'] },
       { zone: 'Kedge Keep', mobs: [], named: ['Seahorse Patriarch', 'Cauldron Hammerhead'] }
     ],
-    'hunter'
+    'hunter',
+    'Kelwyn_neriak'
   )
   await act(async () => button('Clear marks').click())
   expect(seen(host)).toContain('Could not mark the map: locked')
   // A zone's own Mark marks that zone alone (LT-674).
   await act(async () => [...host.querySelectorAll('button')].find((b) => b.textContent === 'Mark')!.click())
-  expect(invoke).toHaveBeenCalledWith('slayer:mark', [{ zone: 'Clan Crushbone', mobs: [], named: ['Lord Darish', 'Emperor Crush'] }], 'hunter')
+  expect(invoke).toHaveBeenCalledWith('slayer:mark', [{ zone: 'Clan Crushbone', mobs: [], named: ['Lord Darish', 'Emperor Crush'] }], 'hunter', 'Kelwyn_neriak')
   // One that does not work in Legends, said so; one said not to work, working again (here, failing).
   expect(seen(host)).toContain('Hunter of BefallenWorks again')
   await act(async () => button('Doesn’t work').click())

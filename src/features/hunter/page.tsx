@@ -121,11 +121,14 @@ export function Hunter() {
     [data, filter, hereSet]
   )
   const toggleMap = (a: string) => setMaps((m) => (m.has(a) ? new Set([...m].filter((x) => x !== a)) : new Set([...m, a])))
-  /** Marks the named of these zones on the game's map (the Hunter set holds only these); none clears it. Said in a toast (LT-674). */
+  /**
+   * Marks the named of these zones on the game's map (the Hunter set holds only these); none clears it.
+   * Said in a toast (LT-674). The marks follow this character's plan after: a named done comes off.
+   */
   const mark = async (zones: NonNullable<typeof data>['zones']) => {
     const marks = zones.map((z) => ({ zone: z.zone, mobs: [], named: z.left.map((n) => n.name) }))
     try {
-      const r = await api.invoke('slayer:mark', marks, 'hunter')
+      const r = await api.invoke('slayer:mark', marks, 'hunter', character ?? undefined)
       showToast(
         marks.length
           ? `Marked ${num(r.spots)} spot${r.spots === 1 ? '' : 's'} in ${marks.length === 1 ? zones[0].zone : `${r.zones} zones`}: pick the LegendsTracker map set in the game’s map window.`
