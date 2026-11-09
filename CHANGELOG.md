@@ -2,6 +2,18 @@
 
 What changed in each version. The release workflow publishes a version's section as its release notes, and installed copies show them when an update arrives.
 
+## 2.23.0 (2026-11-09)
+
+- **Updates install by themselves.** **Restart into updates by itself** (Settings › General) is now on for everyone, since an update that waited for the app to close never came for a tracker left running for days. Once an update has downloaded, the app restarts into it at the next lull in play: out of combat with the log quiet a minute, or the game not in front, and at most two hours after it arrived. The overlays blink and come back; settings and overlays stay as they were, though spell timers running then are lost. Turn it off on Settings › General to update only when you close the app or choose Restart and update; once off, it stays off.
+- **Plan › Slayer: four achievements a new log left Not planned.** Without kills of their own in your logs, Mostly Kunzar, I'm a People Person!, You Dirty Ratman! and Leechy Keen had nowhere to send you. The plan now knows a camp for each:
+  - **Mostly Kunzar:** New Sebilis Expedition's undead, about 244 an hour with a pet, at /waypoint -697, -195.
+  - **I'm a People Person!:** the Iksar troopers, in New Sebilis Expedition and in North Ro by its zone line, back about every eight minutes. A pet can't take them, so they are not in the plan of pet kills alone.
+  - **You Dirty Ratman!:** the Hole's ratmen at Slizik the Mighty, at your usual pace. They are levels 45 to 55, a group's camp more than a pet's.
+  - **Leechy Keen:** the Rathe Mountains' larval bleeders, the very small leeches by the froglok city, about 68 an hour at /waypoint -1272, 1472.
+- **Slayer: larval bleeders count toward Leechy Keen, and New Sebilis' undead no longer count toward I'm a People Person!.** Larval bleeders have no eqlwiki page, so their kills counted toward nothing; they are leeches. New Sebilis Expedition's skeletons and ghosts are Kylong Iksars: they count toward Mostly Kunzar, but I'm a People Person! wants true Iksars, which only the troopers are. North Ro's Trooper Tygin and Trooper Axlia, missing from eqlwiki, count as the Iksars they are.
+- **Plan › Slayer: Not planned says what it means.** The card no longer claims eqlwiki doesn't know where its races die (its guide often names a zone): it says nothing the plan can pace feeds them.
+- **Hunter: the game's map marks follow the plan.** A named killed on another PC, or before the marks were made, stayed marked on the map after an export said its achievement was done. The marks now keep only the named the plan still wants, each time the plan (Plan › Hunter, or the overlay's route) is worked out.
+
 ## 2.22.0 (2026-11-06)
 
 - **Your own endurance, said when it runs low.** The Triggers page's group health card has **Say when your own endurance is low** beside the mana cue (off until switched on; 25% unless changed, said again once you are 10% back over). It reads the Player window's endurance bar on the screen, solo or grouped, and works with the group alert and the mana cue off. Cannibalization's pause holds back only your mana, never your endurance.
