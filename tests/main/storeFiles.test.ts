@@ -18,7 +18,15 @@ vi.mock('electron', () => ({
   }
 }))
 
-const { Store } = await import('../../src/main/store')
+const real = await import('../../src/main/store')
+/** Stores a test opened: a profile without a schema record is migrated and written at once, done before its folder goes. */
+const opened: InstanceType<typeof real.Store>[] = []
+class Store extends real.Store {
+  constructor(...args: ConstructorParameters<typeof real.Store>) {
+    super(...args)
+    opened.push(this)
+  }
+}
 const { DEFAULT_OVERLAYS, defaultSettings, filesSetAside, retrySchedule } = await import('../../src/main/storeCore')
 const { SCHEMAS } = await import('../../src/main/schema')
 
@@ -48,7 +56,8 @@ beforeEach(() => {
   vi.spyOn(console, 'log').mockImplementation(() => {})
 })
 
-afterEach(() => {
+afterEach(async () => {
+  await Promise.all(opened.splice(0).map((s) => s.settled))
   vi.restoreAllMocks()
   // A store's timed write can still land as the folder goes (ENOTEMPTY under a full run): tried again.
   rmSync(profile.dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 50 })

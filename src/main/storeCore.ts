@@ -18,7 +18,8 @@ export function defaultSettings(): AppSettings {
     logFolders: [],
     followOtherPcs: true,
     autoStart: true,
-    autoRestartUpdates: false,
+    // On: players leave the app running for days, so an update waiting for a quit never came (2026-11-09).
+    autoRestartUpdates: true,
     characters: {},
     tracking: {
       enabled: true,

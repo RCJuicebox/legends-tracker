@@ -236,6 +236,17 @@ describe('schema versions', () => {
     expect(JSON.parse(readFileSync(join(dir, 'settings.pre-3.json'), 'utf8'))).toEqual({ volume: 5 })
   })
 
+  it('turns Restart into updates by itself on, once, for a profile from before it was the default', () => {
+    const path = join(dir, 'settings.json')
+    writeFileSync(path, JSON.stringify({ autoRestartUpdates: false, volume: 5 }))
+    const r = upgrade(path, { autoRestartUpdates: false, volume: 5 }, 1)
+    expect(r.value).toEqual({ autoRestartUpdates: true, volume: 5 })
+    expect(r.state).toMatchObject({ state: 'migrated', from: 1 })
+    // At the new schema, a player's choice of off stays off.
+    expect(upgrade(path, { autoRestartUpdates: false }, 2)).toEqual({ value: { autoRestartUpdates: false }, state: { state: 'current' } })
+    expect(defaultSettings().autoRestartUpdates).toBe(true)
+  })
+
   it('leaves a file a newer build wrote as it is, and says so', () => {
     const r = upgrade(join(dir, 'settings.json'), { x: 1 }, 4, { 'settings.json': 1 }, [])
     expect(r).toEqual({ value: { x: 1 }, state: { state: 'newer', version: 4 } })

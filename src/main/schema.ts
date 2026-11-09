@@ -11,7 +11,7 @@ import { readJsonFile } from './storeCore'
 
 /** The schema each file is at in this build. */
 export const SCHEMAS: Readonly<Record<string, number>> = {
-  'settings.json': 1,
+  'settings.json': 2,
   'triggers.json': 1,
   'spell-rules.json': 1,
   'casts.json': 2,
@@ -52,7 +52,10 @@ const MIGRATIONS: readonly Migration[] = [
   { file: 'respawns.json', to: 3, run: (v) => v },
   // Casts by character (LT-525). Those kept before are put under '', and the store gives them to the
   // character the log being followed is (the one they were mostly cast by).
-  { file: 'casts.json', to: 2, run: (v) => ({ '': v }) }
+  { file: 'casts.json', to: 2, run: (v) => ({ '': v }) },
+  // Restart into updates by itself, on for everyone once: it was off unless chosen, and players leave
+  // the app running for days, so an update that waited for a quit never came (2026-11-09).
+  { file: 'settings.json', to: 2, run: (v) => (v && typeof v === 'object' ? { ...v, autoRestartUpdates: true } : v) }
 ]
 
 export type SchemaState = { state: 'current' } | { state: 'migrated'; from: number; backup: string } | { state: 'newer'; version: number }
