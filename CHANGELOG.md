@@ -2,6 +2,10 @@
 
 What changed in each version. The release workflow publishes a version's section as its release notes, and installed copies show them when an update arrives.
 
+## Unreleased
+
+- **Long buff timers round the way the game does.** Focus is now applied before the rank bonus, and its fraction of a tick is dropped. Most timers don't change. A few long buffs were one tick (6 seconds) long: Dexterity IV now reads 2:22:48, as its spell tooltip does, not 2:22:54.
+
 ## 2.23.1 (2026-11-09)
 
 - **Plan › Slayer: every unfinished achievement gets a step.** A new log could still find achievements on Not planned when the only camps for them are above your level, or the spawn tables have none. The plan still prefers camps at your level. Where there is none, it now offers a higher camp, marked "over your level: a group’s camp more than a pet’s". Where the spawn tables have nothing, it offers the zones eqlwiki’s guide names, at your usual pace. Only an achievement nothing the plan knows can feed is left on Not planned.

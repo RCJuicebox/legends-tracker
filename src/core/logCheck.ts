@@ -1,6 +1,6 @@
 import { promises as fs } from 'node:fs'
 import { decodeCp1252, LogClock } from './logLine'
-import { computeDuration, focusForObserved, tieredTicks } from './durations'
+import { computeDuration, focusForObserved, formulaTicks, tierMultiplier } from './durations'
 import { SpellTracker } from './spellTracker'
 import { TimerBoard, type BoardTimer } from './timers'
 import type { Spell, SpellBook } from './spells'
@@ -117,7 +117,8 @@ export async function checkAgainstLog(opts: {
     const calc = computeDuration({ spell: r.spell, rank: r.rank, level: opts.level(r.spell.name), tierPct: opts.tierPct, focusPct })
     if (calc.permanent || calc.wholeTicks <= 0) continue
     const fits = median >= calc.earliestSec - 1 && median <= calc.latestSec + 1
-    const range = fits ? null : focusForObserved(tieredTicks(r.spell, r.rank, opts.level(r.spell.name), opts.tierPct), median)
+    const base = formulaTicks(opts.level(r.spell.name), r.spell.formula, r.spell.cap)
+    const range = fits ? null : focusForObserved(base, tierMultiplier(r.spell, r.rank, opts.tierPct), median)
     rows.push({
       rankedName,
       spell: r.spell.name,

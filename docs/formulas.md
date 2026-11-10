@@ -266,7 +266,7 @@ Implemented in `src/core/combatModel.ts` `classicCritChance`, kept for compariso
 Settled 2026-09-23 against a level-50 Shaman's in-game Spell windows, and 2026-09-24 in play (the log's landing-to-fade times).
 
 ```
-ticks = round(formula ticks × (1 + tier% × rank) × (1 + focus%))
+ticks = round(floor(formula ticks × (1 + focus%)) × (1 + tier% × rank))
 ```
 
 That is the bracketed number in the in-game Spell window. The effect then runs on into the partial tick it landed in, so it wears off between `ticks × 6` and `(ticks + 1) × 6` seconds after landing.
@@ -275,7 +275,7 @@ That is the bracketed number in the in-game Spell window. The effect then runs o
 - **Rank:** the roman numeral in the cast line is the tier count (rank X has ten); an unranked spell has none. A spell whose own name ends in the numeral has no rank: Harm Touch X (13540, a Shadowknight ability at class level 254) is its formula's 6 ticks, 36 s, with no tier bonus (2026-10-18).
 - **Tier bonus per category:** DoT +5%, buff, debuff, mez and charm +10%, from the EQL spell upgrade (mote) guide. Heal over time is **7%, fitted** (2026-09-24): the guide's "+5% (?)" does not match Slugs Healing V (Spell window 0:24 (0:48) with only the AA; 9 ticks in the log with the ring too).
 - **Focus:** an item's focus is read from its focus spell: SPA 128 the bonus, 134 the level cap and the decay (percent *of the focus* lost per spell level over the cap), 138 beneficial or detrimental, 140 a minimum duration, 137 excluded effect types. Only the best item focus applies; AAs such as Spell Casting Reinforcement add on top. The Spell window's bracket includes item focus.
-- **Rounding:** to the nearest tick.
+- **Rounding:** focus first, its fraction dropped; the rank bonus last, to the nearest tick (2026-11-10). Dexterity IV's tooltip settles the order: one rounding of 630 × 1.4 × 1.62 = 1428.84 would read 1429, the tooltip reads 1428. Every Spell window read before fits it too, and so does the log's Puma VI (16 × 1.6 = 25.6 → 26). The one disagreement left is Slugs Healing V with the ring on: the model says 8 ticks (4 × 1.65 = 6.6 → 6, × 1.35 → 8), the log's fades 55–58 s on say 9.
 - **A DoT's first tick pins its end:** it wears off on its target's tick, `ticks` ticks (the Spell window's count) after the first tick line. Odium X, 8 ticks: the fade line came 48-49 s after the first tick in 44 of 76 casts in the logs (2026-10-19).
 
 | Spell | Base | Calculation | Spell window |
@@ -283,7 +283,9 @@ That is the bracketed number in the in-game Spell window. The effect then runs o
 | Envenomed Bolt X | 6 ticks | 6 × 1.5 = 9 | 0:36 (0:54) |
 | Odium X | 5 | 5 × 1.5 = 7.5 → 8 | 0:30 (0:48) |
 | Plague X | 13 | 13 × 1.5 = 19.5 → 20 | 1:18 (2:00) |
-| Spirit of the Puma X | 10 | 10 × 2.0 × (1 + 0.50 + 0.105) = 32.1 → 32 | 1:00 (3:12) |
+| Spirit of the Puma X | 10 | 10 × (1 + 0.50 + 0.105) = 16.05 → 16, × 2.0 = 32 | 1:00 (3:12) |
+| Dexterity IV (SHM 48) | 630 | 630 × 1.62 = 1020.6 → 1020, × 1.4 = 1428 | 1:03:00 (2:22:48) |
+| Stamina IV (SHM 43) | 630 | 630 × 1.65 = 1039.5 → 1039, × 1.4 = 1454.6 → 1455 | 1:03:00 (2:25:30) |
 
 Puma's focus is Spell Casting Reinforcement (AA, 50%) plus Extended Enhancement II (the Engineer's Ring's exaltation, +15%, cap 44) decayed six levels to 10.5%. In play on 2026-09-24 Puma X faded 194 s after landing with the ring on (32 ticks) and 184 s with it off (30 ticks: 10 × 2.0 × 1.5); with the ring off the Spell window reads 1:00 (3:00). The decayed focus applies although the ring never prints its "sparkles" message on a Puma cast, so the absence of a focus message is no evidence either way.
 

@@ -93,13 +93,16 @@ export interface DurationInput {
 /**
  * The duration model, checked against the in-game Spell window and a real EQL log (see README):
  *
- *   ticks = round(formula ticks × (1 + tier% × rank) × (1 + focus%))
+ *   ticks = round(floor(formula ticks × (1 + focus%)) × (1 + tier% × rank))
  *
  * - The rank numeral is the tier count: an unranked spell has none, rank X has ten. Envenomed
  *   Bolt X's window reads 0:36 (0:54): 6 ticks × 1.5 = 9.
- * - Rounded to the nearest tick: Odium X 5 × 1.5 = 7.5 → 8 (0:48); Plague X 13 × 1.5 = 19.5 → 20 (2:00).
- * - Tier bonus and focus multiply: Spirit of the Puma X 10 × 2.0 × 1.605 = 32.1 → 32 (3:12), the focus
+ * - Focus comes first and drops the fraction; the rank bonus comes last and rounds to the nearest
+ *   tick. Dexterity IV (SHM 48, focus 62%): 630 × 1.62 = 1020.6 → 1020, × 1.4 = 1428 (2:22:48), where
+ *   one rounding of 630 × 1.4 × 1.62 = 1428.84 would say 1429. Odium X 5 × 1.5 = 7.5 → 8 (0:48).
+ * - Tier bonus and focus multiply: Spirit of the Puma X 10 × 1.605 = 16.05 → 16, × 2.0 = 32 (3:12), the focus
  *   being Spell Casting Reinforcement's 50% plus Extended Enhancement II's 15% decayed to 10.5% (see focus.ts).
+ *   Puma VI's 16 × 1.6 = 25.6 → 26 is why the rank step rounds rather than drops the fraction.
  * - That is the Spell window's bracketed figure. The effect then runs into the partial tick it
  *   landed in, wearing off on its target's tick: between ticks × 6 and (ticks + 1) × 6 seconds
  *   after landing.
@@ -142,16 +145,17 @@ export function computeDuration(input: DurationInput): DurationBreakdown {
   }
   steps.push(`Formula ${spell.formula} at level ${level}${spell.cap ? `, capped at ${spell.cap}` : ''}: ${base} ticks (${clock(base * 6)})`)
   let ticks = base
+  steps.push(...(focusSteps ?? []))
+  if (focusPct) {
+    const focused = base * (1 + focusPct / 100)
+    ticks = Math.floor(focused + 1e-9)
+    steps.push(`Focus ${focusPct > 0 ? '+' : ''}${round2(focusPct)}% in total → ${round2(focused)}${ticks !== focused ? `, fraction dropped: ${ticks}` : ''}`)
+  }
   const tiers = Math.max(0, rank)
   const pct = tierPct[spell.category] ?? 0
   if (tiers > 0 && pct) {
     ticks *= 1 + (pct * tiers) / 100
     steps.push(`Rank ${rank}: ${tiers} tier${tiers === 1 ? '' : 's'} × ${pct}% (${CATEGORY_LABELS[spell.category]}) = +${pct * tiers}% → ${round2(ticks)}`)
-  }
-  steps.push(...(focusSteps ?? []))
-  if (focusPct) {
-    ticks *= 1 + focusPct / 100
-    steps.push(`Focus ${focusPct > 0 ? '+' : ''}${round2(focusPct)}% in total → ${round2(ticks)}`)
   }
   const whole = Math.max(1, Math.round(ticks + 1e-9))
   if (whole !== ticks) steps.push(`Rounded: ${whole} ticks`)
@@ -163,22 +167,24 @@ export function computeDuration(input: DurationInput): DurationBreakdown {
   return { ticks: total, wholeTicks: whole, permanent: false, seconds: earliest, earliestSec: earliest, latestSec: latest, spellWindowSec: whole * 6, baseSec: base * 6, steps }
 }
 
-/** Ticks after the formula and rank bonus, before focus and rounding. */
-export function tieredTicks(spell: Spell, rank: number, level: number, tierPct: Record<SpellCategory, number>): number {
-  const base = formulaTicks(level, spell.formula, spell.cap)
-  if (base <= 0) return base
-  return base * (1 + ((tierPct[spell.category] ?? 0) * Math.max(0, rank)) / 100)
+/** The rank bonus as a multiplier: 1.4 for a rank IV buff at 10% a tier. */
+export function tierMultiplier(spell: Spell, rank: number, tierPct: Record<SpellCategory, number>): number {
+  return 1 + ((tierPct[spell.category] ?? 0) * Math.max(0, rank)) / 100
 }
 
 /**
  * The focus range, in percent, that makes the model predict a wear-off at `observedSec` after
- * landing, or null when no focus can. Inverts round(tiered × (1 + focus)) = whole ticks.
+ * landing, or null when no focus can. Inverts round(floor(base × (1 + focus)) × tier) = whole ticks.
  */
-export function focusForObserved(tiered: number, observedSec: number): [number, number] | null {
-  if (tiered <= 0) return null
+export function focusForObserved(baseTicks: number, tier: number, observedSec: number): [number, number] | null {
+  if (baseTicks <= 0) return null
   const wholeTicks = Math.floor(observedSec / 6) // ticks before the partial one
   if (wholeTicks < 1) return null
-  return [Math.round(((wholeTicks - 0.5) / tiered - 1) * 100), Math.round(((wholeTicks + 0.5) / tiered - 1) * 100)]
+  // The focused tick counts the rank step rounds to wholeTicks, then the focus that floors to them.
+  const lo = Math.ceil((wholeTicks - 0.5) / tier - 1e-9)
+  const hi = Math.ceil((wholeTicks + 0.5) / tier - 1e-9) - 1
+  if (hi < lo) return null
+  return [Math.round((lo / baseTicks - 1) * 100), Math.round(((hi + 1) / baseTicks - 1) * 100)]
 }
 
 /** Rounded to two decimal places, for the breakdown's figures. */

@@ -351,7 +351,7 @@ yourself starting to appear." (the shipped "Invis dropping" trigger speaks there
 How each part was measured, and when, is in [`docs/formulas.md`](docs/formulas.md#spell-durations).
 
 ```
-ticks = round(formula ticks × (1 + tier% × rank) × (1 + focus%))
+ticks = round(floor(formula ticks × (1 + focus%)) × (1 + tier% × rank))
 ```
 
 That is the bracketed number in the in-game Spell window. The effect then runs on into the partial
@@ -368,7 +368,10 @@ tick it landed in, so it wears off between `ticks × 6` and `(ticks + 1) × 6` s
   decay (percent *of the focus* lost per spell level over the cap), 138 beneficial or detrimental,
   140 a minimum duration, 137 excluded effect types. Only the best item focus applies; AAs such as
   Spell Casting Reinforcement add on top. Each spell's breakdown lists what applied.
-- **Rounding**: to the nearest tick.
+- **Rounding**: focus first, its fraction dropped; the rank bonus last, to the nearest tick. Dexterity IV
+  (tooltip 2026-11-10) settles the order: one rounding of 630 × 1.4 × 1.62 = 1428.84 would read 1429, the
+  tooltip reads 1428. Slugs Healing V with the ring on is the one disagreement left: the model says 8 ticks
+  (4 × 1.65 = 6.6 → 6, × 1.35 → 8), the log's fades 55–58 s on say 9.
 
 Checked against a level-50 Shaman's in-game Spell windows (2026-09-23):
 
@@ -377,7 +380,9 @@ Checked against a level-50 Shaman's in-game Spell windows (2026-09-23):
 | Envenomed Bolt X | 6 ticks | 6 × 1.5 = 9 | 0:36 (0:54) |
 | Odium X | 5 | 5 × 1.5 = 7.5 → 8 | 0:30 (0:48) |
 | Plague X | 13 | 13 × 1.5 = 19.5 → 20 | 1:18 (2:00) |
-| Spirit of the Puma X | 10 | 10 × 2.0 × (1 + 0.50 + 0.105) = 32.1 → 32 | 1:00 (3:12) |
+| Spirit of the Puma X | 10 | 10 × (1 + 0.50 + 0.105) = 16.05 → 16, × 2.0 = 32 | 1:00 (3:12) |
+| Dexterity IV (SHM 48) | 630 | 630 × 1.62 = 1020.6 → 1020, × 1.4 = 1428 | 1:03:00 (2:22:48) |
+| Stamina IV (SHM 43) | 630 | 630 × 1.65 = 1039.5 → 1039, × 1.4 = 1454.6 → 1455 | 1:03:00 (2:25:30) |
 
 …and against the landing-to-fade times of every rank of those spells in the log (`tests/core/durations.test.ts`).
 Puma's focus is Spell Casting Reinforcement (AA, 50%) plus Extended Enhancement II (the Engineer's

@@ -1,5 +1,8 @@
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { computeDuration, formulaTicks } from '../../src/core/durations'
+import { computeDuration, focusForObserved, formulaTicks } from '../../src/core/durations'
+import { SpellBook } from '../../src/core/spells'
 import { fixtureBook } from '../helpers'
 import { DEFAULT_TIER_DURATION_PCT } from '../../src/shared/types'
 
@@ -54,9 +57,40 @@ describe('computeDuration against the Spell window, ring off', () => {
     expect(dur(name, 50).steps).toContain(`Spell window: ${shown}`)
   })
 
-  it('gives Slugs Healing V 9 ticks with the ring on, as the log shows (~55s)', () => {
-    // Level 42 is under the ring's cap of 44, so it gets the full 15%: 50 + 15 = 65%.
-    expect(dur('Slugs Healing V', 65).steps).toContain('Spell window: 0:24 (0:54)')
+  it('gives Slugs Healing V 8 ticks with the ring on, though the log says 9', () => {
+    // Level 42 is under the ring's cap of 44, so it gets the full 15%: 50 + 15 = 65%. 4 × 1.65 = 6.6
+    // drops to 6, the same as the ring off, so the model can't tell the two apart. The log disagrees:
+    // most landings fade 55–58 s on (9 whole ticks). Every Spell window and tooltip read so far fits
+    // focus-first, so this stays open until the ring-on Spell window is read.
+    expect(dur('Slugs Healing V', 65).steps).toContain('Spell window: 0:24 (0:48)')
+  })
+})
+
+// Spell tooltips, 2026-11-10: Dexterity IV (SHM 48) reads 1:03:00 (2:22:48), Stamina IV (SHM 43)
+// 1:03:00 (2:25:30). Spell Casting Reinforcement's 50% plus Extended Enhancement II, 12% at level 48
+// (15% × 80%) and the whole 15% at 43. Dexterity is the case that settles the order: focus first,
+// fraction dropped (1020.6 → 1020), then the rank bonus (× 1.4 = 1428), not 1428.84 rounded to 1429.
+describe('computeDuration against spell tooltips, focus before rank', () => {
+  const stackBook = SpellBook.parse(
+    readFileSync(join(__dirname, '..', 'fixtures', 'stacking_spells_us.txt'), 'latin1'),
+    readFileSync(join(__dirname, '..', 'fixtures', 'stacking_spells_us_str.txt'), 'latin1')
+  )
+  it.each([
+    ['Dexterity', 62, '1:03:00 (2:22:48)'],
+    ['Stamina', 65, '1:03:00 (2:25:30)']
+  ])('%s IV with %s%% focus reads %s', (name, focus, shown) => {
+    const d = computeDuration({ spell: stackBook.named(name)!, rank: 4, level: 50, tierPct: DEFAULT_TIER_DURATION_PCT, focusPct: focus })
+    expect(d.steps).toContain(`Spell window: ${shown}`)
+  })
+
+  it('inverts the model for the log check', () => {
+    // Dexterity IV wearing off 8568–8574 s after landing: 1428 whole ticks, which 61.9%–62.0% focus gives.
+    const [lo, hi] = focusForObserved(630, 1.4, 8570)!
+    expect(lo).toBeLessThanOrEqual(62)
+    expect(hi).toBeGreaterThanOrEqual(62)
+    // 1430 whole ticks: no whole number of focused ticks × 1.4 rounds to it.
+    expect(focusForObserved(630, 1.4, 8580)).toBeNull()
+    expect(focusForObserved(630, 1.4, 8610)![0]).toBeGreaterThan(62)
   })
 })
 
