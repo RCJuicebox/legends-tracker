@@ -434,6 +434,47 @@ export function procRows(seg: Segment, scope: MeterScope): ProcRow[] {
   return rows
 }
 
+export interface ProcInRow {
+  key: string
+  name: string
+  /** The enemy that fired it. */
+  source: string
+  /** Whom it landed on, for the rows in scope. */
+  targets: string[]
+  count: number
+  damage: number
+  /** Firings per minute of the fight or session; null under MIN_PROC_ACTIVE_SEC of it. */
+  ppm: number | null
+  /** The spells a shared message may be. */
+  spells?: string[]
+  /** Of the most frequent row. */
+  fill: number
+}
+
+/**
+ * Enemies' effects that landed on the rows in scope with no cast line, damage or none, most frequent
+ * first: one row per effect and enemy, whoever of your side it landed on.
+ */
+export function procInRows(seg: Segment, scope: MeterScope): ProcInRow[] {
+  const rows = new Map<string, ProcInRow>()
+  for (const e of scoped(seg, scope)) {
+    for (const [key, p] of Object.entries(e.procsIn ?? {})) {
+      const r = rows.get(key) ?? { key, name: p.name, source: p.source, targets: [], count: 0, damage: 0, ppm: null, fill: 0, ...(p.spells ? { spells: p.spells } : {}) }
+      r.count += p.count
+      r.damage += p.damage
+      if (!r.targets.includes(e.name)) r.targets.push(e.name)
+      rows.set(key, r)
+    }
+  }
+  const ms = seg.activeMs
+  const out = [...rows.values()].filter((r) => r.count > 0)
+  for (const r of out) r.ppm = perMinute(r.count, ms)
+  out.sort((a, b) => b.count - a.count || a.name.localeCompare(b.name))
+  const top = out[0]?.count ?? 0
+  for (const r of out) r.fill = top ? r.count / top : 0
+  return out
+}
+
 /** Your worn items' exaltations that fired, most first, with a rate over your active time (LT-721). */
 export function exaltRows(seg: Segment): { item: string; count: number; ppm: number | null }[] {
   const you = seg.entities[nameKey(SELF)]

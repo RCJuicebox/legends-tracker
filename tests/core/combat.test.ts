@@ -8,6 +8,7 @@ import {
   damageRows,
   defenseOf,
   healerRows,
+  procInRows,
   procRows,
   procSummary,
   procText,
@@ -207,12 +208,28 @@ describe('combat lines', () => {
 const CHARM_LANDS: Record<string, string> = { 'cajole undead': ' moans.', allure: ' has been charmed.' }
 const charmLand = (spell: string) => CHARM_LANDS[spell.replace(/ [IVX]+$/, '').toLowerCase()]
 
+/** Landing messages as spells_us_str.txt gives them, some shared by several spells; the app indexes the whole file (spellLandings.ts). */
+const LANDINGS: [string, string, string[]][] = [
+  ['You feel very dispelled.', ' feels very dispelled.', ['Strip Enchantment', 'Pillage Enchantment']],
+  ['Your body freezes as the frost hits you.', "'s body freezes as the frost hits them.", ['Frost Breath', 'Glaciate']],
+  ['Your life force drains away.', ' staggers.', ['Leech Touch I', 'Dark Siphon']],
+  ['You feel agile.', ' looks agile.', ['Agility']]
+]
+const landing = (text: string) => {
+  for (const [self, other, spells] of LANDINGS) {
+    if (text === self) return { target: SELF, spells, text: self }
+    if (text.endsWith(other)) return { target: text.slice(0, -other.length), spells, text: self }
+  }
+  return undefined
+}
+
 function meter(opts: { fightGapSec?: number; newSessionOnZone?: boolean; charmPets?: boolean; spellData?: boolean } = {}) {
   const m = new CombatMeter({
     fightGapSec: opts.fightGapSec ?? 10,
     newSessionOnZone: opts.newSessionOnZone ?? true,
     charmPets: opts.charmPets,
-    charmLand: opts.spellData ? charmLand : undefined
+    charmLand: opts.spellData ? charmLand : undefined,
+    landing: opts.spellData ? landing : undefined
   })
   m.setSelf('Kelwyn')
   const feed = (text: string) => {
@@ -1066,5 +1083,81 @@ describe('the Live card and the feed', () => {
     }
     // An hour since the first blow, ten idle minutes of it after the last.
     expect(sessionPace(s, from + 3_600_000)).toEqual(['42 kills/hour, 84 while fighting', '38 of 42 gave experience', '3 AA/h', 'next point in ≈ 10 min'])
+  })
+})
+
+// Kedge Keep, 2026-11-10: Phinigel Autropos's dispel proc fires off his melee and prints no cast line.
+describe('procs on your side (incoming)', () => {
+  it('books a message with no cast line on whom it landed, put down to the enemy whose blow just landed', () => {
+    const { m, feed } = meter({ spellData: true })
+    feed(`
+      [Tue Nov 10 06:39:45 2026] You punch Phinigel Autropos for 186 points of damage. (Critical)
+      [Tue Nov 10 06:39:46 2026] Phinigel Autropos crushes YOU for 142 points of damage.
+      [Tue Nov 10 06:39:46 2026] You feel very dispelled.
+      [Tue Nov 10 06:39:47 2026] Phinigel Autropos crushes YOU for 120 points of damage.
+      [Tue Nov 10 06:39:47 2026] You feel very dispelled.
+      [Tue Nov 10 06:39:47 2026] Phinigel Autropos crushes YOU for 98 points of damage. (Riposte)
+      [Tue Nov 10 06:39:47 2026] You feel very dispelled.
+      [Tue Nov 10 06:39:52 2026] You feel very dispelled.
+      [Tue Nov 10 06:39:53 2026] Phinigel Autropos bites Jobarab for 80 points of damage.
+      [Tue Nov 10 06:39:53 2026] Jobarab feels very dispelled.`)
+    const f = m.liveFight!
+    // Three after a blow, two of them in one second: three firings. The one five seconds after any blow is nobody's.
+    expect(f.entities['you'].procsIn).toEqual({
+      'You feel very dispelled.|phinigel autropos': {
+        name: 'You feel very dispelled.',
+        source: 'Phinigel Autropos',
+        count: 3,
+        damage: 0,
+        spells: ['Strip Enchantment', 'Pillage Enchantment']
+      }
+    })
+    // Jobarab is no pet of yours here, so the group scope leaves it out; everyone takes it in.
+    expect(procInRows(f, 'you').map((r) => [r.name, r.source, r.count, r.damage, r.targets])).toEqual([['You feel very dispelled.', 'Phinigel Autropos', 3, 0, ['You']]])
+    expect(m.liveSession!.entities['you'].procsIn!['You feel very dispelled.|phinigel autropos'].count).toBe(3)
+  })
+
+  it('counts a damage line and its message as one firing, whoever struck last', () => {
+    const { m, feed } = meter({ spellData: true })
+    feed(`
+      [Mon Nov 02 09:00:15 2026] You punch Lady Vox for 175 points of damage.
+      [Mon Nov 02 09:00:15 2026] Lady Vox bites YOU for 170 points of damage.
+      [Mon Nov 02 09:00:16 2026] A priest of Nagafen hits YOU for 55 points of damage.
+      [Mon Nov 02 09:00:16 2026] Lady Vox hit you for 600 points of cold damage by Frost Breath.
+      [Mon Nov 02 09:00:16 2026] Your body freezes as the frost hits you.
+      [Mon Nov 02 09:00:24 2026] Lady Vox bites YOU for 73 points of damage.
+      [Mon Nov 02 09:00:24 2026] Lady Vox hit you for 600 points of cold damage by Frost Breath.
+      [Mon Nov 02 09:00:24 2026] Your body freezes as the frost hits you.`)
+    const rows = procInRows(m.liveFight!, 'you')
+    expect(rows.map((r) => [r.name, r.source, r.count, r.damage])).toEqual([['Frost Breath', 'Lady Vox', 2, 1200]])
+  })
+
+  it('leaves out a cast spell, your Quick Buff, and a lifetap draining its own caster', () => {
+    const { m, feed } = meter({ spellData: true })
+    feed(`
+      [Tue Nov 10 06:43:10 2026] You punch Phinigel Autropos for 100 points of damage.
+      [Tue Nov 10 06:43:11 2026] Phinigel Autropos begins casting Strip Enchantment.
+      [Tue Nov 10 06:43:13 2026] Phinigel Autropos crushes YOU for 202 points of damage.
+      [Tue Nov 10 06:43:13 2026] You feel very dispelled.
+      [Tue Nov 10 06:43:40 2026] You activate Quick Buff.
+      [Tue Nov 10 06:43:43 2026] Phinigel Autropos crushes YOU for 150 points of damage.
+      [Tue Nov 10 06:43:43 2026] You feel agile.
+      [Tue Nov 10 06:44:30 2026] Phinigel Autropos crushes YOU for 120 points of damage.
+      [Tue Nov 10 06:44:30 2026] Phinigel Autropos has taken 451 damage from your Harm Touch X.
+      [Tue Nov 10 06:44:30 2026] Your life force drains away.
+      [Tue Nov 10 06:44:30 2026] Phinigel Autropos healed you for 451 hit points by Leech Touch I.`)
+    expect(procInRows(m.liveFight!, 'you')).toEqual([])
+    expect(m.liveFight!.entities['you'].procsIn ?? {}).toEqual({})
+  })
+
+  it("stops counting your own dispel's cast against your side once it lands on the mob", () => {
+    const { m, feed } = meter({ spellData: true })
+    feed(`
+      [Tue Nov 10 06:43:10 2026] You punch Phinigel Autropos for 100 points of damage.
+      [Tue Nov 10 06:43:15 2026] You begin casting Pillage Enchantment.
+      [Tue Nov 10 06:43:19 2026] Phinigel Autropos feels very dispelled.
+      [Tue Nov 10 06:43:25 2026] Phinigel Autropos crushes YOU for 156 points of damage.
+      [Tue Nov 10 06:43:25 2026] You feel very dispelled.`)
+    expect(procInRows(m.liveFight!, 'you').map((r) => r.count)).toEqual([1])
   })
 })

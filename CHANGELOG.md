@@ -4,6 +4,8 @@ What changed in each version. The release workflow publishes a version's section
 
 ## Unreleased
 
+- **Damage meter: enemies' procs on you.** Incoming has a new **Procs on you** card (**Procs on your side** for group or everyone) for what enemies fired with no cast line: weapon procs, breaths, dispels. It lists them with or without damage. An effect that prints only a message, like Phinigel Autropos's "You feel very dispelled.", is put down to the enemy whose blow landed that second. When several spells print the same message, the row shows the message, and hovering it lists the spells it may be.
+
 - **Long buff timers round the way the game does.** Focus is now applied before the rank bonus, and its fraction of a tick is dropped. Most timers don't change. A few long buffs were one tick (6 seconds) long: Dexterity IV now reads 2:22:48, as its spell tooltip does, not 2:22:54.
 
 ## 2.23.1 (2026-11-09)

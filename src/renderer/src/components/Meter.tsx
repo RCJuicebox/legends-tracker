@@ -9,7 +9,7 @@ import { attackerRows, copyText, damageRows, defenseOf, fmtRate, healTotals, hea
 import type { MeterMode, MeterScope, MeterSpan, Segment, SegmentSummary } from '../../../shared/types'
 import { DpsChart } from './MeterChart'
 import { ComparePane } from './MeterCompare'
-import { DamagePane, DefenseCard, Headline, HealedCard, HealingPane, IncomingPane, ProcsCard, TakenCard, TargetsCard, type Drill } from './MeterPanes'
+import { DamagePane, DefenseCard, Headline, HealedCard, HealingPane, IncomingPane, ProcsCard, ProcsInCard, TakenCard, TargetsCard, type Drill } from './MeterPanes'
 import { KIND_TEXT, kindTag } from './MeterBars'
 import { GroupRoster } from './GroupRoster'
 
@@ -209,6 +209,7 @@ export function Meter({ standalone = false }: { standalone?: boolean }) {
               <div className="dm-side">
                 {mode === 'damage' && <TargetsCard seg={seg} scope={scope} drill={drill} setDrill={setDrill} />}
                 {mode !== 'incoming' && <ProcsCard seg={seg} scope={scope} name={name} />}
+                {mode === 'incoming' && <ProcsInCard seg={seg} scope={scope} />}
                 {mode === 'incoming' && <DefenseCard d={defenseOf(seg, scope)} scope={scope} />}
                 {mode === 'incoming' && <TakenCard seg={seg} scope={scope} />}
                 {mode === 'healing' && <HealedCard seg={seg} scope={scope} />}

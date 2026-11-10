@@ -3,7 +3,7 @@ import { zoneEntered, type LogLine } from './logLine'
 import { ARTICLE, isFriend, nameKey, Roster } from './combatRoster'
 import { book, stitch } from './combatTimeline'
 import { CharmWatch } from './combatCharm'
-import { bookProc, ProcFirings, tapTick } from './combatProcs'
+import { addProcInDamage, bookProc, bookProcIn, IncomingFirings, ProcFirings, tapTick, unbookProcIn } from './combatProcs'
 import { EXPERIENCE } from './phrases'
 import { parseAaLine } from './aaHistory'
 import type { CombatSnapshot, DamageHow, Defense, Entity, EntityKind, HealTally, Segment, SegmentSummary, SkillStat, Tally, StitchedTimeline } from '../shared/types'
@@ -43,7 +43,16 @@ export interface MeterConfig {
    * name: " has been charmed.", or " moans." for the undead charms; undefined when it is no charm.
    */
   charmLand?: (spell: string) => string | undefined
+  /**
+   * The spells a line is the landing message of, and whom it landed on: "You feel very dispelled." is
+   * You and the six dispels that print it; "Ardan feels very dispelled." is Ardan and the same six.
+   * Undefined for any other line.
+   */
+  landing?: (text: string) => { target: string; spells: string[]; text: string } | undefined
 }
+
+/** Your own Quick Buff's landings come this long after its line, and are no enemy's. */
+const QUICK_BUFF_MS = 15_000
 
 export interface MeterHooks {
   onChange?: () => void
@@ -145,6 +154,10 @@ export class CombatMeter {
   private invite: { who: string; at: number } | null = null
   /** Who cast what when, and the procs' last lines (combatProcs.ts). */
   private readonly procs = new ProcFirings()
+  /** Enemies' procs on your side: who struck whom last, and each firing's lines. */
+  private readonly procsIn = new IncomingFirings()
+  /** When you last activated Quick Buff. */
+  private quickBuffAt = -Infinity
   /** Charmed mobs followed as their charmers' pets (combatCharm.ts). */
   private readonly charms = new CharmWatch(this.who, {
     enabled: () => !!this.config.charmPets,
@@ -211,6 +224,8 @@ export class CombatMeter {
     this.session = null
     this.who.clear()
     this.procs.clear()
+    this.procsIn.clear()
+    this.quickBuffAt = -Infinity
     this.charms.clear(true)
     this.held.clear()
     this.heldPrunedAt = 0
@@ -440,6 +455,18 @@ export class CombatMeter {
       return null
     }
     if (this.charms.line(text, time)) return null
+    if (text === 'You activate Quick Buff.') {
+      this.quickBuffAt = time
+      return null
+    }
+    // Only in a fight can a landing be an enemy's proc; out of one, the lookup is not worth making.
+    if (this.live && this.config.landing) {
+      const landed = this.config.landing(text)
+      if (landed) {
+        this.onLanding(landed, time)
+        return null
+      }
+    }
     if (!looksLikeCombat(text)) return null
     const ev = parseCombatLine(text)
     if (ev) this.event(ev, time)
@@ -537,6 +564,11 @@ export class CombatMeter {
     const proc = ss === 'friend' && ev.how === 'spell' ? this.procs.origin(source, ev.skill, at) : null
     // A lifetap whose heal line came first already counted this firing.
     const ownFiring = !!proc && this.procs.damage(source, ev.skill, at)
+    if (ss === 'enemy' && ev.how === 'melee') this.procsIn.strike(source, target, at)
+    // An enemy's spell on your side with no cast line of theirs: their proc (incoming). Its message, if
+    // it printed one first, already counted the firing.
+    const procIn = ss === 'enemy' && ev.how === 'spell' && this.procs.origin(source, ev.skill, at) !== null
+    const procInKey = procIn ? this.procsIn.firing(target, [ev.skill], `${ev.skill}|${nameKey(source)}`, 'damage', at) : null
     const finishing = ev.how === 'melee' && ev.mods.includes('finishing blow')
     for (const seg of closed ? [this.ensureSession(at), closed] : this.liveSegments(at, true)) {
       const src = this.ent(seg, source, at)
@@ -544,6 +576,10 @@ export class CombatMeter {
       add(src.out, ev.amount, crit)
       if (proc) this.exaltOf(bookProc(src, ev.skill, proc, ev.amount, 0, ownFiring), source, at)
       if (finishing) bookProc(src, 'Finishing Blow', 'aa', ev.amount, 0, true)
+      if (procIn) {
+        if (procInKey) addProcInDamage(tgt, procInKey, ev.amount)
+        else bookProcIn(tgt, ev.skill, source, [ev.skill], ev.amount, true)
+      }
       const skill = (src.skills[skillKey(ev.skill, ev.how)] ??= skillStat(ev.skill, ev.how))
       add(skill, ev.amount, crit)
       for (const m of ev.mods) skill.mods[m] = (skill.mods[m] ?? 0) + 1
@@ -569,6 +605,28 @@ export class CombatMeter {
       else if (ss === 'friend') book(seg, at, 'group', ev.amount)
       if (tgt.kind === 'you') book(seg, at, 'inc', ev.amount)
     }
+    this.changed()
+  }
+
+  /**
+   * A spell's landing message on one of your side, in a fight: an enemy's proc when nobody cast the
+   * spell and an enemy's blow landed on them that second ("You feel very dispelled." after Phinigel
+   * Autropos crushes YOU). Named for the spell, or the message when several spells print it.
+   */
+  private onLanding(l: { target: string; spells: string[]; text: string }, at: number): void {
+    const target = this.who.norm(l.target)
+    const side = this.who.sideOf(target)
+    // Your own Pillage Enchantment landing on the mob: no proc, and its cast no longer explains a dispel on you.
+    if (side === 'enemy') for (const s of l.spells) this.procs.landedOnEnemy(s, at)
+    if (side !== 'friend' || at - this.quickBuffAt <= QUICK_BUFF_MS) return
+    if (l.spells.some((s) => this.procs.castByAnyone(s, at))) return
+    const source = this.procsIn.striker(target, at)
+    if (!source) return
+    const name = l.spells.length === 1 ? l.spells[0] : l.text
+    const key = `${name}|${nameKey(source)}`
+    if (this.procsIn.firing(target, l.spells, key, 'message', at)) return
+    this.procsIn.fromMessage(target, l.spells, key, at)
+    for (const seg of this.liveSegments(at, false)) bookProcIn(this.ent(seg, target, at), name, source, l.spells, 0, true)
     this.changed()
   }
 
@@ -622,6 +680,9 @@ export class CombatMeter {
   private onHeal(ev: Extract<CombatEvent, { kind: 'heal' }>, at: number): void {
     let source = this.who.norm(ev.source)
     const target = this.who.norm(ev.target)
+    // A lifetap's heal after its drain message: the message was no enemy's proc after all.
+    const retracted = ev.spell ? this.procsIn.retract(target, ev.spell, at) : null
+    if (retracted) for (const seg of this.liveSegments(at, false)) if (seg.entities[nameKey(target)]) unbookProcIn(seg.entities[nameKey(target)], retracted)
     let [ss, ts] = this.who.place(source, target, false)
     // A lifetap ticking on an enemy heals its caster, and the log names the enemy as the healer:
     // "Innoruuk, the Prince of Hate healed you for 451 hit points by Leech Touch I." Enemies do not

@@ -13,6 +13,7 @@ import {
   healedRows,
   MIN_PROC_ACTIVE_SEC,
   procAmount,
+  procInRows,
   exaltRows,
   procRows,
   procSummary,
@@ -351,6 +352,53 @@ export function ProcsCard({ seg, scope, name }: { seg: Segment; scope: MeterScop
           ))}
         </div>
       )}
+    </div>
+  )
+}
+
+export function ProcsInCard({ seg, scope }: { seg: Segment; scope: MeterScope }) {
+  const rows = useMemo(() => procInRows(seg, scope), [seg, scope])
+  const count = rows.reduce((n, r) => n + r.count, 0)
+  return (
+    <div className="dm-aux">
+      <div className="dm-aux-head">
+        <span>
+          Procs on {scope === 'you' ? 'you' : 'your side'}{' '}
+          <Info
+            label="About incoming procs"
+            text="An enemy's effect that landed with no cast line behind it, with damage or without: a weapon proc, a dispel, a breath. One that prints only a message (You feel very dispelled.) is put down to the enemy whose blow landed on that person in the same second. Several spells can print one message; the row then shows the message, and hovering it lists the spells it may be."
+          />
+        </span>
+        {count > 0 && (
+          <span className="faint small">
+            {count} firing{count === 1 ? '' : 's'}
+          </span>
+        )}
+      </div>
+      {!rows.length && <div className="faint small">Nothing has landed on {scope === 'you' ? 'you' : 'your side'} uncast yet.</div>}
+      {rows.slice(0, 12).map((r) => (
+        <div
+          key={r.key}
+          className="dm-procrow"
+          title={[
+            r.spells ? `One of: ${r.spells.join(', ')}` : '',
+            `On ${r.targets.join(', ')}`,
+            r.ppm === null ? `No rate yet: that needs ${MIN_PROC_ACTIVE_SEC} s of combat.` : ''
+          ]
+            .filter(Boolean)
+            .join('. ')}
+        >
+          <i className="dm-dot" style={{ background: PROC_COLOR.spell }} />
+          <span className="dm-name">
+            {r.name}
+            <em className="dm-tag">{r.source}</em>
+          </span>
+          <span className="dm-right">
+            {r.ppm === null ? '–' : `${num1(round(r.ppm, 1))}/min`} · <b>×{r.count}</b> · {r.damage > 0 ? num(r.damage) : 'no damage'}
+          </span>
+        </div>
+      ))}
+      {rows.length > 12 && <div className="faint small">+{rows.length - 12} more</div>}
     </div>
   )
 }

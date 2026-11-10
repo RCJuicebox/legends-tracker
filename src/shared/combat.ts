@@ -72,6 +72,20 @@ interface ProcStat {
   item?: string
 }
 
+/**
+ * An effect an enemy fired on this entity with no cast line behind it: a weapon proc, with damage or
+ * without ("You feel very dispelled."), by name and enemy.
+ */
+export interface IncomingProc {
+  name: string
+  /** The enemy that fired it. */
+  source: string
+  count: number
+  damage: number
+  /** When the name is a message several spells share: those spells, the first few. */
+  spells?: string[]
+}
+
 export interface Entity {
   name: string
   kind: EntityKind
@@ -89,6 +103,8 @@ export interface Entity {
   takenBy: Record<string, SkillStat>
   /** Effects that fired without being cast, by name. */
   procs: Record<string, ProcStat>
+  /** Enemies' effects that landed on this entity without being cast, by name and enemy. */
+  procsIn?: Record<string, IncomingProc>
   defense: Defense
   healOut: HealTally
   healIn: HealTally

@@ -13,6 +13,7 @@ import { lastZoneLine } from '../game'
 import { log } from '../log'
 import { Backlog, Throttled } from '../../core/throttle'
 import type { SpellBook } from '../../core/spells'
+import { LandingIndex } from '../../core/spellLandings'
 import type { CombatSnapshot, Segment } from '../../shared/types'
 import type { EngineOutputs, EngineStore, LootView } from './contracts'
 import type { EngineFeature } from './feature'
@@ -146,8 +147,19 @@ export class CombatFeed implements EngineFeature {
       charmLand: (spell: string) => {
         const s = this.hooks.book()?.resolve(spell)?.spell
         return s?.category === 'charm' && s.landOther ? s.landOther : undefined
-      }
+      },
+      landing: (text: string) => this.landings()?.find(text)
     }
+  }
+
+  /** The spell book's landing messages, indexed once per book. */
+  private landingIndex: { book: SpellBook; index: LandingIndex } | null = null
+
+  private landings(): LandingIndex | null {
+    const book = this.hooks.book()
+    if (!book) return null
+    if (this.landingIndex?.book !== book) this.landingIndex = { book, index: new LandingIndex(book) }
+    return this.landingIndex.index
   }
 
   /** New settings; true when charm pets were switched, which changes whose every past blow was. */
