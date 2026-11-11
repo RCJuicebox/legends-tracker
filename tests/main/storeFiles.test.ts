@@ -6,6 +6,7 @@ import type { BuffsFile } from '../../src/core/buffs'
 import type { RespawnRecords } from '../../src/core/respawns'
 import type { MoteState } from '../../src/core/motes'
 import { tempDir } from '../tempDir'
+import { OFFERED_BEFORE_RECORD } from '../../src/core/shippedTriggers'
 
 // The Store finds its folder from Electron's userData path: each test gets its own scratch folder.
 const profile = vi.hoisted(() => ({ dir: '' }))
@@ -82,12 +83,13 @@ describe('a first run on an empty profile', () => {
     expect(store.buffs.get()).toEqual({ people: {}, wanted: {}, active: {} })
   })
 
-  it('writes nothing until flushed, then only the default triggers and the schema record', async () => {
+  it('writes nothing until flushed, then only the default triggers, what they were, and the schema record', async () => {
     const store = new Store(defaultTriggers)
     expect(readdirSync(profile.dir)).toEqual([])
     await store.flushAll()
-    expect(readdirSync(profile.dir).sort()).toEqual(['schema.json', 'triggers.json'])
+    expect(readdirSync(profile.dir).sort()).toEqual(['schema.json', 'shipped-triggers.json', 'triggers.json'])
     expect(readJson('triggers.json')).toEqual([DEFAULT_TRIGGER])
+    expect((readJson('shipped-triggers.json') as { offered: string[] }).offered).toContain(DEFAULT_TRIGGER.id)
     expect(readJson('schema.json')).toEqual(SCHEMAS)
   })
 
@@ -369,8 +371,44 @@ describe('files read back through the sanitisers', () => {
   })
 })
 
+describe('triggers a newer version ships', () => {
+  const mine: Trigger = { ...DEFAULT_TRIGGER, id: 'mine', name: 'Mez' }
+  const dispelled: Trigger = { ...DEFAULT_TRIGGER, id: 'dispelled', name: 'Dispelled' }
+  const tell: Trigger = { ...DEFAULT_TRIGGER, id: OFFERED_BEFORE_RECORD[0] }
+  const ship = (...list: Trigger[]) => writeFileSync(defaultTriggers, JSON.stringify(list))
+
+  it('join a profile from before the record once, and one deleted afterwards stays out', async () => {
+    ship(tell, dispelled)
+    writeFileSync(file('triggers.json'), JSON.stringify([mine]))
+    const store = new Store(defaultTriggers)
+    // Incoming tell was shipped before the record: this profile took it out, and it stays out.
+    expect(store.triggers.get().map((t) => t.name)).toEqual(['Mez', 'Dispelled'])
+    expect(store.addedShipped).toEqual(['Dispelled'])
+    await store.flushAll()
+    expect(readJson('shipped-triggers.json')).toEqual({ offered: expect.arrayContaining([tell.id, 'dispelled']) })
+
+    writeFileSync(file('triggers.json'), JSON.stringify([mine]))
+    const again = new Store(defaultTriggers)
+    expect(again.triggers.get().map((t) => t.name)).toEqual(['Mez'])
+    expect(again.addedShipped).toEqual([])
+  })
+
+  it('stay out of a triggers file set aside, and of one beside a record that would not read', async () => {
+    ship(DEFAULT_TRIGGER, dispelled)
+    writeFileSync(file('triggers.json'), '[{"id": ')
+    expect(new Store(defaultTriggers).triggers.get()).toEqual([])
+    writeFileSync(file('triggers.json'), JSON.stringify([mine]))
+    writeFileSync(file('shipped-triggers.json'), '{"offered": [')
+    const store = new Store(defaultTriggers)
+    expect(store.triggers.get().map((t) => t.name)).toEqual(['Mez'])
+    await store.flushAll()
+    expect(readJson('triggers.json')).toEqual([mine])
+  })
+})
+
 describe('a triggers file of another shape', () => {
   it('reads the import format, and sets anything else aside rather than writing over it (LT-611)', () => {
+    writeFileSync(file('shipped-triggers.json'), JSON.stringify({ offered: [DEFAULT_TRIGGER.id] }))
     writeFileSync(file('triggers.json'), JSON.stringify({ triggers: [{ id: 'a', name: 'Tell', phrases: [{ text: 'tells you', regex: false }] }] }))
     expect(new Store(defaultTriggers).triggers.get().map((t) => t.name)).toEqual(['Tell'])
     writeFileSync(file('triggers.json'), JSON.stringify({ nothing: 'here' }))

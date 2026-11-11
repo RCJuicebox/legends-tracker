@@ -6,6 +6,8 @@ import { join } from 'node:path'
 import { DEFAULT_CHARACTER, type AppSettings, type CharacterSettings, type FocusSource, type MoteStock, type SpellRule, type Trigger } from '../shared/types'
 import { sanitizeBuffs, sanitizeCasts, sanitizeMoteStock, sanitizeMotes, sanitizeRespawns, sanitizeSettings, sanitizeSpellRule, sanitizeTriggers } from '../core/validate'
 import { SCHEMAS, upgrade } from './schema'
+import { log } from './log'
+import { offerShipped, type ShippedOffer } from '../core/shippedTriggers'
 import { DEFAULT_OVERLAYS, JsonFile, characterKey, defaultSettings, mergeDefaults, readJsonFile, setAside, type ReadResult } from './storeCore'
 
 export interface KnownCast {
@@ -18,6 +20,10 @@ export class Store {
   readonly dir = app.getPath('userData')
   readonly settings: JsonFile<AppSettings>
   readonly triggers: JsonFile<Trigger[]>
+  /** The shipped trigger ids this profile has been offered: each joins the list once. */
+  readonly shipped: JsonFile<{ offered: string[] }>
+  /** The shipped triggers added at this start, by name. */
+  readonly addedShipped: string[] = []
   readonly rules: JsonFile<Record<string, SpellRule>>
   /** By character key: what each has cast. */
   readonly casts: JsonFile<Record<string, Record<string, KnownCast>>>
@@ -92,13 +98,32 @@ export class Store {
     const raw = triggers.state === 'ok' ? triggers.value : undefined
     const inner = raw && typeof raw === 'object' && !Array.isArray(raw) && 'triggers' in raw ? (raw as { triggers: unknown }).triggers : raw
     let list: Trigger[] = []
+    let trusted = firstRun
     if (triggers.state === 'ok') {
       const read = sanitizeTriggers(inner)
-      if (read) list = read
-      else if (!firstRun) this.recovered.push(setAside(p('triggers.json'), new Date(), 'wrong-shape').movedTo)
+      if (read) {
+        list = read
+        trusted = firstRun || !this.newer.includes('triggers.json')
+      } else if (!firstRun) this.recovered.push(setAside(p('triggers.json'), new Date(), 'wrong-shape').movedTo)
+    }
+    // A shipped trigger this profile was never offered joins its list, once (see offerShipped). Not
+    // into a list set aside, written by a newer build, or beside a record that could not be read.
+    const offeredRead = readResult('shipped-triggers.json')
+    const record = offeredRead.state === 'ok' ? (offeredRead.value as { offered?: unknown } | null)?.offered : undefined
+    const offered = Array.isArray(record) ? record.filter((id): id is string => typeof id === 'string') : undefined
+    let offer: ShippedOffer | null = null
+    if (trusted && (offeredRead.state === 'ok' || offeredRead.state === 'missing')) {
+      const shippedRead = firstRun ? triggers : readJsonFile(defaultTriggersPath, { setAside: false })
+      const shipped = (shippedRead.state === 'ok' ? sanitizeTriggers(shippedRead.value) : null) ?? []
+      offer = offerShipped(shipped, list, offered)
+      list = [...list, ...offer.add]
+      this.addedShipped = offer.add.map((t) => t.name)
+      if (offer.add.length) log.info(`Added the shipped trigger${offer.add.length === 1 ? '' : 's'} this profile was never offered: ${this.addedShipped.join(', ')}`)
     }
     this.triggers = new JsonFile(p('triggers.json'), list, { backup: true })
-    if (firstRun) this.triggers.markDirty()
+    if (firstRun || offer?.add.length) this.triggers.markDirty()
+    this.shipped = new JsonFile(p('shipped-triggers.json'), { offered: offer?.offered ?? offered ?? [] })
+    if (offer?.changed) this.shipped.markDirty()
 
     const rules = read('spell-rules.json')
     const ruleList: Record<string, SpellRule> = {}
@@ -134,6 +159,7 @@ export class Store {
     const byName: Record<string, JsonFile<unknown>> = {
       'settings.json': this.settings,
       'triggers.json': this.triggers,
+      'shipped-triggers.json': this.shipped,
       'spell-rules.json': this.rules,
       'casts.json': this.casts,
       'motes.json': this.motes,
@@ -194,7 +220,7 @@ export class Store {
 
   /** Writes whatever changed. Never rejects: a file that cannot be written is logged. */
   private get files(): JsonFile<unknown>[] {
-    return [this.settings, this.triggers, this.rules, this.casts, this.motes, this.stock, this.respawns, this.buffs]
+    return [this.settings, this.triggers, this.shipped, this.rules, this.casts, this.motes, this.stock, this.respawns, this.buffs]
   }
 
   async flushAll(): Promise<void> {

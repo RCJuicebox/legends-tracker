@@ -181,7 +181,8 @@ export function Triggers() {
 
   if (!draft) return loadError ? <LoadError what="your triggers" error={loadError} retry={() => setAttempt((n) => n + 1)} /> : <Pending what="your triggers" />
 
-  // The shipped triggers this profile does not have (FEAT-043): a new default reaches an old profile here.
+  // The shipped triggers this profile does not have (FEAT-043). A new one joins the list by itself at
+  // the next start (offerShipped); what's left here is one the player took out.
   const have = new Set(list.map((t) => t.id))
   const missing = (shipped ?? []).filter((t) => !have.has(t.id))
   const importFrom = async (channel: 'triggers:import' | 'triggers:importGina', what: string) => {
@@ -207,7 +208,7 @@ export function Triggers() {
           {missing.length > 0 && (
             <button
               className="btn"
-              title={`Triggers this version ships that your list does not have: ${missing.map((t) => t.name).join(', ')}`}
+              title={`Shipped triggers you took out of your list: ${missing.map((t) => t.name).join(', ')}`}
               onClick={() => {
                 setList((l) => [...l, ...missing])
                 showToast(`Added ${missing.length} shipped trigger${missing.length === 1 ? '' : 's'}; Save changes keeps them.`)

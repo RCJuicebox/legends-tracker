@@ -4,7 +4,9 @@ What changed in each version. The release workflow publishes a version's section
 
 ## Unreleased
 
-- **A Dispelled trigger.** A new shipped trigger says "Dispelled" when an enemy's dispel lands on you. That includes dragon breaths that strip buffs, like Lady Vox's Frost Breath ("Your body freezes as the frost hits you.") and Lord Nagafen's Lava Breath, and procs like Phinigel Autropos's. An existing profile gets it from **Add 1 shipped** on the Triggers page.
+- **A Dispelled trigger.** A new shipped trigger says "Dispelled" when an enemy's dispel lands on you. That includes dragon breaths that strip buffs, like Lady Vox's Frost Breath ("Your body freezes as the frost hits you.") and Lord Nagafen's Lava Breath, and procs like Phinigel Autropos's.
+
+- **New shipped triggers join your list by themselves.** A trigger a new version ships is added to your triggers at the next start, once. Before, it waited for **Add N shipped** on the Triggers page, which was easy to miss. One you delete afterwards stays deleted, and the button still brings back any shipped trigger you took out.
 
 - **Triggers: anchored phrases are quick again, and a phrase with "|" is never skipped.** A regex phrase starting with `^` now gets the same quick check as any other. A regex phrase with an alternative in it, like `You have slain|Your pet slew`, could miss lines that matched only its second half. That's fixed.
 
