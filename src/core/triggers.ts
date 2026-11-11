@@ -72,17 +72,20 @@ const GUARD_MIN = 3
 /**
  * The literal text a phrase starts with, lower-cased (LT-746): every line it matches holds it, so a
  * cheap `includes` turns most lines away before the regular expression runs. A regex phrase's literal
- * start stops at its first special character; one that starts with a pattern has none.
+ * start stops at its first special character, after a leading ^; one that starts with a pattern has
+ * none, nor has one with a | anywhere, as another branch may match without that text.
  */
 export function phraseGuard(p: Phrase): string {
   let text = p.text
   const snippet = text.search(SNIPPET_START)
   if (snippet >= 0) text = text.slice(0, snippet)
   if (p.regex) {
-    const special = text.search(/[\\^$.*+?()[\]{}|]/)
-    if (special >= 0) text = text.slice(0, special)
+    if (/(^|[^\\])\|/.test(p.text)) return ''
+    const from = text.startsWith('^') ? 1 : 0
+    const special = text.slice(from).search(/[\\^$.*+?()[\]{}|]/)
+    const end = special >= 0 ? from + special : text.length
     // A quantifier binds to the character before it: that one is not certain to be there.
-    if (special >= 0 && /[*?{]/.test(p.text[special])) text = text.slice(0, -1)
+    text = text.slice(from, special >= 0 && /[*?{]/.test(p.text[end]) ? end - 1 : end)
   }
   const g = text.toLowerCase()
   return g.trim().length >= GUARD_MIN ? g : ''

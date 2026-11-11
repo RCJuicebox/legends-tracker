@@ -94,6 +94,75 @@
     ]
   },
   {
+    "id": "a1f0c9d2-4e3b-4a71-9c58-7d21b8e40006",
+    "name": "Dispelled",
+    "folder": "Buffs",
+    "enabled": true,
+    "comment": "An enemy's dispel landed on you, and took time off your buffs: Strip and Pillage Enchantment procs, Cancel and Nullify Magic, and the dragon breaths that dispel (Vox's Frost Breath, Nagafen's Lava Breath).",
+    "phrases": [
+      {
+        "text": "^You feel very dispelled\\.$",
+        "regex": true
+      },
+      {
+        "text": "^You feel a bit dispelled\\.$",
+        "regex": true
+      },
+      {
+        "text": "^You feel dispelled\\.$",
+        "regex": true
+      },
+      {
+        "text": "^Your body freezes as the frost hits you\\.$",
+        "regex": true
+      },
+      {
+        "text": "^Your body combusts as the lava hits you\\.$",
+        "regex": true
+      },
+      {
+        "text": "^You are shredded by ice\\.$",
+        "regex": true
+      },
+      {
+        "text": "^Your enchantments fade\\.$",
+        "regex": true
+      },
+      {
+        "text": "^Your enchantments are stripped by a static pulse\\.$",
+        "regex": true
+      },
+      {
+        "text": "^A static pulse slows your movements\\.$",
+        "regex": true
+      },
+      {
+        "text": "^A field of energy causes you to convulse violently\\.$",
+        "regex": true
+      },
+      {
+        "text": "^An inescapable wind throws you into the air\\.$",
+        "regex": true
+      },
+      {
+        "text": "^The curse of the triumvirate consumes you\\.$",
+        "regex": true
+      },
+      {
+        "text": "^A wave of fury crashes over you\\.$",
+        "regex": true
+      }
+    ],
+    "cooldownSec": 2,
+    "actions": [
+      {
+        "type": "speak",
+        "text": "Dispelled",
+        "interrupt": false
+      }
+    ]
+  },
+  {
     "id": "a1f0c9d2-4e3b-4a71-9c58-7d21b8e40004",
     "name": "FD Fail",
     "folder": "Combat",

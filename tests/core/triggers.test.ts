@@ -1,4 +1,6 @@
 import { describe, expect, it } from 'vitest'
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import { compilePhrase, conditionsHold, phraseGuard, testTrigger, TriggerEngine } from '../../src/core/triggers'
 import { TimerBoard } from '../../src/core/timers'
 import { parseLogLine } from '../../src/core/logLine'
@@ -201,6 +203,14 @@ describe('the cheap look before a phrase runs (LT-746)', () => {
     expect(phraseGuard({ text: 'Bones? crack', regex: true })).toBe('bone')
     expect(phraseGuard({ text: 'ab', regex: false })).toBe('')
   })
+
+  it('reads past a leading ^, and takes nothing from a regex with another branch', () => {
+    expect(phraseGuard({ text: '^You feel very dispelled\\.$', regex: true })).toBe('you feel very dispelled')
+    expect(phraseGuard({ text: '^Bones? crack', regex: true })).toBe('bone')
+    expect(phraseGuard({ text: 'You have slain|Your pet slew', regex: true })).toBe('')
+    expect(phraseGuard({ text: '^You (feel|look) dispelled', regex: true })).toBe('')
+    expect(phraseGuard({ text: 'Ping \\| pong', regex: true })).toBe('ping ')
+  })
 })
 
 describe('trigger conditions and counters (FEAT-030)', () => {
@@ -246,5 +256,30 @@ describe('trigger conditions and counters (FEAT-030)', () => {
     line('11')
     line('12')
     expect(notes).toHaveLength(1)
+  })
+})
+
+describe('the shipped Dispelled trigger', () => {
+  const shipped = JSON.parse(readFileSync(join(__dirname, '../../defaults/triggers.json'), 'utf8')) as Trigger[]
+  const dispelled = shipped.find((t) => t.name === 'Dispelled')!
+
+  it('speaks for a dispel proc and for the dragon breaths that dispel, on you only', () => {
+    // Real lines: Phinigel Autropos's proc, Lady Vox's and Lord Nagafen's breaths.
+    for (const line of [
+      '[Tue Nov 10 06:43:25 2026] You feel very dispelled.',
+      '[Tue Nov 10 21:55:02 2026] Your body freezes as the frost hits you.',
+      'Your body combusts as the lava hits you.',
+      'You feel a bit dispelled.'
+    ])
+      expect(testTrigger(dispelled, line, 'Kelwyn').outputs).toEqual(['Speak: "Dispelled"'])
+    for (const line of [
+      'Phinigel Autropos feels very dispelled.',
+      "You tell your party, 'All 37 You feel very dispelled. lines follow a melee hit.'",
+      "Ardan's body freezes as the frost hits them.",
+      // Harm Touch's message too: the one SpellTheft dispel that prints it is left out.
+      'Your life force drains away.',
+      "You resist Lady Vox's Frost Breath!"
+    ])
+      expect(testTrigger(dispelled, line, 'Kelwyn').matched).toBe(false)
   })
 })
