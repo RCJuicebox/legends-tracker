@@ -1,7 +1,19 @@
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { castableByMine, castRows, DEFAULT_SPELL_WEIGHTS, isAbility, rankGain, sectionOf, spellUpgradeOptions, spendOnSpell, stockXp, valueGainOf } from '../../src/core/spellMotes'
+import {
+  castableByMine,
+  castRows,
+  DEFAULT_SPELL_WEIGHTS,
+  isAbility,
+  rankGain,
+  sectionOf,
+  spellUpgradeOptions,
+  spellMoteXp,
+  spendOnSpell,
+  stockXp,
+  valueGainOf
+} from '../../src/core/spellMotes'
 import { SpellBook } from '../../src/core/spells'
 import { DEFAULT_TIER_DURATION_PCT } from '../../src/shared/types'
 import { fixtureBook } from '../helpers'
@@ -9,27 +21,32 @@ import { fixtureBook } from '../helpers'
 const character = { level: 50, classLevels: {}, focusSources: [] }
 
 describe('paying for a spell rank with motes', () => {
-  it('counts every mote at its xp, whatever the rank', () => {
-    expect(stockXp({ infinitesimal: 3, minor: 2, lesser: 1, superior: 2, infinite: 1 })).toBe(3 + 2 + 2 + 14 + 10)
+  it('counts a mote at double the xp of the rank below on a spell, as the game previews show', () => {
+    // Previews (2026-11-12): a Potential mote took a rank 0 spell to rank 3 1/8 (8 xp), a Major took rank 5 8/32 to 24/32 (16).
+    expect(spellMoteXp(0)).toBe(1)
+    expect(spellMoteXp(3)).toBe(8)
+    expect(spellMoteXp(4)).toBe(16)
+    expect(spellMoteXp(9)).toBe(512)
+    expect(stockXp({ infinitesimal: 3, minor: 2, lesser: 1, superior: 2, infinite: 1 })).toBe(3 + 4 + 4 + 128 + 512)
   })
 
-  it('spends the lowest ranks first, since their combine value is the cheapest xp', () => {
-    // 8 xp: three Infinitesimal (3 xp, worth 3), then Lesser at 2 xp each: three of them cover the last 5 with 1 over.
+  it('spends the lowest ranks first', () => {
+    // 8 xp: three Infinitesimal (3 xp), then Lesser at 4 xp each: two of them cover the last 5 with 3 over.
     const p = spendOnSpell(8, { infinitesimal: 3, lesser: 4, major: 10 })
     expect(p).toEqual({
       motes: [
         { m: 0, n: 3 },
-        { m: 2, n: 3 }
+        { m: 2, n: 2 }
       ],
-      xp: 9,
-      over: 1,
-      worth: 3 + 12,
+      xp: 11,
+      over: 3,
+      worth: 3 + 8,
       short: 0
     })
   })
 
   it('says how far short the stock is', () => {
-    expect(spendOnSpell(16, { minor: 3 })).toEqual({ motes: [{ m: 1, n: 3 }], xp: 3, over: 0, worth: 6, short: 13 })
+    expect(spendOnSpell(16, { minor: 3 })).toEqual({ motes: [{ m: 1, n: 3 }], xp: 6, over: 0, worth: 6, short: 10 })
     expect(spendOnSpell(4, {})).toEqual({ motes: [], xp: 0, over: 0, worth: 0, short: 4 })
   })
 })
@@ -206,15 +223,15 @@ describe('the best spell to upgrade next', () => {
     // Puma at rank 0: 1 xp; 5 casts × (3 + 10 + 2 + 2 + 1) points.
     expect(opts[0]).toMatchObject({ rank: 0, next: 1, need: 1, benefit: 18, worth: 90, rate: 90, affordable: true, maxed: false, section: 'buff' })
     expect(opts[0].spend.motes).toEqual([{ m: 0, n: 1 }])
-    // Superior Healing at III: 8 xp; 40 casts × (3 + 1 + 2 + 1). The stock's 2 + 6 xp just covers it.
+    // Superior Healing at III: 8 xp; 40 casts × (3 + 1 + 2 + 1). Two Infinitesimal (2 xp), then two Lesser at 4 xp each, 2 over.
     expect(opts[1]).toMatchObject({ rank: 3, next: 4, need: 8, benefit: 7, worth: 280, rate: 35, affordable: true, section: 'heal' })
     expect(opts[1].spend).toMatchObject({
       motes: [
         { m: 0, n: 2 },
-        { m: 2, n: 3 }
+        { m: 2, n: 2 }
       ],
-      xp: 8,
-      over: 0,
+      xp: 10,
+      over: 2,
       short: 0
     })
     // Rank X: nothing to plan.

@@ -16,6 +16,8 @@ What changed in each version. The release workflow publishes a version's section
 
 - **Long buff timers round the way the game does.** Focus is now applied before the rank bonus, and its fraction of a tick is dropped. Most timers don't change. A few long buffs were one tick (6 seconds) long: Dexterity IV now reads 2:22:48, as its spell tooltip does, not 2:22:54.
 
+- **Motes are worth far more on spells.** On a spell a mote's xp doubles with each rank: Infinitesimal 1, Minor 2, Lesser 4, Potential 8, Major 16, up to Infinite 512, as the game's upgrade previews show. Motes › Spell upgrades and Best upgrade used the item values (Potential 4, Major 5 … Infinite 10), so they priced spell ranks far too high and said a stock covered far less than it does. xp past a rank carries on into the next one.
+
 ## 2.23.1 (2026-11-09)
 
 - **Plan › Slayer: every unfinished achievement gets a step.** A new log could still find achievements on Not planned when the only camps for them are above your level, or the spawn tables have none. The plan still prefers camps at your level. Where there is none, it now offers a higher camp, marked "over your level: a group’s camp more than a pet’s". Where the spawn tables have nothing, it offers the zones eqlwiki’s guide names, at your usual pace. Only an achievement nothing the plan knows can feed is left on Not planned.

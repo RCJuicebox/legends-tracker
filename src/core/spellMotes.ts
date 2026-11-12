@@ -4,10 +4,12 @@
 // The spell side of motes, as the community's EQL spell upgrade (mote) guide has it and play bears
 // out:
 //   - A spell at rank N needs 2^N xp to reach rank N+1 (rank 4 takes 15 xp in all, rank 5 31).
-//   - Every mote counts its xp on any spell, whatever the spell's rank: Infinitesimal 1, Minor 1,
-//     Lesser 2, Potential 4, Major 5 … Infinite 10. There is no tier limit as on items, so motes
-//     that no item of yours can use any more (an Infinitesimal only works on a +0 item) are worth
-//     their full xp here. Spending the lowest ranks first costs the least combine value.
+//   - Every mote works on any spell, whatever the spell's rank, and on a spell a mote's xp doubles
+//     with each rank: Infinitesimal 1, Minor 2, Lesser 4, Potential 8, Major 16 … Infinite 512, its
+//     combine value (spellMoteXp). Not the item table (1, 1, 2, 4, 5 … 10): in-game upgrade previews
+//     (2026-11-12) gave a Potential mote 8 xp and a Major 16 on spells. xp past a rank carries on
+//     into the next ones (a preview went from rank 5 8/32 to rank 7 40/128 in one go). There is no
+//     tier limit as on items, so motes no item of yours can use any more are the ones to spend.
 //   - What a rank gives depends on the spell's category (the guide's table, RANK_BONUS below), plus
 //     the same for every spell: recovery and reuse −2%, resist modifier −15 on resistable spells.
 //     Buffs and debuffs grow by what their effects are (valueGainOf), measured from spell windows.
@@ -343,15 +345,24 @@ export interface SpendPlan {
   short: number
 }
 
+/**
+ * A mote's xp on a spell, by rank index: it doubles each rank, the same as its combine value
+ * (Infinitesimal 1, Potential 8, Major 16). On items motes give far less (MOTE_RANKS xp).
+ */
+export function spellMoteXp(index: number): number {
+  return moteWorth(index)
+}
+
 /** Every mote's xp on a spell, summed. */
 export function stockXp(stock: MoteCounts): number {
-  return MOTE_RANKS.reduce((n, r, i) => n + (stock[r.key] ?? 0) * MOTE_RANKS[i].xp, 0)
+  return MOTE_RANKS.reduce((n, r, i) => n + (stock[r.key] ?? 0) * spellMoteXp(i), 0)
 }
 
 /**
- * Motes to pay `need` xp with, lowest rank first: a rank's combine value doubles each step while its
- * xp grows by one or two, so the low ranks are always the cheapest xp. The last mote may give more
- * than was needed; whether the spare carries over is not known, so it is shown as `over`.
+ * Motes to pay `need` xp with, lowest rank first. On a spell every rank gives the same xp per
+ * combine value, so none is cheaper as such; the low ranks are the ones items stop using first
+ * (an Infinitesimal only works on a +0 item). The last mote may give more than was needed: `over`,
+ * which carries on into the following ranks.
  */
 export function spendOnSpell(need: number, stock: MoteCounts): SpendPlan {
   const inv = countsToArray(stock)
@@ -360,12 +371,13 @@ export function spendOnSpell(need: number, stock: MoteCounts): SpendPlan {
   let xp = 0
   let worth = 0
   for (let m = 0; m < MOTE_RANKS.length && remaining > 0; m++) {
-    const n = Math.min(inv[m], Math.ceil(remaining / MOTE_RANKS[m].xp))
+    const each = spellMoteXp(m)
+    const n = Math.min(inv[m], Math.ceil(remaining / each))
     if (n <= 0) continue
     motes.push({ m, n })
-    xp += n * MOTE_RANKS[m].xp
+    xp += n * each
     worth += n * moteWorth(m)
-    remaining -= n * MOTE_RANKS[m].xp
+    remaining -= n * each
   }
   return { motes, xp, over: Math.max(0, -remaining), worth, short: Math.max(0, remaining) }
 }

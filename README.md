@@ -544,11 +544,11 @@ into next. It counts your casts (`You begin casting …` / `You begin singing �
 or 30 days of play, or all your logs, and scores the next rank of each spell with the community's
 EQL spell upgrade (mote) guide:
 
-- A spell at rank N needs 2^N xp for rank N+1, and on a spell every mote counts its xp whatever the
-  spell's rank (Infinitesimal 1, Minor 1, Lesser 2, Potential 4, Major 5, Greater 6, Superior 7,
-  Grand 8, Ascendant 9, Infinite 10). There is no tier limit as on items, so the low ranks that no
-  item of yours can use any more are worth their full xp here, and "Pay with" spends the lowest ranks
-  first (each rank's combine value doubles while its xp barely grows).
+- A spell at rank N needs 2^N xp for rank N+1, and on a spell a mote's xp doubles with each rank,
+  whatever the spell's rank: Infinitesimal 1, Minor 2, Lesser 4, Potential 8, Major 16, Greater 32,
+  Superior 64, Grand 128, Ascendant 256, Infinite 512 (its combine value; checked in the game's
+  upgrade previews). That is far more than a mote gives an item, and there is no tier limit as on
+  items. "Pay with" spends the lowest ranks first; xp past a rank carries on into the next.
 - What a rank gives depends on the category, from the guide's per-tier table: nukes and lifetaps
   −2% cast, −2% mana, +6% damage; DoTs −4% cast, −2% mana, +5% duration, +3% per tick (unconfirmed);
   heals −4% cast, −2% mana, about +3% healing; heals over time the same with +5% duration; debuffs,

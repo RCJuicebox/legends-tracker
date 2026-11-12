@@ -38,9 +38,9 @@ const whoCode = (name: string) => {
 const HOW =
   'Every spell and song you cast in the window, with what its next rank would give each cast, from the EQL spell upgrade (mote) guide: the per-rank ' +
   'table for its category, plus −2% recovery and reuse for every spell. A point is one cast made one percent better, weighed as set above, so a rank’s ' +
-  'worth is casts × points per cast. A spell at rank N needs 2^N xp for the next rank, and on a spell every mote counts its xp whatever the rank ' +
-  '(Infinitesimal 1, Minor 1, Lesser 2, Potential 4, Major 5 … Infinite 10): there is no tier limit as on items. Worth per xp is what to sort by. ' +
-  'Pay with lists the cheapest motes in your stock for the step, lowest rank first, since each rank’s combine value doubles while its xp barely grows.'
+  'worth is casts × points per cast. A spell at rank N needs 2^N xp for the next rank, and on a spell a mote’s xp doubles with each rank ' +
+  '(Infinitesimal 1, Minor 2, Lesser 4, Potential 8, Major 16 … Infinite 512, its combine value), whatever the spell’s rank: there is no tier limit as on items. ' +
+  'Worth per xp is what to sort by. Pay with lists motes from your stock for the step, lowest rank first; xp over carries on into the next rank.'
 
 /** The guide's per-rank line for a section. */
 function sectionNote(key: SectionKey, tierPct: Record<string, number>): string {
@@ -74,7 +74,7 @@ function PayWith({ o }: { o: SpellUpgradeOption }) {
   if (o.maxed) return <span className="chip">rank X: done</span>
   const s = o.spend
   const list = s.motes.map((m) => `${m.n} ${short(m.m)}`).join(' + ')
-  const title = s.short ? `${s.short} xp short of ${o.need}` : `${s.xp} xp from motes worth ${num(s.worth)} Infinitesimal${s.over ? `; ${s.over} xp over` : ''}`
+  const title = s.short ? `${s.short} xp short of ${o.need}` : `${s.xp} xp from motes worth ${num(s.worth)} Infinitesimal${s.over ? `; ${s.over} xp over, carried on` : ''}`
   return (
     <>
       <span className={`chip ${s.short ? 'warn' : 'ok'}`} title={title}>
@@ -211,9 +211,9 @@ export function MoteSpells({ go }: { go?: Go }) {
               {w && w.total > 0
                 ? `${num(w.total)} casts from ${w.from} to ${w.to}, ${options.length} spell${options.length === 1 ? '' : 's'}${maxed ? `, ${maxed} at rank X already` : ''}${ignoredCount ? `, ${ignoredCount} ignored` : ''}.`
                 : 'No casts in your log for this window.'}{' '}
-              {stock ? `Your motes are worth ${num(xp)} xp on spells.` : 'Motes on hand are not loaded yet, so nothing is marked affordable.'} Spend the low ranks here: on an item
-              a mote only works at its own tier, but on a spell it always counts its xp. Every rank also takes −{UNIVERSAL.recovery}% recovery, −{UNIVERSAL.reuse}% reuse and −
-              {UNIVERSAL.resist} off the resist modifier of resistable spells. The duration a rank adds is{' '}
+              {stock ? `Your motes are worth ${num(xp)} xp on spells.` : 'Motes on hand are not loaded yet, so nothing is marked affordable.'} On a spell every mote gives its
+              combine value in xp (a Superior 64), where on an item it only works at its own tier for a few xp. Every rank also takes −{UNIVERSAL.recovery}% recovery, −
+              {UNIVERSAL.reuse}% reuse and −{UNIVERSAL.resist} off the resist modifier of resistable spells. The duration a rank adds is{' '}
               {go ? (
                 <button className="link-button inline" onClick={() => go('spells')}>
                   Spell Timers' Rank bonuses
@@ -324,7 +324,7 @@ export function MoteSpells({ go }: { go?: Go }) {
                     <th className="num" title="Worth per xp: the value of the upgrade">
                       Per xp
                     </th>
-                    <th title="The cheapest motes in your stock for it, lowest rank first">Pay with</th>
+                    <th title="Motes from your stock for it, lowest rank first">Pay with</th>
                     <th />
                   </tr>
                 </thead>
