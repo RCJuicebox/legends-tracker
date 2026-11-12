@@ -322,7 +322,12 @@ export const MOB_RACES: Record<string, string> = {
   'larval bleeder': 'leech',
   // North Ro's troopers by the New Sebilis zone line, true Iksars like their fellows eqlwiki has (the player, 2026-11-09).
   'trooper tygin': 'iksar',
-  'trooper axlia': 'iksar'
+  'trooper axlia': 'iksar',
+  // Dragonbane's True Dragons, which the client calls plain Dragon: no export can single them out from
+  // the runs' other kills, but the player's 235 Vox and Nagafen kills to 2026-11-11's export (213 in the
+  // live log, 22 in its archives) are its 235 exactly (2026-11-12).
+  'lady vox': 'true dragon',
+  'lord nagafen': 'true dragon'
 }
 
 /**

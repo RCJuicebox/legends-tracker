@@ -440,21 +440,33 @@ describe('what an export settles', () => {
   })
 
   it('learns which of a race the client names as one an achievement lists some of counts', () => {
-    // The client calls every dragon Dragon; Dragonbane lists True Dragons. Nagafen is a dragon for
+    // The client calls every dragon Dragon; Dragonbane lists True Dragons. Talendor is a dragon for
     // certain, and whether he is a true one only an export can say.
     const dragons = [{ section: 'Slayer: Special', name: 'Dragonbane', races: 'True Dragons', count: 0, max: 50 }]
     const r = new SlayerRaces(dragons, GAME)
     expect([...r.broader[0]]).toEqual(['dragon'])
-    const raceOf = (m: string) => ({ 'Lord Nagafen': 'Lava Dragon', 'a kobold runt': 'Kobold' })[m]
+    const raceOf = (m: string) => ({ Talendor: 'Dragon', 'a kobold runt': 'Kobold' })[m]
     const kills = [
-      { name: 'Lord Nagafen', n: 5 },
+      { name: 'Talendor', n: 5 },
       { name: 'a kobold runt', n: 5 }
     ]
     // Not counted on his race alone.
-    expect(slayerCounts(dragons, r, new Map([['lord nagafen', { name: 'Lord Nagafen', times: [1, 2, 3, 4, 5] }]]), raceOf, noFacts, new Set()).rows[0].since).toBe(0)
+    expect(slayerCounts(dragons, r, new Map([['talendor', { name: 'Talendor', times: [1, 2, 3, 4, 5] }]]), raceOf, noFacts, new Set()).rows[0].since).toBe(0)
     // The numbers alone cannot tell him from the kobolds; the kobolds' race can.
     const got = learnFromExport(new Map([['dragonbane', 0]]), [{ ...dragons[0], count: 5 }], r, kills, raceOf, noFacts)
-    expect(got).toEqual([{ mob: 'lord nagafen', achievement: 'dragonbane', counts: true, kills: 5, rise: 5 }])
+    expect(got).toEqual([{ mob: 'talendor', achievement: 'dragonbane', counts: true, kills: 5, rise: 5 }])
+  })
+
+  it('counts Lady Vox and Lord Nagafen toward Dragonbane as they die, as play settled (2026-11-12)', () => {
+    const dragons = [{ section: 'Slayer: Special', name: 'Dragonbane', races: 'True Dragons', count: 235, max: 250 }]
+    const r = new SlayerRaces(dragons, GAME)
+    const raceOf = (m: string) => ({ 'Lord Nagafen': 'Lava Dragon', 'Lady Vox': 'Dragon' })[m]
+    const kills: SlayerKills = new Map([
+      ['lord nagafen', { name: 'Lord Nagafen', times: [1, 2] }],
+      ['lady vox', { name: 'Lady Vox', times: [3] }]
+    ])
+    expect(r.place('Lady Vox', 'Dragon')).toMatchObject({ key: 'true dragon', by: 'play', sure: true })
+    expect(slayerCounts(dragons, r, kills, raceOf, noFacts, new Set()).rows[0]).toMatchObject({ since: 3, guessed: 0, last: 3 })
   })
 
   it('leaves a compound race open to an export under the race its last word is (LT-531)', () => {
