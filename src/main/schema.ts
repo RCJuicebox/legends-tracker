@@ -32,6 +32,7 @@ export const SCHEMAS: Readonly<Record<string, number>> = {
   'hunter-spots.json': 1,
   'sky.json': 1,
   'epics.json': 1,
+  'reincarnation.json': 1,
   'slayer-races.json': 1,
   'achievements-history.json': 1
 }

@@ -65,7 +65,8 @@ const PAGE_NAMES = [
   'Hunter',
   'Sky',
   'Epics',
-  'SpellQuests'
+  'SpellQuests',
+  'Reincarnation'
 ]
 let pages: Record<string, Page>
 let StateProvider: ComponentType<{ children: React.ReactNode }>

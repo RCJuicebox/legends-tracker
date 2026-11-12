@@ -4822,3 +4822,192 @@ input[aria-invalid='true'] {
 .epic-target-table td:last-child {
   width: 22%;
 }
+/* Goals › Reincarnation: a bar of three ranks per AA, the class notes as chips, the trio builder. */
+.rc-cols {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(520px, 1fr));
+  gap: 16px;
+}
+.rc-list {
+  display: grid;
+  gap: 6px;
+}
+.rc-row {
+  display: grid;
+  grid-template-columns: 112px 136px 116px minmax(0, 1fr) auto;
+  align-items: center;
+  column-gap: 12px;
+}
+.rc-list.races .rc-row {
+  grid-template-columns: 112px 116px minmax(0, 1fr) auto;
+}
+.rc-name {
+  font-weight: 600;
+  white-space: nowrap;
+}
+.rc-note {
+  min-width: 0;
+}
+.rc-tags {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.chip.rc-tag {
+  font-size: 11px;
+  padding: 1px 7px;
+}
+.chip.rc-tag.evasive {
+  background: color-mix(in srgb, var(--teal) 16%, transparent);
+  color: var(--teal-text);
+}
+.chip.rc-tag.defensive {
+  background: color-mix(in srgb, var(--blue) 18%, transparent);
+  color: var(--blue-text);
+}
+.chip.rc-tag.wis {
+  background: color-mix(in srgb, var(--green) 15%, transparent);
+  color: var(--green-text);
+}
+.chip.rc-tag.int {
+  background: color-mix(in srgb, var(--violet) 18%, transparent);
+  color: var(--violet-text);
+}
+.chip.rc-tag.none {
+  background: transparent;
+  color: var(--text-3);
+  border: 1px dashed var(--line-2);
+}
+.rc-bar {
+  display: inline-flex;
+  gap: 3px;
+}
+.rc-part {
+  display: inline-block;
+  width: 34px;
+  height: 12px;
+  padding: 0;
+  border: 1px solid var(--line-3);
+  border-radius: 2px;
+  background: var(--well);
+  cursor: pointer;
+}
+.rc-bar.static .rc-part {
+  cursor: default;
+}
+.rc-part.done {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+.rc-part.planned {
+  background: repeating-linear-gradient(135deg, color-mix(in srgb, var(--accent) 45%, transparent) 0 4px, transparent 4px 8px);
+  border-color: var(--accent);
+}
+.rc-part.inline {
+  width: 18px;
+  height: 10px;
+  vertical-align: middle;
+  margin: 0 2px 0 8px;
+  cursor: default;
+}
+button.rc-part:hover {
+  outline: 1px solid var(--accent-2);
+}
+.rc-slots {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.rc-slot {
+  min-width: 130px;
+  padding: 6px 10px;
+  border: 1px dashed var(--line-3);
+  border-radius: 4px;
+  color: var(--text-3);
+  background: transparent;
+  text-align: center;
+}
+.rc-slot.filled {
+  border-style: solid;
+  border-color: var(--accent);
+  color: var(--text);
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  cursor: pointer;
+}
+.rc-slot.race {
+  margin-left: 12px;
+}
+.rc-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+  margin-bottom: 8px;
+}
+.rc-pick-head {
+  margin: 12px 0 6px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.rc-pick {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.rc-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  border: 1px solid var(--line-2);
+  border-radius: 4px;
+  background: var(--panel-2);
+  color: var(--text);
+  cursor: pointer;
+}
+.rc-chip:hover:not(:disabled) {
+  border-color: var(--accent);
+}
+.rc-chip.on {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+}
+.rc-chip:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+.rc-gap {
+  margin-top: 8px;
+}
+.rc-plans {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+}
+.rc-plan {
+  display: grid;
+  grid-template-columns: 24px 1fr auto auto;
+  align-items: center;
+  gap: 12px;
+  padding: 6px 8px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+}
+.rc-plan.editing {
+  border-color: var(--accent);
+}
+.rc-plan-what {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+}
+.rc-history {
+  margin: 0;
+  padding-left: 18px;
+}
+.rc-status {
+  flex-wrap: wrap;
+  gap: 8px 24px;
+}

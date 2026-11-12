@@ -7,6 +7,7 @@ import { Hunter } from './hunter/page'
 import { Sky } from './sky/page'
 import { Epics } from './epics/page'
 import { SpellQuests } from './epics/spellPage'
+import { Reincarnation } from './reincarnation/page'
 
 // Each feature module's page (src/features/<name>/page.tsx), by the id src/features/index.ts lists it
 // under: the shell draws them from here, so a new feature's page is one line in each of the two (LT-632).
@@ -18,5 +19,6 @@ export const FEATURE_ELEMENTS: Record<FeaturePageId, ComponentType<{ go: Go }>> 
   hunter: Hunter,
   sky: Sky,
   epics: Epics,
-  spellquests: SpellQuests
+  spellquests: SpellQuests,
+  reincarnation: Reincarnation
 }

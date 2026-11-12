@@ -59,6 +59,15 @@ export const FEATURE_PAGES = [
     after: 'epics',
     optional:
       'The five class spells a quest gives (Tashania, Ice Comet, Divine Might, Life Leech, Call of Flame), every step of each with how many of each piece you hold from your log and inventory export. Every class’s by default; pick yours to narrow it. Targets says where to hunt for the rest.'
+  },
+  {
+    id: 'reincarnation',
+    group: 'Goals',
+    label: 'Reincarnation',
+    icon: 'reincarnate',
+    after: 'spellquests',
+    optional:
+      'Every class and race Reincarnation AA with its three ranks, read from your log as the game gives them, and a planner: build the trios and races you mean to reincarnate as, and each class and race comes off the list once all three of its ranks are planned or done. Each class says whether it has Evasive or Defensive stance and whether its mana comes from WIS or INT.'
   }
 ] as const satisfies readonly FeaturePage[]
 

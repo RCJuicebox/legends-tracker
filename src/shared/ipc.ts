@@ -19,6 +19,7 @@ import type { SlayerMap, SlayerMark } from '../features/slayer/spawns'
 import type { HunterPlanData } from '../features/hunter/core'
 import type { SkyState } from '../features/sky/core'
 import type { EpicState } from '../features/epics/core'
+import type { ReincPlan, ReincState } from '../features/reincarnation/core'
 import type { AchievementTrack, PlayerLocation } from './tracking'
 import type { FocusReport } from '../core/itemFocus'
 import type { LootSnapshot, MobDrops } from '../core/loot'
@@ -518,6 +519,14 @@ export interface Invokes {
   'epics:have': (character: string, item: string, have: number) => EpicState
   /** Whether the epic pieces wanted in a zone are said on zoning in; turns it on or off when given. */
   'epics:zoneAlert': (on?: boolean) => boolean
+  /** What Goals › Reincarnation shows for a character: each class and race AA's rank, the plan of trios, the reincarnations made and the tokens held. */
+  'reincarnation:state': (character: string) => ReincState
+  /** Sets a Reincarnation AA's rank by hand (`class:shd`, `race:Wood Elf`; 0 to 3), or null to go back to the log's; the state after. */
+  'reincarnation:rank': (character: string, key: string, rank: number | null) => ReincState
+  /** Keeps the plan of trios, in the player's order; the state after. */
+  'reincarnation:plans': (character: string, plans: ReincPlan[]) => ReincState
+  /** Says a plan was reincarnated as: a rank in each of its AAs, and off the plan; the state after. */
+  'reincarnation:done': (character: string, id: string) => ReincState
   /** Where the character being played is in its faction plan, and its Slayer counts since its achievements export. */
   'achievements:track': (watching?: boolean) => AchievementTrack | null
   /** The player's last /loc, while they are still in its zone; null without one (FEAT-023). */
@@ -767,6 +776,10 @@ const INVOKE_CHANNELS: Record<InvokeChannel, true> = {
   'epics:tick': true,
   'epics:have': true,
   'epics:zoneAlert': true,
+  'reincarnation:state': true,
+  'reincarnation:rank': true,
+  'reincarnation:plans': true,
+  'reincarnation:done': true,
   'achievements:track': true,
   'game:location': true,
   'character:exports': true,
