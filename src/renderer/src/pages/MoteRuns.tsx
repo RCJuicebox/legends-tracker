@@ -11,11 +11,12 @@ import {
   MOTE_RANKS,
   farmPlaces,
   fragmentSpellXp,
+  haulValue,
   localDay,
-  moteValue,
   moteWorth,
   pausedHours,
   sessionHours,
+  sumDays,
   timeOnDay,
   totalMotes,
   type MoteCounts,
@@ -48,7 +49,14 @@ export function useMotes(): View | null {
 }
 
 const VALUE_HINT =
-  'Counted in Infinitesimal motes. Two of a rank combine into one of the next, so each rank is worth double the one below: Minor 2, Lesser 4, Potential 8, Major 16, Greater 32, Superior 64, Grand 128.'
+  'Counted in Infinitesimal motes. Two of a rank combine into one of the next, so each rank is worth double the one below: Minor 2, Lesser 4, Potential 8, Major 16, Greater 32, Superior 64, Grand 128. ' +
+  'A Fragment of Potential counts for what it gives a spell, twice its rank’s mote: Infinitesimal 2, Potential 16, Superior 128.'
+
+/** "and 3 fragments" after a mote count, or nothing. */
+function andFragments(c: MoteCounts | undefined): string {
+  const n = totalMotes(c ?? {})
+  return n ? ` and ${n} fragment${n === 1 ? '' : 's'}` : ''
+}
 
 export function perHour(n: number, hours: number): string {
   return hours >= 1 / 60 ? num1(round(n / hours, 1)) : '—'
@@ -147,12 +155,14 @@ export function MoteRuns() {
   if (!view) return <Pending what="your motes" error={q.error} retry={q.reload} />
   const a = view.active
   const today = view.daily[localDay(now)] ?? {}
+  const todayFragments = view.dailyFragments?.[localDay(now)] ?? {}
   const crawls = view.sessions.filter((s) => s.kind === 'crawl' && s.outcome === 'completed')
   const crawlHours = crawls.reduce((n, s) => n + sessionHours(s, now), 0)
   const crawlMotes = crawls.reduce((n, s) => n + totalMotes(s.motes), 0)
-  const crawlValue = crawls.reduce((n, s) => n + moteValue(s.motes), 0)
-  const allTime: MoteCounts = {}
-  for (const day of Object.values(view.daily)) for (const r of MOTE_RANKS) if (day[r.key]) allTime[r.key] = (allTime[r.key] ?? 0) + day[r.key]!
+  const crawlFragments = crawls.reduce((n, s) => n + totalMotes(s.fragments ?? {}), 0)
+  const crawlValue = crawls.reduce((n, s) => n + haulValue(s.motes, s.fragments), 0)
+  const allTime = sumDays(view.daily)
+  const allFragments = sumDays(view.dailyFragments)
   const scanPct = Math.round((view.scanProgress ?? 0) * 100)
 
   return (
@@ -207,7 +217,7 @@ export function MoteRuns() {
               <span className="label">Today</span>
               <span className="value">{totalMotes(today)}</span>
               <span className="sub" title={VALUE_HINT}>
-                worth {moteValue(today)} Infinitesimal motes
+                {andFragments(todayFragments) ? `motes${andFragments(todayFragments)}, ` : ''}worth {haulValue(today, todayFragments)} Infinitesimal motes
               </span>
             </div>
             <div className="stat">
@@ -219,16 +229,16 @@ export function MoteRuns() {
               <span className="label">Crawl average</span>
               <span className="value">{perHour(crawlMotes, crawlHours)}/h</span>
               <span className="sub" title={VALUE_HINT}>
-                worth {perHour(crawlValue, crawlHours)} Infinitesimal motes an hour
+                {crawlFragments ? `motes and ${perHour(crawlFragments, crawlHours)} fragments, ` : ''}worth {perHour(crawlValue, crawlHours)} Infinitesimal motes an hour
               </span>
             </div>
           </div>
           <div className="small muted mb-8">Today</div>
-          <RankChips counts={today} />
+          <RankChips counts={today} fragments={todayFragments} />
           <div className="small muted" style={{ margin: '12px 0 6px' }}>
             Everything in your logs
           </div>
-          <RankChips counts={allTime} />
+          <RankChips counts={allTime} fragments={allFragments} />
         </div>
       </div>
 
@@ -243,7 +253,7 @@ export function MoteRuns() {
 function ByPlace({ sessions, now }: { sessions: MoteSession[]; now: number }) {
   const places = farmPlaces(sessions, now)
     .filter((p) => p.hours > 0)
-    .sort((a, b) => moteValue(b.motes) / b.hours - moteValue(a.motes) / a.hours)
+    .sort((a, b) => haulValue(b.motes, b.fragments) / b.hours - haulValue(a.motes, a.fragments) / a.hours)
   if (places.length < 2) return null
   return (
     <div className="card mb-16">
@@ -271,7 +281,7 @@ function ByPlace({ sessions, now }: { sessions: MoteSession[]; now: number }) {
                   <td className="mono">{p.runs}</td>
                   <td className="mono nowrap">{duration(p.hours * 3600)}</td>
                   <td className="mono">{perHour(totalMotes(p.motes), p.hours)}</td>
-                  <td className="mono">{perHour(moteValue(p.motes), p.hours)}</td>
+                  <td className="mono">{perHour(haulValue(p.motes, p.fragments), p.hours)}</td>
                   <td className="nowrap">{top && top.n > 0 ? `${top.r.name || 'Potential'} ${perHour(top.n, p.hours)}/h` : '—'}</td>
                 </tr>
               )
@@ -309,14 +319,14 @@ function ActiveSession({ a }: { a: MoteSession | null | undefined }) {
               <span className="label">Motes</span>
               <span className="value">{totalMotes(a.motes)}</span>
               <span className="sub" title={VALUE_HINT}>
-                worth {moteValue(a.motes)} Infinitesimal motes
+                {andFragments(a.fragments) ? `motes${andFragments(a.fragments)}, ` : ''}worth {haulValue(a.motes, a.fragments)} Infinitesimal motes
               </span>
             </div>
             <div className="stat">
               <span className="label">Per hour</span>
               <span className="value">{perHour(totalMotes(a.motes), sessionHours(a, now))}</span>
               <span className="sub" title={VALUE_HINT}>
-                worth {perHour(moteValue(a.motes), sessionHours(a, now))} Infinitesimal motes an hour
+                worth {perHour(haulValue(a.motes, a.fragments), sessionHours(a, now))} Infinitesimal motes an hour
               </span>
             </div>
           </div>
@@ -349,7 +359,7 @@ function SessionTable({ sessions, now }: { sessions: MoteSession[]; now: number 
     time: hours,
     motes: (s) => totalMotes(s.motes),
     perHour: (s) => totalMotes(s.motes) / Math.max(hours(s), 1 / 60),
-    value: (s) => moteValue(s.motes) / Math.max(hours(s), 1 / 60)
+    value: (s) => haulValue(s.motes, s.fragments) / Math.max(hours(s), 1 / 60)
   })
   return (
     <div className="card">
@@ -430,7 +440,7 @@ function SessionTable({ sessions, now }: { sessions: MoteSession[]; now: number 
                     </td>
                     <td className="mono">{totalMotes(s.motes)}</td>
                     <td className="mono">{perHour(totalMotes(s.motes), h)}</td>
-                    <td className="mono">{perHour(moteValue(s.motes), h)}</td>
+                    <td className="mono">{perHour(haulValue(s.motes, s.fragments), h)}</td>
                     <td>
                       <ConfirmButton
                         className="btn ghost small x-btn"

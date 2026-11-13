@@ -104,7 +104,15 @@ export function MergeTab({
       const info = view.items[itemKey(item.name)] ?? extraInfo[itemKey(item.name)]
       return info?.found ? parseStatsBlock(info.statsblock) : null
     }
-    const all = mergeOptions({ worn, baseStatsOf, weights, hands, stock: stock?.counts, planned: stock?.item })
+    const all = mergeOptions({
+      worn,
+      baseStatsOf,
+      weights,
+      hands,
+      stock: stock?.counts,
+      fragments: stock?.fragmentsOnItems === false ? undefined : stock?.fragments,
+      planned: stock?.item
+    })
     return sortBy === 'gain' ? [...all].sort((a, b) => b.gain - a.gain || a.cost - b.cost) : all
   }, [worn, view.items, extraInfo, weights, hands, stock, sortBy])
   const shown = onlyAffordable ? options.filter((o) => o.affordable) : options
@@ -154,7 +162,7 @@ export function MergeTab({
               written <Ago t={view.modified} />
             </>
           )}
-          ; motes on hand from the Merge planner{stock ? '' : ' (not loaded yet)'}.
+          ; motes and fragments on hand from the Merge planner{stock ? '' : ' (not loaded yet)'}.
           {unknown > 0 && ` ${unknown} worn item${unknown === 1 ? ' is' : 's are'} not on the wiki, so ${unknown === 1 ? 'it is' : 'they are'} left out.`}
           {maxed > 0 && ` ${maxed} ${maxed === 1 ? 'is' : 'are'} at +10 already.`}
         </p>
@@ -186,8 +194,8 @@ export function MergeTab({
                 <th className="num" title="In the finder's score, with the role's weights">
                   Gain
                 </th>
-                <th title="The motes the step takes, and how many you could make">Motes</th>
-                <th className="num" title="Those motes' combine value, in Infinitesimal motes">
+                <th title="What the step takes from what you have, cheapest first; or the motes it would take">Motes</th>
+                <th className="num" title="Their combine value, in Infinitesimal motes; a fragment counts for what it gives a spell">
                   Value (Infinitesimal)
                 </th>
                 <th className="num" title="Gain per 100 Infinitesimal motes' worth">
@@ -219,16 +227,24 @@ export function MergeTab({
                   </td>
                   <td className="mono num">{num1(o.gain)}</td>
                   <td className="small">
-                    <Tip
-                      className={`chip ${o.affordable ? 'ok' : 'warn'}`}
-                      text={`${o.motes} ${moteName(o.mote, o.motes)}: ${o.need} xp. You have ${num(o.held)}${o.canMake > o.held ? `; combining your lower ranks makes ${num(o.canMake - o.held)} more, ${num(o.canMake)} in all` : ''}.`}
-                    >
-                      {o.motes} × {rankName(o.mote)}
-                    </Tip>
-                    <div className="faint">
-                      have {num(o.held)}
-                      {o.canMake > o.held && ` · +${num(o.canMake - o.held)} by combining`}
-                    </div>
+                    {o.uses ? (
+                      <Tip className="chip ok" text={`${o.need} xp, from what you have, the cheapest first (as the Merge planner spends it).`}>
+                        {o.uses.map((u) => `${u.n} × ${rankName(u.m)}${u.kind === 'fragment' ? ' fragment' : ''}`).join(' + ')}
+                      </Tip>
+                    ) : (
+                      <>
+                        <Tip
+                          className="chip warn"
+                          text={`${o.motes} ${moteName(o.mote, o.motes)}: ${o.need} xp. You have ${num(o.held)}${o.canMake > o.held ? `; combining your lower ranks makes ${num(o.canMake - o.held)} more, ${num(o.canMake)} in all` : ''}.`}
+                        >
+                          {o.motes} × {rankName(o.mote)}
+                        </Tip>
+                        <div className="faint">
+                          have {num(o.held)}
+                          {o.canMake > o.held && ` · +${num(o.canMake - o.held)} by combining`}
+                        </div>
+                      </>
+                    )}
                   </td>
                   <td className="mono num">{num(o.cost)}</td>
                   <td className="mono num">{num1(o.rate)}</td>

@@ -34,16 +34,31 @@ describe('the best merge next', () => {
 
   it('says what the stock can pay for, combining up from lower ranks', () => {
     const none = mergeOptions({ worn: inv.worn, baseStatsOf, weights, stock: { lesser: 1 } })
-    expect(none.map((o) => [o.item.name, o.canMake, o.affordable])).toEqual([
-      ['Good Ring', 0, false],
-      ['Plain Ring +2', 1, false]
+    // A Lesser mote works on anything below +3, so it pays for the +0 ring's step (at its own worth, 4).
+    expect(none.map((o) => [o.item.name, o.canMake, o.affordable, o.cost])).toEqual([
+      ['Good Ring', 0, true, 4],
+      ['Plain Ring +2', 1, false, 8]
     ])
+    expect(none[0].uses).toEqual([{ kind: 'mote', m: 2, n: 1 }])
     // Four Minor make two Lesser.
     const some = mergeOptions({ worn: inv.worn, baseStatsOf, weights, stock: { minor: 4 } })
     expect(some.find((o) => o.item.name === 'Plain Ring +2')).toMatchObject({ held: 0, canMake: 2, affordable: true })
     // Those on hand are told apart from those combining would make.
     const both = mergeOptions({ worn: inv.worn, baseStatsOf, weights, stock: { minor: 4, lesser: 1 } })
     expect(both.find((o) => o.item.name === 'Plain Ring +2')).toMatchObject({ held: 1, canMake: 3 })
+  })
+
+  it('spends fragments on hand and costs them at their spell worth', () => {
+    // A fragment works below its rank: a Lesser one (4 xp, worth 8) covers the +2 ring's 4 xp; a Minor one cannot.
+    const opts = mergeOptions({ worn: inv.worn, baseStatsOf, weights, fragments: { lesser: 1, minor: 5 } })
+    const plain = opts.find((o) => o.item.name === 'Plain Ring +2')!
+    expect(plain).toMatchObject({ affordable: true, cost: 8, rate: 25 })
+    expect(plain.uses).toEqual([{ kind: 'fragment', m: 2, n: 1 }])
+    // The +0 ring takes a Minor fragment's 3 xp for its 1 (worth 4): the only thing on hand that works there.
+    expect(opts.find((o) => o.item.name === 'Good Ring')).toMatchObject({ affordable: true, cost: 4, uses: [{ kind: 'fragment', m: 1, n: 1 }] })
+    // Kept for spells: the same step is costed by the motes it would take, and not covered.
+    const kept = mergeOptions({ worn: inv.worn, baseStatsOf, weights }).find((o) => o.item.name === 'Plain Ring +2')!
+    expect(kept).toMatchObject({ affordable: false, uses: null, cost: 8 })
   })
 
   it("counts xp already in the planned item's bar", () => {

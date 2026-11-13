@@ -161,6 +161,29 @@ export function moteValue(c: MoteCounts): number {
   return MOTE_RANKS.reduce((n, r, i) => n + (c[r.key] ?? 0) * moteWorth(i), 0)
 }
 
+/** The worth of some fragments, in Infinitesimal motes: what they give a spell, as with motes. */
+export function fragmentValue(c: MoteCounts): number {
+  return FRAGMENT_RANKS.reduce((n, r, i) => n + (c[r.key] ?? 0) * fragmentWorth(i), 0)
+}
+
+/** A haul's motes and fragments together, in Infinitesimal motes. */
+export function haulValue(motes: MoteCounts, fragments: MoteCounts = {}): number {
+  return moteValue(motes) + fragmentValue(fragments)
+}
+
+/** Adds one set of counts to another, in place. */
+export function addCounts(into: MoteCounts, from: MoteCounts): MoteCounts {
+  for (const r of MOTE_RANKS) if (from[r.key]) into[r.key] = (into[r.key] ?? 0) + from[r.key]!
+  return into
+}
+
+/** Every day's counts added up. */
+export function sumDays(days: Record<string, MoteCounts> | undefined): MoteCounts {
+  const out: MoteCounts = {}
+  for (const c of Object.values(days ?? {})) addCounts(out, c)
+  return out
+}
+
 export function moteName(rank: MoteKey): string {
   const r = MOTE_RANKS.find((x) => x.key === rank)!
   return r.name ? `Mote of ${r.name} Potential` : 'Mote of Potential'
@@ -177,6 +200,8 @@ export interface MoteState {
   sessions: MoteSession[]
   /** Motes looted per local day, "2026-09-24". */
   daily: Record<string, MoteCounts>
+  /** Fragments of Potential looted per local day, kept apart from the motes. */
+  dailyFragments?: Record<string, MoteCounts>
   /** The time of the last log line read, so a restart can catch up on what it missed. */
   seenUntil?: number
   /**
@@ -275,10 +300,9 @@ export class MoteTracker {
   }
 
   private onLoot(loot: MoteLoot, time: number): void {
-    if (!loot.fragment) {
-      const counts = (this.state.daily[localDay(time)] ??= {})
-      counts[loot.rank] = (counts[loot.rank] ?? 0) + loot.count
-    }
+    const days = loot.fragment ? (this.state.dailyFragments ??= {}) : this.state.daily
+    const counts = (days[localDay(time)] ??= {})
+    counts[loot.rank] = (counts[loot.rank] ?? 0) + loot.count
     // The reward chest is logged after the completion line; it belongs to the crawl just finished.
     const recent = this.lastEnded && time - this.lastEnded.at <= CHEST_GRACE_MS ? this.lastEnded.session : null
     const target = this.state.active ?? recent
@@ -407,12 +431,13 @@ export function sessionHours(s: MoteSession, now: number): number {
   return Math.max(0, end - s.startedAt - paused) / 3_600_000
 }
 
-/** A place's runs together (FEAT-035): how many, the hours in them, and the motes they dropped by rank. */
+/** A place's runs together (FEAT-035): how many, the hours in them, and the motes and fragments they dropped by rank. */
 export interface FarmPlace {
   name: string
   runs: number
   hours: number
   motes: MoteCounts
+  fragments: MoteCounts
 }
 
 /** Every place the runs were in, by name ("The Plane of Hate 4 (Refined)"), runs still open left out. */
@@ -420,10 +445,11 @@ export function farmPlaces(sessions: readonly MoteSession[], now: number): FarmP
   const by = new Map<string, FarmPlace>()
   for (const s of sessions) {
     if (s.endedAt === null || s.kind === 'manual') continue
-    const p = by.get(s.name) ?? { name: s.name, runs: 0, hours: 0, motes: {} }
+    const p = by.get(s.name) ?? { name: s.name, runs: 0, hours: 0, motes: {}, fragments: {} }
     p.runs++
     p.hours += sessionHours(s, now)
-    for (const [k, n] of Object.entries(s.motes) as [MoteKey, number][]) p.motes[k] = (p.motes[k] ?? 0) + n
+    addCounts(p.motes, s.motes)
+    addCounts(p.fragments, s.fragments ?? {})
     by.set(s.name, p)
   }
   return [...by.values()]

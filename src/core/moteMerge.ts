@@ -1,4 +1,4 @@
-import { applyMarks, MOTE_RANKS, type MoteCounts, type MoteSession, type MoteState, MoteTracker } from './motes'
+import { addCounts, applyMarks, type MoteCounts, type MoteSession, type MoteState, MoteTracker } from './motes'
 
 // Mote history is one record across characters: live tracking keeps whichever character's log is
 // being watched. A rebuild reads every character's logs, so its result is merged into what is kept
@@ -24,6 +24,8 @@ export interface MoteScanResult {
 export interface RebuiltMotes {
   sessions: MoteSession[]
   daily: Record<string, MoteCounts>
+  /** Fragments looted per day, as `daily`. */
+  dailyFragments: Record<string, MoteCounts>
   /** Days the logs read have any line on: for those days the logs' counts are the truth. */
   days: string[]
   active: MoteSession | null
@@ -36,18 +38,17 @@ export interface RebuiltMotes {
 export function combineScans(scan: MoteScanResult, watchedLog: string, gameRunning: boolean): RebuiltMotes {
   const sessions: MoteSession[] = []
   const daily: Record<string, MoteCounts> = {}
+  const dailyFragments: Record<string, MoteCounts> = {}
   let active: MoteSession | null = null
   for (const c of scan.characters) {
     const watched = samePath(c.logPath, watchedLog)
     const state = closeOpenRun(c, !(watched && gameRunning))
     sessions.push(...state.sessions)
     if (watched) active = state.active
-    for (const [day, counts] of Object.entries(state.daily)) {
-      const into = (daily[day] ??= {})
-      for (const r of MOTE_RANKS) if (counts[r.key]) into[r.key] = (into[r.key] ?? 0) + counts[r.key]!
-    }
+    for (const [day, counts] of Object.entries(state.daily)) addCounts((daily[day] ??= {}), counts)
+    for (const [day, counts] of Object.entries(state.dailyFragments ?? {})) addCounts((dailyFragments[day] ??= {}), counts)
   }
-  return { sessions, daily, days: scan.days, active }
+  return { sessions, daily, dailyFragments, days: scan.days, active }
 }
 
 function closeOpenRun(c: CharacterScan, close: boolean): MoteState {
@@ -72,14 +73,19 @@ export function mergeRebuilt(current: MoteState, rebuilt: RebuiltMotes): MoteSta
   const sessions = [...rebuilt.sessions, ...kept].sort((a, b) => b.startedAt - a.startedAt || a.id.localeCompare(b.id))
 
   const covered = new Set(rebuilt.days)
-  const daily: Record<string, MoteCounts> = {}
-  for (const [day, counts] of Object.entries(current.daily)) if (!covered.has(day)) daily[day] = counts
-  for (const [day, counts] of Object.entries(rebuilt.daily)) daily[day] = counts
+  const days = (kept: Record<string, MoteCounts> | undefined, read: Record<string, MoteCounts>) => {
+    const out: Record<string, MoteCounts> = {}
+    for (const [day, counts] of Object.entries(kept ?? {})) if (!covered.has(day)) out[day] = counts
+    for (const [day, counts] of Object.entries(read)) out[day] = counts
+    return out
+  }
+  const daily = days(current.daily, rebuilt.daily)
+  const dailyFragments = days(current.dailyFragments, rebuilt.dailyFragments)
 
   // A manual session is the player's own doing; it keeps running over the rebuilt history.
   const a = current.active
   const active = a?.kind === 'manual' ? a : (rebuilt.active ?? (a && !known(a) ? a : null))
-  return applyMarks({ ...current, active, sessions, daily })
+  return applyMarks({ ...current, active, sessions, daily, dailyFragments })
 }
 
 export function samePath(a: string, b: string): boolean {
@@ -98,18 +104,19 @@ export interface OtherMoteMark {
 }
 
 /**
- * Hands what another PC's log added over to the history kept here: its motes per day, and runs that
- * are over. A run already handed over (the same id) is not taken twice.
+ * Hands what another PC's log added over to the history kept here: its motes and fragments per day,
+ * and runs that are over. A run already handed over (the same id) is not taken twice.
  */
-export function absorbOther(current: MoteState, added: Record<string, MoteCounts>, runs: MoteSession[]): MoteState {
-  const daily = { ...current.daily }
-  for (const [day, counts] of Object.entries(added)) {
-    const into = { ...daily[day] }
-    for (const r of MOTE_RANKS) if (counts[r.key]) into[r.key] = (into[r.key] ?? 0) + counts[r.key]!
-    daily[day] = into
+export function absorbOther(current: MoteState, added: Record<string, MoteCounts>, runs: MoteSession[], addedFragments: Record<string, MoteCounts> = {}): MoteState {
+  const plus = (kept: Record<string, MoteCounts>, more: Record<string, MoteCounts>) => {
+    const out = { ...kept }
+    for (const [day, counts] of Object.entries(more)) out[day] = addCounts({ ...out[day] }, counts)
+    return out
   }
+  const daily = plus(current.daily, added)
+  const dailyFragments = Object.keys(addedFragments).length ? plus(current.dailyFragments ?? {}, addedFragments) : current.dailyFragments
   const known = new Set(current.sessions.map((s) => s.id))
   const fresh = runs.filter((s) => !known.has(s.id))
   const sessions = fresh.length ? [...fresh, ...current.sessions].sort((a, b) => b.startedAt - a.startedAt || a.id.localeCompare(b.id)) : current.sessions
-  return applyMarks({ ...current, daily, sessions })
+  return applyMarks({ ...current, daily, ...(dailyFragments ? { dailyFragments } : {}), sessions })
 }

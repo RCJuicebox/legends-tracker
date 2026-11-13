@@ -141,4 +141,11 @@ describe('absorbOther', () => {
     expect(next.sessions.map((x) => x.id)).toEqual(['b', 'a'])
     expect(kept.daily['2026-09-24']).toEqual({ major: 2 })
   })
+
+  it("adds another PC's fragments to their own days", () => {
+    const kept: MoteState = { active: null, sessions: [], daily: {}, dailyFragments: { '2026-11-12': { major: 1 } } }
+    const next = absorbOther(kept, {}, [], { '2026-11-12': { major: 2 }, '2026-11-13': { superior: 1 } })
+    expect(next.dailyFragments).toEqual({ '2026-11-12': { major: 3 }, '2026-11-13': { superior: 1 } })
+    expect(absorbOther(kept, {}, []).dailyFragments).toBe(kept.dailyFragments)
+  })
 })

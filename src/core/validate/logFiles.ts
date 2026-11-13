@@ -218,6 +218,11 @@ export function sanitizeMotes(v: unknown): MoteState | null {
     sessions: v.sessions.map(moteSession).filter((s): s is MoteSession => !!s),
     daily
   }
+  if (isObj(v.dailyFragments)) {
+    const frags: NonNullable<MoteState['dailyFragments']> = {}
+    for (const [day, counts] of Object.entries(v.dailyFragments)) if (/^\d{4}-\d{2}-\d{2}$/.test(day) && isObj(counts)) frags[day] = sanitizeFragmentCounts(counts)
+    out.dailyFragments = frags
+  }
   const seen = time(v.seenUntil)
   if (seen !== null) out.seenUntil = seen
   if (isObj(v.marks)) {

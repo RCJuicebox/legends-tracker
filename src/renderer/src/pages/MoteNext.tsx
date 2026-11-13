@@ -54,7 +54,15 @@ function Ranking({ view, sheet }: { view: InventoryView; sheet: CharacterSheet |
       const info = view.items[itemKey(item.name)]
       return info?.found ? parseStatsBlock(info.statsblock) : null
     }
-    const items = mergeOptions({ worn: view.inventory?.worn ?? [], baseStatsOf, weights: c.weights, hands: c.hands, stock: stock?.counts, planned: stock?.item })
+    const items = mergeOptions({
+      worn: view.inventory?.worn ?? [],
+      baseStatsOf,
+      weights: c.weights,
+      hands: c.hands,
+      stock: stock?.counts,
+      fragments: stock?.fragmentsOnItems === false ? undefined : stock?.fragments,
+      planned: stock?.item
+    })
     const data = spellsQ.data
     const mine = data?.mine ?? []
     const spellRows = mine.length ? (data?.rows ?? []).filter((r) => castableByMine(r, mine)) : (data?.rows ?? [])

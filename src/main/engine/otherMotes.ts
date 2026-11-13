@@ -4,7 +4,7 @@ import { localDay } from '../../core/dates'
 import { sameFile } from '../../core/fileIdentity'
 import { readLines } from '../../core/logReading'
 import { absorbOther, type CharacterScan, type OtherMoteMark } from '../../core/moteMerge'
-import { MOTE_RANKS, MoteTracker, type MoteCounts, type MoteSession, type MoteState } from '../../core/motes'
+import { addCounts, MoteTracker, sumDays, totalMotes, type MoteCounts, type MoteSession, type MoteState } from '../../core/motes'
 import { log } from '../log'
 import { identityOf } from '../sources/logHistory'
 import { otherArchiveDir } from '../logFolders'
@@ -41,7 +41,7 @@ export class OtherMotes {
   private readonly file: string
   private marks: Record<string, OtherMoteMark> | null = null
   /** Each log's tracker, kept between looks so a run's loose ends (a reward chest after the completion line) stay with it. */
-  private readonly trackers = new Map<string, { tracker: MoteTracker; added: Record<string, MoteCounts> }>()
+  private readonly trackers = new Map<string, { tracker: MoteTracker; added: Record<string, MoteCounts>; addedFragments: Record<string, MoteCounts> }>()
   private running: Promise<void> | null = null
 
   constructor(
@@ -71,13 +71,14 @@ export class OtherMotes {
     const looks = await this.folders!.lookAll()
     const marks = this.load()
     const added: Record<string, MoteCounts> = {}
+    const addedFragments: Record<string, MoteCounts> = {}
     const runs: MoteSession[] = []
     let moved = false
     for (const look of looks) {
       if (!look.reachable) continue
       for (const l of look.logs) {
         try {
-          moved = (await this.readOn(marks, l.path, now - l.modified > QUIET_MS, added, runs)) || moved
+          moved = (await this.readOn(marks, l.path, now - l.modified > QUIET_MS, added, addedFragments, runs)) || moved
         } catch (e) {
           // Its PC went away part way: this log's tracker starts again from its mark next time.
           this.trackers.delete(l.path.toLowerCase())
@@ -93,19 +94,27 @@ export class OtherMotes {
       return
     }
     this.save()
-    if (!Object.keys(added).length && !runs.length) return
+    if (!Object.keys(added).length && !Object.keys(addedFragments).length && !runs.length) return
     const motes = this.hooks.motes()
-    motes.state = absorbOther(motes.state, added, runs)
+    motes.state = absorbOther(motes.state, added, runs, addedFragments)
     this.hooks.changed(motes.state)
-    const n = Object.values(added).reduce((sum, c) => sum + MOTE_RANKS.reduce((m, r) => m + (c[r.key] ?? 0), 0), 0)
-    log.info(`Motes from other PCs: ${n} mote${n === 1 ? '' : 's'} and ${runs.length} run${runs.length === 1 ? '' : 's'} added`)
+    const n = totalMotes(sumDays(added))
+    const f = totalMotes(sumDays(addedFragments))
+    log.info(`Motes from other PCs: ${n} mote${n === 1 ? '' : 's'}${f ? `, ${f} fragment${f === 1 ? '' : 's'}` : ''} and ${runs.length} run${runs.length === 1 ? '' : 's'} added`)
   }
 
   /**
    * One log read on from its mark into its tracker; runs that are over and the motes it added go into
    * `added` and `runs`. Whether anything about it changed.
    */
-  private async readOn(marks: Record<string, OtherMoteMark>, path: string, quiet: boolean, added: Record<string, MoteCounts>, runs: MoteSession[]): Promise<boolean> {
+  private async readOn(
+    marks: Record<string, OtherMoteMark>,
+    path: string,
+    quiet: boolean,
+    added: Record<string, MoteCounts>,
+    addedFragments: Record<string, MoteCounts>,
+    runs: MoteSession[]
+  ): Promise<boolean> {
     const k = path.toLowerCase()
     const st = await fs.stat(path, { bigint: true }).catch(() => null)
     if (!st) return false
@@ -120,16 +129,15 @@ export class OtherMotes {
     let t = this.trackers.get(k)
     if (!t) {
       const counted: Record<string, MoteCounts> = {}
+      const countedFragments: Record<string, MoteCounts> = {}
       const tracker = new MoteTracker(structuredClone(mark.state), {
         onChange: () => {},
         onLoot: (loot, _run, time) => {
-          // The day counts are motes only; fragments stay with their run.
-          if (loot.fragment) return
-          const day = (counted[localDay(time)] ??= {})
+          const day = ((loot.fragment ? countedFragments : counted)[localDay(time)] ??= {})
           day[loot.rank] = (day[loot.rank] ?? 0) + loot.count
         }
       })
-      this.trackers.set(k, (t = { tracker, added: counted }))
+      this.trackers.set(k, (t = { tracker, added: counted, addedFragments: countedFragments }))
     }
     let changed = false
     if (size > mark.offset) {
@@ -159,9 +167,12 @@ export class OtherMotes {
       changed = true
     }
     for (const [day, counts] of Object.entries(t.added)) {
-      const into = (added[day] ??= {})
-      for (const r of MOTE_RANKS) if (counts[r.key]) into[r.key] = (into[r.key] ?? 0) + counts[r.key]!
+      addCounts((added[day] ??= {}), counts)
       delete t.added[day]
+    }
+    for (const [day, counts] of Object.entries(t.addedFragments)) {
+      addCounts((addedFragments[day] ??= {}), counts)
+      delete t.addedFragments[day]
     }
     mark.state = structuredClone(state)
     return changed
@@ -185,7 +196,14 @@ export class OtherMotes {
       }
       for (const l of look.logs) {
         const m = marks[l.path.toLowerCase()]
-        if (m) standIns.push({ logPath: l.path, stem: basename(l.path, '.txt'), state: { active: null, sessions: [], daily: m.state.daily }, lastTime: m.lastTime, end: 0 })
+        if (m)
+          standIns.push({
+            logPath: l.path,
+            stem: basename(l.path, '.txt'),
+            state: { active: null, sessions: [], daily: m.state.daily, dailyFragments: m.state.dailyFragments },
+            lastTime: m.lastTime,
+            end: 0
+          })
       }
     }
     return { logs, standIns }
@@ -199,7 +217,7 @@ export class OtherMotes {
       if (!st) continue
       const k = c.logPath.toLowerCase()
       // The rebuild closed any run still open, as of the log's last line.
-      marks[k] = { id: identityOf(st), offset: c.end, state: { active: null, sessions: [], daily: c.state.daily }, lastTime: c.lastTime }
+      marks[k] = { id: identityOf(st), offset: c.end, state: { active: null, sessions: [], daily: c.state.daily, dailyFragments: c.state.dailyFragments }, lastTime: c.lastTime }
       this.trackers.delete(k)
     }
     this.save()

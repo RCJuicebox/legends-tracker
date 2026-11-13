@@ -271,6 +271,11 @@ describe('mote history read back from disk', () => {
     expect(sanitizeMotes(v)).toEqual(v)
   })
 
+  it('keeps fragments by day, dropping bad days and the Infinite rank no fragment has', () => {
+    const v = sanitizeMotes({ active: null, sessions: [], daily: {}, dailyFragments: { '2026-11-12': { superior: 2, infinite: 1 }, later: { minor: 1 } } })
+    expect(v?.dailyFragments).toEqual({ '2026-11-12': { superior: 2 } })
+  })
+
   it('is rebuilt (null) when its outline is wrong, so the engine never ticks over a missing list', () => {
     for (const v of NOT_OBJECTS) expect(sanitizeMotes(v)).toBeNull()
     expect(sanitizeMotes({ sessions: null, daily: {} })).toBeNull()

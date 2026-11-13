@@ -1,5 +1,20 @@
 import { describe, expect, it } from 'vitest'
-import { applyMarks, bestFor, farmPlaces, markKey, MoteTracker, moteValue, parseMoteLoot, sessionHours, timeOnDay, totalMotes, type MoteSession } from '../../src/core/motes'
+import {
+  applyMarks,
+  bestFor,
+  farmPlaces,
+  fragmentValue,
+  haulValue,
+  markKey,
+  MoteTracker,
+  moteValue,
+  parseMoteLoot,
+  sessionHours,
+  sumDays,
+  timeOnDay,
+  totalMotes,
+  type MoteSession
+} from '../../src/core/motes'
 import { parseLogLine } from '../../src/core/logLine'
 
 function tracker() {
@@ -46,7 +61,7 @@ describe('parseMoteLoot', () => {
     expect(parseMoteLoot("You looted an Unicorn Horn Fragments from Equestrielle the Corrupted's corpse and sold it for 4 platinum.")).toBeNull()
   })
 
-  it("keeps a run's fragments apart from its motes and the day counts", () => {
+  it("keeps a run's fragments apart from its motes, and counts them by day on their own", () => {
     const { t, feed } = tracker()
     feed(`
       [Thu Nov 12 20:00:00 2026] You have entered The Plane of Fear 4 (Refined).
@@ -58,6 +73,15 @@ describe('parseMoteLoot', () => {
     expect(run.motes).toEqual({ major: 1 })
     expect(run.fragments).toEqual({ major: 3 })
     expect(Object.values(t.state.daily)).toEqual([{ major: 1 }])
+    expect(Object.values(t.state.dailyFragments!)).toEqual([{ major: 3 }])
+  })
+
+  it('values fragments at what they give a spell, twice the mote of their rank', () => {
+    expect(fragmentValue({ infinitesimal: 1, potential: 2, superior: 1 })).toBe(2 + 32 + 128)
+    expect(haulValue({ major: 1 }, { major: 3 })).toBe(16 + 96)
+    expect(haulValue({ major: 1 })).toBe(moteValue({ major: 1 }))
+    expect(sumDays({ a: { minor: 1 }, b: { minor: 2, grand: 1 } })).toEqual({ minor: 3, grand: 1 })
+    expect(sumDays(undefined)).toEqual({})
   })
 
   it('keeps a normal instance that dropped only fragments', () => {
@@ -248,6 +272,12 @@ describe('where to farm what you are short of (FEAT-035)', () => {
     motes,
     outsideSince: null,
     outsideMs: 0
+  })
+
+  it("adds up a place's fragments beside its motes", () => {
+    const withFragments = (s: MoteSession, fragments: Record<string, number>): MoteSession => ({ ...s, fragments })
+    const [p] = farmPlaces([withFragments(run('Hate', 1, { major: 1 }), { superior: 1 }), withFragments(run('Hate', 1, {}), { superior: 2, minor: 1 })], 0)
+    expect(p).toMatchObject({ motes: { major: 1 }, fragments: { superior: 3, minor: 1 } })
   })
 
   it("puts each place's runs together and ranks those that dropped a rank fastest, two runs or more", () => {

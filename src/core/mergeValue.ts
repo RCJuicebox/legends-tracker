@@ -1,16 +1,18 @@
 // Which worn item to merge next: the stat value each item's next +1 would add, against the motes it
 // costs, so the best boost per mote goes first.
 //
-// The next level of a +N item takes 2^N xp from motes of rank N+1 (Infinitesimal on +0 … Infinite on
-// +9), and two motes of a rank make one of the next, so a mote of rank index i is worth 2^i
-// Infinitesimal motes: the cost of a step is its mote count × that worth. The gain is the finder's
-// own score of the item's stats at +N+1 less at +N, with the same weights, so a Tank sees AC and
-// HP, a Caster mana and wisdom.
+// The next level of a +N item takes 2^N xp from motes of rank N+1 or higher (Infinitesimal on +0 …
+// Infinite on +9), and two motes of a rank make one of the next, so a mote of rank index i is worth
+// 2^i Infinitesimal motes, and a Fragment of Potential what it gives a spell. When the stock covers
+// the step, its cost is what the Merge planner would spend on it, cheapest first, fragments
+// included; when it does not, the motes of rank N+1 it would take. The gain is the finder's own
+// score of the item's stats at +N+1 less at +N, with the same weights, so a Tank sees AC and HP, a
+// Caster mana and wisdom.
 
 import { itemKey, mergeLevel, scaledStats, type InvItem, type ItemStats } from './inventory'
 import { round } from './format'
-import { countsToArray, makeable, MAX_LEVEL, moteForLevel } from './moteCalc'
-import { MOTE_RANKS, moteWorth, type MoteCounts } from './motes'
+import { countsToArray, makeable, MAX_LEVEL, moteForLevel, plan, type PlanUse } from './moteCalc'
+import { fragmentWorth, MOTE_RANKS, moteWorth, type MoteCounts } from './motes'
 import { score, statValues, weightsForSlot, type HandWeights, type WeightKey, type Weights } from './gearFinder'
 
 export interface MergeOption {
@@ -28,7 +30,9 @@ export interface MergeOption {
   mote: number
   /** How many of them. */
   motes: number
-  /** The combine value of those motes, in Infinitesimal motes. */
+  /** What the stock would spend on the step, cheapest first, when it covers it. */
+  uses: PlanUse[] | null
+  /** The combine value of what it takes, in Infinitesimal motes. */
   cost: number
   /** Gain per 100 Infinitesimal motes' worth: the number to sort by. */
   rate: number
@@ -48,6 +52,8 @@ export interface MergeInput {
   hands?: HandWeights | null
   /** Motes on hand, for what is affordable now. */
   stock?: MoteCounts
+  /** Fragments on hand to spend on items too; none when the planner keeps them for spells. */
+  fragments?: MoteCounts
   /** The planner's item, whose xp bar is partly filled. */
   planned?: { name: string; lvl: number; xp: number } | null
 }
@@ -116,7 +122,10 @@ export function mergeOptions(o: MergeInput): MergeOption[] {
     const inBar = o.planned && o.planned.name === item.name && o.planned.lvl === level ? o.planned.xp : 0
     const need = Math.max(1, 2 ** level - inBar)
     const motes = Math.ceil(need / MOTE_RANKS[mote].xp)
-    const cost = motes * moteWorth(mote)
+    // What the planner would spend from the stock, when the stock covers the step at all.
+    const p = plan({ name: item.name, lvl: level, xp: 2 ** level - need, to: level + 1 }, o.stock ?? {}, o.fragments ?? {})
+    const uses = p.covered ? p.steps[0].uses : null
+    const cost = uses ? uses.reduce((n, u) => n + u.n * (u.kind === 'fragment' ? fragmentWorth(u.m) : moteWorth(u.m)), 0) : motes * moteWorth(mote)
     const canMake = makeable(inv, mote)
     out.push({
       item,
@@ -127,11 +136,12 @@ export function mergeOptions(o: MergeInput): MergeOption[] {
       need,
       mote,
       motes,
+      uses,
       cost,
       rate: round((gain / cost) * 100, 2),
       held: inv[mote] ?? 0,
       canMake,
-      affordable: canMake >= motes
+      affordable: !!uses
     })
   }
   return out.sort((a, b) => b.rate - a.rate || b.gain - a.gain || a.cost - b.cost)
