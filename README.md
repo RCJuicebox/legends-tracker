@@ -530,11 +530,16 @@ The page's other three tabs spend the same stock:
   since it was written, the tab says so. **Only what your motes cover** hides the rest, and **Plan**
   sets an item up in the planner.
 - **Merge planner**: put in an item's level, the xp in its bar and the level you want, and it works
-  out which motes it takes, how many, and what to combine from your stock. Each mote works on one
-  item level, one below its rank (Greater on +5, Superior on +6), and two combine into one of the
-  next rank. The stock can be typed in, read off the game's currency window with Windows OCR
-  (**Read motes from screen**), and with **Add looted motes automatically** grows as motes drop.
-  **Done** takes the motes used off the stock and sets the item to its new level.
+  out which motes and fragments it takes, how many, and what to combine from your stock. A mote or
+  Fragment of Potential works on any item below its rank (a Superior on +0 to +6), and xp past a
+  level carries on into the next. Each level takes what in your stock gives its xp cheapest, counted
+  in what it would give a spell instead: the lowest mote rank that works, combined up from the ranks
+  below when you have none. Two motes combine into one of the next rank; fragments do not. Fragments
+  give an item 2, 3, 4, 6, 8, 12, 16, 24 and 32 xp by rank (Greater, Grand and Ascendant are
+  guesses until seen in game), and **Use fragments on items** keeps them for spells instead. The
+  stock can be typed in, read off the game's currency window with Windows OCR (**Read motes from
+  screen**, motes only), and with **Add looted motes automatically** grows as motes and fragments
+  drop. **Done** takes what was used off the stock and sets the item to its new level and xp.
 - **Spell upgrades**: below.
 
 ### Spell upgrades

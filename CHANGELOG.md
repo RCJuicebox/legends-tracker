@@ -2,7 +2,7 @@
 
 What changed in each version. The release workflow publishes a version's section as its release notes, and installed copies show them when an update arrives.
 
-## Unreleased
+## 2.24.0 (2026-11-13)
 
 - **Goals › Reincarnation (a new optional module).** Turn it on under Settings › Modules. **Progress** has a bar of three ranks for every class and race Reincarnation AA, read from your log as the game gives them, or set by clicking. **Planner** builds the trios and races you mean to reincarnate as: each class and race comes off the list once all three of its ranks are planned or done. Each class says whether it has Evasive or Defensive stance and whether it is a WIS or INT caster, and a trio warns when it mixes the two. **Copy** plans a trio again just under it. A trio comes off the plan when your log shows it reincarnated. The page also counts the Tokens of Reincarnation in your inventory export.
 
@@ -17,6 +17,12 @@ What changed in each version. The release workflow publishes a version's section
 - **Long buff timers round the way the game does.** Focus is now applied before the rank bonus, and its fraction of a tick is dropped. Most timers don't change. A few long buffs were one tick (6 seconds) long: Dexterity IV now reads 2:22:48, as its spell tooltip does, not 2:22:54.
 
 - **Motes are worth far more on spells.** On a spell a mote's xp doubles with each rank: Infinitesimal 1, Minor 2, Lesser 4, Potential 8, Major 16, up to Infinite 512, as the game's upgrade previews show. Motes › Spell upgrades and Best upgrade used the item values (Potential 4, Major 5 … Infinite 10), so they priced spell ranks far too high and said a stock covered far less than it does. xp past a rank carries on into the next one.
+
+- **Motes: Fragments of Potential.** The 11-12 patch's fragments, from reward chests and raid bosses, are counted as they drop, kept apart from your motes. The Merge planner has a table for them (with a switch to keep them off items), Spell upgrades and Best upgrade spend them after your motes, and each run on Motes › Runs shows the fragments it dropped. On a spell a fragment gives twice the mote of its rank: Infinitesimal 2 up to Ascendant 512. On an item it gives 2, 3, 4, 6, 8 for the first five ranks and 16 for Superior; Greater, Grand and Ascendant are guesses (12, 24, 32) until someone previews one. Fragments you had before this version are not counted: type them in on the Merge planner.
+
+- **Merge planner: motes work on any item below their rank.** Since the 11-12 patch a Major mote works on a +0 item, not only a +4 one, and xp past a level carries on into the next. The planner now works that way: each level takes what in your stock gives its xp cheapest, the lowest rank that works first, and **Done** keeps the xp carried past the last level.
+
+- **Plan › Slayer: Lady Vox and Lord Nagafen count toward Dragonbane as they die.** The overlay's Dragonbane count moves with each kill instead of waiting for your next export.
 
 ## 2.23.1 (2026-11-09)
 
