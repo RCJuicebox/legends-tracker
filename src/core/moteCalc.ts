@@ -10,6 +10,10 @@ import { FRAGMENT_RANKS, MOTE_RANKS, fragmentWorth, moteWorth, type MoteCounts }
 //   game hands back fragments the item cannot take any more.
 // - XP past a level carries on into the next ones (a preview went +0 → +3 1/8 in one fragment).
 // - Two motes of one rank combine into one of the next. Fragments do not combine.
+//
+// How the planner spends (Dan, 2026-11-13): motes first. A fragment gives a spell twice what it gives
+// an item at the low levels, and every bit of it counts there, so on an item it is spent only when no
+// mote can pay, and only one whose xp all lands before the level planned to: never one that goes past.
 
 export interface PlannedItem {
   name: string
@@ -181,13 +185,13 @@ const moteCost = (i: number) => moteWorth(i) / MOTE_RANKS[i].xp
 const fragmentCost = (i: number) => fragmentWorth(i) / FRAGMENT_RANKS[i].xp
 
 /**
- * The next thing to spend on a +t item: of everything that works at +t, the one whose item xp costs
- * least, counted in Infinitesimal motes' worth (what it would give a spell instead). That is the
- * lowest mote rank that works, made by combining lower motes when there is none on hand, before any
- * higher one. On a tie the lower rank goes first, since it stops working on the item sooner, and a
- * mote before a fragment.
+ * The next thing to spend on a +t item with `room` xp left before the planned level. Motes first: the
+ * one whose item xp costs least, counted in Infinitesimal motes' worth (what it would give a spell
+ * instead), which is the lowest rank that works, made by combining lower motes when there is none on
+ * hand, before any higher one. Only when no mote can pay, a fragment, the cheapest whose xp fits in
+ * `room`. On a tie the lower rank goes first, since it stops working on the item sooner.
  */
-function cheapest(inv: number[], frag: number[], t: number): { kind: 'mote' | 'fragment' | 'combine'; m: number } | null {
+function cheapest(inv: number[], frag: number[], t: number, room: number): { kind: 'mote' | 'fragment' | 'combine'; m: number } | null {
   let best: { kind: 'mote' | 'fragment' | 'combine'; m: number } | null = null
   let cost = Infinity
   const consider = (kind: 'mote' | 'fragment' | 'combine', m: number, c: number) => {
@@ -198,7 +202,8 @@ function cheapest(inv: number[], frag: number[], t: number): { kind: 'mote' | 'f
   }
   for (let i = t; i < MOTE_RANKS.length; i++) if (inv[i] > 0) consider('mote', i, moteCost(i))
   if (inv[t] === 0 && t > 0 && makeable(inv, t) > 0) consider('combine', t, moteCost(t))
-  for (let i = t; i < FRAGMENT_RANKS.length; i++) if (frag[i] > 0) consider('fragment', i, fragmentCost(i))
+  if (best) return best
+  for (let i = t; i < FRAGMENT_RANKS.length; i++) if (frag[i] > 0 && FRAGMENT_RANKS[i].xp <= room) consider('fragment', i, fragmentCost(i))
   return best
 }
 
@@ -209,9 +214,9 @@ function addUse(uses: PlanUse[], kind: PlanUse['kind'], m: number): void {
 }
 
 /**
- * Plans the item from its level up to `to` with the stock: level by level, the cheapest mote or
- * fragment that works there one at a time, xp past a level carrying on. Pass no fragments to plan
- * with motes alone.
+ * Plans the item from its level up to `to` with the stock: level by level, one at a time, the
+ * cheapest mote that works there, or when none can, a fragment that does not go past `to` (see
+ * cheapest); xp past a level carries on. Pass no fragments to plan with motes alone.
  */
 export function plan(item: PlannedItem, stock: MoteCounts, fragments: MoteCounts = {}): Plan {
   const inv = countsToArray(stock)
@@ -224,6 +229,8 @@ export function plan(item: PlannedItem, stock: MoteCounts, fragments: MoteCounts
   let after: number[] | null = null
   let afterFragments: number[] | null = null
   let doneTotal = total
+  // No fragment's xp may go past the level planned to.
+  const end = 2 ** item.to - 1
   for (let t = item.lvl; t < item.to; t++) {
     const base = 2 ** t - 1
     const top = 2 ** (t + 1) - 1
@@ -239,7 +246,7 @@ export function plan(item: PlannedItem, stock: MoteCounts, fragments: MoteCounts
       continue
     }
     while (total < top) {
-      const pick = cheapest(inv, frag, t)
+      const pick = cheapest(inv, frag, t, end - total)
       if (!pick) {
         st.short = Math.ceil((top - total) / MOTE_RANKS[t].xp)
         blocked = true

@@ -507,7 +507,9 @@ followed, and still spoken if that is on.
 
 One page for motes coming and going, in four tabs. **Runs** is the count: every mote you loot is counted from its loot line (`You looted 4 Mote of Major Potential from Reward Chest
 and stored it in your currency`), per day and per rank, with each rank's item-XP value from the mote
-guide (Infinitesimal 1 … Infinite 10).
+guide (Infinitesimal 1 … Infinite 10). Fragments of Potential are counted the same way, beside the
+motes, and every value on the page (today, the crawl average, by place, each run) adds them in at
+what they give a spell.
 
 Instance runs are timed for motes per hour. A run starts when you enter a tiered instance zone
 (`The Plane of Hate 4 (Refined)`, `Najena - Solo 4 (Refined)`, tiers Refined/Awakened/Adaptive/Fused).
@@ -526,15 +528,17 @@ On first launch, history is rebuilt from the character's log and its zipped arch
 The page's other three tabs spend the same stock:
 
 - **Best merge**: the next +1 of each item you wear, best stat boost per mote first, by the Gear
-  page's stat weights. What you wear is the inventory export; if you have looted or merged gear
+  page's stat weights. A step your stock covers costs what the Merge planner would spend on it,
+  fragments included. What you wear is the inventory export; if you have looted or merged gear
   since it was written, the tab says so. **Only what your motes cover** hides the rest, and **Plan**
   sets an item up in the planner.
 - **Merge planner**: put in an item's level, the xp in its bar and the level you want, and it works
   out which motes and fragments it takes, how many, and what to combine from your stock. A mote or
   Fragment of Potential works on any item below its rank (a Superior on +0 to +6), and xp past a
-  level carries on into the next. Each level takes what in your stock gives its xp cheapest, counted
-  in what it would give a spell instead: the lowest mote rank that works, combined up from the ranks
-  below when you have none. Two motes combine into one of the next rank; fragments do not. Fragments
+  level carries on into the next. Each level takes motes first, the one whose xp is cheapest counted
+  in what it would give a spell instead: the lowest rank that works, combined up from the ranks below
+  when you have none. Only when no mote can pay does it take a fragment, and never one whose xp would
+  go past the level planned to. Two motes combine into one of the next rank; fragments do not. Fragments
   give an item 2, 3, 4, 6, 8, 12, 16, 24 and 32 xp by rank (Greater, Grand and Ascendant are
   guesses until seen in game), and **Use fragments on items** keeps them for spells instead. The
   stock can be typed in, read off the game's currency window with Windows OCR (**Read motes from

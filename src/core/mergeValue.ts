@@ -4,8 +4,8 @@
 // The next level of a +N item takes 2^N xp from motes of rank N+1 or higher (Infinitesimal on +0 …
 // Infinite on +9), and two motes of a rank make one of the next, so a mote of rank index i is worth
 // 2^i Infinitesimal motes, and a Fragment of Potential what it gives a spell. When the stock covers
-// the step, its cost is what the Merge planner would spend on it, cheapest first, fragments
-// included; when it does not, the motes of rank N+1 it would take. The gain is the finder's own
+// the step, its cost is what the Merge planner would spend on it (motes first, then only a fragment
+// that does not go past +N+1); when it does not, the motes of rank N+1 it would take. The gain is the finder's own
 // score of the item's stats at +N+1 less at +N, with the same weights, so a Tank sees AC and HP, a
 // Caster mana and wisdom.
 

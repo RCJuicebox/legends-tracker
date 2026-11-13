@@ -202,6 +202,8 @@ export interface MoteState {
   daily: Record<string, MoteCounts>
   /** Fragments of Potential looted per local day, kept apart from the motes. */
   dailyFragments?: Record<string, MoteCounts>
+  /** Set once the logs have been read with fragments counted by day; a history kept before is read again once. */
+  fragmentsByDay?: true
   /** The time of the last log line read, so a restart can catch up on what it missed. */
   seenUntil?: number
   /**

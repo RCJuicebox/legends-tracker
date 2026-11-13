@@ -2,6 +2,14 @@
 
 What changed in each version. The release workflow publishes a version's section as its release notes, and installed copies show them when an update arrives.
 
+## Unreleased
+
+- **Motes › Runs counts fragments.** Today, Everything in your logs, the crawl average, By place and each run now count Fragments of Potential beside your motes, valued at what they give a spell (twice the mote of their rank). The first start of this version reads your logs again once, so fragments looted since the 11-12 patch show up on their days.
+
+- **Fragments are spent on items last, and never wasted.** The Merge planner now spends motes first, even where a fragment would be cheaper. It takes a fragment only when no mote can pay, and never one whose xp would go past the level you're planning to. A fragment gives a spell far more than an item, and on a spell all of its xp counts.
+
+- **Best merge and Best upgrade price fragments too.** An item's next level costs what the Merge planner would spend on it from your stock. That now includes fragments, and a higher mote that works on a lower item, so more of your items show as covered.
+
 ## 2.24.0 (2026-11-13)
 
 - **Goals › Reincarnation (a new optional module).** Turn it on under Settings › Modules. **Progress** has a bar of three ranks for every class and race Reincarnation AA, read from your log as the game gives them, or set by clicking. **Planner** builds the trios and races you mean to reincarnate as: each class and race comes off the list once all three of its ranks are planned or done. Each class says whether it has Evasive or Defensive stance and whether it is a WIS or INT caster, and a trio warns when it mixes the two. **Copy** plans a trio again just under it. A trio comes off the plan when your log shows it reincarnated. The page also counts the Tokens of Reincarnation in your inventory export.

@@ -324,7 +324,9 @@ export class Engine {
     }, 30_000)
     this.archives.resumeStaging().catch((e: unknown) => log.error('Finishing interrupted archives failed:', e))
     // Reading history starts the backlog before the tailer can give a line, so nothing slips between.
-    const history = this.store.motesFresh ? this.rebuildMoteHistory() : this.catchUpMotes()
+    // A history kept before fragments were counted by day is rebuilt once, so its days get them.
+    const rebuild = this.store.motesFresh || !this.motes.state.fragmentsByDay
+    const history = rebuild ? this.rebuildMoteHistory() : this.catchUpMotes()
     history.catch((e: unknown) => log.error('Reading mote history at startup failed:', e))
     // Then what other PCs' logs gained while this app was closed.
     void history.then(
@@ -333,7 +335,7 @@ export class Engine {
     )
     // Catching up reads the log's end on this thread; the meter's own read of it waits its turn. A
     // rebuild runs in a worker and is not waited for.
-    if (!this.store.motesFresh) this.startupRead = history.catch(() => undefined)
+    if (!rebuild) this.startupRead = history.catch(() => undefined)
     if (this.settings.autoStart && this.settings.logFile) await this.startWatching()
     this.emitStatus()
   }

@@ -85,7 +85,7 @@ export function mergeRebuilt(current: MoteState, rebuilt: RebuiltMotes): MoteSta
   // A manual session is the player's own doing; it keeps running over the rebuilt history.
   const a = current.active
   const active = a?.kind === 'manual' ? a : (rebuilt.active ?? (a && !known(a) ? a : null))
-  return applyMarks({ ...current, active, sessions, daily, dailyFragments })
+  return applyMarks({ ...current, active, sessions, daily, dailyFragments, fragmentsByDay: true })
 }
 
 export function samePath(a: string, b: string): boolean {

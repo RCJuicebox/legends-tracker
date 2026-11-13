@@ -70,7 +70,7 @@ describe('fragments in the stock', () => {
   })
 
   it('leaves fragments alone when they are switched off for items', () => {
-    const t = keeper({ name: '', lvl: 0, xp: 0, to: 1 })
+    const t = keeper({ name: '', lvl: 0, xp: 0, to: 2 })
     t.k.setFragments({ minor: 2 })
     t.k.setFragmentsOnItems(false)
     expect(t.k.applyPlan().fragments).toEqual({ minor: 2 })

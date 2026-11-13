@@ -54,8 +54,8 @@ describe('the best merge next', () => {
     const plain = opts.find((o) => o.item.name === 'Plain Ring +2')!
     expect(plain).toMatchObject({ affordable: true, cost: 8, rate: 25 })
     expect(plain.uses).toEqual([{ kind: 'fragment', m: 2, n: 1 }])
-    // The +0 ring takes a Minor fragment's 3 xp for its 1 (worth 4): the only thing on hand that works there.
-    expect(opts.find((o) => o.item.name === 'Good Ring')).toMatchObject({ affordable: true, cost: 4, uses: [{ kind: 'fragment', m: 1, n: 1 }] })
+    // The +0 ring needs 1 xp: a Minor fragment's 3 would go past it, so it is not spent there.
+    expect(opts.find((o) => o.item.name === 'Good Ring')).toMatchObject({ affordable: false, uses: null, cost: 1 })
     // Kept for spells: the same step is costed by the motes it would take, and not covered.
     const kept = mergeOptions({ worn: inv.worn, baseStatsOf, weights }).find((o) => o.item.name === 'Plain Ring +2')!
     expect(kept).toMatchObject({ affordable: false, uses: null, cost: 8 })

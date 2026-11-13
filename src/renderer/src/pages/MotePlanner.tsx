@@ -278,9 +278,10 @@ export function MotePlanner() {
           </div>
         )}
         <p className="faint small" style={{ margin: 0 }}>
-          A mote or fragment works on any item below its rank: a Superior (rank 7) on +0 to +6. XP past a level carries on into the next. Each level takes whatever in your stock
-          gives its xp cheapest, counted in what it would give a spell instead: that is the lowest mote rank that works, combined up from the ranks below when you have none. Two
-          motes combine into one of the next rank; fragments do not.
+          A mote or fragment works on any item below its rank: a Superior (rank 7) on +0 to +6. XP past a level carries on into the next. Each level takes motes first, the one
+          whose xp is cheapest counted in what it would give a spell instead: that is the lowest rank that works, combined up from the ranks below when you have none. Only when no
+          mote can pay does it take a fragment, and only one whose xp all lands before the level you plan to: a fragment gives a spell far more. Two motes combine into one of the
+          next rank; fragments do not.
         </p>
       </div>
 
@@ -379,7 +380,8 @@ export function MotePlanner() {
         </div>
         <p className="faint small" style={{ marginBottom: 0 }}>
           Fragments do not combine, and the game hands back any the item cannot take. Item xp marked ? is a guess (2, 3, 4, 6, 8, 12, 16, 24, 32 by rank) until one is previewed in
-          game. {useFragments ? 'The plan spends them where they are the cheapest xp.' : 'The plan leaves them for spells.'} Read from screen counts motes only.
+          game. {useFragments ? 'The plan spends them only once your motes run out, and never one that would go past the level you plan to.' : 'The plan leaves them for spells.'}{' '}
+          Read from screen counts motes only.
         </p>
       </div>
     </div>

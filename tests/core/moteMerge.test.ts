@@ -28,5 +28,7 @@ describe('a rebuild of the mote history', () => {
     const current: MoteState = { active: null, sessions: [], daily: {}, dailyFragments: { '2026-11-11': { major: 4 }, '2026-11-12': { major: 9 } } }
     const merged = mergeRebuilt(current, { sessions: [], daily: {}, dailyFragments: { '2026-11-12': { major: 1 } }, days: ['2026-11-12'], active: null })
     expect(merged.dailyFragments).toEqual({ '2026-11-11': { major: 4 }, '2026-11-12': { major: 1 } })
+    // A history from before fragments were counted by day is read again once; after a rebuild it is not.
+    expect(merged.fragmentsByDay).toBe(true)
   })
 })

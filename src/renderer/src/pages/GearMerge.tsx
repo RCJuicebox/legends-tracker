@@ -194,7 +194,7 @@ export function MergeTab({
                 <th className="num" title="In the finder's score, with the role's weights">
                   Gain
                 </th>
-                <th title="What the step takes from what you have, cheapest first; or the motes it would take">Motes</th>
+                <th title="What the step takes from what you have, motes first; or the motes it would take">Motes</th>
                 <th className="num" title="Their combine value, in Infinitesimal motes; a fragment counts for what it gives a spell">
                   Value (Infinitesimal)
                 </th>
@@ -228,7 +228,10 @@ export function MergeTab({
                   <td className="mono num">{num1(o.gain)}</td>
                   <td className="small">
                     {o.uses ? (
-                      <Tip className="chip ok" text={`${o.need} xp, from what you have, the cheapest first (as the Merge planner spends it).`}>
+                      <Tip
+                        className="chip ok"
+                        text={`${o.need} xp from what you have, as the Merge planner spends it: motes first, then a fragment that does not go past +${o.next}.`}
+                      >
                         {o.uses.map((u) => `${u.n} × ${rankName(u.m)}${u.kind === 'fragment' ? ' fragment' : ''}`).join(' + ')}
                       </Tip>
                     ) : (
