@@ -1,4 +1,4 @@
-import { MOTE_RANKS, type MoteLoot } from './motes'
+import { FRAGMENT_RANKS, MOTE_RANKS, type MoteLoot } from './motes'
 import { itemKey, mergeLevel } from './inventory'
 import { StockCursor, fixItem, levelFromName, plan } from './moteCalc'
 import type { FeedItem, MoteStock } from '../shared/types'
@@ -34,12 +34,25 @@ export class MoteStockKeeper {
     if (!s.autoAdd) return
     this.cursor ??= new StockCursor(s.seenUntil ?? 0, s.seenAtSecond ?? 0)
     if (!this.cursor.accept(time)) return
+    const into = loot.fragment ? 'fragments' : 'counts'
+    const was = s[into] ?? {}
     this.save({
       ...s,
-      counts: { ...s.counts, [loot.rank]: (s.counts[loot.rank] ?? 0) + loot.count },
+      [into]: { ...was, [loot.rank]: (was[loot.rank] ?? 0) + loot.count },
       seenUntil: this.cursor.seenUntil,
       seenAtSecond: this.cursor.seenAtSecond
     })
+  }
+
+  setFragments(fragments: NonNullable<MoteStock['fragments']>): MoteStock {
+    return this.save({ ...this.cell.get(), fragments })
+  }
+
+  setFragmentsOnItems(on: boolean): MoteStock {
+    const s = { ...this.cell.get() }
+    if (on) delete s.fragmentsOnItems
+    else s.fragmentsOnItems = false
+    return this.save(s)
   }
 
   /**
@@ -86,15 +99,17 @@ export class MoteStockKeeper {
     return this.save({ ...s, item: fixItem({ name, lvl: level, xp: 0, to: Math.max(s.item.to, level + 1) }) })
   }
 
-  /** "Done": takes the planned motes off the stock and moves the item up to the level reached. */
+  /** "Done": takes the planned motes and fragments off the stock and moves the item up to where they take it. */
   applyPlan(): MoteStock {
     const s = this.cell.get()
-    const p = plan(fixItem(s.item), s.counts)
-    if (!p.covered || !p.after) return s
+    const p = plan(fixItem(s.item), s.counts, s.fragmentsOnItems === false ? {} : (s.fragments ?? {}))
+    if (!p.covered || !p.after || !p.afterFragments) return s
     const counts = { ...s.counts }
     MOTE_RANKS.forEach((r, i) => (counts[r.key] = p.after![i]))
+    const fragments = { ...s.fragments }
+    if (s.fragmentsOnItems !== false) FRAGMENT_RANKS.forEach((r, i) => (fragments[r.key] = p.afterFragments![i]))
     const name = levelFromName(s.item.name) !== null ? s.item.name.replace(/\+\d+\s*$/, `+${p.reached}`) : s.item.name
     this.feed('loot', `Upgraded ${name || 'the item'} to +${p.reached}.`)
-    return this.save({ ...s, counts, item: fixItem({ name, lvl: p.reached, xp: 0, to: Math.max(s.item.to, p.reached + 1) }) })
+    return this.save({ ...s, counts, fragments, item: fixItem({ name, lvl: p.reached, xp: p.xp, to: Math.max(s.item.to, p.reached + 1) }) })
   }
 }

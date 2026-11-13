@@ -1,6 +1,6 @@
 import { handle } from './handle'
 import { dropRates } from '../../core/loot'
-import { isCharacterKey, sanitizeStockCounts, sanitizeStockItem, stringsArg } from '../../core/validate'
+import { isCharacterKey, sanitizeFragmentCounts, sanitizeStockCounts, sanitizeStockItem, stringsArg } from '../../core/validate'
 import type { AppContext } from '../context'
 
 // What happens in play: the damage meter, loot, buffs, respawns, motes and the mote stock.
@@ -67,6 +67,8 @@ export function registerPlayIpc(ctx: AppContext): void {
     if (!item) throw new Error('Not an item to plan.')
     return engine.stock.setItem(item)
   })
+  handle('stock:fragments', (counts) => engine.stock.setFragments(sanitizeFragmentCounts(counts)))
+  handle('stock:fragmentsOnItems', (on) => engine.stock.setFragmentsOnItems(on === true))
   handle('stock:autoAdd', (on) => engine.stock.setAutoAdd(on === true))
   handle('stock:apply', () => engine.stock.applyPlan())
 }

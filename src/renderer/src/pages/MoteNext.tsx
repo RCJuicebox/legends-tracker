@@ -58,7 +58,7 @@ function Ranking({ view, sheet }: { view: InventoryView; sheet: CharacterSheet |
     const data = spellsQ.data
     const mine = data?.mine ?? []
     const spellRows = mine.length ? (data?.rows ?? []).filter((r) => castableByMine(r, mine)) : (data?.rows ?? [])
-    const spells = spellUpgradeOptions({ rows: spellRows, tierPct: tracking.tierDurationPct, weights: spellWeights, stock: stock?.counts })
+    const spells = spellUpgradeOptions({ rows: spellRows, tierPct: tracking.tierDurationPct, weights: spellWeights, stock: stock?.counts, fragments: stock?.fragments })
     const you = segQ.data?.entities['you']
     const shares = you ? spellShares(you.skills, (n) => spellBase(n)) : new Map<string, number>()
     return nextRanking(items, spells, { ratioWeight: c.weights.ratio, damageShare: (name) => shares.get(name.toLowerCase()) ?? null, weights: c.weights })

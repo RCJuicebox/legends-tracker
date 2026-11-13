@@ -25,6 +25,8 @@ export interface EngineOutputs {
   /** Progress of a mote history rebuild alone, without the history itself. */
   moteScan: (scan: MoteScan) => void
   stock: (stock: MoteStock) => void
+  /** A Windows notification. */
+  toast?: (title: string, body: string) => void
   combat: (snapshot: CombatSnapshot) => void
   loot: (snapshot: LootView) => void
   respawns: (view: RespawnView) => void
@@ -49,6 +51,11 @@ export interface EngineEnv {
   soundDirs: () => string[]
   /** Where the engine keeps its own files: catchup.json. */
   dataDir: string
+  /**
+   * Run from source, not an installed release: the player's own copy, where checks meant only for it
+   * run (a fragment rank whose item xp is still a guess, looted).
+   */
+  localBuild?: boolean
   /** Reads mote history in place of the worker thread; for tests. */
   scanMotes?: MoteScanner
   /** Other PCs' Logs folders (Settings › Log files), for the motes looted there. */

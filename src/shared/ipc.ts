@@ -441,6 +441,8 @@ export interface Invokes {
   'stock:get': () => MoteStock
   'stock:counts': (counts: MoteStock['counts']) => MoteStock
   'stock:item': (item: MoteStock['item']) => MoteStock
+  'stock:fragments': (fragments: MoteStock['counts']) => MoteStock
+  'stock:fragmentsOnItems': (on: boolean) => MoteStock
   'stock:autoAdd': (on: boolean) => MoteStock
   'stock:apply': () => MoteStock
   'stock:readScreen': () => MoteScreenRead
@@ -733,6 +735,8 @@ const INVOKE_CHANNELS: Record<InvokeChannel, true> = {
   'stock:get': true,
   'stock:counts': true,
   'stock:item': true,
+  'stock:fragments': true,
+  'stock:fragmentsOnItems': true,
   'stock:autoAdd': true,
   'stock:apply': true,
   'stock:readScreen': true,

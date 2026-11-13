@@ -6,7 +6,21 @@ import { act } from '../toast'
 import { useNow } from '../components/TimerBars'
 import { ConfirmButton, FilterBox, Icon, Info, Pending, ShowingSome, type Sort, sortRows, SortTh } from '../components/ui'
 import { useRemembered } from '../remember'
-import { MOTE_RANKS, farmPlaces, localDay, moteValue, moteWorth, pausedHours, sessionHours, timeOnDay, totalMotes, type MoteCounts, type MoteSession } from '../../../core/motes'
+import {
+  FRAGMENT_RANKS,
+  MOTE_RANKS,
+  farmPlaces,
+  fragmentSpellXp,
+  localDay,
+  moteValue,
+  moteWorth,
+  pausedHours,
+  sessionHours,
+  timeOnDay,
+  totalMotes,
+  type MoteCounts,
+  type MoteSession
+} from '../../../core/motes'
 import type { MoteScan, MoteView } from '../../../shared/ipc'
 
 type Scan = MoteScan
@@ -40,11 +54,21 @@ export function perHour(n: number, hours: number): string {
   return hours >= 1 / 60 ? num1(round(n / hours, 1)) : '—'
 }
 
-function RankChips({ counts }: { counts: MoteCounts }) {
+function RankChips({ counts, fragments = {} }: { counts: MoteCounts; fragments?: MoteCounts }) {
   const ranks = MOTE_RANKS.filter((r) => counts[r.key])
-  if (!ranks.length) return <span className="faint">none yet</span>
+  const frags = FRAGMENT_RANKS.filter((r) => fragments[r.key])
+  if (!ranks.length && !frags.length) return <span className="faint">none yet</span>
   return (
     <span className="row tight">
+      {frags.map((r) => (
+        <span
+          key={`f-${r.key}`}
+          className="chip buff"
+          title={`Fragments: ${fragmentSpellXp(FRAGMENT_RANKS.indexOf(r))} xp each on a spell, ${r.xp}${r.checked ? '' : ' (a guess)'} on an item`}
+        >
+          {fragments[r.key]} {r.name || 'Potential'} fragment{fragments[r.key] === 1 ? '' : 's'}
+        </span>
+      ))}
       {ranks.map((r) => (
         <span
           key={r.key}
@@ -296,7 +320,7 @@ function ActiveSession({ a }: { a: MoteSession | null | undefined }) {
               </span>
             </div>
           </div>
-          <RankChips counts={a.motes} />
+          <RankChips counts={a.motes} fragments={a.fragments} />
           <PauseControl s={a} now={now} />
         </div>
       ) : (
@@ -375,7 +399,7 @@ function SessionTable({ sessions, now }: { sessions: MoteSession[]; now: number 
                     <td>
                       <div style={{ fontWeight: 600 }}>{s.name}</div>
                       <div className="small">
-                        <RankChips counts={s.motes} />
+                        <RankChips counts={s.motes} fragments={s.fragments} />
                       </div>
                     </td>
                     <td>

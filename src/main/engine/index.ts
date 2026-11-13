@@ -8,7 +8,7 @@ import { SpellTracker } from '../../core/spellTracker'
 import type { QuickBuffLanding } from '../castHistory'
 import { TriggerEngine } from '../../core/triggers'
 import { respawnTriggerId } from '../../core/respawns'
-import { MoteTracker, moteName } from '../../core/motes'
+import { MoteTracker, fragmentChecked, fragmentName, moteName, type MoteKey } from '../../core/motes'
 import { PetGearReader, petSummonName } from '../../core/pets'
 import type { BuffView } from '../../core/buffs'
 import type { MyClass } from '../../core/spellMotes'
@@ -189,7 +189,9 @@ export class Engine {
       },
       onLoot: (loot, session, time) => {
         if (!this.simulating) this.stock.add(loot, time)
-        this.pushFeed('loot', `${loot.count > 1 ? `${loot.count} × ` : ''}${moteName(loot.rank)} from ${loot.source}${session ? '' : ' (no session running)'}`)
+        const name = loot.fragment ? fragmentName(loot.rank) : moteName(loot.rank)
+        this.pushFeed('loot', `${loot.count > 1 ? `${loot.count} × ` : ''}${name} from ${loot.source}${session ? '' : ' (no session running)'}`)
+        if (loot.fragment && !this.simulating) this.uncheckedFragment(loot.rank, time)
       },
       onSession: (s) => this.pushFeed('loot', s.kind === 'crawl' ? `Dungeon crawl completed: ${s.name}` : `${s.kind === 'manual' ? 'Session' : 'Normal instance'} ended: ${s.name}`)
     })
@@ -631,6 +633,24 @@ export class Engine {
       warned: false,
       graceMs: 0
     })
+  }
+
+  /**
+   * A fragment rank whose item xp is still a guess (Greater, Grand, Ascendant), just looted: said in
+   * the feed, on the overlay, aloud and as a Windows notification, so a preview of it on an item can
+   * settle the value. Only in a copy run from source (the player's own), never a release, and only
+   * for loot a moment ago, not a log read back.
+   */
+  private uncheckedFragment(rank: MoteKey, time: number): void {
+    if (!this.env.localBuild || fragmentChecked(rank) || Date.now() - time > 2 * 60_000) return
+    const name = fragmentName(rank)
+    const text = `Looted a ${name}: its item xp is still a guess. Preview it on a +0 item and note the tier and xp.`
+    this.pushFeed('warn', text)
+    this.notifier.notify([
+      { kind: 'text', text: `New fragment: ${name}`, color: '#ffd166', durationSec: 12 },
+      { kind: 'speak', text: `Unconfirmed fragment looted: ${name}.`, interrupt: false }
+    ])
+    this.out.toast?.(`Unconfirmed fragment: ${name}`, 'Preview it on a +0 item (and a rank 0 spell) and send the tier and xp it shows.')
   }
 
   /** Alerts, speech and sounds, as a trigger's would go: muting and the settings apply. */

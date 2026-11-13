@@ -20,6 +20,46 @@ export const MOTE_RANKS = [
 export type MoteKey = (typeof MOTE_RANKS)[number]['key']
 export type MoteCounts = Partial<Record<MoteKey, number>>
 
+/**
+ * Fragments of <Rank> Potential (2026-11-12 patch): reward-chest and raid-boss drops beside motes,
+ * nine ranks with no Infinite. `xp` is what one gives an item, read off the game's upgrade previews;
+ * `checked` is false where that is a guess from the pattern (Greater, Grand, Ascendant, not yet seen).
+ * On a spell a fragment gives 2^rank xp (fragmentSpellXp), twice the mote of its rank. A fragment of
+ * rank R works on an item below +R, and they do not combine.
+ */
+export const FRAGMENT_RANKS = [
+  { key: 'infinitesimal', name: 'Infinitesimal', xp: 2, checked: true },
+  { key: 'minor', name: 'Minor', xp: 3, checked: true },
+  { key: 'lesser', name: 'Lesser', xp: 4, checked: true },
+  { key: 'potential', name: '', xp: 6, checked: true },
+  { key: 'major', name: 'Major', xp: 8, checked: true },
+  { key: 'greater', name: 'Greater', xp: 12, checked: false },
+  { key: 'superior', name: 'Superior', xp: 16, checked: true },
+  { key: 'grand', name: 'Grand', xp: 24, checked: false },
+  { key: 'ascendant', name: 'Ascendant', xp: 32, checked: false }
+] as const
+
+/** A fragment's xp on a spell, by rank index: Infinitesimal 2, Potential 16, Superior 128. */
+export function fragmentSpellXp(index: number): number {
+  return 2 ** (index + 1)
+}
+
+/** What a fragment is worth in Infinitesimal motes: its xp on a spell, as a mote's worth is. */
+export function fragmentWorth(index: number): number {
+  return fragmentSpellXp(index)
+}
+
+export function fragmentName(rank: MoteKey, count = 1): string {
+  const r = FRAGMENT_RANKS.find((x) => x.key === rank)
+  const of = r?.name ? `${r.name} Potential` : 'Potential'
+  return `${count === 1 ? 'Fragment' : 'Fragments'} of ${of}`
+}
+
+/** Whether a fragment's item xp has been seen in game, not guessed. */
+export function fragmentChecked(rank: MoteKey): boolean {
+  return FRAGMENT_RANKS.some((r) => r.key === rank && r.checked)
+}
+
 export type SessionOutcome = 'active' | 'completed' | 'abandoned' | 'stopped' | 'game closed'
 
 export interface MoteSession {
@@ -38,6 +78,8 @@ export interface MoteSession {
   endedAt: number | null
   outcome: SessionOutcome
   motes: MoteCounts
+  /** Fragments of Potential looted in the run, by rank, kept apart from the motes. */
+  fragments?: MoteCounts
   /** While a crawl is open but you are outside its instance (banking), when you left. */
   outsideSince: number | null
   /** Time spent outside the instance, so in-dungeon time can be shown too. */
@@ -52,12 +94,16 @@ export interface MoteLoot {
   rank: MoteKey
   count: number
   source: string
+  /** A Fragment of Potential, not a mote. */
+  fragment?: true
 }
 
 // "You looted a Mote of Major Potential from a turmoil toad's corpse and stored it in your currency"
 // "You looted 4 Mote of Major Potential from Reward Chest and stored it in your currency"
 // "You looted a Mote of Potential from …" — the unnamed rank.
-const RE_LOOT = /^(?:--)?You (?:have )?looted (a|an|\d+) Motes? of (?:(\w+) )?Potential from (.+?)(?: and stored it in your currency|\.--|\.)?$/
+// "You looted 4 Fragment of Major Potential from Reward Chest and stored it in your currency"
+// "--You have looted a Fragment of Superior Potential from Lady Vox's corpse.--"
+const RE_LOOT = /^(?:--)?You (?:have )?looted (a|an|\d+) (Mote|Fragment)s? of (?:(\w+) )?Potential from (.+?)(?: and stored it in your currency|\.--|\.)?$/
 // "You have entered The Plane of Fear 4 (Refined)." / "… Nagafen's Lair - Solo 4 (Refined)."
 const RE_INSTANCE = /^(.+?)(?: - (?:Solo|Group))? (\d+) \((\w+)\)$/
 const RE_CREATING = /^Player .+ creating instance .+ \d+\.$/
@@ -71,10 +117,11 @@ const CHEST_GRACE_MS = 15_000
 export function parseMoteLoot(text: string): MoteLoot | null {
   const m = RE_LOOT.exec(text)
   if (!m) return null
-  const rank = (m[2] ? m[2].toLowerCase() : 'potential') as MoteKey
-  if (!MOTE_RANKS.some((r) => r.key === rank)) return null
+  const fragment = m[2] === 'Fragment'
+  const rank = (m[3] ? m[3].toLowerCase() : 'potential') as MoteKey
+  if (!(fragment ? FRAGMENT_RANKS : MOTE_RANKS).some((r) => r.key === rank)) return null
   const count = /^\d+$/.test(m[1]) ? Number(m[1]) : 1
-  return { rank, count, source: m[3].replace(/'s corpse$/, '') }
+  return { rank, count, source: m[4].replace(/'s corpse$/, ''), ...(fragment ? { fragment: true as const } : {}) }
 }
 
 function isCrawlInstance(zone: string): boolean {
@@ -228,13 +275,17 @@ export class MoteTracker {
   }
 
   private onLoot(loot: MoteLoot, time: number): void {
-    const day = localDay(time)
-    const counts = (this.state.daily[day] ??= {})
-    counts[loot.rank] = (counts[loot.rank] ?? 0) + loot.count
+    if (!loot.fragment) {
+      const counts = (this.state.daily[localDay(time)] ??= {})
+      counts[loot.rank] = (counts[loot.rank] ?? 0) + loot.count
+    }
     // The reward chest is logged after the completion line; it belongs to the crawl just finished.
     const recent = this.lastEnded && time - this.lastEnded.at <= CHEST_GRACE_MS ? this.lastEnded.session : null
     const target = this.state.active ?? recent
-    if (target) target.motes[loot.rank] = (target.motes[loot.rank] ?? 0) + loot.count
+    if (target) {
+      const into = loot.fragment ? (target.fragments ??= {}) : target.motes
+      into[loot.rank] = (into[loot.rank] ?? 0) + loot.count
+    }
     this.hooks.onLoot?.(loot, target, time)
     this.hooks.onChange()
   }
@@ -274,7 +325,7 @@ export class MoteTracker {
     this.state.active = null
     this.lastEnded = { session: s, at: time }
     // An instance visit that never completed and found no motes is not worth a row.
-    if (s.kind === 'instance' && totalMotes(s.motes) === 0) {
+    if (s.kind === 'instance' && totalMotes(s.motes) + totalMotes(s.fragments ?? {}) === 0) {
       this.hooks.onChange()
       return
     }

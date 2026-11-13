@@ -1,6 +1,6 @@
 import { type MoteStock, type SpellRule } from '../../shared/types'
 import { SPOT_WITHIN, type RespawnRecords, type RespawnTimerSpec, type SpawnLink, type SpawnSpot } from '../respawns'
-import { MOTE_RANKS, type MoteSession, type MoteState } from '../motes'
+import { FRAGMENT_RANKS, MOTE_RANKS, type MoteSession, type MoteState } from '../motes'
 import type { ActiveBuff, BuffsFile, Person } from '../buffs'
 import { DAY } from './triggers'
 import { bool, num, numbers, oneOf, str } from './settings'
@@ -146,6 +146,14 @@ export function sanitizeStockCounts(v: unknown): MoteStock['counts'] {
   return out
 }
 
+/** Fragments on hand as the planner sends them: the nine fragment ranks only, whole numbers from 0. */
+export function sanitizeFragmentCounts(v: unknown): MoteStock['counts'] {
+  const out: MoteStock['counts'] = {}
+  if (!isObj(v)) return out
+  for (const { key } of FRAGMENT_RANKS) if (typeof v[key] === 'number' && Number.isFinite(v[key])) out[key] = Math.round(num(v[key], 0, 0, 1e9))
+  return out
+}
+
 /** The item being planned; null when it is not an object. */
 export function sanitizeStockItem(v: unknown): MoteStock['item'] | null {
   if (!isObj(v)) return null
@@ -160,6 +168,8 @@ export function sanitizeMoteStock(v: unknown): MoteStock {
     item: sanitizeStockItem(o.item) ?? { name: '', lvl: 0, xp: 0, to: 1 },
     autoAdd: bool(o.autoAdd, true)
   }
+  if (isObj(o.fragments)) out.fragments = sanitizeFragmentCounts(o.fragments)
+  if (o.fragmentsOnItems === false) out.fragmentsOnItems = false
   if (typeof o.seenUntil === 'number' && Number.isFinite(o.seenUntil)) out.seenUntil = o.seenUntil
   if (typeof o.seenAtSecond === 'number' && Number.isFinite(o.seenAtSecond)) out.seenAtSecond = Math.max(0, Math.round(o.seenAtSecond))
   if (Array.isArray(o.merges))
@@ -187,6 +197,7 @@ export function moteSession(v: unknown): MoteSession | null {
     outsideSince: time(v.outsideSince),
     outsideMs: num(v.outsideMs, 0, 0, 1e12)
   }
+  if (isObj(v.fragments)) s.fragments = sanitizeFragmentCounts(v.fragments)
   if (v.byHand === true) s.byHand = true
   if ('pausedSince' in v) s.pausedSince = time(v.pausedSince)
   if ('pausedMs' in v) s.pausedMs = num(v.pausedMs, 0, 0, 1e12)

@@ -40,7 +40,7 @@ const HOW =
   'table for its category, plus −2% recovery and reuse for every spell. A point is one cast made one percent better, weighed as set above, so a rank’s ' +
   'worth is casts × points per cast. A spell at rank N needs 2^N xp for the next rank, and on a spell a mote’s xp doubles with each rank ' +
   '(Infinitesimal 1, Minor 2, Lesser 4, Potential 8, Major 16 … Infinite 512, its combine value), whatever the spell’s rank: there is no tier limit as on items. ' +
-  'Worth per xp is what to sort by. Pay with lists motes from your stock for the step, lowest rank first; xp over carries on into the next rank.'
+  'Worth per xp is what to sort by. Pay with lists motes from your stock for the step, lowest rank first, then Fragments of Potential (twice their rank’s mote on a spell: Infinitesimal 2 … Ascendant 512); xp over carries on into the next rank.'
 
 /** The guide's per-rank line for a section. */
 function sectionNote(key: SectionKey, tierPct: Record<string, number>): string {
@@ -73,8 +73,10 @@ function Parts({ o }: { o: SpellUpgradeOption }) {
 function PayWith({ o }: { o: SpellUpgradeOption }) {
   if (o.maxed) return <span className="chip">rank X: done</span>
   const s = o.spend
-  const list = s.motes.map((m) => `${m.n} ${short(m.m)}`).join(' + ')
-  const title = s.short ? `${s.short} xp short of ${o.need}` : `${s.xp} xp from motes worth ${num(s.worth)} Infinitesimal${s.over ? `; ${s.over} xp over, carried on` : ''}`
+  const list = s.motes.map((m) => `${m.n} ${short(m.m)}${m.fragment ? ' fragment' + (m.n === 1 ? '' : 's') : ''}`).join(' + ')
+  const title = s.short
+    ? `${s.short} xp short of ${o.need}`
+    : `${s.xp} xp from motes and fragments worth ${num(s.worth)} Infinitesimal${s.over ? `; ${s.over} xp over, carried on` : ''}`
   return (
     <>
       <span className={`chip ${s.short ? 'warn' : 'ok'}`} title={title}>
@@ -112,17 +114,18 @@ export function MoteSpells({ go }: { go?: Go }) {
   const q = useInvoke('motes:spellCasts', [characterKey, days], [characterKey, days, spellsLoaded])
   const stockQ = useStock()
   const stock = stockQ.data?.counts
+  const fragments = stockQ.data?.fragments
 
   const data = q.data
   const mine = useMemo(() => data?.mine ?? [], [data])
   const options = useMemo(() => {
     // Legends characters change classes: "your classes" is what /who last said, so a spell from a class you left is left out.
     const rows = whose === 'mine' && mine.length ? (data?.rows ?? []).filter((r) => castableByMine(r, mine)) : (data?.rows ?? [])
-    const all = spellUpgradeOptions({ rows, tierPct, weights, stock })
+    const all = spellUpgradeOptions({ rows, tierPct, weights, stock, fragments })
     if (sortBy === 'worth') return [...all].sort((a, b) => Number(a.maxed) - Number(b.maxed) || b.worth - a.worth || a.need - b.need)
     if (sortBy === 'casts') return [...all].sort((a, b) => Number(a.maxed) - Number(b.maxed) || b.row.casts - a.row.casts)
     return all
-  }, [data, tierPct, weights, stock, sortBy, whose, mine])
+  }, [data, tierPct, weights, stock, fragments, sortBy, whose, mine])
 
   // Main answers null without the spell file, which reads the same here as no answer yet: the
   // watch status says which it is (LT-343).
@@ -143,7 +146,7 @@ export function MoteSpells({ go }: { go?: Go }) {
   const shown = kept.filter((o) => section === 'all' || o.section === section)
   const maxed = options.filter((o) => o.maxed).length
   const ignoredCount = options.filter(isIgnored).length
-  const xp = stock ? stockXp(stock) : 0
+  const xp = stock ? stockXp(stock, fragments) : 0
   const w = q.data.window
   const unknown = q.data.unknown
 
@@ -211,9 +214,9 @@ export function MoteSpells({ go }: { go?: Go }) {
               {w && w.total > 0
                 ? `${num(w.total)} casts from ${w.from} to ${w.to}, ${options.length} spell${options.length === 1 ? '' : 's'}${maxed ? `, ${maxed} at rank X already` : ''}${ignoredCount ? `, ${ignoredCount} ignored` : ''}.`
                 : 'No casts in your log for this window.'}{' '}
-              {stock ? `Your motes are worth ${num(xp)} xp on spells.` : 'Motes on hand are not loaded yet, so nothing is marked affordable.'} On a spell every mote gives its
-              combine value in xp (a Superior 64), where on an item it only works at its own tier for a few xp. Every rank also takes −{UNIVERSAL.recovery}% recovery, −
-              {UNIVERSAL.reuse}% reuse and −{UNIVERSAL.resist} off the resist modifier of resistable spells. The duration a rank adds is{' '}
+              {stock ? `Your motes and fragments are worth ${num(xp)} xp on spells.` : 'Motes on hand are not loaded yet, so nothing is marked affordable.'} On a spell every mote
+              gives its combine value in xp (a Superior 64), where on an item it gives a few xp, below its own rank only. A fragment gives twice its rank's mote. Every rank also
+              takes −{UNIVERSAL.recovery}% recovery, −{UNIVERSAL.reuse}% reuse and −{UNIVERSAL.resist} off the resist modifier of resistable spells. The duration a rank adds is{' '}
               {go ? (
                 <button className="link-button inline" onClick={() => go('spells')}>
                   Spell Timers' Rank bonuses

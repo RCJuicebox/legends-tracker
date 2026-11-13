@@ -25,6 +25,51 @@ describe('parseMoteLoot', () => {
     expect(parseMoteLoot("You looted a Mote of Potential from a scareling's corpse and stored it in your currency")?.rank).toBe('potential')
     expect(parseMoteLoot("You looted a Puma Skin from a snow leopard's corpse and stored it in your tradeskill depot")).toBeNull()
   })
+
+  it('reads Fragments of Potential as fragments, from chests and raid bosses (2026-11-12)', () => {
+    expect(parseMoteLoot('You looted 4 Fragment of Major Potential from Reward Chest and stored it in your currency')).toEqual({
+      rank: 'major',
+      count: 4,
+      source: 'Reward Chest',
+      fragment: true
+    })
+    expect(parseMoteLoot("--You have looted a Fragment of Superior Potential from Lady Vox's corpse.--")).toEqual({
+      rank: 'superior',
+      count: 1,
+      source: 'Lady Vox',
+      fragment: true
+    })
+    expect(parseMoteLoot("--You have looted a Fragment of Potential from Lord Nagafen's corpse.--")?.rank).toBe('potential')
+    expect(parseMoteLoot('--You have looted 4 Fragment of Minor Potential from Reward Chest.--')).toMatchObject({ rank: 'minor', count: 4, fragment: true })
+    // There is no Fragment of Infinite Potential, nor any bone fragment.
+    expect(parseMoteLoot('You looted a Fragment of Infinite Potential from Reward Chest and stored it in your currency')).toBeNull()
+    expect(parseMoteLoot("You looted an Unicorn Horn Fragments from Equestrielle the Corrupted's corpse and sold it for 4 platinum.")).toBeNull()
+  })
+
+  it("keeps a run's fragments apart from its motes and the day counts", () => {
+    const { t, feed } = tracker()
+    feed(`
+      [Thu Nov 12 20:00:00 2026] You have entered The Plane of Fear 4 (Refined).
+      [Thu Nov 12 20:10:00 2026] You looted a Mote of Major Potential from a boogeyman's corpse and stored it in your currency
+      [Thu Nov 12 20:20:00 2026] You have completed the Dungeon Crawl and earned reward loot!
+      [Thu Nov 12 20:20:00 2026] You looted 3 Fragment of Major Potential from Reward Chest and stored it in your currency
+    `)
+    const [run] = t.state.sessions
+    expect(run.motes).toEqual({ major: 1 })
+    expect(run.fragments).toEqual({ major: 3 })
+    expect(Object.values(t.state.daily)).toEqual([{ major: 1 }])
+  })
+
+  it('keeps a normal instance that dropped only fragments', () => {
+    const { t, feed } = tracker()
+    feed(`
+      [Thu Nov 12 20:00:00 2026] You have entered Nagafen's Lair - Group 4 (Refined).
+      [Thu Nov 12 20:10:00 2026] --You have looted a Fragment of Potential from Lord Nagafen's corpse.--
+      [Thu Nov 12 20:15:00 2026] You have entered Lavastorm Mountains.
+    `)
+    t.tick(Date.UTC(2027, 0, 1))
+    expect(t.state.sessions.map((s) => s.fragments)).toEqual([{ potential: 1 }])
+  })
 })
 
 // Kelwyn's crawl of 2026-09-24, from the real log (lines trimmed to the ones that matter).

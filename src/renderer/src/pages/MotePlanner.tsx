@@ -4,14 +4,22 @@ import { useDebounced, useInvoke } from '../hooks'
 import { showError } from '../toast'
 import { ConfirmButton, Pending, Switch } from '../components/ui'
 import { numExact as num } from '../../../core/format'
-import { bestFor, farmPlaces, MOTE_RANKS } from '../../../core/motes'
-import { countsToArray, fixItem, levelFromName, makeable, plan, MAX_LEVEL } from '../../../core/moteCalc'
+import { bestFor, farmPlaces, FRAGMENT_RANKS, fragmentName, fragmentSpellXp, MOTE_RANKS } from '../../../core/motes'
+import { countsToArray, fixItem, levelFromName, makeable, plan, MAX_LEVEL, type PlanUse } from '../../../core/moteCalc'
 import type { MoteStock } from '../../../shared/types'
 import type { Invokes } from '../../../shared/ipc'
 import type { MoteScreenRead } from '../../../shared/ipc'
 
 const short = (i: number) => MOTE_RANKS[i].name || 'Potential'
 const long = (i: number, n: number) => `${n === 1 ? 'Mote' : 'Motes'} of ${MOTE_RANKS[i].name ? MOTE_RANKS[i].name + ' ' : ''}Potential`
+const fragLong = (i: number, n: number) => fragmentName(FRAGMENT_RANKS[i].key, n)
+
+/** "3 × Motes of Major Potential at 5 xp each", "1 × Fragment of Grand Potential at 24 xp each (a guess …)". */
+function spendLine(u: PlanUse): string {
+  if (u.kind === 'mote') return `${num(u.n)} × ${long(u.m, u.n)} at ${MOTE_RANKS[u.m].xp} xp each`
+  const r = FRAGMENT_RANKS[u.m]
+  return `${num(u.n)} × ${fragLong(u.m, u.n)} at ${r.xp} xp each${r.checked ? '' : ' (a guess: not seen in game yet)'}`
+}
 
 export function useStock() {
   const q = useInvoke('stock:get')
@@ -24,7 +32,7 @@ export function useStock() {
 /** How long typing in the planner waits before it is written. */
 const SAVE_MS = 400
 
-type StockWrite = 'stock:counts' | 'stock:item' | 'stock:autoAdd' | 'stock:apply'
+type StockWrite = 'stock:counts' | 'stock:fragments' | 'stock:fragmentsOnItems' | 'stock:item' | 'stock:autoAdd' | 'stock:apply'
 
 async function writeStock<K extends StockWrite>(set: (s: MoteStock) => void, channel: K, ...args: Parameters<Invokes[K]>): Promise<void> {
   try {
@@ -140,10 +148,12 @@ export function MotePlanner() {
   // Typed values are kept as text while editing, so a field can be cleared and retyped.
   const [draft, setDraft] = useState<Record<string, string>>({})
   const item = useMemo(() => fixItem(stock?.item ?? {}), [stock?.item])
-  const result = useMemo(() => (stock ? plan(item, stock.counts) : null), [item, stock])
+  const useFragments = stock?.fragmentsOnItems !== false
+  const result = useMemo(() => (stock ? plan(item, stock.counts, useFragments ? (stock.fragments ?? {}) : {}) : null), [item, stock, useFragments])
   // What is typed shows at once and is written once typing stops.
   const saveItem = useDebounced((d: MoteStock['item']) => void writeStock(setStock, 'stock:item', d), SAVE_MS)
   const saveCounts = useDebounced((c: MoteStock['counts']) => void writeStock(setStock, 'stock:counts', c), SAVE_MS)
+  const saveFragments = useDebounced((c: MoteStock['counts']) => void writeStock(setStock, 'stock:fragments', c), SAVE_MS)
   if (!stock || !result) return <Pending what="your mote stock" error={q.error} retry={q.reload} />
 
   const inv = countsToArray(stock.counts)
@@ -164,7 +174,18 @@ export function MotePlanner() {
     setStock({ ...stock, counts })
     saveCounts.call(counts)
   }
-  const spent = result.after ? MOTE_RANKS.map((r, i) => ({ i, d: (stock.counts[r.key] ?? 0) - result.after![i] })).filter((x) => x.d > 0) : []
+  const setFragment = (key: string, value: string) => {
+    setDraft((x) => ({ ...x, [`f:${key}`]: value }))
+    const fragments = { ...stock.fragments, [key]: Math.max(0, Math.floor(Number(value) || 0)) }
+    setStock({ ...stock, fragments })
+    saveFragments.call(fragments)
+  }
+  const spent = [
+    ...(result.after ? MOTE_RANKS.map((r, i) => ({ d: (stock.counts[r.key] ?? 0) - result.after![i], name: short(i) })) : []),
+    ...(result.afterFragments && useFragments
+      ? FRAGMENT_RANKS.map((r, i) => ({ d: (stock.fragments?.[r.key] ?? 0) - result.afterFragments![i], name: `${short(i)} fragment` }))
+      : [])
+  ].filter((x) => x.d > 0)
 
   return (
     <div className="grid two" style={{ alignItems: 'start' }}>
@@ -196,7 +217,7 @@ export function MotePlanner() {
           {result.steps.map((st) => {
             const state = st.noMote || st.short ? 'bad' : st.unsourced ? '' : 'ok'
             const pill = st.noMote ? 'No mote' : st.short ? `Short ${num(st.short)}` : st.unsourced ? 'Needs the step above' : 'Covered'
-            const have = (st.count ?? 0) - (st.short ?? 0)
+            const byCarry = !st.unsourced && !st.noMote && st.carried >= st.need
             return (
               <div key={st.from} className="action-card">
                 <div className="row">
@@ -209,28 +230,27 @@ export function MotePlanner() {
                 </div>
                 {st.noMote ? (
                   <div className="muted small">No mote upgrades a +{st.from} item. Mote of Infinite Potential tops out at +9 → +10.</div>
+                ) : st.unsourced ? (
+                  <div className="muted small">Planned once the level above is covered.</div>
+                ) : byCarry ? (
+                  <div className="muted small">Reached on xp carried over from the level below.</div>
                 ) : (
                   <>
-                    <div>
-                      <b>
-                        {num(st.count!)} × {long(st.m, st.count!)}
-                      </b>{' '}
-                      <span className="muted">
-                        at {MOTE_RANKS[st.m].xp} xp each{st.over ? `, ${st.over} xp over` : ''}
-                      </span>
-                    </div>
-                    {!st.unsourced && (st.combos!.length > 0 || have > 0) && (
+                    {st.carried > 0 && (
+                      <div className="muted small">
+                        {num(st.carried)} of {num(st.need)} xp already in the bar.
+                      </div>
+                    )}
+                    {(st.combos.length > 0 || st.uses.length > 0) && (
                       <ol className="steps" style={{ fontSize: 13 }}>
-                        {st.combos!.map((c, i) => (
-                          <li key={i}>
+                        {st.combos.map((c, i) => (
+                          <li key={`c${i}`}>
                             Combine {num(c.n)} {short(c.from)} into {num(c.make)} {short(c.to)}
                           </li>
                         ))}
-                        {have > 0 && (
-                          <li>
-                            Use {num(have)} {short(st.m)} on the item
-                          </li>
-                        )}
+                        {st.uses.map((u, i) => (
+                          <li key={`u${i}`}>Use {spendLine(u)}</li>
+                        ))}
                       </ol>
                     )}
                     {!!st.short && (
@@ -248,15 +268,19 @@ export function MotePlanner() {
 
         {result.covered > 0 && (
           <div className="stack gap-8">
-            <div className="muted small">From your stock this uses {spent.map((x) => `${num(x.d)} ${short(x.i)}`).join(', ')}.</div>
+            <div className="muted small">
+              From your stock this uses {spent.map((x) => `${num(x.d)} ${x.name}`).join(', ')}.
+              {result.xp > 0 ? ` The item ends at +${result.reached} with ${num(result.xp)} xp in its bar.` : ''}
+            </div>
             <ConfirmButton className="btn primary" question="Take them off your stock?" onConfirm={() => void writeStock(setStock, 'stock:apply')}>
               Done: take them off my stock and set the item to +{result.reached}
             </ConfirmButton>
           </div>
         )}
         <p className="faint small" style={{ margin: 0 }}>
-          Each mote works on one item level, one below its rank: Greater on +5 items, Superior on +6. Two motes combine into one of the next rank. XP left over past the next level
-          is assumed lost, so a plan spanning several levels may slightly overcount.
+          A mote or fragment works on any item below its rank: a Superior (rank 7) on +0 to +6. XP past a level carries on into the next. Each level takes whatever in your stock
+          gives its xp cheapest, counted in what it would give a spell instead: that is the lowest mote rank that works, combined up from the ranks below when you have none. Two
+          motes combine into one of the next rank; fragments do not.
         </p>
       </div>
 
@@ -276,7 +300,7 @@ export function MotePlanner() {
               <tr>
                 <th>Mote</th>
                 <th title="Item xp each mote gives">XP each</th>
-                <th title="The item level this mote works on">Works on</th>
+                <th title="The item levels this mote works on">Works on</th>
                 <th>Have</th>
                 <th title="Counting what you could combine up from the ranks below">Can make</th>
               </tr>
@@ -286,7 +310,7 @@ export function MotePlanner() {
                 <tr key={r.key}>
                   <td>{long(i, 2)}</td>
                   <td className="mono">{r.xp}</td>
-                  <td className="mono">+{i}</td>
+                  <td className="mono">{i ? `+0 to +${i}` : '+0'}</td>
                   <td>
                     <input
                       type="number"
@@ -304,10 +328,58 @@ export function MotePlanner() {
             </tbody>
           </table>
         </div>
-        <p className="faint small" style={{ marginBottom: 0 }}>
+        <p className="faint small">
           {stock.autoAdd
-            ? 'Every mote you loot is added here as it drops, including reward chests. Edit a count if it is off.'
+            ? 'Every mote and fragment you loot is added here as it drops, including reward chests. Edit a count if it is off.'
             : 'Counts change only when you edit them or press Done.'}
+        </p>
+        <div className="card-head">
+          <h3>Fragments of Potential</h3>
+          <span className="spacer" />
+          <span className="row tight">
+            <Switch on={useFragments} label="Use fragments on items" onChange={(v) => void writeStock(setStock, 'stock:fragmentsOnItems', v)} />
+            Use fragments on items
+          </span>
+        </div>
+        <div className="table-scroll">
+          <table className="table">
+            <thead>
+              <tr>
+                <th>Fragment</th>
+                <th title="Item xp each fragment gives, from the game's upgrade previews">Item xp</th>
+                <th title="Spell xp each fragment gives: twice its rank's mote">Spell xp</th>
+                <th title="The item levels this fragment works on">Works on</th>
+                <th>Have</th>
+              </tr>
+            </thead>
+            <tbody>
+              {FRAGMENT_RANKS.map((r, i) => (
+                <tr key={r.key}>
+                  <td>{fragLong(i, 2)}</td>
+                  <td className="mono" title={r.checked ? 'Seen in game' : 'A guess from the pattern: not seen in game yet'}>
+                    {r.checked ? r.xp : `${r.xp}?`}
+                  </td>
+                  <td className="mono">{num(fragmentSpellXp(i))}</td>
+                  <td className="mono">{i ? `+0 to +${i}` : '+0'}</td>
+                  <td>
+                    <input
+                      type="number"
+                      min={0}
+                      style={{ width: 80 }}
+                      aria-label={`${fragLong(i, 2)} you have`}
+                      value={draft[`f:${r.key}`] ?? String(stock.fragments?.[r.key] ?? 0)}
+                      onChange={(e) => setFragment(r.key, e.target.value)}
+                      onBlur={() => setDraft((x) => ({ ...x, [`f:${r.key}`]: undefined as unknown as string }))}
+                    />
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <p className="faint small" style={{ marginBottom: 0 }}>
+          Fragments do not combine, and the game hands back any the item cannot take. Item xp marked ? is a guess (2, 3, 4, 6, 8, 12, 16, 24, 32 by rank) until one is previewed in
+          game. {useFragments ? 'The plan spends them where they are the cheapest xp.' : 'The plan leaves them for spells.'} Read from screen counts motes only.
         </p>
       </div>
     </div>

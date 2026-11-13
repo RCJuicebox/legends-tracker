@@ -160,6 +160,10 @@ export interface GameFolderCheck {
 export interface MoteStock {
   /** Motes on hand, by rank key ("major": 60). */
   counts: Partial<Record<string, number>>
+  /** Fragments of Potential on hand, by rank key, apart from the motes. */
+  fragments?: Partial<Record<string, number>>
+  /** Whether the item planner may spend fragments too (on unless switched off). */
+  fragmentsOnItems?: boolean
   /** The item being planned. */
   item: { name: string; lvl: number; xp: number; to: number }
   /** Add motes to the stock as they are looted. */

@@ -354,7 +354,8 @@ export function createContext(): AppContext {
           store.settings.set({ ...st, characters: { ...st.characters, [key]: rec } })
         }
       },
-      reconfigure: () => ctx.engine.reconfigure()
+      reconfigure: () => ctx.engine.reconfigure(),
+      toast: (title, body) => windows.toast(title, body)
     }),
     appEngineEnv({
       dataDir,

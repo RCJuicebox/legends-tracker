@@ -19,9 +19,9 @@
 // A rank's worth to you is how often you cast the spell times what the rank gives each cast, in
 // percent points weighed the way you choose: a point is one cast made one percent better.
 
-import { MOTE_RANKS, moteWorth, type MoteCounts } from './motes'
+import { FRAGMENT_RANKS, MOTE_RANKS, fragmentSpellXp, fragmentWorth, moteWorth, type MoteCounts } from './motes'
 import { round } from './format'
-import { countsToArray } from './moteCalc'
+import { countsToArray, fragmentsToArray } from './moteCalc'
 import { casterLevel, formulaTicks } from './durations'
 import { isItemEffect } from './focus'
 import { isSong, summonsPet } from './spellKinds'
@@ -328,10 +328,12 @@ export function castRows(
 }
 
 interface Spend {
-  /** Rank index into MOTE_RANKS … */
+  /** Rank index into MOTE_RANKS (or FRAGMENT_RANKS) … */
   m: number
   /** … and how many of it. */
   n: number
+  /** Fragments of Potential, not motes. */
+  fragment?: true
 }
 
 export interface SpendPlan {
@@ -353,32 +355,36 @@ export function spellMoteXp(index: number): number {
   return moteWorth(index)
 }
 
-/** Every mote's xp on a spell, summed. */
-export function stockXp(stock: MoteCounts): number {
-  return MOTE_RANKS.reduce((n, r, i) => n + (stock[r.key] ?? 0) * spellMoteXp(i), 0)
+/** Every mote's xp on a spell, summed, and every fragment's (twice its rank's mote). */
+export function stockXp(stock: MoteCounts, fragments: MoteCounts = {}): number {
+  const motes = MOTE_RANKS.reduce((n, r, i) => n + (stock[r.key] ?? 0) * spellMoteXp(i), 0)
+  return motes + FRAGMENT_RANKS.reduce((n, r, i) => n + (fragments[r.key] ?? 0) * fragmentSpellXp(i), 0)
 }
 
 /**
  * Motes to pay `need` xp with, lowest rank first. On a spell every rank gives the same xp per
  * combine value, so none is cheaper as such; the low ranks are the ones items stop using first
- * (an Infinitesimal only works on a +0 item). The last mote may give more than was needed: `over`,
- * which carries on into the following ranks.
+ * (an Infinitesimal only works on a +0 item). Fragments come after the motes, lowest rank first,
+ * at twice their rank's mote. The last one may give more than was needed: `over`, which carries on
+ * into the following ranks.
  */
-export function spendOnSpell(need: number, stock: MoteCounts): SpendPlan {
+export function spendOnSpell(need: number, stock: MoteCounts, fragments: MoteCounts = {}): SpendPlan {
   const inv = countsToArray(stock)
+  const frag = fragmentsToArray(fragments)
   const motes: Spend[] = []
   let remaining = need
   let xp = 0
   let worth = 0
-  for (let m = 0; m < MOTE_RANKS.length && remaining > 0; m++) {
-    const each = spellMoteXp(m)
-    const n = Math.min(inv[m], Math.ceil(remaining / each))
-    if (n <= 0) continue
-    motes.push({ m, n })
+  const take = (have: number, each: number, worthEach: number, s: Omit<Spend, 'n'>) => {
+    const n = Math.min(have, Math.ceil(remaining / each))
+    if (n <= 0) return
+    motes.push({ ...s, n })
     xp += n * each
-    worth += n * moteWorth(m)
+    worth += n * worthEach
     remaining -= n * each
   }
+  for (let m = 0; m < MOTE_RANKS.length && remaining > 0; m++) take(inv[m], spellMoteXp(m), moteWorth(m), { m })
+  for (let m = 0; m < FRAGMENT_RANKS.length && remaining > 0; m++) take(frag[m], fragmentSpellXp(m), fragmentWorth(m), { m, fragment: true })
   return { motes, xp, over: Math.max(0, -remaining), worth, short: Math.max(0, remaining) }
 }
 
@@ -420,6 +426,8 @@ export interface SpellUpgradeInput {
   tierPct: Record<SpellCategory, number>
   weights?: SpellWeights
   stock?: MoteCounts
+  /** Fragments on hand, spent after the motes. */
+  fragments?: MoteCounts
 }
 
 /** What one more rank gives one cast of the spell, in weighed points, part by part. */
@@ -461,7 +469,7 @@ export function spellUpgradeOptions(o: SpellUpgradeInput): SpellUpgradeOption[] 
     )
     const worth = round(row.casts * benefit, 1)
     const need = maxed ? 0 : 2 ** rank
-    const spend = maxed ? { motes: [], xp: 0, over: 0, worth: 0, short: 0 } : spendOnSpell(need, stock)
+    const spend = maxed ? { motes: [], xp: 0, over: 0, worth: 0, short: 0 } : spendOnSpell(need, stock, o.fragments)
     out.push({
       row,
       section: row.section,

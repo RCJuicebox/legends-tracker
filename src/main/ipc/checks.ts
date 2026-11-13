@@ -130,6 +130,8 @@ export const CHECKS: { [K in InvokeChannel]: Check<Parameters<Invokes[K]>> } = {
   'stock:get': none,
   'stock:counts': args(obj),
   'stock:item': args(obj),
+  'stock:fragments': args(obj),
+  'stock:fragmentsOnItems': args(bool),
   'stock:autoAdd': args(bool),
   'stock:apply': none,
   'stock:readScreen': none,

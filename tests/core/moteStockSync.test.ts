@@ -54,3 +54,28 @@ describe('what a +0 drop takes to reach your merge level (LT-742)', () => {
     expect(mergeBill(7).motes[0]).toEqual({ mote: 6, count: Math.ceil(64 / 7) })
   })
 })
+
+describe('fragments in the stock', () => {
+  it('counts looted fragments apart from motes, and Done spends both and keeps the xp carried past', () => {
+    const t = keeper({ name: 'Blackened Alloy Bastard Sword', lvl: 0, xp: 0, to: 1 })
+    t.k.add({ rank: 'superior', count: 1, source: 'Lady Vox', fragment: true }, 1000)
+    t.k.add({ rank: 'major', count: 2, source: 'a toad' }, 2000)
+    expect(t.stock().fragments).toEqual({ superior: 1 })
+    expect(t.stock().counts).toEqual({ major: 2 })
+    // A +0 item: the Major motes (5 xp for 16's worth) go before the Superior fragment (16 for 128's).
+    t.k.applyPlan()
+    expect(t.stock().counts.major).toBe(1)
+    expect(t.stock().fragments?.superior).toBe(1)
+    expect(t.stock().item).toMatchObject({ lvl: 2, xp: 2 })
+  })
+
+  it('leaves fragments alone when they are switched off for items', () => {
+    const t = keeper({ name: '', lvl: 0, xp: 0, to: 1 })
+    t.k.setFragments({ minor: 2 })
+    t.k.setFragmentsOnItems(false)
+    expect(t.k.applyPlan().fragments).toEqual({ minor: 2 })
+    expect(t.stock().item.lvl).toBe(0)
+    expect(t.k.setFragmentsOnItems(true).fragmentsOnItems).toBeUndefined()
+    expect(t.k.applyPlan()).toMatchObject({ fragments: { minor: 1 }, item: { lvl: 2, xp: 0 } })
+  })
+})

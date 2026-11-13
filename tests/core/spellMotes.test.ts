@@ -45,6 +45,22 @@ describe('paying for a spell rank with motes', () => {
     })
   })
 
+  it('spends fragments after the motes, at twice their rank’s mote (2^rank)', () => {
+    // Ice Shock V previews (2026-11-12): fragments gave 2, 4, 8, 16, 32 and 128 xp.
+    expect(stockXp({}, { infinitesimal: 1, minor: 1, lesser: 1, potential: 1, major: 1, superior: 1 })).toBe(2 + 4 + 8 + 16 + 32 + 128)
+    expect(spendOnSpell(20, { infinitesimal: 2 }, { lesser: 1, potential: 2 })).toEqual({
+      motes: [
+        { m: 0, n: 2 },
+        { m: 2, n: 1, fragment: true },
+        { m: 3, n: 1, fragment: true }
+      ],
+      xp: 26,
+      over: 6,
+      worth: 2 + 8 + 16,
+      short: 0
+    })
+  })
+
   it('says how far short the stock is', () => {
     expect(spendOnSpell(16, { minor: 3 })).toEqual({ motes: [{ m: 1, n: 3 }], xp: 6, over: 0, worth: 6, short: 10 })
     expect(spendOnSpell(4, {})).toEqual({ motes: [], xp: 0, over: 0, worth: 0, short: 4 })

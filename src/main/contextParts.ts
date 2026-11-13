@@ -97,6 +97,8 @@ export interface OutputDeps {
   /** The record of a character, and keeping a new one. */
   record: { get: (key: string) => CharacterSettings | null; set: (key: string, rec: CharacterSettings) => void }
   reconfigure: () => void
+  /** A Windows notification; clicking it brings the main window up. */
+  toast?: (title: string, body: string) => void
 }
 
 /** Where the engine's views go: the overlays and the main window, the latter only what changed where it can (LT-369, LT-555). */
@@ -121,6 +123,7 @@ export function engineOutputs(d: OutputDeps): EngineOutputs {
     motes: (m) => d.toMain('state:motes', m),
     moteScan: (s) => d.toMain('state:moteScan', s),
     stock: (s) => d.toMain('state:stock', s),
+    toast: (title, body) => d.toast?.(title, body),
     combat: (snap) => {
       d.overlays().combat(snap)
       d.combatToMain(snap)

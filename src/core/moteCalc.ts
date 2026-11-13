@@ -1,12 +1,15 @@
-import { MOTE_RANKS, type MoteCounts } from './motes'
+import { FRAGMENT_RANKS, MOTE_RANKS, fragmentWorth, moteWorth, type MoteCounts } from './motes'
 
-// The item-upgrade rules, as the EQL mote guide and play have established them:
+// The item-upgrade rules, as the EQL mote guide and in-game upgrade previews (2026-11-12) have them:
 //
 // - An item at +N needs 2^N xp to reach +N+1.
-// - Only the mote of rank N+1 works on a +N item: Infinitesimal (rank 1) on +0 items … Infinite (rank 10)
-//   on +9. Wu's Fist of Mastery +6 takes Mote of Superior Potential (rank 7) to reach +7.
-// - Two motes of one rank combine into one of the next.
-// - XP past the next level is assumed lost (unconfirmed), so a multi-level plan may slightly overcount.
+// - A mote of rank R (Infinitesimal 1 … Infinite 10) works on any item below +R, for its item xp
+//   (1, 1, 2, 4, 5 … 10): a Major mote on a +0 item gave 5 xp. Before the 11-12 patch only the
+//   mote of rank N+1 worked on a +N item; the cheapest is still that one.
+// - A Fragment of rank R works the same way, below +R, for its own item xp (FRAGMENT_RANKS). The
+//   game hands back fragments the item cannot take any more.
+// - XP past a level carries on into the next ones (a preview went +0 → +3 1/8 in one fragment).
+// - Two motes of one rank combine into one of the next. Fragments do not combine.
 
 export interface PlannedItem {
   name: string
@@ -28,19 +31,30 @@ interface Combine {
   to: number
 }
 
+/** Motes or fragments of one rank spent on the item. */
+export interface PlanUse {
+  kind: 'mote' | 'fragment'
+  /** Rank index. */
+  m: number
+  n: number
+}
+
 interface PlanStep {
   from: number
   to: number
-  /** XP needed for this level. */
+  /** XP the level takes in all … */
   need: number
-  /** Rank index of the mote that works here, or -1 when none does (+10 and up). */
+  /** … and how much of it was already in the bar: the item's own, or carried over from the level below. */
+  carried: number
+  /** What is spent on the item at this level, in order. */
+  uses: PlanUse[]
+  /** Motes combined first to make some of those. */
+  combos: Combine[]
+  /** The lowest mote rank that works here: what `short` is counted in. */
   m: number
+  /** No mote works here (+10 and up). */
   noMote?: boolean
-  count?: number
-  /** XP wasted by the last mote. */
-  over?: number
-  combos?: Combine[]
-  /** Motes still missing after combining everything below. */
+  /** Motes of rank `m` still missing once the stock is spent. */
   short?: number
   /** Not planned because an earlier step could not be covered. */
   unsourced?: boolean
@@ -50,9 +64,13 @@ export interface Plan {
   steps: PlanStep[]
   /** Levels the stock covers, in order. */
   covered: number
-  /** The stock left after the covered steps, by rank index. */
+  /** The motes left after the covered steps, by rank index … */
   after: number[] | null
+  /** … and the fragments. */
+  afterFragments: number[] | null
   reached: number
+  /** XP in the bar at `reached` once the covered steps are done (carried past the last level). */
+  xp: number
 }
 
 export const MAX_LEVEL = 10
@@ -104,12 +122,17 @@ export class StockCursor {
   }
 }
 
+/** The cheapest mote for a +level item, by rank index: rank level+1; -1 when none works (+10 and up). */
 export function moteForLevel(level: number): number {
   return level < 0 ? 0 : level < MOTE_RANKS.length ? level : -1
 }
 
 export function countsToArray(c: MoteCounts): number[] {
   return MOTE_RANKS.map((r) => c[r.key] ?? 0)
+}
+
+export function fragmentsToArray(c: MoteCounts): number[] {
+  return FRAGMENT_RANKS.map((r) => c[r.key] ?? 0)
 }
 
 /** How many of rank `m` you could have, combining everything below it. */
@@ -153,34 +176,109 @@ export function levelFromName(name: string): number | null {
   return m ? Number(m[1]) : null
 }
 
-export function plan(item: PlannedItem, stock: MoteCounts): Plan {
+/** What an item xp costs, in Infinitesimal motes' worth, spending a mote or fragment of a rank. */
+const moteCost = (i: number) => moteWorth(i) / MOTE_RANKS[i].xp
+const fragmentCost = (i: number) => fragmentWorth(i) / FRAGMENT_RANKS[i].xp
+
+/**
+ * The next thing to spend on a +t item: of everything that works at +t, the one whose item xp costs
+ * least, counted in Infinitesimal motes' worth (what it would give a spell instead). That is the
+ * lowest mote rank that works, made by combining lower motes when there is none on hand, before any
+ * higher one. On a tie the lower rank goes first, since it stops working on the item sooner, and a
+ * mote before a fragment.
+ */
+function cheapest(inv: number[], frag: number[], t: number): { kind: 'mote' | 'fragment' | 'combine'; m: number } | null {
+  let best: { kind: 'mote' | 'fragment' | 'combine'; m: number } | null = null
+  let cost = Infinity
+  const consider = (kind: 'mote' | 'fragment' | 'combine', m: number, c: number) => {
+    if (c < cost - 1e-9) {
+      best = { kind, m }
+      cost = c
+    }
+  }
+  for (let i = t; i < MOTE_RANKS.length; i++) if (inv[i] > 0) consider('mote', i, moteCost(i))
+  if (inv[t] === 0 && t > 0 && makeable(inv, t) > 0) consider('combine', t, moteCost(t))
+  for (let i = t; i < FRAGMENT_RANKS.length; i++) if (frag[i] > 0) consider('fragment', i, fragmentCost(i))
+  return best
+}
+
+function addUse(uses: PlanUse[], kind: PlanUse['kind'], m: number): void {
+  const last = uses[uses.length - 1]
+  if (last && last.kind === kind && last.m === m) last.n++
+  else uses.push({ kind, m, n: 1 })
+}
+
+/**
+ * Plans the item from its level up to `to` with the stock: level by level, the cheapest mote or
+ * fragment that works there one at a time, xp past a level carrying on. Pass no fragments to plan
+ * with motes alone.
+ */
+export function plan(item: PlannedItem, stock: MoteCounts, fragments: MoteCounts = {}): Plan {
   const inv = countsToArray(stock)
+  const frag = fragmentsToArray(fragments)
   const steps: PlanStep[] = []
+  // XP counted from +0, so a use that goes past a level simply carries on.
+  let total = 2 ** item.lvl - 1 + item.xp
   let covered = 0
   let blocked = false
   let after: number[] | null = null
+  let afterFragments: number[] | null = null
+  let doneTotal = total
   for (let t = item.lvl; t < item.to; t++) {
-    const need = 2 ** t - (t === item.lvl ? item.xp : 0)
-    const m = moteForLevel(t)
-    const st: PlanStep = { from: t, to: t + 1, need, m }
-    if (m < 0) {
+    const base = 2 ** t - 1
+    const top = 2 ** (t + 1) - 1
+    const st: PlanStep = { from: t, to: t + 1, need: 2 ** t, carried: Math.max(0, Math.min(2 ** t, total - base)), uses: [], combos: [], m: moteForLevel(t) }
+    steps.push(st)
+    if (blocked) {
+      st.unsourced = true
+      continue
+    }
+    if (st.m < 0) {
       st.noMote = true
       blocked = true
-    } else {
-      st.count = Math.ceil(need / MOTE_RANKS[m].xp)
-      st.over = st.count * MOTE_RANKS[m].xp - need
-      if (!blocked) {
-        const p = planStep(inv, m, st.count)
-        st.combos = p.combos
-        st.short = p.short
-        if (p.short) blocked = true
-        else {
-          covered++
-          after = inv.slice()
-        }
-      } else st.unsourced = true
+      continue
     }
-    steps.push(st)
+    while (total < top) {
+      const pick = cheapest(inv, frag, t)
+      if (!pick) {
+        st.short = Math.ceil((top - total) / MOTE_RANKS[t].xp)
+        blocked = true
+        break
+      }
+      if (pick.kind === 'fragment') {
+        frag[pick.m]--
+        total += FRAGMENT_RANKS[pick.m].xp
+        addUse(st.uses, 'fragment', pick.m)
+        continue
+      }
+      if (pick.kind === 'combine') st.combos.push(...planStep(inv, pick.m, 1).combos)
+      else inv[pick.m]--
+      total += MOTE_RANKS[pick.m].xp
+      addUse(st.uses, 'mote', pick.m)
+    }
+    if (blocked) continue
+    covered++
+    after = inv.slice()
+    afterFragments = frag.slice()
+    doneTotal = total
   }
-  return { steps, covered, after, reached: item.lvl + covered }
+  // Combines that made the same rank one at a time read better as one.
+  for (const st of steps) st.combos = mergeCombos(st.combos)
+  // Where the item ends up: a use past the last planned level can carry it further still.
+  let reached = item.lvl
+  if (covered) while (reached < MAX_LEVEL && doneTotal >= 2 ** (reached + 1) - 1) reached++
+  const xp = covered ? doneTotal - (2 ** reached - 1) : item.xp
+  return { steps, covered, after, afterFragments, reached, xp }
+}
+
+function mergeCombos(combos: Combine[]): Combine[] {
+  const out: Combine[] = []
+  for (const c of combos) {
+    const same = out.find((x) => x.from === c.from && x.to === c.to)
+    if (same) {
+      same.n += c.n
+      same.make += c.make
+    } else out.push({ ...c })
+  }
+  return out.sort((a, b) => a.from - b.from)
 }

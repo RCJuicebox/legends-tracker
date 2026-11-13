@@ -123,6 +123,8 @@ export class OtherMotes {
       const tracker = new MoteTracker(structuredClone(mark.state), {
         onChange: () => {},
         onLoot: (loot, _run, time) => {
+          // The day counts are motes only; fragments stay with their run.
+          if (loot.fragment) return
           const day = (counted[localDay(time)] ??= {})
           day[loot.rank] = (day[loot.rank] ?? 0) + loot.count
         }
