@@ -2,7 +2,7 @@
 
 What changed in each version. The release workflow publishes a version's section as its release notes, and installed copies show them when an update arrives.
 
-## Unreleased
+## 2.24.1 (2026-11-13)
 
 - **Motes › Runs counts fragments.** Today, Everything in your logs, the crawl average, By place and each run now count Fragments of Potential beside your motes, valued at what they give a spell (twice the mote of their rank). The first start of this version reads your logs again once, so every fragment already in your logs shows up on its day.
 
