@@ -4,7 +4,7 @@ What changed in each version. The release workflow publishes a version's section
 
 ## Unreleased
 
-- **Motes › Runs counts fragments.** Today, Everything in your logs, the crawl average, By place and each run now count Fragments of Potential beside your motes, valued at what they give a spell (twice the mote of their rank). The first start of this version reads your logs again once, so fragments looted since the 11-12 patch show up on their days.
+- **Motes › Runs counts fragments.** Today, Everything in your logs, the crawl average, By place and each run now count Fragments of Potential beside your motes, valued at what they give a spell (twice the mote of their rank). The first start of this version reads your logs again once, so every fragment already in your logs shows up on its day.
 
 - **Fragments are spent on items last, and never wasted.** The Merge planner now spends motes first, even where a fragment would be cheaper. It takes a fragment only when no mote can pay, and never one whose xp would go past the level you're planning to. A fragment gives a spell far more than an item, and on a spell all of its xp counts.
 
