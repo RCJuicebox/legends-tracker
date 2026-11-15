@@ -507,7 +507,7 @@ export interface PlanStage {
 export interface PlanInput {
   ranks: Partial<Record<ReincKey, { rank: number }>>
   priority: readonly PriorityEntry[]
-  /** At the cap: true; below it or not known: anything else. */
+  /** Below the cap: false. At it, or not known (taken as at it: the player's classes are levelled), anything else. */
   capped: Partial<Record<ClassId, boolean | null>>
   /** The class in every levelling trio; '' for none. */
   anchor: ClassId | ''
@@ -548,7 +548,8 @@ export function rankedLines(priority: readonly PriorityEntry[]): { classes: Clas
 export function plannedReincs(input: PlanInput): PlannedReinc[] {
   const rank: Partial<Record<ReincKey, number>> = {}
   for (const k of REINC_KEYS) rank[k] = input.ranks[k]?.rank ?? 0
-  const capped = { ...input.capped }
+  const capped: Partial<Record<ClassId, boolean>> = {}
+  for (const c of CLASS_ORDER) capped[c] = input.capped[c] !== false
   const order = rankedLines(input.priority)
   const left = (k: ReincKey) => rank[k]! < REINC_RANKS
   const out: PlannedReinc[] = []
@@ -592,7 +593,7 @@ export function makePlan(input: PlanInput): PlanStage[] {
   const raceRank: Partial<Record<string, number>> = {}
   for (const r of REINC_RACES) raceRank[r.race] = input.ranks[raceKey(r.race)]?.rank ?? 0
   const capped: Partial<Record<ClassId, boolean>> = {}
-  for (const c of CLASS_ORDER) capped[c] = input.capped[c] === true
+  for (const c of CLASS_ORDER) capped[c] = input.capped[c] !== false
   let race = input.race
   const anchor = input.anchor
 

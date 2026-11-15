@@ -61,8 +61,8 @@ const HOW = (
     <div>
       <b>The plan</b> is made from your order of the classes and of the races (on Setup) each time the page draws, so a reincarnation your log shows (or you say you made) moves it
       on by itself. Levelling trios keep the class you choose, take the classes the next reincarnation needs at level {LEVEL_CAP}, and fill the places left without raising the XP
-      penalty: evasive stance first, defensive when no evasive class fits, then the reincarnated classes below {LEVEL_CAP} with the most ranks. Which classes are at {LEVEL_CAP}{' '}
-      comes from /who while you play them and from what you say: the log’s level lines do not name the class.
+      penalty: evasive stance first, defensive when no evasive class fits, then the reincarnated classes below {LEVEL_CAP} with the most ranks. Every class is taken as at{' '}
+      {LEVEL_CAP} unless /who shows it below while you play it, a reincarnation sets it back to 1, or you say so: the log’s level lines do not name the class.
     </div>
     <div>
       <b>The XP penalty</b>: levels 1–{XP_PENALTY_LEVELS} take {XP_PENALTY_PER_RANK}% more experience for each Reincarnation rank, only while you play the classes and race that
@@ -357,7 +357,7 @@ const LEVEL_FROM: Record<ClassLevel['from'], string> = {
   who: 'your /who said so while you played it',
   hand: 'you said so',
   reincarnated: 'reincarnated since: back to level 1',
-  none: 'not known: the plan takes it as below the cap until you say'
+  none: 'nothing says otherwise, so the plan takes it as levelled'
 }
 
 /** The levelling choices: the class every trio keeps, and which classes are at the cap. */
@@ -378,19 +378,19 @@ function Levelling({ s, onAnchor, onCapped }: { s: ReincState; onAnchor: (id: Cl
           </select>
         </label>
       </div>
-      <div className="rc-pick-head small faint">At level {LEVEL_CAP}? Click a class to say it is, or is not</div>
+      <div className="rc-pick-head small faint">At level {LEVEL_CAP}? Every class is, unless /who, a reincarnation or you say not; click to change</div>
       <div className="rc-pick">
         {REINC_CLASSES.map((c) => {
           const l = s.levels[c.id]
           return (
             <button
               key={c.id}
-              className={`rc-chip${l.capped ? ' on' : ''}`}
-              aria-pressed={l.capped === true}
-              onClick={() => onCapped(c.id, l.capped !== true)}
-              title={`${c.name}: ${l.capped ? `at ${LEVEL_CAP}` : l.capped === false ? `below ${LEVEL_CAP}` : 'not known'} (${LEVEL_FROM[l.from]}). Click to say it ${l.capped ? 'is not' : 'is'}.`}
+              className={`rc-chip${l.capped !== false ? ' on' : ''}`}
+              aria-pressed={l.capped !== false}
+              onClick={() => onCapped(c.id, l.capped === false)}
+              title={`${c.name}: ${l.capped === false ? `below ${LEVEL_CAP}` : `at ${LEVEL_CAP}`} (${LEVEL_FROM[l.from]}). Click to say it ${l.capped === false ? 'is' : 'is not'}.`}
             >
-              {c.name} <span className="mono faint">{l.capped ? LEVEL_CAP : l.capped === false ? `<${LEVEL_CAP}` : '?'}</span>
+              {c.name} <span className="mono faint">{l.capped === false ? `<${LEVEL_CAP}` : LEVEL_CAP}</span>
             </button>
           )
         })}
@@ -419,7 +419,7 @@ function StanceTag({ classes }: { classes: readonly ClassId[] }) {
 }
 
 /** A levelling trio: the classes that level, those along at the cap, and the penalty. */
-function RunStep({ r, unknown }: { r: LevelRun; unknown: (c: ClassId) => boolean }) {
+function RunStep({ r }: { r: LevelRun }) {
   const floor = r.penalty / XP_PENALTY_PER_RANK
   return (
     <div className="rc-step">
@@ -428,13 +428,9 @@ function RunStep({ r, unknown }: { r: LevelRun; unknown: (c: ClassId) => boolean
         {r.classes.map((c) => {
           const levels = r.levels.includes(c)
           return (
-            <span
-              key={c}
-              className={levels ? '' : 'faint'}
-              title={levels ? (unknown(c) ? `Not known to be at ${LEVEL_CAP}: levels if it is not` : `Below ${LEVEL_CAP}: levels`) : `At ${LEVEL_CAP} already: along for the trio`}
-            >
+            <span key={c} className={levels ? '' : 'faint'} title={levels ? `Below ${LEVEL_CAP}: levels` : `At ${LEVEL_CAP} already: along for the trio`}>
               {levels ? <b>{reincClass(c).name}</b> : reincClass(c).name}
-              {levels ? (unknown(c) ? ' ?' : '') : ` (${LEVEL_CAP})`}
+              {levels ? '' : ` (${LEVEL_CAP})`}
             </span>
           )
         })}
@@ -518,7 +514,6 @@ function ThePlan({ s, stages, onDone, onSetup }: { s: ReincState; stages: PlanSt
   }, [s.ranks, stages])
   const reincs = stages.filter((st) => st.reinc).length
   const runs = stages.reduce((n, st) => n + st.runs.length, 0)
-  const unknown = (c: ClassId) => s.levels[c].capped === null
   let n = 0
   return (
     <div className="card">
@@ -532,10 +527,11 @@ function ThePlan({ s, stages, onDone, onSetup }: { s: ReincState; stages: PlanSt
       {stages.length ? (
         <>
           <div className="small faint mb-8">
-            {num(reincs)} {reincs === 1 ? 'reincarnation' : 'reincarnations'} from your list, and {num(runs)} levelling {runs === 1 ? 'trio' : 'trios'}. A levelling trio takes the
-            classes that must reach level {LEVEL_CAP}, the highest ranks together, then fills its other places without raising the XP penalty: a class with evasive stance (or
-            defensive, when no evasive one fits), then the reincarnated classes below {LEVEL_CAP} with the most ranks. <b>Bold</b> classes level; the others are at {LEVEL_CAP}{' '}
-            already; “?” is a class not known to be.
+            {num(reincs)} {reincs === 1 ? 'reincarnation' : 'reincarnations'} until every class and race is at rank 3, and {num(runs)} levelling {runs === 1 ? 'trio' : 'trios'}. A
+            levelling trio takes the classes that must reach level {LEVEL_CAP}, the highest ranks together, then fills its other places without raising the XP penalty: a class with
+            evasive stance (or defensive, when no evasive one fits), then the reincarnated classes below {LEVEL_CAP} with the most ranks. <b>Bold</b> classes level; the others are
+            at {LEVEL_CAP} already. Races take far more reincarnations than classes, so once every class is at rank 3 the plan goes on for the races, and classes are reset again
+            for them.
           </div>
           <ol className="rc-stages">
             {stages.map((st, i) => {
@@ -550,7 +546,7 @@ function ThePlan({ s, stages, onDone, onSetup }: { s: ReincState; stages: PlanSt
                       : 'After the last reincarnation'}
                   </div>
                   {st.runs.map((r, j) => (
-                    <RunStep key={j} r={r} unknown={i === 0 ? unknown : () => false} />
+                    <RunStep key={j} r={r} />
                   ))}
                   {st.reinc && <ReincStep r={st.reinc} n={n} after={(k) => afters[i][k] ?? 0} onDone={n === 1 ? () => onDone(st.reinc!) : undefined} />}
                 </li>

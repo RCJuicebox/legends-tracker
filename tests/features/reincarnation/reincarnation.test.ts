@@ -186,9 +186,10 @@ describe('class levels', () => {
 })
 
 describe('the plan', () => {
-  // The test character: Rogue, Shadow Knight and Wizard reincarnated twice as Erudites, levelling them now.
+  // The test character: Rogue, Shadow Knight and Wizard reincarnated twice as Erudites, levelling them now;
+  // every other class is taken as at the cap.
   const held = { 'class:rog': { rank: 2 }, 'class:shd': { rank: 2 }, 'class:wiz': { rank: 2 }, 'race:Erudite': { rank: 2 } }
-  const input = (over: Partial<PlanInput>): PlanInput => ({ ranks: held, priority: [], capped: {}, anchor: 'wiz', race: 'Erudite', ...over })
+  const input = (over: Partial<PlanInput>): PlanInput => ({ ranks: held, priority: [], capped: { rog: false, shd: false, wiz: false }, anchor: 'wiz', race: 'Erudite', ...over })
 
   it('ranks every class and race: those on the list in its order, then the rest in the game’s', () => {
     const got = rankedLines(want(['class:mnk', 3], ['race:Ogre', 3], ['class:dru', 3], ['class:mnk', 1]))
@@ -218,16 +219,18 @@ describe('the plan', () => {
   })
 
   it('makes up a trio with the anchor class, then classes at the cap, and keeps the race played when none is left', () => {
+    // Warrior and Paladin are said to be below the cap: passed over for Shadow Knight, taken as at it.
     const r: PlanInput['ranks'] = Object.fromEntries(REINC_KEYS.map((k) => [k, { rank: 3 }]))
     r['class:mnk'] = { rank: 0 }
-    const got = plannedReincs(input({ ranks: r, capped: { brd: true, enc: true } }))
+    const got = plannedReincs(input({ ranks: r, capped: { war: false, pal: false } }))
     expect(got).toHaveLength(3)
-    expect(got[0]).toEqual({ classes: ['mnk', 'wiz', 'brd'], race: 'Erudite', extra: ['class:wiz', 'class:brd', 'race:Erudite'] })
+    expect(got[0]).toEqual({ classes: ['mnk', 'wiz', 'shd'], race: 'Erudite', extra: ['class:wiz', 'class:shd', 'race:Erudite'] })
   })
 
   it('levels with the anchor, an evasive class and the most-reincarnated classes, without raising the penalty', () => {
-    // Monk, Druid and Necromancer first, none known at the cap; Rogue and Shadow Knight are below it too.
-    const stages = makePlan(input({ priority: want(['class:mnk', 3], ['class:dru', 3], ['class:nec', 3], ['race:Ogre', 3]) }))
+    // Monk, Druid and Necromancer first, all below the cap; Rogue and Shadow Knight are below it too.
+    const below = { mnk: false, dru: false, nec: false, rog: false, shd: false, wiz: false }
+    const stages = makePlan(input({ priority: want(['class:mnk', 3], ['class:dru', 3], ['class:nec', 3], ['race:Ogre', 3]), capped: below }))
     expect(stages.slice(0, 3).map((st) => st.reinc?.classes.join('/'))).toEqual(['mnk/dru/nec', 'mnk/dru/nec', 'mnk/dru/nec'])
     expect(stages[0].runs.map((r) => [r.classes.join('/'), r.penalty])).toEqual([
       ['wiz/mnk/dru', 20],
@@ -244,7 +247,7 @@ describe('the plan', () => {
     // Every evasive class at rank 3 and the cap, the Wizard at rank 1.
     const evasive = ['rng', 'mnk', 'brd', 'rog', 'bst'] as const
     const r = { 'class:wiz': { rank: 1 }, ...Object.fromEntries(evasive.map((c) => [`class:${c}`, { rank: 3 }])) }
-    const capped = { wiz: true, ...Object.fromEntries(evasive.map((c) => [c, true])) }
+    const capped = { wiz: true, clr: false, dru: false, shm: false }
     const [stage] = makePlan(input({ ranks: r, priority: want(['class:clr', 1], ['class:dru', 1], ['class:shm', 1]), race: '', capped }))
     expect(stage.runs.map((x) => [x.classes.join('/'), x.penalty])).toEqual([
       ['wiz/clr/dru', 10],
