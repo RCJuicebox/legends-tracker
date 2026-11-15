@@ -60,10 +60,11 @@ const HOW = (
     </div>
     <div>
       <b>The plan</b> is made from your order of the classes and of the races (on Setup) each time the page draws, so a reincarnation your log shows (or you say you made) moves it
-      on by itself. Levelling trios level as many classes at once as they can: the classes the next reincarnation needs at level {LEVEL_CAP}, three together, then more below{' '}
-      {LEVEL_CAP} that the plan needs. A place left goes, without raising the XP penalty, to the class you choose, then to a class at {LEVEL_CAP} with the stance the trio lacks
-      (evasive, else defensive). Every class is taken as at {LEVEL_CAP} unless /who shows it below while you play it, a reincarnation sets it back to 1, or you say so: the log’s
-      level lines do not name the class.
+      on by itself. Every class and race starts at {LEVEL_CAP}. A reincarnation takes three classes and a race at {LEVEL_CAP} and sets all four to level 1; then one levelling trio,
+      as that race: your chosen class (in every levelling trio) and two of the classes at level 1, picked for the classes still short of rank 3 first, then the least XP penalty,
+      then evasive stance (else defensive). The third waits at level 1 for a later trio; when too few classes are at {LEVEL_CAP} for the next reincarnation, another levelling trio
+      comes first. Every class is taken as at {LEVEL_CAP} unless /who shows it below while you play it, a reincarnation sets it back to 1, or you say so: the log’s level lines do
+      not name the class.
     </div>
     <div>
       <b>The XP penalty</b>: levels 1–{XP_PENALTY_LEVELS} take {XP_PENALTY_PER_RANK}% more experience for each time a class or race was reincarnated, past rank 3 too, only while
@@ -362,15 +363,15 @@ const LEVEL_FROM: Record<ClassLevel['from'], string> = {
   none: 'nothing says otherwise, so the plan takes it as levelled'
 }
 
-/** The levelling choices: the class a spare place in a levelling trio goes to, and which classes are at the cap. */
+/** The levelling choices: the class every levelling trio keeps, and which classes are at the cap. */
 function Levelling({ s, onAnchor, onCapped }: { s: ReincState; onAnchor: (id: ClassId | '') => void; onCapped: (id: ClassId, capped: boolean) => void }) {
   return (
     <div className="card">
       <h3>Levelling</h3>
       <div className="row">
         <label className="row tight">
-          A spare place in a levelling trio goes to
-          <select value={s.anchor} onChange={(e) => onAnchor(e.target.value as ClassId | '')} aria-label="Class a spare place in a levelling trio goes to">
+          Every levelling trio keeps
+          <select value={s.anchor} onChange={(e) => onAnchor(e.target.value as ClassId | '')} aria-label="Class every levelling trio keeps">
             <option value="">no class in particular</option>
             {REINC_CLASSES.map((c) => (
               <option key={c.id} value={c.id}>
@@ -465,7 +466,7 @@ function timesText(name: string, n: number): string {
 function ReincStep({ r, n, onDone }: { r: PlannedReinc; n: number; onDone?: () => void }) {
   const made = (k: ReincKey) => r.extra.includes(k)
   const MADE_UP =
-    'Its ranks are done or not next: it makes up the trio for the race. The plan takes the classes reincarnated least often (each time adds 10% to levelling it), and the class you chose for spare levelling places only while that leaves it below the most-reincarnated class.'
+    'Its ranks are done or not next: it makes up the trio for the race. The plan takes the classes reincarnated least often (each time adds 10% to levelling it), and the class every levelling trio keeps only while that leaves it below the most-reincarnated class.'
   const times = (k: ReincKey) => r.times[k] ?? 0
   return (
     <div className="rc-step reinc">
@@ -509,7 +510,7 @@ function ThePlan({ s, stages, onDone, onSetup }: { s: ReincState; stages: PlanSt
     <div className="card">
       <h3>The plan</h3>
       <div className="small mb-8">
-        Made from your class and race order, {s.anchor ? `${reincClass(s.anchor).name} in levelling trios’ spare places` : 'no class chosen for levelling trios’ spare places'}.{' '}
+        Made from your class and race order, levelling with {s.anchor ? reincClass(s.anchor).name : 'no class in particular'} in every trio.{' '}
         <button className="link-button" onClick={onSetup}>
           {s.priority.length ? 'Change it on Setup' : 'Set it on Setup (the game’s order until you do)'}
         </button>
@@ -517,11 +518,10 @@ function ThePlan({ s, stages, onDone, onSetup }: { s: ReincState; stages: PlanSt
       {stages.length ? (
         <>
           <div className="small faint mb-8">
-            {num(reincs)} {reincs === 1 ? 'reincarnation' : 'reincarnations'} until every class and race is at rank 3, and {num(runs)} levelling {runs === 1 ? 'trio' : 'trios'}. A
-            levelling trio levels as many classes as it can at once: those that must reach level {LEVEL_CAP}, three together, then more below {LEVEL_CAP} the plan needs. A place
-            left goes, without raising the XP penalty, to your chosen class, then to a class at {LEVEL_CAP} with the stance the trio lacks. <b>Bold</b> classes level; the others
-            are at {LEVEL_CAP} already. Races take far more reincarnations than classes, so once every class is at rank 3 the plan goes on for the races, and classes are reset
-            again for them.
+            {num(reincs)} {reincs === 1 ? 'reincarnation' : 'reincarnations'} until every class and race is at rank 3, and {num(runs)} levelling {runs === 1 ? 'trio' : 'trios'}.
+            After each reincarnation, one trio as its race levels it with two of its classes; the third waits at level 1. <b>Bold</b> classes level; the others are at {LEVEL_CAP}{' '}
+            already. Races take far more reincarnations than classes, so once every class is at rank 3 the plan goes on for the races, spreading the extra reincarnations over the
+            classes evenly.
           </div>
           <ol className="rc-stages">
             {stages.map((st, i) => {
@@ -531,8 +531,10 @@ function ThePlan({ s, stages, onDone, onSetup }: { s: ReincState; stages: PlanSt
                   <div className="rc-stage-head small faint">
                     {st.reinc
                       ? st.runs.length
-                        ? `Before reincarnation ${n}`
-                        : `Reincarnation ${n}: its classes are at level ${LEVEL_CAP} already`
+                        ? n === 1
+                          ? 'First'
+                          : `After reincarnation ${n - 1}`
+                        : `Reincarnation ${n}: everything it needs is at level ${LEVEL_CAP}`
                       : 'After the last reincarnation'}
                   </div>
                   {st.runs.map((r, j) => (

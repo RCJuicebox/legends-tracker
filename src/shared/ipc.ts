@@ -529,7 +529,7 @@ export interface Invokes {
   'reincarnation:priority': (character: string, priority: PriorityEntry[]) => ReincState
   /** Says a class is at the level cap (true) or below it (false), or null to forget it; the state after. */
   'reincarnation:capped': (character: string, id: string, capped: boolean | null) => ReincState
-  /** Sets the class a spare place in a levelling trio goes to (a class id, or '' for none); the state after. */
+  /** Sets the class every levelling trio keeps (a class id, or '' for none); the state after. */
   'reincarnation:anchor': (character: string, id: string) => ReincState
   /** Says the character reincarnated as this trio and race ('' when not known): a rank in each of their AAs; the state after. */
   'reincarnation:done': (character: string, classes: string[], race: string) => ReincState

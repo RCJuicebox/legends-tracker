@@ -107,7 +107,7 @@ export class ReincarnationTracker implements AppFeature {
       this.keep(c, { ...kept, levels: capped === null ? levels : { ...levels, [cls]: { capped, at: Date.now(), by: 'hand' } } })
       return this.state(ctx, c)
     })
-    // The class a spare place in a levelling trio goes to, or '' for none.
+    // The class every levelling trio keeps, or '' for none.
     handle('reincarnation:anchor', async (character, id) => {
       const c = check(character)
       this.keep(c, { ...this.kept(c), anchor: id === '' ? '' : classOf(id) })

@@ -10,7 +10,6 @@ import {
   loggedRanks,
   loggedReincarnations,
   makePlan,
-  plannedReincs,
   rankedLines,
   reincTimes,
   rankOf,
@@ -220,88 +219,54 @@ describe('the plan', () => {
     expect(got.races).toHaveLength(16)
   })
 
-  it('reincarnates the three highest-ranked classes below rank 3 together, and each race three times running', () => {
-    const order = want(['class:mnk', 3], ['class:dru', 3], ['class:nec', 3], ['class:rng', 3], ['class:shm', 3], ['class:ber', 3], ['race:Ogre', 3], ['race:Gnome', 3])
-    const got = plannedReincs(input({ priority: order }))
-    expect(got.slice(0, 4).map((r) => [r.classes.join('/'), r.race])).toEqual([
-      ['mnk/dru/nec', 'Ogre'],
-      ['mnk/dru/nec', 'Ogre'],
-      ['mnk/dru/nec', 'Ogre'],
-      ['rng/shm/ber', 'Gnome']
-    ])
-    expect(got[2].times).toEqual({ 'class:mnk': 3, 'class:dru': 3, 'class:nec': 3, 'race:Ogre': 3 })
-    // It runs on until every class and race is at rank 3: the races take the most.
-    expect(got).toHaveLength(46)
+  it('reincarnates three classes and a race at the cap, then levels the anchor and two of them as that race', () => {
+    const order = want(['class:mnk', 3], ['class:dru', 3], ['class:nec', 3], ['class:rng', 3], ['race:Ogre', 3], ['race:Gnome', 3])
+    const stages = makePlan(input({ priority: order }))
+    // First the levelling under way: the Wizard, Shadow Knight and Rogue as Erudite, from where they are.
+    expect(stages[0].runs.map((r) => [r.classes.join('/'), r.race, r.raceLevels])).toEqual([['wiz/shd/rog', 'Erudite', true]])
+    expect(stages[0].reinc).toMatchObject({ classes: ['mnk', 'dru', 'nec'], race: 'Ogre', extra: [] })
+    expect(stages[0].reinc!.times).toEqual({ 'class:mnk': 1, 'class:dru': 1, 'class:nec': 1, 'race:Ogre': 1 })
+    // Then one trio as Ogre: the Wizard and two of the three (Monk for its stance); Necromancer waits at level 1.
+    expect(stages[1].runs.map((r) => [r.classes.join('/'), r.levels.join('/'), r.race, r.raceLevels, r.penalty])).toEqual([['wiz/mnk/dru', 'mnk/dru', 'Ogre', true, 20]])
+    // So the next takes the classes at the cap: Monk and Druid again, then Ranger.
+    expect(stages[1].reinc?.classes).toEqual(['mnk', 'dru', 'rng'])
+    expect(stages.every((st) => st.runs.every((r) => r.classes[0] === 'wiz'))).toBe(true)
   })
 
-  it('keeps classes at different ranks moving without wasting a rank', () => {
-    const got = plannedReincs(input({ priority: want(['class:war', 3], ['class:shd', 3], ['class:rog', 3], ['class:wiz', 3]) }))
-    expect(got.slice(0, 2).map((r) => r.classes.join('/'))).toEqual(['war/shd/rog', 'war/wiz/pal'])
-  })
-
-  it('makes up a trio for the races from the classes reincarnated least, the anchor never becoming the most', () => {
-    // Every class at rank 3, reincarnated three times, but Monk five times and Bard four; the races are all to do.
-    const times: PlanInput['times'] = { ...allAt(3), 'class:mnk': 5, 'class:brd': 4 }
-    for (const r of REINC_RACES) times[`race:${r.race}`] = 0
-    const got = plannedReincs(input({ times }))
-    // At the cap first: Shadow Knight and Rogue are below it, so Ranger goes before them.
-    expect(got[0]).toMatchObject({ classes: ['war', 'pal', 'rng'], race: 'Human', extra: ['class:war', 'class:pal', 'class:rng'] })
-    // Spread: the next take classes not taken again yet. The Wizard (three times, like most) may go up to
-    // four, with Monk at five: it takes its turn, but never above every other class.
-    expect(got[1].classes).toEqual(['ber', 'bst', 'clr'])
-    expect(got.slice(0, 5).flatMap((r) => r.classes)).not.toContain('mnk')
-    const wizard = got.flatMap((r, i) => (r.classes.includes('wiz') ? [i] : []))
-    expect(wizard.length).toBeGreaterThan(0)
-    for (const i of wizard) {
-      const others = Math.max(
-        ...REINC_CLASSES.filter((c) => c.id !== 'wiz').map((c) => got.slice(0, i + 1).reduce((n, r) => n + Number(r.classes.includes(c.id)), times[`class:${c.id}`]!))
-      )
-      expect(got[i].times['class:wiz']).toBeLessThanOrEqual(others)
-    }
-  })
-
-  it('levels the race back after every reincarnation, as the race to reincarnate as, its trio all at once', () => {
-    // Monk, Druid and Necromancer first, all at the cap, as Ogre: the first needs nothing levelled.
-    const stages = makePlan(input({ priority: want(['class:mnk', 3], ['class:dru', 3], ['class:nec', 3], ['race:Ogre', 3]) }))
-    expect(stages[0].runs).toEqual([])
-    // Then Ogre is at level 1 with the three: one trio levels them all, at 10% (no Wizard to raise it).
-    expect(stages[1].runs.map((r) => [r.classes.join('/'), r.levels.join('/'), r.race, r.raceLevels, r.penalty])).toEqual([['mnk/dru/nec', 'mnk/dru/nec', 'Ogre', true, 10]])
-  })
-
-  it('fills a spare place with a class to level, then the anchor when it adds no penalty', () => {
-    // Shadow Knight and Rogue (twice each, below the cap) and Warrior (at it) are next.
-    const stages = makePlan(input({ priority: want(['class:shd', 3], ['class:rog', 3]), capped: { shd: false, rog: false } }))
-    expect(stages[0].reinc?.classes).toEqual(['shd', 'rog', 'war'])
-    expect(stages[0].runs.map((r) => [r.classes.join('/'), r.levels.join('/'), r.penalty])).toEqual([['shd/rog/wiz', 'shd/rog', 20]])
-    // A Wizard reincarnated more than the trio would raise it: left out.
-    const more = makePlan(input({ times: { ...held, 'class:wiz': 3 }, priority: want(['class:shd', 3], ['class:rog', 3]), capped: { shd: false, rog: false } }))
-    expect(more[0].runs[0].classes).not.toContain('wiz')
-  })
-
-  it('levels the race alone when the classes are at the cap', () => {
-    const times = { ...allAt(3) }
-    times['race:Ogre'] = 1
-    const stages = makePlan(input({ times, race: 'Ogre', raceCapped: false, capped: {} }))
+  it('levels again first when too few classes are at the cap', () => {
+    const below = Object.fromEntries(REINC_CLASSES.map((c) => [c.id, false]))
+    const stages = makePlan(input({ times: {}, capped: { ...below, mnk: true, brd: true }, race: 'Human', raceCapped: true }))
+    // Monk and Bard alone are at the cap (the Wizard is not, and may not be the most-reincarnated anyway).
     expect(stages[0].runs).toHaveLength(1)
-    // Every class was reincarnated more often than Ogre: any would raise the penalty, so the places stay open.
-    expect(stages[0].runs[0]).toMatchObject({ race: 'Ogre', raceLevels: true, levels: [], classes: [], open: 3, penalty: 10 })
+    expect(stages[0].runs[0]).toMatchObject({ race: 'Human', raceLevels: false })
+    expect(stages[0].reinc?.classes).toHaveLength(3)
   })
 
-  it('takes defensive stance when no evasive class fits under the penalty', () => {
-    // Every evasive class and the Wizard reincarnated three times; Druid and Shaman to level, Cleric at the cap.
-    const evasive = ['rng', 'mnk', 'brd', 'rog', 'bst', 'wiz'] as const
-    const times = Object.fromEntries(evasive.map((c) => [`class:${c}`, 3]))
-    const capped = { clr: true, dru: false, shm: false }
-    const [stage] = makePlan(input({ times, priority: want(['class:clr', 3], ['class:dru', 3], ['class:shm', 3]), race: 'Human', raceCapped: true, capped }))
-    expect(stage.runs.map((x) => [x.classes.join('/'), x.levels.join('/'), x.penalty])).toEqual([['dru/shm/war', 'dru/shm', 0]])
+  it('picks the levelling pair with a stance: evasive, else defensive', () => {
+    const atCap = input({ times: {}, capped: {}, race: 'Human', raceCapped: true })
+    const evasive = makePlan({ ...atCap, priority: want(['class:war', 3], ['class:clr', 3], ['class:mnk', 3]) })
+    expect(evasive[1].runs[0].classes).toEqual(['wiz', 'war', 'mnk'])
+    const defensive = makePlan({ ...atCap, priority: want(['class:clr', 3], ['class:dru', 3], ['class:war', 3]) })
+    expect(defensive[1].runs[0].classes).toEqual(['wiz', 'clr', 'war'])
+  })
+
+  it('spreads the reincarnations the races need, the anchor never the most-reincarnated', () => {
+    const stages = makePlan(input({}))
+    const reincs = stages.flatMap((st) => (st.reinc ? [st.reinc] : []))
+    // Every class and race to rank 3: 46 reincarnations from the test character's two.
+    expect(reincs).toHaveLength(46)
+    const times: Record<string, number> = Object.fromEntries(REINC_CLASSES.map((c) => [c.id, held[`class:${c.id}`] ?? 0]))
+    for (const r of reincs) {
+      for (const c of r.classes) times[c]++
+      if (r.classes.includes('wiz')) expect(times.wiz).toBeLessThanOrEqual(Math.max(...REINC_CLASSES.filter((c) => c.id !== 'wiz').map((c) => times[c.id])))
+    }
+    const counts = Object.values(times)
+    expect(Math.max(...counts) - Math.min(...counts)).toBeLessThanOrEqual(1)
   })
 
   it('says when the race costs more than the classes', () => {
-    // Every race at rank 3: the classes still need reincarnations, and Human (reincarnated three times) takes them.
-    const times: PlanInput['times'] = Object.fromEntries(REINC_RACES.map((r) => [`race:${r.race}`, 3]))
-    times['class:wiz'] = 1
-    const [stage] = makePlan(input({ times }))
-    expect(stage.runs[0]).toMatchObject({ penalty: 30, classPenalty: 10, race: 'Human' })
+    const [stage] = makePlan(input({ times: { 'class:wiz': 1, 'race:Erudite': 3 } }))
+    expect(stage.runs[0]).toMatchObject({ race: 'Erudite', penalty: 30, classPenalty: 10 })
   })
 
   it('needs nothing when every class and race is at rank 3 and the cap', () => {
