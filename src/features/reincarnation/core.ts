@@ -167,7 +167,7 @@ export interface ReincRace {
   first: string
 }
 
-const RACE_FACTS: Record<(typeof PLAYABLE_RACES)[number], [string, string]> = {
+const RACE_FACTS: Record<Exclude<(typeof PLAYABLE_RACES)[number], 'Drakkin'>, [string, string]> = {
   Human: ['Higher base stat caps', '+5'],
   Barbarian: ['Less cold damage taken', '3%'],
   Erudite: ['Mana regeneration', '+2'],
@@ -182,13 +182,19 @@ const RACE_FACTS: Record<(typeof PLAYABLE_RACES)[number], [string, string]> = {
   Gnome: ['Resists charm and mez more often', '10%'],
   Iksar: ['HP regeneration and base AC', '+2 regen, +5 AC'],
   Kerran: ['Endurance regeneration and Safe Fall', '+2 regen, +10 Safe Fall'],
-  Froglok: ['Jump higher, and HP regeneration', '10% jump, +1 regen'],
-  // The game's text for it is blank (2026-11-11): a rank does nothing anyone can see yet.
-  Drakkin: ['Nothing yet: the game’s text for it is blank', '—']
+  Froglok: ['Jump higher, and HP regeneration', '10% jump, +1 regen']
 }
 
-/** The sixteen playable races' AAs. The client also has Half Dark Elf's and a placeholder, for races no one can play. */
-export const REINC_RACES: readonly ReincRace[] = PLAYABLE_RACES.map((race) => ({ race, passive: RACE_FACTS[race][0], first: RACE_FACTS[race][1] }))
+/**
+ * The playable races' AAs but Drakkin's: the game's text for it is blank (2026-11-11), a rank does nothing
+ * anyone can see, and the player leaves it out (2026-11-15). The client also has Half Dark Elf's and a
+ * placeholder, for races no one can play.
+ */
+export const REINC_RACES: readonly ReincRace[] = PLAYABLE_RACES.filter((r): r is keyof typeof RACE_FACTS => r !== 'Drakkin').map((race) => ({
+  race,
+  passive: RACE_FACTS[race][0],
+  first: RACE_FACTS[race][1]
+}))
 
 export const COMPLETIONIST = {
   name: 'Reincarnation: Completionist',

@@ -207,7 +207,7 @@ function Progress({ s, stages, onRank }: { s: ReincState; stages: PlanStage[]; o
                   <span className="rc-name">{x.race}</span>
                   <RankBar name={x.race} rank={r} planned={left(k)} onRank={(n) => onRank(k, n)} />
                   <span className="rc-note small faint">
-                    {x.passive} {x.first !== '—' && <span className="mono">({x.first})</span>}
+                    {x.passive} <span className="mono">({x.first})</span>
                   </span>
                   <RankFrom rank={r} onRank={(n) => onRank(k, n)} />
                 </div>
