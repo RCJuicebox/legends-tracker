@@ -4873,6 +4873,10 @@ input[aria-invalid='true'] {
   background: color-mix(in srgb, var(--violet) 18%, transparent);
   color: var(--violet-text);
 }
+.chip.rc-tag.xp {
+  background: color-mix(in srgb, var(--amber) 18%, transparent);
+  color: var(--amber-text);
+}
 .chip.rc-tag.none {
   background: transparent;
   color: var(--text-3);

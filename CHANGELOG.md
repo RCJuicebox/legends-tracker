@@ -2,6 +2,10 @@
 
 What changed in each version. The release workflow publishes a version's section as its release notes, and installed copies show them when an update arrives.
 
+## Unreleased
+
+- **Reincarnation shows the XP penalty.** Levels 1–50 take 10% more experience for each Reincarnation rank, but only while you play the classes and race that hold it. The status line shows your loadout's penalty now, and each plan and the trio you're building show what levelling it will cost after that reincarnation. Measured from a log, the second reincarnation of the same trio and race cost 20%, not 80%, so the page counts the highest rank among what you play rather than adding the ranks up.
+
 ## 2.24.1 (2026-11-13)
 
 - **Motes › Runs counts fragments.** Today, Everything in your logs, the crawl average, By place and each run now count Fragments of Potential beside your motes, valued at what they give a spell (twice the mote of their rank). The first start of this version reads your logs again once, so every fragment already in your logs shows up on its day.

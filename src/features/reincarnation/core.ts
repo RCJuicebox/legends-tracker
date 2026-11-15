@@ -1,5 +1,6 @@
 import { CLASSES, CLASS_TABLE, classIdOf, type ClassId } from '../../shared/game/classes'
 import { PLAYABLE_RACES } from '../../shared/game/races'
+import { LEVEL_CAP } from '../../shared/game/levels'
 import type { Inventory } from '../../shared/character'
 
 // Goals › Reincarnation (an optional module): the 2026-11-10 patch's Reincarnation AAs, one line per
@@ -426,6 +427,37 @@ export function poolLeft(ranks: Partial<Record<ReincKey, LineRank>>, plans: read
 export function reincarnationsLeft(ranks: Partial<Record<ReincKey, LineRank>>): { classes: number; races: number } {
   const left = (keys: ReincKey[]) => keys.reduce((n, k) => n + REINC_RANKS - (ranks[k]?.rank ?? 0), 0)
   return { classes: Math.ceil(left(REINC_CLASSES.map((c) => classKey(c.id))) / 3), races: left(REINC_RACES.map((r) => raceKey(r.race))) }
+}
+
+// ---- The XP penalty ----
+
+/**
+ * Levelling reincarnated classes and race takes more XP: 10% a rank, at level 50 and below, and only
+ * while you play the classes and race that hold the ranks. Measured 2026-11-15 from one character's log
+ * (the same mob at the same level, kill for kill, before and after): a trio and race's first
+ * reincarnation cost 10% and its second 20%, not the 40% and 80% that adding the four lines' ranks would
+ * give. Counting the highest rank among the classes and race you play fits both. That is this module's
+ * reading; a loadout whose lines are at different ranks would tell it apart from an average, say.
+ */
+export const XP_PENALTY_PER_RANK = 10
+/** The penalty is on levels up to the cap, not on AA experience. */
+export const XP_PENALTY_LEVELS = LEVEL_CAP
+
+/** The XP penalty, in percent, for playing these classes and race with these ranks. */
+export function xpPenalty(ranks: Partial<Record<ReincKey, { rank: number }>>, classes: readonly ClassId[], race: string): number {
+  const keys: ReincKey[] = [...classes.map(classKey), ...(race ? [raceKey(race)] : [])]
+  return XP_PENALTY_PER_RANK * Math.max(0, ...keys.map((k) => ranks[k]?.rank ?? 0))
+}
+
+/** Each plan's XP penalty while levelling it after reincarnating: its lines' ranks with every plan up to it done. */
+export function planPenalties(ranks: Partial<Record<ReincKey, { rank: number }>>, plans: readonly Pick<ReincPlan, 'classes' | 'race'>[]): number[] {
+  const after: Partial<Record<ReincKey, { rank: number }>> = { ...ranks }
+  const up = (k: ReincKey) => (after[k] = { rank: Math.min(REINC_RANKS, (after[k]?.rank ?? 0) + 1) })
+  return plans.map((p) => {
+    p.classes.forEach((c) => up(classKey(c)))
+    if (p.race) up(raceKey(p.race))
+    return xpPenalty(after, p.classes, p.race)
+  })
 }
 
 // ---- A trio's notes ----

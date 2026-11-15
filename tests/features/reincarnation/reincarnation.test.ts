@@ -8,6 +8,7 @@ import {
   loggedRanks,
   loggedReincarnations,
   openPlans,
+  planPenalties,
   poolLeft,
   rankOf,
   reincarnationsLeft,
@@ -17,6 +18,7 @@ import {
   sanitizeReincCharacter,
   tokenCount,
   trioNotes,
+  xpPenalty,
   type LineRank,
   type RankEvent,
   type ReincKey,
@@ -151,6 +153,29 @@ describe('the plan’s pool', () => {
   it('takes sixteen reincarnations to finish from nothing', () => {
     expect(reincarnationsLeft(ranks({}))).toEqual({ classes: 16, races: 48 })
     expect(reincarnationsLeft(ranks({ 'class:rog': 1, 'class:shd': 1, 'class:wiz': 1 })).classes).toBe(15)
+  })
+})
+
+describe('the XP penalty', () => {
+  it('is 10% for the highest rank among the classes and race played, not their sum', () => {
+    const r = ranks({ 'class:rog': 2, 'class:shd': 2, 'class:wiz': 2, 'race:Erudite': 2, 'class:war': 1 })
+    expect(xpPenalty(r, ['rog', 'shd', 'wiz'], 'Erudite')).toBe(20)
+    // Only what is played: a fresh trio and race carry none, one reincarnated class carries its own.
+    expect(xpPenalty(r, ['mnk', 'clr', 'nec'], 'Dwarf')).toBe(0)
+    expect(xpPenalty(r, ['war', 'clr', 'nec'], 'Dwarf')).toBe(10)
+    expect(xpPenalty(r, ['war', 'clr', 'nec'], 'Erudite')).toBe(20)
+    expect(xpPenalty(r, ['war', 'clr', 'nec'], '')).toBe(10)
+  })
+
+  it('counts each plan with the plans before it done, a rank at most three', () => {
+    const r = ranks({ 'class:rog': 1, 'class:shd': 1, 'class:wiz': 1, 'race:Erudite': 1 })
+    const plans = [
+      plan('a', ['rog', 'shd', 'wiz'], 'Erudite'),
+      plan('b', ['mnk', 'clr', 'nec'], 'Dwarf'),
+      plan('c', ['rog', 'shd', 'wiz'], 'Erudite'),
+      plan('d', ['rog', 'war', 'clr'])
+    ]
+    expect(planPenalties(r, plans)).toEqual([20, 10, 30, 30])
   })
 })
 

@@ -14,12 +14,16 @@ import {
   REINC_CLASSES,
   REINC_RACES,
   REINC_RANKS,
+  XP_PENALTY_LEVELS,
+  XP_PENALTY_PER_RANK,
   classKey,
+  planPenalties,
   poolLeft,
   raceKey,
   reincarnationsLeft,
   reincClass,
   trioNotes,
+  xpPenalty,
   type LineRank,
   type ReincClass,
   type ReincKey,
@@ -49,8 +53,26 @@ const HOW = (
       <b>What each AA does</b> is the game’s text at rank 1, shortened. The patch notes say ranks 2 and 3 are stronger but not by how much. Stances are eqlwiki’s Stances &amp;
       Invocations table; a class’s mana stat is the Stats page’s rule (WIS for priests, Paladin, Ranger and Beastlord; INT for the other classes with mana).
     </div>
+    <div>
+      <b>The XP penalty</b>: levels 1–{XP_PENALTY_LEVELS} take {XP_PENALTY_PER_RANK}% more experience for each Reincarnation rank, only while you play the classes and race that
+      hold it. Measured from a log, the same mob at the same level kill for kill: a trio and race’s first reincarnation cost {XP_PENALTY_PER_RANK}% and the second{' '}
+      {2 * XP_PENALTY_PER_RANK}%, not four times that, so the four ranks do not add up. This page counts the highest rank among the classes and race you play. A loadout whose ranks
+      differ would show whether the game takes the highest or an average.
+    </div>
   </>
 )
+
+/** A loadout or plan's XP penalty as a chip, with what it means. */
+function PenaltyTag({ pct, raceOpen }: { pct: number; raceOpen?: boolean }) {
+  const text = pct
+    ? `Levels 1–${XP_PENALTY_LEVELS} take ${pct}% more experience: the highest Reincarnation rank among these classes and race, ${XP_PENALTY_PER_RANK}% a rank.${raceOpen ? ' The race is not chosen yet, so it could be more.' : ''}`
+    : `No Reincarnation ranks among these${raceOpen ? ' classes yet (the race is not chosen)' : ' classes and race'}, so no XP penalty.`
+  return (
+    <Tip className={`chip pill rc-tag ${pct ? 'xp' : 'none'}`} text={text}>
+      {pct ? `XP ${raceOpen ? '≥ ' : ''}+${pct}%` : raceOpen ? 'No class XP penalty' : 'No XP penalty'}
+    </Tip>
+  )
+}
 
 const STANCE_TIP = {
   evasive: 'Evasive stance: a 95% chance to evade attacks, paid for in endurance.',
@@ -213,6 +235,18 @@ function Planner({ s, onPlans, onDone }: { s: ReincState; onPlans: (plans: Reinc
   const others = useMemo(() => s.plans.filter((p) => p.id !== editing), [s.plans, editing])
   const pool = useMemo(() => poolLeft(s.ranks, [...others, { id: 'draft', classes: trio, race, since: 0 }]), [s.ranks, others, trio, race])
   const left = reincarnationsLeft(s.ranks)
+  // The penalty the trio being built would level with: the plans before it done, then it.
+  const before = editing
+    ? s.plans.slice(
+        0,
+        Math.max(
+          0,
+          s.plans.findIndex((p) => p.id === editing)
+        )
+      )
+    : s.plans
+  const draftPenalty = trio.length === 3 ? planPenalties(s.ranks, [...before, { classes: trio, race }]).at(-1)! : null
+  const penalties = useMemo(() => planPenalties(s.ranks, s.plans), [s.ranks, s.plans])
   const placedClasses = REINC_CLASSES.filter((c) => pool.classes[c.id] <= 0 && !trio.includes(c.id))
   const placedRaces = REINC_RACES.filter((r) => pool.races[r.race] <= 0 && r.race !== race)
   const over = [...REINC_CLASSES.filter((c) => pool.classes[c.id] < 0).map((c) => c.name), ...REINC_RACES.filter((r) => pool.races[r.race] < 0).map((r) => r.race)]
@@ -276,6 +310,13 @@ function Planner({ s, onPlans, onDone }: { s: ReincState; onPlans: (plans: Reinc
           )}
         </div>
         <TrioSummary classes={trio} />
+        {draftPenalty !== null && (
+          <div className="rc-summary small">
+            <span>
+              Levelling it after this reincarnation: <PenaltyTag pct={draftPenalty} raceOpen={!race} />
+            </span>
+          </div>
+        )}
         <div className="rc-pick-head small faint">Classes left to place (each three times)</div>
         <div className="rc-pick">
           {REINC_CLASSES.filter((c) => pool.classes[c.id] > 0 || trio.includes(c.id)).map((c) => {
@@ -354,6 +395,7 @@ function Planner({ s, onPlans, onDone }: { s: ReincState; onPlans: (plans: Reinc
                     </Tip>
                     {n.wis.length > 0 && <span className="chip pill rc-tag wis">WIS ×{n.wis.length}</span>}
                     {n.int.length > 0 && <span className="chip pill rc-tag int">INT ×{n.int.length}</span>}
+                    <PenaltyTag pct={penalties[i]} raceOpen={!p.race} />
                   </span>
                   <span className="row tight">
                     <button className="btn small ghost" disabled={i === 0} onClick={() => move(i, -1)} aria-label="Move it up">
@@ -446,6 +488,16 @@ function Status({ s }: { s: ReincState }) {
           {ready ? <span className="ok-text"> · ready to reincarnate</span> : <span className="faint"> · each class needs level {LEVEL_CAP}</span>}
           {isNext && <span className="ok-text"> · your next plan</span>}
         </span>
+      )}
+      {lo.classes.length > 0 && (
+        <PenaltyTag
+          pct={xpPenalty(
+            s.ranks,
+            lo.classes.map((c) => c.id),
+            lo.race
+          )}
+          raceOpen={!lo.race}
+        />
       )}
     </div>
   )
