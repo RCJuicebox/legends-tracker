@@ -416,12 +416,13 @@ export function reincarnationsLeft(ranks: Partial<Record<ReincKey, LineRank>>): 
 // ---- The XP penalty ----
 
 /**
- * Levelling reincarnated classes and race takes more XP: 10% a rank, at level 50 and below, and only
- * while you play the classes and race that hold the ranks. Measured 2026-11-15 from one character's log
- * (the same mob at the same level, kill for kill, before and after): a trio and race's first
- * reincarnation cost 10% and its second 20%, not the 40% and 80% that adding the four lines' ranks would
- * give. Counting the highest rank among the classes and race you play fits both. That is this module's
- * reading; a loadout whose lines are at different ranks would tell it apart from an average, say.
+ * Levelling reincarnated classes and race takes more XP: 10% for each time one was reincarnated (past
+ * rank 3 too, the player says: a reincarnation at rank 3 gains nothing but still counts), at level 50
+ * and below, and only while you play them. Measured 2026-11-15 from one character's log (the same mob at
+ * the same level, kill for kill, before and after): a trio and race's first reincarnation cost 10% and
+ * its second 20%, not the 40% and 80% that adding the four lines would give. Counting the most-
+ * reincarnated of the classes and race you play fits both. That is this module's reading; a loadout
+ * whose lines differ would tell it apart from an average, say.
  */
 export const XP_PENALTY_PER_RANK = 10
 /** The penalty is on levels up to the cap, not on AA experience. */
@@ -475,26 +476,30 @@ export function levelsSeen(
 
 // ---- The plan ----
 
-/** A reincarnation the plan makes: three classes and a race, and which of them the priority list did not ask for. */
+/** A reincarnation the plan makes: three classes and a race, and which of them the rankings did not ask for. */
 export interface PlannedReinc {
   classes: ClassId[]
   /** '' when no race is known: the one played then gains the rank. */
   race: string
-  /** Classes and race taken to make up the reincarnation, not from the list. */
+  /** Classes and race taken to make up the reincarnation: their ranks are done, it needs them for the races. */
   extra: ReincKey[]
+  /** How many times each of its lines has been reincarnated, this one counted. */
+  times: Partial<Record<ReincKey, number>>
 }
 
 /** A trio to level as: its classes, which of them are below the cap and level, and the XP penalty while it does. */
 export interface LevelRun {
   classes: ClassId[]
-  /** The classes below the cap (or not known to be at it), levelled by this trio. */
+  /** The classes below the cap, levelled by this trio. */
   levels: ClassId[]
-  /** Slots left for any class at a rank no higher than the trio's, when no class that needs levelling fits. */
+  /** Slots left for any class reincarnated no more often than the trio's lines, when no class that needs levelling fits. */
   open: number
   race: string
+  /** Whether the race is below the cap and levels too (a reincarnation sets it to level 1). */
+  raceLevels: boolean
   /** With the race. */
   penalty: number
-  /** The classes' alone: lower when the race's rank is above theirs. */
+  /** The classes' alone: lower when the race has been reincarnated more often than they have. */
   classPenalty: number
 }
 
@@ -505,14 +510,16 @@ export interface PlanStage {
 }
 
 export interface PlanInput {
-  ranks: Partial<Record<ReincKey, { rank: number }>>
+  /** Reincarnations so far, by line: its rank, or more for a line reincarnated past rank 3. */
+  times: Partial<Record<ReincKey, number>>
   priority: readonly PriorityEntry[]
   /** Below the cap: false. At it, or not known (taken as at it: the player's classes are levelled), anything else. */
   capped: Partial<Record<ClassId, boolean | null>>
   /** The class in every levelling trio; '' for none. */
   anchor: ClassId | ''
-  /** The race played now. */
+  /** The race played now, and whether it is at the cap (every other race is taken as at it). */
   race: string
+  raceCapped: boolean
 }
 
 /** The most reincarnations a plan runs to: every race three times over. */
@@ -537,21 +544,31 @@ export function rankedLines(priority: readonly PriorityEntry[]): { classes: Clas
   return { classes, races }
 }
 
+/** Reincarnations so far, by line: the rank, or how many the history shows when more (a line reincarnated at rank 3 gains nothing but still counts). */
+export function reincTimes(ranks: Partial<Record<ReincKey, { rank: number }>>, history: readonly Pick<ReincDone, 'classes' | 'race'>[]): Partial<Record<ReincKey, number>> {
+  const seen: Partial<Record<ReincKey, number>> = {}
+  for (const h of history) for (const k of [...h.classes.map(classKey), ...(h.race ? [raceKey(h.race)] : [])]) seen[k] = (seen[k] ?? 0) + 1
+  const out: Partial<Record<ReincKey, number>> = {}
+  for (const k of REINC_KEYS) out[k] = Math.max(ranks[k]?.rank ?? 0, seen[k] ?? 0)
+  return out
+}
+
 /**
  * The reincarnations the class and race rankings make, in order, until every class and race is at
  * rank 3. Each takes the three highest-ranked classes below rank 3 and the highest-ranked race below
- * it, so classes level together from rank 0 to 3 and a race takes its three ranks in a row. Once fewer
- * than three classes are left below rank 3, the trio is made up: the anchor class first (it is in every
- * levelling trio anyway, so the trio levels back in one), then classes at the cap, then those with the
- * fewest ranks, in your order, so the extra levelling and the XP penalty both stay low.
+ * it, so classes go from rank 0 to 3 together and a race takes its three ranks in a row. Races take
+ * three times as many reincarnations as classes, so once fewer than three classes are left below rank
+ * 3 the trio is made up from the classes reincarnated least often (each time adds to the XP penalty
+ * of levelling that class), at the cap first, in your order, and never the anchor class while another
+ * will do: it stays at the cap, and the race's reset to level 1 is levelled with it all the same.
  */
 export function plannedReincs(input: PlanInput): PlannedReinc[] {
-  const rank: Partial<Record<ReincKey, number>> = {}
-  for (const k of REINC_KEYS) rank[k] = input.ranks[k]?.rank ?? 0
+  const times: Partial<Record<ReincKey, number>> = {}
+  for (const k of REINC_KEYS) times[k] = input.times[k] ?? 0
   const capped: Partial<Record<ClassId, boolean>> = {}
   for (const c of CLASS_ORDER) capped[c] = input.capped[c] !== false
   const order = rankedLines(input.priority)
-  const left = (k: ReincKey) => rank[k]! < REINC_RANKS
+  const left = (k: ReincKey) => times[k]! < REINC_RANKS
   const out: PlannedReinc[] = []
   while (out.length < MAX_REINCS) {
     const classes = order.classes.filter((c) => left(classKey(c))).slice(0, 3)
@@ -560,56 +577,63 @@ export function plannedReincs(input: PlanInput): PlannedReinc[] {
     const extra: ReincKey[] = []
     const spare = order.classes
       .filter((c) => !classes.includes(c))
-      .sort((a, b) => Number(b === input.anchor) - Number(a === input.anchor) || Number(capped[b] === true) - Number(capped[a] === true) || rank[classKey(a)]! - rank[classKey(b)]!)
+      .sort(
+        (a, b) => Number(a === input.anchor) - Number(b === input.anchor) || times[classKey(a)]! - times[classKey(b)]! || Number(capped[b] === true) - Number(capped[a] === true)
+      )
     while (classes.length < 3) {
       const c = spare.shift()!
       classes.push(c)
       extra.push(classKey(c))
     }
-    const r = race ?? input.race
-    if (!race && r) extra.push(raceKey(r))
-    for (const k of [...classes.map(classKey), ...(r ? [raceKey(r)] : [])]) rank[k] = Math.min(REINC_RANKS, rank[k]! + 1)
+    // With every race at rank 3, the one reincarnated least often takes it.
+    const r = race ?? [...order.races].sort((a, b) => times[raceKey(a)]! - times[raceKey(b)]!)[0]
+    if (!race) extra.push(raceKey(r))
+    const keys = [...classes.map(classKey), raceKey(r)]
+    for (const k of keys) times[k]! += 1
     for (const c of classes) capped[c] = false
-    out.push({ classes, race: r, extra })
+    out.push({ classes, race: r, extra, times: Object.fromEntries(keys.map((k) => [k, times[k]])) })
   }
   return out
 }
 
 /**
- * The whole plan: before each reincarnation, the levelling trios that bring its classes to the cap,
- * and after the last one, those that bring every reincarnated class back to it.
+ * The whole plan: before each reincarnation, the levelling trios that bring its classes and its race
+ * to the cap (a reincarnation sets its race to level 1, so there is levelling after every one), and
+ * after the last, those that bring every reincarnated class back to it.
  *
  * A levelling trio keeps the anchor class (the player's choice), then takes the classes that must
- * reach the cap, the highest ranks together so that fewer trios carry a high penalty. The XP penalty
- * is the highest rank among the trio and race, so each slot left is filled without raising it: a class
- * with evasive stance first when the trio has none (defensive when no evasive one fits and the trio has
- * neither), then the classes below the cap with the most ranks, those the plan needs soonest first. A
- * slot nothing below the cap fits stays open for any class at that rank or lower.
+ * reach the cap, the most-reincarnated together so that fewer trios carry a high penalty. The XP
+ * penalty is 10% for each time the most-reincarnated of the trio and race was reincarnated, so each
+ * slot left is filled without raising it: a class with evasive stance first when the trio has none
+ * (defensive when no evasive one fits and the trio has neither), then the classes below the cap
+ * reincarnated most, those the plan needs soonest first. A slot nothing below the cap fits stays open
+ * for any class reincarnated no more often.
  */
 export function makePlan(input: PlanInput): PlanStage[] {
   const reincs = plannedReincs(input)
-  const rank: Partial<Record<ClassId, number>> = {}
-  for (const c of CLASS_ORDER) rank[c] = input.ranks[classKey(c)]?.rank ?? 0
-  const raceRank: Partial<Record<string, number>> = {}
-  for (const r of REINC_RACES) raceRank[r.race] = input.ranks[raceKey(r.race)]?.rank ?? 0
+  const times: Partial<Record<ReincKey, number>> = {}
+  for (const k of REINC_KEYS) times[k] = input.times[k] ?? 0
+  const t = (c: ClassId) => times[classKey(c)]!
   const capped: Partial<Record<ClassId, boolean>> = {}
   for (const c of CLASS_ORDER) capped[c] = input.capped[c] !== false
+  const raceCapped: Partial<Record<string, boolean>> = { [input.race]: input.raceCapped }
   let race = input.race
   const anchor = input.anchor
 
   const levelRuns = (need: ClassId[], upcoming: ClassId[]): LevelRun[] => {
     const soon = (c: ClassId) => (upcoming.includes(c) ? upcoming.indexOf(c) : Infinity)
+    const raceLow = !!race && raceCapped[race] === false
     const base: ClassId[] = anchor ? [anchor] : []
-    const rest = need.filter((c) => c !== anchor).sort((a, b) => rank[b]! - rank[a]! || soon(a) - soon(b))
-    // Highest ranks first, so they share trios. Among classes of the same rank (the swap costs nothing),
-    // one with a stance the trio lacks goes in first.
+    const rest = need.filter((c) => c !== anchor).sort((a, b) => t(b) - t(a) || soon(a) - soon(b))
+    // Most-reincarnated first, so they share trios. Among classes reincarnated as often (the swap costs
+    // nothing), one with a stance the trio lacks goes in first.
     const chunks: ClassId[][] = []
     while (rest.length) {
       const chunk = [rest.shift()!]
       while (chunk.length < 3 - base.length && rest.length) {
         const group = [...base, ...chunk]
         const lacks = (s: Stance) => !group.some((c) => hasStance(c, s))
-        const same = rest.filter((c) => rank[c] === rank[rest[0]])
+        const same = rest.filter((c) => t(c) === t(rest[0]))
         const pick =
           (lacks('evasive') && same.find((c) => hasStance(c, 'evasive'))) || (lacks('evasive') && lacks('defensive') && same.find((c) => hasStance(c, 'defensive'))) || rest[0]
         chunk.push(pick)
@@ -617,16 +641,17 @@ export function makePlan(input: PlanInput): PlanStage[] {
       }
       chunks.push(chunk)
     }
-    if (!chunks.length && anchor && need.includes(anchor)) chunks.push([])
+    // Nothing else to level but the race (or the anchor): one trio for it.
+    if (!chunks.length && (raceLow || (anchor && need.includes(anchor)))) chunks.push([])
     return chunks.map((chunk) => {
       const classes = [...base, ...chunk]
-      const racePenalty = race ? XP_PENALTY_PER_RANK * raceRank[race]! : 0
-      const floor = Math.max(...classes.map((c) => rank[c]!), racePenalty / XP_PENALTY_PER_RANK)
-      const useful = (c: ClassId) => !capped[c] && (rank[c]! > 0 || upcoming.includes(c))
+      const raceTimes = race ? times[raceKey(race)]! : 0
+      const floor = Math.max(0, ...classes.map(t), raceTimes)
+      const useful = (c: ClassId) => !capped[c] && (t(c) > 0 || upcoming.includes(c))
       const best = (fits: (c: ClassId) => boolean) =>
-        CLASS_ORDER.filter((c) => !classes.includes(c) && rank[c]! <= floor && fits(c)).sort(
-          // Below the cap and needed first; then one at the cap (nothing to level) over one not known to be.
-          (a, b) => Number(useful(b)) - Number(useful(a)) || Number(capped[b] === true) - Number(capped[a] === true) || rank[b]! - rank[a]! || soon(a) - soon(b)
+        CLASS_ORDER.filter((c) => !classes.includes(c) && t(c) <= floor && fits(c)).sort(
+          // Below the cap and needed first; then one at the cap, reincarnated least.
+          (a, b) => Number(useful(b)) - Number(useful(a)) || (useful(a) ? t(b) - t(a) : t(a) - t(b)) || soon(a) - soon(b)
         )[0]
       const has = (s: Stance) => classes.some((c) => hasStance(c, s))
       if (classes.length < 3 && !has('evasive')) {
@@ -640,28 +665,27 @@ export function makePlan(input: PlanInput): PlanStage[] {
       }
       const levels = classes.filter((c) => !capped[c])
       for (const c of classes) capped[c] = true
-      const classPenalty = XP_PENALTY_PER_RANK * Math.max(...classes.map((c) => rank[c]!))
-      return { classes, levels, open: 3 - classes.length, race, penalty: Math.max(classPenalty, racePenalty), classPenalty }
+      const raceLevels = raceLow && raceCapped[race] === false
+      if (race) raceCapped[race] = true
+      const classPenalty = XP_PENALTY_PER_RANK * Math.max(0, ...classes.map(t))
+      return { classes, levels, open: 3 - classes.length, race, raceLevels, penalty: Math.max(classPenalty, XP_PENALTY_PER_RANK * raceTimes), classPenalty }
     })
   }
 
   const stages: PlanStage[] = reincs.map((r, i) => {
+    // Level as the race to reincarnate as: it must be at the cap, and the trio's classes with it.
+    race = r.race
     const runs = levelRuns(
       r.classes.filter((c) => !capped[c]),
       reincs.slice(i).flatMap((x) => x.classes)
     )
-    for (const c of r.classes) {
-      rank[c] = Math.min(REINC_RANKS, rank[c]! + 1)
-      capped[c] = false
-    }
-    if (r.race) {
-      raceRank[r.race] = Math.min(REINC_RANKS, raceRank[r.race]! + 1)
-      race = r.race
-    }
+    for (const c of r.classes) capped[c] = false
+    for (const k of [...r.classes.map(classKey), raceKey(r.race)]) times[k]! += 1
+    raceCapped[r.race] = false
     return { runs, reinc: r }
   })
-  const after = CLASS_ORDER.filter((c) => rank[c]! > 0 && !capped[c])
-  if (after.length) stages.push({ runs: levelRuns(after, []), reinc: null })
+  const after = CLASS_ORDER.filter((c) => t(c) > 0 && !capped[c])
+  if (after.length || (race && raceCapped[race] === false)) stages.push({ runs: levelRuns(after, []), reinc: null })
   return stages
 }
 

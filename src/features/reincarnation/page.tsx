@@ -12,13 +12,13 @@ import type { ClassId } from '../../shared/game/classes'
 import {
   COMPLETIONIST,
   REINC_CLASSES,
-  REINC_KEYS,
   REINC_RACES,
   REINC_RANKS,
   XP_PENALTY_LEVELS,
   XP_PENALTY_PER_RANK,
   classKey,
   makePlan,
+  reincTimes,
   rankedLines,
   raceKey,
   reincarnationsLeft,
@@ -65,10 +65,10 @@ const HOW = (
       {LEVEL_CAP} unless /who shows it below while you play it, a reincarnation sets it back to 1, or you say so: the log’s level lines do not name the class.
     </div>
     <div>
-      <b>The XP penalty</b>: levels 1–{XP_PENALTY_LEVELS} take {XP_PENALTY_PER_RANK}% more experience for each Reincarnation rank, only while you play the classes and race that
-      hold it. Measured from a log, the same mob at the same level kill for kill: a trio and race’s first reincarnation cost {XP_PENALTY_PER_RANK}% and the second{' '}
-      {2 * XP_PENALTY_PER_RANK}%, not four times that, so the four ranks do not add up. This page counts the highest rank among the classes and race you play. A loadout whose ranks
-      differ would show whether the game takes the highest or an average.
+      <b>The XP penalty</b>: levels 1–{XP_PENALTY_LEVELS} take {XP_PENALTY_PER_RANK}% more experience for each time a class or race was reincarnated, past rank 3 too, only while
+      you play it. Measured from a log, the same mob at the same level kill for kill: a trio and race’s first reincarnation cost {XP_PENALTY_PER_RANK}% and the second{' '}
+      {2 * XP_PENALTY_PER_RANK}%, not four times that, so the four lines do not add up: this page counts the most-reincarnated of the classes and race you play. That is why the
+      plan spreads the extra reincarnations the races need over the classes reincarnated least, and keeps the class every levelling trio holds out of them.
     </div>
   </>
 )
@@ -76,7 +76,7 @@ const HOW = (
 /** A loadout or plan's XP penalty as a chip, with what it means. */
 function PenaltyTag({ pct, raceOpen }: { pct: number; raceOpen?: boolean }) {
   const text = pct
-    ? `Levels 1–${XP_PENALTY_LEVELS} take ${pct}% more experience: the highest Reincarnation rank among these classes and race, ${XP_PENALTY_PER_RANK}% a rank.${raceOpen ? ' The race is not chosen yet, so it could be more.' : ''}`
+    ? `Levels 1–${XP_PENALTY_LEVELS} take ${pct}% more experience: ${XP_PENALTY_PER_RANK}% for each time the most-reincarnated of these classes and race was reincarnated.${raceOpen ? ' The race is not chosen yet, so it could be more.' : ''}`
     : `No Reincarnation ranks among these${raceOpen ? ' classes yet (the race is not chosen)' : ' classes and race'}, so no XP penalty.`
   return (
     <Tip className={`chip pill rc-tag ${pct ? 'xp' : 'none'}`} text={text}>
@@ -436,10 +436,10 @@ function RunStep({ r }: { r: LevelRun }) {
         })}
         {r.open > 0 && (
           <span className="faint">
-            + {r.open === 1 ? 'any class' : `any ${r.open} classes`} at rank {floor} or lower
+            + {r.open === 1 ? 'any class' : `any ${r.open} classes`} reincarnated {floor} {floor === 1 ? 'time' : 'times'} or fewer
           </span>
         )}
-        {r.race && <span className="faint">as {r.race}</span>}
+        {r.race && (r.raceLevels ? <b>as {r.race}, from level 1</b> : <span className="faint">as {r.race}</span>)}
       </span>
       <span className="rc-tags">
         <StanceTag classes={r.classes} />
@@ -454,10 +454,17 @@ function RunStep({ r }: { r: LevelRun }) {
   )
 }
 
+/** A line's rank after a reincarnation, and how many times it has been, when that is more than its rank. */
+function timesText(name: string, n: number): string {
+  return `${name} → ${Math.min(REINC_RANKS, n)}${n > REINC_RANKS ? ` (${n}×)` : ''}`
+}
+
 /** A reincarnation in the plan: the trio and race, the ranks they reach, and, for the next one, a way to say it is made. */
-function ReincStep({ r, n, after, onDone }: { r: PlannedReinc; n: number; after: (k: ReincKey) => number; onDone?: () => void }) {
+function ReincStep({ r, n, onDone }: { r: PlannedReinc; n: number; onDone?: () => void }) {
   const made = (k: ReincKey) => r.extra.includes(k)
-  const MADE_UP = 'Not on your list: it makes up the reincarnation (classes at the cap with the fewest ranks first, so there is less to level).'
+  const MADE_UP =
+    'Its ranks are done or not next: it makes up the trio for the race. The plan takes the classes reincarnated least often (each time adds 10% to levelling it), never the class every levelling trio keeps while another will do.'
+  const times = (k: ReincKey) => r.times[k] ?? 0
   return (
     <div className="rc-step reinc">
       <span className="rc-kind reinc">Reincarnate {n}</span>
@@ -465,33 +472,25 @@ function ReincStep({ r, n, after, onDone }: { r: PlannedReinc; n: number; after:
         {r.classes.map((c) =>
           made(classKey(c)) ? (
             <Tip key={c} className="faint" text={MADE_UP}>
-              {reincClass(c).name} → {after(classKey(c))}
+              {timesText(reincClass(c).name, times(classKey(c)))}
             </Tip>
           ) : (
-            <b key={c}>
-              {reincClass(c).name} → {after(classKey(c))}
-            </b>
+            <b key={c}>{timesText(reincClass(c).name, times(classKey(c)))}</b>
           )
         )}
-        {r.race ? (
-          made(raceKey(r.race)) ? (
-            <Tip className="faint" text="No race on your list: the race you play then takes the rank.">
-              {r.race} → {after(raceKey(r.race))}
-            </Tip>
-          ) : (
-            <span>
-              {r.race} → {after(raceKey(r.race))}
-            </span>
-          )
+        {made(raceKey(r.race)) ? (
+          <Tip className="faint" text="Every race is at rank 3: the one reincarnated least often takes it.">
+            {timesText(r.race, times(raceKey(r.race)))}
+          </Tip>
         ) : (
-          <span className="faint">the race you play then</span>
+          <span>{timesText(r.race, times(raceKey(r.race)))}</span>
         )}
       </span>
       <span className="rc-tags">
         <StanceTag classes={r.classes} />
       </span>
       {onDone && (
-        <ConfirmButton className="btn small" question="Reincarnated as this? Each of its AAs goes up a rank, and its classes go back to level 1." onConfirm={onDone}>
+        <ConfirmButton className="btn small" question="Reincarnated as this? Each of its AAs goes up a rank, and its classes and race go back to level 1." onConfirm={onDone}>
           Reincarnated
         </ConfirmButton>
       )}
@@ -501,17 +500,6 @@ function ReincStep({ r, n, after, onDone }: { r: PlannedReinc; n: number; after:
 
 /** The plan: before each reincarnation the trios to level as, then it; after the last, the levelling left. */
 function ThePlan({ s, stages, onDone, onSetup }: { s: ReincState; stages: PlanStage[]; onDone: (r: PlannedReinc) => void; onSetup: () => void }) {
-  // The rank each reincarnation takes its lines to, counting the ones before it.
-  const afters = useMemo(() => {
-    const got: Partial<Record<ReincKey, number>> = {}
-    for (const k of REINC_KEYS) got[k] = s.ranks[k]?.rank ?? 0
-    return stages.map((st) => {
-      if (!st.reinc) return { ...got }
-      const keys = [...st.reinc.classes.map(classKey), ...(st.reinc.race ? [raceKey(st.reinc.race)] : [])]
-      for (const k of keys) got[k] = Math.min(REINC_RANKS, got[k]! + 1)
-      return { ...got }
-    })
-  }, [s.ranks, stages])
   const reincs = stages.filter((st) => st.reinc).length
   const runs = stages.reduce((n, st) => n + st.runs.length, 0)
   let n = 0
@@ -548,7 +536,7 @@ function ThePlan({ s, stages, onDone, onSetup }: { s: ReincState; stages: PlanSt
                   {st.runs.map((r, j) => (
                     <RunStep key={j} r={r} />
                   ))}
-                  {st.reinc && <ReincStep r={st.reinc} n={n} after={(k) => afters[i][k] ?? 0} onDone={n === 1 ? () => onDone(st.reinc!) : undefined} />}
+                  {st.reinc && <ReincStep r={st.reinc} n={n} onDone={n === 1 ? () => onDone(st.reinc!) : undefined} />}
                 </li>
               )
             })}
@@ -604,7 +592,7 @@ function Planner({ s, stages, onDone, onSetup }: { s: ReincState; stages: PlanSt
 }
 
 /** The tokens held and whether the loadout can reincarnate now. */
-function Status({ s, next }: { s: ReincState; next: PlannedReinc | undefined }) {
+function Status({ s, times, next }: { s: ReincState; times: Partial<Record<ReincKey, number>>; next: PlannedReinc | undefined }) {
   const lo = s.loadout
   const ready = lo.classes.length === 3 && lo.classes.every((c) => c.level >= LEVEL_CAP)
   const isNext = !!next && lo.classes.length === 3 && lo.classes.every((c) => next.classes.includes(c.id)) && (!next.race || next.race === lo.race)
@@ -632,7 +620,7 @@ function Status({ s, next }: { s: ReincState; next: PlannedReinc | undefined }) 
       {lo.classes.length > 0 && (
         <PenaltyTag
           pct={xpPenalty(
-            s.ranks,
+            Object.fromEntries(Object.entries(times).map(([k, n]) => [k, { rank: n ?? 0 }])) as Partial<Record<ReincKey, { rank: number }>>,
             lo.classes.map((c) => c.id),
             lo.race
           )}
@@ -650,18 +638,20 @@ export function Reincarnation() {
   useVisibleInterval(q.reload, 60_000)
   const [view, setView] = useRemembered<View>('reinc.view', 'progress')
   const s = q.data
+  const times = useMemo(() => (s ? reincTimes(s.ranks, s.history) : {}), [s])
   const stages = useMemo(
     () =>
       s
         ? makePlan({
-            ranks: s.ranks,
+            times,
             priority: s.priority,
             capped: Object.fromEntries(REINC_CLASSES.map((c) => [c.id, s.levels[c.id].capped])),
             anchor: s.anchor,
-            race: s.loadout.race
+            race: s.loadout.race,
+            raceCapped: s.loadout.classes.every((c) => c.level >= LEVEL_CAP)
           })
         : [],
-    [s]
+    [s, times]
   )
 
   /** Calls one of the module's channels and shows the state it answers with. */
@@ -709,7 +699,7 @@ export function Reincarnation() {
               ['plan', 'Planner']
             ]}
           />
-          <Status s={s} next={stages.find((st) => st.reinc)?.reinc ?? undefined} />
+          <Status s={s} times={times} next={stages.find((st) => st.reinc)?.reinc ?? undefined} />
           {view === 'progress' ? (
             <Progress s={s} stages={stages} onRank={(key, rank) => void save(() => api.invoke('reincarnation:rank', character, key, rank))} />
           ) : view === 'setup' ? (
