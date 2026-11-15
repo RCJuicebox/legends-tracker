@@ -535,23 +535,35 @@ const classOfKey = (k: `class:${ClassId}`) => k.slice(6) as ClassId
 const CLASS_ORDER = REINC_CLASSES.map((c) => c.id)
 const hasStance = (c: ClassId, s: Stance) => reincClass(c).stances.includes(s)
 
+/** The class list as trios: each three classes in a row, in the list's order (each class once). */
+export function trioGroups(priority: readonly PriorityEntry[]): ClassId[][] {
+  const classes: ClassId[] = []
+  for (const e of priority) if (isClassKey(e.key) && !classes.includes(classOfKey(e.key))) classes.push(classOfKey(e.key))
+  const out: ClassId[][] = []
+  for (let i = 0; i < classes.length; i += 3) out.push(classes.slice(i, i + 3))
+  return out
+}
+
 /**
- * The reincarnations the priority list makes, in order. Each takes the first three classes on the
- * list with a rank still to come (one rank each, so a line to rank 3 comes up three times) and the
- * first race. When fewer than three classes are left on it, the trio is made up from the classes at
- * the cap with the lowest ranks, so the extra levelling and the XP penalty both stay low; with no race
- * left on it, the race played then takes the rank.
+ * The reincarnations the priority lists make, in order. Every three classes in a row on the class list
+ * are a trio, reincarnated together until all three reach rank 3 (three times from rank 0); a trio
+ * already there is passed over. Races go in the race list's order, each until it reaches rank 3. A
+ * last trio short of three is made up from the classes at the cap with the lowest ranks, so the extra
+ * levelling and the XP penalty both stay low; with no race left on the list, the race played then takes
+ * the rank.
  */
 export function plannedReincs(input: PlanInput): PlannedReinc[] {
   const rank: Partial<Record<ReincKey, number>> = {}
   for (const k of REINC_KEYS) rank[k] = input.ranks[k]?.rank ?? 0
   const capped = { ...input.capped }
   let race = input.race
-  const steps = prioritySteps(input.priority, input.ranks)
+  const races = prioritySteps(
+    input.priority.filter((e) => !isClassKey(e.key)),
+    input.ranks
+  )
   const out: PlannedReinc[] = []
-  while (steps.length && out.length < MAX_REINCS) {
-    const classes: ClassId[] = []
-    for (const s of steps) if (isClassKey(s.key) && !classes.includes(classOfKey(s.key)) && classes.length < 3) classes.push(classOfKey(s.key))
+  for (const group of trioGroups(input.priority)) {
+    const classes = [...group]
     const extra: ReincKey[] = []
     const spare = CLASS_ORDER.filter((c) => !classes.includes(c) && rank[classKey(c)]! < REINC_RANKS).sort(
       (a, b) => Number(capped[b] === true) - Number(capped[a] === true) || rank[classKey(a)]! - rank[classKey(b)]!
@@ -562,17 +574,16 @@ export function plannedReincs(input: PlanInput): PlannedReinc[] {
       extra.push(classKey(c))
     }
     if (classes.length < 3) break
-    const raceStep = steps.find((s) => !isClassKey(s.key))
-    const r = raceStep ? raceStep.key.slice(5) : race
-    if (!raceStep && r) extra.push(raceKey(r))
-    for (const k of [...classes.map(classKey), ...(r ? [raceKey(r)] : [])]) {
-      const i = steps.findIndex((s) => s.key === k)
-      if (i >= 0) steps.splice(i, 1)
-      rank[k] = Math.min(REINC_RANKS, rank[k]! + 1)
+    const times = REINC_RANKS - Math.min(...classes.map((c) => rank[classKey(c)]!))
+    for (let n = 0; n < times && out.length < MAX_REINCS; n++) {
+      const step = races.shift()
+      const r = step ? step.key.slice(5) : race
+      const made = [...extra, ...(!step && r ? [raceKey(r)] : [])]
+      for (const k of [...classes.map(classKey), ...(r ? [raceKey(r)] : [])]) rank[k] = Math.min(REINC_RANKS, rank[k]! + 1)
+      for (const c of classes) capped[c] = false
+      race = r
+      out.push({ classes, race: r, extra: made })
     }
-    for (const c of classes) capped[c] = false
-    race = r
-    out.push({ classes, race: r, extra })
   }
   return out
 }
