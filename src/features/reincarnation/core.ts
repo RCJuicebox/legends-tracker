@@ -559,8 +559,9 @@ export function reincTimes(ranks: Partial<Record<ReincKey, { rank: number }>>, h
  * it, so classes go from rank 0 to 3 together and a race takes its three ranks in a row. Races take
  * three times as many reincarnations as classes, so once fewer than three classes are left below rank
  * 3 the trio is made up from the classes reincarnated least often (each time adds to the XP penalty
- * of levelling that class), at the cap first, in your order, and never the anchor class while another
- * will do: it stays at the cap, and the race's reset to level 1 is levelled with it all the same.
+ * of levelling that class), at the cap first, in your order. The anchor class takes its turn too, but
+ * never so as to become the most-reincarnated class: it is in every levelling trio, so its count is the
+ * least penalty any of them carries.
  */
 export function plannedReincs(input: PlanInput): PlannedReinc[] {
   const times: Partial<Record<ReincKey, number>> = {}
@@ -575,11 +576,13 @@ export function plannedReincs(input: PlanInput): PlannedReinc[] {
     const race = order.races.find((r) => left(raceKey(r)))
     if (!classes.length && !race) break
     const extra: ReincKey[] = []
+    // The anchor class is in every levelling trio, so its count sets the least penalty any of them has:
+    // it waits while one more would make it the most-reincarnated class.
+    const most = Math.max(...CLASS_ORDER.filter((c) => c !== input.anchor).map((c) => times[classKey(c)]!))
+    const waits = (c: ClassId) => c === input.anchor && times[classKey(c)]! >= most
     const spare = order.classes
       .filter((c) => !classes.includes(c))
-      .sort(
-        (a, b) => Number(a === input.anchor) - Number(b === input.anchor) || times[classKey(a)]! - times[classKey(b)]! || Number(capped[b] === true) - Number(capped[a] === true)
-      )
+      .sort((a, b) => Number(waits(a)) - Number(waits(b)) || times[classKey(a)]! - times[classKey(b)]! || Number(capped[b] === true) - Number(capped[a] === true))
     while (classes.length < 3) {
       const c = spare.shift()!
       classes.push(c)

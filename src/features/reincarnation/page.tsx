@@ -68,7 +68,8 @@ const HOW = (
       <b>The XP penalty</b>: levels 1–{XP_PENALTY_LEVELS} take {XP_PENALTY_PER_RANK}% more experience for each time a class or race was reincarnated, past rank 3 too, only while
       you play it. Measured from a log, the same mob at the same level kill for kill: a trio and race’s first reincarnation cost {XP_PENALTY_PER_RANK}% and the second{' '}
       {2 * XP_PENALTY_PER_RANK}%, not four times that, so the four lines do not add up: this page counts the most-reincarnated of the classes and race you play. That is why the
-      plan spreads the extra reincarnations the races need over the classes reincarnated least, and keeps the class every levelling trio holds out of them.
+      plan spreads the extra reincarnations the races need over the classes reincarnated least, and lets the class every levelling trio holds take a turn only while that leaves it
+      below the most-reincarnated class.
     </div>
   </>
 )
@@ -463,7 +464,7 @@ function timesText(name: string, n: number): string {
 function ReincStep({ r, n, onDone }: { r: PlannedReinc; n: number; onDone?: () => void }) {
   const made = (k: ReincKey) => r.extra.includes(k)
   const MADE_UP =
-    'Its ranks are done or not next: it makes up the trio for the race. The plan takes the classes reincarnated least often (each time adds 10% to levelling it), never the class every levelling trio keeps while another will do.'
+    'Its ranks are done or not next: it makes up the trio for the race. The plan takes the classes reincarnated least often (each time adds 10% to levelling it), and the class every levelling trio keeps only while that leaves it below the most-reincarnated class.'
   const times = (k: ReincKey) => r.times[k] ?? 0
   return (
     <div className="rc-step reinc">

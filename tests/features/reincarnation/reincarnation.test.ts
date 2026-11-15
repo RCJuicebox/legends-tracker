@@ -239,17 +239,25 @@ describe('the plan', () => {
     expect(got.slice(0, 2).map((r) => r.classes.join('/'))).toEqual(['war/shd/rog', 'war/wiz/pal'])
   })
 
-  it('makes up a trio for the races from the classes reincarnated least, never the anchor while another will do', () => {
+  it('makes up a trio for the races from the classes reincarnated least, the anchor never becoming the most', () => {
     // Every class at rank 3, reincarnated three times, but Monk five times and Bard four; the races are all to do.
     const times: PlanInput['times'] = { ...allAt(3), 'class:mnk': 5, 'class:brd': 4 }
     for (const r of REINC_RACES) times[`race:${r.race}`] = 0
     const got = plannedReincs(input({ times }))
     // At the cap first: Shadow Knight and Rogue are below it, so Ranger goes before them.
     expect(got[0]).toMatchObject({ classes: ['war', 'pal', 'rng'], race: 'Human', extra: ['class:war', 'class:pal', 'class:rng'] })
-    // Spread: the next take classes not taken again yet; the Wizard comes last.
+    // Spread: the next take classes not taken again yet. The Wizard (three times, like most) may go up to
+    // four, with Monk at five: it takes its turn, but never above every other class.
     expect(got[1].classes).toEqual(['ber', 'bst', 'clr'])
-    expect(got.slice(0, 5).flatMap((r) => r.classes)).not.toContain('wiz')
     expect(got.slice(0, 5).flatMap((r) => r.classes)).not.toContain('mnk')
+    const wizard = got.flatMap((r, i) => (r.classes.includes('wiz') ? [i] : []))
+    expect(wizard.length).toBeGreaterThan(0)
+    for (const i of wizard) {
+      const others = Math.max(
+        ...REINC_CLASSES.filter((c) => c.id !== 'wiz').map((c) => got.slice(0, i + 1).reduce((n, r) => n + Number(r.classes.includes(c.id)), times[`class:${c.id}`]!))
+      )
+      expect(got[i].times['class:wiz']).toBeLessThanOrEqual(others)
+    }
   })
 
   it('levels the race back after every reincarnation, as the race to reincarnate as', () => {
