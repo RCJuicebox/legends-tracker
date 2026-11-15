@@ -5012,31 +5012,15 @@ button.rc-part:hover {
   padding-left: 18px;
 }
 /* Setup's priority lists: tiles in order, dragged into place. */
-.rc-tiles-acts {
-  margin-left: auto;
-}
 .rc-tiles {
   list-style: none;
   margin: 0;
   padding: 6px;
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
   gap: 6px;
-  min-height: 56px;
   border: 1px dashed transparent;
   border-radius: 4px;
-}
-.rc-tiles.drop-end {
-  border-color: var(--accent);
-}
-.rc-tiles.trios {
-  grid-template-columns: 64px repeat(3, minmax(0, 1fr));
-}
-.rc-trio-label {
-  align-self: center;
-  font-weight: 650;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
 }
 .rc-tile {
   display: grid;
@@ -5054,6 +5038,9 @@ button.rc-part:hover {
 }
 .rc-tile.drop-before {
   box-shadow: -3px 0 0 var(--accent);
+}
+.rc-tile.drop-after {
+  box-shadow: 3px 0 0 var(--accent);
 }
 .rc-tile.done {
   opacity: 0.6;
@@ -5076,23 +5063,6 @@ button.rc-part:hover {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-}
-.rc-tile-empty {
-  grid-column: 1 / -1;
-  padding: 10px;
-  list-style: none;
-}
-.rc-pool {
-  min-height: 34px;
-  padding: 4px;
-  border: 1px dashed transparent;
-  border-radius: 4px;
-}
-.rc-pool.drop-here {
-  border-color: var(--accent);
-}
-.rc-pool .rc-chip {
-  cursor: grab;
 }
 /* The plan: each reincarnation with the levelling before it. */
 .rc-stages {

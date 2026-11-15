@@ -1,4 +1,4 @@
-import { Fragment, useMemo, useState, type DragEvent, type KeyboardEvent, type ReactNode } from 'react'
+import { useMemo, useState, type KeyboardEvent, type ReactNode } from 'react'
 import { CharacterPicker } from '../../renderer/src/components/CharacterPicker'
 import { api } from '../../renderer/src/api'
 import { useInvoke, useVisibleInterval } from '../../renderer/src/hooks'
@@ -19,6 +19,7 @@ import {
   XP_PENALTY_PER_RANK,
   classKey,
   makePlan,
+  rankedLines,
   raceKey,
   reincarnationsLeft,
   reincClass,
@@ -58,10 +59,10 @@ const HOW = (
       Invocations table; a class’s mana stat is the Stats page’s rule (WIS for priests, Paladin, Ranger and Beastlord; INT for the other classes with mana).
     </div>
     <div>
-      <b>The plan</b> is made from your class and race lists (on Setup) each time the page draws, so a reincarnation your log shows (or you say you made) moves it on by itself.
-      Levelling trios keep the class you choose, take the classes the next reincarnation needs at level {LEVEL_CAP}, and fill the places left without raising the XP penalty:
-      evasive stance first, defensive when no evasive class fits, then the reincarnated classes below {LEVEL_CAP} with the most ranks. Which classes are at {LEVEL_CAP} comes from
-      /who while you play them and from what you say: the log’s level lines do not name the class.
+      <b>The plan</b> is made from your order of the classes and of the races (on Setup) each time the page draws, so a reincarnation your log shows (or you say you made) moves it
+      on by itself. Levelling trios keep the class you choose, take the classes the next reincarnation needs at level {LEVEL_CAP}, and fill the places left without raising the XP
+      penalty: evasive stance first, defensive when no evasive class fits, then the reincarnated classes below {LEVEL_CAP} with the most ranks. Which classes are at {LEVEL_CAP}{' '}
+      comes from /who while you play them and from what you say: the log’s level lines do not name the class.
     </div>
     <div>
       <b>The XP penalty</b>: levels 1–{XP_PENALTY_LEVELS} take {XP_PENALTY_PER_RANK}% more experience for each Reincarnation rank, only while you play the classes and race that
@@ -222,224 +223,133 @@ function Progress({ s, stages, onRank }: { s: ReincState; stages: PlanStage[]; o
 /** A line's name: the class's, or the race. */
 const lineName = (k: ReincKey) => (k.startsWith('class:') ? reincClass(k.slice(6) as ClassId).name : k.slice(5))
 
-/** The priority list as one list per kind, each line once (an older list's repeats take their first place and highest rank). */
-function splitPriority(list: readonly PriorityEntry[]): { classes: PriorityEntry[]; races: PriorityEntry[] } {
-  const out: PriorityEntry[] = []
-  for (const e of list) {
-    const had = out.find((x) => x.key === e.key)
-    if (had) had.rank = Math.max(had.rank, e.rank)
-    else out.push({ ...e })
-  }
-  return { classes: out.filter((e) => e.key.startsWith('class:')), races: out.filter((e) => e.key.startsWith('race:')) }
-}
-
-/** What a tile is dragged from: its line, and whether it was on the list or among those not on it. */
-type Dragging = { key: ReincKey; from: 'list' | 'pool' } | null
-
 /**
- * One priority list as tiles: those on it in order, numbered, and those not on it below. Drag a tile
- * to its place, or from one part to the other; click one not on it to add it at the end. A tile on the
- * list moves with Ctrl+arrows and comes off with Delete, for the keyboard.
+ * Every class (or every race) as numbered tiles, 1 first. Drag a tile to its place; for the keyboard,
+ * focus a tile's number and move it with Ctrl+arrows.
  */
-function TileList({
+function RankList({
   title,
   hint,
-  list,
-  all,
+  order,
   rankOf,
   tags,
-  trios = false,
   onChange
 }: {
   title: string
-  hint: string
-  list: PriorityEntry[]
-  all: ReincKey[]
+  hint: ReactNode
+  order: ReincKey[]
   rankOf: (k: ReincKey) => number
   tags?: (k: ReincKey) => ReactNode
-  /** Show the list as trios, three tiles a row. */
-  trios?: boolean
-  onChange: (list: PriorityEntry[]) => void
+  onChange: (order: ReincKey[]) => void
 }) {
-  const [drag, setDrag] = useState<Dragging>(null)
-  const [over, setOver] = useState<number | 'end' | 'pool' | null>(null)
-  const on = new Set(list.map((e) => e.key))
-  const pool = all.filter((k) => !on.has(k))
-  const open = pool.filter((k) => rankOf(k) < REINC_RANKS)
+  const [drag, setDrag] = useState<ReincKey | null>(null)
+  const [over, setOver] = useState<number | null>(null)
 
+  /** Moves a tile to sit before the one now at `at` (the end when `at` is the length). */
   const place = (key: ReincKey, at: number) => {
-    const had = list.find((e) => e.key === key)
-    const rest = list.filter((e) => e.key !== key)
-    const from = list.findIndex((e) => e.key === key)
-    // Taking a tile out ahead of where it goes moves that place up one.
-    const i = Math.max(0, Math.min(rest.length, from >= 0 && from < at ? at - 1 : at))
-    onChange([...rest.slice(0, i), had ?? { key, rank: REINC_RANKS }, ...rest.slice(i)])
+    const from = order.indexOf(key)
+    const rest = order.filter((k) => k !== key)
+    const i = from < at ? at - 1 : at
+    const next = [...rest.slice(0, i), key, ...rest.slice(i)]
+    if (next.some((k, j) => k !== order[j])) onChange(next)
   }
-  const remove = (key: ReincKey) => onChange(list.filter((e) => e.key !== key))
   const end = () => {
     setDrag(null)
     setOver(null)
   }
-  const dropOn = (at: number | 'end' | 'pool') => (e: DragEvent) => {
-    e.preventDefault()
-    e.stopPropagation()
-    if (drag) {
-      if (at === 'pool') {
-        if (drag.from === 'list') remove(drag.key)
-      } else place(drag.key, at === 'end' ? list.length : at)
-    }
-    end()
-  }
-  const overOn = (at: number | 'end' | 'pool') => (e: DragEvent) => {
-    if (!drag) return
-    e.preventDefault()
-    e.stopPropagation()
-    if (over !== at) setOver(at)
-  }
   const keys = (i: number, key: ReincKey) => (e: KeyboardEvent) => {
-    if (e.target !== e.currentTarget) return
-    if (e.key === 'Delete' || e.key === 'Backspace') remove(key)
-    else if (e.ctrlKey && (e.key === 'ArrowLeft' || e.key === 'ArrowUp') && i > 0) place(key, i - 1)
-    else if (e.ctrlKey && (e.key === 'ArrowRight' || e.key === 'ArrowDown') && i < list.length - 1) place(key, i + 2)
+    if (e.ctrlKey && (e.key === 'ArrowLeft' || e.key === 'ArrowUp') && i > 0) place(key, i - 1)
+    else if (e.ctrlKey && (e.key === 'ArrowRight' || e.key === 'ArrowDown') && i < order.length - 1) place(key, i + 2)
     else return
     e.preventDefault()
   }
 
   return (
     <div className="card">
-      <div className="row">
-        <h3>{title}</h3>
-        <span className="small faint">
-          {num(list.length)} on the list, {num(open.length)} not
-        </span>
-        <span className="row tight rc-tiles-acts">
-          {open.length > 0 && (
-            <button className="btn small ghost" onClick={() => onChange([...list, ...open.map((key) => ({ key, rank: REINC_RANKS }))])}>
-              Add the rest
-            </button>
-          )}
-          {list.length > 0 && (
-            <ConfirmButton className="btn small ghost" question={`Take every ${title.toLowerCase().replace(/s$/, '')} off?`} onConfirm={() => onChange([])}>
-              Clear
-            </ConfirmButton>
-          )}
-        </span>
-      </div>
+      <h3>{title}</h3>
       <div className="small faint mb-8">{hint}</div>
-      <ol className={`rc-tiles${trios ? ' trios' : ''}${over === 'end' ? ' drop-end' : ''}`} onDragOver={overOn('end')} onDrop={dropOn('end')} aria-label={`${title}, in order`}>
-        {list.map((e, i) => {
-          const held = rankOf(e.key)
-          const done = held >= REINC_RANKS
-          const trio = list.slice(i, i + 3)
-          const tile = (
+      <ol className="rc-tiles" aria-label={`${title}, first first`}>
+        {order.map((k, i) => {
+          const held = rankOf(k)
+          return (
             <li
-              key={e.key}
-              className={`rc-tile${drag?.key === e.key ? ' dragging' : ''}${over === i ? ' drop-before' : ''}${done ? ' done' : ''}`}
+              key={k}
+              className={`rc-tile${drag === k ? ' dragging' : ''}${over === i ? (drag && order.indexOf(drag) < i ? ' drop-after' : ' drop-before') : ''}${held >= REINC_RANKS ? ' done' : ''}`}
               draggable
               onDragStart={(ev) => {
                 ev.dataTransfer.effectAllowed = 'move'
-                ev.dataTransfer.setData('text/plain', e.key)
-                setDrag({ key: e.key, from: 'list' })
+                ev.dataTransfer.setData('text/plain', k)
+                setDrag(k)
               }}
               onDragEnd={end}
-              onDragOver={overOn(i)}
-              onDrop={dropOn(i)}
+              onDragOver={(ev) => {
+                if (!drag) return
+                ev.preventDefault()
+                if (over !== i) setOver(i)
+              }}
+              onDrop={(ev) => {
+                ev.preventDefault()
+                // Dropped on a tile further down, it goes after it; further up, before it.
+                if (drag) place(drag, order.indexOf(drag) < i ? i + 1 : i)
+                end()
+              }}
               title="Drag to move it."
             >
               <button
                 className="rc-tile-num mono"
-                onKeyDown={keys(i, e.key)}
-                aria-label={`${lineName(e.key)}, ${i + 1} of ${list.length}: Ctrl+arrows move it, Delete takes it off`}
-                title="Drag the tile to move it; or focus this and use Ctrl+arrows, and Delete to take it off."
+                onKeyDown={keys(i, k)}
+                aria-label={`${lineName(k)}, number ${i + 1} of ${order.length}: Ctrl+arrows move it`}
+                title="Drag the tile to move it, or focus this and use Ctrl+arrows."
               >
                 {i + 1}
               </button>
               <span className="rc-tile-body">
-                <b>{lineName(e.key)}</b>
+                <b>{lineName(k)}</b>
                 <span className="small faint">
                   rank {held}
-                  {done ? ', done' : ''}
+                  {held >= REINC_RANKS ? ', done' : ''}
                 </span>
-                {tags?.(e.key)}
-              </span>
-              <span className="rc-tile-acts">
-                <button className="link-button faint" onClick={() => remove(e.key)} aria-label={`Take ${lineName(e.key)} off the list`} title="Take it off the list">
-                  ✕
-                </button>
+                {tags?.(k)}
               </span>
             </li>
           )
-          if (!trios || i % 3) return tile
-          return (
-            <Fragment key={e.key}>
-              <li className="rc-trio-label small faint" onDragOver={overOn(i)} onDrop={dropOn(i)}>
-                Trio {i / 3 + 1}
-                {trio.every((x) => rankOf(x.key) >= REINC_RANKS) ? ', done' : trio.length < 3 ? `: the plan adds ${3 - trio.length}` : ''}
-              </li>
-              {tile}
-            </Fragment>
-          )
         })}
-        {!list.length && <li className="rc-tile-empty faint">Drag tiles here, or click them below, in the order you want them.</li>}
       </ol>
-      <div className="rc-pick-head small faint">Not on the list: click to add at the end, or drag into place</div>
-      <div className={`rc-pick rc-pool${over === 'pool' ? ' drop-here' : ''}`} onDragOver={overOn('pool')} onDrop={dropOn('pool')}>
-        {pool.map((k) => {
-          const full = rankOf(k) >= REINC_RANKS
-          return (
-            <button
-              key={k}
-              className="rc-chip"
-              disabled={full}
-              draggable={!full}
-              onDragStart={(ev) => {
-                ev.dataTransfer.effectAllowed = 'move'
-                ev.dataTransfer.setData('text/plain', k)
-                setDrag({ key: k, from: 'pool' })
-              }}
-              onDragEnd={end}
-              onClick={() => onChange([...list, { key: k, rank: REINC_RANKS }])}
-              title={full ? 'All three ranks done.' : 'Click to add it at the end, or drag it into place.'}
-            >
-              <span>
-                {lineName(k)} <span className="mono faint">R{rankOf(k)}</span>
-              </span>
-              {tags?.(k)}
-            </button>
-          )
-        })}
-        {!pool.length && <span className="small faint">All of them are on the list. Drag one here to take it off.</span>}
-      </div>
     </div>
   )
 }
 
-/** The two priority lists, classes and races; the plan reads them as one. */
+/** The two rankings, every class and every race; the plan builds the trios from them. */
 function PriorityLists({ s, onPriority }: { s: ReincState; onPriority: (list: PriorityEntry[]) => void }) {
-  const { classes, races } = useMemo(() => splitPriority(s.priority), [s.priority])
+  const order = useMemo(() => rankedLines(s.priority), [s.priority])
+  const classes = order.classes.map(classKey)
+  const races = order.races.map(raceKey)
   const left = reincarnationsLeft(s.ranks)
   const rankOfLine = (k: ReincKey) => s.ranks[k]?.rank ?? 0
+  const save = (keys: ReincKey[]) => onPriority(keys.map((key) => ({ key, rank: REINC_RANKS })))
   return (
-    <>
-      <TileList
+    <div className="rc-cols">
+      <RankList
         title="Classes"
-        hint={`Every three classes in a row are a trio, reincarnated together until all three reach rank 3 (three times from rank 0), then the next trio. A last trio short of three is made up from classes at level ${LEVEL_CAP} with the fewest ranks. Every class at rank 3 takes ${num(left.classes)} more ${left.classes === 1 ? 'reincarnation' : 'reincarnations'}.`}
-        list={classes}
-        all={REINC_CLASSES.map((c) => classKey(c.id))}
+        hint={
+          <>
+            Your order, 1 first. Each reincarnation takes your three highest classes still below rank 3, so they go from rank 0 to 3 together, then the next three. Every class at
+            rank 3 takes {num(left.classes)} more {left.classes === 1 ? 'reincarnation' : 'reincarnations'}.
+          </>
+        }
+        order={classes}
         rankOf={rankOfLine}
         tags={(k) => <ClassTags c={reincClass(k.slice(6) as ClassId)} />}
-        trios
-        onChange={(list) => onPriority([...list, ...races])}
+        onChange={(next) => save([...next, ...races])}
       />
-      <TileList
+      <RankList
         title="Races"
-        hint="Each race in turn until it reaches rank 3 (three reincarnations from rank 0), then the next. With none left on the list, the race you play then takes the rank."
-        list={races}
-        all={REINC_RACES.map((r) => raceKey(r.race))}
+        hint={<>Your order, 1 first. Each reincarnation takes your highest race still below rank 3, so a race takes its three ranks in a row, then the next.</>}
+        order={races}
         rankOf={rankOfLine}
-        onChange={(list) => onPriority([...classes, ...list])}
+        onChange={(next) => save([...classes, ...next])}
       />
-    </>
+    </div>
   )
 }
 
@@ -593,13 +503,6 @@ function ReincStep({ r, n, after, onDone }: { r: PlannedReinc; n: number; after:
   )
 }
 
-/** "3 trios and 4 races": what the lists hold. */
-function listed(priority: readonly PriorityEntry[]): string {
-  const { classes, races } = splitPriority(priority)
-  const trios = Math.ceil(classes.length / 3)
-  return `${num(trios)} ${trios === 1 ? 'trio' : 'trios'} and ${num(races.length)} ${races.length === 1 ? 'race' : 'races'}`
-}
-
 /** The plan: before each reincarnation the trios to level as, then it; after the last, the levelling left. */
 function ThePlan({ s, stages, onDone, onSetup }: { s: ReincState; stages: PlanStage[]; onDone: (r: PlannedReinc) => void; onSetup: () => void }) {
   // The rank each reincarnation takes its lines to, counting the ones before it.
@@ -621,10 +524,9 @@ function ThePlan({ s, stages, onDone, onSetup }: { s: ReincState; stages: PlanSt
     <div className="card">
       <h3>The plan</h3>
       <div className="small mb-8">
-        {s.priority.length ? `Made from your ${listed(s.priority)}, ` : 'Your class and race lists are empty, '}
-        levelling with {s.anchor ? reincClass(s.anchor).name : 'no class in particular'} in every trio.{' '}
+        Made from your class and race order, levelling with {s.anchor ? reincClass(s.anchor).name : 'no class in particular'} in every trio.{' '}
         <button className="link-button" onClick={onSetup}>
-          {s.priority.length ? 'Change them on Setup' : 'Fill them in on Setup'}
+          {s.priority.length ? 'Change it on Setup' : 'Set it on Setup (the game’s order until you do)'}
         </button>
       </div>
       {stages.length ? (
@@ -657,15 +559,13 @@ function ThePlan({ s, stages, onDone, onSetup }: { s: ReincState; stages: PlanSt
           </ol>
         </>
       ) : (
-        <div className="empty">
-          Nothing to plan yet. On <b>Setup</b>, list the classes and races you want ranks in, in order; any reincarnated class below level {LEVEL_CAP} shows here to level too.
-        </div>
+        <div className="empty">Nothing left to plan: every class and race is at rank 3, and no reincarnated class is below level {LEVEL_CAP}.</div>
       )}
     </div>
   )
 }
 
-/** Setup: the class and race priority lists the plan is made from, and the levelling choices. */
+/** Setup: the class and race order the plan is made from, and the levelling choices. */
 function Setup({
   s,
   onPriority,
