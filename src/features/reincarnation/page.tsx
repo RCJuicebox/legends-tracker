@@ -37,11 +37,11 @@ import {
 } from './core'
 
 // Goals › Reincarnation (an optional module, Settings › Modules): Progress, a bar of three ranks for
-// every class and race AA, read from the log or set by hand; Planner, a plan made from the player's
-// priority list: the reincarnations it asks for, and before each the trios to level as, chosen for the
-// least XP penalty (core.ts's makePlan).
+// every class and race AA, read from the log or set by hand; Setup, the player's priority list and
+// levelling choices; Planner, the plan made from them: the reincarnations the list asks for, and before
+// each the trios to level as, chosen for the least XP penalty (core.ts's makePlan).
 
-type View = 'progress' | 'plan'
+type View = 'progress' | 'setup' | 'plan'
 
 const HOW = (
   <>
@@ -59,10 +59,10 @@ const HOW = (
       Invocations table; a class’s mana stat is the Stats page’s rule (WIS for priests, Paladin, Ranger and Beastlord; INT for the other classes with mana).
     </div>
     <div>
-      <b>The plan</b> is made from your priority list each time the page draws, so a reincarnation your log shows (or you say you made) moves it on by itself. Levelling trios keep
-      the class you choose, take the classes the next reincarnation needs at level {LEVEL_CAP}, and fill the places left without raising the XP penalty: evasive stance first,
-      defensive when no evasive class fits, then the reincarnated classes below {LEVEL_CAP} with the most ranks. Which classes are at {LEVEL_CAP} comes from /who while you play
-      them and from what you say: the log’s level lines do not name the class.
+      <b>The plan</b> is made from your priority list (on Setup) each time the page draws, so a reincarnation your log shows (or you say you made) moves it on by itself. Levelling
+      trios keep the class you choose, take the classes the next reincarnation needs at level {LEVEL_CAP}, and fill the places left without raising the XP penalty: evasive stance
+      first, defensive when no evasive class fits, then the reincarnated classes below {LEVEL_CAP} with the most ranks. Which classes are at {LEVEL_CAP} comes from /who while you
+      play them and from what you say: the log’s level lines do not name the class.
     </div>
     <div>
       <b>The XP penalty</b>: levels 1–{XP_PENALTY_LEVELS} take {XP_PENALTY_PER_RANK}% more experience for each Reincarnation rank, only while you play the classes and race that
@@ -495,7 +495,7 @@ function ReincStep({ r, n, after, onDone }: { r: PlannedReinc; n: number; after:
 }
 
 /** The plan: before each reincarnation the trios to level as, then it; after the last, the levelling left. */
-function ThePlan({ s, stages, onDone }: { s: ReincState; stages: PlanStage[]; onDone: (r: PlannedReinc) => void }) {
+function ThePlan({ s, stages, onDone, onSetup }: { s: ReincState; stages: PlanStage[]; onDone: (r: PlannedReinc) => void; onSetup: () => void }) {
   // The rank each reincarnation takes its lines to, counting the ones before it.
   const afters = useMemo(() => {
     const got: Partial<Record<ReincKey, number>> = {}
@@ -514,6 +514,13 @@ function ThePlan({ s, stages, onDone }: { s: ReincState; stages: PlanStage[]; on
   return (
     <div className="card">
       <h3>The plan</h3>
+      <div className="small mb-8">
+        {s.priority.length ? `Made from your priority list (${num(s.priority.length)} ${s.priority.length === 1 ? 'line' : 'lines'}), ` : 'Your priority list is empty, '}
+        levelling with {s.anchor ? reincClass(s.anchor).name : 'no class in particular'} in every trio.{' '}
+        <button className="link-button" onClick={onSetup}>
+          {s.priority.length ? 'Change it on Setup' : 'Fill it in on Setup'}
+        </button>
+      </div>
       {stages.length ? (
         <>
           <div className="small faint mb-8">
@@ -544,34 +551,38 @@ function ThePlan({ s, stages, onDone }: { s: ReincState; stages: PlanStage[]; on
           </ol>
         </>
       ) : (
-        <div className="empty">Nothing to plan: put classes and races on your priority list, and any reincarnated class below level {LEVEL_CAP} shows here to level.</div>
+        <div className="empty">
+          Nothing to plan yet. On <b>Setup</b>, list the classes and races you want ranks in, in order; any reincarnated class below level {LEVEL_CAP} shows here to level too.
+        </div>
       )}
     </div>
   )
 }
 
-function Planner({
+/** Setup: the priority list the plan is made from, and the levelling choices. */
+function Setup({
   s,
-  stages,
   onPriority,
   onAnchor,
-  onCapped,
-  onDone
+  onCapped
 }: {
   s: ReincState
-  stages: PlanStage[]
   onPriority: (list: PriorityEntry[]) => void
   onAnchor: (id: ClassId | '') => void
   onCapped: (id: ClassId, capped: boolean) => void
-  onDone: (r: PlannedReinc) => void
 }) {
   return (
     <div className="stack gap-16">
-      <ThePlan s={s} stages={stages} onDone={onDone} />
-      <div className="rc-cols">
-        <PriorityList s={s} onPriority={onPriority} />
-        <Levelling s={s} onAnchor={onAnchor} onCapped={onCapped} />
-      </div>
+      <PriorityList s={s} onPriority={onPriority} />
+      <Levelling s={s} onAnchor={onAnchor} onCapped={onCapped} />
+    </div>
+  )
+}
+
+function Planner({ s, stages, onDone, onSetup }: { s: ReincState; stages: PlanStage[]; onDone: (r: PlannedReinc) => void; onSetup: () => void }) {
+  return (
+    <div className="stack gap-16">
+      <ThePlan s={s} stages={stages} onDone={onDone} onSetup={onSetup} />
       {s.history.length > 0 && (
         <div className="card">
           <h3>Reincarnations made</h3>
@@ -692,21 +703,22 @@ export function Reincarnation() {
             onChange={setView}
             tabs={[
               ['progress', 'Progress'],
+              ['setup', s.priority.length ? 'Setup' : 'Setup (start here)'],
               ['plan', 'Planner']
             ]}
           />
           <Status s={s} next={stages.find((st) => st.reinc)?.reinc ?? undefined} />
           {view === 'progress' ? (
             <Progress s={s} stages={stages} onRank={(key, rank) => void save(() => api.invoke('reincarnation:rank', character, key, rank))} />
-          ) : (
-            <Planner
+          ) : view === 'setup' ? (
+            <Setup
               s={s}
-              stages={stages}
               onPriority={(list) => void save(() => api.invoke('reincarnation:priority', character, list))}
               onAnchor={(id) => void save(() => api.invoke('reincarnation:anchor', character, id))}
               onCapped={(id, capped) => void save(() => api.invoke('reincarnation:capped', character, id, capped))}
-              onDone={(r) => void save(() => api.invoke('reincarnation:done', character, r.classes, r.race))}
             />
+          ) : (
+            <Planner s={s} stages={stages} onDone={(r) => void save(() => api.invoke('reincarnation:done', character, r.classes, r.race))} onSetup={() => setView('setup')} />
           )}
         </>
       )}
