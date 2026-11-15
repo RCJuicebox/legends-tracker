@@ -60,16 +60,17 @@ const HOW = (
     </div>
     <div>
       <b>The plan</b> is made from your order of the classes and of the races (on Setup) each time the page draws, so a reincarnation your log shows (or you say you made) moves it
-      on by itself. Levelling trios keep the class you choose, take the classes the next reincarnation needs at level {LEVEL_CAP}, and fill the places left without raising the XP
-      penalty: evasive stance first, defensive when no evasive class fits, then the reincarnated classes below {LEVEL_CAP} with the most ranks. Every class is taken as at{' '}
-      {LEVEL_CAP} unless /who shows it below while you play it, a reincarnation sets it back to 1, or you say so: the log’s level lines do not name the class.
+      on by itself. Levelling trios level as many classes at once as they can: the classes the next reincarnation needs at level {LEVEL_CAP}, three together, then more below{' '}
+      {LEVEL_CAP} that the plan needs. A place left goes, without raising the XP penalty, to the class you choose, then to a class at {LEVEL_CAP} with the stance the trio lacks
+      (evasive, else defensive). Every class is taken as at {LEVEL_CAP} unless /who shows it below while you play it, a reincarnation sets it back to 1, or you say so: the log’s
+      level lines do not name the class.
     </div>
     <div>
       <b>The XP penalty</b>: levels 1–{XP_PENALTY_LEVELS} take {XP_PENALTY_PER_RANK}% more experience for each time a class or race was reincarnated, past rank 3 too, only while
       you play it. Measured from a log, the same mob at the same level kill for kill: a trio and race’s first reincarnation cost {XP_PENALTY_PER_RANK}% and the second{' '}
       {2 * XP_PENALTY_PER_RANK}%, not four times that, so the four lines do not add up: this page counts the most-reincarnated of the classes and race you play. That is why the
-      plan spreads the extra reincarnations the races need over the classes reincarnated least, and lets the class every levelling trio holds take a turn only while that leaves it
-      below the most-reincarnated class.
+      plan spreads the extra reincarnations the races need over the classes reincarnated least, and lets your chosen class take a turn only while that leaves it below the
+      most-reincarnated class.
     </div>
   </>
 )
@@ -361,15 +362,15 @@ const LEVEL_FROM: Record<ClassLevel['from'], string> = {
   none: 'nothing says otherwise, so the plan takes it as levelled'
 }
 
-/** The levelling choices: the class every trio keeps, and which classes are at the cap. */
+/** The levelling choices: the class a spare place in a levelling trio goes to, and which classes are at the cap. */
 function Levelling({ s, onAnchor, onCapped }: { s: ReincState; onAnchor: (id: ClassId | '') => void; onCapped: (id: ClassId, capped: boolean) => void }) {
   return (
     <div className="card">
       <h3>Levelling</h3>
       <div className="row">
         <label className="row tight">
-          Every levelling trio keeps
-          <select value={s.anchor} onChange={(e) => onAnchor(e.target.value as ClassId | '')} aria-label="Class every levelling trio keeps">
+          A spare place in a levelling trio goes to
+          <select value={s.anchor} onChange={(e) => onAnchor(e.target.value as ClassId | '')} aria-label="Class a spare place in a levelling trio goes to">
             <option value="">no class in particular</option>
             {REINC_CLASSES.map((c) => (
               <option key={c.id} value={c.id}>
@@ -464,7 +465,7 @@ function timesText(name: string, n: number): string {
 function ReincStep({ r, n, onDone }: { r: PlannedReinc; n: number; onDone?: () => void }) {
   const made = (k: ReincKey) => r.extra.includes(k)
   const MADE_UP =
-    'Its ranks are done or not next: it makes up the trio for the race. The plan takes the classes reincarnated least often (each time adds 10% to levelling it), and the class every levelling trio keeps only while that leaves it below the most-reincarnated class.'
+    'Its ranks are done or not next: it makes up the trio for the race. The plan takes the classes reincarnated least often (each time adds 10% to levelling it), and the class you chose for spare levelling places only while that leaves it below the most-reincarnated class.'
   const times = (k: ReincKey) => r.times[k] ?? 0
   return (
     <div className="rc-step reinc">
@@ -508,7 +509,7 @@ function ThePlan({ s, stages, onDone, onSetup }: { s: ReincState; stages: PlanSt
     <div className="card">
       <h3>The plan</h3>
       <div className="small mb-8">
-        Made from your class and race order, levelling with {s.anchor ? reincClass(s.anchor).name : 'no class in particular'} in every trio.{' '}
+        Made from your class and race order, {s.anchor ? `${reincClass(s.anchor).name} in levelling trios’ spare places` : 'no class chosen for levelling trios’ spare places'}.{' '}
         <button className="link-button" onClick={onSetup}>
           {s.priority.length ? 'Change it on Setup' : 'Set it on Setup (the game’s order until you do)'}
         </button>
@@ -517,10 +518,10 @@ function ThePlan({ s, stages, onDone, onSetup }: { s: ReincState; stages: PlanSt
         <>
           <div className="small faint mb-8">
             {num(reincs)} {reincs === 1 ? 'reincarnation' : 'reincarnations'} until every class and race is at rank 3, and {num(runs)} levelling {runs === 1 ? 'trio' : 'trios'}. A
-            levelling trio takes the classes that must reach level {LEVEL_CAP}, the highest ranks together, then fills its other places without raising the XP penalty: a class with
-            evasive stance (or defensive, when no evasive one fits), then the reincarnated classes below {LEVEL_CAP} with the most ranks. <b>Bold</b> classes level; the others are
-            at {LEVEL_CAP} already. Races take far more reincarnations than classes, so once every class is at rank 3 the plan goes on for the races, and classes are reset again
-            for them.
+            levelling trio levels as many classes as it can at once: those that must reach level {LEVEL_CAP}, three together, then more below {LEVEL_CAP} the plan needs. A place
+            left goes, without raising the XP penalty, to your chosen class, then to a class at {LEVEL_CAP} with the stance the trio lacks. <b>Bold</b> classes level; the others
+            are at {LEVEL_CAP} already. Races take far more reincarnations than classes, so once every class is at rank 3 the plan goes on for the races, and classes are reset
+            again for them.
           </div>
           <ol className="rc-stages">
             {stages.map((st, i) => {
