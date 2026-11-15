@@ -2,6 +2,10 @@
 
 What changed in each version. The release workflow publishes a version's section as its release notes, and installed copies show them when an update arrives.
 
+## Unreleased
+
+- **Half Dark Elf joins the races.** Reincarnation's lists, plan and progress bars now include it (its AA gives tracking and map awareness range), and /who and the Stats page know it. Factions leaves it out of race swaps until the game gives it faction modifiers.
+
 ## 2.25.0 (2026-11-15)
 
 - **The Reincarnation planner makes the plan for you.** On the new **Setup** tab, drag the 16 classes and 15 races (Drakkin's AA does nothing yet, so it is left out) into your order, 1 first, and choose the class every levelling trio keeps. **Planner** plays it out: every class and race starts at level 50; a reincarnation takes three classes and a race at 50 (your highest still short of rank 3) and sets all four to level 1; then one levelling trio, as that race, with your chosen class and two of the three, picked for the classes still short of rank 3, then the least XP penalty, then Evasive (else Defensive) stance. The third waits at level 1 for a later trio, and when too few classes are at 50 for the next reincarnation, another levelling trio comes first. The plan runs until every race is at rank 3, which takes far more reincarnations than the classes; those extra reincarnations are spread over the classes evenly, and your chosen class takes its turn but is never the most-reincarnated. Every class is taken as at 50 unless /who shows it below, a reincarnation sets it back, or you click it. Trios you planned by hand set the starting order.

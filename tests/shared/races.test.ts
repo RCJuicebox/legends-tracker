@@ -4,7 +4,8 @@ import { parseWho } from '../../src/core/buffs'
 
 describe('Playable races', () => {
   it('lists the sixteen the client has "created as a …" achievements for', () => {
-    expect(PLAYABLE_RACES).toHaveLength(16)
+    expect(PLAYABLE_RACES).toHaveLength(17)
+    expect(PLAYABLE_RACES).toContain('Half Dark Elf')
     expect(PLAYABLE_RACES).toContain('Kerran')
     expect(PLAYABLE_RACES).not.toContain('Vah Shir')
   })

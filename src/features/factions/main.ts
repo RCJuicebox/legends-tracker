@@ -20,6 +20,7 @@ import {
   parseFactionPageFull,
   parseFactionsExport,
   progressionStatus,
+  RACE_KEYS,
   SinceExports,
   type ExportMark,
   type FactionAchievements,
@@ -358,7 +359,9 @@ async function swapConsFor(
   const own = playableRace(ctx.store.characterByKey(character).race ?? '')
   const out: Record<string, Record<string, number>> = {}
   if (!own) return out
-  for (const race of PLAYABLE_RACES) if (race !== own && (!races || races.includes(race))) out[race] = consOf(await withConsFor(ctx, character, exported, view, 'Agnostic', race))
+  // A race the client has no faction modifiers for yet (Half Dark Elf) has no con to give.
+  for (const race of PLAYABLE_RACES)
+    if (race !== own && RACE_KEYS[race.toLowerCase()] && (!races || races.includes(race))) out[race] = consOf(await withConsFor(ctx, character, exported, view, 'Agnostic', race))
   const trio = Object.keys(ctx.store.characterByKey(character).classLevels ?? {})
   for (const race of [own, ...Object.keys(out)])
     for (const s of classSwaps(trio, race)) out[s.name] = consOf(await withConsFor(ctx, character, exported, view, 'Agnostic', race, s.classes))

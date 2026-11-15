@@ -182,13 +182,15 @@ const RACE_FACTS: Record<Exclude<(typeof PLAYABLE_RACES)[number], 'Drakkin'>, [s
   Gnome: ['Resists charm and mez more often', '10%'],
   Iksar: ['HP regeneration and base AC', '+2 regen, +5 AC'],
   Kerran: ['Endurance regeneration and Safe Fall', '+2 regen, +10 Safe Fall'],
-  Froglok: ['Jump higher, and HP regeneration', '10% jump, +1 regen']
+  Froglok: ['Jump higher, and HP regeneration', '10% jump, +1 regen'],
+  // The client's text leaves its number out ("by #1%").
+  'Half Dark Elf': ['Longer range for tracking and map awareness', '?%']
 }
 
 /**
  * The playable races' AAs but Drakkin's: the game's text for it is blank (2026-11-11), a rank does nothing
- * anyone can see, and the player leaves it out (2026-11-15). The client also has Half Dark Elf's and a
- * placeholder, for races no one can play.
+ * anyone can see, and the player leaves it out (2026-11-15). The client also has a placeholder
+ * ("Race 18") for a race no one can play.
  */
 export const REINC_RACES: readonly ReincRace[] = PLAYABLE_RACES.filter((r): r is keyof typeof RACE_FACTS => r !== 'Drakkin').map((race) => ({
   race,

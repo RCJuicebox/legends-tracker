@@ -42,15 +42,16 @@ describe('the Reincarnation AAs', () => {
   it('are one a class and one a playable race', () => {
     expect(REINC_CLASSES).toHaveLength(16)
     // Drakkin left out: its AA does nothing anyone can see.
-    expect(REINC_RACES).toHaveLength(15)
-    expect(REINC_KEYS).toHaveLength(31)
+    expect(REINC_RACES).toHaveLength(16)
+    expect(REINC_KEYS).toHaveLength(32)
   })
 
   it('are read from the names the game gives them', () => {
     expect(reincKeyOf('Class Reincarnation: Shadow Knight')).toBe('class:shd')
     expect(reincKeyOf('Race Reincarnation: Wood Elf')).toBe('race:Wood Elf')
     // The client's AAs for races no one plays, and every other AA, are not lines.
-    expect(reincKeyOf('Race Reincarnation: Half Dark Elf')).toBeNull()
+    expect(reincKeyOf('Race Reincarnation: Half Dark Elf')).toBe('race:Half Dark Elf')
+    expect(reincKeyOf('Race Reincarnation: Race 18')).toBeNull()
     expect(reincKeyOf('Race Reincarnation: Race 18')).toBeNull()
     expect(reincKeyOf('Race Reincarnation: Drakkin')).toBeNull()
     expect(reincKeyOf('Reincarnation: Completionist')).toBeNull()
@@ -138,7 +139,7 @@ describe('reincarnations from the log', () => {
 
 describe('reincarnations left', () => {
   it('takes sixteen to finish every class from nothing', () => {
-    expect(reincarnationsLeft(ranks({}))).toEqual({ classes: 16, races: 45 })
+    expect(reincarnationsLeft(ranks({}))).toEqual({ classes: 16, races: 48 })
     expect(reincarnationsLeft(ranks({ 'class:rog': 1, 'class:shd': 1, 'class:wiz': 1 })).classes).toBe(15)
   })
 })
@@ -218,7 +219,7 @@ describe('the plan', () => {
     expect(got.classes.slice(0, 5)).toEqual(['mnk', 'dru', 'war', 'pal', 'shd'])
     expect(got.classes).toHaveLength(16)
     expect(got.races.slice(0, 2)).toEqual(['Ogre', 'Human'])
-    expect(got.races).toHaveLength(15)
+    expect(got.races).toHaveLength(16)
   })
 
   it('reincarnates three classes and a race at the cap, then levels the anchor and two of them as that race', () => {
@@ -255,8 +256,8 @@ describe('the plan', () => {
   it('spreads the reincarnations the races need, the anchor never the most-reincarnated', () => {
     const stages = makePlan(input({}))
     const reincs = stages.flatMap((st) => (st.reinc ? [st.reinc] : []))
-    // Every class and race to rank 3: 43 reincarnations from the test character's two.
-    expect(reincs).toHaveLength(43)
+    // Every class and race to rank 3: 46 reincarnations from the test character's two.
+    expect(reincs).toHaveLength(46)
     const times: Record<string, number> = Object.fromEntries(REINC_CLASSES.map((c) => [c.id, held[`class:${c.id}`] ?? 0]))
     for (const r of reincs) {
       for (const c of r.classes) times[c]++
@@ -294,7 +295,7 @@ describe('what is kept', () => {
     ).toEqual(want(['class:rog', 3], ['race:Erudite', 1]))
     expect(sanitizePriority([{ key: 'class:rog', rank: 4 }])).toBeNull()
     expect(sanitizePriority([{ key: 'class:rog', rank: 0 }])).toBeNull()
-    expect(sanitizePriority([{ key: 'race:Half Dark Elf', rank: 1 }])).toBeNull()
+    expect(sanitizePriority([{ key: 'race:Race 18', rank: 1 }])).toBeNull()
     expect(sanitizePriority('nope')).toBeNull()
   })
 

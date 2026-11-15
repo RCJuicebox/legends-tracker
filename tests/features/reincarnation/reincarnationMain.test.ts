@@ -107,7 +107,7 @@ describe('the Reincarnation page', () => {
     expect(file.characters[C].done).toHaveLength(1)
     expect(s.levels.mnk).toEqual({ capped: false, from: 'reincarnated' })
     await expect(call('reincarnation:done', C, ['mnk', 'mnk', 'nec'], '')).rejects.toThrow('three different classes')
-    await expect(call('reincarnation:done', C, ['mnk', 'shm', 'nec'], 'Half Dark Elf')).rejects.toThrow('No such race')
+    await expect(call('reincarnation:done', C, ['mnk', 'shm', 'nec'], 'Race 18')).rejects.toThrow('No such race')
   })
 
   it('counts the tokens in the inventory export', async () => {

@@ -3,6 +3,7 @@
 /**
  * As /who writes them, in the order of the client's "created as a …" achievements, which name all
  * sixteen: the classic twelve, Iksar, then Kerran (where classic EQ had Vah Shir), Froglok and Drakkin.
+ * Then Half Dark Elf, which has a race unlock and a Reincarnation AA but no "created as" achievement yet.
  */
 export const PLAYABLE_RACES = [
   'Human',
@@ -20,7 +21,8 @@ export const PLAYABLE_RACES = [
   'Iksar',
   'Kerran',
   'Froglok',
-  'Drakkin'
+  'Drakkin',
+  'Half Dark Elf'
 ] as const
 
 /** A playable race as the game spells it, or '' for anything else: /who shows an illusion's form too ("Elemental"). */
