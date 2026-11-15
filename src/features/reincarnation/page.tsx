@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useMemo } from 'react'
 import { CharacterPicker } from '../../renderer/src/components/CharacterPicker'
 import { api } from '../../renderer/src/api'
 import { useInvoke, useVisibleInterval } from '../../renderer/src/hooks'
@@ -11,30 +11,35 @@ import { LEVEL_CAP } from '../../shared/game/levels'
 import type { ClassId } from '../../shared/game/classes'
 import {
   COMPLETIONIST,
+  MAX_PRIORITY,
   REINC_CLASSES,
+  REINC_KEYS,
   REINC_RACES,
   REINC_RANKS,
   XP_PENALTY_LEVELS,
   XP_PENALTY_PER_RANK,
   classKey,
-  planPenalties,
-  poolLeft,
+  makePlan,
   raceKey,
   reincarnationsLeft,
   reincClass,
   trioNotes,
   xpPenalty,
+  type ClassLevel,
+  type LevelRun,
   type LineRank,
+  type PlanStage,
+  type PlannedReinc,
+  type PriorityEntry,
   type ReincClass,
   type ReincKey,
-  type ReincPlan,
   type ReincState
 } from './core'
 
 // Goals › Reincarnation (an optional module, Settings › Modules): Progress, a bar of three ranks for
-// every class and race AA, read from the log or set by hand; Planner, the trios and races the player
-// means to reincarnate as, built from what is left to place, each class and race coming off the list
-// once its three ranks are all planned or done.
+// every class and race AA, read from the log or set by hand; Planner, a plan made from the player's
+// priority list: the reincarnations it asks for, and before each the trios to level as, chosen for the
+// least XP penalty (core.ts's makePlan).
 
 type View = 'progress' | 'plan'
 
@@ -52,6 +57,12 @@ const HOW = (
     <div>
       <b>What each AA does</b> is the game’s text at rank 1, shortened. The patch notes say ranks 2 and 3 are stronger but not by how much. Stances are eqlwiki’s Stances &amp;
       Invocations table; a class’s mana stat is the Stats page’s rule (WIS for priests, Paladin, Ranger and Beastlord; INT for the other classes with mana).
+    </div>
+    <div>
+      <b>The plan</b> is made from your priority list each time the page draws, so a reincarnation your log shows (or you say you made) moves it on by itself. Levelling trios keep
+      the class you choose, take the classes the next reincarnation needs at level {LEVEL_CAP}, and fill the places left without raising the XP penalty: evasive stance first,
+      defensive when no evasive class fits, then the reincarnated classes below {LEVEL_CAP} with the most ranks. Which classes are at {LEVEL_CAP} comes from /who while you play
+      them and from what you say: the log’s level lines do not name the class.
     </div>
     <div>
       <b>The XP penalty</b>: levels 1–{XP_PENALTY_LEVELS} take {XP_PENALTY_PER_RANK}% more experience for each Reincarnation rank, only while you play the classes and race that
@@ -129,10 +140,11 @@ function RankFrom({ rank, onRank }: { rank: LineRank; onRank: (rank: number | nu
   )
 }
 
-/** How many open plans take each line. */
-function plannedCounts(plans: readonly ReincPlan[]): Partial<Record<ReincKey, number>> {
+/** How many of the plan's reincarnations take each line. */
+function plannedCounts(stages: readonly PlanStage[]): Partial<Record<ReincKey, number>> {
   const out: Partial<Record<ReincKey, number>> = {}
-  for (const p of plans) {
+  for (const { reinc: p } of stages) {
+    if (!p) continue
     for (const c of p.classes) out[classKey(c)] = (out[classKey(c)] ?? 0) + 1
     if (p.race) out[raceKey(p.race)] = (out[raceKey(p.race)] ?? 0) + 1
   }
@@ -141,8 +153,8 @@ function plannedCounts(plans: readonly ReincPlan[]): Partial<Record<ReincKey, nu
 
 const NO_RANK: LineRank = { rank: 0, from: 'none', logged: 0 }
 
-function Progress({ s, onRank }: { s: ReincState; onRank: (key: ReincKey, rank: number | null) => void }) {
-  const planned = useMemo(() => plannedCounts(s.plans), [s.plans])
+function Progress({ s, stages, onRank }: { s: ReincState; stages: PlanStage[]; onRank: (key: ReincKey, rank: number | null) => void }) {
+  const planned = useMemo(() => plannedCounts(stages), [stages])
   const left = (k: ReincKey) => Math.max(0, Math.min(planned[k] ?? 0, REINC_RANKS - (s.ranks[k]?.rank ?? 0)))
   return (
     <div className="stack gap-16">
@@ -208,242 +220,358 @@ function Progress({ s, onRank }: { s: ReincState; onRank: (key: ReincKey, rank: 
   )
 }
 
-/** A trio's stances and mana, said plainly. */
-function TrioSummary({ classes }: { classes: readonly ClassId[] }) {
-  if (!classes.length) return null
-  const n = trioNotes(classes)
-  const names = (ids: ClassId[]) => ids.map((id) => reincClass(id).name).join(', ')
+/** A line's name: the class's, or the race. */
+const lineName = (k: ReincKey) => (k.startsWith('class:') ? reincClass(k.slice(6) as ClassId).name : k.slice(5))
+
+/** The priority list: lines in the order the player wants their ranks, each up to a rank. */
+function PriorityList({ s, onPriority }: { s: ReincState; onPriority: (list: PriorityEntry[]) => void }) {
+  const list = s.priority
+  const left = reincarnationsLeft(s.ranks)
+  // What each line adds: its ranks past the one held, or past where a line above takes it.
+  const adds = useMemo(() => {
+    const got: Partial<Record<ReincKey, number>> = {}
+    return list.map((e) => {
+      const from = got[e.key] ?? s.ranks[e.key]?.rank ?? 0
+      got[e.key] = Math.max(from, e.rank)
+      return Math.max(0, e.rank - from)
+    })
+  }, [list, s.ranks])
+  const full = list.length >= MAX_PRIORITY
+  const add = (key: ReincKey) => onPriority([...list, { key, rank: REINC_RANKS }])
+  const move = (i: number, by: number) => {
+    const next = [...list]
+    const [e] = next.splice(i, 1)
+    next.splice(i + by, 0, e)
+    onPriority(next)
+  }
+  const rankOfLine = (k: ReincKey) => s.ranks[k]?.rank ?? 0
+
   return (
-    <div className="rc-summary small">
-      <span className={n.evasive.length ? 'ok-text' : 'faint'}>{n.evasive.length ? `Evasive stance: ${names(n.evasive)}` : 'No evasive stance'}</span>
-      <span className={n.defensive.length ? 'ok-text' : 'faint'}>{n.defensive.length ? `Defensive stance: ${names(n.defensive)}` : 'No defensive stance'}</span>
-      <span>
-        {n.wis.length || n.int.length ? [n.wis.length ? `WIS: ${names(n.wis)}` : '', n.int.length ? `INT: ${names(n.int)}` : ''].filter(Boolean).join(' · ') : 'No mana: all melee'}
-      </span>
-      {n.mixed && <span className="warn-text">Mixes WIS and INT casters: each takes its mana from its own stat, so gear for one does less for the other.</span>}
+    <div className="card">
+      <h3>Priority</h3>
+      <div className="small faint mb-8">
+        The lines you want ranks in, first first. Each reincarnation takes the first three classes on the list with a rank still to come and the first race, so a class to rank 3
+        comes up three times running. To spread ranks out, put a line in twice: to rank 1 near the top, to rank 3 further down. Every class at rank 3 takes {num(left.classes)} more{' '}
+        {left.classes === 1 ? 'reincarnation' : 'reincarnations'}; every race at rank 3, {num(left.races)}.
+      </div>
+      {list.length ? (
+        <ol className="rc-plans">
+          {list.map((e, i) => {
+            const held = rankOfLine(e.key)
+            return (
+              <li key={i} className="rc-plan rc-prio">
+                <span className="mono faint">{i + 1}</span>
+                <span className="rc-plan-what">
+                  <b>{lineName(e.key)}</b>
+                  {e.key.startsWith('race:') && <span className="faint">race</span>}
+                  <span className="faint">rank {held} now</span>
+                </span>
+                <span className="rc-ranks" role="group" aria-label={`${lineName(e.key)}: up to rank`}>
+                  <span className="small faint">to rank</span>
+                  {Array.from({ length: REINC_RANKS }, (_, n) => n + 1).map((n) => (
+                    <button
+                      key={n}
+                      className={`rc-rank${e.rank === n ? ' on' : ''}`}
+                      aria-pressed={e.rank === n}
+                      onClick={() => onPriority(list.map((x, j) => (j === i ? { ...x, rank: n } : x)))}
+                    >
+                      {n}
+                    </button>
+                  ))}
+                </span>
+                <span className={`small ${adds[i] ? '' : 'faint'}`}>
+                  {adds[i] ? `+${adds[i]} ${adds[i] === 1 ? 'rank' : 'ranks'}` : held >= e.rank ? 'done' : 'a line above has it'}
+                </span>
+                <span className="row tight">
+                  <button className="btn small ghost" disabled={i === 0} onClick={() => move(i, -1)} aria-label="Move it up">
+                    ▲
+                  </button>
+                  <button className="btn small ghost" disabled={i === list.length - 1} onClick={() => move(i, 1)} aria-label="Move it down">
+                    ▼
+                  </button>
+                  <button className="btn small ghost" onClick={() => onPriority(list.filter((_, j) => j !== i))} aria-label="Take it off the list">
+                    ✕
+                  </button>
+                </span>
+              </li>
+            )
+          })}
+        </ol>
+      ) : (
+        <div className="empty">Nothing on the list yet: add the classes and races below, in the order you want them.</div>
+      )}
+      <div className="rc-pick-head small faint">Add a class (to rank 3; change it on the list)</div>
+      <div className="rc-pick">
+        {REINC_CLASSES.map((c) => {
+          const k = classKey(c.id)
+          return (
+            <button
+              key={c.id}
+              className="rc-chip"
+              disabled={full || rankOfLine(k) >= REINC_RANKS}
+              onClick={() => add(k)}
+              title={`${c.passive} (${c.first} at rank 1). Rank 3 adds ${c.active.name}.`}
+            >
+              <span>
+                {c.name} <span className="mono faint">R{rankOfLine(k)}</span>
+              </span>
+              <ClassTags c={c} />
+            </button>
+          )
+        })}
+      </div>
+      <div className="rc-pick-head small faint">Add a race</div>
+      <div className="rc-pick">
+        {REINC_RACES.map((r) => {
+          const k = raceKey(r.race)
+          return (
+            <button key={r.race} className="rc-chip" disabled={full || rankOfLine(k) >= REINC_RANKS} onClick={() => add(k)} title={`${r.passive} (${r.first} at rank 1)`}>
+              <span>
+                {r.race} <span className="mono faint">R{rankOfLine(k)}</span>
+              </span>
+            </button>
+          )
+        })}
+      </div>
+      {list.length > 0 && (
+        <div className="row mt-16">
+          <ConfirmButton className="btn small ghost" question="Clear the whole list?" onConfirm={() => onPriority([])}>
+            Clear the list
+          </ConfirmButton>
+        </div>
+      )}
     </div>
   )
 }
 
-const newId = () => `p${Date.now().toString(36)}${Math.floor(Math.random() * 1296).toString(36)}`
+const LEVEL_FROM: Record<ClassLevel['from'], string> = {
+  who: 'your /who said so while you played it',
+  hand: 'you said so',
+  reincarnated: 'reincarnated since: back to level 1',
+  none: 'not known: the plan takes it as below the cap until you say'
+}
 
-function Planner({ s, onPlans, onDone }: { s: ReincState; onPlans: (plans: ReincPlan[]) => void; onDone: (id: string) => void }) {
-  const [trio, setTrio] = useState<ClassId[]>([])
-  const [race, setRace] = useState('')
-  const [editing, setEditing] = useState<string | null>(null)
-  // The pool leaves out the plan being edited, and counts what the builder holds.
-  const others = useMemo(() => s.plans.filter((p) => p.id !== editing), [s.plans, editing])
-  const pool = useMemo(() => poolLeft(s.ranks, [...others, { id: 'draft', classes: trio, race, since: 0 }]), [s.ranks, others, trio, race])
-  const left = reincarnationsLeft(s.ranks)
-  // The penalty the trio being built would level with: the plans before it done, then it.
-  const before = editing
-    ? s.plans.slice(
-        0,
-        Math.max(
-          0,
-          s.plans.findIndex((p) => p.id === editing)
-        )
-      )
-    : s.plans
-  const draftPenalty = trio.length === 3 ? planPenalties(s.ranks, [...before, { classes: trio, race }]).at(-1)! : null
-  const penalties = useMemo(() => planPenalties(s.ranks, s.plans), [s.ranks, s.plans])
-  const placedClasses = REINC_CLASSES.filter((c) => pool.classes[c.id] <= 0 && !trio.includes(c.id))
-  const placedRaces = REINC_RACES.filter((r) => pool.races[r.race] <= 0 && r.race !== race)
-  const over = [...REINC_CLASSES.filter((c) => pool.classes[c.id] < 0).map((c) => c.name), ...REINC_RACES.filter((r) => pool.races[r.race] < 0).map((r) => r.race)]
-
-  const clear = () => {
-    setTrio([])
-    setRace('')
-    setEditing(null)
-  }
-  const save = () => {
-    if (trio.length !== 3) return
-    const plan: ReincPlan = { id: editing ?? newId(), classes: trio, race, since: Date.now() }
-    onPlans(editing ? s.plans.map((p) => (p.id === editing ? plan : p)) : [...s.plans, plan])
-    clear()
-  }
-  const edit = (p: ReincPlan) => {
-    setEditing(p.id)
-    setTrio([...p.classes])
-    setRace(p.race)
-  }
-  // A copy goes in under the trio it copies. Every class needs a rank left to plan; the race comes along
-  // while it has one too, and is left to choose otherwise.
-  const planned = useMemo(() => poolLeft(s.ranks, s.plans), [s.ranks, s.plans])
-  const full = (p: ReincPlan) => p.classes.filter((c) => planned.classes[c] <= 0).map((c) => reincClass(c).name)
-  const copy = (i: number) => {
-    const p = s.plans[i]
-    const next = [...s.plans]
-    next.splice(i + 1, 0, { id: newId(), classes: [...p.classes], race: p.race && planned.races[p.race] > 0 ? p.race : '', since: Date.now() })
-    onPlans(next)
-  }
-  const move = (i: number, by: number) => {
-    const next = [...s.plans]
-    const [p] = next.splice(i, 1)
-    next.splice(i + by, 0, p)
-    onPlans(next)
-  }
-
+/** The levelling choices: the class every trio keeps, and which classes are at the cap. */
+function Levelling({ s, onAnchor, onCapped }: { s: ReincState; onAnchor: (id: ClassId | '') => void; onCapped: (id: ClassId, capped: boolean) => void }) {
   return (
-    <div className="stack gap-16">
-      <div className="card">
-        <h3>{editing ? `Change plan ${s.plans.findIndex((p) => p.id === editing) + 1}` : 'Build a trio'}</h3>
-        <div className="rc-slots">
-          {[0, 1, 2].map((i) => {
-            const id = trio[i]
-            return id ? (
-              <button key={i} className="rc-slot filled" onClick={() => setTrio(trio.filter((x) => x !== id))} title="Take it out of the trio">
-                {reincClass(id).name} ✕
-              </button>
-            ) : (
-              <span key={i} className="rc-slot">
-                Class {i + 1}
-              </span>
-            )
-          })}
-          {race ? (
-            <button className="rc-slot filled race" onClick={() => setRace('')} title="Take the race out">
-              {race} ✕
-            </button>
-          ) : (
-            <span className="rc-slot race">Race</span>
-          )}
-        </div>
-        <TrioSummary classes={trio} />
-        {draftPenalty !== null && (
-          <div className="rc-summary small">
-            <span>
-              Levelling it after this reincarnation: <PenaltyTag pct={draftPenalty} raceOpen={!race} />
-            </span>
-          </div>
-        )}
-        <div className="rc-pick-head small faint">Classes left to place (each three times)</div>
-        <div className="rc-pick">
-          {REINC_CLASSES.filter((c) => pool.classes[c.id] > 0 || trio.includes(c.id)).map((c) => {
-            const inTrio = trio.includes(c.id)
-            return (
-              <button
-                key={c.id}
-                className={`rc-chip${inTrio ? ' on' : ''}`}
-                disabled={!inTrio && trio.length >= 3}
-                onClick={() => setTrio(inTrio ? trio.filter((x) => x !== c.id) : [...trio, c.id])}
-                title={`${c.passive} (${c.first} at rank 1). Rank 3 adds ${c.active.name}.`}
-              >
-                <span>
-                  {c.name} <span className="mono faint">×{Math.max(0, pool.classes[c.id])}</span>
-                </span>
-                <ClassTags c={c} />
-              </button>
-            )
-          })}
-        </div>
-        {placedClasses.length > 0 && <div className="small faint rc-gap">All three ranks planned or done: {placedClasses.map((c) => c.name).join(', ')}.</div>}
-        <div className="rc-pick-head small faint">Races left to place</div>
-        <div className="rc-pick">
-          {REINC_RACES.filter((r) => pool.races[r.race] > 0 || r.race === race).map((r) => (
-            <button
-              key={r.race}
-              className={`rc-chip${r.race === race ? ' on' : ''}`}
-              onClick={() => setRace(r.race === race ? '' : r.race)}
-              title={`${r.passive} (${r.first} at rank 1)`}
-            >
-              <span>
-                {r.race} <span className="mono faint">×{Math.max(0, pool.races[r.race])}</span>
-              </span>
-            </button>
-          ))}
-        </div>
-        {placedRaces.length > 0 && <div className="small faint rc-gap">All three ranks planned or done: {placedRaces.map((r) => r.race).join(', ')}.</div>}
-        {over.length > 0 && <div className="warn-text small rc-gap">Planned more than three times, ranks done included: {over.join(', ')}.</div>}
-        <div className="row mt-16">
-          <button className="btn" disabled={trio.length !== 3} onClick={save}>
-            {editing ? 'Save the change' : 'Add to the plan'}
-          </button>
-          {(trio.length > 0 || race || editing) && (
-            <button className="btn ghost" onClick={clear}>
-              {editing ? 'Cancel' : 'Clear'}
-            </button>
-          )}
-          <span className="small faint">{trio.length < 3 ? `Pick ${3 - trio.length} more ${trio.length === 2 ? 'class' : 'classes'}.` : race ? '' : 'The race can wait.'}</span>
-        </div>
+    <div className="card">
+      <h3>Levelling</h3>
+      <div className="row">
+        <label className="row tight">
+          Every levelling trio keeps
+          <select value={s.anchor} onChange={(e) => onAnchor(e.target.value as ClassId | '')} aria-label="Class every levelling trio keeps">
+            <option value="">no class in particular</option>
+            {REINC_CLASSES.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.name}
+              </option>
+            ))}
+          </select>
+        </label>
       </div>
+      <div className="rc-pick-head small faint">At level {LEVEL_CAP}? Click a class to say it is, or is not</div>
+      <div className="rc-pick">
+        {REINC_CLASSES.map((c) => {
+          const l = s.levels[c.id]
+          return (
+            <button
+              key={c.id}
+              className={`rc-chip${l.capped ? ' on' : ''}`}
+              aria-pressed={l.capped === true}
+              onClick={() => onCapped(c.id, l.capped !== true)}
+              title={`${c.name}: ${l.capped ? `at ${LEVEL_CAP}` : l.capped === false ? `below ${LEVEL_CAP}` : 'not known'} (${LEVEL_FROM[l.from]}). Click to say it ${l.capped ? 'is not' : 'is'}.`}
+            >
+              {c.name} <span className="mono faint">{l.capped ? LEVEL_CAP : l.capped === false ? `<${LEVEL_CAP}` : '?'}</span>
+            </button>
+          )
+        })}
+      </div>
+      <div className="small faint rc-gap">
+        Your log never says which class a level went to, so the page keeps what /who shows of the classes you play, and what you say here. A reincarnation sets its classes back to
+        level 1.
+      </div>
+    </div>
+  )
+}
 
-      <div className="card">
-        <h3>The plan</h3>
-        <div className="small faint mb-8">
-          {num(s.plans.length)} planned. Every class at rank 3 takes {num(left.classes)} more {left.classes === 1 ? 'reincarnation' : 'reincarnations'} (three class ranks each);
-          every race at rank 3 takes {num(left.races)} (one race rank each). A trio comes off the plan when your log shows it reincarnated, or when you say so.
-        </div>
-        {s.plans.length ? (
-          <ol className="rc-plans">
-            {s.plans.map((p, i) => {
-              const n = trioNotes(p.classes)
-              const noCopy = full(p)
+/** A trio's stance as one chip: evasive if it has it, else defensive, else none. */
+function StanceTag({ classes }: { classes: readonly ClassId[] }) {
+  const n = trioNotes(classes)
+  const s = n.evasive.length ? 'evasive' : n.defensive.length ? 'defensive' : null
+  return s ? (
+    <Tip className={`chip pill rc-tag ${s}`} text={`${STANCE_TIP[s]} From ${(s === 'evasive' ? n.evasive : n.defensive).map((c) => reincClass(c).name).join(', ')}.`}>
+      {s === 'evasive' ? 'Evasive' : 'Defensive'}
+    </Tip>
+  ) : (
+    <Tip className="chip pill rc-tag none" text="No class with evasive or defensive stance fits without a higher XP penalty.">
+      No stance
+    </Tip>
+  )
+}
+
+/** A levelling trio: the classes that level, those along at the cap, and the penalty. */
+function RunStep({ r, unknown }: { r: LevelRun; unknown: (c: ClassId) => boolean }) {
+  const floor = r.penalty / XP_PENALTY_PER_RANK
+  return (
+    <div className="rc-step">
+      <span className="rc-kind level">Level</span>
+      <span className="rc-plan-what">
+        {r.classes.map((c) => {
+          const levels = r.levels.includes(c)
+          return (
+            <span
+              key={c}
+              className={levels ? '' : 'faint'}
+              title={levels ? (unknown(c) ? `Not known to be at ${LEVEL_CAP}: levels if it is not` : `Below ${LEVEL_CAP}: levels`) : `At ${LEVEL_CAP} already: along for the trio`}
+            >
+              {levels ? <b>{reincClass(c).name}</b> : reincClass(c).name}
+              {levels ? (unknown(c) ? ' ?' : '') : ` (${LEVEL_CAP})`}
+            </span>
+          )
+        })}
+        {r.open > 0 && (
+          <span className="faint">
+            + {r.open === 1 ? 'any class' : `any ${r.open} classes`} at rank {floor} or lower
+          </span>
+        )}
+        {r.race && <span className="faint">as {r.race}</span>}
+      </span>
+      <span className="rc-tags">
+        <StanceTag classes={r.classes} />
+        <PenaltyTag pct={r.penalty} raceOpen={!r.race} />
+      </span>
+      {r.penalty > r.classPenalty && (
+        <span className="small warn-text rc-step-note">
+          {r.race}’s rank makes it +{r.penalty}%: as a race at rank {r.classPenalty / XP_PENALTY_PER_RANK} or lower it would be +{r.classPenalty}%.
+        </span>
+      )}
+    </div>
+  )
+}
+
+/** A reincarnation in the plan: the trio and race, the ranks they reach, and, for the next one, a way to say it is made. */
+function ReincStep({ r, n, after, onDone }: { r: PlannedReinc; n: number; after: (k: ReincKey) => number; onDone?: () => void }) {
+  const made = (k: ReincKey) => r.extra.includes(k)
+  const MADE_UP = 'Not on your list: it makes up the reincarnation (classes at the cap with the fewest ranks first, so there is less to level).'
+  return (
+    <div className="rc-step reinc">
+      <span className="rc-kind reinc">Reincarnate {n}</span>
+      <span className="rc-plan-what">
+        {r.classes.map((c) =>
+          made(classKey(c)) ? (
+            <Tip key={c} className="faint" text={MADE_UP}>
+              {reincClass(c).name} → {after(classKey(c))}
+            </Tip>
+          ) : (
+            <b key={c}>
+              {reincClass(c).name} → {after(classKey(c))}
+            </b>
+          )
+        )}
+        {r.race ? (
+          made(raceKey(r.race)) ? (
+            <Tip className="faint" text="No race on your list: the race you play then takes the rank.">
+              {r.race} → {after(raceKey(r.race))}
+            </Tip>
+          ) : (
+            <span>
+              {r.race} → {after(raceKey(r.race))}
+            </span>
+          )
+        ) : (
+          <span className="faint">the race you play then</span>
+        )}
+      </span>
+      <span className="rc-tags">
+        <StanceTag classes={r.classes} />
+      </span>
+      {onDone && (
+        <ConfirmButton className="btn small" question="Reincarnated as this? Each of its AAs goes up a rank, and its classes go back to level 1." onConfirm={onDone}>
+          Reincarnated
+        </ConfirmButton>
+      )}
+    </div>
+  )
+}
+
+/** The plan: before each reincarnation the trios to level as, then it; after the last, the levelling left. */
+function ThePlan({ s, stages, onDone }: { s: ReincState; stages: PlanStage[]; onDone: (r: PlannedReinc) => void }) {
+  // The rank each reincarnation takes its lines to, counting the ones before it.
+  const afters = useMemo(() => {
+    const got: Partial<Record<ReincKey, number>> = {}
+    for (const k of REINC_KEYS) got[k] = s.ranks[k]?.rank ?? 0
+    return stages.map((st) => {
+      if (!st.reinc) return { ...got }
+      const keys = [...st.reinc.classes.map(classKey), ...(st.reinc.race ? [raceKey(st.reinc.race)] : [])]
+      for (const k of keys) got[k] = Math.min(REINC_RANKS, got[k]! + 1)
+      return { ...got }
+    })
+  }, [s.ranks, stages])
+  const reincs = stages.filter((st) => st.reinc).length
+  const runs = stages.reduce((n, st) => n + st.runs.length, 0)
+  const unknown = (c: ClassId) => s.levels[c].capped === null
+  let n = 0
+  return (
+    <div className="card">
+      <h3>The plan</h3>
+      {stages.length ? (
+        <>
+          <div className="small faint mb-8">
+            {num(reincs)} {reincs === 1 ? 'reincarnation' : 'reincarnations'} from your list, and {num(runs)} levelling {runs === 1 ? 'trio' : 'trios'}. A levelling trio takes the
+            classes that must reach level {LEVEL_CAP}, the highest ranks together, then fills its other places without raising the XP penalty: a class with evasive stance (or
+            defensive, when no evasive one fits), then the reincarnated classes below {LEVEL_CAP} with the most ranks. <b>Bold</b> classes level; the others are at {LEVEL_CAP}{' '}
+            already; “?” is a class not known to be.
+          </div>
+          <ol className="rc-stages">
+            {stages.map((st, i) => {
+              if (st.reinc) n++
               return (
-                <li key={p.id} className={`rc-plan${p.id === editing ? ' editing' : ''}`}>
-                  <span className="mono faint">{i + 1}</span>
-                  <span className="rc-plan-what">
-                    <b>{p.classes.map((c) => reincClass(c).name).join(' · ')}</b>
-                    <span className={p.race ? '' : 'faint'}>{p.race || 'race not chosen'}</span>
-                  </span>
-                  <span className="rc-tags">
-                    <Tip className={`chip pill rc-tag ${n.evasive.length ? 'evasive' : 'none'}`} text={n.evasive.length ? 'Has evasive stance' : 'No evasive stance'}>
-                      {n.evasive.length ? 'Evasive' : 'No evasive'}
-                    </Tip>
-                    <Tip className={`chip pill rc-tag ${n.defensive.length ? 'defensive' : 'none'}`} text={n.defensive.length ? 'Has defensive stance' : 'No defensive stance'}>
-                      {n.defensive.length ? 'Defensive' : 'No defensive'}
-                    </Tip>
-                    {n.wis.length > 0 && <span className="chip pill rc-tag wis">WIS ×{n.wis.length}</span>}
-                    {n.int.length > 0 && <span className="chip pill rc-tag int">INT ×{n.int.length}</span>}
-                    <PenaltyTag pct={penalties[i]} raceOpen={!p.race} />
-                  </span>
-                  <span className="row tight">
-                    <button className="btn small ghost" disabled={i === 0} onClick={() => move(i, -1)} aria-label="Move it up">
-                      ▲
-                    </button>
-                    <button className="btn small ghost" disabled={i === s.plans.length - 1} onClick={() => move(i, 1)} aria-label="Move it down">
-                      ▼
-                    </button>
-                    <button className="btn small ghost" onClick={() => edit(p)}>
-                      Change
-                    </button>
-                    <button
-                      className="btn small ghost"
-                      disabled={noCopy.length > 0}
-                      onClick={() => copy(i)}
-                      title={
-                        noCopy.length
-                          ? `All three ranks of ${noCopy.join(', ').replace(/, ([^,]*)$/, ' and $1')} are planned or done already.`
-                          : p.race && planned.races[p.race] <= 0
-                            ? `Plan this trio again, just under it. All three ${p.race} ranks are planned, so the copy's race is left to choose.`
-                            : 'Plan this trio again, just under it: each trio can be done three times.'
-                      }
-                    >
-                      Copy
-                    </button>
-                    <ConfirmButton className="btn small" question="Reincarnated as this? Each of its AAs goes up a rank, and it comes off the plan." onConfirm={() => onDone(p.id)}>
-                      Reincarnated
-                    </ConfirmButton>
-                    <button
-                      className="btn small ghost"
-                      onClick={() => {
-                        if (editing === p.id) clear()
-                        onPlans(s.plans.filter((x) => x !== p))
-                      }}
-                      aria-label="Take it off the plan"
-                    >
-                      ✕
-                    </button>
-                  </span>
+                <li key={i} className="rc-stage">
+                  <div className="rc-stage-head small faint">
+                    {st.reinc
+                      ? st.runs.length
+                        ? `Before reincarnation ${n}`
+                        : `Reincarnation ${n}: its classes are at level ${LEVEL_CAP} already`
+                      : 'After the last reincarnation'}
+                  </div>
+                  {st.runs.map((r, j) => (
+                    <RunStep key={j} r={r} unknown={i === 0 ? unknown : () => false} />
+                  ))}
+                  {st.reinc && <ReincStep r={st.reinc} n={n} after={(k) => afters[i][k] ?? 0} onDone={n === 1 ? () => onDone(st.reinc!) : undefined} />}
                 </li>
               )
             })}
           </ol>
-        ) : (
-          <div className="empty">Nothing planned yet: pick three classes and a race above.</div>
-        )}
-      </div>
+        </>
+      ) : (
+        <div className="empty">Nothing to plan: put classes and races on your priority list, and any reincarnated class below level {LEVEL_CAP} shows here to level.</div>
+      )}
+    </div>
+  )
+}
 
+function Planner({
+  s,
+  stages,
+  onPriority,
+  onAnchor,
+  onCapped,
+  onDone
+}: {
+  s: ReincState
+  stages: PlanStage[]
+  onPriority: (list: PriorityEntry[]) => void
+  onAnchor: (id: ClassId | '') => void
+  onCapped: (id: ClassId, capped: boolean) => void
+  onDone: (r: PlannedReinc) => void
+}) {
+  return (
+    <div className="stack gap-16">
+      <ThePlan s={s} stages={stages} onDone={onDone} />
+      <div className="rc-cols">
+        <PriorityList s={s} onPriority={onPriority} />
+        <Levelling s={s} onAnchor={onAnchor} onCapped={onCapped} />
+      </div>
       {s.history.length > 0 && (
         <div className="card">
           <h3>Reincarnations made</h3>
@@ -463,10 +591,9 @@ function Planner({ s, onPlans, onDone }: { s: ReincState; onPlans: (plans: Reinc
 }
 
 /** The tokens held and whether the loadout can reincarnate now. */
-function Status({ s }: { s: ReincState }) {
+function Status({ s, next }: { s: ReincState; next: PlannedReinc | undefined }) {
   const lo = s.loadout
   const ready = lo.classes.length === 3 && lo.classes.every((c) => c.level >= LEVEL_CAP)
-  const next = s.plans[0]
   const isNext = !!next && lo.classes.length === 3 && lo.classes.every((c) => next.classes.includes(c.id)) && (!next.race || next.race === lo.race)
   return (
     <div className="card row mb-16 rc-status">
@@ -486,7 +613,7 @@ function Status({ s }: { s: ReincState }) {
         <span>
           Now: {lo.race || 'race not known'} · {lo.classes.map((c) => `${reincClass(c.id).name} ${c.level}`).join(' · ')}
           {ready ? <span className="ok-text"> · ready to reincarnate</span> : <span className="faint"> · each class needs level {LEVEL_CAP}</span>}
-          {isNext && <span className="ok-text"> · your next plan</span>}
+          {isNext && <span className="ok-text"> · your next reincarnation</span>}
         </span>
       )}
       {lo.classes.length > 0 && (
@@ -510,6 +637,19 @@ export function Reincarnation() {
   useVisibleInterval(q.reload, 60_000)
   const [view, setView] = useRemembered<View>('reinc.view', 'progress')
   const s = q.data
+  const stages = useMemo(
+    () =>
+      s
+        ? makePlan({
+            ranks: s.ranks,
+            priority: s.priority,
+            capped: Object.fromEntries(REINC_CLASSES.map((c) => [c.id, s.levels[c.id].capped])),
+            anchor: s.anchor,
+            race: s.loadout.race
+          })
+        : [],
+    [s]
+  )
 
   /** Calls one of the module's channels and shows the state it answers with. */
   const save = async (call: () => Promise<ReincState>) => {
@@ -526,7 +666,8 @@ export function Reincarnation() {
         <div>
           <h1>Reincarnation</h1>
           <div className="lead">
-            Every class and race Reincarnation AA, three ranks each, and your plan of which trio and race come next. <Info label="How it is worked out" text={HOW} />
+            Every class and race Reincarnation AA, three ranks each, and a plan made from your priority list: what to reincarnate as, and what to level as between.{' '}
+            <Info label="How it is worked out" text={HOW} />
           </div>
         </div>
         <div className="actions">
@@ -551,17 +692,20 @@ export function Reincarnation() {
             onChange={setView}
             tabs={[
               ['progress', 'Progress'],
-              ['plan', s.plans.length ? `Planner (${s.plans.length})` : 'Planner']
+              ['plan', 'Planner']
             ]}
           />
-          <Status s={s} />
+          <Status s={s} next={stages.find((st) => st.reinc)?.reinc ?? undefined} />
           {view === 'progress' ? (
-            <Progress s={s} onRank={(key, rank) => void save(() => api.invoke('reincarnation:rank', character, key, rank))} />
+            <Progress s={s} stages={stages} onRank={(key, rank) => void save(() => api.invoke('reincarnation:rank', character, key, rank))} />
           ) : (
             <Planner
               s={s}
-              onPlans={(plans) => void save(() => api.invoke('reincarnation:plans', character, plans))}
-              onDone={(id) => void save(() => api.invoke('reincarnation:done', character, id))}
+              stages={stages}
+              onPriority={(list) => void save(() => api.invoke('reincarnation:priority', character, list))}
+              onAnchor={(id) => void save(() => api.invoke('reincarnation:anchor', character, id))}
+              onCapped={(id, capped) => void save(() => api.invoke('reincarnation:capped', character, id, capped))}
+              onDone={(r) => void save(() => api.invoke('reincarnation:done', character, r.classes, r.race))}
             />
           )}
         </>

@@ -5,8 +5,8 @@ import type { AppContext } from '../../../src/main/context'
 import { tempDir } from '../../tempDir'
 
 // Goals › Reincarnation's main side against a log on disk, read as the app reads it: a reincarnation's
-// four ranks from the AA lines, a plan the log saw made coming off, ranks set by hand, a plan said done,
-// and the tokens in the inventory export.
+// four ranks from the AA lines, the priority list and class levels kept, ranks set by hand, a
+// reincarnation said made, and the tokens in the inventory export.
 
 type Handler = (e: unknown, ...args: unknown[]) => unknown
 const h = vi.hoisted(() => ({ dir: '', handlers: new Map<string, Handler>() }))
@@ -68,16 +68,25 @@ describe('the Reincarnation page', () => {
     expect(s.tokens).toBeNull()
   })
 
-  it('keeps plans, and takes off one the log saw made after it was planned', async () => {
-    const before = Date.UTC(2026, 0, 1)
-    let s = await call('reincarnation:plans', C, [
-      { id: 'a', classes: ['wiz', 'rog', 'shd'], race: 'Dark Elf', since: before },
-      { id: 'b', classes: ['mnk', 'shm', 'nec'], race: 'Dwarf', since: before }
+  it('keeps the priority list, the anchor class and the classes said at the cap', async () => {
+    let s = await call('reincarnation:priority', C, [
+      { key: 'class:mnk', rank: 3 },
+      { key: 'race:Dwarf', rank: 1 }
     ])
-    expect(s.plans.map((p: { id: string }) => p.id)).toEqual(['b'])
-    await expect(call('reincarnation:plans', C, [{ id: 'x', classes: ['mnk', 'mnk', 'nec'], race: '' }])).rejects.toThrow('three different classes')
-    s = await call('reincarnation:state', C)
-    expect(s.plans.map((p: { id: string }) => p.id)).toEqual(['b'])
+    expect(s.priority).toEqual([
+      { key: 'class:mnk', rank: 3 },
+      { key: 'race:Dwarf', rank: 1 }
+    ])
+    await expect(call('reincarnation:priority', C, [{ key: 'class:mnk', rank: 5 }])).rejects.toThrow('rank from 1 to 3')
+    s = await call('reincarnation:anchor', C, 'wiz')
+    expect(s.anchor).toBe('wiz')
+    await expect(call('reincarnation:anchor', C, 'nope')).rejects.toThrow('No such class')
+    s = await call('reincarnation:capped', C, 'mnk', true)
+    expect(s.levels.mnk).toEqual({ capped: true, from: 'hand' })
+    s = await call('reincarnation:capped', C, 'mnk', null)
+    expect(s.levels.mnk).toEqual({ capped: null, from: 'none' })
+    // The classes played now: the log's reincarnation already says they are below the cap, as the record does.
+    expect(s.levels.rog).toEqual({ capped: false, from: 'reincarnated' })
   })
 
   it('sets a rank by hand, and goes back to the log’s', async () => {
@@ -89,15 +98,16 @@ describe('the Reincarnation page', () => {
     await expect(call('reincarnation:rank', C, 'class:war', 4)).rejects.toThrow('0 to 3')
   })
 
-  it('raises each line of a plan said done, and keeps it', async () => {
-    const s = await call('reincarnation:done', C, 'b')
-    expect(s.plans).toEqual([])
+  it('raises each line of a reincarnation said made, and keeps it', async () => {
+    const s = await call('reincarnation:done', C, ['mnk', 'shm', 'nec'], 'Dwarf')
     expect(['class:mnk', 'class:shm', 'class:nec', 'race:Dwarf'].map((k) => s.ranks[k])).toEqual(Array(4).fill({ rank: 1, from: 'hand', logged: 0 }))
     expect(s.history.map((x: { by: string }) => x.by)).toEqual(['hand', 'log'])
     await reinc.flush()
     const file = JSON.parse(readFileSync(join(h.dir, 'reincarnation.json'), 'utf8'))
     expect(file.characters[C].done).toHaveLength(1)
-    await expect(call('reincarnation:done', C, 'b')).rejects.toThrow('No such plan')
+    expect(s.levels.mnk).toEqual({ capped: false, from: 'reincarnated' })
+    await expect(call('reincarnation:done', C, ['mnk', 'mnk', 'nec'], '')).rejects.toThrow('three different classes')
+    await expect(call('reincarnation:done', C, ['mnk', 'shm', 'nec'], 'Half Dark Elf')).rejects.toThrow('No such race')
   })
 
   it('counts the tokens in the inventory export', async () => {

@@ -7,16 +7,19 @@ import { classIdOf, type ClassId } from '../../shared/game/classes'
 import type { AppContext } from '../../main/context'
 import type { AppFeature, FeatureDeps } from '../../main/appFeature'
 import {
+  REINC_CLASSES,
   REINC_KEYS,
+  REINC_RACES,
   REINC_RANKS,
+  classLevels,
   completionistRank,
   emptyReincCharacter,
+  levelsSeen,
   loggedRanks,
   loggedReincarnations,
-  openPlans,
   rankOf,
   reincHistory,
-  sanitizePlans,
+  sanitizePriority,
   sanitizeReincCharacter,
   tokenCount,
   type LineRank,
@@ -28,8 +31,16 @@ import {
 
 // Goals › Reincarnation's side of the app (an optional module): each line's rank from the AA lines the
 // game writes when a reincarnation gives one (Stats › AAs reads the same lines), the player's ranks set
-// by hand, their plan of trios, and the Tokens of Reincarnation in the inventory export. What the
-// player keeps is in reincarnation.json, by character.
+// by hand, their priority list, which classes are at the level cap (from /who, kept as it is seen, and
+// from the player), and the Tokens of Reincarnation in the inventory export. What the player keeps is in
+// reincarnation.json, by character; the page makes the plan from it.
+
+/** A class id the page sent, or an error. */
+function classOf(id: unknown): ClassId {
+  const c = REINC_CLASSES.find((x) => x.id === id)
+  if (!c) throw new Error('No such class.')
+  return c.id
+}
 
 export class ReincarnationTracker implements AppFeature {
   readonly id = 'reincarnation'
@@ -79,30 +90,42 @@ export class ReincarnationTracker implements AppFeature {
       this.keep(c, { ...kept, hand: rank === null ? hand : { ...hand, [key]: { rank, at: Date.now() } } })
       return this.state(ctx, c)
     })
-    // The plans, in the player's order: the page sends the whole list each time.
-    handle('reincarnation:plans', async (character, plans) => {
+    // The priority list, in the player's order: the page sends the whole list each time.
+    handle('reincarnation:priority', async (character, priority) => {
       const c = check(character)
-      const ok = sanitizePlans(plans)
-      if (!ok) throw new Error('Each plan is three different classes and a race, or none.')
-      this.keep(c, { ...this.kept(c), plans: ok })
+      const ok = sanitizePriority(priority)
+      if (!ok) throw new Error('Each line is a class or race and a rank from 1 to 3.')
+      this.keep(c, { ...this.kept(c), priority: ok })
       return this.state(ctx, c)
     })
-    // A plan the player says they reincarnated as: a rank in each of its lines, and off the plan.
-    handle('reincarnation:done', async (character, id) => {
+    // A class the player says is at the level cap (true) or below it (false), or null to forget what they said.
+    handle('reincarnation:capped', async (character, id, capped) => {
       const c = check(character)
+      const cls = classOf(id)
       const kept = this.kept(c)
-      const plan = kept.plans.find((p) => p.id === id)
-      if (!plan) throw new Error('No such plan.')
+      const { [cls]: _, ...levels } = kept.levels
+      this.keep(c, { ...kept, levels: capped === null ? levels : { ...levels, [cls]: { capped, at: Date.now(), by: 'hand' } } })
+      return this.state(ctx, c)
+    })
+    // The class every levelling trio keeps, or '' for none.
+    handle('reincarnation:anchor', async (character, id) => {
+      const c = check(character)
+      this.keep(c, { ...this.kept(c), anchor: id === '' ? '' : classOf(id) })
+      return this.state(ctx, c)
+    })
+    // A reincarnation the player says they made, as this trio and race: a rank in each of its lines.
+    handle('reincarnation:done', async (character, classes, race) => {
+      const c = check(character)
+      if (!Array.isArray(classes) || classes.length !== 3 || new Set(classes).size !== 3) throw new Error('A reincarnation is three different classes.')
+      const trio = classes.map(classOf)
+      if (race !== '' && !REINC_RACES.some((r) => r.race === race)) throw new Error('No such race.')
+      const kept = this.kept(c)
       const { ranks } = await this.ranks(ctx, c, kept)
       const at = Date.now()
       const hand = { ...kept.hand }
-      const keys: ReincKey[] = [...plan.classes.map((x): ReincKey => `class:${x}`), ...(plan.race ? [`race:${plan.race}` as ReincKey] : [])]
+      const keys: ReincKey[] = [...trio.map((x): ReincKey => `class:${x}`), ...(race ? [`race:${race}` as ReincKey] : [])]
       for (const k of keys) hand[k] = { rank: Math.min(REINC_RANKS, (ranks[k]?.rank ?? 0) + 1), at }
-      this.keep(c, {
-        hand,
-        plans: kept.plans.filter((p) => p !== plan),
-        done: [...kept.done, { at, classes: plan.classes, race: plan.race, by: 'hand' }]
-      })
+      this.keep(c, { ...kept, hand, done: [...kept.done, { at, classes: trio, race, by: 'hand' }] })
       return this.state(ctx, c)
     })
   }
@@ -121,19 +144,22 @@ export class ReincarnationTracker implements AppFeature {
     let kept = this.kept(character)
     const [{ events, ranks, from }, inv] = await Promise.all([this.ranks(ctx, character, kept), ctx.inventoryFiles.exported(character)])
     const seen = loggedReincarnations(events)
-    // A plan the log has seen made is done: off the list.
-    const { open, done } = openPlans(kept.plans, seen)
-    if (done.length) this.keep(character, (kept = { ...kept, plans: open }))
     const record = ctx.store.settings.get().characters[character]
     const classes = Object.entries(record?.classLevels ?? {}).flatMap(([name, level]): { id: ClassId; level: number }[] => {
       const id = classIdOf(name)
       return id ? [{ id, level: level ?? 0 }] : []
     })
+    // The classes played now: whether each is at the cap is kept, so it is still known once swapped out.
+    const reincs = [...seen, ...kept.done]
+    const levels = levelsSeen(kept.levels, reincs, classes, Date.now())
+    if (levels) this.keep(character, (kept = { ...kept, levels }))
     return {
       character,
       ranks,
       completionist: completionistRank(ranks),
-      plans: kept.plans,
+      priority: kept.priority,
+      levels: classLevels(kept.levels, reincs),
+      anchor: kept.anchor,
       history: reincHistory(seen, kept.done),
       loadout: { race: record?.race ?? '', classes },
       tokens: inv ? { count: tokenCount(inv.inventory), modified: inv.modified } : null,

@@ -4,34 +4,39 @@ import {
   REINC_CLASSES,
   REINC_KEYS,
   REINC_RACES,
+  classLevels,
   completionistRank,
+  levelsSeen,
   loggedRanks,
   loggedReincarnations,
-  openPlans,
-  planPenalties,
-  poolLeft,
+  makePlan,
+  plannedReincs,
+  prioritySteps,
   rankOf,
   reincarnationsLeft,
   reincHistory,
   reincKeyOf,
-  sanitizePlans,
+  sanitizePriority,
   sanitizeReincCharacter,
   tokenCount,
   trioNotes,
   xpPenalty,
   type LineRank,
+  type PlanInput,
+  type PriorityEntry,
   type RankEvent,
-  type ReincKey,
-  type ReincPlan
+  type ReincDone,
+  type ReincKey
 } from '../../../src/features/reincarnation/core'
 
 // Goals › Reincarnation: the class and race AAs as the client names them, ranks from the log's AA lines
-// and from the player, the plan's pool, and a trio's stances and mana.
+// and from the player, class levels, the plan made from a priority list, and a trio's stances and mana.
 
 const T = Date.UTC(2026, 10, 11, 12)
 const ranks = (r: Partial<Record<ReincKey, number>>): Partial<Record<ReincKey, LineRank>> =>
   Object.fromEntries(Object.entries(r).map(([k, n = 0]) => [k, { rank: n, from: 'log' as const, logged: n }]))
-const plan = (id: string, classes: ReincPlan['classes'], race = '', since = 0): ReincPlan => ({ id, classes, race, since })
+type Trio = ReincDone['classes']
+const want = (...lines: [ReincKey, number][]): PriorityEntry[] => lines.map(([key, rank]) => ({ key, rank }))
 
 describe('the Reincarnation AAs', () => {
   it('are one a class and one a playable race', () => {
@@ -116,19 +121,10 @@ describe('reincarnations from the log', () => {
     ])
   })
 
-  it('take the plans they made off, one each, only those planned before', () => {
-    const plans = [plan('a', ['wiz', 'rog', 'shd'], 'Dark Elf', T - 1), plan('b', ['mnk', 'shm', 'nec'], '', T + 8 * 86400_000), plan('c', ['war', 'clr', 'pal'])]
-    const { open, done } = openPlans(plans, seen)
-    expect(done.map((p) => p.id)).toEqual(['a'])
-    expect(open.map((p) => p.id)).toEqual(['b', 'c'])
-    // A plan with another race is not the one made.
-    expect(openPlans([plan('d', ['rog', 'shd', 'wiz'], 'Troll')], seen).done).toEqual([])
-  })
-
   it('show once in the history when the player said so too', () => {
     const said = [
-      { at: T + 3600_000, classes: ['rog', 'shd', 'wiz'] as ReincPlan['classes'], race: 'Dark Elf', by: 'hand' as const },
-      { at: T + 2 * 86400_000, classes: ['war', 'clr', 'pal'] as ReincPlan['classes'], race: '', by: 'hand' as const }
+      { at: T + 3600_000, classes: ['rog', 'shd', 'wiz'] as Trio, race: 'Dark Elf', by: 'hand' as const },
+      { at: T + 2 * 86400_000, classes: ['war', 'clr', 'pal'] as Trio, race: '', by: 'hand' as const }
     ]
     expect(reincHistory(seen, said).map((h) => [h.by, h.classes[0]])).toEqual([
       ['log', 'mnk'],
@@ -138,19 +134,8 @@ describe('reincarnations from the log', () => {
   })
 })
 
-describe('the plan’s pool', () => {
-  it('is each class and race three times, less ranks held and plans made', () => {
-    const pool = poolLeft(ranks({ 'class:rog': 1, 'race:Iksar': 3 }), [plan('a', ['rog', 'shd', 'wiz'], 'Dark Elf'), plan('b', ['rog', 'war', 'clr'])])
-    expect(pool.classes.rog).toBe(0)
-    expect(pool.classes.shd).toBe(2)
-    expect(pool.classes.mnk).toBe(3)
-    expect(pool.races['Dark Elf']).toBe(2)
-    expect(pool.races.Iksar).toBe(0)
-    // Planned once too often: below zero.
-    expect(poolLeft(ranks({ 'class:rog': 3 }), [plan('a', ['rog', 'shd', 'wiz'])]).classes.rog).toBe(-1)
-  })
-
-  it('takes sixteen reincarnations to finish from nothing', () => {
+describe('reincarnations left', () => {
+  it('takes sixteen to finish every class from nothing', () => {
     expect(reincarnationsLeft(ranks({}))).toEqual({ classes: 16, races: 48 })
     expect(reincarnationsLeft(ranks({ 'class:rog': 1, 'class:shd': 1, 'class:wiz': 1 })).classes).toBe(15)
   })
@@ -166,16 +151,118 @@ describe('the XP penalty', () => {
     expect(xpPenalty(r, ['war', 'clr', 'nec'], 'Erudite')).toBe(20)
     expect(xpPenalty(r, ['war', 'clr', 'nec'], '')).toBe(10)
   })
+})
 
-  it('counts each plan with the plans before it done, a rank at most three', () => {
-    const r = ranks({ 'class:rog': 1, 'class:shd': 1, 'class:wiz': 1, 'race:Erudite': 1 })
-    const plans = [
-      plan('a', ['rog', 'shd', 'wiz'], 'Erudite'),
-      plan('b', ['mnk', 'clr', 'nec'], 'Dwarf'),
-      plan('c', ['rog', 'shd', 'wiz'], 'Erudite'),
-      plan('d', ['rog', 'war', 'clr'])
-    ]
-    expect(planPenalties(r, plans)).toEqual([20, 10, 30, 30])
+describe('class levels', () => {
+  const reinc = (at: number, classes: Trio) => ({ at, classes })
+
+  it('are what was last seen, unless a reincarnation came after', () => {
+    const got = classLevels({ mnk: { capped: true, at: T, by: 'hand' }, rog: { capped: true, at: T, by: 'who' } }, [reinc(T + 1, ['rog', 'shd', 'wiz'])])
+    expect(got.mnk).toEqual({ capped: true, from: 'hand' })
+    expect(got.rog).toEqual({ capped: false, from: 'reincarnated' })
+    expect(got.war).toEqual({ capped: null, from: 'none' })
+  })
+
+  it('keep what /who says of the classes played, but not the cap of one reincarnated since', () => {
+    const seen = levelsSeen(
+      {},
+      [],
+      [
+        { id: 'mnk', level: 50 },
+        { id: 'brd', level: 12 }
+      ],
+      T
+    )
+    expect(seen).toEqual({ mnk: { capped: true, at: T, by: 'who' }, brd: { capped: false, at: T, by: 'who' } })
+    expect(levelsSeen(seen!, [], [{ id: 'mnk', level: 50 }], T + 5)).toBeNull()
+    // Reincarnated after it was seen: the record's 50 may be from before, and below the cap is known already.
+    const since = [reinc(T + 1, ['mnk', 'brd', 'enc'])]
+    expect(levelsSeen(seen!, since, [{ id: 'mnk', level: 50 }], T + 5)).toBeNull()
+    expect(levelsSeen(seen!, since, [{ id: 'mnk', level: 3 }], T + 5)).toBeNull()
+    // Back at the cap after the player said it is not: kept.
+    const said = { ...seen!, mnk: { capped: false, at: T + 2, by: 'hand' as const } }
+    expect(levelsSeen(said, since, [{ id: 'mnk', level: 50 }], T + 5)!.mnk).toEqual({ capped: true, at: T + 5, by: 'who' })
+  })
+})
+
+describe('the plan', () => {
+  // The test character: Rogue, Shadow Knight and Wizard reincarnated twice as Erudites, levelling them now.
+  const held = { 'class:rog': { rank: 2 }, 'class:shd': { rank: 2 }, 'class:wiz': { rank: 2 }, 'race:Erudite': { rank: 2 } }
+  const input = (over: Partial<PlanInput>): PlanInput => ({ ranks: held, priority: [], capped: {}, anchor: 'wiz', race: 'Erudite', ...over })
+
+  it('reads the priority list as single ranks, from the rank held', () => {
+    expect(prioritySteps(want(['class:rog', 3], ['class:mnk', 1], ['class:mnk', 3], ['class:rog', 1]), held)).toEqual([
+      { key: 'class:rog', rank: 3 },
+      { key: 'class:mnk', rank: 1 },
+      { key: 'class:mnk', rank: 2 },
+      { key: 'class:mnk', rank: 3 }
+    ])
+  })
+
+  it('reincarnates the first three classes and the first race with ranks to come', () => {
+    const got = plannedReincs(input({ priority: want(['class:mnk', 3], ['class:dru', 3], ['class:nec', 3], ['race:Ogre', 3], ['class:rng', 1], ['race:Gnome', 1]) }))
+    expect(got.map((r) => [r.classes.join('/'), r.race])).toEqual([
+      ['mnk/dru/nec', 'Ogre'],
+      ['mnk/dru/nec', 'Ogre'],
+      ['mnk/dru/nec', 'Ogre'],
+      ['rng/war/pal', 'Gnome']
+    ])
+    // The last trio is made up: Warrior and Paladin are the first classes with no rank, none at the cap.
+    expect(got[3].extra).toEqual(['class:war', 'class:pal'])
+  })
+
+  it('makes up a trio from classes at the cap first, and keeps the race played when none is listed', () => {
+    const got = plannedReincs(input({ priority: want(['class:mnk', 1]), capped: { brd: true, enc: true } }))
+    expect(got).toEqual([{ classes: ['mnk', 'brd', 'enc'], race: 'Erudite', extra: ['class:brd', 'class:enc', 'race:Erudite'] }])
+  })
+
+  it('takes classes in the list’s order a rank at a time, so a line to rank 1 early spreads them', () => {
+    const got = plannedReincs(
+      input({ ranks: {}, priority: want(['class:mnk', 1], ['class:brd', 1], ['class:enc', 1], ['class:mnk', 2], ['class:war', 1], ['class:clr', 1]), race: '' })
+    )
+    expect(got.map((r) => r.classes.join('/'))).toEqual(['mnk/brd/enc', 'mnk/war/clr'])
+  })
+
+  it('levels with the anchor, an evasive class and the most-reincarnated classes, without raising the penalty', () => {
+    // Monk, Druid and Necromancer next, none known at the cap; Rogue and Shadow Knight are below it too.
+    const stages = makePlan(input({ priority: want(['class:mnk', 1], ['class:dru', 1], ['class:nec', 1], ['race:Ogre', 1]) }))
+    const first = stages[0]
+    expect(first.reinc?.classes).toEqual(['mnk', 'dru', 'nec'])
+    expect(first.runs.map((r) => [r.classes.join('/'), r.penalty])).toEqual([
+      ['wiz/mnk/dru', 20],
+      // No evasive class in it: the Rogue, rank 2 and below the cap, adds nothing to the 20% the Wizard brings.
+      ['wiz/nec/rog', 20]
+    ])
+    expect(first.runs[1].levels).toEqual(['nec', 'rog'])
+    // After the reincarnation (now Ogre), Shadow Knight is the reincarnated class still below the cap, and
+    // the three new ones are back at level 1. Monk goes with Shadow Knight for the stance; 20% throughout.
+    const last = stages[1]
+    expect(last.reinc).toBeNull()
+    expect(last.runs.map((r) => r.classes.join('/'))).toEqual(['wiz/shd/mnk', 'wiz/dru/nec'])
+    expect(last.runs.every((r) => r.penalty === 20 && r.race === 'Ogre')).toBe(true)
+  })
+
+  it('takes defensive stance when no evasive class fits under the penalty', () => {
+    // Every evasive class at rank 3 and the cap, the Wizard at rank 1.
+    const evasive = ['rng', 'mnk', 'brd', 'rog', 'bst'] as const
+    const r = { 'class:wiz': { rank: 1 }, ...Object.fromEntries(evasive.map((c) => [`class:${c}`, { rank: 3 }])) }
+    const capped = { wiz: true, ...Object.fromEntries(evasive.map((c) => [c, true])) }
+    const [stage] = makePlan(input({ ranks: r, priority: want(['class:clr', 1], ['class:dru', 1], ['class:shm', 1]), race: '', capped }))
+    expect(stage.runs.map((x) => [x.classes.join('/'), x.penalty])).toEqual([
+      ['wiz/clr/dru', 10],
+      ['wiz/shm/war', 10]
+    ])
+  })
+
+  it('says when the race costs more than the classes', () => {
+    const [stage] = makePlan(input({ ranks: { 'class:wiz': { rank: 1 }, 'race:Erudite': { rank: 3 } } }))
+    expect(stage.runs[0]).toMatchObject({ penalty: 30, classPenalty: 10, race: 'Erudite' })
+  })
+
+  it('needs no levelling for classes at the cap, and none at all with nothing reincarnated', () => {
+    const [stage] = makePlan(input({ ranks: {}, priority: want(['class:mnk', 1], ['class:brd', 1], ['class:enc', 1]), capped: { mnk: true, brd: true, enc: true, wiz: true } }))
+    expect(stage.runs).toEqual([])
+    expect(makePlan(input({ ranks: {} }))).toEqual([])
   })
 })
 
@@ -188,29 +275,44 @@ describe('a trio’s notes', () => {
 })
 
 describe('what is kept', () => {
-  it('takes plans of three different classes and a playable race, or none', () => {
-    expect(sanitizePlans([{ id: 'a', classes: ['rog', 'shd', 'wiz'], race: 'Dark Elf', since: T }])).toEqual([plan('a', ['rog', 'shd', 'wiz'], 'Dark Elf', T)])
-    expect(sanitizePlans([{ id: 'a', classes: ['rog', 'shd', 'wiz'], race: '' }])).toEqual([plan('a', ['rog', 'shd', 'wiz'])])
-    expect(sanitizePlans([{ id: 'a', classes: ['rog', 'rog', 'wiz'], race: '' }])).toBeNull()
-    expect(sanitizePlans([{ id: 'a', classes: ['rog', 'shd'], race: '' }])).toBeNull()
-    expect(sanitizePlans([{ id: 'a', classes: ['rog', 'shd', 'wiz'], race: 'Half Dark Elf' }])).toBeNull()
-    expect(sanitizePlans([{ id: '../x', classes: ['rog', 'shd', 'wiz'], race: '' }])).toBeNull()
-    expect(sanitizePlans([plan('a', ['rog', 'shd', 'wiz']), plan('a', ['war', 'clr', 'pal'])])).toBeNull()
-    expect(sanitizePlans('nope')).toBeNull()
+  it('takes a priority list of lines and ranks from 1 to 3', () => {
+    expect(
+      sanitizePriority([
+        { key: 'class:rog', rank: 3 },
+        { key: 'race:Erudite', rank: 1 }
+      ])
+    ).toEqual(want(['class:rog', 3], ['race:Erudite', 1]))
+    expect(sanitizePriority([{ key: 'class:rog', rank: 4 }])).toBeNull()
+    expect(sanitizePriority([{ key: 'class:rog', rank: 0 }])).toBeNull()
+    expect(sanitizePriority([{ key: 'race:Half Dark Elf', rank: 1 }])).toBeNull()
+    expect(sanitizePriority('nope')).toBeNull()
   })
 
   it('keeps what it can use of a file', () => {
     const got = sanitizeReincCharacter({
       hand: { 'class:rog': { rank: 2, at: T }, 'class:nope': { rank: 1, at: T }, 'race:Troll': { rank: 4, at: T } },
-      plans: [plan('a', ['rog', 'shd', 'wiz']), { id: 'b', classes: ['x'] }],
+      priority: [
+        { key: 'class:mnk', rank: 2 },
+        { key: 'class:nope', rank: 1 }
+      ],
+      levels: { mnk: { capped: true, at: T, by: 'hand' }, nope: { capped: true, at: T, by: 'hand' }, war: { capped: 'yes', at: T, by: 'who' } },
+      anchor: 'wiz',
       done: [{ at: T, classes: ['rog', 'shd', 'wiz'], race: 'Dark Elf' }, { at: 'then' }]
     })
     expect(got).toEqual({
       hand: { 'class:rog': { rank: 2, at: T } },
-      plans: [plan('a', ['rog', 'shd', 'wiz'])],
+      priority: want(['class:mnk', 2]),
+      levels: { mnk: { capped: true, at: T, by: 'hand' } },
+      anchor: 'wiz',
       done: [{ at: T, classes: ['rog', 'shd', 'wiz'], race: 'Dark Elf', by: 'hand' }]
     })
-    expect(sanitizeReincCharacter(null)).toEqual({ hand: {}, plans: [], done: [] })
+    expect(sanitizeReincCharacter(null)).toEqual({ hand: {}, priority: [], levels: {}, anchor: '', done: [] })
+  })
+
+  it('turns the trios an older file planned into a priority list', () => {
+    const trio = (classes: string[], race: string) => ({ id: 'p', classes, race, since: T })
+    const got = sanitizeReincCharacter({ plans: [trio(['mnk', 'dru', 'nec'], 'Ogre'), trio(['mnk', 'dru', 'nec'], 'Ogre'), trio(['rng', 'shm', 'ber'], '')] })
+    expect(got.priority).toEqual(want(['class:mnk', 2], ['class:dru', 2], ['class:nec', 2], ['race:Ogre', 2], ['class:rng', 1], ['class:shm', 1], ['class:ber', 1]))
   })
 })
 

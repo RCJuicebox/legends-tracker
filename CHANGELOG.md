@@ -4,7 +4,9 @@ What changed in each version. The release workflow publishes a version's section
 
 ## Unreleased
 
-- **Reincarnation shows the XP penalty.** Levels 1–50 take 10% more experience for each Reincarnation rank, but only while you play the classes and race that hold it. The status line shows your loadout's penalty now, and each plan and the trio you're building show what levelling it will cost after that reincarnation. Measured from a log, the second reincarnation of the same trio and race cost 20%, not 80%, so the page counts the highest rank among what you play rather than adding the ranks up.
+- **The Reincarnation planner makes the plan for you.** Give it a priority list: the classes and races you want ranks in, in order, each up to a rank. It works out the reincarnations from that list, and before each one the trios to level as. Every levelling trio keeps the class you choose (on the Planner's Levelling card) and takes the classes the next reincarnation needs at level 50, the highest ranks together. It fills its other places without raising the XP penalty: a class with Evasive stance first (Defensive when no Evasive class fits), then your reincarnated classes below 50 with the most ranks. Which classes are at 50 comes from /who while you play them, and from what you click. Plans you built by hand become a priority list on the first start.
+
+- **Reincarnation shows the XP penalty.** Levels 1–50 take 10% more experience for each Reincarnation rank, but only while you play the classes and race that hold it. The status line and every levelling trio show it, and a trio says when its race costs more than its classes. Measured from a log, the second reincarnation of the same trio and race cost 20%, not 80%, so the page counts the highest rank among what you play rather than adding the ranks up.
 
 ## 2.24.1 (2026-11-13)
 
