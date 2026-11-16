@@ -580,8 +580,9 @@ function combos<T>(from: readonly T[], k: number): T[][] {
  * highest race at the cap below it. Once fewer classes than that are ready, the trio is made up from
  * classes at the cap reincarnated least often (each time adds 10% to levelling that class), in the
  * player's order; the anchor takes its turn only while one more leaves it below the most-reincarnated
- * class (the player's rule). With every race at rank 3 the plan ends; races take three times as many
- * reincarnations as classes, so classes are reincarnated past rank 3 on the way.
+ * class (the player's rule). With every race at rank 3 the reincarnations end; races take three times
+ * as many reincarnations as classes, so classes are reincarnated past rank 3 on the way. Last, levelling
+ * trios (as the last race) bring every class still below the cap back to it.
  *
  * A levelling trio's two places go to the pair that, in turn: has the most classes still below rank 3
  * (they must be back at the cap to be reincarnated again), carries the least XP penalty (10% for each
@@ -681,6 +682,8 @@ export function makePlan(input: PlanInput): PlanStage[] {
     stages.push({ runs, reinc })
     runs = [levelRun(race)]
   }
+  // Then every class back to the cap: the plan ends with all of them at 50, the anchor in each trio still.
+  for (let n = 0; CLASS_ORDER.some((c) => !atCap[c]) && n < CLASS_ORDER.length; n++) runs.push(levelRun(race))
   if (runs.length) stages.push({ runs, reinc: null })
   return stages
 }

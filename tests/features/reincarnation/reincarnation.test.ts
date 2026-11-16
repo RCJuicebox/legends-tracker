@@ -267,6 +267,21 @@ describe('the plan', () => {
     expect(Math.max(...counts) - Math.min(...counts)).toBeLessThanOrEqual(1)
   })
 
+  it('ends with every class back at the cap, the anchor in each trio', () => {
+    const stages = makePlan(input({}))
+    const last = stages.at(-1)!
+    expect(last.reinc).toBeNull()
+    const atCap: Record<string, boolean> = Object.fromEntries(REINC_CLASSES.map((c) => [c.id, !['rog', 'shd', 'wiz'].includes(c.id)]))
+    for (const st of stages) {
+      for (const r of st.runs) for (const c of r.classes) atCap[c] = true
+      for (const c of st.reinc?.classes ?? []) atCap[c] = false
+    }
+    expect(Object.entries(atCap).filter(([, v]) => !v)).toEqual([])
+    // Two classes a trio beside the Wizard, all as the last race.
+    expect(last.runs.length).toBeGreaterThan(1)
+    expect(last.runs.every((r) => r.classes[0] === 'wiz' && r.race === stages.at(-2)!.reinc!.race)).toBe(true)
+  })
+
   it('says when the race costs more than the classes', () => {
     const [stage] = makePlan(input({ times: { 'class:wiz': 1, 'race:Erudite': 3 } }))
     expect(stage.runs[0]).toMatchObject({ race: 'Erudite', penalty: 30, classPenalty: 10 })

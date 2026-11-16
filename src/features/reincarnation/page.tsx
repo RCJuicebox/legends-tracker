@@ -63,8 +63,8 @@ const HOW = (
       on by itself. Every class and race starts at {LEVEL_CAP}. A reincarnation takes three classes and a race at {LEVEL_CAP} and sets all four to level 1; then one levelling trio,
       as that race: your chosen class (in every levelling trio) and two of the classes at level 1, picked for the classes still short of rank 3 first, then the least XP penalty,
       then evasive stance (else defensive). The third waits at level 1 for a later trio; when too few classes are at {LEVEL_CAP} for the next reincarnation, another levelling trio
-      comes first. Every class is taken as at {LEVEL_CAP} unless /who shows it below while you play it, a reincarnation sets it back to 1, or you say so: the log’s level lines do
-      not name the class.
+      comes first. After the last reincarnation, levelling trios bring every class back to {LEVEL_CAP}. Every class is taken as at {LEVEL_CAP} unless /who shows it below while you
+      play it, a reincarnation sets it back to 1, or you say so: the log’s level lines do not name the class.
     </div>
     <div>
       <b>The XP penalty</b>: levels 1–{XP_PENALTY_LEVELS} take {XP_PENALTY_PER_RANK}% more experience for each time a class or race was reincarnated, past rank 3 too, only while
@@ -521,7 +521,7 @@ function ThePlan({ s, stages, onDone, onSetup }: { s: ReincState; stages: PlanSt
             {num(reincs)} {reincs === 1 ? 'reincarnation' : 'reincarnations'} until every class and race is at rank 3, and {num(runs)} levelling {runs === 1 ? 'trio' : 'trios'}.
             After each reincarnation, one trio as its race levels it with two of its classes; the third waits at level 1. <b>Bold</b> classes level; the others are at {LEVEL_CAP}{' '}
             already. Races take far more reincarnations than classes, so once every class is at rank 3 the plan goes on for the races, spreading the extra reincarnations over the
-            classes evenly.
+            classes evenly. After the last, levelling trios bring every class back to {LEVEL_CAP}.
           </div>
           <ol className="rc-stages">
             {stages.map((st, i) => {

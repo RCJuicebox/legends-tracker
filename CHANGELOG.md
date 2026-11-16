@@ -4,6 +4,8 @@ What changed in each version. The release workflow publishes a version's section
 
 ## Unreleased
 
+- **The Reincarnation plan ends with every class back at 50.** After the last reincarnation it now adds the levelling trios (your chosen class and two more each, as the last race) that bring every class back to 50. Before, it stopped after one trio and left most classes at level 1.
+
 - **Half Dark Elf joins the races.** Reincarnation's lists, plan and progress bars now include it (its AA gives tracking and map awareness range), and /who and the Stats page know it. Factions leaves it out of race swaps until the game gives it faction modifiers.
 
 ## 2.25.0 (2026-11-15)
