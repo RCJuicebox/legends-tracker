@@ -23,8 +23,7 @@ export type MoteCounts = Partial<Record<MoteKey, number>>
 /**
  * Fragments of <Rank> Potential (2026-11-12 patch): reward-chest and raid-boss drops beside motes,
  * nine ranks with no Infinite. `xp` is what one gives an item, read off the game's upgrade previews;
- * `checked` is false where that is a guess (Grand, Ascendant, not yet seen): every measured rank is
- * 2^((rank+1)/2) rounded, with rank counted from 1.
+ * `checked` is false where a value is a guess; all nine are measured now (2026-11-17).
  * On a spell a fragment gives 2^rank xp (fragmentSpellXp), twice the mote of its rank. A fragment of
  * rank R works on an item below +R, and they do not combine.
  */
@@ -36,8 +35,8 @@ export const FRAGMENT_RANKS = [
   { key: 'major', name: 'Major', xp: 8, checked: true },
   { key: 'greater', name: 'Greater', xp: 11, checked: true },
   { key: 'superior', name: 'Superior', xp: 16, checked: true },
-  { key: 'grand', name: 'Grand', xp: 23, checked: false },
-  { key: 'ascendant', name: 'Ascendant', xp: 32, checked: false }
+  { key: 'grand', name: 'Grand', xp: 22, checked: true },
+  { key: 'ascendant', name: 'Ascendant', xp: 32, checked: true }
 ] as const
 
 /** A fragment's xp on a spell, by rank index: Infinitesimal 2, Potential 16, Superior 128. */
