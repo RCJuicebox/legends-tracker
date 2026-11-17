@@ -25,7 +25,7 @@ export type MoteCounts = Partial<Record<MoteKey, number>>
  * nine ranks with no Infinite. `xp` is what one gives an item, read off the game's upgrade previews;
  * `checked` is false where a value is a guess; all nine are measured now (2026-11-17).
  * On a spell a fragment gives 2^rank xp (fragmentSpellXp), twice the mote of its rank. A fragment of
- * rank R works on an item below +R, and they do not combine.
+ * rank R works on an item below +R, and two of one rank combine into one of the next (2026-11-17).
  */
 export const FRAGMENT_RANKS = [
   { key: 'infinitesimal', name: 'Infinitesimal', xp: 2, checked: true },

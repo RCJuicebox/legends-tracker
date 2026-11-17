@@ -9,7 +9,10 @@ import { FRAGMENT_RANKS, MOTE_RANKS, fragmentWorth, moteWorth, type MoteCounts }
 // - A Fragment of rank R works the same way, below +R, for its own item xp (FRAGMENT_RANKS). The
 //   game hands back fragments the item cannot take any more.
 // - XP past a level carries on into the next ones (a preview went +0 → +3 1/8 in one fragment).
-// - Two motes of one rank combine into one of the next. Fragments do not combine.
+// - Two motes of one rank combine into one of the next, and so do two fragments (2026-11-17), at
+//   every rank. Combining fragments loses item xp (two Infinitesimal give 4, a Minor 3) and keeps
+//   their spell xp, so the plan combines them only up to the lowest rank that works on the item, when
+//   there is none of it on hand: the same rule as motes.
 //
 // How the planner spends (Dan, 2026-11-13): motes first. A fragment gives a spell twice what it gives
 // an item at the low levels, and every bit of it counts there, so on an item it is spent only when no
@@ -26,6 +29,7 @@ export interface PlannedItem {
 }
 
 interface Combine {
+  kind: 'mote' | 'fragment'
   /** Rank index combined from … */
   from: number
   /** … how many of them … */
@@ -52,7 +56,7 @@ interface PlanStep {
   carried: number
   /** What is spent on the item at this level, in order. */
   uses: PlanUse[]
-  /** Motes combined first to make some of those. */
+  /** Motes or fragments combined first to make some of those. */
   combos: Combine[]
   /** The lowest mote rank that works here: what `short` is counted in. */
   m: number
@@ -139,7 +143,7 @@ export function fragmentsToArray(c: MoteCounts): number[] {
   return FRAGMENT_RANKS.map((r) => c[r.key] ?? 0)
 }
 
-/** How many of rank `m` you could have, combining everything below it. */
+/** How many of rank `m` you could have, combining everything below it (motes or fragments alike). */
 export function makeable(inv: number[], m: number): number {
   let carry = 0
   for (let k = 0; k <= m; k++) {
@@ -150,8 +154,8 @@ export function makeable(inv: number[], m: number): number {
   return 0
 }
 
-/** Takes `count` motes of rank `m` from `inv` (mutated), combining up from lower ranks for any shortfall. */
-function planStep(inv: number[], m: number, count: number): { take: number; short: number; combos: Combine[] } {
+/** Takes `count` of rank `m` from `inv` (mutated), combining up from lower ranks for any shortfall. */
+function planStep(inv: number[], m: number, count: number, kind: Combine['kind'] = 'mote'): { take: number; short: number; combos: Combine[] } {
   const take = Math.min(count, makeable(inv, m))
   let need = take
   const combos: Combine[] = []
@@ -159,7 +163,7 @@ function planStep(inv: number[], m: number, count: number): { take: number; shor
     const use = Math.min(inv[k], need)
     inv[k] -= use
     const short = need - use
-    if (short && k > 0) combos.push({ from: k - 1, n: short * 2, make: short, to: k })
+    if (short && k > 0) combos.push({ kind, from: k - 1, n: short * 2, make: short, to: k })
     need = short * 2
   }
   return { take, short: count - take, combos: combos.reverse() }
@@ -189,12 +193,15 @@ const fragmentCost = (i: number) => fragmentWorth(i) / FRAGMENT_RANKS[i].xp
  * one whose item xp costs least, counted in Infinitesimal motes' worth (what it would give a spell
  * instead), which is the lowest rank that works, made by combining lower motes when there is none on
  * hand, before any higher one. Only when no mote can pay, a fragment, the cheapest whose xp fits in
- * `room`. On a tie the lower rank goes first, since it stops working on the item sooner.
+ * `room`, made the same way from lower fragments when there is none of the lowest working rank. On a
+ * tie the lower rank goes first, since it stops working on the item sooner.
  */
-function cheapest(inv: number[], frag: number[], t: number, room: number): { kind: 'mote' | 'fragment' | 'combine'; m: number } | null {
-  let best: { kind: 'mote' | 'fragment' | 'combine'; m: number } | null = null
+type Pick = { kind: 'mote' | 'fragment' | 'combine' | 'fragmentCombine'; m: number }
+
+function cheapest(inv: number[], frag: number[], t: number, room: number): Pick | null {
+  let best: Pick | null = null
   let cost = Infinity
-  const consider = (kind: 'mote' | 'fragment' | 'combine', m: number, c: number) => {
+  const consider = (kind: Pick['kind'], m: number, c: number) => {
     if (c < cost - 1e-9) {
       best = { kind, m }
       cost = c
@@ -204,6 +211,7 @@ function cheapest(inv: number[], frag: number[], t: number, room: number): { kin
   if (inv[t] === 0 && t > 0 && makeable(inv, t) > 0) consider('combine', t, moteCost(t))
   if (best) return best
   for (let i = t; i < FRAGMENT_RANKS.length; i++) if (frag[i] > 0 && FRAGMENT_RANKS[i].xp <= room) consider('fragment', i, fragmentCost(i))
+  if (t < FRAGMENT_RANKS.length && frag[t] === 0 && t > 0 && FRAGMENT_RANKS[t].xp <= room && makeable(frag, t) > 0) consider('fragmentCombine', t, fragmentCost(t))
   return best
 }
 
@@ -252,8 +260,9 @@ export function plan(item: PlannedItem, stock: MoteCounts, fragments: MoteCounts
         blocked = true
         break
       }
-      if (pick.kind === 'fragment') {
-        frag[pick.m]--
+      if (pick.kind === 'fragment' || pick.kind === 'fragmentCombine') {
+        if (pick.kind === 'fragmentCombine') st.combos.push(...planStep(frag, pick.m, 1, 'fragment').combos)
+        else frag[pick.m]--
         total += FRAGMENT_RANKS[pick.m].xp
         addUse(st.uses, 'fragment', pick.m)
         continue
@@ -281,11 +290,11 @@ export function plan(item: PlannedItem, stock: MoteCounts, fragments: MoteCounts
 function mergeCombos(combos: Combine[]): Combine[] {
   const out: Combine[] = []
   for (const c of combos) {
-    const same = out.find((x) => x.from === c.from && x.to === c.to)
+    const same = out.find((x) => x.kind === c.kind && x.from === c.from && x.to === c.to)
     if (same) {
       same.n += c.n
       same.make += c.make
     } else out.push({ ...c })
   }
-  return out.sort((a, b) => a.from - b.from)
+  return out.sort((a, b) => (a.kind === b.kind ? a.from - b.from : a.kind === 'mote' ? -1 : 1))
 }

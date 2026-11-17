@@ -16,7 +16,7 @@ describe('mote upgrade planner', () => {
     // Needs 9 Superior; has 7, plus 4 Greater (too low for a +6 item) that combine into 2 more.
     const p = plan(fixItem({ lvl: 6, xp: 5, to: 7 }), { superior: 7, greater: 4 })
     expect(p.steps[0].short).toBeUndefined()
-    expect(p.steps[0].combos).toEqual([{ from: 5, n: 4, make: 2, to: 6 }])
+    expect(p.steps[0].combos).toEqual([{ kind: 'mote', from: 5, n: 4, make: 2, to: 6 }])
     expect(p.steps[0].uses).toEqual([{ kind: 'mote', m: 6, n: 9 }])
     expect(p.after!.slice(5, 7)).toEqual([0, 0])
   })
@@ -36,9 +36,28 @@ describe('mote upgrade planner', () => {
     expect(p.steps[0].uses).toEqual([{ kind: 'fragment', m: 2, n: 1 }])
     expect(p.steps[1].carried).toBe(2)
     expect(p.steps[2].uses).toEqual([{ kind: 'fragment', m: 2, n: 1 }])
-    expect(p.steps[3].short).toBe(2)
+    // At +3 a Lesser no longer works, so the last two combine into a Potential (6 xp): 1 Potential mote short.
+    expect(p.steps[3]).toMatchObject({ combos: [{ kind: 'fragment', from: 2, n: 2, make: 1, to: 3 }], uses: [{ kind: 'fragment', m: 3, n: 1 }], short: 1 })
     expect(p).toMatchObject({ covered: 3, reached: 3, xp: 1 })
     expect(p.afterFragments![2]).toBe(2)
+  })
+
+  it('combines fragments two into one, only up to the lowest rank the item takes (2026-11-17)', () => {
+    // A +3 item takes Potential fragments and up; four Lesser make two Potential, 12 xp: +3 0/8 to +4 4/16.
+    const p = plan(fixItem({ lvl: 3, to: 5 }), {}, { lesser: 4 })
+    expect(p.steps[0]).toMatchObject({ combos: [{ kind: 'fragment', from: 2, n: 4, make: 2, to: 3 }], uses: [{ kind: 'fragment', m: 3, n: 2 }] })
+    expect(p.steps[0].short).toBeUndefined()
+    expect(p).toMatchObject({ covered: 1, reached: 4, xp: 4, afterFragments: [0, 0, 0, 0, 0, 0, 0, 0, 0] })
+    // A fragment that already works is spent as it is, not combined: Lesser on a +1 item.
+    expect(plan(fixItem({ lvl: 1, to: 3 }), {}, { lesser: 2 }).steps[0]).toMatchObject({ combos: [], uses: [{ kind: 'fragment', m: 2, n: 1 }] })
+    // Combining goes through every rank between: eight Infinitesimal make one Potential.
+    const q = plan(fixItem({ lvl: 3, to: 4 }), {}, { infinitesimal: 8 })
+    expect(q.steps[0].combos).toEqual([
+      { kind: 'fragment', from: 0, n: 8, make: 4, to: 1 },
+      { kind: 'fragment', from: 1, n: 4, make: 2, to: 2 },
+      { kind: 'fragment', from: 2, n: 2, make: 1, to: 3 }
+    ])
+    expect(q.steps[0].uses).toEqual([{ kind: 'fragment', m: 3, n: 1 }])
   })
 
   it('spends motes first, even where a fragment would give the xp cheaper', () => {

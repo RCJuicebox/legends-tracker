@@ -14,7 +14,7 @@ const short = (i: number) => MOTE_RANKS[i].name || 'Potential'
 const long = (i: number, n: number) => `${n === 1 ? 'Mote' : 'Motes'} of ${MOTE_RANKS[i].name ? MOTE_RANKS[i].name + ' ' : ''}Potential`
 const fragLong = (i: number, n: number) => fragmentName(FRAGMENT_RANKS[i].key, n)
 
-/** "3 × Motes of Major Potential at 5 xp each", "1 × Fragment of Grand Potential at 24 xp each (a guess …)". */
+/** "3 × Motes of Major Potential at 5 xp each", "1 × Fragment of Grand Potential at 22 xp each". */
 function spendLine(u: PlanUse): string {
   if (u.kind === 'mote') return `${num(u.n)} × ${long(u.m, u.n)} at ${MOTE_RANKS[u.m].xp} xp each`
   const r = FRAGMENT_RANKS[u.m]
@@ -245,7 +245,9 @@ export function MotePlanner() {
                       <ol className="steps" style={{ fontSize: 13 }}>
                         {st.combos.map((c, i) => (
                           <li key={`c${i}`}>
-                            Combine {num(c.n)} {short(c.from)} into {num(c.make)} {short(c.to)}
+                            {c.kind === 'fragment'
+                              ? `Combine ${num(c.n)} ${fragLong(c.from, c.n)} into ${num(c.make)} ${fragLong(c.to, c.make)}`
+                              : `Combine ${num(c.n)} ${short(c.from)} into ${num(c.make)} ${short(c.to)}`}
                           </li>
                         ))}
                         {st.uses.map((u, i) => (
@@ -379,9 +381,10 @@ export function MotePlanner() {
           </table>
         </div>
         <p className="faint small" style={{ marginBottom: 0 }}>
-          Fragments do not combine, and the game hands back any the item cannot take. Item xp marked ? is a guess (2, 3, 4, 6, 8, 12, 16, 24, 32 by rank) until one is previewed in
-          game. {useFragments ? 'The plan spends them only once your motes run out, and never one that would go past the level you plan to.' : 'The plan leaves them for spells.'}{' '}
-          Read from screen counts motes only.
+          Two fragments combine into one of the next rank, like motes: the same spell xp, but less item xp, so the plan combines them only to reach a rank the item still takes. The
+          game hands back any the item cannot take.{' '}
+          {useFragments ? 'The plan spends them only once your motes run out, and never one that would go past the level you plan to.' : 'The plan leaves them for spells.'} Read
+          from screen counts motes only.
         </p>
       </div>
     </div>
