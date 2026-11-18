@@ -247,6 +247,13 @@ describe('paths in the settings', () => {
     expect(sanitizeSettings(older, { ...fb, skinStartCommands: undefined } as never)?.skinStartCommands).toEqual([])
   })
 
+  it("keep Live's player models off unless switched on, and off for settings from before them", () => {
+    expect(sanitizeSettings({ ...fb, liveModels: true }, fb)?.liveModels).toBe(true)
+    expect(sanitizeSettings({ ...fb, liveModels: 'yes' }, fb)?.liveModels).toBe(false)
+    const { liveModels: _, ...older } = fb
+    expect(sanitizeSettings(older, { ...fb, liveModels: undefined } as never)?.liveModels).toBe(false)
+  })
+
   it('know a full path from one that depends on the current folder', () => {
     expect(['C:\\x', 'c:/x', '\\\\server\\share'].map(isFullPath)).toEqual([true, true, true])
     expect(['', 'C:', 'C:x', 'x\\y', '\\\\', 7].map(isFullPath)).toEqual([false, false, false, false, false, false])

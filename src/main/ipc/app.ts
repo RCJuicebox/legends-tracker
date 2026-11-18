@@ -9,6 +9,7 @@ import { sources } from '../sources/registry'
 import { jobs } from '../sources/jobs'
 import { checkGameFolder, findInstall, isGameFolder, resolveGameFolder } from '../game'
 import { approvedCommands, listSkinBuilds, listSkins, readBagLayout, runSkinBuild, saveBagLayout } from '../skinBuilds'
+import { liveModelsStatus } from '../liveModels'
 import { join } from 'node:path'
 import { assertCharacterKey, isCharacterKey, meterOptions, sanitizeCharacter, sanitizeSettings, textArg } from '../../core/validate'
 import { className } from '../../shared/game/classes'
@@ -118,6 +119,7 @@ export function registerAppIpc(ctx: AppContext): void {
   // A UI skin's rebuild, as the skin's own file names it (src/core/skinBuild.ts).
   handle('skins:builds', () => listSkinBuilds(ctx.installDir()))
   handle('skins:list', () => listSkins(ctx.installDir()))
+  handle('skins:liveModels', () => liveModelsStatus(ctx.installDir()))
   const approved = approvedCommands(join(app.getPath('userData'), 'skin-commands.json'))
   handle('skins:build', (skin, character, approve) => runSkinBuild(ctx.installDir(), skin, character, approved, approve === true))
   handle('skins:layout', (skin, character) => readBagLayout(ctx.installDir(), skin, isCharacterKey(character) ? ctx.inventoryFiles.exportPath(character) : ''))

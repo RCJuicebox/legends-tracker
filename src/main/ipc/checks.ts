@@ -202,6 +202,7 @@ export const CHECKS: { [K in InvokeChannel]: Check<Parameters<Invokes[K]>> } = {
   'game:choose': none,
   'skins:builds': none,
   'skins:list': none,
+  'skins:liveModels': none,
   'skins:build': args(str, str, opt(bool)),
   'skins:layout': args(str, str),
   'skins:saveLayout': args(str, obj),

@@ -273,6 +273,11 @@ export interface AppSettings {
    * kept exactly as it was shown (startKey): a skin whose file names another command runs nothing.
    */
   skinStartCommands: string[]
+  /**
+   * Live's newer ("Luclin") player-race models in place of the classic ones (Settings › UI): lines added to the
+   * game's GlobalLoad.txt each time it starts (src/core/liveModels.ts), taken out when switched off.
+   */
+  liveModels: boolean
   /** The optional modules the player turned on (Settings › Modules), by page id; one not named is off. */
   modules: Record<string, boolean>
   combat: CombatSettings

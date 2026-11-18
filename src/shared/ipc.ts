@@ -29,6 +29,7 @@ import type { PetGearReading, PetProfile, PetSpellOption } from '../core/pets'
 import type { RespawnTimerSpec, RespawnView, SpawnLink } from '../core/respawns'
 import type { MyClass, SpellCastRow } from '../core/spellMotes'
 import type { BagLayoutView, SkinBuild, SkinBuildResult } from '../core/skinBuild'
+import type { LiveModelsStatus } from '../core/liveModels'
 import type { Calibration } from '../core/groupHealth'
 import type { Offer, Purchase, Recipe } from '../core/tradeskills'
 import type { CatalogItem } from '../core/wikiItem'
@@ -565,6 +566,8 @@ export interface Invokes {
   'game:choose': () => { canceled: boolean; picked: string; dir: string }
   /** The UI skins in the game folder that ask for a rebuild button (src/core/skinBuild.ts). */
   'skins:builds': () => SkinBuild[]
+  /** Whether the game's GlobalLoad.txt loads Live's player models now, and how the last change went (Settings › UI). */
+  'skins:liveModels': () => LiveModelsStatus
   /** Every UI skin in the game folder, and whether its file says how it draws the group health bars (FEAT-040). */
   'skins:list': () => { skin: string; profile: boolean }[]
   /** Runs a skin's rebuild, for a character's export. */
@@ -811,6 +814,7 @@ const INVOKE_CHANNELS: Record<InvokeChannel, true> = {
   'game:choose': true,
   'skins:builds': true,
   'skins:list': true,
+  'skins:liveModels': true,
   'skins:build': true,
   'skins:layout': true,
   'skins:saveLayout': true,

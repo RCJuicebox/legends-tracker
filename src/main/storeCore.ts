@@ -54,6 +54,7 @@ export function defaultSettings(): AppSettings {
     achievementCues: true,
     hunterToasts: true,
     skinStartCommands: [],
+    liveModels: false,
     modules: {},
     combat: { fightGapSec: 10, historyMinutes: 60, newSessionOnZone: true, combinePet: true, charmPets: true },
     groupHealth: {

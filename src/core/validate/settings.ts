@@ -416,6 +416,7 @@ export function sanitizeSettings(v: unknown, fb: AppSettings): AppSettings | nul
     achievementCues: bool(v.achievementCues, fb.achievementCues),
     hunterToasts: bool(v.hunterToasts, fb.hunterToasts ?? true),
     skinStartCommands: Array.isArray(v.skinStartCommands) ? stringsArg(v.skinStartCommands, 20, 24000) : (fb.skinStartCommands ?? []),
+    liveModels: bool(v.liveModels, fb.liveModels ?? false),
     modules: modules(v.modules, fb.modules),
     combat,
     groupHealth,

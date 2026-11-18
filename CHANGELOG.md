@@ -2,6 +2,10 @@
 
 What changed in each version. The release workflow publishes a version's section as its release notes, and installed copies show them when an update arrives.
 
+## Unreleased
+
+- **Live's player models, with or without a custom UI.** Settings › UI has a new **Player models** switch. The game ships Live's newer (Luclin-style) player-race models and their animations but never loads them; switched on, Legends Tracker adds the lines that load them to the game's GlobalLoad.txt each time the game starts, since the launcher puts that file back every time. Switching it off takes the lines out again. Vah Shir and Half Dark Elf keep their own models.
+
 ## 2.26.0 (2026-11-17)
 
 - **Fragments combine in the Merge planner.** The game now combines two Fragments of Potential of one rank into one of the next, like motes. Combining keeps a fragment's spell xp but gives an item less, so the planner combines fragments only to reach a rank the item still takes, and only when you have none of that rank. Four Lesser fragments, too low for a +3 item, become two Potential that take it to +4. The plan lists those combines beside your motes'.

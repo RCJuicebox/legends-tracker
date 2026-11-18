@@ -16,6 +16,7 @@ import kokoroWorkerPath from './kokoroWorker?modulePath'
 import { VoiceRouter } from './voiceRouter'
 import { IconSource, characterSkin } from './icons'
 import { runGameStart } from './skinBuilds'
+import { setLiveModels } from './liveModels'
 import { OverlayManager } from './overlays'
 import { GameWatcher } from './gameWatcher'
 import { overlaysVisible } from '../core/overlayVisibility'
@@ -309,7 +310,11 @@ export function createContext(): AppContext {
       ctx.engine.gameStarted()
       // Skins' game-start commands the player switched on (Settings › UI): as early as the game is seen,
       // ahead of what it loads once a server is picked.
-      void runGameStart(ctx.installDir(), ctx.characterKey(), store.settings.get().skinStartCommands)
+      // Then Live's player models, if switched on: after the skins' commands, one of which may edit the same file.
+      const dir = ctx.installDir()
+      void runGameStart(dir, ctx.characterKey(), store.settings.get().skinStartCommands).then(() => {
+        if (store.settings.get().liveModels) void setLiveModels(dir, true)
+      })
     }
     ctx.refreshOverlayVisibility()
     ctx.overlays.setGameInFront(state.foregroundName === 'eqgame')
@@ -456,6 +461,7 @@ export function createContext(): AppContext {
     // Another character's log: its record, for the pages that show the character being played.
     if (next.logFile !== prev.logFile) toMain('state:character', store.characterOf(next.logFile))
     if (next.logFile !== prev.logFile || next.installDir !== prev.installDir) void followSkin(ctx)
+    if (next.liveModels !== prev.liveModels) void setLiveModels(ctx.installDir(), next.liveModels)
     toMain('state:settings', next)
     ctx.logSettings()
     return next
