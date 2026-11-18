@@ -111,7 +111,6 @@ export class LogTailer {
   }
 
   private async poll(gen: number): Promise<void> {
-    this.stats.polls++
     try {
       await this.readOnce()
       if (this.failures >= FAIL_AFTER) this.opts.onRecovered?.()
@@ -122,6 +121,9 @@ export class LogTailer {
       this.stats.failures++
       if (++this.failures === FAIL_AFTER) this.opts.onError?.(e, 'read')
     }
+    // Counted once done, not as it starts: a first poll counted while its look at the file was still
+    // under way had not yet fixed where reading starts, so a line written then could be taken as old.
+    this.stats.polls++
     this.schedule(gen)
   }
 

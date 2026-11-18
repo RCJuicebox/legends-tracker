@@ -7,6 +7,7 @@ import type { FileHandle } from 'node:fs/promises'
 import { LogTailer } from '../../src/core/tailer'
 import { archiveLog, compressLoose, findStaging, finishStaged, stagingOriginalName } from '../../src/core/archiver'
 import { tempDir } from '../tempDir'
+import { sleep, waitFor } from '../helpers'
 
 /** A sleep that runs `step` on its first call instead of waiting: the game acting while the archiver polls. */
 function actOnFirstSleep(step: () => Promise<unknown>) {
@@ -49,6 +50,33 @@ describe('parseLogLine', () => {
 })
 
 describe('LogTailer', () => {
+  it('counts its first poll only once it knows where the log ends, so a line written after that is read', async () => {
+    const path = join(dir, 'eqlog_Kelwyn_neriak.txt')
+    await fs.writeFile(path, '')
+    const got: string[] = []
+    // The first look at the file is slow, as on a busy PC: the tests' "tailing" waits counted it as done.
+    const stat = fs.stat
+    let held: (() => void) | null = null
+    const spy = vi.spyOn(fs, 'stat').mockImplementationOnce(async (...args: Parameters<typeof fs.stat>) => {
+      await new Promise<void>((r) => (held = r))
+      return stat(...args)
+    })
+    const t = new LogTailer(path, { startAtEnd: true, pollMs: 5, onLines: (l) => got.push(...l) })
+    try {
+      t.start()
+      await sleep(30)
+      expect(t.stats.polls).toBe(0)
+      held!()
+      await waitFor(() => t.stats.polls > 0)
+      await fs.appendFile(path, 'one\r\n')
+      await waitFor(() => got.length > 0)
+      expect(got).toEqual(['one'])
+    } finally {
+      t.stop()
+      spy.mockRestore()
+    }
+  })
+
   it('keeps one handle across reads, lets the archiver rename the log away, and follows the new file', async () => {
     const path = join(dir, 'eqlog_Kelwyn_neriak.txt')
     await fs.writeFile(path, '')
