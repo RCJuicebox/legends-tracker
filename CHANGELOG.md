@@ -2,7 +2,7 @@
 
 What changed in each version. The release workflow publishes a version's section as its release notes, and installed copies show them when an update arrives.
 
-## Unreleased
+## 2.27.0 (2026-11-18)
 
 - **Fix: since the 2026-11-16 game patch, no spell data loaded.** The patch put sixteen new columns into the game's spell file, just before the effects, and the app refused the file as a layout it did not know: spell timers, recast cues, focus and icons all went without it. The new layout is now read, and every spell reads as it did before the patch.
 
