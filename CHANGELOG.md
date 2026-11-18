@@ -2,7 +2,11 @@
 
 What changed in each version. The release workflow publishes a version's section as its release notes, and installed copies show them when an update arrives.
 
-## Unreleased
+## 2.26.0 (2026-11-17)
+
+- **Fragments combine in the Merge planner.** The game now combines two Fragments of Potential of one rank into one of the next, like motes. Combining keeps a fragment's spell xp but gives an item less, so the planner combines fragments only to reach a rank the item still takes, and only when you have none of that rank. Four Lesser fragments, too low for a +3 item, become two Potential that take it to +4. The plan lists those combines beside your motes'.
+
+- **Every fragment's item xp is measured.** Greater gives an item 11 xp, Grand 22 and Ascendant 32, as the game's upgrade previews show. The planner had guessed 12, 24 and 32, so plans with Greater or Grand fragments are now right.
 
 - **The Reincarnation plan ends with every class back at 50.** After the last reincarnation it now adds the levelling trios (your chosen class and two more each, as the last race) that bring every class back to 50. Before, it stopped after one trio and left most classes at level 1.
 
