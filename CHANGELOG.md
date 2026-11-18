@@ -4,7 +4,7 @@ What changed in each version. The release workflow publishes a version's section
 
 ## Unreleased
 
-- **The Reincarnation plan takes each trio and race from rank 0 to 3 in one go.** With your levelling class in every trio already at rank 3, its XP penalty is the same whichever ranks the others have, so nothing is saved by spreading them. A new trio and race are now reincarnated three times running, with two levelling trios between (two of its classes, then the third), before the next starts; none is left part done. A reincarnation you made but haven't finished the ranks of comes first.
+- **The Reincarnation plan goes round every class and race.** With your levelling class in every trio already at rank 3, its XP penalty is the same whichever ranks the others have, so the plan no longer takes a few classes further than the rest. Each reincarnation now takes the classes and race reincarnated fewest times, so every one gets rank 1 before any gets rank 2, and rank 2 before rank 3. The levelling trio after it levels the two classes that have waited at level 1 longest: reincarnate Monk, Ranger and Berserker as Ogre, level Ranger and Berserker; reincarnate Necromancer, Shaman and Paladin as Gnome, level Monk and Shaman; and so on.
 
 ## 2.27.0 (2026-11-18)
 
