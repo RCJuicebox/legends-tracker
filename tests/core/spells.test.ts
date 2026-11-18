@@ -56,6 +56,28 @@ describe('SpellBook.parse', () => {
     expect(book.named('Envenomed Bolt')!.category).toBe('dot')
   })
 
+  it('reads the 2026-11-16 layout, sixteen more columns put in just before the effects: everything as before', () => {
+    const plain = SpellBook.parse(spells(), strings())
+    const patched = spells()
+      .split('\n')
+      .map((l) => {
+        const f = l.replace(/\r$/, '').split('^')
+        if (f.length <= 100) return l
+        const at57 = [...f.slice(0, 57), '0', ...f.slice(57)]
+        // The new columns' values in the 2026-11-16 client: zeros, or a colour's four (60^140^255^110).
+        const added = ['60', '140', '255', '110', ...Array<string>(12).fill('0')]
+        return [...at57.slice(0, 173), ...added, ...at57.slice(173)].join('^')
+      })
+      .join('\n')
+    const book = SpellBook.parse(patched, strings())
+    expect(book.layout).toEqual({ effects: 189, icon: 76 })
+    const full = (b: SpellBook) =>
+      [...b.all()].map((s) => [s.id, s.icon, s.category, s.formula, s.cap, s.castMs, s.effects.map((e) => `${e.slot}:${e.spa}:${e.base}:${e.max}`).join(' ')])
+    expect(full(book)).toEqual(full(plain))
+    expect(book.named('Spirit of the Puma')!.category).toBe('buff')
+    expect(book.named('Envenomed Bolt')!.category).toBe('dot')
+  })
+
   it('refuses a layout whose effects stand where no known client keeps them, rather than misread it', () => {
     const moved = spells()
       .split('\n')

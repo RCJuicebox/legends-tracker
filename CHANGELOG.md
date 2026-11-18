@@ -4,6 +4,8 @@ What changed in each version. The release workflow publishes a version's section
 
 ## Unreleased
 
+- **Fix: since the 2026-11-16 game patch, no spell data loaded.** The patch put sixteen new columns into the game's spell file, just before the effects, and the app refused the file as a layout it did not know: spell timers, recast cues, focus and icons all went without it. The new layout is now read, and every spell reads as it did before the patch.
+
 - **Live's player models, with or without a custom UI.** Settings › UI has a new **Player models** switch. The game ships Live's newer (Luclin-style) player-race models and their animations but never loads them; switched on, Legends Tracker adds the lines that load them to the game's GlobalLoad.txt each time the game starts, since the launcher puts that file back every time. Switching it off takes the lines out again. Vah Shir and Half Dark Elf keep their own models.
 
 ## 2.26.0 (2026-11-17)

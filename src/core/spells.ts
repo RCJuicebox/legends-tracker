@@ -64,9 +64,11 @@ for (const i of Object.values(F)) WANTED[i] = true
 /**
  * Where a client keeps the icon, by how far its effect slots stand past field 172 (the 2026-09
  * client's): the 2026-10-12 patch put a column in at 57, so its effects are at 173 and its icon at
- * 76, not 75. A move this version does not know is refused, not misread.
+ * 76, not 75; the 2026-11-16 patch put sixteen more in at 173, just before the effects (colours, by
+ * their values: 60^140^255^110…), so its effects are at 189 and its icon still at 76. A move this
+ * version does not know is refused, not misread.
  */
-const ICON_BY_SHIFT: Readonly<Record<number, number>> = { 0: 75, 1: 76 }
+const ICON_BY_SHIFT: Readonly<Record<number, number>> = { 0: 75, 1: 76, 17: 76 }
 const EFFECTS_AT = 172
 /** An effect slot list: "1|116|8|0|100|0$2|0|-217|0|103|325". */
 const EFFECT_LIST = /^\d+\|-?\d+\|/
