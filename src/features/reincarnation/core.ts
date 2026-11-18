@@ -528,6 +528,8 @@ export interface PlanInput {
   /** The race played now, and whether it is at the cap (every other race is taken as at it). */
   race: string
   raceCapped: boolean
+  /** The race of the last reincarnation made: it goes on to rank 3 before another race starts. */
+  lastRace?: string
 }
 
 /** The most reincarnations a plan runs to: every race three times over. */
@@ -576,11 +578,12 @@ function combos<T>(from: readonly T[], k: number): T[][] {
  * classes are at the cap for the next reincarnation, another levelling trio comes first, as the race
  * played then.
  *
- * Reincarnations go round (the player, 2026-11-18: with the anchor at rank 3 every levelling trio costs
- * its 30% anyway, so no class or race is taken further than the rest): each takes the three classes at
- * the cap reincarnated fewest times and the race at the cap reincarnated fewest times, the player's
- * order breaking ties. So every class and race gets rank 1 before any gets rank 2, and rank 2 before
- * rank 3. The anchor takes its turn only while one more leaves it below the most-reincarnated class (the
+ * Classes go round (the player, 2026-11-18: with the anchor at rank 3 every levelling trio costs its
+ * 30% anyway, so no class is taken further than the rest): each reincarnation takes the three classes
+ * at the cap reincarnated fewest times, the player's order breaking ties, so every class gets rank 1
+ * before any gets rank 2, and rank 2 before rank 3. Races don't (the player, the same day): the race of
+ * the last reincarnation goes again until it is at rank 3, then the next in the player's order still
+ * below it. The anchor takes its turn only while one more leaves it below the most-reincarnated class (the
  * player's rule). With every race at rank 3 the reincarnations end; races take three times as many
  * reincarnations as classes, so classes are reincarnated past rank 3 on the way, still in turn. Last,
  * levelling trios (as the last race) bring every class still below the cap back to it.
@@ -605,6 +608,7 @@ export function makePlan(input: PlanInput): PlanStage[] {
   for (const r of REINC_RACES) raceAtCap[r.race] = true
   if (input.race) raceAtCap[input.race] = input.raceCapped
   let race = input.race
+  let lastRace = input.lastRace ?? ''
   const anchor = input.anchor
   const pos = (c: ClassId) => order.classes.indexOf(c)
   const needs = (c: ClassId) => tc(c) < REINC_RANKS
@@ -669,7 +673,10 @@ export function makePlan(input: PlanInput): PlanStage[] {
       .sort((a, b) => tc(a) - tc(b) || pos(a) - pos(b))
       .slice(0, 3)
     const extra: ReincKey[] = classes.filter((c) => !needs(c)).map(classKey)
-    const r = order.races.filter((x) => raceAtCap[x]).sort((a, b) => tr(a) - tr(b) || order.races.indexOf(a) - order.races.indexOf(b))[0]
+    const ready = order.races.filter((x) => raceAtCap[x])
+    const going = lastRace && tr(lastRace) < REINC_RANKS ? lastRace : ''
+    if (going && !raceAtCap[going]) return null
+    const r = going || ready.find((x) => tr(x) < REINC_RANKS) || [...ready].sort((a, b) => tr(a) - tr(b))[0]
     if (classes.length < 3 || !r) return null
     if (tr(r) >= REINC_RANKS) extra.push(raceKey(r))
     return { classes, race: r, extra, times: {} }
@@ -691,7 +698,7 @@ export function makePlan(input: PlanInput): PlanStage[] {
     reinc.times = Object.fromEntries(keys.map((k) => [k, times[k]]))
     for (const c of reinc.classes) [atCap[c], since[c]] = [false, stages.length]
     raceAtCap[reinc.race] = false
-    race = reinc.race
+    race = lastRace = reinc.race
     stages.push({ runs, reinc })
     runs = [levelRun(race)]
   }

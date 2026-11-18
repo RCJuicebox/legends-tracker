@@ -519,10 +519,10 @@ function ThePlan({ s, stages, onDone, onSetup }: { s: ReincState; stages: PlanSt
         <>
           <div className="small faint mb-8">
             {num(reincs)} {reincs === 1 ? 'reincarnation' : 'reincarnations'} until every class and race is at rank 3, and {num(runs)} levelling {runs === 1 ? 'trio' : 'trios'}.
-            Reincarnations go round: each takes the classes and race reincarnated fewest times, so every one gets rank 1 before any gets rank 2. After each, one trio as its race
-            levels the two classes that have waited at level 1 longest. <b>Bold</b> classes level; the others are at {LEVEL_CAP} already. Races take far more reincarnations than
-            classes, so once every class is at rank 3 the plan goes on for the races, spreading the extra reincarnations over the classes evenly. After the last, levelling trios
-            bring every class back to {LEVEL_CAP}.
+            Classes go round: each reincarnation takes the classes reincarnated fewest times, so every one gets rank 1 before any gets rank 2. A race goes again until it is at rank
+            3, then the next in your order. After each, one trio as its race levels the two classes that have waited at level 1 longest. <b>Bold</b> classes level; the others are
+            at {LEVEL_CAP} already. Races take far more reincarnations than classes, so once every class is at rank 3 the plan goes on for the races, spreading the extra
+            reincarnations over the classes evenly. After the last, levelling trios bring every class back to {LEVEL_CAP}.
           </div>
           <ol className="rc-stages">
             {stages.map((st, i) => {
@@ -653,7 +653,8 @@ export function Reincarnation() {
             capped: Object.fromEntries(REINC_CLASSES.map((c) => [c.id, s.levels[c.id].capped])),
             anchor: s.anchor,
             race: s.loadout.race,
-            raceCapped: s.loadout.classes.every((c) => c.level >= LEVEL_CAP)
+            raceCapped: s.loadout.classes.every((c) => c.level >= LEVEL_CAP),
+            lastRace: s.history[0]?.race ?? ''
           })
         : [],
     [s, times]

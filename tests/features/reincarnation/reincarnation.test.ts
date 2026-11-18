@@ -231,12 +231,12 @@ describe('the plan', () => {
     expect(stages[0].reinc!.times).toEqual({ 'class:mnk': 1, 'class:dru': 1, 'class:nec': 1, 'race:Ogre': 1 })
     // Then one trio as Ogre: the Wizard and two of the three (Monk for its stance); Necromancer waits at level 1.
     expect(stages[1].runs.map((r) => [r.classes.join('/'), r.levels.join('/'), r.race, r.raceLevels, r.penalty])).toEqual([['wiz/mnk/dru', 'mnk/dru', 'Ogre', true, 20]])
-    // The next takes classes and a race not reincarnated yet, not Monk and Druid again.
-    expect(stages[1].reinc).toMatchObject({ classes: ['rng', 'war', 'pal'], race: 'Gnome' })
+    // The next takes classes not reincarnated yet, not Monk and Druid again, but Ogre again.
+    expect(stages[1].reinc).toMatchObject({ classes: ['rng', 'war', 'pal'], race: 'Ogre' })
     expect(stages.every((st) => st.runs.every((r) => r.classes[0] === 'wiz'))).toBe(true)
   })
 
-  it('goes round the classes and races, and levels the classes that waited longest (the player, 2026-11-18)', () => {
+  it('goes round the classes, keeps a race to rank 3, and levels the classes that waited longest (the player, 2026-11-18)', () => {
     // The player's example, from Rogue, Shadow Knight, Wizard and Erudite at rank 3 and every class at 50.
     const order = want(
       ['class:rng', 3],
@@ -255,17 +255,28 @@ describe('the plan', () => {
     const steps = stages
       .slice(0, 3)
       .flatMap((st) => [...st.runs.map((r) => `level ${[...r.classes].sort().join('/')} ${r.race}`), `reinc ${[...st.reinc!.classes].sort().join('/')} ${st.reinc!.race}`])
-    expect(steps).toEqual(['reinc ber/mnk/rng Ogre', 'level ber/rng/wiz Ogre', 'reinc nec/pal/shm Gnome', 'level mnk/shm/wiz Gnome', 'reinc dru/mag/war Kerran'])
+    expect(steps).toEqual(['reinc ber/mnk/rng Ogre', 'level ber/rng/wiz Ogre', 'reinc nec/pal/shm Ogre', 'level mnk/shm/wiz Ogre', 'reinc dru/mag/war Ogre'])
+    // Then the next race in the order, three times.
+    expect(stages.slice(3, 6).map((st) => st.reinc!.race)).toEqual(['Gnome', 'Gnome', 'Gnome'])
     expect(stages[3].runs.map((r) => [...r.levels].sort().join('/'))).toEqual(['nec/pal'])
-    // No class or race gets a rank before every other has the one below it.
+    // No class gets a rank before every other has the one below it.
     const seen: Record<string, number> = { ...times }
     for (const r of stages.flatMap((st) => (st.reinc ? [st.reinc] : []))) {
-      for (const k of [...r.classes.map((c) => `class:${c}`), `race:${r.race}`]) {
-        const kind = k.slice(0, 5)
-        if ((seen[k] ?? 0) < 3) expect(Math.min(...REINC_KEYS.filter((x) => x.startsWith(kind) && x !== 'class:wiz').map((x) => seen[x] ?? 0))).toBeGreaterThanOrEqual(seen[k] ?? 0)
+      for (const k of r.classes.map((c) => `class:${c}`)) {
+        if ((seen[k] ?? 0) < 3)
+          expect(Math.min(...REINC_KEYS.filter((x) => x.startsWith('class:') && x !== 'class:wiz').map((x) => seen[x] ?? 0))).toBeGreaterThanOrEqual(seen[k] ?? 0)
         seen[k] = (seen[k] ?? 0) + 1
       }
     }
+  })
+
+  it('goes on with the last reincarnation’s race before the next in the order', () => {
+    const times = { 'class:rog': 3, 'class:shd': 3, 'class:wiz': 3, 'race:Erudite': 3, 'race:Troll': 1 }
+    const priority = want(['race:Ogre', 3], ['race:Troll', 3])
+    const going = makePlan(input({ times, priority, capped: {}, raceCapped: true, lastRace: 'Troll' }))
+    expect(going.slice(0, 3).map((st) => st.reinc!.race)).toEqual(['Troll', 'Troll', 'Ogre'])
+    const done = makePlan(input({ times, priority, capped: {}, raceCapped: true, lastRace: 'Erudite' }))
+    expect(done[0].reinc!.race).toBe('Ogre')
   })
 
   it('levels again first when too few classes are at the cap', () => {
