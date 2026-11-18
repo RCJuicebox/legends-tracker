@@ -519,9 +519,10 @@ function ThePlan({ s, stages, onDone, onSetup }: { s: ReincState; stages: PlanSt
         <>
           <div className="small faint mb-8">
             {num(reincs)} {reincs === 1 ? 'reincarnation' : 'reincarnations'} until every class and race is at rank 3, and {num(runs)} levelling {runs === 1 ? 'trio' : 'trios'}.
-            After each reincarnation, one trio as its race levels it with two of its classes; the third waits at level 1. <b>Bold</b> classes level; the others are at {LEVEL_CAP}{' '}
-            already. Races take far more reincarnations than classes, so once every class is at rank 3 the plan goes on for the races, spreading the extra reincarnations over the
-            classes evenly. After the last, levelling trios bring every class back to {LEVEL_CAP}.
+            Each trio and race goes from rank 0 to 3 before the next starts: after each reincarnation, trios as its race level it with two of its classes, then the third (with a
+            class left at level 1 before, or one at {LEVEL_CAP} beside it). <b>Bold</b> classes level; the others are at {LEVEL_CAP} already. Races take far more reincarnations
+            than classes, so once every class is at rank 3 the plan goes on for the races, spreading the extra reincarnations over the classes evenly. After the last, levelling
+            trios bring every class back to {LEVEL_CAP}.
           </div>
           <ol className="rc-stages">
             {stages.map((st, i) => {
@@ -652,7 +653,8 @@ export function Reincarnation() {
             capped: Object.fromEntries(REINC_CLASSES.map((c) => [c.id, s.levels[c.id].capped])),
             anchor: s.anchor,
             race: s.loadout.race,
-            raceCapped: s.loadout.classes.every((c) => c.level >= LEVEL_CAP)
+            raceCapped: s.loadout.classes.every((c) => c.level >= LEVEL_CAP),
+            last: s.history[0] ?? null
           })
         : [],
     [s, times]

@@ -229,11 +229,44 @@ describe('the plan', () => {
     expect(stages[0].runs.map((r) => [r.classes.join('/'), r.race, r.raceLevels])).toEqual([['wiz/shd/rog', 'Erudite', true]])
     expect(stages[0].reinc).toMatchObject({ classes: ['mnk', 'dru', 'nec'], race: 'Ogre', extra: [] })
     expect(stages[0].reinc!.times).toEqual({ 'class:mnk': 1, 'class:dru': 1, 'class:nec': 1, 'race:Ogre': 1 })
-    // Then one trio as Ogre: the Wizard and two of the three (Monk for its stance); Necromancer waits at level 1.
-    expect(stages[1].runs.map((r) => [r.classes.join('/'), r.levels.join('/'), r.race, r.raceLevels, r.penalty])).toEqual([['wiz/mnk/dru', 'mnk/dru', 'Ogre', true, 20]])
-    // So the next takes the classes at the cap: Monk and Druid again, then Ranger.
-    expect(stages[1].reinc?.classes).toEqual(['mnk', 'dru', 'rng'])
+    // Then trios as Ogre: the Wizard and two of the three (Monk for its stance), then the Wizard and Necromancer.
+    expect(stages[1].runs.map((r) => [r.classes[0], r.levels.join('/'), r.race, r.penalty])).toEqual([
+      ['wiz', 'mnk/dru', 'Ogre', 20],
+      ['wiz', 'nec', 'Ogre', 20]
+    ])
+    expect(stages[1].runs[0].raceLevels).toBe(true)
     expect(stages.every((st) => st.runs.every((r) => r.classes[0] === 'wiz'))).toBe(true)
+  })
+
+  it('takes a trio and race to rank 3 before starting another (the player, 2026-11-18)', () => {
+    const order = want(['class:mnk', 3], ['class:dru', 3], ['class:nec', 3], ['class:rng', 3], ['class:bst', 3], ['class:clr', 3], ['race:Ogre', 3], ['race:Gnome', 3])
+    const reincs = makePlan(input({ priority: order })).flatMap((st) => (st.reinc ? [st.reinc] : []))
+    expect(reincs.slice(0, 4).map((r) => `${r.classes.join('/')} ${r.race}`)).toEqual(['mnk/dru/nec Ogre', 'mnk/dru/nec Ogre', 'mnk/dru/nec Ogre', 'rng/bst/clr Gnome'])
+    // The last reincarnation made goes on from where it is, ahead of the order.
+    const going = makePlan(
+      input({
+        times: { ...held, 'class:pal': 1, 'class:shm': 1, 'class:ber': 1, 'race:Kerran': 1 },
+        priority: order,
+        capped: {},
+        race: 'Kerran',
+        raceCapped: true,
+        last: { classes: ['pal', 'shm', 'ber'], race: 'Kerran' }
+      })
+    )
+    expect(going[0]).toMatchObject({ runs: [], reinc: { classes: ['pal', 'shm', 'ber'], race: 'Kerran' } })
+    // A class of it still below the cap levels first.
+    const waits = makePlan(
+      input({
+        times: { ...held, 'class:pal': 1, 'class:shm': 1, 'class:ber': 1, 'race:Kerran': 1 },
+        priority: order,
+        capped: { ber: false },
+        race: 'Kerran',
+        raceCapped: true,
+        last: { classes: ['pal', 'shm', 'ber'], race: 'Kerran' }
+      })
+    )
+    expect(waits[0].runs.map((r) => r.levels)).toEqual([['ber']])
+    expect(waits[0].reinc?.classes).toEqual(['pal', 'shm', 'ber'])
   })
 
   it('levels again first when too few classes are at the cap', () => {

@@ -2,6 +2,10 @@
 
 What changed in each version. The release workflow publishes a version's section as its release notes, and installed copies show them when an update arrives.
 
+## Unreleased
+
+- **The Reincarnation plan takes each trio and race from rank 0 to 3 in one go.** With your levelling class in every trio already at rank 3, its XP penalty is the same whichever ranks the others have, so nothing is saved by spreading them. A new trio and race are now reincarnated three times running, with two levelling trios between (two of its classes, then the third), before the next starts; none is left part done. A reincarnation you made but haven't finished the ranks of comes first.
+
 ## 2.27.0 (2026-11-18)
 
 - **Fix: since the 2026-11-16 game patch, no spell data loaded.** The patch put sixteen new columns into the game's spell file, just before the effects, and the app refused the file as a layout it did not know: spell timers, recast cues, focus and icons all went without it. The new layout is now read, and every spell reads as it did before the patch.

@@ -528,6 +528,8 @@ export interface PlanInput {
   /** The race played now, and whether it is at the cap (every other race is taken as at it). */
   race: string
   raceCapped: boolean
+  /** The last reincarnation made: its classes and race still short of rank 3 go on to it before any others start. */
+  last?: Pick<ReincDone, 'classes' | 'race'> | null
 }
 
 /** The most reincarnations a plan runs to: every race three times over. */
@@ -572,11 +574,16 @@ function combos<T>(from: readonly T[], k: number): T[][] {
  * reincarnation or the player says are below it). A reincarnation takes three classes at the cap and
  * a race at the cap, and sets all four to level 1. Then one levelling trio, as that race: the anchor
  * class (the player's choice, in every levelling trio) and two classes at level 1, which brings the
- * race and those two back to the cap; the reincarnation's third class waits at level 1 for a later
- * trio. When too few classes are at the cap for the next reincarnation, another levelling trio comes
- * first, as the race played then.
+ * race and those two back to the cap; the third class levels in the next trio. When too few classes
+ * are at the cap for the next reincarnation, another levelling trio comes first, as the race played then.
  *
- * Reincarnations go by the player's order: the highest classes at the cap still below rank 3, and the
+ * A class or race reincarnated goes on to rank 3 before any other starts (the player, 2026-11-18: with
+ * the anchor at rank 3 every levelling trio costs its 30% anyway, so nothing is saved by spreading the
+ * ranks, and none is left part done): the next reincarnation takes the last one's classes and race still
+ * below rank 3 again, so it waits, levelling trios first, until all of them are back at the cap. The
+ * third class's trio has a place over for a class a group before left at level 1.
+ *
+ * Otherwise reincarnations go by the player's order: the highest classes at the cap still below rank 3, and the
  * highest race at the cap below it. Once fewer classes than that are ready, the trio is made up from
  * classes at the cap reincarnated least often (each time adds 10% to levelling that class), in the
  * player's order; the anchor takes its turn only while one more leaves it below the most-reincarnated
@@ -602,6 +609,7 @@ export function makePlan(input: PlanInput): PlanStage[] {
   for (const r of REINC_RACES) raceAtCap[r.race] = true
   if (input.race) raceAtCap[input.race] = input.raceCapped
   let race = input.race
+  let last = input.last ?? null
   const anchor = input.anchor
   const pos = (c: ClassId) => order.classes.indexOf(c)
   const needs = (c: ClassId) => tc(c) < REINC_RANKS
@@ -646,8 +654,13 @@ export function makePlan(input: PlanInput): PlanStage[] {
   /** The next reincarnation from the classes and races at the cap; null when too few are. */
   const nextReinc = (): PlannedReinc | null => {
     const most = Math.max(0, ...CLASS_ORDER.filter((c) => c !== anchor).map(tc))
-    const ok = (c: ClassId) => atCap[c] && (c !== anchor || tc(c) < most)
-    const classes = order.classes.filter((c) => ok(c) && needs(c)).slice(0, 3)
+    const allowed = (c: ClassId) => c !== anchor || tc(c) < most
+    const ok = (c: ClassId) => atCap[c] && allowed(c)
+    // The last reincarnation's lines short of rank 3 go again, once they are back at the cap.
+    const going = (last?.classes ?? []).filter((c) => needs(c) && allowed(c))
+    const goingRace = last?.race && tr(last.race) < REINC_RANKS ? last.race : ''
+    if (going.some((c) => !atCap[c]) || (goingRace && !raceAtCap[goingRace])) return null
+    const classes = [...going, ...order.classes.filter((c) => !going.includes(c) && ok(c) && needs(c))].slice(0, 3)
     const extra: ReincKey[] = []
     for (const c of order.classes.filter((x) => ok(x) && !classes.includes(x)).sort((a, b) => tc(a) - tc(b) || pos(a) - pos(b))) {
       if (classes.length >= 3) break
@@ -655,7 +668,7 @@ export function makePlan(input: PlanInput): PlanStage[] {
       extra.push(classKey(c))
     }
     const ready = order.races.filter((r) => raceAtCap[r])
-    const wanted = ready.find((r) => tr(r) < REINC_RANKS)
+    const wanted = goingRace || ready.find((r) => tr(r) < REINC_RANKS)
     const r = wanted ?? [...ready].sort((a, b) => tr(a) - tr(b))[0]
     if (classes.length < 3 || !r) return null
     if (!wanted) extra.push(raceKey(r))
@@ -679,6 +692,7 @@ export function makePlan(input: PlanInput): PlanStage[] {
     for (const c of reinc.classes) atCap[c] = false
     raceAtCap[reinc.race] = false
     race = reinc.race
+    last = reinc
     stages.push({ runs, reinc })
     runs = [levelRun(race)]
   }
