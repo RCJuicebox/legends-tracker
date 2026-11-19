@@ -20,7 +20,7 @@ import {
   type SkillRow
 } from '../../../core/combatView'
 import type { CombatSnapshot, MeterMode, MeterOverlayOptions, MeterSpan, OverlayConfig, Segment, SegmentSummary, TimerView } from '../../../shared/types'
-import type { AchievementTrack, SkillRow as SkillGoalRow, SlayerPlanTrackView, TrackKind, TrackedAchievement } from '../../../shared/tracking'
+import type { AchievementTrack, CrawlStopRow, CrawlTrackView, SkillRow as SkillGoalRow, SlayerPlanTrackView, TrackKind, TrackedAchievement } from '../../../shared/tracking'
 import { itemsSaid } from '../../../shared/tracking'
 import { TimerBars, useNow } from '../components/TimerBars'
 import { DEFAULT_METER_OPTIONS } from '../../../shared/overlays'
@@ -234,6 +234,48 @@ function MeterOverlay({ config, snap, arranging }: { config: OverlayConfig; snap
   )
 }
 
+/** A crawl stop's rares, those a /con called rare this run marked as up: "Coralyn Kelpmaiden, tainted seahorse (up)". */
+const crawlRares = (r: CrawlStopRow) => r.rares.map((x) => `${x.name}${x.up ? ' (up)' : ''}`).join(', ')
+
+/**
+ * The Dungeon Crawl route in the instance the player is in: the stop to swim to now, by its number on
+ * the game's map and its floor, then the few after it. Stops passed over stay listed faintly: the
+ * game's map says whether a rare was up there.
+ */
+function CrawlSection({ crawl }: { crawl: CrawlTrackView }) {
+  return (
+    <section className="ach-ov-crawl">
+      <div className="ach-ov-head">
+        <span>Crawl route</span>
+        <span className="ach-ov-faint">
+          {crawl.visited} of {crawl.stops} stops · {crawl.killed} rare{crawl.killed === 1 ? '' : 's'} down
+        </span>
+      </div>
+      {crawl.done ? (
+        <div className="ach-ov-line">Crawl completed.</div>
+      ) : crawl.next ? (
+        <>
+          <div className="ach-ov-tag">
+            Next · stop {crawl.next.n} · {crawl.next.floor} floor
+          </div>
+          <div className="ach-ov-line">
+            <b>{crawlRares(crawl.next) || 'nothing left known here'}</b>
+          </div>
+          {crawl.ahead.map((r) => (
+            <div key={r.n} className="ach-ov-faint">
+              {r.n} · {r.floor} · {crawlRares(r) || '—'}
+            </div>
+          ))}
+        </>
+      ) : (
+        <div className="ach-ov-line">Every stop after your last kill is done: the game’s map shows any rare still up.</div>
+      )}
+      {crawl.passed.length > 0 && <div className="ach-ov-faint">Passed over: {crawl.passed.map((r) => `${r.n} ${crawlRares(r)}`).join(' · ')}</div>}
+      {crawl.also.length > 0 && <div className="ach-ov-faint">Also rare, not on the route: {crawl.also.join(', ')}</div>}
+    </section>
+  )
+}
+
 /** How long a Slayer count stays on the achievements overlay after a kill moved it. */
 const SLAYER_RECENT_MS = 30 * 60_000
 /** Slayer counts, and skills, shown at most each. */
@@ -372,8 +414,10 @@ function AchievementsRegion({ config, track, arranging }: { config: OverlayConfi
   const hunter = config.achievements?.hunter === false ? [] : (track?.hunter?.rows ?? []).filter((r) => !trackedNames.has(r.achievement))
   // The epic pieces still wanted from this zone (Goals › Epics), at the player's choice.
   const epics = config.achievements?.epics === false ? null : (track?.epics ?? null)
+  // The Dungeon Crawl route's next stops, in an instance of a zone that has a route (Motes › Crawl route).
+  const crawl = config.achievements?.crawl === false ? null : (track?.crawl ?? null)
   // Shown on purpose and empty would look broken; one faint line says what it waits for.
-  if (!tracked.length && !plan && !slayerPlan && !slayer.length && !skills.length && !hunter.length && !epics)
+  if (!tracked.length && !plan && !slayerPlan && !slayer.length && !skills.length && !hunter.length && !epics && !crawl)
     return (
       <div className="ach-ov" style={style}>
         <div className="ach-ov-empty">
@@ -477,6 +521,7 @@ function AchievementsRegion({ config, track, arranging }: { config: OverlayConfi
         </section>
       )}
       {slayerPlan && <SlayerPlanSection plan={slayerPlan} />}
+      {crawl && <CrawlSection crawl={crawl} />}
       {hunter.length > 0 && (
         <section className="ach-ov-hunter">
           {hunter.slice(0, 2).map((r) => (

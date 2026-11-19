@@ -39,6 +39,7 @@ import type { HunterPlanner } from '../features/hunter/main'
 import type { SkyTracker } from '../features/sky/main'
 import type { ReincarnationTracker } from '../features/reincarnation/main'
 import type { EpicTracker } from '../features/epics/main'
+import type { CrawlGuide } from '../features/crawl/main'
 import { createFeatures, FEATURE_CONSUMERS } from '../features/main'
 import { LogHistory, type HistoryWhere } from './sources/logHistory'
 import { TradeFavorites } from './tradeFavorites'
@@ -114,6 +115,8 @@ export interface AppContext {
   sky: SkyTracker
   /** Goals › Epics' side (an optional module): the epic pieces counted over the logs, and each character's ticks and corrections. */
   epics: EpicTracker
+  /** Motes › Crawl route's side: the Dungeon Crawl routes, and the run in hand. */
+  crawl: CrawlGuide
   /** Goals › Reincarnation's side (an optional module): each character's ranks set by hand and plan of trios. */
   reincarnation: ReincarnationTracker
   /** Plan › Slayer's side: the plan's data, and the player's choices (the overlay makes the plan from them). */
@@ -397,7 +400,8 @@ export function createContext(): AppContext {
   ctx.sky = features.sky
   ctx.epics = features.epics
   ctx.reincarnation = features.reincarnation
-  ctx.features = [ctx.factions, ctx.slayer, ctx.hunter, ctx.sky, ctx.epics, ctx.reincarnation, ctx.liveAchievements, new GroupHealth()]
+  ctx.crawl = features.crawl
+  ctx.features = [ctx.factions, ctx.slayer, ctx.hunter, ctx.sky, ctx.epics, ctx.reincarnation, ctx.crawl, ctx.liveAchievements, new GroupHealth()]
 
   ctx.refreshOverlayVisibility = () =>
     ctx.overlays.setShown(

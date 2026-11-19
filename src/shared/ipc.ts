@@ -19,6 +19,7 @@ import type { SlayerMap, SlayerMark } from '../features/slayer/spawns'
 import type { HunterPlanData } from '../features/hunter/core'
 import type { SkyState } from '../features/sky/core'
 import type { EpicState } from '../features/epics/core'
+import type { CrawlData } from '../features/crawl/core'
 import type { PriorityEntry, ReincState } from '../features/reincarnation/core'
 import type { AchievementTrack, PlayerLocation } from './tracking'
 import type { FocusReport } from '../core/itemFocus'
@@ -514,6 +515,10 @@ export interface Invokes {
   'sky:mark': (character: string, quest: string, mark: 'favorite' | 'ignored', on: boolean) => SkyState
   /** Hand-ins of a Test the player adds over what the log saw (or takes away, below 0); the state after. */
   'sky:turnIns': (character: string, quest: string, hand: number) => SkyState
+  /** Motes › Crawl route: a zone's Dungeon Crawl route with its map and the run in hand; with no zone, the one being played in or the first that has a route. */
+  'crawl:route': (zone?: string) => CrawlData
+  /** Draws a zone's route on the game's map (a layer of its own in the LegendsTracker map set), or takes it off. */
+  'crawl:mark': (zone: string, on: boolean) => { folder: string; lines: number }
   /** What Goals › Epics shows for a character: the epic pieces its logs and inventory export count, the steps ticked off and its corrections. */
   'epics:state': (character: string) => EpicState
   /** Ticks a step off by hand (by its tick key, "class|step"), or unticks it; the state after. */
@@ -783,6 +788,8 @@ const INVOKE_CHANNELS: Record<InvokeChannel, true> = {
   'sky:have': true,
   'sky:mark': true,
   'sky:turnIns': true,
+  'crawl:route': true,
+  'crawl:mark': true,
   'epics:state': true,
   'epics:tick': true,
   'epics:have': true,

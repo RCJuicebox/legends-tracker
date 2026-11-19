@@ -171,6 +171,8 @@ export const CHECKS: { [K in InvokeChannel]: Check<Parameters<Invokes[K]>> } = {
   'sky:have': args(str, str, num),
   'sky:mark': args(str, str, oneOf('favorite', 'ignored'), bool),
   'sky:turnIns': args(str, str, num),
+  'crawl:route': args(opt(str)),
+  'crawl:mark': args(str, bool),
   'epics:state': args(str),
   'epics:tick': args(str, str, bool),
   'epics:have': args(str, str, num),

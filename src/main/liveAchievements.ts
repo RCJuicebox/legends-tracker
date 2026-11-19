@@ -102,6 +102,8 @@ export class LiveAchievements implements AppFeature {
     if (follow) follow.onChange = (character) => this.refreshFaction(character)
     const epics = ctx.epics
     if (epics) epics.onChange = () => this.publish()
+    const crawl = ctx.crawl
+    if (crawl) crawl.onChange = () => this.publish()
   }
 
   /** What the overlay and the pages were last told. */
@@ -435,6 +437,7 @@ export class LiveAchievements implements AppFeature {
       skills: this.skills,
       hunter: null,
       epics: null,
+      crawl: null,
       slayerPlan: this.slayerPlan,
       tracked: this.trackedAchievements(),
       visited: this.visitedSinceExport()
@@ -451,6 +454,7 @@ export class LiveAchievements implements AppFeature {
       track.skills,
       track.hunter,
       track.epics,
+      track.crawl,
       track.slayerPlan,
       track.tracked,
       track.visited,

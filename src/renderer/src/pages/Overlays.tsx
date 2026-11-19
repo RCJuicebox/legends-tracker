@@ -213,6 +213,17 @@ export function Overlays() {
                       switch is on those pages
                     </span>
                   </label>
+                  <label className="row">
+                    <Switch
+                      on={(o.achievements ?? DEFAULT_ACHIEVEMENT_OPTIONS).crawl ?? true}
+                      onChange={(v) => update(o.id, { achievements: { ...DEFAULT_ACHIEVEMENT_OPTIONS, ...o.achievements, crawl: v } })}
+                      label="Show the Dungeon Crawl route’s next stops"
+                    />
+                    Show the Dungeon Crawl route
+                    <span className="faint small">
+                      in an instance of a zone that has a route (Motes › Crawl route): the stop to go to next, by its number on the game’s map and its floor, and the rares left
+                    </span>
+                  </label>
                   <div className="row small">
                     <span>The Slayer plan’s step</span>
                     <span className="faint small">is turned on for each character on its own, with On the overlay at the top of</span>

@@ -430,13 +430,14 @@ describe('achievements overlay options', () => {
     sanitizeSettings({ ...fb, overlays: fb.overlays.map((x) => (x.kind === 'achievements' ? { ...x, ...o } : x)) }, fb)?.overlays.find((x) => x.kind === 'achievements')
 
   it('show the faction plan, the Hunter named and the epic pieces unless hidden', () => {
-    expect(achievementsOverlay({})?.achievements).toEqual({ factionPlan: true, hunter: true, alsoHere: true, epics: true })
-    expect(achievementsOverlay({ achievements: { factionPlan: false } })?.achievements).toEqual({ factionPlan: false, hunter: true, alsoHere: true, epics: true })
-    expect(achievementsOverlay({ achievements: { factionPlan: 'no', hunter: false, alsoHere: false, epics: false, junk: 1 } })?.achievements).toEqual({
+    expect(achievementsOverlay({})?.achievements).toEqual({ factionPlan: true, hunter: true, alsoHere: true, epics: true, crawl: true })
+    expect(achievementsOverlay({ achievements: { factionPlan: false } })?.achievements).toEqual({ factionPlan: false, hunter: true, alsoHere: true, epics: true, crawl: true })
+    expect(achievementsOverlay({ achievements: { factionPlan: 'no', hunter: false, alsoHere: false, epics: false, crawl: false, junk: 1 } })?.achievements).toEqual({
       factionPlan: true,
       hunter: false,
       alsoHere: false,
-      epics: false
+      epics: false,
+      crawl: false
     })
   })
 

@@ -162,6 +162,8 @@ export interface AchievementOverlayOptions {
   alsoHere?: boolean
   /** Show the epic and spell-quest pieces still wanted from the zone you are in (Goals › Epics). */
   epics?: boolean
+  /** Show the Dungeon Crawl route's next stops in an instance of a zone that has one (Motes › Crawl route). */
+  crawl?: boolean
 }
 
 export interface OverlayConfig {

@@ -157,6 +157,42 @@ export interface HunterTrackView {
   }[]
 }
 
+/** A stop of a Dungeon Crawl route, as the overlay lists it. */
+export interface CrawlStopRow {
+  /** Its number on the route, from 1: the one on the game's map. */
+  n: number
+  /** The floor it is on, as the route names it. */
+  floor: string
+  /** The rares that pop there and are not dead; `up` for one a /con called rare this run. */
+  rares: { name: string; up?: boolean }[]
+  /** How far the way there is, in the game's units. */
+  length: number
+}
+
+/** How a Dungeon Crawl run stands against the zone's route (Motes › Crawl route), in an instance of a zone that has one. */
+export interface CrawlTrackView {
+  /** The instance, as the log names it. */
+  zone: string
+  /** The zone the route is of. */
+  route: string
+  /** Stops on the route, and those a rare has died at. */
+  stops: number
+  visited: number
+  /** Rares the route knows, and rares killed this run. */
+  rares: number
+  killed: number
+  /** Where to go now; none once every stop after the last kill is visited. */
+  next?: CrawlStopRow
+  /** The stops after it, a few. */
+  ahead: CrawlStopRow[]
+  /** Stops passed over with nothing killed there: not every rare is up every run. */
+  passed: CrawlStopRow[]
+  /** Rares a /con called rare this run that the route does not know, still up. */
+  also: string[]
+  /** The game said the crawl was completed. */
+  done?: boolean
+}
+
 /** The epic and spell-quest pieces the character's classes still want from the zone the player is in (Goals › Epics). */
 export interface EpicsTrackView {
   zone: string
@@ -223,6 +259,8 @@ export interface AchievementTrack {
   hunter?: HunterTrackView | null
   /** The epic pieces still wanted from the zone the player is in, while Goals › Epics or Spell Quests is on; null when none. */
   epics?: EpicsTrackView | null
+  /** The Dungeon Crawl route's next stops, in an instance of a zone that has a route; null elsewhere. */
+  crawl?: CrawlTrackView | null
   /** Plan › Slayer's step, when the player shows it here. */
   slayerPlan?: SlayerPlanTrackView | null
   /** The achievements the player tracks, in the order tracked. */

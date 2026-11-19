@@ -1,8 +1,9 @@
-import { useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react'
+import { useMemo, useState } from 'react'
 import { useInvoke, useVisibleInterval } from '../../renderer/src/hooks'
 import { Pending } from '../../renderer/src/components/ui'
 import { duration } from '../../core/format'
 import { waypoint, type PetCamp, type SlayerMap } from './spawns'
+import { useMapView, type View } from '../../renderer/src/components/mapView'
 import { zoneKey } from '../../core/zones'
 import type { PlayerLocation } from '../../shared/tracking'
 
@@ -15,11 +16,6 @@ import type { PlayerLocation } from '../../shared/tracking'
 const PAD = 0.04
 /** The map's tallest, in CSS pixels: its width follows from the zone's shape. */
 const MAX_H = 420
-/** Zoomed in no further than this many times. */
-const MAX_ZOOM = 12
-
-type View = [number, number, number, number]
-
 /** The map's extent: its lines and its spots, a little room around. */
 function box(map: SlayerMap): [number, number, number, number] {
   const xs: number[] = map.spots.map((s) => s.x)
@@ -56,50 +52,14 @@ const spotText = (s: SlayerMap['spots'][number]) =>
 
 function SpawnMapView({ map, stand, you, camps = [] }: { map: SlayerMap; stand?: Stand; you?: PlayerLocation | null; camps?: PetCamp[] }) {
   const whole = useMemo<View>(() => box(stand ? { ...map, spots: [...map.spots, { x: -stand.at[1], y: -stand.at[0], z: 0, mobs: [], timer: 0 }] } : map), [map, stand])
-  const [view, setView] = useState<View>(whole)
-  useEffect(() => setView(whole), [whole])
+  const { view, svg, zoomed, reset, on } = useMapView(whole)
   const [x, y, w, h] = view
   const [hot, setHot] = useState<number | null>(null)
-  const svg = useRef<SVGSVGElement>(null)
-  const drag = useRef<{ px: number; py: number; view: View } | null>(null)
   const path = useMemo(() => {
     const out: string[] = []
     for (let i = 0; i + 3 < map.lines.length; i += 4) out.push(`M${map.lines[i]} ${map.lines[i + 1]}L${map.lines[i + 2]} ${map.lines[i + 3]}`)
     return out.join('')
   }, [map])
-  // The wheel zooms about the pointer. Listened to by hand: React's wheel listener cannot stop the page scrolling.
-  useEffect(() => {
-    const el = svg.current
-    if (!el) return
-    const onWheel = (e: WheelEvent) => {
-      e.preventDefault()
-      const rect = el.getBoundingClientRect()
-      setView(([vx, vy, vw, vh]) => {
-        const k = Math.exp(e.deltaY * 0.0015)
-        const nw = Math.min(whole[2], Math.max(whole[2] / MAX_ZOOM, vw * k))
-        const nh = (nw / vw) * vh
-        const fx = rect.width ? (e.clientX - rect.left) / rect.width : 0.5
-        const fy = rect.height ? (e.clientY - rect.top) / rect.height : 0.5
-        return [vx + (vw - nw) * fx, vy + (vh - nh) * fy, nw, nh]
-      })
-    }
-    el.addEventListener('wheel', onWheel, { passive: false })
-    return () => el.removeEventListener('wheel', onWheel)
-  }, [whole])
-  const down = (e: ReactPointerEvent<SVGSVGElement>) => {
-    if (e.button !== 0) return
-    drag.current = { px: e.clientX, py: e.clientY, view }
-    e.currentTarget.setPointerCapture?.(e.pointerId)
-  }
-  const move = (e: ReactPointerEvent<SVGSVGElement>) => {
-    const d = drag.current
-    const rect = svg.current?.getBoundingClientRect()
-    if (!d || !rect?.width) return
-    const scale = d.view[2] / rect.width
-    setView([d.view[0] - (e.clientX - d.px) * scale, d.view[1] - (e.clientY - d.py) * scale, d.view[2], d.view[3]])
-  }
-  const up = () => (drag.current = null)
-  const zoomed = w < whole[2] - 1e-6
   // Spots and labels keep their size on screen as the map zooms.
   const r = Math.max(w, h) / 140
   const font = Math.max(w, h) / 70
@@ -112,11 +72,7 @@ function SpawnMapView({ map, stand, you, camps = [] }: { map: SlayerMap; stand?:
         viewBox={`${x} ${y} ${w} ${h}`}
         role="img"
         aria-label={`Map of ${map.zone} with ${map.spots.length} spawn spots: the wheel zooms, a drag moves it`}
-        onPointerDown={down}
-        onPointerMove={move}
-        onPointerUp={up}
-        onPointerCancel={up}
-        onDoubleClick={() => setView(whole)}
+        {...on}
       >
         <path d={path} className="sl-map-line" vectorEffect="non-scaling-stroke" />
         {map.labels
@@ -173,7 +129,7 @@ function SpawnMapView({ map, stand, you, camps = [] }: { map: SlayerMap; stand?:
         <span className="mono">{hot !== null && map.spots[hot] ? spotText(map.spots[hot]) : 'Point at a spot for what pops there and its /waypoint'}</span>
         <span className="spacer" />
         {zoomed && (
-          <button className="btn small ghost" onClick={() => setView(whole)}>
+          <button className="btn small ghost" onClick={reset}>
             Whole zone
           </button>
         )}

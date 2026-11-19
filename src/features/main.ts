@@ -5,6 +5,7 @@ import { HunterPlanner } from './hunter/main'
 import { SkyTracker } from './sky/main'
 import { EpicTracker } from './epics/main'
 import { ReincarnationTracker } from './reincarnation/main'
+import { CrawlGuide } from './crawl/main'
 
 // The feature modules' main sides, built one way (LT-632): each class's static create takes the same
 // FeatureDeps, and each one's log-history counts are spread into the LogHistory's from here. A new
@@ -21,6 +22,7 @@ export function createFeatures(d: FeatureDeps) {
     hunter: HunterPlanner.create(d),
     sky: SkyTracker.create(d),
     epics: EpicTracker.create(d),
-    reincarnation: ReincarnationTracker.create(d)
+    reincarnation: ReincarnationTracker.create(d),
+    crawl: CrawlGuide.create(d)
   }
 }

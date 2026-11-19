@@ -220,7 +220,8 @@ export function achievementOptions(v: unknown, fb: AchievementOverlayOptions | u
         factionPlan: bool(v.factionPlan, base.factionPlan),
         hunter: bool(v.hunter, base.hunter ?? true),
         alsoHere: bool(v.alsoHere, base.alsoHere ?? true),
-        epics: bool(v.epics, base.epics ?? true)
+        epics: bool(v.epics, base.epics ?? true),
+        crawl: bool(v.crawl, base.crawl ?? true)
       }
     : { ...base }
 }

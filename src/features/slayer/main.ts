@@ -1,5 +1,5 @@
 import { join } from 'node:path'
-import { copyFile, mkdir, readdir, readFile, rm, writeFile } from 'node:fs/promises'
+import { readFile, rm, writeFile } from 'node:fs/promises'
 import { RACE_TABLE } from '../../core/raceNames'
 import { zoneKey } from '../../core/zones'
 import { mixCredits, sayKey, setSaidRaces, SlayerRaces, slayerCounters, zoneLeavesOut } from '../../core/slayer'
@@ -39,6 +39,7 @@ import { lockoutDayStart } from '../../shared/game/slayerCamps'
 import { greenConMax } from '../../shared/game/levels'
 import { hunterZones, type HunterZone } from '../hunter/core'
 import { newerBuildWrote } from '../../main/schema'
+import { mapSet } from '../../main/mapSet'
 import type { MapPoint } from '../../core/where'
 
 // The Slayer page's side of the app: every kill over each character's log and archives, by zone
@@ -49,9 +50,6 @@ import type { MapPoint } from '../../core/where'
 /** TAKP's classic spawn tables, as scripts/takp-spawns.mjs wrote them. */
 const TABLES = TAKP.zones as unknown as SpawnTables
 const tableOf = zoneIndex(TABLES)
-
-/** The map set the plan's spawns are marked in: a copy of the game's own maps, so its files stay as they are. */
-const MAP_SET = 'LegendsTracker'
 
 /** Each stretch of log's kills by zone, as a LogHistory consumer. Version 2: trips between zones, each mob's last kill; 3: each stretch of killing. */
 const killConsumer: HistoryConsumer<SlayerKillTallies> = {
@@ -540,12 +538,7 @@ async function spawnMap(installDir: string, zone: string, mobs: string[]): Promi
  * A zone no longer marked goes back to the game's copy. The game's own files are only read.
  */
 export async function markMaps(installDir: string, marks: SlayerMark[]): Promise<{ folder: string; zones: number; spots: number }> {
-  if (!installDir) throw new Error('Choose the game folder on Settings › General first.')
-  const maps = join(installDir, 'maps')
-  const set = join(maps, MAP_SET)
-  await mkdir(set, { recursive: true })
-  const have = new Set(await readdir(set))
-  for (const f of await readdir(maps, { withFileTypes: true })) if (f.isFile() && /\.txt$/i.test(f.name) && !have.has(f.name)) await copyFile(join(maps, f.name), join(set, f.name))
+  const { maps, set } = await mapSet(installDir)
   // One zone's marks together, whichever steps and pages asked for them.
   const byZone = new Map<string, { mobs: Set<string>; named: Set<string> }>()
   for (const m of marks) {

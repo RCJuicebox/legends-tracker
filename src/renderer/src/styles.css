@@ -4628,6 +4628,81 @@ input[aria-invalid='true'] {
   outline: none;
 }
 
+/* Motes › Crawl route: the zone's map cut by depth, each floor in its colour, with the route's stops and way. */
+.sl-map.cr-map {
+  max-height: 600px;
+}
+.cr-map-line {
+  fill: none;
+  stroke-width: 1;
+}
+.cr-map-way {
+  stroke-width: 3;
+  stroke-linecap: round;
+}
+.cr-map-way.done {
+  stroke-dasharray: 2 6;
+}
+.cr-map-way.next {
+  stroke-width: 4.5;
+}
+.cr-map-stop {
+  cursor: pointer;
+  outline: none;
+}
+.cr-map-stop circle {
+  stroke: var(--bg);
+  stroke-width: 2;
+}
+.cr-map-stop text {
+  fill: #111;
+  font-weight: 700;
+  pointer-events: none;
+}
+.cr-map-stop.hot circle,
+.cr-map-stop:focus-visible circle,
+.cr-map-stop.next circle {
+  stroke: var(--text);
+  stroke-width: 3;
+}
+.cr-map-stop.done circle {
+  fill-opacity: 0.35;
+}
+.cr-map-far {
+  stroke: none;
+}
+.cr-map-change {
+  paint-order: stroke;
+  stroke: var(--bg);
+  stroke-width: 0.25em;
+  cursor: default;
+}
+.cr-map-start rect {
+  fill: var(--text);
+  stroke: var(--bg);
+  stroke-width: 1.5;
+}
+.cr-map-start text {
+  fill: var(--text);
+  font-weight: 700;
+}
+.row.cr-legend {
+  flex-wrap: wrap;
+  gap: 4px 16px;
+}
+.cr-swatch {
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+}
+.cr-dead {
+  text-decoration: line-through;
+  opacity: 0.6;
+}
+.chip.cr-up {
+  margin-left: 4px;
+}
+
 /* Plan › Hunter: a spot the player found a named at, and the form that keeps one (FEAT-020). */
 .hu-found .chip button {
   margin-left: 4px;

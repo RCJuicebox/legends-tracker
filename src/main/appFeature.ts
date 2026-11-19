@@ -30,7 +30,7 @@ export interface AppFeature {
    * Its part of the achievements overlay's track, from what it holds (LiveAchievements asks when it
    * publishes, LT-623): the faction plan's step, the Slayer counts, the Hunter named and the epic pieces in the zone.
    */
-  track?(at: TrackContext): Partial<Pick<AchievementTrack, 'faction' | 'slayer' | 'hunter' | 'epics'>>
+  track?(at: TrackContext): Partial<Pick<AchievementTrack, 'faction' | 'slayer' | 'hunter' | 'epics' | 'crawl'>>
 }
 
 /** What every feature module is built from (LT-632): the log history its counts come from, and the settings folder its files are kept in. */

@@ -11,3 +11,4 @@ package-lock.json
 src/shared/game/takpSpawns.json
 src/shared/game/skyQuests.json
 src/shared/game/epicItems.json
+src/shared/game/crawlRoutes.json
