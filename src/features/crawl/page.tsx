@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { Fragment, useMemo, useState } from 'react'
 import { api } from '../../renderer/src/api'
 import { useInvoke, useVisibleInterval } from '../../renderer/src/hooks'
 import { useActions, useSettled } from '../../renderer/src/state'
@@ -9,13 +9,37 @@ import { zoneKey } from '../../core/zones'
 import { DEFAULT_ACHIEVEMENT_OPTIONS } from '../../shared/overlays'
 import type { PlayerLocation } from '../../shared/tracking'
 import { useMapView, type View } from '../../renderer/src/components/mapView'
-import { floorColor, floorOf, legFloors, legPieces, rareKey, stopStates, type CrawlData, type CrawlRare, type CrawlRoute, type CrawlRun, type Point } from './core'
+import {
+  campIsLow,
+  campLetter,
+  campLevels,
+  campSpots,
+  floorColor,
+  floorOf,
+  legFloors,
+  legPieces,
+  rareKey,
+  stopStates,
+  wayFloors,
+  wayPieces,
+  type CrawlCamp,
+  type CrawlData,
+  type CrawlRare,
+  type CrawlRoute,
+  type CrawlRun,
+  type Point,
+  type SeenSpot
+} from './core'
 
 // Motes › Crawl route: a zone's Dungeon Crawl route. The zone's map, as the game's own files draw it,
 // cut by depth: one floor at a time, or the whole zone from the side, so the floors a flat map piles
 // on one another come apart. On it the stops (where the rares pop) numbered in the order that makes the
 // shortest swim from the zone-in, and the way between them as it really runs (core.ts). The same route
 // goes on the game's own map at a click, and the achievements overlay follows a run stop by stop.
+//
+// The same map has a second view, Places to sit: the zone's rooms where enough spawn spots are in a
+// straight open line to kill what pops without moving (the zone itself, where things respawn), each with
+// the way to it from the zone-in. It is a view of its own so neither crowds the other.
 
 const HOW = (
   <>
@@ -37,7 +61,28 @@ const HOW = (
   </>
 )
 
+const HOW_SIT = (
+  <>
+    <div>
+      <b>A place to sit</b> has at least four spawn spots in a straight open line from it, within 200 units (the reach of most spells): what pops there can be targeted with the
+      nearest-mob key and cast on without moving. These are for the zone itself, where things respawn; in a crawl nothing does.
+    </div>
+    <div>
+      <b>In sight</b> is measured through the zone’s own geometry, read from the game’s files, cut into cells four units wide: a line through a very narrow gap may count as closed.
+      Fish that roam leave their spots and come back to them.
+    </div>
+    <div>
+      <b>The spots and levels</b> are TAKP’s classic spawn tables; the levels your /con shows in Legends match them. A spot within 70 units is inside classic’s usual aggro reach:
+      what pops there comes at you on its own.
+    </div>
+    <div>
+      <b>Small fry</b> (the level 1 to 5 sailfins) are seen but not counted: the nearest-mob key picks them too. No place has Phinigel Autropos in sight.
+    </div>
+  </>
+)
+
 type Show = 'all' | 'side' | `f${number}`
+type Mode = 'route' | 'sit'
 
 const rgb = (floor: number, alpha = 1) => `rgb(${floorColor(floor).join(' ')} / ${alpha})`
 
@@ -59,13 +104,57 @@ const youText = (l: PlayerLocation, now: number) => {
 /** The map's tallest, in CSS pixels. */
 const MAX_H = 600
 
-function CrawlMap({ data, route, show, you, states }: { data: CrawlData; route: CrawlRoute; show: Show; you: PlayerLocation | null; states: ReturnType<typeof stopStates> }) {
+/** A place to sit in a line: "Place B · Top floor · 7 spots in sight, levels 28–36". */
+const campLine = (route: CrawlRoute, c: CrawlCamp, i: number) =>
+  `Place ${campLetter(i)} · ${route.floors[floorOf(route, c.at[2])].name} floor · ${campSpots(c)} spots in sight, levels ${campLevels(c).join('–')}`
+
+type SpotKind = 'want' | 'over' | 'small'
+const SPOT_KIND: Record<SpotKind, string> = {
+  want: 'A spawn spot in sight',
+  over: 'A spawn spot in sight, of mobs above the levels wanted',
+  small: 'A spawn spot of small fry in sight'
+}
+
+function CrawlMap({
+  data,
+  route,
+  show,
+  you,
+  states,
+  pick,
+  onPick
+}: {
+  data: CrawlData
+  route: CrawlRoute
+  show: Show
+  you: PlayerLocation | null
+  states: ReturnType<typeof stopStates>
+  /** With the places to sit shown in place of the route: the one picked. */
+  pick?: number
+  onPick?: (i: number) => void
+}) {
+  const sit = pick !== undefined
+  const camps = useMemo(() => route.camps ?? [], [route])
+  const camp = sit ? (camps[pick] ?? null) : null
   const side = show === 'side'
   const only = show.startsWith('f') ? Number(show.slice(1)) : null
   // Where a point is drawn: from above (the game's maps put x right and y down), or from the side, height up.
   const px = (p: readonly number[]) => p[0]
   const py = (p: readonly number[]) => (side ? -p[2] : p[1])
-  const pieces = useMemo(() => legPieces(route), [route])
+  const legs = useMemo(() => legPieces(route), [route])
+  // What is drawn as the way: the route's legs, or the way to the place picked.
+  const pieces = useMemo(() => (!sit ? legs : camp ? wayPieces(route, camp.way) : []), [sit, legs, camp, route])
+  const seen = useMemo(
+    () =>
+      camp
+        ? [
+            ...camp.spots.map((p): [SpotKind, SeenSpot] => ['want', p]),
+            ...(camp.over ?? []).map((p): [SpotKind, SeenSpot] => ['over', p]),
+            ...(camp.small ?? []).map((p): [SpotKind, SeenSpot] => ['small', p])
+          ]
+        : [],
+    [camp]
+  )
   // The zone's lines, a path for each floor.
   const floors = useMemo(() => {
     const out = route.floors.map(() => [] as string[])
@@ -84,15 +173,19 @@ function CrawlMap({ data, route, show, you, states }: { data: CrawlData; route: 
       xs.push(l[i], l[i + 3])
       ys.push(side ? -l[i + 2] : l[i + 1], side ? -l[i + 5] : l[i + 4])
     }
-    for (const p of pieces) {
+    for (const p of legs) {
       xs.push(px(p.from), px(p.to))
       ys.push(py(p.from), py(p.to))
+    }
+    for (const c of camps) {
+      xs.push(px(c.at))
+      ys.push(py(c.at))
     }
     const [x0, x1, y0, y1] = [Math.min(...xs), Math.max(...xs), Math.min(...ys), Math.max(...ys)]
     const pad = Math.max(x1 - x0, y1 - y0, 100) * 0.04
     return [x0 - pad, y0 - pad, x1 - x0 + 2 * pad, y1 - y0 + 2 * pad]
     // oxlint-disable-next-line react-hooks/exhaustive-deps -- px and py follow `side`
-  }, [data.lines, pieces, route, side])
+  }, [data.lines, legs, camps, route, side])
   const { view, svg, zoomed, reset, on } = useMapView(whole)
   const [x, y, w, h] = view
   const [hot, setHot] = useState<number | null>(null)
@@ -113,7 +206,7 @@ function CrawlMap({ data, route, show, you, states }: { data: CrawlData; route: 
         style={{ maxWidth: `${Math.round((MAX_H * whole[2]) / whole[3])}px` }}
         viewBox={`${x} ${y} ${w} ${h}`}
         role="img"
-        aria-label={`Map of ${route.name} ${side ? 'from the side' : only === null ? 'from above, every floor' : `from above, the ${route.floors[only].name} floor`}, with the route’s ${route.stops.length} stops: the wheel zooms, a drag moves it`}
+        aria-label={`Map of ${route.name} ${side ? 'from the side' : only === null ? 'from above, every floor' : `from above, the ${route.floors[only].name} floor`}, with ${sit ? `its ${camps.length} places to sit` : `the route’s ${route.stops.length} stops`}: the wheel zooms, a drag moves it`}
         {...on}
       >
         {floors.map((d, f) => (
@@ -126,7 +219,7 @@ function CrawlMap({ data, route, show, you, states }: { data: CrawlData; route: 
             y1={py(p.from)}
             x2={px(p.to)}
             y2={py(p.to)}
-            className={`cr-map-way${states.visitedAt[p.stop] ? ' done' : ''}${p.stop === states.next ? ' next' : ''}`}
+            className={`cr-map-way${!sit && states.visitedAt[p.stop] ? ' done' : ''}${!sit && p.stop === states.next ? ' next' : ''}`}
             style={{ stroke: rgb(p.floor, shown(p.floor) ? 1 : 0.25) }}
             vectorEffect="non-scaling-stroke"
           />
@@ -143,10 +236,19 @@ function CrawlMap({ data, route, show, you, states }: { data: CrawlData; route: 
               style={{ fill: rgb(c.to), opacity: shown(c.from) || shown(c.to) ? 1 : 0.25 }}
             >
               {c.to > c.from ? '▼' : '▲'}
-              <title>{`The way to stop ${c.stop + 1} goes ${c.to > c.from ? 'down' : 'up'} here, from the ${route.floors[c.from].name} floor to the ${route.floors[c.to].name} floor`}</title>
+              <title>{`The way to ${sit ? `place ${campLetter(pick)}` : `stop ${c.stop + 1}`} goes ${c.to > c.from ? 'down' : 'up'} here, from the ${route.floors[c.from].name} floor to the ${route.floors[c.to].name} floor`}</title>
             </text>
           ))}
-        {route.stops.flatMap((s, i) =>
+        {camp &&
+          seen.map(([kind, p], i) => (
+            <g key={`seen${i}`} opacity={shown(floorOf(route, p[2])) ? 1 : 0.35}>
+              <line x1={px(camp.at)} y1={py(camp.at)} x2={px(p)} y2={py(p)} className={`cr-map-ray ${kind}`} vectorEffect="non-scaling-stroke" />
+              <circle cx={px(p)} cy={py(p)} r={r * (kind === 'small' ? 0.22 : 0.4)} className={`cr-map-spot ${kind}`} vectorEffect="non-scaling-stroke">
+                <title>{`${SPOT_KIND[kind]}, ${p[3]} away, on the ${route.floors[floorOf(route, p[2])].name} floor`}</title>
+              </circle>
+            </g>
+          ))}
+        {(sit ? [] : route.stops).flatMap((s, i) =>
           (s.far ?? []).map((p, j) => (
             <circle
               key={`far${i}-${j}`}
@@ -171,7 +273,33 @@ function CrawlMap({ data, route, show, you, states }: { data: CrawlData; route: 
             in
           </text>
         </g>
-        {route.stops.map((s, i) => {
+        {(sit ? camps : []).map((c, i) => {
+          const f = floorOf(route, c.at[2])
+          return (
+            <g
+              key={`camp${i}`}
+              className={`cr-map-stop cr-map-camp${pick === i ? ' hot' : ''}${campIsLow(c) ? '' : ' high'}`}
+              opacity={shown(f) ? 1 : 0.3}
+              tabIndex={0}
+              role="button"
+              aria-pressed={pick === i}
+              aria-label={campLine(route, c, i)}
+              onClick={() => onPick?.(i)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault()
+                  onPick?.(i)
+                }
+              }}
+            >
+              <rect x={px(c.at) - r} y={py(c.at) - r} width={r * 2} height={r * 2} rx={r * 0.3} style={{ fill: rgb(f) }} vectorEffect="non-scaling-stroke" />
+              <text x={px(c.at)} y={py(c.at) + r * 0.4} fontSize={r * 1.2} textAnchor="middle">
+                {campLetter(i)}
+              </text>
+            </g>
+          )
+        })}
+        {(sit ? [] : route.stops).map((s, i) => {
           const f = floorOf(route, s.at[2])
           return (
             <g
@@ -203,9 +331,13 @@ function CrawlMap({ data, route, show, you, states }: { data: CrawlData; route: 
       </svg>
       <div className="row tight small sl-map-hot" aria-live="polite">
         <span className="mono">
-          {hotStop && hot !== null
-            ? `Stop ${hot + 1} · ${route.floors[floorOf(route, hotStop.at[2])].name} floor · ${hotStop.rares.map((x) => `${x.name}${x.far ? ' (near, long odds)' : ''}`).join(', ')} · ${waypoint(hotStop.at)}`
-            : 'Point at a stop for what pops there and its /waypoint'}
+          {sit
+            ? camp
+              ? `${campLine(route, camp, pick)} · ${waypoint(camp.at)}`
+              : 'Pick a place for what it sees and the way to it'
+            : hotStop && hot !== null
+              ? `Stop ${hot + 1} · ${route.floors[floorOf(route, hotStop.at[2])].name} floor · ${hotStop.rares.map((x) => `${x.name}${x.far ? ' (near, long odds)' : ''}`).join(', ')} · ${waypoint(hotStop.at)}`
+              : 'Point at a stop for what pops there and its /waypoint'}
         </span>
         <span className="spacer" />
         {zoomed && (
@@ -215,6 +347,112 @@ function CrawlMap({ data, route, show, you, states }: { data: CrawlData; route: 
         )}
       </div>
     </>
+  )
+}
+
+/** What a place to sit kills, lowest first: each mob with its levels and how many of the spots in sight it pops at. */
+function CampMobs({ camp, under }: { camp: CrawlCamp; under: number }) {
+  const real = camp.mobs.filter((m) => !m.small)
+  const small = camp.mobs.filter((m) => m.small)
+  return (
+    <>
+      {real.map((m, i) => (
+        <span key={m.name}>
+          {i > 0 && ', '}
+          <Tip
+            className={m.hi >= under ? 'cr-over' : undefined}
+            text={`Level ${m.lo === m.hi ? m.lo : `${m.lo} to ${m.hi}`}. It pops at ${m.spots} of the spots in sight, ${m.chance}% of the time at most at one, by classic’s tables.${m.named ? ' A rare of the zone.' : ''}`}
+          >
+            <b>{m.name.replace(/^an? /, '')}</b> {m.lo === m.hi ? m.lo : `${m.lo}–${m.hi}`}
+          </Tip>
+          <span className="faint">
+            {' '}
+            ×{m.spots}
+            {m.named ? ` (rare, ${m.chance}%)` : ''}
+          </span>
+        </span>
+      ))}
+      {small.length > 0 && (
+        <span className="faint">
+          {' '}
+          · small fry at {camp.small?.length ?? 0} more: {small.map((m) => m.name.replace(/^an? /, '')).join(', ')}
+        </span>
+      )}
+    </>
+  )
+}
+
+/** The places to sit, listed: those of the levels wanted first, then the rest under a line of their own. */
+function CampList({ route, pick, onPick }: { route: CrawlRoute; pick: number; onPick: (i: number) => void }) {
+  const camps = route.camps ?? []
+  const under = route.sitUnder ?? Infinity
+  const firstHigh = camps.findIndex((c) => !campIsLow(c))
+  return (
+    <ol className="fp-steps">
+      {camps.map((c, i) => {
+        const f = floorOf(route, c.at[2])
+        const through = wayFloors(route, c.way)
+        const low = campIsLow(c)
+        const mins = Math.round(c.respawn / 60)
+        return (
+          <Fragment key={i}>
+            {i === firstHigh && Number.isFinite(under) && (
+              <li className="cr-divider small">
+                <b>Level {under} and over</b>
+                <span className="faint"> · the zone’s other rooms with four spots in sight, for later</span>
+              </li>
+            )}
+            <li className={`fp-step${i === pick ? ' now' : ''}`}>
+              <button
+                className="fp-num cr-pick"
+                style={{ background: rgb(f), color: '#111' }}
+                aria-pressed={i === pick}
+                aria-label={`Show place ${campLetter(i)} on the map`}
+                title="Show it on the map, with the way to it"
+                onClick={() => onPick(i)}
+              >
+                {campLetter(i)}
+              </button>
+              <div className="fp-body">
+                <div className="fp-head">
+                  <span className="fp-zone">
+                    <b>{campSpots(c)} spawn spots in sight</b>
+                  </span>
+                  <span className="chip" style={{ borderColor: rgb(f) }}>
+                    {route.floors[f].name} floor
+                  </span>
+                  <span className={`chip ${low ? 'ok' : 'warn'}`}>levels {campLevels(c).join('–')}</span>
+                  {!!c.over?.length && low && (
+                    <span className="chip warn">
+                      {c.over.length} spot{c.over.length > 1 ? 's' : ''} at {under} or over
+                    </span>
+                  )}
+                  <span className="spacer" />
+                  <Tip className="mono small" text="The way from the zone-in, through the open tunnels, in the game’s units">
+                    {num(c.length)} from the zone-in
+                  </Tip>
+                </div>
+                <div className="small">
+                  <CampMobs camp={c} under={under} />
+                </div>
+                <div className="small faint">
+                  {c.close === campSpots(c) ? 'All' : c.close} of the {campSpots(c)} within 70: {c.close ? 'they come at you as they pop' : 'none comes on its own'}
+                  {c.close < campSpots(c) && c.close > 0 ? '; the rest wait for a cast' : ''} · respawn about {mins} min by classic’s timers
+                </div>
+                <div className="small">
+                  {through.length > 1 ? (
+                    <>The way: {through.map((t, j) => `${j ? (t > through[j - 1] ? ' ↓ ' : ' ↑ ') : ''}${route.floors[t].name}`).join('')} · </>
+                  ) : (
+                    <>On the {route.floors[f].name} floor all the way · </>
+                  )}
+                  <GameCommand cmd={waypoint(c.at)} />
+                </div>
+              </div>
+            </li>
+          </Fragment>
+        )
+      })}
+    </ol>
   )
 }
 
@@ -251,6 +489,8 @@ export function CrawlRoutePage() {
   const where = useInvoke('game:location')
   useVisibleInterval(where.reload, 15_000)
   const [show, setShow] = useState<Show>('all')
+  const [mode, setMode] = useState<Mode>('route')
+  const [pick, setPick] = useState(0)
   const { patchSettings } = useActions()
   const achOverlay = useSettled((s) => s.settings.overlays.find((o) => o.kind === 'achievements'))
   const onOverlay = (achOverlay?.achievements ?? DEFAULT_ACHIEVEMENT_OPTIONS).crawl ?? true
@@ -268,14 +508,17 @@ export function CrawlRoutePage() {
   const total = route.stops.reduce((s, x) => s + x.length, 0)
   const rares = new Set(route.stops.flatMap((s) => s.rares.map((x) => x.name))).size
   const run = data.run
+  const camps = route.camps ?? []
+  const sit = mode === 'sit' && camps.length > 0
   const mark = async (on: boolean) => {
     try {
-      const r = await api.invoke('crawl:mark', route.name, on)
+      const r = await api.invoke('crawl:mark', route.name, on, sit ? 'camps' : 'route')
       q.reload()
+      const what = sit ? 'places to sit' : 'route'
       showToast(
         on
-          ? `Drew the route on ${route.name}’s map, ${num(r.lines)} lines and labels: pick the LegendsTracker map set in the game’s map window (layer 2 holds the route).`
-          : `Took the route off ${route.name}’s map in the LegendsTracker map set.`
+          ? `Drew the ${what} on ${route.name}’s map, ${num(r.lines)} lines and labels: pick the LegendsTracker map set in the game’s map window (layer ${sit ? 3 : 2} holds the ${what}).`
+          : `Took the ${what} off ${route.name}’s map in the LegendsTracker map set.`
       )
     } catch (e) {
       showToast(`Could not write the game’s map: ${e instanceof Error ? e.message : String(e)}`, { tone: 'bad' })
@@ -285,11 +528,31 @@ export function CrawlRoutePage() {
   return (
     <>
       <div className="page-head">
-        <p>
-          The shortest way past every rare of a zone, for a Dungeon Crawl: the stops in order, floor by floor, along the zone’s real tunnels.{' '}
-          <Info label="How it is worked out" text={HOW} />
-        </p>
+        {sit ? (
+          <p>
+            Rooms to sit in and kill what pops, in the zone itself where things respawn: each has four or more spawn spots in a straight open line, within a spell’s reach.{' '}
+            <Info label="How they are found" text={HOW_SIT} />
+          </p>
+        ) : (
+          <p>
+            The shortest way past every rare of a zone, for a Dungeon Crawl: the stops in order, floor by floor, along the zone’s real tunnels.{' '}
+            <Info label="How it is worked out" text={HOW} />
+          </p>
+        )}
       </div>
+      {camps.length > 0 && (
+        <div className="row mb-8">
+          <Tabs
+            label="What the map shows"
+            value={sit ? 'sit' : 'route'}
+            onChange={setMode}
+            tabs={[
+              ['route', 'Crawl route'],
+              ['sit', 'Places to sit']
+            ]}
+          />
+        </div>
+      )}
       <div className="card row mb-16">
         {data.zones.length > 1 ? (
           <label className="row tight">
@@ -303,17 +566,28 @@ export function CrawlRoutePage() {
         ) : (
           <b>{route.name}</b>
         )}
-        <span>
-          <b>{route.stops.length}</b> stops, <b>{rares}</b> rares, about <b>{num(total)}</b> units of swimming
-        </span>
-        {run && (
+        {sit ? (
+          <span>
+            <b>{camps.length}</b> places with four or more spawn spots in sight
+            {route.sitUnder ? (
+              <>
+                , <b>{camps.filter(campIsLow).length}</b> of them of mobs under level {route.sitUnder}
+              </>
+            ) : null}
+          </span>
+        ) : (
+          <span>
+            <b>{route.stops.length}</b> stops, <b>{rares}</b> rares, about <b>{num(total)}</b> units of swimming
+          </span>
+        )}
+        {!sit && run && (
           <span className="chip">
             {data.here ? 'Run in hand' : 'Last run'}: {states.visitedAt.filter(Boolean).length} of {route.stops.length} stops
             {run.doneAt ? ' · completed' : ''}
           </span>
         )}
         <span className="spacer" />
-        {achOverlay && (
+        {!sit && achOverlay && (
           <label
             className="row tight small"
             title="In an instance of the zone, the achievements overlay shows the stop to go to next and the rares left (the switch under Settings › Overlays)"
@@ -322,11 +596,19 @@ export function CrawlRoutePage() {
             On the overlay
           </label>
         )}
-        <Tip text="Draws the way and the numbered stops on the game’s own map, each floor in its colour: in the LegendsTracker map set (a copy of the game’s maps, so its own stay as they are), on layer 2, which the map window can switch off on its own.">
-          <button className="btn small" onClick={() => void mark(!data.marked)}>
-            {data.marked ? 'Take it off the game’s map' : 'Draw it on the game’s map'}
-          </button>
-        </Tip>
+        {sit ? (
+          <Tip text="Draws each place, lettered, and the way to it from the zone-in on the game’s own map: in the LegendsTracker map set (a copy of the game’s maps, so its own stay as they are), on layer 3, apart from the crawl route’s layer 2; the map window can switch each off on its own.">
+            <button className="btn small" onClick={() => void mark(!data.campsMarked)}>
+              {data.campsMarked ? 'Take them off the game’s map' : 'Draw them on the game’s map'}
+            </button>
+          </Tip>
+        ) : (
+          <Tip text="Draws the way and the numbered stops on the game’s own map, each floor in its colour: in the LegendsTracker map set (a copy of the game’s maps, so its own stay as they are), on layer 2, which the map window can switch off on its own.">
+            <button className="btn small" onClick={() => void mark(!data.marked)}>
+              {data.marked ? 'Take it off the game’s map' : 'Draw it on the game’s map'}
+            </button>
+          </Tip>
+        )}
       </div>
       <div className="card mb-16">
         <div className="row mb-8">
@@ -343,14 +625,23 @@ export function CrawlRoutePage() {
             </span>
           ))}
         </div>
-        <CrawlMap data={data} route={route} show={show} you={you} states={states} />
+        {sit ? (
+          <CrawlMap data={data} route={route} show={show} you={you} states={states} pick={Math.min(pick, camps.length - 1)} onPick={setPick} />
+        ) : (
+          <CrawlMap data={data} route={route} show={show} you={you} states={states} />
+        )}
         <div className="faint small">
           Floors by height (the third number of /loc)
           {you ? ` · ${youText(you, Date.now())}, the ${route.floors[floorOf(route, you.z)].name} floor` : ' · type /loc in game to see where you are on it'}
           {!data.lines.length && ' · the game’s map for this zone was not found'}
         </div>
       </div>
-      <div className="card mb-16">
+      {sit && (
+        <div className="card mb-16">
+          <CampList route={route} pick={Math.min(pick, camps.length - 1)} onPick={setPick} />
+        </div>
+      )}
+      <div className="card mb-16" hidden={sit}>
         <ol className="fp-steps">
           {route.stops.map((s, i) => {
             const f = floorOf(route, s.at[2])

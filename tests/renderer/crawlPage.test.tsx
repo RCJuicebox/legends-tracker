@@ -35,7 +35,7 @@ const appState: AppState = {
 }
 
 const route = (ROUTES.zones as unknown as CrawlRoutes)['kedge']
-let answer: CrawlData = { zones: ['Kedge Keep'], route, lines: [0, 0, 300, 50, 0, 300, 0, 0, -80, 50, 40, -80], marked: false, run: null, here: false }
+let answer: CrawlData = { zones: ['Kedge Keep'], route, lines: [0, 0, 300, 50, 0, 300, 0, 0, -80, 50, 40, -80], marked: false, campsMarked: false, run: null, here: false }
 
 const invoke = vi.fn((channel: string, ...args: unknown[]) => {
   switch (channel) {
@@ -44,7 +44,7 @@ const invoke = vi.fn((channel: string, ...args: unknown[]) => {
     case 'crawl:route':
       return Promise.resolve(answer)
     case 'crawl:mark':
-      return args[1] ? Promise.resolve({ folder: 'maps/LegendsTracker', lines: 150 }) : Promise.reject(new Error('locked'))
+      return args[1] ? Promise.resolve({ folder: 'maps/LegendsTracker', lines: args[2] === 'camps' ? 60 : 150 }) : Promise.reject(new Error('locked'))
     case 'game:location':
       return Promise.resolve({ zone: 'Kedge Keep 1 (Awakened)', y: -50, x: -100, z: -90, at: Date.now() })
     default:
@@ -111,7 +111,7 @@ it('lists the stops in order with their floors and the way to each, and draws th
 it('draws the route on the game’s map, and says so when it cannot', async () => {
   const { host, done } = await draw()
   await act(async () => button(host, 'Draw it on the game’s map').click())
-  expect(invoke).toHaveBeenCalledWith('crawl:mark', 'Kedge Keep', true)
+  expect(invoke).toHaveBeenCalledWith('crawl:mark', 'Kedge Keep', true, 'route')
   expect(seen(host)).toContain('Drew the route on Kedge Keep’s map, 150 lines and labels')
   done()
   answer = { ...answer, marked: true }
@@ -119,6 +119,47 @@ it('draws the route on the game’s map, and says so when it cannot', async () =
   await act(async () => button(again.host, 'Take it off the game’s map').click())
   expect(seen(again.host)).toContain('Could not write the game’s map: locked')
   again.done()
+})
+
+it('shows the places to sit on a view of their own: those under the level wanted first, the one picked with what it sees', async () => {
+  answer = { ...answer, marked: false }
+  const { host, done } = await draw()
+  expect(host.querySelectorAll('.cr-map-camp')).toHaveLength(0)
+  await act(async () => button(host, 'Places to sit').click())
+  const camps = route.camps!
+  const text = seen(host)
+  expect(text).toContain(`${camps.length} places with four or more spawn spots in sight, 2 of them of mobs under level 40`)
+  expect(text).toContain('7 spawn spots in sight')
+  expect(text).toContain('lancer swordfish 28–32')
+  expect(text).toContain('levels 28–36')
+  expect(text).toContain('All of the 7 within 70: they come at you as they pop')
+  expect(text).toContain('respawn about 20 min')
+  expect(text).toContain('Level 40 and over')
+  // The route's stops give way to the places, lettered; the first is picked, with a line to each spot it sees.
+  expect(host.querySelectorAll('.cr-map-stop:not(.cr-map-camp)')).toHaveLength(0)
+  expect(host.querySelectorAll('.cr-map-camp')).toHaveLength(camps.length)
+  expect(host.querySelectorAll('.cr-map-ray')).toHaveLength(7)
+  expect(text).toMatch(/Place A · Top floor · 7 spots in sight, levels 28–36 · \/waypoint /)
+  const steps = [...host.querySelectorAll('.fp-step:not([hidden] .fp-step)')]
+  expect(steps[0].className).toContain('now')
+  // Another picked from the list, or on the map.
+  await act(async () => steps[1].querySelector<HTMLButtonElement>('.cr-pick')!.click())
+  expect(seen(host)).toMatch(/Place B · /)
+  expect(host.querySelectorAll('.cr-map-ray.over').length).toBe(camps[1].over?.length ?? 0)
+  await act(async () => host.querySelectorAll<SVGGElement>('.cr-map-camp')[2].dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })))
+  expect(seen(host)).toMatch(/Place C · /)
+  await act(async () => host.querySelectorAll<SVGGElement>('.cr-map-camp')[0].dispatchEvent(new MouseEvent('click', { bubbles: true })))
+  expect(seen(host)).toMatch(/Place A · /)
+  // They go on the game's map on their own layer.
+  await act(async () => button(host, 'Draw them on the game’s map').click())
+  expect(invoke).toHaveBeenCalledWith('crawl:mark', 'Kedge Keep', true, 'camps')
+  expect(seen(host)).toContain('Drew the places to sit on Kedge Keep’s map, 60 lines and labels')
+  expect(seen(host)).toContain('layer 3')
+  // Back to the route.
+  await act(async () => button(host, 'Crawl route').click())
+  expect(host.querySelectorAll('.cr-map-camp')).toHaveLength(0)
+  expect(host.querySelectorAll('.cr-map-stop')).toHaveLength(route.stops.length)
+  done()
 })
 
 it('ticks the stops of a run in hand and marks the next', async () => {
@@ -135,7 +176,7 @@ it('ticks the stops of a run in hand and marks the next', async () => {
 })
 
 it('says so when no zone has a route', async () => {
-  answer = { zones: [], route: null, lines: [], marked: false, run: null, here: false }
+  answer = { zones: [], route: null, lines: [], marked: false, campsMarked: false, run: null, here: false }
   const { host, done } = await draw()
   expect(seen(host)).toContain('No zone has a crawl route yet.')
   done()

@@ -5185,3 +5185,57 @@ button.rc-part:hover {
   flex-wrap: wrap;
   gap: 8px 24px;
 }
+/* Places to sit: a lettered square each, the one picked with lines to the spawn spots it sees. */
+.cr-map-camp rect {
+  stroke: var(--bg);
+  stroke-width: 2;
+}
+.cr-map-camp.hot rect,
+.cr-map-camp:focus-visible rect {
+  stroke: var(--text);
+  stroke-width: 3;
+}
+.cr-map-camp.high rect {
+  fill-opacity: 0.45;
+}
+.cr-map-ray {
+  stroke: var(--text);
+  stroke-width: 1;
+  stroke-opacity: 0.55;
+  stroke-dasharray: 3 3;
+}
+.cr-map-ray.over {
+  stroke: var(--red);
+}
+.cr-map-ray.small {
+  stroke-opacity: 0.25;
+}
+.cr-map-spot {
+  fill: var(--text);
+  stroke: var(--bg);
+  stroke-width: 1.5;
+}
+.cr-map-spot.over {
+  fill: var(--red);
+}
+.cr-map-spot.small {
+  fill: var(--text-3);
+  stroke: none;
+}
+.cr-pick {
+  border: 0;
+  cursor: pointer;
+  font: inherit;
+  font-weight: 700;
+}
+.cr-pick:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.cr-over {
+  color: var(--amber-text);
+}
+.fp-steps > .cr-divider {
+  padding: 10px 0 6px;
+  border-top: 1px solid var(--line);
+}

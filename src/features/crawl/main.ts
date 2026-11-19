@@ -9,18 +9,27 @@ import type { AppFeature, FeatureDeps, TrackContext } from '../../main/appFeatur
 import type { AchievementTrack } from '../../shared/tracking'
 import ROUTES from '../../shared/game/crawlRoutes.json'
 import { mapSet } from '../../main/mapSet'
-import { crawlView, isInstance, newRun, parseMapLines, readRunLine, routeMarks, routeOf, type CrawlData, type CrawlRoutes, type CrawlRun } from './core'
+import { campMarks, crawlView, isInstance, newRun, parseMapLines, readRunLine, routeMarks, routeOf, type CrawlData, type CrawlRoutes, type CrawlRun } from './core'
 
 // Motes › Crawl route's side of the app: the routes (crawlRoutes.json, as scripts/crawl-routes.mjs
 // wrote them), the game's own map of a route's zone with its heights kept, the route drawn on the game's
 // map (a layer of its own in the LegendsTracker map set, beside Hunter's marks), and the run in hand:
 // the rares the log has shown dying since the instance was entered, kept in crawl.json so a restart
 // mid-run loses nothing. The achievements overlay shows the next stops while the player is in the instance.
+// The zone's places to sit go on the game's map too, on a third layer, so neither crowds the other.
 
 const routes = ROUTES.zones as unknown as CrawlRoutes
 
-/** The map layer the route is drawn on: the game's maps use the first for labels (and Hunter's marks go there). */
-const LAYER = 2
+/**
+ * What goes on the game's map, each on a layer of its own: the game's maps use the first for labels (and
+ * Hunter's marks go there). `mark` is the line its part of the layer starts with: what tells a layer
+ * holding the app's lines from the game's own.
+ */
+const LAYERS = {
+  route: { layer: 2, mark: 'LegendsTracker_crawl_route' },
+  camps: { layer: 3, mark: 'LegendsTracker_places_to_sit' }
+} as const
+type CrawlMarks = keyof typeof LAYERS
 /** A run this old is not the one being entered again. */
 const RUN_STALE_MS = 6 * 3600_000
 /** "Player Juicebox creating instance Kedge Keep 453.", "Juicebox has been added to Kedge Keep - Group.": the next instance entered is a new one. */
@@ -110,10 +119,11 @@ export class CrawlGuide implements AppFeature {
       }
     })
     handle('crawl:route', async (zone) => this.data(ctx, typeof zone === 'string' ? zone : ''))
-    handle('crawl:mark', async (zone, on) => {
+    handle('crawl:mark', async (zone, on, what) => {
       const found = typeof zone === 'string' ? routeOf(routes, zone) : undefined
       if (!found || typeof on !== 'boolean') throw new Error('No route for that zone.')
-      return markRoute(ctx.installDir(), found.short, on ? routeMarks(found.route) : [])
+      const camps = what === 'camps'
+      return markRoute(ctx.installDir(), found.short, !on ? [] : camps ? campMarks(found.route) : routeMarks(found.route), camps ? 'camps' : 'route')
     })
   }
 
@@ -121,34 +131,33 @@ export class CrawlGuide implements AppFeature {
   private async data(ctx: AppContext, zone: string): Promise<CrawlData> {
     const zones = Object.values(routes).map((r) => r.name)
     const found = routeOf(routes, zone) ?? routeOf(routes, ctx.engine?.status.zone ?? '') ?? routeOf(routes, zones[0] ?? '')
-    if (!found) return { zones, route: null, lines: [], marked: false, run: null, here: false }
+    if (!found) return { zones, route: null, lines: [], marked: false, campsMarked: false, run: null, here: false }
     const dir = ctx.installDir()
     const maps = dir ? join(dir, 'maps') : ''
     const files = maps ? await Promise.all([`${found.short}.txt`, `${found.short}_1.txt`].map((f) => readText(join(maps, f)))) : []
-    const mine = maps ? await readText(join(maps, 'LegendsTracker', `${found.short}_${LAYER}.txt`)) : null
+    const marked = async (what: CrawlMarks) => !!maps && !!(await readText(join(maps, 'LegendsTracker', `${found.short}_${LAYERS[what].layer}.txt`)))?.includes(LAYERS[what].mark)
     const run = this.runIn(found.route.name)
     return {
       zones,
       route: found.route,
       lines: parseMapLines(files.filter((t): t is string => t !== null).join('\n')),
-      marked: !!mine && mine.includes(MARK),
+      marked: await marked('route'),
+      campsMarked: await marked('camps'),
       run,
       here: !!run && run.instance === (ctx.engine?.status.zone ?? '')
     }
   }
 }
 
-/** The line the route's layer starts its own part with: what tells a layer holding a route from the game's own. */
-const MARK = 'LegendsTracker_crawl_route'
-
 /**
- * Draws a route on the game's map, in the app's own map set (maps\LegendsTracker): the zone's second
- * layer written as the game's own (where it has one) and then the route's lines; no lines takes the
- * route off again. The layer can be switched off in the game's map window on its own.
+ * Draws a route (or the places to sit) on the game's map, in the app's own map set (maps\LegendsTracker):
+ * its layer written as the game's own (where it has one) and then the lines; no lines takes them off
+ * again. The layer can be switched off in the game's map window on its own.
  */
-export async function markRoute(installDir: string, short: string, lines: string[]): Promise<{ folder: string; lines: number }> {
+export async function markRoute(installDir: string, short: string, lines: string[], what: CrawlMarks = 'route'): Promise<{ folder: string; lines: number }> {
   const { maps, set } = await mapSet(installDir)
-  const file = `${short}_${LAYER}.txt`
+  const { layer, mark: MARK } = LAYERS[what]
+  const file = `${short}_${layer}.txt`
   const base = await readText(join(maps, file))
   if (!lines.length) {
     if (base === null) await rm(join(set, file), { force: true })

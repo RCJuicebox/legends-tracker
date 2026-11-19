@@ -10,6 +10,10 @@ import type { CrawlTrackView } from '../../shared/tracking'
 // from each stop to the next as it really runs, floor by floor. This file reads a route: which floor a
 // height is on, the way cut into pieces a map can draw, the marks for the game's own map, and how a
 // run stands from the kills the log shows.
+//
+// A route's zone also has its places to sit (camps): spots that have enough spawn spots in a straight
+// open line, within a spell's reach, to kill what pops there without moving. Those are for the zone
+// itself, where things respawn, not for a crawl.
 
 /** A rare that pops at a stop. */
 export interface CrawlRare {
@@ -47,6 +51,45 @@ export interface CrawlFloor {
   from: number | null
 }
 
+/** A mob a place to sit has in sight. */
+export interface CampMob {
+  /** As the log names it. */
+  name: string
+  /** Its levels, by classic's tables (Legends' /con levels match them). */
+  lo: number
+  hi: number
+  /** How many of the spots in sight it can pop at, and the most it rolls at one, in a hundred. */
+  spots: number
+  chance: number
+  /** A rare of the zone, or a named on a long timer. */
+  named?: boolean
+  /** Too low to be worth a spell (a level 1 fish): seen, not counted. */
+  small?: boolean
+}
+
+/** A spawn spot seen from a place to sit: x, y, height, and how far it is. */
+export type SeenSpot = [number, number, number, number]
+
+/** A place to sit and kill what pops: the spawn spots in a straight open line from it, within a spell's reach. */
+export interface CrawlCamp {
+  at: Point
+  /** The spots in sight that mostly hold something worth a spell, of the levels wanted (the route's sitUnder). */
+  spots: SeenSpot[]
+  /** The spots in sight that mostly hold something above those levels. */
+  over?: SeenSpot[]
+  /** The spots in sight that mostly hold small fry. */
+  small?: SeenSpot[]
+  /** How many of `spots` and `over` are within classic's aggro reach: those mobs come on their own. */
+  close: number
+  /** What pops at the spots in sight, the lowest first, small fry last. */
+  mobs: CampMob[]
+  /** The spots' respawn time by classic's tables, in seconds. */
+  respawn: number
+  /** The way here from the zone-in, flattened as a stop's leg is. */
+  way: number[]
+  length: number
+}
+
 export interface CrawlRoute {
   /** As the game's ZoneNames.txt names it. */
   name: string
@@ -56,6 +99,10 @@ export interface CrawlRoute {
   stops: CrawlStop[]
   /** How far each stop is from each other by the open ways (row and column 0 are the start), in the stops' order. */
   dist: number[][]
+  /** The zone's places to sit: those with enough spots under `sitUnder` first, then the rest, each by the most spots in sight. */
+  camps?: CrawlCamp[]
+  /** The level the mobs of a place to sit are wanted under. */
+  sitUnder?: number
 }
 
 export type CrawlRoutes = Record<string, CrawlRoute>
@@ -95,45 +142,47 @@ export interface LegPiece {
 /** A stretch of a leg on another floor shorter than this, between two longer ones, is no change of floor. */
 const MIN_RUN = 60
 
-/** The whole way as straight pieces, each on a floor: what a map draws, and what says where a leg changes floors. */
-export function legPieces(route: CrawlRoute): LegPiece[] {
-  const out: LegPiece[] = []
-  route.stops.forEach((s, stop) => {
-    const leg: LegPiece[] = []
-    for (let i = 0; i + 5 < s.leg.length; i += 3) {
-      const from: Point = [s.leg[i], s.leg[i + 1], s.leg[i + 2]]
-      const to: Point = [s.leg[i + 3], s.leg[i + 4], s.leg[i + 5]]
-      const floor = floorOf(route, (from[2] + to[2]) / 2)
-      leg.push({ stop, floor, level: floor, from, to })
+/** One way (a stop's leg, the way to a place to sit) as straight pieces, each on a floor; `stop` is what it leads to. */
+export function wayPieces(route: Pick<CrawlRoute, 'floors'>, way: number[], stop = 0): LegPiece[] {
+  const leg: LegPiece[] = []
+  for (let i = 0; i + 5 < way.length; i += 3) {
+    const from: Point = [way[i], way[i + 1], way[i + 2]]
+    const to: Point = [way[i + 3], way[i + 4], way[i + 5]]
+    const floor = floorOf(route, (from[2] + to[2]) / 2)
+    leg.push({ stop, floor, level: floor, from, to })
+  }
+  // Runs of pieces on one level, each with its length; a short run that is neither the way's first nor its last joins the one before.
+  for (let changed = true; changed;) {
+    changed = false
+    const runs: { at: number; n: number; length: number }[] = []
+    leg.forEach((p, i) => {
+      const len = Math.hypot(p.to[0] - p.from[0], p.to[1] - p.from[1], p.to[2] - p.from[2])
+      const last = runs.at(-1)
+      if (last && leg[last.at].level === p.level) {
+        last.n++
+        last.length += len
+      } else runs.push({ at: i, n: 1, length: len })
+    })
+    const short = runs.findIndex((r, i) => i > 0 && i < runs.length - 1 && r.length < MIN_RUN)
+    if (short > 0) {
+      const r = runs[short]
+      for (let i = r.at; i < r.at + r.n; i++) leg[i].level = leg[r.at - 1].level
+      changed = true
     }
-    // Runs of pieces on one level, each with its length; a short run that is neither the leg's first nor its last joins the one before.
-    for (let changed = true; changed;) {
-      changed = false
-      const runs: { at: number; n: number; length: number }[] = []
-      leg.forEach((p, i) => {
-        const len = Math.hypot(p.to[0] - p.from[0], p.to[1] - p.from[1], p.to[2] - p.from[2])
-        const last = runs.at(-1)
-        if (last && leg[last.at].level === p.level) {
-          last.n++
-          last.length += len
-        } else runs.push({ at: i, n: 1, length: len })
-      })
-      const short = runs.findIndex((r, i) => i > 0 && i < runs.length - 1 && r.length < MIN_RUN)
-      if (short > 0) {
-        const r = runs[short]
-        for (let i = r.at; i < r.at + r.n; i++) leg[i].level = leg[r.at - 1].level
-        changed = true
-      }
-    }
-    out.push(...leg)
-  })
-  return out
+  }
+  return leg
 }
 
+/** The whole route as straight pieces, each on a floor: what a map draws, and what says where a leg changes floors. */
+export const legPieces = (route: CrawlRoute): LegPiece[] => route.stops.flatMap((s, stop) => wayPieces(route, s.leg, stop))
+
 /** The floors a stop's leg passes through, in order, each once in a row: "Top → High → Upper". */
-export function legFloors(route: CrawlRoute, stop: number): number[] {
+export const legFloors = (route: CrawlRoute, stop: number): number[] => wayFloors(route, route.stops[stop].leg)
+
+/** The floors a way passes through, in order, each once in a row. */
+export function wayFloors(route: Pick<CrawlRoute, 'floors'>, way: number[]): number[] {
   const out: number[] = []
-  for (const p of legPieces({ ...route, stops: route.stops.map((s, i) => (i === stop ? s : { ...s, leg: [] })) })) if (out.at(-1) !== p.level) out.push(p.level)
+  for (const p of wayPieces(route, way)) if (out.at(-1) !== p.level) out.push(p.level)
   return out
 }
 
@@ -165,6 +214,37 @@ export function routeMarks(route: CrawlRoute): string[] {
     return `P ${s.at.map(n).join(', ')}, ${floorColor(floorOf(route, s.at[2])).join(', ')}, 3, ${text}`
   })
   return [...lines, ...labels]
+}
+
+/** A place to sit's letter, as the page and the game's map both name it: A for the first. */
+export const campLetter = (i: number) => String.fromCharCode(65 + (i % 26))
+
+/** The levels of what a place to sit kills, small fry and the seldom seen named aside: [lowest, highest]. */
+export function campLevels(camp: CrawlCamp): [number, number] {
+  const real = camp.mobs.filter((m) => !m.small)
+  const usual = real.filter((m) => !m.named || m.chance >= 50)
+  const of = usual.length ? usual : real
+  return [Math.min(...of.map((m) => m.lo)), Math.max(...of.map((m) => m.hi))]
+}
+
+/** How many spawn spots worth a spell a place to sit has in sight. */
+export const campSpots = (camp: CrawlCamp) => camp.spots.length + (camp.over?.length ?? 0)
+
+/** Whether a place to sit is of the levels wanted: enough spots under them, and few above (one in five at most). */
+export const campIsLow = (camp: CrawlCamp) => camp.spots.length >= 4 && (camp.over?.length ?? 0) * 4 <= camp.spots.length
+
+/**
+ * The places to sit as lines for one of the game's map layers: the way to each from the zone-in in each
+ * floor's colour, then a label at each with its letter, how many spots it sees and their levels ("Sit_B_7_spots_levels_28-42").
+ */
+export function campMarks(route: CrawlRoute): string[] {
+  const n = (v: number) => v.toFixed(4)
+  const camps = route.camps ?? []
+  const lines = camps.flatMap((c) => wayPieces(route, c.way).map((p) => `L ${[...p.from, ...p.to].map(n).join(', ')}, ${floorColor(p.floor).join(', ')}`))
+  const labels = camps.map(
+    (c, i) => `P ${c.at.map(n).join(', ')}, ${floorColor(floorOf(route, c.at[2])).join(', ')}, 3, Sit_${campLetter(i)}_${campSpots(c)}_spots_levels_${campLevels(c).join('-')}`
+  )
+  return [...new Set(lines), ...labels]
 }
 
 // ---- a run ----
@@ -297,6 +377,8 @@ export interface CrawlData {
   lines: number[]
   /** The route is drawn on the game's map (the LegendsTracker map set). */
   marked: boolean
+  /** The places to sit are drawn on the game's map, on a layer of their own. */
+  campsMarked: boolean
   /** The run in hand in an instance of this zone, if any; `here` while the player is in it. */
   run: CrawlRun | null
   here: boolean

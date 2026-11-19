@@ -8,6 +8,9 @@
 // A zone's rares are the game's own Hunter list for it (Resources\Achievements), and what play has
 // shown Legends adds (RARES below, each with who said so). Their spots are TAKP's (takpSpawns.json).
 // Only zones swum through are done so far: a path here may go straight up or down, which walking may not.
+//
+// It also finds the zone's places to sit: where enough spawn spots are in a straight open line, within a
+// spell's reach, to kill what pops without moving (the zone itself, where things respawn; not a crawl).
 
 import { readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
@@ -21,6 +24,8 @@ const TAKP = JSON.parse(readFileSync(new URL('../src/shared/game/takpSpawns.json
  * them, with why. `with`: a rare TAKP has no spot for, found where another is. `start`: the label on
  * the game's map the run starts by. `floors`: the zone's depths top first, each from the height it
  * starts at (the last has no bottom), cut where the game's map has no lines between two levels.
+ * `avoid`: mobs no place to sit may have in sight (a raid boss the nearest-mob key would pick).
+ * `sitUnder`: places to sit whose mobs are under this level come first (the player's ask, 2026-11-19).
  */
 const ZONES = {
   kedge: {
@@ -33,6 +38,8 @@ const ZONES = {
       ['Lower', -175],
       ['Bottom', null]
     ],
+    avoid: ['Phinigel Autropos'],
+    sitUnder: 40,
     also: [
       { name: 'a golden haired mermaid', why: 'con' },
       { name: 'Auraline', why: 'con' },
@@ -53,6 +60,19 @@ const STOP_REACH = 90
 /** A rare's spot counts as a stop of its own when it pops there at least this often, or has this few spots. */
 const SURE_CHANCE = 10
 const SURE_SPOTS = 2
+
+/** How far a mob can be seen and cast on from a place to sit: most spells reach this far. */
+const SIGHT = 200
+/** A place to sit has at least this many spawn spots of mobs worth killing in sight. */
+const CAMP_SPOTS = 4
+/** A mob whose highest level is under this is small fry (Kedge's sailfins are level 1): seen, not counted. */
+const SMALL_FRY = 20
+/** A mob this near comes at whoever sits there on its own, by classic's aggro reach. */
+const AGGRO = 70
+/** A spot on a timer this long is a named's or a boss's. */
+const NAMED_SEC = 3600
+/** The most places kept for a zone. */
+const CAMPS = 8
 
 const game = process.argv[2]
 if (!game) throw new Error('Give the EverQuest Legends folder: node scripts/crawl-routes.mjs "<folder>"')
@@ -553,6 +573,114 @@ for (const [short, conf] of Object.entries(ZONES)) {
     from = st
   }
   console.log(`  ${round(total)} in all`)
+
+  // ---- places to sit ----
+  // A place to sit and kill what pops: an open cell that has enough spawn spots in a straight open line
+  // within a spell's reach. Every spot of the zone, each with what it rolls.
+  const under = conf.sitUnder ?? Infinity
+  const rareKeys = new Set(rares.map((r) => key(r.name)))
+  const points = []
+  for (const [sec, rolls, flat] of takp.groups) {
+    const total = Math.max(
+      100,
+      rolls.reduce((sum, [, c]) => sum + c, 0)
+    )
+    const mobs = rolls.map(([i, c]) => {
+      const [name, , lo, hi] = takp.npcs[i]
+      // A named: a rare of the zone, or what alone holds a spot on a long timer.
+      const named = rareKeys.has(key(name)) || (sec >= NAMED_SEC && rolls.length === 1)
+      // How many of its levels are under the level wanted: all of a 35 to 37's, one in three of a 39 to 41's.
+      const low = Math.max(0, Math.min(hi, under - 1) - lo + 1) / (hi - lo + 1)
+      return { name, lo, hi, chance: (c * 100) / total, named, low }
+    })
+    // How much of the time the spot holds something worth a spell, and something of the levels wanted.
+    const real = mobs.filter((m) => m.hi >= SMALL_FRY)
+    const worth = real.reduce((sum, m) => sum + m.chance, 0) / 100
+    const wanted = real.reduce((sum, m) => sum + m.chance * m.low, 0) / 100
+    const kind = worth < 0.5 ? 'small' : wanted >= worth / 2 ? 'want' : 'over'
+    const avoid = mobs.some((m) => (conf.avoid ?? []).some((a) => key(a) === key(m.name)))
+    for (let p = 0; p + 2 < flat.length; p += 3) {
+      const cell = grid.open([flat[p], flat[p + 1], flat[p + 2]])
+      if (cell >= 0) points.push({ at: [flat[p], flat[p + 1], flat[p + 2]], eye: grid.at(cell), sec, mobs, kind, avoid })
+    }
+  }
+  // Every other open cell each way with room around it, and what it sees.
+  const [gx, gy] = grid.n
+  const seats = []
+  for (let i = 0; i < grid.cells.length; i++) {
+    const c = grid.cells[i]
+    if (grid.near[i] < 1 || (c % gx) % 2 || (Math.floor(c / gx) % gy) % 2 || Math.floor(c / (gx * gy)) % 2) continue
+    const at = grid.at(c)
+    const sees = []
+    for (let p = 0; p < points.length; p++) {
+      const e = points[p].eye
+      const dist = Math.hypot(e[0] - at[0], e[1] - at[1], e[2] - at[2])
+      if (dist <= SIGHT && grid.clear(at, e, 0)) sees.push([p, dist])
+    }
+    const of = (kind) => sees.filter(([p]) => points[p].kind === kind)
+    const want = of('want')
+    const over = of('over')
+    if (want.length + over.length < CAMP_SPOTS || sees.some(([p]) => points[p].avoid)) continue
+    const real = [...want, ...over]
+    seats.push({ cell: c, at, sees, want: want.length, over: over.length, mean: real.reduce((sum, [, d]) => sum + d, 0) / real.length })
+  }
+  // The best first. Places with enough spots of the levels wanted come before any other: among them the
+  // more of those and the fewer above them the better, then the nearer. A seat that sees mostly what a
+  // kept one sees is the same room.
+  const camps = []
+  const keep = (list, kinds) => {
+    for (const seat of list) {
+      if (camps.length >= CAMPS) break
+      const mine = seat.sees.filter(([p]) => kinds.includes(points[p].kind)).map(([p]) => p)
+      if (camps.some((k) => mine.filter((p) => k.set.has(p)).length * 2 >= mine.length)) continue
+      camps.push({ ...seat, set: new Set(seat.sees.filter(([p]) => points[p].kind !== 'small').map(([p]) => p)) })
+    }
+  }
+  keep(
+    seats.filter((s) => s.want >= CAMP_SPOTS).sort((a, b) => b.want - b.over - (a.want - a.over) || b.want - a.want || a.mean - b.mean),
+    ['want']
+  )
+  const low = camps.length
+  keep(
+    seats.sort((a, b) => b.want + b.over - (a.want + a.over) || a.over - b.over || a.mean - b.mean),
+    ['want', 'over']
+  )
+  const outCamps = camps.map((k, n) => {
+    const pts = grid.path(startSpread.prev, k.cell)
+    const byName = new Map()
+    for (const [p] of k.sees)
+      for (const m of points[p].mobs) {
+        const had = byName.get(key(m.name))
+        byName.set(key(m.name), {
+          name: m.name,
+          lo: Math.min(m.lo, had?.lo ?? m.lo),
+          hi: Math.max(m.hi, had?.hi ?? m.hi),
+          spots: (had?.spots ?? 0) + 1,
+          chance: Math.max(Math.round(m.chance), had?.chance ?? 0),
+          ...(m.named ? { named: true } : {}),
+          ...(m.hi < SMALL_FRY ? { small: true } : {})
+        })
+      }
+    const of = (kind) => k.sees.filter(([p]) => points[p].kind === kind)
+    const flat = (list) => list.map(([p, d]) => [...points[p].at, round(d)])
+    const real = [...of('want'), ...of('over')]
+    const secs = real.map(([p]) => points[p].sec).sort((a, b) => a - b)
+    const camp = {
+      at: k.at.map(round),
+      spots: flat(of('want')),
+      ...(k.over ? { over: flat(of('over')) } : {}),
+      ...(of('small').length ? { small: flat(of('small')) } : {}),
+      close: real.filter(([, d]) => d <= AGGRO).length,
+      mobs: [...byName.values()].sort((a, b) => Number(!!a.small) - Number(!!b.small) || a.lo - b.lo || a.hi - b.hi || a.name.localeCompare(b.name)),
+      respawn: secs[secs.length >> 1],
+      way: pts.flat().map(round),
+      length: round(length(pts))
+    }
+    console.log(
+      `  sit ${n < low ? 'low ' : 'high'} @ ${camp.at.join(', ')}: ${k.want} spots under ${under}, ${k.over} over (${camp.close} close, ${of('small').length} small fry), ${round(k.mean)} away on average, ${camp.length} from the zone-in · ${camp.mobs.map((m) => `${m.name}${m.named ? '*' : ''} ${m.lo}-${m.hi} ×${m.spots} ${m.chance}%`).join(', ')}`
+    )
+    return camp
+  })
   // How far each stop is from each other and from the start (row and column 0), in the order above: what is left can be ordered again as a run goes.
   const seq = [0, ...ordered]
   zones[short] = {
@@ -560,6 +688,8 @@ for (const [short, conf] of Object.entries(ZONES)) {
     start: start.map(round),
     floors: conf.floors.map(([name, from]) => ({ name, from })),
     stops: outStops,
+    ...(conf.sitUnder ? { sitUnder: conf.sitUnder } : {}),
+    camps: outCamps,
     dist: seq.map((i) => seq.map((j) => (i === j || j === 0 ? 0 : round(d[i][j]))))
   }
 }

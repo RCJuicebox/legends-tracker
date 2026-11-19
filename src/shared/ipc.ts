@@ -517,8 +517,8 @@ export interface Invokes {
   'sky:turnIns': (character: string, quest: string, hand: number) => SkyState
   /** Motes › Crawl route: a zone's Dungeon Crawl route with its map and the run in hand; with no zone, the one being played in or the first that has a route. */
   'crawl:route': (zone?: string) => CrawlData
-  /** Draws a zone's route on the game's map (a layer of its own in the LegendsTracker map set), or takes it off. */
-  'crawl:mark': (zone: string, on: boolean) => { folder: string; lines: number }
+  /** Draws a zone's route on the game's map (a layer of its own in the LegendsTracker map set), or its places to sit (another layer), or takes them off. */
+  'crawl:mark': (zone: string, on: boolean, what?: 'route' | 'camps') => { folder: string; lines: number }
   /** What Goals › Epics shows for a character: the epic pieces its logs and inventory export count, the steps ticked off and its corrections. */
   'epics:state': (character: string) => EpicState
   /** Ticks a step off by hand (by its tick key, "class|step"), or unticks it; the state after. */

@@ -91,7 +91,7 @@ describe('a crawl run followed from the log', () => {
     expect(data.zones).toContain('Kedge Keep')
     expect(data.route?.name).toBe('Kedge Keep')
     expect(data.lines).toEqual([0, 0, 300, 10, 0, 300, 0, 0, -80, 10, 0, -80])
-    expect(data).toMatchObject({ marked: false, here: true, run: { instance: 'Kedge Keep 4 (Refined)' } })
+    expect(data).toMatchObject({ marked: false, campsMarked: false, here: true, run: { instance: 'Kedge Keep 4 (Refined)' } })
     // A zone with no route asked for: the one being played in.
     expect((await call<CrawlData>('crawl:route', 'Befallen')).route?.name).toBe('Kedge Keep')
   })
@@ -114,6 +114,22 @@ describe('the route on the game’s map', () => {
     expect(existsSync(join(set, 'kedge_2.txt'))).toBe(false)
     expect((await call<CrawlData>('crawl:route', 'Kedge Keep')).marked).toBe(false)
     await expect(call('crawl:mark', 'Befallen', true)).rejects.toThrow('No route')
+  })
+
+  it('puts the places to sit on a layer of their own, apart from the route', async () => {
+    const set = join(game, 'maps', 'LegendsTracker')
+    await call('crawl:mark', 'Kedge Keep', true, 'camps')
+    const layer = readFileSync(join(set, 'kedge_3.txt'), 'latin1')
+    expect(layer).toMatch(/^P 0\.0000, 0\.0000, -9000\.0000, 0, 0, 0, 1, LegendsTracker_places_to_sit\r\nL /)
+    expect(layer).toMatch(/\r\nP [-\d.]+, [-\d.]+, [-\d.]+, \d+, \d+, \d+, 3, Sit_A_\d+_spots_levels_28-36\r\n/)
+    expect(existsSync(join(set, 'kedge_2.txt'))).toBe(false)
+    expect(await call<CrawlData>('crawl:route', 'Kedge Keep')).toMatchObject({ marked: false, campsMarked: true })
+    await call('crawl:mark', 'Kedge Keep', true)
+    expect(await call<CrawlData>('crawl:route', 'Kedge Keep')).toMatchObject({ marked: true, campsMarked: true })
+    await call('crawl:mark', 'Kedge Keep', false, 'camps')
+    expect(existsSync(join(set, 'kedge_3.txt'))).toBe(false)
+    expect(await call<CrawlData>('crawl:route', 'Kedge Keep')).toMatchObject({ marked: true, campsMarked: false })
+    await call('crawl:mark', 'Kedge Keep', false, 'route')
   })
 
   it('keeps a layer the game has of its own under the route, and gives it back', async () => {

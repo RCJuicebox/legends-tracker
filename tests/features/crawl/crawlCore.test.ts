@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import ROUTES from '../../../src/shared/game/crawlRoutes.json'
 import {
+  campIsLow,
+  campLetter,
+  campLevels,
+  campMarks,
+  campSpots,
   crawlView,
   floorOf,
   isInstance,
@@ -14,6 +19,8 @@ import {
   routeOf,
   slainMob,
   stopStates,
+  wayFloors,
+  type CrawlCamp,
   type CrawlRoute,
   type CrawlRoutes,
   type CrawlRun
@@ -214,5 +221,97 @@ describe('the shipped routes', () => {
       'Undertow'
     ])
       expect(names).toContain(n)
+  })
+})
+
+describe('a place to sit', () => {
+  const mob = (name: string, lo: number, hi: number, more: Partial<CrawlCamp['mobs'][number]> = {}) => ({ name, lo, hi, spots: 1, chance: 100, ...more })
+  const low: CrawlCamp = {
+    at: [10, 0, 300],
+    spots: [
+      [20, 0, 300, 10],
+      [30, 0, 300, 20],
+      [40, 0, 300, 30],
+      [90, 0, 300, 80]
+    ],
+    small: [[10, 10, 300, 10]],
+    close: 3,
+    mobs: [mob('a lancer swordfish', 28, 32, { spots: 4 }), mob('a fierce impaler', 42, 42, { chance: 25, named: true }), mob('a cobalt sailfin', 1, 1, { small: true })],
+    respawn: 1200,
+    way: [0, 0, 300, 10, 0, 300],
+    length: 10
+  }
+  const high: CrawlCamp = {
+    at: [10, 40, -80],
+    spots: [[10, 50, -80, 10]],
+    over: [
+      [10, 60, -80, 20],
+      [10, 70, -80, 30],
+      [10, 80, -80, 40]
+    ],
+    close: 4,
+    mobs: [mob('a stingtooth piranha', 35, 37), mob('a swirlspine seahorse', 49, 51, { spots: 3 })],
+    respawn: 1080,
+    way: [0, 0, 300, 10, 0, 300, 10, 0, 50, 10, 40, -80],
+    length: 396
+  }
+  const withCamps: CrawlRoute = { ...route, camps: [low, high], sitUnder: 40 }
+
+  it('counts its spots, and is of the levels wanted when few of them hold mobs above those', () => {
+    expect(campSpots(low)).toBe(4)
+    expect(campSpots(high)).toBe(4)
+    expect(campIsLow(low)).toBe(true)
+    expect(campIsLow(high)).toBe(false)
+    // One spot above the levels among four under them is still a place of those levels.
+    expect(campIsLow({ ...low, over: [[0, 0, 300, 10]] })).toBe(true)
+    expect(campIsLow({ ...low, over: [[0, 0, 300, 10]], spots: low.spots.slice(0, 3) })).toBe(false)
+  })
+
+  it('gives its levels without small fry and a named seldom up, and its letter', () => {
+    expect(campLevels(low)).toEqual([28, 32])
+    expect(campLevels(high)).toEqual([35, 51])
+    // A place of named alone still has levels.
+    expect(campLevels({ ...low, mobs: [mob('Undertow', 49, 49, { chance: 20, named: true })] })).toEqual([49, 49])
+    expect([0, 1, 7].map(campLetter)).toEqual(['A', 'B', 'H'])
+    expect(wayFloors(withCamps, high.way)).toEqual([0, 1, 2])
+  })
+
+  it('becomes the ways and lettered labels for a layer of the game’s map', () => {
+    const marks = campMarks(withCamps)
+    // The piece both ways share is drawn once.
+    expect(marks.filter((m) => m.startsWith('L '))).toHaveLength(3)
+    expect(marks).toContain('L 0.0000, 0.0000, 300.0000, 10.0000, 0.0000, 300.0000, 255, 90, 90')
+    expect(marks).toContain('P 10.0000, 0.0000, 300.0000, 255, 90, 90, 3, Sit_A_4_spots_levels_28-32')
+    expect(marks.at(-1)).toBe('P 10.0000, 40.0000, -80.0000, 235, 215, 40, 3, Sit_B_4_spots_levels_35-51')
+    expect(campMarks(route)).toEqual([])
+  })
+})
+
+describe('the shipped places to sit', () => {
+  const routes = ROUTES.zones as unknown as CrawlRoutes
+  it.each(Object.entries(routes).filter(([, r]) => r.camps?.length))(
+    '%s: each sees four spots or more within a spell’s reach, and its way runs from the zone-in to it',
+    (_short, r) => {
+      const camps = r.camps!
+      for (const c of camps) {
+        expect(campSpots(c)).toBeGreaterThanOrEqual(4)
+        for (const s of [...c.spots, ...(c.over ?? []), ...(c.small ?? [])]) expect(s[3]).toBeLessThanOrEqual(200)
+        expect(c.close).toBeLessThanOrEqual(campSpots(c))
+        expect(c.mobs.some((m) => !m.small)).toBe(true)
+        expect(Math.hypot(c.way[0] - r.start[0], c.way[1] - r.start[1], c.way[2] - r.start[2])).toBeLessThan(30)
+        expect(Math.hypot(c.way.at(-3)! - c.at[0], c.way.at(-2)! - c.at[1], c.way.at(-1)! - c.at[2])).toBeLessThan(30)
+      }
+      // Those of the levels wanted come first.
+      const lows = camps.map(campIsLow)
+      expect(lows.indexOf(false) < 0 || !lows.slice(lows.indexOf(false)).includes(true)).toBe(true)
+    }
+  )
+
+  it('Kedge Keep’s start with the zone-in’s swordfish, under level 40, and none sees Phinigel Autropos', () => {
+    const k = routes['kedge']
+    expect(k.sitUnder).toBe(40)
+    expect(campIsLow(k.camps![0])).toBe(true)
+    expect(k.camps![0].mobs[0]).toMatchObject({ name: 'a lancer swordfish', lo: 28, hi: 32 })
+    expect(k.camps!.flatMap((c) => c.mobs.map((m) => m.name))).not.toContain('Phinigel Autropos')
   })
 })
