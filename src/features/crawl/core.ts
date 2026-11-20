@@ -200,20 +200,72 @@ export const FLOOR_COLORS: readonly (readonly [number, number, number])[] = [
 
 export const floorColor = (floor: number) => FLOOR_COLORS[Math.min(floor, FLOOR_COLORS.length - 1)]
 
+/** A climb or a drop of the route this tall is called out on the game's map: under it, the route stays inside a tight height filter. */
+const CLIMB = 24
+
+/** Where the route leaves the height it is at, to go up or down. */
+export interface Climb {
+  /** Where it starts, at the height the player is still at: where the route's line ends under a height filter. */
+  at: Point
+  up: boolean
+  /** The stop it starts at (from 0), when it starts where that stop's label is. */
+  from?: number
+}
+
+/**
+ * The route's climbs and drops: each run of a leg's pieces rising (or falling) at least half as fast as
+ * they go along, when the run is CLIMB tall or more. With the game's map filtered by height the route's
+ * line stops at each of them, and nothing else says which way it went.
+ */
+export function routeClimbs(route: CrawlRoute): Climb[] {
+  const out: Climb[] = []
+  route.stops.forEach((s, stop) => {
+    let at: Point | null = null
+    let rise = 0
+    let first = false
+    const close = () => {
+      if (at && Math.abs(rise) >= CLIMB) out.push({ at, up: rise > 0, ...(first && stop > 0 ? { from: stop - 1 } : {}) })
+      at = null
+      rise = 0
+    }
+    for (let i = 0; i + 5 < s.leg.length; i += 3) {
+      const dz = s.leg[i + 5] - s.leg[i + 2]
+      const steep = dz !== 0 && Math.abs(dz) * 2 >= Math.hypot(s.leg[i + 3] - s.leg[i], s.leg[i + 4] - s.leg[i + 1])
+      if (!steep || dz > 0 !== rise > 0) close()
+      if (!steep) continue
+      if (!at) {
+        at = [s.leg[i], s.leg[i + 1], s.leg[i + 2]]
+        first = i === 0
+      }
+      rise += dz
+    }
+    close()
+  })
+  return out
+}
+
 /**
  * The route as lines for one of the game's map layers: the way in each floor's colour, then a label at
- * each stop with its number and what pops there ("3_Cauldronbubble"). The game's map files take
- * "L x1, y1, z1, x2, y2, z2, r, g, b" and "P x, y, z, r, g, b, size, text", a label's spaces as underscores.
+ * each stop with its number and what pops there ("3_Cauldronbubble"), then "up" or "down" where the way
+ * climbs or drops (on the stop's own label when it does so from a stop: "3_Cauldronbubble_then_up").
+ * The game's map files take "L x1, y1, z1, x2, y2, z2, r, g, b" and "P x, y, z, r, g, b, size, text", a
+ * label's spaces as underscores.
  */
 export function routeMarks(route: CrawlRoute): string[] {
   const n = (v: number) => v.toFixed(4)
+  const way = (c: Climb) => (c.up ? 'up' : 'down')
+  const climbs = routeClimbs(route)
   const lines = legPieces(route).map((p) => `L ${[...p.from, ...p.to].map(n).join(', ')}, ${floorColor(p.floor).join(', ')}`)
   const labels = route.stops.map((s, i) => {
     const names = s.rares.filter((r) => !r.far).map((r) => r.name.replace(/^an? /, ''))
-    const text = `${i + 1}_${names.slice(0, 2).join('/')}${names.length > 2 ? `_+${names.length - 2}` : ''}`.replace(/[\s,]+/g, '_').replace(/[^\x20-\x7e]/g, '')
+    const then = climbs.find((c) => c.from === i)
+    const text = `${i + 1}_${names.slice(0, 2).join('/')}${names.length > 2 ? `_+${names.length - 2}` : ''}${then ? `_then_${way(then)}` : ''}`
+      .replace(/[\s,]+/g, '_')
+      .replace(/[^\x20-\x7e]/g, '')
     return `P ${s.at.map(n).join(', ')}, ${floorColor(floorOf(route, s.at[2])).join(', ')}, 3, ${text}`
   })
-  return [...lines, ...labels]
+  const turns = climbs.filter((c) => c.from === undefined).map((c) => `P ${c.at.map(n).join(', ')}, ${floorColor(floorOf(route, c.at[2])).join(', ')}, 2, ${way(c)}`)
+  return [...lines, ...labels, ...turns]
 }
 
 /** A place to sit's letter, as the page and the game's map both name it: A for the first. */

@@ -25,7 +25,8 @@ const TAKP = JSON.parse(readFileSync(new URL('../src/shared/game/takpSpawns.json
  * the game's map the run starts by. `floors`: the zone's depths top first, each from the height it
  * starts at (the last has no bottom), cut where the game's map has no lines between two levels.
  * `avoid`: mobs no place to sit may have in sight (a raid boss the nearest-mob key would pick).
- * `sitUnder`: places to sit whose mobs are under this level come first (the player's ask, 2026-11-19).
+ * `sitUnder`: places to sit whose mobs are under this level come first (the player's ask, 2026-11-19: 40 at
+ * first, then 50 once mobs in their forties proved no trouble).
  */
 const ZONES = {
   kedge: {
@@ -39,7 +40,7 @@ const ZONES = {
       ['Bottom', null]
     ],
     avoid: ['Phinigel Autropos'],
-    sitUnder: 40,
+    sitUnder: 50,
     also: [
       { name: 'a golden haired mermaid', why: 'con' },
       { name: 'Auraline', why: 'con' },
@@ -72,7 +73,7 @@ const AGGRO = 70
 /** A spot on a timer this long is a named's or a boss's. */
 const NAMED_SEC = 3600
 /** The most places kept for a zone. */
-const CAMPS = 8
+const CAMPS = 12
 
 const game = process.argv[2]
 if (!game) throw new Error('Give the EverQuest Legends folder: node scripts/crawl-routes.mjs "<folder>"')

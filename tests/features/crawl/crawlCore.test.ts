@@ -15,6 +15,7 @@ import {
   parseMapLines,
   rareCon,
   readRunLine,
+  routeClimbs,
   routeMarks,
   routeOf,
   slainMob,
@@ -112,9 +113,31 @@ describe('a crawl route', () => {
     expect(marks[0]).toBe('L 0.0000, 0.0000, 300.0000, 10.0000, 0.0000, 300.0000, 255, 90, 90')
     expect(marks[2]).toMatch(/^L 10\.0000, 0\.0000, 210\.0000, 10\.0000, 0\.0000, 50\.0000, 255, 165, 30$/)
     // A label: the stop's number and its own rares, the long-odds ones left out, no article, no spaces.
-    expect(marks[5]).toBe('P 10.0000, 0.0000, 300.0000, 255, 90, 90, 3, 1_fierce_impaler')
-    expect(marks[6]).toBe('P 10.0000, 0.0000, 50.0000, 255, 165, 30, 3, 2_Coralyn_Kelpmaiden')
+    // A stop the way drops (or climbs) from says so: a height filter hides the line from there.
+    expect(marks[5]).toBe('P 10.0000, 0.0000, 300.0000, 255, 90, 90, 3, 1_fierce_impaler_then_down')
+    expect(marks[6]).toBe('P 10.0000, 0.0000, 50.0000, 255, 165, 30, 3, 2_Coralyn_Kelpmaiden_then_down')
     expect(marks[7]).toMatch(/3_Undertow\/tainted_seahorse$/)
+  })
+
+  it('says up or down where the way climbs or drops between stops', () => {
+    // Along, a shaft down in two pieces, along, a short step up (too small to say), a slope too gentle to say, then up.
+    const leg = [0, 0, 300, 40, 0, 300, 40, 0, 250, 44, 0, 100, 90, 0, 100, 90, 0, 116, 150, 0, 130, 150, 4, 190]
+    const hilly: CrawlRoute = { ...route, stops: [{ ...route.stops[0], leg }] }
+    expect(routeClimbs(hilly)).toEqual([
+      { at: [40, 0, 300], up: false },
+      { at: [150, 0, 130], up: true }
+    ])
+    expect(routeMarks(hilly).slice(-3)).toEqual([
+      'P 10.0000, 0.0000, 300.0000, 255, 90, 90, 3, 1_fierce_impaler',
+      'P 40.0000, 0.0000, 300.0000, 255, 90, 90, 2, down',
+      'P 150.0000, 0.0000, 130.0000, 255, 165, 30, 2, up'
+    ])
+    // The first leg starts at the zone-in, which has no label of its own to say it on.
+    expect(routeClimbs({ ...route, stops: [{ ...route.stops[0], leg: [0, 0, 300, 0, 0, 200] }] })).toEqual([{ at: [0, 0, 300], up: false }])
+    expect(routeClimbs(route)).toEqual([
+      { at: [10, 0, 300], up: false, from: 0 },
+      { at: [10, 0, 50], up: false, from: 1 }
+    ])
   })
 
   it('reads the game’s map lines with their heights', () => {
@@ -307,9 +330,9 @@ describe('the shipped places to sit', () => {
     }
   )
 
-  it('Kedge Keep’s start with the zone-in’s swordfish, under level 40, and none sees Phinigel Autropos', () => {
+  it('Kedge Keep’s start with the zone-in’s swordfish, under level 50, and none sees Phinigel Autropos', () => {
     const k = routes['kedge']
-    expect(k.sitUnder).toBe(40)
+    expect(k.sitUnder).toBe(50)
     expect(campIsLow(k.camps![0])).toBe(true)
     expect(k.camps![0].mobs[0]).toMatchObject({ name: 'a lancer swordfish', lo: 28, hi: 32 })
     expect(k.camps!.flatMap((c) => c.mobs.map((m) => m.name))).not.toContain('Phinigel Autropos')

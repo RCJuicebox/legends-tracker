@@ -108,7 +108,10 @@ describe('the route on the game’s map', () => {
     expect(existsSync(join(game, 'maps', 'kedge_2.txt'))).toBe(false)
     const layer = readFileSync(join(set, 'kedge_2.txt'), 'latin1')
     expect(layer).toMatch(/^P 0\.0000, 0\.0000, -9000\.0000, 0, 0, 0, 1, LegendsTracker_crawl_route\r\nL /)
-    expect(layer).toMatch(/\r\nP [-\d.]+, [-\d.]+, [-\d.]+, \d+, \d+, \d+, 3, 1_fierce_impaler\r\n/)
+    expect(layer).toMatch(/\r\nP [-\d.]+, [-\d.]+, [-\d.]+, \d+, \d+, \d+, 3, 1_fierce_impaler_then_down\r\n/)
+    // Where the way climbs or drops between stops, a small label says which.
+    expect(layer).toMatch(/\r\nP [-\d.]+, [-\d.]+, [-\d.]+, \d+, \d+, \d+, 2, up\r\n/)
+    expect(layer).toMatch(/\r\nP [-\d.]+, [-\d.]+, [-\d.]+, \d+, \d+, \d+, 2, down\r\n/)
     expect((await call<CrawlData>('crawl:route', 'Kedge Keep')).marked).toBe(true)
     await call('crawl:mark', 'Kedge Keep', false)
     expect(existsSync(join(set, 'kedge_2.txt'))).toBe(false)

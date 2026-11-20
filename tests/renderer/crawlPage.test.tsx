@@ -128,13 +128,13 @@ it('shows the places to sit on a view of their own: those under the level wanted
   await act(async () => button(host, 'Places to sit').click())
   const camps = route.camps!
   const text = seen(host)
-  expect(text).toContain(`${camps.length} places with four or more spawn spots in sight, 2 of them of mobs under level 40`)
+  expect(text).toContain(`${camps.length} places with four or more spawn spots in sight, 8 of them of mobs under level 50`)
   expect(text).toContain('7 spawn spots in sight')
   expect(text).toContain('lancer swordfish 28–32')
   expect(text).toContain('levels 28–36')
   expect(text).toContain('All of the 7 within 70: they come at you as they pop')
   expect(text).toContain('respawn about 20 min')
-  expect(text).toContain('Level 40 and over')
+  expect(text).toContain('Level 50 and over')
   // The route's stops give way to the places, lettered; the first is picked, with a line to each spot it sees.
   expect(host.querySelectorAll('.cr-map-stop:not(.cr-map-camp)')).toHaveLength(0)
   expect(host.querySelectorAll('.cr-map-camp')).toHaveLength(camps.length)
