@@ -45,14 +45,15 @@ function icoFromPng(pngPath: string): Buffer {
 /**
  * From source only: a Start Menu shortcut, "Legends Tracker (source)", that starts this checkout
  * and carries its AppUserModelID and the hourglass, so the taskbar shows the hourglass rather than
- * Electron's icon. Kept up to date on each start; a test run on a scratch profile leaves it alone.
+ * Electron's icon; Electron's own shortcut for toasts is given the same. Kept up to date on each
+ * start; a test run on a scratch profile leaves them alone.
  */
 export function ensureSourceShortcut(iconPng: string): void {
   if (app.isPackaged || process.platform !== 'win32' || process.env['EQL_USER_DATA']) return
   try {
     const ico = join(app.getPath('userData'), 'app-icon.ico')
     if (!existsSync(ico) || statSync(ico).mtimeMs < statSync(iconPng).mtimeMs) writeFileSync(ico, icoFromPng(iconPng))
-    const lnk = join(app.getPath('appData'), 'Microsoft', 'Windows', 'Start Menu', 'Programs', 'Legends Tracker (source).lnk')
+    const programs = join(app.getPath('appData'), 'Microsoft', 'Windows', 'Start Menu', 'Programs')
     const want = {
       target: process.execPath,
       args: `"${app.getAppPath()}"`,
@@ -62,14 +63,26 @@ export function ensureSourceShortcut(iconPng: string): void {
       iconIndex: 0,
       appUserModelId: appUserModelId()
     }
-    let have: Electron.ShortcutDetails | null = null
-    try {
-      have = existsSync(lnk) ? shell.readShortcutLink(lnk) : null
-    } catch {
-      have = null
+    // Electron keeps a shortcut of its own for toasts: the first one shown from source makes
+    // "Electron.lnk" beside ours, with this AppUserModelID and electron.exe's own icon, and Windows may
+    // draw the taskbar button from either (it showed Electron's icon after a Hunter toast, 2026-11-18).
+    // Electron leaves one it finds alone (tried 2026-11-20), so both are kept alike; Electron's keeps
+    // what else it holds (its toast activator), and one that is another program's is not touched.
+    for (const [name, electrons] of [
+      ['Legends Tracker (source).lnk', false],
+      ['Electron.lnk', true]
+    ] as const) {
+      const lnk = join(programs, name)
+      let have: Electron.ShortcutDetails | null = null
+      try {
+        have = existsSync(lnk) ? shell.readShortcutLink(lnk) : null
+      } catch {
+        have = null
+      }
+      if (electrons && have && have.appUserModelId !== want.appUserModelId) continue
+      const same = have && have.target === want.target && have.args === want.args && have.icon === want.icon && have.appUserModelId === want.appUserModelId
+      if (!same && !shell.writeShortcutLink(lnk, !have ? 'create' : electrons ? 'update' : 'replace', want)) log.warn(`Could not write the Start Menu shortcut ${lnk}`)
     }
-    const same = have && have.target === want.target && have.args === want.args && have.icon === want.icon && have.appUserModelId === want.appUserModelId
-    if (!same && !shell.writeShortcutLink(lnk, have ? 'replace' : 'create', want)) log.warn(`Could not write the Start Menu shortcut ${lnk}`)
   } catch (e) {
     log.warn('Could not set up the Start Menu shortcut for the taskbar icon:', e)
   }
