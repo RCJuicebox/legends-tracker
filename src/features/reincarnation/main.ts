@@ -151,7 +151,7 @@ export class ReincarnationTracker implements AppFeature {
     })
     // The classes played now: whether each is at the cap is kept, so it is still known once swapped out.
     const reincs = [...seen, ...kept.done]
-    const levels = levelsSeen(kept.levels, reincs, classes, Date.now())
+    const levels = levelsSeen(kept.levels, reincs, classes, record?.whoAt, Date.now())
     if (levels) this.keep(character, (kept = { ...kept, levels }))
     return {
       character,

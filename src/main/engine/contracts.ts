@@ -1,7 +1,7 @@
 import type { MoteState } from '../../core/motes'
 import type { RespawnRecords, RespawnView } from '../../core/respawns'
 import type { PetGearReading } from '../../core/pets'
-import type { SelfWho } from '../../core/selfWho'
+import type { IllusionSeen, SelfWho } from '../../core/selfWho'
 import type { BuffsFile } from '../../core/buffs'
 import type { Cell } from '../../core/moteStock'
 import type { MoteScanJob, MoteScanResult } from '../moteHistory'
@@ -15,6 +15,8 @@ import type { AudioCommand, LootView, MoteScan, MoteView, PushChannel, Pushes } 
 export interface EngineOutputs {
   /** A /who line about the character being played, typed now (not read back from the log): its race and classes, for the character record. */
   selfSeen?: (who: SelfWho) => void
+  /** An illusion landing on the character being played, or fading (race ''): the record keeps it, so /who's race is read right. */
+  illusion?: (seen: IllusionSeen) => void
   timers: (views: TimerView[]) => void
   alert: (payload: { text: string; color: string; durationSec: number }) => void
   audio: (payload: AudioCommand) => void

@@ -2,7 +2,7 @@ import type { UpdateState } from '../shared/runtime'
 import type { EngineOutputs } from './engine/contracts'
 import type { Pushes, PushChannel } from '../shared/ipc'
 import type { CharacterSettings, WatchStatus } from '../shared/types'
-import type { SelfWho } from '../core/selfWho'
+import type { IllusionSeen, SelfWho } from '../core/selfWho'
 import { describeClasses, recordFromWho } from '../core/selfWho'
 import { respawnChanges } from '../core/respawns'
 import { sources } from './sources/registry'
@@ -163,10 +163,23 @@ export function engineOutputs(d: OutputDeps): EngineOutputs {
       const next = rec ? recordFromWho(rec, who) : null
       if (!key || !rec || !next) return
       if (next.race !== rec.race) log.info(`Race for ${key}: ${rec.race || 'none'} → ${next.race} (from /who).`)
+      else if (rec.illusion?.race && who.race.trim().toLowerCase() === rec.illusion.race.toLowerCase() && who.race.trim().toLowerCase() !== (rec.race ?? '').toLowerCase())
+        log.info(`Race for ${key}: /who shows ${who.race}, the illusion on you; kept ${rec.race || 'none'}.`)
       const [was, now] = [describeClasses(rec.classLevels), describeClasses(next.classLevels)]
       if (was !== now) log.info(`Classes for ${key}: ${was} → ${now} (from /who).`)
       d.record.set(key, next)
-      d.reconfigure()
+      // Only the time changed: nothing the engine uses.
+      if (next.race !== rec.race || was !== now) d.reconfigure()
+      d.toMain('state:character', next)
+    },
+    // An illusion on you: kept on the record (its race, or '' once it fades), so a /who under it leaves your race alone.
+    illusion: (seen: IllusionSeen) => {
+      const key = d.characterKey()
+      const rec = key ? d.record.get(key) : null
+      if (!key || !rec || (rec.illusion && rec.illusion.at >= seen.at) || (rec.illusion?.race ?? '') === seen.race) return
+      log.info(`Illusion for ${key}: ${seen.race || 'none'}.`)
+      const next = { ...rec, illusion: seen }
+      d.record.set(key, next)
       d.toMain('state:character', next)
     }
   }

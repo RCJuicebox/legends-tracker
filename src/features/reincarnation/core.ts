@@ -463,21 +463,26 @@ export function classLevels(seen: ReincCharacter['levels'], reincs: readonly Pic
 
 /**
  * The levels kept, after the classes played now (the character record, from /who); null when they
- * change nothing. A class reincarnated since it was last seen is not taken as at the cap on the
- * record's word: the record may be from before the reincarnation. The player says so instead.
+ * change nothing. `whoAt` is when that /who was: one from before a class's last reincarnation says
+ * nothing of it now, nor does one older than what the player said. A record with no time (from before
+ * /who times were kept) may be from before a reincarnation, so it is not taken to say such a class is
+ * at the cap.
  */
 export function levelsSeen(
   kept: ReincCharacter['levels'],
   reincs: readonly Pick<ReincDone, 'at' | 'classes'>[],
   playing: readonly { id: ClassId; level: number }[],
-  at: number
+  whoAt: number | undefined,
+  now: number
 ): ReincCharacter['levels'] | null {
-  const now = classLevels(kept, reincs)
+  const levels = classLevels(kept, reincs)
   let next: ReincCharacter['levels'] | null = null
   for (const c of playing) {
     const capped = c.level >= LEVEL_CAP
-    if (now[c.id].capped === capped || (capped && now[c.id].from === 'reincarnated')) continue
-    next = { ...(next ?? kept), [c.id]: { capped, at, by: 'who' } }
+    if (levels[c.id].capped === capped) continue
+    const reincAt = Math.max(-1, ...reincs.filter((r) => r.classes.includes(c.id)).map((r) => r.at))
+    if (whoAt === undefined ? capped && levels[c.id].from === 'reincarnated' : whoAt < reincAt || whoAt < (kept[c.id]?.at ?? 0)) continue
+    next = { ...(next ?? kept), [c.id]: { capped, at: whoAt ?? now, by: 'who' } }
   }
   return next
 }

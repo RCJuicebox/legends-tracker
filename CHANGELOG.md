@@ -4,6 +4,10 @@ What changed in each version. The release workflow publishes a version's section
 
 ## Unreleased
 
+- **A /who under an illusion keeps your race.** /who prints the race of an illusion you wear, and the app took it as your own: an Illusion: Dark Elf made you a Dark Elf for the Factions cons and the Stats page. The app now notes an illusion landing on you (its cast, then "You feel different."), until it fades or you die, and keeps your race while /who shows the illusion's.
+
+- **A /who after a reincarnation tells the Reincarnation plan your classes are back at 50.** The app now notes when each /who of yours was, so a class seen at 50 after its reincarnation counts as levelled. Before, it waited for you to say so on Setup, since it could not tell an old 50 from a new one.
+
 - **The Reincarnation plan goes round the classes, and finishes one race at a time.** With your levelling class in every trio already at rank 3, its XP penalty is the same whichever ranks the others have, so the plan no longer takes a few classes further than the rest. Each reincarnation now takes the classes reincarnated fewest times, so every class gets rank 1 before any gets rank 2, and rank 2 before rank 3. The race stays the same until it is at rank 3, then the next race in your order starts. The levelling trio after each reincarnation levels the two classes that have waited at level 1 longest: reincarnate Monk, Ranger and Berserker as Ogre, level Ranger and Berserker; reincarnate Necromancer, Shaman and Paladin as Ogre, level Monk and Shaman; and so on.
 
 ## 2.27.0 (2026-11-18)

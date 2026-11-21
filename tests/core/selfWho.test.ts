@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { classLevelsFromWho, describeClasses, recordFromWho, type SelfWho } from '../../src/core/selfWho'
+import { IllusionWatch, classLevelsFromWho, describeClasses, recordFromWho, type SelfWho } from '../../src/core/selfWho'
 import { parseWho } from '../../src/core/buffs'
 import type { CharacterSettings } from '../../src/shared/types'
 
@@ -9,10 +9,10 @@ import type { CharacterSettings } from '../../src/shared/types'
 const rec = (classLevels: CharacterSettings['classLevels'], race = 'Iksar'): CharacterSettings => ({ level: 50, classLevels, race, focusSources: [] })
 
 /** What the engine passes on for a /who line. */
-function seen(line: string): SelfWho {
-  const p = parseWho(line, 0)
+function seen(line: string, at = 0): SelfWho {
+  const p = parseWho(line, at)
   if (!p) throw new Error(`not a /who line: ${line}`)
-  return { race: p.race, classes: p.classes, level: p.level }
+  return { race: p.race, classes: p.classes, level: p.level, at: p.at }
 }
 
 describe('Classes from your own /who', () => {
@@ -64,10 +64,73 @@ describe('The record after your own /who', () => {
     expect(recordFromWho(rec({ Wizard: 50 }, 'Gnome'), seen('[50 WIZ/MAG/ENC] Kelwyn (Elemental)'))).toEqual(rec({ Wizard: 50, Magician: 50, Enchanter: 50 }, 'Gnome'))
   })
 
+  it('keeps the race when /who shows the playable race of the illusion on you', () => {
+    const disguised = { ...rec({ Ranger: 50, Monk: 50, Wizard: 50 }, 'Ogre'), illusion: { race: 'Dark Elf', at: 1 } }
+    expect(recordFromWho(disguised, seen('[50 RNG/MNK/WIZ] Kelwyn (Dark Elf) <Test Guild> ZONE: The Lavastorm Mountains (lavastorm)'))).toBeNull()
+    // Another race than the illusion's is a real change (a reincarnation into it, say).
+    expect(recordFromWho(disguised, seen('[50 RNG/MNK/WIZ] Kelwyn (Gnome)'))?.race).toBe('Gnome')
+    // With the illusion gone, the race /who shows is taken.
+    expect(recordFromWho({ ...disguised, illusion: { race: '', at: 2 } }, seen('[50 RNG/MNK/WIZ] Kelwyn (Dark Elf)'))?.race).toBe('Dark Elf')
+  })
+
+  it('keeps the time of the latest /who, even when it changes nothing else', () => {
+    const r = rec({ Monk: 50, Bard: 42, Enchanter: 40 }, 'Wood Elf')
+    expect(recordFromWho(r, seen('[40 MNK/BRD/ENC] Kelwyn (Wood Elf)', 1000))).toEqual({ ...r, whoAt: 1000 })
+    expect(recordFromWho({ ...r, whoAt: 1000 }, seen('[40 MNK/BRD/ENC] Kelwyn (Wood Elf)', 1000))).toBeNull()
+  })
+
   it('fills a new record from the first /who', () => {
     expect(recordFromWho(rec({}, ''), seen('[17 DRU/ENC/BER] Kelwyn (Kerran)  ZONE: The Northern Plains of Karana (northkarana)'))).toEqual(
       rec({ Druid: 17, Enchanter: 17, Berserker: 17 }, 'Kerran')
     )
+  })
+})
+
+describe('Illusions from the log', () => {
+  const read = (lines: [number, string][]) => {
+    const w = new IllusionWatch()
+    return lines.map(([at, text]) => w.line(text, at)).filter((x) => x)
+  }
+
+  it('put on the race of the illusion cast, once it lands on you', () => {
+    // The player's own lines, 2026-11-20.
+    expect(
+      read([
+        [0, 'You begin casting Illusion: Dark Elf.'],
+        [2000, 'A gloomstalker mermaid begins casting Spirit of Wolf.'],
+        [5000, 'You feel different.']
+      ])
+    ).toEqual([{ race: 'Dark Elf', at: 5000 }])
+    // Cast by someone else, on you.
+    expect(
+      read([
+        [0, 'Noamuth begins casting Illusion: Dark Elf.'],
+        [6000, 'You feel different.']
+      ])
+    ).toEqual([{ race: 'Dark Elf', at: 6000 }])
+  })
+
+  it('know no race for a landing without a cast, or one long after it, or a form that is not a race', () => {
+    expect(read([[0, 'You feel different.']])).toEqual([{ race: '', at: 0 }])
+    expect(
+      read([
+        [0, 'You begin casting Illusion: Dark Elf.'],
+        [3, 'Your Illusion: Dark Elf spell is interrupted.'],
+        [60_000, 'You feel different.']
+      ])
+    ).toEqual([{ race: '', at: 60_000 }])
+    expect(
+      read([
+        [0, 'You begin casting Illusion: Skeleton.'],
+        [5000, 'You feel different.']
+      ])
+    ).toEqual([{ race: '', at: 5000 }])
+  })
+
+  it('come off when one fades or you die', () => {
+    expect(read([[0, 'Your illusion fades.']])).toEqual([{ race: '', at: 0 }])
+    expect(read([[0, 'You died.']])).toEqual([{ race: '', at: 0 }])
+    expect(read([[0, 'You have been slain by a lava elemental!']])).toEqual([{ race: '', at: 0 }])
   })
 })
 

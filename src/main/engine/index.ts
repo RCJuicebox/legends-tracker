@@ -10,6 +10,7 @@ import { TriggerEngine } from '../../core/triggers'
 import { respawnTriggerId } from '../../core/respawns'
 import { MoteTracker, fragmentChecked, fragmentName, moteName, type MoteKey } from '../../core/motes'
 import { PetGearReader, petSummonName } from '../../core/pets'
+import { IllusionWatch } from '../../core/selfWho'
 import type { BuffView } from '../../core/buffs'
 import type { MyClass } from '../../core/spellMotes'
 import { CAST_BY_YOU } from '../../core/phrases'
@@ -85,6 +86,8 @@ export class Engine {
   readonly combat: CombatFeed
   private readonly moteHistory: MoteCatchUp
   private readonly petReader: PetGearReader
+  /** Illusions landing on you and fading: /who shows their race, not yours. */
+  private readonly illusions = new IllusionWatch()
   private readonly timersOut: Throttled
   private readonly motesOut: Throttled
   /** Size and last-line time change with every write; they go out at most once a second. */
@@ -169,7 +172,7 @@ export class Engine {
           this.tracker?.setZone(p.zone)
           this.emitStatus()
         }
-        if (!this.combat.backlog.active) out.selfSeen?.({ race: p.race, classes: p.classes, level: p.level })
+        if (!this.combat.backlog.active) out.selfSeen?.({ race: p.race, classes: p.classes, level: p.level, at: p.at })
       }
     })
     this.combat = new CombatFeed(store, out, this.notifier, this.buffs, {
@@ -251,6 +254,14 @@ export class Engine {
       { id: 'spells', line: (line) => this.tracker?.handle(line) },
       { id: 'triggers', line: (line) => this.triggers.handle(line) },
       { id: 'pet', line: (line) => this.petLine(line), tick: (now) => this.petReader.tick(now) },
+      {
+        id: 'illusion',
+        line: (line) => {
+          const seen = this.simulating ? null : this.illusions.line(line.text, line.time)
+          if (seen) this.out.illusion?.(seen)
+          return !!seen
+        }
+      },
       { id: 'motes', tick: (now) => this.motes.tick(now) },
       this.moteHistory,
       this.combat,

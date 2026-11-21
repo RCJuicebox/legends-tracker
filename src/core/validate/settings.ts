@@ -176,6 +176,14 @@ export function focusSource(v: unknown): FocusSource | null {
   })
 }
 
+const isTime = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v) && v > 0
+
+/** The later of two illusions: one from a file or a page, and the one kept. */
+function newerIllusion(v: unknown, kept: CharacterSettings['illusion']): CharacterSettings['illusion'] {
+  const given = isObj(v) && typeof v.race === 'string' && isTime(v.at) ? { race: v.race.slice(0, 40), at: v.at } : undefined
+  return given && (!kept || given.at > kept.at) ? given : kept
+}
+
 export function sanitizeCharacter(v: unknown, fb: CharacterSettings): CharacterSettings | null {
   if (!isObj(v)) return null
   const classLevels: CharacterSettings['classLevels'] = {}
@@ -190,6 +198,9 @@ export function sanitizeCharacter(v: unknown, fb: CharacterSettings): CharacterS
     classLevels: isObj(v.classLevels) ? classLevels : fb.classLevels,
     race: typeof v.race === 'string' ? v.race.slice(0, 40) : fb.race,
     deity: typeof v.deity === 'string' ? v.deity.slice(0, 40) : fb.deity,
+    // The engine's own facts: a page saving the record from an older copy keeps the newer.
+    whoAt: Math.max(isTime(v.whoAt) ? v.whoAt : 0, fb.whoAt ?? 0) || undefined,
+    illusion: newerIllusion(v.illusion, fb.illusion),
     focusSources: Array.isArray(v.focusSources) ? v.focusSources.map(focusSource).filter((f) => f !== null) : fb.focusSources
   })
   // The old flat figures are read once and then dropped; keep them only as numbers.

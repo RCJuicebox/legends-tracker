@@ -166,7 +166,7 @@ describe('class levels', () => {
     expect(got.war).toEqual({ capped: null, from: 'none' })
   })
 
-  it('keep what /who says of the classes played, but not the cap of one reincarnated since', () => {
+  it('keep what /who says of the classes played, but not the cap of one reincarnated since, from a record with no /who time', () => {
     const seen = levelsSeen(
       {},
       [],
@@ -174,17 +174,40 @@ describe('class levels', () => {
         { id: 'mnk', level: 50 },
         { id: 'brd', level: 12 }
       ],
+      undefined,
       T
     )
     expect(seen).toEqual({ mnk: { capped: true, at: T, by: 'who' }, brd: { capped: false, at: T, by: 'who' } })
-    expect(levelsSeen(seen!, [], [{ id: 'mnk', level: 50 }], T + 5)).toBeNull()
+    expect(levelsSeen(seen!, [], [{ id: 'mnk', level: 50 }], undefined, T + 5)).toBeNull()
     // Reincarnated after it was seen: the record's 50 may be from before, and below the cap is known already.
     const since = [reinc(T + 1, ['mnk', 'brd', 'enc'])]
-    expect(levelsSeen(seen!, since, [{ id: 'mnk', level: 50 }], T + 5)).toBeNull()
-    expect(levelsSeen(seen!, since, [{ id: 'mnk', level: 3 }], T + 5)).toBeNull()
+    expect(levelsSeen(seen!, since, [{ id: 'mnk', level: 50 }], undefined, T + 5)).toBeNull()
+    expect(levelsSeen(seen!, since, [{ id: 'mnk', level: 3 }], undefined, T + 5)).toBeNull()
     // Back at the cap after the player said it is not: kept.
     const said = { ...seen!, mnk: { capped: false, at: T + 2, by: 'hand' as const } }
-    expect(levelsSeen(said, since, [{ id: 'mnk', level: 50 }], T + 5)!.mnk).toEqual({ capped: true, at: T + 5, by: 'who' })
+    expect(levelsSeen(said, since, [{ id: 'mnk', level: 50 }], undefined, T + 5)!.mnk).toEqual({ capped: true, at: T + 5, by: 'who' })
+  })
+
+  it('take a /who after a reincarnation as saying a class is back at the cap (the player, 2026-11-21)', () => {
+    // Monk and Ranger reincarnated at T + 1; Monk seen at 50 before it, and both by a /who after it.
+    const before = { mnk: { capped: true, at: T, by: 'who' as const } }
+    const since = [reinc(T + 1, ['mnk', 'rng', 'ber'])]
+    const playing = [
+      { id: 'rng' as const, level: 50 },
+      { id: 'mnk' as const, level: 50 },
+      { id: 'wiz' as const, level: 50 }
+    ]
+    expect(levelsSeen(before, since, playing, T + 10, T + 20)).toEqual({
+      mnk: { capped: true, at: T + 10, by: 'who' },
+      rng: { capped: true, at: T + 10, by: 'who' },
+      wiz: { capped: true, at: T + 10, by: 'who' }
+    })
+    // The same record, from a /who before the reincarnation: it says nothing of Monk and Ranger now.
+    expect(Object.keys(levelsSeen(before, since, playing, T - 5, T + 20)!)).toEqual(['mnk', 'wiz'])
+    expect(levelsSeen(before, since, playing, T - 5, T + 20)!.mnk).toBe(before.mnk)
+    // Nor one older than what the player said.
+    const said = { rng: { capped: false, at: T + 12, by: 'hand' as const } }
+    expect(levelsSeen(said, since, playing, T + 10, T + 20)?.rng).toBe(said.rng)
   })
 })
 

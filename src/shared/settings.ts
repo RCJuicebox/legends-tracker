@@ -44,6 +44,13 @@ export interface CharacterSettings {
   race?: string
   /** As Loadouts names it ("Agnostic", "Cazic Thule"); '' or absent when not set. /who does not show it: set on the Stats page, for faction cons. */
   deity?: string
+  /** When a /who of this character last reached the record (the line's time): what it says of the classes holds from then. */
+  whoAt?: number
+  /**
+   * The illusion on the character as the log last showed it: the race it makes them look ('' for none,
+   * or one that is not a playable race), and when. /who prints that race, so the record keeps its own.
+   */
+  illusion?: { race: string; at: number }
   focusSources: FocusSource[]
   /** Replaced by focusSources; read once to carry an old single figure over. */
   beneficialFocusPct?: number
