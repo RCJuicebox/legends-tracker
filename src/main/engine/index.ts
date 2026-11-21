@@ -172,7 +172,7 @@ export class Engine {
           this.tracker?.setZone(p.zone)
           this.emitStatus()
         }
-        if (!this.combat.backlog.active) out.selfSeen?.({ race: p.race, classes: p.classes, level: p.level, at: p.at })
+        if (!this.combat.backlog.active) out.selfSeen?.({ race: p.race, classes: p.classes, level: p.level })
       }
     })
     this.combat = new CombatFeed(store, out, this.notifier, this.buffs, {

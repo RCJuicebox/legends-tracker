@@ -14,8 +14,6 @@ export interface SelfWho {
   classes: string[]
   /** The lowest of the classes' levels. */
   level: number
-  /** The /who line's time. */
-  at: number
 }
 
 /**
@@ -44,9 +42,8 @@ export function recordFromWho(rec: CharacterSettings, who: SelfWho): CharacterSe
   const classLevels = who.classes.length ? classLevelsFromWho(rec.classLevels, who.classes, who.level) : rec.classLevels
   // Key order counts: the first class is the player's main one.
   const sameClasses = JSON.stringify(classLevels) === JSON.stringify(rec.classLevels)
-  const newer = who.at > (rec.whoAt ?? 0)
-  if (!race && sameClasses && !newer) return null
-  return { ...rec, ...(race ? { race } : {}), classLevels, ...(newer ? { whoAt: who.at } : {}) }
+  if (!race && sameClasses) return null
+  return { ...rec, ...(race ? { race } : {}), classLevels }
 }
 
 // ---- Illusions ----

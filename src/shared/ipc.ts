@@ -539,6 +539,8 @@ export interface Invokes {
   'reincarnation:anchor': (character: string, id: string) => ReincState
   /** Says the character reincarnated as this trio and race ('' when not known): a rank in each of their AAs; the state after. */
   'reincarnation:done': (character: string, classes: string[], race: string) => ReincState
+  /** A levelling trio the player has levelled: its classes, and its race unless '', at the level cap. */
+  'reincarnation:levelled': (character: string, classes: string[], race: string) => ReincState
   /** Where the character being played is in its faction plan, and its Slayer counts since its achievements export. */
   'achievements:track': (watching?: boolean) => AchievementTrack | null
   /** The player's last /loc, while they are still in its zone; null without one (FEAT-023). */
@@ -800,6 +802,7 @@ const INVOKE_CHANNELS: Record<InvokeChannel, true> = {
   'reincarnation:capped': true,
   'reincarnation:anchor': true,
   'reincarnation:done': true,
+  'reincarnation:levelled': true,
   'achievements:track': true,
   'game:location': true,
   'character:exports': true,

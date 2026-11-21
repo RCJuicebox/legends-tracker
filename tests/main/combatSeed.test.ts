@@ -255,6 +255,6 @@ describe('Your race and classes from your own /who', () => {
     expect(seen).toEqual([])
     await fs.appendFile(logFile, line(0, who('MNK/BRD/ENC', 'Wood Elf')))
     await waitFor(() => seen.length > 0)
-    expect(seen).toEqual([{ race: 'Wood Elf', classes: ['mnk', 'brd', 'enc'], level: 50, at: expect.any(Number) }])
+    expect(seen).toEqual([{ race: 'Wood Elf', classes: ['mnk', 'brd', 'enc'], level: 50 }])
   })
 })

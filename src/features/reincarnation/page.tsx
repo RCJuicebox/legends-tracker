@@ -24,7 +24,6 @@ import {
   reincarnationsLeft,
   reincClass,
   trioNotes,
-  xpPenalty,
   type ClassLevel,
   type LevelRun,
   type LineRank,
@@ -358,7 +357,7 @@ function PriorityLists({ s, onPriority }: { s: ReincState; onPriority: (list: Pr
 
 const LEVEL_FROM: Record<ClassLevel['from'], string> = {
   who: 'your /who said so while you played it',
-  hand: 'you said so',
+  hand: 'you said so, here or with Levelled on the plan',
   reincarnated: 'reincarnated since: back to level 1',
   none: 'nothing says otherwise, so the plan takes it as levelled'
 }
@@ -381,7 +380,7 @@ function Levelling({ s, onAnchor, onCapped }: { s: ReincState; onAnchor: (id: Cl
           </select>
         </label>
       </div>
-      <div className="rc-pick-head small faint">At level {LEVEL_CAP}? Every class is, unless /who, a reincarnation or you say not; click to change</div>
+      <div className="rc-pick-head small faint">At level {LEVEL_CAP}? Every class is, unless a reincarnation or you say not; click to change</div>
       <div className="rc-pick">
         {REINC_CLASSES.map((c) => {
           const l = s.levels[c.id]
@@ -399,8 +398,8 @@ function Levelling({ s, onAnchor, onCapped }: { s: ReincState; onAnchor: (id: Cl
         })}
       </div>
       <div className="small faint rc-gap">
-        Your log never says which class a level went to, so the page keeps what /who shows of the classes you play, and what you say here. A reincarnation sets its classes back to
-        level 1.
+        Your log never says which class a level went to, so the plan keeps what you tell it: a reincarnation sets its classes and race to level 1, and Levelled on the plan sets a
+        trio back to {LEVEL_CAP}. Click a class here to put it right.
       </div>
     </div>
   )
@@ -422,7 +421,7 @@ function StanceTag({ classes }: { classes: readonly ClassId[] }) {
 }
 
 /** A levelling trio: the classes that level, those along at the cap, and the penalty. */
-function RunStep({ r }: { r: LevelRun }) {
+function RunStep({ r, onLevelled }: { r: LevelRun; onLevelled?: () => void }) {
   const floor = r.penalty / XP_PENALTY_PER_RANK
   return (
     <div className="rc-step">
@@ -452,6 +451,15 @@ function RunStep({ r }: { r: LevelRun }) {
         <span className="small warn-text rc-step-note">
           {r.race}’s rank makes it +{r.penalty}%: as a race at rank {r.classPenalty / XP_PENALTY_PER_RANK} or lower it would be +{r.classPenalty}%.
         </span>
+      )}
+      {onLevelled && (
+        <ConfirmButton
+          className="btn small"
+          question={`Levelled this trio to ${LEVEL_CAP}? Its classes${r.raceLevels ? ' and race' : ''} are taken as at level ${LEVEL_CAP} until they are reincarnated.`}
+          onConfirm={onLevelled}
+        >
+          Levelled
+        </ConfirmButton>
       )}
     </div>
   )
@@ -502,7 +510,19 @@ function ReincStep({ r, n, onDone }: { r: PlannedReinc; n: number; onDone?: () =
 }
 
 /** The plan: before each reincarnation the trios to level as, then it; after the last, the levelling left. */
-function ThePlan({ s, stages, onDone, onSetup }: { s: ReincState; stages: PlanStage[]; onDone: (r: PlannedReinc) => void; onSetup: () => void }) {
+function ThePlan({
+  s,
+  stages,
+  onDone,
+  onLevelled,
+  onSetup
+}: {
+  s: ReincState
+  stages: PlanStage[]
+  onDone: (r: PlannedReinc) => void
+  onLevelled: (r: LevelRun) => void
+  onSetup: () => void
+}) {
   const reincs = stages.filter((st) => st.reinc).length
   const runs = stages.reduce((n, st) => n + st.runs.length, 0)
   let n = 0
@@ -521,8 +541,9 @@ function ThePlan({ s, stages, onDone, onSetup }: { s: ReincState; stages: PlanSt
             {num(reincs)} {reincs === 1 ? 'reincarnation' : 'reincarnations'} until every class and race is at rank 3, and {num(runs)} levelling {runs === 1 ? 'trio' : 'trios'}.
             Classes go round: each reincarnation takes the classes reincarnated fewest times, so every one gets rank 1 before any gets rank 2. A race goes again until it is at rank
             3, then the next in your order. After each, one trio as its race levels the two classes that have waited at level 1 longest. <b>Bold</b> classes level; the others are
-            at {LEVEL_CAP} already. Races take far more reincarnations than classes, so once every class is at rank 3 the plan goes on for the races, spreading the extra
-            reincarnations over the classes evenly. After the last, levelling trios bring every class back to {LEVEL_CAP}.
+            at {LEVEL_CAP} already. Click Reincarnated and Levelled on the next step as you do them: the plan keeps each class’s and race’s level from those. Races take far more
+            reincarnations than classes, so once every class is at rank 3 the plan goes on for the races, spreading the extra reincarnations over the classes evenly. After the
+            last, levelling trios bring every class back to {LEVEL_CAP}.
           </div>
           <ol className="rc-stages">
             {stages.map((st, i) => {
@@ -539,7 +560,7 @@ function ThePlan({ s, stages, onDone, onSetup }: { s: ReincState; stages: PlanSt
                       : 'After the last reincarnation'}
                   </div>
                   {st.runs.map((r, j) => (
-                    <RunStep key={j} r={r} />
+                    <RunStep key={j} r={r} onLevelled={i === 0 && j === 0 ? () => onLevelled(r) : undefined} />
                   ))}
                   {st.reinc && <ReincStep r={st.reinc} n={n} onDone={n === 1 ? () => onDone(st.reinc!) : undefined} />}
                 </li>
@@ -574,10 +595,22 @@ function Setup({
   )
 }
 
-function Planner({ s, stages, onDone, onSetup }: { s: ReincState; stages: PlanStage[]; onDone: (r: PlannedReinc) => void; onSetup: () => void }) {
+function Planner({
+  s,
+  stages,
+  onDone,
+  onLevelled,
+  onSetup
+}: {
+  s: ReincState
+  stages: PlanStage[]
+  onDone: (r: PlannedReinc) => void
+  onLevelled: (r: LevelRun) => void
+  onSetup: () => void
+}) {
   return (
     <div className="stack gap-16">
-      <ThePlan s={s} stages={stages} onDone={onDone} onSetup={onSetup} />
+      <ThePlan s={s} stages={stages} onDone={onDone} onLevelled={onLevelled} onSetup={onSetup} />
       {s.history.length > 0 && (
         <div className="card">
           <h3>Reincarnations made</h3>
@@ -596,11 +629,10 @@ function Planner({ s, stages, onDone, onSetup }: { s: ReincState; stages: PlanSt
   )
 }
 
-/** The tokens held and whether the loadout can reincarnate now. */
-function Status({ s, times, next }: { s: ReincState; times: Partial<Record<ReincKey, number>>; next: PlannedReinc | undefined }) {
-  const lo = s.loadout
-  const ready = lo.classes.length === 3 && lo.classes.every((c) => c.level >= LEVEL_CAP)
-  const isNext = !!next && lo.classes.length === 3 && lo.classes.every((c) => next.classes.includes(c.id)) && (!next.race || next.race === lo.race)
+/** The tokens held, and the plan's next step: the trio to level as now, or the reincarnation it is ready for. */
+function Status({ s, next }: { s: ReincState; next: PlanStage | undefined }) {
+  const run = next?.runs[0]
+  const names = (cs: readonly ClassId[]) => cs.map((c) => reincClass(c).name).join(' · ')
   return (
     <div className="card row mb-16 rc-status">
       <span>
@@ -615,23 +647,18 @@ function Status({ s, times, next }: { s: ReincState; times: Partial<Record<Reinc
           <span className="faint">No inventory export to count tokens from (/outputfile inventory).</span>
         )}
       </span>
-      {lo.classes.length > 0 && (
+      {run ? (
         <span>
-          Now: {lo.race || 'race not known'} · {lo.classes.map((c) => `${reincClass(c.id).name} ${c.level}`).join(' · ')}
-          {ready ? <span className="ok-text"> · ready to reincarnate</span> : <span className="faint"> · each class needs level {LEVEL_CAP}</span>}
-          {isNext && <span className="ok-text"> · your next reincarnation</span>}
+          Now: level {names(run.classes)}
+          {run.race ? ` as ${run.race}` : ''}
+          <span className="faint"> · Levelled on the plan once they are at {LEVEL_CAP}</span>
         </span>
-      )}
-      {lo.classes.length > 0 && (
-        <PenaltyTag
-          pct={xpPenalty(
-            Object.fromEntries(Object.entries(times).map(([k, n]) => [k, { rank: n ?? 0 }])) as Partial<Record<ReincKey, { rank: number }>>,
-            lo.classes.map((c) => c.id),
-            lo.race
-          )}
-          raceOpen={!lo.race}
-        />
-      )}
+      ) : next?.reinc ? (
+        <span>
+          Now: <span className="ok-text">ready to reincarnate</span> as {names(next.reinc.classes)}, {next.reinc.race}
+        </span>
+      ) : null}
+      {run && <PenaltyTag pct={run.penalty} raceOpen={!run.race} />}
     </div>
   )
 }
@@ -652,8 +679,8 @@ export function Reincarnation() {
             priority: s.priority,
             capped: Object.fromEntries(REINC_CLASSES.map((c) => [c.id, s.levels[c.id].capped])),
             anchor: s.anchor,
-            race: s.loadout.race,
-            raceCapped: s.loadout.classes.every((c) => c.level >= LEVEL_CAP),
+            race: s.race.name,
+            raceCapped: s.race.capped,
             lastRace: s.history[0]?.race ?? ''
           })
         : [],
@@ -705,7 +732,7 @@ export function Reincarnation() {
               ['plan', 'Planner']
             ]}
           />
-          <Status s={s} times={times} next={stages.find((st) => st.reinc)?.reinc ?? undefined} />
+          <Status s={s} next={stages[0]} />
           {view === 'progress' ? (
             <Progress s={s} stages={stages} onRank={(key, rank) => void save(() => api.invoke('reincarnation:rank', character, key, rank))} />
           ) : view === 'setup' ? (
@@ -716,7 +743,13 @@ export function Reincarnation() {
               onCapped={(id, capped) => void save(() => api.invoke('reincarnation:capped', character, id, capped))}
             />
           ) : (
-            <Planner s={s} stages={stages} onDone={(r) => void save(() => api.invoke('reincarnation:done', character, r.classes, r.race))} onSetup={() => setView('setup')} />
+            <Planner
+              s={s}
+              stages={stages}
+              onDone={(r) => void save(() => api.invoke('reincarnation:done', character, r.classes, r.race))}
+              onLevelled={(r) => void save(() => api.invoke('reincarnation:levelled', character, r.classes, r.raceLevels ? r.race : ''))}
+              onSetup={() => setView('setup')}
+            />
           )}
         </>
       )}

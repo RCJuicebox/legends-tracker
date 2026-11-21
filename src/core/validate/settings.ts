@@ -198,8 +198,7 @@ export function sanitizeCharacter(v: unknown, fb: CharacterSettings): CharacterS
     classLevels: isObj(v.classLevels) ? classLevels : fb.classLevels,
     race: typeof v.race === 'string' ? v.race.slice(0, 40) : fb.race,
     deity: typeof v.deity === 'string' ? v.deity.slice(0, 40) : fb.deity,
-    // The engine's own facts: a page saving the record from an older copy keeps the newer.
-    whoAt: Math.max(isTime(v.whoAt) ? v.whoAt : 0, fb.whoAt ?? 0) || undefined,
+    // The engine's own fact: a page saving the record from an older copy keeps the newer.
     illusion: newerIllusion(v.illusion, fb.illusion),
     focusSources: Array.isArray(v.focusSources) ? v.focusSources.map(focusSource).filter((f) => f !== null) : fb.focusSources
   })

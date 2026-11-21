@@ -6,7 +6,7 @@ import {
   REINC_RACES,
   classLevels,
   completionistRank,
-  levelsSeen,
+  raceAtCap,
   loggedRanks,
   loggedReincarnations,
   makePlan,
@@ -20,7 +20,6 @@ import {
   sanitizeReincCharacter,
   tokenCount,
   trioNotes,
-  xpPenalty,
   type LineRank,
   type PlanInput,
   type PriorityEntry,
@@ -144,18 +143,6 @@ describe('reincarnations left', () => {
   })
 })
 
-describe('the XP penalty', () => {
-  it('is 10% for the highest rank among the classes and race played, not their sum', () => {
-    const r = ranks({ 'class:rog': 2, 'class:shd': 2, 'class:wiz': 2, 'race:Erudite': 2, 'class:war': 1 })
-    expect(xpPenalty(r, ['rog', 'shd', 'wiz'], 'Erudite')).toBe(20)
-    // Only what is played: a fresh trio and race carry none, one reincarnated class carries its own.
-    expect(xpPenalty(r, ['mnk', 'clr', 'nec'], 'Dwarf')).toBe(0)
-    expect(xpPenalty(r, ['war', 'clr', 'nec'], 'Dwarf')).toBe(10)
-    expect(xpPenalty(r, ['war', 'clr', 'nec'], 'Erudite')).toBe(20)
-    expect(xpPenalty(r, ['war', 'clr', 'nec'], '')).toBe(10)
-  })
-})
-
 describe('class levels', () => {
   const reinc = (at: number, classes: Trio) => ({ at, classes })
 
@@ -166,48 +153,14 @@ describe('class levels', () => {
     expect(got.war).toEqual({ capped: null, from: 'none' })
   })
 
-  it('keep what /who says of the classes played, but not the cap of one reincarnated since, from a record with no /who time', () => {
-    const seen = levelsSeen(
-      {},
-      [],
-      [
-        { id: 'mnk', level: 50 },
-        { id: 'brd', level: 12 }
-      ],
-      undefined,
-      T
-    )
-    expect(seen).toEqual({ mnk: { capped: true, at: T, by: 'who' }, brd: { capped: false, at: T, by: 'who' } })
-    expect(levelsSeen(seen!, [], [{ id: 'mnk', level: 50 }], undefined, T + 5)).toBeNull()
-    // Reincarnated after it was seen: the record's 50 may be from before, and below the cap is known already.
-    const since = [reinc(T + 1, ['mnk', 'brd', 'enc'])]
-    expect(levelsSeen(seen!, since, [{ id: 'mnk', level: 50 }], undefined, T + 5)).toBeNull()
-    expect(levelsSeen(seen!, since, [{ id: 'mnk', level: 3 }], undefined, T + 5)).toBeNull()
-    // Back at the cap after the player said it is not: kept.
-    const said = { ...seen!, mnk: { capped: false, at: T + 2, by: 'hand' as const } }
-    expect(levelsSeen(said, since, [{ id: 'mnk', level: 50 }], undefined, T + 5)!.mnk).toEqual({ capped: true, at: T + 5, by: 'who' })
-  })
-
-  it('take a /who after a reincarnation as saying a class is back at the cap (the player, 2026-11-21)', () => {
-    // Monk and Ranger reincarnated at T + 1; Monk seen at 50 before it, and both by a /who after it.
-    const before = { mnk: { capped: true, at: T, by: 'who' as const } }
-    const since = [reinc(T + 1, ['mnk', 'rng', 'ber'])]
-    const playing = [
-      { id: 'rng' as const, level: 50 },
-      { id: 'mnk' as const, level: 50 },
-      { id: 'wiz' as const, level: 50 }
-    ]
-    expect(levelsSeen(before, since, playing, T + 10, T + 20)).toEqual({
-      mnk: { capped: true, at: T + 10, by: 'who' },
-      rng: { capped: true, at: T + 10, by: 'who' },
-      wiz: { capped: true, at: T + 10, by: 'who' }
-    })
-    // The same record, from a /who before the reincarnation: it says nothing of Monk and Ranger now.
-    expect(Object.keys(levelsSeen(before, since, playing, T - 5, T + 20)!)).toEqual(['mnk', 'wiz'])
-    expect(levelsSeen(before, since, playing, T - 5, T + 20)!.mnk).toBe(before.mnk)
-    // Nor one older than what the player said.
-    const said = { rng: { capped: false, at: T + 12, by: 'hand' as const } }
-    expect(levelsSeen(said, since, playing, T + 10, T + 20)?.rng).toBe(said.rng)
+  it('take a race as at the cap until a reincarnation as it, then as the player last said', () => {
+    const since = [{ at: T + 1, race: 'Ogre' }]
+    expect(raceAtCap('Ogre', {}, [])).toBe(true)
+    expect(raceAtCap('Ogre', {}, since)).toBe(false)
+    // Levelled after the reincarnation: at the cap; before it, not.
+    expect(raceAtCap('Ogre', { Ogre: { capped: true, at: T + 2 } }, since)).toBe(true)
+    expect(raceAtCap('Ogre', { Ogre: { capped: true, at: T } }, since)).toBe(false)
+    expect(raceAtCap('Gnome', {}, since)).toBe(true)
   })
 })
 
@@ -388,6 +341,7 @@ describe('what is kept', () => {
         { key: 'class:nope', rank: 1 }
       ],
       levels: { mnk: { capped: true, at: T, by: 'hand' }, nope: { capped: true, at: T, by: 'hand' }, war: { capped: 'yes', at: T, by: 'who' } },
+      races: { Ogre: { capped: true, at: T }, 'Race 18': { capped: true, at: T }, Gnome: { capped: 1, at: T } },
       anchor: 'wiz',
       done: [{ at: T, classes: ['rog', 'shd', 'wiz'], race: 'Dark Elf' }, { at: 'then' }]
     })
@@ -395,10 +349,11 @@ describe('what is kept', () => {
       hand: { 'class:rog': { rank: 2, at: T } },
       priority: want(['class:mnk', 2]),
       levels: { mnk: { capped: true, at: T, by: 'hand' } },
+      races: { Ogre: { capped: true, at: T } },
       anchor: 'wiz',
       done: [{ at: T, classes: ['rog', 'shd', 'wiz'], race: 'Dark Elf', by: 'hand' }]
     })
-    expect(sanitizeReincCharacter(null)).toEqual({ hand: {}, priority: [], levels: {}, anchor: '', done: [] })
+    expect(sanitizeReincCharacter(null)).toEqual({ hand: {}, priority: [], levels: {}, races: {}, anchor: '', done: [] })
   })
 
   it('turns the trios an older file planned into a priority list', () => {

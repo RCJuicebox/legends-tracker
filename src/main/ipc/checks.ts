@@ -183,6 +183,7 @@ export const CHECKS: { [K in InvokeChannel]: Check<Parameters<Invokes[K]>> } = {
   'reincarnation:capped': args(str, str, nullable(bool)),
   'reincarnation:anchor': args(str, str),
   'reincarnation:done': args(str, strs, str),
+  'reincarnation:levelled': args(str, strs, str),
   'achievements:track': args(opt(bool)),
   'game:location': none,
   'character:exports': none,

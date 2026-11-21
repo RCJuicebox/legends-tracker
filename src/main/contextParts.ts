@@ -168,8 +168,7 @@ export function engineOutputs(d: OutputDeps): EngineOutputs {
       const [was, now] = [describeClasses(rec.classLevels), describeClasses(next.classLevels)]
       if (was !== now) log.info(`Classes for ${key}: ${was} → ${now} (from /who).`)
       d.record.set(key, next)
-      // Only the time changed: nothing the engine uses.
-      if (next.race !== rec.race || was !== now) d.reconfigure()
+      d.reconfigure()
       d.toMain('state:character', next)
     },
     // An illusion on you: kept on the record (its race, or '' once it fades), so a /who under it leaves your race alone.

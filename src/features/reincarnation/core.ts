@@ -257,18 +257,26 @@ export interface LevelSeen {
   by: 'hand' | 'who'
 }
 
+/** A race at the level cap or not, and when the player said so (Levelled on the plan). */
+export interface RaceSeen {
+  capped: boolean
+  at: number
+}
+
 export interface ReincCharacter {
   hand: Partial<Record<ReincKey, HandRank>>
   /** The order the player wants ranks in; the plan is made from it. */
   priority: PriorityEntry[]
-  /** Each class at the cap or not, as last seen. A reincarnation after it sets the class back to level 1. */
+  /** Each class at the cap or not, as the player last said (Setup, or Levelled on the plan). A reincarnation after it sets the class back to level 1. */
   levels: Partial<Record<ClassId, LevelSeen>>
+  /** Each race at the cap or not, as the player last said (Levelled on the plan). A reincarnation as it after that sets it back to level 1. */
+  races: Partial<Record<string, RaceSeen>>
   /** The class every levelling trio keeps; '' for none. */
   anchor: ClassId | ''
   done: ReincDone[]
 }
 
-export const emptyReincCharacter = (): ReincCharacter => ({ hand: {}, priority: [], levels: {}, anchor: '', done: [] })
+export const emptyReincCharacter = (): ReincCharacter => ({ hand: {}, priority: [], levels: {}, races: {}, anchor: '', done: [] })
 
 const isClassId = (v: unknown): v is ClassId => typeof v === 'string' && CLASS_TABLE.some((c) => c.id === v)
 const isRace = (v: unknown): v is string => typeof v === 'string' && REINC_RACES.some((r) => r.race === v)
@@ -333,6 +341,12 @@ export function sanitizeReincCharacter(v: unknown): ReincCharacter {
       const x = (l ?? {}) as Record<string, unknown>
       if (isClassId(k) && typeof x.capped === 'boolean' && isTime(x.at) && (x.by === 'hand' || x.by === 'who')) levels[k] = { capped: x.capped, at: x.at, by: x.by }
     }
+  const races: ReincCharacter['races'] = {}
+  if (o.races && typeof o.races === 'object')
+    for (const [k, l] of Object.entries(o.races as Record<string, unknown>)) {
+      const x = (l ?? {}) as Record<string, unknown>
+      if (isRace(k) && typeof x.capped === 'boolean' && isTime(x.at)) races[k] = { capped: x.capped, at: x.at }
+    }
   const done = Array.isArray(o.done)
     ? o.done.flatMap((d): ReincDone[] => {
         const x = (d ?? {}) as Record<string, unknown>
@@ -340,7 +354,7 @@ export function sanitizeReincCharacter(v: unknown): ReincCharacter {
         return classes && isTime(x.at) && (x.race === '' || isRace(x.race)) ? [{ at: x.at, classes, race: x.race as string, by: 'hand' }] : []
       })
     : []
-  return { hand, priority: priority.slice(0, MAX_PRIORITY), levels, anchor: isClassId(o.anchor) ? o.anchor : '', done }
+  return { hand, priority: priority.slice(0, MAX_PRIORITY), levels, races, anchor: isClassId(o.anchor) ? o.anchor : '', done }
 }
 
 // ---- Ranks ----
@@ -436,12 +450,6 @@ export const XP_PENALTY_PER_RANK = 10
 /** The penalty is on levels up to the cap, not on AA experience. */
 export const XP_PENALTY_LEVELS = LEVEL_CAP
 
-/** The XP penalty, in percent, for playing these classes and race with these ranks. */
-export function xpPenalty(ranks: Partial<Record<ReincKey, { rank: number }>>, classes: readonly ClassId[], race: string): number {
-  const keys: ReincKey[] = [...classes.map(classKey), ...(race ? [raceKey(race)] : [])]
-  return XP_PENALTY_PER_RANK * Math.max(0, ...keys.map((k) => ranks[k]?.rank ?? 0))
-}
-
 // ---- Class levels ----
 
 /** A class at the level cap or not, and what says so; null when nothing has. */
@@ -462,29 +470,14 @@ export function classLevels(seen: ReincCharacter['levels'], reincs: readonly Pic
 }
 
 /**
- * The levels kept, after the classes played now (the character record, from /who); null when they
- * change nothing. `whoAt` is when that /who was: one from before a class's last reincarnation says
- * nothing of it now, nor does one older than what the player said. A record with no time (from before
- * /who times were kept) may be from before a reincarnation, so it is not taken to say such a class is
- * at the cap.
+ * Whether a race is at the level cap: what the player last said (Levelled on the plan), unless a
+ * reincarnation as it came after, which sets it to level 1. A race nothing says anything of is taken as
+ * at the cap, as the classes are.
  */
-export function levelsSeen(
-  kept: ReincCharacter['levels'],
-  reincs: readonly Pick<ReincDone, 'at' | 'classes'>[],
-  playing: readonly { id: ClassId; level: number }[],
-  whoAt: number | undefined,
-  now: number
-): ReincCharacter['levels'] | null {
-  const levels = classLevels(kept, reincs)
-  let next: ReincCharacter['levels'] | null = null
-  for (const c of playing) {
-    const capped = c.level >= LEVEL_CAP
-    if (levels[c.id].capped === capped) continue
-    const reincAt = Math.max(-1, ...reincs.filter((r) => r.classes.includes(c.id)).map((r) => r.at))
-    if (whoAt === undefined ? capped && levels[c.id].from === 'reincarnated' : whoAt < reincAt || whoAt < (kept[c.id]?.at ?? 0)) continue
-    next = { ...(next ?? kept), [c.id]: { capped, at: whoAt ?? now, by: 'who' } }
-  }
-  return next
+export function raceAtCap(race: string, said: ReincCharacter['races'], reincs: readonly Pick<ReincDone, 'at' | 'race'>[]): boolean {
+  const s = said[race]
+  const last = Math.max(-1, ...reincs.filter((r) => r.race === race).map((r) => r.at))
+  return s && s.at >= last ? s.capped : last < 0
 }
 
 // ---- The plan ----
@@ -751,12 +744,12 @@ export interface ReincState {
   priority: PriorityEntry[]
   /** Each class at the level cap or not, as far as anything says. */
   levels: Record<ClassId, ClassLevel>
+  /** The race being played (the last reincarnation's, else the record's) and whether it is at the cap. */
+  race: { name: string; capped: boolean }
   /** The class every levelling trio keeps; '' for none. */
   anchor: ClassId | ''
   /** Reincarnations made, newest first. */
   history: ReincDone[]
-  /** The character's race and classes as its record has them (from /who), with each class's level. */
-  loadout: { race: string; classes: { id: ClassId; level: number }[] }
   /** Tokens of Reincarnation in the inventory export; null without one. */
   tokens: { count: number; modified: number } | null
   /** The first line of the oldest log read. */

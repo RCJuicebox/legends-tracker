@@ -9,10 +9,10 @@ import type { CharacterSettings } from '../../src/shared/types'
 const rec = (classLevels: CharacterSettings['classLevels'], race = 'Iksar'): CharacterSettings => ({ level: 50, classLevels, race, focusSources: [] })
 
 /** What the engine passes on for a /who line. */
-function seen(line: string, at = 0): SelfWho {
-  const p = parseWho(line, at)
+function seen(line: string): SelfWho {
+  const p = parseWho(line, 0)
   if (!p) throw new Error(`not a /who line: ${line}`)
-  return { race: p.race, classes: p.classes, level: p.level, at: p.at }
+  return { race: p.race, classes: p.classes, level: p.level }
 }
 
 describe('Classes from your own /who', () => {
@@ -71,12 +71,6 @@ describe('The record after your own /who', () => {
     expect(recordFromWho(disguised, seen('[50 RNG/MNK/WIZ] Kelwyn (Gnome)'))?.race).toBe('Gnome')
     // With the illusion gone, the race /who shows is taken.
     expect(recordFromWho({ ...disguised, illusion: { race: '', at: 2 } }, seen('[50 RNG/MNK/WIZ] Kelwyn (Dark Elf)'))?.race).toBe('Dark Elf')
-  })
-
-  it('keeps the time of the latest /who, even when it changes nothing else', () => {
-    const r = rec({ Monk: 50, Bard: 42, Enchanter: 40 }, 'Wood Elf')
-    expect(recordFromWho(r, seen('[40 MNK/BRD/ENC] Kelwyn (Wood Elf)', 1000))).toEqual({ ...r, whoAt: 1000 })
-    expect(recordFromWho({ ...r, whoAt: 1000 }, seen('[40 MNK/BRD/ENC] Kelwyn (Wood Elf)', 1000))).toBeNull()
   })
 
   it('fills a new record from the first /who', () => {

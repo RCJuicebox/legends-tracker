@@ -51,21 +51,16 @@ const call = (channel: string, ...args: unknown[]) => Promise.resolve(h.handlers
 const C = 'Kelwyn_neriak'
 
 describe('the Reincarnation page', () => {
-  it('reads the ranks a reincarnation gave from the log, with the loadout', async () => {
+  it('reads the ranks a reincarnation gave from the log', async () => {
     const s = await call('reincarnation:state', C)
     expect(s.ranks['class:rog']).toEqual({ rank: 1, from: 'log', logged: 1 })
     expect(s.ranks['race:Dark Elf'].rank).toBe(1)
     expect(s.ranks['class:mnk']).toEqual({ rank: 0, from: 'none', logged: 0 })
     expect(s.completionist).toBe(0)
     expect(s.history).toEqual([{ at: expect.any(Number), classes: ['rog', 'shd', 'wiz'], race: 'Dark Elf', by: 'log' }])
-    expect(s.loadout).toEqual({
-      race: 'Dark Elf',
-      classes: expect.arrayContaining([
-        { id: 'rog', level: 1 },
-        { id: 'wiz', level: 1 }
-      ])
-    })
     expect(s.tokens).toBeNull()
+    // Reincarnated as a Dark Elf, and not said levelled since: the race is at level 1.
+    expect(s.race).toEqual({ name: 'Dark Elf', capped: false })
   })
 
   it('keeps the priority list, the anchor class and the classes said at the cap', async () => {
@@ -108,6 +103,20 @@ describe('the Reincarnation page', () => {
     expect(s.levels.mnk).toEqual({ capped: false, from: 'reincarnated' })
     await expect(call('reincarnation:done', C, ['mnk', 'mnk', 'nec'], '')).rejects.toThrow('three different classes')
     await expect(call('reincarnation:done', C, ['mnk', 'shm', 'nec'], 'Race 18')).rejects.toThrow('No such race')
+  })
+
+  it('puts a levelling trio said levelled, and its race, back at the cap', async () => {
+    let s = await call('reincarnation:state', C)
+    expect(s.race).toEqual({ name: 'Dwarf', capped: false })
+    s = await call('reincarnation:levelled', C, ['wiz', 'mnk', 'shm'], 'Dwarf')
+    expect([s.levels.wiz, s.levels.mnk, s.levels.shm]).toEqual(Array(3).fill({ capped: true, from: 'hand' }))
+    expect(s.levels.nec).toEqual({ capped: false, from: 'reincarnated' })
+    expect(s.race).toEqual({ name: 'Dwarf', capped: true })
+    // Two classes and an open place, the race at the cap already.
+    s = await call('reincarnation:levelled', C, ['wiz', 'nec'], '')
+    expect(s.levels.nec).toEqual({ capped: true, from: 'hand' })
+    await expect(call('reincarnation:levelled', C, ['wiz', 'wiz'], '')).rejects.toThrow('different classes')
+    await expect(call('reincarnation:levelled', C, ['wiz'], 'Race 18')).rejects.toThrow('No such race')
   })
 
   it('counts the tokens in the inventory export', async () => {
