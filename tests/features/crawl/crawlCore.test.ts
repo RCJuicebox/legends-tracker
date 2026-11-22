@@ -6,7 +6,9 @@ import {
   campLevels,
   campMarks,
   campSpots,
+  crawlCue,
   crawlView,
+  createdInstance,
   floorOf,
   isInstance,
   legFloors,
@@ -74,6 +76,11 @@ describe('a crawl route', () => {
     expect(isInstance('Kedge Keep 1 (Awakened)')).toBe(true)
     expect(isInstance("Nagafen's Lair - Solo 4 (Refined)")).toBe(true)
     expect(isInstance('Kedge Keep')).toBe(false)
+    // A base instance made from a Solo or Group entrance says so in its name; one made of the zone itself does not.
+    expect(isInstance("Nagafen's Lair - Solo")).toBe(true)
+    expect(isInstance('Kedge Keep - Group')).toBe(true)
+    expect(createdInstance('Player Kelwyn creating instance Kedge Keep 1360.')).toBe('Kedge Keep')
+    expect(createdInstance('Kelwyn has been removed from Kedge Keep.')).toBeNull()
   })
 
   it('puts a height on its floor, and cuts the way into pieces by floor', () => {
@@ -173,6 +180,28 @@ describe('a crawl run', () => {
     expect(view.next).toEqual({ n: 4, floor: 'Bottom', rares: [{ name: 'Cauldronboil' }], length: 80 })
     expect(view.ahead).toEqual([])
     expect(view.passed).toEqual([{ n: 2, floor: 'Middle', rares: [{ name: 'Coralyn Kelpmaiden' }], length: 250 }])
+  })
+
+  it('says where to go as a run moves on, and nothing when a line changes nothing of that', () => {
+    const start = newRun('Kedge Keep 1 (Awakened)', 500)
+    expect(crawlCue(route, null, start)).toBe('Move to fierce impaler.')
+    expect(crawlCue(route, start, start)).toBeNull()
+    const one = follow(start, 'You have slain a fierce impaler!')
+    expect(crawlCue(route, start, one)).toBe('Move to Coralyn Kelpmaiden.')
+    // A rare of two stops dying visits no stop: nowhere new to go.
+    expect(crawlCue(route, one, follow(one, 'Tainted seahorse has been slain by Jabartik!'))).toBeNull()
+    // A rare a /con saw up at the stop just visited keeps the player there until it dies.
+    const seen = follow(one, 'Tainted seahorse - a rare creature - scowls at you, ready to attack -- looks kind of dangerous. (Lvl: 51)')
+    const stay = follow(seen, 'You have slain Undertow!')
+    expect(crawlCue(route, seen, stay)).toBeNull()
+    const on = follow(stay, 'You have slain Tainted seahorse!')
+    expect(crawlCue(route, stay, on)).toBe('Move to Cauldronboil.')
+    const last = follow(on, 'You have slain Cauldronboil!')
+    expect(crawlCue(route, on, last)).toBe('Last stop done.')
+    // Completed: the game has said so itself.
+    expect(crawlCue(route, last, follow(last, 'You have completed the Dungeon Crawl and earned reward loot!'))).toBeNull()
+    // A run read back with every stop done has nothing to say.
+    expect(crawlCue(route, null, last)).toBeNull()
   })
 
   it('lists what is ahead, a rare a /con saw up, and one the route does not know', () => {

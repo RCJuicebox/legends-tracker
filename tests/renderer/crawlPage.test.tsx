@@ -35,7 +35,16 @@ const appState: AppState = {
 }
 
 const route = (ROUTES.zones as unknown as CrawlRoutes)['kedge']
-let answer: CrawlData = { zones: ['Kedge Keep'], route, lines: [0, 0, 300, 50, 0, 300, 0, 0, -80, 50, 40, -80], marked: false, campsMarked: false, run: null, here: false }
+let answer: CrawlData = {
+  zones: ['Kedge Keep'],
+  route,
+  lines: [0, 0, 300, 50, 0, 300, 0, 0, -80, 50, 40, -80],
+  marked: false,
+  campsMarked: false,
+  run: null,
+  here: false,
+  cues: true
+}
 
 const invoke = vi.fn((channel: string, ...args: unknown[]) => {
   switch (channel) {
@@ -45,6 +54,8 @@ const invoke = vi.fn((channel: string, ...args: unknown[]) => {
       return Promise.resolve(answer)
     case 'crawl:mark':
       return args[1] ? Promise.resolve({ folder: 'maps/LegendsTracker', lines: args[2] === 'camps' ? 60 : 150 }) : Promise.reject(new Error('locked'))
+    case 'crawl:cues':
+      return Promise.resolve(args[0])
     case 'game:location':
       return Promise.resolve({ zone: 'Kedge Keep 1 (Awakened)', y: -50, x: -100, z: -90, at: Date.now() })
     default:
@@ -121,6 +132,15 @@ it('draws the route on the game’s map, and says so when it cannot', async () =
   again.done()
 })
 
+it('switches the spoken stops of a run on and off from the page', async () => {
+  const { host, done } = await draw()
+  const sw = host.querySelector<HTMLButtonElement>('button[role="switch"][aria-label="Say the next stop"]')!
+  expect(sw.getAttribute('aria-checked')).toBe('true')
+  await act(async () => sw.click())
+  expect(invoke).toHaveBeenCalledWith('crawl:cues', false)
+  done()
+})
+
 it('shows the places to sit on a view of their own: those under the level wanted first, the one picked with what it sees', async () => {
   answer = { ...answer, marked: false }
   const { host, done } = await draw()
@@ -176,7 +196,7 @@ it('ticks the stops of a run in hand and marks the next', async () => {
 })
 
 it('says so when no zone has a route', async () => {
-  answer = { zones: [], route: null, lines: [], marked: false, campsMarked: false, run: null, here: false }
+  answer = { zones: [], route: null, lines: [], marked: false, campsMarked: false, run: null, here: false, cues: true }
   const { host, done } = await draw()
   expect(seen(host)).toContain('No zone has a crawl route yet.')
   done()

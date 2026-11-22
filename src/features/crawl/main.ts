@@ -1,6 +1,7 @@
 import { join } from 'node:path'
 import { readFile, rm, writeFile } from 'node:fs/promises'
 import { zoneEntered } from '../../core/logLine'
+import { zoneKey } from '../../core/zones'
 import { handle } from '../../main/ipc/handle'
 import { JsonFile, readJsonFile } from '../../main/storeCore'
 import { newerBuildWrote } from '../../main/schema'
@@ -9,7 +10,21 @@ import type { AppFeature, FeatureDeps, TrackContext } from '../../main/appFeatur
 import type { AchievementTrack } from '../../shared/tracking'
 import ROUTES from '../../shared/game/crawlRoutes.json'
 import { mapSet } from '../../main/mapSet'
-import { campMarks, crawlView, isInstance, newRun, parseMapLines, readRunLine, routeMarks, routeOf, type CrawlData, type CrawlRoutes, type CrawlRun } from './core'
+import {
+  campMarks,
+  crawlCue,
+  crawlView,
+  createdInstance,
+  isInstance,
+  newRun,
+  parseMapLines,
+  readRunLine,
+  routeMarks,
+  routeOf,
+  type CrawlData,
+  type CrawlRoutes,
+  type CrawlRun
+} from './core'
 
 // Motes › Crawl route's side of the app: the routes (crawlRoutes.json, as scripts/crawl-routes.mjs
 // wrote them), the game's own map of a route's zone with its heights kept, the route drawn on the game's
@@ -17,6 +32,8 @@ import { campMarks, crawlView, isInstance, newRun, parseMapLines, readRunLine, r
 // the rares the log has shown dying since the instance was entered, kept in crawl.json so a restart
 // mid-run loses nothing. The achievements overlay shows the next stops while the player is in the instance.
 // The zone's places to sit go on the game's map too, on a third layer, so neither crowds the other.
+// While a run goes on, the stop to go to next is said aloud ("Move to fierce impaler."), all of it on one
+// switch on the page, kept with the run in crawl.json.
 
 const routes = ROUTES.zones as unknown as CrawlRoutes
 
@@ -39,11 +56,20 @@ const readText = (path: string) => readFile(path, 'latin1').catch(() => null)
 
 export class CrawlGuide implements AppFeature {
   readonly id = 'crawl'
-  private readonly file: JsonFile<{ run: CrawlRun | null }>
+  private readonly file: JsonFile<{ run: CrawlRun | null; cues: boolean }>
+  private ctx: AppContext | null = null
   /** The next instance entered is a new one, whatever its name. */
   private fresh = false
   /** The zone the log last entered. */
   private zone = ''
+  /** The zone an instance was just made of, until it is entered: a base instance carries the zone's own name. */
+  private created = ''
+  /** What was last said of the run in hand. */
+  private lastCue = ''
+  /** The player is in the instance of the run in hand: its name alone does not say so when it is the zone's own. */
+  private inside = false
+  /** The zone the player was in as the app started has been taken from the engine (it knows it a moment after the features are built). */
+  private synced = false
   /** Told when the run has moved (LiveAchievements publishes the track again). */
   onChange: (() => void) | null = null
 
@@ -55,7 +81,9 @@ export class CrawlGuide implements AppFeature {
   constructor(dir: string) {
     const path = join(dir, 'crawl.json')
     const read = readJsonFile(path)
-    this.file = new JsonFile(path, { run: sanitizeRun(read.state === 'ok' ? (read.value as { run?: unknown } | null)?.run : null) }, { delayMs: 1000 })
+    const kept = read.state === 'ok' ? (read.value as { run?: unknown; cues?: unknown } | null) : null
+    // The cues are on until the player switches them off.
+    this.file = new JsonFile(path, { run: sanitizeRun(kept?.run), cues: kept?.cues !== false }, { delayMs: 1000 })
     if (read.state === 'unreadable') this.file.freeze('could not be read at start')
     if (newerBuildWrote(path)) this.file.freeze('written by a newer version')
   }
@@ -71,54 +99,104 @@ export class CrawlGuide implements AppFeature {
   }
 
   private setRun(run: CrawlRun | null): void {
-    this.file.set({ run })
+    this.file.set({ ...this.file.get(), run })
     this.onChange?.()
+  }
+
+  /** Says where a run goes next, as a trigger's speech would go (muting and the voice settings apply), while the cues are on. */
+  private say(cue: string | null): void {
+    // A rare seen and killed at a stop after its "Move to" was said sends the player to the same stop again: said once.
+    if (!cue || cue === this.lastCue) return
+    this.lastCue = cue
+    if (this.file.get().cues) this.ctx?.engine?.notify([{ kind: 'speak', text: cue, interrupt: false }])
+  }
+
+  /** A run that is neither completed nor long over: one a step outside and back goes on with. */
+  private going(run: CrawlRun | null, at: number): run is CrawlRun {
+    return !!run && !run.doneAt && at - run.startedAt <= RUN_STALE_MS
+  }
+
+  /**
+   * Once, as the app starts mid-game: the zone the engine found the player in, and whether that is the
+   * instance of the run in hand (a restart in the middle of a crawl goes on with it).
+   */
+  private sync(): void {
+    const zone = this.ctx?.engine?.status.zone
+    if (this.synced || !zone) return
+    this.synced = true
+    this.zone = zone
+    const run = this.file.get().run
+    this.inside = !!run && run.instance === zone && (isInstance(zone) || this.going(run, Date.now()))
   }
 
   /** Whether the line was one it reads: an instance of a route's zone entered, a rare of the run dying or called rare. */
   private line(text: string, at: number): boolean {
+    this.sync()
     if (NEW_INSTANCE.test(text)) {
       this.fresh = true
+      this.created = createdInstance(text) ?? ''
       return false
     }
     const entered = zoneEntered(text)
     if (entered) {
+      this.synced = true
       this.zone = entered
-      if (!isInstance(entered) || !routeOf(routes, entered)) return false
+      const of = routeOf(routes, entered)
       const run = this.file.get().run
+      // The zone's own name is an instance right after the line creating one of it, and again on stepping
+      // back into the run in hand while it goes on; without either it is the open zone.
+      const base = zoneKey(this.created) === zoneKey(entered) || (!this.fresh && run?.instance === entered && this.going(run, at))
+      this.created = ''
+      this.inside = !!of && (isInstance(entered) || base)
+      if (!of || !this.inside) return false
       // Stepping out and back into the same instance keeps the run; a new instance, or one long over, starts one.
-      if (this.fresh || !run || run.instance !== entered || run.doneAt || at - run.startedAt > RUN_STALE_MS) this.setRun(newRun(entered, at))
+      if (this.fresh || !run || run.instance !== entered || run.doneAt || at - run.startedAt > RUN_STALE_MS) {
+        const started = newRun(entered, at)
+        this.setRun(started)
+        this.lastCue = ''
+        this.say(crawlCue(of.route, null, started))
+      }
       this.fresh = false
       return false
     }
     const run = this.file.get().run
-    const found = run && run.instance === this.zone ? routeOf(routes, run.instance) : undefined
+    const found = run && this.inside && run.instance === this.zone ? routeOf(routes, run.instance) : undefined
     if (!run || !found) return false
     const next = readRunLine(found.route, run, text, at)
     if (next === run) return false
     this.setRun(next)
+    this.say(crawlCue(found.route, run, next))
     return true
   }
 
   /** Its part of the achievements overlay's track: how the run stands, while the player is in its instance. */
   track(at: TrackContext): Partial<Pick<AchievementTrack, 'crawl'>> {
+    this.sync()
     const run = this.file.get().run
-    const found = run && run.instance === at.zone ? routeOf(routes, at.zone) : undefined
+    const found = run && this.inside && run.instance === at.zone ? routeOf(routes, at.zone) : undefined
     return { crawl: run && found ? crawlView(found.route, run, at.zone) : null }
   }
 
   register(ctx: AppContext): void {
-    this.zone = ctx.engine?.status.zone ?? ''
+    this.ctx = ctx
+    this.sync()
     ctx.engine?.use({
       id: 'crawl',
       line: (line) => this.line(line.text, line.time),
       reset: () => {
         this.fresh = false
         this.zone = ''
+        this.created = ''
+        this.inside = false
         if (this.file.get().run) this.setRun(null)
       }
     })
     handle('crawl:route', async (zone) => this.data(ctx, typeof zone === 'string' ? zone : ''))
+    handle('crawl:cues', async (on) => {
+      if (typeof on !== 'boolean') throw new Error('On or off.')
+      this.file.set({ ...this.file.get(), cues: on })
+      return on
+    })
     handle('crawl:mark', async (zone, on, what) => {
       const found = typeof zone === 'string' ? routeOf(routes, zone) : undefined
       if (!found || typeof on !== 'boolean') throw new Error('No route for that zone.')
@@ -131,7 +209,8 @@ export class CrawlGuide implements AppFeature {
   private async data(ctx: AppContext, zone: string): Promise<CrawlData> {
     const zones = Object.values(routes).map((r) => r.name)
     const found = routeOf(routes, zone) ?? routeOf(routes, ctx.engine?.status.zone ?? '') ?? routeOf(routes, zones[0] ?? '')
-    if (!found) return { zones, route: null, lines: [], marked: false, campsMarked: false, run: null, here: false }
+    const cues = this.file.get().cues
+    if (!found) return { zones, route: null, lines: [], marked: false, campsMarked: false, run: null, here: false, cues }
     const dir = ctx.installDir()
     const maps = dir ? join(dir, 'maps') : ''
     const files = maps ? await Promise.all([`${found.short}.txt`, `${found.short}_1.txt`].map((f) => readText(join(maps, f)))) : []
@@ -144,7 +223,8 @@ export class CrawlGuide implements AppFeature {
       marked: await marked('route'),
       campsMarked: await marked('camps'),
       run,
-      here: !!run && run.instance === (ctx.engine?.status.zone ?? '')
+      here: !!run && this.inside && run.instance === (ctx.engine?.status.zone ?? ''),
+      cues
     }
   }
 }

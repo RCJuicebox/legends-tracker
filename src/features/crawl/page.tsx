@@ -587,6 +587,21 @@ export function CrawlRoutePage() {
           </span>
         )}
         <span className="spacer" />
+        {!sit && (
+          <label className="row tight small" title="During a crawl, says the stop to go to next as each one is done: “Move to fierce impaler.” It speaks as your triggers do.">
+            <Switch
+              on={data.cues}
+              label="Say the next stop"
+              onChange={(on) =>
+                void api
+                  .invoke('crawl:cues', on)
+                  .then(q.reload)
+                  .catch((e: unknown) => showToast(`Could not switch the spoken stops: ${e instanceof Error ? e.message : String(e)}`, { tone: 'bad' }))
+              }
+            />
+            Say the next stop
+          </label>
+        )}
         {!sit && achOverlay && (
           <label
             className="row tight small"

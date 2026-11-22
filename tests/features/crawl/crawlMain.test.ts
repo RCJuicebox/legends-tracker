@@ -28,7 +28,8 @@ writeFileSync(join(game, 'maps', 'kedge_1.txt'), "P -30, -128, 299, 150, 0, 200,
 
 const status = { zone: '' }
 let feature: EngineFeature | undefined
-const ctx = { installDir: () => game, engine: { status, use: (f: EngineFeature) => void (feature = f) } } as unknown as AppContext
+const spoken = vi.fn()
+const ctx = { installDir: () => game, engine: { status, use: (f: EngineFeature) => void (feature = f), notify: spoken } } as unknown as AppContext
 const guide = CrawlGuide.create({ dir: h.dir, logHistory: null as never })
 const changed = vi.fn()
 guide.onChange = changed
@@ -94,6 +95,84 @@ describe('a crawl run followed from the log', () => {
     expect(data).toMatchObject({ marked: false, campsMarked: false, here: true, run: { instance: 'Kedge Keep 4 (Refined)' } })
     // A zone with no route asked for: the one being played in.
     expect((await call<CrawlData>('crawl:route', 'Befallen')).route?.name).toBe('Kedge Keep')
+  })
+
+  it('says the stop to go to next aloud, until the cues are switched off', async () => {
+    const said = (text: string) => [{ kind: 'speak', text, interrupt: false }]
+    spoken.mockClear()
+    say('Player Kelwyn creating instance Kedge Keep 455.')
+    say('You have entered Kedge Keep 2 (Adaptive).')
+    expect(spoken).toHaveBeenLastCalledWith(said('Move to fierce impaler.'))
+    say('You have slain a fierce impaler!')
+    expect(spoken).toHaveBeenLastCalledWith(said('Move to golden haired mermaid.'))
+    expect(spoken).toHaveBeenCalledTimes(2)
+    // A common mob says nothing.
+    say('You have slain a lancer swordfish!')
+    expect(spoken).toHaveBeenCalledTimes(2)
+    expect((await call<CrawlData>('crawl:route')).cues).toBe(true)
+    expect(await call<boolean>('crawl:cues', false)).toBe(false)
+    expect((await call<CrawlData>('crawl:route')).cues).toBe(false)
+    say('You have slain a golden haired mermaid!')
+    expect(spoken).toHaveBeenCalledTimes(2)
+    await call('crawl:cues', true)
+    say('You have slain Cauldronbubble!')
+    expect(spoken).toHaveBeenLastCalledWith(said('Move to Coralyn Kelpmaiden.'))
+    // A rare seen up at a stop after its move was said, then killed: the same stop is not said twice.
+    say('You have slain Estrella of Gloomwater!')
+    expect(spoken).toHaveBeenLastCalledWith(said('Move to Priestess Auraia.'))
+    const times = spoken.mock.calls.length
+    say('Nyrein the Beguiled - a rare creature - glares at you threateningly -- looks like quite a gamble. (Lvl: 52)')
+    say('You have slain Nyrein the Beguiled!')
+    expect(spoken).toHaveBeenCalledTimes(times)
+    // The switch is kept with the run.
+    await guide.flush()
+    expect(JSON.parse(readFileSync(join(h.dir, 'crawl.json'), 'utf8')).cues).toBe(true)
+  })
+
+  it('follows a crawl in a base instance, which carries the zone’s own name', async () => {
+    const said = (text: string) => [{ kind: 'speak', text, interrupt: false }]
+    // The open zone: no run, and a rare dying there is nobody's.
+    say('Kelwyn has been removed from Kedge Keep.')
+    say('You have entered Kedge Keep.')
+    expect(track()).toBeNull()
+    expect(say('You have slain a fierce impaler!')).toBe(false)
+    // An instance made of it: the same name, now a run.
+    spoken.mockClear()
+    say('Player Kelwyn creating instance Kedge Keep 1360.')
+    say('Kedge Keep is now available to you.')
+    say('You have entered Kedge Keep.')
+    expect(track()).toMatchObject({ zone: 'Kedge Keep', route: 'Kedge Keep', visited: 0, next: { n: 1 } })
+    expect(spoken).toHaveBeenLastCalledWith(said('Move to fierce impaler.'))
+    expect(say('You have slain a fierce impaler!')).toBe(true)
+    expect(track()).toMatchObject({ visited: 1, next: { n: 2 } })
+    expect((await call<CrawlData>('crawl:route')).here).toBe(true)
+    // A step outside and back: the same run, while it goes on.
+    say("You have entered Dagnor's Cauldron.")
+    expect(track()).toBeNull()
+    say('You have entered Kedge Keep.')
+    expect(track()).toMatchObject({ visited: 1, next: { n: 2 } })
+    // Completed and removed from it: the zone of that name is the open one again.
+    say('You have completed the Dungeon Crawl and earned reward loot!')
+    expect(track()?.done).toBe(true)
+    say('Kelwyn has been removed from Kedge Keep.')
+    say('You have entered Kedge Keep.')
+    expect(track()).toBeNull()
+    expect(say('You have slain Undertow!')).toBe(false)
+    expect((await call<CrawlData>('crawl:route')).here).toBe(false)
+  })
+
+  it('goes on with a run when the app starts in the middle of it', async () => {
+    now = Date.now()
+    say('Player Kelwyn creating instance Kedge Keep 1361.')
+    say('You have entered Kedge Keep.')
+    say('You have slain a fierce impaler!')
+    await guide.flush()
+    // Another copy of the feature over the same file, as after a restart: the engine already knows the zone.
+    const again = CrawlGuide.create({ dir: h.dir, logHistory: null as never })
+    again.register(ctx)
+    expect(again.track({ character: 'Kelwyn_neriak', zone: status.zone, exported: null }).crawl).toMatchObject({ visited: 1, next: { n: 2 } })
+    // The tests after this one go on with the first copy.
+    guide.register(ctx)
   })
 })
 

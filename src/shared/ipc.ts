@@ -519,6 +519,8 @@ export interface Invokes {
   'crawl:route': (zone?: string) => CrawlData
   /** Draws a zone's route on the game's map (a layer of its own in the LegendsTracker map set), or its places to sit (another layer), or takes them off. */
   'crawl:mark': (zone: string, on: boolean, what?: 'route' | 'camps') => { folder: string; lines: number }
+  /** Switches a crawl run's spoken cues on or off ("Move to fierce impaler." as each stop is done); what it now is. */
+  'crawl:cues': (on: boolean) => boolean
   /** What Goals › Epics shows for a character: the epic pieces its logs and inventory export count, the steps ticked off and its corrections. */
   'epics:state': (character: string) => EpicState
   /** Ticks a step off by hand (by its tick key, "class|step"), or unticks it; the state after. */
@@ -792,6 +794,7 @@ const INVOKE_CHANNELS: Record<InvokeChannel, true> = {
   'sky:turnIns': true,
   'crawl:route': true,
   'crawl:mark': true,
+  'crawl:cues': true,
   'epics:state': true,
   'epics:tick': true,
   'epics:have': true,

@@ -114,9 +114,17 @@ export function routeOf(routes: CrawlRoutes, zone: string): { short: string; rou
   return short ? { short, route: routes[short] } : undefined
 }
 
-/** "Kedge Keep 1 (Awakened)", "Nagafen's Lair - Solo 4 (Refined)": an instance, where nothing respawns on a crawl. */
-const INSTANCE = /^.+? \d+ \(\w+\)$/
+/**
+ * "Kedge Keep 1 (Awakened)", "Nagafen's Lair - Solo 4 (Refined)", "Nagafen's Lair - Solo": an instance by
+ * its name alone. A base instance (no difficulty picked) made from the zone itself carries the zone's
+ * own name, "Kedge Keep": only the line creating it tells that one from the open zone (createdInstance).
+ */
+const INSTANCE = /^.+? (?:\d+ \(\w+\)|- (?:Solo|Group))$/
 export const isInstance = (zone: string) => INSTANCE.test(zone)
+
+/** "Player Juicebox creating instance Kedge Keep 1360.": the zone an instance was just made of. */
+const CREATED = /^Player .+ creating instance (.+) \d+\.$/
+export const createdInstance = (text: string): string | null => CREATED.exec(text)?.[1] ?? null
 
 /** The floor a height is on: its place in the route's floors, top first. */
 export function floorOf(route: Pick<CrawlRoute, 'floors'>, z: number): number {
@@ -362,6 +370,35 @@ export function stopStates(route: CrawlRoute, run: CrawlRun | null): { visitedAt
   return { visitedAt, last, next: visitedAt.findIndex((at, i) => i > last && !at) }
 }
 
+/** No stop to go to yet: a rare a /con saw up is still alive at the stop just visited. */
+const STAY = -2
+
+/**
+ * The stop a run is sent to: the next one (stopStates), -1 when none is left, and STAY while a rare of
+ * the stop just visited that a /con saw up is not dead yet (its other rares may not be up at all this
+ * run, so only one seen keeps the player there).
+ */
+function runTarget(route: CrawlRoute, run: CrawlRun): number {
+  const { last, next } = stopStates(route, run)
+  if (last >= 0 && route.stops[last].rares.some((r) => !r.far && run.up[rareKey(r.name)])) return STAY
+  return next
+}
+
+/**
+ * What is said aloud as a run moves on, or null when a line changed nothing of where to go: "Move to
+ * fierce impaler." as a run starts and each time the stop to go to changes (naming the first of its
+ * own rares not dead yet), "Last stop done." when none is left. Nothing once the crawl is completed.
+ */
+export function crawlCue(route: CrawlRoute, before: CrawlRun | null, after: CrawlRun): string | null {
+  if (after.doneAt) return null
+  const to = runTarget(route, after)
+  if (to === STAY || (before && runTarget(route, before) === to)) return null
+  if (to < 0) return before ? 'Last stop done.' : null
+  const rares = route.stops[to].rares
+  const rare = rares.find((r) => !r.far && !after.killed[rareKey(r.name)]) ?? rares[0]
+  return `Move to ${rare.name.replace(/^an? /i, '').replace(/`/g, '')}.`
+}
+
 /** Stops listed on the overlay after the next one. */
 const AHEAD = 3
 
@@ -434,4 +471,6 @@ export interface CrawlData {
   /** The run in hand in an instance of this zone, if any; `here` while the player is in it. */
   run: CrawlRun | null
   here: boolean
+  /** The next stop is said aloud as a run moves on (crawlCue). */
+  cues: boolean
 }
