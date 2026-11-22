@@ -46,8 +46,7 @@ const ZONES = {
       { name: 'Auraline', why: 'con' },
       { name: 'Cauldronbubble', why: 'con' },
       { name: 'Estrella of Gloomwater', why: 'guess' },
-      { name: 'tainted seahorse', why: 'guess' },
-      { name: 'corrupted seahorse', why: 'guess', with: 'tainted seahorse' },
+      // The tainted and the corrupted seahorse were guessed rares at first: a crawl does not ask for them (the player, 2026-11-20).
       { name: 'Nyrein the Beguiled', why: 'guess' },
       { name: 'Priestess Auraia', why: 'guess' }
     ]
@@ -588,8 +587,9 @@ for (const [short, conf] of Object.entries(ZONES)) {
     )
     const mobs = rolls.map(([i, c]) => {
       const [name, , lo, hi] = takp.npcs[i]
-      // A named: a rare of the zone, or what alone holds a spot on a long timer.
-      const named = rareKeys.has(key(name)) || (sec >= NAMED_SEC && rolls.length === 1)
+      // A named: a rare of the zone, what alone holds a spot on a long timer, or a name with no "a" or "an"
+      // before it (the tainted seahorse: no rare a crawl asks for, and still nothing a room's levels count).
+      const named = rareKeys.has(key(name)) || (sec >= NAMED_SEC && rolls.length === 1) || !/^an? /i.test(name)
       // How many of its levels are under the level wanted: all of a 35 to 37's, one in three of a 39 to 41's.
       const low = Math.max(0, Math.min(hi, under - 1) - lo + 1) / (hi - lo + 1)
       return { name, lo, hi, chance: (c * 100) / total, named, low }
