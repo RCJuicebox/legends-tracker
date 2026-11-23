@@ -12,7 +12,7 @@ import { CrawlGuide } from './crawl/main'
 // feature is a line in each, and its field on AppContext.
 
 /** Every feature module's log-history consumers, by name. */
-export const FEATURE_CONSUMERS = { ...Factions.consumers, ...SlayerPlanner.consumers, ...SkyTracker.consumers, ...EpicTracker.consumers }
+export const FEATURE_CONSUMERS = { ...Factions.consumers, ...SlayerPlanner.consumers, ...SkyTracker.consumers, ...EpicTracker.consumers, ...CrawlGuide.consumers }
 
 /** Every feature module, built. */
 export function createFeatures(d: FeatureDeps) {

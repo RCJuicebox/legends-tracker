@@ -38,6 +38,9 @@ export function signed(n: number, places = 1): string {
  */
 export const pct = (fraction: number, places = 0) => `${Number((fraction * 100).toFixed(places))}%`
 
+/** Percent of a level as the game's experience lines give it, to the thousandth: 0.553 → "0.553%". */
+export const levelPct = (percent: number) => `${percent.toFixed(3)}%`
+
 /**
  * Seconds as a timer shows them: "4:05", "1:02:09"; "∞" for no end. Rounded to the second first,
  * so 59.6 s is "1:00", never "0:60"; never below "0:00".

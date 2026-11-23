@@ -20,6 +20,7 @@ import type { HunterPlanData } from '../features/hunter/core'
 import type { SkyState } from '../features/sky/core'
 import type { EpicState } from '../features/epics/core'
 import type { CrawlData } from '../features/crawl/core'
+import type { CrawlXpData } from '../features/crawl/xp'
 import type { PriorityEntry, ReincState } from '../features/reincarnation/core'
 import type { AchievementTrack, PlayerLocation } from './tracking'
 import type { FocusReport } from '../core/itemFocus'
@@ -521,6 +522,8 @@ export interface Invokes {
   'crawl:mark': (zone: string, on: boolean, what?: 'route' | 'camps') => { folder: string; lines: number }
   /** Switches a crawl run's spoken cues on or off ("Move to fierce impaler." as each stop is done); what it now is. */
   'crawl:cues': (on: boolean) => boolean
+  /** Motes › Crawl XP: a character's runs in instances over all its logs, the experience each brought, and what a kill of each level is worth. */
+  'crawl:xp': (character: string) => CrawlXpData
   /** What Goals › Epics shows for a character: the epic pieces its logs and inventory export count, the steps ticked off and its corrections. */
   'epics:state': (character: string) => EpicState
   /** Ticks a step off by hand (by its tick key, "class|step"), or unticks it; the state after. */
@@ -795,6 +798,7 @@ const INVOKE_CHANNELS: Record<InvokeChannel, true> = {
   'crawl:route': true,
   'crawl:mark': true,
   'crawl:cues': true,
+  'crawl:xp': true,
   'epics:state': true,
   'epics:tick': true,
   'epics:have': true,

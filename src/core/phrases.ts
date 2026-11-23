@@ -17,6 +17,11 @@ export const DIED = /^(.+) died\.$/
 export const YOU_DIED = /^You died\.$/
 /** "You have been slain by a fetid fiend!": the killer. */
 export const YOU_WERE_SLAIN = /^You have been slain by (.+)!$/
+/** A /con's answer: "a soul tamer regards you indifferently -- what would you like your tombstone to say? (Lvl: 56)": mob, level. */
+export const CONSIDERED =
+  /^\*?(.+?)(?: - a rare creature -)? (?:regards you|looks upon you|kindly considers you|judges you|looks your way|glowers at you|glares at you|scowls at you)\b.* -- .*\(Lvl: (\d+)\)$/
+/** "You have gained a level! Welcome to level 49!": the new level. */
+export const LEVEL_GAINED = /^You have gained a level! Welcome to level (\d+)!$/
 
 /**
  * "Jobarab told you, 'Attacking a fetid fiend Master.'": the pet, and what it goes for. Only a pet of

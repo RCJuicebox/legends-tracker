@@ -355,3 +355,18 @@ Read 2026-10-12. TAKP's AllaClone (`zone.php?name=<zone>&mode=spawngroups`; its 
 - **A named's wait:** its timer over how often it is up (its chance, summed over its spots), at least a timer.
 
 Implemented in `src/features/slayer/spawns.ts` (`zoneTimings`, `mobSpawns`, `spotsOf`, the map files) and `scripts/takp-spawns.mjs` (the tables).
+
+## Experience per kill and the crawl reward
+
+Read 2026-11-23, live with the player over four Nagafen's Lair crawls (D0 at level 48, D0, D1 and D4 at 49; Paladin/Shaman/Wizard with a 30% reincarnation penalty), every mob /con'd just before its kill. The log's "You gain experience! (N%)" is the kill's share of a level.
+
+- **A mob's level alone sets what it gives**, at a given player level: rares, named and every kind of mob of one level give the same to the thousandth. A grey mob and an NPC's pet ("a lava beetle pet") give nothing.
+- **Blue and up:** percent = k × L² × (1 − gap/35), L the mob's level, gap the levels it is below the player (negative above). Every blue, even and yellow kill at 48 and 49 fits to the thousandth; k is 3.2248e-4 at 48 and 2.940e-4 at 49, so level 49 takes 1.097 times what 48 did. At 42 (2026-11-20, Kedge Keep) the rise above the player flattens about six levels up.
+- **Light blue and green** fall below that: a mob 6 levels down gave 0.518 of an even con's L² rate at 48, falling about 0.037 a level, and green (L33-35) gave the same at 48 and 49 once the level's cost is taken out. The light blue edge moves with the player (L43 was blue at 48, light blue at 49).
+- **Difficulty adds a tenth per step, not compounding:** every kill at D1 gave 1.10 times D0's, at D2 1.20 times (all 17 mob levels, 33 to 50), at D3 1.30 times, at D4 1.40 times (1.1⁴ would be 1.46: the blue kills rule it out). The log names the difficulty only in the zone line: "Nagafen's Lair 1 (Awakened)", "2 (Adaptive)", "3 (Fused)", "4 (Refined)"; D0 is the plain name.
+- **Level 50 takes about 1/1.2 of what level 49 did**: the same blue mobs gave 1.16 times as much of a level at 50 (1.199 once the step down the blue line is taken out).
+- **The crawl's completion pays a fifth of what the run's kills gave**, difficulty included: 3.052% on 15.243% (D0), 3.685% on 18.422% (D1), 3.725% on 18.638% (D2), 4.334% on 21.656% (D4, the bar 68.821% against 68.818% foretold). The log says only "You gained reward experience from the Dungeon Crawl!". Twice a run that gained a level came out short: the reward gaining 48 to 49 (2.43% into 49 against about 3.1% foretold), and a D3 run that reached 50 on a kill (17.599% against 18.163%). Whether a level gained loses some of what is over, or the reward shrinks, is not settled.
+
+- **Mobs' health by difficulty** (not used by the app): the damage each mob took until it died, less the heals it took, on kills whose last hit was under 8% of the total, the same mob kinds compared: D1 1.11 times D0's, D2 1.21, D3 about 1.6 (kinds from 1.30 to 1.76), D4 2.02 (eight or nine kinds each, D1, D2 and D4 mostly within 0.05). Experience per point of damage is so the same through D2 and 0.7 of D0's at D4.
+
+Implemented in `src/features/crawl/xp.ts` (`readXpLine`, `joinXp`, `CRAWL_REWARD_SHARE`, `TIER_STEP`), shown on Motes › Crawl XP.

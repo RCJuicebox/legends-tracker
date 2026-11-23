@@ -6,7 +6,7 @@ import { zoneEntered } from '../../core/logLine'
 import { achievementRaces, slayerLine, type SlayerCounter, type SlayerKills, type SlayerRaces } from '../../core/slayer'
 import type { RaceTable } from '../../core/raceNames'
 import { baseZone, isCity, zoneKey } from '../../core/zones'
-import { KILL_RUN_MS } from '../../core/phrases'
+import { CONSIDERED, KILL_RUN_MS } from '../../core/phrases'
 import { SLAYER_CAMPS, SLAYER_SPOTS, type SlayerCamp } from '../../shared/game/slayerCamps'
 import { SLAYER_GUIDE, SLAYER_GUIDE_SAID, SLAYER_GUIDE_SPOTS, type SlayerGuideTip } from '../../shared/game/slayerGuide'
 import { HUNT } from '../../shared/game/hunt'
@@ -67,13 +67,9 @@ export const emptyKillTallies = (): SlayerKillTallies => ({ zone: '', lastAt: 0,
 /** The zone an instance is of: "The Permafrost Caverns - Solo" and "Befallen 1 (Awakened)" are their zones' camps. */
 export const campZone = (zone: string) => baseZone(zone)
 
-/** A /con's answer: "a soul tamer regards you indifferently -- what would you like your tombstone to say? (Lvl: 56)". */
-const CON_LINE =
-  /^\*?(.+?)(?: - a rare creature -)? (?:regards you|looks upon you|kindly considers you|judges you|looks your way|glowers at you|glares at you|scowls at you)\b.* -- .*\(Lvl: (\d+)\)$/
-
 /** The mob a /con named and its level; null for any other line. */
 export function conLevel(text: string): { mob: string; level: number } | null {
-  const m = CON_LINE.exec(text)
+  const m = CONSIDERED.exec(text)
   return m ? { mob: m[1].toLowerCase(), level: Number(m[2]) } : null
 }
 

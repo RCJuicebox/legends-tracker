@@ -4,6 +4,8 @@ What changed in each version. The release workflow publishes a version's section
 
 ## Unreleased
 
+- **Motes › Crawl XP: the experience each crawl brought.** A new tab lists every run in an instance from your logs, archives and other PCs' logs included: the difficulty, your level, the time, the kills that gave experience and what they gave, the completion reward and the total per hour. The game never says what the reward is; read from the experience bar on three crawls, it is a fifth of what the run's kills gave, so it is worked out. Below it, what a kill of each mob level is worth at your level (at D0, D1 and D4), from the mobs you /con just before killing them.
+
 - **A /who under an illusion keeps your race.** /who prints the race of an illusion you wear, and the app took it as your own: an Illusion: Dark Elf made you a Dark Elf for the Factions cons and the Stats page. The app now notes an illusion landing on you (its cast, then "You feel different."), until it fades or you die, and keeps your race while /who shows the illusion's.
 
 - **Levelled, on the Reincarnation plan.** The next levelling trio in the plan has a Levelled button, as the next reincarnation has Reincarnated. Click it once the trio is at 50: its classes, and its race when that levelled too, are back at 50. A reincarnation sets its classes and race to level 1. The plan keeps levels from those two alone now, not from /who, which could not tell a 50 from before a reincarnation from one after it. Setup's class chips still put a class right by hand. The line above the plan now shows its next step too (the trio to level as, or the reincarnation it is ready for), not the last /who's loadout.

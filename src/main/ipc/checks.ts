@@ -174,6 +174,7 @@ export const CHECKS: { [K in InvokeChannel]: Check<Parameters<Invokes[K]>> } = {
   'crawl:route': args(opt(str)),
   'crawl:mark': args(str, bool, opt(oneOf('route', 'camps'))),
   'crawl:cues': args(bool),
+  'crawl:xp': args(str),
   'epics:state': args(str),
   'epics:tick': args(str, str, bool),
   'epics:have': args(str, str, num),

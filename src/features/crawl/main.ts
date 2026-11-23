@@ -10,6 +10,9 @@ import type { AppFeature, FeatureDeps, TrackContext } from '../../main/appFeatur
 import type { AchievementTrack } from '../../shared/tracking'
 import ROUTES from '../../shared/game/crawlRoutes.json'
 import { mapSet } from '../../main/mapSet'
+import { everyStretch, type HistoryConsumer, type LogHistory } from '../../main/sources/logHistory'
+import { isCharacterKey } from '../../core/validate'
+import { emptyXpTally, joinXp, readXpLine, type CrawlXpData, type XpTally } from './xp'
 import {
   campMarks,
   crawlCue,
@@ -54,8 +57,20 @@ const NEW_INSTANCE = /^(?:Player .+ creating instance .+ \d+\.|.+ has been (?:ad
 
 const readText = (path: string) => readFile(path, 'latin1').catch(() => null)
 
+/** Each stretch of log's runs in instances and the experience each brought (Motes › Crawl XP), as a LogHistory consumer. */
+const xpConsumer: HistoryConsumer<XpTally> = {
+  version: 1,
+  empty: emptyXpTally,
+  reader: () => readXpLine
+}
+
+const XP_KEY = 'crawlXp'
+/** Runs the page lists, newest first. */
+const XP_RUNS_SHOWN = 200
+
 export class CrawlGuide implements AppFeature {
   readonly id = 'crawl'
+  static readonly consumers: Readonly<Record<string, HistoryConsumer<unknown>>> = { [XP_KEY]: xpConsumer }
   private readonly file: JsonFile<{ run: CrawlRun | null; cues: boolean }>
   private ctx: AppContext | null = null
   /** The next instance entered is a new one, whatever its name. */
@@ -75,10 +90,13 @@ export class CrawlGuide implements AppFeature {
 
   /** Built as every feature module is (src/features/main.ts). */
   static create(d: FeatureDeps): CrawlGuide {
-    return new CrawlGuide(d.dir)
+    return new CrawlGuide(d.dir, d.logHistory)
   }
 
-  constructor(dir: string) {
+  constructor(
+    dir: string,
+    private readonly history: LogHistory | null = null
+  ) {
     const path = join(dir, 'crawl.json')
     const read = readJsonFile(path)
     const kept = read.state === 'ok' ? (read.value as { run?: unknown; cues?: unknown } | null) : null
@@ -192,6 +210,10 @@ export class CrawlGuide implements AppFeature {
       }
     })
     handle('crawl:route', async (zone) => this.data(ctx, typeof zone === 'string' ? zone : ''))
+    handle('crawl:xp', async (character) => {
+      if (!isCharacterKey(character)) throw new Error('No such character.')
+      return this.xp(ctx, character)
+    })
     handle('crawl:cues', async (on) => {
       if (typeof on !== 'boolean') throw new Error('On or off.')
       this.file.set({ ...this.file.get(), cues: on })
@@ -203,6 +225,16 @@ export class CrawlGuide implements AppFeature {
       const camps = what === 'camps'
       return markRoute(ctx.installDir(), found.short, !on ? [] : camps ? campMarks(found.route) : routeMarks(found.route), camps ? 'camps' : 'route')
     })
+  }
+
+  /** Motes › Crawl XP: every run in an instance over the character's logs, and what each level of mob is worth. */
+  private async xp(ctx: AppContext, character: string): Promise<CrawlXpData> {
+    if (!this.history) return { runs: [], current: null, level: null, values: {} }
+    const slice = await this.history.get<XpTally>(XP_KEY, ctx.historyOf(character))
+    const { runs, values, level } = joinXp(everyStretch(slice))
+    const live = slice.live
+    const current = live.inside && live.open ? (runs.find((r) => r.zone === live.open?.zone && r.startedAt === live.open.startedAt) ?? live.open) : null
+    return { runs: runs.slice(0, XP_RUNS_SHOWN), current, level, values }
   }
 
   /** What the page shows: the zone asked for (else the one being played in, else the first with a route), its route, its map and the run in hand. */

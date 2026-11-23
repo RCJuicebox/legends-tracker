@@ -160,6 +160,7 @@ describe('every page draws', () => {
     expect((await draw(pages.Motes)).tabs).toEqual([
       'Motes view/Runs',
       'Motes view/Crawl route',
+      'Motes view/Crawl XP',
       'Motes view/Best merge',
       'Motes view/Merge planner',
       'Motes view/Spell upgrades',
