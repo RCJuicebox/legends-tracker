@@ -2,7 +2,9 @@
 
 What changed in each version. The release workflow publishes a version's section as its release notes, and installed copies show them when an update arrives.
 
-## Unreleased
+## 2.28.0 (2026-11-23)
+
+- **Motes › Crawl route: the shortest way past a zone's rares, Kedge Keep first.** A crawl ends when every rare is dead, and in Kedge Keep the hard part is the way between them. The new tab shows the zone's map a floor at a time (or every floor, or from the side) with the rares as numbered stops in the order that makes the shortest swim from the zone-in, along real paths read from the zone's own geometry, so no leg crosses a wall. The route can go on the game's map (layer 2, with "up" and "down" where the way climbs or drops), the achievements overlay shows the next stop during a crawl, and the app says it aloud ("Move to fierce impaler."; one switch, "Say the next stop"). A crawl in a base instance is followed too. A second view, **Places to sit**, lists rooms where four or more spawn spots are in sight, lettered on the map and on the game's map (layer 3), rooms of mobs under level 50 first.
 
 - **Motes › Crawl XP: the experience each crawl brought.** A new tab lists every run in an instance from your logs, archives and other PCs' logs included: the difficulty, your level, the time, the kills that gave experience and what they gave, the completion reward and the total per hour. The game never says what the reward is; read from the experience bar on three crawls, it is a fifth of what the run's kills gave, so it is worked out. Below it, what a kill of each mob level is worth at your level (at D0, D1 and D4), from the mobs you /con just before killing them.
 
